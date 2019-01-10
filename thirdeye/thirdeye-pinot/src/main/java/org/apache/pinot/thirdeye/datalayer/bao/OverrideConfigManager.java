@@ -17,9 +17,9 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datalayer.bao;
+package org.apache.pinot.thirdeye.datalayer.bao;
 
-import com.linkedin.thirdeye.datalayer.dto.OverrideConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.OverrideConfigDTO;
 import java.util.List;
 
 public interface OverrideConfigManager extends AbstractManager<OverrideConfigDTO> {

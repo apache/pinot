@@ -17,12 +17,12 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datalayer.bao.jdbc;
+package org.apache.pinot.thirdeye.datalayer.bao.jdbc;
 
 import com.google.inject.Singleton;
-import com.linkedin.thirdeye.datalayer.bao.DetectionAlertConfigManager;
-import com.linkedin.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
-import com.linkedin.thirdeye.datalayer.pojo.DetectionAlertConfigBean;
+import org.apache.pinot.thirdeye.datalayer.bao.DetectionAlertConfigManager;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.pojo.DetectionAlertConfigBean;
 
 
 @Singleton

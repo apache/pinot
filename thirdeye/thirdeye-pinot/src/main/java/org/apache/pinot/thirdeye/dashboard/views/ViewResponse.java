@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.dashboard.views;
+package org.apache.pinot.thirdeye.dashboard.views;
 
 public interface ViewResponse {
 

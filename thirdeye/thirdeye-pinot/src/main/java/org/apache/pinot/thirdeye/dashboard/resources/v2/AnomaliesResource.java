@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.dashboard.resources.v2;
+package org.apache.pinot.thirdeye.dashboard.resources.v2;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -25,61 +25,61 @@ import com.google.common.cache.LoadingCache;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
 import com.linkedin.pinot.pql.parsers.utils.Pair;
-import com.linkedin.thirdeye.anomaly.alert.util.AlertFilterHelper;
-import com.linkedin.thirdeye.anomaly.classification.ClassificationTaskRunner;
-import com.linkedin.thirdeye.anomaly.detection.AnomalyDetectionInputContext;
-import com.linkedin.thirdeye.anomaly.detection.AnomalyDetectionInputContextBuilder;
-import com.linkedin.thirdeye.anomaly.views.AnomalyTimelinesView;
-import com.linkedin.thirdeye.anomalydetection.context.AnomalyFeedback;
-import com.linkedin.thirdeye.api.DimensionMap;
-import com.linkedin.thirdeye.api.MetricTimeSeries;
-import com.linkedin.thirdeye.api.TimeGranularity;
-import com.linkedin.thirdeye.api.TimeRange;
-import com.linkedin.thirdeye.api.TimeSpec;
-import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
-import com.linkedin.thirdeye.constant.AnomalyResultSource;
-import com.linkedin.thirdeye.dashboard.Utils;
-import com.linkedin.thirdeye.datasource.loader.AggregationLoader;
-import com.linkedin.thirdeye.datasource.loader.DefaultAggregationLoader;
-import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomaliesWrapper;
-import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomalyDataCompare;
-import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomalyDetails;
-import com.linkedin.thirdeye.dashboard.resources.v2.pojo.SearchFilters;
-import com.linkedin.thirdeye.dashboard.views.TimeBucket;
-import com.linkedin.thirdeye.dataframe.BooleanSeries;
-import com.linkedin.thirdeye.dataframe.DataFrame;
-import com.linkedin.thirdeye.dataframe.DoubleSeries;
-import com.linkedin.thirdeye.dataframe.LongSeries;
-import com.linkedin.thirdeye.dataframe.util.MetricSlice;
-import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
-import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.DetectionConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.GroupedAnomalyResultsManager;
-import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
-import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
-import com.linkedin.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
-import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
-import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.GroupedAnomalyResultsDTO;
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
-import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean;
-import com.linkedin.thirdeye.datasource.DAORegistry;
-import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
-import com.linkedin.thirdeye.datasource.cache.QueryCache;
-import com.linkedin.thirdeye.datasource.loader.DefaultTimeSeriesLoader;
-import com.linkedin.thirdeye.datasource.loader.TimeSeriesLoader;
-import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
-import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
-import com.linkedin.thirdeye.detector.function.BaseAnomalyFunction;
-import com.linkedin.thirdeye.detector.metric.transfer.MetricTransfer;
-import com.linkedin.thirdeye.detector.metric.transfer.ScalingFactor;
-import com.linkedin.thirdeye.rootcause.timeseries.Baseline;
-import com.linkedin.thirdeye.rootcause.timeseries.BaselineAggregate;
-import com.linkedin.thirdeye.rootcause.timeseries.BaselineAggregateType;
-import com.linkedin.thirdeye.util.AnomalyOffset;
-import com.linkedin.thirdeye.util.ThirdEyeUtils;
+import org.apache.pinot.thirdeye.anomaly.alert.util.AlertFilterHelper;
+import org.apache.pinot.thirdeye.anomaly.classification.ClassificationTaskRunner;
+import org.apache.pinot.thirdeye.anomaly.detection.AnomalyDetectionInputContext;
+import org.apache.pinot.thirdeye.anomaly.detection.AnomalyDetectionInputContextBuilder;
+import org.apache.pinot.thirdeye.anomaly.views.AnomalyTimelinesView;
+import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyFeedback;
+import org.apache.pinot.thirdeye.api.DimensionMap;
+import org.apache.pinot.thirdeye.api.MetricTimeSeries;
+import org.apache.pinot.thirdeye.api.TimeGranularity;
+import org.apache.pinot.thirdeye.api.TimeRange;
+import org.apache.pinot.thirdeye.api.TimeSpec;
+import org.apache.pinot.thirdeye.constant.AnomalyFeedbackType;
+import org.apache.pinot.thirdeye.constant.AnomalyResultSource;
+import org.apache.pinot.thirdeye.dashboard.Utils;
+import org.apache.pinot.thirdeye.datasource.loader.AggregationLoader;
+import org.apache.pinot.thirdeye.datasource.loader.DefaultAggregationLoader;
+import org.apache.pinot.thirdeye.dashboard.resources.v2.pojo.AnomaliesWrapper;
+import org.apache.pinot.thirdeye.dashboard.resources.v2.pojo.AnomalyDataCompare;
+import org.apache.pinot.thirdeye.dashboard.resources.v2.pojo.AnomalyDetails;
+import org.apache.pinot.thirdeye.dashboard.resources.v2.pojo.SearchFilters;
+import org.apache.pinot.thirdeye.dashboard.views.TimeBucket;
+import org.apache.pinot.thirdeye.dataframe.BooleanSeries;
+import org.apache.pinot.thirdeye.dataframe.DataFrame;
+import org.apache.pinot.thirdeye.dataframe.DoubleSeries;
+import org.apache.pinot.thirdeye.dataframe.LongSeries;
+import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
+import org.apache.pinot.thirdeye.datalayer.bao.AnomalyFunctionManager;
+import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
+import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
+import org.apache.pinot.thirdeye.datalayer.bao.GroupedAnomalyResultsManager;
+import org.apache.pinot.thirdeye.datalayer.bao.MergedAnomalyResultManager;
+import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
+import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.GroupedAnomalyResultsDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.pojo.AlertConfigBean;
+import org.apache.pinot.thirdeye.datasource.DAORegistry;
+import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
+import org.apache.pinot.thirdeye.datasource.cache.QueryCache;
+import org.apache.pinot.thirdeye.datasource.loader.DefaultTimeSeriesLoader;
+import org.apache.pinot.thirdeye.datasource.loader.TimeSeriesLoader;
+import org.apache.pinot.thirdeye.detector.email.filter.AlertFilterFactory;
+import org.apache.pinot.thirdeye.detector.function.AnomalyFunctionFactory;
+import org.apache.pinot.thirdeye.detector.function.BaseAnomalyFunction;
+import org.apache.pinot.thirdeye.detector.metric.transfer.MetricTransfer;
+import org.apache.pinot.thirdeye.detector.metric.transfer.ScalingFactor;
+import org.apache.pinot.thirdeye.rootcause.timeseries.Baseline;
+import org.apache.pinot.thirdeye.rootcause.timeseries.BaselineAggregate;
+import org.apache.pinot.thirdeye.rootcause.timeseries.BaselineAggregateType;
+import org.apache.pinot.thirdeye.util.AnomalyOffset;
+import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -122,7 +122,7 @@ import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
+import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
 
 
 @Path(value = "/anomalies")
@@ -412,7 +412,7 @@ public class AnomaliesResource {
   /**
    * Update anomaly feedback
    * @param mergedAnomalyId : mergedAnomalyId
-   * @param payload         : Json payload containing feedback @see com.linkedin.thirdeye.constant.AnomalyFeedbackType
+   * @param payload         : Json payload containing feedback @see org.apache.pinot.thirdeye.constant.AnomalyFeedbackType
    *                        eg. payload
    *                        <p/>
    *                        { "feedbackType": "NOT_ANOMALY", "comment": "this is not an anomaly" }

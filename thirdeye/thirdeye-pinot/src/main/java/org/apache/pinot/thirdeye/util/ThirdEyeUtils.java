@@ -19,14 +19,14 @@
 
 
 
-package com.linkedin.thirdeye.util;
+package org.apache.pinot.thirdeye.util;
 
 import com.google.common.collect.HashMultimap;
 import com.linkedin.pinot.common.data.TimeGranularitySpec.TimeFormat;
-import com.linkedin.thirdeye.api.DimensionMap;
+import org.apache.pinot.thirdeye.api.DimensionMap;
 
-import com.linkedin.thirdeye.dashboard.ThirdEyeDashboardConfiguration;
-import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
+import org.apache.pinot.thirdeye.dashboard.ThirdEyeDashboardConfiguration;
+import org.apache.pinot.thirdeye.datalayer.util.DaoProviderUtil;
 import io.dropwizard.configuration.ConfigurationFactory;
 import io.dropwizard.jackson.Jackson;
 import java.io.File;
@@ -56,19 +56,19 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
-import com.linkedin.thirdeye.api.TimeGranularity;
-import com.linkedin.thirdeye.api.TimeSpec;
-import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
-import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
-import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean.COMPARE_MODE;
-import com.linkedin.thirdeye.datalayer.pojo.DatasetConfigBean;
-import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean;
-import com.linkedin.thirdeye.datasource.DAORegistry;
-import com.linkedin.thirdeye.datasource.MetricExpression;
-import com.linkedin.thirdeye.datasource.MetricFunction;
-import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
-import com.linkedin.thirdeye.datasource.cache.MetricDataset;
+import org.apache.pinot.thirdeye.api.TimeGranularity;
+import org.apache.pinot.thirdeye.api.TimeSpec;
+import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
+import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.pojo.AlertConfigBean.COMPARE_MODE;
+import org.apache.pinot.thirdeye.datalayer.pojo.DatasetConfigBean;
+import org.apache.pinot.thirdeye.datalayer.pojo.MetricConfigBean;
+import org.apache.pinot.thirdeye.datasource.DAORegistry;
+import org.apache.pinot.thirdeye.datasource.MetricExpression;
+import org.apache.pinot.thirdeye.datasource.MetricFunction;
+import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
+import org.apache.pinot.thirdeye.datasource.cache.MetricDataset;
 
 
 public abstract class ThirdEyeUtils {

@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.alert.commons;
+package org.apache.pinot.thirdeye.alert.commons;
 
 public class AnomalyFetcherConfig {
   private String type;

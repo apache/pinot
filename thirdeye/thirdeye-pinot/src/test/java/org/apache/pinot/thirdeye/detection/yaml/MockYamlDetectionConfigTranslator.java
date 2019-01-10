@@ -1,6 +1,6 @@
-package com.linkedin.thirdeye.detection.yaml;
+package org.apache.pinot.thirdeye.detection.yaml;
 
-import com.linkedin.thirdeye.detection.DataProvider;
+import org.apache.pinot.thirdeye.detection.DataProvider;
 import java.util.HashMap;
 import java.util.Map;
 

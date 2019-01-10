@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datalayer.util;
+package org.apache.pinot.thirdeye.datalayer.util;
 
 import java.lang.reflect.Field;
 import java.sql.Connection;
@@ -32,7 +32,7 @@ import java.util.Map;
 
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
-import com.linkedin.thirdeye.datalayer.entity.AbstractEntity;
+import org.apache.pinot.thirdeye.datalayer.entity.AbstractEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

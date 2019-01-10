@@ -17,11 +17,11 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.detection.finetune;
+package org.apache.pinot.thirdeye.detection.finetune;
 
-import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.detection.DetectionPipelineResult;
+import org.apache.pinot.thirdeye.constant.AnomalyFeedbackType;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.detection.DetectionPipelineResult;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;

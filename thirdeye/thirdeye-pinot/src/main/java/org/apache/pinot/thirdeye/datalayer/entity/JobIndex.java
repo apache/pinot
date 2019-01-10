@@ -17,9 +17,9 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datalayer.entity;
+package org.apache.pinot.thirdeye.datalayer.entity;
 
-import com.linkedin.thirdeye.anomaly.task.TaskConstants;
+import org.apache.pinot.thirdeye.anomaly.task.TaskConstants;
 
 public class JobIndex extends AbstractIndexEntity {
   String name;

@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.api;
+package org.apache.pinot.thirdeye.api;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -159,14 +159,14 @@ public class DimensionMap implements SortedMap<String, String>, Comparable<Dimen
   }
 
   /**
-   * Returns a JSON string representation of this dimension map for {@link com.linkedin.thirdeye.datalayer.dao.GenericPojoDao}
+   * Returns a JSON string representation of this dimension map for {@link org.apache.pinot.thirdeye.datalayer.dao.GenericPojoDao}
    * to persistent the map to backend database.
    *
    * It returns the generic string representation of this dimension map if any exception occurs when generating the JSON
    * string. In that case, the constructor {@link DimensionMap(String)} will be invoked during the construction of that
    * dimension map.
    *
-   * @return a JSON string representation of this dimension map for {@link com.linkedin.thirdeye.datalayer.dao.GenericPojoDao}
+   * @return a JSON string representation of this dimension map for {@link org.apache.pinot.thirdeye.datalayer.dao.GenericPojoDao}
    * to persistent the map to backend database.
    */
   @Override

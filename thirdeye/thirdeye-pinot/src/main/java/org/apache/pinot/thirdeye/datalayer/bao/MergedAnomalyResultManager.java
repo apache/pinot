@@ -17,12 +17,12 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datalayer.bao;
+package org.apache.pinot.thirdeye.datalayer.bao;
 
-import com.linkedin.thirdeye.datalayer.pojo.MergedAnomalyResultBean;
+import org.apache.pinot.thirdeye.datalayer.pojo.MergedAnomalyResultBean;
 import java.util.List;
 
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import java.util.Map;
 
 

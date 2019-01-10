@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.dashboard.views.heatmap;
+package org.apache.pinot.thirdeye.dashboard.views.heatmap;
 
 import java.util.ArrayList;
 import java.util.List;

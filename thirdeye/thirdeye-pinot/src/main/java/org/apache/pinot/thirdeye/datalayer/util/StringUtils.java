@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datalayer.util;
+package org.apache.pinot.thirdeye.datalayer.util;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Splitter;

@@ -17,15 +17,15 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomaly.onboard.tasks;
+package org.apache.pinot.thirdeye.anomaly.onboard.tasks;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.thirdeye.anomaly.onboard.framework.BaseDetectionOnboardTask;
-import com.linkedin.thirdeye.anomaly.onboard.framework.DetectionOnboardExecutionContext;
-import com.linkedin.thirdeye.anomaly.onboard.framework.DetectionOnboardTaskContext;
-import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutotuneFactory;
-import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
-import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
+import org.apache.pinot.thirdeye.anomaly.onboard.framework.BaseDetectionOnboardTask;
+import org.apache.pinot.thirdeye.anomaly.onboard.framework.DetectionOnboardExecutionContext;
+import org.apache.pinot.thirdeye.anomaly.onboard.framework.DetectionOnboardTaskContext;
+import org.apache.pinot.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutotuneFactory;
+import org.apache.pinot.thirdeye.detector.email.filter.AlertFilterFactory;
+import org.apache.pinot.thirdeye.detector.function.AnomalyFunctionFactory;
 import org.apache.commons.configuration.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

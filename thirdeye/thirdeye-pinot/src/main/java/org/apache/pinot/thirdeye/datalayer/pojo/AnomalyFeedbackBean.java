@@ -17,9 +17,9 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datalayer.pojo;
+package org.apache.pinot.thirdeye.datalayer.pojo;
 
-import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
+import org.apache.pinot.thirdeye.constant.AnomalyFeedbackType;
 import java.io.Serializable;
 import java.util.Objects;
 

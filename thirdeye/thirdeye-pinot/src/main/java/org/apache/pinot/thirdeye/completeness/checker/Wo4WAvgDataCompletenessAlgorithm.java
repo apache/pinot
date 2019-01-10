@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.completeness.checker;
+package org.apache.pinot.thirdeye.completeness.checker;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -33,10 +33,10 @@ import org.joda.time.format.DateTimeFormatter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.thirdeye.api.TimeSpec;
-import com.linkedin.thirdeye.datalayer.bao.DataCompletenessConfigManager;
-import com.linkedin.thirdeye.datalayer.dto.DataCompletenessConfigDTO;
-import com.linkedin.thirdeye.datasource.DAORegistry;
+import org.apache.pinot.thirdeye.api.TimeSpec;
+import org.apache.pinot.thirdeye.datalayer.bao.DataCompletenessConfigManager;
+import org.apache.pinot.thirdeye.datalayer.dto.DataCompletenessConfigDTO;
+import org.apache.pinot.thirdeye.datasource.DAORegistry;
 
 /**
  * This is the implementation of the WO4W Average function or checking data completeness of datasets

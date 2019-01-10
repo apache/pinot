@@ -17,11 +17,11 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomaly.onboard.framework;
+package org.apache.pinot.thirdeye.anomaly.onboard.framework;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
-import com.linkedin.thirdeye.anomaly.task.TaskConstants;
+import org.apache.pinot.thirdeye.anomaly.task.TaskConstants;
 
 public class DetectionOnboardTaskStatus {
   private String taskName = "Unknown Task Name";

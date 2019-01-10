@@ -17,12 +17,12 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomaly.override;
+package org.apache.pinot.thirdeye.anomaly.override;
 
 import com.linkedin.pinot.pql.parsers.utils.Pair;
-import com.linkedin.thirdeye.datalayer.bao.OverrideConfigManager;
-import com.linkedin.thirdeye.datalayer.dto.OverrideConfigDTO;
-import com.linkedin.thirdeye.detector.metric.transfer.ScalingFactor;
+import org.apache.pinot.thirdeye.datalayer.bao.OverrideConfigManager;
+import org.apache.pinot.thirdeye.datalayer.dto.OverrideConfigDTO;
+import org.apache.pinot.thirdeye.detector.metric.transfer.ScalingFactor;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;

@@ -17,13 +17,13 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomalydetection.function;
+package org.apache.pinot.thirdeye.anomalydetection.function;
 
-import com.linkedin.thirdeye.anomalydetection.model.data.DataModel;
-import com.linkedin.thirdeye.anomalydetection.model.detection.DetectionModel;
-import com.linkedin.thirdeye.anomalydetection.model.merge.MergeModel;
-import com.linkedin.thirdeye.anomalydetection.model.prediction.PredictionModel;
-import com.linkedin.thirdeye.anomalydetection.model.transform.TransformationFunction;
+import org.apache.pinot.thirdeye.anomalydetection.model.data.DataModel;
+import org.apache.pinot.thirdeye.anomalydetection.model.detection.DetectionModel;
+import org.apache.pinot.thirdeye.anomalydetection.model.merge.MergeModel;
+import org.apache.pinot.thirdeye.anomalydetection.model.prediction.PredictionModel;
+import org.apache.pinot.thirdeye.anomalydetection.model.transform.TransformationFunction;
 import java.util.List;
 
 public interface ModularizedAnomalyFunctionModelProvider {

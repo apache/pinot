@@ -17,9 +17,9 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.rootcause;
+package org.apache.pinot.thirdeye.rootcause;
 
-import com.linkedin.thirdeye.rootcause.util.EntityUtils;
+import org.apache.pinot.thirdeye.rootcause.util.EntityUtils;
 import java.util.Map;
 import java.util.Set;
 

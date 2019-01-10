@@ -14,19 +14,19 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.detection.components;
+package org.apache.pinot.thirdeye.detection.components;
 
-import com.linkedin.thirdeye.dataframe.DataFrame;
-import com.linkedin.thirdeye.dataframe.util.MetricSlice;
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.detection.DataProvider;
-import com.linkedin.thirdeye.detection.DefaultInputDataFetcher;
-import com.linkedin.thirdeye.detection.DetectionTestUtils;
-import com.linkedin.thirdeye.detection.MockDataProvider;
-import com.linkedin.thirdeye.detection.spec.SitewideImpactRuleAnomalyFilterSpec;
-import com.linkedin.thirdeye.rootcause.timeseries.Baseline;
-import com.linkedin.thirdeye.rootcause.timeseries.BaselineAggregate;
-import com.linkedin.thirdeye.rootcause.timeseries.BaselineAggregateType;
+import org.apache.pinot.thirdeye.dataframe.DataFrame;
+import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.detection.DataProvider;
+import org.apache.pinot.thirdeye.detection.DefaultInputDataFetcher;
+import org.apache.pinot.thirdeye.detection.DetectionTestUtils;
+import org.apache.pinot.thirdeye.detection.MockDataProvider;
+import org.apache.pinot.thirdeye.detection.spec.SitewideImpactRuleAnomalyFilterSpec;
+import org.apache.pinot.thirdeye.rootcause.timeseries.Baseline;
+import org.apache.pinot.thirdeye.rootcause.timeseries.BaselineAggregate;
+import org.apache.pinot.thirdeye.rootcause.timeseries.BaselineAggregateType;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -37,7 +37,7 @@ import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
+import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
 
 
 public class SitewideImpactRuleAnomalyFilterTest {

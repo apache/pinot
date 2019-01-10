@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomalydetection.model.data;
+package org.apache.pinot.thirdeye.anomalydetection.model.data;
 
 import java.util.ArrayList;
 import java.util.Collections;

@@ -17,26 +17,26 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomaly.onboard.tasks;
+package org.apache.pinot.thirdeye.anomaly.onboard.tasks;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.thirdeye.alert.commons.EmailEntity;
-import com.linkedin.thirdeye.alert.content.EmailContentFormatter;
-import com.linkedin.thirdeye.alert.content.EmailContentFormatterConfiguration;
-import com.linkedin.thirdeye.alert.content.EmailContentFormatterContext;
-import com.linkedin.thirdeye.alert.content.OnboardingNotificationEmailContentFormatter;
-import com.linkedin.thirdeye.anomaly.SmtpConfiguration;
-import com.linkedin.thirdeye.anomaly.alert.util.AlertFilterHelper;
-import com.linkedin.thirdeye.anomaly.alert.util.EmailHelper;
-import com.linkedin.thirdeye.anomaly.onboard.framework.BaseDetectionOnboardTask;
-import com.linkedin.thirdeye.anomaly.onboard.framework.DetectionOnboardExecutionContext;
-import com.linkedin.thirdeye.anomalydetection.context.AnomalyResult;
-import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
-import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.datasource.DAORegistry;
-import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
+import org.apache.pinot.thirdeye.alert.commons.EmailEntity;
+import org.apache.pinot.thirdeye.alert.content.EmailContentFormatter;
+import org.apache.pinot.thirdeye.alert.content.EmailContentFormatterConfiguration;
+import org.apache.pinot.thirdeye.alert.content.EmailContentFormatterContext;
+import org.apache.pinot.thirdeye.alert.content.OnboardingNotificationEmailContentFormatter;
+import org.apache.pinot.thirdeye.anomaly.SmtpConfiguration;
+import org.apache.pinot.thirdeye.anomaly.alert.util.AlertFilterHelper;
+import org.apache.pinot.thirdeye.anomaly.alert.util.EmailHelper;
+import org.apache.pinot.thirdeye.anomaly.onboard.framework.BaseDetectionOnboardTask;
+import org.apache.pinot.thirdeye.anomaly.onboard.framework.DetectionOnboardExecutionContext;
+import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyResult;
+import org.apache.pinot.thirdeye.datalayer.bao.MergedAnomalyResultManager;
+import org.apache.pinot.thirdeye.datalayer.dto.AlertConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.datasource.DAORegistry;
+import org.apache.pinot.thirdeye.detector.email.filter.AlertFilterFactory;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;

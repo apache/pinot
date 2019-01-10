@@ -17,10 +17,10 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datalayer.bao.jdbc;
+package org.apache.pinot.thirdeye.datalayer.bao.jdbc;
 
 import com.google.inject.Singleton;
-import com.linkedin.thirdeye.anomaly.task.TaskConstants;
+import org.apache.pinot.thirdeye.anomaly.task.TaskConstants;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -35,11 +35,11 @@ import java.util.Set;
 import org.joda.time.DateTime;
 
 import com.google.inject.persist.Transactional;
-import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskStatus;
-import com.linkedin.thirdeye.datalayer.bao.TaskManager;
-import com.linkedin.thirdeye.datalayer.dto.TaskDTO;
-import com.linkedin.thirdeye.datalayer.pojo.TaskBean;
-import com.linkedin.thirdeye.datalayer.util.Predicate;
+import org.apache.pinot.thirdeye.anomaly.task.TaskConstants.TaskStatus;
+import org.apache.pinot.thirdeye.datalayer.bao.TaskManager;
+import org.apache.pinot.thirdeye.datalayer.dto.TaskDTO;
+import org.apache.pinot.thirdeye.datalayer.pojo.TaskBean;
+import org.apache.pinot.thirdeye.datalayer.util.Predicate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datasource;
+package org.apache.pinot.thirdeye.datasource;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -26,11 +26,11 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 
-import com.linkedin.thirdeye.constant.MetricAggFunction;
-import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
-import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean;
-import com.linkedin.thirdeye.util.ThirdEyeUtils;
+import org.apache.pinot.thirdeye.constant.MetricAggFunction;
+import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.pojo.MetricConfigBean;
+import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
 
 import parsii.eval.Expression;
 import parsii.eval.Parser;

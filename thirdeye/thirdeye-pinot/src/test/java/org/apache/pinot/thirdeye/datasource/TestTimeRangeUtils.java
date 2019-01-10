@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.datasource;
+package org.apache.pinot.thirdeye.datasource;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -28,8 +28,8 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import com.google.common.collect.Range;
-import com.linkedin.thirdeye.api.TimeGranularity;
-import com.linkedin.thirdeye.datasource.TimeRangeUtils;
+import org.apache.pinot.thirdeye.api.TimeGranularity;
+import org.apache.pinot.thirdeye.datasource.TimeRangeUtils;
 
 public class TestTimeRangeUtils {
 

@@ -17,11 +17,11 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.detection.spi.model;
+package org.apache.pinot.thirdeye.detection.spi.model;
 
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 
 
 /**

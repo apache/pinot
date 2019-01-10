@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomaly.detection;
+package org.apache.pinot.thirdeye.anomaly.detection;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -30,13 +30,13 @@ import org.joda.time.Period;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
 
-import com.linkedin.thirdeye.api.TimeGranularity;
-import com.linkedin.thirdeye.api.TimeSpec;
-import com.linkedin.thirdeye.completeness.checker.DataCompletenessUtils;
-import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
-import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.DetectionStatusDTO;
-import com.linkedin.thirdeye.util.ThirdEyeUtils;
+import org.apache.pinot.thirdeye.api.TimeGranularity;
+import org.apache.pinot.thirdeye.api.TimeSpec;
+import org.apache.pinot.thirdeye.completeness.checker.DataCompletenessUtils;
+import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionStatusDTO;
+import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
 
 public class DetectionJobSchedulerUtils {
 

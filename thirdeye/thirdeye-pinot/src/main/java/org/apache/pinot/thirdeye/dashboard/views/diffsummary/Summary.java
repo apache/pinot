@@ -17,10 +17,10 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.dashboard.views.diffsummary;
+package org.apache.pinot.thirdeye.dashboard.views.diffsummary;
 
-import com.linkedin.thirdeye.client.diffsummary.DimNameValueCostEntry;
-import com.linkedin.thirdeye.client.diffsummary.costfunctions.BalancedCostFunction;
+import org.apache.pinot.thirdeye.client.diffsummary.DimNameValueCostEntry;
+import org.apache.pinot.thirdeye.client.diffsummary.costfunctions.BalancedCostFunction;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -33,9 +33,9 @@ import org.jfree.util.Log;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.linkedin.thirdeye.client.diffsummary.costfunctions.CostFunction;
-import com.linkedin.thirdeye.client.diffsummary.Cube;
-import com.linkedin.thirdeye.client.diffsummary.HierarchyNode;
+import org.apache.pinot.thirdeye.client.diffsummary.costfunctions.CostFunction;
+import org.apache.pinot.thirdeye.client.diffsummary.Cube;
+import org.apache.pinot.thirdeye.client.diffsummary.HierarchyNode;
 
 
 public class Summary {

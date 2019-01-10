@@ -17,17 +17,17 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.client.diffsummary;
+package org.apache.pinot.thirdeye.client.diffsummary;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.Multimap;
-import com.linkedin.thirdeye.client.diffsummary.costfunctions.CostFunction;
-import com.linkedin.thirdeye.constant.MetricAggFunction;
-import com.linkedin.thirdeye.dashboard.Utils;
-import com.linkedin.thirdeye.dashboard.views.diffsummary.Summary;
-import com.linkedin.thirdeye.dashboard.views.diffsummary.SummaryResponse;
-import com.linkedin.thirdeye.datasource.MetricExpression;
+import org.apache.pinot.thirdeye.client.diffsummary.costfunctions.CostFunction;
+import org.apache.pinot.thirdeye.constant.MetricAggFunction;
+import org.apache.pinot.thirdeye.dashboard.Utils;
+import org.apache.pinot.thirdeye.dashboard.views.diffsummary.Summary;
+import org.apache.pinot.thirdeye.dashboard.views.diffsummary.SummaryResponse;
+import org.apache.pinot.thirdeye.datasource.MetricExpression;
 import java.util.List;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;

@@ -17,12 +17,12 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.client.diffsummary;
+package org.apache.pinot.thirdeye.client.diffsummary;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Multimap;
-import com.linkedin.thirdeye.anomaly.utils.ThirdeyeMetricsUtil;
-import com.linkedin.thirdeye.client.diffsummary.costfunctions.CostFunction;
+import org.apache.pinot.thirdeye.anomaly.utils.ThirdeyeMetricsUtil;
+import org.apache.pinot.thirdeye.client.diffsummary.costfunctions.CostFunction;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;

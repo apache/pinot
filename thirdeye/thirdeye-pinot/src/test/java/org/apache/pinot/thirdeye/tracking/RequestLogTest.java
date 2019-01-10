@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.tracking;
+package org.apache.pinot.thirdeye.tracking;
 
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;

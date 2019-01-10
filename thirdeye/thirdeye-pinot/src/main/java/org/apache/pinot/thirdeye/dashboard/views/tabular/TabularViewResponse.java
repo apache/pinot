@@ -17,14 +17,14 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.dashboard.views.tabular;
+package org.apache.pinot.thirdeye.dashboard.views.tabular;
 
 import java.util.List;
 import java.util.Map;
 
-import com.linkedin.thirdeye.dashboard.views.GenericResponse;
-import com.linkedin.thirdeye.dashboard.views.TimeBucket;
-import com.linkedin.thirdeye.dashboard.views.ViewResponse;
+import org.apache.pinot.thirdeye.dashboard.views.GenericResponse;
+import org.apache.pinot.thirdeye.dashboard.views.TimeBucket;
+import org.apache.pinot.thirdeye.dashboard.views.ViewResponse;
 
 public class TabularViewResponse implements ViewResponse {
   List<String> metrics;

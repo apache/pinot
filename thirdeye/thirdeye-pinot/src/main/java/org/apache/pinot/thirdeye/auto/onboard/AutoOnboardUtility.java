@@ -17,13 +17,13 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.auto.onboard;
+package org.apache.pinot.thirdeye.auto.onboard;
 
 import com.google.common.base.CaseFormat;
-import com.linkedin.thirdeye.datasource.DataSourceConfig;
-import com.linkedin.thirdeye.datasource.DataSources;
-import com.linkedin.thirdeye.datasource.DataSourcesLoader;
-import com.linkedin.thirdeye.datasource.MetadataSourceConfig;
+import org.apache.pinot.thirdeye.datasource.DataSourceConfig;
+import org.apache.pinot.thirdeye.datasource.DataSources;
+import org.apache.pinot.thirdeye.datasource.DataSourcesLoader;
+import org.apache.pinot.thirdeye.datasource.MetadataSourceConfig;
 import java.lang.reflect.Constructor;
 import java.net.URL;
 import java.util.ArrayList;

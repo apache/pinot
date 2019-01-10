@@ -17,21 +17,21 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.dashboard.resources.v2;
+package org.apache.pinot.thirdeye.dashboard.resources.v2;
 
 import com.google.common.collect.SetMultimap;
 import com.google.common.collect.TreeMultimap;
-import com.linkedin.thirdeye.api.TimeGranularity;
-import com.linkedin.thirdeye.constant.AnomalyResultSource;
-import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomalyClassificationType;
-import com.linkedin.thirdeye.dataframe.util.MetricSlice;
-import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
-import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
-import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
-import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean;
+import org.apache.pinot.thirdeye.api.TimeGranularity;
+import org.apache.pinot.thirdeye.constant.AnomalyResultSource;
+import org.apache.pinot.thirdeye.dashboard.resources.v2.pojo.AnomalyClassificationType;
+import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
+import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
+import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
+import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.pojo.MetricConfigBean;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.util.ArrayList;

@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomaly.events;
+package org.apache.pinot.thirdeye.anomaly.events;
 
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;

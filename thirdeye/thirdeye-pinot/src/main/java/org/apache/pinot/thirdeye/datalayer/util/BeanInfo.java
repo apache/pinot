@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datalayer.util;
+package org.apache.pinot.thirdeye.datalayer.util;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;

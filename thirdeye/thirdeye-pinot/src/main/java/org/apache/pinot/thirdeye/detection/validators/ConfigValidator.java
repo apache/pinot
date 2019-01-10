@@ -17,11 +17,11 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.detection.validators;
+package org.apache.pinot.thirdeye.detection.validators;
 
-import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.ApplicationManager;
-import com.linkedin.thirdeye.datasource.DAORegistry;
+import org.apache.pinot.thirdeye.datalayer.bao.AlertConfigManager;
+import org.apache.pinot.thirdeye.datalayer.bao.ApplicationManager;
+import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import java.util.Map;
 import org.apache.commons.lang.StringUtils;
 import org.yaml.snakeyaml.Yaml;

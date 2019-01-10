@@ -17,25 +17,25 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.detection;
+package org.apache.pinot.thirdeye.detection;
 
 import com.google.common.collect.Multimap;
-import com.linkedin.thirdeye.api.DimensionMap;
-import com.linkedin.thirdeye.dataframe.BooleanSeries;
-import com.linkedin.thirdeye.dataframe.DataFrame;
-import com.linkedin.thirdeye.dataframe.LongSeries;
-import com.linkedin.thirdeye.dataframe.util.MetricSlice;
-import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.EventDTO;
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
-import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean;
-import com.linkedin.thirdeye.detection.DataProvider;
-import com.linkedin.thirdeye.detection.spi.components.BaseComponent;
-import com.linkedin.thirdeye.detection.spi.model.AnomalySlice;
-import com.linkedin.thirdeye.detection.spi.model.EventSlice;
-import com.linkedin.thirdeye.detection.spi.model.InputData;
-import com.linkedin.thirdeye.detection.spi.model.InputDataSpec;
+import org.apache.pinot.thirdeye.api.DimensionMap;
+import org.apache.pinot.thirdeye.dataframe.BooleanSeries;
+import org.apache.pinot.thirdeye.dataframe.DataFrame;
+import org.apache.pinot.thirdeye.dataframe.LongSeries;
+import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
+import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.EventDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.pojo.MetricConfigBean;
+import org.apache.pinot.thirdeye.detection.DataProvider;
+import org.apache.pinot.thirdeye.detection.spi.components.BaseComponent;
+import org.apache.pinot.thirdeye.detection.spi.model.AnomalySlice;
+import org.apache.pinot.thirdeye.detection.spi.model.EventSlice;
+import org.apache.pinot.thirdeye.detection.spi.model.InputData;
+import org.apache.pinot.thirdeye.detection.spi.model.InputDataSpec;
 import java.lang.reflect.ParameterizedType;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -49,7 +49,7 @@ import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.Period;
 
-import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
+import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
 
 
 public class DetectionUtils {

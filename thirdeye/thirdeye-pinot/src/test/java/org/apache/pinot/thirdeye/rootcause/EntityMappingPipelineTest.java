@@ -17,12 +17,12 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.rootcause;
+package org.apache.pinot.thirdeye.rootcause;
 
-import com.linkedin.thirdeye.datalayer.bao.EntityToEntityMappingManager;
-import com.linkedin.thirdeye.datalayer.dto.EntityToEntityMappingDTO;
-import com.linkedin.thirdeye.rootcause.impl.DimensionEntity;
-import com.linkedin.thirdeye.rootcause.impl.EntityMappingPipeline;
+import org.apache.pinot.thirdeye.datalayer.bao.EntityToEntityMappingManager;
+import org.apache.pinot.thirdeye.datalayer.dto.EntityToEntityMappingDTO;
+import org.apache.pinot.thirdeye.rootcause.impl.DimensionEntity;
+import org.apache.pinot.thirdeye.rootcause.impl.EntityMappingPipeline;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;

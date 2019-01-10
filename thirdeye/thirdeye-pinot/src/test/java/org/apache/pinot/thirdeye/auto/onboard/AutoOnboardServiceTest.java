@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.auto.onboard;
+package org.apache.pinot.thirdeye.auto.onboard;
 
-import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
-import com.linkedin.thirdeye.api.TimeGranularity;
+import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
+import org.apache.pinot.thirdeye.api.TimeGranularity;
 import java.net.URL;
 import java.util.concurrent.TimeUnit;
 import org.testng.annotations.Test;

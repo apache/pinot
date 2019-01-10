@@ -17,33 +17,33 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.detection;
+package org.apache.pinot.thirdeye.detection;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableMap;
 import com.linkedin.pinot.common.utils.ServiceStatus;
-import com.linkedin.thirdeye.api.Constants;
-import com.linkedin.thirdeye.constant.AnomalyResultSource;
-import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.DetectionAlertConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.DetectionConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.EventManager;
-import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
-import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
-import com.linkedin.thirdeye.datalayer.dto.AbstractDTO;
-import com.linkedin.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.datalayer.util.Predicate;
-import com.linkedin.thirdeye.datasource.DAORegistry;
-import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
-import com.linkedin.thirdeye.datasource.loader.AggregationLoader;
-import com.linkedin.thirdeye.datasource.loader.DefaultAggregationLoader;
-import com.linkedin.thirdeye.datasource.loader.DefaultTimeSeriesLoader;
-import com.linkedin.thirdeye.datasource.loader.TimeSeriesLoader;
-import com.linkedin.thirdeye.detection.finetune.GridSearchTuningAlgorithm;
-import com.linkedin.thirdeye.detection.finetune.TuningAlgorithm;
-import com.linkedin.thirdeye.detection.spi.model.AnomalySlice;
+import org.apache.pinot.thirdeye.api.Constants;
+import org.apache.pinot.thirdeye.constant.AnomalyResultSource;
+import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
+import org.apache.pinot.thirdeye.datalayer.bao.DetectionAlertConfigManager;
+import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
+import org.apache.pinot.thirdeye.datalayer.bao.EventManager;
+import org.apache.pinot.thirdeye.datalayer.bao.MergedAnomalyResultManager;
+import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
+import org.apache.pinot.thirdeye.datalayer.dto.AbstractDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.datalayer.util.Predicate;
+import org.apache.pinot.thirdeye.datasource.DAORegistry;
+import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
+import org.apache.pinot.thirdeye.datasource.loader.AggregationLoader;
+import org.apache.pinot.thirdeye.datasource.loader.DefaultAggregationLoader;
+import org.apache.pinot.thirdeye.datasource.loader.DefaultTimeSeriesLoader;
+import org.apache.pinot.thirdeye.datasource.loader.TimeSeriesLoader;
+import org.apache.pinot.thirdeye.detection.finetune.GridSearchTuningAlgorithm;
+import org.apache.pinot.thirdeye.detection.finetune.TuningAlgorithm;
+import org.apache.pinot.thirdeye.detection.spi.model.AnomalySlice;
 import com.wordnik.swagger.annotations.Api;
 import com.wordnik.swagger.annotations.ApiOperation;
 import com.wordnik.swagger.annotations.ApiParam;
@@ -320,7 +320,7 @@ public class DetectionResource {
    * Legacy replay endpoint. Replay all the moving windows within start time and end time.
    * Saves anomaly for each moving window before starting detection for next window.
    * Behaves exactly like the legacy replay endpoint.
-   * See also {@link com.linkedin.thirdeye.dashboard.resources.DetectionJobResource#generateAnomaliesInRangeForFunctions(String, String, String, String, Boolean, Boolean)}}
+   * See also {@link org.apache.pinot.thirdeye.dashboard.resources.DetectionJobResource#generateAnomaliesInRangeForFunctions(String, String, String, String, Boolean, Boolean)}}
    * @param configId the config id to replay
    * @param start start time
    * @param end end time

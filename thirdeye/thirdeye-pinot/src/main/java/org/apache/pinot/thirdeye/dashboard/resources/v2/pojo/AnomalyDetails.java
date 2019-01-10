@@ -17,11 +17,11 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.dashboard.resources.v2.pojo;
+package org.apache.pinot.thirdeye.dashboard.resources.v2.pojo;
 
 import java.util.List;
 
-import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
+import org.apache.pinot.thirdeye.constant.AnomalyFeedbackType;
 
 public class AnomalyDetails {
 

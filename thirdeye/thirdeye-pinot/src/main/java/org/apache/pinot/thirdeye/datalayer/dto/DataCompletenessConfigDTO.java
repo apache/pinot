@@ -17,9 +17,9 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datalayer.dto;
+package org.apache.pinot.thirdeye.datalayer.dto;
 
-import com.linkedin.thirdeye.datalayer.pojo.DataCompletenessConfigBean;
+import org.apache.pinot.thirdeye.datalayer.pojo.DataCompletenessConfigBean;
 
 public class DataCompletenessConfigDTO extends DataCompletenessConfigBean {
 

@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.datasource.pinot;
+package org.apache.pinot.thirdeye.datasource.pinot;
 
-import com.linkedin.thirdeye.constant.MetricAggFunction;
+import org.apache.pinot.thirdeye.constant.MetricAggFunction;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;

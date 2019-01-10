@@ -17,11 +17,11 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.dashboard.resources.v2.rootcause;
+package org.apache.pinot.thirdeye.dashboard.resources.v2.rootcause;
 
-import com.linkedin.thirdeye.dashboard.resources.v2.RootCauseEventEntityFormatter;
-import com.linkedin.thirdeye.dashboard.resources.v2.pojo.RootCauseEventEntity;
-import com.linkedin.thirdeye.rootcause.impl.EventEntity;
+import org.apache.pinot.thirdeye.dashboard.resources.v2.RootCauseEventEntityFormatter;
+import org.apache.pinot.thirdeye.dashboard.resources.v2.pojo.RootCauseEventEntity;
+import org.apache.pinot.thirdeye.rootcause.impl.EventEntity;
 
 
 public class DefaultEventEntityFormatter extends RootCauseEventEntityFormatter {

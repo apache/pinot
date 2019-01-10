@@ -14,19 +14,19 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.detection.algorithm;
+package org.apache.pinot.thirdeye.detection.algorithm;
 
-import com.linkedin.thirdeye.dataframe.DataFrame;
-import com.linkedin.thirdeye.dataframe.DoubleSeries;
-import com.linkedin.thirdeye.dataframe.StringSeries;
-import com.linkedin.thirdeye.dataframe.util.MetricSlice;
-import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.detection.DataProvider;
-import com.linkedin.thirdeye.detection.MockDataProvider;
-import com.linkedin.thirdeye.detection.MockPipeline;
-import com.linkedin.thirdeye.detection.MockPipelineLoader;
-import com.linkedin.thirdeye.detection.MockPipelineOutput;
+import org.apache.pinot.thirdeye.dataframe.DataFrame;
+import org.apache.pinot.thirdeye.dataframe.DoubleSeries;
+import org.apache.pinot.thirdeye.dataframe.StringSeries;
+import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.detection.DataProvider;
+import org.apache.pinot.thirdeye.detection.MockDataProvider;
+import org.apache.pinot.thirdeye.detection.MockPipeline;
+import org.apache.pinot.thirdeye.detection.MockPipelineLoader;
+import org.apache.pinot.thirdeye.detection.MockPipelineOutput;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -38,7 +38,7 @@ import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
+import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
 
 
 public class LegacyDimensionWrapperTest {
@@ -63,7 +63,7 @@ public class LegacyDimensionWrapperTest {
   private static final Collection<String> PROP_NESTED_METRIC_URN_VALUES = Collections.singleton("thirdeye:metric:2");
   private static final String PROP_NESTED_METRIC_URN_KEY_VALUE = "myMetricUrn";
   private static final String PROP_ANOMALY_FUNCTION_CLASS_NAME_VALUE =
-      "com.linkedin.thirdeye.anomalydetection.function.MinMaxThresholdFunction";
+      "org.apache.pinot.thirdeye.anomalydetection.function.MinMaxThresholdFunction";
   private Map<String, Object> specs;
 
   private DataProvider provider;

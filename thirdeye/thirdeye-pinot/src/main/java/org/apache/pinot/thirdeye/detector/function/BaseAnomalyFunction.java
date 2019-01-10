@@ -17,17 +17,17 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.detector.function;
+package org.apache.pinot.thirdeye.detector.function;
 
 import com.linkedin.pinot.pql.parsers.utils.Pair;
-import com.linkedin.thirdeye.anomaly.views.AnomalyTimelinesView;
-import com.linkedin.thirdeye.anomalydetection.context.AnomalyResult;
-import com.linkedin.thirdeye.api.DimensionMap;
-import com.linkedin.thirdeye.api.MetricTimeSeries;
-import com.linkedin.thirdeye.api.TimeGranularity;
-import com.linkedin.thirdeye.dashboard.views.TimeBucket;
-import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.anomaly.views.AnomalyTimelinesView;
+import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyResult;
+import org.apache.pinot.thirdeye.api.DimensionMap;
+import org.apache.pinot.thirdeye.api.MetricTimeSeries;
+import org.apache.pinot.thirdeye.api.TimeGranularity;
+import org.apache.pinot.thirdeye.dashboard.views.TimeBucket;
+import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -36,8 +36,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
 
-import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
-import com.linkedin.thirdeye.util.AnomalyOffset;
+import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import org.apache.pinot.thirdeye.util.AnomalyOffset;
 
 import java.util.concurrent.TimeUnit;
 

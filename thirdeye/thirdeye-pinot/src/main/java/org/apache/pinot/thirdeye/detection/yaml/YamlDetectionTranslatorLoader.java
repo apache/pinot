@@ -17,11 +17,11 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.detection.yaml;
+package org.apache.pinot.thirdeye.detection.yaml;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.thirdeye.detection.DataProvider;
-import com.linkedin.thirdeye.detection.annotation.registry.DetectionRegistry;
+import org.apache.pinot.thirdeye.detection.DataProvider;
+import org.apache.pinot.thirdeye.detection.annotation.registry.DetectionRegistry;
 import java.lang.reflect.Constructor;
 import java.util.Map;
 

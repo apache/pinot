@@ -17,12 +17,12 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.dashboard.resources.v2;
+package org.apache.pinot.thirdeye.dashboard.resources.v2;
 
-import com.linkedin.thirdeye.api.Constants;
-import com.linkedin.thirdeye.datalayer.bao.DetectionAlertConfigManager;
-import com.linkedin.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
-import com.linkedin.thirdeye.datalayer.util.Predicate;
+import org.apache.pinot.thirdeye.api.Constants;
+import org.apache.pinot.thirdeye.datalayer.bao.DetectionAlertConfigManager;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.util.Predicate;
 import com.wordnik.swagger.annotations.Api;
 import java.util.ArrayList;
 import java.util.Collections;

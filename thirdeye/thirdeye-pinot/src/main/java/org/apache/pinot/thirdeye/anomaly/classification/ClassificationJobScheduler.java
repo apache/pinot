@@ -17,18 +17,18 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomaly.classification;
+package org.apache.pinot.thirdeye.anomaly.classification;
 
-import com.linkedin.thirdeye.anomaly.task.TaskConstants;
-import com.linkedin.thirdeye.anomaly.utils.AnomalyUtils;
-import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
-import com.linkedin.thirdeye.datalayer.bao.ClassificationConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.TaskManager;
-import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
-import com.linkedin.thirdeye.datalayer.dto.ClassificationConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.JobDTO;
-import com.linkedin.thirdeye.datalayer.dto.TaskDTO;
-import com.linkedin.thirdeye.datasource.DAORegistry;
+import org.apache.pinot.thirdeye.anomaly.task.TaskConstants;
+import org.apache.pinot.thirdeye.anomaly.utils.AnomalyUtils;
+import org.apache.pinot.thirdeye.datalayer.bao.AnomalyFunctionManager;
+import org.apache.pinot.thirdeye.datalayer.bao.ClassificationConfigManager;
+import org.apache.pinot.thirdeye.datalayer.bao.TaskManager;
+import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.ClassificationConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.JobDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.TaskDTO;
+import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;

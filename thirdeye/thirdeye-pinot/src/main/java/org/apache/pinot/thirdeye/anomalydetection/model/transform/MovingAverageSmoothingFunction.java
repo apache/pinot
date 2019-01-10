@@ -17,11 +17,11 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomalydetection.model.transform;
+package org.apache.pinot.thirdeye.anomalydetection.model.transform;
 
-import com.linkedin.thirdeye.anomalydetection.context.AnomalyDetectionContext;
-import com.linkedin.thirdeye.anomalydetection.context.TimeSeries;
-import com.linkedin.thirdeye.api.DimensionMap;
+import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyDetectionContext;
+import org.apache.pinot.thirdeye.anomalydetection.context.TimeSeries;
+import org.apache.pinot.thirdeye.api.DimensionMap;
 import org.joda.time.Interval;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

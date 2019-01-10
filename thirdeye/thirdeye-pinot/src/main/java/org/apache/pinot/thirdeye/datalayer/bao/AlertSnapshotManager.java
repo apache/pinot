@@ -17,9 +17,9 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datalayer.bao;
+package org.apache.pinot.thirdeye.datalayer.bao;
 
-import com.linkedin.thirdeye.datalayer.dto.AlertSnapshotDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.AlertSnapshotDTO;
 
 
 public interface AlertSnapshotManager extends AbstractManager<AlertSnapshotDTO> {

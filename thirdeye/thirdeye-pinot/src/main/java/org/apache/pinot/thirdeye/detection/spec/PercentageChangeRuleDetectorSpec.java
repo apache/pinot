@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.detection.spec;
+package org.apache.pinot.thirdeye.detection.spec;
 
 public class PercentageChangeRuleDetectorSpec extends AbstractSpec {
   private double percentageChange = Double.NaN;

@@ -14,16 +14,16 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.detection.wrapper;
+package org.apache.pinot.thirdeye.detection.wrapper;
 
 import com.google.common.collect.ImmutableSet;
-import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
-import com.linkedin.thirdeye.detection.DataProvider;
-import com.linkedin.thirdeye.detection.DetectionPipelineResult;
-import com.linkedin.thirdeye.detection.MockDataProvider;
-import com.linkedin.thirdeye.detection.MockPipeline;
-import com.linkedin.thirdeye.detection.MockPipelineLoader;
-import com.linkedin.thirdeye.detection.MockPipelineOutput;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
+import org.apache.pinot.thirdeye.detection.DataProvider;
+import org.apache.pinot.thirdeye.detection.DetectionPipelineResult;
+import org.apache.pinot.thirdeye.detection.MockDataProvider;
+import org.apache.pinot.thirdeye.detection.MockPipeline;
+import org.apache.pinot.thirdeye.detection.MockPipelineLoader;
+import org.apache.pinot.thirdeye.detection.MockPipelineOutput;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -36,7 +36,7 @@ import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import static com.linkedin.thirdeye.detection.DetectionTestUtils.*;
+import static org.apache.pinot.thirdeye.detection.DetectionTestUtils.*;
 
 
 public class ChildKeepingMergeWrapperTest {

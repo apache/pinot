@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.eventprovider;
+package org.apache.pinot.thirdeye.eventprovider;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -25,8 +25,8 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import com.google.common.collect.Lists;
-import com.linkedin.thirdeye.anomaly.events.EventFilter;
-import com.linkedin.thirdeye.datalayer.dto.EventDTO;
+import org.apache.pinot.thirdeye.anomaly.events.EventFilter;
+import org.apache.pinot.thirdeye.datalayer.dto.EventDTO;
 
 public class TestEventFilter {
 

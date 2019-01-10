@@ -17,10 +17,10 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.rootcause;
+package org.apache.pinot.thirdeye.rootcause;
 
-import com.linkedin.thirdeye.rootcause.Entity;
-import com.linkedin.thirdeye.rootcause.MaxScoreSet;
+import org.apache.pinot.thirdeye.rootcause.Entity;
+import org.apache.pinot.thirdeye.rootcause.MaxScoreSet;
 import java.util.Collections;
 import org.testng.Assert;
 import org.testng.annotations.Test;

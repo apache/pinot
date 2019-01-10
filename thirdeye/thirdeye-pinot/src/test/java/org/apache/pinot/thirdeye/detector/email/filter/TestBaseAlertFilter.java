@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.detector.email.filter;
+package org.apache.pinot.thirdeye.detector.email.filter;
 
-import com.linkedin.thirdeye.datalayer.DaoTestUtils;
-import com.linkedin.thirdeye.datalayer.bao.DAOTestBase;
-import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import org.apache.pinot.thirdeye.datalayer.DaoTestUtils;
+import org.apache.pinot.thirdeye.datalayer.bao.DAOTestBase;
+import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import java.util.Map;
 import org.testng.Assert;
 import org.testng.annotations.Test;

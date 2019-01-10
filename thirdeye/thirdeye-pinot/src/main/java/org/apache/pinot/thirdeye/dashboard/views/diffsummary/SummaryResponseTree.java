@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.dashboard.views.diffsummary;
+package org.apache.pinot.thirdeye.dashboard.views.diffsummary;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -27,9 +27,9 @@ import java.util.List;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.linkedin.thirdeye.client.diffsummary.costfunctions.CostFunction;
-import com.linkedin.thirdeye.client.diffsummary.Dimensions;
-import com.linkedin.thirdeye.client.diffsummary.HierarchyNode;
+import org.apache.pinot.thirdeye.client.diffsummary.costfunctions.CostFunction;
+import org.apache.pinot.thirdeye.client.diffsummary.Dimensions;
+import org.apache.pinot.thirdeye.client.diffsummary.HierarchyNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datalayer;
+package org.apache.pinot.thirdeye.datalayer;
 
 import java.io.IOException;
 import java.io.LineNumberReader;

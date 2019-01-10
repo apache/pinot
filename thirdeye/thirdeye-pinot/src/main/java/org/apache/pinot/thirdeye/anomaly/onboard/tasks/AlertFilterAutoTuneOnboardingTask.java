@@ -17,17 +17,17 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomaly.onboard.tasks;
+package org.apache.pinot.thirdeye.anomaly.onboard.tasks;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
-import com.linkedin.thirdeye.anomaly.detection.DetectionJobScheduler;
-import com.linkedin.thirdeye.anomaly.onboard.framework.BaseDetectionOnboardTask;
-import com.linkedin.thirdeye.anomaly.onboard.framework.DetectionOnboardExecutionContext;
-import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutotuneFactory;
-import com.linkedin.thirdeye.dashboard.resources.DetectionJobResource;
-import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
-import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
+import org.apache.pinot.thirdeye.anomaly.detection.DetectionJobScheduler;
+import org.apache.pinot.thirdeye.anomaly.onboard.framework.BaseDetectionOnboardTask;
+import org.apache.pinot.thirdeye.anomaly.onboard.framework.DetectionOnboardExecutionContext;
+import org.apache.pinot.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutotuneFactory;
+import org.apache.pinot.thirdeye.dashboard.resources.DetectionJobResource;
+import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import org.apache.pinot.thirdeye.detector.email.filter.AlertFilterFactory;
 import java.io.IOException;
 import java.util.List;
 import javax.ws.rs.core.Response;

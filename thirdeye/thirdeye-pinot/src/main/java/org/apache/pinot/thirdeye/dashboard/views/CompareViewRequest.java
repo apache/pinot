@@ -17,15 +17,15 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.dashboard.views;
+package org.apache.pinot.thirdeye.dashboard.views;
 
 import java.util.List;
 
 import org.joda.time.DateTime;
 
 import com.google.common.collect.Multimap;
-import com.linkedin.thirdeye.api.TimeGranularity;
-import com.linkedin.thirdeye.datasource.MetricExpression;
+import org.apache.pinot.thirdeye.api.TimeGranularity;
+import org.apache.pinot.thirdeye.datasource.MetricExpression;
 
 public class CompareViewRequest implements ViewRequest {
 

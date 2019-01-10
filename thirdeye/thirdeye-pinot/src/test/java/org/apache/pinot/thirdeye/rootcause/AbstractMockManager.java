@@ -17,11 +17,11 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.rootcause;
+package org.apache.pinot.thirdeye.rootcause;
 
-import com.linkedin.thirdeye.datalayer.bao.AbstractManager;
-import com.linkedin.thirdeye.datalayer.dto.AbstractDTO;
-import com.linkedin.thirdeye.datalayer.util.Predicate;
+import org.apache.pinot.thirdeye.datalayer.bao.AbstractManager;
+import org.apache.pinot.thirdeye.datalayer.dto.AbstractDTO;
+import org.apache.pinot.thirdeye.datalayer.util.Predicate;
 import java.util.List;
 import java.util.Map;
 
@@ -68,7 +68,7 @@ public abstract class AbstractMockManager<T extends AbstractDTO> implements Abst
   }
 
   @Override
-  public int deleteByPredicate(com.linkedin.thirdeye.datalayer.util.Predicate predicate) {
+  public int deleteByPredicate(org.apache.pinot.thirdeye.datalayer.util.Predicate predicate) {
     throw new AssertionError("not implemented");
   }
 
@@ -93,7 +93,7 @@ public abstract class AbstractMockManager<T extends AbstractDTO> implements Abst
   }
 
   @Override
-  public List<Long> findIdsByPredicate(com.linkedin.thirdeye.datalayer.util.Predicate predicate) {
+  public List<Long> findIdsByPredicate(org.apache.pinot.thirdeye.datalayer.util.Predicate predicate) {
     throw new AssertionError("not implemented");
   }
 

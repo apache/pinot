@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.detection.annotation;
+package org.apache.pinot.thirdeye.detection.annotation;
 
 public enum DetectionTag {
   ALGORITHM_DETECTION,

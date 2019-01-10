@@ -17,10 +17,10 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.detection.finetune;
+package org.apache.pinot.thirdeye.detection.finetune;
 
-import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
-import com.linkedin.thirdeye.detection.spi.model.AnomalySlice;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
+import org.apache.pinot.thirdeye.detection.spi.model.AnomalySlice;
 
 
 /**

@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datalayer.pojo;
+package org.apache.pinot.thirdeye.datalayer.pojo;
 
 import java.util.Objects;
 

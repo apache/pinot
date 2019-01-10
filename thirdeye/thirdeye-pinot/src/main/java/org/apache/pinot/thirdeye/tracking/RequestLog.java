@@ -17,9 +17,9 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.tracking;
+package org.apache.pinot.thirdeye.tracking;
 
-import com.linkedin.thirdeye.auth.ThirdEyeAuthFilter;
+import org.apache.pinot.thirdeye.auth.ThirdEyeAuthFilter;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;

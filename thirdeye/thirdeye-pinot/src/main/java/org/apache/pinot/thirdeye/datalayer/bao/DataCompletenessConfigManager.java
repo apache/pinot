@@ -17,11 +17,11 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datalayer.bao;
+package org.apache.pinot.thirdeye.datalayer.bao;
 
 import java.util.List;
 
-import com.linkedin.thirdeye.datalayer.dto.DataCompletenessConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.DataCompletenessConfigDTO;
 
 public interface DataCompletenessConfigManager extends AbstractManager<DataCompletenessConfigDTO>{
 

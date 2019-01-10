@@ -17,26 +17,26 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.detection.alert;
+package org.apache.pinot.thirdeye.detection.alert;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
-import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.EventManager;
-import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
-import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
-import com.linkedin.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
-import com.linkedin.thirdeye.datasource.DAORegistry;
-import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
-import com.linkedin.thirdeye.datasource.loader.AggregationLoader;
-import com.linkedin.thirdeye.datasource.loader.DefaultAggregationLoader;
-import com.linkedin.thirdeye.datasource.loader.DefaultTimeSeriesLoader;
-import com.linkedin.thirdeye.datasource.loader.TimeSeriesLoader;
-import com.linkedin.thirdeye.detection.DataProvider;
-import com.linkedin.thirdeye.detection.DefaultDataProvider;
-import com.linkedin.thirdeye.detection.DetectionPipelineLoader;
-import com.linkedin.thirdeye.detection.alert.scheme.DetectionAlertScheme;
-import com.linkedin.thirdeye.detection.alert.suppress.DetectionAlertSuppressor;
+import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
+import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
+import org.apache.pinot.thirdeye.datalayer.bao.EventManager;
+import org.apache.pinot.thirdeye.datalayer.bao.MergedAnomalyResultManager;
+import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
+import org.apache.pinot.thirdeye.datasource.DAORegistry;
+import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
+import org.apache.pinot.thirdeye.datasource.loader.AggregationLoader;
+import org.apache.pinot.thirdeye.datasource.loader.DefaultAggregationLoader;
+import org.apache.pinot.thirdeye.datasource.loader.DefaultTimeSeriesLoader;
+import org.apache.pinot.thirdeye.datasource.loader.TimeSeriesLoader;
+import org.apache.pinot.thirdeye.detection.DataProvider;
+import org.apache.pinot.thirdeye.detection.DefaultDataProvider;
+import org.apache.pinot.thirdeye.detection.DetectionPipelineLoader;
+import org.apache.pinot.thirdeye.detection.alert.scheme.DetectionAlertScheme;
+import org.apache.pinot.thirdeye.detection.alert.suppress.DetectionAlertSuppressor;
 import java.lang.reflect.Constructor;
 import java.util.Collections;
 import java.util.HashMap;
@@ -51,7 +51,7 @@ public class DetectionAlertTaskFactory {
   private static final Logger LOG = LoggerFactory.getLogger(DetectionAlertTaskFactory.class);
 
   private static final String PROP_CLASS_NAME = "className";
-  private static final String DEFAULT_ALERT_SCHEME = "com.linkedin.thirdeye.detection.alert.scheme.DetectionEmailAlerter";
+  private static final String DEFAULT_ALERT_SCHEME = "org.apache.pinot.thirdeye.detection.alert.scheme.DetectionEmailAlerter";
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
   private final DataProvider provider;

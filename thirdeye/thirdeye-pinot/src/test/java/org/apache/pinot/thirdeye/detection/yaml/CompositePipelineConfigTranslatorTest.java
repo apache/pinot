@@ -1,15 +1,15 @@
-package com.linkedin.thirdeye.detection.yaml;
+package org.apache.pinot.thirdeye.detection.yaml;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableMap;
-import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
-import com.linkedin.thirdeye.detection.DataProvider;
-import com.linkedin.thirdeye.detection.MockDataProvider;
-import com.linkedin.thirdeye.detection.annotation.registry.DetectionRegistry;
-import com.linkedin.thirdeye.detection.components.RuleBaselineProvider;
-import com.linkedin.thirdeye.detection.components.ThresholdRuleAnomalyFilter;
-import com.linkedin.thirdeye.detection.components.ThresholdRuleDetector;
+import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
+import org.apache.pinot.thirdeye.detection.DataProvider;
+import org.apache.pinot.thirdeye.detection.MockDataProvider;
+import org.apache.pinot.thirdeye.detection.annotation.registry.DetectionRegistry;
+import org.apache.pinot.thirdeye.detection.components.RuleBaselineProvider;
+import org.apache.pinot.thirdeye.detection.components.ThresholdRuleAnomalyFilter;
+import org.apache.pinot.thirdeye.detection.components.ThresholdRuleDetector;
 import java.util.Collections;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;

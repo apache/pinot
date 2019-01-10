@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datalayer.util;
+package org.apache.pinot.thirdeye.datalayer.util;
 
 import com.google.common.base.Preconditions;
 import java.lang.reflect.Array;
@@ -43,8 +43,8 @@ import org.slf4j.LoggerFactory;
 
 import com.google.common.collect.BiMap;
 import com.google.common.collect.Sets;
-import com.linkedin.thirdeye.datalayer.entity.AbstractEntity;
-import com.linkedin.thirdeye.datalayer.entity.AbstractIndexEntity;
+import org.apache.pinot.thirdeye.datalayer.entity.AbstractEntity;
+import org.apache.pinot.thirdeye.datalayer.entity.AbstractIndexEntity;
 
 public class SqlQueryBuilder {
 

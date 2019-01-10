@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.util;
+package org.apache.pinot.thirdeye.util;
 
 import java.util.ArrayList;
 import java.util.List;

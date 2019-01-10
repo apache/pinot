@@ -17,25 +17,25 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.detection.wrapper;
+package org.apache.pinot.thirdeye.detection.wrapper;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.thirdeye.anomaly.detection.DetectionJobSchedulerUtils;
-import com.linkedin.thirdeye.anomalydetection.context.AnomalyResult;
-import com.linkedin.thirdeye.api.TimeGranularity;
-import com.linkedin.thirdeye.api.TimeSpec;
-import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
-import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
-import com.linkedin.thirdeye.detection.DataProvider;
-import com.linkedin.thirdeye.detection.DetectionPipeline;
-import com.linkedin.thirdeye.detection.DetectionPipelineResult;
-import com.linkedin.thirdeye.detection.DetectionUtils;
-import com.linkedin.thirdeye.detection.spi.components.AnomalyDetector;
-import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
-import com.linkedin.thirdeye.util.ThirdEyeUtils;
+import org.apache.pinot.thirdeye.anomaly.detection.DetectionJobSchedulerUtils;
+import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyResult;
+import org.apache.pinot.thirdeye.api.TimeGranularity;
+import org.apache.pinot.thirdeye.api.TimeSpec;
+import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
+import org.apache.pinot.thirdeye.detection.DataProvider;
+import org.apache.pinot.thirdeye.detection.DetectionPipeline;
+import org.apache.pinot.thirdeye.detection.DetectionPipelineResult;
+import org.apache.pinot.thirdeye.detection.DetectionUtils;
+import org.apache.pinot.thirdeye.detection.spi.components.AnomalyDetector;
+import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
+import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;

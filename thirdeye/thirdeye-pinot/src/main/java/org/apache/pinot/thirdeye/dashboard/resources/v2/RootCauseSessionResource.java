@@ -17,15 +17,15 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.dashboard.resources.v2;
+package org.apache.pinot.thirdeye.dashboard.resources.v2;
 
-import com.linkedin.thirdeye.api.Constants;
-import com.linkedin.thirdeye.auth.ThirdEyeAuthFilter;
-import com.linkedin.thirdeye.datalayer.bao.RootcauseSessionManager;
-import com.linkedin.thirdeye.datalayer.dto.RootcauseSessionDTO;
-import com.linkedin.thirdeye.datalayer.pojo.RootcauseSessionBean;
-import com.linkedin.thirdeye.datalayer.util.Predicate;
-import com.linkedin.thirdeye.rootcause.impl.AnomalyEventEntity;
+import org.apache.pinot.thirdeye.api.Constants;
+import org.apache.pinot.thirdeye.auth.ThirdEyeAuthFilter;
+import org.apache.pinot.thirdeye.datalayer.bao.RootcauseSessionManager;
+import org.apache.pinot.thirdeye.datalayer.dto.RootcauseSessionDTO;
+import org.apache.pinot.thirdeye.datalayer.pojo.RootcauseSessionBean;
+import org.apache.pinot.thirdeye.datalayer.util.Predicate;
+import org.apache.pinot.thirdeye.rootcause.impl.AnomalyEventEntity;
 import com.wordnik.swagger.annotations.Api;
 import com.wordnik.swagger.annotations.ApiOperation;
 import com.wordnik.swagger.annotations.ApiParam;

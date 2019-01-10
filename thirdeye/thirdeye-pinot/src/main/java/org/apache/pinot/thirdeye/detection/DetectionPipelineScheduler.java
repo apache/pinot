@@ -17,12 +17,12 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.detection;
+package org.apache.pinot.thirdeye.detection;
 
-import com.linkedin.thirdeye.anomaly.task.TaskConstants;
-import com.linkedin.thirdeye.anomaly.utils.AnomalyUtils;
-import com.linkedin.thirdeye.datalayer.bao.DetectionConfigManager;
-import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
+import org.apache.pinot.thirdeye.anomaly.task.TaskConstants;
+import org.apache.pinot.thirdeye.anomaly.utils.AnomalyUtils;
+import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;

@@ -17,21 +17,21 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.rootcause.util;
+package org.apache.pinot.thirdeye.rootcause.util;
 
 import com.google.common.collect.Multimap;
 import com.google.common.collect.TreeMultimap;
-import com.linkedin.thirdeye.rootcause.Entity;
-import com.linkedin.thirdeye.rootcause.MaxScoreSet;
-import com.linkedin.thirdeye.rootcause.impl.AnomalyEventEntity;
-import com.linkedin.thirdeye.rootcause.impl.DatasetEntity;
-import com.linkedin.thirdeye.rootcause.impl.DimensionEntity;
-import com.linkedin.thirdeye.rootcause.impl.DimensionsEntity;
-import com.linkedin.thirdeye.rootcause.impl.EntityType;
-import com.linkedin.thirdeye.rootcause.impl.HyperlinkEntity;
-import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
-import com.linkedin.thirdeye.rootcause.impl.ServiceEntity;
-import com.linkedin.thirdeye.rootcause.impl.TimeRangeEntity;
+import org.apache.pinot.thirdeye.rootcause.Entity;
+import org.apache.pinot.thirdeye.rootcause.MaxScoreSet;
+import org.apache.pinot.thirdeye.rootcause.impl.AnomalyEventEntity;
+import org.apache.pinot.thirdeye.rootcause.impl.DatasetEntity;
+import org.apache.pinot.thirdeye.rootcause.impl.DimensionEntity;
+import org.apache.pinot.thirdeye.rootcause.impl.DimensionsEntity;
+import org.apache.pinot.thirdeye.rootcause.impl.EntityType;
+import org.apache.pinot.thirdeye.rootcause.impl.HyperlinkEntity;
+import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
+import org.apache.pinot.thirdeye.rootcause.impl.ServiceEntity;
+import org.apache.pinot.thirdeye.rootcause.impl.TimeRangeEntity;
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.net.URLEncoder;

@@ -17,12 +17,12 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomaly;
+package org.apache.pinot.thirdeye.anomaly;
 
-import com.linkedin.thirdeye.anomaly.monitor.MonitorConfiguration;
-import com.linkedin.thirdeye.anomaly.task.TaskDriverConfiguration;
-import com.linkedin.thirdeye.auto.onboard.AutoOnboardConfiguration;
-import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
+import org.apache.pinot.thirdeye.anomaly.monitor.MonitorConfiguration;
+import org.apache.pinot.thirdeye.anomaly.task.TaskDriverConfiguration;
+import org.apache.pinot.thirdeye.auto.onboard.AutoOnboardConfiguration;
+import org.apache.pinot.thirdeye.common.ThirdEyeConfiguration;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;

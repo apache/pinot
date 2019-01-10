@@ -17,17 +17,17 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.dashboard.resources.v2;
+package org.apache.pinot.thirdeye.dashboard.resources.v2;
 
 import com.google.common.base.Optional;
-import com.linkedin.thirdeye.auth.Credentials;
-import com.linkedin.thirdeye.auth.ThirdEyeAuthFilter;
-import com.linkedin.thirdeye.auth.ThirdEyePrincipal;
-import com.linkedin.thirdeye.datalayer.bao.SessionManager;
-import com.linkedin.thirdeye.datalayer.dto.SessionDTO;
-import com.linkedin.thirdeye.datalayer.pojo.SessionBean;
-import com.linkedin.thirdeye.datalayer.util.Predicate;
-import com.linkedin.thirdeye.datasource.DAORegistry;
+import org.apache.pinot.thirdeye.auth.Credentials;
+import org.apache.pinot.thirdeye.auth.ThirdEyeAuthFilter;
+import org.apache.pinot.thirdeye.auth.ThirdEyePrincipal;
+import org.apache.pinot.thirdeye.datalayer.bao.SessionManager;
+import org.apache.pinot.thirdeye.datalayer.dto.SessionDTO;
+import org.apache.pinot.thirdeye.datalayer.pojo.SessionBean;
+import org.apache.pinot.thirdeye.datalayer.util.Predicate;
+import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import io.dropwizard.auth.Authenticator;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;

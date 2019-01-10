@@ -17,14 +17,14 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.dashboard.resources;
+package org.apache.pinot.thirdeye.dashboard.resources;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.linkedin.thirdeye.dashboard.Utils;
-import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
-import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
-import com.linkedin.thirdeye.datasource.DAORegistry;
-import com.linkedin.thirdeye.util.JsonResponseUtil;
+import org.apache.pinot.thirdeye.dashboard.Utils;
+import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
+import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
+import org.apache.pinot.thirdeye.datasource.DAORegistry;
+import org.apache.pinot.thirdeye.util.JsonResponseUtil;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;

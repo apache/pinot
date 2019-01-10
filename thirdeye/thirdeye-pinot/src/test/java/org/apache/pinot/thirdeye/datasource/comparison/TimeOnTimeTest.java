@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.datasource.comparison;
+package org.apache.pinot.thirdeye.datasource.comparison;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -26,18 +26,18 @@ import java.util.concurrent.TimeUnit;
 import org.joda.time.DateTime;
 
 import com.google.common.collect.Lists;
-import com.linkedin.thirdeye.api.TimeGranularity;
-import com.linkedin.thirdeye.constant.MetricAggFunction;
-import com.linkedin.thirdeye.dashboard.Utils;
-import com.linkedin.thirdeye.datasource.MetricExpression;
-import com.linkedin.thirdeye.datasource.MetricFunction;
-import com.linkedin.thirdeye.datasource.ThirdEyeDataSource;
-import com.linkedin.thirdeye.datasource.cache.QueryCache;
-import com.linkedin.thirdeye.datasource.comparison.TimeOnTimeComparisonHandler;
-import com.linkedin.thirdeye.datasource.comparison.TimeOnTimeComparisonRequest;
-import com.linkedin.thirdeye.datasource.comparison.TimeOnTimeComparisonResponse;
-import com.linkedin.thirdeye.datasource.comparison.Row.Metric;
-import com.linkedin.thirdeye.datasource.pinot.PinotThirdEyeDataSource;
+import org.apache.pinot.thirdeye.api.TimeGranularity;
+import org.apache.pinot.thirdeye.constant.MetricAggFunction;
+import org.apache.pinot.thirdeye.dashboard.Utils;
+import org.apache.pinot.thirdeye.datasource.MetricExpression;
+import org.apache.pinot.thirdeye.datasource.MetricFunction;
+import org.apache.pinot.thirdeye.datasource.ThirdEyeDataSource;
+import org.apache.pinot.thirdeye.datasource.cache.QueryCache;
+import org.apache.pinot.thirdeye.datasource.comparison.TimeOnTimeComparisonHandler;
+import org.apache.pinot.thirdeye.datasource.comparison.TimeOnTimeComparisonRequest;
+import org.apache.pinot.thirdeye.datasource.comparison.TimeOnTimeComparisonResponse;
+import org.apache.pinot.thirdeye.datasource.comparison.Row.Metric;
+import org.apache.pinot.thirdeye.datasource.pinot.PinotThirdEyeDataSource;
 
 /** Manual test for verifying code works as expected (ie without exceptions thrown) */
 public class TimeOnTimeTest {

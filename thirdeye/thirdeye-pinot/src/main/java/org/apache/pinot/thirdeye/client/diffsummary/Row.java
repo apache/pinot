@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.client.diffsummary;
+package org.apache.pinot.thirdeye.client.diffsummary;
 
 import com.google.common.base.Preconditions;
 import java.util.Objects;

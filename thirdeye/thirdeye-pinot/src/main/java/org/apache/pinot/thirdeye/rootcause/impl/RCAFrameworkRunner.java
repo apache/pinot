@@ -17,19 +17,19 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.rootcause.impl;
+package org.apache.pinot.thirdeye.rootcause.impl;
 
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
-import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
-import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
-import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
-import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
-import com.linkedin.thirdeye.rootcause.Entity;
-import com.linkedin.thirdeye.rootcause.Pipeline;
-import com.linkedin.thirdeye.rootcause.RCAFramework;
-import com.linkedin.thirdeye.rootcause.RCAFrameworkExecutionResult;
-import com.linkedin.thirdeye.rootcause.util.EntityUtils;
+import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
+import org.apache.pinot.thirdeye.common.ThirdEyeConfiguration;
+import org.apache.pinot.thirdeye.datalayer.util.DaoProviderUtil;
+import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
+import org.apache.pinot.thirdeye.rootcause.Entity;
+import org.apache.pinot.thirdeye.rootcause.Pipeline;
+import org.apache.pinot.thirdeye.rootcause.RCAFramework;
+import org.apache.pinot.thirdeye.rootcause.RCAFrameworkExecutionResult;
+import org.apache.pinot.thirdeye.rootcause.util.EntityUtils;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
@@ -63,7 +63,7 @@ import org.slf4j.LoggerFactory;
  * The user can specify the TimeRange and Baseline entities, as well as arbitrary URNs to
  * populate the search context with. The console interface allows one-off or interactive REPL execution modes.
  *
- * <br/><b>Example:</b> {@code java -cp target/thirdeye-pinot-1.0-SNAPSHOT.jar com.linkedin.thirdeye.rootcause.impl.RCAFrameworkRunner
+ * <br/><b>Example:</b> {@code java -cp target/thirdeye-pinot-1.0-SNAPSHOT.jar org.apache.pinot.thirdeye.rootcause.impl.RCAFrameworkRunner
  * --config-dir local-configs/ --window-size 28 --baseline-offset 28 --entities thirdeye:metric:pageViews,thirdeye:metric:logins}
  *
  */

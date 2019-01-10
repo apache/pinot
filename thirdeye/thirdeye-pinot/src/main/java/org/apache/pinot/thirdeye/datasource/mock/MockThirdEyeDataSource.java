@@ -17,19 +17,19 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datasource.mock;
+package org.apache.pinot.thirdeye.datasource.mock;
 
 import com.google.common.base.Predicate;
 import com.google.common.collect.Collections2;
-import com.linkedin.thirdeye.dataframe.DataFrame;
-import com.linkedin.thirdeye.dataframe.StringSeries;
-import com.linkedin.thirdeye.dataframe.util.DataFrameUtils;
-import com.linkedin.thirdeye.datasource.MetadataSourceConfig;
-import com.linkedin.thirdeye.datasource.ThirdEyeDataSource;
-import com.linkedin.thirdeye.datasource.ThirdEyeRequest;
-import com.linkedin.thirdeye.datasource.ThirdEyeResponse;
-import com.linkedin.thirdeye.datasource.csv.CSVThirdEyeDataSource;
-import com.linkedin.thirdeye.detection.ConfigUtils;
+import org.apache.pinot.thirdeye.dataframe.DataFrame;
+import org.apache.pinot.thirdeye.dataframe.StringSeries;
+import org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils;
+import org.apache.pinot.thirdeye.datasource.MetadataSourceConfig;
+import org.apache.pinot.thirdeye.datasource.ThirdEyeDataSource;
+import org.apache.pinot.thirdeye.datasource.ThirdEyeRequest;
+import org.apache.pinot.thirdeye.datasource.ThirdEyeResponse;
+import org.apache.pinot.thirdeye.datasource.csv.CSVThirdEyeDataSource;
+import org.apache.pinot.thirdeye.detection.ConfigUtils;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -52,7 +52,7 @@ import org.joda.time.PeriodType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
+import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
 
 
 /**

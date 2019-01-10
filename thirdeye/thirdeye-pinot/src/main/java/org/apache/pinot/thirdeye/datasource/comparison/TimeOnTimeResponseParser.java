@@ -17,9 +17,9 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datasource.comparison;
+package org.apache.pinot.thirdeye.datasource.comparison;
 
-import static com.linkedin.thirdeye.datasource.ResponseParserUtils.OTHER;
+import static org.apache.pinot.thirdeye.datasource.ResponseParserUtils.OTHER;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -35,14 +35,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.common.collect.Range;
-import com.linkedin.thirdeye.api.TimeGranularity;
-import com.linkedin.thirdeye.datasource.MetricFunction;
-import com.linkedin.thirdeye.datasource.ResponseParserUtils;
-import com.linkedin.thirdeye.datasource.ThirdEyeResponse;
-import com.linkedin.thirdeye.datasource.ThirdEyeResponseRow;
-import com.linkedin.thirdeye.datasource.comparison.Row.Builder;
-import com.linkedin.thirdeye.datasource.comparison.Row.Metric;
-import com.linkedin.thirdeye.util.ThirdEyeUtils;
+import org.apache.pinot.thirdeye.api.TimeGranularity;
+import org.apache.pinot.thirdeye.datasource.MetricFunction;
+import org.apache.pinot.thirdeye.datasource.ResponseParserUtils;
+import org.apache.pinot.thirdeye.datasource.ThirdEyeResponse;
+import org.apache.pinot.thirdeye.datasource.ThirdEyeResponseRow;
+import org.apache.pinot.thirdeye.datasource.comparison.Row.Builder;
+import org.apache.pinot.thirdeye.datasource.comparison.Row.Metric;
+import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
 
 public class TimeOnTimeResponseParser {
 

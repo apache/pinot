@@ -17,10 +17,10 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.detection.annotation;
+package org.apache.pinot.thirdeye.detection.annotation;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.linkedin.thirdeye.detection.annotation.registry.DetectionRegistry;
+import org.apache.pinot.thirdeye.detection.annotation.registry.DetectionRegistry;
 import com.wordnik.swagger.annotations.ApiParam;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;

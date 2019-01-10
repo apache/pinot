@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomalydetection.context;
+package org.apache.pinot.thirdeye.anomalydetection.context;
 
 import java.util.Set;
 import org.joda.time.Interval;

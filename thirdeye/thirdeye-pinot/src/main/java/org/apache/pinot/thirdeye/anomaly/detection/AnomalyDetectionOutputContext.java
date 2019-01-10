@@ -17,11 +17,11 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomaly.detection;
+package org.apache.pinot.thirdeye.anomaly.detection;
 
 import com.google.common.collect.ListMultimap;
-import com.linkedin.thirdeye.api.DimensionMap;
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.api.DimensionMap;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 
 public class AnomalyDetectionOutputContext {
   ListMultimap<DimensionMap, MergedAnomalyResultDTO> mergedAnomalies;

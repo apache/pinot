@@ -17,18 +17,18 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomaly.monitor;
+package org.apache.pinot.thirdeye.anomaly.monitor;
 
-import com.linkedin.thirdeye.anomaly.job.JobConstants.JobStatus;
-import com.linkedin.thirdeye.anomaly.monitor.MonitorConstants.MonitorType;
-import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskStatus;
-import com.linkedin.thirdeye.anomaly.task.TaskContext;
-import com.linkedin.thirdeye.anomaly.task.TaskInfo;
-import com.linkedin.thirdeye.anomaly.task.TaskResult;
-import com.linkedin.thirdeye.anomaly.task.TaskRunner;
-import com.linkedin.thirdeye.datalayer.dto.JobDTO;
-import com.linkedin.thirdeye.datalayer.dto.TaskDTO;
-import com.linkedin.thirdeye.datasource.DAORegistry;
+import org.apache.pinot.thirdeye.anomaly.job.JobConstants.JobStatus;
+import org.apache.pinot.thirdeye.anomaly.monitor.MonitorConstants.MonitorType;
+import org.apache.pinot.thirdeye.anomaly.task.TaskConstants.TaskStatus;
+import org.apache.pinot.thirdeye.anomaly.task.TaskContext;
+import org.apache.pinot.thirdeye.anomaly.task.TaskInfo;
+import org.apache.pinot.thirdeye.anomaly.task.TaskResult;
+import org.apache.pinot.thirdeye.anomaly.task.TaskRunner;
+import org.apache.pinot.thirdeye.datalayer.dto.JobDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.TaskDTO;
+import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;

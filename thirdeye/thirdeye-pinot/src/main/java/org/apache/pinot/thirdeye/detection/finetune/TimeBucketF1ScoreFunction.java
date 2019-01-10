@@ -17,17 +17,17 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.detection.finetune;
+package org.apache.pinot.thirdeye.detection.finetune;
 
 import com.google.common.base.Function;
 import com.google.common.base.Predicate;
 import com.google.common.collect.Collections2;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
-import com.linkedin.thirdeye.api.DimensionMap;
-import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.detection.DetectionPipelineResult;
+import org.apache.pinot.thirdeye.api.DimensionMap;
+import org.apache.pinot.thirdeye.constant.AnomalyFeedbackType;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.detection.DetectionPipelineResult;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;

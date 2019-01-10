@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.client.diffsummary;
+package org.apache.pinot.thirdeye.client.diffsummary;
 
 import java.util.ArrayList;
 import java.util.Collections;

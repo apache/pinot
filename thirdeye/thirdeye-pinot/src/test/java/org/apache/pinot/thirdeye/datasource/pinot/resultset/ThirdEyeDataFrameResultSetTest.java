@@ -14,14 +14,14 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.datasource.pinot.resultset;
+package org.apache.pinot.thirdeye.datasource.pinot.resultset;
 
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.client.PinotClientException;
 import com.linkedin.pinot.client.ResultSet;
-import com.linkedin.thirdeye.dataframe.DataFrame;
-import com.linkedin.thirdeye.dataframe.ObjectSeries;
-import com.linkedin.thirdeye.dataframe.StringSeries;
+import org.apache.pinot.thirdeye.dataframe.DataFrame;
+import org.apache.pinot.thirdeye.dataframe.ObjectSeries;
+import org.apache.pinot.thirdeye.dataframe.StringSeries;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;

@@ -17,26 +17,26 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.detection.algorithm;
+package org.apache.pinot.thirdeye.detection.algorithm;
 
 import com.google.common.base.Strings;
 import com.google.common.collect.ArrayListMultimap;
-import com.linkedin.thirdeye.dataframe.DataFrame;
-import com.linkedin.thirdeye.dataframe.util.MetricSlice;
-import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.detection.DataProvider;
-import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
-import com.linkedin.thirdeye.rootcause.timeseries.Baseline;
-import com.linkedin.thirdeye.rootcause.timeseries.BaselineAggregate;
-import com.linkedin.thirdeye.rootcause.timeseries.BaselineAggregateType;
+import org.apache.pinot.thirdeye.dataframe.DataFrame;
+import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.detection.DataProvider;
+import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
+import org.apache.pinot.thirdeye.rootcause.timeseries.Baseline;
+import org.apache.pinot.thirdeye.rootcause.timeseries.BaselineAggregate;
+import org.apache.pinot.thirdeye.rootcause.timeseries.BaselineAggregateType;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Map;
 import org.apache.commons.collections.MapUtils;
 import org.joda.time.DateTimeZone;
 
-import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
+import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
 
 
 /**

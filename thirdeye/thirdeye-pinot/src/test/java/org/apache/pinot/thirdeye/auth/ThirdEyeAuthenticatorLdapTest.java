@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.auth;
+package org.apache.pinot.thirdeye.auth;
 
 import com.google.common.base.Optional;
 import io.dropwizard.auth.AuthenticationException;

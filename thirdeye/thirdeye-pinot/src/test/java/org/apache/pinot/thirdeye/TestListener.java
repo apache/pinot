@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye;
+package org.apache.pinot.thirdeye;
 
-import com.linkedin.thirdeye.datasource.DAORegistry;
+import org.apache.pinot.thirdeye.datasource.DAORegistry;
 
 import org.testng.ITestContext;
 import org.testng.ITestListener;

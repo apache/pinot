@@ -17,29 +17,29 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.dataframe.util;
+package org.apache.pinot.thirdeye.dataframe.util;
 
-import com.linkedin.thirdeye.api.TimeGranularity;
-import com.linkedin.thirdeye.dashboard.Utils;
-import com.linkedin.thirdeye.dataframe.DataFrame;
-import com.linkedin.thirdeye.dataframe.DoubleSeries;
-import com.linkedin.thirdeye.dataframe.LongSeries;
-import com.linkedin.thirdeye.dataframe.Series;
-import com.linkedin.thirdeye.dataframe.StringSeries;
-import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
-import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
-import com.linkedin.thirdeye.datasource.DAORegistry;
-import com.linkedin.thirdeye.datasource.MetricExpression;
-import com.linkedin.thirdeye.datasource.MetricFunction;
-import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
-import com.linkedin.thirdeye.datasource.ThirdEyeRequest;
-import com.linkedin.thirdeye.datasource.ThirdEyeResponse;
-import com.linkedin.thirdeye.datasource.ThirdEyeResponseRow;
-import com.linkedin.thirdeye.datasource.cache.QueryCache;
-import com.linkedin.thirdeye.datasource.pinot.resultset.ThirdEyeResultSet;
-import com.linkedin.thirdeye.datasource.pinot.resultset.ThirdEyeResultSetGroup;
+import org.apache.pinot.thirdeye.api.TimeGranularity;
+import org.apache.pinot.thirdeye.dashboard.Utils;
+import org.apache.pinot.thirdeye.dataframe.DataFrame;
+import org.apache.pinot.thirdeye.dataframe.DoubleSeries;
+import org.apache.pinot.thirdeye.dataframe.LongSeries;
+import org.apache.pinot.thirdeye.dataframe.Series;
+import org.apache.pinot.thirdeye.dataframe.StringSeries;
+import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
+import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
+import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
+import org.apache.pinot.thirdeye.datasource.DAORegistry;
+import org.apache.pinot.thirdeye.datasource.MetricExpression;
+import org.apache.pinot.thirdeye.datasource.MetricFunction;
+import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
+import org.apache.pinot.thirdeye.datasource.ThirdEyeRequest;
+import org.apache.pinot.thirdeye.datasource.ThirdEyeResponse;
+import org.apache.pinot.thirdeye.datasource.ThirdEyeResponseRow;
+import org.apache.pinot.thirdeye.datasource.cache.QueryCache;
+import org.apache.pinot.thirdeye.datasource.pinot.resultset.ThirdEyeResultSet;
+import org.apache.pinot.thirdeye.datasource.pinot.resultset.ThirdEyeResultSetGroup;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;

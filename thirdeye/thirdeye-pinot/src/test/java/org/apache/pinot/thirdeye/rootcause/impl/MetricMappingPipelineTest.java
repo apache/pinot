@@ -17,19 +17,19 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.rootcause.impl;
+package org.apache.pinot.thirdeye.rootcause.impl;
 
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
-import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.EntityToEntityMappingDTO;
-import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
-import com.linkedin.thirdeye.rootcause.Entity;
-import com.linkedin.thirdeye.rootcause.MockDatasetConfigManager;
-import com.linkedin.thirdeye.rootcause.MockEntityToEntityMappingManager;
-import com.linkedin.thirdeye.rootcause.MockMetricConfigManager;
-import com.linkedin.thirdeye.rootcause.PipelineContext;
-import com.linkedin.thirdeye.rootcause.PipelineResult;
+import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.EntityToEntityMappingDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
+import org.apache.pinot.thirdeye.rootcause.Entity;
+import org.apache.pinot.thirdeye.rootcause.MockDatasetConfigManager;
+import org.apache.pinot.thirdeye.rootcause.MockEntityToEntityMappingManager;
+import org.apache.pinot.thirdeye.rootcause.MockMetricConfigManager;
+import org.apache.pinot.thirdeye.rootcause.PipelineContext;
+import org.apache.pinot.thirdeye.rootcause.PipelineResult;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;

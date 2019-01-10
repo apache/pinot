@@ -17,27 +17,27 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.common;
+package org.apache.pinot.thirdeye.common;
 
 import com.fasterxml.jackson.databind.Module;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.module.SimpleModule;
-import com.linkedin.thirdeye.dataframe.DataFrame;
-import com.linkedin.thirdeye.dataframe.util.DataFrameSerializer;
-import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
-import com.linkedin.thirdeye.datalayer.bao.AutotuneConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.JobManager;
-import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
-import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.jdbc.AnomalyFunctionManagerImpl;
-import com.linkedin.thirdeye.datalayer.bao.jdbc.AutotuneConfigManagerImpl;
-import com.linkedin.thirdeye.datalayer.bao.jdbc.DatasetConfigManagerImpl;
-import com.linkedin.thirdeye.datalayer.bao.jdbc.JobManagerImpl;
-import com.linkedin.thirdeye.datalayer.bao.jdbc.MergedAnomalyResultManagerImpl;
-import com.linkedin.thirdeye.datalayer.bao.jdbc.MetricConfigManagerImpl;
-import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
-import com.linkedin.thirdeye.datasource.DAORegistry;
+import org.apache.pinot.thirdeye.dataframe.DataFrame;
+import org.apache.pinot.thirdeye.dataframe.util.DataFrameSerializer;
+import org.apache.pinot.thirdeye.datalayer.bao.AnomalyFunctionManager;
+import org.apache.pinot.thirdeye.datalayer.bao.AutotuneConfigManager;
+import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
+import org.apache.pinot.thirdeye.datalayer.bao.JobManager;
+import org.apache.pinot.thirdeye.datalayer.bao.MergedAnomalyResultManager;
+import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
+import org.apache.pinot.thirdeye.datalayer.bao.jdbc.AnomalyFunctionManagerImpl;
+import org.apache.pinot.thirdeye.datalayer.bao.jdbc.AutotuneConfigManagerImpl;
+import org.apache.pinot.thirdeye.datalayer.bao.jdbc.DatasetConfigManagerImpl;
+import org.apache.pinot.thirdeye.datalayer.bao.jdbc.JobManagerImpl;
+import org.apache.pinot.thirdeye.datalayer.bao.jdbc.MergedAnomalyResultManagerImpl;
+import org.apache.pinot.thirdeye.datalayer.bao.jdbc.MetricConfigManagerImpl;
+import org.apache.pinot.thirdeye.datalayer.util.DaoProviderUtil;
+import org.apache.pinot.thirdeye.datasource.DAORegistry;
 
 import io.dropwizard.Application;
 import io.dropwizard.Configuration;

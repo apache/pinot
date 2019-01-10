@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.anomaly.detection;
+package org.apache.pinot.thirdeye.anomaly.detection;
 
-import com.linkedin.thirdeye.anomalydetection.context.AnomalyResult;
-import com.linkedin.thirdeye.anomalydetection.context.RawAnomalyResult;
+import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyResult;
+import org.apache.pinot.thirdeye.anomalydetection.context.RawAnomalyResult;
 import java.util.ArrayList;
 import java.util.List;
 import org.testng.Assert;

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.anomalydetection.model.transform;
+package org.apache.pinot.thirdeye.anomalydetection.model.transform;
 
 import org.testng.Assert;
 import org.testng.annotations.Test;

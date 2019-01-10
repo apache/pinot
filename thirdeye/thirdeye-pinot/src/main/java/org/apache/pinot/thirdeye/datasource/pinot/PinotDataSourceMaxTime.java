@@ -17,15 +17,15 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datasource.pinot;
+package org.apache.pinot.thirdeye.datasource.pinot;
 
-import com.linkedin.thirdeye.anomaly.utils.ThirdeyeMetricsUtil;
-import com.linkedin.thirdeye.api.TimeSpec;
-import com.linkedin.thirdeye.dashboard.Utils;
-import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
-import com.linkedin.thirdeye.datasource.DAORegistry;
-import com.linkedin.thirdeye.datasource.pinot.resultset.ThirdEyeResultSetGroup;
-import com.linkedin.thirdeye.util.ThirdEyeUtils;
+import org.apache.pinot.thirdeye.anomaly.utils.ThirdeyeMetricsUtil;
+import org.apache.pinot.thirdeye.api.TimeSpec;
+import org.apache.pinot.thirdeye.dashboard.Utils;
+import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
+import org.apache.pinot.thirdeye.datasource.DAORegistry;
+import org.apache.pinot.thirdeye.datasource.pinot.resultset.ThirdEyeResultSetGroup;
+import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;

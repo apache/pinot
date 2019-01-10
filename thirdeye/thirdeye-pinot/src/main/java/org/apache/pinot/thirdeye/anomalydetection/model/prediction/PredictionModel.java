@@ -17,10 +17,10 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomalydetection.model.prediction;
+package org.apache.pinot.thirdeye.anomalydetection.model.prediction;
 
-import com.linkedin.thirdeye.anomalydetection.context.AnomalyDetectionContext;
-import com.linkedin.thirdeye.anomalydetection.context.TimeSeries;
+import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyDetectionContext;
+import org.apache.pinot.thirdeye.anomalydetection.context.TimeSeries;
 import java.util.List;
 import java.util.Properties;
 

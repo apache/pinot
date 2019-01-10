@@ -17,14 +17,14 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.detection.algorithm.stage;
+package org.apache.pinot.thirdeye.detection.algorithm.stage;
 
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.detection.DataProvider;
-import com.linkedin.thirdeye.detection.DefaultInputDataFetcher;
-import com.linkedin.thirdeye.detection.InputDataFetcher;
-import com.linkedin.thirdeye.detection.spi.model.InputData;
-import com.linkedin.thirdeye.detection.spi.model.InputDataSpec;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.detection.DataProvider;
+import org.apache.pinot.thirdeye.detection.DefaultInputDataFetcher;
+import org.apache.pinot.thirdeye.detection.InputDataFetcher;
+import org.apache.pinot.thirdeye.detection.spi.model.InputData;
+import org.apache.pinot.thirdeye.detection.spi.model.InputDataSpec;
 import java.util.Map;
 
 

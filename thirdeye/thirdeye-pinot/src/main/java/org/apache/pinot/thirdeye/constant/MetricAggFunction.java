@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.constant;
+package org.apache.pinot.thirdeye.constant;
 
 public enum MetricAggFunction {
   SUM, AVG, COUNT, MAX, PCT50, PCT90, PCT95, PCT99;

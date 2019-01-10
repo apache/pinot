@@ -17,10 +17,10 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.auto.onboard;
+package org.apache.pinot.thirdeye.auto.onboard;
 
-import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
-import com.linkedin.thirdeye.api.TimeGranularity;
+import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
+import org.apache.pinot.thirdeye.api.TimeGranularity;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;

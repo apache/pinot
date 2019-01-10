@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomalydetection.model.merge;
+package org.apache.pinot.thirdeye.anomalydetection.model.merge;
 
 /**
  * If a merge model implements this interface, then its merge strategy does not require additional

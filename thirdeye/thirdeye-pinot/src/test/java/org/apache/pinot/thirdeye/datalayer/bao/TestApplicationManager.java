@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.datalayer.bao;
+package org.apache.pinot.thirdeye.datalayer.bao;
 
-import com.linkedin.thirdeye.datalayer.dto.ApplicationDTO;
-import com.linkedin.thirdeye.datasource.DAORegistry;
+import org.apache.pinot.thirdeye.datalayer.dto.ApplicationDTO;
+import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;

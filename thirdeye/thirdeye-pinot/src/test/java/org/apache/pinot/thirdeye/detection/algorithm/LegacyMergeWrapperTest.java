@@ -14,19 +14,19 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.detection.algorithm;
+package org.apache.pinot.thirdeye.detection.algorithm;
 
-import com.linkedin.thirdeye.dataframe.DataFrame;
-import com.linkedin.thirdeye.dataframe.util.MetricSlice;
-import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
-import com.linkedin.thirdeye.detection.DataProvider;
-import com.linkedin.thirdeye.detection.DetectionPipelineResult;
-import com.linkedin.thirdeye.detection.MockDataProvider;
-import com.linkedin.thirdeye.detection.MockPipeline;
-import com.linkedin.thirdeye.detection.MockPipelineLoader;
-import com.linkedin.thirdeye.detection.MockPipelineOutput;
+import org.apache.pinot.thirdeye.dataframe.DataFrame;
+import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
+import org.apache.pinot.thirdeye.detection.DataProvider;
+import org.apache.pinot.thirdeye.detection.DetectionPipelineResult;
+import org.apache.pinot.thirdeye.detection.MockDataProvider;
+import org.apache.pinot.thirdeye.detection.MockPipeline;
+import org.apache.pinot.thirdeye.detection.MockPipelineLoader;
+import org.apache.pinot.thirdeye.detection.MockPipelineOutput;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -38,8 +38,8 @@ import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
-import static com.linkedin.thirdeye.detection.DetectionTestUtils.*;
+import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
+import static org.apache.pinot.thirdeye.detection.DetectionTestUtils.*;
 
 
 public class LegacyMergeWrapperTest {
@@ -52,7 +52,7 @@ public class LegacyMergeWrapperTest {
   private static final String PROP_PROPERTIES = "properties";
   private static final String PROP_NESTED = "nested";
   private static final String PROP_ANOMALY_FUNCTION_CLASS_NAME = "anomalyFunctionClassName";
-  private static final String PROP_ANOMALY_FUNCTION_CLASS_NAME_VALUE = "com.linkedin.thirdeye.anomalydetection.function.MinMaxThresholdFunction";
+  private static final String PROP_ANOMALY_FUNCTION_CLASS_NAME_VALUE = "org.apache.pinot.thirdeye.anomalydetection.function.MinMaxThresholdFunction";
 
   private DetectionConfigDTO config;
   private Map<String, Object> properties;

@@ -17,9 +17,9 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.rootcause;
+package org.apache.pinot.thirdeye.rootcause;
 
-import com.linkedin.thirdeye.rootcause.impl.LinearAggregationPipeline;
+import org.apache.pinot.thirdeye.rootcause.impl.LinearAggregationPipeline;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;

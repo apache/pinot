@@ -17,12 +17,12 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomalydetection.context;
+package org.apache.pinot.thirdeye.anomalydetection.context;
 
 import com.google.common.base.MoreObjects;
 import com.google.common.base.Preconditions;
-import com.linkedin.thirdeye.api.DimensionMap;
-import com.linkedin.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
+import org.apache.pinot.thirdeye.api.DimensionMap;
+import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
 import java.util.Collections;
 import java.util.Map;
 

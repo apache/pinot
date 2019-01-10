@@ -17,13 +17,13 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomaly.alert.util;
+package org.apache.pinot.thirdeye.anomaly.alert.util;
 
-import com.linkedin.thirdeye.alert.content.EmailContentFormatterConfiguration;
-import com.linkedin.thirdeye.anomaly.SmtpConfiguration;
-import com.linkedin.thirdeye.anomaly.utils.EmailUtils;
-import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
-import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterRecipients;
+import org.apache.pinot.thirdeye.alert.content.EmailContentFormatterConfiguration;
+import org.apache.pinot.thirdeye.anomaly.SmtpConfiguration;
+import org.apache.pinot.thirdeye.anomaly.utils.EmailUtils;
+import org.apache.pinot.thirdeye.common.ThirdEyeConfiguration;
+import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterRecipients;
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -37,7 +37,7 @@ import org.quartz.JobExecutionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static com.linkedin.thirdeye.anomaly.SmtpConfiguration.SMTP_CONFIG_KEY;
+import static org.apache.pinot.thirdeye.anomaly.SmtpConfiguration.SMTP_CONFIG_KEY;
 
 
 public class EmailScreenshotHelper {

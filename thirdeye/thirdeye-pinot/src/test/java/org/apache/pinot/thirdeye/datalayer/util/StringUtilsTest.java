@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.datalayer.util;
+package org.apache.pinot.thirdeye.datalayer.util;
 
 import java.util.Properties;
 import org.testng.Assert;

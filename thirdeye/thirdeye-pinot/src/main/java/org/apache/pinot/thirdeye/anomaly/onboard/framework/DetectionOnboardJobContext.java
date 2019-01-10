@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomaly.onboard.framework;
+package org.apache.pinot.thirdeye.anomaly.onboard.framework;
 
 import com.google.common.base.Preconditions;
 import org.apache.commons.configuration.Configuration;

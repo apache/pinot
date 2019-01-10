@@ -17,9 +17,9 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datalayer.entity;
+package org.apache.pinot.thirdeye.datalayer.entity;
 
-import com.linkedin.thirdeye.anomaly.events.EventType;
+import org.apache.pinot.thirdeye.anomaly.events.EventType;
 
 public class EventIndex extends AbstractIndexEntity {
   String name;

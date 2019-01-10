@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.datalayer.bao;
+package org.apache.pinot.thirdeye.datalayer.bao;
 
-import com.linkedin.thirdeye.datalayer.DaoTestUtils;
-import com.linkedin.thirdeye.datalayer.dto.ClassificationConfigDTO;
-import com.linkedin.thirdeye.datasource.DAORegistry;
+import org.apache.pinot.thirdeye.datalayer.DaoTestUtils;
+import org.apache.pinot.thirdeye.datalayer.dto.ClassificationConfigDTO;
+import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;

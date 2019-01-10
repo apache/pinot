@@ -17,27 +17,27 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.detection.components;
+package org.apache.pinot.thirdeye.detection.components;
 
-import com.linkedin.thirdeye.dashboard.resources.v2.BaselineParsingUtils;
-import com.linkedin.thirdeye.dataframe.DataFrame;
-import com.linkedin.thirdeye.dataframe.util.MetricSlice;
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.detection.InputDataFetcher;
-import com.linkedin.thirdeye.detection.Pattern;
-import com.linkedin.thirdeye.detection.annotation.Components;
-import com.linkedin.thirdeye.detection.annotation.DetectionTag;
-import com.linkedin.thirdeye.detection.spec.PercentageChangeRuleAnomalyFilterSpec;
-import com.linkedin.thirdeye.detection.spi.components.AnomalyFilter;
-import com.linkedin.thirdeye.detection.spi.model.InputDataSpec;
-import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
-import com.linkedin.thirdeye.rootcause.timeseries.Baseline;
+import org.apache.pinot.thirdeye.dashboard.resources.v2.BaselineParsingUtils;
+import org.apache.pinot.thirdeye.dataframe.DataFrame;
+import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.detection.InputDataFetcher;
+import org.apache.pinot.thirdeye.detection.Pattern;
+import org.apache.pinot.thirdeye.detection.annotation.Components;
+import org.apache.pinot.thirdeye.detection.annotation.DetectionTag;
+import org.apache.pinot.thirdeye.detection.spec.PercentageChangeRuleAnomalyFilterSpec;
+import org.apache.pinot.thirdeye.detection.spi.components.AnomalyFilter;
+import org.apache.pinot.thirdeye.detection.spi.model.InputDataSpec;
+import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
+import org.apache.pinot.thirdeye.rootcause.timeseries.Baseline;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang.StringUtils;
 
-import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
+import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
 
 /**
  * Percentage change anomaly filter. Check if the anomaly's percentage change compared to baseline is above the threshold.

@@ -17,9 +17,9 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.detection;
+package org.apache.pinot.thirdeye.detection;
 
-import com.linkedin.thirdeye.anomaly.task.TaskInfo;
+import org.apache.pinot.thirdeye.anomaly.task.TaskInfo;
 
 
 public class DetectionPipelineTaskInfo implements TaskInfo {

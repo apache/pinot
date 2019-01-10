@@ -14,18 +14,18 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.datasource.csv;
+package org.apache.pinot.thirdeye.datasource.csv;
 
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
-import com.linkedin.thirdeye.api.TimeGranularity;
-import com.linkedin.thirdeye.api.TimeSpec;
-import com.linkedin.thirdeye.constant.MetricAggFunction;
-import com.linkedin.thirdeye.dataframe.DataFrame;
-import com.linkedin.thirdeye.datasource.MetricFunction;
-import com.linkedin.thirdeye.datasource.ThirdEyeDataSource;
-import com.linkedin.thirdeye.datasource.ThirdEyeRequest;
-import com.linkedin.thirdeye.datasource.ThirdEyeResponse;
+import org.apache.pinot.thirdeye.api.TimeGranularity;
+import org.apache.pinot.thirdeye.api.TimeSpec;
+import org.apache.pinot.thirdeye.constant.MetricAggFunction;
+import org.apache.pinot.thirdeye.dataframe.DataFrame;
+import org.apache.pinot.thirdeye.datasource.MetricFunction;
+import org.apache.pinot.thirdeye.datasource.ThirdEyeDataSource;
+import org.apache.pinot.thirdeye.datasource.ThirdEyeRequest;
+import org.apache.pinot.thirdeye.datasource.ThirdEyeResponse;
 import java.net.URL;
 import java.util.Arrays;
 import java.util.Collections;

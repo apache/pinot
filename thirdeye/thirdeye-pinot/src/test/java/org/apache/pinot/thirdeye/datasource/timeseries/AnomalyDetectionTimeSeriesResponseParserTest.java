@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.datasource.timeseries;
+package org.apache.pinot.thirdeye.datasource.timeseries;
 
 import java.util.Arrays;
 import java.util.HashSet;
@@ -25,7 +25,7 @@ import org.joda.time.DateTime;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import static com.linkedin.thirdeye.datasource.timeseries.BaseTimeSeriesResponseParserTest.buildMockedThirdEyeResponse;
+import static org.apache.pinot.thirdeye.datasource.timeseries.BaseTimeSeriesResponseParserTest.buildMockedThirdEyeResponse;
 
 public class AnomalyDetectionTimeSeriesResponseParserTest {
   @Test

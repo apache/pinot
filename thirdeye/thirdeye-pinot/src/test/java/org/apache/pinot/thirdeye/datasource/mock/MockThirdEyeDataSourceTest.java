@@ -1,10 +1,10 @@
-package com.linkedin.thirdeye.datasource.mock;
+package org.apache.pinot.thirdeye.datasource.mock;
 
-import com.linkedin.thirdeye.constant.MetricAggFunction;
-import com.linkedin.thirdeye.dataframe.DataFrame;
-import com.linkedin.thirdeye.datasource.MetricFunction;
-import com.linkedin.thirdeye.datasource.ThirdEyeRequest;
-import com.linkedin.thirdeye.datasource.ThirdEyeResponse;
+import org.apache.pinot.thirdeye.constant.MetricAggFunction;
+import org.apache.pinot.thirdeye.dataframe.DataFrame;
+import org.apache.pinot.thirdeye.datasource.MetricFunction;
+import org.apache.pinot.thirdeye.datasource.ThirdEyeRequest;
+import org.apache.pinot.thirdeye.datasource.ThirdEyeResponse;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.util.Arrays;

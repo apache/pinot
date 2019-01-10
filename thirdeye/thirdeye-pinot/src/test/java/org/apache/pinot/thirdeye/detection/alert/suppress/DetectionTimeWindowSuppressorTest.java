@@ -1,10 +1,10 @@
-package com.linkedin.thirdeye.detection.alert.suppress;
+package org.apache.pinot.thirdeye.detection.alert.suppress;
 
-import com.linkedin.thirdeye.datalayer.bao.DAOTestBase;
-import com.linkedin.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterRecipients;
-import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterResult;
+import org.apache.pinot.thirdeye.datalayer.bao.DAOTestBase;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterRecipients;
+import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterResult;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -21,7 +21,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import static com.linkedin.thirdeye.detection.alert.suppress.DetectionAlertTimeWindowSuppressor.*;
+import static org.apache.pinot.thirdeye.detection.alert.suppress.DetectionAlertTimeWindowSuppressor.*;
 
 
 public class DetectionTimeWindowSuppressorTest {

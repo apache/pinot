@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.util;
+package org.apache.pinot.thirdeye.util;
 
 import java.io.IOException;
 import java.util.List;

@@ -17,9 +17,9 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datalayer.dto;
+package org.apache.pinot.thirdeye.datalayer.dto;
 
-import com.linkedin.thirdeye.datalayer.pojo.DetectionAlertConfigBean;
+import org.apache.pinot.thirdeye.datalayer.pojo.DetectionAlertConfigBean;
 
 
 public class DetectionAlertConfigDTO extends DetectionAlertConfigBean {

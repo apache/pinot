@@ -17,21 +17,21 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.detection.components;
+package org.apache.pinot.thirdeye.detection.components;
 
-import com.linkedin.thirdeye.dashboard.resources.v2.BaselineParsingUtils;
-import com.linkedin.thirdeye.dataframe.Series;
-import com.linkedin.thirdeye.dataframe.util.MetricSlice;
-import com.linkedin.thirdeye.detection.InputDataFetcher;
-import com.linkedin.thirdeye.detection.annotation.Components;
-import com.linkedin.thirdeye.detection.spec.RuleBaselineProviderSpec;
-import com.linkedin.thirdeye.detection.spi.components.BaselineProvider;
-import com.linkedin.thirdeye.detection.spi.model.InputData;
-import com.linkedin.thirdeye.detection.spi.model.InputDataSpec;
-import com.linkedin.thirdeye.detection.spi.model.TimeSeries;
-import com.linkedin.thirdeye.rootcause.timeseries.Baseline;
+import org.apache.pinot.thirdeye.dashboard.resources.v2.BaselineParsingUtils;
+import org.apache.pinot.thirdeye.dataframe.Series;
+import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
+import org.apache.pinot.thirdeye.detection.InputDataFetcher;
+import org.apache.pinot.thirdeye.detection.annotation.Components;
+import org.apache.pinot.thirdeye.detection.spec.RuleBaselineProviderSpec;
+import org.apache.pinot.thirdeye.detection.spi.components.BaselineProvider;
+import org.apache.pinot.thirdeye.detection.spi.model.InputData;
+import org.apache.pinot.thirdeye.detection.spi.model.InputDataSpec;
+import org.apache.pinot.thirdeye.detection.spi.model.TimeSeries;
+import org.apache.pinot.thirdeye.rootcause.timeseries.Baseline;
 
-import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
+import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
 
 @Components(title = "rule baseline",
     type = "RULE_BASELINE"

@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.dashboard.views.heatmap;
+package org.apache.pinot.thirdeye.dashboard.views.heatmap;
 
 import java.util.HashMap;
 import java.util.List;
@@ -28,9 +28,9 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import com.linkedin.thirdeye.dashboard.views.GenericResponse;
-import com.linkedin.thirdeye.dashboard.views.GenericResponse.Info;
-import com.linkedin.thirdeye.dashboard.views.ViewResponse;
+import org.apache.pinot.thirdeye.dashboard.views.GenericResponse;
+import org.apache.pinot.thirdeye.dashboard.views.GenericResponse.Info;
+import org.apache.pinot.thirdeye.dashboard.views.ViewResponse;
 
 /**
  * Header: dimension,

@@ -17,17 +17,17 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.dashboard.resources;
+package org.apache.pinot.thirdeye.dashboard.resources;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.BaseAlertFilterAutoTune;
-import com.linkedin.thirdeye.api.Constants;
-import com.linkedin.thirdeye.dashboard.ThirdEyeDashboardConfiguration;
-import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
-import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.ApplicationDTO;
-import com.linkedin.thirdeye.detector.email.filter.BaseAlertFilter;
+import org.apache.pinot.thirdeye.anomalydetection.alertFilterAutotune.BaseAlertFilterAutoTune;
+import org.apache.pinot.thirdeye.api.Constants;
+import org.apache.pinot.thirdeye.dashboard.ThirdEyeDashboardConfiguration;
+import org.apache.pinot.thirdeye.datalayer.bao.AlertConfigManager;
+import org.apache.pinot.thirdeye.datalayer.dto.AlertConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.ApplicationDTO;
+import org.apache.pinot.thirdeye.detector.email.filter.BaseAlertFilter;
 import com.wordnik.swagger.annotations.Api;
 import com.wordnik.swagger.annotations.ApiOperation;
 import java.io.IOException;
@@ -56,7 +56,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 
-import com.linkedin.thirdeye.anomaly.detection.DetectionJobScheduler;
+import org.apache.pinot.thirdeye.anomaly.detection.DetectionJobScheduler;
 import org.apache.commons.lang.NullArgumentException;
 import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
@@ -68,26 +68,26 @@ import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.thirdeye.anomaly.detection.lib.AutotuneMethodType;
-import com.linkedin.thirdeye.anomaly.detection.lib.FunctionReplayRunnable;
-import com.linkedin.thirdeye.anomaly.job.JobConstants.JobStatus;
-import com.linkedin.thirdeye.anomaly.utils.AnomalyUtils;
-import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutotuneFactory;
-import com.linkedin.thirdeye.anomalydetection.performanceEvaluation.PerformanceEvaluateHelper;
-import com.linkedin.thirdeye.anomalydetection.performanceEvaluation.PerformanceEvaluationMethod;
-import com.linkedin.thirdeye.api.TimeGranularity;
-import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
-import com.linkedin.thirdeye.datalayer.bao.AutotuneConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
-import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
-import com.linkedin.thirdeye.datalayer.dto.AutotuneConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.datasource.DAORegistry;
-import com.linkedin.thirdeye.detector.email.filter.AlertFilter;
-import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
-import com.linkedin.thirdeye.detector.email.filter.PrecisionRecallEvaluator;
+import org.apache.pinot.thirdeye.anomaly.detection.lib.AutotuneMethodType;
+import org.apache.pinot.thirdeye.anomaly.detection.lib.FunctionReplayRunnable;
+import org.apache.pinot.thirdeye.anomaly.job.JobConstants.JobStatus;
+import org.apache.pinot.thirdeye.anomaly.utils.AnomalyUtils;
+import org.apache.pinot.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutotuneFactory;
+import org.apache.pinot.thirdeye.anomalydetection.performanceEvaluation.PerformanceEvaluateHelper;
+import org.apache.pinot.thirdeye.anomalydetection.performanceEvaluation.PerformanceEvaluationMethod;
+import org.apache.pinot.thirdeye.api.TimeGranularity;
+import org.apache.pinot.thirdeye.datalayer.bao.AnomalyFunctionManager;
+import org.apache.pinot.thirdeye.datalayer.bao.AutotuneConfigManager;
+import org.apache.pinot.thirdeye.datalayer.bao.MergedAnomalyResultManager;
+import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.AutotuneConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.datasource.DAORegistry;
+import org.apache.pinot.thirdeye.detector.email.filter.AlertFilter;
+import org.apache.pinot.thirdeye.detector.email.filter.AlertFilterFactory;
+import org.apache.pinot.thirdeye.detector.email.filter.PrecisionRecallEvaluator;
 
-import static com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO.*;
+import static org.apache.pinot.thirdeye.datalayer.dto.AnomalyFunctionDTO.*;
 
 
 @Path("/detection-job")

@@ -17,10 +17,10 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomaly.classification;
+package org.apache.pinot.thirdeye.anomaly.classification;
 
-import com.linkedin.thirdeye.anomaly.task.TaskInfo;
-import com.linkedin.thirdeye.datalayer.dto.ClassificationConfigDTO;
+import org.apache.pinot.thirdeye.anomaly.task.TaskInfo;
+import org.apache.pinot.thirdeye.datalayer.dto.ClassificationConfigDTO;
 
 public class ClassificationTaskInfo implements TaskInfo {
   private long jobexecutionId;

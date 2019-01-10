@@ -17,10 +17,10 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datalayer.dto;
+package org.apache.pinot.thirdeye.datalayer.dto;
 
 
-import com.linkedin.thirdeye.datalayer.pojo.JobBean;
+import org.apache.pinot.thirdeye.datalayer.pojo.JobBean;
 
 /**
  * This class corresponds to an anomaly job. An anomaly job is created for every execution of an

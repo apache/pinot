@@ -17,16 +17,16 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomaly.onboard.framework;
+package org.apache.pinot.thirdeye.anomaly.onboard.framework;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.thirdeye.anomaly.SmtpConfiguration;
-import com.linkedin.thirdeye.anomaly.alert.util.EmailHelper;
-import com.linkedin.thirdeye.anomaly.job.JobConstants;
-import com.linkedin.thirdeye.anomaly.onboard.tasks.DefaultDetectionOnboardJob;
-import com.linkedin.thirdeye.anomaly.task.TaskConstants;
-import com.linkedin.thirdeye.anomaly.utils.EmailUtils;
-import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterRecipients;
+import org.apache.pinot.thirdeye.anomaly.SmtpConfiguration;
+import org.apache.pinot.thirdeye.anomaly.alert.util.EmailHelper;
+import org.apache.pinot.thirdeye.anomaly.job.JobConstants;
+import org.apache.pinot.thirdeye.anomaly.onboard.tasks.DefaultDetectionOnboardJob;
+import org.apache.pinot.thirdeye.anomaly.task.TaskConstants;
+import org.apache.pinot.thirdeye.anomaly.utils.EmailUtils;
+import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterRecipients;
 import java.io.IOException;
 import java.util.List;
 import java.util.Set;

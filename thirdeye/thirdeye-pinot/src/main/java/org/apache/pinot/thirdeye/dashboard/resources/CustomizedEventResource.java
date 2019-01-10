@@ -17,13 +17,13 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.dashboard.resources;
+package org.apache.pinot.thirdeye.dashboard.resources;
 
-import com.linkedin.thirdeye.anomaly.events.EventType;
-import com.linkedin.thirdeye.api.Constants;
-import com.linkedin.thirdeye.dashboard.resources.v2.ResourceUtils;
-import com.linkedin.thirdeye.datalayer.bao.EventManager;
-import com.linkedin.thirdeye.datalayer.dto.EventDTO;
+import org.apache.pinot.thirdeye.anomaly.events.EventType;
+import org.apache.pinot.thirdeye.api.Constants;
+import org.apache.pinot.thirdeye.dashboard.resources.v2.ResourceUtils;
+import org.apache.pinot.thirdeye.datalayer.bao.EventManager;
+import org.apache.pinot.thirdeye.datalayer.dto.EventDTO;
 import com.wordnik.swagger.annotations.Api;
 import com.wordnik.swagger.annotations.ApiOperation;
 import com.wordnik.swagger.annotations.ApiParam;

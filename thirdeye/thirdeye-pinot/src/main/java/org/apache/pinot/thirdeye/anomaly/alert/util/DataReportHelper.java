@@ -17,12 +17,12 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomaly.alert.util;
+package org.apache.pinot.thirdeye.anomaly.alert.util;
 
-import com.linkedin.thirdeye.anomaly.alert.template.pojo.MetricDimensionReport;
-import com.linkedin.thirdeye.api.DimensionMap;
-import com.linkedin.thirdeye.dashboard.views.contributor.ContributorViewResponse;
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.anomaly.alert.template.pojo.MetricDimensionReport;
+import org.apache.pinot.thirdeye.api.DimensionMap;
+import org.apache.pinot.thirdeye.dashboard.views.contributor.ContributorViewResponse;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import freemarker.template.TemplateMethodModelEx;
 import freemarker.template.TemplateModelException;
 import freemarker.template.TemplateNumberModel;

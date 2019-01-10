@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.dashboard.views.diffsummary;
+package org.apache.pinot.thirdeye.dashboard.views.diffsummary;
 
 
 public class SummaryGainerLoserResponseRow extends BaseResponseRow {

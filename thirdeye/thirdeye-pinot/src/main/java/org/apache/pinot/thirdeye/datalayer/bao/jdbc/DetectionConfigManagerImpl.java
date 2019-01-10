@@ -17,14 +17,14 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datalayer.bao.jdbc;
+package org.apache.pinot.thirdeye.datalayer.bao.jdbc;
 
 import com.google.inject.Singleton;
-import com.linkedin.thirdeye.datalayer.bao.DetectionConfigManager;
-import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.datalayer.pojo.DetectionConfigBean;
-import com.linkedin.thirdeye.datalayer.pojo.MergedAnomalyResultBean;
+import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.datalayer.pojo.DetectionConfigBean;
+import org.apache.pinot.thirdeye.datalayer.pojo.MergedAnomalyResultBean;
 import java.util.Collections;
 
 

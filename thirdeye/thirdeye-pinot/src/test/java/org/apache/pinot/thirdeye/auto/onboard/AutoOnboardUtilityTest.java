@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.auto.onboard;
+package org.apache.pinot.thirdeye.auto.onboard;
 
-import com.linkedin.thirdeye.datasource.MetadataSourceConfig;
+import org.apache.pinot.thirdeye.datasource.MetadataSourceConfig;
 import java.net.URL;
 import java.util.List;
 import java.util.Map;
@@ -43,21 +43,21 @@ public class AutoOnboardUtilityTest {
 
     // Assertion on AutoOnboardDummyDataSource
     MetadataSourceConfig dummyMDSource = dsToOnboardsMap.get("PinotThirdEyeDataSource").get(0).getMetadataSourceConfig();
-    Assert.assertEquals(dummyMDSource.getClassName(), "com.linkedin.thirdeye.auto.onboard.AutoOnboardDummyDataSource");
+    Assert.assertEquals(dummyMDSource.getClassName(), "org.apache.pinot.thirdeye.auto.onboard.AutoOnboardDummyDataSource");
     Assert.assertEquals(dummyMDSource.getProperties().size(), 10);
     Assert.assertEquals(dummyMDSource.getProperties().get("username"), "username");
     Assert.assertEquals(dummyMDSource.getProperties().get("password"), "password");
 
     // Assertion on AutoOnboardAnotherDummyDataSource
     MetadataSourceConfig anotherDummyMDSource = dsToOnboardsMap.get("PinotThirdEyeDataSource").get(1).getMetadataSourceConfig();
-    Assert.assertEquals(anotherDummyMDSource.getClassName(), "com.linkedin.thirdeye.auto.onboard.AutoOnboardAnotherDummyDataSource");
+    Assert.assertEquals(anotherDummyMDSource.getClassName(), "org.apache.pinot.thirdeye.auto.onboard.AutoOnboardAnotherDummyDataSource");
     Assert.assertEquals(anotherDummyMDSource.getProperties().size(), 10);
     Assert.assertEquals(anotherDummyMDSource.getProperties().get("host"), "host");
     Assert.assertEquals(anotherDummyMDSource.getProperties().get("port"), 9999);
 
     // Assertion on AutoOnboardAnotherRandomDataSource
     MetadataSourceConfig anotherRandomMDSource = dsToOnboardsMap.get("CSVThirdEyeDataSource").get(0).getMetadataSourceConfig();
-    Assert.assertEquals(anotherRandomMDSource.getClassName(), "com.linkedin.thirdeye.auto.onboard.AutoOnboardAnotherRandomDataSource");
+    Assert.assertEquals(anotherRandomMDSource.getClassName(), "org.apache.pinot.thirdeye.auto.onboard.AutoOnboardAnotherRandomDataSource");
     Assert.assertEquals(anotherRandomMDSource.getProperties().size(), 1);
   }
 

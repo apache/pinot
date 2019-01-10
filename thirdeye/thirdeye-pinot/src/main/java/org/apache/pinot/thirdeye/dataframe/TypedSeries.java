@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.dataframe;
+package org.apache.pinot.thirdeye.dataframe;
 
 @SuppressWarnings("unchecked")
 public abstract class TypedSeries<T extends Series> extends Series {

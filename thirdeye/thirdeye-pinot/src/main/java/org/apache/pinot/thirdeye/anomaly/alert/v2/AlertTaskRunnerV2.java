@@ -17,63 +17,63 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomaly.alert.v2;
+package org.apache.pinot.thirdeye.anomaly.alert.v2;
 
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.SetMultimap;
-import com.linkedin.thirdeye.alert.commons.AnomalyFeedConfig;
-import com.linkedin.thirdeye.alert.commons.AnomalyFeedFactory;
-import com.linkedin.thirdeye.alert.commons.EmailContentFormatterFactory;
-import com.linkedin.thirdeye.alert.commons.EmailEntity;
-import com.linkedin.thirdeye.alert.content.EmailContentFormatter;
-import com.linkedin.thirdeye.alert.content.EmailContentFormatterConfiguration;
-import com.linkedin.thirdeye.alert.content.EmailContentFormatterContext;
-import com.linkedin.thirdeye.alert.feed.AnomalyFeed;
-import com.linkedin.thirdeye.anomaly.SmtpConfiguration;
-import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
-import com.linkedin.thirdeye.anomaly.alert.AlertTaskInfo;
-import com.linkedin.thirdeye.anomaly.alert.grouping.AlertGrouper;
-import com.linkedin.thirdeye.anomaly.alert.grouping.AlertGrouperFactory;
-import com.linkedin.thirdeye.anomaly.alert.grouping.DummyAlertGrouper;
-import com.linkedin.thirdeye.anomaly.alert.grouping.SimpleGroupedAnomalyMerger;
-import com.linkedin.thirdeye.anomaly.alert.grouping.auxiliary_info_provider.AlertGroupAuxiliaryInfoProvider;
-import com.linkedin.thirdeye.anomaly.alert.grouping.auxiliary_info_provider.AlertGroupRecipientProviderFactory;
-import com.linkedin.thirdeye.anomaly.alert.grouping.auxiliary_info_provider.AuxiliaryAlertGroupInfo;
-import com.linkedin.thirdeye.anomaly.alert.grouping.filter.AlertGroupFilter;
-import com.linkedin.thirdeye.anomaly.alert.grouping.filter.AlertGroupFilterFactory;
-import com.linkedin.thirdeye.anomaly.alert.template.pojo.MetricDimensionReport;
-import com.linkedin.thirdeye.anomaly.alert.util.AlertFilterHelper;
-import com.linkedin.thirdeye.anomaly.alert.util.DataReportHelper;
-import com.linkedin.thirdeye.anomaly.alert.util.EmailHelper;
-import com.linkedin.thirdeye.anomaly.task.TaskContext;
-import com.linkedin.thirdeye.anomaly.task.TaskInfo;
-import com.linkedin.thirdeye.anomaly.task.TaskResult;
-import com.linkedin.thirdeye.anomaly.task.TaskRunner;
-import com.linkedin.thirdeye.anomaly.utils.EmailUtils;
-import com.linkedin.thirdeye.anomaly.utils.ThirdeyeMetricsUtil;
-import com.linkedin.thirdeye.anomalydetection.context.AnomalyResult;
-import com.linkedin.thirdeye.api.DimensionMap;
-import com.linkedin.thirdeye.constant.AnomalyResultSource;
-import com.linkedin.thirdeye.dashboard.views.contributor.ContributorViewResponse;
-import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.AlertSnapshotManager;
-import com.linkedin.thirdeye.datalayer.bao.GroupedAnomalyResultsManager;
-import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
-import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
-import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.AlertSnapshotDTO;
-import com.linkedin.thirdeye.datalayer.dto.GroupedAnomalyResultsDTO;
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
-import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean.AlertGroupConfig;
-import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean.EmailConfig;
-import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean.EmailFormatterConfig;
-import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean.ReportConfigCollection;
-import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean.ReportMetricConfig;
-import com.linkedin.thirdeye.datasource.DAORegistry;
-import com.linkedin.thirdeye.detection.ConfigUtils;
-import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterRecipients;
-import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
+import org.apache.pinot.thirdeye.alert.commons.AnomalyFeedConfig;
+import org.apache.pinot.thirdeye.alert.commons.AnomalyFeedFactory;
+import org.apache.pinot.thirdeye.alert.commons.EmailContentFormatterFactory;
+import org.apache.pinot.thirdeye.alert.commons.EmailEntity;
+import org.apache.pinot.thirdeye.alert.content.EmailContentFormatter;
+import org.apache.pinot.thirdeye.alert.content.EmailContentFormatterConfiguration;
+import org.apache.pinot.thirdeye.alert.content.EmailContentFormatterContext;
+import org.apache.pinot.thirdeye.alert.feed.AnomalyFeed;
+import org.apache.pinot.thirdeye.anomaly.SmtpConfiguration;
+import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
+import org.apache.pinot.thirdeye.anomaly.alert.AlertTaskInfo;
+import org.apache.pinot.thirdeye.anomaly.alert.grouping.AlertGrouper;
+import org.apache.pinot.thirdeye.anomaly.alert.grouping.AlertGrouperFactory;
+import org.apache.pinot.thirdeye.anomaly.alert.grouping.DummyAlertGrouper;
+import org.apache.pinot.thirdeye.anomaly.alert.grouping.SimpleGroupedAnomalyMerger;
+import org.apache.pinot.thirdeye.anomaly.alert.grouping.auxiliary_info_provider.AlertGroupAuxiliaryInfoProvider;
+import org.apache.pinot.thirdeye.anomaly.alert.grouping.auxiliary_info_provider.AlertGroupRecipientProviderFactory;
+import org.apache.pinot.thirdeye.anomaly.alert.grouping.auxiliary_info_provider.AuxiliaryAlertGroupInfo;
+import org.apache.pinot.thirdeye.anomaly.alert.grouping.filter.AlertGroupFilter;
+import org.apache.pinot.thirdeye.anomaly.alert.grouping.filter.AlertGroupFilterFactory;
+import org.apache.pinot.thirdeye.anomaly.alert.template.pojo.MetricDimensionReport;
+import org.apache.pinot.thirdeye.anomaly.alert.util.AlertFilterHelper;
+import org.apache.pinot.thirdeye.anomaly.alert.util.DataReportHelper;
+import org.apache.pinot.thirdeye.anomaly.alert.util.EmailHelper;
+import org.apache.pinot.thirdeye.anomaly.task.TaskContext;
+import org.apache.pinot.thirdeye.anomaly.task.TaskInfo;
+import org.apache.pinot.thirdeye.anomaly.task.TaskResult;
+import org.apache.pinot.thirdeye.anomaly.task.TaskRunner;
+import org.apache.pinot.thirdeye.anomaly.utils.EmailUtils;
+import org.apache.pinot.thirdeye.anomaly.utils.ThirdeyeMetricsUtil;
+import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyResult;
+import org.apache.pinot.thirdeye.api.DimensionMap;
+import org.apache.pinot.thirdeye.constant.AnomalyResultSource;
+import org.apache.pinot.thirdeye.dashboard.views.contributor.ContributorViewResponse;
+import org.apache.pinot.thirdeye.datalayer.bao.AlertConfigManager;
+import org.apache.pinot.thirdeye.datalayer.bao.AlertSnapshotManager;
+import org.apache.pinot.thirdeye.datalayer.bao.GroupedAnomalyResultsManager;
+import org.apache.pinot.thirdeye.datalayer.bao.MergedAnomalyResultManager;
+import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
+import org.apache.pinot.thirdeye.datalayer.dto.AlertConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.AlertSnapshotDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.GroupedAnomalyResultsDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.pojo.AlertConfigBean.AlertGroupConfig;
+import org.apache.pinot.thirdeye.datalayer.pojo.AlertConfigBean.EmailConfig;
+import org.apache.pinot.thirdeye.datalayer.pojo.AlertConfigBean.EmailFormatterConfig;
+import org.apache.pinot.thirdeye.datalayer.pojo.AlertConfigBean.ReportConfigCollection;
+import org.apache.pinot.thirdeye.datalayer.pojo.AlertConfigBean.ReportMetricConfig;
+import org.apache.pinot.thirdeye.datasource.DAORegistry;
+import org.apache.pinot.thirdeye.detection.ConfigUtils;
+import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterRecipients;
+import org.apache.pinot.thirdeye.detector.email.filter.AlertFilterFactory;
 import freemarker.template.Configuration;
 import freemarker.template.Template;
 import freemarker.template.TemplateExceptionHandler;
@@ -101,7 +101,7 @@ import org.quartz.JobExecutionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static com.linkedin.thirdeye.anomaly.SmtpConfiguration.SMTP_CONFIG_KEY;
+import static org.apache.pinot.thirdeye.anomaly.SmtpConfiguration.SMTP_CONFIG_KEY;
 
 
 public class AlertTaskRunnerV2 implements TaskRunner {
@@ -307,7 +307,7 @@ public class AlertTaskRunnerV2 implements TaskRunner {
         EmailContentFormatterConfiguration emailContemtFormatterConfig = EmailContentFormatterConfiguration
             .fromThirdEyeAnomalyConfiguration(thirdeyeConfig);
         if (emailFormatterConfig != null && StringUtils.isNotBlank(emailFormatterConfig.getProperties())) {
-          emailContentFormatter.init(com.linkedin.thirdeye.datalayer.util.
+          emailContentFormatter.init(org.apache.pinot.thirdeye.datalayer.util.
               StringUtils.decodeCompactedProperties(emailFormatterConfig.getProperties()), emailContemtFormatterConfig
               );
         } else {

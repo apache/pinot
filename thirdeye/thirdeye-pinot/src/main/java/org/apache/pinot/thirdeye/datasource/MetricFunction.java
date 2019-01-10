@@ -17,13 +17,13 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datasource;
+package org.apache.pinot.thirdeye.datasource;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Objects;
-import com.linkedin.thirdeye.constant.MetricAggFunction;
-import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
+import org.apache.pinot.thirdeye.constant.MetricAggFunction;
+import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
 
 public class MetricFunction implements Comparable<MetricFunction> {
 

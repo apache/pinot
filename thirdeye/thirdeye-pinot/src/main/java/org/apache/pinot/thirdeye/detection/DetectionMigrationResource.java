@@ -17,20 +17,20 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.detection;
+package org.apache.pinot.thirdeye.detection;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
-import com.linkedin.thirdeye.anomaly.detection.AnomalyDetectionInputContextBuilder;
-import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
-import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.DetectionConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
-import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
-import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
-import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
-import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
+import org.apache.pinot.thirdeye.anomaly.detection.AnomalyDetectionInputContextBuilder;
+import org.apache.pinot.thirdeye.datalayer.bao.AnomalyFunctionManager;
+import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
+import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
+import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
+import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
+import org.apache.pinot.thirdeye.detector.email.filter.AlertFilterFactory;
+import org.apache.pinot.thirdeye.detector.function.AnomalyFunctionFactory;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
@@ -52,7 +52,7 @@ import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.Yaml;
 
-import static com.linkedin.thirdeye.anomaly.merge.AnomalyMergeStrategy.*;
+import static org.apache.pinot.thirdeye.anomaly.merge.AnomalyMergeStrategy.*;
 
 
 /**

@@ -17,11 +17,11 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomalydetection.performanceEvaluation;
+package org.apache.pinot.thirdeye.anomalydetection.performanceEvaluation;
 
-import com.linkedin.thirdeye.api.DimensionMap;
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.util.IntervalUtils;
+import org.apache.pinot.thirdeye.api.DimensionMap;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.util.IntervalUtils;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;

@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datalayer.entity;
+package org.apache.pinot.thirdeye.datalayer.entity;
 
 public class AnomalyFunctionIndex extends AbstractIndexEntity {
   String functionName;

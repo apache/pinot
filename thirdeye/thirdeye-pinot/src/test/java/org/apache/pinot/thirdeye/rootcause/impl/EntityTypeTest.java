@@ -17,10 +17,10 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.rootcause.impl;
+package org.apache.pinot.thirdeye.rootcause.impl;
 
-import com.linkedin.thirdeye.rootcause.Entity;
-import com.linkedin.thirdeye.rootcause.util.ParsedUrn;
+import org.apache.pinot.thirdeye.rootcause.Entity;
+import org.apache.pinot.thirdeye.rootcause.util.ParsedUrn;
 import java.util.Arrays;
 import java.util.Collections;
 import org.testng.Assert;

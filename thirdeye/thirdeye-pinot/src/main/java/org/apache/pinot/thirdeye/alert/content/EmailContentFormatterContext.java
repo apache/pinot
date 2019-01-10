@@ -17,10 +17,10 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.alert.content;
+package org.apache.pinot.thirdeye.alert.content;
 
-import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.AlertConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import org.joda.time.DateTime;
 
 

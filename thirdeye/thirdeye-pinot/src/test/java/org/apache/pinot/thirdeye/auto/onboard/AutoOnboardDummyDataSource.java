@@ -1,7 +1,7 @@
-package com.linkedin.thirdeye.auto.onboard;
+package org.apache.pinot.thirdeye.auto.onboard;
 
-import com.linkedin.thirdeye.datasource.DataSourceConfig;
-import com.linkedin.thirdeye.datasource.MetadataSourceConfig;
+import org.apache.pinot.thirdeye.datasource.DataSourceConfig;
+import org.apache.pinot.thirdeye.datasource.MetadataSourceConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

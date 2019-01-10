@@ -14,20 +14,20 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.alert.feed;
+package org.apache.pinot.thirdeye.alert.feed;
 
-import com.linkedin.thirdeye.alert.commons.AnomalyFeedConfig;
-import com.linkedin.thirdeye.api.DimensionMap;
-import com.linkedin.thirdeye.datalayer.DaoTestUtils;
-import com.linkedin.thirdeye.datalayer.bao.AlertSnapshotManager;
-import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
-import com.linkedin.thirdeye.datalayer.bao.DAOTestBase;
-import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
-import com.linkedin.thirdeye.datalayer.dto.AlertSnapshotDTO;
-import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.datasource.DAORegistry;
-import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
+import org.apache.pinot.thirdeye.alert.commons.AnomalyFeedConfig;
+import org.apache.pinot.thirdeye.api.DimensionMap;
+import org.apache.pinot.thirdeye.datalayer.DaoTestUtils;
+import org.apache.pinot.thirdeye.datalayer.bao.AlertSnapshotManager;
+import org.apache.pinot.thirdeye.datalayer.bao.AnomalyFunctionManager;
+import org.apache.pinot.thirdeye.datalayer.bao.DAOTestBase;
+import org.apache.pinot.thirdeye.datalayer.bao.MergedAnomalyResultManager;
+import org.apache.pinot.thirdeye.datalayer.dto.AlertSnapshotDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.datasource.DAORegistry;
+import org.apache.pinot.thirdeye.detector.email.filter.AlertFilterFactory;
 import java.util.Collection;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;

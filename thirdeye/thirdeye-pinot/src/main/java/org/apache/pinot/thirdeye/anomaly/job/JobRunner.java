@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomaly.job;
+package org.apache.pinot.thirdeye.anomaly.job;
 
 import java.util.List;
 

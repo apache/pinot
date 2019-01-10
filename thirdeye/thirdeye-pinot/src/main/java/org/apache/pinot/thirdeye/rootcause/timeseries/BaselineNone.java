@@ -17,12 +17,12 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.rootcause.timeseries;
+package org.apache.pinot.thirdeye.rootcause.timeseries;
 
-import com.linkedin.thirdeye.dataframe.DataFrame;
-import com.linkedin.thirdeye.dataframe.DoubleSeries;
-import com.linkedin.thirdeye.dataframe.LongSeries;
-import com.linkedin.thirdeye.dataframe.util.MetricSlice;
+import org.apache.pinot.thirdeye.dataframe.DataFrame;
+import org.apache.pinot.thirdeye.dataframe.DoubleSeries;
+import org.apache.pinot.thirdeye.dataframe.LongSeries;
+import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;

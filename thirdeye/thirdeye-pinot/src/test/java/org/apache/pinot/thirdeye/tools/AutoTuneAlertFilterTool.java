@@ -14,16 +14,16 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.tools;
+package org.apache.pinot.thirdeye.tools;
 
 
-import com.linkedin.thirdeye.anomaly.utils.DetectionResourceHttpUtils;
-import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
-import com.linkedin.thirdeye.datalayer.bao.AutotuneConfigManager;
-import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
-import com.linkedin.thirdeye.datalayer.dto.AutotuneConfigDTO;
-import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
-import com.linkedin.thirdeye.detector.email.filter.PrecisionRecallEvaluator;
+import org.apache.pinot.thirdeye.anomaly.utils.DetectionResourceHttpUtils;
+import org.apache.pinot.thirdeye.datalayer.bao.AnomalyFunctionManager;
+import org.apache.pinot.thirdeye.datalayer.bao.AutotuneConfigManager;
+import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.AutotuneConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.util.DaoProviderUtil;
+import org.apache.pinot.thirdeye.detector.email.filter.PrecisionRecallEvaluator;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
@@ -62,9 +62,9 @@ public class AutoTuneAlertFilterTool {
   public AutoTuneAlertFilterTool(File persistenceFile, String authToken){
     DaoProviderUtil.init(persistenceFile);
     anomalyFunctionDAO = DaoProviderUtil
-        .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.AnomalyFunctionManagerImpl.class);
+        .getInstance(org.apache.pinot.thirdeye.datalayer.bao.jdbc.AnomalyFunctionManagerImpl.class);
     autotuneConfigDAO = DaoProviderUtil
-        .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.AutotuneConfigManagerImpl.class);
+        .getInstance(org.apache.pinot.thirdeye.datalayer.bao.jdbc.AutotuneConfigManagerImpl.class);
 
     httpUtils = new DetectionResourceHttpUtils(LOCALHOST, APPLICATION_PORT, authToken);
   }

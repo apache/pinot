@@ -17,17 +17,17 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datalayer.bao.jdbc;
+package org.apache.pinot.thirdeye.datalayer.bao.jdbc;
 
 import com.google.inject.Singleton;
-import com.linkedin.thirdeye.datalayer.bao.GroupedAnomalyResultsManager;
-import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
-import com.linkedin.thirdeye.datalayer.dto.GroupedAnomalyResultsDTO;
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.datalayer.pojo.GroupedAnomalyResultsBean;
-import com.linkedin.thirdeye.datalayer.pojo.MergedAnomalyResultBean;
-import com.linkedin.thirdeye.datalayer.util.Predicate;
-import com.linkedin.thirdeye.datasource.DAORegistry;
+import org.apache.pinot.thirdeye.datalayer.bao.GroupedAnomalyResultsManager;
+import org.apache.pinot.thirdeye.datalayer.bao.MergedAnomalyResultManager;
+import org.apache.pinot.thirdeye.datalayer.dto.GroupedAnomalyResultsDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.datalayer.pojo.GroupedAnomalyResultsBean;
+import org.apache.pinot.thirdeye.datalayer.pojo.MergedAnomalyResultBean;
+import org.apache.pinot.thirdeye.datalayer.util.Predicate;
+import org.apache.pinot.thirdeye.datasource.DAORegistry;
 
 import java.util.ArrayList;
 import java.util.Collections;

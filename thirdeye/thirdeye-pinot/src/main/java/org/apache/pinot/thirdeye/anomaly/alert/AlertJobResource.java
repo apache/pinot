@@ -17,11 +17,11 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomaly.alert;
+package org.apache.pinot.thirdeye.anomaly.alert;
 
-import com.linkedin.thirdeye.anomaly.alert.v2.AlertJobSchedulerV2;
-import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
-import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
+import org.apache.pinot.thirdeye.anomaly.alert.v2.AlertJobSchedulerV2;
+import org.apache.pinot.thirdeye.datalayer.bao.AlertConfigManager;
+import org.apache.pinot.thirdeye.datalayer.dto.AlertConfigDTO;
 import java.util.List;
 
 import javax.ws.rs.DELETE;

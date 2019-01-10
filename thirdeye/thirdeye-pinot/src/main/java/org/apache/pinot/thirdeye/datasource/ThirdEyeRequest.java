@@ -17,10 +17,10 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datasource;
+package org.apache.pinot.thirdeye.datasource;
 
 import com.google.common.collect.ArrayListMultimap;
-import com.linkedin.thirdeye.datasource.pinot.PinotThirdEyeDataSource;
+import org.apache.pinot.thirdeye.datasource.pinot.PinotThirdEyeDataSource;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -35,7 +35,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.google.common.base.MoreObjects;
 import com.google.common.collect.LinkedListMultimap;
 import com.google.common.collect.Multimap;
-import com.linkedin.thirdeye.api.TimeGranularity;
+import org.apache.pinot.thirdeye.api.TimeGranularity;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

@@ -1,11 +1,11 @@
-package com.linkedin.thirdeye.detection.yaml;
+package org.apache.pinot.thirdeye.detection.yaml;
 
-import com.linkedin.thirdeye.datalayer.bao.DAOTestBase;
-import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
-import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
-import com.linkedin.thirdeye.datasource.DAORegistry;
-import com.linkedin.thirdeye.detection.MockDataProvider;
+import org.apache.pinot.thirdeye.datalayer.bao.DAOTestBase;
+import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
+import org.apache.pinot.thirdeye.datasource.DAORegistry;
+import org.apache.pinot.thirdeye.detection.MockDataProvider;
 import java.util.HashMap;
 import java.util.Map;
 import org.testng.Assert;

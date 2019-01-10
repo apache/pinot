@@ -17,25 +17,25 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.dashboard.resources.v2.rootcause;
+package org.apache.pinot.thirdeye.dashboard.resources.v2.rootcause;
 
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
-import com.linkedin.thirdeye.dashboard.resources.v2.ResourceUtils;
-import com.linkedin.thirdeye.dashboard.resources.v2.RootCauseEntityFormatter;
-import com.linkedin.thirdeye.dashboard.resources.v2.pojo.RootCauseEntity;
-import com.linkedin.thirdeye.dataframe.util.MetricSlice;
-import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
-import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
-import com.linkedin.thirdeye.datasource.DAORegistry;
-import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
-import com.linkedin.thirdeye.rootcause.Entity;
-import com.linkedin.thirdeye.rootcause.util.EntityUtils;
-import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
-import com.linkedin.thirdeye.rootcause.impl.TimeRangeEntity;
+import org.apache.pinot.thirdeye.dashboard.resources.v2.ResourceUtils;
+import org.apache.pinot.thirdeye.dashboard.resources.v2.RootCauseEntityFormatter;
+import org.apache.pinot.thirdeye.dashboard.resources.v2.pojo.RootCauseEntity;
+import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
+import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
+import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
+import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
+import org.apache.pinot.thirdeye.datasource.DAORegistry;
+import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
+import org.apache.pinot.thirdeye.rootcause.Entity;
+import org.apache.pinot.thirdeye.rootcause.util.EntityUtils;
+import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
+import org.apache.pinot.thirdeye.rootcause.impl.TimeRangeEntity;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;

@@ -17,10 +17,10 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datalayer.dto;
+package org.apache.pinot.thirdeye.datalayer.dto;
 
-import com.linkedin.thirdeye.api.TimeGranularity;
-import com.linkedin.thirdeye.datalayer.pojo.DatasetConfigBean;
+import org.apache.pinot.thirdeye.api.TimeGranularity;
+import org.apache.pinot.thirdeye.datalayer.pojo.DatasetConfigBean;
 import java.util.concurrent.TimeUnit;
 
 public class DatasetConfigDTO extends DatasetConfigBean {

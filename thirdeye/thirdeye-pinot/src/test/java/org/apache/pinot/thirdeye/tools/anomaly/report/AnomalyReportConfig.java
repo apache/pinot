@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.tools.anomaly.report;
+package org.apache.pinot.thirdeye.tools.anomaly.report;
 
-import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterRecipients;
+import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterRecipients;
 
 
 public class AnomalyReportConfig {

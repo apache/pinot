@@ -17,22 +17,22 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.detection.algorithm.stage;
+package org.apache.pinot.thirdeye.detection.algorithm.stage;
 
-import com.linkedin.thirdeye.dataframe.DataFrame;
-import com.linkedin.thirdeye.dataframe.util.MetricSlice;
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.detection.DataProvider;
-import com.linkedin.thirdeye.detection.annotation.Components;
-import com.linkedin.thirdeye.detection.annotation.Param;
-import com.linkedin.thirdeye.detection.annotation.DetectionTag;
-import com.linkedin.thirdeye.detection.annotation.PresentationOption;
-import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
+import org.apache.pinot.thirdeye.dataframe.DataFrame;
+import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.detection.DataProvider;
+import org.apache.pinot.thirdeye.detection.annotation.Components;
+import org.apache.pinot.thirdeye.detection.annotation.Param;
+import org.apache.pinot.thirdeye.detection.annotation.DetectionTag;
+import org.apache.pinot.thirdeye.detection.annotation.PresentationOption;
+import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
 import java.util.Collections;
 import java.util.Map;
 import org.apache.commons.collections.MapUtils;
 
-import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
+import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
 
 
 /**

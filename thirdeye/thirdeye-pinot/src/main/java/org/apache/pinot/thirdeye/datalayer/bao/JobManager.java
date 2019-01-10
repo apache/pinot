@@ -17,13 +17,13 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datalayer.bao;
+package org.apache.pinot.thirdeye.datalayer.bao;
 
-import com.linkedin.thirdeye.anomaly.task.TaskConstants;
+import org.apache.pinot.thirdeye.anomaly.task.TaskConstants;
 import java.util.List;
 
-import com.linkedin.thirdeye.anomaly.job.JobConstants.JobStatus;
-import com.linkedin.thirdeye.datalayer.dto.JobDTO;
+import org.apache.pinot.thirdeye.anomaly.job.JobConstants.JobStatus;
+import org.apache.pinot.thirdeye.datalayer.dto.JobDTO;
 
 
 public interface JobManager extends AbstractManager<JobDTO> {

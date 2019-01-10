@@ -17,12 +17,12 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.rootcause.impl;
+package org.apache.pinot.thirdeye.rootcause.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
-import com.linkedin.thirdeye.rootcause.Pipeline;
-import com.linkedin.thirdeye.rootcause.RCAFramework;
+import org.apache.pinot.thirdeye.rootcause.Pipeline;
+import org.apache.pinot.thirdeye.rootcause.RCAFramework;
 import java.io.File;
 import java.lang.reflect.Constructor;
 import java.util.ArrayList;

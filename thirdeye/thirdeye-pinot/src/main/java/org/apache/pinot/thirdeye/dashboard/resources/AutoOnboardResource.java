@@ -17,15 +17,15 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.dashboard.resources;
+package org.apache.pinot.thirdeye.dashboard.resources;
 
-import com.linkedin.thirdeye.auto.onboard.AutoOnboard;
-import com.linkedin.thirdeye.auto.onboard.AutoOnboardUtility;
-import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
-import com.linkedin.thirdeye.datasource.DataSourceConfig;
-import com.linkedin.thirdeye.datasource.DataSources;
-import com.linkedin.thirdeye.datasource.DataSourcesLoader;
-import com.linkedin.thirdeye.datasource.MetadataSourceConfig;
+import org.apache.pinot.thirdeye.auto.onboard.AutoOnboard;
+import org.apache.pinot.thirdeye.auto.onboard.AutoOnboardUtility;
+import org.apache.pinot.thirdeye.common.ThirdEyeConfiguration;
+import org.apache.pinot.thirdeye.datasource.DataSourceConfig;
+import org.apache.pinot.thirdeye.datasource.DataSources;
+import org.apache.pinot.thirdeye.datasource.DataSourcesLoader;
+import org.apache.pinot.thirdeye.datasource.MetadataSourceConfig;
 import java.lang.reflect.Constructor;
 import java.net.URL;
 import java.util.ArrayList;

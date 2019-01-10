@@ -17,19 +17,19 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.detection.algorithm;
+package org.apache.pinot.thirdeye.detection.algorithm;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.collect.Collections2;
-import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.detection.ConfigUtils;
-import com.linkedin.thirdeye.detection.DataProvider;
-import com.linkedin.thirdeye.detection.DetectionPipeline;
-import com.linkedin.thirdeye.detection.DetectionPipelineResult;
-import com.linkedin.thirdeye.detector.email.filter.BaseAlertFilter;
-import com.linkedin.thirdeye.detector.email.filter.DummyAlertFilter;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.detection.ConfigUtils;
+import org.apache.pinot.thirdeye.detection.DataProvider;
+import org.apache.pinot.thirdeye.detection.DetectionPipeline;
+import org.apache.pinot.thirdeye.detection.DetectionPipelineResult;
+import org.apache.pinot.thirdeye.detector.email.filter.BaseAlertFilter;
+import org.apache.pinot.thirdeye.detector.email.filter.DummyAlertFilter;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;

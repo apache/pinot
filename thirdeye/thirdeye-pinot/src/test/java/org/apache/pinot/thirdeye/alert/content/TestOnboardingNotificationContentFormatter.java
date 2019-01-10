@@ -14,25 +14,25 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.alert.content;
+package org.apache.pinot.thirdeye.alert.content;
 
-import com.linkedin.thirdeye.alert.commons.EmailEntity;
-import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
-import com.linkedin.thirdeye.anomaly.monitor.MonitorConfiguration;
-import com.linkedin.thirdeye.anomaly.task.TaskDriverConfiguration;
-import com.linkedin.thirdeye.anomaly.utils.EmailUtils;
-import com.linkedin.thirdeye.anomalydetection.context.AnomalyResult;
-import com.linkedin.thirdeye.api.TimeGranularity;
-import com.linkedin.thirdeye.datalayer.DaoTestUtils;
-import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
-import com.linkedin.thirdeye.datalayer.bao.DAOTestBase;
-import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
-import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.datasource.DAORegistry;
-import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterRecipients;
+import org.apache.pinot.thirdeye.alert.commons.EmailEntity;
+import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
+import org.apache.pinot.thirdeye.anomaly.monitor.MonitorConfiguration;
+import org.apache.pinot.thirdeye.anomaly.task.TaskDriverConfiguration;
+import org.apache.pinot.thirdeye.anomaly.utils.EmailUtils;
+import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyResult;
+import org.apache.pinot.thirdeye.api.TimeGranularity;
+import org.apache.pinot.thirdeye.datalayer.DaoTestUtils;
+import org.apache.pinot.thirdeye.datalayer.bao.AlertConfigManager;
+import org.apache.pinot.thirdeye.datalayer.bao.AnomalyFunctionManager;
+import org.apache.pinot.thirdeye.datalayer.bao.DAOTestBase;
+import org.apache.pinot.thirdeye.datalayer.bao.MergedAnomalyResultManager;
+import org.apache.pinot.thirdeye.datalayer.dto.AlertConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.datasource.DAORegistry;
+import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterRecipients;
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.lang.reflect.Field;
@@ -50,7 +50,7 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static com.linkedin.thirdeye.anomaly.SmtpConfiguration.*;
+import static org.apache.pinot.thirdeye.anomaly.SmtpConfiguration.*;
 
 
 public class TestOnboardingNotificationContentFormatter {

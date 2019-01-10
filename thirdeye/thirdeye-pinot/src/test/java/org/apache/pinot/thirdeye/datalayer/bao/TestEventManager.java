@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.datalayer.bao;
+package org.apache.pinot.thirdeye.datalayer.bao;
 
-import com.linkedin.thirdeye.anomaly.events.EventType;
-import com.linkedin.thirdeye.datalayer.dto.EventDTO;
-import com.linkedin.thirdeye.datasource.DAORegistry;
+import org.apache.pinot.thirdeye.anomaly.events.EventType;
+import org.apache.pinot.thirdeye.datalayer.dto.EventDTO;
+import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;

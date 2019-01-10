@@ -17,14 +17,14 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomaly.task;
+package org.apache.pinot.thirdeye.anomaly.task;
 
-import com.linkedin.thirdeye.anomaly.classification.classifier.AnomalyClassifierFactory;
-import com.linkedin.thirdeye.anomaly.utils.AnomalyUtils;
-import com.linkedin.thirdeye.anomaly.utils.ThirdeyeMetricsUtil;
-import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
+import org.apache.pinot.thirdeye.anomaly.classification.classifier.AnomalyClassifierFactory;
+import org.apache.pinot.thirdeye.anomaly.utils.AnomalyUtils;
+import org.apache.pinot.thirdeye.anomaly.utils.ThirdeyeMetricsUtil;
+import org.apache.pinot.thirdeye.detector.email.filter.AlertFilterFactory;
 
-import com.linkedin.thirdeye.util.ThirdEyeUtils;
+import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -40,13 +40,13 @@ import org.apache.commons.lang.exception.ExceptionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
-import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskStatus;
-import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskType;
-import com.linkedin.thirdeye.datalayer.bao.TaskManager;
-import com.linkedin.thirdeye.datalayer.dto.TaskDTO;
-import com.linkedin.thirdeye.datasource.DAORegistry;
-import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
+import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
+import org.apache.pinot.thirdeye.anomaly.task.TaskConstants.TaskStatus;
+import org.apache.pinot.thirdeye.anomaly.task.TaskConstants.TaskType;
+import org.apache.pinot.thirdeye.datalayer.bao.TaskManager;
+import org.apache.pinot.thirdeye.datalayer.dto.TaskDTO;
+import org.apache.pinot.thirdeye.datasource.DAORegistry;
+import org.apache.pinot.thirdeye.detector.function.AnomalyFunctionFactory;
 
 public class TaskDriver {
 

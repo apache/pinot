@@ -17,10 +17,10 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.dashboard.resources.v2.pojo;
+package org.apache.pinot.thirdeye.dashboard.resources.v2.pojo;
 
-import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
-import com.linkedin.thirdeye.constant.AnomalyResultSource;
+import org.apache.pinot.thirdeye.constant.AnomalyFeedbackType;
+import org.apache.pinot.thirdeye.constant.AnomalyResultSource;
 import java.util.Map;
 
 

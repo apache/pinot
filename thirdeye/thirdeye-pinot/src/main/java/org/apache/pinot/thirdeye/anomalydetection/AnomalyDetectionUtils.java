@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomalydetection;
+package org.apache.pinot.thirdeye.anomalydetection;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Splitter;

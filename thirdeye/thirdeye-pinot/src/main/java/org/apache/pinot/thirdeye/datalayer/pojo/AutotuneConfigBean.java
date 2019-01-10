@@ -17,12 +17,12 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datalayer.pojo;
+package org.apache.pinot.thirdeye.datalayer.pojo;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.google.common.base.MoreObjects;
-import com.linkedin.thirdeye.anomaly.detection.lib.AutotuneMethodType;
-import com.linkedin.thirdeye.anomalydetection.performanceEvaluation.PerformanceEvaluationMethod;
+import org.apache.pinot.thirdeye.anomaly.detection.lib.AutotuneMethodType;
+import org.apache.pinot.thirdeye.anomalydetection.performanceEvaluation.PerformanceEvaluationMethod;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;

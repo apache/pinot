@@ -17,18 +17,18 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.detection;
+package org.apache.pinot.thirdeye.detection;
 
 import com.google.common.collect.Multimap;
-import com.linkedin.thirdeye.dataframe.DataFrame;
-import com.linkedin.thirdeye.dataframe.util.MetricSlice;
-import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.EventDTO;
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
-import com.linkedin.thirdeye.detection.spi.model.AnomalySlice;
-import com.linkedin.thirdeye.detection.spi.model.EventSlice;
+import org.apache.pinot.thirdeye.dataframe.DataFrame;
+import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
+import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.EventDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
+import org.apache.pinot.thirdeye.detection.spi.model.AnomalySlice;
+import org.apache.pinot.thirdeye.detection.spi.model.EventSlice;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -47,7 +47,7 @@ public interface DataProvider {
    * The format of the DataFrame follows the standard convention of DataFrameUtils.
    *
    * @see MetricSlice
-   * @see com.linkedin.thirdeye.dataframe.util.DataFrameUtils
+   * @see org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils
    *
    * @param slices metric slices
    * @return map of timeseries (keyed by slice)
@@ -60,7 +60,7 @@ public interface DataProvider {
    * The format of the DataFrame follows the standard convention of DataFrameUtils.
    *
    * @see MetricSlice
-   * @see com.linkedin.thirdeye.dataframe.util.DataFrameUtils
+   * @see org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils
    *
    * @param slices metric slices
    * @param dimensions dimensions to group by

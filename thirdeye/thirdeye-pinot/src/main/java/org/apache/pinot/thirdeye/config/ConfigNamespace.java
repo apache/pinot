@@ -17,11 +17,11 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.config;
+package org.apache.pinot.thirdeye.config;
 
-import com.linkedin.thirdeye.datalayer.bao.ConfigManager;
-import com.linkedin.thirdeye.datalayer.dto.ConfigDTO;
-import com.linkedin.thirdeye.datasource.DAORegistry;
+import org.apache.pinot.thirdeye.datalayer.bao.ConfigManager;
+import org.apache.pinot.thirdeye.datalayer.dto.ConfigDTO;
+import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;

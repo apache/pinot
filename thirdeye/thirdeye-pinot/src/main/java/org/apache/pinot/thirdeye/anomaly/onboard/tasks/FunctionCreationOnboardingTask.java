@@ -17,31 +17,31 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomaly.onboard.tasks;
+package org.apache.pinot.thirdeye.anomaly.onboard.tasks;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.thirdeye.anomaly.onboard.framework.BaseDetectionOnboardTask;
-import com.linkedin.thirdeye.anomaly.onboard.framework.DetectionOnboardExecutionContext;
-import com.linkedin.thirdeye.anomaly.onboard.framework.DetectionOnboardTaskContext;
-import com.linkedin.thirdeye.anomaly.onboard.utils.FunctionCreationUtils;
-import com.linkedin.thirdeye.anomaly.utils.EmailUtils;
-import com.linkedin.thirdeye.api.TimeGranularity;
-import com.linkedin.thirdeye.api.TimeSpec;
-import com.linkedin.thirdeye.constant.MetricAggFunction;
-import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
-import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
-import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
-import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
-import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean.EmailConfig;
-import com.linkedin.thirdeye.datasource.DAORegistry;
-import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterRecipients;
-import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
-import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
-import com.linkedin.thirdeye.util.ThirdEyeUtils;
+import org.apache.pinot.thirdeye.anomaly.onboard.framework.BaseDetectionOnboardTask;
+import org.apache.pinot.thirdeye.anomaly.onboard.framework.DetectionOnboardExecutionContext;
+import org.apache.pinot.thirdeye.anomaly.onboard.framework.DetectionOnboardTaskContext;
+import org.apache.pinot.thirdeye.anomaly.onboard.utils.FunctionCreationUtils;
+import org.apache.pinot.thirdeye.anomaly.utils.EmailUtils;
+import org.apache.pinot.thirdeye.api.TimeGranularity;
+import org.apache.pinot.thirdeye.api.TimeSpec;
+import org.apache.pinot.thirdeye.constant.MetricAggFunction;
+import org.apache.pinot.thirdeye.datalayer.bao.AlertConfigManager;
+import org.apache.pinot.thirdeye.datalayer.bao.AnomalyFunctionManager;
+import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
+import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
+import org.apache.pinot.thirdeye.datalayer.dto.AlertConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.pojo.AlertConfigBean.EmailConfig;
+import org.apache.pinot.thirdeye.datasource.DAORegistry;
+import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterRecipients;
+import org.apache.pinot.thirdeye.detector.email.filter.AlertFilterFactory;
+import org.apache.pinot.thirdeye.detector.function.AnomalyFunctionFactory;
+import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
 import java.net.URLDecoder;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -198,9 +198,9 @@ public class FunctionCreationOnboardingTask extends BaseDetectionOnboardTask {
       AnomalyFunctionDTO defaultFunctionSpec = getDefaultFunctionSpecByTimeGranularity(dataGranularity);
 
       // Merge user properties with default properties; the user assigned property can override default property
-      Properties userAssignedFunctionProperties = com.linkedin.thirdeye.datalayer.util.StringUtils
+      Properties userAssignedFunctionProperties = org.apache.pinot.thirdeye.datalayer.util.StringUtils
           .decodeCompactedProperties(configuration.getString(PROPERTIES, ""));
-      Properties defaultFunctionProperties = com.linkedin.thirdeye.datalayer.util.StringUtils
+      Properties defaultFunctionProperties = org.apache.pinot.thirdeye.datalayer.util.StringUtils
           .decodeCompactedProperties(defaultFunctionSpec.getProperties());
       for (Map.Entry propertyEntry : userAssignedFunctionProperties.entrySet()) {
         defaultFunctionProperties.setProperty((String) propertyEntry.getKey(), (String) propertyEntry.getValue());
@@ -231,7 +231,7 @@ public class FunctionCreationOnboardingTask extends BaseDetectionOnboardTask {
       anomalyFunction.setWindowDelayUnit(TimeUnit.valueOf(
           configuration.getString(WINDOW_DELAY_UNIT, dataGranularity.getUnit().toString())));
       anomalyFunction.setType(configuration.getString(FUNCTION_TYPE, defaultFunctionSpec.getType()));
-      anomalyFunction.setProperties(com.linkedin.thirdeye.datalayer.util.StringUtils.
+      anomalyFunction.setProperties(org.apache.pinot.thirdeye.datalayer.util.StringUtils.
           encodeCompactedProperties(defaultFunctionProperties));
       if (defaultFunctionSpec.getFrequency() != null) {
         anomalyFunction.setFrequency(defaultFunctionSpec.getFrequency());

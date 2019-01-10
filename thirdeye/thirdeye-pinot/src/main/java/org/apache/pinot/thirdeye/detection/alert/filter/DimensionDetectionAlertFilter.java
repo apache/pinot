@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.detection.alert.filter;
+package org.apache.pinot.thirdeye.detection.alert.filter;
 
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
@@ -25,13 +25,13 @@ import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
 import com.google.common.collect.SetMultimap;
-import com.linkedin.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.detection.ConfigUtils;
-import com.linkedin.thirdeye.detection.DataProvider;
-import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterRecipients;
-import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterResult;
-import com.linkedin.thirdeye.detection.alert.StatefulDetectionAlertFilter;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.detection.ConfigUtils;
+import org.apache.pinot.thirdeye.detection.DataProvider;
+import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterRecipients;
+import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterResult;
+import org.apache.pinot.thirdeye.detection.alert.StatefulDetectionAlertFilter;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;

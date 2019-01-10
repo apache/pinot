@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.tools;
+package org.apache.pinot.thirdeye.tools;
 
-import com.linkedin.thirdeye.anomaly.utils.AbstractResourceHttpUtils;
-import com.linkedin.thirdeye.api.TimeGranularity;
+import org.apache.pinot.thirdeye.anomaly.utils.AbstractResourceHttpUtils;
+import org.apache.pinot.thirdeye.api.TimeGranularity;
 import java.net.URLEncoder;
 import java.util.concurrent.TimeUnit;
 import org.apache.http.HttpHost;

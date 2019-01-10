@@ -17,14 +17,14 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datalayer.bao.jdbc;
+package org.apache.pinot.thirdeye.datalayer.bao.jdbc;
 
 import com.google.inject.Singleton;
-import com.linkedin.thirdeye.datalayer.bao.RootcauseSessionManager;
-import com.linkedin.thirdeye.datalayer.dto.RootcauseSessionDTO;
-import com.linkedin.thirdeye.datalayer.pojo.AbstractBean;
-import com.linkedin.thirdeye.datalayer.pojo.RootcauseSessionBean;
-import com.linkedin.thirdeye.datalayer.util.Predicate;
+import org.apache.pinot.thirdeye.datalayer.bao.RootcauseSessionManager;
+import org.apache.pinot.thirdeye.datalayer.dto.RootcauseSessionDTO;
+import org.apache.pinot.thirdeye.datalayer.pojo.AbstractBean;
+import org.apache.pinot.thirdeye.datalayer.pojo.RootcauseSessionBean;
+import org.apache.pinot.thirdeye.datalayer.util.Predicate;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;

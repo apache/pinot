@@ -17,17 +17,17 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomaly.task;
+package org.apache.pinot.thirdeye.anomaly.task;
 
-import com.linkedin.thirdeye.anomaly.alert.v2.AlertTaskRunnerV2;
-import com.linkedin.thirdeye.anomaly.classification.ClassificationTaskRunner;
-import com.linkedin.thirdeye.anomaly.detection.DetectionTaskRunner;
-import com.linkedin.thirdeye.anomaly.monitor.MonitorTaskRunner;
-import com.linkedin.thirdeye.anomaly.onboard.ReplayTaskRunner;
-import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskType;
-import com.linkedin.thirdeye.completeness.checker.DataCompletenessTaskRunner;
-import com.linkedin.thirdeye.detection.DetectionPipelineTaskRunner;
-import com.linkedin.thirdeye.detection.alert.DetectionAlertTaskRunner;
+import org.apache.pinot.thirdeye.anomaly.alert.v2.AlertTaskRunnerV2;
+import org.apache.pinot.thirdeye.anomaly.classification.ClassificationTaskRunner;
+import org.apache.pinot.thirdeye.anomaly.detection.DetectionTaskRunner;
+import org.apache.pinot.thirdeye.anomaly.monitor.MonitorTaskRunner;
+import org.apache.pinot.thirdeye.anomaly.onboard.ReplayTaskRunner;
+import org.apache.pinot.thirdeye.anomaly.task.TaskConstants.TaskType;
+import org.apache.pinot.thirdeye.completeness.checker.DataCompletenessTaskRunner;
+import org.apache.pinot.thirdeye.detection.DetectionPipelineTaskRunner;
+import org.apache.pinot.thirdeye.detection.alert.DetectionAlertTaskRunner;
 
 
 /**

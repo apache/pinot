@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.util;
+package org.apache.pinot.thirdeye.util;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -30,15 +30,15 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.joda.time.DateTime;
 
 import com.google.common.collect.Maps;
-import com.linkedin.thirdeye.constant.MetricAggFunction;
-import com.linkedin.thirdeye.dashboard.Utils;
-import com.linkedin.thirdeye.datasource.MetricExpression;
-import com.linkedin.thirdeye.datasource.MetricFunction;
-import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
-import com.linkedin.thirdeye.datasource.ThirdEyeRequest;
-import com.linkedin.thirdeye.datasource.ThirdEyeResponse;
-import com.linkedin.thirdeye.datasource.ThirdEyeResponseRow;
-import com.linkedin.thirdeye.datasource.ThirdEyeRequest.ThirdEyeRequestBuilder;
+import org.apache.pinot.thirdeye.constant.MetricAggFunction;
+import org.apache.pinot.thirdeye.dashboard.Utils;
+import org.apache.pinot.thirdeye.datasource.MetricExpression;
+import org.apache.pinot.thirdeye.datasource.MetricFunction;
+import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
+import org.apache.pinot.thirdeye.datasource.ThirdEyeRequest;
+import org.apache.pinot.thirdeye.datasource.ThirdEyeResponse;
+import org.apache.pinot.thirdeye.datasource.ThirdEyeResponseRow;
+import org.apache.pinot.thirdeye.datasource.ThirdEyeRequest.ThirdEyeRequestBuilder;
 
 public class SeverityComputationUtil {
 

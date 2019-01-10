@@ -17,16 +17,16 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.completeness.checker;
+package org.apache.pinot.thirdeye.completeness.checker;
 
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ListMultimap;
-import com.linkedin.thirdeye.api.TimeSpec;
-import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
-import com.linkedin.thirdeye.datasource.pinot.PinotQuery;
-import com.linkedin.thirdeye.datasource.pinot.PinotThirdEyeDataSource;
-import com.linkedin.thirdeye.datasource.pinot.resultset.ThirdEyeResultSet;
-import com.linkedin.thirdeye.datasource.pinot.resultset.ThirdEyeResultSetGroup;
+import org.apache.pinot.thirdeye.api.TimeSpec;
+import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
+import org.apache.pinot.thirdeye.datasource.pinot.PinotQuery;
+import org.apache.pinot.thirdeye.datasource.pinot.PinotThirdEyeDataSource;
+import org.apache.pinot.thirdeye.datasource.pinot.resultset.ThirdEyeResultSet;
+import org.apache.pinot.thirdeye.datasource.pinot.resultset.ThirdEyeResultSetGroup;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;

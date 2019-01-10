@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomaly.utils;
+package org.apache.pinot.thirdeye.anomaly.utils;
 
 import java.io.IOException;
 import java.io.InputStream;

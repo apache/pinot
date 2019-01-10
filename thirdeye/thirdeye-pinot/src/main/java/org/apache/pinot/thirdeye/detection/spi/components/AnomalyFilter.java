@@ -17,10 +17,10 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.detection.spi.components;
+package org.apache.pinot.thirdeye.detection.spi.components;
 
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.detection.spec.AbstractSpec;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.detection.spec.AbstractSpec;
 
 
 public interface AnomalyFilter<T extends AbstractSpec> extends BaseComponent<T> {

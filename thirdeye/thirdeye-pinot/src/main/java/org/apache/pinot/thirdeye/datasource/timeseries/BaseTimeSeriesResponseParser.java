@@ -17,16 +17,16 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datasource.timeseries;
+package org.apache.pinot.thirdeye.datasource.timeseries;
 
 import com.google.common.collect.Range;
-import com.linkedin.thirdeye.api.TimeGranularity;
-import com.linkedin.thirdeye.datasource.MetricFunction;
-import com.linkedin.thirdeye.datasource.ResponseParserUtils;
-import com.linkedin.thirdeye.datasource.ThirdEyeRequest;
-import com.linkedin.thirdeye.datasource.ThirdEyeResponse;
-import com.linkedin.thirdeye.datasource.ThirdEyeResponseRow;
-import com.linkedin.thirdeye.datasource.TimeRangeUtils;
+import org.apache.pinot.thirdeye.api.TimeGranularity;
+import org.apache.pinot.thirdeye.datasource.MetricFunction;
+import org.apache.pinot.thirdeye.datasource.ResponseParserUtils;
+import org.apache.pinot.thirdeye.datasource.ThirdEyeRequest;
+import org.apache.pinot.thirdeye.datasource.ThirdEyeResponse;
+import org.apache.pinot.thirdeye.datasource.ThirdEyeResponseRow;
+import org.apache.pinot.thirdeye.datasource.TimeRangeUtils;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;

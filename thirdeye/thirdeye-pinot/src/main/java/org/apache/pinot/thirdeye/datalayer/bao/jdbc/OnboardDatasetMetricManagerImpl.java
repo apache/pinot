@@ -17,13 +17,13 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datalayer.bao.jdbc;
+package org.apache.pinot.thirdeye.datalayer.bao.jdbc;
 
 import com.google.inject.Singleton;
-import com.linkedin.thirdeye.datalayer.bao.OnboardDatasetMetricManager;
-import com.linkedin.thirdeye.datalayer.dto.OnboardDatasetMetricDTO;
-import com.linkedin.thirdeye.datalayer.pojo.OnboardDatasetMetricBean;
-import com.linkedin.thirdeye.datalayer.util.Predicate;
+import org.apache.pinot.thirdeye.datalayer.bao.OnboardDatasetMetricManager;
+import org.apache.pinot.thirdeye.datalayer.dto.OnboardDatasetMetricDTO;
+import org.apache.pinot.thirdeye.datalayer.pojo.OnboardDatasetMetricBean;
+import org.apache.pinot.thirdeye.datalayer.util.Predicate;
 
 import java.util.List;
 

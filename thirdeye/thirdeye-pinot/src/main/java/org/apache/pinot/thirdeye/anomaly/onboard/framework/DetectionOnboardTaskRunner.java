@@ -17,10 +17,10 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomaly.onboard.framework;
+package org.apache.pinot.thirdeye.anomaly.onboard.framework;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.thirdeye.anomaly.task.TaskConstants;
+import org.apache.pinot.thirdeye.anomaly.task.TaskConstants;
 import java.util.concurrent.Callable;
 import org.apache.commons.lang.exception.ExceptionUtils;
 import org.slf4j.Logger;

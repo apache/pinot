@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datasource.comparison;
+package org.apache.pinot.thirdeye.datasource.comparison;
 
 import java.util.ArrayList;
 import java.util.List;

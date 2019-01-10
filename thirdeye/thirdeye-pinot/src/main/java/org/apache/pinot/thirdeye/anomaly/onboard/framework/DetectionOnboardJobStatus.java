@@ -17,12 +17,12 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomaly.onboard.framework;
+package org.apache.pinot.thirdeye.anomaly.onboard.framework;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
-import com.linkedin.thirdeye.anomaly.job.JobConstants;
+import org.apache.pinot.thirdeye.anomaly.job.JobConstants;
 import java.util.ArrayList;
 import java.util.List;
 

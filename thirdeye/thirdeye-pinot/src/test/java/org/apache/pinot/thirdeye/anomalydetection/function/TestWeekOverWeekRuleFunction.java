@@ -14,19 +14,19 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.anomalydetection.function;
+package org.apache.pinot.thirdeye.anomalydetection.function;
 
-import com.linkedin.thirdeye.anomalydetection.context.AnomalyDetectionContext;
-import com.linkedin.thirdeye.anomalydetection.context.AnomalyResult;
-import com.linkedin.thirdeye.anomalydetection.context.RawAnomalyResult;
-import com.linkedin.thirdeye.anomalydetection.context.TimeSeries;
-import com.linkedin.thirdeye.anomalydetection.context.TimeSeriesKey;
-import com.linkedin.thirdeye.anomalydetection.model.detection.SimpleThresholdDetectionModel;
-import com.linkedin.thirdeye.anomalydetection.model.transform.MovingAverageSmoothingFunction;
-import com.linkedin.thirdeye.anomalydetection.model.transform.TotalCountThresholdRemovalFunction;
-import com.linkedin.thirdeye.api.DimensionMap;
-import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyDetectionContext;
+import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyResult;
+import org.apache.pinot.thirdeye.anomalydetection.context.RawAnomalyResult;
+import org.apache.pinot.thirdeye.anomalydetection.context.TimeSeries;
+import org.apache.pinot.thirdeye.anomalydetection.context.TimeSeriesKey;
+import org.apache.pinot.thirdeye.anomalydetection.model.detection.SimpleThresholdDetectionModel;
+import org.apache.pinot.thirdeye.anomalydetection.model.transform.MovingAverageSmoothingFunction;
+import org.apache.pinot.thirdeye.anomalydetection.model.transform.TotalCountThresholdRemovalFunction;
+import org.apache.pinot.thirdeye.api.DimensionMap;
+import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;

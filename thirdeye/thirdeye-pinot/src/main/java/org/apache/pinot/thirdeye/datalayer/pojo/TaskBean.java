@@ -17,10 +17,10 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datalayer.pojo;
+package org.apache.pinot.thirdeye.datalayer.pojo;
 
-import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskStatus;
-import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskType;
+import org.apache.pinot.thirdeye.anomaly.task.TaskConstants.TaskStatus;
+import org.apache.pinot.thirdeye.anomaly.task.TaskConstants.TaskType;
 import java.sql.Timestamp;
 import java.util.Objects;
 

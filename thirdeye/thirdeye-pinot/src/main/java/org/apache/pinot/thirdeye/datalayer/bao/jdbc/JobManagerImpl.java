@@ -17,12 +17,12 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datalayer.bao.jdbc;
+package org.apache.pinot.thirdeye.datalayer.bao.jdbc;
 
 import com.google.common.base.Preconditions;
 import com.google.inject.Singleton;
-import com.linkedin.thirdeye.anomaly.detection.DetectionTaskRunner;
-import com.linkedin.thirdeye.anomaly.task.TaskConstants;
+import org.apache.pinot.thirdeye.anomaly.detection.DetectionTaskRunner;
+import org.apache.pinot.thirdeye.anomaly.task.TaskConstants;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -36,11 +36,11 @@ import org.joda.time.DateTime;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.inject.persist.Transactional;
-import com.linkedin.thirdeye.anomaly.job.JobConstants.JobStatus;
-import com.linkedin.thirdeye.datalayer.bao.JobManager;
-import com.linkedin.thirdeye.datalayer.dto.JobDTO;
-import com.linkedin.thirdeye.datalayer.pojo.JobBean;
-import com.linkedin.thirdeye.datalayer.util.Predicate;
+import org.apache.pinot.thirdeye.anomaly.job.JobConstants.JobStatus;
+import org.apache.pinot.thirdeye.datalayer.bao.JobManager;
+import org.apache.pinot.thirdeye.datalayer.dto.JobDTO;
+import org.apache.pinot.thirdeye.datalayer.pojo.JobBean;
+import org.apache.pinot.thirdeye.datalayer.util.Predicate;
 
 @Singleton
 public class JobManagerImpl extends AbstractManagerImpl<JobDTO> implements JobManager {

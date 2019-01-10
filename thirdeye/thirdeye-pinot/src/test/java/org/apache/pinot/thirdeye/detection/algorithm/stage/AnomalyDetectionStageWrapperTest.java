@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.detection.algorithm.stage;
+package org.apache.pinot.thirdeye.detection.algorithm.stage;
 
-import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
-import com.linkedin.thirdeye.detection.MockDataProvider;
+import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
+import org.apache.pinot.thirdeye.detection.MockDataProvider;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;

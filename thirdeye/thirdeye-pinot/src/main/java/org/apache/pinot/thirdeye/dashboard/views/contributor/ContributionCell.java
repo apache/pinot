@@ -17,11 +17,11 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.dashboard.views.contributor;
+package org.apache.pinot.thirdeye.dashboard.views.contributor;
 
 import java.text.DecimalFormat;
 
-import com.linkedin.thirdeye.dashboard.views.TimeBucket;
+import org.apache.pinot.thirdeye.dashboard.views.TimeBucket;
 
 public class ContributionCell {
   private static String[] columns;

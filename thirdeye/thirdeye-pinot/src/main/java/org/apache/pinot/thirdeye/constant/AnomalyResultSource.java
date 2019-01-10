@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.constant;
+package org.apache.pinot.thirdeye.constant;
 
 public enum AnomalyResultSource {
   DEFAULT_ANOMALY_DETECTION,

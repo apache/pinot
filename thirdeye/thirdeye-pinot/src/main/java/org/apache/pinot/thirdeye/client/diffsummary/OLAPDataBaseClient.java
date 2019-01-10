@@ -17,14 +17,14 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.client.diffsummary;
+package org.apache.pinot.thirdeye.client.diffsummary;
 
 import com.google.common.collect.Multimap;
 import java.util.List;
 
 import org.joda.time.DateTime;
 
-import com.linkedin.thirdeye.datasource.MetricExpression;
+import org.apache.pinot.thirdeye.datasource.MetricExpression;
 
 public interface OLAPDataBaseClient {
 

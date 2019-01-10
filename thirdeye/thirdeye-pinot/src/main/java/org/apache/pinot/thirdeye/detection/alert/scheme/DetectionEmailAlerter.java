@@ -17,25 +17,25 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.detection.alert.scheme;
+package org.apache.pinot.thirdeye.detection.alert.scheme;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.thirdeye.alert.commons.EmailContentFormatterFactory;
-import com.linkedin.thirdeye.alert.commons.EmailEntity;
-import com.linkedin.thirdeye.alert.content.EmailContentFormatter;
-import com.linkedin.thirdeye.alert.content.EmailContentFormatterConfiguration;
-import com.linkedin.thirdeye.alert.content.EmailContentFormatterContext;
-import com.linkedin.thirdeye.anomaly.SmtpConfiguration;
-import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
-import com.linkedin.thirdeye.anomalydetection.context.AnomalyResult;
-import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.detection.ConfigUtils;
-import com.linkedin.thirdeye.detection.alert.AlertUtils;
-import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterRecipients;
-import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterResult;
-import com.linkedin.thirdeye.detection.annotation.AlertScheme;
+import org.apache.pinot.thirdeye.alert.commons.EmailContentFormatterFactory;
+import org.apache.pinot.thirdeye.alert.commons.EmailEntity;
+import org.apache.pinot.thirdeye.alert.content.EmailContentFormatter;
+import org.apache.pinot.thirdeye.alert.content.EmailContentFormatterConfiguration;
+import org.apache.pinot.thirdeye.alert.content.EmailContentFormatterContext;
+import org.apache.pinot.thirdeye.anomaly.SmtpConfiguration;
+import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
+import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyResult;
+import org.apache.pinot.thirdeye.datalayer.dto.AlertConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.detection.ConfigUtils;
+import org.apache.pinot.thirdeye.detection.alert.AlertUtils;
+import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterRecipients;
+import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterResult;
+import org.apache.pinot.thirdeye.detection.annotation.AlertScheme;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -51,7 +51,7 @@ import org.apache.commons.mail.HtmlEmail;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static com.linkedin.thirdeye.anomaly.SmtpConfiguration.SMTP_CONFIG_KEY;
+import static org.apache.pinot.thirdeye.anomaly.SmtpConfiguration.SMTP_CONFIG_KEY;
 
 
 @AlertScheme(type = "EMAIL")

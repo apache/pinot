@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datasource.timeseries;
+package org.apache.pinot.thirdeye.datasource.timeseries;
 
 import com.google.common.collect.ImmutableList;
 
@@ -27,7 +27,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
 
-import com.linkedin.thirdeye.datasource.timeseries.TimeSeriesRow.TimeSeriesMetric;
+import org.apache.pinot.thirdeye.datasource.timeseries.TimeSeriesRow.TimeSeriesMetric;
 
 public class TimeSeriesResponse {
   int numRows;

@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datasource;
+package org.apache.pinot.thirdeye.datasource;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -29,8 +29,8 @@ import org.joda.time.Days;
 import org.joda.time.Duration;
 
 import com.google.common.collect.Range;
-import com.linkedin.thirdeye.api.TimeGranularity;
-import com.linkedin.thirdeye.api.TimeRange;
+import org.apache.pinot.thirdeye.api.TimeGranularity;
+import org.apache.pinot.thirdeye.api.TimeRange;
 import org.joda.time.Hours;
 
 /**

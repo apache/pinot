@@ -17,10 +17,10 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomaly.alert.grouping.auxiliary_info_provider;
+package org.apache.pinot.thirdeye.anomaly.alert.grouping.auxiliary_info_provider;
 
-import com.linkedin.thirdeye.api.DimensionMap;
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.api.DimensionMap;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import java.util.List;
 
 public class DummyAlertGroupAuxiliaryInfoProvider extends BaseAlertGroupAuxiliaryInfoProvider {

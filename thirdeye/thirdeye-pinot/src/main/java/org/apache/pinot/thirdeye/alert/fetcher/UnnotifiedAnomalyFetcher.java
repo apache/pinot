@@ -17,15 +17,15 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.alert.fetcher;
+package org.apache.pinot.thirdeye.alert.fetcher;
 
 import com.google.common.collect.Multimap;
-import com.linkedin.thirdeye.alert.commons.AnomalyNotifiedStatus;
-import com.linkedin.thirdeye.alert.commons.AnomalySource;
-import com.linkedin.thirdeye.datalayer.dto.AlertSnapshotDTO;
-import com.linkedin.thirdeye.api.TimeGranularity;
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.datalayer.util.Predicate;
+import org.apache.pinot.thirdeye.alert.commons.AnomalyNotifiedStatus;
+import org.apache.pinot.thirdeye.alert.commons.AnomalySource;
+import org.apache.pinot.thirdeye.datalayer.dto.AlertSnapshotDTO;
+import org.apache.pinot.thirdeye.api.TimeGranularity;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.datalayer.util.Predicate;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Collection;

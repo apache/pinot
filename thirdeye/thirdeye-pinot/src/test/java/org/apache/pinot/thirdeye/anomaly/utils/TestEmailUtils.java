@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.anomaly.utils;
+package org.apache.pinot.thirdeye.anomaly.utils;
 
 import java.util.HashSet;
 import java.util.Set;

@@ -17,10 +17,10 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomaly.alert;
+package org.apache.pinot.thirdeye.anomaly.alert;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.AlertConfigDTO;
 import java.util.Objects;
 
 import org.joda.time.DateTime;
@@ -28,9 +28,9 @@ import org.joda.time.DateTime;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.google.common.base.MoreObjects;
-import com.linkedin.thirdeye.anomaly.task.TaskInfo;
-import com.linkedin.thirdeye.util.CustomDateDeserializer;
-import com.linkedin.thirdeye.util.CustomDateSerializer;
+import org.apache.pinot.thirdeye.anomaly.task.TaskInfo;
+import org.apache.pinot.thirdeye.util.CustomDateDeserializer;
+import org.apache.pinot.thirdeye.util.CustomDateSerializer;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class AlertTaskInfo implements TaskInfo {

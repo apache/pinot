@@ -17,11 +17,11 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datalayer.pojo;
+package org.apache.pinot.thirdeye.datalayer.pojo;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.linkedin.thirdeye.api.MetricType;
-import com.linkedin.thirdeye.constant.MetricAggFunction;
+import org.apache.pinot.thirdeye.api.MetricType;
+import org.apache.pinot.thirdeye.constant.MetricAggFunction;
 
 import java.util.Map;
 import java.util.Objects;

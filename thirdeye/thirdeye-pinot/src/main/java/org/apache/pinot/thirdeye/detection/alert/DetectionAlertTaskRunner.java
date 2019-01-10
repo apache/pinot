@@ -17,26 +17,26 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.detection.alert;
+package org.apache.pinot.thirdeye.detection.alert;
 
-import com.linkedin.thirdeye.anomaly.task.TaskContext;
-import com.linkedin.thirdeye.anomaly.task.TaskInfo;
-import com.linkedin.thirdeye.anomaly.task.TaskResult;
-import com.linkedin.thirdeye.anomaly.task.TaskRunner;
-import com.linkedin.thirdeye.anomaly.utils.ThirdeyeMetricsUtil;
-import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.DetectionAlertConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
-import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
-import com.linkedin.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.datasource.DAORegistry;
-import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
-import com.linkedin.thirdeye.datasource.loader.AggregationLoader;
-import com.linkedin.thirdeye.datasource.loader.DefaultAggregationLoader;
-import com.linkedin.thirdeye.detection.CurrentAndBaselineLoader;
-import com.linkedin.thirdeye.detection.alert.scheme.DetectionAlertScheme;
-import com.linkedin.thirdeye.detection.alert.suppress.DetectionAlertSuppressor;
+import org.apache.pinot.thirdeye.anomaly.task.TaskContext;
+import org.apache.pinot.thirdeye.anomaly.task.TaskInfo;
+import org.apache.pinot.thirdeye.anomaly.task.TaskResult;
+import org.apache.pinot.thirdeye.anomaly.task.TaskRunner;
+import org.apache.pinot.thirdeye.anomaly.utils.ThirdeyeMetricsUtil;
+import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
+import org.apache.pinot.thirdeye.datalayer.bao.DetectionAlertConfigManager;
+import org.apache.pinot.thirdeye.datalayer.bao.MergedAnomalyResultManager;
+import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.datasource.DAORegistry;
+import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
+import org.apache.pinot.thirdeye.datasource.loader.AggregationLoader;
+import org.apache.pinot.thirdeye.datasource.loader.DefaultAggregationLoader;
+import org.apache.pinot.thirdeye.detection.CurrentAndBaselineLoader;
+import org.apache.pinot.thirdeye.detection.alert.scheme.DetectionAlertScheme;
+import org.apache.pinot.thirdeye.detection.alert.suppress.DetectionAlertSuppressor;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;

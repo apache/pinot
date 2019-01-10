@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datasource.comparison;
+package org.apache.pinot.thirdeye.datasource.comparison;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -32,17 +32,17 @@ import java.util.concurrent.TimeUnit;
 import org.joda.time.DateTime;
 
 import com.google.common.collect.Range;
-import com.linkedin.thirdeye.api.TimeGranularity;
-import com.linkedin.thirdeye.dashboard.Utils;
-import com.linkedin.thirdeye.datasource.MetricExpression;
-import com.linkedin.thirdeye.datasource.MetricFunction;
-import com.linkedin.thirdeye.datasource.ThirdEyeRequest;
-import com.linkedin.thirdeye.datasource.ThirdEyeResponse;
-import com.linkedin.thirdeye.datasource.TimeRangeUtils;
-import com.linkedin.thirdeye.datasource.ThirdEyeRequest.ThirdEyeRequestBuilder;
-import com.linkedin.thirdeye.datasource.cache.QueryCache;
-import com.linkedin.thirdeye.datasource.comparison.Row.Metric;
-import com.linkedin.thirdeye.util.ThirdEyeUtils;
+import org.apache.pinot.thirdeye.api.TimeGranularity;
+import org.apache.pinot.thirdeye.dashboard.Utils;
+import org.apache.pinot.thirdeye.datasource.MetricExpression;
+import org.apache.pinot.thirdeye.datasource.MetricFunction;
+import org.apache.pinot.thirdeye.datasource.ThirdEyeRequest;
+import org.apache.pinot.thirdeye.datasource.ThirdEyeResponse;
+import org.apache.pinot.thirdeye.datasource.TimeRangeUtils;
+import org.apache.pinot.thirdeye.datasource.ThirdEyeRequest.ThirdEyeRequestBuilder;
+import org.apache.pinot.thirdeye.datasource.cache.QueryCache;
+import org.apache.pinot.thirdeye.datasource.comparison.Row.Metric;
+import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
 
 public class TimeOnTimeComparisonHandler {
   private static final String CURRENT = "current";

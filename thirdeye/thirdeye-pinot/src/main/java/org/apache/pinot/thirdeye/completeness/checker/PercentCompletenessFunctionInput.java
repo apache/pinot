@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.completeness.checker;
+package org.apache.pinot.thirdeye.completeness.checker;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -29,7 +29,7 @@ import org.slf4j.LoggerFactory;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.linkedin.thirdeye.datalayer.pojo.DatasetConfigBean;
+import org.apache.pinot.thirdeye.datalayer.pojo.DatasetConfigBean;
 
 /**
  * This class serves as the input for the call to the endpoint which determines percent completeness

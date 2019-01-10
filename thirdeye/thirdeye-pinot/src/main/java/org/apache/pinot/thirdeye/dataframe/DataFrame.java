@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.dataframe;
+package org.apache.pinot.thirdeye.dataframe;
 
 import com.linkedin.pinot.client.ResultSet;
 import com.linkedin.pinot.client.ResultSetGroup;

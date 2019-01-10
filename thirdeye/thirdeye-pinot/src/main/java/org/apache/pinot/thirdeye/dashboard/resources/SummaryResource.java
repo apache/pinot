@@ -17,24 +17,24 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.dashboard.resources;
+package org.apache.pinot.thirdeye.dashboard.resources;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Strings;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
-import com.linkedin.thirdeye.client.diffsummary.Dimensions;
-import com.linkedin.thirdeye.client.diffsummary.MultiDimensionalSummary;
-import com.linkedin.thirdeye.client.diffsummary.MultiDimensionalSummaryCLITool;
-import com.linkedin.thirdeye.client.diffsummary.OLAPDataBaseClient;
-import com.linkedin.thirdeye.client.diffsummary.PinotThirdEyeSummaryClient;
-import com.linkedin.thirdeye.client.diffsummary.costfunctions.BalancedCostFunction;
-import com.linkedin.thirdeye.client.diffsummary.costfunctions.CostFunction;
-import com.linkedin.thirdeye.dashboard.Utils;
-import com.linkedin.thirdeye.dashboard.views.diffsummary.SummaryResponse;
-import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
-import com.linkedin.thirdeye.util.ThirdEyeUtils;
+import org.apache.pinot.thirdeye.client.diffsummary.Dimensions;
+import org.apache.pinot.thirdeye.client.diffsummary.MultiDimensionalSummary;
+import org.apache.pinot.thirdeye.client.diffsummary.MultiDimensionalSummaryCLITool;
+import org.apache.pinot.thirdeye.client.diffsummary.OLAPDataBaseClient;
+import org.apache.pinot.thirdeye.client.diffsummary.PinotThirdEyeSummaryClient;
+import org.apache.pinot.thirdeye.client.diffsummary.costfunctions.BalancedCostFunction;
+import org.apache.pinot.thirdeye.client.diffsummary.costfunctions.CostFunction;
+import org.apache.pinot.thirdeye.dashboard.Utils;
+import org.apache.pinot.thirdeye.dashboard.views.diffsummary.SummaryResponse;
+import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
+import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
 import java.net.URLDecoder;
 import java.util.Arrays;
 import java.util.Collections;

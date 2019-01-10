@@ -17,11 +17,11 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datalayer.pojo;
+package org.apache.pinot.thirdeye.datalayer.pojo;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.linkedin.thirdeye.alert.commons.AnomalyFeedConfig;
-import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterRecipients;
+import org.apache.pinot.thirdeye.alert.commons.AnomalyFeedConfig;
+import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterRecipients;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;

@@ -17,11 +17,11 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.detection.spi.components;
+package org.apache.pinot.thirdeye.detection.spi.components;
 
-import com.linkedin.thirdeye.detection.spec.AbstractSpec;
-import com.linkedin.thirdeye.detection.spi.model.InputData;
-import com.linkedin.thirdeye.detection.spi.model.InputDataSpec;
+import org.apache.pinot.thirdeye.detection.spec.AbstractSpec;
+import org.apache.pinot.thirdeye.detection.spi.model.InputData;
+import org.apache.pinot.thirdeye.detection.spi.model.InputDataSpec;
 import java.util.Map;
 import org.joda.time.Interval;
 

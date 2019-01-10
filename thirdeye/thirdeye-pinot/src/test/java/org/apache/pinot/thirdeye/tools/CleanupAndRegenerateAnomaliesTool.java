@@ -14,16 +14,16 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.tools;
+package org.apache.pinot.thirdeye.tools;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
-import com.linkedin.thirdeye.anomaly.utils.DetectionResourceHttpUtils;
-import com.linkedin.thirdeye.dashboard.resources.OnboardResource;
-import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
-import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
-import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
-import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
+import org.apache.pinot.thirdeye.anomaly.utils.DetectionResourceHttpUtils;
+import org.apache.pinot.thirdeye.dashboard.resources.OnboardResource;
+import org.apache.pinot.thirdeye.datalayer.bao.AnomalyFunctionManager;
+import org.apache.pinot.thirdeye.datalayer.bao.MergedAnomalyResultManager;
+import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import org.apache.pinot.thirdeye.datalayer.util.DaoProviderUtil;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -71,9 +71,9 @@ public class CleanupAndRegenerateAnomaliesTool {
   public void init(File persistenceFile) throws Exception {
     DaoProviderUtil.init(persistenceFile);
     anomalyFunctionDAO = DaoProviderUtil
-        .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.AnomalyFunctionManagerImpl.class);
+        .getInstance(org.apache.pinot.thirdeye.datalayer.bao.jdbc.AnomalyFunctionManagerImpl.class);
     mergedResultDAO = DaoProviderUtil
-        .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.MergedAnomalyResultManagerImpl.class);
+        .getInstance(org.apache.pinot.thirdeye.datalayer.bao.jdbc.MergedAnomalyResultManagerImpl.class);
   }
 
   private List<Long> getFunctionIds(String datasets, String functionIds) {

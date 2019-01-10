@@ -1,8 +1,8 @@
-package com.linkedin.thirdeye.detection.alert.scheme;
+package org.apache.pinot.thirdeye.detection.alert.scheme;
 
-import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
-import com.linkedin.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
-import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterResult;
+import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
+import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterResult;
 
 
 public class AnotherRandomAlerter extends DetectionAlertScheme {

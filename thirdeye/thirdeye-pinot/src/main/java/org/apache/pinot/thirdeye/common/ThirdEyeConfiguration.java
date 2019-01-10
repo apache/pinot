@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.common;
+package org.apache.pinot.thirdeye.common;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.federecio.dropwizard.swagger.SwaggerBundleConfiguration;

@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datasource.comparison;
+package org.apache.pinot.thirdeye.datasource.comparison;
 
 public class TimeOnTimeConstants {
   public static final String CURRENT_VALUE = "CURRENT_VALUE";

@@ -17,10 +17,10 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.detection.alert;
+package org.apache.pinot.thirdeye.detection.alert;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;

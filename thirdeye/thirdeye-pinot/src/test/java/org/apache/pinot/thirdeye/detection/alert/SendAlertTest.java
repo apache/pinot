@@ -14,27 +14,27 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.detection.alert;
+package org.apache.pinot.thirdeye.detection.alert;
 
-import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
-import com.linkedin.thirdeye.anomaly.task.TaskContext;
-import com.linkedin.thirdeye.dataframe.DataFrame;
-import com.linkedin.thirdeye.datalayer.bao.DAOTestBase;
-import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.DetectionAlertConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.DetectionConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
-import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
-import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
-import com.linkedin.thirdeye.datasource.DAORegistry;
-import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
-import com.linkedin.thirdeye.datasource.ThirdEyeDataSource;
-import com.linkedin.thirdeye.datasource.cache.QueryCache;
-import com.linkedin.thirdeye.datasource.csv.CSVThirdEyeDataSource;
+import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
+import org.apache.pinot.thirdeye.anomaly.task.TaskContext;
+import org.apache.pinot.thirdeye.dataframe.DataFrame;
+import org.apache.pinot.thirdeye.datalayer.bao.DAOTestBase;
+import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
+import org.apache.pinot.thirdeye.datalayer.bao.DetectionAlertConfigManager;
+import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
+import org.apache.pinot.thirdeye.datalayer.bao.MergedAnomalyResultManager;
+import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
+import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
+import org.apache.pinot.thirdeye.datasource.DAORegistry;
+import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
+import org.apache.pinot.thirdeye.datasource.ThirdEyeDataSource;
+import org.apache.pinot.thirdeye.datasource.cache.QueryCache;
+import org.apache.pinot.thirdeye.datasource.csv.CSVThirdEyeDataSource;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -111,14 +111,14 @@ public class SendAlertTest {
 
     this.alertConfigDTO = new DetectionAlertConfigDTO();
     Map<String, Object> properties = new HashMap<>();
-    properties.put(PROP_CLASS_NAME, "com.linkedin.thirdeye.detection.alert.filter.ToAllRecipientsDetectionAlertFilter");
+    properties.put(PROP_CLASS_NAME, "org.apache.pinot.thirdeye.detection.alert.filter.ToAllRecipientsDetectionAlertFilter");
     Map<String, Set<String>> recipients = new HashMap<>();
     recipients.put(PROP_TO, PROP_RECIPIENTS_VALUE);
     properties.put(PROP_RECIPIENTS, recipients);
     properties.put(PROP_DETECTION_CONFIG_IDS, Collections.singletonList(this.detectionConfigId));
 
     Map<String, Object> emailScheme = new HashMap<>();
-    emailScheme.put("className", "com.linkedin.thirdeye.detection.alert.scheme.RandomAlerter");
+    emailScheme.put("className", "org.apache.pinot.thirdeye.detection.alert.scheme.RandomAlerter");
     this.alertConfigDTO.setAlertSchemes(Collections.singletonMap("EmailScheme", emailScheme));
     this.alertConfigDTO.setProperties(properties);
     this.alertConfigDTO.setFrom(FROM_ADDRESS_VALUE);

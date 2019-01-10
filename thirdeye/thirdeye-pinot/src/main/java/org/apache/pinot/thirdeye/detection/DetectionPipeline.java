@@ -17,21 +17,21 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.detection;
+package org.apache.pinot.thirdeye.detection;
 
 import com.google.common.collect.Multimap;
-import com.linkedin.thirdeye.api.DimensionMap;
-import com.linkedin.thirdeye.dataframe.BooleanSeries;
-import com.linkedin.thirdeye.dataframe.DataFrame;
-import com.linkedin.thirdeye.dataframe.LongSeries;
-import com.linkedin.thirdeye.dataframe.util.MetricSlice;
-import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
-import com.linkedin.thirdeye.detection.spec.AbstractSpec;
-import com.linkedin.thirdeye.detection.spi.components.BaseComponent;
-import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
+import org.apache.pinot.thirdeye.api.DimensionMap;
+import org.apache.pinot.thirdeye.dataframe.BooleanSeries;
+import org.apache.pinot.thirdeye.dataframe.DataFrame;
+import org.apache.pinot.thirdeye.dataframe.LongSeries;
+import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
+import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
+import org.apache.pinot.thirdeye.detection.spec.AbstractSpec;
+import org.apache.pinot.thirdeye.detection.spi.components.BaseComponent;
+import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -44,8 +44,8 @@ import org.joda.time.Period;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
-import static com.linkedin.thirdeye.detection.DetectionUtils.*;
+import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
+import static org.apache.pinot.thirdeye.detection.DetectionUtils.*;
 
 
 /**

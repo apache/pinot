@@ -17,10 +17,10 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.detection.algorithm.stage;
+package org.apache.pinot.thirdeye.detection.algorithm.stage;
 
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.detection.DataProvider;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.detection.DataProvider;
 import java.util.List;
 
 

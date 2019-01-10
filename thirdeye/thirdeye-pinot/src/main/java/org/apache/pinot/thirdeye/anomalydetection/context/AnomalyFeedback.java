@@ -17,9 +17,9 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomalydetection.context;
+package org.apache.pinot.thirdeye.anomalydetection.context;
 
-import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
+import org.apache.pinot.thirdeye.constant.AnomalyFeedbackType;
 
 public interface AnomalyFeedback {
   /**

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.tools;
+package org.apache.pinot.thirdeye.tools;
 
 import java.io.File;
 import java.io.IOException;

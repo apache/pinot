@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datalayer.entity;
+package org.apache.pinot.thirdeye.datalayer.entity;
 
 import java.sql.Timestamp;
 import org.apache.commons.lang.builder.ToStringBuilder;

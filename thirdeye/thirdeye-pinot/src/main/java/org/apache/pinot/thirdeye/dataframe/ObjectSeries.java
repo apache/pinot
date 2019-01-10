@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.dataframe;
+package org.apache.pinot.thirdeye.dataframe;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;

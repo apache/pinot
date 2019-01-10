@@ -17,21 +17,21 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datasource;
+package org.apache.pinot.thirdeye.datasource;
 
 import com.google.common.base.Preconditions;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.LoadingCache;
-import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
-import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
-import com.linkedin.thirdeye.datasource.cache.DatasetConfigCacheLoader;
-import com.linkedin.thirdeye.datasource.cache.DatasetListCache;
-import com.linkedin.thirdeye.datasource.cache.DatasetMaxDataTimeCacheLoader;
-import com.linkedin.thirdeye.datasource.cache.DimensionFiltersCacheLoader;
-import com.linkedin.thirdeye.datasource.cache.MetricConfigCacheLoader;
-import com.linkedin.thirdeye.datasource.cache.MetricDataset;
-import com.linkedin.thirdeye.datasource.cache.QueryCache;
+import org.apache.pinot.thirdeye.common.ThirdEyeConfiguration;
+import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
+import org.apache.pinot.thirdeye.datasource.cache.DatasetConfigCacheLoader;
+import org.apache.pinot.thirdeye.datasource.cache.DatasetListCache;
+import org.apache.pinot.thirdeye.datasource.cache.DatasetMaxDataTimeCacheLoader;
+import org.apache.pinot.thirdeye.datasource.cache.DimensionFiltersCacheLoader;
+import org.apache.pinot.thirdeye.datasource.cache.MetricConfigCacheLoader;
+import org.apache.pinot.thirdeye.datasource.cache.MetricDataset;
+import org.apache.pinot.thirdeye.datasource.cache.QueryCache;
 import java.net.URL;
 import java.util.Map;
 import java.util.concurrent.Executors;

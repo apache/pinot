@@ -14,15 +14,15 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.detection.wrapper;
+package org.apache.pinot.thirdeye.detection.wrapper;
 
 import com.google.common.collect.ImmutableMap;
-import com.linkedin.thirdeye.api.TimeSpec;
-import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
-import com.linkedin.thirdeye.detection.MockDataProvider;
-import com.linkedin.thirdeye.detection.components.ThresholdRuleDetector;
+import org.apache.pinot.thirdeye.api.TimeSpec;
+import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
+import org.apache.pinot.thirdeye.detection.MockDataProvider;
+import org.apache.pinot.thirdeye.detection.components.ThresholdRuleDetector;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;

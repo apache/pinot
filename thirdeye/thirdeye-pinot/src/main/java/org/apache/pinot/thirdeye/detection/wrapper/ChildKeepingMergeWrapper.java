@@ -17,13 +17,13 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.detection.wrapper;
+package org.apache.pinot.thirdeye.detection.wrapper;
 
 import com.google.common.collect.Collections2;
-import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.detection.DataProvider;
-import com.linkedin.thirdeye.detection.algorithm.MergeWrapper;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.detection.DataProvider;
+import org.apache.pinot.thirdeye.detection.algorithm.MergeWrapper;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;

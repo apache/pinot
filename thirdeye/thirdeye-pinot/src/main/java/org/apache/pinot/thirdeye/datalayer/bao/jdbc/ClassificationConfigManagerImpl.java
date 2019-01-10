@@ -17,13 +17,13 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datalayer.bao.jdbc;
+package org.apache.pinot.thirdeye.datalayer.bao.jdbc;
 
 import com.google.inject.Singleton;
-import com.linkedin.thirdeye.datalayer.bao.ClassificationConfigManager;
-import com.linkedin.thirdeye.datalayer.dto.ClassificationConfigDTO;
-import com.linkedin.thirdeye.datalayer.pojo.ClassificationConfigBean;
-import com.linkedin.thirdeye.datalayer.util.Predicate;
+import org.apache.pinot.thirdeye.datalayer.bao.ClassificationConfigManager;
+import org.apache.pinot.thirdeye.datalayer.dto.ClassificationConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.pojo.ClassificationConfigBean;
+import org.apache.pinot.thirdeye.datalayer.util.Predicate;
 import java.util.List;
 import org.apache.commons.collections.CollectionUtils;
 

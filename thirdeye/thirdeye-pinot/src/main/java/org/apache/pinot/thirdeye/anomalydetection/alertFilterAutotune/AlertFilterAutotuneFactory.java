@@ -17,16 +17,16 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomalydetection.alertFilterAutotune;
+package org.apache.pinot.thirdeye.anomalydetection.alertFilterAutotune;
 
-import com.linkedin.thirdeye.anomaly.detection.lib.AutotuneMethodType;
-import com.linkedin.thirdeye.anomalydetection.performanceEvaluation.PerformanceEvaluate;
-import com.linkedin.thirdeye.anomalydetection.performanceEvaluation.PerformanceEvaluationMethod;
-import com.linkedin.thirdeye.datalayer.bao.AutotuneConfigManager;
-import com.linkedin.thirdeye.datalayer.dto.AutotuneConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.detector.email.filter.AlertFilter;
-import com.linkedin.thirdeye.detector.email.filter.BaseAlertFilter;
+import org.apache.pinot.thirdeye.anomaly.detection.lib.AutotuneMethodType;
+import org.apache.pinot.thirdeye.anomalydetection.performanceEvaluation.PerformanceEvaluate;
+import org.apache.pinot.thirdeye.anomalydetection.performanceEvaluation.PerformanceEvaluationMethod;
+import org.apache.pinot.thirdeye.datalayer.bao.AutotuneConfigManager;
+import org.apache.pinot.thirdeye.datalayer.dto.AutotuneConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.detector.email.filter.AlertFilter;
+import org.apache.pinot.thirdeye.detector.email.filter.BaseAlertFilter;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;

@@ -17,9 +17,9 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomaly.merge;
+package org.apache.pinot.thirdeye.anomaly.merge;
 
-import com.linkedin.thirdeye.anomalydetection.context.AnomalyResult;
+import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyResult;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -30,7 +30,7 @@ import org.apache.commons.lang.ObjectUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 
 
 

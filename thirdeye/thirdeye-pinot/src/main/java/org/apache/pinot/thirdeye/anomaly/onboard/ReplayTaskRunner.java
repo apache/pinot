@@ -17,25 +17,25 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomaly.onboard;
+package org.apache.pinot.thirdeye.anomaly.onboard;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.thirdeye.anomaly.SmtpConfiguration;
-import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
-import com.linkedin.thirdeye.anomaly.job.JobConstants;
-import com.linkedin.thirdeye.anomaly.onboard.framework.DetectionOnBoardJobRunner;
-import com.linkedin.thirdeye.anomaly.onboard.framework.DetectionOnboardJob;
-import com.linkedin.thirdeye.anomaly.onboard.framework.DetectionOnboardJobContext;
-import com.linkedin.thirdeye.anomaly.onboard.framework.DetectionOnboardJobStatus;
-import com.linkedin.thirdeye.anomaly.onboard.framework.DetectionOnboardTask;
-import com.linkedin.thirdeye.anomaly.onboard.tasks.DefaultDetectionOnboardJob;
-import com.linkedin.thirdeye.anomaly.task.TaskContext;
-import com.linkedin.thirdeye.anomaly.task.TaskInfo;
-import com.linkedin.thirdeye.anomaly.task.TaskResult;
-import com.linkedin.thirdeye.anomaly.task.TaskRunner;
-import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
-import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
-import com.linkedin.thirdeye.datasource.DAORegistry;
+import org.apache.pinot.thirdeye.anomaly.SmtpConfiguration;
+import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
+import org.apache.pinot.thirdeye.anomaly.job.JobConstants;
+import org.apache.pinot.thirdeye.anomaly.onboard.framework.DetectionOnBoardJobRunner;
+import org.apache.pinot.thirdeye.anomaly.onboard.framework.DetectionOnboardJob;
+import org.apache.pinot.thirdeye.anomaly.onboard.framework.DetectionOnboardJobContext;
+import org.apache.pinot.thirdeye.anomaly.onboard.framework.DetectionOnboardJobStatus;
+import org.apache.pinot.thirdeye.anomaly.onboard.framework.DetectionOnboardTask;
+import org.apache.pinot.thirdeye.anomaly.onboard.tasks.DefaultDetectionOnboardJob;
+import org.apache.pinot.thirdeye.anomaly.task.TaskContext;
+import org.apache.pinot.thirdeye.anomaly.task.TaskInfo;
+import org.apache.pinot.thirdeye.anomaly.task.TaskResult;
+import org.apache.pinot.thirdeye.anomaly.task.TaskRunner;
+import org.apache.pinot.thirdeye.datalayer.bao.AnomalyFunctionManager;
+import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -47,7 +47,7 @@ import org.apache.commons.lang.exception.ExceptionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static com.linkedin.thirdeye.anomaly.SmtpConfiguration.SMTP_CONFIG_KEY;
+import static org.apache.pinot.thirdeye.anomaly.SmtpConfiguration.SMTP_CONFIG_KEY;
 
 
 /**

@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.config;
+package org.apache.pinot.thirdeye.config;
 
-import com.linkedin.thirdeye.datalayer.bao.ConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.DAOTestBase;
-import com.linkedin.thirdeye.datasource.DAORegistry;
+import org.apache.pinot.thirdeye.datalayer.bao.ConfigManager;
+import org.apache.pinot.thirdeye.datalayer.bao.DAOTestBase;
+import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;

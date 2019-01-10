@@ -17,13 +17,13 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomaly.monitor;
+package org.apache.pinot.thirdeye.anomaly.monitor;
 
 import java.util.Objects;
 
 import com.google.common.base.MoreObjects;
-import com.linkedin.thirdeye.anomaly.monitor.MonitorConstants.MonitorType;
-import com.linkedin.thirdeye.anomaly.task.TaskInfo;
+import org.apache.pinot.thirdeye.anomaly.monitor.MonitorConstants.MonitorType;
+import org.apache.pinot.thirdeye.anomaly.task.TaskInfo;
 
 public class MonitorTaskInfo implements TaskInfo {
 

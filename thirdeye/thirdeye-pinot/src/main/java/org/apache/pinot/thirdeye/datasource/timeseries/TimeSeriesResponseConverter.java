@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datasource.timeseries;
+package org.apache.pinot.thirdeye.datasource.timeseries;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -34,11 +34,11 @@ import org.apache.commons.collections.map.MultiKeyMap;
 
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.SetMultimap;
-import com.linkedin.thirdeye.api.DimensionKey;
-import com.linkedin.thirdeye.api.MetricSchema;
-import com.linkedin.thirdeye.api.MetricTimeSeries;
-import com.linkedin.thirdeye.api.MetricType;
-import com.linkedin.thirdeye.datasource.timeseries.TimeSeriesRow.TimeSeriesMetric;
+import org.apache.pinot.thirdeye.api.DimensionKey;
+import org.apache.pinot.thirdeye.api.MetricSchema;
+import org.apache.pinot.thirdeye.api.MetricTimeSeries;
+import org.apache.pinot.thirdeye.api.MetricType;
+import org.apache.pinot.thirdeye.datasource.timeseries.TimeSeriesRow.TimeSeriesMetric;
 
 /**
  * Util class to support the older ThirdEyeDataSource API for time series responses. See

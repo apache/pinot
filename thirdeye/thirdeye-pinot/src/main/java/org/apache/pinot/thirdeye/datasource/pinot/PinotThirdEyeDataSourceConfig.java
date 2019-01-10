@@ -17,15 +17,15 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datasource.pinot;
+package org.apache.pinot.thirdeye.datasource.pinot;
 
 import com.google.common.base.MoreObjects;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableMap;
-import com.linkedin.thirdeye.auto.onboard.AutoOnboardPinotMetadataSource;
-import com.linkedin.thirdeye.datasource.DataSourceConfig;
-import com.linkedin.thirdeye.datasource.MetadataSourceConfig;
+import org.apache.pinot.thirdeye.auto.onboard.AutoOnboardPinotMetadataSource;
+import org.apache.pinot.thirdeye.datasource.DataSourceConfig;
+import org.apache.pinot.thirdeye.datasource.MetadataSourceConfig;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;

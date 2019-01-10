@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomaly.monitor;
+package org.apache.pinot.thirdeye.anomaly.monitor;
 
 
 import java.util.ArrayList;
@@ -28,15 +28,15 @@ import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.linkedin.thirdeye.anomaly.job.JobConstants.JobStatus;
-import com.linkedin.thirdeye.anomaly.job.JobRunner;
-import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskStatus;
-import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskType;
-import com.linkedin.thirdeye.anomaly.task.TaskGenerator;
-import com.linkedin.thirdeye.datalayer.bao.JobManager;
-import com.linkedin.thirdeye.datalayer.bao.TaskManager;
-import com.linkedin.thirdeye.datalayer.dto.JobDTO;
-import com.linkedin.thirdeye.datalayer.dto.TaskDTO;
+import org.apache.pinot.thirdeye.anomaly.job.JobConstants.JobStatus;
+import org.apache.pinot.thirdeye.anomaly.job.JobRunner;
+import org.apache.pinot.thirdeye.anomaly.task.TaskConstants.TaskStatus;
+import org.apache.pinot.thirdeye.anomaly.task.TaskConstants.TaskType;
+import org.apache.pinot.thirdeye.anomaly.task.TaskGenerator;
+import org.apache.pinot.thirdeye.datalayer.bao.JobManager;
+import org.apache.pinot.thirdeye.datalayer.bao.TaskManager;
+import org.apache.pinot.thirdeye.datalayer.dto.JobDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.TaskDTO;
 
 public class MonitorJobRunner implements JobRunner {
 

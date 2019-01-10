@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.anomaly.detection;
+package org.apache.pinot.thirdeye.anomaly.detection;
 
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -26,10 +26,10 @@ import org.joda.time.format.DateTimeFormatter;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import com.linkedin.thirdeye.api.TimeGranularity;
-import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
-import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.DetectionStatusDTO;
+import org.apache.pinot.thirdeye.api.TimeGranularity;
+import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionStatusDTO;
 
 public class TestDetectionJobSchedulerUtils {
 

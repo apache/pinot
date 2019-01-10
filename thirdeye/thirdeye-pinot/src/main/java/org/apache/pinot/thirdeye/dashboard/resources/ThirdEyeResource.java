@@ -17,14 +17,14 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.dashboard.resources;
+package org.apache.pinot.thirdeye.dashboard.resources;
 
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 
-import com.linkedin.thirdeye.dashboard.views.ThirdEyeView;
+import org.apache.pinot.thirdeye.dashboard.views.ThirdEyeView;
 
 import io.dropwizard.views.View;
 

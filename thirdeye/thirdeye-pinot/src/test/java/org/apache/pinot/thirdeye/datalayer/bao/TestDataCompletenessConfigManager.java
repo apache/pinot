@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.datalayer.bao;
+package org.apache.pinot.thirdeye.datalayer.bao;
 
-import com.linkedin.thirdeye.datalayer.DaoTestUtils;
-import com.linkedin.thirdeye.datasource.DAORegistry;
+import org.apache.pinot.thirdeye.datalayer.DaoTestUtils;
+import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import java.util.List;
 
 import org.joda.time.DateTime;
@@ -28,7 +28,7 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import com.linkedin.thirdeye.datalayer.dto.DataCompletenessConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.DataCompletenessConfigDTO;
 
 public class TestDataCompletenessConfigManager {
 

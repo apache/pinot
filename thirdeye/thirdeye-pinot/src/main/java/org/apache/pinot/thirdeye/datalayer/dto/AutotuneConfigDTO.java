@@ -17,12 +17,12 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datalayer.dto;
+package org.apache.pinot.thirdeye.datalayer.dto;
 
-import com.linkedin.thirdeye.datalayer.pojo.AutotuneConfigBean;
-import com.linkedin.thirdeye.detector.email.filter.AlertFilter;
-import com.linkedin.thirdeye.detector.email.filter.BaseAlertFilter;
-import com.linkedin.thirdeye.detector.email.filter.DummyAlertFilter;
+import org.apache.pinot.thirdeye.datalayer.pojo.AutotuneConfigBean;
+import org.apache.pinot.thirdeye.detector.email.filter.AlertFilter;
+import org.apache.pinot.thirdeye.detector.email.filter.BaseAlertFilter;
+import org.apache.pinot.thirdeye.detector.email.filter.DummyAlertFilter;
 import java.util.Properties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

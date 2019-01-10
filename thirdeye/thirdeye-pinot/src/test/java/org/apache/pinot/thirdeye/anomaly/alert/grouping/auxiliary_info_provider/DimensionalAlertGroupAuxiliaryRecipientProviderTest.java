@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.anomaly.alert.grouping.auxiliary_info_provider;
+package org.apache.pinot.thirdeye.anomaly.alert.grouping.auxiliary_info_provider;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.linkedin.thirdeye.api.DimensionMap;
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.api.DimensionMap;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;

@@ -17,27 +17,27 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomaly.task;
+package org.apache.pinot.thirdeye.anomaly.task;
 
-import com.linkedin.thirdeye.anomaly.classification.ClassificationJobContext;
-import com.linkedin.thirdeye.anomaly.classification.ClassificationTaskInfo;
-import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.ClassificationConfigDTO;
+import org.apache.pinot.thirdeye.anomaly.classification.ClassificationJobContext;
+import org.apache.pinot.thirdeye.anomaly.classification.ClassificationTaskInfo;
+import org.apache.pinot.thirdeye.datalayer.dto.AlertConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.ClassificationConfigDTO;
 import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
 
-import com.linkedin.thirdeye.anomaly.alert.AlertJobContext;
-import com.linkedin.thirdeye.anomaly.alert.AlertTaskInfo;
-import com.linkedin.thirdeye.anomaly.detection.DetectionJobContext;
-import com.linkedin.thirdeye.anomaly.detection.DetectionTaskInfo;
-import com.linkedin.thirdeye.anomaly.monitor.MonitorConfiguration;
-import com.linkedin.thirdeye.anomaly.monitor.MonitorConstants.MonitorType;
-import com.linkedin.thirdeye.anomaly.monitor.MonitorJobContext;
-import com.linkedin.thirdeye.anomaly.monitor.MonitorTaskInfo;
-import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import org.apache.pinot.thirdeye.anomaly.alert.AlertJobContext;
+import org.apache.pinot.thirdeye.anomaly.alert.AlertTaskInfo;
+import org.apache.pinot.thirdeye.anomaly.detection.DetectionJobContext;
+import org.apache.pinot.thirdeye.anomaly.detection.DetectionTaskInfo;
+import org.apache.pinot.thirdeye.anomaly.monitor.MonitorConfiguration;
+import org.apache.pinot.thirdeye.anomaly.monitor.MonitorConstants.MonitorType;
+import org.apache.pinot.thirdeye.anomaly.monitor.MonitorJobContext;
+import org.apache.pinot.thirdeye.anomaly.monitor.MonitorTaskInfo;
+import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 
 
 /**

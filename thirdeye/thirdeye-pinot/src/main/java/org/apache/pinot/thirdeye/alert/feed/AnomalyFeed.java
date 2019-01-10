@@ -17,11 +17,11 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.alert.feed;
+package org.apache.pinot.thirdeye.alert.feed;
 
-import com.linkedin.thirdeye.alert.commons.AnomalyFeedConfig;
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
+import org.apache.pinot.thirdeye.alert.commons.AnomalyFeedConfig;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.detector.email.filter.AlertFilterFactory;
 import java.util.Collection;
 
 /**

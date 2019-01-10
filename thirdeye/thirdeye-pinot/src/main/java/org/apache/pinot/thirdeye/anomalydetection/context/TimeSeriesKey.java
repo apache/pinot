@@ -17,9 +17,9 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomalydetection.context;
+package org.apache.pinot.thirdeye.anomalydetection.context;
 
-import com.linkedin.thirdeye.api.DimensionMap;
+import org.apache.pinot.thirdeye.api.DimensionMap;
 import java.util.Objects;
 import org.apache.commons.lang.ObjectUtils;
 

@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.completeness.checker;
+package org.apache.pinot.thirdeye.completeness.checker;
 
 
 import java.lang.reflect.Constructor;

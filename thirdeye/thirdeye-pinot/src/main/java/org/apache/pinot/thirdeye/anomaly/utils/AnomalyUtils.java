@@ -17,11 +17,11 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomaly.utils;
+package org.apache.pinot.thirdeye.anomaly.utils;
 
-import com.linkedin.thirdeye.anomalydetection.context.AnomalyFeedback;
-import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyFeedback;
+import org.apache.pinot.thirdeye.constant.AnomalyFeedbackType;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.List;

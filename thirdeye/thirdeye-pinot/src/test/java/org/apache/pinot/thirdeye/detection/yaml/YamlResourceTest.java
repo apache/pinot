@@ -1,11 +1,11 @@
-package com.linkedin.thirdeye.detection.yaml;
+package org.apache.pinot.thirdeye.detection.yaml;
 
-import com.linkedin.thirdeye.datalayer.bao.DAOTestBase;
-import com.linkedin.thirdeye.datalayer.dto.ApplicationDTO;
-import com.linkedin.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
-import com.linkedin.thirdeye.datasource.DAORegistry;
-import com.linkedin.thirdeye.detection.annotation.registry.DetectionAlertRegistry;
-import com.linkedin.thirdeye.detection.annotation.registry.DetectionRegistry;
+import org.apache.pinot.thirdeye.datalayer.bao.DAOTestBase;
+import org.apache.pinot.thirdeye.datalayer.dto.ApplicationDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
+import org.apache.pinot.thirdeye.datasource.DAORegistry;
+import org.apache.pinot.thirdeye.detection.annotation.registry.DetectionAlertRegistry;
+import org.apache.pinot.thirdeye.detection.annotation.registry.DetectionRegistry;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;

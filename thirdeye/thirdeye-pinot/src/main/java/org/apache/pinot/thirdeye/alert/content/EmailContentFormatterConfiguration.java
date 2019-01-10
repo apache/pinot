@@ -17,13 +17,13 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.alert.content;
+package org.apache.pinot.thirdeye.alert.content;
 
-import com.linkedin.thirdeye.anomaly.SmtpConfiguration;
-import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
+import org.apache.pinot.thirdeye.anomaly.SmtpConfiguration;
+import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import java.util.List;
 
-import static com.linkedin.thirdeye.anomaly.SmtpConfiguration.SMTP_CONFIG_KEY;
+import static org.apache.pinot.thirdeye.anomaly.SmtpConfiguration.SMTP_CONFIG_KEY;
 
 
 public class EmailContentFormatterConfiguration{

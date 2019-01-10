@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.dashboard;
+package org.apache.pinot.thirdeye.dashboard;
 
 import java.io.IOException;
 
@@ -26,7 +26,7 @@ import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.methods.HttpDelete;
 import org.apache.http.client.methods.HttpPost;
 
-import com.linkedin.thirdeye.anomaly.utils.AbstractResourceHttpUtils;
+import org.apache.pinot.thirdeye.anomaly.utils.AbstractResourceHttpUtils;
 import org.apache.http.impl.cookie.BasicClientCookie;
 
 

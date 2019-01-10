@@ -17,17 +17,17 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.rootcause.impl;
+package org.apache.pinot.thirdeye.rootcause.impl;
 
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
-import com.linkedin.thirdeye.dataframe.DataFrame;
-import com.linkedin.thirdeye.dataframe.DoubleSeries;
-import com.linkedin.thirdeye.dataframe.StringSeries;
-import com.linkedin.thirdeye.rootcause.Entity;
-import com.linkedin.thirdeye.rootcause.Pipeline;
-import com.linkedin.thirdeye.rootcause.PipelineContext;
-import com.linkedin.thirdeye.rootcause.PipelineResult;
+import org.apache.pinot.thirdeye.dataframe.DataFrame;
+import org.apache.pinot.thirdeye.dataframe.DoubleSeries;
+import org.apache.pinot.thirdeye.dataframe.StringSeries;
+import org.apache.pinot.thirdeye.rootcause.Entity;
+import org.apache.pinot.thirdeye.rootcause.Pipeline;
+import org.apache.pinot.thirdeye.rootcause.PipelineContext;
+import org.apache.pinot.thirdeye.rootcause.PipelineResult;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;

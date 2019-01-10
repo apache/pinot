@@ -17,9 +17,9 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.detector.metric.transfer;
+package org.apache.pinot.thirdeye.detector.metric.transfer;
 
-import com.linkedin.thirdeye.api.MetricTimeSeries;
+import org.apache.pinot.thirdeye.api.MetricTimeSeries;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;

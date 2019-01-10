@@ -17,12 +17,12 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomalydetection.model.merge;
+package org.apache.pinot.thirdeye.anomalydetection.model.merge;
 
-import com.linkedin.thirdeye.anomalydetection.context.AnomalyDetectionContext;
-import com.linkedin.thirdeye.anomalydetection.context.TimeSeries;
-import com.linkedin.thirdeye.anomalydetection.model.detection.MinMaxThresholdDetectionModel;
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyDetectionContext;
+import org.apache.pinot.thirdeye.anomalydetection.context.TimeSeries;
+import org.apache.pinot.thirdeye.anomalydetection.model.detection.MinMaxThresholdDetectionModel;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import java.util.Properties;
 import org.joda.time.Interval;
 

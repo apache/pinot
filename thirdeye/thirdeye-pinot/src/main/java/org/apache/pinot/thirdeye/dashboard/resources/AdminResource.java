@@ -17,9 +17,9 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.dashboard.resources;
+package org.apache.pinot.thirdeye.dashboard.resources;
 
-import com.linkedin.thirdeye.api.Constants;
+import org.apache.pinot.thirdeye.api.Constants;
 import com.wordnik.swagger.annotations.Api;
 import com.wordnik.swagger.annotations.ApiOperation;
 import javax.ws.rs.GET;
@@ -27,7 +27,7 @@ import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 
-import com.linkedin.thirdeye.dashboard.views.ThirdEyeAdminView;
+import org.apache.pinot.thirdeye.dashboard.views.ThirdEyeAdminView;
 
 import io.dropwizard.views.View;
 

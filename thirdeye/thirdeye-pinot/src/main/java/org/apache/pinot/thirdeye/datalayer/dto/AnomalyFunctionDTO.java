@@ -17,10 +17,10 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datalayer.dto;
+package org.apache.pinot.thirdeye.datalayer.dto;
 
-import com.linkedin.thirdeye.datalayer.pojo.AnomalyFunctionBean;
-import com.linkedin.thirdeye.datalayer.util.StringUtils;
+import org.apache.pinot.thirdeye.datalayer.pojo.AnomalyFunctionBean;
+import org.apache.pinot.thirdeye.datalayer.util.StringUtils;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;

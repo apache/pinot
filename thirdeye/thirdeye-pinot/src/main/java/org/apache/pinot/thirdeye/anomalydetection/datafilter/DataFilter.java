@@ -17,10 +17,10 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomalydetection.datafilter;
+package org.apache.pinot.thirdeye.anomalydetection.datafilter;
 
-import com.linkedin.thirdeye.api.DimensionMap;
-import com.linkedin.thirdeye.api.MetricTimeSeries;
+import org.apache.pinot.thirdeye.api.DimensionMap;
+import org.apache.pinot.thirdeye.api.MetricTimeSeries;
 import java.util.Map;
 
 public interface DataFilter {

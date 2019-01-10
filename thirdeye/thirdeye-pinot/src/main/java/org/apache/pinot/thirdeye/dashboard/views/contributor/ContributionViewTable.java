@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.dashboard.views.contributor;
+package org.apache.pinot.thirdeye.dashboard.views.contributor;
 
 import java.util.List;
 

@@ -17,16 +17,16 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datasource.mock;
+package org.apache.pinot.thirdeye.datasource.mock;
 
-import com.linkedin.thirdeye.auto.onboard.AutoOnboard;
-import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
-import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
-import com.linkedin.thirdeye.datasource.DAORegistry;
-import com.linkedin.thirdeye.datasource.MetadataSourceConfig;
-import com.linkedin.thirdeye.detection.ConfigUtils;
+import org.apache.pinot.thirdeye.auto.onboard.AutoOnboard;
+import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
+import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
+import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
+import org.apache.pinot.thirdeye.datasource.DAORegistry;
+import org.apache.pinot.thirdeye.datasource.MetadataSourceConfig;
+import org.apache.pinot.thirdeye.detection.ConfigUtils;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;

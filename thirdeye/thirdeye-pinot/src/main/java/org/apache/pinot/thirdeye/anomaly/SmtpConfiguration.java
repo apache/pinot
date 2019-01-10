@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomaly;
+package org.apache.pinot.thirdeye.anomaly;
 
 import java.util.Map;
 import java.util.Objects;

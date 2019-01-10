@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomaly.task;
+package org.apache.pinot.thirdeye.anomaly.task;
 
 /**
  * Interface for task info of the various types of tasks

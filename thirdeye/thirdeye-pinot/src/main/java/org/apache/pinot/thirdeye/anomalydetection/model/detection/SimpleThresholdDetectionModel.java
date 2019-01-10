@@ -17,16 +17,16 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomalydetection.model.detection;
+package org.apache.pinot.thirdeye.anomalydetection.model.detection;
 
-import com.linkedin.thirdeye.anomalydetection.context.AnomalyDetectionContext;
-import com.linkedin.thirdeye.anomalydetection.context.AnomalyResult;
-import com.linkedin.thirdeye.anomalydetection.context.RawAnomalyResult;
-import com.linkedin.thirdeye.anomalydetection.context.TimeSeries;
-import com.linkedin.thirdeye.anomalydetection.model.prediction.ExpectedTimeSeriesPredictionModel;
-import com.linkedin.thirdeye.anomalydetection.model.prediction.PredictionModel;
-import com.linkedin.thirdeye.api.DimensionMap;
-import com.linkedin.thirdeye.util.ThirdEyeUtils;
+import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyDetectionContext;
+import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyResult;
+import org.apache.pinot.thirdeye.anomalydetection.context.RawAnomalyResult;
+import org.apache.pinot.thirdeye.anomalydetection.context.TimeSeries;
+import org.apache.pinot.thirdeye.anomalydetection.model.prediction.ExpectedTimeSeriesPredictionModel;
+import org.apache.pinot.thirdeye.anomalydetection.model.prediction.PredictionModel;
+import org.apache.pinot.thirdeye.api.DimensionMap;
+import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
 import java.util.ArrayList;
 import java.util.List;
 import org.joda.time.Interval;

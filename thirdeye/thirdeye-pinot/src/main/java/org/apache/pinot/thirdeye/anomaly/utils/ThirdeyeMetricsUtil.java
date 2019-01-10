@@ -17,10 +17,10 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomaly.utils;
+package org.apache.pinot.thirdeye.anomaly.utils;
 
-import com.linkedin.thirdeye.datasource.DAORegistry;
-import com.linkedin.thirdeye.tracking.RequestLog;
+import org.apache.pinot.thirdeye.datasource.DAORegistry;
+import org.apache.pinot.thirdeye.tracking.RequestLog;
 import com.yammer.metrics.core.Counter;
 import com.yammer.metrics.core.Gauge;
 import com.yammer.metrics.core.MetricsRegistry;

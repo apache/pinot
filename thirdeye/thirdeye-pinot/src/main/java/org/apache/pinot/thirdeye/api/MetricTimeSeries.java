@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.api;
+package org.apache.pinot.thirdeye.api;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -36,7 +36,7 @@ import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.thirdeye.util.NumberUtils;
+import org.apache.pinot.thirdeye.util.NumberUtils;
 
 /**
  * @author kgopalak

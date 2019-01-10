@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomaly.onboard.utils;
+package org.apache.pinot.thirdeye.anomaly.onboard.utils;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.api;
+package org.apache.pinot.thirdeye.api;
 
 import org.testng.Assert;
 import org.testng.annotations.Test;

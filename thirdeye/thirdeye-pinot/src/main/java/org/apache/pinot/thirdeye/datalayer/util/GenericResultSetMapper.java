@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datalayer.util;
+package org.apache.pinot.thirdeye.datalayer.util;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -43,8 +43,8 @@ import org.modelmapper.config.Configuration.AccessLevel;
 import org.modelmapper.convention.NameTokenizers;
 
 import com.google.common.collect.BiMap;
-import com.linkedin.thirdeye.datalayer.dto.TaskDTO;
-import com.linkedin.thirdeye.datalayer.entity.AbstractEntity;
+import org.apache.pinot.thirdeye.datalayer.dto.TaskDTO;
+import org.apache.pinot.thirdeye.datalayer.entity.AbstractEntity;
 
 public class GenericResultSetMapper {
 

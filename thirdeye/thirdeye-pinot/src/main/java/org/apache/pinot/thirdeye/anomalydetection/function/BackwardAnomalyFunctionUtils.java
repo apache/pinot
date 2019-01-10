@@ -17,16 +17,16 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomalydetection.function;
+package org.apache.pinot.thirdeye.anomalydetection.function;
 
 import com.linkedin.pinot.pql.parsers.utils.Pair;
-import com.linkedin.thirdeye.anomalydetection.AnomalyDetectionUtils;
-import com.linkedin.thirdeye.anomalydetection.context.AnomalyDetectionContext;
-import com.linkedin.thirdeye.anomalydetection.context.TimeSeries;
-import com.linkedin.thirdeye.anomalydetection.context.TimeSeriesKey;
-import com.linkedin.thirdeye.api.DimensionMap;
-import com.linkedin.thirdeye.api.MetricTimeSeries;
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.anomalydetection.AnomalyDetectionUtils;
+import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyDetectionContext;
+import org.apache.pinot.thirdeye.anomalydetection.context.TimeSeries;
+import org.apache.pinot.thirdeye.anomalydetection.context.TimeSeriesKey;
+import org.apache.pinot.thirdeye.api.DimensionMap;
+import org.apache.pinot.thirdeye.api.MetricTimeSeries;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;

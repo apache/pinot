@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomaly.task;
+package org.apache.pinot.thirdeye.anomaly.task;
 
 public class TaskDriverConfiguration {
   private int noTaskDelayInMillis = 15_000; // 15 seconds

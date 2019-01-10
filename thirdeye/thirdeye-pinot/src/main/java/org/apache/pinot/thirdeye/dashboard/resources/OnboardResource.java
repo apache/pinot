@@ -17,28 +17,28 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.dashboard.resources;
+package org.apache.pinot.thirdeye.dashboard.resources;
 
 import com.codahale.metrics.Counter;
 import com.google.common.base.CaseFormat;
-import com.linkedin.thirdeye.anomaly.onboard.DetectionOnboardResource;
-import com.linkedin.thirdeye.anomaly.onboard.tasks.DefaultDetectionOnboardJob;
-import com.linkedin.thirdeye.auto.onboard.AutoOnboardUtility;
-import com.linkedin.thirdeye.dashboard.ThirdEyeDashboardConfiguration;
-import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
-import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
-import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.TaskManager;
-import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
-import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
-import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean;
-import com.linkedin.thirdeye.datasource.DAORegistry;
-import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterRecipients;
+import org.apache.pinot.thirdeye.anomaly.onboard.DetectionOnboardResource;
+import org.apache.pinot.thirdeye.anomaly.onboard.tasks.DefaultDetectionOnboardJob;
+import org.apache.pinot.thirdeye.auto.onboard.AutoOnboardUtility;
+import org.apache.pinot.thirdeye.dashboard.ThirdEyeDashboardConfiguration;
+import org.apache.pinot.thirdeye.datalayer.bao.AlertConfigManager;
+import org.apache.pinot.thirdeye.datalayer.bao.AnomalyFunctionManager;
+import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
+import org.apache.pinot.thirdeye.datalayer.bao.MergedAnomalyResultManager;
+import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
+import org.apache.pinot.thirdeye.datalayer.bao.TaskManager;
+import org.apache.pinot.thirdeye.datalayer.dto.AlertConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.pojo.AlertConfigBean;
+import org.apache.pinot.thirdeye.datasource.DAORegistry;
+import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterRecipients;
 import com.wordnik.swagger.annotations.ApiOperation;
 import com.wordnik.swagger.annotations.ApiParam;
 import java.util.ArrayList;
@@ -68,8 +68,8 @@ import org.quartz.CronExpression;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static com.linkedin.thirdeye.anomaly.onboard.tasks.FunctionCreationOnboardingTask.*;
-import static com.linkedin.thirdeye.dashboard.resources.EntityManagerResource.*;
+import static org.apache.pinot.thirdeye.anomaly.onboard.tasks.FunctionCreationOnboardingTask.*;
+import static org.apache.pinot.thirdeye.dashboard.resources.EntityManagerResource.*;
 
 
 @Path("/onboard")

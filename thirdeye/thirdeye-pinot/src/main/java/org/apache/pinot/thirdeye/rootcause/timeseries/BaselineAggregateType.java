@@ -17,10 +17,10 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.rootcause.timeseries;
+package org.apache.pinot.thirdeye.rootcause.timeseries;
 
-import com.linkedin.thirdeye.dataframe.DoubleSeries;
-import com.linkedin.thirdeye.dataframe.Series;
+import org.apache.pinot.thirdeye.dataframe.DoubleSeries;
+import org.apache.pinot.thirdeye.dataframe.Series;
 
 
 /**

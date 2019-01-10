@@ -17,12 +17,12 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.detection.spi.model;
+package org.apache.pinot.thirdeye.detection.spi.model;
 
-import com.linkedin.thirdeye.dataframe.DataFrame;
-import com.linkedin.thirdeye.dataframe.DoubleSeries;
-import com.linkedin.thirdeye.dataframe.LongSeries;
-import com.linkedin.thirdeye.dataframe.util.DataFrameUtils;
+import org.apache.pinot.thirdeye.dataframe.DataFrame;
+import org.apache.pinot.thirdeye.dataframe.DoubleSeries;
+import org.apache.pinot.thirdeye.dataframe.LongSeries;
+import org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils;
 
 /**
  * Time series. wrapper object of data frame. Used by baselineProvider to return the predicted time series

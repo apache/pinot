@@ -17,10 +17,10 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomalydetection.performanceEvaluation;
+package org.apache.pinot.thirdeye.anomalydetection.performanceEvaluation;
 
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.util.IntervalUtils;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.util.IntervalUtils;
 import java.util.List;
 import org.joda.time.Interval;
 

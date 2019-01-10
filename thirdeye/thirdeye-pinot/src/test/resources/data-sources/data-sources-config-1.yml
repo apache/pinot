@@ -1,5 +1,5 @@
 dataSourceConfigs:
-  - className: com.linkedin.thirdeye.datasource.pinot.PinotThirdEyeDataSource
+  - className: org.apache.pinot.thirdeye.datasource.pinot.PinotThirdEyeDataSource
     properties:
         zookeeperUrl: 'dummy-url'
         clusterName: 'dummy-cluster'
@@ -10,16 +10,16 @@ dataSourceConfigs:
         d2PinotProxyPort: 9999
         cacheLoaderClassName: dummy-cache
     metadataSourceConfigs:
-      - className: com.linkedin.thirdeye.auto.onboard.AutoOnboardDummyDataSource
+      - className: org.apache.pinot.thirdeye.auto.onboard.AutoOnboardDummyDataSource
         properties:
             username: 'username'
             password: 'password'
-      - className: com.linkedin.thirdeye.auto.onboard.AutoOnboardAnotherDummyDataSource
+      - className: org.apache.pinot.thirdeye.auto.onboard.AutoOnboardAnotherDummyDataSource
         properties:
             host: 'host'
             port: 9999
-  - className: com.linkedin.thirdeye.datasource.csv.CSVThirdEyeDataSource
+  - className: org.apache.pinot.thirdeye.datasource.csv.CSVThirdEyeDataSource
     properties:
         business: business.csv
     metadataSourceConfigs:
-      - className: com.linkedin.thirdeye.auto.onboard.AutoOnboardAnotherRandomDataSource
+      - className: org.apache.pinot.thirdeye.auto.onboard.AutoOnboardAnotherRandomDataSource

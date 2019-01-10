@@ -17,13 +17,13 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.dashboard.resources.v2;
+package org.apache.pinot.thirdeye.dashboard.resources.v2;
 
-import com.linkedin.thirdeye.dashboard.resources.v2.pojo.RootCauseEntity;
-import com.linkedin.thirdeye.dashboard.resources.v2.pojo.RootCauseEventEntity;
-import com.linkedin.thirdeye.rootcause.Entity;
-import com.linkedin.thirdeye.rootcause.impl.EventEntity;
-import com.linkedin.thirdeye.rootcause.impl.TimeRangeEntity;
+import org.apache.pinot.thirdeye.dashboard.resources.v2.pojo.RootCauseEntity;
+import org.apache.pinot.thirdeye.dashboard.resources.v2.pojo.RootCauseEventEntity;
+import org.apache.pinot.thirdeye.rootcause.Entity;
+import org.apache.pinot.thirdeye.rootcause.impl.EventEntity;
+import org.apache.pinot.thirdeye.rootcause.impl.TimeRangeEntity;
 
 
 /**

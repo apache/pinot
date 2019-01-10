@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.tools;
+package org.apache.pinot.thirdeye.tools;
 
-import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
+import org.apache.pinot.thirdeye.datalayer.util.DaoProviderUtil;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;

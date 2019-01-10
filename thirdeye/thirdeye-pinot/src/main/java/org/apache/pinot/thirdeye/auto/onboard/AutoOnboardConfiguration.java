@@ -17,11 +17,11 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.auto.onboard;
+package org.apache.pinot.thirdeye.auto.onboard;
 
 import java.util.concurrent.TimeUnit;
 
-import com.linkedin.thirdeye.api.TimeGranularity;
+import org.apache.pinot.thirdeye.api.TimeGranularity;
 
 public class AutoOnboardConfiguration {
 

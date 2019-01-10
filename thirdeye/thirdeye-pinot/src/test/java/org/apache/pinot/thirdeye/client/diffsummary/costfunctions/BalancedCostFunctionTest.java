@@ -14,14 +14,14 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.client.diffsummary.costfunctions;
+package org.apache.pinot.thirdeye.client.diffsummary.costfunctions;
 
 import java.util.HashMap;
 import java.util.Map;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import static com.linkedin.thirdeye.client.diffsummary.costfunctions.BalancedCostFunction.*;
+import static org.apache.pinot.thirdeye.client.diffsummary.costfunctions.BalancedCostFunction.*;
 
 
 public class BalancedCostFunctionTest {

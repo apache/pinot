@@ -17,9 +17,9 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.completeness.checker;
+package org.apache.pinot.thirdeye.completeness.checker;
 
-import com.linkedin.thirdeye.anomaly.utils.AnomalyUtils;
+import org.apache.pinot.thirdeye.anomaly.utils.AnomalyUtils;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;

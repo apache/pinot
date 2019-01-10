@@ -17,9 +17,9 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.alert.commons;
+package org.apache.pinot.thirdeye.alert.commons;
 
-import com.linkedin.thirdeye.datalayer.util.Predicate;
+import org.apache.pinot.thirdeye.datalayer.util.Predicate;
 
 
 public enum AnomalySource {

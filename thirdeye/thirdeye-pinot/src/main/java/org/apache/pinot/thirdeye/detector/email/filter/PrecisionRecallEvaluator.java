@@ -17,12 +17,12 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.detector.email.filter;
+package org.apache.pinot.thirdeye.detector.email.filter;
 
-import com.linkedin.thirdeye.anomalydetection.context.AnomalyFeedback;
-import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
-import com.linkedin.thirdeye.constant.AnomalyResultSource;
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyFeedback;
+import org.apache.pinot.thirdeye.constant.AnomalyFeedbackType;
+import org.apache.pinot.thirdeye.constant.AnomalyResultSource;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -31,7 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
-import static com.linkedin.thirdeye.detector.email.filter.UserReportUtils.*;
+import static org.apache.pinot.thirdeye.detector.email.filter.UserReportUtils.*;
 
 
 /**

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.dataframe;
+package org.apache.pinot.thirdeye.dataframe;
 
 import java.io.IOException;
 import java.io.InputStreamReader;

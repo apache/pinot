@@ -14,13 +14,13 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.datasource.pinot.resultset;
+package org.apache.pinot.thirdeye.datasource.pinot.resultset;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.Version;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.module.SimpleModule;
-import com.linkedin.thirdeye.dataframe.DataFrame;
+import org.apache.pinot.thirdeye.dataframe.DataFrame;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;

@@ -17,11 +17,11 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datalayer.pojo;
+package org.apache.pinot.thirdeye.datalayer.pojo;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
-import com.linkedin.thirdeye.datalayer.dto.AbstractDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.AbstractDTO;
 
 @JsonIgnoreProperties(ignoreUnknown=true)
 public abstract class AbstractBean extends AbstractDTO {

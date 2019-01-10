@@ -17,27 +17,27 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomaly.alert.util;
+package org.apache.pinot.thirdeye.anomaly.alert.util;
 
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
-import com.linkedin.thirdeye.alert.commons.EmailEntity;
-import com.linkedin.thirdeye.anomaly.SmtpConfiguration;
-import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
-import com.linkedin.thirdeye.anomaly.alert.v2.AlertTaskRunnerV2;
-import com.linkedin.thirdeye.anomaly.utils.EmailUtils;
-import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
-import com.linkedin.thirdeye.constant.MetricAggFunction;
-import com.linkedin.thirdeye.dashboard.Utils;
-import com.linkedin.thirdeye.dashboard.views.contributor.ContributorViewHandler;
-import com.linkedin.thirdeye.dashboard.views.contributor.ContributorViewRequest;
-import com.linkedin.thirdeye.dashboard.views.contributor.ContributorViewResponse;
-import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean;
+import org.apache.pinot.thirdeye.alert.commons.EmailEntity;
+import org.apache.pinot.thirdeye.anomaly.SmtpConfiguration;
+import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
+import org.apache.pinot.thirdeye.anomaly.alert.v2.AlertTaskRunnerV2;
+import org.apache.pinot.thirdeye.anomaly.utils.EmailUtils;
+import org.apache.pinot.thirdeye.common.ThirdEyeConfiguration;
+import org.apache.pinot.thirdeye.constant.MetricAggFunction;
+import org.apache.pinot.thirdeye.dashboard.Utils;
+import org.apache.pinot.thirdeye.dashboard.views.contributor.ContributorViewHandler;
+import org.apache.pinot.thirdeye.dashboard.views.contributor.ContributorViewRequest;
+import org.apache.pinot.thirdeye.dashboard.views.contributor.ContributorViewResponse;
+import org.apache.pinot.thirdeye.datalayer.pojo.AlertConfigBean;
 
-import com.linkedin.thirdeye.detection.alert.AlertUtils;
-import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterRecipients;
+import org.apache.pinot.thirdeye.detection.alert.AlertUtils;
+import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterRecipients;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -54,15 +54,15 @@ import org.quartz.JobExecutionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
-import com.linkedin.thirdeye.datalayer.dto.DataCompletenessConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
-import com.linkedin.thirdeye.datasource.DAORegistry;
-import com.linkedin.thirdeye.datasource.MetricExpression;
-import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
-import com.linkedin.thirdeye.datasource.cache.QueryCache;
+import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
+import org.apache.pinot.thirdeye.datalayer.dto.DataCompletenessConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
+import org.apache.pinot.thirdeye.datasource.DAORegistry;
+import org.apache.pinot.thirdeye.datasource.MetricExpression;
+import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
+import org.apache.pinot.thirdeye.datasource.cache.QueryCache;
 
-import static com.linkedin.thirdeye.anomaly.SmtpConfiguration.SMTP_CONFIG_KEY;
+import static org.apache.pinot.thirdeye.anomaly.SmtpConfiguration.SMTP_CONFIG_KEY;
 
 
 /**

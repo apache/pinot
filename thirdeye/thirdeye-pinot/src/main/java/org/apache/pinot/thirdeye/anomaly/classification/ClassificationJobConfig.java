@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomaly.classification;
+package org.apache.pinot.thirdeye.anomaly.classification;
 
 
 public class ClassificationJobConfig {

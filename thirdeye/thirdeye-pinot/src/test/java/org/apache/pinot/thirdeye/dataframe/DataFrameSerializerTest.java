@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.dataframe;
+package org.apache.pinot.thirdeye.dataframe;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.module.SimpleModule;
-import com.linkedin.thirdeye.dataframe.util.DataFrameSerializer;
+import org.apache.pinot.thirdeye.dataframe.util.DataFrameSerializer;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;

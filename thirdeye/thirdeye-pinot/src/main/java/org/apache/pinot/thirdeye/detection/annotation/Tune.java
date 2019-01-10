@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.detection.annotation;
+package org.apache.pinot.thirdeye.detection.annotation;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.lang.annotation.ElementType;

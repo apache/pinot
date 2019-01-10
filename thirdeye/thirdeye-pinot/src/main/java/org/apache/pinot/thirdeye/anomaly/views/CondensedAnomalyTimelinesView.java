@@ -17,11 +17,11 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomaly.views;
+package org.apache.pinot.thirdeye.anomaly.views;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.linkedin.thirdeye.dashboard.views.TimeBucket;
+import org.apache.pinot.thirdeye.dashboard.views.TimeBucket;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;

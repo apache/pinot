@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomalydetection.performanceEvaluation;
+package org.apache.pinot.thirdeye.anomalydetection.performanceEvaluation;
 
 public interface PerformanceEvaluate {
   public double evaluate();

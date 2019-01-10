@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.client.diffsummary.costfunctions;
+package org.apache.pinot.thirdeye.client.diffsummary.costfunctions;
 
 public class ChangeRatioCostFunction implements CostFunction {
   @Override

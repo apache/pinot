@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datasource.pinot.resultset;
+package org.apache.pinot.thirdeye.datasource.pinot.resultset;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;

@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.dashboard;
+package org.apache.pinot.thirdeye.dashboard;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;

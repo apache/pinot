@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.dashboard.resources.v2.pojo;
+package org.apache.pinot.thirdeye.dashboard.resources.v2.pojo;
 
 import java.util.ArrayList;
 import java.util.List;

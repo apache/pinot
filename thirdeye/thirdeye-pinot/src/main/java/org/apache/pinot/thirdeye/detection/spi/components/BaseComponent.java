@@ -17,10 +17,10 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.detection.spi.components;
+package org.apache.pinot.thirdeye.detection.spi.components;
 
-import com.linkedin.thirdeye.detection.InputDataFetcher;
-import com.linkedin.thirdeye.detection.spec.AbstractSpec;
+import org.apache.pinot.thirdeye.detection.InputDataFetcher;
+import org.apache.pinot.thirdeye.detection.spec.AbstractSpec;
 
 
 public interface BaseComponent<T extends AbstractSpec> {

@@ -17,18 +17,18 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomaly.onboard;
+package org.apache.pinot.thirdeye.anomaly.onboard;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.linkedin.thirdeye.anomaly.job.JobConstants;
-import com.linkedin.thirdeye.anomaly.onboard.framework.DetectionOnboardJobStatus;
-import com.linkedin.thirdeye.anomaly.task.TaskConstants;
-import com.linkedin.thirdeye.api.Constants;
-import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
-import com.linkedin.thirdeye.datalayer.bao.TaskManager;
-import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
-import com.linkedin.thirdeye.datalayer.dto.TaskDTO;
+import org.apache.pinot.thirdeye.anomaly.job.JobConstants;
+import org.apache.pinot.thirdeye.anomaly.onboard.framework.DetectionOnboardJobStatus;
+import org.apache.pinot.thirdeye.anomaly.task.TaskConstants;
+import org.apache.pinot.thirdeye.api.Constants;
+import org.apache.pinot.thirdeye.datalayer.bao.AnomalyFunctionManager;
+import org.apache.pinot.thirdeye.datalayer.bao.TaskManager;
+import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.TaskDTO;
 import com.wordnik.swagger.annotations.Api;
 import com.wordnik.swagger.annotations.ApiOperation;
 import com.wordnik.swagger.annotations.ApiParam;

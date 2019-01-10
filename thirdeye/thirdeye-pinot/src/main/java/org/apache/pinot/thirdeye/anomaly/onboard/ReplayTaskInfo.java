@@ -17,9 +17,9 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomaly.onboard;
+package org.apache.pinot.thirdeye.anomaly.onboard;
 
-import com.linkedin.thirdeye.anomaly.task.TaskInfo;
+import org.apache.pinot.thirdeye.anomaly.task.TaskInfo;
 import java.util.Map;
 
 

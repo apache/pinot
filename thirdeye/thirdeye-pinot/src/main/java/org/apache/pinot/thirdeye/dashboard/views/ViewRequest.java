@@ -17,11 +17,11 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.dashboard.views;
+package org.apache.pinot.thirdeye.dashboard.views;
 
 
 import com.google.common.collect.Multimap;
-import com.linkedin.thirdeye.api.TimeGranularity;
+import org.apache.pinot.thirdeye.api.TimeGranularity;
 
 public interface ViewRequest {
 

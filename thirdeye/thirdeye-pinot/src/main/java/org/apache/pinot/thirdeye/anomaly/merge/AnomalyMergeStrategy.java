@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomaly.merge;
+package org.apache.pinot.thirdeye.anomaly.merge;
 
 public enum AnomalyMergeStrategy {
   FUNCTION_DIMENSIONS,

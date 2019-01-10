@@ -17,20 +17,20 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.alert.feed;
+package org.apache.pinot.thirdeye.alert.feed;
 
-import com.linkedin.thirdeye.alert.commons.AnomalyFeedConfig;
-import com.linkedin.thirdeye.alert.commons.AnomalyFetcherConfig;
-import com.linkedin.thirdeye.alert.commons.AnomalyFetcherFactory;
-import com.linkedin.thirdeye.alert.commons.AnomalySource;
-import com.linkedin.thirdeye.alert.fetcher.AnomalyFetcher;
-import com.linkedin.thirdeye.anomaly.alert.util.AlertFilterHelper;
-import com.linkedin.thirdeye.datalayer.bao.AlertSnapshotManager;
-import com.linkedin.thirdeye.datalayer.dto.AlertSnapshotDTO;
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.datasource.DAORegistry;
-import com.linkedin.thirdeye.detector.email.filter.AlertFilter;
-import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
+import org.apache.pinot.thirdeye.alert.commons.AnomalyFeedConfig;
+import org.apache.pinot.thirdeye.alert.commons.AnomalyFetcherConfig;
+import org.apache.pinot.thirdeye.alert.commons.AnomalyFetcherFactory;
+import org.apache.pinot.thirdeye.alert.commons.AnomalySource;
+import org.apache.pinot.thirdeye.alert.fetcher.AnomalyFetcher;
+import org.apache.pinot.thirdeye.anomaly.alert.util.AlertFilterHelper;
+import org.apache.pinot.thirdeye.datalayer.bao.AlertSnapshotManager;
+import org.apache.pinot.thirdeye.datalayer.dto.AlertSnapshotDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.datasource.DAORegistry;
+import org.apache.pinot.thirdeye.detector.email.filter.AlertFilter;
+import org.apache.pinot.thirdeye.detector.email.filter.AlertFilterFactory;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;

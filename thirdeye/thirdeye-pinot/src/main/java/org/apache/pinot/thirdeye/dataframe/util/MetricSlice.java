@@ -17,11 +17,11 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.dataframe.util;
+package org.apache.pinot.thirdeye.dataframe.util;
 
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
-import com.linkedin.thirdeye.api.TimeGranularity;
+import org.apache.pinot.thirdeye.api.TimeGranularity;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang.builder.ToStringBuilder;

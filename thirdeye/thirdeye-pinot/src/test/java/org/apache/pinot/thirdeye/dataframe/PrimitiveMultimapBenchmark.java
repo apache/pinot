@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.dataframe;
+package org.apache.pinot.thirdeye.dataframe;
 
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;

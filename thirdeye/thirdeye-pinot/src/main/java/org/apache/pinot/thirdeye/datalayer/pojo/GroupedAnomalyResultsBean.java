@@ -17,9 +17,9 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datalayer.pojo;
+package org.apache.pinot.thirdeye.datalayer.pojo;
 
-import com.linkedin.thirdeye.api.DimensionMap;
+import org.apache.pinot.thirdeye.api.DimensionMap;
 import java.util.ArrayList;
 import java.util.List;
 

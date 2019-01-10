@@ -17,10 +17,10 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.dataframe.util;
+package org.apache.pinot.thirdeye.dataframe.util;
 
-import com.linkedin.thirdeye.datasource.MetricExpression;
-import com.linkedin.thirdeye.datasource.ThirdEyeRequest;
+import org.apache.pinot.thirdeye.datasource.MetricExpression;
+import org.apache.pinot.thirdeye.datasource.ThirdEyeRequest;
 import java.util.List;
 
 

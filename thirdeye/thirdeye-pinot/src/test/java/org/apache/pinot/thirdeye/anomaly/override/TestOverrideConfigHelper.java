@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.anomaly.override;
+package org.apache.pinot.thirdeye.anomaly.override;
 
-import com.linkedin.thirdeye.datalayer.dto.OverrideConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.OverrideConfigDTO;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;

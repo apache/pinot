@@ -17,9 +17,9 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomaly.utils;
+package org.apache.pinot.thirdeye.anomaly.utils;
 
-import com.linkedin.thirdeye.anomalydetection.performanceEvaluation.PerformanceEvaluationMethod;
+import org.apache.pinot.thirdeye.anomalydetection.performanceEvaluation.PerformanceEvaluationMethod;
 import java.io.IOException;
 
 import org.apache.http.HttpHost;

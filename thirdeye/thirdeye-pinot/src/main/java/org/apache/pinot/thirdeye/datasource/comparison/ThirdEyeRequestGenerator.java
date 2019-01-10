@@ -17,23 +17,23 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datasource.comparison;
+package org.apache.pinot.thirdeye.datasource.comparison;
 
-import static com.linkedin.thirdeye.datasource.comparison.TimeOnTimeConstants.ALL_BASELINE;
-import static com.linkedin.thirdeye.datasource.comparison.TimeOnTimeConstants.ALL_CURRENT;
-import static com.linkedin.thirdeye.datasource.comparison.TimeOnTimeConstants.DIMENSION_BASELINE;
-import static com.linkedin.thirdeye.datasource.comparison.TimeOnTimeConstants.DIMENSION_CURRENT;
+import static org.apache.pinot.thirdeye.datasource.comparison.TimeOnTimeConstants.ALL_BASELINE;
+import static org.apache.pinot.thirdeye.datasource.comparison.TimeOnTimeConstants.ALL_CURRENT;
+import static org.apache.pinot.thirdeye.datasource.comparison.TimeOnTimeConstants.DIMENSION_BASELINE;
+import static org.apache.pinot.thirdeye.datasource.comparison.TimeOnTimeConstants.DIMENSION_CURRENT;
 
 import java.util.ArrayList;
 import java.util.List;
 
 import org.joda.time.DateTime;
 
-import com.linkedin.thirdeye.api.TimeGranularity;
-import com.linkedin.thirdeye.dashboard.Utils;
-import com.linkedin.thirdeye.datasource.MetricFunction;
-import com.linkedin.thirdeye.datasource.ThirdEyeRequest;
-import com.linkedin.thirdeye.datasource.ThirdEyeRequest.ThirdEyeRequestBuilder;
+import org.apache.pinot.thirdeye.api.TimeGranularity;
+import org.apache.pinot.thirdeye.dashboard.Utils;
+import org.apache.pinot.thirdeye.datasource.MetricFunction;
+import org.apache.pinot.thirdeye.datasource.ThirdEyeRequest;
+import org.apache.pinot.thirdeye.datasource.ThirdEyeRequest.ThirdEyeRequestBuilder;
 
 public class ThirdEyeRequestGenerator {
 

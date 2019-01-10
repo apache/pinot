@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomaly.detection;
+package org.apache.pinot.thirdeye.anomaly.detection;
 
 import java.util.List;
 import java.util.Objects;
@@ -27,11 +27,11 @@ import org.joda.time.DateTime;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.google.common.base.MoreObjects;
-import com.linkedin.thirdeye.anomaly.task.TaskInfo;
-import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
-import com.linkedin.thirdeye.util.CustomListDateDeserializer;
-import com.linkedin.thirdeye.util.CustomListDateSerializer;
-import com.linkedin.thirdeye.anomaly.detection.DetectionJobContext.DetectionJobType;
+import org.apache.pinot.thirdeye.anomaly.task.TaskInfo;
+import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import org.apache.pinot.thirdeye.util.CustomListDateDeserializer;
+import org.apache.pinot.thirdeye.util.CustomListDateSerializer;
+import org.apache.pinot.thirdeye.anomaly.detection.DetectionJobContext.DetectionJobType;
 
 public class DetectionTaskInfo implements TaskInfo {
 

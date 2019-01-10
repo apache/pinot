@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.detector.metric.transfer;
+package org.apache.pinot.thirdeye.detector.metric.transfer;
 
 /**
  * Scaling factor to rescale the metric within a time window

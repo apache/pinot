@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.auth;
+package org.apache.pinot.thirdeye.auth;
 
 import java.security.Principal;
 import java.util.HashSet;

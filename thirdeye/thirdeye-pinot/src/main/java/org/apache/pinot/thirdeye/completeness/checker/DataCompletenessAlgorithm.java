@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.completeness.checker;
+package org.apache.pinot.thirdeye.completeness.checker;
 
 import java.util.List;
 import java.util.Map;
@@ -25,7 +25,7 @@ import java.util.Map;
 import org.joda.time.DateTimeZone;
 import org.joda.time.format.DateTimeFormatter;
 
-import com.linkedin.thirdeye.api.TimeSpec;
+import org.apache.pinot.thirdeye.api.TimeSpec;
 
 /**
  * This will serve as the interface for any algorithm we plug in to the completeness checker

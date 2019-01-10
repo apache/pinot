@@ -17,28 +17,28 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.dashboard.resources.v2;
+package org.apache.pinot.thirdeye.dashboard.resources.v2;
 
 import com.google.common.base.Strings;
 import com.google.common.cache.LoadingCache;
-import com.linkedin.thirdeye.api.TimeGranularity;
-import com.linkedin.thirdeye.dashboard.Utils;
-import com.linkedin.thirdeye.dashboard.resources.v2.pojo.TimeSeriesCompareMetricView;
-import com.linkedin.thirdeye.dashboard.resources.v2.pojo.ValuesContainer;
-import com.linkedin.thirdeye.dashboard.views.TimeBucket;
-import com.linkedin.thirdeye.dashboard.views.contributor.ContributorViewHandler;
-import com.linkedin.thirdeye.dashboard.views.contributor.ContributorViewRequest;
-import com.linkedin.thirdeye.dashboard.views.contributor.ContributorViewResponse;
-import com.linkedin.thirdeye.dashboard.views.tabular.TabularViewHandler;
-import com.linkedin.thirdeye.dashboard.views.tabular.TabularViewRequest;
-import com.linkedin.thirdeye.dashboard.views.tabular.TabularViewResponse;
-import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
-import com.linkedin.thirdeye.datasource.DAORegistry;
-import com.linkedin.thirdeye.datasource.MetricExpression;
-import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
-import com.linkedin.thirdeye.datasource.cache.QueryCache;
-import com.linkedin.thirdeye.util.ThirdEyeUtils;
+import org.apache.pinot.thirdeye.api.TimeGranularity;
+import org.apache.pinot.thirdeye.dashboard.Utils;
+import org.apache.pinot.thirdeye.dashboard.resources.v2.pojo.TimeSeriesCompareMetricView;
+import org.apache.pinot.thirdeye.dashboard.resources.v2.pojo.ValuesContainer;
+import org.apache.pinot.thirdeye.dashboard.views.TimeBucket;
+import org.apache.pinot.thirdeye.dashboard.views.contributor.ContributorViewHandler;
+import org.apache.pinot.thirdeye.dashboard.views.contributor.ContributorViewRequest;
+import org.apache.pinot.thirdeye.dashboard.views.contributor.ContributorViewResponse;
+import org.apache.pinot.thirdeye.dashboard.views.tabular.TabularViewHandler;
+import org.apache.pinot.thirdeye.dashboard.views.tabular.TabularViewRequest;
+import org.apache.pinot.thirdeye.dashboard.views.tabular.TabularViewResponse;
+import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
+import org.apache.pinot.thirdeye.datasource.DAORegistry;
+import org.apache.pinot.thirdeye.datasource.MetricExpression;
+import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
+import org.apache.pinot.thirdeye.datasource.cache.QueryCache;
+import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
 import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.Arrays;

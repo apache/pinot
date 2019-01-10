@@ -17,14 +17,14 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.alert.commons;
+package org.apache.pinot.thirdeye.alert.commons;
 
-import com.linkedin.thirdeye.alert.content.EmailContentFormatter;
-import com.linkedin.thirdeye.common.BaseFactory;
+import org.apache.pinot.thirdeye.alert.content.EmailContentFormatter;
+import org.apache.pinot.thirdeye.common.BaseFactory;
 
 
 public class EmailContentFormatterFactory extends BaseFactory<EmailContentFormatter> {
-  public static final String PACKAGE_PATH = "com.linkedin.thirdeye.alert.content";
+  public static final String PACKAGE_PATH = "org.apache.pinot.thirdeye.alert.content";
 
   public static EmailContentFormatter fromClassName(String className)
       throws ClassNotFoundException, IllegalAccessException, InstantiationException{

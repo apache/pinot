@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datasource.pinot;
+package org.apache.pinot.thirdeye.datasource.pinot;
 
 public enum PinotThirdeyeDataSourceProperties {
   CONTROLLER_HOST("controllerHost"),

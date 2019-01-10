@@ -17,12 +17,12 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomaly.alert;
+package org.apache.pinot.thirdeye.anomaly.alert;
 
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.linkedin.thirdeye.anomaly.job.JobContext;
-import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
+import org.apache.pinot.thirdeye.anomaly.job.JobContext;
+import org.apache.pinot.thirdeye.datalayer.dto.AlertConfigDTO;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class AlertJobContext extends JobContext {

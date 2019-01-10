@@ -17,14 +17,14 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datasource.comparison;
+package org.apache.pinot.thirdeye.datasource.comparison;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
 
-import com.linkedin.thirdeye.datasource.comparison.Row.Metric;
+import org.apache.pinot.thirdeye.datasource.comparison.Row.Metric;
 
 public class TimeOnTimeComparisonResponse {
 

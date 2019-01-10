@@ -17,9 +17,9 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.dashboard.views.contributor;
+package org.apache.pinot.thirdeye.dashboard.views.contributor;
 
-import com.linkedin.thirdeye.dashboard.views.CompareViewRequest;
+import org.apache.pinot.thirdeye.dashboard.views.CompareViewRequest;
 
 public class ContributorViewRequest extends CompareViewRequest {
 

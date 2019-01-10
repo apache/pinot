@@ -17,27 +17,27 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomalydetection.function;
+package org.apache.pinot.thirdeye.anomalydetection.function;
 
-import com.linkedin.thirdeye.anomaly.views.AnomalyTimelinesView;
-import com.linkedin.thirdeye.anomalydetection.context.AnomalyDetectionContext;
-import com.linkedin.thirdeye.anomalydetection.context.TimeSeries;
-import com.linkedin.thirdeye.anomalydetection.model.data.DataModel;
-import com.linkedin.thirdeye.anomalydetection.model.data.NoopDataModel;
-import com.linkedin.thirdeye.anomalydetection.model.detection.DetectionModel;
-import com.linkedin.thirdeye.anomalydetection.model.detection.MinMaxThresholdDetectionModel;
-import com.linkedin.thirdeye.anomalydetection.model.detection.NoopDetectionModel;
-import com.linkedin.thirdeye.anomalydetection.model.merge.MergeModel;
-import com.linkedin.thirdeye.anomalydetection.model.merge.MinMaxThresholdMergeModel;
-import com.linkedin.thirdeye.anomalydetection.model.merge.NoopMergeModel;
-import com.linkedin.thirdeye.anomalydetection.model.prediction.ExpectedTimeSeriesPredictionModel;
-import com.linkedin.thirdeye.anomalydetection.model.prediction.NoopPredictionModel;
-import com.linkedin.thirdeye.anomalydetection.model.prediction.PredictionModel;
-import com.linkedin.thirdeye.anomalydetection.model.transform.TransformationFunction;
-import com.linkedin.thirdeye.anomalydetection.model.transform.ZeroRemovalFunction;
-import com.linkedin.thirdeye.dashboard.views.TimeBucket;
-import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.anomaly.views.AnomalyTimelinesView;
+import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyDetectionContext;
+import org.apache.pinot.thirdeye.anomalydetection.context.TimeSeries;
+import org.apache.pinot.thirdeye.anomalydetection.model.data.DataModel;
+import org.apache.pinot.thirdeye.anomalydetection.model.data.NoopDataModel;
+import org.apache.pinot.thirdeye.anomalydetection.model.detection.DetectionModel;
+import org.apache.pinot.thirdeye.anomalydetection.model.detection.MinMaxThresholdDetectionModel;
+import org.apache.pinot.thirdeye.anomalydetection.model.detection.NoopDetectionModel;
+import org.apache.pinot.thirdeye.anomalydetection.model.merge.MergeModel;
+import org.apache.pinot.thirdeye.anomalydetection.model.merge.MinMaxThresholdMergeModel;
+import org.apache.pinot.thirdeye.anomalydetection.model.merge.NoopMergeModel;
+import org.apache.pinot.thirdeye.anomalydetection.model.prediction.ExpectedTimeSeriesPredictionModel;
+import org.apache.pinot.thirdeye.anomalydetection.model.prediction.NoopPredictionModel;
+import org.apache.pinot.thirdeye.anomalydetection.model.prediction.PredictionModel;
+import org.apache.pinot.thirdeye.anomalydetection.model.transform.TransformationFunction;
+import org.apache.pinot.thirdeye.anomalydetection.model.transform.ZeroRemovalFunction;
+import org.apache.pinot.thirdeye.dashboard.views.TimeBucket;
+import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import java.util.ArrayList;
 import java.util.List;
 

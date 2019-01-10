@@ -17,15 +17,15 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.dashboard.resources.v2.rootcause;
+package org.apache.pinot.thirdeye.dashboard.resources.v2.rootcause;
 
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
-import com.linkedin.thirdeye.dashboard.resources.v2.RootCauseEventEntityFormatter;
-import com.linkedin.thirdeye.dashboard.resources.v2.pojo.RootCauseEventEntity;
-import com.linkedin.thirdeye.datalayer.dto.EventDTO;
-import com.linkedin.thirdeye.rootcause.impl.EventEntity;
-import com.linkedin.thirdeye.rootcause.impl.ThirdEyeEventEntity;
+import org.apache.pinot.thirdeye.dashboard.resources.v2.RootCauseEventEntityFormatter;
+import org.apache.pinot.thirdeye.dashboard.resources.v2.pojo.RootCauseEventEntity;
+import org.apache.pinot.thirdeye.datalayer.dto.EventDTO;
+import org.apache.pinot.thirdeye.rootcause.impl.EventEntity;
+import org.apache.pinot.thirdeye.rootcause.impl.ThirdEyeEventEntity;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang.StringUtils;

@@ -17,15 +17,15 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datasource.csv;
+package org.apache.pinot.thirdeye.datasource.csv;
 
-import com.linkedin.thirdeye.api.TimeSpec;
-import com.linkedin.thirdeye.dataframe.DataFrame;
-import com.linkedin.thirdeye.datasource.BaseThirdEyeResponse;
-import com.linkedin.thirdeye.datasource.MetricFunction;
-import com.linkedin.thirdeye.datasource.ThirdEyeRequest;
-import com.linkedin.thirdeye.datasource.ThirdEyeResponseRow;
-import com.linkedin.thirdeye.datasource.TimeRangeUtils;
+import org.apache.pinot.thirdeye.api.TimeSpec;
+import org.apache.pinot.thirdeye.dataframe.DataFrame;
+import org.apache.pinot.thirdeye.datasource.BaseThirdEyeResponse;
+import org.apache.pinot.thirdeye.datasource.MetricFunction;
+import org.apache.pinot.thirdeye.datasource.ThirdEyeRequest;
+import org.apache.pinot.thirdeye.datasource.ThirdEyeResponseRow;
+import org.apache.pinot.thirdeye.datasource.TimeRangeUtils;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;

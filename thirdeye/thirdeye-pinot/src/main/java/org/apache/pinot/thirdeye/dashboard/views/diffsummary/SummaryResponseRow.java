@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.dashboard.views.diffsummary;
+package org.apache.pinot.thirdeye.dashboard.views.diffsummary;
 
 import java.util.ArrayList;
 import java.util.List;

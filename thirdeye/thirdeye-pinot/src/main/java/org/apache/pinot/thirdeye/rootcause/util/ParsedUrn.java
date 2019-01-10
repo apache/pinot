@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.rootcause.util;
+package org.apache.pinot.thirdeye.rootcause.util;
 
 import com.google.common.collect.Multimap;
 import com.google.common.collect.TreeMultimap;

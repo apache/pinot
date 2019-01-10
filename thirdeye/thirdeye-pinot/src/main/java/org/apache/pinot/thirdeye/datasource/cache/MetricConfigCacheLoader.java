@@ -17,14 +17,14 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datasource.cache;
+package org.apache.pinot.thirdeye.datasource.cache;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.common.cache.CacheLoader;
-import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
-import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
+import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
 
 public class MetricConfigCacheLoader extends CacheLoader<MetricDataset, MetricConfigDTO> {
 

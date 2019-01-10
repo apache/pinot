@@ -17,11 +17,11 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.util;
+package org.apache.pinot.thirdeye.util;
 
-import com.linkedin.thirdeye.anomaly.views.AnomalyTimelinesView;
-import com.linkedin.thirdeye.anomalydetection.context.TimeSeries;
-import com.linkedin.thirdeye.dashboard.views.TimeBucket;
+import org.apache.pinot.thirdeye.anomaly.views.AnomalyTimelinesView;
+import org.apache.pinot.thirdeye.anomalydetection.context.TimeSeries;
+import org.apache.pinot.thirdeye.dashboard.views.TimeBucket;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;

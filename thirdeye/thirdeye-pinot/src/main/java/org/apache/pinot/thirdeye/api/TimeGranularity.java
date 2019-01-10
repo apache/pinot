@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.api;
+package org.apache.pinot.thirdeye.api;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.Objects;

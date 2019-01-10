@@ -17,9 +17,9 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.dashboard.resources.v2.pojo;
+package org.apache.pinot.thirdeye.dashboard.resources.v2.pojo;
 
-import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean;
+import org.apache.pinot.thirdeye.datalayer.pojo.AlertConfigBean;
 import java.util.ArrayList;
 import java.util.List;
 

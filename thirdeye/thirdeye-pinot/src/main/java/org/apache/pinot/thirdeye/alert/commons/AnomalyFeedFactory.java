@@ -17,14 +17,14 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.alert.commons;
+package org.apache.pinot.thirdeye.alert.commons;
 
-import com.linkedin.thirdeye.alert.feed.AnomalyFeed;
-import com.linkedin.thirdeye.common.BaseFactory;
+import org.apache.pinot.thirdeye.alert.feed.AnomalyFeed;
+import org.apache.pinot.thirdeye.common.BaseFactory;
 
 
 public class AnomalyFeedFactory extends BaseFactory<AnomalyFeed> {
-  public static final String PACKAGE_PATH = "com.linkedin.thirdeye.alert.feed";
+  public static final String PACKAGE_PATH = "org.apache.pinot.thirdeye.alert.feed";
 
   public static AnomalyFeed fromClassName(String className)
       throws ClassNotFoundException, IllegalAccessException, InstantiationException{

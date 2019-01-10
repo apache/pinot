@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.datasource.timeseries;
+package org.apache.pinot.thirdeye.datasource.timeseries;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -29,17 +29,17 @@ import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
-import com.linkedin.thirdeye.api.DimensionKey;
-import com.linkedin.thirdeye.api.MetricSchema;
-import com.linkedin.thirdeye.api.MetricTimeSeries;
-import com.linkedin.thirdeye.api.MetricType;
-import com.linkedin.thirdeye.constant.MetricAggFunction;
-import com.linkedin.thirdeye.datasource.MetricFunction;
-import com.linkedin.thirdeye.datasource.timeseries.TimeSeriesResponse;
-import com.linkedin.thirdeye.datasource.timeseries.TimeSeriesResponseConverter;
-import com.linkedin.thirdeye.datasource.timeseries.TimeSeriesRow;
-import com.linkedin.thirdeye.datasource.timeseries.TimeSeriesRow.Builder;
-import com.linkedin.thirdeye.datasource.timeseries.TimeSeriesRow.TimeSeriesMetric;
+import org.apache.pinot.thirdeye.api.DimensionKey;
+import org.apache.pinot.thirdeye.api.MetricSchema;
+import org.apache.pinot.thirdeye.api.MetricTimeSeries;
+import org.apache.pinot.thirdeye.api.MetricType;
+import org.apache.pinot.thirdeye.constant.MetricAggFunction;
+import org.apache.pinot.thirdeye.datasource.MetricFunction;
+import org.apache.pinot.thirdeye.datasource.timeseries.TimeSeriesResponse;
+import org.apache.pinot.thirdeye.datasource.timeseries.TimeSeriesResponseConverter;
+import org.apache.pinot.thirdeye.datasource.timeseries.TimeSeriesRow;
+import org.apache.pinot.thirdeye.datasource.timeseries.TimeSeriesRow.Builder;
+import org.apache.pinot.thirdeye.datasource.timeseries.TimeSeriesRow.TimeSeriesMetric;
 
 public class TestTimeSeriesResponseUtils {
 

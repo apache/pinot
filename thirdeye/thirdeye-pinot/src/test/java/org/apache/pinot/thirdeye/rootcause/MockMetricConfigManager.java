@@ -17,12 +17,12 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.rootcause;
+package org.apache.pinot.thirdeye.rootcause;
 
 import com.google.common.base.Predicate;
 import com.google.common.collect.Collections2;
-import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
-import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
+import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;

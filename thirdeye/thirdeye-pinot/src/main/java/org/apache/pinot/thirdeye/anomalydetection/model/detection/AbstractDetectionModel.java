@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomalydetection.model.detection;
+package org.apache.pinot.thirdeye.anomalydetection.model.detection;
 
 import java.util.Properties;
 

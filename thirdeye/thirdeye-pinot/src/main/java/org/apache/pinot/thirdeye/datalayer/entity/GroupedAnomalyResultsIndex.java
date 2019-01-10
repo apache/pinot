@@ -17,9 +17,9 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datalayer.entity;
+package org.apache.pinot.thirdeye.datalayer.entity;
 
-import com.linkedin.thirdeye.api.DimensionMap;
+import org.apache.pinot.thirdeye.api.DimensionMap;
 
 public class GroupedAnomalyResultsIndex extends AbstractIndexEntity {
   long alertConfigId;

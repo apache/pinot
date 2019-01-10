@@ -17,10 +17,10 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomalydetection.model.transform;
+package org.apache.pinot.thirdeye.anomalydetection.model.transform;
 
-import com.linkedin.thirdeye.anomalydetection.context.AnomalyDetectionContext;
-import com.linkedin.thirdeye.anomalydetection.context.TimeSeries;
+import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyDetectionContext;
+import org.apache.pinot.thirdeye.anomalydetection.context.TimeSeries;
 import org.apache.commons.lang3.StringUtils;
 
 public class TotalCountThresholdRemovalFunction extends AbstractTransformationFunction {

@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomaly.classification.classifier;
+package org.apache.pinot.thirdeye.anomaly.classification.classifier;
 
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;

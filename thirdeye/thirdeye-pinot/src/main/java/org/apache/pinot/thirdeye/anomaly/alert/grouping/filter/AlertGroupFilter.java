@@ -17,9 +17,9 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomaly.alert.grouping.filter;
+package org.apache.pinot.thirdeye.anomaly.alert.grouping.filter;
 
-import com.linkedin.thirdeye.datalayer.dto.GroupedAnomalyResultsDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.GroupedAnomalyResultsDTO;
 import java.util.Map;
 
 // TODO: Unify merged and grouped anomaly. Afterwards, unify their alert filter.

@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomaly.events;
+package org.apache.pinot.thirdeye.anomaly.events;
 
 import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
 import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
@@ -31,10 +31,10 @@ import com.google.api.services.calendar.CalendarScopes;
 import com.google.api.services.calendar.model.Event;
 import com.google.common.collect.ImmutableMap;
 import com.ibm.icu.util.TimeZone;
-import com.linkedin.thirdeye.anomaly.HolidayEventsLoaderConfiguration;
-import com.linkedin.thirdeye.api.TimeGranularity;
-import com.linkedin.thirdeye.datalayer.bao.EventManager;
-import com.linkedin.thirdeye.datalayer.dto.EventDTO;
+import org.apache.pinot.thirdeye.anomaly.HolidayEventsLoaderConfiguration;
+import org.apache.pinot.thirdeye.api.TimeGranularity;
+import org.apache.pinot.thirdeye.datalayer.bao.EventManager;
+import org.apache.pinot.thirdeye.datalayer.dto.EventDTO;
 import java.io.FileInputStream;
 import java.util.ArrayList;
 import java.util.Collections;

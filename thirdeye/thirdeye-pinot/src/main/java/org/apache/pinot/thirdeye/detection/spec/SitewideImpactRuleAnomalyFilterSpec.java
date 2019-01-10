@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.detection.spec;
+package org.apache.pinot.thirdeye.detection.spec;
 
 import java.util.Collection;
 import java.util.HashMap;

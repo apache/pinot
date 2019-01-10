@@ -17,13 +17,13 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datalayer.dto;
+package org.apache.pinot.thirdeye.datalayer.dto;
 
-import com.linkedin.thirdeye.anomalydetection.context.AnomalyFeedback;
-import com.linkedin.thirdeye.anomalydetection.context.AnomalyResult;
+import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyFeedback;
+import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyResult;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.linkedin.thirdeye.datalayer.pojo.MergedAnomalyResultBean;
+import org.apache.pinot.thirdeye.datalayer.pojo.MergedAnomalyResultBean;
 import java.util.HashSet;
 import java.util.Objects;
 import java.util.Set;

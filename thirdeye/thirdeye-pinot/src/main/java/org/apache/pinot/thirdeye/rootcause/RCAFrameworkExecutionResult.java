@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.rootcause;
+package org.apache.pinot.thirdeye.rootcause;
 
 import java.util.ArrayList;
 import java.util.Collections;

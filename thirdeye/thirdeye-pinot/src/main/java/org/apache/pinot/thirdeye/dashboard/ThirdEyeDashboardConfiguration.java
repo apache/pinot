@@ -17,12 +17,12 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.dashboard;
+package org.apache.pinot.thirdeye.dashboard;
 
-import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
-import com.linkedin.thirdeye.dashboard.RootCauseConfiguration;
-import com.linkedin.thirdeye.dashboard.configs.AuthConfiguration;
-import com.linkedin.thirdeye.dashboard.configs.ResourceConfiguration;
+import org.apache.pinot.thirdeye.common.ThirdEyeConfiguration;
+import org.apache.pinot.thirdeye.dashboard.RootCauseConfiguration;
+import org.apache.pinot.thirdeye.dashboard.configs.AuthConfiguration;
+import org.apache.pinot.thirdeye.dashboard.configs.ResourceConfiguration;
 import java.util.List;
 
 

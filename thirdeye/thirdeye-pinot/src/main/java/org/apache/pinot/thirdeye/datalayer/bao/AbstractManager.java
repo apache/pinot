@@ -17,13 +17,13 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datalayer.bao;
+package org.apache.pinot.thirdeye.datalayer.bao;
 
 import java.util.List;
 import java.util.Map;
 
-import com.linkedin.thirdeye.datalayer.dto.AbstractDTO;
-import com.linkedin.thirdeye.datalayer.util.Predicate;
+import org.apache.pinot.thirdeye.datalayer.dto.AbstractDTO;
+import org.apache.pinot.thirdeye.datalayer.util.Predicate;
 
 
 public interface AbstractManager<E extends AbstractDTO> {

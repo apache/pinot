@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datasource.pinot.resultset;
+package org.apache.pinot.thirdeye.datasource.pinot.resultset;
 
 public abstract class AbstractThirdEyeResultSet implements ThirdEyeResultSet {
 

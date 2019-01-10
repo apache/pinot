@@ -17,9 +17,9 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datalayer.dto;
+package org.apache.pinot.thirdeye.datalayer.dto;
 
-import com.linkedin.thirdeye.datalayer.pojo.SessionBean;
+import org.apache.pinot.thirdeye.datalayer.pojo.SessionBean;
 
 
 public class SessionDTO extends SessionBean {

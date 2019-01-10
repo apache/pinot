@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.anomaly.alert.grouping.auxiliary_info_provider;
+package org.apache.pinot.thirdeye.anomaly.alert.grouping.auxiliary_info_provider;
 
 import java.util.HashMap;
 import java.util.Map;

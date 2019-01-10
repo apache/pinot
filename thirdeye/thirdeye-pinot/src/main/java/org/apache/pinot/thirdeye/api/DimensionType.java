@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.api;
+package org.apache.pinot.thirdeye.api;
 
 public enum DimensionType {
   EMAIL_DOMAIN,

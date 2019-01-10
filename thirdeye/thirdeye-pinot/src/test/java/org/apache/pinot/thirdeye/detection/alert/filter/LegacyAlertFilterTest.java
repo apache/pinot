@@ -14,13 +14,13 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.detection.alert.filter;
+package org.apache.pinot.thirdeye.detection.alert.filter;
 
-import com.linkedin.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.detection.DataProvider;
-import com.linkedin.thirdeye.detection.MockDataProvider;
-import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterResult;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.detection.DataProvider;
+import org.apache.pinot.thirdeye.detection.MockDataProvider;
+import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterResult;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -32,7 +32,7 @@ import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import static com.linkedin.thirdeye.detection.DetectionTestUtils.*;
+import static org.apache.pinot.thirdeye.detection.DetectionTestUtils.*;
 
 
 public class LegacyAlertFilterTest {
@@ -85,7 +85,7 @@ public class LegacyAlertFilterTest {
     DetectionAlertConfigDTO detectionAlertConfig = new DetectionAlertConfigDTO();
     Map<String, Object> properties = new HashMap<>();
     properties.put(PROP_DETECTION_CONFIG_IDS, PROP_ID_VALUE);
-    properties.put(PROP_LEGACY_ALERT_FILTER_CLASS_NAME, "com.linkedin.thirdeye.detector.email.filter.DummyAlertFilter");
+    properties.put(PROP_LEGACY_ALERT_FILTER_CLASS_NAME, "org.apache.pinot.thirdeye.detector.email.filter.DummyAlertFilter");
     properties.put(PROP_LEGACY_ALERT_FILTER_CONFIG, "");
     properties.put(PROP_RECIPIENTS, recipientsMap);
     detectionAlertConfig.setHighWaterMark(0L);

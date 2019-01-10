@@ -17,12 +17,12 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datalayer.bao;
+package org.apache.pinot.thirdeye.datalayer.bao;
 
 
 import java.util.List;
 
-import com.linkedin.thirdeye.datalayer.dto.DetectionStatusDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionStatusDTO;
 
 public interface DetectionStatusManager extends AbstractManager<DetectionStatusDTO>{
 

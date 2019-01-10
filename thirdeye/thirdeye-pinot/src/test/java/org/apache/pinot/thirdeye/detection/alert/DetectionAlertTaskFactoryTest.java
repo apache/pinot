@@ -1,12 +1,12 @@
-package com.linkedin.thirdeye.detection.alert;
+package org.apache.pinot.thirdeye.detection.alert;
 
-import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
-import com.linkedin.thirdeye.anomaly.task.TaskContext;
-import com.linkedin.thirdeye.datalayer.bao.DAOTestBase;
-import com.linkedin.thirdeye.datalayer.bao.DetectionAlertConfigManager;
-import com.linkedin.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
-import com.linkedin.thirdeye.datasource.DAORegistry;
-import com.linkedin.thirdeye.detection.alert.scheme.DetectionAlertScheme;
+import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
+import org.apache.pinot.thirdeye.anomaly.task.TaskContext;
+import org.apache.pinot.thirdeye.datalayer.bao.DAOTestBase;
+import org.apache.pinot.thirdeye.datalayer.bao.DetectionAlertConfigManager;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
+import org.apache.pinot.thirdeye.datasource.DAORegistry;
+import org.apache.pinot.thirdeye.detection.alert.scheme.DetectionAlertScheme;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -35,9 +35,9 @@ public class DetectionAlertTaskFactoryTest {
   @BeforeMethod
   public void beforeClass() throws Exception {
     Map<String, Object> randomAlerter = new HashMap<>();
-    randomAlerter.put("className", "com.linkedin.thirdeye.detection.alert.scheme.RandomAlerter");
+    randomAlerter.put("className", "org.apache.pinot.thirdeye.detection.alert.scheme.RandomAlerter");
     Map<String, Object> anotherRandomAlerter = new HashMap<>();
-    anotherRandomAlerter.put("className", "com.linkedin.thirdeye.detection.alert.scheme.AnotherRandomAlerter");
+    anotherRandomAlerter.put("className", "org.apache.pinot.thirdeye.detection.alert.scheme.AnotherRandomAlerter");
 
     alerters = new HashMap<>();
     alerters.put("randomScheme", randomAlerter);
@@ -74,7 +74,7 @@ public class DetectionAlertTaskFactoryTest {
   @Test
   public void testLoadAlertFilter() throws Exception {
     DetectionAlertConfigDTO alertConfig = createAlertConfig(alerters,
-        "com.linkedin.thirdeye.detection.alert.filter.ToAllRecipientsDetectionAlertFilter");
+        "org.apache.pinot.thirdeye.detection.alert.filter.ToAllRecipientsDetectionAlertFilter");
     long endTime = 9999l;
     DetectionAlertTaskFactory detectionAlertTaskFactory = new DetectionAlertTaskFactory();
     DetectionAlertFilter detectionAlertFilter = detectionAlertTaskFactory.loadAlertFilter(alertConfig, endTime);
@@ -87,7 +87,7 @@ public class DetectionAlertTaskFactoryTest {
   @Test
   public void testLoadAlertSchemes() throws Exception {
     DetectionAlertConfigDTO alertConfig = createAlertConfig(alerters,
-        "com.linkedin.thirdeye.detection.alert.filter.ToAllRecipientsDetectionAlertFilter");
+        "org.apache.pinot.thirdeye.detection.alert.filter.ToAllRecipientsDetectionAlertFilter");
     DetectionAlertTaskFactory detectionAlertTaskFactory = new DetectionAlertTaskFactory();
     Set<DetectionAlertScheme> detectionAlertSchemes = detectionAlertTaskFactory.loadAlertSchemes(alertConfig,
         new ThirdEyeAnomalyConfiguration(), null);
@@ -113,7 +113,7 @@ public class DetectionAlertTaskFactoryTest {
   @Test
   public void testLoadDefaultAlertSchemes() throws Exception {
     DetectionAlertConfigDTO alertConfig = createAlertConfig(Collections.emptyMap(),
-        "com.linkedin.thirdeye.detection.alert.filter.ToAllRecipientsDetectionAlertFilter");
+        "org.apache.pinot.thirdeye.detection.alert.filter.ToAllRecipientsDetectionAlertFilter");
     DetectionAlertTaskFactory detectionAlertTaskFactory = new DetectionAlertTaskFactory();
     Set<DetectionAlertScheme> detectionAlertSchemes = detectionAlertTaskFactory.loadAlertSchemes(alertConfig,
         new ThirdEyeAnomalyConfiguration(), null);

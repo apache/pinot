@@ -14,16 +14,16 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.anomalydetection.function;
+package org.apache.pinot.thirdeye.anomalydetection.function;
 
-import com.linkedin.thirdeye.detector.function.AnomalyFunction;
-import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
+import org.apache.pinot.thirdeye.detector.function.AnomalyFunction;
+import org.apache.pinot.thirdeye.detector.function.AnomalyFunctionFactory;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
-import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 
 public class TestAnomalyFunctionFactory {
 

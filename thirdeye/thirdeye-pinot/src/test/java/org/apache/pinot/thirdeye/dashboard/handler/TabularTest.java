@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.dashboard.handler;
+package org.apache.pinot.thirdeye.dashboard.handler;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -26,14 +26,14 @@ import java.util.concurrent.TimeUnit;
 import org.joda.time.DateTime;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.linkedin.thirdeye.api.TimeGranularity;
-import com.linkedin.thirdeye.dashboard.views.tabular.TabularViewHandler;
-import com.linkedin.thirdeye.dashboard.views.tabular.TabularViewRequest;
-import com.linkedin.thirdeye.dashboard.views.tabular.TabularViewResponse;
-import com.linkedin.thirdeye.datasource.MetricExpression;
-import com.linkedin.thirdeye.datasource.ThirdEyeDataSource;
-import com.linkedin.thirdeye.datasource.cache.QueryCache;
-import com.linkedin.thirdeye.datasource.pinot.PinotThirdEyeDataSource;
+import org.apache.pinot.thirdeye.api.TimeGranularity;
+import org.apache.pinot.thirdeye.dashboard.views.tabular.TabularViewHandler;
+import org.apache.pinot.thirdeye.dashboard.views.tabular.TabularViewRequest;
+import org.apache.pinot.thirdeye.dashboard.views.tabular.TabularViewResponse;
+import org.apache.pinot.thirdeye.datasource.MetricExpression;
+import org.apache.pinot.thirdeye.datasource.ThirdEyeDataSource;
+import org.apache.pinot.thirdeye.datasource.cache.QueryCache;
+import org.apache.pinot.thirdeye.datasource.pinot.PinotThirdEyeDataSource;
 
 /** Manual test for verifying code works as expected (ie without exceptions thrown) */
 public class TabularTest {

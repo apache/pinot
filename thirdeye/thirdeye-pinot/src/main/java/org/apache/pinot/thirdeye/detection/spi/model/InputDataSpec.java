@@ -17,9 +17,9 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.detection.spi.model;
+package org.apache.pinot.thirdeye.detection.spi.model;
 
-import com.linkedin.thirdeye.dataframe.util.MetricSlice;
+import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
 import java.util.Collection;
 import java.util.Collections;
 

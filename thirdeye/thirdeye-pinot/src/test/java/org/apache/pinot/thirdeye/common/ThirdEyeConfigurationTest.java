@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.common;
+package org.apache.pinot.thirdeye.common;
 
 import java.net.URL;
 import org.testng.Assert;

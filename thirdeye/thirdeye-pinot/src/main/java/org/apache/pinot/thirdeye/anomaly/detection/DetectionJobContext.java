@@ -17,12 +17,12 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomaly.detection;
+package org.apache.pinot.thirdeye.anomaly.detection;
 
 import java.util.List;
 
-import com.linkedin.thirdeye.anomaly.job.JobContext;
-import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import org.apache.pinot.thirdeye.anomaly.job.JobContext;
+import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 
 public class DetectionJobContext extends JobContext {
 

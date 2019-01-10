@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.detection.spec;
+package org.apache.pinot.thirdeye.detection.spec;
 
 import com.google.common.collect.ImmutableMap;
-import com.linkedin.thirdeye.detection.components.RuleBaselineProvider;
+import org.apache.pinot.thirdeye.detection.components.RuleBaselineProvider;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 

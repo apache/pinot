@@ -17,10 +17,10 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datalayer.pojo;
+package org.apache.pinot.thirdeye.datalayer.pojo;
 
-import com.linkedin.thirdeye.api.DimensionMap;
-import com.linkedin.thirdeye.constant.AnomalyResultSource;
+import org.apache.pinot.thirdeye.api.DimensionMap;
+import org.apache.pinot.thirdeye.constant.AnomalyResultSource;
 import java.util.Objects;
 import org.apache.commons.lang.ObjectUtils;
 import org.joda.time.DateTime;

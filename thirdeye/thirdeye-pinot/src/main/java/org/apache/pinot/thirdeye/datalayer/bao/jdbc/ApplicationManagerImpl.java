@@ -17,12 +17,12 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datalayer.bao.jdbc;
+package org.apache.pinot.thirdeye.datalayer.bao.jdbc;
 
-import com.linkedin.thirdeye.datalayer.bao.ApplicationManager;
-import com.linkedin.thirdeye.datalayer.dto.ApplicationDTO;
-import com.linkedin.thirdeye.datalayer.pojo.ApplicationBean;
-import com.linkedin.thirdeye.datalayer.util.Predicate;
+import org.apache.pinot.thirdeye.datalayer.bao.ApplicationManager;
+import org.apache.pinot.thirdeye.datalayer.dto.ApplicationDTO;
+import org.apache.pinot.thirdeye.datalayer.pojo.ApplicationBean;
+import org.apache.pinot.thirdeye.datalayer.util.Predicate;
 import java.util.ArrayList;
 import java.util.List;
 

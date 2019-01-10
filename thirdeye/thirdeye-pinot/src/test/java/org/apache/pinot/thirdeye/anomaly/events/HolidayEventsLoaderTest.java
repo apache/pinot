@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.anomaly.events;
+package org.apache.pinot.thirdeye.anomaly.events;
 
-import com.linkedin.thirdeye.anomaly.HolidayEventsLoaderConfiguration;
-import com.linkedin.thirdeye.datalayer.dto.EventDTO;
+import org.apache.pinot.thirdeye.anomaly.HolidayEventsLoaderConfiguration;
+import org.apache.pinot.thirdeye.datalayer.dto.EventDTO;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;

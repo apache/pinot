@@ -17,12 +17,12 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.rootcause.util;
+package org.apache.pinot.thirdeye.rootcause.util;
 
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
-import com.linkedin.thirdeye.rootcause.impl.EntityType;
+import org.apache.pinot.thirdeye.rootcause.impl.EntityType;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;

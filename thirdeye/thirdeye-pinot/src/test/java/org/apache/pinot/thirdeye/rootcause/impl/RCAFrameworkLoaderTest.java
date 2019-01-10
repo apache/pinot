@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.rootcause.impl;
+package org.apache.pinot.thirdeye.rootcause.impl;
 
 import java.io.File;
 import java.util.HashMap;

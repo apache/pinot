@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datasource.pinot;
+package org.apache.pinot.thirdeye.datasource.pinot;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -25,11 +25,11 @@ import java.util.List;
 import java.util.Map;
 
 import com.linkedin.pinot.client.TextTable;
-import com.linkedin.thirdeye.api.TimeSpec;
-import com.linkedin.thirdeye.datasource.BaseThirdEyeResponse;
-import com.linkedin.thirdeye.datasource.MetricFunction;
-import com.linkedin.thirdeye.datasource.ThirdEyeRequest;
-import com.linkedin.thirdeye.datasource.ThirdEyeResponseRow;
+import org.apache.pinot.thirdeye.api.TimeSpec;
+import org.apache.pinot.thirdeye.datasource.BaseThirdEyeResponse;
+import org.apache.pinot.thirdeye.datasource.MetricFunction;
+import org.apache.pinot.thirdeye.datasource.ThirdEyeRequest;
+import org.apache.pinot.thirdeye.datasource.ThirdEyeResponseRow;
 
 public class PinotThirdEyeResponse extends BaseThirdEyeResponse {
   private final Map<MetricFunction, Integer> metricFuncToIdMapping;

@@ -17,15 +17,15 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.detection.yaml;
+package org.apache.pinot.thirdeye.detection.yaml;
 
 import com.google.common.base.CaseFormat;
 import com.google.common.base.Preconditions;
-import com.linkedin.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
-import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean;
-import com.linkedin.thirdeye.detection.ConfigUtils;
-import com.linkedin.thirdeye.detection.annotation.registry.DetectionAlertRegistry;
-import com.linkedin.thirdeye.detection.annotation.registry.DetectionRegistry;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.pojo.AlertConfigBean;
+import org.apache.pinot.thirdeye.detection.ConfigUtils;
+import org.apache.pinot.thirdeye.detection.annotation.registry.DetectionAlertRegistry;
+import org.apache.pinot.thirdeye.detection.annotation.registry.DetectionRegistry;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;

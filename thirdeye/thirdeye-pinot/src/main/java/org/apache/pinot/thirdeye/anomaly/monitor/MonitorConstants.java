@@ -17,11 +17,11 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomaly.monitor;
+package org.apache.pinot.thirdeye.anomaly.monitor;
 
 import java.util.concurrent.TimeUnit;
 
-import com.linkedin.thirdeye.api.TimeGranularity;
+import org.apache.pinot.thirdeye.api.TimeGranularity;
 
 public class MonitorConstants {
   public enum MonitorType {

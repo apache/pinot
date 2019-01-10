@@ -17,14 +17,14 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.completeness.checker;
+package org.apache.pinot.thirdeye.completeness.checker;
 
 import java.util.List;
 import java.util.Objects;
 
 import com.google.common.base.MoreObjects;
-import com.linkedin.thirdeye.anomaly.task.TaskInfo;
-import com.linkedin.thirdeye.completeness.checker.DataCompletenessConstants.DataCompletenessType;
+import org.apache.pinot.thirdeye.anomaly.task.TaskInfo;
+import org.apache.pinot.thirdeye.completeness.checker.DataCompletenessConstants.DataCompletenessType;
 
 /**
  * This class contains the information needed by a task of data completeness type

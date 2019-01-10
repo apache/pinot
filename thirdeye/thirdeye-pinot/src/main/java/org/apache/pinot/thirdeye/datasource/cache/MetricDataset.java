@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datasource.cache;
+package org.apache.pinot.thirdeye.datasource.cache;
 
 import java.util.Objects;
 

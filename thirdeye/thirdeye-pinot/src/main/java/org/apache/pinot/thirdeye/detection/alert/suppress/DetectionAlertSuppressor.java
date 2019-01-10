@@ -17,10 +17,10 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.detection.alert.suppress;
+package org.apache.pinot.thirdeye.detection.alert.suppress;
 
-import com.linkedin.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
-import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterResult;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
+import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterResult;
 
 
 /**

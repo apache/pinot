@@ -17,15 +17,15 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.detection.annotation.registry;
+package org.apache.pinot.thirdeye.detection.annotation.registry;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
-import com.linkedin.thirdeye.detection.annotation.Components;
-import com.linkedin.thirdeye.detection.annotation.Tune;
-import com.linkedin.thirdeye.detection.annotation.Yaml;
-import com.linkedin.thirdeye.detection.spi.components.BaseComponent;
-import com.linkedin.thirdeye.detection.yaml.YamlDetectionConfigTranslator;
+import org.apache.pinot.thirdeye.detection.annotation.Components;
+import org.apache.pinot.thirdeye.detection.annotation.Tune;
+import org.apache.pinot.thirdeye.detection.annotation.Yaml;
+import org.apache.pinot.thirdeye.detection.spi.components.BaseComponent;
+import org.apache.pinot.thirdeye.detection.yaml.YamlDetectionConfigTranslator;
 import java.lang.annotation.Annotation;
 import java.util.ArrayList;
 import java.util.HashMap;

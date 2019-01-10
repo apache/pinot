@@ -17,16 +17,16 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datalayer.dto;
+package org.apache.pinot.thirdeye.datalayer.dto;
 
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
-import com.linkedin.thirdeye.alert.commons.AnomalyNotifiedStatus;
-import com.linkedin.thirdeye.api.TimeGranularity;
-import com.linkedin.thirdeye.dashboard.resources.v2.AnomaliesResource;
-import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
-import com.linkedin.thirdeye.datalayer.pojo.AlertSnapshotBean;
-import com.linkedin.thirdeye.datasource.DAORegistry;
+import org.apache.pinot.thirdeye.alert.commons.AnomalyNotifiedStatus;
+import org.apache.pinot.thirdeye.api.TimeGranularity;
+import org.apache.pinot.thirdeye.dashboard.resources.v2.AnomaliesResource;
+import org.apache.pinot.thirdeye.datalayer.bao.MergedAnomalyResultManager;
+import org.apache.pinot.thirdeye.datalayer.pojo.AlertSnapshotBean;
+import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;

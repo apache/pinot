@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datalayer.bao.jdbc;
+package org.apache.pinot.thirdeye.datalayer.bao.jdbc;
 
 import com.google.inject.Singleton;
 import java.sql.Timestamp;
@@ -28,10 +28,10 @@ import org.apache.commons.collections.CollectionUtils;
 import org.joda.time.DateTime;
 
 import com.google.inject.persist.Transactional;
-import com.linkedin.thirdeye.datalayer.bao.DetectionStatusManager;
-import com.linkedin.thirdeye.datalayer.dto.DetectionStatusDTO;
-import com.linkedin.thirdeye.datalayer.pojo.DetectionStatusBean;
-import com.linkedin.thirdeye.datalayer.util.Predicate;
+import org.apache.pinot.thirdeye.datalayer.bao.DetectionStatusManager;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionStatusDTO;
+import org.apache.pinot.thirdeye.datalayer.pojo.DetectionStatusBean;
+import org.apache.pinot.thirdeye.datalayer.util.Predicate;
 
 @Singleton
 public class DetectionStatusManagerImpl extends AbstractManagerImpl<DetectionStatusDTO>

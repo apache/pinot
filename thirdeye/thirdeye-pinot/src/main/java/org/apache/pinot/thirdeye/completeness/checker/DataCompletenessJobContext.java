@@ -17,12 +17,12 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.completeness.checker;
+package org.apache.pinot.thirdeye.completeness.checker;
 
 
 import java.util.List;
 
-import com.linkedin.thirdeye.anomaly.job.JobContext;
+import org.apache.pinot.thirdeye.anomaly.job.JobContext;
 
 /**
  * job context for data completeness jobs

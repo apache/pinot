@@ -17,9 +17,9 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.auto.onboard;
+package org.apache.pinot.thirdeye.auto.onboard;
 
-import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean;
+import org.apache.pinot.thirdeye.datalayer.pojo.MetricConfigBean;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -29,13 +29,13 @@ import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.TimeGranularitySpec;
 import com.linkedin.pinot.common.data.TimeGranularitySpec.TimeFormat;
-import com.linkedin.thirdeye.api.MetricType;
-import com.linkedin.thirdeye.api.TimeGranularity;
-import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
-import com.linkedin.thirdeye.datalayer.pojo.DatasetConfigBean;
-import com.linkedin.thirdeye.datasource.pinot.PinotThirdEyeDataSource;
-import com.linkedin.thirdeye.util.ThirdEyeUtils;
+import org.apache.pinot.thirdeye.api.MetricType;
+import org.apache.pinot.thirdeye.api.TimeGranularity;
+import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.pojo.DatasetConfigBean;
+import org.apache.pinot.thirdeye.datasource.pinot.PinotThirdEyeDataSource;
+import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
 
 public class ConfigGenerator {
 

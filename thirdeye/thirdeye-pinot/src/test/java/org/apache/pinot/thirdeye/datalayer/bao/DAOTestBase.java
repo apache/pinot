@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.datalayer.bao;
+package org.apache.pinot.thirdeye.datalayer.bao;
 
-import com.linkedin.thirdeye.datalayer.ScriptRunner;
-import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
-import com.linkedin.thirdeye.datalayer.util.PersistenceConfig;
+import org.apache.pinot.thirdeye.datalayer.ScriptRunner;
+import org.apache.pinot.thirdeye.datalayer.util.DaoProviderUtil;
+import org.apache.pinot.thirdeye.datalayer.util.PersistenceConfig;
 import java.io.File;
 import java.io.FileReader;
 import java.io.PrintWriter;

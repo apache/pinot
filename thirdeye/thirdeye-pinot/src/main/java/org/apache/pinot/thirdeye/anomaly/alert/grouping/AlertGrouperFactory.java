@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomaly.alert.grouping;
+package org.apache.pinot.thirdeye.anomaly.alert.grouping;
 
 import java.util.Collections;
 import java.util.Map;

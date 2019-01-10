@@ -17,10 +17,10 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.dashboard.resources.v2;
+package org.apache.pinot.thirdeye.dashboard.resources.v2;
 
-import com.linkedin.thirdeye.config.ConfigNamespace;
-import com.linkedin.thirdeye.datalayer.bao.ConfigManager;
+import org.apache.pinot.thirdeye.config.ConfigNamespace;
+import org.apache.pinot.thirdeye.datalayer.bao.ConfigManager;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;

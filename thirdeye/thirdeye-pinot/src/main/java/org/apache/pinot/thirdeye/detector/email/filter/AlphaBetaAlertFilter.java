@@ -17,10 +17,10 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.detector.email.filter;
+package org.apache.pinot.thirdeye.detector.email.filter;
 
 import com.google.common.base.MoreObjects;
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;

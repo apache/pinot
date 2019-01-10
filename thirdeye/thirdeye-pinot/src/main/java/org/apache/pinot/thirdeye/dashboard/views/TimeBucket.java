@@ -17,12 +17,12 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.dashboard.views;
+package org.apache.pinot.thirdeye.dashboard.views;
 
 import java.util.HashSet;
 import java.util.Set;
 
-import com.linkedin.thirdeye.datasource.comparison.Row;
+import org.apache.pinot.thirdeye.datasource.comparison.Row;
 
 public class TimeBucket implements Comparable<TimeBucket> {
 

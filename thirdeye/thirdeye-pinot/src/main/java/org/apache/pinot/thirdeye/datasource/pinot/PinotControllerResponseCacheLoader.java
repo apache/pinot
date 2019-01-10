@@ -17,14 +17,14 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datasource.pinot;
+package org.apache.pinot.thirdeye.datasource.pinot;
 
 import com.linkedin.pinot.client.Connection;
 import com.linkedin.pinot.client.ConnectionFactory;
 import com.linkedin.pinot.client.PinotClientException;
 import com.linkedin.pinot.client.ResultSet;
 import com.linkedin.pinot.client.ResultSetGroup;
-import com.linkedin.thirdeye.datasource.pinot.resultset.ThirdEyeResultSetGroup;
+import org.apache.pinot.thirdeye.datasource.pinot.resultset.ThirdEyeResultSetGroup;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;

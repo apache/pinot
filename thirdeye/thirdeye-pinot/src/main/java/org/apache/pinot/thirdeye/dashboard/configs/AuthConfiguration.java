@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.dashboard.configs;
+package org.apache.pinot.thirdeye.dashboard.configs;
 
 import java.util.Collections;
 import java.util.HashSet;

@@ -17,9 +17,9 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.detector.email;
+package org.apache.pinot.thirdeye.detector.email;
 
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import java.awt.BasicStroke;
 import java.awt.Color;
 import java.io.File;
@@ -54,10 +54,10 @@ import org.jfree.data.xy.XYDataset;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.thirdeye.api.TimeGranularity;
-import com.linkedin.thirdeye.datasource.comparison.Row;
-import com.linkedin.thirdeye.datasource.comparison.TimeOnTimeComparisonResponse;
-import com.linkedin.thirdeye.datasource.comparison.Row.Metric;
+import org.apache.pinot.thirdeye.api.TimeGranularity;
+import org.apache.pinot.thirdeye.datasource.comparison.Row;
+import org.apache.pinot.thirdeye.datasource.comparison.TimeOnTimeComparisonResponse;
+import org.apache.pinot.thirdeye.datasource.comparison.Row.Metric;
 
 /** Creates JFreeChart images from Thirdeye Data. */
 public class AnomalyGraphGenerator {

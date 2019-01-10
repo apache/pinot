@@ -17,17 +17,17 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datalayer.pojo;
+package org.apache.pinot.thirdeye.datalayer.pojo;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.Multimap;
-import com.linkedin.thirdeye.anomaly.merge.AnomalyMergeConfig;
-import com.linkedin.thirdeye.anomaly.onboard.framework.DetectionOnboardJobStatus;
-import com.linkedin.thirdeye.api.TimeGranularity;
-import com.linkedin.thirdeye.constant.MetricAggFunction;
-import com.linkedin.thirdeye.util.ThirdEyeUtils;
+import org.apache.pinot.thirdeye.anomaly.merge.AnomalyMergeConfig;
+import org.apache.pinot.thirdeye.anomaly.onboard.framework.DetectionOnboardJobStatus;
+import org.apache.pinot.thirdeye.api.TimeGranularity;
+import org.apache.pinot.thirdeye.constant.MetricAggFunction;
+import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;

@@ -14,15 +14,15 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.detection.components;
+package org.apache.pinot.thirdeye.detection.components;
 
-import com.linkedin.thirdeye.dataframe.Series;
-import com.linkedin.thirdeye.dataframe.util.MetricSlice;
-import com.linkedin.thirdeye.detection.DefaultInputDataFetcher;
-import com.linkedin.thirdeye.detection.InputDataFetcher;
-import com.linkedin.thirdeye.detection.spec.MockBaselineProviderSpec;
-import com.linkedin.thirdeye.detection.spi.components.BaselineProvider;
-import com.linkedin.thirdeye.detection.spi.model.TimeSeries;
+import org.apache.pinot.thirdeye.dataframe.Series;
+import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
+import org.apache.pinot.thirdeye.detection.DefaultInputDataFetcher;
+import org.apache.pinot.thirdeye.detection.InputDataFetcher;
+import org.apache.pinot.thirdeye.detection.spec.MockBaselineProviderSpec;
+import org.apache.pinot.thirdeye.detection.spi.components.BaselineProvider;
+import org.apache.pinot.thirdeye.detection.spi.model.TimeSeries;
 
 
 public class MockBaselineProvider implements BaselineProvider<MockBaselineProviderSpec> {

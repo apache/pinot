@@ -17,11 +17,11 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datasource.loader;
+package org.apache.pinot.thirdeye.datasource.loader;
 
-import com.linkedin.thirdeye.dataframe.DataFrame;
-import com.linkedin.thirdeye.dataframe.util.DataFrameUtils;
-import com.linkedin.thirdeye.dataframe.util.MetricSlice;
+import org.apache.pinot.thirdeye.dataframe.DataFrame;
+import org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils;
+import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
 import java.util.List;
 
 

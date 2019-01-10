@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.dashboard.views.tabular;
+package org.apache.pinot.thirdeye.dashboard.views.tabular;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -34,22 +34,22 @@ import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
 
 import com.google.common.collect.Multimap;
-import com.linkedin.thirdeye.api.TimeSpec;
-import com.linkedin.thirdeye.dashboard.views.GenericResponse;
-import com.linkedin.thirdeye.dashboard.views.GenericResponse.ResponseSchema;
-import com.linkedin.thirdeye.dashboard.views.TimeBucket;
-import com.linkedin.thirdeye.dashboard.views.ViewHandler;
-import com.linkedin.thirdeye.dashboard.views.heatmap.HeatMapCell;
-import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
-import com.linkedin.thirdeye.datasource.MetricExpression;
-import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
-import com.linkedin.thirdeye.datasource.cache.QueryCache;
-import com.linkedin.thirdeye.datasource.comparison.Row;
-import com.linkedin.thirdeye.datasource.comparison.TimeOnTimeComparisonHandler;
-import com.linkedin.thirdeye.datasource.comparison.TimeOnTimeComparisonRequest;
-import com.linkedin.thirdeye.datasource.comparison.TimeOnTimeComparisonResponse;
-import com.linkedin.thirdeye.datasource.comparison.Row.Metric;
-import com.linkedin.thirdeye.util.ThirdEyeUtils;
+import org.apache.pinot.thirdeye.api.TimeSpec;
+import org.apache.pinot.thirdeye.dashboard.views.GenericResponse;
+import org.apache.pinot.thirdeye.dashboard.views.GenericResponse.ResponseSchema;
+import org.apache.pinot.thirdeye.dashboard.views.TimeBucket;
+import org.apache.pinot.thirdeye.dashboard.views.ViewHandler;
+import org.apache.pinot.thirdeye.dashboard.views.heatmap.HeatMapCell;
+import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
+import org.apache.pinot.thirdeye.datasource.MetricExpression;
+import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
+import org.apache.pinot.thirdeye.datasource.cache.QueryCache;
+import org.apache.pinot.thirdeye.datasource.comparison.Row;
+import org.apache.pinot.thirdeye.datasource.comparison.TimeOnTimeComparisonHandler;
+import org.apache.pinot.thirdeye.datasource.comparison.TimeOnTimeComparisonRequest;
+import org.apache.pinot.thirdeye.datasource.comparison.TimeOnTimeComparisonResponse;
+import org.apache.pinot.thirdeye.datasource.comparison.Row.Metric;
+import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
 
 public class TabularViewHandler implements ViewHandler<TabularViewRequest, TabularViewResponse> {
   private static ThirdEyeCacheRegistry CACHE_REGISTRY = ThirdEyeCacheRegistry.getInstance();

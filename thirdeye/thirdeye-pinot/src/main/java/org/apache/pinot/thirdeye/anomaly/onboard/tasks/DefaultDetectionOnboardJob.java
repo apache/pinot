@@ -17,16 +17,16 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomaly.onboard.tasks;
+package org.apache.pinot.thirdeye.anomaly.onboard.tasks;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.thirdeye.anomaly.onboard.framework.BaseDetectionOnboardJob;
-import com.linkedin.thirdeye.anomaly.onboard.framework.DetectionOnBoardJobRunner;
-import com.linkedin.thirdeye.anomaly.onboard.framework.DetectionOnboardTask;
-import com.linkedin.thirdeye.anomaly.onboard.utils.PropertyCheckUtils;
-import com.linkedin.thirdeye.dashboard.resources.DetectionJobResource;
-import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
-import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
+import org.apache.pinot.thirdeye.anomaly.onboard.framework.BaseDetectionOnboardJob;
+import org.apache.pinot.thirdeye.anomaly.onboard.framework.DetectionOnBoardJobRunner;
+import org.apache.pinot.thirdeye.anomaly.onboard.framework.DetectionOnboardTask;
+import org.apache.pinot.thirdeye.anomaly.onboard.utils.PropertyCheckUtils;
+import org.apache.pinot.thirdeye.dashboard.resources.DetectionJobResource;
+import org.apache.pinot.thirdeye.detector.email.filter.AlertFilterFactory;
+import org.apache.pinot.thirdeye.detector.function.AnomalyFunctionFactory;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;

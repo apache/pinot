@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.anomalydetection.datafilter;
+package org.apache.pinot.thirdeye.anomalydetection.datafilter;
 
 import java.util.HashMap;
 import java.util.Map;

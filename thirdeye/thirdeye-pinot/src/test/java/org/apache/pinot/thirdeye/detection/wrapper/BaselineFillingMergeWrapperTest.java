@@ -14,27 +14,27 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.detection.wrapper;
+package org.apache.pinot.thirdeye.detection.wrapper;
 
 import com.google.common.collect.ImmutableMap;
-import com.linkedin.thirdeye.constant.MetricAggFunction;
-import com.linkedin.thirdeye.dataframe.DataFrame;
-import com.linkedin.thirdeye.dataframe.util.MetricSlice;
-import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
-import com.linkedin.thirdeye.detection.DataProvider;
-import com.linkedin.thirdeye.detection.DefaultInputDataFetcher;
-import com.linkedin.thirdeye.detection.DetectionPipelineResult;
-import com.linkedin.thirdeye.detection.InputDataFetcher;
-import com.linkedin.thirdeye.detection.MockDataProvider;
-import com.linkedin.thirdeye.detection.MockPipeline;
-import com.linkedin.thirdeye.detection.MockPipelineLoader;
-import com.linkedin.thirdeye.detection.MockPipelineOutput;
-import com.linkedin.thirdeye.detection.algorithm.MergeWrapper;
-import com.linkedin.thirdeye.detection.components.MockBaselineProvider;
-import com.linkedin.thirdeye.detection.spec.MockBaselineProviderSpec;
-import com.linkedin.thirdeye.detection.spi.components.BaselineProvider;
+import org.apache.pinot.thirdeye.constant.MetricAggFunction;
+import org.apache.pinot.thirdeye.dataframe.DataFrame;
+import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
+import org.apache.pinot.thirdeye.detection.DataProvider;
+import org.apache.pinot.thirdeye.detection.DefaultInputDataFetcher;
+import org.apache.pinot.thirdeye.detection.DetectionPipelineResult;
+import org.apache.pinot.thirdeye.detection.InputDataFetcher;
+import org.apache.pinot.thirdeye.detection.MockDataProvider;
+import org.apache.pinot.thirdeye.detection.MockPipeline;
+import org.apache.pinot.thirdeye.detection.MockPipelineLoader;
+import org.apache.pinot.thirdeye.detection.MockPipelineOutput;
+import org.apache.pinot.thirdeye.detection.algorithm.MergeWrapper;
+import org.apache.pinot.thirdeye.detection.components.MockBaselineProvider;
+import org.apache.pinot.thirdeye.detection.spec.MockBaselineProviderSpec;
+import org.apache.pinot.thirdeye.detection.spi.components.BaselineProvider;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -44,8 +44,8 @@ import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
-import static com.linkedin.thirdeye.detection.DetectionTestUtils.*;
+import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
+import static org.apache.pinot.thirdeye.detection.DetectionTestUtils.*;
 
 
 public class BaselineFillingMergeWrapperTest {

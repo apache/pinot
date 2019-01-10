@@ -17,9 +17,9 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.alert.commons;
+package org.apache.pinot.thirdeye.alert.commons;
 
-import com.linkedin.thirdeye.datalayer.util.StringUtils;
+import org.apache.pinot.thirdeye.datalayer.util.StringUtils;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;

@@ -17,12 +17,12 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datalayer.dto;
+package org.apache.pinot.thirdeye.datalayer.dto;
 
-import com.linkedin.thirdeye.anomalydetection.context.AnomalyFeedback;
-import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
+import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyFeedback;
+import org.apache.pinot.thirdeye.constant.AnomalyFeedbackType;
 import java.io.Serializable;
-import com.linkedin.thirdeye.datalayer.pojo.AnomalyFeedbackBean;
+import org.apache.pinot.thirdeye.datalayer.pojo.AnomalyFeedbackBean;
 import org.apache.commons.lang3.StringUtils;
 
 public class AnomalyFeedbackDTO extends AnomalyFeedbackBean implements AnomalyFeedback, Serializable {

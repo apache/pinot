@@ -17,9 +17,9 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.dashboard.views.tabular;
+package org.apache.pinot.thirdeye.dashboard.views.tabular;
 
-import com.linkedin.thirdeye.dashboard.views.CompareViewRequest;
+import org.apache.pinot.thirdeye.dashboard.views.CompareViewRequest;
 
 public class TabularViewRequest extends CompareViewRequest {
 

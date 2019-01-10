@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.client.diffsummary;
+package org.apache.pinot.thirdeye.client.diffsummary;
 
-import com.linkedin.thirdeye.client.diffsummary.costfunctions.BalancedCostFunction;
+import org.apache.pinot.thirdeye.client.diffsummary.costfunctions.BalancedCostFunction;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.util.Arrays;

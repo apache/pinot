@@ -17,10 +17,10 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.tracking;
+package org.apache.pinot.thirdeye.tracking;
 
-import com.linkedin.thirdeye.anomaly.utils.ThirdeyeMetricsUtil;
-import com.linkedin.thirdeye.api.TimeGranularity;
+import org.apache.pinot.thirdeye.anomaly.utils.ThirdeyeMetricsUtil;
+import org.apache.pinot.thirdeye.api.TimeGranularity;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import org.slf4j.Logger;

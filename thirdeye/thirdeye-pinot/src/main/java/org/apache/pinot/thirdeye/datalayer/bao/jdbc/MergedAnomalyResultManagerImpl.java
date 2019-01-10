@@ -17,14 +17,14 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datalayer.bao.jdbc;
+package org.apache.pinot.thirdeye.datalayer.bao.jdbc;
 
 import com.google.inject.Singleton;
-import com.linkedin.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
-import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
-import com.linkedin.thirdeye.datalayer.pojo.AnomalyFeedbackBean;
-import com.linkedin.thirdeye.datalayer.pojo.AnomalyFunctionBean;
-import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean;
+import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import org.apache.pinot.thirdeye.datalayer.pojo.AnomalyFeedbackBean;
+import org.apache.pinot.thirdeye.datalayer.pojo.AnomalyFunctionBean;
+import org.apache.pinot.thirdeye.datalayer.pojo.MetricConfigBean;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -32,10 +32,10 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.datalayer.pojo.MergedAnomalyResultBean;
-import com.linkedin.thirdeye.datalayer.util.Predicate;
+import org.apache.pinot.thirdeye.datalayer.bao.MergedAnomalyResultManager;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.datalayer.pojo.MergedAnomalyResultBean;
+import org.apache.pinot.thirdeye.datalayer.util.Predicate;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;

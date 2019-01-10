@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.alert.commons;
+package org.apache.pinot.thirdeye.alert.commons;
 
-import com.linkedin.thirdeye.alert.content.EmailContentFormatter;
-import com.linkedin.thirdeye.alert.content.HierarchicalAnomaliesEmailContentFormatter;
-import com.linkedin.thirdeye.alert.content.MultipleAnomaliesEmailContentFormatter;
+import org.apache.pinot.thirdeye.alert.content.EmailContentFormatter;
+import org.apache.pinot.thirdeye.alert.content.HierarchicalAnomaliesEmailContentFormatter;
+import org.apache.pinot.thirdeye.alert.content.MultipleAnomaliesEmailContentFormatter;
 import org.junit.Assert;
 import org.testng.annotations.Test;
 

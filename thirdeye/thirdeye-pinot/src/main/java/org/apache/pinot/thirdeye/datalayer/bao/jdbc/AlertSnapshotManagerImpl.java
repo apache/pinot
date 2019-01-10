@@ -17,11 +17,11 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datalayer.bao.jdbc;
+package org.apache.pinot.thirdeye.datalayer.bao.jdbc;
 
-import com.linkedin.thirdeye.datalayer.bao.AlertSnapshotManager;
-import com.linkedin.thirdeye.datalayer.dto.AlertSnapshotDTO;
-import com.linkedin.thirdeye.datalayer.pojo.AlertSnapshotBean;
+import org.apache.pinot.thirdeye.datalayer.bao.AlertSnapshotManager;
+import org.apache.pinot.thirdeye.datalayer.dto.AlertSnapshotDTO;
+import org.apache.pinot.thirdeye.datalayer.pojo.AlertSnapshotBean;
 
 
 public class AlertSnapshotManagerImpl extends AbstractManagerImpl<AlertSnapshotDTO>

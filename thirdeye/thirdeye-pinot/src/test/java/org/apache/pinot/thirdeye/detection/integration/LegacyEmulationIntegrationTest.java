@@ -14,23 +14,23 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.detection.integration;
+package org.apache.pinot.thirdeye.detection.integration;
 
-import com.linkedin.thirdeye.dataframe.DataFrame;
-import com.linkedin.thirdeye.dataframe.util.MetricSlice;
-import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
-import com.linkedin.thirdeye.detection.DataProvider;
-import com.linkedin.thirdeye.detection.DetectionPipeline;
-import com.linkedin.thirdeye.detection.DetectionPipelineLoader;
-import com.linkedin.thirdeye.detection.DetectionPipelineResult;
-import com.linkedin.thirdeye.detection.MockDataProvider;
-import com.linkedin.thirdeye.detection.algorithm.LegacyAlertFilterWrapper;
-import com.linkedin.thirdeye.detection.algorithm.LegacyAnomalyFunctionAlgorithm;
-import com.linkedin.thirdeye.detection.algorithm.LegacyDimensionWrapper;
-import com.linkedin.thirdeye.detection.algorithm.LegacyMergeWrapper;
+import org.apache.pinot.thirdeye.dataframe.DataFrame;
+import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
+import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
+import org.apache.pinot.thirdeye.detection.DataProvider;
+import org.apache.pinot.thirdeye.detection.DetectionPipeline;
+import org.apache.pinot.thirdeye.detection.DetectionPipelineLoader;
+import org.apache.pinot.thirdeye.detection.DetectionPipelineResult;
+import org.apache.pinot.thirdeye.detection.MockDataProvider;
+import org.apache.pinot.thirdeye.detection.algorithm.LegacyAlertFilterWrapper;
+import org.apache.pinot.thirdeye.detection.algorithm.LegacyAnomalyFunctionAlgorithm;
+import org.apache.pinot.thirdeye.detection.algorithm.LegacyDimensionWrapper;
+import org.apache.pinot.thirdeye.detection.algorithm.LegacyMergeWrapper;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -40,7 +40,7 @@ import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
+import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
 
 
 public class LegacyEmulationIntegrationTest {
@@ -80,7 +80,7 @@ public class LegacyEmulationIntegrationTest {
 
     this.properties = new HashMap<>();
     this.properties.put("specs", specs);
-    this.properties.put("anomalyFunctionClassName", "com.linkedin.thirdeye.anomalydetection.function.MinMaxThresholdFunction");
+    this.properties.put("anomalyFunctionClassName", "org.apache.pinot.thirdeye.anomalydetection.function.MinMaxThresholdFunction");
     this.properties.put("alertFilterLookBack", "0");
 
     this.config = new DetectionConfigDTO();

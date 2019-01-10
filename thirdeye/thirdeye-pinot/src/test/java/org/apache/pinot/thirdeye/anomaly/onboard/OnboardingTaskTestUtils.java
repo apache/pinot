@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.anomaly.onboard;
+package org.apache.pinot.thirdeye.anomaly.onboard;
 
-import com.linkedin.thirdeye.anomaly.onboard.framework.DetectionOnboardTaskContext;
-import com.linkedin.thirdeye.anomaly.onboard.tasks.DefaultDetectionOnboardJob;
+import org.apache.pinot.thirdeye.anomaly.onboard.framework.DetectionOnboardTaskContext;
+import org.apache.pinot.thirdeye.anomaly.onboard.tasks.DefaultDetectionOnboardJob;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.configuration.Configuration;

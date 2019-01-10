@@ -1,10 +1,10 @@
 {
-  "className": "com.linkedin.thirdeye.detection.algorithm.MergeWrapper",
+  "className": "org.apache.pinot.thirdeye.detection.algorithm.MergeWrapper",
   "maxGap": 100,
   "maxDuration": 10000,
   "nested": [
     {
-      "className": "com.linkedin.thirdeye.detection.algorithm.DimensionWrapper",
+      "className": "org.apache.pinot.thirdeye.detection.algorithm.DimensionWrapper",
       "metricUrn": "thirdeye:metric:1:a%3D1:a%3D2",
       "nestedMetricUrns": [ "thirdeye:metric:2" ],
       "dimensions": ["a", "b"],
@@ -13,17 +13,17 @@
       "k": 3,
       "nested": [
         {
-          "className": "com.linkedin.thirdeye.detection.algorithm.ThresholdAlgorithm",
+          "className": "org.apache.pinot.thirdeye.detection.algorithm.ThresholdAlgorithm",
           "min": 15
         },
         {
-          "className": "com.linkedin.thirdeye.detection.algorithm.ThresholdAlgorithm",
+          "className": "org.apache.pinot.thirdeye.detection.algorithm.ThresholdAlgorithm",
           "max": 20
         }
       ]
     },
     {
-      "className": "com.linkedin.thirdeye.detection.algorithm.ThresholdAlgorithm",
+      "className": "org.apache.pinot.thirdeye.detection.algorithm.ThresholdAlgorithm",
       "metricUrn": "thirdeye:metric:2",
       "max": 70
     }

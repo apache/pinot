@@ -17,13 +17,13 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.rootcause.callgraph;
+package org.apache.pinot.thirdeye.rootcause.callgraph;
 
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
-import com.linkedin.thirdeye.dashboard.resources.v2.RootCauseEntityFormatter;
-import com.linkedin.thirdeye.dashboard.resources.v2.pojo.RootCauseEntity;
-import com.linkedin.thirdeye.rootcause.Entity;
+import org.apache.pinot.thirdeye.dashboard.resources.v2.RootCauseEntityFormatter;
+import org.apache.pinot.thirdeye.dashboard.resources.v2.pojo.RootCauseEntity;
+import org.apache.pinot.thirdeye.rootcause.Entity;
 
 
 public class CallGraphEntityFormatter extends RootCauseEntityFormatter {

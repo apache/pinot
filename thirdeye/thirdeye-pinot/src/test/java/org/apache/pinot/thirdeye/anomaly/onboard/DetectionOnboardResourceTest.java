@@ -14,13 +14,13 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.anomaly.onboard;
+package org.apache.pinot.thirdeye.anomaly.onboard;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.linkedin.thirdeye.anomaly.job.JobConstants;
-import com.linkedin.thirdeye.anomaly.onboard.framework.DetectionOnboardJobStatus;
-import com.linkedin.thirdeye.datalayer.bao.DAOTestBase;
-import com.linkedin.thirdeye.datasource.DAORegistry;
+import org.apache.pinot.thirdeye.anomaly.job.JobConstants;
+import org.apache.pinot.thirdeye.anomaly.onboard.framework.DetectionOnboardJobStatus;
+import org.apache.pinot.thirdeye.datalayer.bao.DAOTestBase;
+import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.Map;

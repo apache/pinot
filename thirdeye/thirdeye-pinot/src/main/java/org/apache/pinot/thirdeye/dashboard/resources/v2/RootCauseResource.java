@@ -17,15 +17,15 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.dashboard.resources.v2;
+package org.apache.pinot.thirdeye.dashboard.resources.v2;
 
-import com.linkedin.thirdeye.api.Constants;
-import com.linkedin.thirdeye.dashboard.resources.v2.pojo.RootCauseEntity;
-import com.linkedin.thirdeye.rootcause.Entity;
-import com.linkedin.thirdeye.rootcause.RCAFramework;
-import com.linkedin.thirdeye.rootcause.RCAFrameworkExecutionResult;
-import com.linkedin.thirdeye.rootcause.util.EntityUtils;
-import com.linkedin.thirdeye.rootcause.impl.TimeRangeEntity;
+import org.apache.pinot.thirdeye.api.Constants;
+import org.apache.pinot.thirdeye.dashboard.resources.v2.pojo.RootCauseEntity;
+import org.apache.pinot.thirdeye.rootcause.Entity;
+import org.apache.pinot.thirdeye.rootcause.RCAFramework;
+import org.apache.pinot.thirdeye.rootcause.RCAFrameworkExecutionResult;
+import org.apache.pinot.thirdeye.rootcause.util.EntityUtils;
+import org.apache.pinot.thirdeye.rootcause.impl.TimeRangeEntity;
 import com.wordnik.swagger.annotations.Api;
 import com.wordnik.swagger.annotations.ApiOperation;
 import com.wordnik.swagger.annotations.ApiParam;

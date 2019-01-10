@@ -17,9 +17,9 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.dashboard.views.heatmap;
+package org.apache.pinot.thirdeye.dashboard.views.heatmap;
 
-import com.linkedin.thirdeye.dashboard.views.CompareViewRequest;
+import org.apache.pinot.thirdeye.dashboard.views.CompareViewRequest;
 
 public class HeatMapViewRequest extends CompareViewRequest {
 

@@ -17,16 +17,16 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datalayer.util;
+package org.apache.pinot.thirdeye.datalayer.util;
 
 import org.apache.tomcat.jdbc.pool.DataSource;
 
 import com.google.inject.Guice;
 import com.google.inject.Injector;
-import com.linkedin.thirdeye.datalayer.bao.jdbc.AbstractManagerImpl;
-import com.linkedin.thirdeye.datalayer.dao.GenericPojoDao;
-import com.linkedin.thirdeye.datalayer.dto.AbstractDTO;
-import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil.DataSourceModule;
+import org.apache.pinot.thirdeye.datalayer.bao.jdbc.AbstractManagerImpl;
+import org.apache.pinot.thirdeye.datalayer.dao.GenericPojoDao;
+import org.apache.pinot.thirdeye.datalayer.dto.AbstractDTO;
+import org.apache.pinot.thirdeye.datalayer.util.DaoProviderUtil.DataSourceModule;
 
 public class ManagerProvider {
 

@@ -17,9 +17,9 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datalayer.entity;
+package org.apache.pinot.thirdeye.datalayer.entity;
 
-import com.linkedin.thirdeye.datalayer.pojo.SessionBean;
+import org.apache.pinot.thirdeye.datalayer.pojo.SessionBean;
 
 
 public class SessionIndex extends AbstractIndexEntity {

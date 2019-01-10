@@ -17,10 +17,10 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomaly.monitor;
+package org.apache.pinot.thirdeye.anomaly.monitor;
 
 
-import com.linkedin.thirdeye.anomaly.job.JobContext;
+import org.apache.pinot.thirdeye.anomaly.job.JobContext;
 
 public class MonitorJobContext extends JobContext {
 

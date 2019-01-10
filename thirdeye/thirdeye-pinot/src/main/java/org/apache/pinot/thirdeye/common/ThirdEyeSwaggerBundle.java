@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.common;
+package org.apache.pinot.thirdeye.common;
 
 import io.federecio.dropwizard.swagger.SwaggerBundle;
 import io.federecio.dropwizard.swagger.SwaggerBundleConfiguration;

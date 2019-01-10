@@ -14,17 +14,17 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.eventprovider;
+package org.apache.pinot.thirdeye.eventprovider;
 
 import com.google.common.collect.Lists;
-import com.linkedin.thirdeye.anomaly.events.HolidayEventProvider;
-import com.linkedin.thirdeye.anomaly.events.EventFilter;
-import com.linkedin.thirdeye.anomaly.events.EventType;
-import com.linkedin.thirdeye.datalayer.bao.DAOTestBase;
-import com.linkedin.thirdeye.datalayer.bao.EventManager;
-import com.linkedin.thirdeye.datalayer.dto.EventDTO;
+import org.apache.pinot.thirdeye.anomaly.events.HolidayEventProvider;
+import org.apache.pinot.thirdeye.anomaly.events.EventFilter;
+import org.apache.pinot.thirdeye.anomaly.events.EventType;
+import org.apache.pinot.thirdeye.datalayer.bao.DAOTestBase;
+import org.apache.pinot.thirdeye.datalayer.bao.EventManager;
+import org.apache.pinot.thirdeye.datalayer.dto.EventDTO;
 
-import com.linkedin.thirdeye.datasource.DAORegistry;
+import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;

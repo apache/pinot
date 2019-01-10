@@ -17,14 +17,14 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.detection.validators;
+package org.apache.pinot.thirdeye.detection.validators;
 
-import com.linkedin.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang.StringUtils;
 
-import static com.linkedin.thirdeye.detection.yaml.YamlDetectionAlertConfigTranslator.*;
+import static org.apache.pinot.thirdeye.detection.yaml.YamlDetectionAlertConfigTranslator.*;
 
 
 public class DetectionAlertConfigValidator extends ConfigValidator {

@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.dashboard.resources;
+package org.apache.pinot.thirdeye.dashboard.resources;
 
 import io.dropwizard.views.View;
 
@@ -55,33 +55,33 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.google.common.base.Joiner;
 import com.google.common.cache.LoadingCache;
-import com.linkedin.thirdeye.api.TimeGranularity;
-import com.linkedin.thirdeye.api.TimeSpec;
-import com.linkedin.thirdeye.constant.MetricAggFunction;
-import com.linkedin.thirdeye.dashboard.Utils;
-import com.linkedin.thirdeye.dashboard.views.DashboardView;
-import com.linkedin.thirdeye.dashboard.views.contributor.ContributorViewHandler;
-import com.linkedin.thirdeye.dashboard.views.contributor.ContributorViewRequest;
-import com.linkedin.thirdeye.dashboard.views.contributor.ContributorViewResponse;
-import com.linkedin.thirdeye.dashboard.views.heatmap.HeatMapViewHandler;
-import com.linkedin.thirdeye.dashboard.views.heatmap.HeatMapViewRequest;
-import com.linkedin.thirdeye.dashboard.views.heatmap.HeatMapViewResponse;
-import com.linkedin.thirdeye.dashboard.views.tabular.TabularViewHandler;
-import com.linkedin.thirdeye.dashboard.views.tabular.TabularViewRequest;
-import com.linkedin.thirdeye.dashboard.views.tabular.TabularViewResponse;
-import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
-import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
-import com.linkedin.thirdeye.datasource.DAORegistry;
-import com.linkedin.thirdeye.datasource.MetricExpression;
-import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
-import com.linkedin.thirdeye.datasource.cache.QueryCache;
-import com.linkedin.thirdeye.datasource.timeseries.TimeSeriesHandler;
-import com.linkedin.thirdeye.datasource.timeseries.TimeSeriesRequest;
-import com.linkedin.thirdeye.datasource.timeseries.TimeSeriesResponse;
-import com.linkedin.thirdeye.datasource.timeseries.TimeSeriesRow;
-import com.linkedin.thirdeye.datasource.timeseries.TimeSeriesRow.TimeSeriesMetric;
-import com.linkedin.thirdeye.util.ThirdEyeUtils;
+import org.apache.pinot.thirdeye.api.TimeGranularity;
+import org.apache.pinot.thirdeye.api.TimeSpec;
+import org.apache.pinot.thirdeye.constant.MetricAggFunction;
+import org.apache.pinot.thirdeye.dashboard.Utils;
+import org.apache.pinot.thirdeye.dashboard.views.DashboardView;
+import org.apache.pinot.thirdeye.dashboard.views.contributor.ContributorViewHandler;
+import org.apache.pinot.thirdeye.dashboard.views.contributor.ContributorViewRequest;
+import org.apache.pinot.thirdeye.dashboard.views.contributor.ContributorViewResponse;
+import org.apache.pinot.thirdeye.dashboard.views.heatmap.HeatMapViewHandler;
+import org.apache.pinot.thirdeye.dashboard.views.heatmap.HeatMapViewRequest;
+import org.apache.pinot.thirdeye.dashboard.views.heatmap.HeatMapViewResponse;
+import org.apache.pinot.thirdeye.dashboard.views.tabular.TabularViewHandler;
+import org.apache.pinot.thirdeye.dashboard.views.tabular.TabularViewRequest;
+import org.apache.pinot.thirdeye.dashboard.views.tabular.TabularViewResponse;
+import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
+import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
+import org.apache.pinot.thirdeye.datasource.DAORegistry;
+import org.apache.pinot.thirdeye.datasource.MetricExpression;
+import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
+import org.apache.pinot.thirdeye.datasource.cache.QueryCache;
+import org.apache.pinot.thirdeye.datasource.timeseries.TimeSeriesHandler;
+import org.apache.pinot.thirdeye.datasource.timeseries.TimeSeriesRequest;
+import org.apache.pinot.thirdeye.datasource.timeseries.TimeSeriesResponse;
+import org.apache.pinot.thirdeye.datasource.timeseries.TimeSeriesRow;
+import org.apache.pinot.thirdeye.datasource.timeseries.TimeSeriesRow.TimeSeriesMetric;
+import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
 
 @Path(value = "/dashboard")
 public class DashboardResource {

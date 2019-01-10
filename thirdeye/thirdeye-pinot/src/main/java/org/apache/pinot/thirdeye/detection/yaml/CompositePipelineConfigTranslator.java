@@ -17,31 +17,31 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.detection.yaml;
+package org.apache.pinot.thirdeye.detection.yaml;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Multimap;
-import com.linkedin.thirdeye.api.TimeGranularity;
-import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
-import com.linkedin.thirdeye.detection.ConfigUtils;
-import com.linkedin.thirdeye.detection.DataProvider;
-import com.linkedin.thirdeye.detection.DefaultInputDataFetcher;
-import com.linkedin.thirdeye.detection.InputDataFetcher;
-import com.linkedin.thirdeye.detection.algorithm.DimensionWrapper;
-import com.linkedin.thirdeye.detection.annotation.registry.DetectionRegistry;
-import com.linkedin.thirdeye.detection.annotation.Yaml;
-import com.linkedin.thirdeye.detection.spec.AbstractSpec;
-import com.linkedin.thirdeye.detection.spi.components.Tunable;
-import com.linkedin.thirdeye.detection.wrapper.AnomalyDetectorWrapper;
-import com.linkedin.thirdeye.detection.wrapper.AnomalyFilterWrapper;
-import com.linkedin.thirdeye.detection.wrapper.BaselineFillingMergeWrapper;
-import com.linkedin.thirdeye.detection.wrapper.ChildKeepingMergeWrapper;
-import com.linkedin.thirdeye.detection.DetectionUtils;
-import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
+import org.apache.pinot.thirdeye.api.TimeGranularity;
+import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
+import org.apache.pinot.thirdeye.detection.ConfigUtils;
+import org.apache.pinot.thirdeye.detection.DataProvider;
+import org.apache.pinot.thirdeye.detection.DefaultInputDataFetcher;
+import org.apache.pinot.thirdeye.detection.InputDataFetcher;
+import org.apache.pinot.thirdeye.detection.algorithm.DimensionWrapper;
+import org.apache.pinot.thirdeye.detection.annotation.registry.DetectionRegistry;
+import org.apache.pinot.thirdeye.detection.annotation.Yaml;
+import org.apache.pinot.thirdeye.detection.spec.AbstractSpec;
+import org.apache.pinot.thirdeye.detection.spi.components.Tunable;
+import org.apache.pinot.thirdeye.detection.wrapper.AnomalyDetectorWrapper;
+import org.apache.pinot.thirdeye.detection.wrapper.AnomalyFilterWrapper;
+import org.apache.pinot.thirdeye.detection.wrapper.BaselineFillingMergeWrapper;
+import org.apache.pinot.thirdeye.detection.wrapper.ChildKeepingMergeWrapper;
+import org.apache.pinot.thirdeye.detection.DetectionUtils;
+import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -55,8 +55,8 @@ import org.apache.commons.collections.MapUtils;
 import org.joda.time.DateTimeZone;
 import org.joda.time.Interval;
 
-import static com.linkedin.thirdeye.detection.ConfigUtils.*;
-import static com.linkedin.thirdeye.detection.DetectionUtils.*;
+import static org.apache.pinot.thirdeye.detection.ConfigUtils.*;
+import static org.apache.pinot.thirdeye.detection.DetectionUtils.*;
 
 
 /**

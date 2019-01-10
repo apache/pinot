@@ -17,25 +17,25 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomalydetection.function;
+package org.apache.pinot.thirdeye.anomalydetection.function;
 
-import com.linkedin.thirdeye.anomalydetection.model.data.DataModel;
-import com.linkedin.thirdeye.anomalydetection.model.data.NoopDataModel;
-import com.linkedin.thirdeye.anomalydetection.model.data.SeasonalDataModel;
-import com.linkedin.thirdeye.anomalydetection.model.detection.DetectionModel;
-import com.linkedin.thirdeye.anomalydetection.model.detection.NoopDetectionModel;
-import com.linkedin.thirdeye.anomalydetection.model.detection.SimpleThresholdDetectionModel;
-import com.linkedin.thirdeye.anomalydetection.model.merge.MergeModel;
-import com.linkedin.thirdeye.anomalydetection.model.merge.NoopMergeModel;
-import com.linkedin.thirdeye.anomalydetection.model.merge.SimplePercentageMergeModel;
-import com.linkedin.thirdeye.anomalydetection.model.prediction.NoopPredictionModel;
-import com.linkedin.thirdeye.anomalydetection.model.prediction.PredictionModel;
-import com.linkedin.thirdeye.anomalydetection.model.prediction.SeasonalAveragePredictionModel;
-import com.linkedin.thirdeye.anomalydetection.model.transform.MovingAverageSmoothingFunction;
-import com.linkedin.thirdeye.anomalydetection.model.transform.TotalCountThresholdRemovalFunction;
-import com.linkedin.thirdeye.anomalydetection.model.transform.TransformationFunction;
-import com.linkedin.thirdeye.anomalydetection.model.transform.ZeroRemovalFunction;
-import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import org.apache.pinot.thirdeye.anomalydetection.model.data.DataModel;
+import org.apache.pinot.thirdeye.anomalydetection.model.data.NoopDataModel;
+import org.apache.pinot.thirdeye.anomalydetection.model.data.SeasonalDataModel;
+import org.apache.pinot.thirdeye.anomalydetection.model.detection.DetectionModel;
+import org.apache.pinot.thirdeye.anomalydetection.model.detection.NoopDetectionModel;
+import org.apache.pinot.thirdeye.anomalydetection.model.detection.SimpleThresholdDetectionModel;
+import org.apache.pinot.thirdeye.anomalydetection.model.merge.MergeModel;
+import org.apache.pinot.thirdeye.anomalydetection.model.merge.NoopMergeModel;
+import org.apache.pinot.thirdeye.anomalydetection.model.merge.SimplePercentageMergeModel;
+import org.apache.pinot.thirdeye.anomalydetection.model.prediction.NoopPredictionModel;
+import org.apache.pinot.thirdeye.anomalydetection.model.prediction.PredictionModel;
+import org.apache.pinot.thirdeye.anomalydetection.model.prediction.SeasonalAveragePredictionModel;
+import org.apache.pinot.thirdeye.anomalydetection.model.transform.MovingAverageSmoothingFunction;
+import org.apache.pinot.thirdeye.anomalydetection.model.transform.TotalCountThresholdRemovalFunction;
+import org.apache.pinot.thirdeye.anomalydetection.model.transform.TransformationFunction;
+import org.apache.pinot.thirdeye.anomalydetection.model.transform.ZeroRemovalFunction;
+import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;

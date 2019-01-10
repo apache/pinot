@@ -17,13 +17,13 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datalayer.pojo;
+package org.apache.pinot.thirdeye.datalayer.pojo;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.linkedin.thirdeye.api.TimeGranularity;
-import com.linkedin.thirdeye.api.TimeSpec;
-import com.linkedin.thirdeye.completeness.checker.Wo4WAvgDataCompletenessAlgorithm;
-import com.linkedin.thirdeye.datasource.pinot.PinotThirdEyeDataSource;
+import org.apache.pinot.thirdeye.api.TimeGranularity;
+import org.apache.pinot.thirdeye.api.TimeSpec;
+import org.apache.pinot.thirdeye.completeness.checker.Wo4WAvgDataCompletenessAlgorithm;
+import org.apache.pinot.thirdeye.datasource.pinot.PinotThirdEyeDataSource;
 
 import java.util.Collections;
 import java.util.HashMap;

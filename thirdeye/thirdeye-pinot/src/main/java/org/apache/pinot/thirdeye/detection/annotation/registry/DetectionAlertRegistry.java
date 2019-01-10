@@ -17,13 +17,13 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.detection.annotation.registry;
+package org.apache.pinot.thirdeye.detection.annotation.registry;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.thirdeye.detection.alert.scheme.DetectionAlertScheme;
-import com.linkedin.thirdeye.detection.alert.suppress.DetectionAlertSuppressor;
-import com.linkedin.thirdeye.detection.annotation.AlertScheme;
-import com.linkedin.thirdeye.detection.annotation.AlertSuppressor;
+import org.apache.pinot.thirdeye.detection.alert.scheme.DetectionAlertScheme;
+import org.apache.pinot.thirdeye.detection.alert.suppress.DetectionAlertSuppressor;
+import org.apache.pinot.thirdeye.detection.annotation.AlertScheme;
+import org.apache.pinot.thirdeye.detection.annotation.AlertSuppressor;
 import java.lang.annotation.Annotation;
 import java.util.HashMap;
 import java.util.Map;

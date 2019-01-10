@@ -17,18 +17,18 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomaly.detection.lib;
+package org.apache.pinot.thirdeye.anomaly.detection.lib;
 
-import com.linkedin.thirdeye.anomaly.detection.DetectionJobScheduler;
-import com.linkedin.thirdeye.anomalydetection.performanceEvaluation.PerformanceEvaluate;
-import com.linkedin.thirdeye.anomalydetection.performanceEvaluation.PerformanceEvaluateHelper;
-import com.linkedin.thirdeye.anomalydetection.performanceEvaluation.PerformanceEvaluationMethod;
-import com.linkedin.thirdeye.dashboard.resources.OnboardResource;
-import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
-import com.linkedin.thirdeye.datalayer.bao.AutotuneConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
-import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
-import com.linkedin.thirdeye.datalayer.dto.AutotuneConfigDTO;
+import org.apache.pinot.thirdeye.anomaly.detection.DetectionJobScheduler;
+import org.apache.pinot.thirdeye.anomalydetection.performanceEvaluation.PerformanceEvaluate;
+import org.apache.pinot.thirdeye.anomalydetection.performanceEvaluation.PerformanceEvaluateHelper;
+import org.apache.pinot.thirdeye.anomalydetection.performanceEvaluation.PerformanceEvaluationMethod;
+import org.apache.pinot.thirdeye.dashboard.resources.OnboardResource;
+import org.apache.pinot.thirdeye.datalayer.bao.AnomalyFunctionManager;
+import org.apache.pinot.thirdeye.datalayer.bao.AutotuneConfigManager;
+import org.apache.pinot.thirdeye.datalayer.bao.MergedAnomalyResultManager;
+import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.AutotuneConfigDTO;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;

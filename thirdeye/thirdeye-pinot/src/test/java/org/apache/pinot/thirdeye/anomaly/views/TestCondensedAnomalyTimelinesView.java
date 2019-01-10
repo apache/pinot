@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.anomaly.views;
+package org.apache.pinot.thirdeye.anomaly.views;
 
-import com.linkedin.thirdeye.dashboard.views.TimeBucket;
+import org.apache.pinot.thirdeye.dashboard.views.TimeBucket;
 import org.joda.time.DateTime;
 import org.joda.time.Hours;
 import org.testng.Assert;

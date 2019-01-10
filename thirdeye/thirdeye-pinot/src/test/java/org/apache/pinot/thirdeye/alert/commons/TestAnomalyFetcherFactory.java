@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.alert.commons;
+package org.apache.pinot.thirdeye.alert.commons;
 
-import com.linkedin.thirdeye.alert.fetcher.AnomalyFetcher;
-import com.linkedin.thirdeye.alert.fetcher.ContinuumAnomalyFetcher;
-import com.linkedin.thirdeye.alert.fetcher.UnnotifiedAnomalyFetcher;
+import org.apache.pinot.thirdeye.alert.fetcher.AnomalyFetcher;
+import org.apache.pinot.thirdeye.alert.fetcher.ContinuumAnomalyFetcher;
+import org.apache.pinot.thirdeye.alert.fetcher.UnnotifiedAnomalyFetcher;
 import org.junit.Assert;
 import org.testng.annotations.Test;
 

@@ -17,18 +17,18 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomaly.task;
+package org.apache.pinot.thirdeye.anomaly.task;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.linkedin.thirdeye.anomaly.alert.AlertTaskInfo;
-import com.linkedin.thirdeye.anomaly.classification.ClassificationTaskInfo;
-import com.linkedin.thirdeye.anomaly.detection.DetectionTaskInfo;
-import com.linkedin.thirdeye.anomaly.monitor.MonitorTaskInfo;
-import com.linkedin.thirdeye.anomaly.onboard.ReplayTaskInfo;
-import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskType;
-import com.linkedin.thirdeye.completeness.checker.DataCompletenessTaskInfo;
-import com.linkedin.thirdeye.detection.DetectionPipelineTaskInfo;
-import com.linkedin.thirdeye.detection.alert.DetectionAlertTaskInfo;
+import org.apache.pinot.thirdeye.anomaly.alert.AlertTaskInfo;
+import org.apache.pinot.thirdeye.anomaly.classification.ClassificationTaskInfo;
+import org.apache.pinot.thirdeye.anomaly.detection.DetectionTaskInfo;
+import org.apache.pinot.thirdeye.anomaly.monitor.MonitorTaskInfo;
+import org.apache.pinot.thirdeye.anomaly.onboard.ReplayTaskInfo;
+import org.apache.pinot.thirdeye.anomaly.task.TaskConstants.TaskType;
+import org.apache.pinot.thirdeye.completeness.checker.DataCompletenessTaskInfo;
+import org.apache.pinot.thirdeye.detection.DetectionPipelineTaskInfo;
+import org.apache.pinot.thirdeye.detection.alert.DetectionAlertTaskInfo;
 import java.io.IOException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.tracking;
+package org.apache.pinot.thirdeye.tracking;
 
 import java.util.ArrayList;
 import java.util.Collections;

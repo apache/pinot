@@ -17,9 +17,9 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.rootcause;
+package org.apache.pinot.thirdeye.rootcause;
 
-import com.linkedin.thirdeye.anomaly.utils.ThirdeyeMetricsUtil;
+import org.apache.pinot.thirdeye.anomaly.utils.ThirdeyeMetricsUtil;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;

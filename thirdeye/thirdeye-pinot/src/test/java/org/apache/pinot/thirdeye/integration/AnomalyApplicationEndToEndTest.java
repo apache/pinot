@@ -14,49 +14,49 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.integration;
+package org.apache.pinot.thirdeye.integration;
 
 import com.google.common.cache.LoadingCache;
-import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
-import com.linkedin.thirdeye.anomaly.alert.v2.AlertJobSchedulerV2;
-import com.linkedin.thirdeye.anomaly.classification.classifier.AnomalyClassifierFactory;
-import com.linkedin.thirdeye.anomaly.detection.DetectionJobScheduler;
-import com.linkedin.thirdeye.anomaly.classification.ClassificationJobScheduler;
-import com.linkedin.thirdeye.anomaly.job.JobConstants.JobStatus;
-import com.linkedin.thirdeye.anomaly.monitor.MonitorConfiguration;
-import com.linkedin.thirdeye.anomaly.monitor.MonitorConstants;
-import com.linkedin.thirdeye.anomaly.monitor.MonitorJobScheduler;
-import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskStatus;
-import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskType;
-import com.linkedin.thirdeye.anomaly.task.TaskDriver;
-import com.linkedin.thirdeye.anomaly.task.TaskDriverConfiguration;
-import com.linkedin.thirdeye.anomaly.task.TaskInfoFactory;
-import com.linkedin.thirdeye.api.TimeGranularity;
-import com.linkedin.thirdeye.api.TimeSpec;
-import com.linkedin.thirdeye.completeness.checker.DataCompletenessConstants.DataCompletenessType;
-import com.linkedin.thirdeye.completeness.checker.DataCompletenessScheduler;
-import com.linkedin.thirdeye.completeness.checker.DataCompletenessTaskInfo;
-import com.linkedin.thirdeye.datalayer.DaoTestUtils;
-import com.linkedin.thirdeye.datalayer.bao.DAOTestBase;
-import com.linkedin.thirdeye.datalayer.bao.TaskManager;
-import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
-import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.JobDTO;
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.TaskDTO;
-import com.linkedin.thirdeye.datasource.DAORegistry;
-import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
-import com.linkedin.thirdeye.datasource.ThirdEyeDataSource;
-import com.linkedin.thirdeye.datasource.ThirdEyeRequest;
-import com.linkedin.thirdeye.datasource.ThirdEyeResponse;
-import com.linkedin.thirdeye.datasource.cache.MetricDataset;
-import com.linkedin.thirdeye.datasource.cache.QueryCache;
-import com.linkedin.thirdeye.datasource.pinot.PinotThirdEyeDataSource;
-import com.linkedin.thirdeye.datasource.pinot.PinotThirdEyeResponse;
-import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
-import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
-import com.linkedin.thirdeye.util.ThirdEyeUtils;
+import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
+import org.apache.pinot.thirdeye.anomaly.alert.v2.AlertJobSchedulerV2;
+import org.apache.pinot.thirdeye.anomaly.classification.classifier.AnomalyClassifierFactory;
+import org.apache.pinot.thirdeye.anomaly.detection.DetectionJobScheduler;
+import org.apache.pinot.thirdeye.anomaly.classification.ClassificationJobScheduler;
+import org.apache.pinot.thirdeye.anomaly.job.JobConstants.JobStatus;
+import org.apache.pinot.thirdeye.anomaly.monitor.MonitorConfiguration;
+import org.apache.pinot.thirdeye.anomaly.monitor.MonitorConstants;
+import org.apache.pinot.thirdeye.anomaly.monitor.MonitorJobScheduler;
+import org.apache.pinot.thirdeye.anomaly.task.TaskConstants.TaskStatus;
+import org.apache.pinot.thirdeye.anomaly.task.TaskConstants.TaskType;
+import org.apache.pinot.thirdeye.anomaly.task.TaskDriver;
+import org.apache.pinot.thirdeye.anomaly.task.TaskDriverConfiguration;
+import org.apache.pinot.thirdeye.anomaly.task.TaskInfoFactory;
+import org.apache.pinot.thirdeye.api.TimeGranularity;
+import org.apache.pinot.thirdeye.api.TimeSpec;
+import org.apache.pinot.thirdeye.completeness.checker.DataCompletenessConstants.DataCompletenessType;
+import org.apache.pinot.thirdeye.completeness.checker.DataCompletenessScheduler;
+import org.apache.pinot.thirdeye.completeness.checker.DataCompletenessTaskInfo;
+import org.apache.pinot.thirdeye.datalayer.DaoTestUtils;
+import org.apache.pinot.thirdeye.datalayer.bao.DAOTestBase;
+import org.apache.pinot.thirdeye.datalayer.bao.TaskManager;
+import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.JobDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.TaskDTO;
+import org.apache.pinot.thirdeye.datasource.DAORegistry;
+import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
+import org.apache.pinot.thirdeye.datasource.ThirdEyeDataSource;
+import org.apache.pinot.thirdeye.datasource.ThirdEyeRequest;
+import org.apache.pinot.thirdeye.datasource.ThirdEyeResponse;
+import org.apache.pinot.thirdeye.datasource.cache.MetricDataset;
+import org.apache.pinot.thirdeye.datasource.cache.QueryCache;
+import org.apache.pinot.thirdeye.datasource.pinot.PinotThirdEyeDataSource;
+import org.apache.pinot.thirdeye.datasource.pinot.PinotThirdEyeResponse;
+import org.apache.pinot.thirdeye.detector.email.filter.AlertFilterFactory;
+import org.apache.pinot.thirdeye.detector.function.AnomalyFunctionFactory;
+import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
 
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -81,7 +81,7 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static com.linkedin.thirdeye.datalayer.DaoTestUtils.*;
+import static org.apache.pinot.thirdeye.datalayer.DaoTestUtils.*;
 
 
 public class AnomalyApplicationEndToEndTest {

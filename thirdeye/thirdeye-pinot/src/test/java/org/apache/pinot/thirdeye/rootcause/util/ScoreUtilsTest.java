@@ -17,9 +17,9 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.rootcause.util;
+package org.apache.pinot.thirdeye.rootcause.util;
 
-import com.linkedin.thirdeye.rootcause.util.ScoreUtils;
+import org.apache.pinot.thirdeye.rootcause.util.ScoreUtils;
 import java.util.concurrent.TimeUnit;
 import org.testng.Assert;
 import org.testng.annotations.Test;

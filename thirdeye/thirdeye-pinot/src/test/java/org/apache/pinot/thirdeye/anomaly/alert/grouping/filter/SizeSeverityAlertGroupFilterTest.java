@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.anomaly.alert.grouping.filter;
+package org.apache.pinot.thirdeye.anomaly.alert.grouping.filter;
 
 import java.util.HashMap;
 import java.util.HashSet;

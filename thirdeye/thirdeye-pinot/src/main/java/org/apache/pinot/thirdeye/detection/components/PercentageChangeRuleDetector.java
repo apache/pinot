@@ -17,35 +17,35 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.detection.components;
+package org.apache.pinot.thirdeye.detection.components;
 
-import com.linkedin.thirdeye.dashboard.resources.v2.BaselineParsingUtils;
-import com.linkedin.thirdeye.dataframe.BooleanSeries;
-import com.linkedin.thirdeye.dataframe.DataFrame;
-import com.linkedin.thirdeye.dataframe.Series;
-import com.linkedin.thirdeye.dataframe.util.MetricSlice;
-import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.detection.DetectionUtils;
-import com.linkedin.thirdeye.detection.InputDataFetcher;
-import com.linkedin.thirdeye.detection.Pattern;
-import com.linkedin.thirdeye.detection.annotation.Components;
-import com.linkedin.thirdeye.detection.annotation.DetectionTag;
-import com.linkedin.thirdeye.detection.annotation.Param;
-import com.linkedin.thirdeye.detection.annotation.PresentationOption;
-import com.linkedin.thirdeye.detection.spec.PercentageChangeRuleDetectorSpec;
-import com.linkedin.thirdeye.detection.spi.components.AnomalyDetector;
-import com.linkedin.thirdeye.detection.spi.model.InputData;
-import com.linkedin.thirdeye.detection.spi.model.InputDataSpec;
-import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
-import com.linkedin.thirdeye.rootcause.timeseries.Baseline;
+import org.apache.pinot.thirdeye.dashboard.resources.v2.BaselineParsingUtils;
+import org.apache.pinot.thirdeye.dataframe.BooleanSeries;
+import org.apache.pinot.thirdeye.dataframe.DataFrame;
+import org.apache.pinot.thirdeye.dataframe.Series;
+import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
+import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.detection.DetectionUtils;
+import org.apache.pinot.thirdeye.detection.InputDataFetcher;
+import org.apache.pinot.thirdeye.detection.Pattern;
+import org.apache.pinot.thirdeye.detection.annotation.Components;
+import org.apache.pinot.thirdeye.detection.annotation.DetectionTag;
+import org.apache.pinot.thirdeye.detection.annotation.Param;
+import org.apache.pinot.thirdeye.detection.annotation.PresentationOption;
+import org.apache.pinot.thirdeye.detection.spec.PercentageChangeRuleDetectorSpec;
+import org.apache.pinot.thirdeye.detection.spi.components.AnomalyDetector;
+import org.apache.pinot.thirdeye.detection.spi.model.InputData;
+import org.apache.pinot.thirdeye.detection.spi.model.InputDataSpec;
+import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
+import org.apache.pinot.thirdeye.rootcause.timeseries.Baseline;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import org.joda.time.Interval;
 
-import static com.linkedin.thirdeye.dataframe.DoubleSeries.*;
-import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
+import static org.apache.pinot.thirdeye.dataframe.DoubleSeries.*;
+import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
 
 @Components(title = "Percentage change rule detection",
     type = "PERCENTAGE_RULE",

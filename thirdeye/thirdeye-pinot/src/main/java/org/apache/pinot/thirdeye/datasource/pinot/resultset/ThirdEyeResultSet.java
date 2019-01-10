@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datasource.pinot.resultset;
+package org.apache.pinot.thirdeye.datasource.pinot.resultset;
 
 /**
  * An interface to mimic {@link com.linkedin.pinot.client.ResultSet}. Note that this class is used to decouple

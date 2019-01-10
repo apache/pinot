@@ -17,9 +17,9 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomaly.onboard.utils;
+package org.apache.pinot.thirdeye.anomaly.onboard.utils;
 
-import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;

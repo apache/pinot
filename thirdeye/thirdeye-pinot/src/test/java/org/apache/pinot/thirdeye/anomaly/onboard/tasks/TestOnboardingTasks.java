@@ -14,23 +14,23 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.anomaly.onboard.tasks;
+package org.apache.pinot.thirdeye.anomaly.onboard.tasks;
 
-import com.linkedin.thirdeye.anomaly.onboard.OnboardingTaskTestUtils;
-import com.linkedin.thirdeye.anomaly.onboard.framework.DetectionOnboardExecutionContext;
-import com.linkedin.thirdeye.anomaly.onboard.framework.DetectionOnboardTask;
-import com.linkedin.thirdeye.anomaly.onboard.framework.DetectionOnboardTaskContext;
-import com.linkedin.thirdeye.constant.MetricAggFunction;
-import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
-import com.linkedin.thirdeye.datalayer.bao.DAOTestBase;
-import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.JobManager;
-import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
-import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
-import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
-import com.linkedin.thirdeye.datasource.DAORegistry;
+import org.apache.pinot.thirdeye.anomaly.onboard.OnboardingTaskTestUtils;
+import org.apache.pinot.thirdeye.anomaly.onboard.framework.DetectionOnboardExecutionContext;
+import org.apache.pinot.thirdeye.anomaly.onboard.framework.DetectionOnboardTask;
+import org.apache.pinot.thirdeye.anomaly.onboard.framework.DetectionOnboardTaskContext;
+import org.apache.pinot.thirdeye.constant.MetricAggFunction;
+import org.apache.pinot.thirdeye.datalayer.bao.AlertConfigManager;
+import org.apache.pinot.thirdeye.datalayer.bao.AnomalyFunctionManager;
+import org.apache.pinot.thirdeye.datalayer.bao.DAOTestBase;
+import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
+import org.apache.pinot.thirdeye.datalayer.bao.JobManager;
+import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
+import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
+import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import java.util.concurrent.TimeUnit;
 import org.junit.Assert;
 import org.testng.annotations.AfterClass;

@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.tools.anomaly.report;
+package org.apache.pinot.thirdeye.tools.anomaly.report;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
-import com.linkedin.thirdeye.anomaly.SmtpConfiguration;
-import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
+import org.apache.pinot.thirdeye.anomaly.SmtpConfiguration;
+import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import io.dropwizard.configuration.ConfigurationFactory;
 import io.dropwizard.jackson.Jackson;
 import java.io.File;
@@ -32,7 +32,7 @@ import java.util.concurrent.TimeUnit;
 import javax.validation.Validation;
 import org.quartz.CronExpression;
 
-import static com.linkedin.thirdeye.anomaly.SmtpConfiguration.SMTP_CONFIG_KEY;
+import static org.apache.pinot.thirdeye.anomaly.SmtpConfiguration.SMTP_CONFIG_KEY;
 
 
 public class AnomalyReportDriver {

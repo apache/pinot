@@ -17,12 +17,12 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.rootcause.impl;
+package org.apache.pinot.thirdeye.rootcause.impl;
 
-import com.linkedin.thirdeye.rootcause.Entity;
-import com.linkedin.thirdeye.rootcause.PipelineContext;
-import com.linkedin.thirdeye.rootcause.util.EntityUtils;
-import com.linkedin.thirdeye.rootcause.util.ParsedUrn;
+import org.apache.pinot.thirdeye.rootcause.Entity;
+import org.apache.pinot.thirdeye.rootcause.PipelineContext;
+import org.apache.pinot.thirdeye.rootcause.util.EntityUtils;
+import org.apache.pinot.thirdeye.rootcause.util.ParsedUrn;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;

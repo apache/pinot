@@ -17,19 +17,19 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datasource.pinot.resources;
+package org.apache.pinot.thirdeye.datasource.pinot.resources;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.Version;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.google.common.base.Preconditions;
-import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
-import com.linkedin.thirdeye.datasource.pinot.PinotQuery;
-import com.linkedin.thirdeye.datasource.pinot.PinotThirdEyeDataSource;
-import com.linkedin.thirdeye.datasource.pinot.resultset.ThirdEyeResultSet;
-import com.linkedin.thirdeye.datasource.pinot.resultset.ThirdEyeResultSetGroup;
-import com.linkedin.thirdeye.datasource.pinot.resultset.ThirdEyeResultSetSerializer;
+import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
+import org.apache.pinot.thirdeye.datasource.pinot.PinotQuery;
+import org.apache.pinot.thirdeye.datasource.pinot.PinotThirdEyeDataSource;
+import org.apache.pinot.thirdeye.datasource.pinot.resultset.ThirdEyeResultSet;
+import org.apache.pinot.thirdeye.datasource.pinot.resultset.ThirdEyeResultSetGroup;
+import org.apache.pinot.thirdeye.datasource.pinot.resultset.ThirdEyeResultSetSerializer;
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.util.concurrent.ExecutionException;

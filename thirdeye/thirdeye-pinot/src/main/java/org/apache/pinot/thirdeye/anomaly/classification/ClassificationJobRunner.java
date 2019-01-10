@@ -17,17 +17,17 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomaly.classification;
+package org.apache.pinot.thirdeye.anomaly.classification;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.linkedin.thirdeye.anomaly.job.JobConstants;
-import com.linkedin.thirdeye.anomaly.job.JobRunner;
-import com.linkedin.thirdeye.anomaly.task.TaskConstants;
-import com.linkedin.thirdeye.anomaly.task.TaskGenerator;
-import com.linkedin.thirdeye.datalayer.bao.JobManager;
-import com.linkedin.thirdeye.datalayer.dto.JobDTO;
-import com.linkedin.thirdeye.datalayer.dto.TaskDTO;
-import com.linkedin.thirdeye.datasource.DAORegistry;
+import org.apache.pinot.thirdeye.anomaly.job.JobConstants;
+import org.apache.pinot.thirdeye.anomaly.job.JobRunner;
+import org.apache.pinot.thirdeye.anomaly.task.TaskConstants;
+import org.apache.pinot.thirdeye.anomaly.task.TaskGenerator;
+import org.apache.pinot.thirdeye.datalayer.bao.JobManager;
+import org.apache.pinot.thirdeye.datalayer.dto.JobDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.TaskDTO;
+import org.apache.pinot.thirdeye.datasource.DAORegistry;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -35,7 +35,7 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static com.linkedin.thirdeye.dashboard.resources.EntityManagerResource.OBJECT_MAPPER;
+import static org.apache.pinot.thirdeye.dashboard.resources.EntityManagerResource.OBJECT_MAPPER;
 
 public class ClassificationJobRunner implements JobRunner {
   private static final Logger LOG = LoggerFactory.getLogger(ClassificationJobRunner.class);

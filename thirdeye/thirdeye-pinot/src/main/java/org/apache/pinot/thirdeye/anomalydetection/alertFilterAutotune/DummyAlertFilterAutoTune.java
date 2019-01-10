@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.anomalydetection.alertFilterAutotune;
+package org.apache.pinot.thirdeye.anomalydetection.alertFilterAutotune;
 
 import java.util.Collections;
 import java.util.Map;

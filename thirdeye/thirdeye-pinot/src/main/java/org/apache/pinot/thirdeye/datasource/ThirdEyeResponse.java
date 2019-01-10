@@ -17,12 +17,12 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.datasource;
+package org.apache.pinot.thirdeye.datasource;
 
 import java.util.List;
 import java.util.Map;
 
-import com.linkedin.thirdeye.api.TimeSpec;
+import org.apache.pinot.thirdeye.api.TimeSpec;
 
 /**
  * The result of calling {@link ThirdEyeDataSource#execute(ThirdEyeRequest)}.

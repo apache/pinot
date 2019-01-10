@@ -17,11 +17,11 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.dashboard.views.diffsummary;
+package org.apache.pinot.thirdeye.dashboard.views.diffsummary;
 
-import com.linkedin.thirdeye.client.diffsummary.Cube;
-import com.linkedin.thirdeye.client.diffsummary.costfunctions.CostFunction;
-import com.linkedin.thirdeye.client.diffsummary.DimNameValueCostEntry;
+import org.apache.pinot.thirdeye.client.diffsummary.Cube;
+import org.apache.pinot.thirdeye.client.diffsummary.costfunctions.CostFunction;
+import org.apache.pinot.thirdeye.client.diffsummary.DimNameValueCostEntry;
 import java.text.DecimalFormat;
 import java.text.NumberFormat;
 import java.util.ArrayList;
@@ -30,9 +30,9 @@ import java.util.List;
 import java.util.Map;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.linkedin.thirdeye.client.diffsummary.DimensionValues;
-import com.linkedin.thirdeye.client.diffsummary.Dimensions;
-import com.linkedin.thirdeye.client.diffsummary.HierarchyNode;
+import org.apache.pinot.thirdeye.client.diffsummary.DimensionValues;
+import org.apache.pinot.thirdeye.client.diffsummary.Dimensions;
+import org.apache.pinot.thirdeye.client.diffsummary.HierarchyNode;
 
 public class SummaryResponse {
   private final static int MAX_GAINER_LOSER_COUNT = 5;

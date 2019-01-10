@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.completeness.checker;
+package org.apache.pinot.thirdeye.completeness.checker;
 
 import java.util.Collections;
 import java.util.HashMap;
@@ -31,8 +31,8 @@ import org.testng.annotations.Test;
 
 import com.google.common.collect.ListMultimap;
 import com.google.common.collect.Lists;
-import com.linkedin.thirdeye.api.TimeGranularity;
-import com.linkedin.thirdeye.api.TimeSpec;
+import org.apache.pinot.thirdeye.api.TimeGranularity;
+import org.apache.pinot.thirdeye.api.TimeSpec;
 
 public class DataCompletenessUtilsTest {
 

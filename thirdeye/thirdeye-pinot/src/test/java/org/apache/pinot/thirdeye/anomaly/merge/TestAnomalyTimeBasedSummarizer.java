@@ -14,13 +14,13 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.anomaly.merge;
+package org.apache.pinot.thirdeye.anomaly.merge;
 
-import com.linkedin.thirdeye.anomalydetection.context.AnomalyResult;
-import com.linkedin.thirdeye.anomalydetection.context.RawAnomalyResult;
-import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.util.JodaDateTimeUtils;
+import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyResult;
+import org.apache.pinot.thirdeye.anomalydetection.context.RawAnomalyResult;
+import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.util.JodaDateTimeUtils;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;

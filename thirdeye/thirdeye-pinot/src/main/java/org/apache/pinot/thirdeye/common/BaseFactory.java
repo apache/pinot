@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.linkedin.thirdeye.common;
+package org.apache.pinot.thirdeye.common;
 
 /**
  * This BaseFactory is responsible to generate an instance from a given class path.

@@ -14,14 +14,14 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.anomalydetection.datafilter;
+package org.apache.pinot.thirdeye.anomalydetection.datafilter;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.linkedin.thirdeye.api.DimensionMap;
-import com.linkedin.thirdeye.api.MetricSchema;
-import com.linkedin.thirdeye.api.MetricTimeSeries;
-import com.linkedin.thirdeye.api.MetricType;
+import org.apache.pinot.thirdeye.api.DimensionMap;
+import org.apache.pinot.thirdeye.api.MetricSchema;
+import org.apache.pinot.thirdeye.api.MetricTimeSeries;
+import org.apache.pinot.thirdeye.api.MetricType;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
