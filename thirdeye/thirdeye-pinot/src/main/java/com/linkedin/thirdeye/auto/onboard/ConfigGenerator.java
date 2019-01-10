@@ -16,6 +16,7 @@
 
 package com.linkedin.thirdeye.auto.onboard;
 
+import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean;
 import java.util.ArrayList;
 import java.util.List;
@@ -38,6 +39,7 @@ public class ConfigGenerator {
 
   private static final String PDT_TIMEZONE = "US/Pacific";
   private static final String BYTES_STRING = "BYTES";
+  private static final String NON_ADDITIVE_TAG = "_non_additive";
 
   public static void setTimeSpecs(DatasetConfigDTO datasetConfigDTO, TimeGranularitySpec timeSpec) {
     datasetConfigDTO.setTimeColumn(timeSpec.getName());
@@ -57,6 +59,11 @@ public class ConfigGenerator {
 
     // Create DatasetConfig
     DatasetConfigDTO datasetConfigDTO = new DatasetConfigDTO();
+    if (dataset != null && dataset.endsWith(NON_ADDITIVE_TAG)) {
+      datasetConfigDTO.setAdditive(false);
+    } else {
+      datasetConfigDTO.setAdditive(true);
+    }
     datasetConfigDTO.setDataset(dataset);
     datasetConfigDTO.setDimensions(dimensions);
     setTimeSpecs(datasetConfigDTO, timeSpec);
@@ -91,12 +98,17 @@ public class ConfigGenerator {
     metricConfigDTO.setAlias(ThirdEyeUtils.constructMetricAlias(dataset, metric));
     metricConfigDTO.setDataset(dataset);
 
+    // TODO: Discuss on how we can improve the approximation for non-additive datasets
     String dataTypeStr = metricFieldSpec.getDataType().toString();
     if (BYTES_STRING.equals(dataTypeStr)) {
       // Assume if the column is BYTES type, use the default TDigest function and set the return data type to double
       metricConfigDTO.setDefaultAggFunction(MetricConfigBean.DEFAULT_TDIGEST_AGG_FUNCTION);
       metricConfigDTO.setDatatype(MetricType.DOUBLE);
+    } else if (dataset != null && dataset.endsWith(NON_ADDITIVE_TAG)) {
+      metricConfigDTO.setDefaultAggFunction(MetricAggFunction.AVG);
+      metricConfigDTO.setDatatype(MetricType.valueOf(dataTypeStr));
     } else {
+      metricConfigDTO.setDefaultAggFunction(MetricAggFunction.SUM);
       metricConfigDTO.setDatatype(MetricType.valueOf(dataTypeStr));
     }
 

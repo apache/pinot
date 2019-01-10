@@ -34,7 +34,7 @@ import java.util.concurrent.TimeUnit;
 public class DatasetConfigBean extends AbstractBean {
 
   public static final String DEFAULT_COMPLETENESS_ALGORITHM = Wo4WAvgDataCompletenessAlgorithm.class.getName();
-  public static String DEFAULT_PREAGGREGATED_DIMENSION_VALUE = "all";
+  public static String DEFAULT_PREAGGREGATED_DIMENSION_VALUE = "*";
   public static String DATASET_OFFLINE_PREFIX = "_OFFLINE";
   public static TimeGranularity DEFAULT_HOURLY_EXPECTED_DELAY = new TimeGranularity(8, TimeUnit.HOURS);
   public static TimeGranularity DEFAULT_DAILY_EXPECTED_DELAY = new TimeGranularity(36, TimeUnit.HOURS);
