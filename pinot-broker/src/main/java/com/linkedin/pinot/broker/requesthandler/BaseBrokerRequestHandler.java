@@ -107,7 +107,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       return "";
     }
   }
-  
+
   @Override
   public BrokerResponse handleRequest(JSONObject request, @Nullable RequesterIdentity requesterIdentity)
       throws Exception {
@@ -149,8 +149,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     // Check table access
     boolean hasAccess = _accessControlFactory.create().hasAccess(requesterIdentity, brokerRequest);
     if (!hasAccess) {
-      _brokerMetrics.addMeteredTableValue(brokerRequest.getQuerySource().getTableName(),
-          BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
+      _brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
+      LOGGER.info("Access denied for requestId {}, table {}", requestId, tableName);
       requestStatistics.setErrorCode(QueryException.ACCESS_DENIED_ERROR_CODE);
       return new BrokerResponseNative(QueryException.ACCESS_DENIED_ERROR);
     }
