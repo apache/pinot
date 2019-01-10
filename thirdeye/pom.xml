@@ -158,17 +158,17 @@
     <dependencies>
       <!-- project dependencies -->
       <dependency>
-        <groupId>com.linkedin.pinot</groupId>
+        <groupId>org.apache.pinot</groupId>
         <artifactId>pinot-api</artifactId>
         <version>${pinot.version}</version>
       </dependency>
       <dependency>
-        <groupId>com.linkedin.pinot</groupId>
+        <groupId>org.apache.pinot</groupId>
         <artifactId>pinot-common</artifactId>
         <version>${pinot.version}</version>
       </dependency>
       <dependency>
-        <groupId>com.linkedin.pinot</groupId>
+        <groupId>org.apache.pinot</groupId>
         <artifactId>pinot-core</artifactId>
         <version>${pinot.version}</version>
       </dependency>
