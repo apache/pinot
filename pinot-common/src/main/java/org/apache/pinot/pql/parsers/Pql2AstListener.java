@@ -20,7 +20,6 @@ package org.apache.pinot.pql.parsers;
 
 import java.util.Stack;
 import org.antlr.v4.runtime.misc.NotNull;
-import org.apache.pinot.pql.parsers.PQL2BaseListener;
 import org.apache.pinot.pql.parsers.pql2.ast.AstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.BetweenPredicateAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.BinaryMathOpAstNode;
