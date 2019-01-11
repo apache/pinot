@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.common.query.gen;
+package org.apache.pinot.common.query.gen;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -42,7 +42,7 @@ import org.apache.avro.util.Utf8;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.Predicate;
 
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
+import org.apache.pinot.common.data.FieldSpec.DataType;
 
 public class AvroQueryGenerator {
 

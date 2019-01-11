@@ -16,15 +16,15 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.common.data;
+package org.apache.pinot.common.data;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.config.ConfigKey;
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
-import com.linkedin.pinot.common.utils.EqualityUtils;
-import com.linkedin.pinot.common.utils.JsonUtils;
+import org.apache.pinot.common.config.ConfigKey;
+import org.apache.pinot.common.data.FieldSpec.DataType;
+import org.apache.pinot.common.utils.EqualityUtils;
+import org.apache.pinot.common.utils.JsonUtils;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
 import org.joda.time.DateTime;

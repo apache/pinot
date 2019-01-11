@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.common.request.transform;
+package org.apache.pinot.common.request.transform;
 
 import java.util.List;
 import org.testng.Assert;

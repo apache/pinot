@@ -16,15 +16,15 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.transport.perf;
+package org.apache.pinot.transport.perf;
 
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
-import com.linkedin.pinot.common.metrics.AggregatedMetricsRegistry;
-import com.linkedin.pinot.transport.netty.NettyServer;
-import com.linkedin.pinot.transport.netty.NettyServer.RequestHandler;
-import com.linkedin.pinot.transport.netty.NettyServer.RequestHandlerFactory;
-import com.linkedin.pinot.transport.netty.NettyTCPServer;
+import org.apache.pinot.common.metrics.AggregatedMetricsRegistry;
+import org.apache.pinot.transport.netty.NettyServer;
+import org.apache.pinot.transport.netty.NettyServer.RequestHandler;
+import org.apache.pinot.transport.netty.NettyServer.RequestHandlerFactory;
+import org.apache.pinot.transport.netty.NettyTCPServer;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import java.util.concurrent.CountDownLatch;

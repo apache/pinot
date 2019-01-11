@@ -16,16 +16,16 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.hadoop;
+package org.apache.pinot.hadoop;
 
 import java.io.FileInputStream;
 import java.util.Arrays;
 import java.util.Properties;
 
-import com.linkedin.pinot.common.utils.StringUtil;
-import com.linkedin.pinot.hadoop.job.SegmentCreationJob;
-import com.linkedin.pinot.hadoop.job.SegmentTarPushJob;
-import com.linkedin.pinot.hadoop.job.SegmentUriPushJob;
+import org.apache.pinot.common.utils.StringUtil;
+import org.apache.pinot.hadoop.job.SegmentCreationJob;
+import org.apache.pinot.hadoop.job.SegmentTarPushJob;
+import org.apache.pinot.hadoop.job.SegmentUriPushJob;
 
 
 public class PinotHadoopJobLauncher {

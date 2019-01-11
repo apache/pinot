@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.realtime.stream;
+package org.apache.pinot.core.realtime.stream;
 
-import com.linkedin.pinot.core.data.GenericRow;
+import org.apache.pinot.core.data.GenericRow;
 
 
 /**

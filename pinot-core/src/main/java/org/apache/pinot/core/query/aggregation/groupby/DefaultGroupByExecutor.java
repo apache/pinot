@@ -16,18 +16,18 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.query.aggregation.groupby;
+package org.apache.pinot.core.query.aggregation.groupby;
 
-import com.linkedin.pinot.common.request.GroupBy;
-import com.linkedin.pinot.common.request.transform.TransformExpressionTree;
-import com.linkedin.pinot.core.common.BlockValSet;
-import com.linkedin.pinot.core.operator.blocks.TransformBlock;
-import com.linkedin.pinot.core.operator.transform.TransformOperator;
-import com.linkedin.pinot.core.operator.transform.TransformResultMetadata;
-import com.linkedin.pinot.core.plan.DocIdSetPlanNode;
-import com.linkedin.pinot.core.query.aggregation.AggregationFunctionContext;
-import com.linkedin.pinot.core.query.aggregation.function.AggregationFunction;
-import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionType;
+import org.apache.pinot.common.request.GroupBy;
+import org.apache.pinot.common.request.transform.TransformExpressionTree;
+import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.operator.blocks.TransformBlock;
+import org.apache.pinot.core.operator.transform.TransformOperator;
+import org.apache.pinot.core.operator.transform.TransformResultMetadata;
+import org.apache.pinot.core.plan.DocIdSetPlanNode;
+import org.apache.pinot.core.query.aggregation.AggregationFunctionContext;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunctionType;
 import java.util.List;
 import javax.annotation.Nonnull;
 

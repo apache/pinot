@@ -16,10 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.broker.routing;
+package org.apache.pinot.broker.routing;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.linkedin.pinot.common.utils.JsonUtils;
+import org.apache.pinot.common.utils.JsonUtils;
 
 
 public interface TimeBoundaryService {

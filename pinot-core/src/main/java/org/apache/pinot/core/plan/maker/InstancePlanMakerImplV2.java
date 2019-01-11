@@ -16,29 +16,29 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.plan.maker;
+package org.apache.pinot.core.plan.maker;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.request.AggregationInfo;
-import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.common.request.transform.TransformExpressionTree;
-import com.linkedin.pinot.core.data.manager.SegmentDataManager;
-import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.plan.AggregationGroupByPlanNode;
-import com.linkedin.pinot.core.plan.AggregationPlanNode;
-import com.linkedin.pinot.core.plan.CombinePlanNode;
-import com.linkedin.pinot.core.plan.DictionaryBasedAggregationPlanNode;
-import com.linkedin.pinot.core.plan.GlobalPlanImplV0;
-import com.linkedin.pinot.core.plan.InstanceResponsePlanNode;
-import com.linkedin.pinot.core.plan.MetadataBasedAggregationPlanNode;
-import com.linkedin.pinot.core.plan.Plan;
-import com.linkedin.pinot.core.plan.PlanNode;
-import com.linkedin.pinot.core.plan.SelectionPlanNode;
-import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionType;
-import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionUtils;
-import com.linkedin.pinot.core.query.config.QueryExecutorConfig;
-import com.linkedin.pinot.core.segment.index.readers.Dictionary;
+import org.apache.pinot.common.request.AggregationInfo;
+import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.request.transform.TransformExpressionTree;
+import org.apache.pinot.core.data.manager.SegmentDataManager;
+import org.apache.pinot.core.indexsegment.IndexSegment;
+import org.apache.pinot.core.plan.AggregationGroupByPlanNode;
+import org.apache.pinot.core.plan.AggregationPlanNode;
+import org.apache.pinot.core.plan.CombinePlanNode;
+import org.apache.pinot.core.plan.DictionaryBasedAggregationPlanNode;
+import org.apache.pinot.core.plan.GlobalPlanImplV0;
+import org.apache.pinot.core.plan.InstanceResponsePlanNode;
+import org.apache.pinot.core.plan.MetadataBasedAggregationPlanNode;
+import org.apache.pinot.core.plan.Plan;
+import org.apache.pinot.core.plan.PlanNode;
+import org.apache.pinot.core.plan.SelectionPlanNode;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunctionType;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
+import org.apache.pinot.core.query.config.QueryExecutorConfig;
+import org.apache.pinot.core.segment.index.readers.Dictionary;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;

@@ -16,12 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.realtime.impl;
+package org.apache.pinot.core.realtime.impl;
 
-import com.linkedin.pinot.common.config.SegmentPartitionConfig;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
-import com.linkedin.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
+import org.apache.pinot.common.config.SegmentPartitionConfig;
+import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import org.apache.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import java.util.Set;
 
 

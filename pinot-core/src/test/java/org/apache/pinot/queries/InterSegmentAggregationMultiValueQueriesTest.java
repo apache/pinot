@@ -16,10 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.queries;
+package org.apache.pinot.queries;
 
-import com.linkedin.pinot.common.response.broker.BrokerResponseNative;
-import com.linkedin.pinot.core.plan.maker.InstancePlanMakerImplV2;
+import org.apache.pinot.common.response.broker.BrokerResponseNative;
+import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.*;

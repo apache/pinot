@@ -16,13 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.query.selection.iterator;
+package org.apache.pinot.core.query.selection.iterator;
 
 import java.io.Serializable;
 
-import com.linkedin.pinot.core.common.Block;
-import com.linkedin.pinot.core.common.BlockMultiValIterator;
-import com.linkedin.pinot.core.segment.index.readers.Dictionary;
+import org.apache.pinot.core.common.Block;
+import org.apache.pinot.core.common.BlockMultiValIterator;
+import org.apache.pinot.core.segment.index.readers.Dictionary;
 
 /**
  * Iterator on multi-value column selection query.

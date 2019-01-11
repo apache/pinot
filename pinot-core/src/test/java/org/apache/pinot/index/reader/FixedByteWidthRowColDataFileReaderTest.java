@@ -16,10 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.index.reader;
+package org.apache.pinot.index.reader;
 
-import com.linkedin.pinot.core.io.reader.impl.FixedByteSingleValueMultiColReader;
-import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
+import org.apache.pinot.core.io.reader.impl.FixedByteSingleValueMultiColReader;
+import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;

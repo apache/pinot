@@ -16,11 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.server.api.resources;
+package org.apache.pinot.server.api.resources;
 
-import com.linkedin.pinot.common.utils.ServiceStatus;
-import com.linkedin.pinot.common.utils.ServiceStatus.Status;
-import com.linkedin.pinot.server.starter.ServerInstance;
+import org.apache.pinot.common.utils.ServiceStatus;
+import org.apache.pinot.common.utils.ServiceStatus.Status;
+import org.apache.pinot.server.starter.ServerInstance;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiResponse;

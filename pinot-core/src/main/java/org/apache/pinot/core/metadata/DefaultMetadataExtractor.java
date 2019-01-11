@@ -16,12 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.metadata;
+package org.apache.pinot.core.metadata;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.segment.SegmentMetadata;
-import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
-import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+import org.apache.pinot.common.segment.SegmentMetadata;
+import org.apache.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
 import java.io.File;
 
 

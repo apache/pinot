@@ -16,10 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.startree.v2.builder;
+package org.apache.pinot.core.startree.v2.builder;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.core.startree.v2.AggregationFunctionColumnPair;
+import org.apache.pinot.core.startree.v2.AggregationFunctionColumnPair;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
@@ -29,9 +29,9 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
 
-import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.Indexes.*;
-import static com.linkedin.pinot.core.startree.v2.StarTreeV2Constants.*;
-import static com.linkedin.pinot.core.startree.v2.store.StarTreeIndexMapUtils.*;
+import static org.apache.pinot.core.segment.creator.impl.V1Constants.Indexes.*;
+import static org.apache.pinot.core.startree.v2.StarTreeV2Constants.*;
+import static org.apache.pinot.core.startree.v2.store.StarTreeIndexMapUtils.*;
 
 
 /**
@@ -77,7 +77,7 @@ public class StarTreeIndexCombiner implements Closeable {
     try (FileChannel src = new RandomAccessFile(srcFile, "r").getChannel()) {
       long offset = _fileChannel.position();
       long size = src.size();
-      com.linkedin.pinot.common.utils.FileUtils.transferBytes(src, 0, size, _fileChannel);
+      org.apache.pinot.common.utils.FileUtils.transferBytes(src, 0, size, _fileChannel);
       return new IndexValue(offset, size);
     }
   }

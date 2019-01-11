@@ -16,10 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.startree.hll;
+package org.apache.pinot.core.startree.hll;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
-import com.linkedin.pinot.startree.hll.HllSizeUtils;
+import org.apache.pinot.startree.hll.HllSizeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;

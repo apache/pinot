@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.operator.dociditerators;
+package org.apache.pinot.core.operator.dociditerators;
 
-import com.linkedin.pinot.core.common.BlockDocIdIterator;
+import org.apache.pinot.core.common.BlockDocIdIterator;
 /**
  * Marker interface to say that the doc id iteration is based on an index. 
  */

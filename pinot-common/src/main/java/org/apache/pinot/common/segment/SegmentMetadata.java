@@ -16,10 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.common.segment;
+package org.apache.pinot.common.segment;
 
-import com.linkedin.pinot.common.data.MetricFieldSpec;
-import com.linkedin.pinot.common.data.Schema;
+import org.apache.pinot.common.data.MetricFieldSpec;
+import org.apache.pinot.common.data.Schema;
 import java.io.File;
 import java.util.concurrent.TimeUnit;
 import org.joda.time.Duration;

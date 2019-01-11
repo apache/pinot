@@ -16,15 +16,15 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.realtime.impl.kafka;
+package org.apache.pinot.core.realtime.impl.kafka;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Splitter;
 import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.Uninterruptibles;
-import com.linkedin.pinot.core.realtime.stream.PermanentConsumerException;
-import com.linkedin.pinot.core.realtime.stream.StreamConfig;
-import com.linkedin.pinot.core.realtime.stream.TransientConsumerException;
+import org.apache.pinot.core.realtime.stream.PermanentConsumerException;
+import org.apache.pinot.core.realtime.stream.StreamConfig;
+import org.apache.pinot.core.realtime.stream.TransientConsumerException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;

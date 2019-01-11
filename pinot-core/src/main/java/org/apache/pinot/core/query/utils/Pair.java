@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.query.utils;
+package org.apache.pinot.core.query.utils;
 
 import java.io.Serializable;
 

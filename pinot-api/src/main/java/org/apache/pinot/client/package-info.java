@@ -20,7 +20,7 @@
  * This package contains the Pinot client API.
  *
  * Connections to Pinot are created using the
- * {@link com.linkedin.pinot.client.ConnectionFactory} class' utility methods to create connections to a Pinot cluster
+ * {@link org.apache.pinot.client.ConnectionFactory} class' utility methods to create connections to a Pinot cluster
  * given a Zookeeper URL, a Java Properties object or a list of broker addresses to connect to.
  *
  * <pre>{@code Connection connection = ConnectionFactory.fromZookeeper
@@ -32,15 +32,15 @@
  *     ("some-server:1234", "some-other-server:1234", ...);}</pre>
  *
  * Queries can be sent directly to the Pinot cluster using the
- * {@link com.linkedin.pinot.client.Connection#execute(java.lang.String)} and
- * {@link com.linkedin.pinot.client.Connection#executeAsync(java.lang.String)} methods of
- * {@link com.linkedin.pinot.client.Connection}.
+ * {@link org.apache.pinot.client.Connection#execute(java.lang.String)} and
+ * {@link org.apache.pinot.client.Connection#executeAsync(java.lang.String)} methods of
+ * {@link org.apache.pinot.client.Connection}.
  *
  * <pre>{@code ResultSetGroup resultSetGroup = connection.execute("select * from foo...");
  * Future<ResultSetGroup> futureResultSetGroup = connection.executeAsync
  *     ("select * from foo...");}</pre>
  *
- * Queries can also use a {@link com.linkedin.pinot.client.PreparedStatement} to escape query parameters:
+ * Queries can also use a {@link org.apache.pinot.client.PreparedStatement} to escape query parameters:
  *
  * <pre>{@code PreparedStatement statement = connection.prepareStatement
  *     ("select * from foo where a = ?");
@@ -50,8 +50,8 @@
  * Future<ResultSetGroup> futureResultSetGroup = statement.executeAsync();}</pre>
  *
  * In the case of a selection query, results can be obtained with the various <code>get</code> methods in the first
- * {@link com.linkedin.pinot.client.ResultSet}, obtained through the
- * {@link com.linkedin.pinot.client.ResultSetGroup#getResultSet(int)} method:
+ * {@link org.apache.pinot.client.ResultSet}, obtained through the
+ * {@link org.apache.pinot.client.ResultSetGroup#getResultSet(int)} method:
  *
  * <pre>{@code ResultSet resultSet = connection.execute
  *     ("select foo, bar from baz where quux = 'quuux'").getResultSet(0);
@@ -64,7 +64,7 @@
  * resultSet.close();}</pre>
  *
  * In the case where there is an aggregation, each aggregation function is within its own
- * {@link com.linkedin.pinot.client.ResultSet}:
+ * {@link org.apache.pinot.client.ResultSet}:
  *
  * <pre>{@code ResultSetGroup resultSetGroup = connection.execute("select count(*) from foo");
  *
@@ -72,7 +72,7 @@
  * System.out.println("Number of records: " + resultSet.getInt(0));
  * resultSet.close();}</pre>
  *
- * There can be more than one {@link com.linkedin.pinot.client.ResultSet}, each of which can contain multiple results
+ * There can be more than one {@link org.apache.pinot.client.ResultSet}, each of which can contain multiple results
  * grouped by a group key.
  *
  * <pre>{@code ResultSetGroup resultSetGroup = connection.execute
@@ -95,4 +95,4 @@
  *
  * resultSet.close();}</pre>
  */
-package com.linkedin.pinot.client;
+package org.apache.pinot.client;

@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.controller.helix.starter;
+package org.apache.pinot.controller.helix.starter;
 
 import org.apache.commons.lang.StringUtils;
 

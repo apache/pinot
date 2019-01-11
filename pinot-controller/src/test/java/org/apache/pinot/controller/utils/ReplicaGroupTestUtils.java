@@ -16,13 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.controller.utils;
+package org.apache.pinot.controller.utils;
 
-import com.linkedin.pinot.common.config.ReplicaGroupStrategyConfig;
-import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.partition.ReplicaGroupPartitionAssignment;
-import com.linkedin.pinot.common.segment.SegmentMetadata;
-import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.common.config.ReplicaGroupStrategyConfig;
+import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.common.partition.ReplicaGroupPartitionAssignment;
+import org.apache.pinot.common.segment.SegmentMetadata;
+import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;

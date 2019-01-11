@@ -16,20 +16,20 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.tools.admin.command;
+package org.apache.pinot.tools.admin.command;
 
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
-import com.linkedin.pinot.common.data.FieldSpec.FieldType;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.data.Schema.SchemaBuilder;
-import com.linkedin.pinot.common.data.TimeFieldSpec;
-import com.linkedin.pinot.common.utils.JsonUtils;
-import com.linkedin.pinot.core.data.readers.FileFormat;
-import com.linkedin.pinot.tools.Command;
-import com.linkedin.pinot.tools.data.generator.DataGenerator;
-import com.linkedin.pinot.tools.data.generator.DataGeneratorSpec;
-import com.linkedin.pinot.tools.data.generator.SchemaAnnotation;
+import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.common.data.FieldSpec.DataType;
+import org.apache.pinot.common.data.FieldSpec.FieldType;
+import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.common.data.Schema.SchemaBuilder;
+import org.apache.pinot.common.data.TimeFieldSpec;
+import org.apache.pinot.common.utils.JsonUtils;
+import org.apache.pinot.core.data.readers.FileFormat;
+import org.apache.pinot.tools.Command;
+import org.apache.pinot.tools.data.generator.DataGenerator;
+import org.apache.pinot.tools.data.generator.DataGeneratorSpec;
+import org.apache.pinot.tools.data.generator.SchemaAnnotation;
 import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;

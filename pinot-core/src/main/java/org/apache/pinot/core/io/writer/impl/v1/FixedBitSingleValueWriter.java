@@ -16,11 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.io.writer.impl.v1;
+package org.apache.pinot.core.io.writer.impl.v1;
 
-import com.linkedin.pinot.core.io.util.FixedBitIntReaderWriter;
-import com.linkedin.pinot.core.io.writer.SingleColumnSingleValueWriter;
-import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
+import org.apache.pinot.core.io.util.FixedBitIntReaderWriter;
+import org.apache.pinot.core.io.writer.SingleColumnSingleValueWriter;
+import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteOrder;

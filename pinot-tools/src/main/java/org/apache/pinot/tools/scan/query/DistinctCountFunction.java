@@ -16,14 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.tools.scan.query;
+package org.apache.pinot.tools.scan.query;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 
-import com.linkedin.pinot.core.query.utils.Pair;
+import org.apache.pinot.core.query.utils.Pair;
 
 
 public class DistinctCountFunction extends AggregationFunc {

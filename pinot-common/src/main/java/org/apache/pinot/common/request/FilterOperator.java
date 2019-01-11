@@ -22,7 +22,7 @@
  * DO NOT EDIT UNLESS YOU ARE SURE THAT YOU KNOW WHAT YOU ARE DOING
  *  @generated
  */
-package com.linkedin.pinot.common.request;
+package org.apache.pinot.common.request;
 
 
 import java.util.Map;

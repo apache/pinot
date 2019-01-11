@@ -16,10 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.common.config;
+package org.apache.pinot.common.config;
 
-import com.linkedin.pinot.common.utils.ServerType;
-import com.linkedin.pinot.common.utils.TenantRole;
+import org.apache.pinot.common.utils.ServerType;
+import org.apache.pinot.common.utils.TenantRole;
 
 
 public class TagNameUtils {

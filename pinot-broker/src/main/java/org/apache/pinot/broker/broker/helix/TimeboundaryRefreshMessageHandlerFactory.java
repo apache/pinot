@@ -16,10 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.broker.broker.helix;
+package org.apache.pinot.broker.broker.helix;
 
-import com.linkedin.pinot.broker.routing.HelixExternalViewBasedRouting;
-import com.linkedin.pinot.common.messages.TimeboundaryRefreshMessage;
+import org.apache.pinot.broker.routing.HelixExternalViewBasedRouting;
+import org.apache.pinot.common.messages.TimeboundaryRefreshMessage;
 import com.sun.org.apache.xpath.internal.operations.Bool;
 import org.apache.helix.NotificationContext;
 import org.apache.helix.messaging.handling.HelixTaskResult;

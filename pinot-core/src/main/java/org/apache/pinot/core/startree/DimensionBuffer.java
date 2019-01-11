@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.startree;
+package org.apache.pinot.core.startree;
 
-import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
+import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import java.nio.ByteBuffer;
 
 

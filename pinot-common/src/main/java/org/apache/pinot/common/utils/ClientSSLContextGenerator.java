@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.common.utils;
+package org.apache.pinot.common.utils;
 
-import com.linkedin.pinot.common.Utils;
+import org.apache.pinot.common.Utils;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;

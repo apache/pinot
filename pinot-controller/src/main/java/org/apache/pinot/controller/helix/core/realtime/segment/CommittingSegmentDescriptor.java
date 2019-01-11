@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.controller.helix.core.realtime.segment;
+package org.apache.pinot.controller.helix.core.realtime.segment;
 
-import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
+import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 
 
 /**

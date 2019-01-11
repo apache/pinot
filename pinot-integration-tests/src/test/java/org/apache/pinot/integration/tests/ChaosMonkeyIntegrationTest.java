@@ -16,12 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.integration.tests;
+package org.apache.pinot.integration.tests;
 
-import com.linkedin.pinot.client.Connection;
-import com.linkedin.pinot.client.ConnectionFactory;
-import com.linkedin.pinot.tools.admin.PinotAdministrator;
-import com.linkedin.pinot.util.TestUtils;
+import org.apache.pinot.client.Connection;
+import org.apache.pinot.client.ConnectionFactory;
+import org.apache.pinot.tools.admin.PinotAdministrator;
+import org.apache.pinot.util.TestUtils;
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Field;

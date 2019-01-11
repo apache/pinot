@@ -16,16 +16,16 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.common.utils.request;
+package org.apache.pinot.common.utils.request;
 
-import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.common.request.FilterQuery;
-import com.linkedin.pinot.common.request.FilterQueryMap;
-import com.linkedin.pinot.common.request.HavingFilterQuery;
-import com.linkedin.pinot.common.request.HavingFilterQueryMap;
-import com.linkedin.pinot.common.request.Selection;
-import com.linkedin.pinot.common.request.SelectionSort;
-import com.linkedin.pinot.common.request.transform.TransformExpressionTree;
+import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.request.FilterQuery;
+import org.apache.pinot.common.request.FilterQueryMap;
+import org.apache.pinot.common.request.HavingFilterQuery;
+import org.apache.pinot.common.request.HavingFilterQueryMap;
+import org.apache.pinot.common.request.Selection;
+import org.apache.pinot.common.request.SelectionSort;
+import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;

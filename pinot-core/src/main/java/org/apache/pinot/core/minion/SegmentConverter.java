@@ -16,21 +16,21 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.minion;
+package org.apache.pinot.core.minion;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.config.IndexingConfig;
-import com.linkedin.pinot.common.data.StarTreeIndexSpec;
-import com.linkedin.pinot.core.data.readers.PinotSegmentRecordReader;
-import com.linkedin.pinot.core.data.readers.RecordReader;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
-import com.linkedin.pinot.core.minion.segment.DefaultRecordPartitioner;
-import com.linkedin.pinot.core.minion.segment.MapperRecordReader;
-import com.linkedin.pinot.core.minion.segment.RecordAggregator;
-import com.linkedin.pinot.core.minion.segment.RecordPartitioner;
-import com.linkedin.pinot.core.minion.segment.RecordTransformer;
-import com.linkedin.pinot.core.minion.segment.ReducerRecordReader;
-import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.common.config.IndexingConfig;
+import org.apache.pinot.common.data.StarTreeIndexSpec;
+import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
+import org.apache.pinot.core.data.readers.RecordReader;
+import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import org.apache.pinot.core.minion.segment.DefaultRecordPartitioner;
+import org.apache.pinot.core.minion.segment.MapperRecordReader;
+import org.apache.pinot.core.minion.segment.RecordAggregator;
+import org.apache.pinot.core.minion.segment.RecordPartitioner;
+import org.apache.pinot.core.minion.segment.RecordTransformer;
+import org.apache.pinot.core.minion.segment.ReducerRecordReader;
+import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;

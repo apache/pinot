@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.minion.rollup.aggregate;
+package org.apache.pinot.core.minion.rollup.aggregate;
 
 /**
  * Factory class to create instances of value aggregator from the given name.

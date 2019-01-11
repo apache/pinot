@@ -16,18 +16,18 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.data.readers;
+package org.apache.pinot.core.data.readers;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.common.segment.SegmentMetadata;
-import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.data.readers.sort.PinotSegmentSorter;
-import com.linkedin.pinot.core.data.readers.sort.SegmentSorter;
-import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
-import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
+import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.common.segment.ReadMode;
+import org.apache.pinot.common.segment.SegmentMetadata;
+import org.apache.pinot.core.data.GenericRow;
+import org.apache.pinot.core.data.readers.sort.PinotSegmentSorter;
+import org.apache.pinot.core.data.readers.sort.SegmentSorter;
+import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
+import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import java.io.File;
 import java.util.Collection;
 import java.util.HashMap;

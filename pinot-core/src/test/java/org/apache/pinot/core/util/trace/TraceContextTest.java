@@ -16,10 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.util.trace;
+package org.apache.pinot.core.util.trace;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.linkedin.pinot.common.utils.JsonUtils;
+import org.apache.pinot.common.utils.JsonUtils;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Queue;

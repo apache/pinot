@@ -16,20 +16,20 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.broker.broker;
+package org.apache.pinot.broker.broker;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.broker.broker.helix.LiveInstancesChangeListenerImpl;
-import com.linkedin.pinot.broker.queryquota.TableQueryQuotaManager;
-import com.linkedin.pinot.broker.requesthandler.BrokerRequestHandler;
-import com.linkedin.pinot.broker.requesthandler.ConnectionPoolBrokerRequestHandler;
-import com.linkedin.pinot.broker.requesthandler.SingleConnectionBrokerRequestHandler;
-import com.linkedin.pinot.broker.routing.RoutingTable;
-import com.linkedin.pinot.broker.routing.TimeBoundaryService;
-import com.linkedin.pinot.common.Utils;
-import com.linkedin.pinot.common.metrics.BrokerMetrics;
-import com.linkedin.pinot.common.metrics.MetricsHelper;
-import com.linkedin.pinot.common.utils.CommonConstants;
+import org.apache.pinot.broker.broker.helix.LiveInstancesChangeListenerImpl;
+import org.apache.pinot.broker.queryquota.TableQueryQuotaManager;
+import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
+import org.apache.pinot.broker.requesthandler.ConnectionPoolBrokerRequestHandler;
+import org.apache.pinot.broker.requesthandler.SingleConnectionBrokerRequestHandler;
+import org.apache.pinot.broker.routing.RoutingTable;
+import org.apache.pinot.broker.routing.TimeBoundaryService;
+import org.apache.pinot.common.Utils;
+import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.common.metrics.MetricsHelper;
+import org.apache.pinot.common.utils.CommonConstants;
 import com.yammer.metrics.core.MetricsRegistry;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.configuration.Configuration;

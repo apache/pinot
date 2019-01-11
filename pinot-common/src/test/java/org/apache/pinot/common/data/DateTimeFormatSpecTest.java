@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.common.data;
+package org.apache.pinot.common.data;
 
-import com.linkedin.pinot.common.data.DateTimeFieldSpec.TimeFormat;
+import org.apache.pinot.common.data.DateTimeFieldSpec.TimeFormat;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.TimeZone;
@@ -188,58 +188,58 @@ public class DateTimeFormatSpecTest {
 
     entries.add(new Object[] {
         "1:HOURS:EPOCH", 1, TimeUnit.HOURS,
-        com.linkedin.pinot.common.data.DateTimeFieldSpec.TimeFormat.EPOCH, null, DateTimeZone.UTC
+        org.apache.pinot.common.data.DateTimeFieldSpec.TimeFormat.EPOCH, null, DateTimeZone.UTC
     });
 
     entries.add(new Object[] {
         "5:MINUTES:EPOCH", 5, TimeUnit.MINUTES,
-        com.linkedin.pinot.common.data.DateTimeFieldSpec.TimeFormat.EPOCH, null, DateTimeZone.UTC
+        org.apache.pinot.common.data.DateTimeFieldSpec.TimeFormat.EPOCH, null, DateTimeZone.UTC
     });
 
     entries.add(new Object[] {
         "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", 1, TimeUnit.DAYS,
-        com.linkedin.pinot.common.data.DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT, "yyyyMMdd", DateTimeZone.UTC
+        org.apache.pinot.common.data.DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT, "yyyyMMdd", DateTimeZone.UTC
     });
 
     entries.add(new Object[] {
         "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd tz(IST)", 1, TimeUnit.DAYS,
-        com.linkedin.pinot.common.data.DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT, "yyyyMMdd",
+        org.apache.pinot.common.data.DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT, "yyyyMMdd",
         DateTimeZone.forTimeZone(TimeZone.getTimeZone("IST"))
     });
 
     entries.add(new Object[] {
         "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd          tz(IST)", 1, TimeUnit.DAYS,
-        com.linkedin.pinot.common.data.DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT, "yyyyMMdd",
+        org.apache.pinot.common.data.DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT, "yyyyMMdd",
         DateTimeZone.forTimeZone(TimeZone.getTimeZone("IST"))
     });
 
     entries.add(new Object[] {
         "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd tz  (   IST   )  ", 1, TimeUnit.DAYS,
-        com.linkedin.pinot.common.data.DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT, "yyyyMMdd",
+        org.apache.pinot.common.data.DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT, "yyyyMMdd",
         DateTimeZone.forTimeZone(TimeZone.getTimeZone("IST"))
     });
 
     entries.add(new Object[] {
         "1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMdd HH", 1, TimeUnit.HOURS,
-        com.linkedin.pinot.common.data.DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT,
+        org.apache.pinot.common.data.DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT,
         "yyyyMMdd HH", DateTimeZone.UTC
     });
 
     entries.add(new Object[] {
         "1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMdd HH tz(dummy)", 1, TimeUnit.HOURS,
-        com.linkedin.pinot.common.data.DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT,
+        org.apache.pinot.common.data.DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT,
         "yyyyMMdd HH", DateTimeZone.UTC
     });
 
     entries.add(new Object[] {
         "1:HOURS:SIMPLE_DATE_FORMAT:M/d/yyyy h:mm:ss a", 1, TimeUnit.HOURS,
-        com.linkedin.pinot.common.data.DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT,
+        org.apache.pinot.common.data.DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT,
         "M/d/yyyy h:mm:ss a", DateTimeZone.UTC
     });
 
     entries.add(new Object[] {
         "1:HOURS:SIMPLE_DATE_FORMAT:M/d/yyyy h:mm:ss a tz(Asia/Tokyo)", 1, TimeUnit.HOURS,
-        com.linkedin.pinot.common.data.DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT,
+        org.apache.pinot.common.data.DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT,
         "M/d/yyyy h:mm:ss a", DateTimeZone.forTimeZone(TimeZone.getTimeZone("Asia/Tokyo"))
     });
     return entries.toArray(new Object[entries.size()][]);

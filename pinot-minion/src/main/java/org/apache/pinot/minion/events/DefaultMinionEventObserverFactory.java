@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.minion.events;
+package org.apache.pinot.minion.events;
 
 public class DefaultMinionEventObserverFactory implements MinionEventObserverFactory {
   private static final MinionEventObserver DEFAULT_EVENT_OBSERVER = new DefaultMinionEventObserver();

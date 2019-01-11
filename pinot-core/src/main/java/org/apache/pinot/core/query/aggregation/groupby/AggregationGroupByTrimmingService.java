@@ -16,13 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.query.aggregation.groupby;
+package org.apache.pinot.core.query.aggregation.groupby;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.response.broker.GroupByResult;
-import com.linkedin.pinot.core.query.aggregation.function.AggregationFunction;
-import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionUtils;
-import com.linkedin.pinot.core.query.aggregation.function.MinAggregationFunction;
+import org.apache.pinot.common.response.broker.GroupByResult;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
+import org.apache.pinot.core.query.aggregation.function.MinAggregationFunction;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;

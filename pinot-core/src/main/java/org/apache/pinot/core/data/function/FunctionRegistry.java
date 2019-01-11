@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.data.function;
+package org.apache.pinot.core.data.function;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;

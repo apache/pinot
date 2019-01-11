@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.common.utils;
+package org.apache.pinot.common.utils;
 
-import com.linkedin.pinot.common.response.BrokerResponseFactory;
+import org.apache.pinot.common.response.BrokerResponseFactory;
 import java.io.File;
 
 
@@ -169,12 +169,12 @@ public class CommonConstants {
     public static final String DEFAULT_INSTANCE_SEGMENT_TAR_DIR =
         DEFAULT_INSTANCE_BASE_DIR + File.separator + "segmentTar";
     public static final String DEFAULT_DATA_MANAGER_CLASS =
-        "com.linkedin.pinot.server.starter.helix.HelixInstanceDataManager";
+        "org.apache.pinot.server.starter.helix.HelixInstanceDataManager";
     public static final String DEFAULT_QUERY_EXECUTOR_CLASS =
-        "com.linkedin.pinot.core.query.executor.ServerQueryExecutorV1Impl";
+        "org.apache.pinot.core.query.executor.ServerQueryExecutorV1Impl";
     public static final long DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS = 15_000L;
     public static final String DEFAULT_REQUEST_HANDLER_FACTORY_CLASS =
-        "com.linkedin.pinot.server.request.SimpleRequestHandlerFactory";
+        "org.apache.pinot.server.request.SimpleRequestHandlerFactory";
     public static final String PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY = "pinot.server.segment.fetcher";
     public static final String PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER = "pinot.server.segment.uploader";
     public static final String DEFAULT_STAR_TREE_FORMAT_VERSION = "OFF_HEAP";

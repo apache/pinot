@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.operator.blocks;
+package org.apache.pinot.core.operator.blocks;
 
-import com.linkedin.pinot.core.operator.docidsets.EmptyFilterBlockDocIdSet;
+import org.apache.pinot.core.operator.docidsets.EmptyFilterBlockDocIdSet;
 
 
 /**

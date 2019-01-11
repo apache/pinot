@@ -16,10 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.common.utils;
+package org.apache.pinot.common.utils;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.exception.HttpErrorStatusException;
+import org.apache.pinot.common.exception.HttpErrorStatusException;
 import java.io.BufferedOutputStream;
 import java.io.Closeable;
 import java.io.File;

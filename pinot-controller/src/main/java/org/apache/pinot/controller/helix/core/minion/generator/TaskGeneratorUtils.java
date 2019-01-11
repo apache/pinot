@@ -16,12 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.controller.helix.core.minion.generator;
+package org.apache.pinot.controller.helix.core.minion.generator;
 
-import com.linkedin.pinot.common.config.PinotTaskConfig;
-import com.linkedin.pinot.common.data.Segment;
-import com.linkedin.pinot.controller.helix.core.minion.ClusterInfoProvider;
-import com.linkedin.pinot.core.common.MinionConstants;
+import org.apache.pinot.common.config.PinotTaskConfig;
+import org.apache.pinot.common.data.Segment;
+import org.apache.pinot.controller.helix.core.minion.ClusterInfoProvider;
+import org.apache.pinot.core.common.MinionConstants;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;

@@ -16,14 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.transport.pool;
+package org.apache.pinot.transport.pool;
 
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import com.google.common.util.concurrent.MoreExecutors;
-import com.linkedin.pinot.common.response.ServerInstance;
-import com.linkedin.pinot.transport.common.Callback;
+import org.apache.pinot.common.response.ServerInstance;
+import org.apache.pinot.transport.common.Callback;
 
 
 public class AsyncPoolResourceManagerAdapterTest {

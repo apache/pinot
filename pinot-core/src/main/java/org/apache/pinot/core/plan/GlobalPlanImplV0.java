@@ -16,11 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.plan;
+package org.apache.pinot.core.plan;
 
-import com.linkedin.pinot.common.utils.DataTable;
-import com.linkedin.pinot.core.operator.InstanceResponseOperator;
-import com.linkedin.pinot.core.operator.blocks.InstanceResponseBlock;
+import org.apache.pinot.common.utils.DataTable;
+import org.apache.pinot.core.operator.InstanceResponseOperator;
+import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

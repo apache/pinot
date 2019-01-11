@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.tools.scan.query;
+package org.apache.pinot.tools.scan.query;
 
 /**
  * Copyright (C) 2014-2015 LinkedIn Corp. (pinot-core@linkedin.com)

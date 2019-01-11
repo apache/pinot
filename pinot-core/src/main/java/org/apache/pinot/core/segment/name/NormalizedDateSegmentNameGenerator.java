@@ -16,11 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.segment.name;
+package org.apache.pinot.core.segment.name;
 
 import com.google.common.base.Joiner;
-import com.linkedin.pinot.common.data.TimeGranularitySpec;
-import com.linkedin.pinot.core.segment.creator.ColumnStatistics;
+import org.apache.pinot.common.data.TimeGranularitySpec;
+import org.apache.pinot.core.segment.creator.ColumnStatistics;
 import java.text.SimpleDateFormat;
 import java.util.Arrays;
 import java.util.Date;

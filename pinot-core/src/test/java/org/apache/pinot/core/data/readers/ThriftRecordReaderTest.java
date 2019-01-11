@@ -16,11 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.data.readers;
+package org.apache.pinot.core.data.readers;
 
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.core.data.GenericRow;
+import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.core.data.GenericRow;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -41,7 +41,7 @@ import org.testng.annotations.Test;
 
 
 /**
- * Test {@code com.linkedin.pinot.core.data.readers.ThriftRecordReader} for a given sample thrift
+ * Test {@code org.apache.pinot.core.data.readers.ThriftRecordReader} for a given sample thrift
  * data.
  */
 public class ThriftRecordReaderTest {
@@ -132,7 +132,7 @@ public class ThriftRecordReaderTest {
 
   private ThriftRecordReaderConfig getThriftRecordReaderConfig() {
     ThriftRecordReaderConfig config = new ThriftRecordReaderConfig();
-    config.setThriftClass("com.linkedin.pinot.core.data.readers.ThriftSampleData");
+    config.setThriftClass("org.apache.pinot.core.data.readers.ThriftSampleData");
     return config;
   }
 

@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.io.writer.impl.v1;
+package org.apache.pinot.core.io.writer.impl.v1;
 
-import com.linkedin.pinot.core.io.compression.ChunkCompressorFactory;
+import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
 import java.io.File;
 import java.io.FileNotFoundException;
 import javax.annotation.concurrent.NotThreadSafe;

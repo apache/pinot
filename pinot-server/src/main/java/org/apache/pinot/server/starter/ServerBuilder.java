@@ -16,19 +16,19 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.server.starter;
+package org.apache.pinot.server.starter;
 
-import com.linkedin.pinot.common.metrics.MetricsHelper;
-import com.linkedin.pinot.common.metrics.ServerMetrics;
-import com.linkedin.pinot.core.data.manager.InstanceDataManager;
-import com.linkedin.pinot.core.operator.transform.function.TransformFunction;
-import com.linkedin.pinot.core.operator.transform.function.TransformFunctionFactory;
-import com.linkedin.pinot.core.query.executor.QueryExecutor;
-import com.linkedin.pinot.core.query.scheduler.QueryScheduler;
-import com.linkedin.pinot.core.query.scheduler.QuerySchedulerFactory;
-import com.linkedin.pinot.server.conf.ServerConf;
-import com.linkedin.pinot.transport.netty.NettyServer;
-import com.linkedin.pinot.transport.netty.NettyTCPServer;
+import org.apache.pinot.common.metrics.MetricsHelper;
+import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.core.data.manager.InstanceDataManager;
+import org.apache.pinot.core.operator.transform.function.TransformFunction;
+import org.apache.pinot.core.operator.transform.function.TransformFunctionFactory;
+import org.apache.pinot.core.query.executor.QueryExecutor;
+import org.apache.pinot.core.query.scheduler.QueryScheduler;
+import org.apache.pinot.core.query.scheduler.QuerySchedulerFactory;
+import org.apache.pinot.server.conf.ServerConf;
+import org.apache.pinot.transport.netty.NettyServer;
+import org.apache.pinot.transport.netty.NettyTCPServer;
 import com.yammer.metrics.core.MetricsRegistry;
 import java.util.HashSet;
 import java.util.Set;

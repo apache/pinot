@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.common;
+package org.apache.pinot.core.common;
 
 public interface BlockDocIdSet {
 

@@ -16,11 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.common;
+package org.apache.pinot.core.common;
 
-import com.linkedin.pinot.core.operator.docvalsets.SingleValueSet;
-import com.linkedin.pinot.core.plan.DocIdSetPlanNode;
-import com.linkedin.pinot.core.segment.index.readers.Dictionary;
+import org.apache.pinot.core.operator.docvalsets.SingleValueSet;
+import org.apache.pinot.core.plan.DocIdSetPlanNode;
+import org.apache.pinot.core.segment.index.readers.Dictionary;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;

@@ -16,16 +16,16 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.startree.executor;
+package org.apache.pinot.core.startree.executor;
 
-import com.linkedin.pinot.core.operator.blocks.TransformBlock;
-import com.linkedin.pinot.core.query.aggregation.AggregationFunctionContext;
-import com.linkedin.pinot.core.query.aggregation.AggregationResultHolder;
-import com.linkedin.pinot.core.query.aggregation.DefaultAggregationExecutor;
-import com.linkedin.pinot.core.query.aggregation.function.AggregationFunction;
-import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionType;
-import com.linkedin.pinot.core.startree.StarTreeUtils;
-import com.linkedin.pinot.core.startree.v2.AggregationFunctionColumnPair;
+import org.apache.pinot.core.operator.blocks.TransformBlock;
+import org.apache.pinot.core.query.aggregation.AggregationFunctionContext;
+import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
+import org.apache.pinot.core.query.aggregation.DefaultAggregationExecutor;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunctionType;
+import org.apache.pinot.core.startree.StarTreeUtils;
+import org.apache.pinot.core.startree.v2.AggregationFunctionColumnPair;
 import javax.annotation.Nonnull;
 
 

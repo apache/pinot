@@ -16,22 +16,22 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.broker.routing;
+package org.apache.pinot.broker.routing;
 
-import com.linkedin.pinot.broker.routing.builder.BalancedRandomRoutingTableBuilder;
-import com.linkedin.pinot.broker.routing.builder.DefaultOfflineRoutingTableBuilder;
-import com.linkedin.pinot.broker.routing.builder.DefaultRealtimeRoutingTableBuilder;
-import com.linkedin.pinot.broker.routing.builder.HighLevelConsumerBasedRoutingTableBuilder;
-import com.linkedin.pinot.broker.routing.builder.LowLevelConsumerRoutingTableBuilder;
-import com.linkedin.pinot.broker.routing.builder.PartitionAwareOfflineRoutingTableBuilder;
-import com.linkedin.pinot.broker.routing.builder.PartitionAwareRealtimeRoutingTableBuilder;
-import com.linkedin.pinot.broker.routing.builder.RoutingTableBuilder;
-import com.linkedin.pinot.common.config.SegmentsValidationAndRetentionConfig;
-import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.metrics.BrokerMetrics;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
-import com.linkedin.pinot.core.realtime.stream.StreamConfig;
+import org.apache.pinot.broker.routing.builder.BalancedRandomRoutingTableBuilder;
+import org.apache.pinot.broker.routing.builder.DefaultOfflineRoutingTableBuilder;
+import org.apache.pinot.broker.routing.builder.DefaultRealtimeRoutingTableBuilder;
+import org.apache.pinot.broker.routing.builder.HighLevelConsumerBasedRoutingTableBuilder;
+import org.apache.pinot.broker.routing.builder.LowLevelConsumerRoutingTableBuilder;
+import org.apache.pinot.broker.routing.builder.PartitionAwareOfflineRoutingTableBuilder;
+import org.apache.pinot.broker.routing.builder.PartitionAwareRealtimeRoutingTableBuilder;
+import org.apache.pinot.broker.routing.builder.RoutingTableBuilder;
+import org.apache.pinot.common.config.SegmentsValidationAndRetentionConfig;
+import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
+import org.apache.pinot.core.realtime.stream.StreamConfig;
 import org.apache.commons.configuration.Configuration;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;

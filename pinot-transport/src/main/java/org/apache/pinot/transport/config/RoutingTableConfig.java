@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.transport.config;
+package org.apache.pinot.transport.config;
 
 import java.util.HashMap;
 import java.util.List;

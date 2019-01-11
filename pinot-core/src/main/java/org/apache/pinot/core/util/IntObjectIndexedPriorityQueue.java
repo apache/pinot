@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.util;
+package org.apache.pinot.core.util;
 
-import com.linkedin.pinot.common.utils.Pairs.IntObjectPair;
+import org.apache.pinot.common.utils.Pairs.IntObjectPair;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import java.util.Collections;
 import javax.annotation.concurrent.NotThreadSafe;

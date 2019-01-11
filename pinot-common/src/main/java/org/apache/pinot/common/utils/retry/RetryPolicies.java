@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.common.utils.retry;
+package org.apache.pinot.common.utils.retry;
 
 /**
  * Factory for retry policies.

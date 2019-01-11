@@ -16,23 +16,23 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.controller.helix.core.rebalance;
+package org.apache.pinot.controller.helix.core.rebalance;
 
 import com.google.common.collect.Lists;
-import com.linkedin.pinot.common.config.IndexingConfig;
-import com.linkedin.pinot.common.config.SegmentsValidationAndRetentionConfig;
-import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.config.TagNameUtils;
-import com.linkedin.pinot.common.exception.InvalidConfigException;
-import com.linkedin.pinot.common.partition.IdealStateBuilderUtil;
-import com.linkedin.pinot.common.partition.PartitionAssignment;
-import com.linkedin.pinot.common.partition.StreamPartitionAssignmentGenerator;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
-import com.linkedin.pinot.core.realtime.impl.kafka.KafkaAvroMessageDecoder;
-import com.linkedin.pinot.core.realtime.impl.kafka.KafkaConsumerFactory;
-import com.linkedin.pinot.core.realtime.stream.StreamConfigProperties;
+import org.apache.pinot.common.config.IndexingConfig;
+import org.apache.pinot.common.config.SegmentsValidationAndRetentionConfig;
+import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.common.config.TableNameBuilder;
+import org.apache.pinot.common.config.TagNameUtils;
+import org.apache.pinot.common.exception.InvalidConfigException;
+import org.apache.pinot.common.partition.IdealStateBuilderUtil;
+import org.apache.pinot.common.partition.PartitionAssignment;
+import org.apache.pinot.common.partition.StreamPartitionAssignmentGenerator;
+import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
+import org.apache.pinot.core.realtime.impl.kafka.KafkaAvroMessageDecoder;
+import org.apache.pinot.core.realtime.impl.kafka.KafkaConsumerFactory;
+import org.apache.pinot.core.realtime.stream.StreamConfigProperties;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;

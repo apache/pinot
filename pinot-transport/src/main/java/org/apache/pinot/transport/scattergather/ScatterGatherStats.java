@@ -16,11 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.transport.scattergather;
+package org.apache.pinot.transport.scattergather;
 
 import java.util.HashMap;
 import java.util.Map;
-import com.linkedin.pinot.common.response.ServerInstance;
+import org.apache.pinot.common.response.ServerInstance;
 import javax.annotation.concurrent.NotThreadSafe;
 
 

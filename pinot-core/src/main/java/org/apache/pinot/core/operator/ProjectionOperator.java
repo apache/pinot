@@ -16,14 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.operator;
+package org.apache.pinot.core.operator;
 
-import com.linkedin.pinot.core.common.Block;
-import com.linkedin.pinot.core.common.DataBlockCache;
-import com.linkedin.pinot.core.common.DataFetcher;
-import com.linkedin.pinot.core.common.DataSource;
-import com.linkedin.pinot.core.operator.blocks.DocIdSetBlock;
-import com.linkedin.pinot.core.operator.blocks.ProjectionBlock;
+import org.apache.pinot.core.common.Block;
+import org.apache.pinot.core.common.DataBlockCache;
+import org.apache.pinot.core.common.DataFetcher;
+import org.apache.pinot.core.common.DataSource;
+import org.apache.pinot.core.operator.blocks.DocIdSetBlock;
+import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nonnull;

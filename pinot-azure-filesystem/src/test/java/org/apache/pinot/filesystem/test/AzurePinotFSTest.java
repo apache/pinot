@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.filesystem.test;
+package org.apache.pinot.filesystem.test;
 
-import com.linkedin.pinot.filesystem.AzurePinotFS;
+import org.apache.pinot.filesystem.AzurePinotFS;
 import com.microsoft.azure.datalake.store.ADLStoreClient;
 import com.microsoft.azure.datalake.store.MockADLFileInputStream;
 import java.io.ByteArrayInputStream;

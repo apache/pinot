@@ -16,10 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.startree.v2;
+package org.apache.pinot.core.startree.v2;
 
-import com.linkedin.pinot.core.common.DataSource;
-import com.linkedin.pinot.core.startree.StarTree;
+import org.apache.pinot.core.common.DataSource;
+import org.apache.pinot.core.startree.StarTree;
 
 
 /**

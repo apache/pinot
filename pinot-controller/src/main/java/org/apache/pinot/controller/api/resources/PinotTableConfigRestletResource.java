@@ -16,15 +16,15 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.controller.api.resources;
+package org.apache.pinot.controller.api.resources;
 
-import com.linkedin.pinot.common.config.CombinedConfig;
-import com.linkedin.pinot.common.config.Deserializer;
-import com.linkedin.pinot.common.config.Serializer;
-import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.common.config.CombinedConfig;
+import org.apache.pinot.common.config.Deserializer;
+import org.apache.pinot.common.config.Serializer;
+import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import io.swagger.annotations.ApiOperation;
 import java.io.IOException;
 import java.util.List;

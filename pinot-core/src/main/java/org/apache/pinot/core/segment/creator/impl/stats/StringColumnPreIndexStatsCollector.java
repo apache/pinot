@@ -16,11 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.segment.creator.impl.stats;
+package org.apache.pinot.core.segment.creator.impl.stats;
 
-import com.linkedin.pinot.common.utils.StringUtil;
-import com.linkedin.pinot.core.segment.creator.StatsCollectorConfig;
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
+import org.apache.pinot.common.utils.StringUtil;
+import org.apache.pinot.core.segment.creator.StatsCollectorConfig;
+import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectSet;
 import java.util.Arrays;

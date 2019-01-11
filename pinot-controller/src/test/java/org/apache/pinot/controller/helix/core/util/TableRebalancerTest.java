@@ -16,11 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.controller.helix.core.util;
+package org.apache.pinot.controller.helix.core.util;
 
-import com.linkedin.pinot.common.utils.EqualityUtils;
-import com.linkedin.pinot.controller.helix.core.TableRebalancer;
-import com.linkedin.pinot.controller.helix.core.rebalance.RebalanceUserConfigConstants;
+import org.apache.pinot.common.utils.EqualityUtils;
+import org.apache.pinot.controller.helix.core.TableRebalancer;
+import org.apache.pinot.controller.helix.core.rebalance.RebalanceUserConfigConstants;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;

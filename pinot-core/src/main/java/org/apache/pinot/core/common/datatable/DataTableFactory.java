@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.common.datatable;
+package org.apache.pinot.core.common.datatable;
 
-import com.linkedin.pinot.common.utils.DataTable;
+import org.apache.pinot.common.utils.DataTable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 

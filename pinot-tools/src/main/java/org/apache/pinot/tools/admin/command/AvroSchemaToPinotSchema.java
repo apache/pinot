@@ -16,12 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.tools.admin.command;
+package org.apache.pinot.tools.admin.command;
 
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.core.util.AvroUtils;
-import com.linkedin.pinot.tools.Command;
+import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.core.util.AvroUtils;
+import org.apache.pinot.tools.Command;
 import java.io.File;
 import java.io.FileWriter;
 import java.util.HashMap;

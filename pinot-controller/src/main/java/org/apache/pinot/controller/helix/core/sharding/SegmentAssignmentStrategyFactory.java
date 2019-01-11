@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.controller.helix.core.sharding;
+package org.apache.pinot.controller.helix.core.sharding;
 
 /**
  * Get SegmentAssignmentStrategyFactory methods.

@@ -16,27 +16,27 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.broker.requesthandler;
+package org.apache.pinot.broker.requesthandler;
 
-import com.linkedin.pinot.broker.api.RequestStatistics;
-import com.linkedin.pinot.broker.broker.AccessControlFactory;
-import com.linkedin.pinot.broker.queryquota.TableQueryQuotaManager;
-import com.linkedin.pinot.broker.routing.RoutingTable;
-import com.linkedin.pinot.broker.routing.TimeBoundaryService;
-import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.metrics.BrokerMeter;
-import com.linkedin.pinot.common.metrics.BrokerMetrics;
-import com.linkedin.pinot.common.metrics.BrokerQueryPhase;
-import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.common.response.BrokerResponse;
-import com.linkedin.pinot.common.response.ServerInstance;
-import com.linkedin.pinot.common.response.broker.BrokerResponseNative;
-import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
-import com.linkedin.pinot.common.utils.DataTable;
-import com.linkedin.pinot.core.transport.AsyncQueryResponse;
-import com.linkedin.pinot.core.transport.QueryRouter;
-import com.linkedin.pinot.core.transport.Server;
-import com.linkedin.pinot.core.transport.ServerResponse;
+import org.apache.pinot.broker.api.RequestStatistics;
+import org.apache.pinot.broker.broker.AccessControlFactory;
+import org.apache.pinot.broker.queryquota.TableQueryQuotaManager;
+import org.apache.pinot.broker.routing.RoutingTable;
+import org.apache.pinot.broker.routing.TimeBoundaryService;
+import org.apache.pinot.common.config.TableNameBuilder;
+import org.apache.pinot.common.metrics.BrokerMeter;
+import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.common.metrics.BrokerQueryPhase;
+import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.response.BrokerResponse;
+import org.apache.pinot.common.response.ServerInstance;
+import org.apache.pinot.common.response.broker.BrokerResponseNative;
+import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
+import org.apache.pinot.common.utils.DataTable;
+import org.apache.pinot.core.transport.AsyncQueryResponse;
+import org.apache.pinot.core.transport.QueryRouter;
+import org.apache.pinot.core.transport.Server;
+import org.apache.pinot.core.transport.ServerResponse;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;

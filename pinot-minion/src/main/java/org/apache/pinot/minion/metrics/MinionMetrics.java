@@ -16,10 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.minion.metrics;
+package org.apache.pinot.minion.metrics;
 
-import com.linkedin.pinot.common.metrics.AbstractMetrics;
-import com.linkedin.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.metrics.AbstractMetrics;
+import org.apache.pinot.common.utils.CommonConstants;
 import com.yammer.metrics.core.MetricsRegistry;
 
 

@@ -16,14 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.integration.tests;
+package org.apache.pinot.integration.tests;
 
 import com.google.common.base.Joiner;
 import com.google.common.collect.Lists;
-import com.linkedin.pinot.common.config.CombinedConfig;
-import com.linkedin.pinot.common.config.CombinedConfigLoader;
-import com.linkedin.pinot.common.config.Serializer;
-import com.linkedin.pinot.util.TestUtils;
+import org.apache.pinot.common.config.CombinedConfig;
+import org.apache.pinot.common.config.CombinedConfigLoader;
+import org.apache.pinot.common.config.Serializer;
+import org.apache.pinot.util.TestUtils;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
@@ -100,7 +100,7 @@ public class NewConfigApplyIntegrationTest extends BaseClusterIntegrationTest {
   private void runAdminCommand(String... args) throws Exception {
     ArrayList<String> commandLine = Lists.newArrayList(
         "java", "-cp", "pinot-tools/target/pinot-tool-launcher-jar-with-dependencies.jar",
-        "com.linkedin.pinot.tools.admin.PinotAdministrator"
+        "org.apache.pinot.tools.admin.PinotAdministrator"
     );
 
     commandLine.addAll(Lists.newArrayList(args));

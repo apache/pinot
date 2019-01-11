@@ -16,16 +16,16 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.transport.netty;
+package org.apache.pinot.transport.netty;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.linkedin.pinot.common.response.ServerInstance;
-import com.linkedin.pinot.transport.common.Callback;
-import com.linkedin.pinot.transport.common.NoneType;
-import com.linkedin.pinot.transport.metrics.NettyClientMetrics;
-import com.linkedin.pinot.transport.pool.KeyedPool;
-import com.linkedin.pinot.transport.pool.PooledResourceManager;
+import org.apache.pinot.common.response.ServerInstance;
+import org.apache.pinot.transport.common.Callback;
+import org.apache.pinot.transport.common.NoneType;
+import org.apache.pinot.transport.metrics.NettyClientMetrics;
+import org.apache.pinot.transport.pool.KeyedPool;
+import org.apache.pinot.transport.pool.PooledResourceManager;
 import io.netty.channel.EventLoopGroup;
 import io.netty.util.Timer;
 

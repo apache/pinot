@@ -16,12 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.tools.admin.command;
+package org.apache.pinot.tools.admin.command;
 
-import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.utils.time.TimeUtils;
-import com.linkedin.pinot.tools.Command;
-import com.linkedin.pinot.tools.realtime.provisioning.MemoryEstimator;
+import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.common.utils.time.TimeUtils;
+import org.apache.pinot.tools.Command;
+import org.apache.pinot.tools.realtime.provisioning.MemoryEstimator;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;

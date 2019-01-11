@@ -24,10 +24,10 @@
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <artifactId>pinot</artifactId>
-    <groupId>com.linkedin.pinot</groupId>
+    <groupId>org.apache.pinot</groupId>
     <version>0.016</version>
   </parent>
-  <groupId>com.linkedin.pinot</groupId>
+  <groupId>org.apache.pinot</groupId>
   <artifactId>pinot-hadoop</artifactId>
   <version>0.016</version>
   <name>pinot-hadoop</name>
@@ -55,7 +55,7 @@
                   <transformers>
                     <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer" />
                     <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                      <mainClass>com.linkedin.pinot.hadoop.PinotHadoopJobLauncher</mainClass>
+                      <mainClass>org.apache.pinot.hadoop.PinotHadoopJobLauncher</mainClass>
                     </transformer>
                   </transformers>
                 </configuration>
@@ -68,7 +68,7 @@
   </profiles>
   <dependencies>
     <dependency>
-      <groupId>com.linkedin.pinot</groupId>
+      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-core</artifactId>
       <exclusions>
         <exclusion>
@@ -76,13 +76,13 @@
           <artifactId>commons-lang</artifactId>
         </exclusion>
         <exclusion>
-          <groupId>com.linkedin.pinot</groupId>
+          <groupId>org.apache.pinot</groupId>
           <artifactId>pinot-common</artifactId>
         </exclusion>
       </exclusions>
     </dependency>
     <dependency>
-      <groupId>com.linkedin.pinot</groupId>
+      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-common</artifactId>
       <version>${project.version}</version>
       <classifier>shaded</classifier>

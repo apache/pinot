@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.query.aggregation.groupby;
+package org.apache.pinot.core.query.aggregation.groupby;
 
-import com.linkedin.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import java.util.Iterator;
 
 

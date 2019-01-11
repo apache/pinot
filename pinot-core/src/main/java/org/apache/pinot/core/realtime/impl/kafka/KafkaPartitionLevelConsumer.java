@@ -16,13 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.realtime.impl.kafka;
+package org.apache.pinot.core.realtime.impl.kafka;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Iterables;
-import com.linkedin.pinot.core.realtime.stream.MessageBatch;
-import com.linkedin.pinot.core.realtime.stream.PartitionLevelConsumer;
-import com.linkedin.pinot.core.realtime.stream.StreamConfig;
+import org.apache.pinot.core.realtime.stream.MessageBatch;
+import org.apache.pinot.core.realtime.stream.PartitionLevelConsumer;
+import org.apache.pinot.core.realtime.stream.StreamConfig;
 import java.io.IOException;
 import kafka.api.FetchRequestBuilder;
 import kafka.javaapi.FetchResponse;

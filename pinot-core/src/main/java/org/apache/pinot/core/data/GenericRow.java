@@ -16,10 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.data;
+package org.apache.pinot.core.data;
 
-import com.linkedin.pinot.common.data.RowEvent;
-import com.linkedin.pinot.common.utils.JsonUtils;
+import org.apache.pinot.common.data.RowEvent;
+import org.apache.pinot.common.utils.JsonUtils;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashMap;

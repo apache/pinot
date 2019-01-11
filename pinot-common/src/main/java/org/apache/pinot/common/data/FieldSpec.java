@@ -16,15 +16,15 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.common.data;
+package org.apache.pinot.common.data;
 
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.linkedin.pinot.common.Utils;
-import com.linkedin.pinot.common.config.ConfigKey;
-import com.linkedin.pinot.common.config.ConfigNodeLifecycleAware;
-import com.linkedin.pinot.common.utils.EqualityUtils;
-import com.linkedin.pinot.common.utils.JsonUtils;
+import org.apache.pinot.common.Utils;
+import org.apache.pinot.common.config.ConfigKey;
+import org.apache.pinot.common.config.ConfigNodeLifecycleAware;
+import org.apache.pinot.common.utils.EqualityUtils;
+import org.apache.pinot.common.utils.JsonUtils;
 import javax.annotation.Nullable;
 import org.apache.avro.Schema.Type;
 import org.apache.commons.codec.DecoderException;

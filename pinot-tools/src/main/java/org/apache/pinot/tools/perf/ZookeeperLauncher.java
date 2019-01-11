@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.tools.perf;
+package org.apache.pinot.tools.perf;
 
 import com.google.common.base.Preconditions;
 import java.io.File;

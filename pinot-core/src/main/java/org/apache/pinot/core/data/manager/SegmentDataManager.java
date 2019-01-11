@@ -16,10 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.data.manager;
+package org.apache.pinot.core.data.manager;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import org.apache.pinot.core.indexsegment.IndexSegment;
 
 
 /**

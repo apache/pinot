@@ -16,10 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.query.aggregation;
+package org.apache.pinot.query.aggregation;
 
-import com.linkedin.pinot.core.query.aggregation.AggregationResultHolder;
-import com.linkedin.pinot.core.query.aggregation.DoubleAggregationResultHolder;
+import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
+import org.apache.pinot.core.query.aggregation.DoubleAggregationResultHolder;
 import java.util.Random;
 import org.testng.Assert;
 import org.testng.annotations.Test;

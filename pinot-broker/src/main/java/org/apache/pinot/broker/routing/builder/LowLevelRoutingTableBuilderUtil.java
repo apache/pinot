@@ -16,10 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.broker.routing.builder;
+package org.apache.pinot.broker.routing.builder;
 
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.SegmentName;
+import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.SegmentName;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.SortedSet;

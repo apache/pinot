@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.metadata;
+package org.apache.pinot.core.metadata;
 
-import com.linkedin.pinot.common.segment.SegmentMetadata;
+import org.apache.pinot.common.segment.SegmentMetadata;
 import java.io.File;
 
 

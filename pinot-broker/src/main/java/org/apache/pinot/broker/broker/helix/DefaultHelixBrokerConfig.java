@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.broker.broker.helix;
+package org.apache.pinot.broker.broker.helix;
 
 import java.util.Iterator;
 import org.apache.commons.configuration.Configuration;

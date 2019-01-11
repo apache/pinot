@@ -16,14 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.segment.creator.impl.stats;
+package org.apache.pinot.core.segment.creator.impl.stats;
 
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
-import com.linkedin.pinot.core.data.partition.PartitionFunction;
-import com.linkedin.pinot.core.segment.creator.ColumnStatistics;
-import com.linkedin.pinot.core.segment.creator.StatsCollectorConfig;
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
+import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.common.data.FieldSpec.DataType;
+import org.apache.pinot.core.data.partition.PartitionFunction;
+import org.apache.pinot.core.segment.creator.ColumnStatistics;
+import org.apache.pinot.core.segment.creator.StatsCollectorConfig;
+import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import java.util.Arrays;
 import java.util.List;
 import org.apache.avro.reflect.Nullable;

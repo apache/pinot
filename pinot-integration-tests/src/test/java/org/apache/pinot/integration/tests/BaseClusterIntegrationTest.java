@@ -16,16 +16,16 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.integration.tests;
+package org.apache.pinot.integration.tests;
 
 import com.google.common.base.Function;
-import com.linkedin.pinot.client.ConnectionFactory;
-import com.linkedin.pinot.common.config.TableTaskConfig;
-import com.linkedin.pinot.common.utils.KafkaStarterUtils;
-import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
-import com.linkedin.pinot.common.utils.ZkStarter;
-import com.linkedin.pinot.core.realtime.impl.kafka.KafkaConsumerFactory;
-import com.linkedin.pinot.util.TestUtils;
+import org.apache.pinot.client.ConnectionFactory;
+import org.apache.pinot.common.config.TableTaskConfig;
+import org.apache.pinot.common.utils.KafkaStarterUtils;
+import org.apache.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.common.utils.ZkStarter;
+import org.apache.pinot.core.realtime.impl.kafka.KafkaConsumerFactory;
+import org.apache.pinot.util.TestUtils;
 import java.io.File;
 import java.net.URL;
 import java.sql.Connection;
@@ -68,7 +68,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   protected final File _segmentDir = new File(_tempDir, "segmentDir");
   protected final File _tarDir = new File(_tempDir, "tarDir");
 
-  private com.linkedin.pinot.client.Connection _pinotConnection;
+  private org.apache.pinot.client.Connection _pinotConnection;
   private Connection _h2Connection;
   private QueryGenerator _queryGenerator;
 
@@ -181,7 +181,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    * @return Pinot connection
    */
   @Nonnull
-  protected com.linkedin.pinot.client.Connection getPinotConnection() {
+  protected org.apache.pinot.client.Connection getPinotConnection() {
     if (_pinotConnection == null) {
       _pinotConnection = ConnectionFactory.fromZookeeper(ZkStarter.DEFAULT_ZK_STR + "/" + getHelixClusterName());
     }

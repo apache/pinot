@@ -16,14 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.query.scheduler.fcfs;
+package org.apache.pinot.core.query.scheduler.fcfs;
 
-import com.linkedin.pinot.common.metrics.ServerMetrics;
-import com.linkedin.pinot.core.query.scheduler.SchedulerQueryContext;
+import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.core.query.scheduler.SchedulerQueryContext;
 import com.yammer.metrics.core.MetricsRegistry;
 import org.testng.annotations.Test;
 
-import static com.linkedin.pinot.core.query.scheduler.TestHelper.*;
+import static org.apache.pinot.core.query.scheduler.TestHelper.*;
 import static org.testng.Assert.*;
 
 

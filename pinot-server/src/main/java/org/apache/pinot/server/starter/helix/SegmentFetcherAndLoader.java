@@ -16,24 +16,24 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.server.starter.helix;
+package org.apache.pinot.server.starter.helix;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.Utils;
-import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
-import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
-import com.linkedin.pinot.common.segment.SegmentMetadata;
-import com.linkedin.pinot.common.segment.fetcher.SegmentFetcherFactory;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
-import com.linkedin.pinot.core.crypt.PinotCrypter;
-import com.linkedin.pinot.core.crypt.PinotCrypterFactory;
-import com.linkedin.pinot.core.data.manager.InstanceDataManager;
-import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
-import com.linkedin.pinot.core.segment.index.loader.LoaderUtils;
-import com.linkedin.pinot.core.segment.index.loader.V3RemoveIndexException;
-import com.linkedin.pinot.filesystem.PinotFSFactory;
+import org.apache.pinot.common.Utils;
+import org.apache.pinot.common.config.TableNameBuilder;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
+import org.apache.pinot.common.segment.SegmentMetadata;
+import org.apache.pinot.common.segment.fetcher.SegmentFetcherFactory;
+import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.core.crypt.PinotCrypter;
+import org.apache.pinot.core.crypt.PinotCrypterFactory;
+import org.apache.pinot.core.data.manager.InstanceDataManager;
+import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
+import org.apache.pinot.core.segment.index.loader.LoaderUtils;
+import org.apache.pinot.core.segment.index.loader.V3RemoveIndexException;
+import org.apache.pinot.filesystem.PinotFSFactory;
 import java.io.File;
 import java.util.concurrent.locks.Lock;
 import javax.annotation.Nonnull;

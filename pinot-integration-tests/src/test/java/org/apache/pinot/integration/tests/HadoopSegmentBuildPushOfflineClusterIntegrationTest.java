@@ -16,14 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.integration.tests;
+package org.apache.pinot.integration.tests;
 
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
-import com.linkedin.pinot.hadoop.job.JobConfigConstants;
-import com.linkedin.pinot.hadoop.job.SegmentCreationJob;
-import com.linkedin.pinot.hadoop.job.SegmentTarPushJob;
-import com.linkedin.pinot.util.TestUtils;
+import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
+import org.apache.pinot.hadoop.job.JobConfigConstants;
+import org.apache.pinot.hadoop.job.SegmentCreationJob;
+import org.apache.pinot.hadoop.job.SegmentTarPushJob;
+import org.apache.pinot.util.TestUtils;
 import java.io.File;
 import java.util.List;
 import java.util.Properties;

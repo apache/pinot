@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.query.aggregation;
+package org.apache.pinot.core.query.aggregation;
 
 /**
  * Interface for ResultHolder to hold the result of aggregation.

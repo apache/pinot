@@ -16,11 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.data.function;
+package org.apache.pinot.core.data.function;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.request.transform.TransformExpressionTree;
-import com.linkedin.pinot.core.data.GenericRow;
+import org.apache.pinot.common.request.transform.TransformExpressionTree;
+import org.apache.pinot.core.data.GenericRow;
 import java.util.List;
 
 

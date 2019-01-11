@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.io.util;
+package org.apache.pinot.core.io.util;
 
 import java.io.IOException;
 

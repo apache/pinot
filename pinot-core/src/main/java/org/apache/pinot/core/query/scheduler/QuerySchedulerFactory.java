@@ -16,14 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.query.scheduler;
+package org.apache.pinot.core.query.scheduler;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.metrics.ServerMetrics;
-import com.linkedin.pinot.core.query.executor.QueryExecutor;
-import com.linkedin.pinot.core.query.scheduler.fcfs.BoundedFCFSScheduler;
-import com.linkedin.pinot.core.query.scheduler.fcfs.FCFSQueryScheduler;
-import com.linkedin.pinot.core.query.scheduler.tokenbucket.TokenPriorityScheduler;
+import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.core.query.executor.QueryExecutor;
+import org.apache.pinot.core.query.scheduler.fcfs.BoundedFCFSScheduler;
+import org.apache.pinot.core.query.scheduler.fcfs.FCFSQueryScheduler;
+import org.apache.pinot.core.query.scheduler.tokenbucket.TokenPriorityScheduler;
 import java.lang.reflect.Constructor;
 import java.util.concurrent.atomic.LongAccumulator;
 import javax.annotation.Nonnull;

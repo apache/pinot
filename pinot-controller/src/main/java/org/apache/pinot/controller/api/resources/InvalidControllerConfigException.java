@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.controller.api.resources;
+package org.apache.pinot.controller.api.resources;
 
 public class InvalidControllerConfigException extends Exception {
   public InvalidControllerConfigException(final String s) {

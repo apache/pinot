@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.util;
+package org.apache.pinot.core.util;
 
 /**
  * The class <code>ArrayCopyUtils</code> provides methods to copy values across arrays of different types.

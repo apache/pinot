@@ -16,12 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.transport.netty;
+package org.apache.pinot.transport.netty;
 
-import com.linkedin.pinot.common.metrics.MetricsHelper;
-import com.linkedin.pinot.common.metrics.MetricsHelper.TimerContext;
-import com.linkedin.pinot.common.response.ServerInstance;
-import com.linkedin.pinot.transport.metrics.NettyClientMetrics;
+import org.apache.pinot.common.metrics.MetricsHelper;
+import org.apache.pinot.common.metrics.MetricsHelper.TimerContext;
+import org.apache.pinot.common.response.ServerInstance;
+import org.apache.pinot.transport.metrics.NettyClientMetrics;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.Channel;

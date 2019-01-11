@@ -16,10 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.realtime.impl.kafka;
+package org.apache.pinot.core.realtime.impl.kafka;
 
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.core.data.GenericRow;
+import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.core.data.GenericRow;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -39,8 +39,8 @@ public class AvroRecordToPinotRowGeneratorTest {
     GenericData.Record avroRecord = new GenericData.Record(avroSchema);
     avroRecord.put("incomingTime", 12345L);
 
-    com.linkedin.pinot.common.data.Schema pinotSchema =
-        new com.linkedin.pinot.common.data.Schema.SchemaBuilder().setSchemaName("testSchema")
+    org.apache.pinot.common.data.Schema pinotSchema =
+        new org.apache.pinot.common.data.Schema.SchemaBuilder().setSchemaName("testSchema")
             .addTime("incomingTime", TimeUnit.MILLISECONDS, FieldSpec.DataType.LONG, "outgoingTime", TimeUnit.DAYS,
                 FieldSpec.DataType.INT)
             .build();

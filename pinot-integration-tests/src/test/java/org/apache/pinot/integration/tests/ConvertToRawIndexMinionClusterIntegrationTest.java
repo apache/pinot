@@ -16,18 +16,18 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.integration.tests;
+package org.apache.pinot.integration.tests;
 
-import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.config.TableTaskConfig;
-import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
-import com.linkedin.pinot.common.segment.SegmentMetadata;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
-import com.linkedin.pinot.controller.helix.core.minion.PinotTaskManager;
-import com.linkedin.pinot.core.common.MinionConstants;
-import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
-import com.linkedin.pinot.util.TestUtils;
+import org.apache.pinot.common.config.TableNameBuilder;
+import org.apache.pinot.common.config.TableTaskConfig;
+import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
+import org.apache.pinot.common.segment.SegmentMetadata;
+import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
+import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
+import org.apache.pinot.core.common.MinionConstants;
+import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
+import org.apache.pinot.util.TestUtils;
 import java.io.File;
 import java.util.Arrays;
 import java.util.Collections;

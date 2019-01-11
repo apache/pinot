@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.common.utils.primitive;
+package org.apache.pinot.common.utils.primitive;
 
 import java.util.Arrays;
 import javax.annotation.Nonnull;

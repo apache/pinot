@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.broker.api;
+package org.apache.pinot.broker.api;
 
-import com.linkedin.pinot.common.response.BrokerResponse;
+import org.apache.pinot.common.response.BrokerResponse;
 import java.util.concurrent.TimeUnit;
 
 

@@ -16,19 +16,19 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.query.selection;
+package org.apache.pinot.core.query.selection;
 
-import com.linkedin.pinot.common.request.Selection;
-import com.linkedin.pinot.common.request.SelectionSort;
-import com.linkedin.pinot.common.response.ServerInstance;
-import com.linkedin.pinot.common.response.broker.SelectionResults;
-import com.linkedin.pinot.common.utils.DataSchema;
-import com.linkedin.pinot.common.utils.DataTable;
-import com.linkedin.pinot.core.common.Block;
-import com.linkedin.pinot.core.common.BlockDocIdIterator;
-import com.linkedin.pinot.core.common.Constants;
-import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.query.selection.comparator.CompositeDocIdValComparator;
+import org.apache.pinot.common.request.Selection;
+import org.apache.pinot.common.request.SelectionSort;
+import org.apache.pinot.common.response.ServerInstance;
+import org.apache.pinot.common.response.broker.SelectionResults;
+import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataTable;
+import org.apache.pinot.core.common.Block;
+import org.apache.pinot.core.common.BlockDocIdIterator;
+import org.apache.pinot.core.common.Constants;
+import org.apache.pinot.core.indexsegment.IndexSegment;
+import org.apache.pinot.core.query.selection.comparator.CompositeDocIdValComparator;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;

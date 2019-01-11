@@ -16,14 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.minion.executor;
-import com.linkedin.pinot.common.exception.HttpErrorStatusException;
-import com.linkedin.pinot.common.utils.FileUploadDownloadClient;
-import com.linkedin.pinot.common.utils.SimpleHttpResponse;
-import com.linkedin.pinot.common.utils.retry.RetryPolicies;
-import com.linkedin.pinot.common.utils.retry.RetryPolicy;
-import com.linkedin.pinot.core.common.MinionConstants;
-import com.linkedin.pinot.minion.MinionContext;
+package org.apache.pinot.minion.executor;
+import org.apache.pinot.common.exception.HttpErrorStatusException;
+import org.apache.pinot.common.utils.FileUploadDownloadClient;
+import org.apache.pinot.common.utils.SimpleHttpResponse;
+import org.apache.pinot.common.utils.retry.RetryPolicies;
+import org.apache.pinot.common.utils.retry.RetryPolicy;
+import org.apache.pinot.core.common.MinionConstants;
+import org.apache.pinot.minion.MinionContext;
 import java.io.File;
 import java.net.URI;
 import java.util.List;

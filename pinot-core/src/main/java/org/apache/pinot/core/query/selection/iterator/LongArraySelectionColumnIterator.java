@@ -16,11 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.query.selection.iterator;
+package org.apache.pinot.core.query.selection.iterator;
 
 import java.io.Serializable;
 
-import com.linkedin.pinot.core.common.Block;
+import org.apache.pinot.core.common.Block;
 
 /**
  * Iterator on long array column selection query.

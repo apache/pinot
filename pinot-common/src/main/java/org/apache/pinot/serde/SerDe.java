@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.serde;
+package org.apache.pinot.serde;
 
 import javax.annotation.concurrent.NotThreadSafe;
 import org.apache.thrift.TBase;

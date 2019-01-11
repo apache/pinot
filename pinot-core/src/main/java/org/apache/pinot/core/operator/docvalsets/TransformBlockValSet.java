@@ -16,13 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.operator.docvalsets;
+package org.apache.pinot.core.operator.docvalsets;
 
-import com.linkedin.pinot.core.common.BaseBlockValSet;
-import com.linkedin.pinot.core.operator.blocks.ProjectionBlock;
-import com.linkedin.pinot.core.operator.transform.TransformResultMetadata;
-import com.linkedin.pinot.core.operator.transform.function.TransformFunction;
-import com.linkedin.pinot.core.plan.DocIdSetPlanNode;
+import org.apache.pinot.core.common.BaseBlockValSet;
+import org.apache.pinot.core.operator.blocks.ProjectionBlock;
+import org.apache.pinot.core.operator.transform.TransformResultMetadata;
+import org.apache.pinot.core.operator.transform.function.TransformFunction;
+import org.apache.pinot.core.plan.DocIdSetPlanNode;
 
 
 /**

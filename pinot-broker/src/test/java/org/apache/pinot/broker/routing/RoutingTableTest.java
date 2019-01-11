@@ -16,20 +16,20 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.broker.routing;
+package org.apache.pinot.broker.routing;
 
-import com.linkedin.pinot.broker.routing.builder.HighLevelConsumerBasedRoutingTableBuilder;
-import com.linkedin.pinot.broker.routing.builder.RoutingTableBuilder;
-import com.linkedin.pinot.broker.util.FakePropertyStore;
-import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.config.TableConfig.Builder;
-import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
-import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
-import com.linkedin.pinot.common.metrics.BrokerMetrics;
-import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
-import com.linkedin.pinot.common.utils.HLCSegmentName;
-import com.linkedin.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.broker.routing.builder.HighLevelConsumerBasedRoutingTableBuilder;
+import org.apache.pinot.broker.routing.builder.RoutingTableBuilder;
+import org.apache.pinot.broker.util.FakePropertyStore;
+import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.common.config.TableConfig.Builder;
+import org.apache.pinot.common.config.TableNameBuilder;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
+import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
+import org.apache.pinot.common.utils.HLCSegmentName;
+import org.apache.pinot.common.utils.LLCSegmentName;
 import com.yammer.metrics.core.MetricsRegistry;
 import java.lang.reflect.Field;
 import java.util.ArrayList;

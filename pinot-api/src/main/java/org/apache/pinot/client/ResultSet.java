@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.client;
+package org.apache.pinot.client;
 
 /**
  * A Pinot result group, representing an aggregation function in the original query.

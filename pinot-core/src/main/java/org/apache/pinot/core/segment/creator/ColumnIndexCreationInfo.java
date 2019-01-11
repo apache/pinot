@@ -16,10 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.segment.creator;
+package org.apache.pinot.core.segment.creator;
 
-import com.linkedin.pinot.core.common.Constants;
-import com.linkedin.pinot.core.data.partition.PartitionFunction;
+import org.apache.pinot.core.common.Constants;
+import org.apache.pinot.core.data.partition.PartitionFunction;
 import java.util.List;
 import org.apache.commons.lang.math.IntRange;
 import org.apache.commons.lang3.ArrayUtils;

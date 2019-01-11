@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.transport.common;
+package org.apache.pinot.transport.common;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
@@ -35,9 +35,9 @@ import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import com.linkedin.pinot.Checkable;
-import com.linkedin.pinot.TestUtils;
-import com.linkedin.pinot.common.response.ServerInstance;
+import org.apache.pinot.Checkable;
+import org.apache.pinot.TestUtils;
+import org.apache.pinot.common.response.ServerInstance;
 
 
 public class ResponseFutureTest {

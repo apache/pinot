@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.query.aggregation.function.customobject;
+package org.apache.pinot.core.query.aggregation.function.customobject;
 
 import java.nio.ByteBuffer;
 import javax.annotation.Nonnull;

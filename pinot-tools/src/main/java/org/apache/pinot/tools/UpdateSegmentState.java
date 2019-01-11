@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.tools;
+package org.apache.pinot.tools;
 
-import com.linkedin.pinot.common.config.TableConfig;
+import org.apache.pinot.common.config.TableConfig;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;

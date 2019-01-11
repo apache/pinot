@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.realtime.impl.dictionary;
+package org.apache.pinot.core.realtime.impl.dictionary;
 
-import com.linkedin.pinot.common.utils.primitive.ByteArray;
+import org.apache.pinot.common.utils.primitive.ByteArray;
 import java.util.Arrays;
 import javax.annotation.Nonnull;
 

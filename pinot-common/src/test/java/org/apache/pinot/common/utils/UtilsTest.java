@@ -16,10 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.common.utils;
+package org.apache.pinot.common.utils;
 
-import com.linkedin.pinot.common.Utils;
-import com.linkedin.pinot.common.utils.time.TimeUtils;
+import org.apache.pinot.common.Utils;
+import org.apache.pinot.common.utils.time.TimeUtils;
 import java.util.concurrent.TimeUnit;
 import org.testng.Assert;
 import org.testng.annotations.Test;

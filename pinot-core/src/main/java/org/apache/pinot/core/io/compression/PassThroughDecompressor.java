@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.io.compression;
+package org.apache.pinot.core.io.compression;
 
 import java.nio.ByteBuffer;
 

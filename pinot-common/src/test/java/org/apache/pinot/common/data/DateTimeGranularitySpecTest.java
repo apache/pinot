@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.common.data;
+package org.apache.pinot.common.data;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;

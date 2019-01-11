@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.request;
+package org.apache.pinot.request;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -26,18 +26,18 @@ import org.apache.thrift.TSerializer;
 import org.apache.thrift.protocol.TCompactProtocol;
 import org.testng.annotations.Test;
 
-import com.linkedin.pinot.common.metrics.MetricsHelper;
-import com.linkedin.pinot.common.metrics.MetricsHelper.TimerContext;
-import com.linkedin.pinot.common.request.AggregationInfo;
-import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.common.request.FilterOperator;
-import com.linkedin.pinot.common.request.FilterQuery;
-import com.linkedin.pinot.common.request.FilterQueryMap;
-import com.linkedin.pinot.common.request.GroupBy;
-import com.linkedin.pinot.common.request.QuerySource;
-import com.linkedin.pinot.common.request.QueryType;
-import com.linkedin.pinot.common.request.Selection;
-import com.linkedin.pinot.common.request.SelectionSort;
+import org.apache.pinot.common.metrics.MetricsHelper;
+import org.apache.pinot.common.metrics.MetricsHelper.TimerContext;
+import org.apache.pinot.common.request.AggregationInfo;
+import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.request.FilterOperator;
+import org.apache.pinot.common.request.FilterQuery;
+import org.apache.pinot.common.request.FilterQueryMap;
+import org.apache.pinot.common.request.GroupBy;
+import org.apache.pinot.common.request.QuerySource;
+import org.apache.pinot.common.request.QueryType;
+import org.apache.pinot.common.request.Selection;
+import org.apache.pinot.common.request.SelectionSort;
 
 
 public class BrokerRequestSerializationTest {

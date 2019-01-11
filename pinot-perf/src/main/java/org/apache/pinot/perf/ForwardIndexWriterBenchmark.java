@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.perf;
+package org.apache.pinot.perf;
 
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
@@ -28,7 +28,7 @@ import java.util.List;
 import org.apache.commons.io.IOUtils;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
-import com.linkedin.pinot.core.io.writer.impl.v1.FixedBitMultiValueWriter;
+import org.apache.pinot.core.io.writer.impl.v1.FixedBitMultiValueWriter;
 
 public class ForwardIndexWriterBenchmark {
   public static void convertRawToForwardIndex(File rawFile) throws Exception {

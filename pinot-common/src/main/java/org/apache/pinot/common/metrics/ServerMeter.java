@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.common.metrics;
+package org.apache.pinot.common.metrics;
 
-import com.linkedin.pinot.common.Utils;
+import org.apache.pinot.common.Utils;
 
 
 /**

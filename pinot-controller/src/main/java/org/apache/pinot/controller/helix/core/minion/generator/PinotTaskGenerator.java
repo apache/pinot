@@ -16,10 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.controller.helix.core.minion.generator;
+package org.apache.pinot.controller.helix.core.minion.generator;
 
-import com.linkedin.pinot.common.config.PinotTaskConfig;
-import com.linkedin.pinot.common.config.TableConfig;
+import org.apache.pinot.common.config.PinotTaskConfig;
+import org.apache.pinot.common.config.TableConfig;
 import java.util.List;
 import javax.annotation.Nonnull;
 import org.apache.helix.task.JobConfig;

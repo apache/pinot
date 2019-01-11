@@ -16,13 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.startree.v2;
+package org.apache.pinot.core.startree.v2;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
-import com.linkedin.pinot.core.common.ObjectSerDeUtils;
-import com.linkedin.pinot.core.data.aggregator.DistinctCountHLLValueAggregator;
-import com.linkedin.pinot.core.data.aggregator.ValueAggregator;
+import org.apache.pinot.common.data.FieldSpec.DataType;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
+import org.apache.pinot.core.data.aggregator.DistinctCountHLLValueAggregator;
+import org.apache.pinot.core.data.aggregator.ValueAggregator;
 import java.util.Random;
 
 import static org.testng.Assert.*;

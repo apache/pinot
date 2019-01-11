@@ -16,10 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.common.data;
+package org.apache.pinot.common.data;
 
-import com.linkedin.pinot.common.data.TimeGranularitySpec.TimeFormat;
-import com.linkedin.pinot.common.utils.SchemaUtils;
+import org.apache.pinot.common.data.TimeGranularitySpec.TimeFormat;
+import org.apache.pinot.common.utils.SchemaUtils;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;

@@ -16,13 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.segment.creator.impl.fwd;
+package org.apache.pinot.core.segment.creator.impl.fwd;
 
-import com.linkedin.pinot.core.io.util.PinotDataBitSet;
-import com.linkedin.pinot.core.io.writer.SingleColumnMultiValueWriter;
-import com.linkedin.pinot.core.io.writer.impl.v1.FixedBitMultiValueWriter;
-import com.linkedin.pinot.core.segment.creator.MultiValueForwardIndexCreator;
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
+import org.apache.pinot.core.io.util.PinotDataBitSet;
+import org.apache.pinot.core.io.writer.SingleColumnMultiValueWriter;
+import org.apache.pinot.core.io.writer.impl.v1.FixedBitMultiValueWriter;
+import org.apache.pinot.core.segment.creator.MultiValueForwardIndexCreator;
+import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import java.io.File;
 import java.io.IOException;
 

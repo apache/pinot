@@ -16,11 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.tools.admin.command;
+package org.apache.pinot.tools.admin.command;
 
 
-import com.linkedin.pinot.common.utils.ZkStarter;
-import com.linkedin.pinot.tools.Command;
+import org.apache.pinot.common.utils.ZkStarter;
+import org.apache.pinot.tools.Command;
 import java.io.File;
 import java.io.IOException;
 

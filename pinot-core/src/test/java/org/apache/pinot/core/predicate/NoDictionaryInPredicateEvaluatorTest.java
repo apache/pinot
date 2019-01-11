@@ -16,14 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.predicate;
+package org.apache.pinot.core.predicate;
 
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.core.common.predicate.InPredicate;
-import com.linkedin.pinot.core.common.predicate.NotInPredicate;
-import com.linkedin.pinot.core.operator.filter.predicate.InPredicateEvaluatorFactory;
-import com.linkedin.pinot.core.operator.filter.predicate.NotInPredicateEvaluatorFactory;
-import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluator;
+import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.core.common.predicate.InPredicate;
+import org.apache.pinot.core.common.predicate.NotInPredicate;
+import org.apache.pinot.core.operator.filter.predicate.InPredicateEvaluatorFactory;
+import org.apache.pinot.core.operator.filter.predicate.NotInPredicateEvaluatorFactory;
+import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import it.unimi.dsi.fastutil.doubles.DoubleOpenHashSet;
 import it.unimi.dsi.fastutil.doubles.DoubleSet;
 import it.unimi.dsi.fastutil.floats.FloatOpenHashSet;

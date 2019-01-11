@@ -16,28 +16,28 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.indexsegment.immutable;
+package org.apache.pinot.core.indexsegment.immutable;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.common.utils.NetUtil;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
-import com.linkedin.pinot.core.segment.index.ColumnMetadata;
-import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
-import com.linkedin.pinot.core.segment.index.column.ColumnIndexContainer;
-import com.linkedin.pinot.core.segment.index.column.PhysicalColumnIndexContainer;
-import com.linkedin.pinot.core.segment.index.converter.SegmentFormatConverter;
-import com.linkedin.pinot.core.segment.index.converter.SegmentFormatConverterFactory;
-import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
-import com.linkedin.pinot.core.segment.index.loader.SegmentPreProcessor;
-import com.linkedin.pinot.core.segment.store.SegmentDirectory;
-import com.linkedin.pinot.core.segment.store.SegmentDirectoryPaths;
-import com.linkedin.pinot.core.segment.virtualcolumn.VirtualColumnContext;
-import com.linkedin.pinot.core.segment.virtualcolumn.VirtualColumnProvider;
-import com.linkedin.pinot.core.segment.virtualcolumn.VirtualColumnProviderFactory;
-import com.linkedin.pinot.core.startree.v2.store.StarTreeIndexContainer;
+import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.common.segment.ReadMode;
+import org.apache.pinot.common.utils.NetUtil;
+import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
+import org.apache.pinot.core.segment.index.ColumnMetadata;
+import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
+import org.apache.pinot.core.segment.index.column.ColumnIndexContainer;
+import org.apache.pinot.core.segment.index.column.PhysicalColumnIndexContainer;
+import org.apache.pinot.core.segment.index.converter.SegmentFormatConverter;
+import org.apache.pinot.core.segment.index.converter.SegmentFormatConverterFactory;
+import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.core.segment.index.loader.SegmentPreProcessor;
+import org.apache.pinot.core.segment.store.SegmentDirectory;
+import org.apache.pinot.core.segment.store.SegmentDirectoryPaths;
+import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnContext;
+import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnProvider;
+import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnProviderFactory;
+import org.apache.pinot.core.startree.v2.store.StarTreeIndexContainer;
 import java.io.File;
 import java.util.HashMap;
 import java.util.Map;

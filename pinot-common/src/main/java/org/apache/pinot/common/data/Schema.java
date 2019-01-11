@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.common.data;
+package org.apache.pinot.common.data;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
@@ -24,12 +24,12 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.config.ConfigKey;
-import com.linkedin.pinot.common.config.UseChildKeyHandler;
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
-import com.linkedin.pinot.common.data.FieldSpec.FieldType;
-import com.linkedin.pinot.common.utils.EqualityUtils;
-import com.linkedin.pinot.common.utils.JsonUtils;
+import org.apache.pinot.common.config.ConfigKey;
+import org.apache.pinot.common.config.UseChildKeyHandler;
+import org.apache.pinot.common.data.FieldSpec.DataType;
+import org.apache.pinot.common.data.FieldSpec.FieldType;
+import org.apache.pinot.common.utils.EqualityUtils;
+import org.apache.pinot.common.utils.JsonUtils;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -49,9 +49,9 @@ import org.slf4j.LoggerFactory;
 /**
  * The <code>Schema</code> class is defined for each table to describe the details of the table's fields (columns).
  * <p>Four field types are supported: DIMENSION, METRIC, TIME, DATE_TIME.
- * ({@link com.linkedin.pinot.common.data.DimensionFieldSpec}, {@link com.linkedin.pinot.common.data.MetricFieldSpec},
- * {@link com.linkedin.pinot.common.data.TimeFieldSpec}, {@link com.linkedin.pinot.common.data.DateTimeFieldSpec})
- * <p>For each field, a {@link com.linkedin.pinot.common.data.FieldSpec} is defined to provide the details of the field.
+ * ({@link org.apache.pinot.common.data.DimensionFieldSpec}, {@link org.apache.pinot.common.data.MetricFieldSpec},
+ * {@link org.apache.pinot.common.data.TimeFieldSpec}, {@link org.apache.pinot.common.data.DateTimeFieldSpec})
+ * <p>For each field, a {@link org.apache.pinot.common.data.FieldSpec} is defined to provide the details of the field.
  * <p>There could be multiple DIMENSION or METRIC or DATE_TIME fields, but at most 1 TIME field.
  * <p>In pinot, we store data using 5 <code>DataType</code>s: INT, LONG, FLOAT, DOUBLE, STRING. All other
  * <code>DataType</code>s will be converted to one of them.

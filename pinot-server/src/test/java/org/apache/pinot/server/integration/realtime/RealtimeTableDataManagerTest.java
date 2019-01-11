@@ -16,34 +16,34 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.server.integration.realtime;
+package org.apache.pinot.server.integration.realtime;
 
-import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.data.FieldSpec.FieldType;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
-import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
-import com.linkedin.pinot.common.metrics.ServerMetrics;
-import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
-import com.linkedin.pinot.common.utils.CommonConstants.Segment.SegmentType;
-import com.linkedin.pinot.core.common.Block;
-import com.linkedin.pinot.core.common.BlockMetadata;
-import com.linkedin.pinot.core.common.BlockMultiValIterator;
-import com.linkedin.pinot.core.common.BlockSingleValIterator;
-import com.linkedin.pinot.core.common.BlockValSet;
-import com.linkedin.pinot.core.common.Constants;
-import com.linkedin.pinot.core.common.DataSource;
-import com.linkedin.pinot.core.data.manager.config.InstanceDataManagerConfig;
-import com.linkedin.pinot.core.data.manager.config.TableDataManagerConfig;
-import com.linkedin.pinot.core.data.manager.realtime.HLRealtimeSegmentDataManager;
-import com.linkedin.pinot.core.data.manager.realtime.TimerService;
-import com.linkedin.pinot.core.indexsegment.mutable.MutableSegment;
-import com.linkedin.pinot.core.indexsegment.mutable.MutableSegmentImplTest;
-import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
-import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
+import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.common.data.FieldSpec.FieldType;
+import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
+import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.segment.ReadMode;
+import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
+import org.apache.pinot.common.utils.CommonConstants.Segment.SegmentType;
+import org.apache.pinot.core.common.Block;
+import org.apache.pinot.core.common.BlockMetadata;
+import org.apache.pinot.core.common.BlockMultiValIterator;
+import org.apache.pinot.core.common.BlockSingleValIterator;
+import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.common.Constants;
+import org.apache.pinot.core.common.DataSource;
+import org.apache.pinot.core.data.manager.config.InstanceDataManagerConfig;
+import org.apache.pinot.core.data.manager.config.TableDataManagerConfig;
+import org.apache.pinot.core.data.manager.realtime.HLRealtimeSegmentDataManager;
+import org.apache.pinot.core.data.manager.realtime.TimerService;
+import org.apache.pinot.core.indexsegment.mutable.MutableSegment;
+import org.apache.pinot.core.indexsegment.mutable.MutableSegmentImplTest;
+import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.segments.v1.creator.SegmentTestUtils;
 import com.yammer.metrics.core.MetricsRegistry;
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -98,7 +98,7 @@ public class RealtimeTableDataManagerTest {
     streamConfigs.put("stream.kafka.consumer.type", "highLevel");
     streamConfigs.put("stream.kafka.topic.name", "kafkaTopic");
     streamConfigs.put("stream.kafka.decoder.class.name",
-        "com.linkedin.pinot.core.realtime.impl.kafka.KafkaAvroMessageDecoder");
+        "org.apache.pinot.core.realtime.impl.kafka.KafkaAvroMessageDecoder");
     streamConfigs.put("stream.kafka.hlc.zk.connect.string", "localhost:1111/zkConnect");
     streamConfigs.put("stream.kafka.decoder.prop.schema.registry.rest.url", "http://localhost:2222/schemaRegistry");
     tableConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.REALTIME).setTableName("mirror")

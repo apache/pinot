@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.segment.index.loader.defaultcolumn;
+package org.apache.pinot.core.segment.index.loader.defaultcolumn;
 
 public interface DefaultColumnHandler {
 

@@ -16,14 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.controller.helix;
+package org.apache.pinot.controller.helix;
 
 import java.io.IOException;
 import java.net.URLEncoder;
 import org.apache.avro.reflect.Nullable;
 import org.apache.commons.lang.StringUtils;
 
-import com.linkedin.pinot.common.utils.StringUtil;
+import org.apache.pinot.common.utils.StringUtil;
 
 
 /**

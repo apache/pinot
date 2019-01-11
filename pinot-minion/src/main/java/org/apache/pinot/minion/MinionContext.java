@@ -16,10 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.minion;
+package org.apache.pinot.minion;
 
-import com.linkedin.pinot.core.minion.SegmentPurger;
-import com.linkedin.pinot.minion.metrics.MinionMetrics;
+import org.apache.pinot.core.minion.SegmentPurger;
+import org.apache.pinot.minion.metrics.MinionMetrics;
 import java.io.File;
 import javax.net.ssl.SSLContext;
 

@@ -16,27 +16,27 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.server.starter.helix;
+package org.apache.pinot.server.starter.helix;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.Uninterruptibles;
-import com.linkedin.pinot.common.Utils;
-import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.config.TagNameUtils;
-import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
-import com.linkedin.pinot.common.metrics.ServerMeter;
-import com.linkedin.pinot.common.metrics.ServerMetrics;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.NetUtil;
-import com.linkedin.pinot.common.utils.ServiceStatus;
-import com.linkedin.pinot.common.utils.ServiceStatus.Status;
-import com.linkedin.pinot.core.data.manager.InstanceDataManager;
-import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
-import com.linkedin.pinot.filesystem.PinotFSFactory;
-import com.linkedin.pinot.server.conf.ServerConf;
-import com.linkedin.pinot.server.realtime.ControllerLeaderLocator;
-import com.linkedin.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
-import com.linkedin.pinot.server.starter.ServerInstance;
+import org.apache.pinot.common.Utils;
+import org.apache.pinot.common.config.TableNameBuilder;
+import org.apache.pinot.common.config.TagNameUtils;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.metrics.ServerMeter;
+import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.NetUtil;
+import org.apache.pinot.common.utils.ServiceStatus;
+import org.apache.pinot.common.utils.ServiceStatus.Status;
+import org.apache.pinot.core.data.manager.InstanceDataManager;
+import org.apache.pinot.core.segment.memory.PinotDataBuffer;
+import org.apache.pinot.filesystem.PinotFSFactory;
+import org.apache.pinot.server.conf.ServerConf;
+import org.apache.pinot.server.realtime.ControllerLeaderLocator;
+import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
+import org.apache.pinot.server.starter.ServerInstance;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.HashSet;

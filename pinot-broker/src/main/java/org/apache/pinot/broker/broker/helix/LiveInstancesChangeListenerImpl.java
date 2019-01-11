@@ -16,12 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.broker.broker.helix;
+package org.apache.pinot.broker.broker.helix;
 
-import com.linkedin.pinot.common.response.ServerInstance;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.transport.netty.PooledNettyClientResourceManager;
-import com.linkedin.pinot.transport.pool.KeyedPool;
+import org.apache.pinot.common.response.ServerInstance;
+import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.transport.netty.PooledNettyClientResourceManager;
+import org.apache.pinot.transport.pool.KeyedPool;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;

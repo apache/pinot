@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.server.starter.helix;
+package org.apache.pinot.server.starter.helix;
 
-import com.linkedin.pinot.server.starter.ServerInstance;
+import org.apache.pinot.server.starter.ServerInstance;
 import io.swagger.jaxrs.config.BeanConfig;
 import java.io.IOException;
 import java.net.URI;
@@ -43,7 +43,7 @@ public class AdminApiApplication extends ResourceConfig {
   private URI baseUri;
   private boolean started = false;
   private HttpServer httpServer;
-  public static final String RESOURCE_PACKAGE = "com.linkedin.pinot.server.api.resources";
+  public static final String RESOURCE_PACKAGE = "org.apache.pinot.server.api.resources";
   public AdminApiApplication(ServerInstance instance) {
     this.serverInstance = instance;
     packages(RESOURCE_PACKAGE);

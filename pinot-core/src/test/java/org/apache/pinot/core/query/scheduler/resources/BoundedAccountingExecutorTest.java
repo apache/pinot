@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.query.scheduler.resources;
+package org.apache.pinot.core.query.scheduler.resources;
 
-import com.linkedin.pinot.core.query.scheduler.SchedulerGroupAccountant;
+import org.apache.pinot.core.query.scheduler.SchedulerGroupAccountant;
 import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.Executor;

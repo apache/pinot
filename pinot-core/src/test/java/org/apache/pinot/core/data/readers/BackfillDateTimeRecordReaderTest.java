@@ -16,20 +16,20 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.data.readers;
+package org.apache.pinot.core.data.readers;
 
-import com.linkedin.pinot.common.data.DateTimeFieldSpec;
-import com.linkedin.pinot.common.data.DateTimeFormatSpec;
-import com.linkedin.pinot.common.data.DimensionFieldSpec;
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
-import com.linkedin.pinot.common.data.MetricFieldSpec;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.data.TimeFieldSpec;
-import com.linkedin.pinot.common.data.TimeGranularitySpec;
-import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.minion.BackfillDateTimeColumn;
-import com.linkedin.pinot.core.minion.BackfillDateTimeColumn.BackfillDateTimeRecordReader;
+import org.apache.pinot.common.data.DateTimeFieldSpec;
+import org.apache.pinot.common.data.DateTimeFormatSpec;
+import org.apache.pinot.common.data.DimensionFieldSpec;
+import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.common.data.FieldSpec.DataType;
+import org.apache.pinot.common.data.MetricFieldSpec;
+import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.common.data.TimeFieldSpec;
+import org.apache.pinot.common.data.TimeGranularitySpec;
+import org.apache.pinot.core.data.GenericRow;
+import org.apache.pinot.core.minion.BackfillDateTimeColumn;
+import org.apache.pinot.core.minion.BackfillDateTimeColumn.BackfillDateTimeRecordReader;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;

@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.realtime.impl;
+package org.apache.pinot.core.realtime.impl;
 
-import com.linkedin.pinot.util.TestUtils;
+import org.apache.pinot.util.TestUtils;
 import java.io.File;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;

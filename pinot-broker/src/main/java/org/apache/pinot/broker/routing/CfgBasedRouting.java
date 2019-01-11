@@ -16,10 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.broker.routing;
+package org.apache.pinot.broker.routing;
 
-import com.linkedin.pinot.transport.config.PerTableRoutingConfig;
-import com.linkedin.pinot.transport.config.RoutingTableConfig;
+import org.apache.pinot.transport.config.PerTableRoutingConfig;
+import org.apache.pinot.transport.config.RoutingTableConfig;
 import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;

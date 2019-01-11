@@ -16,10 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.segment.name;
+package org.apache.pinot.core.segment.name;
 
-import com.linkedin.pinot.common.data.DateTimeFieldSpec;
-import com.linkedin.pinot.core.segment.creator.ColumnStatistics;
+import org.apache.pinot.common.data.DateTimeFieldSpec;
+import org.apache.pinot.core.segment.creator.ColumnStatistics;
 import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.Test;

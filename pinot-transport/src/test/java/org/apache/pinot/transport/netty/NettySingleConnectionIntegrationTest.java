@@ -16,23 +16,23 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.transport.netty;
+package org.apache.pinot.transport.netty;
 
 import com.google.common.util.concurrent.Uninterruptibles;
-import com.linkedin.pinot.common.response.ServerInstance;
-import com.linkedin.pinot.transport.common.AsyncResponseFuture;
-import com.linkedin.pinot.transport.common.Callback;
-import com.linkedin.pinot.transport.common.LinkedDequeue;
-import com.linkedin.pinot.transport.common.NoneType;
-import com.linkedin.pinot.transport.common.ServerResponseFuture;
-import com.linkedin.pinot.transport.metrics.NettyClientMetrics;
-import com.linkedin.pinot.transport.metrics.PoolStats;
-import com.linkedin.pinot.transport.netty.NettyClientConnection.ResponseFuture;
-import com.linkedin.pinot.transport.pool.AsyncPool;
-import com.linkedin.pinot.transport.pool.AsyncPoolImpl;
-import com.linkedin.pinot.transport.pool.AsyncPoolResourceManagerAdapter;
-import com.linkedin.pinot.transport.pool.KeyedPool;
-import com.linkedin.pinot.transport.pool.KeyedPoolImpl;
+import org.apache.pinot.common.response.ServerInstance;
+import org.apache.pinot.transport.common.AsyncResponseFuture;
+import org.apache.pinot.transport.common.Callback;
+import org.apache.pinot.transport.common.LinkedDequeue;
+import org.apache.pinot.transport.common.NoneType;
+import org.apache.pinot.transport.common.ServerResponseFuture;
+import org.apache.pinot.transport.metrics.NettyClientMetrics;
+import org.apache.pinot.transport.metrics.PoolStats;
+import org.apache.pinot.transport.netty.NettyClientConnection.ResponseFuture;
+import org.apache.pinot.transport.pool.AsyncPool;
+import org.apache.pinot.transport.pool.AsyncPoolImpl;
+import org.apache.pinot.transport.pool.AsyncPoolResourceManagerAdapter;
+import org.apache.pinot.transport.pool.KeyedPool;
+import org.apache.pinot.transport.pool.KeyedPoolImpl;
 import com.yammer.metrics.core.MetricsRegistry;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.nio.NioEventLoopGroup;

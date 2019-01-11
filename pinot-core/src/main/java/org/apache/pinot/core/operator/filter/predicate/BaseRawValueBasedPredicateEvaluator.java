@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.operator.filter.predicate;
+package org.apache.pinot.core.operator.filter.predicate;
 
 public abstract class BaseRawValueBasedPredicateEvaluator extends BasePredicateEvaluator {
 

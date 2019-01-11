@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.startree;
+package org.apache.pinot.core.startree;
 
-import com.linkedin.pinot.common.data.Schema;
+import org.apache.pinot.common.data.Schema;
 import java.io.File;
 import java.util.List;
 import java.util.Set;

@@ -16,10 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.server.starter.helix;
+package org.apache.pinot.server.starter.helix;
 
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.server.conf.ServerConf;
+import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.server.conf.ServerConf;
 import java.util.Iterator;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;

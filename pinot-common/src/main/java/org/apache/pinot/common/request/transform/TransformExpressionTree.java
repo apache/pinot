@@ -16,16 +16,16 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.common.request.transform;
+package org.apache.pinot.common.request.transform;
 
-import com.linkedin.pinot.common.utils.EqualityUtils;
-import com.linkedin.pinot.pql.parsers.Pql2CompilationException;
-import com.linkedin.pinot.pql.parsers.Pql2Compiler;
-import com.linkedin.pinot.pql.parsers.pql2.ast.AstNode;
-import com.linkedin.pinot.pql.parsers.pql2.ast.FunctionCallAstNode;
-import com.linkedin.pinot.pql.parsers.pql2.ast.IdentifierAstNode;
-import com.linkedin.pinot.pql.parsers.pql2.ast.LiteralAstNode;
-import com.linkedin.pinot.pql.parsers.pql2.ast.StringLiteralAstNode;
+import org.apache.pinot.common.utils.EqualityUtils;
+import org.apache.pinot.pql.parsers.Pql2CompilationException;
+import org.apache.pinot.pql.parsers.Pql2Compiler;
+import org.apache.pinot.pql.parsers.pql2.ast.AstNode;
+import org.apache.pinot.pql.parsers.pql2.ast.FunctionCallAstNode;
+import org.apache.pinot.pql.parsers.pql2.ast.IdentifierAstNode;
+import org.apache.pinot.pql.parsers.pql2.ast.LiteralAstNode;
+import org.apache.pinot.pql.parsers.pql2.ast.StringLiteralAstNode;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;

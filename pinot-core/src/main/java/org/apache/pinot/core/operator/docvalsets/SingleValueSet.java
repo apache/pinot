@@ -16,14 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.operator.docvalsets;
+package org.apache.pinot.core.operator.docvalsets;
 
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
-import com.linkedin.pinot.core.common.BaseBlockValSet;
-import com.linkedin.pinot.core.common.BlockValIterator;
-import com.linkedin.pinot.core.io.reader.ReaderContext;
-import com.linkedin.pinot.core.io.reader.SingleColumnSingleValueReader;
-import com.linkedin.pinot.core.operator.docvaliterators.SingleValueIterator;
+import org.apache.pinot.common.data.FieldSpec.DataType;
+import org.apache.pinot.core.common.BaseBlockValSet;
+import org.apache.pinot.core.common.BlockValIterator;
+import org.apache.pinot.core.io.reader.ReaderContext;
+import org.apache.pinot.core.io.reader.SingleColumnSingleValueReader;
+import org.apache.pinot.core.operator.docvaliterators.SingleValueIterator;
 
 
 @SuppressWarnings("unchecked")

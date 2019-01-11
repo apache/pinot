@@ -16,13 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.plan.maker;
+package org.apache.pinot.core.plan.maker;
 
-import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.core.data.manager.SegmentDataManager;
-import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.plan.Plan;
-import com.linkedin.pinot.core.plan.PlanNode;
+import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.core.data.manager.SegmentDataManager;
+import org.apache.pinot.core.indexsegment.IndexSegment;
+import org.apache.pinot.core.plan.Plan;
+import org.apache.pinot.core.plan.PlanNode;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 

@@ -16,11 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.common.metrics;
+package org.apache.pinot.common.metrics;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.linkedin.pinot.common.Utils;
-import com.linkedin.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.Utils;
+import org.apache.pinot.common.request.BrokerRequest;
 import com.yammer.metrics.core.MetricName;
 import com.yammer.metrics.core.MetricsRegistry;
 import java.util.Map;

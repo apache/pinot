@@ -16,11 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.common.restlet.resources;
+package org.apache.pinot.common.restlet.resources;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.linkedin.pinot.common.partition.PartitionAssignment;
+import org.apache.pinot.common.partition.PartitionAssignment;
 import java.util.Map;
 
 @JsonIgnoreProperties(ignoreUnknown = true)

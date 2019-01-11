@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.pql.parsers;
+package org.apache.pinot.pql.parsers;
 
 import org.antlr.v4.runtime.RecognitionException;
 

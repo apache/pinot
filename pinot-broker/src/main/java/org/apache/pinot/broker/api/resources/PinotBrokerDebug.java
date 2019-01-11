@@ -16,14 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.broker.api.resources;
+package org.apache.pinot.broker.api.resources;
 
-import com.linkedin.pinot.broker.routing.RoutingTable;
-import com.linkedin.pinot.broker.routing.TimeBoundaryService;
-import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.metrics.BrokerMeter;
-import com.linkedin.pinot.common.metrics.BrokerMetrics;
-import com.linkedin.pinot.common.utils.CommonConstants;
+import org.apache.pinot.broker.routing.RoutingTable;
+import org.apache.pinot.broker.routing.TimeBoundaryService;
+import org.apache.pinot.common.config.TableNameBuilder;
+import org.apache.pinot.common.metrics.BrokerMeter;
+import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.common.utils.CommonConstants;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;

@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.query.scheduler.resources;
+package org.apache.pinot.core.query.scheduler.resources;
 
-import com.linkedin.pinot.core.query.scheduler.SchedulerGroupAccountant;
+import org.apache.pinot.core.query.scheduler.SchedulerGroupAccountant;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.testng.annotations.Test;

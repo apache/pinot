@@ -16,26 +16,26 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.segment.index.data.source;
+package org.apache.pinot.core.segment.index.data.source;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.core.common.Block;
-import com.linkedin.pinot.core.common.Constants;
-import com.linkedin.pinot.core.common.DataSource;
-import com.linkedin.pinot.core.common.DataSourceMetadata;
-import com.linkedin.pinot.core.io.reader.DataFileReader;
-import com.linkedin.pinot.core.io.reader.SingleColumnMultiValueReader;
-import com.linkedin.pinot.core.io.reader.SingleColumnSingleValueReader;
-import com.linkedin.pinot.core.io.reader.impl.v1.SortedIndexReader;
-import com.linkedin.pinot.core.operator.blocks.MultiValueBlock;
-import com.linkedin.pinot.core.operator.blocks.SingleValueBlock;
-import com.linkedin.pinot.core.realtime.impl.dictionary.MutableDictionary;
-import com.linkedin.pinot.core.segment.index.ColumnMetadata;
-import com.linkedin.pinot.core.segment.index.column.ColumnIndexContainer;
-import com.linkedin.pinot.core.segment.index.readers.BloomFilterReader;
-import com.linkedin.pinot.core.segment.index.readers.Dictionary;
-import com.linkedin.pinot.core.segment.index.readers.InvertedIndexReader;
+import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.core.common.Block;
+import org.apache.pinot.core.common.Constants;
+import org.apache.pinot.core.common.DataSource;
+import org.apache.pinot.core.common.DataSourceMetadata;
+import org.apache.pinot.core.io.reader.DataFileReader;
+import org.apache.pinot.core.io.reader.SingleColumnMultiValueReader;
+import org.apache.pinot.core.io.reader.SingleColumnSingleValueReader;
+import org.apache.pinot.core.io.reader.impl.v1.SortedIndexReader;
+import org.apache.pinot.core.operator.blocks.MultiValueBlock;
+import org.apache.pinot.core.operator.blocks.SingleValueBlock;
+import org.apache.pinot.core.realtime.impl.dictionary.MutableDictionary;
+import org.apache.pinot.core.segment.index.ColumnMetadata;
+import org.apache.pinot.core.segment.index.column.ColumnIndexContainer;
+import org.apache.pinot.core.segment.index.readers.BloomFilterReader;
+import org.apache.pinot.core.segment.index.readers.Dictionary;
+import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
 
 
 public final class ColumnDataSource extends DataSource {

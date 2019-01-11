@@ -16,18 +16,18 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.integration.tests;
+package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Function;
-import com.linkedin.pinot.client.ResultSet;
-import com.linkedin.pinot.client.ResultSetGroup;
-import com.linkedin.pinot.common.config.CombinedConfig;
-import com.linkedin.pinot.common.config.Serializer;
-import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.JsonUtils;
-import com.linkedin.pinot.util.TestUtils;
+import org.apache.pinot.client.ResultSet;
+import org.apache.pinot.client.ResultSetGroup;
+import org.apache.pinot.common.config.CombinedConfig;
+import org.apache.pinot.common.config.Serializer;
+import org.apache.pinot.common.config.TableNameBuilder;
+import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.JsonUtils;
+import org.apache.pinot.util.TestUtils;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;

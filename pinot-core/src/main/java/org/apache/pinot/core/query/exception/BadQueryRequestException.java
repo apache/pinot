@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.query.exception;
+package org.apache.pinot.core.query.exception;
 
 public class BadQueryRequestException extends RuntimeException {
   public BadQueryRequestException(String message) {

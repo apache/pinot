@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.minion.events;
+package org.apache.pinot.minion.events;
 
 /**
  * Factory for {@link MinionEventObserver}.

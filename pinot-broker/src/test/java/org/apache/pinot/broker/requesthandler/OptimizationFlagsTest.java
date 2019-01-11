@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.broker.requesthandler;
+package org.apache.pinot.broker.requesthandler;
 
-import com.linkedin.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.request.BrokerRequest;
 import java.util.Collections;
 import org.testng.Assert;
 import org.testng.annotations.Test;

@@ -16,12 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.operator.dociditerators;
+package org.apache.pinot.core.operator.dociditerators;
 
 import org.roaringbitmap.IntIterator;
 
-import com.linkedin.pinot.core.common.BlockDocIdIterator;
-import com.linkedin.pinot.core.common.Constants;
+import org.apache.pinot.core.common.BlockDocIdIterator;
+import org.apache.pinot.core.common.Constants;
 
 public class RangelessBitmapDocIdIterator implements BlockDocIdIterator {
 

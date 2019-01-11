@@ -16,12 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.controller;
+package org.apache.pinot.controller;
 
-import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.StringUtil;
-import com.linkedin.pinot.filesystem.LocalPinotFS;
+import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
+import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.StringUtil;
+import org.apache.pinot.filesystem.LocalPinotFS;
 import java.io.File;
 import java.io.UnsupportedEncodingException;
 import java.net.URI;
@@ -116,7 +116,7 @@ public class ControllerConf extends PropertiesConfiguration {
   private static final boolean DEFAULT_ENABLE_SPLIT_COMMIT = false;
   private static final int DEFAULT_JERSEY_ADMIN_PORT = 21000;
   private static final String DEFAULT_ACCESS_CONTROL_FACTORY_CLASS =
-      "com.linkedin.pinot.controller.api.access.AllowAllAccessFactory";
+      "org.apache.pinot.controller.api.access.AllowAllAccessFactory";
   private static final long DEFAULT_SEGMENT_UPLOAD_TIMEOUT_IN_MILLIS = 600_000L; // 10 minutes
   private static final int DEFAULT_REALTIME_SEGMENT_METADATA_COMMIT_NUMLOCKS = 64;
   private static final boolean DEFAULT_ENABLE_STORAGE_QUOTA_CHECK = true;

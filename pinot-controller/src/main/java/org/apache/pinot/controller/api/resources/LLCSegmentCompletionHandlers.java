@@ -16,17 +16,17 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.controller.api.resources;
+package org.apache.pinot.controller.api.resources;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
-import com.linkedin.pinot.common.utils.LLCSegmentName;
-import com.linkedin.pinot.common.utils.StringUtil;
-import com.linkedin.pinot.controller.ControllerConf;
-import com.linkedin.pinot.controller.helix.core.realtime.SegmentCompletionManager;
-import com.linkedin.pinot.controller.util.SegmentCompletionUtils;
-import com.linkedin.pinot.filesystem.PinotFS;
-import com.linkedin.pinot.filesystem.PinotFSFactory;
+import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
+import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.common.utils.StringUtil;
+import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.controller.helix.core.realtime.SegmentCompletionManager;
+import org.apache.pinot.controller.util.SegmentCompletionUtils;
+import org.apache.pinot.filesystem.PinotFS;
+import org.apache.pinot.filesystem.PinotFSFactory;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;

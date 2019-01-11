@@ -16,25 +16,25 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.startree.v2.builder;
+package org.apache.pinot.core.startree.v2.builder;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.core.data.aggregator.ValueAggregator;
-import com.linkedin.pinot.core.data.aggregator.ValueAggregatorFactory;
-import com.linkedin.pinot.core.data.readers.PinotSegmentColumnReader;
-import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
-import com.linkedin.pinot.core.io.compression.ChunkCompressorFactory.CompressionType;
-import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionType;
-import com.linkedin.pinot.core.segment.creator.SingleValueRawIndexCreator;
-import com.linkedin.pinot.core.segment.creator.impl.fwd.SingleValueFixedByteRawIndexCreator;
-import com.linkedin.pinot.core.segment.creator.impl.fwd.SingleValueUnsortedForwardIndexCreator;
-import com.linkedin.pinot.core.segment.creator.impl.fwd.SingleValueVarByteRawIndexCreator;
-import com.linkedin.pinot.core.startree.StarTreeBuilderUtils;
-import com.linkedin.pinot.core.startree.StarTreeBuilderUtils.TreeNode;
-import com.linkedin.pinot.core.startree.StarTreeNode;
-import com.linkedin.pinot.core.startree.v2.AggregationFunctionColumnPair;
+import org.apache.pinot.common.data.FieldSpec.DataType;
+import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.core.data.aggregator.ValueAggregator;
+import org.apache.pinot.core.data.aggregator.ValueAggregatorFactory;
+import org.apache.pinot.core.data.readers.PinotSegmentColumnReader;
+import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
+import org.apache.pinot.core.io.compression.ChunkCompressorFactory.CompressionType;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunctionType;
+import org.apache.pinot.core.segment.creator.SingleValueRawIndexCreator;
+import org.apache.pinot.core.segment.creator.impl.fwd.SingleValueFixedByteRawIndexCreator;
+import org.apache.pinot.core.segment.creator.impl.fwd.SingleValueUnsortedForwardIndexCreator;
+import org.apache.pinot.core.segment.creator.impl.fwd.SingleValueVarByteRawIndexCreator;
+import org.apache.pinot.core.startree.StarTreeBuilderUtils;
+import org.apache.pinot.core.startree.StarTreeBuilderUtils.TreeNode;
+import org.apache.pinot.core.startree.StarTreeNode;
+import org.apache.pinot.core.startree.v2.AggregationFunctionColumnPair;
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
@@ -49,7 +49,7 @@ import org.apache.commons.configuration.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static com.linkedin.pinot.core.startree.v2.StarTreeV2Constants.*;
+import static org.apache.pinot.core.startree.v2.StarTreeV2Constants.*;
 
 
 /**

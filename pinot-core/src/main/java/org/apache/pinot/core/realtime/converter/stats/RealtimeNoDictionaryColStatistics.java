@@ -16,17 +16,17 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.realtime.converter.stats;
+package org.apache.pinot.core.realtime.converter.stats;
 
-import com.linkedin.pinot.core.common.Block;
-import com.linkedin.pinot.core.common.BlockValSet;
-import com.linkedin.pinot.core.data.partition.PartitionFunction;
-import com.linkedin.pinot.core.segment.creator.ColumnStatistics;
-import com.linkedin.pinot.core.segment.index.data.source.ColumnDataSource;
+import org.apache.pinot.core.common.Block;
+import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.data.partition.PartitionFunction;
+import org.apache.pinot.core.segment.creator.ColumnStatistics;
+import org.apache.pinot.core.segment.index.data.source.ColumnDataSource;
 import java.util.List;
 import org.apache.commons.lang.math.IntRange;
 
-import static com.linkedin.pinot.core.common.Constants.*;
+import static org.apache.pinot.core.common.Constants.*;
 
 public class RealtimeNoDictionaryColStatistics implements ColumnStatistics {
 

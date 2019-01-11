@@ -16,14 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.common.utils;
+package org.apache.pinot.common.utils;
 
-import com.linkedin.pinot.common.data.FieldSpec;
+import org.apache.pinot.common.data.FieldSpec;
 import java.util.Arrays;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import static com.linkedin.pinot.common.utils.DataSchema.ColumnDataType.*;
+import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.*;
 
 
 public class DataSchemaTest {

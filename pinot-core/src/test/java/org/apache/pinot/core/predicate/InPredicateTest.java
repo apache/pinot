@@ -16,16 +16,16 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.predicate;
+package org.apache.pinot.core.predicate;
 
-import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.common.utils.EqualityUtils;
-import com.linkedin.pinot.common.utils.request.FilterQueryTree;
-import com.linkedin.pinot.common.utils.request.RequestUtils;
-import com.linkedin.pinot.core.common.Predicate;
-import com.linkedin.pinot.core.common.predicate.BaseInPredicate;
-import com.linkedin.pinot.core.common.predicate.InPredicate;
-import com.linkedin.pinot.pql.parsers.Pql2Compiler;
+import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.utils.EqualityUtils;
+import org.apache.pinot.common.utils.request.FilterQueryTree;
+import org.apache.pinot.common.utils.request.RequestUtils;
+import org.apache.pinot.core.common.Predicate;
+import org.apache.pinot.core.common.predicate.BaseInPredicate;
+import org.apache.pinot.core.common.predicate.InPredicate;
+import org.apache.pinot.pql.parsers.Pql2Compiler;
 import java.util.Arrays;
 import org.testng.Assert;
 import org.testng.annotations.Test;

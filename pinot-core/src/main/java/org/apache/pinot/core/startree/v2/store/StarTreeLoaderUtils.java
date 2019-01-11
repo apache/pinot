@@ -16,24 +16,24 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.startree.v2.store;
+package org.apache.pinot.core.startree.v2.store;
 
-import com.linkedin.pinot.common.data.MetricFieldSpec;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.segment.StarTreeMetadata;
-import com.linkedin.pinot.core.common.DataSource;
-import com.linkedin.pinot.core.data.aggregator.ValueAggregatorFactory;
-import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionType;
-import com.linkedin.pinot.core.segment.index.ColumnMetadata;
-import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
-import com.linkedin.pinot.core.segment.index.column.ColumnIndexContainer;
-import com.linkedin.pinot.core.segment.index.data.source.ColumnDataSource;
-import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
-import com.linkedin.pinot.core.startree.OffHeapStarTree;
-import com.linkedin.pinot.core.startree.StarTree;
-import com.linkedin.pinot.core.startree.v2.AggregationFunctionColumnPair;
-import com.linkedin.pinot.core.startree.v2.StarTreeV2;
-import com.linkedin.pinot.core.startree.v2.StarTreeV2Metadata;
+import org.apache.pinot.common.data.MetricFieldSpec;
+import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.common.segment.StarTreeMetadata;
+import org.apache.pinot.core.common.DataSource;
+import org.apache.pinot.core.data.aggregator.ValueAggregatorFactory;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunctionType;
+import org.apache.pinot.core.segment.index.ColumnMetadata;
+import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
+import org.apache.pinot.core.segment.index.column.ColumnIndexContainer;
+import org.apache.pinot.core.segment.index.data.source.ColumnDataSource;
+import org.apache.pinot.core.segment.memory.PinotDataBuffer;
+import org.apache.pinot.core.startree.OffHeapStarTree;
+import org.apache.pinot.core.startree.StarTree;
+import org.apache.pinot.core.startree.v2.AggregationFunctionColumnPair;
+import org.apache.pinot.core.startree.v2.StarTreeV2;
+import org.apache.pinot.core.startree.v2.StarTreeV2Metadata;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -43,7 +43,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import static com.linkedin.pinot.core.startree.v2.store.StarTreeIndexMapUtils.*;
+import static org.apache.pinot.core.startree.v2.store.StarTreeIndexMapUtils.*;
 
 
 /**

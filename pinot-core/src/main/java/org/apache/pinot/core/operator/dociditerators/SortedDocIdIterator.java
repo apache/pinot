@@ -16,16 +16,16 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.operator.dociditerators;
+package org.apache.pinot.core.operator.dociditerators;
 
 import java.util.List;
 
 import org.apache.commons.lang3.tuple.Pair;
 
-import com.linkedin.pinot.common.utils.Pairs.IntPair;
-import com.linkedin.pinot.core.common.BlockDocIdIterator;
-import com.linkedin.pinot.core.common.Constants;
-import com.linkedin.pinot.core.operator.docidsets.SortedDocIdSet;
+import org.apache.pinot.common.utils.Pairs.IntPair;
+import org.apache.pinot.core.common.BlockDocIdIterator;
+import org.apache.pinot.core.common.Constants;
+import org.apache.pinot.core.operator.docidsets.SortedDocIdSet;
 
 public final class SortedDocIdIterator implements IndexBasedDocIdIterator {
   /**

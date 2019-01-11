@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.broker.api;
+package org.apache.pinot.broker.api;
 
-import com.linkedin.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.request.BrokerRequest;
 
 
 public interface AccessControl {

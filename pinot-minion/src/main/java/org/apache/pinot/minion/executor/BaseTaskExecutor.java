@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.minion.executor;
+package org.apache.pinot.minion.executor;
 
-import com.linkedin.pinot.minion.MinionContext;
+import org.apache.pinot.minion.MinionContext;
 
 
 public abstract class BaseTaskExecutor implements PinotTaskExecutor {

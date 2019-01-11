@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.transport;
+package org.apache.pinot.core.transport;
 
-import com.linkedin.pinot.common.utils.DataTable;
+import org.apache.pinot.common.utils.DataTable;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;

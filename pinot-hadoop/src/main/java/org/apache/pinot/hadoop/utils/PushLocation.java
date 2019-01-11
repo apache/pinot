@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.hadoop.utils;
+package org.apache.pinot.hadoop.utils;
 
 public class PushLocation {
   private final String _host;

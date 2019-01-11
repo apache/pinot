@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.io.writer;
+package org.apache.pinot.core.io.writer;
 
 import java.io.Closeable;
 

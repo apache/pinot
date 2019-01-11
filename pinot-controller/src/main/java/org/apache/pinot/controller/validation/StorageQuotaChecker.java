@@ -16,19 +16,19 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.controller.validation;
+package org.apache.pinot.controller.validation;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
-import com.linkedin.pinot.common.config.QuotaConfig;
-import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.exception.InvalidConfigException;
-import com.linkedin.pinot.common.metrics.ControllerGauge;
-import com.linkedin.pinot.common.metrics.ControllerMetrics;
-import com.linkedin.pinot.common.utils.DataSize;
-import com.linkedin.pinot.controller.ControllerLeadershipManager;
-import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
-import com.linkedin.pinot.controller.util.TableSizeReader;
+import org.apache.pinot.common.config.QuotaConfig;
+import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.common.exception.InvalidConfigException;
+import org.apache.pinot.common.metrics.ControllerGauge;
+import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.common.utils.DataSize;
+import org.apache.pinot.controller.ControllerLeadershipManager;
+import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.util.TableSizeReader;
 import java.io.File;
 import javax.annotation.Nonnegative;
 import javax.annotation.Nonnull;

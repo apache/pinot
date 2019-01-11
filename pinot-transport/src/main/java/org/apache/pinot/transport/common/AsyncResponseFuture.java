@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.transport.common;
+package org.apache.pinot.transport.common;
 
-import com.linkedin.pinot.common.response.ServerInstance;
+import org.apache.pinot.common.response.ServerInstance;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;

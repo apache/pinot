@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.common.metadata;
+package org.apache.pinot.common.metadata;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -25,7 +25,7 @@ import org.apache.helix.ZNRecord;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
+import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
 
 
 public class InstanceZKMetadataTest {

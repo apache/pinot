@@ -16,15 +16,15 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.common.data;
+package org.apache.pinot.common.data;
 
-import com.linkedin.pinot.common.utils.EqualityUtils;
+import org.apache.pinot.common.utils.EqualityUtils;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.data.DateTimeFieldSpec.TimeFormat;
+import org.apache.pinot.common.data.DateTimeFieldSpec.TimeFormat;
 import org.apache.commons.lang.StringUtils;
 import org.joda.time.DateTimeZone;
 import org.joda.time.format.DateTimeFormatter;

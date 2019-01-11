@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.transport.pool;
+package org.apache.pinot.transport.pool;
 
-import com.linkedin.pinot.common.response.ServerInstance;
+import org.apache.pinot.common.response.ServerInstance;
 
 
 /**

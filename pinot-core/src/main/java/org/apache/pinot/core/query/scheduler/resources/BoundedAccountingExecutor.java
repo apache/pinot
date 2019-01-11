@@ -16,10 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.query.scheduler.resources;
+package org.apache.pinot.core.query.scheduler.resources;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.core.query.scheduler.SchedulerGroupAccountant;
+import org.apache.pinot.core.query.scheduler.SchedulerGroupAccountant;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Semaphore;
 import javax.annotation.Nonnull;

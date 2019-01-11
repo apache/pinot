@@ -16,14 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.hadoop.job;
+package org.apache.pinot.hadoop.job;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.utils.FileUploadDownloadClient;
-import com.linkedin.pinot.common.utils.JsonUtils;
-import com.linkedin.pinot.common.utils.SimpleHttpResponse;
-import com.linkedin.pinot.hadoop.utils.PushLocation;
+import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.common.utils.FileUploadDownloadClient;
+import org.apache.pinot.common.utils.JsonUtils;
+import org.apache.pinot.common.utils.SimpleHttpResponse;
+import org.apache.pinot.hadoop.utils.PushLocation;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;

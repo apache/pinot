@@ -16,12 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.controller.api.resources;
+package org.apache.pinot.controller.api.resources;
 
-import com.linkedin.pinot.controller.ControllerConf;
-import com.linkedin.pinot.controller.api.access.AccessControl;
-import com.linkedin.pinot.controller.api.access.AccessControlFactory;
-import com.linkedin.pinot.controller.helix.ControllerTest;
+import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.controller.api.access.AccessControl;
+import org.apache.pinot.controller.api.access.AccessControlFactory;
+import org.apache.pinot.controller.helix.ControllerTest;
 import java.io.IOException;
 import javax.ws.rs.core.HttpHeaders;
 import org.testng.Assert;

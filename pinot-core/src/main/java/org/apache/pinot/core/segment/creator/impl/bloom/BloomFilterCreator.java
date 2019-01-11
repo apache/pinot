@@ -16,12 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.segment.creator.impl.bloom;
+package org.apache.pinot.core.segment.creator.impl.bloom;
 
-import com.linkedin.pinot.core.bloom.BloomFilterUtil;
-import com.linkedin.pinot.core.bloom.BloomFilter;
-import com.linkedin.pinot.core.bloom.SegmentBloomFilterFactory;
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
+import org.apache.pinot.core.bloom.BloomFilterUtil;
+import org.apache.pinot.core.bloom.BloomFilter;
+import org.apache.pinot.core.bloom.SegmentBloomFilterFactory;
+import org.apache.pinot.core.segment.creator.impl.V1Constants;
 
 import java.io.DataOutputStream;
 import java.io.File;

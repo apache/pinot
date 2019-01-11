@@ -16,14 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.transport.perf;
+package org.apache.pinot.transport.perf;
 
-import com.linkedin.pinot.common.metrics.AggregatedHistogram;
-import com.linkedin.pinot.common.metrics.LatencyMetric;
-import com.linkedin.pinot.common.response.ServerInstance;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.transport.config.PerTableRoutingConfig;
-import com.linkedin.pinot.transport.config.RoutingTableConfig;
+import org.apache.pinot.common.metrics.AggregatedHistogram;
+import org.apache.pinot.common.metrics.LatencyMetric;
+import org.apache.pinot.common.response.ServerInstance;
+import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.transport.config.PerTableRoutingConfig;
+import org.apache.pinot.transport.config.RoutingTableConfig;
 import com.yammer.metrics.core.Histogram;
 import java.util.ArrayList;
 import java.util.Arrays;

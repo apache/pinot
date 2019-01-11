@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.query.selection.iterator;
+package org.apache.pinot.core.query.selection.iterator;
 
 import java.io.Serializable;
 

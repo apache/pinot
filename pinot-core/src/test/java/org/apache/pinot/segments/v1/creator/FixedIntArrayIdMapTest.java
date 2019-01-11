@@ -16,14 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.segments.v1.creator;
+package org.apache.pinot.segments.v1.creator;
 
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
-import com.linkedin.pinot.core.io.writer.impl.DirectMemoryManager;
-import com.linkedin.pinot.core.util.FixedIntArray;
-import com.linkedin.pinot.core.util.FixedIntArrayOffHeapIdMap;
-import com.linkedin.pinot.core.util.IdMap;
+import org.apache.pinot.core.io.writer.impl.DirectMemoryManager;
+import org.apache.pinot.core.util.FixedIntArray;
+import org.apache.pinot.core.util.FixedIntArrayOffHeapIdMap;
+import org.apache.pinot.core.util.IdMap;
 import java.io.IOException;
 import java.util.Random;
 import org.testng.Assert;

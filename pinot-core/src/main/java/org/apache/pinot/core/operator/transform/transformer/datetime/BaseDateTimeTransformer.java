@@ -16,12 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.operator.transform.transformer.datetime;
+package org.apache.pinot.core.operator.transform.transformer.datetime;
 
-import com.linkedin.pinot.common.data.DateTimeFormatSpec;
-import com.linkedin.pinot.common.data.DateTimeFormatUnitSpec.DateTimeTransformUnit;
-import com.linkedin.pinot.common.data.DateTimeGranularitySpec;
-import com.linkedin.pinot.core.operator.transform.transformer.DataTransformer;
+import org.apache.pinot.common.data.DateTimeFormatSpec;
+import org.apache.pinot.common.data.DateTimeFormatUnitSpec.DateTimeTransformUnit;
+import org.apache.pinot.common.data.DateTimeGranularitySpec;
+import org.apache.pinot.core.operator.transform.transformer.DataTransformer;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
 

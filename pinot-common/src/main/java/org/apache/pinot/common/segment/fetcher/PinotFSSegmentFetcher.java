@@ -16,10 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.common.segment.fetcher;
+package org.apache.pinot.common.segment.fetcher;
 
-import com.linkedin.pinot.filesystem.PinotFS;
-import com.linkedin.pinot.filesystem.PinotFSFactory;
+import org.apache.pinot.filesystem.PinotFS;
+import org.apache.pinot.filesystem.PinotFSFactory;
 import java.io.File;
 import java.net.URI;
 import java.util.Collections;

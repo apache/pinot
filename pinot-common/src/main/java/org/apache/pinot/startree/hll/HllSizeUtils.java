@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.startree.hll;
+package org.apache.pinot.startree.hll;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableBiMap;

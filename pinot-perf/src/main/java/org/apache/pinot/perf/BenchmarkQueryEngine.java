@@ -16,14 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.perf;
+package org.apache.pinot.perf;
 
 import com.google.common.util.concurrent.Uninterruptibles;
-import com.linkedin.pinot.broker.requesthandler.OptimizationFlags;
-import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
-import com.linkedin.pinot.tools.perf.PerfBenchmarkDriver;
-import com.linkedin.pinot.tools.perf.PerfBenchmarkDriverConf;
+import org.apache.pinot.broker.requesthandler.OptimizationFlags;
+import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
+import org.apache.pinot.tools.perf.PerfBenchmarkDriver;
+import org.apache.pinot.tools.perf.PerfBenchmarkDriverConf;
 import java.io.File;
 import java.util.HashSet;
 import java.util.Map;

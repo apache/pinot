@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.tools.config.validator;
+package org.apache.pinot.tools.config.validator;
 
-import com.linkedin.pinot.common.config.TableConfig;
+import org.apache.pinot.common.config.TableConfig;
 
 
 public class TableConfigValidator {

@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.transport.pool;
+package org.apache.pinot.transport.pool;
 
 public class SizeLimitExceededException extends Exception {
   private static final long serialVersionUID = 1L;

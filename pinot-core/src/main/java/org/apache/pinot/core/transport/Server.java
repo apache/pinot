@@ -16,12 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.transport;
+package org.apache.pinot.core.transport;
 
 import com.google.common.net.InternetDomainName;
 import javax.annotation.concurrent.ThreadSafe;
 
-import static com.linkedin.pinot.common.utils.CommonConstants.Helix.*;
+import static org.apache.pinot.common.utils.CommonConstants.Helix.*;
 
 
 /**

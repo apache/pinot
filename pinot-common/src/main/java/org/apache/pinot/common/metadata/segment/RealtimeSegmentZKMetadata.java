@@ -16,15 +16,15 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.common.metadata.segment;
+package org.apache.pinot.common.metadata.segment;
 
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
-import com.linkedin.pinot.common.utils.CommonConstants.Segment.SegmentType;
+import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
+import org.apache.pinot.common.utils.CommonConstants.Segment.SegmentType;
 import java.util.Map;
 import org.apache.helix.ZNRecord;
 
-import static com.linkedin.pinot.common.utils.EqualityUtils.*;
+import static org.apache.pinot.common.utils.EqualityUtils.*;
 
 
 public class RealtimeSegmentZKMetadata extends SegmentZKMetadata {

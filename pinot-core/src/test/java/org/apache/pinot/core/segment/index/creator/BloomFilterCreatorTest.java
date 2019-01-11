@@ -16,20 +16,20 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.segment.index.creator;
+package org.apache.pinot.core.segment.index.creator;
 
 import com.google.common.base.Preconditions;
 import com.google.common.hash.BloomFilter;
-import com.linkedin.pinot.common.data.DimensionFieldSpec;
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.core.bloom.BloomFilterType;
-import com.linkedin.pinot.core.bloom.GuavaOnHeapBloomFilter;
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
-import com.linkedin.pinot.core.segment.creator.impl.bloom.BloomFilterCreator;
-import com.linkedin.pinot.core.bloom.BloomFilterUtil;
+import org.apache.pinot.common.data.DimensionFieldSpec;
+import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.core.bloom.BloomFilterType;
+import org.apache.pinot.core.bloom.GuavaOnHeapBloomFilter;
+import org.apache.pinot.core.segment.creator.impl.V1Constants;
+import org.apache.pinot.core.segment.creator.impl.bloom.BloomFilterCreator;
+import org.apache.pinot.core.bloom.BloomFilterUtil;
 
-import com.linkedin.pinot.core.segment.index.ColumnMetadata;
-import com.linkedin.pinot.core.segment.index.readers.BloomFilterReader;
+import org.apache.pinot.core.segment.index.ColumnMetadata;
+import org.apache.pinot.core.segment.index.readers.BloomFilterReader;
 import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileInputStream;

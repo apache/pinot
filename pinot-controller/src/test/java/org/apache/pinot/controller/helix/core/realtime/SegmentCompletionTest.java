@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.controller.helix.core.realtime;
+package org.apache.pinot.controller.helix.core.realtime;
 
-import com.linkedin.pinot.controller.helix.core.realtime.segment.CommittingSegmentDescriptor;
+import org.apache.pinot.controller.helix.core.realtime.segment.CommittingSegmentDescriptor;
 import java.lang.reflect.Field;
 import java.util.List;
 import java.util.Map;
@@ -28,15 +28,15 @@ import org.apache.zookeeper.data.Stat;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
-import com.linkedin.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
-import com.linkedin.pinot.common.metrics.ControllerMetrics;
-import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.LLCSegmentName;
-import com.linkedin.pinot.controller.ControllerConf;
+import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
+import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
+import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.controller.ControllerConf;
 import com.yammer.metrics.core.MetricsRegistry;
-import static com.linkedin.pinot.common.protocols.SegmentCompletionProtocol.ControllerResponseStatus;
-import static com.linkedin.pinot.common.protocols.SegmentCompletionProtocol.Request;
+import static org.apache.pinot.common.protocols.SegmentCompletionProtocol.ControllerResponseStatus;
+import static org.apache.pinot.common.protocols.SegmentCompletionProtocol.Request;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 

@@ -16,20 +16,20 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.indexsegment.immutable;
+package org.apache.pinot.core.indexsegment.immutable;
 
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.indexsegment.IndexSegmentUtils;
-import com.linkedin.pinot.core.io.reader.DataFileReader;
-import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
-import com.linkedin.pinot.core.segment.index.column.ColumnIndexContainer;
-import com.linkedin.pinot.core.segment.index.data.source.ColumnDataSource;
-import com.linkedin.pinot.core.segment.index.readers.Dictionary;
-import com.linkedin.pinot.core.segment.index.readers.InvertedIndexReader;
-import com.linkedin.pinot.core.segment.store.SegmentDirectory;
-import com.linkedin.pinot.core.startree.v2.StarTreeV2;
-import com.linkedin.pinot.core.startree.v2.store.StarTreeIndexContainer;
+import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.core.data.GenericRow;
+import org.apache.pinot.core.indexsegment.IndexSegmentUtils;
+import org.apache.pinot.core.io.reader.DataFileReader;
+import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
+import org.apache.pinot.core.segment.index.column.ColumnIndexContainer;
+import org.apache.pinot.core.segment.index.data.source.ColumnDataSource;
+import org.apache.pinot.core.segment.index.readers.Dictionary;
+import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
+import org.apache.pinot.core.segment.store.SegmentDirectory;
+import org.apache.pinot.core.startree.v2.StarTreeV2;
+import org.apache.pinot.core.startree.v2.store.StarTreeIndexContainer;
 import java.io.IOException;
 import java.util.HashSet;
 import java.util.List;

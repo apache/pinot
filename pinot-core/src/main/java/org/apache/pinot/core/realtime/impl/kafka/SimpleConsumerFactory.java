@@ -16,12 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.realtime.impl.kafka;
+package org.apache.pinot.core.realtime.impl.kafka;
 
 /**
  * This class is deprecated, and is kept for backward compatibility. Use {@link KafkaConsumerFactory} instead
- * Usages of com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerFactory in the table configs,
- * should be changed to com.linkedin.pinot.core.realtime.impl.kafka.KafkaConsumerFactory, as SimpleConsumerFactory will be deleted eventually
+ * Usages of org.apache.pinot.core.realtime.impl.kafka.SimpleConsumerFactory in the table configs,
+ * should be changed to org.apache.pinot.core.realtime.impl.kafka.KafkaConsumerFactory, as SimpleConsumerFactory will be deleted eventually
  */
 @Deprecated
 public class SimpleConsumerFactory extends KafkaConsumerFactory {

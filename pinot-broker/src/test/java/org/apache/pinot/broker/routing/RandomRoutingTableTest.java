@@ -16,12 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.broker.routing;
+package org.apache.pinot.broker.routing;
 
-import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.config.TableConfig.Builder;
-import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
+import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.common.config.TableConfig.Builder;
+import org.apache.pinot.common.config.TableNameBuilder;
+import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
 import java.io.FileInputStream;
 import java.net.URL;
 import java.util.ArrayList;

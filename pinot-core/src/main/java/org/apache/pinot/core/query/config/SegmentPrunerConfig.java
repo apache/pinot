@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.query.config;
+package org.apache.pinot.core.query.config;
 
 import java.util.ArrayList;
 import java.util.List;

@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.data.recordtransformer;
+package org.apache.pinot.core.data.recordtransformer;
 
-import com.linkedin.pinot.core.data.GenericRow;
+import org.apache.pinot.core.data.GenericRow;
 import javax.annotation.Nullable;
 
 

@@ -16,14 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.transport.common;
+package org.apache.pinot.transport.common;
 
 import java.net.InetAddress;
 
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import com.linkedin.pinot.common.response.ServerInstance;
+import org.apache.pinot.common.response.ServerInstance;
 
 
 public class ServerInstanceTest {

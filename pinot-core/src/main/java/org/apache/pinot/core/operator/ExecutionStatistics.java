@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.operator;
+package org.apache.pinot.core.operator;
 
 /**
  * The <code>ExecutionStatistics</code> class contains the operator statistics during execution time.

@@ -16,21 +16,21 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.tools.segment.converter;
+package org.apache.pinot.tools.segment.converter;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.exception.InvalidConfigException;
-import com.linkedin.pinot.common.segment.SegmentMetadata;
-import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
-import com.linkedin.pinot.core.minion.rollup.MergeRollupSegmentConverter;
-import com.linkedin.pinot.core.minion.rollup.MergeType;
-import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
-import com.linkedin.pinot.core.segment.name.NormalizedDateSegmentNameGenerator;
-import com.linkedin.pinot.tools.Command;
-import com.linkedin.pinot.tools.admin.command.AbstractBaseAdminCommand;
+import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.common.config.TableNameBuilder;
+import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.common.exception.InvalidConfigException;
+import org.apache.pinot.common.segment.SegmentMetadata;
+import org.apache.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.core.minion.rollup.MergeRollupSegmentConverter;
+import org.apache.pinot.core.minion.rollup.MergeType;
+import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
+import org.apache.pinot.core.segment.name.NormalizedDateSegmentNameGenerator;
+import org.apache.pinot.tools.Command;
+import org.apache.pinot.tools.admin.command.AbstractBaseAdminCommand;
 import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;

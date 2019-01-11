@@ -16,13 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.data.manager;
+package org.apache.pinot.core.data.manager;
 
-import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.metrics.ServerMetrics;
-import com.linkedin.pinot.core.data.manager.config.TableDataManagerConfig;
-import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
-import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.core.data.manager.config.TableDataManagerConfig;
+import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
+import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
 import java.io.File;
 import java.util.List;
 import javax.annotation.Nonnull;

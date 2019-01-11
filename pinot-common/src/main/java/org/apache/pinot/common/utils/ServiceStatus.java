@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.common.utils;
+package org.apache.pinot.common.utils;
 
-import com.linkedin.pinot.common.config.TableNameBuilder;
+import org.apache.pinot.common.config.TableNameBuilder;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;

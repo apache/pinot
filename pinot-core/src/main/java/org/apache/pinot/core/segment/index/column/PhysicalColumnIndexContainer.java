@@ -16,37 +16,37 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.segment.index.column;
+package org.apache.pinot.core.segment.index.column;
 
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.core.io.reader.DataFileReader;
-import com.linkedin.pinot.core.io.reader.SingleColumnSingleValueReader;
-import com.linkedin.pinot.core.io.reader.impl.v1.FixedBitMultiValueReader;
-import com.linkedin.pinot.core.io.reader.impl.v1.FixedBitSingleValueReader;
-import com.linkedin.pinot.core.io.reader.impl.v1.FixedByteChunkSingleValueReader;
-import com.linkedin.pinot.core.io.reader.impl.v1.SortedIndexReader;
-import com.linkedin.pinot.core.io.reader.impl.v1.SortedIndexReaderImpl;
-import com.linkedin.pinot.core.io.reader.impl.v1.VarByteChunkSingleValueReader;
-import com.linkedin.pinot.core.segment.index.ColumnMetadata;
-import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
-import com.linkedin.pinot.core.segment.index.readers.BitmapInvertedIndexReader;
-import com.linkedin.pinot.core.segment.index.readers.BloomFilterReader;
-import com.linkedin.pinot.core.segment.index.readers.BytesDictionary;
-import com.linkedin.pinot.core.segment.index.readers.DoubleDictionary;
-import com.linkedin.pinot.core.segment.index.readers.FloatDictionary;
-import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
-import com.linkedin.pinot.core.segment.index.readers.IntDictionary;
-import com.linkedin.pinot.core.segment.index.readers.InvertedIndexReader;
-import com.linkedin.pinot.core.segment.index.readers.LongDictionary;
-import com.linkedin.pinot.core.segment.index.readers.OnHeapDoubleDictionary;
-import com.linkedin.pinot.core.segment.index.readers.OnHeapFloatDictionary;
-import com.linkedin.pinot.core.segment.index.readers.OnHeapIntDictionary;
-import com.linkedin.pinot.core.segment.index.readers.OnHeapLongDictionary;
-import com.linkedin.pinot.core.segment.index.readers.OnHeapStringDictionary;
-import com.linkedin.pinot.core.segment.index.readers.StringDictionary;
-import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
-import com.linkedin.pinot.core.segment.store.ColumnIndexType;
-import com.linkedin.pinot.core.segment.store.SegmentDirectory;
+import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.core.io.reader.DataFileReader;
+import org.apache.pinot.core.io.reader.SingleColumnSingleValueReader;
+import org.apache.pinot.core.io.reader.impl.v1.FixedBitMultiValueReader;
+import org.apache.pinot.core.io.reader.impl.v1.FixedBitSingleValueReader;
+import org.apache.pinot.core.io.reader.impl.v1.FixedByteChunkSingleValueReader;
+import org.apache.pinot.core.io.reader.impl.v1.SortedIndexReader;
+import org.apache.pinot.core.io.reader.impl.v1.SortedIndexReaderImpl;
+import org.apache.pinot.core.io.reader.impl.v1.VarByteChunkSingleValueReader;
+import org.apache.pinot.core.segment.index.ColumnMetadata;
+import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.core.segment.index.readers.BitmapInvertedIndexReader;
+import org.apache.pinot.core.segment.index.readers.BloomFilterReader;
+import org.apache.pinot.core.segment.index.readers.BytesDictionary;
+import org.apache.pinot.core.segment.index.readers.DoubleDictionary;
+import org.apache.pinot.core.segment.index.readers.FloatDictionary;
+import org.apache.pinot.core.segment.index.readers.ImmutableDictionaryReader;
+import org.apache.pinot.core.segment.index.readers.IntDictionary;
+import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
+import org.apache.pinot.core.segment.index.readers.LongDictionary;
+import org.apache.pinot.core.segment.index.readers.OnHeapDoubleDictionary;
+import org.apache.pinot.core.segment.index.readers.OnHeapFloatDictionary;
+import org.apache.pinot.core.segment.index.readers.OnHeapIntDictionary;
+import org.apache.pinot.core.segment.index.readers.OnHeapLongDictionary;
+import org.apache.pinot.core.segment.index.readers.OnHeapStringDictionary;
+import org.apache.pinot.core.segment.index.readers.StringDictionary;
+import org.apache.pinot.core.segment.memory.PinotDataBuffer;
+import org.apache.pinot.core.segment.store.ColumnIndexType;
+import org.apache.pinot.core.segment.store.SegmentDirectory;
 import java.io.IOException;
 
 import org.slf4j.Logger;

@@ -16,11 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.io.writer.impl.v1;
+package org.apache.pinot.core.io.writer.impl.v1;
 
-import com.linkedin.pinot.core.io.compression.ChunkCompressor;
-import com.linkedin.pinot.core.io.compression.ChunkCompressorFactory;
-import com.linkedin.pinot.core.io.writer.SingleColumnSingleValueWriter;
+import org.apache.pinot.core.io.compression.ChunkCompressor;
+import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
+import org.apache.pinot.core.io.writer.SingleColumnSingleValueWriter;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;

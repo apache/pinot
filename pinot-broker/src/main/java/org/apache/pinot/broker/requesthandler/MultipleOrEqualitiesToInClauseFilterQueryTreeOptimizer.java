@@ -16,12 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.broker.requesthandler;
+package org.apache.pinot.broker.requesthandler;
 
 import com.google.common.base.Splitter;
-import com.linkedin.pinot.common.request.FilterOperator;
-import com.linkedin.pinot.common.utils.StringUtil;
-import com.linkedin.pinot.common.utils.request.FilterQueryTree;
+import org.apache.pinot.common.request.FilterOperator;
+import org.apache.pinot.common.utils.StringUtil;
+import org.apache.pinot.common.utils.request.FilterQueryTree;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;

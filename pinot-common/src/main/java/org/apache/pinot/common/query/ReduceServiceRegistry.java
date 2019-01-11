@@ -16,10 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.common.query;
+package org.apache.pinot.common.query;
 
-import com.linkedin.pinot.common.response.BrokerResponse;
-import com.linkedin.pinot.common.response.BrokerResponseFactory;
+import org.apache.pinot.common.response.BrokerResponse;
+import org.apache.pinot.common.response.BrokerResponseFactory;
 import java.util.HashMap;
 import java.util.Map;
 

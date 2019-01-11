@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.operator.docidsets;
+package org.apache.pinot.core.operator.docidsets;
 
-import com.linkedin.pinot.core.common.BlockDocIdSet;
+import org.apache.pinot.core.common.BlockDocIdSet;
 
 
 /**

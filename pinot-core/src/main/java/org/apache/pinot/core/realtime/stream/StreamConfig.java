@@ -16,13 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.realtime.stream;
+package org.apache.pinot.core.realtime.stream;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.utils.DataSize;
-import com.linkedin.pinot.common.utils.EqualityUtils;
-import com.linkedin.pinot.common.utils.time.TimeUtils;
-import com.linkedin.pinot.core.realtime.impl.kafka.KafkaConsumerFactory;
+import org.apache.pinot.common.utils.DataSize;
+import org.apache.pinot.common.utils.EqualityUtils;
+import org.apache.pinot.common.utils.time.TimeUtils;
+import org.apache.pinot.core.realtime.impl.kafka.KafkaConsumerFactory;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;

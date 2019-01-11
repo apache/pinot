@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.query.aggregation.groupby.utils;
+package org.apache.pinot.core.query.aggregation.groupby.utils;
 
-import com.linkedin.pinot.common.data.FieldSpec;
+import org.apache.pinot.common.data.FieldSpec;
 
 
 /**

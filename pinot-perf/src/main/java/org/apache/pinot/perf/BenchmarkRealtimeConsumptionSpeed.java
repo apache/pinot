@@ -16,15 +16,15 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.perf;
+package org.apache.pinot.perf;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.util.concurrent.Uninterruptibles;
-import com.linkedin.pinot.common.utils.KafkaStarterUtils;
-import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
-import com.linkedin.pinot.integration.tests.ClusterIntegrationTestUtils;
-import com.linkedin.pinot.integration.tests.RealtimeClusterIntegrationTest;
-import com.linkedin.pinot.util.TestUtils;
+import org.apache.pinot.common.utils.KafkaStarterUtils;
+import org.apache.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.integration.tests.ClusterIntegrationTestUtils;
+import org.apache.pinot.integration.tests.RealtimeClusterIntegrationTest;
+import org.apache.pinot.util.TestUtils;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;

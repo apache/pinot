@@ -16,13 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.common.query;
+package org.apache.pinot.common.query;
 
-import com.linkedin.pinot.common.metrics.BrokerMetrics;
-import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.common.response.BrokerResponse;
-import com.linkedin.pinot.common.response.ServerInstance;
-import com.linkedin.pinot.common.utils.DataTable;
+import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.response.BrokerResponse;
+import org.apache.pinot.common.response.ServerInstance;
+import org.apache.pinot.common.utils.DataTable;
 import java.util.Map;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;

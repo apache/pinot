@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.common.exception;
+package org.apache.pinot.common.exception;
 
 public class InvalidConfigException extends Exception {
 

@@ -16,26 +16,26 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.segment.index;
+package org.apache.pinot.core.segment.index;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.data.MetricFieldSpec;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
-import com.linkedin.pinot.common.segment.SegmentMetadata;
-import com.linkedin.pinot.common.segment.StarTreeMetadata;
-import com.linkedin.pinot.common.utils.JsonUtils;
-import com.linkedin.pinot.common.utils.time.TimeUtils;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
-import com.linkedin.pinot.core.segment.store.SegmentDirectoryPaths;
-import com.linkedin.pinot.core.startree.v2.StarTreeV2Constants;
-import com.linkedin.pinot.core.startree.v2.StarTreeV2Metadata;
-import com.linkedin.pinot.startree.hll.HllConstants;
+import org.apache.pinot.common.data.MetricFieldSpec;
+import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import org.apache.pinot.common.segment.SegmentMetadata;
+import org.apache.pinot.common.segment.StarTreeMetadata;
+import org.apache.pinot.common.utils.JsonUtils;
+import org.apache.pinot.common.utils.time.TimeUtils;
+import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
+import org.apache.pinot.core.segment.creator.impl.V1Constants;
+import org.apache.pinot.core.segment.store.SegmentDirectoryPaths;
+import org.apache.pinot.core.startree.v2.StarTreeV2Constants;
+import org.apache.pinot.core.startree.v2.StarTreeV2Metadata;
+import org.apache.pinot.startree.hll.HllConstants;
 import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -62,9 +62,9 @@ import org.joda.time.Interval;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.*;
-import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.*;
-import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.*;
+import static org.apache.pinot.core.segment.creator.impl.V1Constants.*;
+import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.*;
+import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.*;
 
 
 public class SegmentMetadataImpl implements SegmentMetadata {

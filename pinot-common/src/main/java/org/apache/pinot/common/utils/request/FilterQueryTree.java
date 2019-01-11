@@ -16,11 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.common.utils.request;
+package org.apache.pinot.common.utils.request;
 
 import com.google.common.collect.Lists;
-import com.linkedin.pinot.common.request.FilterOperator;
-import com.linkedin.pinot.common.utils.StringUtil;
+import org.apache.pinot.common.request.FilterOperator;
+import org.apache.pinot.common.utils.StringUtil;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;

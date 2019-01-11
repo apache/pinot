@@ -16,11 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.startree.v2;
+package org.apache.pinot.core.startree.v2;
 
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
-import com.linkedin.pinot.core.data.aggregator.SumValueAggregator;
-import com.linkedin.pinot.core.data.aggregator.ValueAggregator;
+import org.apache.pinot.common.data.FieldSpec.DataType;
+import org.apache.pinot.core.data.aggregator.SumValueAggregator;
+import org.apache.pinot.core.data.aggregator.ValueAggregator;
 import java.util.Random;
 
 import static org.testng.Assert.*;

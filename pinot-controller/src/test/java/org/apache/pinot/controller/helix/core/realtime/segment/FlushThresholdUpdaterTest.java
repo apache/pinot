@@ -16,17 +16,17 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.controller.helix.core.realtime.segment;
+package org.apache.pinot.controller.helix.core.realtime.segment;
 
-import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
-import com.linkedin.pinot.common.partition.PartitionAssignment;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.LLCSegmentName;
-import com.linkedin.pinot.core.realtime.impl.kafka.KafkaAvroMessageDecoder;
-import com.linkedin.pinot.core.realtime.impl.kafka.KafkaConsumerFactory;
-import com.linkedin.pinot.core.realtime.stream.StreamConfig;
-import com.linkedin.pinot.core.realtime.stream.StreamConfigProperties;
+import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
+import org.apache.pinot.common.partition.PartitionAssignment;
+import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.core.realtime.impl.kafka.KafkaAvroMessageDecoder;
+import org.apache.pinot.core.realtime.impl.kafka.KafkaConsumerFactory;
+import org.apache.pinot.core.realtime.stream.StreamConfig;
+import org.apache.pinot.core.realtime.stream.StreamConfigProperties;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;

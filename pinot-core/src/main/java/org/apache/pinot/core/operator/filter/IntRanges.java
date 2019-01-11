@@ -16,10 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.operator.filter;
+package org.apache.pinot.core.operator.filter;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.utils.Pairs;
+import org.apache.pinot.common.utils.Pairs;
 
 
 /**

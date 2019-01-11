@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.common.utils.retry;
+package org.apache.pinot.common.utils.retry;
 
 /**
  * The <code>AttemptsExceededException</code> indicates that the operation did not succeed within maximum number of

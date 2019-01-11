@@ -16,16 +16,16 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.operator;
+package org.apache.pinot.core.operator;
 
-import com.linkedin.pinot.common.exception.QueryException;
-import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.core.common.Block;
-import com.linkedin.pinot.core.common.Operator;
-import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
-import com.linkedin.pinot.core.query.reduce.CombineService;
-import com.linkedin.pinot.core.util.trace.TraceCallable;
-import com.linkedin.pinot.core.util.trace.TraceRunnable;
+import org.apache.pinot.common.exception.QueryException;
+import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.core.common.Block;
+import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
+import org.apache.pinot.core.query.reduce.CombineService;
+import org.apache.pinot.core.util.trace.TraceCallable;
+import org.apache.pinot.core.util.trace.TraceRunnable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;

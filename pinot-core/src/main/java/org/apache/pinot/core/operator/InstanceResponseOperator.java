@@ -16,11 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.operator;
+package org.apache.pinot.core.operator;
 
-import com.linkedin.pinot.core.common.Operator;
-import com.linkedin.pinot.core.operator.blocks.InstanceResponseBlock;
-import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
+import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
+import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 
 
 public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock> {

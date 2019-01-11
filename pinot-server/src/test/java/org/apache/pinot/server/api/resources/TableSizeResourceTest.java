@@ -16,10 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.server.api.resources;
+package org.apache.pinot.server.api.resources;
 
-import com.linkedin.pinot.common.restlet.resources.TableSizeInfo;
-import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
+import org.apache.pinot.common.restlet.resources.TableSizeInfo;
+import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
 import javax.ws.rs.core.Response;
 import org.testng.Assert;
 import org.testng.annotations.Test;

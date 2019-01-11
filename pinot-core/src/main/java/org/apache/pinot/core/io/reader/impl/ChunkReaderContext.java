@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.io.reader.impl;
+package org.apache.pinot.core.io.reader.impl;
 
 import java.nio.ByteBuffer;
 

@@ -16,14 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.minion.rollup;
+package org.apache.pinot.core.minion.rollup;
 
-import com.linkedin.pinot.common.data.MetricFieldSpec;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.minion.rollup.aggregate.ValueAggregator;
-import com.linkedin.pinot.core.minion.rollup.aggregate.ValueAggregatorFactory;
-import com.linkedin.pinot.core.minion.segment.RecordAggregator;
+import org.apache.pinot.common.data.MetricFieldSpec;
+import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.core.data.GenericRow;
+import org.apache.pinot.core.minion.rollup.aggregate.ValueAggregator;
+import org.apache.pinot.core.minion.rollup.aggregate.ValueAggregatorFactory;
+import org.apache.pinot.core.minion.segment.RecordAggregator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;

@@ -16,14 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.tools.streams;
+package org.apache.pinot.tools.streams;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.utils.JsonUtils;
-import com.linkedin.pinot.common.utils.KafkaStarterUtils;
-import com.linkedin.pinot.core.realtime.impl.kafka.KafkaJSONMessageDecoder;
+import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.common.utils.JsonUtils;
+import org.apache.pinot.common.utils.KafkaStarterUtils;
+import org.apache.pinot.core.realtime.impl.kafka.KafkaJSONMessageDecoder;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;

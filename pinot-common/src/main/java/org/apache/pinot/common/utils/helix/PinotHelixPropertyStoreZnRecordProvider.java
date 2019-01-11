@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.common.utils.helix;
+package org.apache.pinot.common.utils.helix;
 
 import org.apache.helix.AccessOption;
 import org.apache.helix.ZNRecord;

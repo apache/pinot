@@ -16,20 +16,20 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.startree;
+package org.apache.pinot.core.startree;
 
-import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.common.request.transform.TransformExpressionTree;
-import com.linkedin.pinot.common.utils.request.FilterQueryTree;
-import com.linkedin.pinot.common.utils.request.RequestUtils;
-import com.linkedin.pinot.core.common.BlockSingleValIterator;
-import com.linkedin.pinot.core.common.DataSource;
-import com.linkedin.pinot.core.common.Operator;
-import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.plan.FilterPlanNode;
-import com.linkedin.pinot.core.segment.index.readers.Dictionary;
-import com.linkedin.pinot.core.startree.plan.StarTreeFilterPlanNode;
-import com.linkedin.pinot.pql.parsers.Pql2Compiler;
+import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.request.transform.TransformExpressionTree;
+import org.apache.pinot.common.utils.request.FilterQueryTree;
+import org.apache.pinot.common.utils.request.RequestUtils;
+import org.apache.pinot.core.common.BlockSingleValIterator;
+import org.apache.pinot.core.common.DataSource;
+import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.indexsegment.IndexSegment;
+import org.apache.pinot.core.plan.FilterPlanNode;
+import org.apache.pinot.core.segment.index.readers.Dictionary;
+import org.apache.pinot.core.startree.plan.StarTreeFilterPlanNode;
+import org.apache.pinot.pql.parsers.Pql2Compiler;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;

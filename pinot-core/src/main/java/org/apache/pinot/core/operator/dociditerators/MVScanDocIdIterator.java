@@ -16,13 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.operator.dociditerators;
+package org.apache.pinot.core.operator.dociditerators;
 
-import com.linkedin.pinot.core.common.BlockMetadata;
-import com.linkedin.pinot.core.common.BlockMultiValIterator;
-import com.linkedin.pinot.core.common.BlockValSet;
-import com.linkedin.pinot.core.common.Constants;
-import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluator;
+import org.apache.pinot.core.common.BlockMetadata;
+import org.apache.pinot.core.common.BlockMultiValIterator;
+import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.common.Constants;
+import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import java.util.Arrays;
 import org.roaringbitmap.IntIterator;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;

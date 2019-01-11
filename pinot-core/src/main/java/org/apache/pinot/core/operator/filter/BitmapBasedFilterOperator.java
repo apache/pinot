@@ -16,14 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.operator.filter;
+package org.apache.pinot.core.operator.filter;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.core.common.DataSource;
-import com.linkedin.pinot.core.operator.blocks.FilterBlock;
-import com.linkedin.pinot.core.operator.docidsets.BitmapDocIdSet;
-import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluator;
-import com.linkedin.pinot.core.segment.index.readers.InvertedIndexReader;
+import org.apache.pinot.core.common.DataSource;
+import org.apache.pinot.core.operator.blocks.FilterBlock;
+import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
+import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
+import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
 import java.util.ArrayList;
 import java.util.List;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;

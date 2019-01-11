@@ -16,11 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.request;
+package org.apache.pinot.request;
 
-import com.linkedin.pinot.common.exception.QueryException;
-import com.linkedin.pinot.common.response.broker.BrokerResponseNative;
-import com.linkedin.pinot.common.response.broker.QueryProcessingException;
+import org.apache.pinot.common.exception.QueryException;
+import org.apache.pinot.common.response.broker.BrokerResponseNative;
+import org.apache.pinot.common.response.broker.QueryProcessingException;
 import java.io.IOException;
 import org.testng.Assert;
 import org.testng.annotations.Test;

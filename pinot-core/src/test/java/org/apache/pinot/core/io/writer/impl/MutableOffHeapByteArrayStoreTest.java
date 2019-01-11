@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.io.writer.impl;
+package org.apache.pinot.core.io.writer.impl;
 
-import com.linkedin.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
+import org.apache.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import java.util.Arrays;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;

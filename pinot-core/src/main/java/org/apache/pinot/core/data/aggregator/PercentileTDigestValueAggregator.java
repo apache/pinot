@@ -16,12 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.data.aggregator;
+package org.apache.pinot.core.data.aggregator;
 
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
-import com.linkedin.pinot.core.common.ObjectSerDeUtils;
-import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionType;
-import com.linkedin.pinot.core.query.aggregation.function.PercentileTDigestAggregationFunction;
+import org.apache.pinot.common.data.FieldSpec.DataType;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunctionType;
+import org.apache.pinot.core.query.aggregation.function.PercentileTDigestAggregationFunction;
 import com.tdunning.math.stats.TDigest;
 
 

@@ -16,14 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.data.aggregator;
+package org.apache.pinot.core.data.aggregator;
 
 import com.clearspring.analytics.stream.cardinality.CardinalityMergeException;
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
-import com.linkedin.pinot.core.common.ObjectSerDeUtils;
-import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionType;
-import com.linkedin.pinot.core.query.aggregation.function.DistinctCountHLLAggregationFunction;
+import org.apache.pinot.common.data.FieldSpec.DataType;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunctionType;
+import org.apache.pinot.core.query.aggregation.function.DistinctCountHLLAggregationFunction;
 
 
 public class DistinctCountHLLValueAggregator implements ValueAggregator<Object, HyperLogLog> {

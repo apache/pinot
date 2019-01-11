@@ -16,14 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.query.aggregation.function;
+package org.apache.pinot.core.query.aggregation.function;
 
 import com.google.common.math.DoubleMath;
-import com.linkedin.pinot.common.request.AggregationInfo;
-import com.linkedin.pinot.common.segment.SegmentMetadata;
-import com.linkedin.pinot.core.plan.AggregationFunctionInitializer;
-import com.linkedin.pinot.core.query.aggregation.AggregationFunctionContext;
-import com.linkedin.pinot.core.startree.v2.AggregationFunctionColumnPair;
+import org.apache.pinot.common.request.AggregationInfo;
+import org.apache.pinot.common.segment.SegmentMetadata;
+import org.apache.pinot.core.plan.AggregationFunctionInitializer;
+import org.apache.pinot.core.query.aggregation.AggregationFunctionContext;
+import org.apache.pinot.core.startree.v2.AggregationFunctionColumnPair;
 import java.io.Serializable;
 import java.util.List;
 import java.util.Locale;

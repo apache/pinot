@@ -16,13 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.broker.broker;
+package org.apache.pinot.broker.broker;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.broker.requesthandler.BrokerRequestHandler;
-import com.linkedin.pinot.broker.routing.RoutingTable;
-import com.linkedin.pinot.broker.routing.TimeBoundaryService;
-import com.linkedin.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
+import org.apache.pinot.broker.routing.RoutingTable;
+import org.apache.pinot.broker.routing.TimeBoundaryService;
+import org.apache.pinot.common.metrics.BrokerMetrics;
 import io.swagger.jaxrs.config.BeanConfig;
 import java.net.URI;
 import java.net.URL;
@@ -36,7 +36,7 @@ import org.glassfish.jersey.server.ResourceConfig;
 
 
 public class BrokerAdminApiApplication extends ResourceConfig {
-  private static final String RESOURCE_PACKAGE = "com.linkedin.pinot.broker.api.resources";
+  private static final String RESOURCE_PACKAGE = "org.apache.pinot.broker.api.resources";
 
   private URI _baseUri;
   private HttpServer _httpServer;

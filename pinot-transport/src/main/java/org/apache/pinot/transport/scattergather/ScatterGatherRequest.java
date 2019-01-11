@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.transport.scattergather;
+package org.apache.pinot.transport.scattergather;
 
-import com.linkedin.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.request.BrokerRequest;
 import java.util.List;
 import java.util.Map;
 
