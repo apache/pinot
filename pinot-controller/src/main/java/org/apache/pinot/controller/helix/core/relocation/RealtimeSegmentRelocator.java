@@ -45,9 +45,8 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * Manager to relocate completed segments to completed servers
- * Segment relocation will be done by this manager, instead of directly moving segments to completed servers on completion,
- * so that we don't get segment downtime when a segment is in transition
+ * Manager to relocate completed segments to "completed" servers
+ * We don't move segments directly to completed servers on completion, because we want to avoid a downtime when a segment is in transition
  *
  * We only relocate segments for realtime tables, and only if tenant config indicates that relocation is required
  * A segment will be relocated, one replica at a time, once all of its replicas are in ONLINE state and all/some are on servers other than completed servers

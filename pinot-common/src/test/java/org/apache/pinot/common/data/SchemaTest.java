@@ -322,6 +322,7 @@ public class SchemaTest {
     byte[] expectedEmptyDefault = new byte[0];
     byte[] expectedNonEmptyDefault = Hex.decodeHex("abcd1234".toCharArray());
 
+    expectedSchema.setSchemaName("test");
     expectedSchema.addField(new MetricFieldSpec("noDefault", FieldSpec.DataType.BYTES));
     expectedSchema.addField(new MetricFieldSpec("emptyDefault", FieldSpec.DataType.BYTES, expectedEmptyDefault));
     expectedSchema.addField(new MetricFieldSpec("nonEmptyDefault", FieldSpec.DataType.BYTES, expectedNonEmptyDefault));
