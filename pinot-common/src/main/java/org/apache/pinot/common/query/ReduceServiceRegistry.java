@@ -18,10 +18,10 @@
  */
 package org.apache.pinot.common.query;
 
-import org.apache.pinot.common.response.BrokerResponse;
-import org.apache.pinot.common.response.BrokerResponseFactory;
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.pinot.common.response.BrokerResponse;
+import org.apache.pinot.common.response.BrokerResponseFactory;
 
 
 /**

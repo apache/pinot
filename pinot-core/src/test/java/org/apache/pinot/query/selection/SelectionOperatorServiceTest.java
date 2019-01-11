@@ -18,13 +18,6 @@
  */
 package org.apache.pinot.query.selection;
 
-import org.apache.pinot.common.request.Selection;
-import org.apache.pinot.common.request.SelectionSort;
-import org.apache.pinot.common.response.broker.SelectionResults;
-import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.common.utils.DataTable;
-import org.apache.pinot.core.query.selection.SelectionOperatorService;
-import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -32,6 +25,13 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.PriorityQueue;
+import org.apache.pinot.common.request.Selection;
+import org.apache.pinot.common.request.SelectionSort;
+import org.apache.pinot.common.response.broker.SelectionResults;
+import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataTable;
+import org.apache.pinot.core.query.selection.SelectionOperatorService;
+import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;

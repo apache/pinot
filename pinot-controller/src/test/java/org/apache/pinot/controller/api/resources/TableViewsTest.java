@@ -18,6 +18,10 @@
  */
 package org.apache.pinot.controller.api.resources;
 
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.util.HashMap;
+import java.util.Map;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.utils.CommonConstants;
@@ -30,10 +34,6 @@ import org.apache.pinot.core.realtime.impl.kafka.KafkaAvroMessageDecoder;
 import org.apache.pinot.core.realtime.impl.kafka.KafkaConsumerFactory;
 import org.apache.pinot.core.realtime.stream.StreamConfig;
 import org.apache.pinot.core.realtime.stream.StreamConfigProperties;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.util.HashMap;
-import java.util.Map;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;

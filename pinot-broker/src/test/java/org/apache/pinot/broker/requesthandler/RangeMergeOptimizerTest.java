@@ -18,14 +18,14 @@
  */
 package org.apache.pinot.broker.requesthandler;
 
-import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.utils.request.FilterQueryTree;
-import org.apache.pinot.common.utils.request.RequestUtils;
-import org.apache.pinot.pql.parsers.Pql2Compiler;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.utils.request.FilterQueryTree;
+import org.apache.pinot.common.utils.request.RequestUtils;
+import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;

@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.common.utils.request;
 
+import java.util.List;
 import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.FilterOperator;
-import java.util.List;
 
 
 public class HavingQueryTree extends QueryTree {

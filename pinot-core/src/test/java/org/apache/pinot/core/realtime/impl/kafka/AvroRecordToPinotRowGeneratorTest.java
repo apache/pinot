@@ -18,13 +18,13 @@
  */
 package org.apache.pinot.core.realtime.impl.kafka;
 
-import org.apache.pinot.common.data.FieldSpec;
-import org.apache.pinot.core.data.GenericRow;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericData;
+import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.core.data.GenericRow;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 

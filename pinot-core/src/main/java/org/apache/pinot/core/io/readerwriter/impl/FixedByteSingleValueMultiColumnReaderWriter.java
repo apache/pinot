@@ -18,14 +18,14 @@
  */
 package org.apache.pinot.core.io.readerwriter.impl;
 
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import org.apache.pinot.core.io.reader.impl.FixedByteSingleValueMultiColReader;
 import org.apache.pinot.core.io.readerwriter.BaseSingleValueMultiColumnReaderWriter;
 import org.apache.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import org.apache.pinot.core.io.writer.impl.FixedByteSingleValueMultiColWriter;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
 
 
 /**

@@ -18,6 +18,17 @@
  */
 package org.apache.pinot.core.query.reduce;
 
+import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.BrokerMeter;
@@ -42,17 +53,6 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByTrimmingService;
 import org.apache.pinot.core.query.selection.SelectionOperatorService;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
-import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.TreeMap;
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
-import javax.annotation.concurrent.ThreadSafe;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -135,7 +135,7 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
       if (numSegmentsMatchedString != null) {
         numSegmentsMatched += Long.parseLong(numSegmentsMatchedString);
       }
-      
+
       String numTotalRawDocsString = metadata.get(DataTable.TOTAL_DOCS_METADATA_KEY);
       if (numTotalRawDocsString != null) {
         numTotalRawDocs += Long.parseLong(numTotalRawDocsString);

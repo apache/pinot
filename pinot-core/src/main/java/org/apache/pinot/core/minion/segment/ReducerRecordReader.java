@@ -19,14 +19,14 @@
 package org.apache.pinot.core.minion.segment;
 
 import com.google.common.base.Preconditions;
+import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.core.data.GenericRow;
 import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
 import org.apache.pinot.core.data.readers.RecordReader;
 import org.apache.pinot.core.data.readers.RecordReaderUtils;
-import java.io.File;
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * Record reader for reducer stage of the segment conversion

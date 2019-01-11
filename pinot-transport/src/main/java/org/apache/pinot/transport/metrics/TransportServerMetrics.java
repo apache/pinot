@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.transport.metrics;
 
-import org.apache.pinot.common.metrics.LatencyMetric;
 import com.yammer.metrics.core.Sampling;
 import com.yammer.metrics.core.Summarizable;
+import org.apache.pinot.common.metrics.LatencyMetric;
 
 
 public interface TransportServerMetrics {

@@ -18,14 +18,14 @@
  */
 package org.apache.pinot.core.operator.filter;
 
-import org.apache.pinot.core.common.BlockDocIdIterator;
-import org.apache.pinot.core.common.Constants;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.TreeSet;
 import org.apache.commons.lang3.ArrayUtils;
+import org.apache.pinot.core.common.BlockDocIdIterator;
+import org.apache.pinot.core.common.Constants;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 

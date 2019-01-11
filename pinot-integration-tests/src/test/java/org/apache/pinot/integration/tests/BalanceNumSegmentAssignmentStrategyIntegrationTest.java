@@ -19,18 +19,18 @@
 package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import org.apache.pinot.common.utils.JsonUtils;
-import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.helix.model.IdealState;
+import org.apache.pinot.common.utils.JsonUtils;
+import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertEquals;
 
 
 /**

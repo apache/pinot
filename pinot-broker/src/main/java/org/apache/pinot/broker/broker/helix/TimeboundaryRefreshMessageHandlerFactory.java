@@ -18,19 +18,17 @@
  */
 package org.apache.pinot.broker.broker.helix;
 
-import org.apache.pinot.broker.routing.HelixExternalViewBasedRouting;
-import org.apache.pinot.common.messages.TimeboundaryRefreshMessage;
-import com.sun.org.apache.xpath.internal.operations.Bool;
+import java.util.Iterator;
+import java.util.concurrent.ConcurrentHashMap;
 import org.apache.helix.NotificationContext;
 import org.apache.helix.messaging.handling.HelixTaskResult;
 import org.apache.helix.messaging.handling.MessageHandler;
 import org.apache.helix.messaging.handling.MessageHandlerFactory;
 import org.apache.helix.model.Message;
+import org.apache.pinot.broker.routing.HelixExternalViewBasedRouting;
+import org.apache.pinot.common.messages.TimeboundaryRefreshMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.Iterator;
-import java.util.concurrent.ConcurrentHashMap;
 
 // Handle the TimeboundaryRefresh message. The Timeboundary refresh requests are handled asynchronously: i.e., they are
 // first put into a request map first. The map dedups requests by their tables thus multiple requests for the same

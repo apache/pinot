@@ -22,13 +22,8 @@ import java.io.File;
 import java.io.IOException;
 import java.util.HashSet;
 import java.util.Set;
-
 import javax.annotation.Nonnull;
-
 import org.apache.commons.io.FileUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import org.apache.pinot.common.data.FieldSpec.DataType;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
@@ -47,6 +42,8 @@ import org.apache.pinot.core.segment.index.readers.StringDictionary;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.apache.pinot.core.segment.store.ColumnIndexType;
 import org.apache.pinot.core.segment.store.SegmentDirectory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class BloomFilterHandler {

@@ -19,17 +19,12 @@
 package org.apache.pinot.core.operator.dociditerators;
 
 import java.util.List;
-
-import org.apache.commons.lang3.tuple.Pair;
-
 import org.apache.pinot.common.utils.Pairs.IntPair;
-import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.common.Constants;
-import org.apache.pinot.core.operator.docidsets.SortedDocIdSet;
 
 public final class SortedDocIdIterator implements IndexBasedDocIdIterator {
   /**
-   * 
+   *
    */
   private List<IntPair> pairs;
   private String datasourceName;

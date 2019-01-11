@@ -18,9 +18,6 @@
  */
 package org.apache.pinot.controller.api.resources;
 
-import org.apache.pinot.common.config.PinotTaskConfig;
-import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
-import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
@@ -36,6 +33,9 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
 import org.apache.helix.task.TaskState;
+import org.apache.pinot.common.config.PinotTaskConfig;
+import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
+import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 
 
 @Api(tags = Constants.TASK_TAG)

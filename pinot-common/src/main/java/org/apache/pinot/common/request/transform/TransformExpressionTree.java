@@ -18,19 +18,18 @@
  */
 package org.apache.pinot.common.request.transform;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+import javax.annotation.Nonnull;
 import org.apache.pinot.common.utils.EqualityUtils;
-import org.apache.pinot.pql.parsers.Pql2CompilationException;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.apache.pinot.pql.parsers.pql2.ast.AstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.FunctionCallAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.IdentifierAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.LiteralAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.StringLiteralAstNode;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
-import java.util.Set;
-import javax.annotation.Nonnull;
 
 
 /**

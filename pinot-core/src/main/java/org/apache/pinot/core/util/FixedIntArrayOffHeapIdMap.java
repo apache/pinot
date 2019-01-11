@@ -18,13 +18,13 @@
  */
 package org.apache.pinot.core.util;
 
+import java.io.IOException;
+import java.util.Arrays;
+import javax.annotation.Nonnull;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import org.apache.pinot.core.io.readerwriter.impl.FixedByteSingleValueMultiColumnReaderWriter;
 import org.apache.pinot.core.realtime.impl.dictionary.BaseOffHeapMutableDictionary;
-import java.io.IOException;
-import java.util.Arrays;
-import javax.annotation.Nonnull;
 
 
 /**

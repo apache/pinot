@@ -19,11 +19,6 @@
 package org.apache.pinot.core.query.scheduler;
 
 import com.google.common.base.Preconditions;
-import org.apache.pinot.common.metrics.ServerMetrics;
-import org.apache.pinot.core.query.scheduler.resources.PolicyBasedResourceManager;
-import org.apache.pinot.core.query.scheduler.resources.ResourceLimitPolicy;
-import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
-import org.apache.pinot.core.query.scheduler.resources.UnboundedResourceManager;
 import com.yammer.metrics.core.MetricsRegistry;
 import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -32,11 +27,17 @@ import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.core.query.scheduler.resources.PolicyBasedResourceManager;
+import org.apache.pinot.core.query.scheduler.resources.ResourceLimitPolicy;
+import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
+import org.apache.pinot.core.query.scheduler.resources.UnboundedResourceManager;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.core.query.scheduler.TestHelper.*;
-import static org.testng.Assert.*;
+import static org.apache.pinot.core.query.scheduler.TestHelper.createQueryRequest;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 
 public class MultiLevelPriorityQueueTest {

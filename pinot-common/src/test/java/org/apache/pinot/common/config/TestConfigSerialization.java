@@ -19,11 +19,6 @@
 package org.apache.pinot.common.config;
 
 import com.google.common.collect.Lists;
-import org.apache.pinot.common.config.CombinedConfig;
-import org.apache.pinot.common.config.CombinedConfigLoader;
-import org.apache.pinot.common.config.Deserializer;
-import org.apache.pinot.common.config.Serializer;
-import org.apache.pinot.common.config.TableConfig;
 import io.vavr.collection.Map;
 import java.io.File;
 import org.testng.Assert;

@@ -18,13 +18,13 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
+import javax.annotation.Nonnull;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.core.util.ArrayCopyUtils;
-import javax.annotation.Nonnull;
 
 
 /**

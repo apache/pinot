@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.broker.api;
 
-import org.apache.pinot.common.response.BrokerResponse;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.common.response.BrokerResponse;
 
 
 /**

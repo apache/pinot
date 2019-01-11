@@ -19,11 +19,11 @@
 package org.apache.pinot.controller.helix.core.realtime.segment;
 
 import com.google.common.annotations.VisibleForTesting;
+import javax.annotation.Nonnull;
 import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import org.apache.pinot.common.partition.PartitionAssignment;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.time.TimeUtils;
-import javax.annotation.Nonnull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

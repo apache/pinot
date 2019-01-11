@@ -18,14 +18,14 @@
  */
 package org.apache.pinot.minion.executor;
 
-import org.apache.pinot.common.config.PinotTaskConfig;
-import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
-import org.apache.pinot.core.common.MinionConstants;
-import org.apache.pinot.core.minion.RawIndexConverter;
 import java.io.File;
 import java.util.Collections;
 import java.util.Map;
 import javax.annotation.Nonnull;
+import org.apache.pinot.common.config.PinotTaskConfig;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
+import org.apache.pinot.core.common.MinionConstants;
+import org.apache.pinot.core.minion.RawIndexConverter;
 
 
 public class ConvertToRawIndexTaskExecutor extends BaseSingleSegmentConversionExecutor {

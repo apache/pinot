@@ -21,12 +21,12 @@ package org.apache.pinot.common.data;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
+import java.util.concurrent.TimeUnit;
+import javax.annotation.Nonnull;
 import org.apache.pinot.common.config.ConfigKey;
 import org.apache.pinot.common.data.FieldSpec.DataType;
 import org.apache.pinot.common.utils.EqualityUtils;
 import org.apache.pinot.common.utils.JsonUtils;
-import java.util.concurrent.TimeUnit;
-import javax.annotation.Nonnull;
 import org.joda.time.DateTime;
 import org.joda.time.format.DateTimeFormat;
 

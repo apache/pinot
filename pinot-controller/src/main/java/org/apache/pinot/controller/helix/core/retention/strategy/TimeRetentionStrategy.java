@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.controller.helix.core.retention.strategy;
 
+import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.time.TimeUtils;
-import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

@@ -18,10 +18,10 @@
  */
 package org.apache.pinot.request;
 
+import java.io.IOException;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
-import java.io.IOException;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 

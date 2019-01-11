@@ -18,11 +18,11 @@
  */
 package org.apache.pinot.core.predicate;
 
+import java.util.Collections;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.core.common.predicate.RangePredicate;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.RangePredicateEvaluatorFactory;
-import java.util.Collections;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 

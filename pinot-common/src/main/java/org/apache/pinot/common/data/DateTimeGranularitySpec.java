@@ -20,10 +20,9 @@ package org.apache.pinot.common.data;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
-import org.apache.pinot.common.utils.EqualityUtils;
-import org.apache.commons.lang3.EnumUtils;
-
 import java.util.concurrent.TimeUnit;
+import org.apache.commons.lang3.EnumUtils;
+import org.apache.pinot.common.utils.EqualityUtils;
 
 /**
  * Class to represent granularity from {@link DateTimeFieldSpec}

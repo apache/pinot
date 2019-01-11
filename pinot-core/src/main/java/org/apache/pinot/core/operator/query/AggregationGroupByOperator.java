@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.query;
 
+import javax.annotation.Nonnull;
 import org.apache.pinot.common.request.GroupBy;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
@@ -29,7 +30,6 @@ import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.DefaultGroupByExecutor;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByExecutor;
 import org.apache.pinot.core.startree.executor.StarTreeGroupByExecutor;
-import javax.annotation.Nonnull;
 
 
 /**

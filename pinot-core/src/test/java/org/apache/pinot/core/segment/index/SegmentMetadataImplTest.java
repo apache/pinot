@@ -19,21 +19,23 @@
 package org.apache.pinot.core.segment.index;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
-import org.apache.pinot.core.segment.creator.SegmentIndexCreationDriver;
-import org.apache.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
-import org.apache.pinot.segments.v1.creator.SegmentTestUtils;
-import org.apache.pinot.util.TestUtils;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import org.apache.pinot.core.segment.creator.SegmentIndexCreationDriver;
+import org.apache.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
+import org.apache.pinot.segments.v1.creator.SegmentTestUtils;
+import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertTrue;
 
 
 public class SegmentMetadataImplTest {

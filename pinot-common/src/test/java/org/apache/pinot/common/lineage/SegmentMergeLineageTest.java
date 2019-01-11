@@ -18,11 +18,11 @@
  */
 package org.apache.pinot.common.lineage;
 
-import org.apache.pinot.common.exception.InvalidConfigException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import org.apache.pinot.common.exception.InvalidConfigException;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 

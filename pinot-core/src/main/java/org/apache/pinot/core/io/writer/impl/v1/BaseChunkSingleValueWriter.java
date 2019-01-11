@@ -18,15 +18,15 @@
  */
 package org.apache.pinot.core.io.writer.impl.v1;
 
-import org.apache.pinot.core.io.compression.ChunkCompressor;
-import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
-import org.apache.pinot.core.io.writer.SingleColumnSingleValueWriter;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import org.apache.pinot.core.io.compression.ChunkCompressor;
+import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
+import org.apache.pinot.core.io.writer.SingleColumnSingleValueWriter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

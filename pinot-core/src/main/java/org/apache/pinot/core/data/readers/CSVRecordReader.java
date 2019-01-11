@@ -18,9 +18,6 @@
  */
 package org.apache.pinot.core.data.readers;
 
-import org.apache.pinot.common.data.FieldSpec;
-import org.apache.pinot.common.data.Schema;
-import org.apache.pinot.core.data.GenericRow;
 import java.io.File;
 import java.io.IOException;
 import java.util.Iterator;
@@ -28,6 +25,9 @@ import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
 import org.apache.commons.lang.StringUtils;
+import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.core.data.GenericRow;
 
 
 /**

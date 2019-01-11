@@ -18,15 +18,6 @@
  */
 package org.apache.pinot.broker.routing.builder;
 
-import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.metadata.ZKMetadataProvider;
-import org.apache.pinot.common.metadata.segment.ColumnPartitionMetadata;
-import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
-import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
-import org.apache.pinot.common.metrics.BrokerMetrics;
-import org.apache.pinot.common.partition.ReplicaGroupPartitionAssignment;
-import org.apache.pinot.common.partition.ReplicaGroupPartitionAssignmentGenerator;
-import org.apache.pinot.common.utils.CommonConstants;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -37,6 +28,15 @@ import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.metadata.segment.ColumnPartitionMetadata;
+import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.common.partition.ReplicaGroupPartitionAssignment;
+import org.apache.pinot.common.partition.ReplicaGroupPartitionAssignmentGenerator;
+import org.apache.pinot.common.utils.CommonConstants;
 
 
 /**

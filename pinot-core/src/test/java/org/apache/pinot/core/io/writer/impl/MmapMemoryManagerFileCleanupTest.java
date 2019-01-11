@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.core.io.writer.impl;
 
-import org.apache.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import java.io.File;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;

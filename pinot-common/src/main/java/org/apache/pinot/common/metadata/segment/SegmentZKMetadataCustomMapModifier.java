@@ -20,13 +20,13 @@ package org.apache.pinot.common.metadata.segment;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import org.apache.pinot.common.utils.JsonUtils;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.utils.JsonUtils;
 
 
 /**

@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.common.config;
 
-import org.apache.pinot.common.Utils;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
 import com.typesafe.config.ConfigIncludeContext;
@@ -38,6 +37,7 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
+import org.apache.pinot.common.Utils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

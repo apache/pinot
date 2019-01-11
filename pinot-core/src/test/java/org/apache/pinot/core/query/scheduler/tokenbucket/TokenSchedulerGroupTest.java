@@ -20,7 +20,8 @@ package org.apache.pinot.core.query.scheduler.tokenbucket;
 
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 
 public class TokenSchedulerGroupTest {

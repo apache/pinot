@@ -38,13 +38,13 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
-import org.apache.pinot.common.utils.JsonUtils;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.commons.lang.math.IntRange;
+import org.apache.pinot.common.utils.JsonUtils;
 
 
 /**

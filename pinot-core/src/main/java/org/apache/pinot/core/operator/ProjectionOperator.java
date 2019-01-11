@@ -18,15 +18,15 @@
  */
 package org.apache.pinot.core.operator;
 
+import java.util.HashMap;
+import java.util.Map;
+import javax.annotation.Nonnull;
 import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.DataBlockCache;
 import org.apache.pinot.core.common.DataFetcher;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.operator.blocks.DocIdSetBlock;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
-import java.util.HashMap;
-import java.util.Map;
-import javax.annotation.Nonnull;
 
 
 public class ProjectionOperator extends BaseOperator<ProjectionBlock> {

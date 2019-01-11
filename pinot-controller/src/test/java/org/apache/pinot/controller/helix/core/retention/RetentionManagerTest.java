@@ -18,6 +18,12 @@
  */
 package org.apache.pinot.controller.helix.core.retention;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+import org.apache.helix.HelixAdmin;
+import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
@@ -31,12 +37,6 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotTableIdealStateBuilder;
 import org.apache.pinot.controller.helix.core.SegmentDeletionManager;
 import org.apache.pinot.controller.helix.core.util.ZKMetadataUtils;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.concurrent.TimeUnit;
-import org.apache.helix.HelixAdmin;
-import org.apache.helix.model.IdealState;
 import org.joda.time.Duration;
 import org.joda.time.Interval;
 import org.mockito.ArgumentMatchers;
@@ -47,7 +47,6 @@ import org.testng.annotations.Test;
 
 import static org.mockito.Matchers.anyInt;
 import static org.mockito.Matchers.anyString;
-import static org.mockito.Mockito.anyList;
 import static org.mockito.Mockito.*;
 
 

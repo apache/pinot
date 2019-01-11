@@ -18,20 +18,16 @@
  */
 package org.apache.pinot.tools.admin.command;
 
-
-import org.apache.pinot.common.utils.ZkStarter;
-import org.apache.pinot.tools.Command;
+import com.google.common.io.Files;
 import java.io.File;
 import java.io.IOException;
-
 import org.I0Itec.zkclient.IDefaultNameSpace;
-import org.I0Itec.zkclient.ZkServer;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.utils.ZkStarter;
+import org.apache.pinot.tools.Command;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.google.common.io.Files;
 
 /**
  * Class for command to start ZooKeeper.

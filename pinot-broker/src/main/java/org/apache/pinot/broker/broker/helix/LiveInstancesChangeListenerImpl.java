@@ -18,16 +18,16 @@
  */
 package org.apache.pinot.broker.broker.helix;
 
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import org.apache.helix.NotificationContext;
+import org.apache.helix.api.listeners.LiveInstanceChangeListener;
+import org.apache.helix.model.LiveInstance;
 import org.apache.pinot.common.response.ServerInstance;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.transport.netty.PooledNettyClientResourceManager;
 import org.apache.pinot.transport.pool.KeyedPool;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import org.apache.helix.api.listeners.LiveInstanceChangeListener;
-import org.apache.helix.NotificationContext;
-import org.apache.helix.model.LiveInstance;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

@@ -19,7 +19,6 @@
 package org.apache.pinot.common.utils;
 
 import com.google.common.base.Preconditions;
-import org.apache.pinot.common.exception.HttpErrorStatusException;
 import java.io.BufferedOutputStream;
 import java.io.Closeable;
 import java.io.File;
@@ -55,6 +54,7 @@ import org.apache.http.entity.mime.content.InputStreamBody;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
+import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

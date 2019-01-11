@@ -18,13 +18,6 @@
  */
 package org.apache.pinot.tools.scan.query;
 
-import org.apache.pinot.core.common.BlockMultiValIterator;
-import org.apache.pinot.core.common.BlockSingleValIterator;
-import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
-import org.apache.pinot.core.query.utils.Pair;
-import org.apache.pinot.core.segment.index.ColumnMetadata;
-import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
-import org.apache.pinot.core.segment.index.readers.Dictionary;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -33,6 +26,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.lang.ArrayUtils;
+import org.apache.pinot.core.common.BlockMultiValIterator;
+import org.apache.pinot.core.common.BlockSingleValIterator;
+import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
+import org.apache.pinot.core.query.utils.Pair;
+import org.apache.pinot.core.segment.index.ColumnMetadata;
+import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
+import org.apache.pinot.core.segment.index.readers.Dictionary;
 
 
 public class Projection {

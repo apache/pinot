@@ -18,10 +18,10 @@
  */
 package org.apache.pinot.core.segment.creator.impl.stats;
 
-import org.apache.pinot.core.segment.creator.StatsCollectorConfig;
 import it.unimi.dsi.fastutil.doubles.DoubleOpenHashSet;
 import it.unimi.dsi.fastutil.doubles.DoubleSet;
 import java.util.Arrays;
+import org.apache.pinot.core.segment.creator.StatsCollectorConfig;
 
 
 public class DoubleColumnPreIndexStatsCollector extends AbstractColumnStatisticsCollector {

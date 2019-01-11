@@ -19,13 +19,6 @@
 package org.apache.pinot.integration.tests;
 
 import com.google.common.base.Function;
-import org.apache.pinot.client.ConnectionFactory;
-import org.apache.pinot.common.config.TableTaskConfig;
-import org.apache.pinot.common.utils.KafkaStarterUtils;
-import org.apache.pinot.common.utils.TarGzCompressionUtils;
-import org.apache.pinot.common.utils.ZkStarter;
-import org.apache.pinot.core.realtime.impl.kafka.KafkaConsumerFactory;
-import org.apache.pinot.util.TestUtils;
 import java.io.File;
 import java.net.URL;
 import java.sql.Connection;
@@ -36,6 +29,13 @@ import java.util.concurrent.Executor;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.client.ConnectionFactory;
+import org.apache.pinot.common.config.TableTaskConfig;
+import org.apache.pinot.common.utils.KafkaStarterUtils;
+import org.apache.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.common.utils.ZkStarter;
+import org.apache.pinot.core.realtime.impl.kafka.KafkaConsumerFactory;
+import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 
 

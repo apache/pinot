@@ -18,13 +18,12 @@
  */
 package org.apache.pinot.core.query.selection.iterator;
 
+import java.io.Serializable;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.utils.primitive.ByteArray;
-import org.apache.pinot.core.segment.index.readers.Dictionary;
-import java.io.Serializable;
-
 import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.BlockSingleValIterator;
+import org.apache.pinot.core.segment.index.readers.Dictionary;
 
 
 /**

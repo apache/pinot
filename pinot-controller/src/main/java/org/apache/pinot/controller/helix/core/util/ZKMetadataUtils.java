@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.controller.helix.core.util;
 
+import java.util.HashMap;
+import java.util.Map;
 import org.apache.pinot.common.metadata.segment.ColumnPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
@@ -26,8 +28,6 @@ import org.apache.pinot.common.utils.CommonConstants.Segment.SegmentType;
 import org.apache.pinot.core.data.partition.PartitionFunction;
 import org.apache.pinot.core.segment.index.ColumnMetadata;
 import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
-import java.util.HashMap;
-import java.util.Map;
 
 
 public class ZKMetadataUtils {

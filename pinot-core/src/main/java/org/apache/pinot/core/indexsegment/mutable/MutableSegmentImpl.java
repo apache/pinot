@@ -19,6 +19,13 @@
 package org.apache.pinot.core.indexsegment.mutable;
 
 import com.google.common.base.Preconditions;
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import org.apache.pinot.common.config.SegmentPartitionConfig;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.Schema;
@@ -46,13 +53,6 @@ import org.apache.pinot.core.startree.v2.StarTreeV2;
 import org.apache.pinot.core.util.FixedIntArray;
 import org.apache.pinot.core.util.FixedIntArrayOffHeapIdMap;
 import org.apache.pinot.core.util.IdMap;
-import java.io.IOException;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
 import org.roaringbitmap.IntIterator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

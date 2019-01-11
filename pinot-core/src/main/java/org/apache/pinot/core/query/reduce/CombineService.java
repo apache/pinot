@@ -18,6 +18,11 @@
  */
 package org.apache.pinot.core.query.reduce;
 
+import java.io.Serializable;
+import java.util.Collection;
+import java.util.List;
+import java.util.PriorityQueue;
+import javax.annotation.Nonnull;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.Selection;
@@ -26,11 +31,6 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.query.aggregation.AggregationFunctionContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
-import java.io.Serializable;
-import java.util.Collection;
-import java.util.List;
-import java.util.PriorityQueue;
-import javax.annotation.Nonnull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

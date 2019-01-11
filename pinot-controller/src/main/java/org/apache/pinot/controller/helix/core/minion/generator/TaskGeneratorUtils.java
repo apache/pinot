@@ -18,15 +18,15 @@
  */
 package org.apache.pinot.controller.helix.core.minion.generator;
 
-import org.apache.pinot.common.config.PinotTaskConfig;
-import org.apache.pinot.common.data.Segment;
-import org.apache.pinot.controller.helix.core.minion.ClusterInfoProvider;
-import org.apache.pinot.core.common.MinionConstants;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nonnull;
 import org.apache.helix.task.TaskState;
+import org.apache.pinot.common.config.PinotTaskConfig;
+import org.apache.pinot.common.data.Segment;
+import org.apache.pinot.controller.helix.core.minion.ClusterInfoProvider;
+import org.apache.pinot.core.common.MinionConstants;
 
 
 public class TaskGeneratorUtils {

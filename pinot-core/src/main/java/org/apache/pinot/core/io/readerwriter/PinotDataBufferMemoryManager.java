@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.core.io.readerwriter;
 
-import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.Closeable;
+import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 
 
 /**

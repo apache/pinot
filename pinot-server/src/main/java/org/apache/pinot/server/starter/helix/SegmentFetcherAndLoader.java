@@ -19,6 +19,14 @@
 package org.apache.pinot.server.starter.helix;
 
 import com.google.common.base.Preconditions;
+import java.io.File;
+import java.util.concurrent.locks.Lock;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+import org.apache.commons.configuration.Configuration;
+import org.apache.commons.io.FileUtils;
+import org.apache.helix.ZNRecord;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
@@ -34,14 +42,6 @@ import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.index.loader.LoaderUtils;
 import org.apache.pinot.core.segment.index.loader.V3RemoveIndexException;
 import org.apache.pinot.filesystem.PinotFSFactory;
-import java.io.File;
-import java.util.concurrent.locks.Lock;
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
-import org.apache.commons.configuration.Configuration;
-import org.apache.commons.io.FileUtils;
-import org.apache.helix.ZNRecord;
-import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

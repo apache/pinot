@@ -18,8 +18,11 @@
  */
 package org.apache.pinot.perf;
 
-import org.apache.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
+import org.apache.pinot.core.io.writer.impl.DirectMemoryManager;
+import org.apache.pinot.core.realtime.impl.dictionary.LongOffHeapMutableDictionary;
+import org.apache.pinot.core.realtime.impl.dictionary.LongOnHeapMutableDictionary;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Mode;
@@ -32,9 +35,6 @@ import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.options.ChainedOptionsBuilder;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 import org.openjdk.jmh.runner.options.TimeValue;
-import org.apache.pinot.core.io.writer.impl.DirectMemoryManager;
-import org.apache.pinot.core.realtime.impl.dictionary.LongOffHeapMutableDictionary;
-import org.apache.pinot.core.realtime.impl.dictionary.LongOnHeapMutableDictionary;
 
 
 @State(Scope.Benchmark)

@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.core.metadata;
 
-import org.apache.pinot.common.segment.SegmentMetadata;
 import java.io.File;
+import org.apache.pinot.common.segment.SegmentMetadata;
 
 
 /**

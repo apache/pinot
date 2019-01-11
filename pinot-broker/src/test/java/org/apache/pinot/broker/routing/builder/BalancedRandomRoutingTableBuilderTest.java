@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.broker.routing.builder;
 
-import org.apache.pinot.broker.routing.RoutingTableLookupRequest;
-import org.apache.pinot.common.config.TableConfig;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -29,6 +27,8 @@ import java.util.Set;
 import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
+import org.apache.pinot.broker.routing.RoutingTableLookupRequest;
+import org.apache.pinot.common.config.TableConfig;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 

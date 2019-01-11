@@ -19,10 +19,6 @@
 package org.apache.pinot.tools.query.comparison;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import org.apache.pinot.common.utils.JsonUtils;
-import org.apache.pinot.tools.scan.query.GroupByOperator;
-import org.apache.pinot.tools.scan.query.QueryResponse;
-import org.apache.pinot.tools.scan.query.ScanBasedQueryProcessor;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
@@ -31,6 +27,10 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.common.utils.JsonUtils;
+import org.apache.pinot.tools.scan.query.GroupByOperator;
+import org.apache.pinot.tools.scan.query.QueryResponse;
+import org.apache.pinot.tools.scan.query.ScanBasedQueryProcessor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

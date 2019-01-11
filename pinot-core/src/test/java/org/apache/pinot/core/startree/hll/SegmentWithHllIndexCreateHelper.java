@@ -18,6 +18,12 @@
  */
 package org.apache.pinot.core.startree.hll;
 
+import java.io.File;
+import java.io.IOException;
+import java.net.URL;
+import java.nio.file.Files;
+import java.util.concurrent.TimeUnit;
+import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.data.DimensionFieldSpec;
 import org.apache.pinot.common.data.MetricFieldSpec;
 import org.apache.pinot.common.data.Schema;
@@ -32,12 +38,6 @@ import org.apache.pinot.segments.v1.creator.SegmentTestUtils;
 import org.apache.pinot.startree.hll.HllConfig;
 import org.apache.pinot.startree.hll.HllConstants;
 import org.apache.pinot.util.TestUtils;
-import java.io.File;
-import java.io.IOException;
-import java.net.URL;
-import java.nio.file.Files;
-import java.util.concurrent.TimeUnit;
-import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

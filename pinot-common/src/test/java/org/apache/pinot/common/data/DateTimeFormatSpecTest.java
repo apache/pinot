@@ -18,11 +18,11 @@
  */
 package org.apache.pinot.common.data;
 
-import org.apache.pinot.common.data.DateTimeFieldSpec.TimeFormat;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.common.data.DateTimeFieldSpec.TimeFormat;
 import org.joda.time.DateTimeZone;
 import org.joda.time.format.DateTimeFormat;
 import org.testng.Assert;

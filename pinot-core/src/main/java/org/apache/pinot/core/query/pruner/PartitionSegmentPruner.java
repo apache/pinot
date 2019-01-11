@@ -18,6 +18,11 @@
  */
 package org.apache.pinot.core.query.pruner;
 
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import org.apache.commons.configuration.Configuration;
+import org.apache.commons.lang.math.IntRange;
 import org.apache.pinot.common.request.FilterOperator;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
 import org.apache.pinot.core.data.partition.PartitionFunction;
@@ -26,12 +31,6 @@ import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.segment.index.ColumnMetadata;
 import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.index.readers.BloomFilterReader;
-
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import org.apache.commons.configuration.Configuration;
-import org.apache.commons.lang.math.IntRange;
 
 
 /**

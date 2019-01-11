@@ -19,12 +19,12 @@
 package org.apache.pinot.controller.helix.core.minion.generator;
 
 import com.clearspring.analytics.util.Preconditions;
-import org.apache.pinot.controller.helix.core.minion.ClusterInfoProvider;
-import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nonnull;
+import org.apache.pinot.controller.helix.core.minion.ClusterInfoProvider;
+import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 
 
 /**

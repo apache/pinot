@@ -23,8 +23,6 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.Arrays;
 import java.util.concurrent.TimeUnit;
-
-import org.joda.time.DateTime;
 import org.joda.time.Duration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,7 +34,7 @@ import org.slf4j.LoggerFactory;
 public class FunctionInvoker {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(FunctionInvoker.class);
-  // Don't log more than 10 entries in 5 MINUTES 
+  // Don't log more than 10 entries in 5 MINUTES
   //TODO:Convert this functionality into a class that can be used in other places
   private static long EXCEPTION_LIMIT_DURATION = TimeUnit.MINUTES.toMillis(5);
   private static long EXCEPTION_LIMIT_RATE = 10;

@@ -19,12 +19,6 @@
 package org.apache.pinot.core.segment.index.loader;
 
 import com.google.common.annotations.VisibleForTesting;
-import org.apache.pinot.common.config.IndexingConfig;
-import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.segment.ReadMode;
-import org.apache.pinot.core.data.manager.config.InstanceDataManagerConfig;
-import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
-import org.apache.pinot.core.segment.index.loader.columnminmaxvalue.ColumnMinMaxValueGeneratorMode;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -33,6 +27,12 @@ import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.config.IndexingConfig;
+import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.common.segment.ReadMode;
+import org.apache.pinot.core.data.manager.config.InstanceDataManagerConfig;
+import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
+import org.apache.pinot.core.segment.index.loader.columnminmaxvalue.ColumnMinMaxValueGeneratorMode;
 
 
 /**

@@ -18,6 +18,10 @@
  */
 package org.apache.pinot.core.operator.query;
 
+import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
 import org.apache.pinot.common.request.Selection;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Block;
@@ -30,10 +34,6 @@ import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.query.selection.SelectionFetcher;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
-import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
 
 
 /**

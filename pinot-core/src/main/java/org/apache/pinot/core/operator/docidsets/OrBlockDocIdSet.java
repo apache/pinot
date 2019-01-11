@@ -18,13 +18,13 @@
  */
 package org.apache.pinot.core.operator.docidsets;
 
+import java.util.ArrayList;
+import java.util.List;
 import org.apache.pinot.common.utils.Pairs;
 import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.operator.dociditerators.BitmapDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.OrDocIdIterator;
-import java.util.ArrayList;
-import java.util.List;
 import org.roaringbitmap.IntIterator;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;

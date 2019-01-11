@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.tools.segment.converter;
 
+import java.io.File;
+import java.lang.reflect.Field;
+import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.data.StarTreeIndexSpec;
 import org.apache.pinot.common.segment.SegmentMetadata;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
@@ -29,9 +32,6 @@ import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl
 import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.name.DefaultSegmentNameGenerator;
 import org.apache.pinot.core.segment.name.SegmentNameGenerator;
-import java.io.File;
-import java.lang.reflect.Field;
-import org.apache.commons.io.FileUtils;
 import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.Option;
 

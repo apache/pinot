@@ -18,13 +18,13 @@
  */
 package org.apache.pinot.broker.routing.builder;
 
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 import org.apache.pinot.common.config.RoutingConfig;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.utils.CommonConstants;
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
 
 
 /**

@@ -18,10 +18,6 @@
  */
 package org.apache.pinot.core.realtime.impl.kafka;
 
-import org.apache.pinot.common.data.Schema;
-import org.apache.pinot.common.utils.retry.RetryPolicies;
-import org.apache.pinot.core.data.GenericRow;
-import org.apache.pinot.core.realtime.stream.StreamMessageDecoder;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -42,6 +38,10 @@ import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.io.DatumReader;
 import org.apache.avro.io.DecoderFactory;
 import org.apache.commons.lang.StringUtils;
+import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.common.utils.retry.RetryPolicies;
+import org.apache.pinot.core.data.GenericRow;
+import org.apache.pinot.core.realtime.stream.StreamMessageDecoder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

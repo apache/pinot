@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.core.query.aggregation;
 
-import org.apache.pinot.core.operator.blocks.TransformBlock;
 import java.util.List;
 import javax.annotation.Nonnull;
+import org.apache.pinot.core.operator.blocks.TransformBlock;
 
 
 /**

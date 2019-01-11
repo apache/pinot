@@ -18,10 +18,10 @@
  */
 package org.apache.pinot.controller.api.resources;
 
-import org.slf4j.LoggerFactory;
-import org.slf4j.Logger;
-import org.apache.pinot.common.utils.CommonConstants;
 import javax.ws.rs.WebApplicationException;
+import org.apache.pinot.common.utils.CommonConstants;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class Constants {

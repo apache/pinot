@@ -18,15 +18,6 @@
  */
 package org.apache.pinot.core.query.selection;
 
-import org.apache.pinot.common.request.Selection;
-import org.apache.pinot.common.request.SelectionSort;
-import org.apache.pinot.common.response.ServerInstance;
-import org.apache.pinot.common.response.broker.SelectionResults;
-import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.common.utils.DataTable;
-import org.apache.pinot.core.common.DataSourceMetadata;
-import org.apache.pinot.core.common.datatable.DataTableBuilder;
-import org.apache.pinot.core.indexsegment.IndexSegment;
 import java.io.Serializable;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
@@ -44,6 +35,15 @@ import java.util.PriorityQueue;
 import java.util.Set;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.request.Selection;
+import org.apache.pinot.common.request.SelectionSort;
+import org.apache.pinot.common.response.ServerInstance;
+import org.apache.pinot.common.response.broker.SelectionResults;
+import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataTable;
+import org.apache.pinot.core.common.DataSourceMetadata;
+import org.apache.pinot.core.common.datatable.DataTableBuilder;
+import org.apache.pinot.core.indexsegment.IndexSegment;
 
 
 /**

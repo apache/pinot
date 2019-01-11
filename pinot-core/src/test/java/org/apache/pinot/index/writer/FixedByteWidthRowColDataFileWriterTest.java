@@ -18,15 +18,15 @@
  */
 package org.apache.pinot.index.writer;
 
-import org.apache.pinot.core.io.reader.impl.FixedByteSingleValueMultiColReader;
-import org.apache.pinot.core.io.writer.impl.FixedByteSingleValueMultiColWriter;
-import org.apache.pinot.core.segment.creator.impl.V1Constants;
-import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.util.Random;
 import org.apache.commons.lang.StringUtils;
+import org.apache.pinot.core.io.reader.impl.FixedByteSingleValueMultiColReader;
+import org.apache.pinot.core.io.writer.impl.FixedByteSingleValueMultiColWriter;
+import org.apache.pinot.core.segment.creator.impl.V1Constants;
+import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 

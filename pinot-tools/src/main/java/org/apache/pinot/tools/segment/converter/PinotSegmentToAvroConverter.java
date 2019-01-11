@@ -18,17 +18,15 @@
  */
 package org.apache.pinot.tools.segment.converter;
 
-import org.apache.pinot.core.data.GenericRow;
-import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
-import org.apache.pinot.core.util.AvroUtils;
-
+import java.io.File;
+import java.util.Arrays;
 import org.apache.avro.Schema;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData.Record;
 import org.apache.avro.generic.GenericDatumWriter;
-
-import java.io.File;
-import java.util.Arrays;
+import org.apache.pinot.core.data.GenericRow;
+import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
+import org.apache.pinot.core.util.AvroUtils;
 
 
 /**

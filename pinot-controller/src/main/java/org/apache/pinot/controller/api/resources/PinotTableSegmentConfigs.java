@@ -18,10 +18,6 @@
  */
 package org.apache.pinot.controller.api.resources;
 
-import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.metrics.ControllerMeter;
-import org.apache.pinot.common.metrics.ControllerMetrics;
-import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
@@ -35,6 +31,10 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.common.metrics.ControllerMeter;
+import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

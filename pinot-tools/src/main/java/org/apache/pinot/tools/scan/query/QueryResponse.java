@@ -20,11 +20,11 @@ package org.apache.pinot.tools.scan.query;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import org.apache.pinot.common.utils.JsonUtils;
-import org.apache.pinot.core.query.utils.Pair;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.pinot.common.utils.JsonUtils;
+import org.apache.pinot.core.query.utils.Pair;
 
 
 public class QueryResponse {

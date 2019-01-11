@@ -18,6 +18,12 @@
  */
 package org.apache.pinot.tools;
 
+import java.io.File;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.common.segment.SegmentMetadata;
@@ -30,12 +36,6 @@ import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.core.startree.v2.StarTreeV2;
-import java.io.File;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.Option;

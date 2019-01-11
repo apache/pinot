@@ -19,16 +19,16 @@
 package org.apache.pinot.tools.admin.command;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
-import org.apache.pinot.common.utils.JsonUtils;
-import org.apache.pinot.common.utils.TenantRole;
-import org.apache.pinot.tools.QuickstartTableRequest;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
+import org.apache.pinot.common.utils.JsonUtils;
+import org.apache.pinot.common.utils.TenantRole;
+import org.apache.pinot.tools.QuickstartTableRequest;
 
 
 public class QuickstartRunner {

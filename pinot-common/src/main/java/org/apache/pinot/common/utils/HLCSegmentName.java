@@ -37,8 +37,8 @@ package org.apache.pinot.common.utils;
 //    sequenceNumber: 1465314044238
 // see org.apache.pinot.controller.helix.core.PinotTableIdealStateBuilder#getGroupIdFromRealtimeDataTable for details on the groupId
 
-import org.apache.commons.lang.StringUtils;
 import com.google.common.collect.Lists;
+import org.apache.commons.lang.StringUtils;
 
 
 public class HLCSegmentName extends SegmentName {

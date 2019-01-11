@@ -18,12 +18,12 @@
  */
 package org.apache.pinot.broker.routing.builder;
 
-import org.apache.pinot.common.utils.CommonConstants;
-import org.apache.pinot.common.utils.SegmentName;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.SortedSet;
 import org.apache.helix.model.ExternalView;
+import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.SegmentName;
 
 
 /**

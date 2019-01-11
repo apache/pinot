@@ -18,10 +18,6 @@
  */
 package org.apache.pinot.transport.netty;
 
-import org.apache.pinot.common.metrics.MetricsHelper;
-import org.apache.pinot.common.metrics.MetricsHelper.TimerContext;
-import org.apache.pinot.common.response.ServerInstance;
-import org.apache.pinot.transport.metrics.NettyClientMetrics;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.Channel;
@@ -44,6 +40,10 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import org.apache.pinot.common.metrics.MetricsHelper;
+import org.apache.pinot.common.metrics.MetricsHelper.TimerContext;
+import org.apache.pinot.common.response.ServerInstance;
+import org.apache.pinot.transport.metrics.NettyClientMetrics;
 
 
 /**

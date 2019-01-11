@@ -18,14 +18,14 @@
  */
 package org.apache.pinot.core.realtime.converter.stats;
 
+import java.util.HashMap;
+import java.util.Map;
 import org.apache.pinot.common.config.SegmentPartitionConfig;
 import org.apache.pinot.core.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.core.realtime.converter.RealtimeSegmentRecordReader;
 import org.apache.pinot.core.segment.creator.ColumnStatistics;
 import org.apache.pinot.core.segment.creator.SegmentPreIndexStatsContainer;
 import org.apache.pinot.core.segment.index.data.source.ColumnDataSource;
-import java.util.HashMap;
-import java.util.Map;
 
 
 /**

@@ -18,10 +18,10 @@
  */
 package org.apache.pinot.core.segment.store;
 
-import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
-import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import java.io.File;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
+import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 

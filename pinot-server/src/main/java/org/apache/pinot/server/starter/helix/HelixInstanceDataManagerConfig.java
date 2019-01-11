@@ -18,11 +18,11 @@
  */
 package org.apache.pinot.server.starter.helix;
 
-import org.apache.pinot.common.segment.ReadMode;
-import org.apache.pinot.core.data.manager.config.InstanceDataManagerConfig;
 import java.util.Iterator;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
+import org.apache.pinot.common.segment.ReadMode;
+import org.apache.pinot.core.data.manager.config.InstanceDataManagerConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

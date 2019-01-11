@@ -19,6 +19,17 @@
 package org.apache.pinot.core.segment.creator.impl;
 
 import com.google.common.base.Preconditions;
+import java.io.File;
+import java.io.IOException;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import org.apache.commons.configuration.ConfigurationException;
+import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.commons.lang.math.IntRange;
 import org.apache.pinot.common.config.ColumnPartitionConfig;
 import org.apache.pinot.common.data.DateTimeFieldSpec;
 import org.apache.pinot.common.data.FieldSpec;
@@ -46,17 +57,6 @@ import org.apache.pinot.core.segment.creator.impl.fwd.SingleValueVarByteRawIndex
 import org.apache.pinot.core.segment.creator.impl.inv.OffHeapBitmapInvertedIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.inv.OnHeapBitmapInvertedIndexCreator;
 import org.apache.pinot.startree.hll.HllConfig;
-import java.io.File;
-import java.io.IOException;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import org.apache.commons.configuration.ConfigurationException;
-import org.apache.commons.configuration.PropertiesConfiguration;
-import org.apache.commons.lang.math.IntRange;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
 import org.slf4j.Logger;

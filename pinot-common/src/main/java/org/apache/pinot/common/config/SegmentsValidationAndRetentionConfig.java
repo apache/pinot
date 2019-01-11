@@ -20,9 +20,9 @@ package org.apache.pinot.common.config;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import java.lang.reflect.Field;
 import org.apache.pinot.common.utils.EqualityUtils;
 import org.apache.pinot.startree.hll.HllConfig;
-import java.lang.reflect.Field;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

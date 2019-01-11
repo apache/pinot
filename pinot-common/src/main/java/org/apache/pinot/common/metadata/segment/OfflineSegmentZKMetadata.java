@@ -19,15 +19,14 @@
 package org.apache.pinot.common.metadata.segment;
 
 import java.util.Map;
-
 import org.apache.helix.ZNRecord;
-
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.CommonConstants.Segment.SegmentType;
-import static org.apache.pinot.common.utils.EqualityUtils.isEqual;
+
 import static org.apache.pinot.common.utils.EqualityUtils.hashCodeOf;
-import static org.apache.pinot.common.utils.EqualityUtils.isSameReference;
+import static org.apache.pinot.common.utils.EqualityUtils.isEqual;
 import static org.apache.pinot.common.utils.EqualityUtils.isNullOrNotSameClass;
+import static org.apache.pinot.common.utils.EqualityUtils.isSameReference;
 
 
 public class OfflineSegmentZKMetadata extends SegmentZKMetadata {

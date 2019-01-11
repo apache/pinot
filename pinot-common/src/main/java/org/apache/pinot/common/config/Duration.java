@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.common.config;
 
-import org.apache.pinot.common.utils.EqualityUtils;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.common.utils.EqualityUtils;
 
 
 /**

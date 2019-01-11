@@ -19,8 +19,6 @@
 package org.apache.pinot.common.utils;
 
 import com.google.common.base.Preconditions;
-import org.apache.pinot.common.data.FieldSpec;
-import org.apache.pinot.common.data.Schema;
 import java.io.IOException;
 import java.net.URL;
 import java.util.concurrent.TimeUnit;
@@ -35,6 +33,8 @@ import org.apache.commons.httpclient.methods.multipart.Part;
 import org.apache.commons.httpclient.methods.multipart.StringPart;
 import org.apache.commons.httpclient.params.HttpMethodParams;
 import org.apache.helix.ZNRecord;
+import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.common.data.Schema;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

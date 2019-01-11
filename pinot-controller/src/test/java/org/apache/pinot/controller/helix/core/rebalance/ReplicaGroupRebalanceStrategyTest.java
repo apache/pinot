@@ -18,6 +18,13 @@
  */
 package org.apache.pinot.controller.helix.core.rebalance;
 
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
+import org.apache.commons.configuration.Configuration;
+import org.apache.commons.configuration.plist.PropertyListConfiguration;
+import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.config.ReplicaGroupStrategyConfig;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.config.TableNameBuilder;
@@ -29,13 +36,6 @@ import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.ControllerRequestBuilderUtil;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.utils.ReplicaGroupTestUtils;
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Set;
-import org.apache.commons.configuration.Configuration;
-import org.apache.commons.configuration.plist.PropertyListConfiguration;
-import org.apache.helix.model.IdealState;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;

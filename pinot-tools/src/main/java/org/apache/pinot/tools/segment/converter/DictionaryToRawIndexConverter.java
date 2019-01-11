@@ -18,6 +18,15 @@
  */
 package org.apache.pinot.tools.segment.converter;
 
+import java.io.File;
+import java.io.IOException;
+import java.lang.reflect.Field;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import org.apache.commons.configuration.ConfigurationException;
+import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.common.utils.StringUtil;
@@ -32,15 +41,6 @@ import org.apache.pinot.core.segment.creator.SingleValueRawIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.SegmentColumnarIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
-import java.io.File;
-import java.io.IOException;
-import java.lang.reflect.Field;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
-import org.apache.commons.configuration.ConfigurationException;
-import org.apache.commons.configuration.PropertiesConfiguration;
-import org.apache.commons.io.FileUtils;
 import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;

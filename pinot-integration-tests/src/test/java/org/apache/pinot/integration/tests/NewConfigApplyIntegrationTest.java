@@ -20,22 +20,20 @@ package org.apache.pinot.integration.tests;
 
 import com.google.common.base.Joiner;
 import com.google.common.collect.Lists;
-import org.apache.pinot.common.config.CombinedConfig;
-import org.apache.pinot.common.config.CombinedConfigLoader;
-import org.apache.pinot.common.config.Serializer;
-import org.apache.pinot.util.TestUtils;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.config.CombinedConfig;
+import org.apache.pinot.common.config.CombinedConfigLoader;
+import org.apache.pinot.util.TestUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNull;
 
 
 /**

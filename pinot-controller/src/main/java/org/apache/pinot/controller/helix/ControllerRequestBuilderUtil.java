@@ -19,13 +19,6 @@
 package org.apache.pinot.controller.helix;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import org.apache.pinot.common.config.TableNameBuilder;
-import org.apache.pinot.common.config.TagNameUtils;
-import org.apache.pinot.common.config.Tenant;
-import org.apache.pinot.common.config.Tenant.TenantBuilder;
-import org.apache.pinot.common.utils.CommonConstants;
-import org.apache.pinot.common.utils.JsonUtils;
-import org.apache.pinot.common.utils.TenantRole;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.helix.HelixManager;
@@ -35,8 +28,16 @@ import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.helix.participant.StateMachineEngine;
 import org.apache.helix.participant.statemachine.StateModelFactory;
+import org.apache.pinot.common.config.TableNameBuilder;
+import org.apache.pinot.common.config.TagNameUtils;
+import org.apache.pinot.common.config.Tenant;
+import org.apache.pinot.common.config.Tenant.TenantBuilder;
+import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.JsonUtils;
+import org.apache.pinot.common.utils.TenantRole;
 
-import static org.apache.pinot.common.utils.CommonConstants.Helix.*;
+import static org.apache.pinot.common.utils.CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE;
+import static org.apache.pinot.common.utils.CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE;
 
 
 public class ControllerRequestBuilderUtil {

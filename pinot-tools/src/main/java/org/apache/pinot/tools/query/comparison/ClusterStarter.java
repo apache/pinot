@@ -18,6 +18,15 @@
  */
 package org.apache.pinot.tools.query.comparison;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.net.SocketException;
+import java.net.URL;
+import java.net.URLConnection;
+import java.net.URLEncoder;
+import java.net.UnknownHostException;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.NetUtil;
@@ -32,15 +41,6 @@ import org.apache.pinot.tools.admin.command.StartServerCommand;
 import org.apache.pinot.tools.admin.command.StartZookeeperCommand;
 import org.apache.pinot.tools.admin.command.UploadSegmentCommand;
 import org.apache.pinot.tools.perf.PerfBenchmarkDriver;
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.net.SocketException;
-import java.net.URL;
-import java.net.URLConnection;
-import java.net.URLEncoder;
-import java.net.UnknownHostException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

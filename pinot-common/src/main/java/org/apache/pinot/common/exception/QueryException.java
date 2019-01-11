@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.common.exception;
 
-import org.apache.pinot.common.response.ProcessingException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import org.apache.pinot.common.response.ProcessingException;
 
 
 public class QueryException {

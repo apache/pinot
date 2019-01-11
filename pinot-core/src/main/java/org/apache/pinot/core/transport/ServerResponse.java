@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.core.transport;
 
-import org.apache.pinot.common.utils.DataTable;
 import javax.annotation.concurrent.ThreadSafe;
+import org.apache.pinot.common.utils.DataTable;
 
 
 /**

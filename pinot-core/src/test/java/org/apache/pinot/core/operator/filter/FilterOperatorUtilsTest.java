@@ -22,7 +22,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertTrue;
 
 
 public class FilterOperatorUtilsTest {

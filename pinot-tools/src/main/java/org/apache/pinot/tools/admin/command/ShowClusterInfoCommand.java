@@ -18,9 +18,6 @@
  */
 package org.apache.pinot.tools.admin.command;
 
-import org.apache.pinot.common.config.TableNameBuilder;
-import org.apache.pinot.common.utils.CommonConstants;
-import org.apache.pinot.tools.Command;
 import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -41,6 +38,9 @@ import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.LiveInstance;
+import org.apache.pinot.common.config.TableNameBuilder;
+import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.tools.Command;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

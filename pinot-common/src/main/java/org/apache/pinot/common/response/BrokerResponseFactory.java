@@ -18,10 +18,10 @@
  */
 package org.apache.pinot.common.response;
 
-import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import java.util.List;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.response.broker.BrokerResponseNative;
 
 
 /**

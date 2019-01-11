@@ -18,13 +18,13 @@
  */
 package org.apache.pinot.core.io.reader.impl.v1;
 
+import java.io.IOException;
+import java.nio.ByteBuffer;
 import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
 import org.apache.pinot.core.io.compression.ChunkDecompressor;
 import org.apache.pinot.core.io.reader.BaseSingleColumnSingleValueReader;
 import org.apache.pinot.core.io.reader.impl.ChunkReaderContext;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
-import java.io.IOException;
-import java.nio.ByteBuffer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

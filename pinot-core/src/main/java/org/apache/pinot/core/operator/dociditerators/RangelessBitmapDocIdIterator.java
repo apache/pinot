@@ -18,10 +18,9 @@
  */
 package org.apache.pinot.core.operator.dociditerators;
 
-import org.roaringbitmap.IntIterator;
-
 import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.common.Constants;
+import org.roaringbitmap.IntIterator;
 
 public class RangelessBitmapDocIdIterator implements BlockDocIdIterator {
 

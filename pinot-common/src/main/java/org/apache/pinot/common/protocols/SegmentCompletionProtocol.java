@@ -21,9 +21,9 @@ package org.apache.pinot.common.protocols;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import org.apache.pinot.common.utils.JsonUtils;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.common.utils.JsonUtils;
 
 
 /*

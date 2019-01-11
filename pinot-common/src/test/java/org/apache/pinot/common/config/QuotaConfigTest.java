@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.common.config;
 
-import org.apache.pinot.common.utils.JsonUtils;
 import java.io.IOException;
 import org.apache.commons.configuration.ConfigurationRuntimeException;
+import org.apache.pinot.common.utils.JsonUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 

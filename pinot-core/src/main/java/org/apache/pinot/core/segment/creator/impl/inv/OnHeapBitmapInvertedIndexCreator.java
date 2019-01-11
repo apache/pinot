@@ -19,14 +19,14 @@
 package org.apache.pinot.core.segment.creator.impl.inv;
 
 import com.google.common.base.Preconditions;
-import org.apache.pinot.core.segment.creator.InvertedIndexCreator;
-import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import java.io.BufferedOutputStream;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.core.segment.creator.InvertedIndexCreator;
+import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 

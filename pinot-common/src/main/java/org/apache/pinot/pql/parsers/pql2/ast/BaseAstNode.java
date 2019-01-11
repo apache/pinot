@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.pql.parsers.pql2.ast;
 
-import org.apache.pinot.common.request.BrokerRequest;
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.pinot.common.request.BrokerRequest;
 
 
 /**

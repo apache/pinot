@@ -18,10 +18,10 @@
  */
 package org.apache.pinot.core.io.readerwriter;
 
-import org.apache.pinot.core.io.reader.SingleValueMultiColumnReader;
-import org.apache.pinot.core.io.reader.ReaderContext;
-import org.apache.pinot.core.io.writer.SingleValueMultiColumnWriter;
 import java.io.IOException;
+import org.apache.pinot.core.io.reader.ReaderContext;
+import org.apache.pinot.core.io.reader.SingleValueMultiColumnReader;
+import org.apache.pinot.core.io.writer.SingleValueMultiColumnWriter;
 
 
 /**

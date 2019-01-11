@@ -18,12 +18,12 @@
  */
 package org.apache.pinot.tools.admin.command;
 
+import java.io.File;
+import java.io.FileNotFoundException;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.tools.Command;
-import java.io.File;
-import java.io.FileNotFoundException;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

@@ -19,8 +19,6 @@
 package org.apache.pinot.controller.api.resources;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import org.apache.pinot.common.Utils;
-import org.apache.pinot.common.utils.JsonUtils;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiResponse;
@@ -29,6 +27,8 @@ import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
+import org.apache.pinot.common.Utils;
+import org.apache.pinot.common.utils.JsonUtils;
 
 
 /**

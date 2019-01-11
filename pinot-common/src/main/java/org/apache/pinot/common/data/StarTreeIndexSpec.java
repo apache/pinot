@@ -21,16 +21,16 @@ package org.apache.pinot.common.data;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.Sets;
-import org.apache.pinot.common.config.ConfigKey;
-import org.apache.pinot.common.segment.StarTreeMetadata;
-import org.apache.pinot.common.utils.EqualityUtils;
-import org.apache.pinot.common.utils.JsonUtils;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import java.util.Set;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
+import org.apache.pinot.common.config.ConfigKey;
+import org.apache.pinot.common.segment.StarTreeMetadata;
+import org.apache.pinot.common.utils.EqualityUtils;
+import org.apache.pinot.common.utils.JsonUtils;
 
 
 @SuppressWarnings("unused")

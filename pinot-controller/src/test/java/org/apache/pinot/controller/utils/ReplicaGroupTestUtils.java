@@ -18,17 +18,17 @@
  */
 package org.apache.pinot.controller.utils;
 
-import org.apache.pinot.common.config.ReplicaGroupStrategyConfig;
-import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.partition.ReplicaGroupPartitionAssignment;
-import org.apache.pinot.common.segment.SegmentMetadata;
-import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.pinot.common.config.ReplicaGroupStrategyConfig;
+import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.common.partition.ReplicaGroupPartitionAssignment;
+import org.apache.pinot.common.segment.SegmentMetadata;
+import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 
 
 public class ReplicaGroupTestUtils {

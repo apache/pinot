@@ -19,8 +19,6 @@
 package org.apache.pinot.core.startree.v2.builder;
 
 import com.google.common.base.Preconditions;
-import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
-import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import it.unimi.dsi.fastutil.ints.IntComparator;
 import java.io.BufferedOutputStream;
 import java.io.File;
@@ -34,8 +32,10 @@ import java.util.Iterator;
 import java.util.List;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
+import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 
-import static org.apache.pinot.core.startree.v2.StarTreeV2Constants.*;
+import static org.apache.pinot.core.startree.v2.StarTreeV2Constants.STAR_IN_FORWARD_INDEX;
 
 
 /**

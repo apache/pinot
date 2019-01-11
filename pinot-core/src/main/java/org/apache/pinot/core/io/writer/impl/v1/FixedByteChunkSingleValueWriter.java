@@ -18,10 +18,10 @@
  */
 package org.apache.pinot.core.io.writer.impl.v1;
 
-import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
 import java.io.File;
 import java.io.FileNotFoundException;
 import javax.annotation.concurrent.NotThreadSafe;
+import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
 
 
 /**

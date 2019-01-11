@@ -18,17 +18,19 @@
  */
 package org.apache.pinot.core.data.recordtransformer;
 
+import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.data.TimeFieldSpec;
 import org.apache.pinot.common.data.TimeGranularitySpec;
 import org.apache.pinot.core.data.GenericRow;
-import java.util.concurrent.TimeUnit;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.fail;
 
 
 public class TimeTransformerTest {

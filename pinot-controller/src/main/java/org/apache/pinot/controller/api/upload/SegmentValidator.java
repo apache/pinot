@@ -18,6 +18,12 @@
  */
 package org.apache.pinot.controller.api.upload;
 
+import java.io.File;
+import java.util.Date;
+import java.util.concurrent.Executor;
+import javax.annotation.Nonnull;
+import javax.ws.rs.core.Response;
+import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.exception.InvalidConfigException;
@@ -30,12 +36,6 @@ import org.apache.pinot.controller.api.resources.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.controller.validation.StorageQuotaChecker;
-import java.io.File;
-import java.util.Date;
-import java.util.concurrent.Executor;
-import javax.annotation.Nonnull;
-import javax.ws.rs.core.Response;
-import org.apache.commons.httpclient.HttpConnectionManager;
 import org.joda.time.Interval;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

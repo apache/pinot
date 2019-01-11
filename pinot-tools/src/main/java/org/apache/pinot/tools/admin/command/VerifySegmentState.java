@@ -19,15 +19,15 @@
 package org.apache.pinot.tools.admin.command;
 
 import com.google.common.collect.Sets;
-import org.apache.pinot.common.config.TableNameBuilder;
-import org.apache.pinot.tools.AbstractBaseCommand;
-import org.apache.pinot.tools.Command;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.helix.manager.zk.ZKHelixAdmin;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
+import org.apache.pinot.common.config.TableNameBuilder;
+import org.apache.pinot.tools.AbstractBaseCommand;
+import org.apache.pinot.tools.Command;
 import org.kohsuke.args4j.CmdLineException;
 import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.Option;

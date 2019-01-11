@@ -21,6 +21,7 @@ package org.apache.pinot.common.utils;
 import java.util.Arrays;
 import org.testng.Assert;
 import org.testng.annotations.Test;
+
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.fail;
 

@@ -19,8 +19,6 @@
 package org.apache.pinot.core.startree;
 
 import com.google.common.collect.BiMap;
-import org.apache.pinot.core.data.GenericRow;
-import org.apache.pinot.core.segment.creator.ColumnIndexCreationInfo;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
@@ -28,6 +26,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.pinot.core.data.GenericRow;
+import org.apache.pinot.core.segment.creator.ColumnIndexCreationInfo;
 
 
 public interface StarTreeBuilder extends Closeable {

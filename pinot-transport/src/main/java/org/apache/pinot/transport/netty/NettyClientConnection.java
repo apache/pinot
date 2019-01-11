@@ -18,15 +18,15 @@
  */
 package org.apache.pinot.transport.netty;
 
-import org.apache.pinot.common.response.ServerInstance;
-import org.apache.pinot.transport.common.AsyncResponseFuture;
-import org.apache.pinot.transport.common.Callback;
-import org.apache.pinot.transport.common.NoneType;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.Channel;
 import io.netty.channel.EventLoopGroup;
 import io.netty.util.Timer;
+import org.apache.pinot.common.response.ServerInstance;
+import org.apache.pinot.transport.common.AsyncResponseFuture;
+import org.apache.pinot.transport.common.Callback;
+import org.apache.pinot.transport.common.NoneType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

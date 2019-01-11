@@ -18,6 +18,10 @@
  */
 package org.apache.pinot.core.startree;
 
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
@@ -30,10 +34,6 @@ import org.apache.pinot.core.plan.FilterPlanNode;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.core.startree.plan.StarTreeFilterPlanNode;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
 import org.testng.Assert;
 
 

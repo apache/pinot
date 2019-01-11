@@ -19,11 +19,6 @@
 package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import org.apache.pinot.common.data.Schema;
-import org.apache.pinot.tools.query.comparison.QueryComparison;
-import org.apache.pinot.tools.query.comparison.SegmentInfoProvider;
-import org.apache.pinot.tools.query.comparison.StarTreeQueryGenerator;
-import org.apache.pinot.util.TestUtils;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
@@ -34,6 +29,11 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.tools.query.comparison.QueryComparison;
+import org.apache.pinot.tools.query.comparison.SegmentInfoProvider;
+import org.apache.pinot.tools.query.comparison.StarTreeQueryGenerator;
+import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;

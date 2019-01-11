@@ -18,11 +18,9 @@
  */
 package org.apache.pinot.hadoop.io;
 
-import org.apache.pinot.common.data.Schema;
-
-import org.apache.hadoop.conf.Configuration;
-
 import java.io.IOException;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.pinot.common.data.Schema;
 
 public interface PinotRecordSerialization<T> {
 

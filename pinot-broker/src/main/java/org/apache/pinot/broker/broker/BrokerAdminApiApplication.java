@@ -19,14 +19,14 @@
 package org.apache.pinot.broker.broker;
 
 import com.google.common.base.Preconditions;
-import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
-import org.apache.pinot.broker.routing.RoutingTable;
-import org.apache.pinot.broker.routing.TimeBoundaryService;
-import org.apache.pinot.common.metrics.BrokerMetrics;
 import io.swagger.jaxrs.config.BeanConfig;
 import java.net.URI;
 import java.net.URL;
 import java.net.URLClassLoader;
+import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
+import org.apache.pinot.broker.routing.RoutingTable;
+import org.apache.pinot.broker.routing.TimeBoundaryService;
+import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.glassfish.grizzly.http.server.CLStaticHttpHandler;
 import org.glassfish.grizzly.http.server.HttpHandler;
 import org.glassfish.grizzly.http.server.HttpServer;

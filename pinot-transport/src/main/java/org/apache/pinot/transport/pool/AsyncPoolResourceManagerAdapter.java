@@ -18,20 +18,18 @@
  */
 package org.apache.pinot.transport.pool;
 
+import com.yammer.metrics.core.Histogram;
+import com.yammer.metrics.core.MetricName;
+import com.yammer.metrics.core.MetricsRegistry;
 import java.util.concurrent.ExecutorService;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import org.apache.pinot.common.metrics.LatencyMetric;
 import org.apache.pinot.common.metrics.MetricsHelper;
 import org.apache.pinot.common.response.ServerInstance;
 import org.apache.pinot.transport.common.Callback;
 import org.apache.pinot.transport.metrics.PoolStats.LifecycleStats;
 import org.apache.pinot.transport.pool.AsyncPool.Lifecycle;
-import com.yammer.metrics.core.Histogram;
-import com.yammer.metrics.core.MetricName;
-import com.yammer.metrics.core.MetricsRegistry;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 // The create() and destoy() methods in this class are ONLY called from

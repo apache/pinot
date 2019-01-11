@@ -18,11 +18,11 @@
  */
 package org.apache.pinot.core.realtime.impl;
 
+import java.util.Set;
 import org.apache.pinot.common.config.SegmentPartitionConfig;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import org.apache.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
-import java.util.Set;
 
 
 public class RealtimeSegmentConfig {

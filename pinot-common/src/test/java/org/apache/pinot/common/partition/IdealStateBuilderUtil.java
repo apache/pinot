@@ -19,15 +19,15 @@
 package org.apache.pinot.common.partition;
 
 import com.google.common.collect.Lists;
-import org.apache.pinot.common.config.TableNameBuilder;
-import org.apache.pinot.common.utils.LLCSegmentName;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.helix.model.IdealState;
+import org.apache.pinot.common.config.TableNameBuilder;
+import org.apache.pinot.common.utils.LLCSegmentName;
 
-import static org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel.*;
+import static org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel.CONSUMING;
 
 
 /**

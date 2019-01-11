@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.segment.index.column;
 
+import java.io.IOException;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.core.io.reader.DataFileReader;
 import org.apache.pinot.core.io.reader.SingleColumnSingleValueReader;
@@ -47,8 +48,6 @@ import org.apache.pinot.core.segment.index.readers.StringDictionary;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.apache.pinot.core.segment.store.ColumnIndexType;
 import org.apache.pinot.core.segment.store.SegmentDirectory;
-import java.io.IOException;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

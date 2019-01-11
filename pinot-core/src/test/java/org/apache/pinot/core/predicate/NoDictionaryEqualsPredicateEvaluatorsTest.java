@@ -18,16 +18,16 @@
  */
 package org.apache.pinot.core.predicate;
 
+import java.util.Collections;
+import java.util.Random;
+import org.apache.commons.lang.ArrayUtils;
+import org.apache.commons.lang.RandomStringUtils;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.core.common.predicate.EqPredicate;
 import org.apache.pinot.core.common.predicate.NEqPredicate;
 import org.apache.pinot.core.operator.filter.predicate.EqualsPredicateEvaluatorFactory;
 import org.apache.pinot.core.operator.filter.predicate.NotEqualsPredicateEvaluatorFactory;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
-import java.util.Collections;
-import java.util.Random;
-import org.apache.commons.lang.ArrayUtils;
-import org.apache.commons.lang.RandomStringUtils;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;

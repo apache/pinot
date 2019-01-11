@@ -18,14 +18,6 @@
  */
 package org.apache.pinot.broker.routing;
 
-import org.apache.pinot.broker.routing.TimeBoundaryService.TimeBoundaryInfo;
-import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.metadata.ZKMetadataProvider;
-import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
-import org.apache.pinot.common.utils.CommonConstants;
-import org.apache.pinot.common.utils.CommonConstants.Segment.SegmentType;
-import org.apache.pinot.common.utils.StringUtil;
-import org.apache.pinot.common.utils.ZkStarter;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang.StringUtils;
@@ -35,6 +27,14 @@ import org.apache.helix.manager.zk.ZkBaseDataAccessor;
 import org.apache.helix.manager.zk.ZkClient;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.pinot.broker.routing.TimeBoundaryService.TimeBoundaryInfo;
+import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
+import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.CommonConstants.Segment.SegmentType;
+import org.apache.pinot.common.utils.StringUtil;
+import org.apache.pinot.common.utils.ZkStarter;
 import org.testng.Assert;
 import org.testng.annotations.AfterTest;
 import org.testng.annotations.BeforeTest;

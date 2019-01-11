@@ -18,9 +18,6 @@
  */
 package org.apache.pinot.broker.api.resources;
 
-import org.apache.pinot.broker.broker.BrokerServerBuilder;
-import org.apache.pinot.common.metrics.BrokerMeter;
-import org.apache.pinot.common.metrics.BrokerMetrics;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiResponse;
@@ -32,6 +29,9 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.pinot.broker.broker.BrokerServerBuilder;
+import org.apache.pinot.common.metrics.BrokerMeter;
+import org.apache.pinot.common.metrics.BrokerMetrics;
 
 @Api(tags = "Health")
 @Path("/")

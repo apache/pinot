@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.filesystem.test;
 
-import org.apache.pinot.filesystem.AzurePinotFS;
 import com.microsoft.azure.datalake.store.ADLStoreClient;
 import com.microsoft.azure.datalake.store.MockADLFileInputStream;
 import java.io.ByteArrayInputStream;
@@ -28,6 +27,7 @@ import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.filesystem.AzurePinotFS;
 import org.mockito.ArgumentMatchers;
 import org.mockito.Mockito;
 import org.testng.Assert;

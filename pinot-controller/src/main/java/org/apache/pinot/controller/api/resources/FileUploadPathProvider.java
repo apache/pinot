@@ -18,15 +18,15 @@
  */
 package org.apache.pinot.controller.api.resources;
 
+import java.io.File;
+import java.io.IOException;
+import java.net.URI;
+import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.filesystem.LocalPinotFS;
 import org.apache.pinot.filesystem.PinotFS;
 import org.apache.pinot.filesystem.PinotFSFactory;
-import java.io.File;
-import java.io.IOException;
-import java.net.URI;
-import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

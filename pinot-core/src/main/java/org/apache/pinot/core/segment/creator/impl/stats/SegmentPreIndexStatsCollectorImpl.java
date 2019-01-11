@@ -18,14 +18,14 @@
  */
 package org.apache.pinot.core.segment.creator.impl.stats;
 
+import java.util.HashMap;
+import java.util.Map;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.core.data.GenericRow;
 import org.apache.pinot.core.segment.creator.ColumnStatistics;
 import org.apache.pinot.core.segment.creator.SegmentPreIndexStatsCollector;
 import org.apache.pinot.core.segment.creator.StatsCollectorConfig;
-import java.util.HashMap;
-import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

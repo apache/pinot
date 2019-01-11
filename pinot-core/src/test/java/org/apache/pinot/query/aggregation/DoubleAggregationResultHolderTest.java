@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.query.aggregation;
 
+import java.util.Random;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.DoubleAggregationResultHolder;
-import java.util.Random;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 

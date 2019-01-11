@@ -18,11 +18,6 @@
  */
 package org.apache.pinot.core.query.aggregation.groupby;
 
-import org.apache.pinot.common.request.transform.TransformExpressionTree;
-import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.operator.blocks.TransformBlock;
-import org.apache.pinot.core.operator.transform.TransformOperator;
-import org.apache.pinot.core.segment.index.readers.Dictionary;
 import it.unimi.dsi.fastutil.ints.Int2IntMap;
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2IntMap;
@@ -33,6 +28,11 @@ import it.unimi.dsi.fastutil.objects.ObjectIterator;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 import javax.annotation.Nonnull;
+import org.apache.pinot.common.request.transform.TransformExpressionTree;
+import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.operator.blocks.TransformBlock;
+import org.apache.pinot.core.operator.transform.TransformOperator;
+import org.apache.pinot.core.segment.index.readers.Dictionary;
 
 
 /**

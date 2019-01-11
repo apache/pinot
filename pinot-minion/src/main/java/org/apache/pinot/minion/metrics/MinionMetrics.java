@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.minion.metrics;
 
+import com.yammer.metrics.core.MetricsRegistry;
 import org.apache.pinot.common.metrics.AbstractMetrics;
 import org.apache.pinot.common.utils.CommonConstants;
-import com.yammer.metrics.core.MetricsRegistry;
 
 
 public class MinionMetrics extends AbstractMetrics<MinionQueryPhase, MinionMeter, MinionGauge, MinionTimer> {

@@ -20,15 +20,6 @@ package org.apache.pinot.controller.api.resources;
 
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
-import org.apache.pinot.common.config.TableNameBuilder;
-import org.apache.pinot.common.exception.InvalidConfigException;
-import org.apache.pinot.common.metrics.ControllerGauge;
-import org.apache.pinot.common.metrics.ControllerMetrics;
-import org.apache.pinot.common.restlet.resources.SegmentSizeInfo;
-import org.apache.pinot.common.restlet.resources.TableSizeInfo;
-import org.apache.pinot.common.utils.JsonUtils;
-import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
-import org.apache.pinot.controller.util.TableSizeReader;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
@@ -45,6 +36,15 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
+import org.apache.pinot.common.config.TableNameBuilder;
+import org.apache.pinot.common.exception.InvalidConfigException;
+import org.apache.pinot.common.metrics.ControllerGauge;
+import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.common.restlet.resources.SegmentSizeInfo;
+import org.apache.pinot.common.restlet.resources.TableSizeInfo;
+import org.apache.pinot.common.utils.JsonUtils;
+import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.util.TableSizeReader;
 import org.mockito.ArgumentMatchers;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
@@ -56,7 +56,8 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.mockito.Matchers.anyString;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 
 public class TableSizeReaderTest {

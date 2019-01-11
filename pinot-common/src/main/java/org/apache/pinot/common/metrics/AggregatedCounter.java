@@ -18,13 +18,12 @@
  */
 package org.apache.pinot.common.metrics;
 
-import java.util.Collection;
-import java.util.concurrent.CopyOnWriteArrayList;
-
 import com.yammer.metrics.core.Counter;
 import com.yammer.metrics.core.Metric;
 import com.yammer.metrics.core.MetricName;
 import com.yammer.metrics.core.MetricProcessor;
+import java.util.Collection;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 
 /**

@@ -18,10 +18,10 @@
  */
 package org.apache.pinot.tools.admin.command;
 
-import org.apache.pinot.common.utils.KafkaStarterUtils;
-import org.apache.pinot.tools.Command;
 import java.io.File;
 import java.io.IOException;
+import org.apache.pinot.common.utils.KafkaStarterUtils;
+import org.apache.pinot.tools.Command;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

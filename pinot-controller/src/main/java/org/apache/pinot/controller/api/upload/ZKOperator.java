@@ -18,6 +18,11 @@
  */
 package org.apache.pinot.controller.api.upload;
 
+import java.io.File;
+import java.net.URI;
+import javax.ws.rs.core.HttpHeaders;
+import javax.ws.rs.core.Response;
+import org.apache.helix.ZNRecord;
 import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
@@ -30,11 +35,6 @@ import org.apache.pinot.controller.api.resources.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.filesystem.PinotFS;
 import org.apache.pinot.filesystem.PinotFSFactory;
-import java.io.File;
-import java.net.URI;
-import javax.ws.rs.core.HttpHeaders;
-import javax.ws.rs.core.Response;
-import org.apache.helix.ZNRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

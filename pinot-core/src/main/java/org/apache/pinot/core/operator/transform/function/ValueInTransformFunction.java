@@ -18,12 +18,6 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
-import org.apache.pinot.common.data.FieldSpec;
-import org.apache.pinot.core.common.DataSource;
-import org.apache.pinot.core.operator.blocks.ProjectionBlock;
-import org.apache.pinot.core.operator.transform.TransformResultMetadata;
-import org.apache.pinot.core.plan.DocIdSetPlanNode;
-import org.apache.pinot.core.segment.index.readers.Dictionary;
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
 import it.unimi.dsi.fastutil.doubles.DoubleList;
 import it.unimi.dsi.fastutil.doubles.DoubleOpenHashSet;
@@ -46,6 +40,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nonnull;
+import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.core.common.DataSource;
+import org.apache.pinot.core.operator.blocks.ProjectionBlock;
+import org.apache.pinot.core.operator.transform.TransformResultMetadata;
+import org.apache.pinot.core.plan.DocIdSetPlanNode;
+import org.apache.pinot.core.segment.index.readers.Dictionary;
 
 
 public class ValueInTransformFunction extends BaseTransformFunction {

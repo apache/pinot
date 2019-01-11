@@ -18,13 +18,6 @@
  */
 package org.apache.pinot.common.metrics;
 
-import com.yammer.metrics.core.Timer;
-import java.lang.reflect.Constructor;
-import java.util.Map;
-import java.util.Set;
-import java.util.WeakHashMap;
-import java.util.concurrent.TimeUnit;
-
 import com.yammer.metrics.Metrics;
 import com.yammer.metrics.core.Counter;
 import com.yammer.metrics.core.Gauge;
@@ -35,6 +28,12 @@ import com.yammer.metrics.core.MetricName;
 import com.yammer.metrics.core.MetricsRegistry;
 import com.yammer.metrics.core.Sampling;
 import com.yammer.metrics.core.Stoppable;
+import com.yammer.metrics.core.Timer;
+import java.lang.reflect.Constructor;
+import java.util.Map;
+import java.util.Set;
+import java.util.WeakHashMap;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.configuration.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

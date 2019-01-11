@@ -19,8 +19,8 @@
 package org.apache.pinot.core.data.partition;
 
 import com.google.common.base.Preconditions;
-import org.apache.pinot.common.utils.StringUtil;
 import org.apache.kafka.common.utils.Utils;
+import org.apache.pinot.common.utils.StringUtil;
 
 
 /**

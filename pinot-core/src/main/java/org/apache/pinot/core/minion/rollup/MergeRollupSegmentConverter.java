@@ -18,21 +18,20 @@
  */
 package org.apache.pinot.core.minion.rollup;
 
-import org.apache.pinot.common.config.IndexingConfig;
-import org.apache.pinot.common.data.DimensionFieldSpec;
-import org.apache.pinot.common.data.Schema;
-import org.apache.pinot.common.exception.InvalidConfigException;
-import org.apache.pinot.common.segment.SegmentMetadata;
-import org.apache.pinot.core.minion.SegmentConverter;
-import org.apache.pinot.core.minion.segment.RecordAggregator;
-import org.apache.pinot.core.minion.segment.RecordTransformer;
-import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.config.IndexingConfig;
+import org.apache.pinot.common.data.DimensionFieldSpec;
+import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.common.exception.InvalidConfigException;
+import org.apache.pinot.core.minion.SegmentConverter;
+import org.apache.pinot.core.minion.segment.RecordAggregator;
+import org.apache.pinot.core.minion.segment.RecordTransformer;
+import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
 
 
 /**

@@ -18,10 +18,6 @@
  */
 package org.apache.pinot.query.aggregation.groupby;
 
-import org.apache.pinot.common.response.broker.GroupByResult;
-import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
-import org.apache.pinot.core.query.aggregation.function.AggregationFunctionFactory;
-import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByTrimmingService;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -31,6 +27,10 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import org.apache.commons.lang.RandomStringUtils;
+import org.apache.pinot.common.response.broker.GroupByResult;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunctionFactory;
+import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByTrimmingService;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;

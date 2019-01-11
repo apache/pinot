@@ -18,13 +18,13 @@
  */
 package org.apache.pinot.core.data.recordtransformer;
 
+import java.util.HashMap;
+import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.core.data.GenericRow;
 import org.apache.pinot.core.data.function.FunctionExpressionEvaluator;
-import java.util.HashMap;
-import java.util.Map;
-import javax.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

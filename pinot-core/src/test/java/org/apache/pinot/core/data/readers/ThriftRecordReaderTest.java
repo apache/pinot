@@ -18,9 +18,6 @@
  */
 package org.apache.pinot.core.data.readers;
 
-import org.apache.pinot.common.data.FieldSpec;
-import org.apache.pinot.common.data.Schema;
-import org.apache.pinot.core.data.GenericRow;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -32,6 +29,9 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
+import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.core.data.GenericRow;
 import org.apache.thrift.TSerializer;
 import org.apache.thrift.protocol.TBinaryProtocol;
 import org.testng.Assert;

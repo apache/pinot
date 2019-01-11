@@ -19,13 +19,13 @@
 package org.apache.pinot.core.operator.filter.predicate;
 
 import com.google.common.base.Preconditions;
+import it.unimi.dsi.fastutil.ints.IntArrayList;
+import it.unimi.dsi.fastutil.ints.IntList;
+import java.util.regex.Pattern;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.core.common.Predicate;
 import org.apache.pinot.core.common.predicate.RegexpLikePredicate;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
-import it.unimi.dsi.fastutil.ints.IntArrayList;
-import it.unimi.dsi.fastutil.ints.IntList;
-import java.util.regex.Pattern;
 
 
 /**

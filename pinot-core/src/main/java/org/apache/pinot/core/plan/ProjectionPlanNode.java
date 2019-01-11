@@ -18,13 +18,13 @@
  */
 package org.apache.pinot.core.plan;
 
-import org.apache.pinot.core.common.DataSource;
-import org.apache.pinot.core.indexsegment.IndexSegment;
-import org.apache.pinot.core.operator.ProjectionOperator;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nonnull;
+import org.apache.pinot.core.common.DataSource;
+import org.apache.pinot.core.indexsegment.IndexSegment;
+import org.apache.pinot.core.operator.ProjectionOperator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

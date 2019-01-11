@@ -19,10 +19,10 @@
 package org.apache.pinot.core.data.readers;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import org.apache.pinot.common.utils.JsonUtils;
 import java.io.File;
 import java.io.FileWriter;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.utils.JsonUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;

@@ -19,13 +19,13 @@
 package org.apache.pinot.tools.admin.command;
 
 import com.google.common.base.Preconditions;
+import java.io.File;
+import java.net.URI;
+import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.tools.Command;
-import java.io.File;
-import java.net.URI;
-import org.apache.commons.io.FileUtils;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

@@ -18,17 +18,10 @@
  */
 package org.apache.pinot.common.lineage;
 
-import org.apache.pinot.common.metadata.ZKMetadataProvider;
-import org.apache.pinot.common.utils.retry.RetryPolicies;
-import org.apache.pinot.common.utils.retry.RetryPolicy;
-import java.util.List;
 import org.apache.helix.AccessOption;
-import org.apache.helix.PropertyPathConfig;
-import org.apache.helix.PropertyType;
 import org.apache.helix.ZNRecord;
-import org.apache.helix.manager.zk.ZKHelixAdmin;
-import org.apache.helix.manager.zk.ZNRecordSerializer;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.zookeeper.data.Stat;
 
 

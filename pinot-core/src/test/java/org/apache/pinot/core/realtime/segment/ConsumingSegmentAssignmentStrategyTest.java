@@ -19,12 +19,6 @@
 package org.apache.pinot.core.realtime.segment;
 
 import com.google.common.collect.Lists;
-import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.exception.InvalidConfigException;
-import org.apache.pinot.common.partition.IdealStateBuilderUtil;
-import org.apache.pinot.common.partition.PartitionAssignment;
-import org.apache.pinot.common.partition.StreamPartitionAssignmentGenerator;
-import org.apache.pinot.common.utils.LLCSegmentName;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -33,11 +27,18 @@ import java.util.Random;
 import java.util.Set;
 import org.apache.helix.HelixManager;
 import org.apache.helix.model.IdealState;
+import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.common.exception.InvalidConfigException;
+import org.apache.pinot.common.partition.IdealStateBuilderUtil;
+import org.apache.pinot.common.partition.PartitionAssignment;
+import org.apache.pinot.common.partition.StreamPartitionAssignmentGenerator;
+import org.apache.pinot.common.utils.LLCSegmentName;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 
 /**

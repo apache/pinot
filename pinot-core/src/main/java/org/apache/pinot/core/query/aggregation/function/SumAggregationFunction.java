@@ -18,13 +18,13 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import javax.annotation.Nonnull;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.DoubleAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.DoubleGroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
-import javax.annotation.Nonnull;
 
 
 public class SumAggregationFunction implements AggregationFunction<Double, Double> {

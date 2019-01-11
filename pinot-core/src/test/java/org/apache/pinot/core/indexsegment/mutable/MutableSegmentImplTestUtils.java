@@ -18,15 +18,17 @@
  */
 package org.apache.pinot.core.indexsegment.mutable;
 
+import java.util.Set;
+import javax.annotation.Nonnull;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import org.apache.pinot.core.io.writer.impl.DirectMemoryManager;
 import org.apache.pinot.core.realtime.impl.RealtimeSegmentConfig;
 import org.apache.pinot.core.realtime.impl.RealtimeSegmentStatsHistory;
-import java.util.Set;
-import javax.annotation.Nonnull;
 
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 
 public class MutableSegmentImplTestUtils {

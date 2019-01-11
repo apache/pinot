@@ -18,13 +18,6 @@
  */
 package org.apache.pinot.tools.query.comparison;
 
-import org.apache.pinot.common.data.DimensionFieldSpec;
-import org.apache.pinot.common.data.Schema;
-import org.apache.pinot.common.segment.ReadMode;
-import org.apache.pinot.common.utils.TarGzCompressionUtils;
-import org.apache.pinot.core.indexsegment.IndexSegment;
-import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
-import org.apache.pinot.core.segment.index.readers.Dictionary;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -33,6 +26,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.data.DimensionFieldSpec;
+import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.common.segment.ReadMode;
+import org.apache.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.core.indexsegment.IndexSegment;
+import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
+import org.apache.pinot.core.segment.index.readers.Dictionary;
 
 
 /**

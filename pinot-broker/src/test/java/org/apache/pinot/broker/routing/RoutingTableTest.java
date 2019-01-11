@@ -18,6 +18,17 @@
  */
 package org.apache.pinot.broker.routing;
 
+import com.yammer.metrics.core.MetricsRegistry;
+import java.lang.reflect.Field;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
+import org.apache.commons.configuration.BaseConfiguration;
+import org.apache.commons.lang.mutable.MutableBoolean;
+import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.broker.routing.builder.HighLevelConsumerBasedRoutingTableBuilder;
 import org.apache.pinot.broker.routing.builder.RoutingTableBuilder;
 import org.apache.pinot.broker.util.FakePropertyStore;
@@ -30,17 +41,6 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
 import org.apache.pinot.common.utils.HLCSegmentName;
 import org.apache.pinot.common.utils.LLCSegmentName;
-import com.yammer.metrics.core.MetricsRegistry;
-import java.lang.reflect.Field;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.TimeUnit;
-import org.apache.commons.configuration.BaseConfiguration;
-import org.apache.commons.lang.mutable.MutableBoolean;
-import org.apache.helix.model.ExternalView;
-import org.apache.helix.model.InstanceConfig;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 

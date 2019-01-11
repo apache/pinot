@@ -18,6 +18,13 @@
  */
 package org.apache.pinot.tools.admin.command;
 
+import java.io.File;
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+import org.apache.commons.lang.math.IntRange;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.FieldSpec.DataType;
 import org.apache.pinot.common.data.FieldSpec.FieldType;
@@ -30,13 +37,6 @@ import org.apache.pinot.tools.Command;
 import org.apache.pinot.tools.data.generator.DataGenerator;
 import org.apache.pinot.tools.data.generator.DataGeneratorSpec;
 import org.apache.pinot.tools.data.generator.SchemaAnnotation;
-import java.io.File;
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.concurrent.TimeUnit;
-import org.apache.commons.lang.math.IntRange;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

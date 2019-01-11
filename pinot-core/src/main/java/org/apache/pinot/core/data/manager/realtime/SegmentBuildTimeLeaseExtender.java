@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.core.data.manager.realtime;
 
-import org.apache.pinot.common.metrics.ServerMetrics;
+import com.google.common.util.concurrent.Uninterruptibles;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -26,11 +26,11 @@ import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import com.google.common.util.concurrent.Uninterruptibles;
+import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**

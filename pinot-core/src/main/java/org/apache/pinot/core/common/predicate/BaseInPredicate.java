@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.core.common.predicate;
 
-import org.apache.pinot.core.common.Predicate;
 import java.util.Arrays;
 import java.util.List;
+import org.apache.pinot.core.common.Predicate;
 
 
 /**

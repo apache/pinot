@@ -20,17 +20,6 @@ package org.apache.pinot.core.query.scheduler;
 
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.Uninterruptibles;
-import org.apache.pinot.common.exception.QueryException;
-import org.apache.pinot.common.metrics.ServerMetrics;
-import org.apache.pinot.common.utils.DataTable;
-import org.apache.pinot.core.common.datatable.DataTableFactory;
-import org.apache.pinot.core.common.datatable.DataTableImplV2;
-import org.apache.pinot.core.data.manager.InstanceDataManager;
-import org.apache.pinot.core.query.executor.QueryExecutor;
-import org.apache.pinot.core.query.request.ServerQueryRequest;
-import org.apache.pinot.core.query.scheduler.resources.PolicyBasedResourceManager;
-import org.apache.pinot.core.query.scheduler.resources.ResourceLimitPolicy;
-import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import com.yammer.metrics.core.MetricsRegistry;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -48,11 +37,25 @@ import java.util.concurrent.atomic.LongAccumulator;
 import javax.annotation.Nonnull;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.pinot.common.exception.QueryException;
+import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.utils.DataTable;
+import org.apache.pinot.core.common.datatable.DataTableFactory;
+import org.apache.pinot.core.common.datatable.DataTableImplV2;
+import org.apache.pinot.core.data.manager.InstanceDataManager;
+import org.apache.pinot.core.query.executor.QueryExecutor;
+import org.apache.pinot.core.query.request.ServerQueryRequest;
+import org.apache.pinot.core.query.scheduler.resources.PolicyBasedResourceManager;
+import org.apache.pinot.core.query.scheduler.resources.ResourceLimitPolicy;
+import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.core.query.scheduler.TestHelper.*;
-import static org.testng.Assert.*;
+import static org.apache.pinot.core.query.scheduler.TestHelper.createQueryRequest;
+import static org.apache.pinot.core.query.scheduler.TestHelper.createServerQueryRequest;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
 
 
 public class PrioritySchedulerTest {

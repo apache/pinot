@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.common.lineage;
 
-import org.apache.pinot.common.exception.InvalidConfigException;
-import org.apache.pinot.common.utils.EqualityUtils;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -28,6 +26,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import org.apache.helix.ZNRecord;
+import org.apache.pinot.common.exception.InvalidConfigException;
+import org.apache.pinot.common.utils.EqualityUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

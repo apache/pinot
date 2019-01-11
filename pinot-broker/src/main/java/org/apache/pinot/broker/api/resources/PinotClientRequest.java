@@ -20,12 +20,6 @@ package org.apache.pinot.broker.api.resources;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import org.apache.pinot.broker.api.RequestStatistics;
-import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
-import org.apache.pinot.common.metrics.BrokerMeter;
-import org.apache.pinot.common.metrics.BrokerMetrics;
-import org.apache.pinot.common.response.BrokerResponse;
-import org.apache.pinot.common.utils.JsonUtils;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
@@ -40,10 +34,18 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.pinot.broker.api.RequestStatistics;
+import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
+import org.apache.pinot.common.metrics.BrokerMeter;
+import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.common.response.BrokerResponse;
+import org.apache.pinot.common.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.common.utils.CommonConstants.Broker.Request.*;
+import static org.apache.pinot.common.utils.CommonConstants.Broker.Request.DEBUG_OPTIONS;
+import static org.apache.pinot.common.utils.CommonConstants.Broker.Request.PQL;
+import static org.apache.pinot.common.utils.CommonConstants.Broker.Request.TRACE;
 
 
 @Api(tags = "Query")

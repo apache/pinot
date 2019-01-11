@@ -18,14 +18,13 @@
  */
 package org.apache.pinot.transport.metrics;
 
+import com.yammer.metrics.core.Sampling;
+import com.yammer.metrics.core.Summarizable;
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
-
 import org.apache.pinot.common.metrics.AggregatedHistogram;
 import org.apache.pinot.common.metrics.LatencyMetric;
-import com.yammer.metrics.core.Sampling;
-import com.yammer.metrics.core.Summarizable;
 
 
 public class AggregatedPoolStats<T extends Sampling & Summarizable> implements PoolStats<T>, PoolStatsProvider {

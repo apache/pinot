@@ -18,14 +18,13 @@
  */
 package org.apache.pinot.transport.pool;
 
+import com.yammer.metrics.core.Histogram;
 import java.util.Collection;
-
 import org.apache.pinot.transport.common.Callback;
 import org.apache.pinot.transport.common.Cancellable;
 import org.apache.pinot.transport.common.NoneType;
 import org.apache.pinot.transport.metrics.PoolStats;
 import org.apache.pinot.transport.metrics.PoolStatsProvider;
-import com.yammer.metrics.core.Histogram;
 
 
 /**
@@ -114,7 +113,7 @@ public interface AsyncPool<T> extends PoolStatsProvider<Histogram> {
   void shutdown(Callback<NoneType> callback);
 
   /**
-   * validate all objects in the pool, recreate invalid objects if recreate=true 
+   * validate all objects in the pool, recreate invalid objects if recreate=true
    * @param recreate
    */
   boolean validate(boolean recreate);

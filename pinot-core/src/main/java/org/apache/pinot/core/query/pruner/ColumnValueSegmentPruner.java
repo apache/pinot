@@ -18,6 +18,11 @@
  */
 package org.apache.pinot.core.query.pruner;
 
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import javax.annotation.Nonnull;
+import org.apache.commons.configuration.Configuration;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.request.FilterOperator;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
@@ -27,14 +32,6 @@ import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.segment.index.ColumnMetadata;
 import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.index.readers.BloomFilterReader;
-
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
-
-import javax.annotation.Nonnull;
-import org.apache.commons.configuration.Configuration;
 
 
 /**

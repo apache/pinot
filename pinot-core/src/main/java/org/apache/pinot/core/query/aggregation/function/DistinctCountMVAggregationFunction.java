@@ -18,12 +18,12 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
+import javax.annotation.Nonnull;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
-import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
-import javax.annotation.Nonnull;
 
 
 public class DistinctCountMVAggregationFunction extends DistinctCountAggregationFunction {

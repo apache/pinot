@@ -19,6 +19,11 @@
 package org.apache.pinot.core.minion;
 
 import com.google.common.base.Preconditions;
+import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.config.IndexingConfig;
 import org.apache.pinot.common.data.StarTreeIndexSpec;
 import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
@@ -31,11 +36,6 @@ import org.apache.pinot.core.minion.segment.RecordPartitioner;
 import org.apache.pinot.core.minion.segment.RecordTransformer;
 import org.apache.pinot.core.minion.segment.ReducerRecordReader;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
-import java.io.File;
-import java.util.ArrayList;
-import java.util.List;
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 
 
 /**

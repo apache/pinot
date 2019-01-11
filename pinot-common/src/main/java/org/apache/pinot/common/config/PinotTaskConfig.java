@@ -18,11 +18,11 @@
  */
 package org.apache.pinot.common.config;
 
-import org.apache.pinot.common.utils.EqualityUtils;
 import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nonnull;
 import org.apache.helix.task.TaskConfig;
+import org.apache.pinot.common.utils.EqualityUtils;
 
 
 public class PinotTaskConfig {

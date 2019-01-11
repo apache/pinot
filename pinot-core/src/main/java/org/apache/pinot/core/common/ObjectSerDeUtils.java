@@ -20,10 +20,6 @@ package org.apache.pinot.core.common;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import com.google.common.primitives.Longs;
-import org.apache.pinot.common.utils.StringUtil;
-import org.apache.pinot.core.query.aggregation.function.customobject.AvgPair;
-import org.apache.pinot.core.query.aggregation.function.customobject.MinMaxRangePair;
-import org.apache.pinot.core.query.aggregation.function.customobject.QuantileDigest;
 import com.tdunning.math.stats.MergingDigest;
 import com.tdunning.math.stats.TDigest;
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
@@ -37,6 +33,10 @@ import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import org.apache.pinot.common.utils.StringUtil;
+import org.apache.pinot.core.query.aggregation.function.customobject.AvgPair;
+import org.apache.pinot.core.query.aggregation.function.customobject.MinMaxRangePair;
+import org.apache.pinot.core.query.aggregation.function.customobject.QuantileDigest;
 
 
 /**

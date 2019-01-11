@@ -18,12 +18,12 @@
  */
 package org.apache.pinot.core.startree;
 
-import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Random;
+import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 

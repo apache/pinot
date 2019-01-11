@@ -18,9 +18,6 @@
  */
 package org.apache.pinot.broker.routing.builder;
 
-import org.apache.pinot.common.utils.CommonConstants;
-import org.apache.pinot.common.utils.HLCSegmentName;
-import org.apache.pinot.common.utils.SegmentName;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -28,6 +25,9 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
+import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.HLCSegmentName;
+import org.apache.pinot.common.utils.SegmentName;
 
 
 public class HighLevelConsumerBasedRoutingTableBuilder extends BaseRoutingTableBuilder {

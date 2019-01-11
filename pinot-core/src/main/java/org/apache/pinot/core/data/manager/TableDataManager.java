@@ -18,17 +18,17 @@
  */
 package org.apache.pinot.core.data.manager;
 
-import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.metrics.ServerMetrics;
-import org.apache.pinot.core.data.manager.config.TableDataManagerConfig;
-import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
-import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
 import java.io.File;
 import java.util.List;
 import javax.annotation.Nonnull;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.core.data.manager.config.TableDataManagerConfig;
+import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
+import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
 
 
 /**

@@ -18,11 +18,11 @@
  */
 package org.apache.pinot.core.io.writer.impl;
 
-import org.apache.pinot.common.utils.StringUtil;
-import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteOrder;
+import org.apache.pinot.common.utils.StringUtil;
+import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 
 
 public class FixedByteSingleValueMultiColWriter {

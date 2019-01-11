@@ -18,11 +18,11 @@
  */
 package org.apache.pinot.tools.admin.command;
 
+import org.apache.pinot.tools.Command;
+import org.apache.pinot.tools.PinotSegmentRebalancer;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.pinot.tools.Command;
-import org.apache.pinot.tools.PinotSegmentRebalancer;
 
 
 public class RebalanceTableCommand extends AbstractBaseAdminCommand implements Command {

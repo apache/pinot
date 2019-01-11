@@ -18,10 +18,6 @@
  */
 package org.apache.pinot.tools.admin.command;
 
-import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.utils.time.TimeUtils;
-import org.apache.pinot.tools.Command;
-import org.apache.pinot.tools.realtime.provisioning.MemoryEstimator;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -29,6 +25,10 @@ import java.util.Arrays;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.common.utils.time.TimeUtils;
+import org.apache.pinot.tools.Command;
+import org.apache.pinot.tools.realtime.provisioning.MemoryEstimator;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.transport.conf;
 
+import org.apache.commons.configuration.Configuration;
 import org.apache.pinot.transport.config.ConnectionPoolConfig;
 import org.apache.pinot.transport.config.RoutingTableConfig;
-import org.apache.commons.configuration.Configuration;
 
 
 public class TransportClientConf {

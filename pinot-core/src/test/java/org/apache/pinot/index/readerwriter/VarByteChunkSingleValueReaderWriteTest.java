@@ -18,11 +18,6 @@
  */
 package org.apache.pinot.index.readerwriter;
 
-import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
-import org.apache.pinot.core.io.reader.impl.ChunkReaderContext;
-import org.apache.pinot.core.io.reader.impl.v1.VarByteChunkSingleValueReader;
-import org.apache.pinot.core.io.writer.impl.v1.VarByteChunkSingleValueWriter;
-import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
@@ -30,6 +25,11 @@ import java.nio.charset.Charset;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.RandomStringUtils;
+import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
+import org.apache.pinot.core.io.reader.impl.ChunkReaderContext;
+import org.apache.pinot.core.io.reader.impl.v1.VarByteChunkSingleValueReader;
+import org.apache.pinot.core.io.writer.impl.v1.VarByteChunkSingleValueWriter;
+import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 

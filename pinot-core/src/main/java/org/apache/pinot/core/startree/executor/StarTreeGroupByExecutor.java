@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.startree.executor;
 
+import javax.annotation.Nonnull;
 import org.apache.pinot.common.request.GroupBy;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
@@ -29,7 +30,6 @@ import org.apache.pinot.core.query.aggregation.groupby.DefaultGroupByExecutor;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.startree.StarTreeUtils;
 import org.apache.pinot.core.startree.v2.AggregationFunctionColumnPair;
-import javax.annotation.Nonnull;
 
 
 /**

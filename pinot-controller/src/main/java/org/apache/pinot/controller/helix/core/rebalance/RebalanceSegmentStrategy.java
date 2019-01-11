@@ -18,11 +18,11 @@
  */
 package org.apache.pinot.controller.helix.core.rebalance;
 
+import org.apache.commons.configuration.Configuration;
+import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.partition.PartitionAssignment;
-import org.apache.commons.configuration.Configuration;
-import org.apache.helix.model.IdealState;
 
 
 /**

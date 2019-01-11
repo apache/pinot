@@ -19,11 +19,10 @@
 package org.apache.pinot.core.realtime.impl.kafka;
 
 import com.google.common.base.Preconditions;
+import java.util.Map;
+import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.common.utils.EqualityUtils;
 import org.apache.pinot.core.realtime.stream.StreamConfig;
-import org.apache.commons.lang.StringUtils;
-
-import java.util.Map;
 
 
 /**

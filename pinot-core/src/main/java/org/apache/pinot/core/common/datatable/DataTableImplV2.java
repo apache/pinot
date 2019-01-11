@@ -18,11 +18,6 @@
  */
 package org.apache.pinot.core.common.datatable;
 
-import org.apache.pinot.common.response.ProcessingException;
-import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.common.utils.DataTable;
-import org.apache.pinot.common.utils.StringUtil;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
@@ -35,6 +30,11 @@ import java.util.Map.Entry;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.response.ProcessingException;
+import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataTable;
+import org.apache.pinot.common.utils.StringUtil;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
 
 
 public class DataTableImplV2 implements DataTable {

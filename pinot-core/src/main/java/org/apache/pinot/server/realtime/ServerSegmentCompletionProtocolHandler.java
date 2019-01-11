@@ -18,6 +18,10 @@
  */
 package org.apache.pinot.server.realtime;
 
+import java.io.File;
+import java.net.URI;
+import javax.net.ssl.SSLContext;
+import org.apache.commons.configuration.Configuration;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
@@ -25,10 +29,6 @@ import org.apache.pinot.common.utils.ClientSSLContextGenerator;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.core.query.utils.Pair;
-import java.io.File;
-import java.net.URI;
-import javax.net.ssl.SSLContext;
-import org.apache.commons.configuration.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.core.realtime.converter.stats;
 
+import java.util.Arrays;
+import java.util.List;
+import org.apache.commons.lang.math.IntRange;
 import org.apache.pinot.common.config.ColumnPartitionConfig;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.core.common.Block;
@@ -29,9 +32,6 @@ import org.apache.pinot.core.operator.blocks.SingleValueBlock;
 import org.apache.pinot.core.realtime.impl.dictionary.MutableDictionary;
 import org.apache.pinot.core.segment.creator.ColumnStatistics;
 import org.apache.pinot.core.segment.index.data.source.ColumnDataSource;
-import java.util.Arrays;
-import java.util.List;
-import org.apache.commons.lang.math.IntRange;
 
 
 /**

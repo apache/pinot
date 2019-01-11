@@ -19,10 +19,6 @@
 package org.apache.pinot.controller.api.resources;
 
 import com.google.common.collect.BiMap;
-import org.apache.pinot.common.http.MultiGetRequest;
-import org.apache.pinot.common.restlet.resources.SegmentSizeInfo;
-import org.apache.pinot.common.restlet.resources.TableSizeInfo;
-import org.apache.pinot.common.utils.JsonUtils;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -32,6 +28,10 @@ import java.util.concurrent.Executor;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.httpclient.URI;
 import org.apache.commons.httpclient.methods.GetMethod;
+import org.apache.pinot.common.http.MultiGetRequest;
+import org.apache.pinot.common.restlet.resources.SegmentSizeInfo;
+import org.apache.pinot.common.restlet.resources.TableSizeInfo;
+import org.apache.pinot.common.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

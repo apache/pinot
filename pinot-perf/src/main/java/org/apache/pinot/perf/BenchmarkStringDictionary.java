@@ -18,12 +18,12 @@
  */
 package org.apache.pinot.perf;
 
+import java.util.Random;
+import java.util.concurrent.TimeUnit;
 import org.apache.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import org.apache.pinot.core.io.writer.impl.DirectMemoryManager;
 import org.apache.pinot.core.realtime.impl.dictionary.StringOffHeapMutableDictionary;
 import org.apache.pinot.core.realtime.impl.dictionary.StringOnHeapMutableDictionary;
-import java.util.Random;
-import java.util.concurrent.TimeUnit;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Mode;

@@ -20,11 +20,6 @@ package org.apache.pinot.transport.perf;
 
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
-import org.apache.pinot.common.metrics.AggregatedMetricsRegistry;
-import org.apache.pinot.transport.netty.NettyServer;
-import org.apache.pinot.transport.netty.NettyServer.RequestHandler;
-import org.apache.pinot.transport.netty.NettyServer.RequestHandlerFactory;
-import org.apache.pinot.transport.netty.NettyTCPServer;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import java.util.concurrent.CountDownLatch;
@@ -32,6 +27,11 @@ import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.GnuParser;
 import org.apache.commons.cli.Options;
+import org.apache.pinot.common.metrics.AggregatedMetricsRegistry;
+import org.apache.pinot.transport.netty.NettyServer;
+import org.apache.pinot.transport.netty.NettyServer.RequestHandler;
+import org.apache.pinot.transport.netty.NettyServer.RequestHandlerFactory;
+import org.apache.pinot.transport.netty.NettyTCPServer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

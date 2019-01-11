@@ -19,12 +19,6 @@
 package org.apache.pinot.minion.executor;
 
 import com.google.common.base.Preconditions;
-import org.apache.pinot.common.config.PinotTaskConfig;
-import org.apache.pinot.common.segment.fetcher.SegmentFetcherFactory;
-import org.apache.pinot.common.utils.FileUploadDownloadClient;
-import org.apache.pinot.common.utils.TarGzCompressionUtils;
-import org.apache.pinot.core.common.MinionConstants;
-import org.apache.pinot.minion.exception.TaskCancelledException;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -35,6 +29,12 @@ import javax.annotation.Nonnull;
 import org.apache.commons.io.FileUtils;
 import org.apache.http.NameValuePair;
 import org.apache.http.message.BasicNameValuePair;
+import org.apache.pinot.common.config.PinotTaskConfig;
+import org.apache.pinot.common.segment.fetcher.SegmentFetcherFactory;
+import org.apache.pinot.common.utils.FileUploadDownloadClient;
+import org.apache.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.core.common.MinionConstants;
+import org.apache.pinot.minion.exception.TaskCancelledException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

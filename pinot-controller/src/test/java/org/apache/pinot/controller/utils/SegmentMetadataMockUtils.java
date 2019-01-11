@@ -18,19 +18,19 @@
  */
 package org.apache.pinot.controller.utils;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+import org.apache.commons.lang.math.IntRange;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import org.apache.pinot.common.segment.SegmentMetadata;
 import org.apache.pinot.core.segment.index.ColumnMetadata;
 import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.TimeUnit;
-
-import org.apache.commons.lang.math.IntRange;
 import org.joda.time.Interval;
 import org.mockito.Mockito;
 
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 public class SegmentMetadataMockUtils {
   private SegmentMetadataMockUtils() {

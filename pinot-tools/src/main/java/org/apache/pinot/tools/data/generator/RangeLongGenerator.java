@@ -19,7 +19,6 @@
 package org.apache.pinot.tools.data.generator;
 
 import java.util.Random;
-import java.lang.Math;
 
 public class RangeLongGenerator implements Generator {
   private final long _start;

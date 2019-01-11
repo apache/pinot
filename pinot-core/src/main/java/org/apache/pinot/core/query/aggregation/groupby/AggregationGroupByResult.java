@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.core.query.aggregation.groupby;
 
-import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import java.util.Iterator;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 
 
 /**

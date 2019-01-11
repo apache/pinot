@@ -18,13 +18,12 @@
  */
 package org.apache.pinot.core.realtime.impl.kafka;
 
+import java.util.HashMap;
+import java.util.Map;
 import org.apache.pinot.core.realtime.stream.StreamConfig;
 import org.apache.pinot.core.realtime.stream.StreamConfigProperties;
 import org.testng.Assert;
 import org.testng.annotations.Test;
-
-import java.util.HashMap;
-import java.util.Map;
 
 public class KafkaLowLevelStreamConfigTest {
 

@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.transport.pool;
 
+import com.yammer.metrics.core.Histogram;
+import com.yammer.metrics.core.MetricName;
+import com.yammer.metrics.core.MetricsRegistry;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -30,8 +33,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.apache.pinot.common.metrics.LatencyMetric;
 import org.apache.pinot.common.metrics.MetricsHelper;
 import org.apache.pinot.transport.common.Callback;
@@ -40,9 +41,8 @@ import org.apache.pinot.transport.common.LinkedDequeue;
 import org.apache.pinot.transport.common.NoneType;
 import org.apache.pinot.transport.metrics.AsyncPoolStats;
 import org.apache.pinot.transport.metrics.PoolStats;
-import com.yammer.metrics.core.Histogram;
-import com.yammer.metrics.core.MetricName;
-import com.yammer.metrics.core.MetricsRegistry;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**

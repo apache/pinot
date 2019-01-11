@@ -19,15 +19,15 @@
 package org.apache.pinot.hadoop.job;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.util.ArrayList;
+import java.util.List;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.JsonUtils;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.hadoop.utils.PushLocation;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.util.ArrayList;
-import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

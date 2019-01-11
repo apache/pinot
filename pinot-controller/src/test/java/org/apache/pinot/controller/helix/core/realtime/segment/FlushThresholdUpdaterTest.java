@@ -18,6 +18,11 @@
  */
 package org.apache.pinot.controller.helix.core.realtime.segment;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Random;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import org.apache.pinot.common.partition.PartitionAssignment;
@@ -27,11 +32,6 @@ import org.apache.pinot.core.realtime.impl.kafka.KafkaAvroMessageDecoder;
 import org.apache.pinot.core.realtime.impl.kafka.KafkaConsumerFactory;
 import org.apache.pinot.core.realtime.stream.StreamConfig;
 import org.apache.pinot.core.realtime.stream.StreamConfigProperties;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Random;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;

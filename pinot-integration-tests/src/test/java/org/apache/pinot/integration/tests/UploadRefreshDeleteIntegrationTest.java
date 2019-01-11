@@ -19,8 +19,6 @@
 package org.apache.pinot.integration.tests;
 
 import com.google.common.util.concurrent.MoreExecutors;
-import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
-import org.apache.pinot.util.TestUtils;
 import java.io.File;
 import java.util.Collections;
 import java.util.concurrent.ExecutorService;
@@ -34,6 +32,8 @@ import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
+import org.apache.pinot.util.TestUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;

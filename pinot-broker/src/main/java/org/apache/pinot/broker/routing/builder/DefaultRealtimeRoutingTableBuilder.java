@@ -18,11 +18,6 @@
  */
 package org.apache.pinot.broker.routing.builder;
 
-import org.apache.pinot.broker.routing.RoutingTableLookupRequest;
-import org.apache.pinot.broker.routing.selector.SegmentSelector;
-import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.metrics.BrokerMetrics;
-import org.apache.pinot.common.utils.SegmentName;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -32,6 +27,11 @@ import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.pinot.broker.routing.RoutingTableLookupRequest;
+import org.apache.pinot.broker.routing.selector.SegmentSelector;
+import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.common.utils.SegmentName;
 
 
 /**

@@ -18,18 +18,15 @@
  */
 package org.apache.pinot.tools.admin.command;
 
-import org.apache.pinot.tools.Command;
 import java.io.File;
-
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.pinot.broker.broker.helix.HelixBrokerStarter;
+import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.tools.Command;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import org.apache.pinot.broker.broker.helix.HelixBrokerStarter;
-import org.apache.pinot.common.utils.CommonConstants;
-import org.apache.pinot.common.utils.NetUtil;
 
 
 /**

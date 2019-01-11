@@ -19,11 +19,11 @@
 package org.apache.pinot.broker.requesthandler;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import javax.annotation.Nullable;
+import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.broker.api.RequestStatistics;
 import org.apache.pinot.broker.api.RequesterIdentity;
 import org.apache.pinot.common.response.BrokerResponse;
-import javax.annotation.Nullable;
-import javax.annotation.concurrent.ThreadSafe;
 
 
 @ThreadSafe

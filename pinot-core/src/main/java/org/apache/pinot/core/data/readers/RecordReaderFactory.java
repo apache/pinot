@@ -19,9 +19,9 @@
 package org.apache.pinot.core.data.readers;
 
 import com.google.common.base.Preconditions;
+import java.io.File;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
-import java.io.File;
 
 
 public class RecordReaderFactory {

@@ -19,7 +19,6 @@
 package org.apache.pinot.core.util.trace;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import org.apache.pinot.common.utils.JsonUtils;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Queue;
@@ -28,6 +27,7 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import org.apache.pinot.common.utils.JsonUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 

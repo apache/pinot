@@ -18,13 +18,13 @@
  */
 package org.apache.pinot.core.transport;
 
-import org.apache.pinot.common.utils.DataTable;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.concurrent.ThreadSafe;
+import org.apache.pinot.common.utils.DataTable;
 
 
 /**

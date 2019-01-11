@@ -18,6 +18,11 @@
  */
 package org.apache.pinot.core.segment.index;
 
+import java.io.File;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.concurrent.TimeUnit;
+import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.MetricFieldSpec;
 import org.apache.pinot.common.segment.ReadMode;
@@ -31,11 +36,6 @@ import org.apache.pinot.core.startree.hll.SegmentWithHllIndexCreateHelper;
 import org.apache.pinot.segments.v1.creator.SegmentTestUtils;
 import org.apache.pinot.startree.hll.HllConfig;
 import org.apache.pinot.util.TestUtils;
-import java.io.File;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.concurrent.TimeUnit;
-import org.apache.commons.io.FileUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;

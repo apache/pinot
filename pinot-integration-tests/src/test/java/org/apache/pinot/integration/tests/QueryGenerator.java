@@ -19,7 +19,6 @@
 package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import org.apache.pinot.common.utils.JsonUtils;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
@@ -39,6 +38,7 @@ import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.commons.lang.StringUtils;
+import org.apache.pinot.common.utils.JsonUtils;
 
 
 /**

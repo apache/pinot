@@ -18,12 +18,12 @@
  */
 package org.apache.pinot.index.readerwriter;
 
-import org.apache.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
-import org.apache.pinot.core.io.readerwriter.impl.FixedByteSingleValueMultiColumnReaderWriter;
-import org.apache.pinot.core.io.writer.impl.DirectMemoryManager;
 import java.io.IOException;
 import java.util.Random;
 import org.apache.commons.lang.RandomStringUtils;
+import org.apache.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
+import org.apache.pinot.core.io.readerwriter.impl.FixedByteSingleValueMultiColumnReaderWriter;
+import org.apache.pinot.core.io.writer.impl.DirectMemoryManager;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;

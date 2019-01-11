@@ -18,14 +18,14 @@
  */
 package org.apache.pinot.core.query.reduce;
 
-import org.apache.pinot.common.request.AggregationInfo;
-import org.apache.pinot.common.request.FilterOperator;
-import org.apache.pinot.common.request.HavingFilterQuery;
-import org.apache.pinot.common.request.HavingFilterQueryMap;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.common.request.AggregationInfo;
+import org.apache.pinot.common.request.FilterOperator;
+import org.apache.pinot.common.request.HavingFilterQuery;
+import org.apache.pinot.common.request.HavingFilterQueryMap;
 
 //This class provides a tree representation of HAVING clause predicate
 

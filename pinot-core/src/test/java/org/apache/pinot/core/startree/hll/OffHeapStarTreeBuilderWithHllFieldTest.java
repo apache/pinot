@@ -18,17 +18,6 @@
  */
 package org.apache.pinot.core.startree.hll;
 
-import org.apache.pinot.common.data.DimensionFieldSpec;
-import org.apache.pinot.common.data.FieldSpec;
-import org.apache.pinot.common.data.FieldSpec.DataType;
-import org.apache.pinot.common.data.MetricFieldSpec;
-import org.apache.pinot.common.data.Schema;
-import org.apache.pinot.common.data.TimeFieldSpec;
-import org.apache.pinot.core.data.GenericRow;
-import org.apache.pinot.core.startree.OffHeapStarTreeBuilder;
-import org.apache.pinot.core.startree.StarTreeBuilderConfig;
-import org.apache.pinot.startree.hll.HllConstants;
-import org.apache.pinot.startree.hll.HllSizeUtils;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -40,6 +29,17 @@ import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.data.DimensionFieldSpec;
+import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.common.data.FieldSpec.DataType;
+import org.apache.pinot.common.data.MetricFieldSpec;
+import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.common.data.TimeFieldSpec;
+import org.apache.pinot.core.data.GenericRow;
+import org.apache.pinot.core.startree.OffHeapStarTreeBuilder;
+import org.apache.pinot.core.startree.StarTreeBuilderConfig;
+import org.apache.pinot.startree.hll.HllConstants;
+import org.apache.pinot.startree.hll.HllSizeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;

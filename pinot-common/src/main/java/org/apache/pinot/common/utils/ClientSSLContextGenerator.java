@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.common.utils;
 
-import org.apache.pinot.common.Utils;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -37,6 +36,7 @@ import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
 import javax.net.ssl.X509TrustManager;
 import org.apache.commons.configuration.Configuration;
+import org.apache.pinot.common.Utils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

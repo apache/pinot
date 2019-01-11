@@ -18,10 +18,10 @@
  */
 package org.apache.pinot.core.segment.index.loader.defaultcolumn;
 
-import org.apache.pinot.core.data.partition.PartitionFunction;
-import org.apache.pinot.core.segment.creator.ColumnStatistics;
 import java.util.List;
 import org.apache.commons.lang.math.IntRange;
+import org.apache.pinot.core.data.partition.PartitionFunction;
+import org.apache.pinot.core.segment.creator.ColumnStatistics;
 
 
 public class DefaultColumnStatistics implements ColumnStatistics {

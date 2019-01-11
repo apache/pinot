@@ -18,6 +18,10 @@
  */
 package org.apache.pinot.core.indexsegment.mutable;
 
+import java.io.File;
+import java.net.URL;
+import java.util.Collections;
+import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.segment.ReadMode;
@@ -36,10 +40,6 @@ import org.apache.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.segments.v1.creator.SegmentTestUtils;
-import java.io.File;
-import java.net.URL;
-import java.util.Collections;
-import org.apache.commons.io.FileUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;

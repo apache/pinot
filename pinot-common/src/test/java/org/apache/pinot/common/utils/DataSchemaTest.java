@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.common.utils;
 
-import org.apache.pinot.common.data.FieldSpec;
 import java.util.Arrays;
+import org.apache.pinot.common.data.FieldSpec;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 

@@ -19,14 +19,6 @@
 package org.apache.pinot.server.api.resources;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import org.apache.pinot.common.restlet.resources.ResourceUtils;
-import org.apache.pinot.common.restlet.resources.TableSegments;
-import org.apache.pinot.common.restlet.resources.TablesList;
-import org.apache.pinot.core.data.manager.InstanceDataManager;
-import org.apache.pinot.core.data.manager.SegmentDataManager;
-import org.apache.pinot.core.data.manager.TableDataManager;
-import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
-import org.apache.pinot.server.starter.ServerInstance;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
@@ -48,6 +40,14 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.pinot.common.restlet.resources.ResourceUtils;
+import org.apache.pinot.common.restlet.resources.TableSegments;
+import org.apache.pinot.common.restlet.resources.TablesList;
+import org.apache.pinot.core.data.manager.InstanceDataManager;
+import org.apache.pinot.core.data.manager.SegmentDataManager;
+import org.apache.pinot.core.data.manager.TableDataManager;
+import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
+import org.apache.pinot.server.starter.ServerInstance;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

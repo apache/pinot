@@ -18,13 +18,13 @@
  */
 package org.apache.pinot.common.segment.fetcher;
 
-import org.apache.pinot.common.utils.ClientSSLContextGenerator;
-import org.apache.pinot.common.utils.CommonConstants;
-import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import java.util.Set;
 import java.util.stream.Collectors;
 import javax.net.ssl.SSLContext;
 import org.apache.commons.configuration.Configuration;
+import org.apache.pinot.common.utils.ClientSSLContextGenerator;
+import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.FileUploadDownloadClient;
 
 
 /*

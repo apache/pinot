@@ -18,6 +18,11 @@
  */
 package org.apache.pinot.core.segment.index.converter;
 
+import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.attribute.FileTime;
+import java.util.concurrent.TimeUnit;
+import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
@@ -31,11 +36,6 @@ import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.core.segment.store.SegmentDirectoryPaths;
 import org.apache.pinot.segments.v1.creator.SegmentTestUtils;
 import org.apache.pinot.util.TestUtils;
-import java.io.File;
-import java.nio.file.Files;
-import java.nio.file.attribute.FileTime;
-import java.util.concurrent.TimeUnit;
-import org.apache.commons.io.FileUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;

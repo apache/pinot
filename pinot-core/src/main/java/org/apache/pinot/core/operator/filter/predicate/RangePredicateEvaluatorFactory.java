@@ -18,14 +18,14 @@
  */
 package org.apache.pinot.core.operator.filter.predicate;
 
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
+import it.unimi.dsi.fastutil.ints.IntSet;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.core.common.Predicate;
 import org.apache.pinot.core.common.predicate.RangePredicate;
 import org.apache.pinot.core.realtime.impl.dictionary.MutableDictionary;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.core.segment.index.readers.ImmutableDictionaryReader;
-import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
-import it.unimi.dsi.fastutil.ints.IntSet;
 
 
 /**

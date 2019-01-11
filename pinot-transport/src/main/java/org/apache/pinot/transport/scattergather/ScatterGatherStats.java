@@ -20,8 +20,8 @@ package org.apache.pinot.transport.scattergather;
 
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.pinot.common.response.ServerInstance;
 import javax.annotation.concurrent.NotThreadSafe;
+import org.apache.pinot.common.response.ServerInstance;
 
 
 /**

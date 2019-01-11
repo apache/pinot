@@ -20,6 +20,7 @@ package org.apache.pinot.common.metadata.segment;
 
 import java.util.Map;
 import org.apache.helix.ZNRecord;
+
 import static org.apache.pinot.common.utils.EqualityUtils.hashCodeOf;
 import static org.apache.pinot.common.utils.EqualityUtils.isEqual;
 import static org.apache.pinot.common.utils.EqualityUtils.isNullOrNotSameClass;

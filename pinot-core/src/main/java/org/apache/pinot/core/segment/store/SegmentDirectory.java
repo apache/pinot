@@ -18,9 +18,6 @@
  */
 package org.apache.pinot.core.segment.store;
 
-import org.apache.pinot.common.segment.ReadMode;
-import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
-import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
@@ -28,6 +25,9 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Path;
 import org.apache.commons.configuration.ConfigurationException;
+import org.apache.pinot.common.segment.ReadMode;
+import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
+import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 
 
 /**

@@ -18,6 +18,10 @@
  */
 package org.apache.pinot.core.plan;
 
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import javax.annotation.Nonnull;
 import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.GroupBy;
@@ -32,10 +36,6 @@ import org.apache.pinot.core.startree.StarTreeUtils;
 import org.apache.pinot.core.startree.plan.StarTreeTransformPlanNode;
 import org.apache.pinot.core.startree.v2.AggregationFunctionColumnPair;
 import org.apache.pinot.core.startree.v2.StarTreeV2;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-import javax.annotation.Nonnull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

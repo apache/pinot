@@ -18,6 +18,14 @@
  */
 package org.apache.pinot.minion.taskfactory;
 
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
+import javax.annotation.Nonnull;
+import org.apache.helix.task.Task;
+import org.apache.helix.task.TaskConfig;
+import org.apache.helix.task.TaskFactory;
+import org.apache.helix.task.TaskResult;
 import org.apache.pinot.common.config.PinotTaskConfig;
 import org.apache.pinot.minion.MinionContext;
 import org.apache.pinot.minion.events.EventObserverFactoryRegistry;
@@ -31,14 +39,6 @@ import org.apache.pinot.minion.executor.TaskExecutorFactoryRegistry;
 import org.apache.pinot.minion.metrics.MinionMeter;
 import org.apache.pinot.minion.metrics.MinionMetrics;
 import org.apache.pinot.minion.metrics.MinionQueryPhase;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.concurrent.TimeUnit;
-import javax.annotation.Nonnull;
-import org.apache.helix.task.Task;
-import org.apache.helix.task.TaskConfig;
-import org.apache.helix.task.TaskFactory;
-import org.apache.helix.task.TaskResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

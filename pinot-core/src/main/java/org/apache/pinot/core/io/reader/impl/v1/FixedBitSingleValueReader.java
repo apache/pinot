@@ -18,11 +18,11 @@
  */
 package org.apache.pinot.core.io.reader.impl.v1;
 
+import java.io.IOException;
 import org.apache.pinot.core.io.reader.BaseSingleColumnSingleValueReader;
 import org.apache.pinot.core.io.reader.ReaderContext;
 import org.apache.pinot.core.io.util.FixedBitIntReaderWriter;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
-import java.io.IOException;
 
 
 public final class FixedBitSingleValueReader extends BaseSingleColumnSingleValueReader {

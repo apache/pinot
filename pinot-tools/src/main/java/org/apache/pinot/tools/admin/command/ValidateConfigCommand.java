@@ -18,13 +18,6 @@
  */
 package org.apache.pinot.tools.admin.command;
 
-import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.data.Schema;
-import org.apache.pinot.common.utils.SchemaUtils;
-import org.apache.pinot.tools.AbstractBaseCommand;
-import org.apache.pinot.tools.Command;
-import org.apache.pinot.tools.config.validator.SchemaValidator;
-import org.apache.pinot.tools.config.validator.TableConfigValidator;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -34,6 +27,13 @@ import org.apache.helix.PropertyType;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.manager.zk.ZNRecordSerializer;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.common.utils.SchemaUtils;
+import org.apache.pinot.tools.AbstractBaseCommand;
+import org.apache.pinot.tools.Command;
+import org.apache.pinot.tools.config.validator.SchemaValidator;
+import org.apache.pinot.tools.config.validator.TableConfigValidator;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

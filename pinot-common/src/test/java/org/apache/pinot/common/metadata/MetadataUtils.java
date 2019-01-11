@@ -21,7 +21,6 @@ package org.apache.pinot.common.metadata;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-
 import org.apache.helix.ZNRecord;
 
 

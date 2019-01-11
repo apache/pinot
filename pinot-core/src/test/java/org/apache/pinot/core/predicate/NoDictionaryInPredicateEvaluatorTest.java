@@ -18,12 +18,6 @@
  */
 package org.apache.pinot.core.predicate;
 
-import org.apache.pinot.common.data.FieldSpec;
-import org.apache.pinot.core.common.predicate.InPredicate;
-import org.apache.pinot.core.common.predicate.NotInPredicate;
-import org.apache.pinot.core.operator.filter.predicate.InPredicateEvaluatorFactory;
-import org.apache.pinot.core.operator.filter.predicate.NotInPredicateEvaluatorFactory;
-import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import it.unimi.dsi.fastutil.doubles.DoubleOpenHashSet;
 import it.unimi.dsi.fastutil.doubles.DoubleSet;
 import it.unimi.dsi.fastutil.floats.FloatOpenHashSet;
@@ -38,6 +32,12 @@ import java.util.List;
 import java.util.Random;
 import java.util.Set;
 import org.apache.commons.lang.RandomStringUtils;
+import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.core.common.predicate.InPredicate;
+import org.apache.pinot.core.common.predicate.NotInPredicate;
+import org.apache.pinot.core.operator.filter.predicate.InPredicateEvaluatorFactory;
+import org.apache.pinot.core.operator.filter.predicate.NotInPredicateEvaluatorFactory;
+import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;

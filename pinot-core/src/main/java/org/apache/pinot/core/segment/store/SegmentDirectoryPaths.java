@@ -19,11 +19,11 @@
 package org.apache.pinot.core.segment.store;
 
 import com.google.common.base.Preconditions;
-import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
-import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import java.io.File;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
+import org.apache.pinot.core.segment.creator.impl.V1Constants;
 
 
 public class SegmentDirectoryPaths {

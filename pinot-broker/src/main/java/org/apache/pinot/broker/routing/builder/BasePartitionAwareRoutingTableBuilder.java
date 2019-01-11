@@ -18,6 +18,16 @@
  */
 package org.apache.pinot.broker.routing.builder;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Random;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import org.apache.commons.configuration.Configuration;
+import org.apache.helix.ZNRecord;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.broker.pruner.SegmentPrunerContext;
 import org.apache.pinot.broker.pruner.SegmentZKMetadataPrunerService;
 import org.apache.pinot.broker.routing.RoutingTableLookupRequest;
@@ -26,17 +36,6 @@ import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.Random;
-import java.util.concurrent.ConcurrentHashMap;
-import org.apache.commons.configuration.Configuration;
-import org.apache.helix.ZNRecord;
-import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

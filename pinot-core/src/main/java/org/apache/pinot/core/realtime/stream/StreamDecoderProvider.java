@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.core.realtime.stream;
 
+import java.util.Map;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.data.Schema;
-import java.util.Map;
 
 
 /**

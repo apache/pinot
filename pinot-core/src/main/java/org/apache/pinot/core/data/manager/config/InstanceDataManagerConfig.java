@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.core.data.manager.config;
 
-import org.apache.pinot.common.segment.ReadMode;
 import org.apache.commons.configuration.Configuration;
+import org.apache.pinot.common.segment.ReadMode;
 
 
 public interface InstanceDataManagerConfig {

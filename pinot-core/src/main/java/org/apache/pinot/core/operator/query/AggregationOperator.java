@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.core.operator.query;
 
+import java.util.List;
+import javax.annotation.Nonnull;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
@@ -27,8 +29,6 @@ import org.apache.pinot.core.query.aggregation.AggregationExecutor;
 import org.apache.pinot.core.query.aggregation.AggregationFunctionContext;
 import org.apache.pinot.core.query.aggregation.DefaultAggregationExecutor;
 import org.apache.pinot.core.startree.executor.StarTreeAggregationExecutor;
-import java.util.List;
-import javax.annotation.Nonnull;
 
 
 /**

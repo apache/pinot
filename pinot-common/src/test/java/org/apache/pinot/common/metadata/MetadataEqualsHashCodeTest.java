@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.common.metadata;
 
+import nl.jqno.equalsverifier.EqualsVerifier;
+import nl.jqno.equalsverifier.Warning;
 import org.apache.pinot.common.data.DateTimeFieldSpec;
 import org.apache.pinot.common.data.DimensionFieldSpec;
 import org.apache.pinot.common.data.MetricFieldSpec;
@@ -27,8 +29,6 @@ import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
-import nl.jqno.equalsverifier.EqualsVerifier;
-import nl.jqno.equalsverifier.Warning;
 import org.testng.annotations.Test;
 
 

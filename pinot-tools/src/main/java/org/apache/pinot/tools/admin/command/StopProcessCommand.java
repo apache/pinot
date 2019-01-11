@@ -18,15 +18,14 @@
  */
 package org.apache.pinot.tools.admin.command;
 
-import org.apache.pinot.tools.Command;
 import java.io.File;
 import java.io.FileReader;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
-
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.tools.Command;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -111,7 +110,7 @@ public class StopProcessCommand extends AbstractBaseAdminCommand implements Comm
           return false;
         }
       });
-      
+
       for (File serverFile : serverFiles) {
         processes.put(serverFile.getName(), serverFile.getAbsolutePath());
       }
@@ -128,7 +127,7 @@ public class StopProcessCommand extends AbstractBaseAdminCommand implements Comm
           return false;
         }
       });
-      
+
       for (File serverFile : serverFiles) {
         processes.put(serverFile.getName(), serverFile.getAbsolutePath());
       }
@@ -145,7 +144,7 @@ public class StopProcessCommand extends AbstractBaseAdminCommand implements Comm
           return false;
         }
       });
-      
+
       for (File serverFile : serverFiles) {
         processes.put(serverFile.getName(), serverFile.getAbsolutePath());
       }

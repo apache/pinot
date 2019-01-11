@@ -19,9 +19,9 @@
 package org.apache.pinot.core.data.function;
 
 import com.google.common.base.Preconditions;
+import java.util.List;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.core.data.GenericRow;
-import java.util.List;
 
 
 /**

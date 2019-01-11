@@ -18,12 +18,12 @@
  */
 package org.apache.pinot.common.config;
 
+import java.io.IOException;
 import org.apache.pinot.common.utils.JsonUtils;
 import org.apache.pinot.common.utils.TenantRole;
-import java.io.IOException;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertEquals;
 
 
 public class TenantTest {

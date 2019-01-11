@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.tools;
 
+import java.lang.reflect.Field;
 import org.apache.pinot.tools.perf.PerfBenchmarkRunner;
 import org.apache.pinot.tools.perf.QueryRunner;
-import java.lang.reflect.Field;
 import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.CmdLineException;
 import org.kohsuke.args4j.CmdLineParser;

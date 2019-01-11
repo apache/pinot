@@ -18,8 +18,19 @@
  */
 package org.apache.pinot.broker.routing.builder;
 
-import org.apache.pinot.broker.util.FakePropertyStore;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Random;
+import java.util.Set;
+import org.apache.commons.lang.math.IntRange;
+import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.broker.routing.RoutingTableLookupRequest;
+import org.apache.pinot.broker.util.FakePropertyStore;
 import org.apache.pinot.common.config.ColumnPartitionConfig;
 import org.apache.pinot.common.config.RoutingConfig;
 import org.apache.pinot.common.config.SegmentPartitionConfig;
@@ -32,17 +43,6 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Random;
-import java.util.Set;
-import org.apache.commons.lang.math.IntRange;
-import org.apache.helix.model.ExternalView;
-import org.apache.helix.model.InstanceConfig;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 

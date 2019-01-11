@@ -18,13 +18,6 @@
  */
 package org.apache.pinot.controller.helix.core;
 
-import org.apache.pinot.common.config.TableNameBuilder;
-import org.apache.pinot.common.metadata.ZKMetadataProvider;
-import org.apache.pinot.common.utils.SegmentName;
-import org.apache.pinot.common.utils.StringUtil;
-import org.apache.pinot.controller.ControllerConf;
-import org.apache.pinot.filesystem.PinotFS;
-import org.apache.pinot.filesystem.PinotFSFactory;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
@@ -45,6 +38,13 @@ import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.pinot.common.config.TableNameBuilder;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.utils.SegmentName;
+import org.apache.pinot.common.utils.StringUtil;
+import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.filesystem.PinotFS;
+import org.apache.pinot.filesystem.PinotFSFactory;
 import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

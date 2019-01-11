@@ -18,15 +18,15 @@
  */
 package org.apache.pinot.core.common;
 
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Random;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.MetricFieldSpec;
 import org.apache.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import org.apache.pinot.core.io.readerwriter.impl.FixedByteSingleColumnSingleValueReaderWriter;
 import org.apache.pinot.core.io.writer.impl.DirectMemoryManager;
 import org.apache.pinot.core.segment.index.data.source.ColumnDataSource;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Random;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;

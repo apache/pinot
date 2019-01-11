@@ -19,16 +19,14 @@
 package org.apache.pinot.core.io.writer.impl.v1;
 
 import com.google.common.base.Preconditions;
-import org.apache.pinot.common.segment.ReadMode;
+import java.io.File;
+import java.io.IOException;
+import java.nio.ByteOrder;
 import org.apache.pinot.core.io.util.FixedBitIntReaderWriter;
 import org.apache.pinot.core.io.util.FixedByteValueReaderWriter;
 import org.apache.pinot.core.io.util.PinotDataBitSet;
 import org.apache.pinot.core.io.writer.SingleColumnMultiValueWriter;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
-import java.io.File;
-import java.io.IOException;
-import java.nio.ByteOrder;
-import java.nio.channels.FileChannel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

@@ -18,10 +18,6 @@
  */
 package org.apache.pinot.core.realtime.impl.dictionary;
 
-import org.apache.pinot.common.data.FieldSpec;
-import org.apache.pinot.common.utils.primitive.ByteArray;
-import org.apache.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
-import org.apache.pinot.core.io.writer.impl.DirectMemoryManager;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -35,6 +31,10 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.stream.Collectors;
 import org.apache.commons.lang.RandomStringUtils;
+import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.common.utils.primitive.ByteArray;
+import org.apache.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
+import org.apache.pinot.core.io.writer.impl.DirectMemoryManager;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.Test;

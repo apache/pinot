@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.tools.admin.command;
 
-import org.apache.pinot.tools.AbstractBaseCommand;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
@@ -30,6 +29,7 @@ import java.net.URL;
 import java.net.URLConnection;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.pinot.tools.AbstractBaseCommand;
 
 
 /**

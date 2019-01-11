@@ -18,17 +18,6 @@
  */
 package org.apache.pinot.transport.scattergather;
 
-import org.apache.pinot.common.metrics.BrokerMeter;
-import org.apache.pinot.common.metrics.BrokerMetrics;
-import org.apache.pinot.common.metrics.BrokerQueryPhase;
-import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.response.ServerInstance;
-import org.apache.pinot.transport.common.CompositeFuture;
-import org.apache.pinot.transport.common.CompositeFuture.GatherModeOnError;
-import org.apache.pinot.transport.common.ServerResponseFuture;
-import org.apache.pinot.transport.netty.NettyClientConnection.ResponseFuture;
-import org.apache.pinot.transport.netty.PooledNettyClientResourceManager;
-import org.apache.pinot.transport.pool.KeyedPool;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import java.util.ArrayList;
@@ -42,6 +31,17 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.metrics.BrokerMeter;
+import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.common.metrics.BrokerQueryPhase;
+import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.response.ServerInstance;
+import org.apache.pinot.transport.common.CompositeFuture;
+import org.apache.pinot.transport.common.CompositeFuture.GatherModeOnError;
+import org.apache.pinot.transport.common.ServerResponseFuture;
+import org.apache.pinot.transport.netty.NettyClientConnection.ResponseFuture;
+import org.apache.pinot.transport.netty.PooledNettyClientResourceManager;
+import org.apache.pinot.transport.pool.KeyedPool;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

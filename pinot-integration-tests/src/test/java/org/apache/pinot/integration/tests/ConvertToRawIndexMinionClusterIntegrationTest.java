@@ -18,6 +18,15 @@
  */
 package org.apache.pinot.integration.tests;
 
+import java.io.File;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import javax.annotation.Nullable;
+import org.apache.commons.lang.StringUtils;
+import org.apache.helix.task.TaskState;
 import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.config.TableTaskConfig;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
@@ -28,15 +37,6 @@ import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
 import org.apache.pinot.util.TestUtils;
-import java.io.File;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import javax.annotation.Nullable;
-import org.apache.commons.lang.StringUtils;
-import org.apache.helix.task.TaskState;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;

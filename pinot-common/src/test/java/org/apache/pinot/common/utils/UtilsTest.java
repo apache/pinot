@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.common.utils;
 
+import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.utils.time.TimeUtils;
-import java.util.concurrent.TimeUnit;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 

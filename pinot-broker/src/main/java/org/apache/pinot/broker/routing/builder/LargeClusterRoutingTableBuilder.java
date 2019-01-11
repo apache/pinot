@@ -18,11 +18,11 @@
  */
 package org.apache.pinot.broker.routing.builder;
 
-import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.commons.configuration.Configuration;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

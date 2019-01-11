@@ -18,10 +18,9 @@
  */
 package org.apache.pinot.core.common.predicate;
 
+import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import java.util.List;
-
-import com.google.common.base.Preconditions;
 import org.apache.pinot.core.common.Predicate;
 
 
@@ -38,9 +37,9 @@ public class RegexpLikePredicate extends Predicate {
   public String toString() {
     return "Predicate: type: " + getType() + ", left : " + getLhs() + ", right : " + Arrays.toString(getRhs().toArray(new String[0])) + "\n";
   }
-  
+
   public String getRegex(){
-   return _regex; 
+   return _regex;
   }
 
 }

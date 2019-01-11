@@ -18,11 +18,6 @@
  */
 package org.apache.pinot.core.data.readers;
 
-import org.apache.pinot.common.data.FieldSpec;
-import org.apache.pinot.common.data.Schema;
-import org.apache.pinot.core.data.GenericRow;
-import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
-import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -33,6 +28,11 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.core.data.GenericRow;
+import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 
 
 /**

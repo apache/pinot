@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.controller.helix.core.realtime.segment;
 
+import javax.annotation.Nonnull;
 import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import org.apache.pinot.common.partition.PartitionAssignment;
-import javax.annotation.Nonnull;
 
 
 /**

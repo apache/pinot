@@ -20,7 +20,6 @@ package org.apache.pinot.common.utils.webhdfs;
 
 import java.io.File;
 import java.io.IOException;
-
 import org.apache.commons.httpclient.HttpClient;
 import org.apache.commons.httpclient.HttpMethod;
 import org.apache.commons.httpclient.methods.FileRequestEntity;

@@ -28,9 +28,9 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import org.apache.pinot.common.response.ServerInstance;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.pinot.common.response.ServerInstance;
 
 
 /**

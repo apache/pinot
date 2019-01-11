@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.core.io.util;
 
-import org.apache.pinot.core.segment.index.readers.Dictionary;
 import java.io.IOException;
+import org.apache.pinot.core.segment.index.readers.Dictionary;
 
 
 /**

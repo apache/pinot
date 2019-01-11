@@ -18,12 +18,12 @@
  */
 package org.apache.pinot.controller.helix;
 
+import java.io.IOException;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.config.TagNameUtils;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
-import java.io.IOException;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;

@@ -18,13 +18,6 @@
  */
 package org.apache.pinot.controller.api.resources;
 
-import org.apache.pinot.common.config.CombinedConfig;
-import org.apache.pinot.common.config.Deserializer;
-import org.apache.pinot.common.config.Serializer;
-import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.data.Schema;
-import org.apache.pinot.common.utils.CommonConstants;
-import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import io.swagger.annotations.ApiOperation;
 import java.io.IOException;
 import java.util.List;
@@ -40,6 +33,13 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Request;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Variant;
+import org.apache.pinot.common.config.CombinedConfig;
+import org.apache.pinot.common.config.Deserializer;
+import org.apache.pinot.common.config.Serializer;
+import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

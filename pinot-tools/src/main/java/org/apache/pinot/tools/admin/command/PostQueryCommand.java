@@ -18,11 +18,11 @@
  */
 package org.apache.pinot.tools.admin.command;
 
+import java.util.Collections;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.JsonUtils;
 import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.tools.Command;
-import java.util.Collections;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

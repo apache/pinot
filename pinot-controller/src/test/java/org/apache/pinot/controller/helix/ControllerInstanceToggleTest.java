@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.controller.helix;
 
+import java.util.Set;
+import org.apache.helix.model.ExternalView;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.config.TagNameUtils;
@@ -25,8 +27,6 @@ import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
-import java.util.Set;
-import org.apache.helix.model.ExternalView;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;

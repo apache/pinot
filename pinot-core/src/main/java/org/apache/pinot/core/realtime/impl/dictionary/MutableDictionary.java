@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.core.realtime.impl.dictionary;
 
-import org.apache.pinot.core.segment.index.readers.BaseDictionary;
 import javax.annotation.Nonnull;
+import org.apache.pinot.core.segment.index.readers.BaseDictionary;
 
 
 public abstract class MutableDictionary extends BaseDictionary {

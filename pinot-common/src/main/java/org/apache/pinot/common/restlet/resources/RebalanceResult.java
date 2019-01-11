@@ -20,8 +20,8 @@ package org.apache.pinot.common.restlet.resources;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import org.apache.pinot.common.partition.PartitionAssignment;
 import java.util.Map;
+import org.apache.pinot.common.partition.PartitionAssignment;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class RebalanceResult {

@@ -18,15 +18,15 @@
  */
 package org.apache.pinot.queries;
 
+import java.io.Serializable;
+import java.util.List;
+import java.util.Queue;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.query.EmptySelectionOperator;
 import org.apache.pinot.core.operator.query.SelectionOnlyOperator;
 import org.apache.pinot.core.operator.query.SelectionOrderByOperator;
-import java.io.Serializable;
-import java.util.List;
-import java.util.Queue;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 

@@ -18,17 +18,17 @@
  */
 package org.apache.pinot.broker.pruner;
 
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+import junit.framework.Assert;
+import org.apache.commons.lang.math.IntRange;
 import org.apache.pinot.common.metadata.segment.ColumnPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
-import junit.framework.Assert;
-import org.apache.commons.lang.math.IntRange;
 import org.testng.annotations.Test;
 
 

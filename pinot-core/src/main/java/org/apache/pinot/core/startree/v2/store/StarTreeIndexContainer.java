@@ -18,6 +18,13 @@
  */
 package org.apache.pinot.core.startree.v2.store;
 
+import java.io.Closeable;
+import java.io.File;
+import java.io.IOException;
+import java.nio.ByteOrder;
+import java.util.List;
+import java.util.Map;
+import org.apache.commons.configuration.ConfigurationException;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
@@ -26,15 +33,9 @@ import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.apache.pinot.core.startree.v2.StarTreeV2;
 import org.apache.pinot.core.startree.v2.StarTreeV2Constants;
 import org.apache.pinot.core.startree.v2.StarTreeV2Metadata;
-import java.io.Closeable;
-import java.io.File;
-import java.io.IOException;
-import java.nio.ByteOrder;
-import java.util.List;
-import java.util.Map;
-import org.apache.commons.configuration.ConfigurationException;
 
-import static org.apache.pinot.core.startree.v2.store.StarTreeIndexMapUtils.*;
+import static org.apache.pinot.core.startree.v2.store.StarTreeIndexMapUtils.IndexKey;
+import static org.apache.pinot.core.startree.v2.store.StarTreeIndexMapUtils.IndexValue;
 
 
 /**

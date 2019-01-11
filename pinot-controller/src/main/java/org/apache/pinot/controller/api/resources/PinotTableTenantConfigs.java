@@ -18,10 +18,6 @@
  */
 package org.apache.pinot.controller.api.resources;
 
-import org.apache.pinot.common.config.TableNameBuilder;
-import org.apache.pinot.common.exception.InvalidConfigException;
-import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
-import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
@@ -34,6 +30,9 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.pinot.common.exception.InvalidConfigException;
+import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

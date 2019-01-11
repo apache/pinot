@@ -22,7 +22,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-
 import org.apache.pinot.common.utils.Pairs;
 import org.apache.pinot.common.utils.Pairs.IntPair;
 

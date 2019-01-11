@@ -18,23 +18,18 @@
  */
 package org.apache.pinot.server.api.resources;
 
-import org.apache.pinot.common.utils.ServiceStatus;
-import org.apache.pinot.common.utils.ServiceStatus.Status;
-import org.apache.pinot.server.starter.ServerInstance;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiResponse;
 import io.swagger.annotations.ApiResponses;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import javax.inject.Inject;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.pinot.common.utils.ServiceStatus;
+import org.apache.pinot.common.utils.ServiceStatus.Status;
 
 /**
  * REST API to do health check through ServiceStatus.

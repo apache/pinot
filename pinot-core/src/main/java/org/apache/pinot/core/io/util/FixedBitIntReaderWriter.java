@@ -19,9 +19,9 @@
 package org.apache.pinot.core.io.util;
 
 import com.google.common.base.Preconditions;
-import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.Closeable;
 import java.io.IOException;
+import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 
 
 public final class FixedBitIntReaderWriter implements Closeable {

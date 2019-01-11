@@ -19,6 +19,9 @@
 package org.apache.pinot.controller.validation;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.util.ArrayList;
+import java.util.List;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.config.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.config.TableNameBuilder;
@@ -29,9 +32,6 @@ import org.apache.pinot.common.utils.time.TimeUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
-import java.util.ArrayList;
-import java.util.List;
-import org.apache.commons.lang3.StringUtils;
 import org.joda.time.Duration;
 import org.joda.time.Interval;
 import org.slf4j.Logger;

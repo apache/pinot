@@ -27,7 +27,7 @@ import org.apache.helix.model.IdealState;
 import org.mockito.Mockito;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertEquals;
 
 
 /**

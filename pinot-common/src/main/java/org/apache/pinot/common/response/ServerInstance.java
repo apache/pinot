@@ -18,14 +18,14 @@
  */
 package org.apache.pinot.common.response;
 
+import com.google.common.net.InternetDomainName;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.commons.lang3.tuple.Triple;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.google.common.net.InternetDomainName;
-import org.apache.pinot.common.utils.CommonConstants;
 
 
 /**

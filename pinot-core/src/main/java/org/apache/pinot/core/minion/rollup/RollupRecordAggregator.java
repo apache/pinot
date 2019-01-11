@@ -18,15 +18,15 @@
  */
 package org.apache.pinot.core.minion.rollup;
 
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import org.apache.pinot.common.data.MetricFieldSpec;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.core.data.GenericRow;
 import org.apache.pinot.core.minion.rollup.aggregate.ValueAggregator;
 import org.apache.pinot.core.minion.rollup.aggregate.ValueAggregatorFactory;
 import org.apache.pinot.core.minion.segment.RecordAggregator;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 
 
 /**

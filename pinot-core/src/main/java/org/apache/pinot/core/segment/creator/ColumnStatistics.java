@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.core.segment.creator;
 
-import org.apache.pinot.core.data.partition.PartitionFunction;
 import java.util.List;
 import org.apache.commons.lang.math.IntRange;
+import org.apache.pinot.core.data.partition.PartitionFunction;
 
 
 /**

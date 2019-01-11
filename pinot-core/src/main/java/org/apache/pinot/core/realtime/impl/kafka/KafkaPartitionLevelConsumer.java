@@ -20,14 +20,14 @@ package org.apache.pinot.core.realtime.impl.kafka;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Iterables;
-import org.apache.pinot.core.realtime.stream.MessageBatch;
-import org.apache.pinot.core.realtime.stream.PartitionLevelConsumer;
-import org.apache.pinot.core.realtime.stream.StreamConfig;
 import java.io.IOException;
 import kafka.api.FetchRequestBuilder;
 import kafka.javaapi.FetchResponse;
 import kafka.javaapi.message.ByteBufferMessageSet;
 import kafka.message.MessageAndOffset;
+import org.apache.pinot.core.realtime.stream.MessageBatch;
+import org.apache.pinot.core.realtime.stream.PartitionLevelConsumer;
+import org.apache.pinot.core.realtime.stream.StreamConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

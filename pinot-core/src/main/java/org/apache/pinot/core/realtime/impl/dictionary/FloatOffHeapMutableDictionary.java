@@ -18,11 +18,11 @@
  */
 package org.apache.pinot.core.realtime.impl.dictionary;
 
-import org.apache.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
-import org.apache.pinot.core.io.readerwriter.impl.FixedByteSingleColumnSingleValueReaderWriter;
 import java.io.IOException;
 import java.util.Arrays;
 import javax.annotation.Nonnull;
+import org.apache.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
+import org.apache.pinot.core.io.readerwriter.impl.FixedByteSingleColumnSingleValueReaderWriter;
 
 
 public class FloatOffHeapMutableDictionary extends BaseOffHeapMutableDictionary {

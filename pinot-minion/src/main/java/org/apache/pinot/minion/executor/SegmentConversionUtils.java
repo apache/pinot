@@ -17,13 +17,7 @@
  * under the License.
  */
 package org.apache.pinot.minion.executor;
-import org.apache.pinot.common.exception.HttpErrorStatusException;
-import org.apache.pinot.common.utils.FileUploadDownloadClient;
-import org.apache.pinot.common.utils.SimpleHttpResponse;
-import org.apache.pinot.common.utils.retry.RetryPolicies;
-import org.apache.pinot.common.utils.retry.RetryPolicy;
-import org.apache.pinot.core.common.MinionConstants;
-import org.apache.pinot.minion.MinionContext;
+
 import java.io.File;
 import java.net.URI;
 import java.util.List;
@@ -32,6 +26,13 @@ import javax.net.ssl.SSLContext;
 import org.apache.http.Header;
 import org.apache.http.HttpStatus;
 import org.apache.http.NameValuePair;
+import org.apache.pinot.common.exception.HttpErrorStatusException;
+import org.apache.pinot.common.utils.FileUploadDownloadClient;
+import org.apache.pinot.common.utils.SimpleHttpResponse;
+import org.apache.pinot.common.utils.retry.RetryPolicies;
+import org.apache.pinot.common.utils.retry.RetryPolicy;
+import org.apache.pinot.core.common.MinionConstants;
+import org.apache.pinot.minion.MinionContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

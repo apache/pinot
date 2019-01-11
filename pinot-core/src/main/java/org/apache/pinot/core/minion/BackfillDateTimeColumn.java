@@ -19,6 +19,9 @@
 package org.apache.pinot.core.minion;
 
 import com.google.common.base.Preconditions;
+import java.io.File;
+import java.io.IOException;
+import javax.annotation.Nonnull;
 import org.apache.pinot.common.data.DateTimeFieldSpec;
 import org.apache.pinot.common.data.DateTimeFormatSpec;
 import org.apache.pinot.common.data.Schema;
@@ -35,9 +38,6 @@ import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.segment.creator.RecordReaderSegmentCreationDataSource;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
-import java.io.File;
-import java.io.IOException;
-import javax.annotation.Nonnull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

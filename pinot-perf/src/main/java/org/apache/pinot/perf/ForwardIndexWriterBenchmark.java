@@ -24,11 +24,9 @@ import java.io.File;
 import java.io.FileReader;
 import java.util.Arrays;
 import java.util.List;
-
 import org.apache.commons.io.IOUtils;
-import org.roaringbitmap.buffer.MutableRoaringBitmap;
-
 import org.apache.pinot.core.io.writer.impl.v1.FixedBitMultiValueWriter;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 public class ForwardIndexWriterBenchmark {
   public static void convertRawToForwardIndex(File rawFile) throws Exception {

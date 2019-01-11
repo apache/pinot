@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.controller.helix.core.rebalance;
 
+import org.apache.helix.HelixManager;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.controller.helix.core.sharding.SegmentAssignmentStrategyEnum;
-import org.apache.helix.HelixManager;
 
 
 /**

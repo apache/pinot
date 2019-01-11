@@ -18,11 +18,11 @@
  */
 package org.apache.pinot.core.io.util;
 
-import org.apache.pinot.common.utils.StringUtil;
-import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.Arrays;
+import org.apache.pinot.common.utils.StringUtil;
+import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 
 
 public final class FixedByteValueReaderWriter implements Closeable, ValueReader {

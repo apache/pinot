@@ -18,10 +18,10 @@
  */
 package org.apache.pinot.controller.helix.core.realtime.segment;
 
-import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.core.realtime.stream.PartitionLevelStreamConfig;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.core.realtime.stream.PartitionLevelStreamConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

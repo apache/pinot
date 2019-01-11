@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.core.io.writer.impl;
 
-import org.apache.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import java.util.Arrays;
+import org.apache.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;

@@ -20,11 +20,11 @@ package org.apache.pinot.broker.requesthandler;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
-import org.apache.pinot.common.request.BrokerRequest;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.request.BrokerRequest;
 
 
 /**

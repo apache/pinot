@@ -18,10 +18,10 @@
  */
 package org.apache.pinot.minion;
 
-import org.apache.pinot.core.minion.SegmentPurger;
-import org.apache.pinot.minion.metrics.MinionMetrics;
 import java.io.File;
 import javax.net.ssl.SSLContext;
+import org.apache.pinot.core.minion.SegmentPurger;
+import org.apache.pinot.minion.metrics.MinionMetrics;
 
 
 /**

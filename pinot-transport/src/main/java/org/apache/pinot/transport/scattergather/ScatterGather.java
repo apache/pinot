@@ -18,10 +18,10 @@
  */
 package org.apache.pinot.transport.scattergather;
 
-import org.apache.pinot.common.metrics.BrokerMetrics;
-import org.apache.pinot.transport.common.CompositeFuture;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.transport.common.CompositeFuture;
 
 
 /**

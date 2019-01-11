@@ -19,14 +19,13 @@
 package org.apache.pinot.core.realtime.impl.kafka;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import java.util.Arrays;
+import java.util.Map;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.utils.JsonUtils;
 import org.apache.pinot.core.data.GenericRow;
 import org.apache.pinot.core.realtime.stream.StreamMessageDecoder;
-import java.io.ByteArrayInputStream;
-import java.util.Arrays;
-import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

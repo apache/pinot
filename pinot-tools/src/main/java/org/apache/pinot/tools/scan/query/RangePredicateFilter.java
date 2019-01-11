@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.tools.scan.query;
 
-import org.apache.pinot.core.segment.index.readers.Dictionary;
 import java.util.List;
+import org.apache.pinot.core.segment.index.readers.Dictionary;
 
 
 public class RangePredicateFilter implements PredicateFilter {

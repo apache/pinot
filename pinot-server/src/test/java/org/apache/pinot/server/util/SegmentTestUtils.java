@@ -18,16 +18,16 @@
  */
 package org.apache.pinot.server.util;
 
-import org.apache.pinot.common.data.Schema;
-import org.apache.pinot.core.data.readers.FileFormat;
-import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
-import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
-import org.apache.pinot.core.util.AvroUtils;
 import java.io.File;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.core.data.readers.FileFormat;
+import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
+import org.apache.pinot.core.util.AvroUtils;
 
 
 public class SegmentTestUtils {

@@ -18,16 +18,16 @@
  */
 package org.apache.pinot.core.operator.filter;
 
-import org.apache.pinot.core.common.DataSource;
-import org.apache.pinot.core.common.DataSourceMetadata;
-import org.apache.pinot.core.common.Predicate;
-import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.core.common.DataSource;
+import org.apache.pinot.core.common.DataSourceMetadata;
+import org.apache.pinot.core.common.Predicate;
+import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 
 
 public class FilterOperatorUtils {

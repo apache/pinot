@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.core.minion.segment;
 
-import org.apache.pinot.core.data.GenericRow;
 import java.util.List;
+import org.apache.pinot.core.data.GenericRow;
 
 
 /**

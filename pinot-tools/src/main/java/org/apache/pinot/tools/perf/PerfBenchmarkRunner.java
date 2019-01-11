@@ -19,15 +19,15 @@
 package org.apache.pinot.tools.perf;
 
 import com.google.common.base.Preconditions;
-import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
-import org.apache.pinot.tools.AbstractBaseCommand;
-import org.apache.pinot.tools.Command;
 import java.io.File;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
+import org.apache.pinot.tools.AbstractBaseCommand;
+import org.apache.pinot.tools.Command;
 import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;

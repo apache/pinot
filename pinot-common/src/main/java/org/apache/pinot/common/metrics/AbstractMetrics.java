@@ -19,8 +19,6 @@
 package org.apache.pinot.common.metrics;
 
 import com.google.common.annotations.VisibleForTesting;
-import org.apache.pinot.common.Utils;
-import org.apache.pinot.common.request.BrokerRequest;
 import com.yammer.metrics.core.MetricName;
 import com.yammer.metrics.core.MetricsRegistry;
 import java.util.Map;
@@ -29,6 +27,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.Utils;
+import org.apache.pinot.common.request.BrokerRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

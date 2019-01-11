@@ -18,15 +18,15 @@
  */
 package org.apache.pinot.core.startree.plan;
 
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.operator.ProjectionOperator;
 import org.apache.pinot.core.plan.PlanNode;
 import org.apache.pinot.core.startree.v2.StarTreeV2;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Set;
-import javax.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

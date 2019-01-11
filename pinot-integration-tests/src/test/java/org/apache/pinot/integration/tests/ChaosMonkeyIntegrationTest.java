@@ -18,10 +18,6 @@
  */
 package org.apache.pinot.integration.tests;
 
-import org.apache.pinot.client.Connection;
-import org.apache.pinot.client.ConnectionFactory;
-import org.apache.pinot.tools.admin.PinotAdministrator;
-import org.apache.pinot.util.TestUtils;
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Field;
@@ -31,6 +27,10 @@ import java.util.List;
 import jnr.constants.platform.Signal;
 import jnr.posix.POSIXFactory;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.client.Connection;
+import org.apache.pinot.client.ConnectionFactory;
+import org.apache.pinot.tools.admin.PinotAdministrator;
+import org.apache.pinot.util.TestUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;

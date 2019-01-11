@@ -19,17 +19,6 @@
 package org.apache.pinot.segments.v1.creator;
 
 import com.google.common.base.Preconditions;
-import org.apache.pinot.common.data.DimensionFieldSpec;
-import org.apache.pinot.common.data.FieldSpec;
-import org.apache.pinot.common.data.FieldSpec.DataType;
-import org.apache.pinot.common.data.FieldSpec.FieldType;
-import org.apache.pinot.common.data.MetricFieldSpec;
-import org.apache.pinot.common.data.Schema;
-import org.apache.pinot.common.data.TimeFieldSpec;
-import org.apache.pinot.common.data.TimeGranularitySpec;
-import org.apache.pinot.core.data.readers.FileFormat;
-import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
-import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -49,6 +38,17 @@ import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.util.Utf8;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.Predicate;
+import org.apache.pinot.common.data.DimensionFieldSpec;
+import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.common.data.FieldSpec.DataType;
+import org.apache.pinot.common.data.FieldSpec.FieldType;
+import org.apache.pinot.common.data.MetricFieldSpec;
+import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.common.data.TimeFieldSpec;
+import org.apache.pinot.common.data.TimeGranularitySpec;
+import org.apache.pinot.core.data.readers.FileFormat;
+import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

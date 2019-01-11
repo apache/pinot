@@ -18,13 +18,13 @@
  */
 package org.apache.pinot.common.config;
 
-import org.apache.pinot.common.data.StarTreeIndexSpec;
-import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
-import org.apache.pinot.startree.hll.HllConfig;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 import org.apache.helix.ZNRecord;
+import org.apache.pinot.common.data.StarTreeIndexSpec;
+import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
+import org.apache.pinot.startree.hll.HllConfig;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 

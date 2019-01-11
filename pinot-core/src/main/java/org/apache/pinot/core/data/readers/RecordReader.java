@@ -18,10 +18,10 @@
  */
 package org.apache.pinot.core.data.readers;
 
-import org.apache.pinot.common.data.Schema;
-import org.apache.pinot.core.data.GenericRow;
 import java.io.Closeable;
 import java.io.IOException;
+import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.core.data.GenericRow;
 
 
 /**

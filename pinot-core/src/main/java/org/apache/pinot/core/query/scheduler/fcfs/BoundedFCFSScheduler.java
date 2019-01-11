@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.core.query.scheduler.fcfs;
 
+import java.util.concurrent.atomic.LongAccumulator;
+import javax.annotation.Nonnull;
+import org.apache.commons.configuration.Configuration;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.scheduler.MultiLevelPriorityQueue;
@@ -28,9 +31,6 @@ import org.apache.pinot.core.query.scheduler.SchedulerPriorityQueue;
 import org.apache.pinot.core.query.scheduler.TableBasedGroupMapper;
 import org.apache.pinot.core.query.scheduler.resources.PolicyBasedResourceManager;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
-import java.util.concurrent.atomic.LongAccumulator;
-import javax.annotation.Nonnull;
-import org.apache.commons.configuration.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

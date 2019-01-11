@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.broker.routing.builder;
 
-import org.apache.pinot.common.utils.CommonConstants;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -27,10 +26,11 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertTrue;
 
 
 /**

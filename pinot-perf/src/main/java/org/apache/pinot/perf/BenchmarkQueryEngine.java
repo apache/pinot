@@ -19,11 +19,6 @@
 package org.apache.pinot.perf;
 
 import com.google.common.util.concurrent.Uninterruptibles;
-import org.apache.pinot.broker.requesthandler.OptimizationFlags;
-import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
-import org.apache.pinot.tools.perf.PerfBenchmarkDriver;
-import org.apache.pinot.tools.perf.PerfBenchmarkDriverConf;
 import java.io.File;
 import java.util.HashSet;
 import java.util.Map;
@@ -32,6 +27,11 @@ import java.util.concurrent.TimeUnit;
 import org.I0Itec.zkclient.ZkClient;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.manager.zk.ZNRecordSerializer;
+import org.apache.pinot.broker.requesthandler.OptimizationFlags;
+import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
+import org.apache.pinot.tools.perf.PerfBenchmarkDriver;
+import org.apache.pinot.tools.perf.PerfBenchmarkDriverConf;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;

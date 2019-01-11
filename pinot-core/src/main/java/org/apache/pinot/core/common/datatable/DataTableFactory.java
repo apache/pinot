@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.core.common.datatable;
 
-import org.apache.pinot.common.utils.DataTable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import org.apache.pinot.common.utils.DataTable;
 
 
 public class DataTableFactory {

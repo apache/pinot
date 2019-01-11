@@ -22,7 +22,8 @@ import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
 
 
 public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleValueQueriesTest {

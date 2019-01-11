@@ -19,7 +19,6 @@
 package org.apache.pinot.common.utils;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import org.apache.pinot.common.utils.FileUploadDownloadClient.FileUploadType;
 import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
@@ -36,6 +35,7 @@ import org.apache.http.Header;
 import org.apache.http.HttpStatus;
 import org.apache.http.NameValuePair;
 import org.apache.http.message.BasicHeader;
+import org.apache.pinot.common.utils.FileUploadDownloadClient.FileUploadType;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;

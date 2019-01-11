@@ -18,10 +18,10 @@
  */
 package org.apache.pinot.core.segment.index.loader;
 
-import org.apache.pinot.common.utils.CommonConstants;
 import java.io.File;
 import java.io.IOException;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;

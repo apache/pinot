@@ -19,6 +19,17 @@
 package org.apache.pinot.core.startree.v2.builder;
 
 import com.google.common.base.Preconditions;
+import java.io.File;
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import javax.annotation.Nullable;
+import org.apache.commons.configuration.Configuration;
 import org.apache.pinot.common.data.FieldSpec.DataType;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.core.data.aggregator.ValueAggregator;
@@ -35,21 +46,12 @@ import org.apache.pinot.core.startree.StarTreeBuilderUtils;
 import org.apache.pinot.core.startree.StarTreeBuilderUtils.TreeNode;
 import org.apache.pinot.core.startree.StarTreeNode;
 import org.apache.pinot.core.startree.v2.AggregationFunctionColumnPair;
-import java.io.File;
-import java.io.IOException;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import javax.annotation.Nullable;
-import org.apache.commons.configuration.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.core.startree.v2.StarTreeV2Constants.*;
+import static org.apache.pinot.core.startree.v2.StarTreeV2Constants.MetadataKey;
+import static org.apache.pinot.core.startree.v2.StarTreeV2Constants.STAR_IN_FORWARD_INDEX;
+import static org.apache.pinot.core.startree.v2.StarTreeV2Constants.STAR_TREE_INDEX_FILE_NAME;
 
 
 /**

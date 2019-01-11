@@ -19,9 +19,8 @@
 package org.apache.pinot.common.messages;
 
 import com.google.common.base.Preconditions;
-import org.apache.helix.model.Message;
-
 import java.util.UUID;
+import org.apache.helix.model.Message;
 
 // A message intended for a pinot Broker to ask it to refresh its Timeboundary Info.
 public class TimeboundaryRefreshMessage extends Message {

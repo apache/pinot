@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.core.operator.transform.transformer.datetime;
 
+import javax.annotation.Nonnull;
 import org.apache.pinot.common.data.DateTimeFormatSpec;
 import org.apache.pinot.common.data.DateTimeGranularitySpec;
-import javax.annotation.Nonnull;
 
 
 /**

@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.core.startree;
 
-import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import java.nio.ByteBuffer;
+import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 
 
 public class DimensionBuffer {

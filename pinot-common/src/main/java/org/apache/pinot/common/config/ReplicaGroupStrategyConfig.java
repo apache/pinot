@@ -19,8 +19,8 @@
 package org.apache.pinot.common.config;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import org.apache.pinot.common.utils.EqualityUtils;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.utils.EqualityUtils;
 
 /**
  * Class representing configurations related to segment assignment strategy.

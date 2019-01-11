@@ -18,9 +18,6 @@
  */
 package org.apache.pinot.controller.helix.core.sharding;
 
-import org.apache.pinot.common.config.TagNameUtils;
-import org.apache.pinot.common.segment.SegmentMetadata;
-import org.apache.pinot.common.utils.helix.HelixHelper;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -29,6 +26,9 @@ import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.pinot.common.config.TagNameUtils;
+import org.apache.pinot.common.segment.SegmentMetadata;
+import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
