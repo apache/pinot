@@ -54,7 +54,7 @@
       <h4 style="color: rgba(0,0,0,0.9);font-size: 18px;font-weight: bold;">Configure summary</h4>
       <div>
         <div style="margin-left: 15px;display: inline-block;">
-          <p><input type="checkbox" {{action 'toggleSelection' "dashboard_summary" on="change"}}> Add dashboard-level comments</p>
+          <p><input type="checkbox" checked={{showDashboardSummary}} {{action 'toggleSelection' "dashboard_summary" on="change"}}> Add dashboard-level comments</p>
           {{#if showDashboardSummary}}
             <p>
               <textarea {{action 'updateComment' "dashboard_summary" on="change"}} value="{{dashboard_summary_comment}}" placeholder="Comment for dashboard summary" name="dashboard_summary" id="dashboard_summary" style="border: none;border-bottom: 1px solid grey;margin-left: 15px;width: 800px;">
@@ -80,7 +80,7 @@
       <!-- Customize email template -->
       <div>
         <div style="margin-left: 15px;display: inline-block;">
-          <p><input type="checkbox" {{action 'toggleSelection' "customize_email" on="change"}}> Customize email template</p>
+          <p><input type="checkbox" checked={{showCustomizeEmailTemplate}} {{action 'toggleSelection' "customize_email" on="change"}}> Customize email template</p>
           <p style="margin-left: 15px;">
             {{#if showCustomizeEmailTemplate}}
               {{!-- <select onchange={{action (mut field.value) value="target.value"}} class={{field.className}}> --}}
