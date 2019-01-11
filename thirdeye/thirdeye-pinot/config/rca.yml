@@ -2,27 +2,27 @@ frameworks:
     identity:
         - outputName: OUTPUT
           inputNames: [INPUT]
-          className: com.linkedin.thirdeye.rootcause.impl.NullPipeline
+          className: org.apache.pinot.thirdeye.rootcause.impl.NullPipeline
 
     metricRelated:
         - outputName: OUTPUT
           inputNames: [INPUT]
-          className: com.linkedin.thirdeye.rootcause.impl.MetricMappingPipeline
+          className: org.apache.pinot.thirdeye.rootcause.impl.MetricMappingPipeline
 
     metricAnalysis:
         - outputName: OUTPUT
           inputNames: [INPUT]
-          className: com.linkedin.thirdeye.rootcause.impl.MetricAnalysisPipeline
+          className: org.apache.pinot.thirdeye.rootcause.impl.MetricAnalysisPipeline
 
     metricBreakdown:
         - outputName: OUTPUT
           inputNames: [INPUT]
-          className: com.linkedin.thirdeye.rootcause.impl.MetricBreakdownPipeline
+          className: org.apache.pinot.thirdeye.rootcause.impl.MetricBreakdownPipeline
 
     metricComponentAnalysis:
         - outputName: OUTPUT
           inputNames: [INPUT]
-          className: com.linkedin.thirdeye.rootcause.impl.MetricComponentAnalysisPipeline
+          className: org.apache.pinot.thirdeye.rootcause.impl.MetricComponentAnalysisPipeline
           properties:
               excludeDimensions: ["environment", "continent"]
               parallelism: 5
@@ -31,16 +31,16 @@ frameworks:
     eventExperiment:
         - outputName: OUTPUT
           inputNames: [INPUT]
-          className: com.linkedin.thirdeye.rootcause.impl.EmptyPipeline
+          className: org.apache.pinot.thirdeye.rootcause.impl.EmptyPipeline
 
     eventHoliday:
         - outputName: METRIC_RELATED
           inputNames: [INPUT]
-          className: com.linkedin.thirdeye.rootcause.impl.MetricAnalysisPipeline
+          className: org.apache.pinot.thirdeye.rootcause.impl.MetricAnalysisPipeline
 
         - outputName: OUTPUT
           inputNames: [INPUT, METRIC_RELATED]
-          className: com.linkedin.thirdeye.rootcause.impl.ThirdEyeEventsPipeline
+          className: org.apache.pinot.thirdeye.rootcause.impl.ThirdEyeEventsPipeline
           properties:
               strategy: COMPOUND
               k: 500
@@ -49,7 +49,7 @@ frameworks:
     eventCustom:
         - outputName: OUTPUT
           inputNames: [INPUT]
-          className: com.linkedin.thirdeye.rootcause.impl.ThirdEyeEventsPipeline
+          className: org.apache.pinot.thirdeye.rootcause.impl.ThirdEyeEventsPipeline
           properties:
               strategy: COMPOUND
               k: 500
@@ -58,9 +58,9 @@ frameworks:
     eventAnomaly:
         - outputName: OUTPUT
           inputNames: [INPUT]
-          className: com.linkedin.thirdeye.rootcause.impl.AnomalyEventsPipeline
+          className: org.apache.pinot.thirdeye.rootcause.impl.AnomalyEventsPipeline
           properties:
-              strategyClass: com.linkedin.thirdeye.rootcause.impl.AnomalyEventsPipeline$TimeRangeScoreStrategy
+              strategyClass: org.apache.pinot.thirdeye.rootcause.impl.AnomalyEventsPipeline$TimeRangeScoreStrategy
               strategyProperties:
                   type: HYPERBOLA
               k: 500
@@ -68,15 +68,15 @@ frameworks:
     eventIssue:
         - outputName: OUTPUT
           inputNames: [INPUT]
-          className: com.linkedin.thirdeye.rootcause.impl.EmptyPipeline
+          className: org.apache.pinot.thirdeye.rootcause.impl.EmptyPipeline
 
     eventChange:
         - outputName: OUTPUT
           inputNames: [INPUT]
-          className: com.linkedin.thirdeye.rootcause.impl.EmptyPipeline
+          className: org.apache.pinot.thirdeye.rootcause.impl.EmptyPipeline
 
     eventDeployment:
         - outputName: OUTPUT
           inputNames: [INPUT]
-          className: com.linkedin.thirdeye.rootcause.impl.EmptyPipeline
+          className: org.apache.pinot.thirdeye.rootcause.impl.EmptyPipeline
 

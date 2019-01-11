@@ -1045,6 +1045,7 @@
             <exclude>thirdeye/**/*</exclude>
             <!-- Documentation files -->
             <exclude>**/docs/_build/**</exclude>
+            <exclude>**/?*</exclude>
           </excludes>
           <mapping>
             <thrift>JAVADOC_STYLE</thrift>
