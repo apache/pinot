@@ -412,7 +412,7 @@ public class AlertTaskRunnerV2 implements TaskRunner {
           }
         }
         Configuration freemarkerConfig = new Configuration(Configuration.VERSION_2_3_21);
-        freemarkerConfig.setClassForTemplateLoading(getClass(), "/com/linkedin/thirdeye/detector/");
+        freemarkerConfig.setClassForTemplateLoading(getClass(), "/org/apache/pinot/thirdeye/detector/");
         freemarkerConfig.setDefaultEncoding(CHARSET);
         freemarkerConfig.setTemplateExceptionHandler(TemplateExceptionHandler.RETHROW_HANDLER);
         Map<String, Object> templateData = new HashMap<>();

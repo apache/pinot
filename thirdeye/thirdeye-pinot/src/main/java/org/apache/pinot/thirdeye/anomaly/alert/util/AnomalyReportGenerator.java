@@ -349,7 +349,7 @@ public class AnomalyReportGenerator {
     ByteArrayOutputStream baos = new ByteArrayOutputStream();
     try (Writer out = new OutputStreamWriter(baos, AlertTaskRunnerV2.CHARSET)) {
       Configuration freemarkerConfig = new Configuration(Configuration.VERSION_2_3_21);
-      freemarkerConfig.setClassForTemplateLoading(getClass(), "/com/linkedin/thirdeye/detector");
+      freemarkerConfig.setClassForTemplateLoading(getClass(), "/org/apache/pinot/thirdeye/detector");
       freemarkerConfig.setDefaultEncoding(AlertTaskRunnerV2.CHARSET);
       freemarkerConfig.setTemplateExceptionHandler(TemplateExceptionHandler.RETHROW_HANDLER);
       Template template = freemarkerConfig.getTemplate(MULTIPLE_ANOMALIES_EMAIL_TEMPLATE);
