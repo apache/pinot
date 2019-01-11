@@ -15,8 +15,8 @@
  */
 package org.apache.pinot.thirdeye.hadoop.backfill;
 
-import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.data.readers.PinotSegmentRecordReader;
+import org.apache.pinot.core.data.GenericRow;
+import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
 import org.apache.pinot.thirdeye.hadoop.config.ThirdEyeConstants;
 import org.apache.pinot.thirdeye.hadoop.util.ThirdeyeAvroUtils;
 import java.io.File;

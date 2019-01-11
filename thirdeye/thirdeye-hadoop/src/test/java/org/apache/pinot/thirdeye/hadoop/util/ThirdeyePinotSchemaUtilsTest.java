@@ -23,7 +23,7 @@ import org.testng.Assert;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
-import com.linkedin.pinot.common.data.Schema;
+import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.thirdeye.hadoop.config.ThirdEyeConfig;
 import org.apache.pinot.thirdeye.hadoop.config.ThirdEyeConfigProperties;
 import org.apache.pinot.thirdeye.hadoop.util.ThirdeyePinotSchemaUtils;

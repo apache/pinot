@@ -16,7 +16,7 @@
 package org.apache.pinot.thirdeye.hadoop.config;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.linkedin.pinot.common.data.TimeGranularitySpec.TimeFormat;
+import org.apache.pinot.common.data.TimeGranularitySpec.TimeFormat;
 
 import java.util.concurrent.TimeUnit;
 

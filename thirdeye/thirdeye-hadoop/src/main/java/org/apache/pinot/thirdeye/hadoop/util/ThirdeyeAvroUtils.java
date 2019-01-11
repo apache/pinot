@@ -42,9 +42,9 @@ import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Joiner;
 import com.google.common.collect.Lists;
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
-import com.linkedin.pinot.core.data.readers.AvroRecordReader;
+import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.common.data.FieldSpec.DataType;
+import org.apache.pinot.core.data.readers.AvroRecordReader;
 import org.apache.pinot.thirdeye.hadoop.config.DimensionType;
 import org.apache.pinot.thirdeye.hadoop.config.MetricType;
 import org.apache.pinot.thirdeye.hadoop.config.ThirdEyeConstants;
@@ -75,7 +75,7 @@ public class ThirdeyeAvroUtils {
    * @param schema
    * @return
    */
-  public static Schema constructAvroSchemaFromPinotSchema(com.linkedin.pinot.common.data.Schema schema) {
+  public static Schema constructAvroSchemaFromPinotSchema(org.apache.pinot.common.data.Schema schema) {
     Schema avroSchema = null;
 
     RecordBuilder<Schema> recordBuilder = SchemaBuilder.record("record");

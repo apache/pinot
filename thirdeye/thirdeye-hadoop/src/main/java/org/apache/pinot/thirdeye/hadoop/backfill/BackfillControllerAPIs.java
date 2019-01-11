@@ -44,7 +44,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.common.io.Files;
-import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.thirdeye.hadoop.config.ThirdEyeConstants;
 
 /**

@@ -33,7 +33,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.google.common.collect.Lists;
-import com.linkedin.pinot.common.data.TimeGranularitySpec.TimeFormat;
+import org.apache.pinot.common.data.TimeGranularitySpec.TimeFormat;
 import org.apache.pinot.thirdeye.hadoop.config.DimensionSpec;
 import org.apache.pinot.thirdeye.hadoop.config.MetricSpec;
 import org.apache.pinot.thirdeye.hadoop.config.MetricType;

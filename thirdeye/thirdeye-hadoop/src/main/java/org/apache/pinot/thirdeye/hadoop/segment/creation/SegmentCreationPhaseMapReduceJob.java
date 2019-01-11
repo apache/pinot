@@ -18,16 +18,16 @@ package org.apache.pinot.thirdeye.hadoop.segment.creation;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.google.common.base.Joiner;
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.data.StarTreeIndexSpec;
-import com.linkedin.pinot.common.data.TimeGranularitySpec.TimeFormat;
-import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
-import com.linkedin.pinot.core.data.readers.FileFormat;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
-import com.linkedin.pinot.core.segment.creator.StatsCollectorConfig;
-import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
-import com.linkedin.pinot.core.segment.creator.impl.stats.LongColumnPreIndexStatsCollector;
+import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.common.data.StarTreeIndexSpec;
+import org.apache.pinot.common.data.TimeGranularitySpec.TimeFormat;
+import org.apache.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.core.data.readers.FileFormat;
+import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import org.apache.pinot.core.segment.creator.StatsCollectorConfig;
+import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.core.segment.creator.impl.stats.LongColumnPreIndexStatsCollector;
 import org.apache.pinot.thirdeye.hadoop.config.ThirdEyeConfig;
 import org.apache.pinot.thirdeye.hadoop.config.ThirdEyeConstants;
 import org.apache.pinot.thirdeye.hadoop.util.ThirdeyePinotSchemaUtils;
@@ -56,7 +56,7 @@ import org.joda.time.format.DateTimeFormatter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.*;
+import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.*;
 import static org.apache.pinot.thirdeye.hadoop.segment.creation.SegmentCreationPhaseConstants.*;
 
 /**
