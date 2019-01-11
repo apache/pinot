@@ -185,6 +185,9 @@ public class SegmentDeletionManager {
         if (pinotFS.exists(fileToMoveURI)) {
           // Overwrites the file if it already exists in the target directory.
           pinotFS.move(fileToMoveURI, deletedSegmentDestURI, true);
+          // Updates last modified.
+          // Touch is needed here so that removeAgedDeletedSegments() works correctly.
+          pinotFS.touch(deletedSegmentDestURI);
           LOGGER.info("Moved segment {} from {} to {}", segmentId, fileToMoveURI.toString(), deletedSegmentDestURI.toString());
         } else {
           if (!SegmentName.isHighLevelConsumerSegmentName(segmentId)) {
@@ -248,7 +251,7 @@ public class SegmentDeletionManager {
           }
         }
       } catch (IOException e) {
-        LOGGER.error("Had trouble deleting directories", deletedDirURI.toString());
+        LOGGER.error("Had trouble deleting directories: {}", deletedDirURI.toString(), e.toString());
       }
     } else {
       LOGGER.info("dataDir is not configured, won't delete any expired segments from deleted directory.");

@@ -170,6 +170,29 @@ public class LocalPinotFSTest {
     localPinotFS.mkdir(firstTempDir.toURI());
     Assert.assertTrue(firstTempDir.exists(), "Could not make directory " + firstTempDir.getPath());
 
+    // Check that touching a file works
+    File nonExistingFile = new File(_absoluteTmpDirPath, "nonExistingFile");
+    Assert.assertFalse(nonExistingFile.exists());
+    localPinotFS.touch(nonExistingFile.toURI());
+    Assert.assertTrue(nonExistingFile.exists());
+    long currentTime = System.currentTimeMillis();
+    Assert.assertTrue(localPinotFS.lastModified(nonExistingFile.toURI()) < currentTime);
+    Thread.sleep(1000L);
+    // update last modified.
+    localPinotFS.touch(nonExistingFile.toURI());
+    Assert.assertTrue(localPinotFS.lastModified(nonExistingFile.toURI()) > currentTime);
+    FileUtils.deleteQuietly(nonExistingFile);
+
+    // Check that touch an file in a directory that doesn't exist should throw an exception.
+    File nonExistingFileUnderNonExistingDir = new File(_absoluteTmpDirPath, "nonExistingDir/nonExistingFile");
+    Assert.assertFalse(nonExistingFileUnderNonExistingDir.exists());
+    try {
+      localPinotFS.touch(nonExistingFileUnderNonExistingDir.toURI());
+      Assert.fail("Touch method should throw an IOException");
+    } catch (IOException e) {
+      // Expected.
+    }
+
     // Check that directory only copy worked
     localPinotFS.copy(firstTempDir.toURI(), secondTempDir.toURI());
     Assert.assertTrue(localPinotFS.exists(secondTempDir.toURI()));

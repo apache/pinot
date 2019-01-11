@@ -36,6 +36,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.io.FileUtils;
@@ -233,5 +234,15 @@ public class AzurePinotFS extends PinotFS {
       LOGGER.error("Could not get directory entry for {}", uri);
       throw new RuntimeException(e);
     }
+  }
+
+  @Override
+  public boolean touch(URI uri) throws IOException {
+    if (!exists(uri)) {
+      _adlStoreClient.createEmptyFile(uri.getPath());
+    } else {
+      _adlStoreClient.setTimes(uri.getPath(), null, new Date());
+    }
+    return true;
   }
 }
