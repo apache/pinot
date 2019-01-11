@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.data.manager.realtime;
+package org.apache.pinot.core.data.manager.realtime;
 
-import com.linkedin.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.metrics.ServerMetrics;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -29,8 +29,8 @@ import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.google.common.util.concurrent.Uninterruptibles;
-import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
-import com.linkedin.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
+import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
+import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 
 
 /**

@@ -16,11 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.broker.broker;
+package org.apache.pinot.broker.broker;
 
-import com.linkedin.pinot.broker.api.AccessControl;
-import com.linkedin.pinot.broker.api.RequesterIdentity;
-import com.linkedin.pinot.common.request.BrokerRequest;
+import org.apache.pinot.broker.api.AccessControl;
+import org.apache.pinot.broker.api.RequesterIdentity;
+import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.commons.configuration.Configuration;
 
 

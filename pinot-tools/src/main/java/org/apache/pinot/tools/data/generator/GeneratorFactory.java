@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.tools.data.generator;
+package org.apache.pinot.tools.data.generator;
 
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
+import org.apache.pinot.common.data.FieldSpec.DataType;
 
 
 /**

@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.server.api.resources;
+package org.apache.pinot.server.api.resources;
 
-import com.linkedin.pinot.server.starter.ServerInstance;
+import org.apache.pinot.server.starter.ServerInstance;
 import javax.inject.Inject;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;

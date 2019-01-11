@@ -16,11 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.io.readerwriter;
+package org.apache.pinot.core.io.readerwriter;
 
-import com.linkedin.pinot.core.io.reader.ReaderContext;
-import com.linkedin.pinot.core.io.reader.SingleColumnMultiValueReader;
-import com.linkedin.pinot.core.io.writer.SingleColumnMultiValueWriter;
+import org.apache.pinot.core.io.reader.ReaderContext;
+import org.apache.pinot.core.io.reader.SingleColumnMultiValueReader;
+import org.apache.pinot.core.io.writer.SingleColumnMultiValueWriter;
 
 
 public abstract class BaseSingleColumnMultiValueReaderWriter<T extends ReaderContext>

@@ -16,15 +16,15 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.realtime.impl.kafka;
+package org.apache.pinot.core.realtime.impl.kafka;
 
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
-import com.linkedin.pinot.common.metrics.ServerMetrics;
-import com.linkedin.pinot.core.realtime.stream.PartitionLevelConsumer;
-import com.linkedin.pinot.core.realtime.stream.StreamConsumerFactory;
-import com.linkedin.pinot.core.realtime.stream.StreamLevelConsumer;
-import com.linkedin.pinot.core.realtime.stream.StreamMetadataProvider;
+import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
+import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.core.realtime.stream.PartitionLevelConsumer;
+import org.apache.pinot.core.realtime.stream.StreamConsumerFactory;
+import org.apache.pinot.core.realtime.stream.StreamLevelConsumer;
+import org.apache.pinot.core.realtime.stream.StreamMetadataProvider;
 
 
 /**

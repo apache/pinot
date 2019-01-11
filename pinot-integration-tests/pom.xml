@@ -24,7 +24,7 @@
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <artifactId>pinot</artifactId>
-    <groupId>com.linkedin.pinot</groupId>
+    <groupId>org.apache.pinot</groupId>
     <version>0.016</version>
   </parent>
   <artifactId>pinot-integration-tests</artifactId>
@@ -52,7 +52,7 @@
         <configuration>
           <programs>
             <program>
-              <mainClass>com.linkedin.pinot.integration.tests.HybridClusterIntegrationTestCommandLineRunner</mainClass>
+              <mainClass>org.apache.pinot.integration.tests.HybridClusterIntegrationTestCommandLineRunner</mainClass>
               <name>pinot-hybrid-cluster-test</name>
               <jvmSettings>
                 <initialMemorySize>4G</initialMemorySize>
@@ -117,15 +117,15 @@
   </profiles>
   <dependencies>
     <dependency>
-      <groupId>com.linkedin.pinot</groupId>
+      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-api</artifactId>
     </dependency>
     <dependency>
-      <groupId>com.linkedin.pinot</groupId>
+      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-server</artifactId>
     </dependency>
     <dependency>
-      <groupId>com.linkedin.pinot</groupId>
+      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-tools</artifactId>
     </dependency>
     <dependency>
@@ -139,53 +139,53 @@
       </exclusions>
     </dependency>
     <dependency>
-      <groupId>com.linkedin.pinot</groupId>
+      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-server</artifactId>
       <version>${project.version}</version>
       <type>test-jar</type>
     </dependency>
     <dependency>
-      <groupId>com.linkedin.pinot</groupId>
+      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-controller</artifactId>
     </dependency>
     <dependency>
-      <groupId>com.linkedin.pinot</groupId>
+      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-controller</artifactId>
       <version>${project.version}</version>
       <type>test-jar</type>
     </dependency>
     <dependency>
-      <groupId>com.linkedin.pinot</groupId>
+      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-common</artifactId>
       <version>${project.version}</version>
       <type>test-jar</type>
     </dependency>
     <dependency>
-      <groupId>com.linkedin.pinot</groupId>
+      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-broker</artifactId>
       <version>${project.version}</version>
       <type>test-jar</type>
     </dependency>
     <dependency>
-      <groupId>com.linkedin.pinot</groupId>
+      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-core</artifactId>
       <version>${project.version}</version>
       <type>test-jar</type>
     </dependency>
     <dependency>
-      <groupId>com.linkedin.pinot</groupId>
+      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-broker</artifactId>
     </dependency>
     <dependency>
-      <groupId>com.linkedin.pinot</groupId>
+      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-minion</artifactId>
     </dependency>
     <dependency>
-      <groupId>com.linkedin.pinot</groupId>
+      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-hadoop</artifactId>
     </dependency>
     <dependency>
-      <groupId>com.linkedin.pinot</groupId>
+      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-minion</artifactId>
       <version>${project.version}</version>
       <type>test-jar</type>

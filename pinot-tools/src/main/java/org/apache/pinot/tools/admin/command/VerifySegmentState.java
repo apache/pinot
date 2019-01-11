@@ -16,12 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.tools.admin.command;
+package org.apache.pinot.tools.admin.command;
 
 import com.google.common.collect.Sets;
-import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.tools.AbstractBaseCommand;
-import com.linkedin.pinot.tools.Command;
+import org.apache.pinot.common.config.TableNameBuilder;
+import org.apache.pinot.tools.AbstractBaseCommand;
+import org.apache.pinot.tools.Command;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;

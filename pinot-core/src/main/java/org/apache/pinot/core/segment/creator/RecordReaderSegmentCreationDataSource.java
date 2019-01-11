@@ -16,21 +16,21 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.segment.creator;
+package org.apache.pinot.core.segment.creator;
 
-import com.linkedin.pinot.common.Utils;
-import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.data.readers.RecordReader;
-import com.linkedin.pinot.core.data.recordtransformer.CompoundTransformer;
-import com.linkedin.pinot.core.data.recordtransformer.RecordTransformer;
-import com.linkedin.pinot.core.segment.creator.impl.stats.SegmentPreIndexStatsCollectorImpl;
+import org.apache.pinot.common.Utils;
+import org.apache.pinot.core.data.GenericRow;
+import org.apache.pinot.core.data.readers.RecordReader;
+import org.apache.pinot.core.data.recordtransformer.CompoundTransformer;
+import org.apache.pinot.core.data.recordtransformer.RecordTransformer;
+import org.apache.pinot.core.segment.creator.impl.stats.SegmentPreIndexStatsCollectorImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 /**
- * {@link com.linkedin.pinot.core.segment.creator.SegmentCreationDataSource} that uses a
- * {@link com.linkedin.pinot.core.data.readers.RecordReader} as the underlying data source.
+ * {@link org.apache.pinot.core.segment.creator.SegmentCreationDataSource} that uses a
+ * {@link org.apache.pinot.core.data.readers.RecordReader} as the underlying data source.
  */
 // TODO: make it Closeable so that resource in record reader can be released
 public class RecordReaderSegmentCreationDataSource implements SegmentCreationDataSource {

@@ -16,12 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.data.readers;
+package org.apache.pinot.core.data.readers;
 
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
+import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.common.data.FieldSpec.DataType;
 
-import com.linkedin.pinot.core.data.GenericRow;
+import org.apache.pinot.core.data.GenericRow;
 import java.io.BufferedInputStream;
 import java.io.BufferedReader;
 import java.io.File;

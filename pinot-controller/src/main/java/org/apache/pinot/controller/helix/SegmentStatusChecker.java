@@ -16,17 +16,17 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.controller.helix;
+package org.apache.pinot.controller.helix;
 
-import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
-import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
-import com.linkedin.pinot.common.metrics.ControllerGauge;
-import com.linkedin.pinot.common.metrics.ControllerMetrics;
-import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
-import com.linkedin.pinot.controller.ControllerConf;
-import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
-import com.linkedin.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
+import org.apache.pinot.common.config.TableNameBuilder;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
+import org.apache.pinot.common.metrics.ControllerGauge;
+import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
+import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;

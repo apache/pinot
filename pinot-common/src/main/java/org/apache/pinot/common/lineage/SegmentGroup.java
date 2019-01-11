@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.common.lineage;
+package org.apache.pinot.common.lineage;
 
 import java.util.List;
 import java.util.Set;

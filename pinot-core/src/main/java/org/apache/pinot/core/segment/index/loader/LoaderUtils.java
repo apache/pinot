@@ -16,13 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.segment.index.loader;
+package org.apache.pinot.core.segment.index.loader;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
-import com.linkedin.pinot.core.segment.store.ColumnIndexType;
-import com.linkedin.pinot.core.segment.store.SegmentDirectory;
+import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.core.segment.memory.PinotDataBuffer;
+import org.apache.pinot.core.segment.store.ColumnIndexType;
+import org.apache.pinot.core.segment.store.SegmentDirectory;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;

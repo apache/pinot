@@ -16,21 +16,21 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.controller.helix.core.relocation;
+package org.apache.pinot.controller.helix.core.relocation;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.collect.MinMaxPriorityQueue;
-import com.linkedin.pinot.common.config.RealtimeTagConfig;
-import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.utils.helix.HelixHelper;
-import com.linkedin.pinot.common.utils.retry.RetryPolicies;
-import com.linkedin.pinot.common.utils.time.TimeUtils;
-import com.linkedin.pinot.controller.ControllerConf;
-import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
-import com.linkedin.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
-import com.linkedin.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
+import org.apache.pinot.common.config.RealtimeTagConfig;
+import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.common.config.TableNameBuilder;
+import org.apache.pinot.common.utils.helix.HelixHelper;
+import org.apache.pinot.common.utils.retry.RetryPolicies;
+import org.apache.pinot.common.utils.time.TimeUtils;
+import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
+import org.apache.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -82,7 +82,7 @@ public class RealtimeSegmentRelocator extends ControllerPeriodicTask {
 
   /**
    * Check the given table. Perform relocation of segments if table is realtime and relocation is required
-   * TODO: Model this to implement {@link com.linkedin.pinot.controller.helix.core.rebalance.RebalanceSegmentStrategy} interface
+   * TODO: Model this to implement {@link org.apache.pinot.controller.helix.core.rebalance.RebalanceSegmentStrategy} interface
    * https://github.com/linkedin/pinot/issues/2609
    *
    * @param tableNameWithType

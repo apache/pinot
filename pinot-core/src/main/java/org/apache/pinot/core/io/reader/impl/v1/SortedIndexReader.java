@@ -16,12 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.io.reader.impl.v1;
+package org.apache.pinot.core.io.reader.impl.v1;
 
-import com.linkedin.pinot.common.utils.Pairs;
-import com.linkedin.pinot.core.io.reader.ReaderContext;
-import com.linkedin.pinot.core.io.reader.SingleColumnSingleValueReader;
-import com.linkedin.pinot.core.segment.index.readers.InvertedIndexReader;
+import org.apache.pinot.common.utils.Pairs;
+import org.apache.pinot.core.io.reader.ReaderContext;
+import org.apache.pinot.core.io.reader.SingleColumnSingleValueReader;
+import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
 import java.io.IOException;
 
 

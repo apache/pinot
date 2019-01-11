@@ -16,21 +16,21 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.query.scheduler;
+package org.apache.pinot.core.query.scheduler;
 
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.Uninterruptibles;
-import com.linkedin.pinot.common.exception.QueryException;
-import com.linkedin.pinot.common.metrics.ServerMetrics;
-import com.linkedin.pinot.common.utils.DataTable;
-import com.linkedin.pinot.core.common.datatable.DataTableFactory;
-import com.linkedin.pinot.core.common.datatable.DataTableImplV2;
-import com.linkedin.pinot.core.data.manager.InstanceDataManager;
-import com.linkedin.pinot.core.query.executor.QueryExecutor;
-import com.linkedin.pinot.core.query.request.ServerQueryRequest;
-import com.linkedin.pinot.core.query.scheduler.resources.PolicyBasedResourceManager;
-import com.linkedin.pinot.core.query.scheduler.resources.ResourceLimitPolicy;
-import com.linkedin.pinot.core.query.scheduler.resources.ResourceManager;
+import org.apache.pinot.common.exception.QueryException;
+import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.utils.DataTable;
+import org.apache.pinot.core.common.datatable.DataTableFactory;
+import org.apache.pinot.core.common.datatable.DataTableImplV2;
+import org.apache.pinot.core.data.manager.InstanceDataManager;
+import org.apache.pinot.core.query.executor.QueryExecutor;
+import org.apache.pinot.core.query.request.ServerQueryRequest;
+import org.apache.pinot.core.query.scheduler.resources.PolicyBasedResourceManager;
+import org.apache.pinot.core.query.scheduler.resources.ResourceLimitPolicy;
+import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import com.yammer.metrics.core.MetricsRegistry;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -51,7 +51,7 @@ import org.apache.commons.configuration.PropertiesConfiguration;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.Test;
 
-import static com.linkedin.pinot.core.query.scheduler.TestHelper.*;
+import static org.apache.pinot.core.query.scheduler.TestHelper.*;
 import static org.testng.Assert.*;
 
 

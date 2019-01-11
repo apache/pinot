@@ -16,14 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.hadoop.job;
+package org.apache.pinot.hadoop.job;
 
-import com.linkedin.pinot.common.Utils;
-import com.linkedin.pinot.common.config.SegmentsValidationAndRetentionConfig;
-import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.hadoop.job.mapper.HadoopSegmentCreationMapReduceJob;
-import com.linkedin.pinot.hadoop.utils.PushLocation;
+import org.apache.pinot.common.Utils;
+import org.apache.pinot.common.config.SegmentsValidationAndRetentionConfig;
+import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.hadoop.job.mapper.HadoopSegmentCreationMapReduceJob;
+import org.apache.pinot.hadoop.utils.PushLocation;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;

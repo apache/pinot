@@ -16,13 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.transport.pool;
+package org.apache.pinot.transport.pool;
 
-import com.linkedin.pinot.common.response.ServerInstance;
-import com.linkedin.pinot.transport.common.AsyncResponseFuture;
-import com.linkedin.pinot.transport.common.ServerResponseFuture;
-import com.linkedin.pinot.transport.common.NoneType;
-import com.linkedin.pinot.transport.metrics.PoolStatsProvider;
+import org.apache.pinot.common.response.ServerInstance;
+import org.apache.pinot.transport.common.AsyncResponseFuture;
+import org.apache.pinot.transport.common.ServerResponseFuture;
+import org.apache.pinot.transport.common.NoneType;
+import org.apache.pinot.transport.metrics.PoolStatsProvider;
 import com.yammer.metrics.core.Histogram;
 
 

@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.minion.segment;
+package org.apache.pinot.core.minion.segment;
 
-import com.linkedin.pinot.core.data.GenericRow;
+import org.apache.pinot.core.data.GenericRow;
 
 
 /**

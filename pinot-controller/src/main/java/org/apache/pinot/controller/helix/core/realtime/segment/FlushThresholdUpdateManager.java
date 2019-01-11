@@ -16,10 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.controller.helix.core.realtime.segment;
+package org.apache.pinot.controller.helix.core.realtime.segment;
 
-import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.core.realtime.stream.PartitionLevelStreamConfig;
+import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.core.realtime.stream.PartitionLevelStreamConfig;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import org.slf4j.Logger;

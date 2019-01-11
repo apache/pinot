@@ -16,17 +16,17 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.query.scheduler.tokenbucket;
+package org.apache.pinot.core.query.scheduler.tokenbucket;
 
-import com.linkedin.pinot.common.metrics.ServerMetrics;
-import com.linkedin.pinot.core.query.executor.QueryExecutor;
-import com.linkedin.pinot.core.query.scheduler.MultiLevelPriorityQueue;
-import com.linkedin.pinot.core.query.scheduler.PriorityScheduler;
-import com.linkedin.pinot.core.query.scheduler.SchedulerGroup;
-import com.linkedin.pinot.core.query.scheduler.SchedulerGroupFactory;
-import com.linkedin.pinot.core.query.scheduler.TableBasedGroupMapper;
-import com.linkedin.pinot.core.query.scheduler.resources.PolicyBasedResourceManager;
-import com.linkedin.pinot.core.query.scheduler.resources.ResourceManager;
+import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.core.query.executor.QueryExecutor;
+import org.apache.pinot.core.query.scheduler.MultiLevelPriorityQueue;
+import org.apache.pinot.core.query.scheduler.PriorityScheduler;
+import org.apache.pinot.core.query.scheduler.SchedulerGroup;
+import org.apache.pinot.core.query.scheduler.SchedulerGroupFactory;
+import org.apache.pinot.core.query.scheduler.TableBasedGroupMapper;
+import org.apache.pinot.core.query.scheduler.resources.PolicyBasedResourceManager;
+import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import java.util.concurrent.atomic.LongAccumulator;
 import javax.annotation.Nonnull;
 import org.apache.commons.configuration.Configuration;

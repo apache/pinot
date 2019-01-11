@@ -16,12 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.perf;
+package org.apache.pinot.perf;
 
-import com.linkedin.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
-import com.linkedin.pinot.core.io.writer.impl.DirectMemoryManager;
-import com.linkedin.pinot.core.realtime.impl.dictionary.BaseOffHeapMutableDictionary;
-import com.linkedin.pinot.core.realtime.impl.dictionary.LongOffHeapMutableDictionary;
+import org.apache.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
+import org.apache.pinot.core.io.writer.impl.DirectMemoryManager;
+import org.apache.pinot.core.realtime.impl.dictionary.BaseOffHeapMutableDictionary;
+import org.apache.pinot.core.realtime.impl.dictionary.LongOffHeapMutableDictionary;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.TearDown;
 

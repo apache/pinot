@@ -16,15 +16,15 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.controller.helix;
+package org.apache.pinot.controller.helix;
 
-import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.metrics.ControllerGauge;
-import com.linkedin.pinot.common.metrics.ControllerMetrics;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.LLCSegmentName;
-import com.linkedin.pinot.controller.ControllerConf;
-import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.common.config.TableNameBuilder;
+import org.apache.pinot.common.metrics.ControllerGauge;
+import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.yammer.metrics.core.MetricsRegistry;
 import java.util.ArrayList;
 import java.util.List;

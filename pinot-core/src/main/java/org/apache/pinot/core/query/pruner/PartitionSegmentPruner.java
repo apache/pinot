@@ -16,16 +16,16 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.query.pruner;
+package org.apache.pinot.core.query.pruner;
 
-import com.linkedin.pinot.common.request.FilterOperator;
-import com.linkedin.pinot.common.utils.request.FilterQueryTree;
-import com.linkedin.pinot.core.data.partition.PartitionFunction;
-import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.query.request.ServerQueryRequest;
-import com.linkedin.pinot.core.segment.index.ColumnMetadata;
-import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
-import com.linkedin.pinot.core.segment.index.readers.BloomFilterReader;
+import org.apache.pinot.common.request.FilterOperator;
+import org.apache.pinot.common.utils.request.FilterQueryTree;
+import org.apache.pinot.core.data.partition.PartitionFunction;
+import org.apache.pinot.core.indexsegment.IndexSegment;
+import org.apache.pinot.core.query.request.ServerQueryRequest;
+import org.apache.pinot.core.segment.index.ColumnMetadata;
+import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
+import org.apache.pinot.core.segment.index.readers.BloomFilterReader;
 
 import java.util.Collections;
 import java.util.List;

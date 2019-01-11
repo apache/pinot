@@ -16,23 +16,23 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.tools.scan.query;
+package org.apache.pinot.tools.scan.query;
 
-import com.linkedin.pinot.common.request.AggregationInfo;
-import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.common.request.FilterOperator;
-import com.linkedin.pinot.common.request.GroupBy;
-import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.common.utils.request.FilterQueryTree;
-import com.linkedin.pinot.common.utils.request.RequestUtils;
-import com.linkedin.pinot.core.common.BlockMultiValIterator;
-import com.linkedin.pinot.core.common.BlockSingleValIterator;
-import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
-import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
-import com.linkedin.pinot.core.query.utils.Pair;
-import com.linkedin.pinot.core.segment.index.ColumnMetadata;
-import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
-import com.linkedin.pinot.core.segment.index.readers.Dictionary;
+import org.apache.pinot.common.request.AggregationInfo;
+import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.request.FilterOperator;
+import org.apache.pinot.common.request.GroupBy;
+import org.apache.pinot.common.segment.ReadMode;
+import org.apache.pinot.common.utils.request.FilterQueryTree;
+import org.apache.pinot.common.utils.request.RequestUtils;
+import org.apache.pinot.core.common.BlockMultiValIterator;
+import org.apache.pinot.core.common.BlockSingleValIterator;
+import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
+import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
+import org.apache.pinot.core.query.utils.Pair;
+import org.apache.pinot.core.segment.index.ColumnMetadata;
+import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
+import org.apache.pinot.core.segment.index.readers.Dictionary;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;

@@ -16,14 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.common.config;
+package org.apache.pinot.common.config;
 
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.utils.EqualityUtils;
+import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.common.utils.EqualityUtils;
 
-import static com.linkedin.pinot.common.utils.EqualityUtils.hashCodeOf;
-import static com.linkedin.pinot.common.utils.EqualityUtils.isEqual;
-import static com.linkedin.pinot.common.utils.EqualityUtils.isNullOrNotSameClass;
+import static org.apache.pinot.common.utils.EqualityUtils.hashCodeOf;
+import static org.apache.pinot.common.utils.EqualityUtils.isEqual;
+import static org.apache.pinot.common.utils.EqualityUtils.isNullOrNotSameClass;
 
 
 /**

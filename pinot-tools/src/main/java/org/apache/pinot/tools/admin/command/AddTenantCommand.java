@@ -16,17 +16,17 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.tools.admin.command;
+package org.apache.pinot.tools.admin.command;
 
-import com.linkedin.pinot.tools.Command;
+import org.apache.pinot.tools.Command;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.pinot.common.config.Tenant;
-import com.linkedin.pinot.common.utils.NetUtil;
-import com.linkedin.pinot.common.utils.TenantRole;
-import com.linkedin.pinot.controller.helix.ControllerRequestURLBuilder;
+import org.apache.pinot.common.config.Tenant;
+import org.apache.pinot.common.utils.NetUtil;
+import org.apache.pinot.common.utils.TenantRole;
+import org.apache.pinot.controller.helix.ControllerRequestURLBuilder;
 
 
 public class AddTenantCommand extends AbstractBaseAdminCommand implements Command {

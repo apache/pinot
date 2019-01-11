@@ -16,11 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.transport.netty;
+package org.apache.pinot.transport.netty;
 
-import com.linkedin.pinot.common.response.ServerInstance;
-import com.linkedin.pinot.transport.metrics.NettyClientMetrics;
-import com.linkedin.pinot.transport.netty.NettyClientConnection.ResponseFuture;
+import org.apache.pinot.common.response.ServerInstance;
+import org.apache.pinot.transport.metrics.NettyClientMetrics;
+import org.apache.pinot.transport.netty.NettyClientConnection.ResponseFuture;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.util.HashedWheelTimer;

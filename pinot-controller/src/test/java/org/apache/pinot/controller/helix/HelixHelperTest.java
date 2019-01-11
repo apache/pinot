@@ -16,11 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.controller.helix;
+package org.apache.pinot.controller.helix;
 
 import com.google.common.base.Function;
-import com.linkedin.pinot.common.utils.helix.HelixHelper;
-import com.linkedin.pinot.common.utils.retry.RetryPolicies;
+import org.apache.pinot.common.utils.helix.HelixHelper;
+import org.apache.pinot.common.utils.retry.RetryPolicies;
 import javax.annotation.Nullable;
 import org.apache.helix.model.IdealState;
 import org.testng.Assert;

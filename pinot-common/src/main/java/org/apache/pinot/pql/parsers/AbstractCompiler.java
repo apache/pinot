@@ -16,10 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.pql.parsers;
+package org.apache.pinot.pql.parsers;
 
-import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.common.request.transform.TransformExpressionTree;
+import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.request.transform.TransformExpressionTree;
 
 /**
  * Interface for PQL compilers.

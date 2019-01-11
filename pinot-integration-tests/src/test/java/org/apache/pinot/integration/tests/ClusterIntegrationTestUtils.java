@@ -16,21 +16,21 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.integration.tests;
+package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.math.DoubleMath;
 import com.google.common.primitives.Longs;
-import com.linkedin.pinot.client.ResultSetGroup;
-import com.linkedin.pinot.common.utils.JsonUtils;
-import com.linkedin.pinot.common.utils.StringUtil;
-import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
-import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
-import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
-import com.linkedin.pinot.core.startree.v2.builder.StarTreeV2BuilderConfig;
-import com.linkedin.pinot.core.util.AvroUtils;
-import com.linkedin.pinot.server.util.SegmentTestUtils;
+import org.apache.pinot.client.ResultSetGroup;
+import org.apache.pinot.common.utils.JsonUtils;
+import org.apache.pinot.common.utils.StringUtil;
+import org.apache.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import org.apache.pinot.core.segment.creator.SegmentIndexCreationDriver;
+import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.core.startree.v2.builder.StarTreeV2BuilderConfig;
+import org.apache.pinot.core.util.AvroUtils;
+import org.apache.pinot.server.util.SegmentTestUtils;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.sql.Connection;
@@ -237,7 +237,7 @@ public class ClusterIntegrationTestUtils {
    */
   public static void buildSegmentsFromAvro(List<File> avroFiles, int baseSegmentIndex, File segmentDir, File tarDir,
       String tableName, boolean createStarTreeIndex, @Nullable List<StarTreeV2BuilderConfig> starTreeV2BuilderConfigs,
-      @Nullable List<String> rawIndexColumns, @Nullable com.linkedin.pinot.common.data.Schema pinotSchema,
+      @Nullable List<String> rawIndexColumns, @Nullable org.apache.pinot.common.data.Schema pinotSchema,
       Executor executor) {
     int numSegments = avroFiles.size();
     for (int i = 0; i < numSegments; i++) {
@@ -501,7 +501,7 @@ public class ClusterIntegrationTestUtils {
    * @throws Exception
    */
   public static void testQuery(@Nonnull String pqlQuery, @Nonnull String brokerUrl,
-      @Nonnull com.linkedin.pinot.client.Connection pinotConnection, @Nullable List<String> sqlQueries,
+      @Nonnull org.apache.pinot.client.Connection pinotConnection, @Nullable List<String> sqlQueries,
       @Nullable Connection h2Connection) throws Exception {
     // Use broker response for metadata check, connection response for value check
     JsonNode pinotResponse = ClusterTest.postQuery(pqlQuery, brokerUrl);
@@ -571,7 +571,7 @@ public class ClusterIntegrationTestUtils {
       // Group-by results
       if (pinotFirstAggregationResult.has("groupByResult")) {
         // Get number of groups
-        com.linkedin.pinot.client.ResultSet pinotFirstGroupByResultSet = pinotResultSetGroup.getResultSet(0);
+        org.apache.pinot.client.ResultSet pinotFirstGroupByResultSet = pinotResultSetGroup.getResultSet(0);
         int pinotNumGroups = pinotFirstGroupByResultSet.getRowCount();
 
         // Get number of group keys in each group
@@ -626,7 +626,7 @@ public class ClusterIntegrationTestUtils {
           // Only compare exhausted results
           if (h2NumGroups < MAX_NUM_ROWS_TO_COMPARE) {
             // Check if all Pinot results are contained in the H2 results
-            com.linkedin.pinot.client.ResultSet pinotGroupByResultSet =
+            org.apache.pinot.client.ResultSet pinotGroupByResultSet =
                 pinotResultSetGroup.getResultSet(aggregationIndex);
             for (int groupIndex = 0; groupIndex < pinotNumGroups; groupIndex++) {
               // Concatenate Pinot group keys
@@ -729,7 +729,7 @@ public class ClusterIntegrationTestUtils {
         expectedValues.add(expectedValue.toString());
       }
 
-      com.linkedin.pinot.client.ResultSet pinotSelectionResultSet = pinotResultSetGroup.getResultSet(0);
+      org.apache.pinot.client.ResultSet pinotSelectionResultSet = pinotResultSetGroup.getResultSet(0);
       int pinotNumRows = pinotSelectionResultSet.getRowCount();
 
       // No record selected in H2

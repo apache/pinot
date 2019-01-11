@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.broker.queryquota;
+package org.apache.pinot.broker.queryquota;
 
 import com.google.common.util.concurrent.RateLimiter;
 import javax.annotation.Nonnull;

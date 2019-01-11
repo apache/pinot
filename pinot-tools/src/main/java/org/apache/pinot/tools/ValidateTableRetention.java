@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.tools;
+package org.apache.pinot.tools;
 
-import com.linkedin.pinot.controller.util.TableRetentionValidator;
+import org.apache.pinot.controller.util.TableRetentionValidator;
 import org.kohsuke.args4j.Option;
 
 

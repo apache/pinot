@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.data.readers.sort;
+package org.apache.pinot.core.data.readers.sort;
 
 import java.util.List;
 

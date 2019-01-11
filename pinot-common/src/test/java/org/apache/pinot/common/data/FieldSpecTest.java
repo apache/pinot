@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.common.data;
+package org.apache.pinot.common.data;
 
-import com.linkedin.pinot.common.utils.JsonUtils;
+import org.apache.pinot.common.utils.JsonUtils;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
@@ -29,7 +29,7 @@ import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
-import static com.linkedin.pinot.common.data.FieldSpec.DataType.*;
+import static org.apache.pinot.common.data.FieldSpec.DataType.*;
 
 
 /**

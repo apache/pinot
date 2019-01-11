@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.io.reader;
+package org.apache.pinot.core.io.reader;
 
 public interface SingleColumnSingleValueReader<T extends ReaderContext> extends DataFileReader<T> {
 

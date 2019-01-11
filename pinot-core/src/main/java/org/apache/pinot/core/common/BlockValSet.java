@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.common;
+package org.apache.pinot.core.common;
 
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
+import org.apache.pinot.common.data.FieldSpec.DataType;
 
 
 public interface BlockValSet {

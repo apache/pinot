@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.io.reader.impl;
+package org.apache.pinot.core.io.reader.impl;
 
-import com.linkedin.pinot.core.io.reader.ReaderContext;
+import org.apache.pinot.core.io.reader.ReaderContext;
 
 
 public class UnSortedValueReaderContext implements ReaderContext {

@@ -16,11 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.operator.docvaliterators;
+package org.apache.pinot.core.operator.docvaliterators;
 
-import com.linkedin.pinot.core.common.BlockMultiValIterator;
-import com.linkedin.pinot.core.io.reader.ReaderContext;
-import com.linkedin.pinot.core.io.reader.SingleColumnMultiValueReader;
+import org.apache.pinot.core.common.BlockMultiValIterator;
+import org.apache.pinot.core.io.reader.ReaderContext;
+import org.apache.pinot.core.io.reader.SingleColumnMultiValueReader;
 
 
 @SuppressWarnings("unchecked")

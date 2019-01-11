@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.indexsegment.generator;
+package org.apache.pinot.core.indexsegment.generator;
 
 public enum SegmentVersion {
   v1, // Each index in a separate file

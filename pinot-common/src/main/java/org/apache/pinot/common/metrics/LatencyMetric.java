@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.common.metrics;
+package org.apache.pinot.common.metrics;
 
 import com.yammer.metrics.core.Sampling;
 import com.yammer.metrics.core.Summarizable;

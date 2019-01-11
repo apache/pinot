@@ -16,15 +16,15 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.startree.v2.builder;
+package org.apache.pinot.core.startree.v2.builder;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
-import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
-import com.linkedin.pinot.core.segment.store.SegmentDirectoryPaths;
-import com.linkedin.pinot.core.startree.v2.store.StarTreeIndexMapUtils;
+import org.apache.pinot.common.segment.ReadMode;
+import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
+import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
+import org.apache.pinot.core.segment.creator.impl.V1Constants;
+import org.apache.pinot.core.segment.store.SegmentDirectoryPaths;
+import org.apache.pinot.core.startree.v2.store.StarTreeIndexMapUtils;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.util.ArrayList;
@@ -36,8 +36,8 @@ import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static com.linkedin.pinot.core.startree.v2.StarTreeV2Constants.*;
-import static com.linkedin.pinot.core.startree.v2.store.StarTreeIndexMapUtils.*;
+import static org.apache.pinot.core.startree.v2.StarTreeV2Constants.*;
+import static org.apache.pinot.core.startree.v2.store.StarTreeIndexMapUtils.*;
 
 
 /**

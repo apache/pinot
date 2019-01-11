@@ -16,15 +16,15 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.util;
+package org.apache.pinot.core.util;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
-import com.linkedin.pinot.common.utils.Pairs;
-import com.linkedin.pinot.common.utils.Pairs.IntPair;
+import org.apache.pinot.common.utils.Pairs;
+import org.apache.pinot.common.utils.Pairs.IntPair;
 
 /**
  * Utility to perform intersection of sorted ranges

@@ -16,12 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.operator.docvalsets;
+package org.apache.pinot.core.operator.docvalsets;
 
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.core.common.BaseBlockValSet;
-import com.linkedin.pinot.core.common.DataBlockCache;
-import com.linkedin.pinot.core.operator.ProjectionOperator;
+import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.core.common.BaseBlockValSet;
+import org.apache.pinot.core.common.DataBlockCache;
+import org.apache.pinot.core.operator.ProjectionOperator;
 
 
 /**

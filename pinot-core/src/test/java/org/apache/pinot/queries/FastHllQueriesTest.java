@@ -16,28 +16,28 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.queries;
+package org.apache.pinot.queries;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.response.broker.BrokerResponseNative;
-import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.core.data.manager.SegmentDataManager;
-import com.linkedin.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
-import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
-import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
-import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
-import com.linkedin.pinot.core.operator.ExecutionStatistics;
-import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
-import com.linkedin.pinot.core.operator.query.AggregationGroupByOperator;
-import com.linkedin.pinot.core.operator.query.AggregationOperator;
-import com.linkedin.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
-import com.linkedin.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
-import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
-import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
-import com.linkedin.pinot.startree.hll.HllConfig;
+import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.common.response.broker.BrokerResponseNative;
+import org.apache.pinot.common.segment.ReadMode;
+import org.apache.pinot.core.data.manager.SegmentDataManager;
+import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
+import org.apache.pinot.core.indexsegment.IndexSegment;
+import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
+import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
+import org.apache.pinot.core.operator.ExecutionStatistics;
+import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
+import org.apache.pinot.core.operator.query.AggregationGroupByOperator;
+import org.apache.pinot.core.operator.query.AggregationOperator;
+import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
+import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
+import org.apache.pinot.core.segment.creator.SegmentIndexCreationDriver;
+import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.startree.hll.HllConfig;
 import java.io.File;
 import java.net.URL;
 import java.util.Arrays;

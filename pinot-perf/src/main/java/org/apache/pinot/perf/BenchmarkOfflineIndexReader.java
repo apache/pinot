@@ -16,29 +16,29 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.perf;
+package org.apache.pinot.perf;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
-import com.linkedin.pinot.core.io.reader.ReaderContext;
-import com.linkedin.pinot.core.io.reader.impl.v1.FixedBitMultiValueReader;
-import com.linkedin.pinot.core.io.reader.impl.v1.FixedBitSingleValueReader;
-import com.linkedin.pinot.core.io.reader.impl.v1.SortedIndexReaderImpl;
-import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
-import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
-import com.linkedin.pinot.core.segment.index.ColumnMetadata;
-import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
-import com.linkedin.pinot.core.segment.index.readers.DoubleDictionary;
-import com.linkedin.pinot.core.segment.index.readers.FloatDictionary;
-import com.linkedin.pinot.core.segment.index.readers.IntDictionary;
-import com.linkedin.pinot.core.segment.index.readers.LongDictionary;
-import com.linkedin.pinot.core.segment.index.readers.StringDictionary;
-import com.linkedin.pinot.core.segment.store.ColumnIndexType;
-import com.linkedin.pinot.core.segment.store.SegmentDirectory;
-import com.linkedin.pinot.integration.tests.ClusterTest;
-import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
-import com.linkedin.pinot.util.TestUtils;
+import org.apache.pinot.common.segment.ReadMode;
+import org.apache.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.core.io.reader.ReaderContext;
+import org.apache.pinot.core.io.reader.impl.v1.FixedBitMultiValueReader;
+import org.apache.pinot.core.io.reader.impl.v1.FixedBitSingleValueReader;
+import org.apache.pinot.core.io.reader.impl.v1.SortedIndexReaderImpl;
+import org.apache.pinot.core.segment.creator.SegmentIndexCreationDriver;
+import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.core.segment.index.ColumnMetadata;
+import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
+import org.apache.pinot.core.segment.index.readers.DoubleDictionary;
+import org.apache.pinot.core.segment.index.readers.FloatDictionary;
+import org.apache.pinot.core.segment.index.readers.IntDictionary;
+import org.apache.pinot.core.segment.index.readers.LongDictionary;
+import org.apache.pinot.core.segment.index.readers.StringDictionary;
+import org.apache.pinot.core.segment.store.ColumnIndexType;
+import org.apache.pinot.core.segment.store.SegmentDirectory;
+import org.apache.pinot.integration.tests.ClusterTest;
+import org.apache.pinot.segments.v1.creator.SegmentTestUtils;
+import org.apache.pinot.util.TestUtils;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;

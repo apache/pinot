@@ -16,32 +16,32 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.query.reduce;
+package org.apache.pinot.core.query.reduce;
 
-import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.exception.QueryException;
-import com.linkedin.pinot.common.metrics.BrokerMeter;
-import com.linkedin.pinot.common.metrics.BrokerMetrics;
-import com.linkedin.pinot.common.query.ReduceService;
-import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.common.request.GroupBy;
-import com.linkedin.pinot.common.request.HavingFilterQuery;
-import com.linkedin.pinot.common.request.HavingFilterQueryMap;
-import com.linkedin.pinot.common.request.Selection;
-import com.linkedin.pinot.common.response.ServerInstance;
-import com.linkedin.pinot.common.response.broker.AggregationResult;
-import com.linkedin.pinot.common.response.broker.BrokerResponseNative;
-import com.linkedin.pinot.common.response.broker.GroupByResult;
-import com.linkedin.pinot.common.response.broker.QueryProcessingException;
-import com.linkedin.pinot.common.response.broker.SelectionResults;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.DataSchema;
-import com.linkedin.pinot.common.utils.DataTable;
-import com.linkedin.pinot.core.query.aggregation.function.AggregationFunction;
-import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionUtils;
-import com.linkedin.pinot.core.query.aggregation.groupby.AggregationGroupByTrimmingService;
-import com.linkedin.pinot.core.query.selection.SelectionOperatorService;
-import com.linkedin.pinot.core.query.selection.SelectionOperatorUtils;
+import org.apache.pinot.common.config.TableNameBuilder;
+import org.apache.pinot.common.exception.QueryException;
+import org.apache.pinot.common.metrics.BrokerMeter;
+import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.common.query.ReduceService;
+import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.request.GroupBy;
+import org.apache.pinot.common.request.HavingFilterQuery;
+import org.apache.pinot.common.request.HavingFilterQueryMap;
+import org.apache.pinot.common.request.Selection;
+import org.apache.pinot.common.response.ServerInstance;
+import org.apache.pinot.common.response.broker.AggregationResult;
+import org.apache.pinot.common.response.broker.BrokerResponseNative;
+import org.apache.pinot.common.response.broker.GroupByResult;
+import org.apache.pinot.common.response.broker.QueryProcessingException;
+import org.apache.pinot.common.response.broker.SelectionResults;
+import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataTable;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
+import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByTrimmingService;
+import org.apache.pinot.core.query.selection.SelectionOperatorService;
+import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.HashMap;

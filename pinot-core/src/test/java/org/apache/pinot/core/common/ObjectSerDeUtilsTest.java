@@ -16,14 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.common;
+package org.apache.pinot.core.common;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
-import com.linkedin.pinot.core.query.aggregation.function.PercentileEstAggregationFunction;
-import com.linkedin.pinot.core.query.aggregation.function.PercentileTDigestAggregationFunction;
-import com.linkedin.pinot.core.query.aggregation.function.customobject.AvgPair;
-import com.linkedin.pinot.core.query.aggregation.function.customobject.MinMaxRangePair;
-import com.linkedin.pinot.core.query.aggregation.function.customobject.QuantileDigest;
+import org.apache.pinot.core.query.aggregation.function.PercentileEstAggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.PercentileTDigestAggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.customobject.AvgPair;
+import org.apache.pinot.core.query.aggregation.function.customobject.MinMaxRangePair;
+import org.apache.pinot.core.query.aggregation.function.customobject.QuantileDigest;
 import com.tdunning.math.stats.TDigest;
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;

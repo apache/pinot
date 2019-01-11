@@ -16,11 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.broker.pruner;
+package org.apache.pinot.broker.pruner;
 
-import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.common.utils.request.FilterQueryTree;
-import com.linkedin.pinot.common.utils.request.RequestUtils;
+import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.utils.request.FilterQueryTree;
+import org.apache.pinot.common.utils.request.RequestUtils;
 
 
 /**

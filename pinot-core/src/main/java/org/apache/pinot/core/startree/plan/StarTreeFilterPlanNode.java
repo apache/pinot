@@ -16,12 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.startree.plan;
+package org.apache.pinot.core.startree.plan;
 
-import com.linkedin.pinot.common.utils.request.FilterQueryTree;
-import com.linkedin.pinot.core.plan.PlanNode;
-import com.linkedin.pinot.core.startree.operator.StarTreeFilterOperator;
-import com.linkedin.pinot.core.startree.v2.StarTreeV2;
+import org.apache.pinot.common.utils.request.FilterQueryTree;
+import org.apache.pinot.core.plan.PlanNode;
+import org.apache.pinot.core.startree.operator.StarTreeFilterOperator;
+import org.apache.pinot.core.startree.v2.StarTreeV2;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;

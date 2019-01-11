@@ -16,12 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.segment.creator.impl.fwd;
+package org.apache.pinot.core.segment.creator.impl.fwd;
 
-import com.linkedin.pinot.core.io.compression.ChunkCompressorFactory;
-import com.linkedin.pinot.core.io.writer.impl.v1.VarByteChunkSingleValueWriter;
-import com.linkedin.pinot.core.segment.creator.BaseSingleValueRawIndexCreator;
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
+import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
+import org.apache.pinot.core.io.writer.impl.v1.VarByteChunkSingleValueWriter;
+import org.apache.pinot.core.segment.creator.BaseSingleValueRawIndexCreator;
+import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import java.io.File;
 import java.io.IOException;
 

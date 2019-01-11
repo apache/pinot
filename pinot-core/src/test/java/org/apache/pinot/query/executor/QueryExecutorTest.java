@@ -16,27 +16,27 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.query.executor;
+package org.apache.pinot.query.executor;
 
-import com.linkedin.pinot.common.metrics.ServerMetrics;
-import com.linkedin.pinot.common.request.InstanceRequest;
-import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.common.utils.DataTable;
-import com.linkedin.pinot.core.data.manager.InstanceDataManager;
-import com.linkedin.pinot.core.data.manager.TableDataManager;
-import com.linkedin.pinot.core.data.manager.config.TableDataManagerConfig;
-import com.linkedin.pinot.core.data.manager.offline.TableDataManagerProvider;
-import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
-import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
-import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
-import com.linkedin.pinot.core.query.executor.QueryExecutor;
-import com.linkedin.pinot.core.query.executor.ServerQueryExecutorV1Impl;
-import com.linkedin.pinot.core.query.request.ServerQueryRequest;
-import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
-import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
-import com.linkedin.pinot.pql.parsers.Pql2Compiler;
-import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
+import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.request.InstanceRequest;
+import org.apache.pinot.common.segment.ReadMode;
+import org.apache.pinot.common.utils.DataTable;
+import org.apache.pinot.core.data.manager.InstanceDataManager;
+import org.apache.pinot.core.data.manager.TableDataManager;
+import org.apache.pinot.core.data.manager.config.TableDataManagerConfig;
+import org.apache.pinot.core.data.manager.offline.TableDataManagerProvider;
+import org.apache.pinot.core.indexsegment.IndexSegment;
+import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
+import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
+import org.apache.pinot.core.query.executor.QueryExecutor;
+import org.apache.pinot.core.query.executor.ServerQueryExecutorV1Impl;
+import org.apache.pinot.core.query.request.ServerQueryRequest;
+import org.apache.pinot.core.segment.creator.SegmentIndexCreationDriver;
+import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.pql.parsers.Pql2Compiler;
+import org.apache.pinot.segments.v1.creator.SegmentTestUtils;
 import com.yammer.metrics.core.MetricsRegistry;
 import java.io.File;
 import java.net.URL;

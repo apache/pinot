@@ -16,15 +16,15 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.tools.admin.command;
+package org.apache.pinot.tools.admin.command;
 
 import com.google.common.base.Charsets;
 import com.google.common.base.Splitter;
-import com.linkedin.pinot.common.config.CombinedConfig;
-import com.linkedin.pinot.common.config.CombinedConfigLoader;
-import com.linkedin.pinot.common.config.Serializer;
-import com.linkedin.pinot.controller.helix.ControllerRequestURLBuilder;
-import com.linkedin.pinot.tools.Command;
+import org.apache.pinot.common.config.CombinedConfig;
+import org.apache.pinot.common.config.CombinedConfigLoader;
+import org.apache.pinot.common.config.Serializer;
+import org.apache.pinot.controller.helix.ControllerRequestURLBuilder;
+import org.apache.pinot.tools.Command;
 import java.io.File;
 import java.io.InputStream;
 import org.apache.commons.io.IOUtils;

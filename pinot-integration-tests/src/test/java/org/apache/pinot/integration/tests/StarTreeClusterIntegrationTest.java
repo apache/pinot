@@ -16,14 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.integration.tests;
+package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.tools.query.comparison.QueryComparison;
-import com.linkedin.pinot.tools.query.comparison.SegmentInfoProvider;
-import com.linkedin.pinot.tools.query.comparison.StarTreeQueryGenerator;
-import com.linkedin.pinot.util.TestUtils;
+import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.tools.query.comparison.QueryComparison;
+import org.apache.pinot.tools.query.comparison.SegmentInfoProvider;
+import org.apache.pinot.tools.query.comparison.StarTreeQueryGenerator;
+import org.apache.pinot.util.TestUtils;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;

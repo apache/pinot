@@ -16,15 +16,15 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.io.readerwriter;
+package org.apache.pinot.core.io.readerwriter;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.metrics.ServerGauge;
-import com.linkedin.pinot.common.metrics.ServerMetrics;
-import com.linkedin.pinot.common.utils.HLCSegmentName;
-import com.linkedin.pinot.common.utils.LLCSegmentName;
-import com.linkedin.pinot.common.utils.SegmentName;
-import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
+import org.apache.pinot.common.metrics.ServerGauge;
+import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.utils.HLCSegmentName;
+import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.common.utils.SegmentName;
+import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.IOException;
 import java.util.LinkedList;
 import java.util.List;

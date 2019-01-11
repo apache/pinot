@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.client;
+package org.apache.pinot.client;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -31,8 +31,8 @@ import org.I0Itec.zkclient.IZkDataListener;
 import org.I0Itec.zkclient.ZkClient;
 import org.I0Itec.zkclient.serialize.BytesPushThroughSerializer;
 
-import static com.linkedin.pinot.client.ExternalViewReader.OFFLINE_SUFFIX;
-import static com.linkedin.pinot.client.ExternalViewReader.REALTIME_SUFFIX;
+import static org.apache.pinot.client.ExternalViewReader.OFFLINE_SUFFIX;
+import static org.apache.pinot.client.ExternalViewReader.REALTIME_SUFFIX;
 
 
 /**

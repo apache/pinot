@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.transport.pool;
+package org.apache.pinot.transport.pool;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -28,17 +28,17 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.linkedin.pinot.common.response.ServerInstance;
-import com.linkedin.pinot.transport.common.AsyncResponseFuture;
-import com.linkedin.pinot.transport.common.Callback;
-import com.linkedin.pinot.transport.common.Cancellable;
-import com.linkedin.pinot.transport.common.CompositeFuture;
-import com.linkedin.pinot.transport.common.CompositeFuture.GatherModeOnError;
-import com.linkedin.pinot.transport.common.ServerResponseFuture;
-import com.linkedin.pinot.transport.common.NoneType;
-import com.linkedin.pinot.transport.metrics.AggregatedPoolStats;
-import com.linkedin.pinot.transport.metrics.PoolStats;
-import com.linkedin.pinot.transport.pool.AsyncPoolImpl.Strategy;
+import org.apache.pinot.common.response.ServerInstance;
+import org.apache.pinot.transport.common.AsyncResponseFuture;
+import org.apache.pinot.transport.common.Callback;
+import org.apache.pinot.transport.common.Cancellable;
+import org.apache.pinot.transport.common.CompositeFuture;
+import org.apache.pinot.transport.common.CompositeFuture.GatherModeOnError;
+import org.apache.pinot.transport.common.ServerResponseFuture;
+import org.apache.pinot.transport.common.NoneType;
+import org.apache.pinot.transport.metrics.AggregatedPoolStats;
+import org.apache.pinot.transport.metrics.PoolStats;
+import org.apache.pinot.transport.pool.AsyncPoolImpl.Strategy;
 import com.yammer.metrics.core.Histogram;
 import com.yammer.metrics.core.MetricsRegistry;
 

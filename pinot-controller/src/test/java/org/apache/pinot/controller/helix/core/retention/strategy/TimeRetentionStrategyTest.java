@@ -16,10 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.controller.helix.core.retention.strategy;
+package org.apache.pinot.controller.helix.core.retention.strategy;
 
-import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
-import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import java.util.concurrent.TimeUnit;
 import org.testng.annotations.Test;
 

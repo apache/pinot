@@ -16,22 +16,22 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.query.selection;
+package org.apache.pinot.core.query.selection;
 
-import com.linkedin.pinot.common.utils.DataSchema;
-import com.linkedin.pinot.core.common.Block;
-import com.linkedin.pinot.core.query.selection.iterator.DoubleArraySelectionColumnIterator;
-import com.linkedin.pinot.core.query.selection.iterator.DoubleSelectionColumnIterator;
-import com.linkedin.pinot.core.query.selection.iterator.FloatArraySelectionColumnIterator;
-import com.linkedin.pinot.core.query.selection.iterator.FloatSelectionColumnIterator;
-import com.linkedin.pinot.core.query.selection.iterator.IntArraySelectionColumnIterator;
-import com.linkedin.pinot.core.query.selection.iterator.IntSelectionColumnIterator;
-import com.linkedin.pinot.core.query.selection.iterator.LongArraySelectionColumnIterator;
-import com.linkedin.pinot.core.query.selection.iterator.LongSelectionColumnIterator;
-import com.linkedin.pinot.core.query.selection.iterator.SelectionColumnIterator;
-import com.linkedin.pinot.core.query.selection.iterator.SelectionSingleValueColumnWithDictIterator;
-import com.linkedin.pinot.core.query.selection.iterator.StringArraySelectionColumnIterator;
-import com.linkedin.pinot.core.query.selection.iterator.StringSelectionColumnIterator;
+import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.core.common.Block;
+import org.apache.pinot.core.query.selection.iterator.DoubleArraySelectionColumnIterator;
+import org.apache.pinot.core.query.selection.iterator.DoubleSelectionColumnIterator;
+import org.apache.pinot.core.query.selection.iterator.FloatArraySelectionColumnIterator;
+import org.apache.pinot.core.query.selection.iterator.FloatSelectionColumnIterator;
+import org.apache.pinot.core.query.selection.iterator.IntArraySelectionColumnIterator;
+import org.apache.pinot.core.query.selection.iterator.IntSelectionColumnIterator;
+import org.apache.pinot.core.query.selection.iterator.LongArraySelectionColumnIterator;
+import org.apache.pinot.core.query.selection.iterator.LongSelectionColumnIterator;
+import org.apache.pinot.core.query.selection.iterator.SelectionColumnIterator;
+import org.apache.pinot.core.query.selection.iterator.SelectionSingleValueColumnWithDictIterator;
+import org.apache.pinot.core.query.selection.iterator.StringArraySelectionColumnIterator;
+import org.apache.pinot.core.query.selection.iterator.StringSelectionColumnIterator;
 import java.io.Serializable;
 
 

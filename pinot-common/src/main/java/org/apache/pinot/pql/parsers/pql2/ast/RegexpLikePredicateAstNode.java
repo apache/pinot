@@ -16,18 +16,18 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.pql.parsers.pql2.ast;
+package org.apache.pinot.pql.parsers.pql2.ast;
 
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import com.linkedin.pinot.common.request.FilterOperator;
-import com.linkedin.pinot.common.utils.StringUtil;
-import com.linkedin.pinot.common.utils.request.FilterQueryTree;
-import com.linkedin.pinot.common.utils.request.HavingQueryTree;
-import com.linkedin.pinot.pql.parsers.Pql2CompilationException;
+import org.apache.pinot.common.request.FilterOperator;
+import org.apache.pinot.common.utils.StringUtil;
+import org.apache.pinot.common.utils.request.FilterQueryTree;
+import org.apache.pinot.common.utils.request.HavingQueryTree;
+import org.apache.pinot.pql.parsers.Pql2CompilationException;
 
 public class RegexpLikePredicateAstNode extends PredicateAstNode {
   private static final String SEPERATOR = "\t\t";

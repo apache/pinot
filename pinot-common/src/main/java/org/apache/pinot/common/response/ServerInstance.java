@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.common.response;
+package org.apache.pinot.common.response;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
@@ -25,7 +25,7 @@ import org.apache.commons.lang3.tuple.Triple;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.google.common.net.InternetDomainName;
-import com.linkedin.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.CommonConstants;
 
 
 /**

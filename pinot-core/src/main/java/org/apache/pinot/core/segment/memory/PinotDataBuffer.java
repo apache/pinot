@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.segment.memory;
+package org.apache.pinot.core.segment.memory;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.io.Closeable;

@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.predicate;
+package org.apache.pinot.core.predicate;
 
 import java.util.Random;
 import org.apache.commons.lang.RandomStringUtils;

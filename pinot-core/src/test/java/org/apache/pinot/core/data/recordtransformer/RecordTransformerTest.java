@@ -16,11 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.data.recordtransformer;
+package org.apache.pinot.core.data.recordtransformer;
 
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.core.data.GenericRow;
+import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.core.data.GenericRow;
 import java.util.HashMap;
 import java.util.Map;
 import org.testng.annotations.Test;

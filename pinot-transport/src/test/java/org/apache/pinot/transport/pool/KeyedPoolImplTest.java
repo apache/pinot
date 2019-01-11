@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.transport.pool;
+package org.apache.pinot.transport.pool;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -39,11 +39,11 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import com.google.common.util.concurrent.MoreExecutors;
-import com.linkedin.pinot.common.response.ServerInstance;
-import com.linkedin.pinot.transport.common.AsyncResponseFuture;
-import com.linkedin.pinot.transport.common.ServerResponseFuture;
-import com.linkedin.pinot.transport.common.NoneType;
-import com.linkedin.pinot.transport.metrics.AggregatedPoolStats;
+import org.apache.pinot.common.response.ServerInstance;
+import org.apache.pinot.transport.common.AsyncResponseFuture;
+import org.apache.pinot.transport.common.ServerResponseFuture;
+import org.apache.pinot.transport.common.NoneType;
+import org.apache.pinot.transport.metrics.AggregatedPoolStats;
 
 
 public class KeyedPoolImplTest {

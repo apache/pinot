@@ -21,7 +21,7 @@
 // (powered by Fernflower decompiler)
 //
 
-package com.linkedin.pinot.core.data.readers;
+package org.apache.pinot.core.data.readers;
 
 import org.apache.thrift.EncodingUtils;
 import org.apache.thrift.TBase;

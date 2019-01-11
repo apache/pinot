@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.query.scheduler;
+package org.apache.pinot.core.query.scheduler;
 
 import java.util.List;
 import javax.annotation.Nonnull;

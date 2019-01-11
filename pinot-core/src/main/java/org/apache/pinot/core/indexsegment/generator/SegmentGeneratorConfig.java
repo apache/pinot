@@ -16,31 +16,31 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.indexsegment.generator;
+package org.apache.pinot.core.indexsegment.generator;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.config.IndexingConfig;
-import com.linkedin.pinot.common.config.SegmentPartitionConfig;
-import com.linkedin.pinot.common.config.SegmentsValidationAndRetentionConfig;
-import com.linkedin.pinot.common.config.StarTreeIndexConfig;
-import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.data.FieldSpec.FieldType;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.data.StarTreeIndexSpec;
-import com.linkedin.pinot.common.data.TimeFieldSpec;
-import com.linkedin.pinot.common.utils.JsonUtils;
-import com.linkedin.pinot.core.data.readers.CSVRecordReaderConfig;
-import com.linkedin.pinot.core.data.readers.FileFormat;
-import com.linkedin.pinot.core.data.readers.RecordReaderConfig;
-import com.linkedin.pinot.core.io.compression.ChunkCompressorFactory;
-import com.linkedin.pinot.core.segment.name.DefaultSegmentNameGenerator;
-import com.linkedin.pinot.core.segment.name.SegmentNameGenerator;
-import com.linkedin.pinot.core.startree.v2.builder.StarTreeV2BuilderConfig;
-import com.linkedin.pinot.core.util.AvroUtils;
-import com.linkedin.pinot.startree.hll.HllConfig;
+import org.apache.pinot.common.config.IndexingConfig;
+import org.apache.pinot.common.config.SegmentPartitionConfig;
+import org.apache.pinot.common.config.SegmentsValidationAndRetentionConfig;
+import org.apache.pinot.common.config.StarTreeIndexConfig;
+import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.common.data.FieldSpec.FieldType;
+import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.common.data.StarTreeIndexSpec;
+import org.apache.pinot.common.data.TimeFieldSpec;
+import org.apache.pinot.common.utils.JsonUtils;
+import org.apache.pinot.core.data.readers.CSVRecordReaderConfig;
+import org.apache.pinot.core.data.readers.FileFormat;
+import org.apache.pinot.core.data.readers.RecordReaderConfig;
+import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
+import org.apache.pinot.core.segment.name.DefaultSegmentNameGenerator;
+import org.apache.pinot.core.segment.name.SegmentNameGenerator;
+import org.apache.pinot.core.startree.v2.builder.StarTreeV2BuilderConfig;
+import org.apache.pinot.core.util.AvroUtils;
+import org.apache.pinot.startree.hll.HllConfig;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;

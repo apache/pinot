@@ -16,11 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.controller.helix.core.minion.generator;
+package org.apache.pinot.controller.helix.core.minion.generator;
 
 import com.clearspring.analytics.util.Preconditions;
-import com.linkedin.pinot.controller.helix.core.minion.ClusterInfoProvider;
-import com.linkedin.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
+import org.apache.pinot.controller.helix.core.minion.ClusterInfoProvider;
+import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;

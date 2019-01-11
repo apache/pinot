@@ -25,7 +25,7 @@
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <artifactId>pinot</artifactId>
-    <groupId>com.linkedin.pinot</groupId>
+    <groupId>org.apache.pinot</groupId>
     <version>0.016</version>
   </parent>
 
@@ -79,7 +79,7 @@
   </profiles>
   <dependencies>
     <dependency>
-      <groupId>com.linkedin.pinot</groupId>
+      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-core</artifactId>
     </dependency>
     <dependency>
@@ -102,11 +102,11 @@
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>com.linkedin.pinot</groupId>
+      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-common</artifactId>
     </dependency>
     <dependency>
-      <groupId>com.linkedin.pinot</groupId>
+      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-core</artifactId>
     </dependency>
   </dependencies>

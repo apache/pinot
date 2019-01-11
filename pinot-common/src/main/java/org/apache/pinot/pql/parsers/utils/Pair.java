@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.pql.parsers.utils;
+package org.apache.pinot.pql.parsers.utils;
 
 import java.io.Serializable;
 

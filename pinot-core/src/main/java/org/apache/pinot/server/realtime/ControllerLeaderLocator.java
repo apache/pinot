@@ -16,10 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.server.realtime;
+package org.apache.pinot.server.realtime;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.linkedin.pinot.core.query.utils.Pair;
+import org.apache.pinot.core.query.utils.Pair;
 import org.apache.helix.AccessOption;
 import org.apache.helix.BaseDataAccessor;
 import org.apache.helix.HelixManager;

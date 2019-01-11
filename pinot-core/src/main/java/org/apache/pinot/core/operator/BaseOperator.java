@@ -16,11 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.operator;
+package org.apache.pinot.core.operator;
 
-import com.linkedin.pinot.core.common.Block;
-import com.linkedin.pinot.core.common.Operator;
-import com.linkedin.pinot.core.util.trace.TraceContext;
+import org.apache.pinot.core.common.Block;
+import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.util.trace.TraceContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

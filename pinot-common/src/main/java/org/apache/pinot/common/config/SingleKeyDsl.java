@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.common.config;
+package org.apache.pinot.common.config;
 
 /**
  * Interface for config DSLs, which transform strings into configuration objects that can be used by multiple fields.

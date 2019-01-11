@@ -16,11 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.data.readers.sort;
+package org.apache.pinot.core.data.readers.sort;
 
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.core.data.readers.PinotSegmentColumnReader;
+import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.core.data.readers.PinotSegmentColumnReader;
 import it.unimi.dsi.fastutil.Arrays;
 import it.unimi.dsi.fastutil.Swapper;
 import it.unimi.dsi.fastutil.ints.IntComparator;

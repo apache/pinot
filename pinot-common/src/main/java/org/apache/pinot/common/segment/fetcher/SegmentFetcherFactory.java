@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.common.segment.fetcher;
+package org.apache.pinot.common.segment.fetcher;
 
 import com.google.common.base.Preconditions;
 import java.net.URI;

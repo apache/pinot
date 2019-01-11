@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.broker.requesthandler;
+package org.apache.pinot.broker.requesthandler;
 
-import com.linkedin.pinot.common.utils.request.FilterQueryTree;
+import org.apache.pinot.common.utils.request.FilterQueryTree;
 
 
 /**

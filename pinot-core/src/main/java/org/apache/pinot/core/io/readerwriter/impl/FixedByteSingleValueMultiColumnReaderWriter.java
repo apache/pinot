@@ -16,13 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.io.readerwriter.impl;
+package org.apache.pinot.core.io.readerwriter.impl;
 
-import com.linkedin.pinot.core.io.reader.impl.FixedByteSingleValueMultiColReader;
-import com.linkedin.pinot.core.io.readerwriter.BaseSingleValueMultiColumnReaderWriter;
-import com.linkedin.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
-import com.linkedin.pinot.core.io.writer.impl.FixedByteSingleValueMultiColWriter;
-import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
+import org.apache.pinot.core.io.reader.impl.FixedByteSingleValueMultiColReader;
+import org.apache.pinot.core.io.readerwriter.BaseSingleValueMultiColumnReaderWriter;
+import org.apache.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
+import org.apache.pinot.core.io.writer.impl.FixedByteSingleValueMultiColWriter;
+import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;

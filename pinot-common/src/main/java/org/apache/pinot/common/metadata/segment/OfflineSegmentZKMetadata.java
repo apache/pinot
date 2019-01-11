@@ -16,18 +16,18 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.common.metadata.segment;
+package org.apache.pinot.common.metadata.segment;
 
 import java.util.Map;
 
 import org.apache.helix.ZNRecord;
 
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.CommonConstants.Segment.SegmentType;
-import static com.linkedin.pinot.common.utils.EqualityUtils.isEqual;
-import static com.linkedin.pinot.common.utils.EqualityUtils.hashCodeOf;
-import static com.linkedin.pinot.common.utils.EqualityUtils.isSameReference;
-import static com.linkedin.pinot.common.utils.EqualityUtils.isNullOrNotSameClass;
+import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.CommonConstants.Segment.SegmentType;
+import static org.apache.pinot.common.utils.EqualityUtils.isEqual;
+import static org.apache.pinot.common.utils.EqualityUtils.hashCodeOf;
+import static org.apache.pinot.common.utils.EqualityUtils.isSameReference;
+import static org.apache.pinot.common.utils.EqualityUtils.isNullOrNotSameClass;
 
 
 public class OfflineSegmentZKMetadata extends SegmentZKMetadata {

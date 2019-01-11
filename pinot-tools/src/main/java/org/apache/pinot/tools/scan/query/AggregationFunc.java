@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.tools.scan.query;
+package org.apache.pinot.tools.scan.query;
 
 public abstract class AggregationFunc {
   protected ResultTable _rows;

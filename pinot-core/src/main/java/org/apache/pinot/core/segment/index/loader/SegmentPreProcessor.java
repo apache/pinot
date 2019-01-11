@@ -16,19 +16,19 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.segment.index.loader;
+package org.apache.pinot.core.segment.index.loader;
 
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
-import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
-import com.linkedin.pinot.core.segment.index.loader.bloomfilter.BloomFilterHandler;
-import com.linkedin.pinot.core.segment.index.loader.columnminmaxvalue.ColumnMinMaxValueGenerator;
-import com.linkedin.pinot.core.segment.index.loader.columnminmaxvalue.ColumnMinMaxValueGeneratorMode;
-import com.linkedin.pinot.core.segment.index.loader.defaultcolumn.DefaultColumnHandler;
-import com.linkedin.pinot.core.segment.index.loader.defaultcolumn.DefaultColumnHandlerFactory;
-import com.linkedin.pinot.core.segment.index.loader.invertedindex.InvertedIndexHandler;
-import com.linkedin.pinot.core.segment.store.SegmentDirectory;
+import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.common.segment.ReadMode;
+import org.apache.pinot.core.segment.creator.impl.V1Constants;
+import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
+import org.apache.pinot.core.segment.index.loader.bloomfilter.BloomFilterHandler;
+import org.apache.pinot.core.segment.index.loader.columnminmaxvalue.ColumnMinMaxValueGenerator;
+import org.apache.pinot.core.segment.index.loader.columnminmaxvalue.ColumnMinMaxValueGeneratorMode;
+import org.apache.pinot.core.segment.index.loader.defaultcolumn.DefaultColumnHandler;
+import org.apache.pinot.core.segment.index.loader.defaultcolumn.DefaultColumnHandlerFactory;
+import org.apache.pinot.core.segment.index.loader.invertedindex.InvertedIndexHandler;
+import org.apache.pinot.core.segment.store.SegmentDirectory;
 import java.io.File;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;

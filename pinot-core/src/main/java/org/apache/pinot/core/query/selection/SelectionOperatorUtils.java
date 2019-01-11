@@ -16,17 +16,17 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.query.selection;
+package org.apache.pinot.core.query.selection;
 
-import com.linkedin.pinot.common.request.Selection;
-import com.linkedin.pinot.common.request.SelectionSort;
-import com.linkedin.pinot.common.response.ServerInstance;
-import com.linkedin.pinot.common.response.broker.SelectionResults;
-import com.linkedin.pinot.common.utils.DataSchema;
-import com.linkedin.pinot.common.utils.DataTable;
-import com.linkedin.pinot.core.common.DataSourceMetadata;
-import com.linkedin.pinot.core.common.datatable.DataTableBuilder;
-import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import org.apache.pinot.common.request.Selection;
+import org.apache.pinot.common.request.SelectionSort;
+import org.apache.pinot.common.response.ServerInstance;
+import org.apache.pinot.common.response.broker.SelectionResults;
+import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataTable;
+import org.apache.pinot.core.common.DataSourceMetadata;
+import org.apache.pinot.core.common.datatable.DataTableBuilder;
+import org.apache.pinot.core.indexsegment.IndexSegment;
 import java.io.Serializable;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;

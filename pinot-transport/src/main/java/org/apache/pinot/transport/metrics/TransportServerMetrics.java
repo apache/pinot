@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.transport.metrics;
+package org.apache.pinot.transport.metrics;
 
-import com.linkedin.pinot.common.metrics.LatencyMetric;
+import org.apache.pinot.common.metrics.LatencyMetric;
 import com.yammer.metrics.core.Sampling;
 import com.yammer.metrics.core.Summarizable;
 

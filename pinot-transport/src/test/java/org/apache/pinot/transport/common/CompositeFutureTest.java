@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.transport.common;
+package org.apache.pinot.transport.common;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -31,8 +31,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.Test;
-import com.linkedin.pinot.common.response.ServerInstance;
-import com.linkedin.pinot.transport.common.CompositeFuture.GatherModeOnError;
+import org.apache.pinot.common.response.ServerInstance;
+import org.apache.pinot.transport.common.CompositeFuture.GatherModeOnError;
 
 
 public class CompositeFutureTest {

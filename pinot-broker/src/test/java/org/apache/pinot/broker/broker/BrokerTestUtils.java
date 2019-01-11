@@ -16,12 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.broker.broker;
+package org.apache.pinot.broker.broker;
 
 import org.apache.commons.configuration.Configuration;
 
-import com.linkedin.pinot.broker.broker.helix.DefaultHelixBrokerConfig;
-import com.linkedin.pinot.broker.broker.helix.HelixBrokerStarter;
+import org.apache.pinot.broker.broker.helix.DefaultHelixBrokerConfig;
+import org.apache.pinot.broker.broker.helix.HelixBrokerStarter;
 
 
 /**

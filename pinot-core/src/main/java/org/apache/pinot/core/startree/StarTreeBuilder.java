@@ -16,11 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.startree;
+package org.apache.pinot.core.startree;
 
 import com.google.common.collect.BiMap;
-import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.segment.creator.ColumnIndexCreationInfo;
+import org.apache.pinot.core.data.GenericRow;
+import org.apache.pinot.core.segment.creator.ColumnIndexCreationInfo;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;

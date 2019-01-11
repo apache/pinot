@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.common.config;
+package org.apache.pinot.common.config;
 
-import com.linkedin.pinot.common.utils.JsonUtils;
+import org.apache.pinot.common.utils.JsonUtils;
 import java.io.IOException;
 import org.apache.commons.configuration.ConfigurationRuntimeException;
 import org.testng.Assert;

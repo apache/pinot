@@ -16,19 +16,19 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.controller.util;
+package org.apache.pinot.controller.util;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.config.IndexingConfig;
-import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.data.TimeFieldSpec;
-import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
-import com.linkedin.pinot.common.utils.JsonUtils;
-import com.linkedin.pinot.controller.helix.ControllerRequestURLBuilder;
+import org.apache.pinot.common.config.IndexingConfig;
+import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.common.config.TableNameBuilder;
+import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.common.data.TimeFieldSpec;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.utils.JsonUtils;
+import org.apache.pinot.controller.helix.ControllerRequestURLBuilder;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.InputStreamReader;

@@ -16,19 +16,19 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.realtime.converter.stats;
+package org.apache.pinot.core.realtime.converter.stats;
 
-import com.linkedin.pinot.common.config.ColumnPartitionConfig;
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.core.common.Block;
-import com.linkedin.pinot.core.common.BlockMultiValIterator;
-import com.linkedin.pinot.core.data.partition.PartitionFunction;
-import com.linkedin.pinot.core.data.partition.PartitionFunctionFactory;
-import com.linkedin.pinot.core.io.reader.SingleColumnSingleValueReader;
-import com.linkedin.pinot.core.operator.blocks.SingleValueBlock;
-import com.linkedin.pinot.core.realtime.impl.dictionary.MutableDictionary;
-import com.linkedin.pinot.core.segment.creator.ColumnStatistics;
-import com.linkedin.pinot.core.segment.index.data.source.ColumnDataSource;
+import org.apache.pinot.common.config.ColumnPartitionConfig;
+import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.core.common.Block;
+import org.apache.pinot.core.common.BlockMultiValIterator;
+import org.apache.pinot.core.data.partition.PartitionFunction;
+import org.apache.pinot.core.data.partition.PartitionFunctionFactory;
+import org.apache.pinot.core.io.reader.SingleColumnSingleValueReader;
+import org.apache.pinot.core.operator.blocks.SingleValueBlock;
+import org.apache.pinot.core.realtime.impl.dictionary.MutableDictionary;
+import org.apache.pinot.core.segment.creator.ColumnStatistics;
+import org.apache.pinot.core.segment.index.data.source.ColumnDataSource;
 import java.util.Arrays;
 import java.util.List;
 import org.apache.commons.lang.math.IntRange;

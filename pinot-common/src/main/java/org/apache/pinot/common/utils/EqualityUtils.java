@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.common.utils;
+package org.apache.pinot.common.utils;
 
 import java.util.ArrayList;
 import java.util.Arrays;

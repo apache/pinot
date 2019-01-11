@@ -16,18 +16,18 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.startree.hll;
+package org.apache.pinot.core.startree.hll;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
-import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.core.common.BlockDocIdIterator;
-import com.linkedin.pinot.core.common.Constants;
-import com.linkedin.pinot.core.common.Operator;
-import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
-import com.linkedin.pinot.core.startree.BaseStarTreeIndexTest;
-import com.linkedin.pinot.core.startree.StarTreeIndexTestSegmentHelper;
-import com.linkedin.pinot.startree.hll.HllConfig;
-import com.linkedin.pinot.startree.hll.HllConstants;
+import org.apache.pinot.common.segment.ReadMode;
+import org.apache.pinot.core.common.BlockDocIdIterator;
+import org.apache.pinot.core.common.Constants;
+import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
+import org.apache.pinot.core.startree.BaseStarTreeIndexTest;
+import org.apache.pinot.core.startree.StarTreeIndexTestSegmentHelper;
+import org.apache.pinot.startree.hll.HllConfig;
+import org.apache.pinot.startree.hll.HllConstants;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;

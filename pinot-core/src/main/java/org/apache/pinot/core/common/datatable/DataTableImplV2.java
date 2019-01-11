@@ -16,13 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.common.datatable;
+package org.apache.pinot.core.common.datatable;
 
-import com.linkedin.pinot.common.response.ProcessingException;
-import com.linkedin.pinot.common.utils.DataSchema;
-import com.linkedin.pinot.common.utils.DataTable;
-import com.linkedin.pinot.common.utils.StringUtil;
-import com.linkedin.pinot.core.common.ObjectSerDeUtils;
+import org.apache.pinot.common.response.ProcessingException;
+import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataTable;
+import org.apache.pinot.common.utils.StringUtil;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;

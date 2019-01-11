@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.minion.executor;
+package org.apache.pinot.minion.executor;
 
 public class PurgeTaskExecutorFactory implements PinotTaskExecutorFactory {
 

@@ -16,20 +16,20 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.reduce;
+package org.apache.pinot.reduce;
 
-import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.common.request.FilterOperator;
-import com.linkedin.pinot.core.query.reduce.BetweenComparison;
-import com.linkedin.pinot.core.query.reduce.EqualComparison;
-import com.linkedin.pinot.core.query.reduce.GreaterEqualComparison;
-import com.linkedin.pinot.core.query.reduce.GreaterThanComparison;
-import com.linkedin.pinot.core.query.reduce.HavingClauseComparisonTree;
-import com.linkedin.pinot.core.query.reduce.InAndNotInComparison;
-import com.linkedin.pinot.core.query.reduce.LessEqualComparison;
-import com.linkedin.pinot.core.query.reduce.LessThanComparison;
-import com.linkedin.pinot.core.query.reduce.NotEqualComparison;
-import com.linkedin.pinot.pql.parsers.Pql2Compiler;
+import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.request.FilterOperator;
+import org.apache.pinot.core.query.reduce.BetweenComparison;
+import org.apache.pinot.core.query.reduce.EqualComparison;
+import org.apache.pinot.core.query.reduce.GreaterEqualComparison;
+import org.apache.pinot.core.query.reduce.GreaterThanComparison;
+import org.apache.pinot.core.query.reduce.HavingClauseComparisonTree;
+import org.apache.pinot.core.query.reduce.InAndNotInComparison;
+import org.apache.pinot.core.query.reduce.LessEqualComparison;
+import org.apache.pinot.core.query.reduce.LessThanComparison;
+import org.apache.pinot.core.query.reduce.NotEqualComparison;
+import org.apache.pinot.pql.parsers.Pql2Compiler;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;

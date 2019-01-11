@@ -16,10 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.segment.index.readers;
+package org.apache.pinot.core.segment.index.readers;
 
-import com.linkedin.pinot.core.io.util.ValueReader;
-import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
+import org.apache.pinot.core.io.util.ValueReader;
+import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 
 
 public class IntDictionary extends ImmutableDictionaryReader {

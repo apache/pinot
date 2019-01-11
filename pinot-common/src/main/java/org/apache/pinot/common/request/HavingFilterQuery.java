@@ -22,7 +22,7 @@
  * DO NOT EDIT UNLESS YOU ARE SURE THAT YOU KNOW WHAT YOU ARE DOING
  *  @generated
  */
-package com.linkedin.pinot.common.request;
+package org.apache.pinot.common.request;
 
 import org.apache.thrift.scheme.IScheme;
 import org.apache.thrift.scheme.SchemeFactory;
@@ -771,7 +771,7 @@ public class HavingFilterQuery implements org.apache.thrift.TBase<HavingFilterQu
             break;
           case 4: // OPERATOR
             if (schemeField.type == org.apache.thrift.protocol.TType.I32) {
-              struct.operator = com.linkedin.pinot.common.request.FilterOperator.findByValue(iprot.readI32());
+              struct.operator = org.apache.pinot.common.request.FilterOperator.findByValue(iprot.readI32());
               struct.setOperatorIsSet(true);
             } else { 
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
@@ -932,7 +932,7 @@ public class HavingFilterQuery implements org.apache.thrift.TBase<HavingFilterQu
         struct.setValueIsSet(true);
       }
       if (incoming.get(2)) {
-        struct.operator = com.linkedin.pinot.common.request.FilterOperator.findByValue(iprot.readI32());
+        struct.operator = org.apache.pinot.common.request.FilterOperator.findByValue(iprot.readI32());
         struct.setOperatorIsSet(true);
       }
       if (incoming.get(3)) {

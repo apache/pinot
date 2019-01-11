@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.hadoop.io;
+package org.apache.pinot.hadoop.io;
 
-import com.linkedin.pinot.common.data.Schema;
+import org.apache.pinot.common.data.Schema;
 
 import org.apache.hadoop.conf.Configuration;
 

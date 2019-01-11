@@ -16,11 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.common.metadata.segment;
+package org.apache.pinot.common.metadata.segment;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.linkedin.pinot.common.utils.JsonUtils;
+import org.apache.pinot.common.utils.JsonUtils;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Iterator;

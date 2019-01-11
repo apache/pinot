@@ -16,13 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.common.partition;
+package org.apache.pinot.common.partition;
 
 import com.google.common.collect.Lists;
-import com.linkedin.pinot.common.config.SegmentsValidationAndRetentionConfig;
-import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.config.TenantConfig;
-import com.linkedin.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.common.config.SegmentsValidationAndRetentionConfig;
+import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.common.config.TenantConfig;
+import org.apache.pinot.common.utils.LLCSegmentName;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;

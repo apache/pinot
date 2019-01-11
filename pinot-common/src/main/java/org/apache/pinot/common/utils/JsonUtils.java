@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.common.utils;
+package org.apache.pinot.common.utils;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -27,7 +27,7 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.data.FieldSpec;
+import org.apache.pinot.common.data.FieldSpec;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;

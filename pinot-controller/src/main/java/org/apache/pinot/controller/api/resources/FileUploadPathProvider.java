@@ -16,13 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.controller.api.resources;
+package org.apache.pinot.controller.api.resources;
 
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.controller.ControllerConf;
-import com.linkedin.pinot.filesystem.LocalPinotFS;
-import com.linkedin.pinot.filesystem.PinotFS;
-import com.linkedin.pinot.filesystem.PinotFSFactory;
+import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.filesystem.LocalPinotFS;
+import org.apache.pinot.filesystem.PinotFS;
+import org.apache.pinot.filesystem.PinotFSFactory;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;

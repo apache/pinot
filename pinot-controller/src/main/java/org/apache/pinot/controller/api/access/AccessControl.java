@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.controller.api.access;
+package org.apache.pinot.controller.api.access;
 
 import javax.ws.rs.core.HttpHeaders;
 

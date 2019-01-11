@@ -16,10 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.controller.helix.core.realtime;
+package org.apache.pinot.controller.helix.core.realtime;
 
-import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;

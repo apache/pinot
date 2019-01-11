@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.controller.api.resources;
+package org.apache.pinot.controller.api.resources;
 
-import com.linkedin.pinot.controller.util.SegmentCompletionUtils;
+import org.apache.pinot.controller.util.SegmentCompletionUtils;
 import junit.framework.Assert;
 import org.testng.annotations.Test;
 

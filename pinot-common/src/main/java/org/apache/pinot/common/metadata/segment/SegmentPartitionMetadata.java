@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.common.metadata.segment;
+package org.apache.pinot.common.metadata.segment;
 
 /**
  * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
@@ -38,7 +38,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.utils.JsonUtils;
+import org.apache.pinot.common.utils.JsonUtils;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;

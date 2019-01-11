@@ -16,10 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.segment.index.loader.defaultcolumn;
+package org.apache.pinot.core.segment.index.loader.defaultcolumn;
 
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
 import java.io.File;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

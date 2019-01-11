@@ -16,16 +16,16 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.plan;
+package org.apache.pinot.core.plan;
 
-import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.common.request.Selection;
-import com.linkedin.pinot.core.common.Operator;
-import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.operator.query.EmptySelectionOperator;
-import com.linkedin.pinot.core.operator.query.SelectionOnlyOperator;
-import com.linkedin.pinot.core.operator.query.SelectionOrderByOperator;
-import com.linkedin.pinot.core.query.selection.SelectionOperatorUtils;
+import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.request.Selection;
+import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.indexsegment.IndexSegment;
+import org.apache.pinot.core.operator.query.EmptySelectionOperator;
+import org.apache.pinot.core.operator.query.SelectionOnlyOperator;
+import org.apache.pinot.core.operator.query.SelectionOrderByOperator;
+import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

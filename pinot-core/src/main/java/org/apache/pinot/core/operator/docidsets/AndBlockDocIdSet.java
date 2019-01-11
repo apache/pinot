@@ -16,17 +16,17 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.operator.docidsets;
+package org.apache.pinot.core.operator.docidsets;
 
-import com.linkedin.pinot.common.utils.Pairs.IntPair;
-import com.linkedin.pinot.core.common.BlockDocIdIterator;
-import com.linkedin.pinot.core.common.BlockDocIdSet;
-import com.linkedin.pinot.core.common.Constants;
-import com.linkedin.pinot.core.operator.dociditerators.AndDocIdIterator;
-import com.linkedin.pinot.core.operator.dociditerators.BitmapDocIdIterator;
-import com.linkedin.pinot.core.operator.dociditerators.RangelessBitmapDocIdIterator;
-import com.linkedin.pinot.core.operator.dociditerators.ScanBasedDocIdIterator;
-import com.linkedin.pinot.core.util.SortedRangeIntersection;
+import org.apache.pinot.common.utils.Pairs.IntPair;
+import org.apache.pinot.core.common.BlockDocIdIterator;
+import org.apache.pinot.core.common.BlockDocIdSet;
+import org.apache.pinot.core.common.Constants;
+import org.apache.pinot.core.operator.dociditerators.AndDocIdIterator;
+import org.apache.pinot.core.operator.dociditerators.BitmapDocIdIterator;
+import org.apache.pinot.core.operator.dociditerators.RangelessBitmapDocIdIterator;
+import org.apache.pinot.core.operator.dociditerators.ScanBasedDocIdIterator;
+import org.apache.pinot.core.util.SortedRangeIntersection;
 import java.util.ArrayList;
 import java.util.List;
 import org.roaringbitmap.IntIterator;

@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.server.api.resources;
+package org.apache.pinot.server.api.resources;
 
 import javax.ws.rs.WebApplicationException;
 import org.slf4j.LoggerFactory;

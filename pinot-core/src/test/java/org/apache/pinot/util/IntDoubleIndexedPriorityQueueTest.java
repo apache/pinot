@@ -16,10 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.util;
+package org.apache.pinot.util;
 
-import com.linkedin.pinot.common.utils.Pairs;
-import com.linkedin.pinot.core.util.IntDoubleIndexedPriorityQueue;
+import org.apache.pinot.common.utils.Pairs;
+import org.apache.pinot.core.util.IntDoubleIndexedPriorityQueue;
 import it.unimi.dsi.fastutil.ints.Int2DoubleMap;
 import it.unimi.dsi.fastutil.ints.Int2DoubleOpenHashMap;
 import java.util.ArrayList;

@@ -16,14 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.segment.creator.impl;
+package org.apache.pinot.core.segment.creator.impl;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.utils.StringUtil;
-import com.linkedin.pinot.common.utils.primitive.ByteArray;
-import com.linkedin.pinot.core.io.util.FixedByteValueReaderWriter;
-import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
+import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.common.utils.StringUtil;
+import org.apache.pinot.common.utils.primitive.ByteArray;
+import org.apache.pinot.core.io.util.FixedByteValueReaderWriter;
+import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import it.unimi.dsi.fastutil.doubles.Double2IntOpenHashMap;
 import it.unimi.dsi.fastutil.floats.Float2IntOpenHashMap;
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;

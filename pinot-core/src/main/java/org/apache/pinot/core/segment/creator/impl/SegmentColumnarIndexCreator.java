@@ -16,36 +16,36 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.segment.creator.impl;
+package org.apache.pinot.core.segment.creator.impl;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.config.ColumnPartitionConfig;
-import com.linkedin.pinot.common.data.DateTimeFieldSpec;
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.data.FieldSpec.FieldType;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.data.StarTreeIndexSpec;
-import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.data.partition.PartitionFunction;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
-import com.linkedin.pinot.core.io.compression.ChunkCompressorFactory;
-import com.linkedin.pinot.core.io.util.PinotDataBitSet;
-import com.linkedin.pinot.core.segment.creator.ColumnIndexCreationInfo;
-import com.linkedin.pinot.core.segment.creator.ForwardIndexCreator;
-import com.linkedin.pinot.core.segment.creator.InvertedIndexCreator;
-import com.linkedin.pinot.core.segment.creator.MultiValueForwardIndexCreator;
-import com.linkedin.pinot.core.segment.creator.SegmentCreator;
-import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationInfo;
-import com.linkedin.pinot.core.segment.creator.SingleValueForwardIndexCreator;
-import com.linkedin.pinot.core.segment.creator.SingleValueRawIndexCreator;
-import com.linkedin.pinot.core.segment.creator.impl.fwd.MultiValueUnsortedForwardIndexCreator;
-import com.linkedin.pinot.core.segment.creator.impl.fwd.SingleValueFixedByteRawIndexCreator;
-import com.linkedin.pinot.core.segment.creator.impl.fwd.SingleValueSortedForwardIndexCreator;
-import com.linkedin.pinot.core.segment.creator.impl.fwd.SingleValueUnsortedForwardIndexCreator;
-import com.linkedin.pinot.core.segment.creator.impl.fwd.SingleValueVarByteRawIndexCreator;
-import com.linkedin.pinot.core.segment.creator.impl.inv.OffHeapBitmapInvertedIndexCreator;
-import com.linkedin.pinot.core.segment.creator.impl.inv.OnHeapBitmapInvertedIndexCreator;
-import com.linkedin.pinot.startree.hll.HllConfig;
+import org.apache.pinot.common.config.ColumnPartitionConfig;
+import org.apache.pinot.common.data.DateTimeFieldSpec;
+import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.common.data.FieldSpec.FieldType;
+import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.common.data.StarTreeIndexSpec;
+import org.apache.pinot.core.data.GenericRow;
+import org.apache.pinot.core.data.partition.PartitionFunction;
+import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
+import org.apache.pinot.core.io.util.PinotDataBitSet;
+import org.apache.pinot.core.segment.creator.ColumnIndexCreationInfo;
+import org.apache.pinot.core.segment.creator.ForwardIndexCreator;
+import org.apache.pinot.core.segment.creator.InvertedIndexCreator;
+import org.apache.pinot.core.segment.creator.MultiValueForwardIndexCreator;
+import org.apache.pinot.core.segment.creator.SegmentCreator;
+import org.apache.pinot.core.segment.creator.SegmentIndexCreationInfo;
+import org.apache.pinot.core.segment.creator.SingleValueForwardIndexCreator;
+import org.apache.pinot.core.segment.creator.SingleValueRawIndexCreator;
+import org.apache.pinot.core.segment.creator.impl.fwd.MultiValueUnsortedForwardIndexCreator;
+import org.apache.pinot.core.segment.creator.impl.fwd.SingleValueFixedByteRawIndexCreator;
+import org.apache.pinot.core.segment.creator.impl.fwd.SingleValueSortedForwardIndexCreator;
+import org.apache.pinot.core.segment.creator.impl.fwd.SingleValueUnsortedForwardIndexCreator;
+import org.apache.pinot.core.segment.creator.impl.fwd.SingleValueVarByteRawIndexCreator;
+import org.apache.pinot.core.segment.creator.impl.inv.OffHeapBitmapInvertedIndexCreator;
+import org.apache.pinot.core.segment.creator.impl.inv.OnHeapBitmapInvertedIndexCreator;
+import org.apache.pinot.startree.hll.HllConfig;
 import java.io.File;
 import java.io.IOException;
 import java.util.Collection;
@@ -62,9 +62,9 @@ import org.joda.time.format.DateTimeFormatter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Column.*;
-import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.*;
-import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.StarTree.*;
+import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Column.*;
+import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.*;
+import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.StarTree.*;
 
 
 /**

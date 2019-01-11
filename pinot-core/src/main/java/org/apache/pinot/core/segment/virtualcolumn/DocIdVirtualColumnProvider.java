@@ -16,22 +16,22 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.segment.virtualcolumn;
+package org.apache.pinot.core.segment.virtualcolumn;
 
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.utils.Pairs;
-import com.linkedin.pinot.core.io.reader.BaseSingleColumnSingleValueReader;
-import com.linkedin.pinot.core.io.reader.DataFileReader;
-import com.linkedin.pinot.core.io.reader.impl.ChunkReaderContext;
-import com.linkedin.pinot.core.io.reader.impl.v1.SortedIndexReader;
-import com.linkedin.pinot.core.io.reader.impl.v1.SortedIndexReaderImpl;
-import com.linkedin.pinot.core.io.util.DictionaryDelegatingValueReader;
-import com.linkedin.pinot.core.io.util.ValueReader;
-import com.linkedin.pinot.core.segment.index.ColumnMetadata;
-import com.linkedin.pinot.core.segment.index.readers.BaseDictionary;
-import com.linkedin.pinot.core.segment.index.readers.Dictionary;
-import com.linkedin.pinot.core.segment.index.readers.IntDictionary;
-import com.linkedin.pinot.core.segment.index.readers.InvertedIndexReader;
+import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.common.utils.Pairs;
+import org.apache.pinot.core.io.reader.BaseSingleColumnSingleValueReader;
+import org.apache.pinot.core.io.reader.DataFileReader;
+import org.apache.pinot.core.io.reader.impl.ChunkReaderContext;
+import org.apache.pinot.core.io.reader.impl.v1.SortedIndexReader;
+import org.apache.pinot.core.io.reader.impl.v1.SortedIndexReaderImpl;
+import org.apache.pinot.core.io.util.DictionaryDelegatingValueReader;
+import org.apache.pinot.core.io.util.ValueReader;
+import org.apache.pinot.core.segment.index.ColumnMetadata;
+import org.apache.pinot.core.segment.index.readers.BaseDictionary;
+import org.apache.pinot.core.segment.index.readers.Dictionary;
+import org.apache.pinot.core.segment.index.readers.IntDictionary;
+import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
 import java.io.IOException;
 
 

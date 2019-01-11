@@ -16,11 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.realtime.impl.dictionary;
+package org.apache.pinot.core.realtime.impl.dictionary;
 
-import com.linkedin.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
-import com.linkedin.pinot.core.io.readerwriter.impl.FixedByteSingleColumnMultiValueReaderWriter;
-import com.linkedin.pinot.core.io.writer.impl.DirectMemoryManager;
+import org.apache.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
+import org.apache.pinot.core.io.readerwriter.impl.FixedByteSingleColumnMultiValueReaderWriter;
+import org.apache.pinot.core.io.writer.impl.DirectMemoryManager;
 import java.util.Random;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;

@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.data.function;
+package org.apache.pinot.core.data.function;
 
-import com.linkedin.pinot.core.data.GenericRow;
+import org.apache.pinot.core.data.GenericRow;
 import java.lang.reflect.Method;
 import org.joda.time.DateTime;
 import org.joda.time.Days;

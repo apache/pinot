@@ -16,12 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.common.partition;
+package org.apache.pinot.common.partition;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.config.ReplicaGroupStrategyConfig;
-import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.config.ReplicaGroupStrategyConfig;
+import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import java.util.Collections;
 import java.util.List;
 import org.apache.helix.AccessOption;

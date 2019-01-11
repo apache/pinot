@@ -16,14 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.plan;
+package org.apache.pinot.core.plan;
 
-import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.core.common.Operator;
-import com.linkedin.pinot.core.operator.CombineGroupByOperator;
-import com.linkedin.pinot.core.operator.CombineOperator;
-import com.linkedin.pinot.core.query.exception.BadQueryRequestException;
-import com.linkedin.pinot.core.util.trace.TraceCallable;
+import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.operator.CombineGroupByOperator;
+import org.apache.pinot.core.operator.CombineOperator;
+import org.apache.pinot.core.query.exception.BadQueryRequestException;
+import org.apache.pinot.core.util.trace.TraceCallable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;

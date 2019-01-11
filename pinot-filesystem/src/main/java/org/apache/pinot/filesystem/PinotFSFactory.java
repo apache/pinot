@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.filesystem;
+package org.apache.pinot.filesystem;
 
 import java.io.IOException;
 import java.util.HashMap;

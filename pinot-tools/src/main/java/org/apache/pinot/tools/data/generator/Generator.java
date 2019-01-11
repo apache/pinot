@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.tools.data.generator;
+package org.apache.pinot.tools.data.generator;
 
 /**
  * Sep 13, 2014

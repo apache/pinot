@@ -16,14 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.integration.tests;
+package org.apache.pinot.integration.tests;
 
-import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionType;
-import com.linkedin.pinot.core.startree.v2.AggregationFunctionColumnPair;
-import com.linkedin.pinot.core.startree.v2.builder.StarTreeV2BuilderConfig;
-import com.linkedin.pinot.tools.query.comparison.SegmentInfoProvider;
-import com.linkedin.pinot.tools.query.comparison.StarTreeQueryGenerator;
-import com.linkedin.pinot.util.TestUtils;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunctionType;
+import org.apache.pinot.core.startree.v2.AggregationFunctionColumnPair;
+import org.apache.pinot.core.startree.v2.builder.StarTreeV2BuilderConfig;
+import org.apache.pinot.tools.query.comparison.SegmentInfoProvider;
+import org.apache.pinot.tools.query.comparison.StarTreeQueryGenerator;
+import org.apache.pinot.util.TestUtils;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;

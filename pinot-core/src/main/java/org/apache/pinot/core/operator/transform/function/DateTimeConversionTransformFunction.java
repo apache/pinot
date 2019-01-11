@@ -16,19 +16,19 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.operator.transform.function;
+package org.apache.pinot.core.operator.transform.function;
 
-import com.linkedin.pinot.common.data.DateTimeFieldSpec;
-import com.linkedin.pinot.core.common.DataSource;
-import com.linkedin.pinot.core.operator.blocks.ProjectionBlock;
-import com.linkedin.pinot.core.operator.transform.TransformResultMetadata;
-import com.linkedin.pinot.core.operator.transform.transformer.datetime.BaseDateTimeTransformer;
-import com.linkedin.pinot.core.operator.transform.transformer.datetime.DateTimeTransformerFactory;
-import com.linkedin.pinot.core.operator.transform.transformer.datetime.EpochToEpochTransformer;
-import com.linkedin.pinot.core.operator.transform.transformer.datetime.EpochToSDFTransformer;
-import com.linkedin.pinot.core.operator.transform.transformer.datetime.SDFToEpochTransformer;
-import com.linkedin.pinot.core.operator.transform.transformer.datetime.SDFToSDFTransformer;
-import com.linkedin.pinot.core.plan.DocIdSetPlanNode;
+import org.apache.pinot.common.data.DateTimeFieldSpec;
+import org.apache.pinot.core.common.DataSource;
+import org.apache.pinot.core.operator.blocks.ProjectionBlock;
+import org.apache.pinot.core.operator.transform.TransformResultMetadata;
+import org.apache.pinot.core.operator.transform.transformer.datetime.BaseDateTimeTransformer;
+import org.apache.pinot.core.operator.transform.transformer.datetime.DateTimeTransformerFactory;
+import org.apache.pinot.core.operator.transform.transformer.datetime.EpochToEpochTransformer;
+import org.apache.pinot.core.operator.transform.transformer.datetime.EpochToSDFTransformer;
+import org.apache.pinot.core.operator.transform.transformer.datetime.SDFToEpochTransformer;
+import org.apache.pinot.core.operator.transform.transformer.datetime.SDFToSDFTransformer;
+import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nonnull;

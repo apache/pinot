@@ -24,7 +24,7 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <parent>
     <artifactId>pinot</artifactId>
-    <groupId>com.linkedin.pinot</groupId>
+    <groupId>org.apache.pinot</groupId>
     <version>0.016</version>
   </parent>
   <modelVersion>4.0.0</modelVersion>
@@ -72,13 +72,13 @@
       </exclusions>
     </dependency>
     <dependency>
-      <groupId>com.linkedin.pinot</groupId>
+      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-filesystem</artifactId>
       <version>0.016</version>
       <scope>compile</scope>
     </dependency>
     <dependency>
-      <groupId>com.linkedin.pinot</groupId>
+      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-common</artifactId>
     </dependency>
   </dependencies>

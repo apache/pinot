@@ -16,19 +16,19 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.segment.index.converter;
+package org.apache.pinot.core.segment.index.converter;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
-import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
-import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
-import com.linkedin.pinot.core.segment.store.ColumnIndexType;
-import com.linkedin.pinot.core.segment.store.SegmentDirectory;
-import com.linkedin.pinot.core.segment.store.SegmentDirectoryPaths;
-import com.linkedin.pinot.core.startree.v2.StarTreeV2Constants;
+import org.apache.pinot.common.segment.ReadMode;
+import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
+import org.apache.pinot.core.segment.creator.impl.V1Constants;
+import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
+import org.apache.pinot.core.segment.memory.PinotDataBuffer;
+import org.apache.pinot.core.segment.store.ColumnIndexType;
+import org.apache.pinot.core.segment.store.SegmentDirectory;
+import org.apache.pinot.core.segment.store.SegmentDirectoryPaths;
+import org.apache.pinot.core.startree.v2.StarTreeV2Constants;
 import java.io.File;
 import java.io.FilenameFilter;
 import java.io.IOException;

@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.controller.util;
+package org.apache.pinot.controller.util;
 
 import java.util.UUID;
 import org.slf4j.Logger;

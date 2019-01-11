@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.tools.query.comparison;
+package org.apache.pinot.tools.query.comparison;
 
-import com.linkedin.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.CommonConstants;
 import java.io.File;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;

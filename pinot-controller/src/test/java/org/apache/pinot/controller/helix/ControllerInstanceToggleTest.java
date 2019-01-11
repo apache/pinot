@@ -16,15 +16,15 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.controller.helix;
+package org.apache.pinot.controller.helix;
 
-import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.config.TagNameUtils;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.ZkStarter;
-import com.linkedin.pinot.common.utils.helix.HelixHelper;
-import com.linkedin.pinot.controller.utils.SegmentMetadataMockUtils;
+import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.common.config.TableNameBuilder;
+import org.apache.pinot.common.config.TagNameUtils;
+import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.ZkStarter;
+import org.apache.pinot.common.utils.helix.HelixHelper;
+import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
 import java.util.Set;
 import org.apache.helix.model.ExternalView;
 import org.testng.Assert;

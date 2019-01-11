@@ -16,16 +16,16 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.tools.data.generator;
+package org.apache.pinot.tools.data.generator;
 
-import com.linkedin.pinot.common.data.DimensionFieldSpec;
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
-import com.linkedin.pinot.common.data.FieldSpec.FieldType;
-import com.linkedin.pinot.common.data.MetricFieldSpec;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.data.TimeFieldSpec;
-import com.linkedin.pinot.core.data.readers.FileFormat;
+import org.apache.pinot.common.data.DimensionFieldSpec;
+import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.common.data.FieldSpec.DataType;
+import org.apache.pinot.common.data.FieldSpec.FieldType;
+import org.apache.pinot.common.data.MetricFieldSpec;
+import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.common.data.TimeFieldSpec;
+import org.apache.pinot.core.data.readers.FileFormat;
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;

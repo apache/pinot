@@ -16,21 +16,21 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.minion.taskfactory;
+package org.apache.pinot.minion.taskfactory;
 
-import com.linkedin.pinot.common.config.PinotTaskConfig;
-import com.linkedin.pinot.minion.MinionContext;
-import com.linkedin.pinot.minion.events.EventObserverFactoryRegistry;
-import com.linkedin.pinot.minion.events.MinionEventObserver;
-import com.linkedin.pinot.minion.events.MinionEventObserverFactory;
-import com.linkedin.pinot.minion.exception.FatalException;
-import com.linkedin.pinot.minion.exception.TaskCancelledException;
-import com.linkedin.pinot.minion.executor.PinotTaskExecutor;
-import com.linkedin.pinot.minion.executor.PinotTaskExecutorFactory;
-import com.linkedin.pinot.minion.executor.TaskExecutorFactoryRegistry;
-import com.linkedin.pinot.minion.metrics.MinionMeter;
-import com.linkedin.pinot.minion.metrics.MinionMetrics;
-import com.linkedin.pinot.minion.metrics.MinionQueryPhase;
+import org.apache.pinot.common.config.PinotTaskConfig;
+import org.apache.pinot.minion.MinionContext;
+import org.apache.pinot.minion.events.EventObserverFactoryRegistry;
+import org.apache.pinot.minion.events.MinionEventObserver;
+import org.apache.pinot.minion.events.MinionEventObserverFactory;
+import org.apache.pinot.minion.exception.FatalException;
+import org.apache.pinot.minion.exception.TaskCancelledException;
+import org.apache.pinot.minion.executor.PinotTaskExecutor;
+import org.apache.pinot.minion.executor.PinotTaskExecutorFactory;
+import org.apache.pinot.minion.executor.TaskExecutorFactoryRegistry;
+import org.apache.pinot.minion.metrics.MinionMeter;
+import org.apache.pinot.minion.metrics.MinionMetrics;
+import org.apache.pinot.minion.metrics.MinionQueryPhase;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;

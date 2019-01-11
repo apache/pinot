@@ -16,10 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.transport.scattergather;
+package org.apache.pinot.transport.scattergather;
 
-import com.linkedin.pinot.common.metrics.BrokerMetrics;
-import com.linkedin.pinot.transport.common.CompositeFuture;
+import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.transport.common.CompositeFuture;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 

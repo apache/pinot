@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.common.utils;
+package org.apache.pinot.common.utils;
 
 // old style name (that needs to be recognized, but not built anymore)
 //  return StringUtils.join(
@@ -35,7 +35,7 @@ package com.linkedin.pinot.common.utils;
 //    groupId: tableName_REALTIME_1433316466991_0
 //    partitionRange: 0
 //    sequenceNumber: 1465314044238
-// see com.linkedin.pinot.controller.helix.core.PinotTableIdealStateBuilder#getGroupIdFromRealtimeDataTable for details on the groupId
+// see org.apache.pinot.controller.helix.core.PinotTableIdealStateBuilder#getGroupIdFromRealtimeDataTable for details on the groupId
 
 import org.apache.commons.lang.StringUtils;
 import com.google.common.collect.Lists;

@@ -16,43 +16,43 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.segment.creator.impl;
+package org.apache.pinot.core.segment.creator.impl;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.data.MetricFieldSpec;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.data.StarTreeIndexSpec;
-import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.data.readers.RecordReader;
-import com.linkedin.pinot.core.data.readers.RecordReaderFactory;
-import com.linkedin.pinot.core.data.recordtransformer.CompoundTransformer;
-import com.linkedin.pinot.core.data.recordtransformer.RecordTransformer;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
-import com.linkedin.pinot.core.segment.creator.ColumnIndexCreationInfo;
-import com.linkedin.pinot.core.segment.creator.ColumnStatistics;
-import com.linkedin.pinot.core.segment.creator.ForwardIndexType;
-import com.linkedin.pinot.core.segment.creator.InvertedIndexType;
-import com.linkedin.pinot.core.segment.creator.RecordReaderSegmentCreationDataSource;
-import com.linkedin.pinot.core.segment.creator.SegmentCreationDataSource;
-import com.linkedin.pinot.core.segment.creator.SegmentCreator;
-import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
-import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationInfo;
-import com.linkedin.pinot.core.segment.creator.SegmentPreIndexStatsContainer;
-import com.linkedin.pinot.core.segment.creator.StatsCollectorConfig;
-import com.linkedin.pinot.core.segment.creator.impl.stats.SegmentPreIndexStatsCollectorImpl;
-import com.linkedin.pinot.core.segment.index.converter.SegmentFormatConverter;
-import com.linkedin.pinot.core.segment.index.converter.SegmentFormatConverterFactory;
-import com.linkedin.pinot.core.segment.store.SegmentDirectoryPaths;
-import com.linkedin.pinot.core.startree.OffHeapStarTreeBuilder;
-import com.linkedin.pinot.core.startree.StarTreeBuilder;
-import com.linkedin.pinot.core.startree.StarTreeBuilderConfig;
-import com.linkedin.pinot.core.startree.hll.HllUtil;
-import com.linkedin.pinot.core.startree.v2.builder.MultipleTreesBuilder;
-import com.linkedin.pinot.core.startree.v2.builder.StarTreeV2BuilderConfig;
-import com.linkedin.pinot.core.util.CrcUtils;
-import com.linkedin.pinot.startree.hll.HllConfig;
+import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.common.data.MetricFieldSpec;
+import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.common.data.StarTreeIndexSpec;
+import org.apache.pinot.core.data.GenericRow;
+import org.apache.pinot.core.data.readers.RecordReader;
+import org.apache.pinot.core.data.readers.RecordReaderFactory;
+import org.apache.pinot.core.data.recordtransformer.CompoundTransformer;
+import org.apache.pinot.core.data.recordtransformer.RecordTransformer;
+import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
+import org.apache.pinot.core.segment.creator.ColumnIndexCreationInfo;
+import org.apache.pinot.core.segment.creator.ColumnStatistics;
+import org.apache.pinot.core.segment.creator.ForwardIndexType;
+import org.apache.pinot.core.segment.creator.InvertedIndexType;
+import org.apache.pinot.core.segment.creator.RecordReaderSegmentCreationDataSource;
+import org.apache.pinot.core.segment.creator.SegmentCreationDataSource;
+import org.apache.pinot.core.segment.creator.SegmentCreator;
+import org.apache.pinot.core.segment.creator.SegmentIndexCreationDriver;
+import org.apache.pinot.core.segment.creator.SegmentIndexCreationInfo;
+import org.apache.pinot.core.segment.creator.SegmentPreIndexStatsContainer;
+import org.apache.pinot.core.segment.creator.StatsCollectorConfig;
+import org.apache.pinot.core.segment.creator.impl.stats.SegmentPreIndexStatsCollectorImpl;
+import org.apache.pinot.core.segment.index.converter.SegmentFormatConverter;
+import org.apache.pinot.core.segment.index.converter.SegmentFormatConverterFactory;
+import org.apache.pinot.core.segment.store.SegmentDirectoryPaths;
+import org.apache.pinot.core.startree.OffHeapStarTreeBuilder;
+import org.apache.pinot.core.startree.StarTreeBuilder;
+import org.apache.pinot.core.startree.StarTreeBuilderConfig;
+import org.apache.pinot.core.startree.hll.HllUtil;
+import org.apache.pinot.core.startree.v2.builder.MultipleTreesBuilder;
+import org.apache.pinot.core.startree.v2.builder.StarTreeV2BuilderConfig;
+import org.apache.pinot.core.util.CrcUtils;
+import org.apache.pinot.startree.hll.HllConfig;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -161,8 +161,8 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     }
 
     // Create a temporary directory used in segment creation
-    tempIndexDir = new File(indexDir, com.linkedin.pinot.common.utils.FileUtils.getRandomFileName());
-    starTreeTempDir = new File(indexDir, com.linkedin.pinot.common.utils.FileUtils.getRandomFileName());
+    tempIndexDir = new File(indexDir, org.apache.pinot.common.utils.FileUtils.getRandomFileName());
+    starTreeTempDir = new File(indexDir, org.apache.pinot.common.utils.FileUtils.getRandomFileName());
     LOGGER.debug("tempIndexDir:{}", tempIndexDir);
     LOGGER.debug("starTreeTempDir:{}", starTreeTempDir);
   }

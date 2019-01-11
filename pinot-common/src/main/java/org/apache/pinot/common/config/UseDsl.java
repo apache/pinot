@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.common.config;
+package org.apache.pinot.common.config;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;

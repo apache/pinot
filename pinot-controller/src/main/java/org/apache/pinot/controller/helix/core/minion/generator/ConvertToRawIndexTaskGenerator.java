@@ -16,17 +16,17 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.controller.helix.core.minion.generator;
+package org.apache.pinot.controller.helix.core.minion.generator;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.config.PinotTaskConfig;
-import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.config.TableTaskConfig;
-import com.linkedin.pinot.common.data.Segment;
-import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.controller.helix.core.minion.ClusterInfoProvider;
-import com.linkedin.pinot.core.common.MinionConstants;
+import org.apache.pinot.common.config.PinotTaskConfig;
+import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.common.config.TableTaskConfig;
+import org.apache.pinot.common.data.Segment;
+import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
+import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.controller.helix.core.minion.ClusterInfoProvider;
+import org.apache.pinot.core.common.MinionConstants;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;

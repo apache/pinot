@@ -16,12 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.tools;
+package org.apache.pinot.tools;
 
 import java.io.File;
 
-import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
-import com.linkedin.pinot.core.data.readers.FileFormat;
+import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
+import org.apache.pinot.core.data.readers.FileFormat;
 
 
 public class QuickstartTableRequest {

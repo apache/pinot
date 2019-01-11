@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.tools.admin.command;
+package org.apache.pinot.tools.admin.command;
 
-import com.linkedin.pinot.tools.AbstractBaseCommand;
+import org.apache.pinot.tools.AbstractBaseCommand;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;

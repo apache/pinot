@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.startree.v2.builder;
+package org.apache.pinot.core.startree.v2.builder;
 
-import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
+import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -26,7 +26,7 @@ import java.util.Iterator;
 import java.util.List;
 import org.apache.commons.configuration.Configuration;
 
-import static com.linkedin.pinot.core.startree.v2.StarTreeV2Constants.*;
+import static org.apache.pinot.core.startree.v2.StarTreeV2Constants.*;
 
 
 /**

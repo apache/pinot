@@ -16,19 +16,19 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.operator.filter.predicate;
+package org.apache.pinot.core.operator.filter.predicate;
 
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
-import com.linkedin.pinot.core.common.DataSource;
-import com.linkedin.pinot.core.common.Predicate;
-import com.linkedin.pinot.core.common.predicate.EqPredicate;
-import com.linkedin.pinot.core.common.predicate.InPredicate;
-import com.linkedin.pinot.core.common.predicate.NEqPredicate;
-import com.linkedin.pinot.core.common.predicate.NotInPredicate;
-import com.linkedin.pinot.core.common.predicate.RangePredicate;
-import com.linkedin.pinot.core.common.predicate.RegexpLikePredicate;
-import com.linkedin.pinot.core.query.exception.BadQueryRequestException;
-import com.linkedin.pinot.core.segment.index.readers.Dictionary;
+import org.apache.pinot.common.data.FieldSpec.DataType;
+import org.apache.pinot.core.common.DataSource;
+import org.apache.pinot.core.common.Predicate;
+import org.apache.pinot.core.common.predicate.EqPredicate;
+import org.apache.pinot.core.common.predicate.InPredicate;
+import org.apache.pinot.core.common.predicate.NEqPredicate;
+import org.apache.pinot.core.common.predicate.NotInPredicate;
+import org.apache.pinot.core.common.predicate.RangePredicate;
+import org.apache.pinot.core.common.predicate.RegexpLikePredicate;
+import org.apache.pinot.core.query.exception.BadQueryRequestException;
+import org.apache.pinot.core.segment.index.readers.Dictionary;
 
 
 public class PredicateEvaluatorProvider {

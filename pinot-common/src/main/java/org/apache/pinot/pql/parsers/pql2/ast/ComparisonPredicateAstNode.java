@@ -16,12 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.pql.parsers.pql2.ast;
+package org.apache.pinot.pql.parsers.pql2.ast;
 
-import com.linkedin.pinot.common.request.FilterOperator;
-import com.linkedin.pinot.common.utils.request.FilterQueryTree;
-import com.linkedin.pinot.common.utils.request.HavingQueryTree;
-import com.linkedin.pinot.pql.parsers.Pql2CompilationException;
+import org.apache.pinot.common.request.FilterOperator;
+import org.apache.pinot.common.utils.request.FilterQueryTree;
+import org.apache.pinot.common.utils.request.HavingQueryTree;
+import org.apache.pinot.pql.parsers.Pql2CompilationException;
 import java.util.Collections;
 
 

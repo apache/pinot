@@ -16,10 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.io.reader.impl;
+package org.apache.pinot.core.io.reader.impl;
 
-import com.linkedin.pinot.common.utils.StringUtil;
-import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
+import org.apache.pinot.common.utils.StringUtil;
+import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.Closeable;
 import java.io.IOException;
 import org.slf4j.Logger;

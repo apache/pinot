@@ -16,15 +16,15 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.realtime.segment;
+package org.apache.pinot.core.realtime.segment;
 
 import com.google.common.collect.Lists;
-import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.exception.InvalidConfigException;
-import com.linkedin.pinot.common.partition.IdealStateBuilderUtil;
-import com.linkedin.pinot.common.partition.PartitionAssignment;
-import com.linkedin.pinot.common.partition.StreamPartitionAssignmentGenerator;
-import com.linkedin.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.common.exception.InvalidConfigException;
+import org.apache.pinot.common.partition.IdealStateBuilderUtil;
+import org.apache.pinot.common.partition.PartitionAssignment;
+import org.apache.pinot.common.partition.StreamPartitionAssignmentGenerator;
+import org.apache.pinot.common.utils.LLCSegmentName;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;

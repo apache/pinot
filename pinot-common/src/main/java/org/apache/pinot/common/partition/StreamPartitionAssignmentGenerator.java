@@ -16,16 +16,16 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.common.partition;
+package org.apache.pinot.common.partition;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Lists;
-import com.linkedin.pinot.common.config.RealtimeTagConfig;
-import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.exception.InvalidConfigException;
-import com.linkedin.pinot.common.utils.EqualityUtils;
-import com.linkedin.pinot.common.utils.LLCSegmentName;
-import com.linkedin.pinot.common.utils.helix.HelixHelper;
+import org.apache.pinot.common.config.RealtimeTagConfig;
+import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.common.exception.InvalidConfigException;
+import org.apache.pinot.common.utils.EqualityUtils;
+import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.common.utils.helix.HelixHelper;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;

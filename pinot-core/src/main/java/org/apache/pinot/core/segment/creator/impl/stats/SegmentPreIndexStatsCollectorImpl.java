@@ -16,14 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.segment.creator.impl.stats;
+package org.apache.pinot.core.segment.creator.impl.stats;
 
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.segment.creator.ColumnStatistics;
-import com.linkedin.pinot.core.segment.creator.SegmentPreIndexStatsCollector;
-import com.linkedin.pinot.core.segment.creator.StatsCollectorConfig;
+import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.core.data.GenericRow;
+import org.apache.pinot.core.segment.creator.ColumnStatistics;
+import org.apache.pinot.core.segment.creator.SegmentPreIndexStatsCollector;
+import org.apache.pinot.core.segment.creator.StatsCollectorConfig;
 import java.util.HashMap;
 import java.util.Map;
 import org.slf4j.Logger;

@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.startree.v2;
+package org.apache.pinot.core.startree.v2;
 
 /**
  * The {@code StarTreeV2Constants} class contains all the constant values used by star-tree.

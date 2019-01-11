@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.index.reader;
+package org.apache.pinot.index.reader;
 
 import java.io.BufferedReader;
 import java.io.File;

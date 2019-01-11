@@ -16,10 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.indexsegment.mutable;
+package org.apache.pinot.core.indexsegment.mutable;
 
-import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import org.apache.pinot.core.data.GenericRow;
+import org.apache.pinot.core.indexsegment.IndexSegment;
 
 
 public interface MutableSegment extends IndexSegment {

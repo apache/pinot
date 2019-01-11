@@ -16,19 +16,19 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.operator.query;
+package org.apache.pinot.core.operator.query;
 
-import com.linkedin.pinot.common.request.GroupBy;
-import com.linkedin.pinot.core.operator.BaseOperator;
-import com.linkedin.pinot.core.operator.ExecutionStatistics;
-import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
-import com.linkedin.pinot.core.operator.blocks.TransformBlock;
-import com.linkedin.pinot.core.operator.transform.TransformOperator;
-import com.linkedin.pinot.core.query.aggregation.AggregationFunctionContext;
-import com.linkedin.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
-import com.linkedin.pinot.core.query.aggregation.groupby.DefaultGroupByExecutor;
-import com.linkedin.pinot.core.query.aggregation.groupby.GroupByExecutor;
-import com.linkedin.pinot.core.startree.executor.StarTreeGroupByExecutor;
+import org.apache.pinot.common.request.GroupBy;
+import org.apache.pinot.core.operator.BaseOperator;
+import org.apache.pinot.core.operator.ExecutionStatistics;
+import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
+import org.apache.pinot.core.operator.blocks.TransformBlock;
+import org.apache.pinot.core.operator.transform.TransformOperator;
+import org.apache.pinot.core.query.aggregation.AggregationFunctionContext;
+import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
+import org.apache.pinot.core.query.aggregation.groupby.DefaultGroupByExecutor;
+import org.apache.pinot.core.query.aggregation.groupby.GroupByExecutor;
+import org.apache.pinot.core.startree.executor.StarTreeGroupByExecutor;
 import javax.annotation.Nonnull;
 
 

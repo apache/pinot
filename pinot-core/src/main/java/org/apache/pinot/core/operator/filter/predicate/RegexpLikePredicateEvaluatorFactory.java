@@ -16,13 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.operator.filter.predicate;
+package org.apache.pinot.core.operator.filter.predicate;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.core.common.Predicate;
-import com.linkedin.pinot.core.common.predicate.RegexpLikePredicate;
-import com.linkedin.pinot.core.segment.index.readers.Dictionary;
+import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.core.common.Predicate;
+import org.apache.pinot.core.common.predicate.RegexpLikePredicate;
+import org.apache.pinot.core.segment.index.readers.Dictionary;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
 import java.util.regex.Pattern;

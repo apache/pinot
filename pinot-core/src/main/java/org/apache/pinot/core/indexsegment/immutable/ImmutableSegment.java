@@ -16,13 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.indexsegment.immutable;
+package org.apache.pinot.core.indexsegment.immutable;
 
-import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.io.reader.DataFileReader;
-import com.linkedin.pinot.core.segment.index.readers.Dictionary;
-import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
-import com.linkedin.pinot.core.segment.index.readers.InvertedIndexReader;
+import org.apache.pinot.core.indexsegment.IndexSegment;
+import org.apache.pinot.core.io.reader.DataFileReader;
+import org.apache.pinot.core.segment.index.readers.Dictionary;
+import org.apache.pinot.core.segment.index.readers.ImmutableDictionaryReader;
+import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
 
 
 public interface ImmutableSegment extends IndexSegment {

@@ -16,16 +16,16 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.controller.helix;
+package org.apache.pinot.controller.helix;
 
-import com.linkedin.pinot.common.data.DimensionFieldSpec;
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.data.MetricFieldSpec;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.utils.ZkStarter;
-import com.linkedin.pinot.controller.ControllerConf;
-import com.linkedin.pinot.controller.ControllerStarter;
-import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.common.data.DimensionFieldSpec;
+import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.common.data.MetricFieldSpec;
+import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.common.utils.ZkStarter;
+import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.controller.ControllerStarter;
+import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;

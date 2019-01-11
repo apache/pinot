@@ -16,12 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.query.scheduler.fcfs;
+package org.apache.pinot.core.query.scheduler.fcfs;
 
-import com.linkedin.pinot.core.query.scheduler.AbstractSchedulerGroup;
-import com.linkedin.pinot.core.query.scheduler.SchedulerGroup;
-import com.linkedin.pinot.core.query.scheduler.SchedulerGroupAccountant;
-import com.linkedin.pinot.core.query.scheduler.SchedulerQueryContext;
+import org.apache.pinot.core.query.scheduler.AbstractSchedulerGroup;
+import org.apache.pinot.core.query.scheduler.SchedulerGroup;
+import org.apache.pinot.core.query.scheduler.SchedulerGroupAccountant;
+import org.apache.pinot.core.query.scheduler.SchedulerQueryContext;
 import javax.annotation.Nonnull;
 
 

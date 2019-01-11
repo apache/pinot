@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.hadoop.job;
+package org.apache.pinot.hadoop.job;
 
 
 public class JobConfigConstants {

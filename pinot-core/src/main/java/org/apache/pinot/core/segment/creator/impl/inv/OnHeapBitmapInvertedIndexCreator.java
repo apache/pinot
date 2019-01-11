@@ -16,11 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.segment.creator.impl.inv;
+package org.apache.pinot.core.segment.creator.impl.inv;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.core.segment.creator.InvertedIndexCreator;
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
+import org.apache.pinot.core.segment.creator.InvertedIndexCreator;
+import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import java.io.BufferedOutputStream;
 import java.io.DataOutputStream;
 import java.io.File;

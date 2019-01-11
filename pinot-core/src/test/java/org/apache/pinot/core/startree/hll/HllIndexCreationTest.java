@@ -16,22 +16,22 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.startree.hll;
+package org.apache.pinot.core.startree.hll;
 
-import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.core.common.DataBlockCache;
-import com.linkedin.pinot.core.common.DataFetcher;
-import com.linkedin.pinot.core.common.DataSource;
-import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
-import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
-import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
-import com.linkedin.pinot.core.segment.index.converter.SegmentV1V2ToV3FormatConverter;
-import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
-import com.linkedin.pinot.core.segment.store.SegmentDirectoryPaths;
-import com.linkedin.pinot.startree.hll.HllConfig;
-import com.linkedin.pinot.startree.hll.HllConstants;
+import org.apache.pinot.common.segment.ReadMode;
+import org.apache.pinot.core.common.DataBlockCache;
+import org.apache.pinot.core.common.DataFetcher;
+import org.apache.pinot.core.common.DataSource;
+import org.apache.pinot.core.indexsegment.IndexSegment;
+import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
+import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
+import org.apache.pinot.core.segment.creator.SegmentIndexCreationDriver;
+import org.apache.pinot.core.segment.creator.impl.V1Constants;
+import org.apache.pinot.core.segment.index.converter.SegmentV1V2ToV3FormatConverter;
+import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.core.segment.store.SegmentDirectoryPaths;
+import org.apache.pinot.startree.hll.HllConfig;
+import org.apache.pinot.startree.hll.HllConstants;
 import java.io.File;
 import java.util.Arrays;
 import java.util.HashMap;

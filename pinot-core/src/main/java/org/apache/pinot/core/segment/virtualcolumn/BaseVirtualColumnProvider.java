@@ -16,10 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.segment.virtualcolumn;
+package org.apache.pinot.core.segment.virtualcolumn;
 
-import com.linkedin.pinot.core.segment.index.ColumnMetadata;
-import com.linkedin.pinot.core.segment.index.column.ColumnIndexContainer;
+import org.apache.pinot.core.segment.index.ColumnMetadata;
+import org.apache.pinot.core.segment.index.column.ColumnIndexContainer;
 
 
 /**

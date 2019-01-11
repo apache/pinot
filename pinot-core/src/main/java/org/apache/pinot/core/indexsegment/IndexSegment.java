@@ -16,12 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.indexsegment;
+package org.apache.pinot.core.indexsegment;
 
-import com.linkedin.pinot.common.segment.SegmentMetadata;
-import com.linkedin.pinot.core.common.DataSource;
-import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.startree.v2.StarTreeV2;
+import org.apache.pinot.common.segment.SegmentMetadata;
+import org.apache.pinot.core.common.DataSource;
+import org.apache.pinot.core.data.GenericRow;
+import org.apache.pinot.core.startree.v2.StarTreeV2;
 import java.util.List;
 import java.util.Set;
 

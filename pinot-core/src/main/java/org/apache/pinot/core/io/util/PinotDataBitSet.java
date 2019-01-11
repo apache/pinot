@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.io.util;
+package org.apache.pinot.core.io.util;
 
-import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
+import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.Closeable;
 import java.io.IOException;
 

@@ -16,10 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.data.partition;
+package org.apache.pinot.core.data.partition;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.utils.StringUtil;
+import org.apache.pinot.common.utils.StringUtil;
 import org.apache.kafka.common.utils.Utils;
 
 

@@ -16,10 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.tools.segment.converter;
+package org.apache.pinot.tools.segment.converter;
 
-import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.data.readers.PinotSegmentRecordReader;
+import org.apache.pinot.core.data.GenericRow;
+import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;

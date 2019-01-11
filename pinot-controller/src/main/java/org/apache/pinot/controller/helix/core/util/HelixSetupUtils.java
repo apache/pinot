@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.controller.helix.core.util;
+package org.apache.pinot.controller.helix.core.util;
 
 import java.util.HashMap;
 import java.util.List;
@@ -47,11 +47,11 @@ import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.helix.HelixHelper;
-import com.linkedin.pinot.controller.helix.core.PinotHelixBrokerResourceOnlineOfflineStateModelGenerator;
-import com.linkedin.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
-import com.linkedin.pinot.controller.helix.core.PinotTableIdealStateBuilder;
+import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.helix.HelixHelper;
+import org.apache.pinot.controller.helix.core.PinotHelixBrokerResourceOnlineOfflineStateModelGenerator;
+import org.apache.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
+import org.apache.pinot.controller.helix.core.PinotTableIdealStateBuilder;
 
 
 /**

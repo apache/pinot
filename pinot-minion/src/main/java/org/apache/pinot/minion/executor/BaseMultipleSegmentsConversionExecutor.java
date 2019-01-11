@@ -16,15 +16,15 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.minion.executor;
+package org.apache.pinot.minion.executor;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.config.PinotTaskConfig;
-import com.linkedin.pinot.common.segment.fetcher.SegmentFetcherFactory;
-import com.linkedin.pinot.common.utils.FileUploadDownloadClient;
-import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
-import com.linkedin.pinot.core.common.MinionConstants;
-import com.linkedin.pinot.minion.exception.TaskCancelledException;
+import org.apache.pinot.common.config.PinotTaskConfig;
+import org.apache.pinot.common.segment.fetcher.SegmentFetcherFactory;
+import org.apache.pinot.common.utils.FileUploadDownloadClient;
+import org.apache.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.core.common.MinionConstants;
+import org.apache.pinot.minion.exception.TaskCancelledException;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;

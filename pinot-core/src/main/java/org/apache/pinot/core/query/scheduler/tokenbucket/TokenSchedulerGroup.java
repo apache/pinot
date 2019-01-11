@@ -16,13 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.query.scheduler.tokenbucket;
+package org.apache.pinot.core.query.scheduler.tokenbucket;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.core.query.scheduler.AbstractSchedulerGroup;
-import com.linkedin.pinot.core.query.scheduler.SchedulerGroup;
-import com.linkedin.pinot.core.query.scheduler.SchedulerGroupAccountant;
-import com.linkedin.pinot.core.query.scheduler.fcfs.FCFSSchedulerGroup;
+import org.apache.pinot.core.query.scheduler.AbstractSchedulerGroup;
+import org.apache.pinot.core.query.scheduler.SchedulerGroup;
+import org.apache.pinot.core.query.scheduler.SchedulerGroupAccountant;
+import org.apache.pinot.core.query.scheduler.fcfs.FCFSSchedulerGroup;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 

@@ -16,11 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.common.utils;
+package org.apache.pinot.common.utils;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.data.Schema;
+import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.common.data.Schema;
 import java.io.IOException;
 import java.net.URL;
 import java.util.concurrent.TimeUnit;

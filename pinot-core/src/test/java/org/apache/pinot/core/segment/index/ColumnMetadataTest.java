@@ -16,21 +16,21 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.segment.index;
+package org.apache.pinot.core.segment.index;
 
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.data.MetricFieldSpec;
-import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.common.segment.StarTreeMetadata;
-import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
-import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
-import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
-import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
-import com.linkedin.pinot.core.startree.hll.SegmentWithHllIndexCreateHelper;
-import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
-import com.linkedin.pinot.startree.hll.HllConfig;
-import com.linkedin.pinot.util.TestUtils;
+import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.common.data.MetricFieldSpec;
+import org.apache.pinot.common.segment.ReadMode;
+import org.apache.pinot.common.segment.StarTreeMetadata;
+import org.apache.pinot.core.indexsegment.IndexSegment;
+import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
+import org.apache.pinot.core.segment.creator.SegmentIndexCreationDriver;
+import org.apache.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
+import org.apache.pinot.core.startree.hll.SegmentWithHllIndexCreateHelper;
+import org.apache.pinot.segments.v1.creator.SegmentTestUtils;
+import org.apache.pinot.startree.hll.HllConfig;
+import org.apache.pinot.util.TestUtils;
 import java.io.File;
 import java.util.Arrays;
 import java.util.HashSet;

@@ -16,12 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.tools.scan.query;
+package org.apache.pinot.tools.scan.query;
 
 import java.util.ArrayList;
 import java.util.Collections;
 
-import com.linkedin.pinot.core.query.utils.Pair;
+import org.apache.pinot.core.query.utils.Pair;
 
 public class MinMaxRangeFunction extends AggregationFunc {
   private static final String _name = "minmaxrange";

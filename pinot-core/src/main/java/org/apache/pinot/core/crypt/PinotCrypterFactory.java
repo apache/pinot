@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.crypt;
+package org.apache.pinot.core.crypt;
 
 import java.util.HashMap;
 import java.util.Iterator;
@@ -45,7 +45,7 @@ public class PinotCrypterFactory {
    * Initializes map of crypter classes at startup time. Will initialize map with lower case simple class names.
    * @param config
    * Sample configuration:
-   * class.nooppinotcrypter = com.linkedin.pinot.core.crypt.NoOpPinotCrypter
+   * class.nooppinotcrypter = org.apache.pinot.core.crypt.NoOpPinotCrypter
    * nooppinotcrypter.keyMap = sample_key
    */
   public static void init(Configuration config) {

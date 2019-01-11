@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.operator.transform.transformer.timeunit;
+package org.apache.pinot.core.operator.transform.transformer.timeunit;
 
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;

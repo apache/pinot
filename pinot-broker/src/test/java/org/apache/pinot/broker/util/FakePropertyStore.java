@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.broker.util;
+package org.apache.pinot.broker.util;
 
 import java.util.HashMap;
 import java.util.Map;

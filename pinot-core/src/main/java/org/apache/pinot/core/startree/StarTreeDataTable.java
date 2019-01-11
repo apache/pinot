@@ -16,11 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.startree;
+package org.apache.pinot.core.startree;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.utils.Pairs.IntPair;
-import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
+import org.apache.pinot.common.utils.Pairs.IntPair;
+import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import it.unimi.dsi.fastutil.Arrays;
 import it.unimi.dsi.fastutil.Swapper;
 import it.unimi.dsi.fastutil.ints.Int2ObjectLinkedOpenHashMap;

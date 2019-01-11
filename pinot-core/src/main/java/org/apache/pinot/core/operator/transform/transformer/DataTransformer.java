@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.operator.transform.transformer;
+package org.apache.pinot.core.operator.transform.transformer;
 
 import javax.annotation.Nonnull;
 

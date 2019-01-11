@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.common.partition;
+package org.apache.pinot.common.partition;
 
-import com.linkedin.pinot.common.utils.EqualityUtils;
+import org.apache.pinot.common.utils.EqualityUtils;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;

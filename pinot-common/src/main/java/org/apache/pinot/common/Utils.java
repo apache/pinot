@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.common;
+package org.apache.pinot.common;
 
 import java.io.IOException;
 import java.net.JarURLConnection;

@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.minion.executor;
+package org.apache.pinot.minion.executor;
 
-import com.linkedin.pinot.core.common.MinionConstants;
+import org.apache.pinot.core.common.MinionConstants;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;

@@ -16,12 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.controller.helix.core.realtime.segment;
+package org.apache.pinot.controller.helix.core.realtime.segment;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.linkedin.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
-import com.linkedin.pinot.common.partition.PartitionAssignment;
-import com.linkedin.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
+import org.apache.pinot.common.partition.PartitionAssignment;
+import org.apache.pinot.common.utils.LLCSegmentName;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;

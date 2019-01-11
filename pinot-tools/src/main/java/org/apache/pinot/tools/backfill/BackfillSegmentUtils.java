@@ -16,14 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.tools.backfill;
+package org.apache.pinot.tools.backfill;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.linkedin.pinot.common.utils.CommonConstants.Segment.SegmentType;
-import com.linkedin.pinot.common.utils.FileUploadDownloadClient;
-import com.linkedin.pinot.common.utils.JsonUtils;
-import com.linkedin.pinot.common.utils.SimpleHttpResponse;
-import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.common.utils.CommonConstants.Segment.SegmentType;
+import org.apache.pinot.common.utils.FileUploadDownloadClient;
+import org.apache.pinot.common.utils.JsonUtils;
+import org.apache.pinot.common.utils.SimpleHttpResponse;
+import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;

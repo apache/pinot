@@ -16,14 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.common.data;
+package org.apache.pinot.common.data;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.config.ConfigKey;
-import com.linkedin.pinot.common.utils.EqualityUtils;
+import org.apache.pinot.common.config.ConfigKey;
+import org.apache.pinot.common.utils.EqualityUtils;
 import javax.annotation.Nonnull;
 
 
@@ -132,7 +132,7 @@ public final class MetricFieldSpec extends FieldSpec {
    * <p>It is currently used for derived field recognition in star tree <code>MetricBuffer</code>, may have other use
    * cases later.
    * <p>Generally, a customized type value should be converted to a standard
-   * {@link com.linkedin.pinot.common.data.FieldSpec.DataType} for storage, and converted back when needed.
+   * {@link org.apache.pinot.common.data.FieldSpec.DataType} for storage, and converted back when needed.
    */
   public enum DerivedMetricType {
     // HLL derived metric type.

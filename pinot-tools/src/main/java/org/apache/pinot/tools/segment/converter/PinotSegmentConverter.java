@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.tools.segment.converter;
+package org.apache.pinot.tools.segment.converter;
 
 public interface PinotSegmentConverter {
 

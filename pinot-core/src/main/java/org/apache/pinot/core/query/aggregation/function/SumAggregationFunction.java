@@ -16,14 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.query.aggregation.function;
+package org.apache.pinot.core.query.aggregation.function;
 
-import com.linkedin.pinot.common.utils.DataSchema;
-import com.linkedin.pinot.core.common.BlockValSet;
-import com.linkedin.pinot.core.query.aggregation.AggregationResultHolder;
-import com.linkedin.pinot.core.query.aggregation.DoubleAggregationResultHolder;
-import com.linkedin.pinot.core.query.aggregation.groupby.DoubleGroupByResultHolder;
-import com.linkedin.pinot.core.query.aggregation.groupby.GroupByResultHolder;
+import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
+import org.apache.pinot.core.query.aggregation.DoubleAggregationResultHolder;
+import org.apache.pinot.core.query.aggregation.groupby.DoubleGroupByResultHolder;
+import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import javax.annotation.Nonnull;
 
 

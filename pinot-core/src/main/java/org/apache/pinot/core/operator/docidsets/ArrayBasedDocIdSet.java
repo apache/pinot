@@ -16,11 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.operator.docidsets;
+package org.apache.pinot.core.operator.docidsets;
 
-import com.linkedin.pinot.core.common.BlockDocIdIterator;
-import com.linkedin.pinot.core.common.BlockDocIdSet;
-import com.linkedin.pinot.core.operator.dociditerators.ArrayBasedDocIdIterator;
+import org.apache.pinot.core.common.BlockDocIdIterator;
+import org.apache.pinot.core.common.BlockDocIdSet;
+import org.apache.pinot.core.operator.dociditerators.ArrayBasedDocIdIterator;
 
 
 public final class ArrayBasedDocIdSet implements BlockDocIdSet {

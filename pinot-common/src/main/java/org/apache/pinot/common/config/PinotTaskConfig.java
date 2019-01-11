@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.common.config;
+package org.apache.pinot.common.config;
 
-import com.linkedin.pinot.common.utils.EqualityUtils;
+import org.apache.pinot.common.utils.EqualityUtils;
 import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nonnull;

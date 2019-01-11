@@ -25,10 +25,10 @@
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <artifactId>pinot</artifactId>
-    <groupId>com.linkedin.pinot</groupId>
+    <groupId>org.apache.pinot</groupId>
     <version>0.016</version>
   </parent>
-  <groupId>com.linkedin.pinot</groupId>
+  <groupId>org.apache.pinot</groupId>
   <artifactId>pinot-perf</artifactId>
   <version>0.016</version>
   <name>pinot-perf</name>
@@ -38,23 +38,23 @@
   </properties>
   <dependencies>
     <dependency>
-      <groupId>com.linkedin.pinot</groupId>
+      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-core</artifactId>
     </dependency>
     <dependency>
-      <groupId>com.linkedin.pinot</groupId>
+      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-server</artifactId>
     </dependency>
     <dependency>
-      <groupId>com.linkedin.pinot</groupId>
+      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-controller</artifactId>
     </dependency>
     <dependency>
-      <groupId>com.linkedin.pinot</groupId>
+      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-broker</artifactId>
     </dependency>
     <dependency>
-      <groupId>com.linkedin.pinot</groupId>
+      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-integration-tests</artifactId>
       <version>${project.version}</version>
       <type>test-jar</type>
@@ -66,19 +66,19 @@
       </exclusions>
     </dependency>
     <dependency>
-      <groupId>com.linkedin.pinot</groupId>
+      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-controller</artifactId>
       <version>${project.version}</version>
       <type>test-jar</type>
     </dependency>
     <dependency>
-      <groupId>com.linkedin.pinot</groupId>
+      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-broker</artifactId>
       <version>${project.version}</version>
       <type>test-jar</type>
     </dependency>
     <dependency>
-      <groupId>com.linkedin.pinot</groupId>
+      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-common</artifactId>
       <version>${project.version}</version>
       <type>test-jar</type>
@@ -120,11 +120,11 @@
         <configuration>
           <programs>
             <program>
-              <mainClass>com.linkedin.pinot.perf.PerfBenchmarkTest</mainClass>
+              <mainClass>org.apache.pinot.perf.PerfBenchmarkTest</mainClass>
               <name>pinot-perfBenchmarkTest</name>
             </program>
             <program>
-              <mainClass>com.linkedin.pinot.perf.PerfBenchmarkRunner</mainClass>
+              <mainClass>org.apache.pinot.perf.PerfBenchmarkRunner</mainClass>
               <name>pinot-perfBenchmarkRunner</name>
             </program>
           </programs>

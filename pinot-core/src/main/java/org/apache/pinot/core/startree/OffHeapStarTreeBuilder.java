@@ -16,20 +16,20 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.startree;
+package org.apache.pinot.core.startree;
 
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.data.MetricFieldSpec;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.utils.Pairs.IntPair;
-import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.segment.creator.ColumnIndexCreationInfo;
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
-import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
-import com.linkedin.pinot.core.startree.StarTreeBuilderUtils.TreeNode;
-import com.linkedin.pinot.core.startree.hll.HllUtil;
+import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.common.data.MetricFieldSpec;
+import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.common.utils.Pairs.IntPair;
+import org.apache.pinot.core.data.GenericRow;
+import org.apache.pinot.core.segment.creator.ColumnIndexCreationInfo;
+import org.apache.pinot.core.segment.creator.impl.V1Constants;
+import org.apache.pinot.core.segment.memory.PinotDataBuffer;
+import org.apache.pinot.core.startree.StarTreeBuilderUtils.TreeNode;
+import org.apache.pinot.core.startree.hll.HllUtil;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import java.io.BufferedOutputStream;
 import java.io.File;
@@ -605,7 +605,7 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
       File tempFile = new File(_tempDir, startDocId + "_" + endDocId + ".unique.tmp");
       try (FileChannel src = new RandomAccessFile(_dataFile, "r").getChannel();
           FileChannel dest = new RandomAccessFile(tempFile, "rw").getChannel()) {
-        com.linkedin.pinot.common.utils.FileUtils.transferBytes(src, startDocId * _docSizeLong, tempBufferSize, dest);
+        org.apache.pinot.common.utils.FileUtils.transferBytes(src, startDocId * _docSizeLong, tempBufferSize, dest);
       }
       tempBuffer = PinotDataBuffer.mapFile(tempFile, false, 0, tempBufferSize, PinotDataBuffer.NATIVE_ORDER,
           "OffHeapStarTreeBuilder#getUniqueCombinations: temp buffer");

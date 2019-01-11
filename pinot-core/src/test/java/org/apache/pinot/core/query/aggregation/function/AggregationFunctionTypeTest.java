@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.query.aggregation.function;
+package org.apache.pinot.core.query.aggregation.function;
 
 import org.testng.Assert;
 import org.testng.annotations.Test;

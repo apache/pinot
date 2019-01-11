@@ -16,16 +16,16 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.common.response.broker;
+package org.apache.pinot.common.response.broker;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
-import com.linkedin.pinot.common.exception.QueryException;
-import com.linkedin.pinot.common.response.BrokerResponse;
-import com.linkedin.pinot.common.response.ProcessingException;
-import com.linkedin.pinot.common.utils.JsonUtils;
+import org.apache.pinot.common.exception.QueryException;
+import org.apache.pinot.common.response.BrokerResponse;
+import org.apache.pinot.common.response.ProcessingException;
+import org.apache.pinot.common.utils.JsonUtils;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;

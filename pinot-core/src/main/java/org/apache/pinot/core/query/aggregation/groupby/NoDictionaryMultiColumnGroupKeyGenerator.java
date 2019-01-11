@@ -16,18 +16,18 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.query.aggregation.groupby;
+package org.apache.pinot.core.query.aggregation.groupby;
 
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.request.transform.TransformExpressionTree;
-import com.linkedin.pinot.core.common.BlockValSet;
-import com.linkedin.pinot.core.operator.blocks.TransformBlock;
-import com.linkedin.pinot.core.operator.transform.TransformOperator;
-import com.linkedin.pinot.core.operator.transform.TransformResultMetadata;
-import com.linkedin.pinot.core.query.aggregation.groupby.utils.ValueToIdMap;
-import com.linkedin.pinot.core.query.aggregation.groupby.utils.ValueToIdMapFactory;
-import com.linkedin.pinot.core.segment.index.readers.Dictionary;
-import com.linkedin.pinot.core.util.FixedIntArray;
+import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.common.request.transform.TransformExpressionTree;
+import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.operator.blocks.TransformBlock;
+import org.apache.pinot.core.operator.transform.TransformOperator;
+import org.apache.pinot.core.operator.transform.TransformResultMetadata;
+import org.apache.pinot.core.query.aggregation.groupby.utils.ValueToIdMap;
+import org.apache.pinot.core.query.aggregation.groupby.utils.ValueToIdMapFactory;
+import org.apache.pinot.core.segment.index.readers.Dictionary;
+import org.apache.pinot.core.util.FixedIntArray;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import java.util.Iterator;
 import java.util.Map;

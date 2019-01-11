@@ -16,10 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.common.lineage;
+package org.apache.pinot.common.lineage;
 
-import com.linkedin.pinot.common.exception.InvalidConfigException;
-import com.linkedin.pinot.common.utils.EqualityUtils;
+import org.apache.pinot.common.exception.InvalidConfigException;
+import org.apache.pinot.common.utils.EqualityUtils;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;

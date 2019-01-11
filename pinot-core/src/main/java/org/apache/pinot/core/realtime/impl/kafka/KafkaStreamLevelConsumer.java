@@ -16,17 +16,17 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.realtime.impl.kafka;
+package org.apache.pinot.core.realtime.impl.kafka;
 
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
-import com.linkedin.pinot.common.metrics.ServerMeter;
-import com.linkedin.pinot.common.metrics.ServerMetrics;
-import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.realtime.stream.StreamConfig;
-import com.linkedin.pinot.core.realtime.stream.StreamDecoderProvider;
-import com.linkedin.pinot.core.realtime.stream.StreamLevelConsumer;
-import com.linkedin.pinot.core.realtime.stream.StreamMessageDecoder;
+import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
+import org.apache.pinot.common.metrics.ServerMeter;
+import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.core.data.GenericRow;
+import org.apache.pinot.core.realtime.stream.StreamConfig;
+import org.apache.pinot.core.realtime.stream.StreamDecoderProvider;
+import org.apache.pinot.core.realtime.stream.StreamLevelConsumer;
+import org.apache.pinot.core.realtime.stream.StreamMessageDecoder;
 import com.yammer.metrics.core.Meter;
 import kafka.consumer.ConsumerIterator;
 import kafka.javaapi.consumer.ConsumerConnector;

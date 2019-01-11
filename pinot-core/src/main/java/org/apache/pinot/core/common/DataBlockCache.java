@@ -16,11 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.common;
+package org.apache.pinot.core.common;
 
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.utils.EqualityUtils;
-import com.linkedin.pinot.core.plan.DocIdSetPlanNode;
+import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.common.utils.EqualityUtils;
+import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;

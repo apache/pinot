@@ -16,10 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.query.request.context;
+package org.apache.pinot.core.query.request.context;
 
-import com.linkedin.pinot.common.metrics.ServerMetrics;
-import com.linkedin.pinot.common.metrics.ServerQueryPhase;
+import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.metrics.ServerQueryPhase;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 

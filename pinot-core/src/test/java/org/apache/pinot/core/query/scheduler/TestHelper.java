@@ -16,13 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.query.scheduler;
+package org.apache.pinot.core.query.scheduler;
 
-import com.linkedin.pinot.common.metrics.ServerMetrics;
-import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.common.request.InstanceRequest;
-import com.linkedin.pinot.common.request.QuerySource;
-import com.linkedin.pinot.core.query.request.ServerQueryRequest;
+import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.request.InstanceRequest;
+import org.apache.pinot.common.request.QuerySource;
+import org.apache.pinot.core.query.request.ServerQueryRequest;
 import java.util.Arrays;
 
 

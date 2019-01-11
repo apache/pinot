@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.startree.v2.builder;
+package org.apache.pinot.core.startree.v2.builder;
 
 import java.io.Closeable;
 

@@ -16,20 +16,20 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.query.request;
+package org.apache.pinot.core.query.request;
 
-import com.linkedin.pinot.common.metrics.ServerMetrics;
-import com.linkedin.pinot.common.request.AggregationInfo;
-import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.common.request.GroupBy;
-import com.linkedin.pinot.common.request.InstanceRequest;
-import com.linkedin.pinot.common.request.Selection;
-import com.linkedin.pinot.common.request.transform.TransformExpressionTree;
-import com.linkedin.pinot.common.utils.request.FilterQueryTree;
-import com.linkedin.pinot.common.utils.request.RequestUtils;
-import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionType;
-import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionUtils;
-import com.linkedin.pinot.core.query.request.context.TimerContext;
+import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.request.AggregationInfo;
+import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.request.GroupBy;
+import org.apache.pinot.common.request.InstanceRequest;
+import org.apache.pinot.common.request.Selection;
+import org.apache.pinot.common.request.transform.TransformExpressionTree;
+import org.apache.pinot.common.utils.request.FilterQueryTree;
+import org.apache.pinot.common.utils.request.RequestUtils;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunctionType;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
+import org.apache.pinot.core.query.request.context.TimerContext;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;

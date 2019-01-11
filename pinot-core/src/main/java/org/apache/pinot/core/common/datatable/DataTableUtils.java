@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.common.datatable;
+package org.apache.pinot.core.common.datatable;
 
-import com.linkedin.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema;
 import javax.annotation.Nonnull;
 
 

@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.periodictask;
+package org.apache.pinot.core.periodictask;
 
 /**
  * A base class to implement periodic task interface.

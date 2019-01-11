@@ -16,25 +16,25 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.integration.tests;
+package org.apache.pinot.integration.tests;
 
-import com.linkedin.pinot.common.config.PinotTaskConfig;
-import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.config.TableTaskConfig;
-import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
-import com.linkedin.pinot.controller.helix.core.minion.ClusterInfoProvider;
-import com.linkedin.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
-import com.linkedin.pinot.controller.helix.core.minion.PinotTaskManager;
-import com.linkedin.pinot.controller.helix.core.minion.generator.PinotTaskGenerator;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
-import com.linkedin.pinot.minion.events.MinionEventObserver;
-import com.linkedin.pinot.minion.events.MinionEventObserverFactory;
-import com.linkedin.pinot.minion.exception.TaskCancelledException;
-import com.linkedin.pinot.minion.executor.BaseTaskExecutor;
-import com.linkedin.pinot.minion.executor.PinotTaskExecutor;
-import com.linkedin.pinot.minion.executor.PinotTaskExecutorFactory;
-import com.linkedin.pinot.util.TestUtils;
+import org.apache.pinot.common.config.PinotTaskConfig;
+import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.common.config.TableNameBuilder;
+import org.apache.pinot.common.config.TableTaskConfig;
+import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
+import org.apache.pinot.controller.helix.core.minion.ClusterInfoProvider;
+import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
+import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
+import org.apache.pinot.controller.helix.core.minion.generator.PinotTaskGenerator;
+import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
+import org.apache.pinot.minion.events.MinionEventObserver;
+import org.apache.pinot.minion.events.MinionEventObserverFactory;
+import org.apache.pinot.minion.exception.TaskCancelledException;
+import org.apache.pinot.minion.executor.BaseTaskExecutor;
+import org.apache.pinot.minion.executor.PinotTaskExecutor;
+import org.apache.pinot.minion.executor.PinotTaskExecutorFactory;
+import org.apache.pinot.util.TestUtils;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;

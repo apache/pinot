@@ -24,7 +24,7 @@
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <artifactId>pinot</artifactId>
-    <groupId>com.linkedin.pinot</groupId>
+    <groupId>org.apache.pinot</groupId>
     <version>0.016</version>
   </parent>
   <artifactId>pinot-api</artifactId>

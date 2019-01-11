@@ -16,11 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.integration.tests;
+package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.linkedin.pinot.common.utils.JsonUtils;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
+import org.apache.pinot.common.utils.JsonUtils;
+import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;

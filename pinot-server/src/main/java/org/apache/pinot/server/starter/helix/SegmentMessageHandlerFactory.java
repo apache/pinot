@@ -16,14 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.server.starter.helix;
+package org.apache.pinot.server.starter.helix;
 
-import com.linkedin.pinot.common.Utils;
-import com.linkedin.pinot.common.messages.SegmentRefreshMessage;
-import com.linkedin.pinot.common.messages.SegmentReloadMessage;
-import com.linkedin.pinot.common.metrics.ServerMeter;
-import com.linkedin.pinot.common.metrics.ServerMetrics;
-import com.linkedin.pinot.core.data.manager.InstanceDataManager;
+import org.apache.pinot.common.Utils;
+import org.apache.pinot.common.messages.SegmentRefreshMessage;
+import org.apache.pinot.common.messages.SegmentReloadMessage;
+import org.apache.pinot.common.metrics.ServerMeter;
+import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.core.data.manager.InstanceDataManager;
 import java.util.concurrent.Semaphore;
 import org.apache.helix.NotificationContext;
 import org.apache.helix.messaging.handling.HelixTaskResult;

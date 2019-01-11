@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.tools.scan.query;
+package org.apache.pinot.tools.scan.query;
 
-import com.linkedin.pinot.core.segment.index.readers.Dictionary;
+import org.apache.pinot.core.segment.index.readers.Dictionary;
 
 public class EqualsPredicateFilter implements PredicateFilter {
   int _equalsDictId;

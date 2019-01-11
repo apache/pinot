@@ -16,11 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.filesystem;
+package org.apache.pinot.filesystem;
 
 import com.google.common.base.Strings;
-import com.linkedin.pinot.common.utils.retry.RetryPolicies;
-import com.linkedin.pinot.common.utils.retry.RetryPolicy;
+import org.apache.pinot.common.utils.retry.RetryPolicies;
+import org.apache.pinot.common.utils.retry.RetryPolicy;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
@@ -35,8 +35,8 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static com.linkedin.pinot.common.utils.CommonConstants.SegmentOperations.HadoopSegmentOperations.*;
-import static com.linkedin.pinot.common.utils.CommonConstants.SegmentOperations.*;
+import static org.apache.pinot.common.utils.CommonConstants.SegmentOperations.HadoopSegmentOperations.*;
+import static org.apache.pinot.common.utils.CommonConstants.SegmentOperations.*;
 
 
 /**

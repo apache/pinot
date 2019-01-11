@@ -16,13 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.common.predicate;
+package org.apache.pinot.core.common.predicate;
 
 import java.util.Arrays;
 import java.util.List;
 
-import com.linkedin.pinot.core.common.Predicate;
-import com.linkedin.pinot.core.common.Predicate.Type;
+import org.apache.pinot.core.common.Predicate;
+import org.apache.pinot.core.common.Predicate.Type;
 
 
 public class NEqPredicate extends Predicate {

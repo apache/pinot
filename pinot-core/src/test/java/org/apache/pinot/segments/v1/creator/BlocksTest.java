@@ -16,13 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.segments.v1.creator;
+package org.apache.pinot.segments.v1.creator;
 
-import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
-import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
-import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
-import com.linkedin.pinot.core.util.AvroUtils;
-import com.linkedin.pinot.util.TestUtils;
+import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import org.apache.pinot.core.segment.creator.SegmentIndexCreationDriver;
+import org.apache.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
+import org.apache.pinot.core.util.AvroUtils;
+import org.apache.pinot.util.TestUtils;
 import java.io.File;
 import java.util.concurrent.TimeUnit;
 import org.apache.avro.Schema.Field;

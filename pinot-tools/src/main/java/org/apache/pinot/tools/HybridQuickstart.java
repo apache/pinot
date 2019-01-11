@@ -16,24 +16,24 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.tools;
+package org.apache.pinot.tools;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.utils.KafkaStarterUtils;
-import com.linkedin.pinot.common.utils.ZkStarter;
-import com.linkedin.pinot.core.data.readers.FileFormat;
-import com.linkedin.pinot.tools.Quickstart.Color;
-import com.linkedin.pinot.tools.admin.command.QuickstartRunner;
-import com.linkedin.pinot.tools.streams.AirlineDataStream;
+import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.common.utils.KafkaStarterUtils;
+import org.apache.pinot.common.utils.ZkStarter;
+import org.apache.pinot.core.data.readers.FileFormat;
+import org.apache.pinot.tools.Quickstart.Color;
+import org.apache.pinot.tools.admin.command.QuickstartRunner;
+import org.apache.pinot.tools.streams.AirlineDataStream;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
 import kafka.server.KafkaServerStartable;
 import org.apache.commons.io.FileUtils;
 
-import static com.linkedin.pinot.tools.Quickstart.printStatus;
+import static org.apache.pinot.tools.Quickstart.printStatus;
 
 
 public class HybridQuickstart {

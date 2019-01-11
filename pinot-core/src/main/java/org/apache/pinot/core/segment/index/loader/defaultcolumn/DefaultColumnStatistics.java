@@ -16,10 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.segment.index.loader.defaultcolumn;
+package org.apache.pinot.core.segment.index.loader.defaultcolumn;
 
-import com.linkedin.pinot.core.data.partition.PartitionFunction;
-import com.linkedin.pinot.core.segment.creator.ColumnStatistics;
+import org.apache.pinot.core.data.partition.PartitionFunction;
+import org.apache.pinot.core.segment.creator.ColumnStatistics;
 import java.util.List;
 import org.apache.commons.lang.math.IntRange;
 

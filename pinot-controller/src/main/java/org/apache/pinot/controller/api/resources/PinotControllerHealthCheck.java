@@ -16,12 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.controller.api.resources;
+package org.apache.pinot.controller.api.resources;
 
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import org.apache.commons.lang.StringUtils;
-import com.linkedin.pinot.controller.ControllerConf;
+import org.apache.pinot.controller.ControllerConf;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiResponse;

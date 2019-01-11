@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.common.http;
+package org.apache.pinot.common.http;
 
 import com.google.common.base.Throwables;
 import com.sun.net.httpserver.HttpExchange;

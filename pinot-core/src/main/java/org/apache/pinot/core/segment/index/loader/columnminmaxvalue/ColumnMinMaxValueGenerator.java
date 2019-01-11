@@ -16,22 +16,22 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.segment.index.loader.columnminmaxvalue;
+package org.apache.pinot.core.segment.index.loader.columnminmaxvalue;
 
 import com.clearspring.analytics.util.Preconditions;
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.core.segment.creator.impl.SegmentColumnarIndexCreator;
-import com.linkedin.pinot.core.segment.index.ColumnMetadata;
-import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
-import com.linkedin.pinot.core.segment.index.readers.DoubleDictionary;
-import com.linkedin.pinot.core.segment.index.readers.FloatDictionary;
-import com.linkedin.pinot.core.segment.index.readers.IntDictionary;
-import com.linkedin.pinot.core.segment.index.readers.LongDictionary;
-import com.linkedin.pinot.core.segment.index.readers.StringDictionary;
-import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
-import com.linkedin.pinot.core.segment.store.ColumnIndexType;
-import com.linkedin.pinot.core.segment.store.SegmentDirectory;
+import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.core.segment.creator.impl.SegmentColumnarIndexCreator;
+import org.apache.pinot.core.segment.index.ColumnMetadata;
+import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
+import org.apache.pinot.core.segment.index.readers.DoubleDictionary;
+import org.apache.pinot.core.segment.index.readers.FloatDictionary;
+import org.apache.pinot.core.segment.index.readers.IntDictionary;
+import org.apache.pinot.core.segment.index.readers.LongDictionary;
+import org.apache.pinot.core.segment.index.readers.StringDictionary;
+import org.apache.pinot.core.segment.memory.PinotDataBuffer;
+import org.apache.pinot.core.segment.store.ColumnIndexType;
+import org.apache.pinot.core.segment.store.SegmentDirectory;
 import org.apache.commons.configuration.PropertiesConfiguration;
 
 

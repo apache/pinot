@@ -16,12 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.query.scheduler;
+package org.apache.pinot.core.query.scheduler;
 
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
-import com.linkedin.pinot.core.query.request.ServerQueryRequest;
+import org.apache.pinot.core.query.request.ServerQueryRequest;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 

@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.tools.data.generator;
+package org.apache.pinot.tools.data.generator;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -26,9 +26,9 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.lang.math.IntRange;
 
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
-import com.linkedin.pinot.common.data.FieldSpec.FieldType;
-import com.linkedin.pinot.core.data.readers.FileFormat;
+import org.apache.pinot.common.data.FieldSpec.DataType;
+import org.apache.pinot.common.data.FieldSpec.FieldType;
+import org.apache.pinot.core.data.readers.FileFormat;
 
 
 /**

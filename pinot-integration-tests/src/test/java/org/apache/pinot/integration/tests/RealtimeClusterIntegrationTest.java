@@ -16,11 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.integration.tests;
+package org.apache.pinot.integration.tests;
 
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.utils.KafkaStarterUtils;
-import com.linkedin.pinot.util.TestUtils;
+import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.common.utils.KafkaStarterUtils;
+import org.apache.pinot.util.TestUtils;
 import java.io.File;
 import java.util.Collections;
 import java.util.List;

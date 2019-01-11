@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.segment.creator;
+package org.apache.pinot.core.segment.creator;
 
-import com.linkedin.pinot.core.data.readers.RecordReader;
+import org.apache.pinot.core.data.readers.RecordReader;
 
 
 /**

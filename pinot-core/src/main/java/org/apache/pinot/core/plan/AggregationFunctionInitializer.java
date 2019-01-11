@@ -16,11 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.plan;
+package org.apache.pinot.core.plan;
 
-import com.linkedin.pinot.common.segment.SegmentMetadata;
-import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionVisitorBase;
-import com.linkedin.pinot.core.query.aggregation.function.FastHLLAggregationFunction;
+import org.apache.pinot.common.segment.SegmentMetadata;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunctionVisitorBase;
+import org.apache.pinot.core.query.aggregation.function.FastHLLAggregationFunction;
 
 
 // class is public because existing tests are in different package

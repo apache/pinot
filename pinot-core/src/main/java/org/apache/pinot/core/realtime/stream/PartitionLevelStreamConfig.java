@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.realtime.stream;
+package org.apache.pinot.core.realtime.stream;
 
-import com.linkedin.pinot.common.utils.time.TimeUtils;
+import org.apache.pinot.common.utils.time.TimeUtils;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

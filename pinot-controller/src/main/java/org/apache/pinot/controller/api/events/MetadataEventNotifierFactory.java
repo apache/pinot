@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.controller.api.events;
+package org.apache.pinot.controller.api.events;
 
 import org.apache.commons.configuration.Configuration;
 import org.slf4j.Logger;

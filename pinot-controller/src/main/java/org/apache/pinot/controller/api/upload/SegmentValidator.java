@@ -16,20 +16,20 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.controller.api.upload;
+package org.apache.pinot.controller.api.upload;
 
-import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.exception.InvalidConfigException;
-import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
-import com.linkedin.pinot.common.metrics.ControllerMetrics;
-import com.linkedin.pinot.common.segment.SegmentMetadata;
-import com.linkedin.pinot.common.utils.time.TimeUtils;
-import com.linkedin.pinot.controller.ControllerConf;
-import com.linkedin.pinot.controller.api.resources.ControllerApplicationException;
-import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
-import com.linkedin.pinot.controller.util.TableSizeReader;
-import com.linkedin.pinot.controller.validation.StorageQuotaChecker;
+import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.common.config.TableNameBuilder;
+import org.apache.pinot.common.exception.InvalidConfigException;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.common.segment.SegmentMetadata;
+import org.apache.pinot.common.utils.time.TimeUtils;
+import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.controller.api.resources.ControllerApplicationException;
+import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.util.TableSizeReader;
+import org.apache.pinot.controller.validation.StorageQuotaChecker;
 import java.io.File;
 import java.util.Date;
 import java.util.concurrent.Executor;

@@ -16,22 +16,22 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.segment.index;
+package org.apache.pinot.core.segment.index;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.linkedin.pinot.common.config.ColumnPartitionConfig;
-import com.linkedin.pinot.common.data.DateTimeFieldSpec;
-import com.linkedin.pinot.common.data.DimensionFieldSpec;
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
-import com.linkedin.pinot.common.data.FieldSpec.FieldType;
-import com.linkedin.pinot.common.data.MetricFieldSpec;
-import com.linkedin.pinot.common.data.MetricFieldSpec.DerivedMetricType;
-import com.linkedin.pinot.common.data.TimeFieldSpec;
-import com.linkedin.pinot.core.data.partition.PartitionFunction;
-import com.linkedin.pinot.core.data.partition.PartitionFunctionFactory;
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
-import com.linkedin.pinot.startree.hll.HllSizeUtils;
+import org.apache.pinot.common.config.ColumnPartitionConfig;
+import org.apache.pinot.common.data.DateTimeFieldSpec;
+import org.apache.pinot.common.data.DimensionFieldSpec;
+import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.common.data.FieldSpec.DataType;
+import org.apache.pinot.common.data.FieldSpec.FieldType;
+import org.apache.pinot.common.data.MetricFieldSpec;
+import org.apache.pinot.common.data.MetricFieldSpec.DerivedMetricType;
+import org.apache.pinot.common.data.TimeFieldSpec;
+import org.apache.pinot.core.data.partition.PartitionFunction;
+import org.apache.pinot.core.data.partition.PartitionFunctionFactory;
+import org.apache.pinot.core.segment.creator.impl.V1Constants;
+import org.apache.pinot.startree.hll.HllSizeUtils;
 import java.lang.reflect.Field;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -41,8 +41,8 @@ import org.apache.commons.lang.math.IntRange;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Column.*;
-import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.*;
+import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Column.*;
+import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.*;
 
 
 public class ColumnMetadata {

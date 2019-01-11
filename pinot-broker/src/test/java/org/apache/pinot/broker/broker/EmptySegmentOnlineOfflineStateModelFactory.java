@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.broker.broker;
+package org.apache.pinot.broker.broker;
 
 import org.apache.helix.NotificationContext;
 import org.apache.helix.model.Message;

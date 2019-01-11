@@ -16,20 +16,20 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.server.starter.helix;
+package org.apache.pinot.server.starter.helix;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.Utils;
-import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
-import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
-import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
-import com.linkedin.pinot.common.utils.LLCSegmentName;
-import com.linkedin.pinot.common.utils.SegmentName;
-import com.linkedin.pinot.core.data.manager.InstanceDataManager;
-import com.linkedin.pinot.core.data.manager.SegmentDataManager;
-import com.linkedin.pinot.core.data.manager.TableDataManager;
-import com.linkedin.pinot.core.data.manager.realtime.LLRealtimeSegmentDataManager;
+import org.apache.pinot.common.Utils;
+import org.apache.pinot.common.config.TableNameBuilder;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
+import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.common.utils.SegmentName;
+import org.apache.pinot.core.data.manager.InstanceDataManager;
+import org.apache.pinot.core.data.manager.SegmentDataManager;
+import org.apache.pinot.core.data.manager.TableDataManager;
+import org.apache.pinot.core.data.manager.realtime.LLRealtimeSegmentDataManager;
 import java.io.File;
 import java.util.concurrent.locks.Lock;
 import org.apache.commons.io.FileUtils;

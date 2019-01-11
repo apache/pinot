@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.pql.parsers.pql2.ast;
+package org.apache.pinot.pql.parsers.pql2.ast;
 
 /**
  * AST node for a quoted string literal.

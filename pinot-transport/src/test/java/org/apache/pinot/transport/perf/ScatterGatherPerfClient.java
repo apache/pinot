@@ -16,24 +16,24 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.transport.perf;
+package org.apache.pinot.transport.perf;
 
 import com.google.common.util.concurrent.MoreExecutors;
-import com.linkedin.pinot.common.metrics.BrokerMetrics;
-import com.linkedin.pinot.common.metrics.MetricsHelper;
-import com.linkedin.pinot.common.metrics.MetricsHelper.TimerContext;
-import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.common.response.ServerInstance;
-import com.linkedin.pinot.transport.common.CompositeFuture;
-import com.linkedin.pinot.transport.config.PerTableRoutingConfig;
-import com.linkedin.pinot.transport.config.RoutingTableConfig;
-import com.linkedin.pinot.transport.metrics.NettyClientMetrics;
-import com.linkedin.pinot.transport.netty.PooledNettyClientResourceManager;
-import com.linkedin.pinot.transport.pool.KeyedPool;
-import com.linkedin.pinot.transport.pool.KeyedPoolImpl;
-import com.linkedin.pinot.transport.scattergather.ScatterGatherImpl;
-import com.linkedin.pinot.transport.scattergather.ScatterGatherRequest;
-import com.linkedin.pinot.transport.scattergather.ScatterGatherStats;
+import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.common.metrics.MetricsHelper;
+import org.apache.pinot.common.metrics.MetricsHelper.TimerContext;
+import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.response.ServerInstance;
+import org.apache.pinot.transport.common.CompositeFuture;
+import org.apache.pinot.transport.config.PerTableRoutingConfig;
+import org.apache.pinot.transport.config.RoutingTableConfig;
+import org.apache.pinot.transport.metrics.NettyClientMetrics;
+import org.apache.pinot.transport.netty.PooledNettyClientResourceManager;
+import org.apache.pinot.transport.pool.KeyedPool;
+import org.apache.pinot.transport.pool.KeyedPoolImpl;
+import org.apache.pinot.transport.scattergather.ScatterGatherImpl;
+import org.apache.pinot.transport.scattergather.ScatterGatherRequest;
+import org.apache.pinot.transport.scattergather.ScatterGatherStats;
 import com.yammer.metrics.core.Histogram;
 import com.yammer.metrics.core.MetricName;
 import com.yammer.metrics.core.MetricsRegistry;

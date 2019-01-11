@@ -16,16 +16,16 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.query.reduce;
+package org.apache.pinot.core.query.reduce;
 
-import com.linkedin.pinot.common.exception.QueryException;
-import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.common.request.Selection;
-import com.linkedin.pinot.common.response.ProcessingException;
-import com.linkedin.pinot.common.utils.DataSchema;
-import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
-import com.linkedin.pinot.core.query.aggregation.AggregationFunctionContext;
-import com.linkedin.pinot.core.query.selection.SelectionOperatorUtils;
+import org.apache.pinot.common.exception.QueryException;
+import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.request.Selection;
+import org.apache.pinot.common.response.ProcessingException;
+import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
+import org.apache.pinot.core.query.aggregation.AggregationFunctionContext;
+import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import java.io.Serializable;
 import java.util.Collection;
 import java.util.List;

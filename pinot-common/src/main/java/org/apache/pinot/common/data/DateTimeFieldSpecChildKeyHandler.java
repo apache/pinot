@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.common.data;
+package org.apache.pinot.common.data;
 
-import com.linkedin.pinot.common.config.NamedListChildKeyHandler;
+import org.apache.pinot.common.config.NamedListChildKeyHandler;
 
 
 /**

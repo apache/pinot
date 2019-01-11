@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.query.aggregation;
+package org.apache.pinot.core.query.aggregation;
 
-import com.linkedin.pinot.core.operator.blocks.TransformBlock;
+import org.apache.pinot.core.operator.blocks.TransformBlock;
 import java.util.List;
 import javax.annotation.Nonnull;
 

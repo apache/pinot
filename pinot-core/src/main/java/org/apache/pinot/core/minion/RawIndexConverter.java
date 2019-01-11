@@ -16,27 +16,27 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.minion;
+package org.apache.pinot.core.minion;
 
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.data.MetricFieldSpec;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.core.common.BlockSingleValIterator;
-import com.linkedin.pinot.core.common.DataSource;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
-import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
-import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
-import com.linkedin.pinot.core.io.compression.ChunkCompressorFactory;
-import com.linkedin.pinot.core.segment.creator.SingleValueRawIndexCreator;
-import com.linkedin.pinot.core.segment.creator.impl.SegmentColumnarIndexCreator;
-import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
-import com.linkedin.pinot.core.segment.index.ColumnMetadata;
-import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
-import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
-import com.linkedin.pinot.core.segment.index.readers.Dictionary;
-import com.linkedin.pinot.core.util.CrcUtils;
+import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.common.data.MetricFieldSpec;
+import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.common.segment.ReadMode;
+import org.apache.pinot.core.common.BlockSingleValIterator;
+import org.apache.pinot.core.common.DataSource;
+import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
+import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
+import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
+import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
+import org.apache.pinot.core.segment.creator.SingleValueRawIndexCreator;
+import org.apache.pinot.core.segment.creator.impl.SegmentColumnarIndexCreator;
+import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.core.segment.creator.impl.V1Constants;
+import org.apache.pinot.core.segment.index.ColumnMetadata;
+import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
+import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.core.segment.index.readers.Dictionary;
+import org.apache.pinot.core.util.CrcUtils;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;

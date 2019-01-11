@@ -16,13 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.tools.admin.command;
+package org.apache.pinot.tools.admin.command;
 
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.linkedin.pinot.tools.Command;
-import com.linkedin.pinot.tools.PinotSegmentRebalancer;
+import org.apache.pinot.tools.Command;
+import org.apache.pinot.tools.PinotSegmentRebalancer;
 
 
 public class RebalanceTableCommand extends AbstractBaseAdminCommand implements Command {

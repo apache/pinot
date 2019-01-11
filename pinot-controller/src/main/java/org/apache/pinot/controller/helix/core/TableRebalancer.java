@@ -16,19 +16,19 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.controller.helix.core;
+package org.apache.pinot.controller.helix.core;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.MapDifference;
 import com.google.common.collect.Maps;
-import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.exception.InvalidConfigException;
-import com.linkedin.pinot.common.partition.PartitionAssignment;
-import com.linkedin.pinot.common.restlet.resources.RebalanceResult;
-import com.linkedin.pinot.common.utils.EqualityUtils;
-import com.linkedin.pinot.common.utils.helix.HelixHelper;
-import com.linkedin.pinot.controller.helix.core.rebalance.RebalanceSegmentStrategy;
-import com.linkedin.pinot.controller.helix.core.rebalance.RebalanceUserConfigConstants;
+import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.common.exception.InvalidConfigException;
+import org.apache.pinot.common.partition.PartitionAssignment;
+import org.apache.pinot.common.restlet.resources.RebalanceResult;
+import org.apache.pinot.common.utils.EqualityUtils;
+import org.apache.pinot.common.utils.helix.HelixHelper;
+import org.apache.pinot.controller.helix.core.rebalance.RebalanceSegmentStrategy;
+import org.apache.pinot.controller.helix.core.rebalance.RebalanceUserConfigConstants;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.I0Itec.zkclient.exception.ZkBadVersionException;
@@ -87,7 +87,7 @@ public class TableRebalancer {
    * rebalancing is required (incase there are new segments or other changes to the cluster). This is done by comparing
    * the IdealState that was used to generate the target in each step.
    *
-   * Note: we don't use {@link com.linkedin.pinot.common.utils.helix.HelixHelper} directly as we would like to manage
+   * Note: we don't use {@link org.apache.pinot.common.utils.helix.HelixHelper} directly as we would like to manage
    * the main logic and retries according to the rebalance algorithm. Some amount of code is duplicated from HelixHelper.
    */
   public RebalanceResult rebalance(TableConfig tableConfig, RebalanceSegmentStrategy strategy,

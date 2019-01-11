@@ -16,20 +16,20 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.tools.realtime.provisioning;
+package org.apache.pinot.tools.realtime.provisioning;
 
-import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
-import com.linkedin.pinot.common.utils.DataSize;
-import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.data.readers.PinotSegmentRecordReader;
-import com.linkedin.pinot.core.indexsegment.mutable.MutableSegmentImpl;
-import com.linkedin.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
-import com.linkedin.pinot.core.io.writer.impl.DirectMemoryManager;
-import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentConfig;
-import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentStatsHistory;
-import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import org.apache.pinot.common.utils.DataSize;
+import org.apache.pinot.core.data.GenericRow;
+import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
+import org.apache.pinot.core.indexsegment.mutable.MutableSegmentImpl;
+import org.apache.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
+import org.apache.pinot.core.io.writer.impl.DirectMemoryManager;
+import org.apache.pinot.core.realtime.impl.RealtimeSegmentConfig;
+import org.apache.pinot.core.realtime.impl.RealtimeSegmentStatsHistory;
+import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
 import java.io.File;
 import java.io.IOException;
 import java.util.HashSet;

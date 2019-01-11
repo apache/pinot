@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.server.api.resources;
+package org.apache.pinot.server.api.resources;
 
-import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
+import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiResponse;

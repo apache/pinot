@@ -16,13 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.query.selection.iterator;
+package org.apache.pinot.core.query.selection.iterator;
 
 import com.clearspring.analytics.util.Preconditions;
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.utils.primitive.ByteArray;
-import com.linkedin.pinot.core.common.Block;
-import com.linkedin.pinot.core.common.BlockSingleValIterator;
+import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.common.utils.primitive.ByteArray;
+import org.apache.pinot.core.common.Block;
+import org.apache.pinot.core.common.BlockSingleValIterator;
 import java.io.Serializable;
 
 

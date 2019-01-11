@@ -16,10 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.query.pruner;
+package org.apache.pinot.core.query.pruner;
 
-import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.query.request.ServerQueryRequest;
+import org.apache.pinot.core.indexsegment.IndexSegment;
+import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.commons.configuration.Configuration;
 
 

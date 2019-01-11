@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.tools.query.comparison;
+package org.apache.pinot.tools.query.comparison;
 
 import java.io.BufferedReader;
 import java.io.FileReader;

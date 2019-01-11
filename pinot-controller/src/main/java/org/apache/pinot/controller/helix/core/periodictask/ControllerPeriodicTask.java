@@ -16,11 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.controller.helix.core.periodictask;
+package org.apache.pinot.controller.helix.core.periodictask;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
-import com.linkedin.pinot.core.periodictask.BasePeriodicTask;
+import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.core.periodictask.BasePeriodicTask;
 import java.util.List;
 import java.util.Random;
 import org.slf4j.Logger;

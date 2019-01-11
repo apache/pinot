@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.controller.api;
+package org.apache.pinot.controller.api;
 
 import java.io.IOException;
 import java.net.URI;
@@ -44,7 +44,7 @@ public class ControllerAdminApiApplication extends ResourceConfig {
   private HttpServer httpServer;
   private URI baseUri;
   private boolean started = false;
-  private static final String RESOURCE_PACKAGE = "com.linkedin.pinot.controller.api.resources";
+  private static final String RESOURCE_PACKAGE = "org.apache.pinot.controller.api.resources";
   private static String CONSOLE_WEB_PATH;
   private final boolean _useHttps;
 

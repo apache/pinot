@@ -16,11 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.operator.dociditerators;
+package org.apache.pinot.core.operator.dociditerators;
 
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
-import com.linkedin.pinot.core.common.BlockDocIdIterator;
+import org.apache.pinot.core.common.BlockDocIdIterator;
 
 /**
  * All scan based filter iterators must implement this interface. This allows interesection to be

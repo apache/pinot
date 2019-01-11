@@ -16,15 +16,15 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.server.realtime;
+package org.apache.pinot.server.realtime;
 
-import com.linkedin.pinot.common.metrics.ServerMeter;
-import com.linkedin.pinot.common.metrics.ServerMetrics;
-import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
-import com.linkedin.pinot.common.utils.ClientSSLContextGenerator;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.FileUploadDownloadClient;
-import com.linkedin.pinot.core.query.utils.Pair;
+import org.apache.pinot.common.metrics.ServerMeter;
+import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
+import org.apache.pinot.common.utils.ClientSSLContextGenerator;
+import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.FileUploadDownloadClient;
+import org.apache.pinot.core.query.utils.Pair;
 import java.io.File;
 import java.net.URI;
 import javax.net.ssl.SSLContext;

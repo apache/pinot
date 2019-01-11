@@ -16,10 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.query.aggregation.function;
+package org.apache.pinot.core.query.aggregation.function;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.core.query.exception.BadQueryRequestException;
+import org.apache.pinot.core.query.exception.BadQueryRequestException;
 import javax.annotation.Nonnull;
 
 

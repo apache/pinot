@@ -16,11 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.common.segment.fetcher;
+package org.apache.pinot.common.segment.fetcher;
 
-import com.linkedin.pinot.common.exception.HttpErrorStatusException;
-import com.linkedin.pinot.common.utils.FileUploadDownloadClient;
-import com.linkedin.pinot.common.utils.retry.RetryPolicies;
+import org.apache.pinot.common.exception.HttpErrorStatusException;
+import org.apache.pinot.common.utils.FileUploadDownloadClient;
+import org.apache.pinot.common.utils.retry.RetryPolicies;
 import java.io.File;
 import java.net.URI;
 import java.util.Collections;
@@ -29,7 +29,7 @@ import org.apache.commons.configuration.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static com.linkedin.pinot.common.utils.CommonConstants.SegmentOperations.*;
+import static org.apache.pinot.common.utils.CommonConstants.SegmentOperations.*;
 
 
 public class HttpSegmentFetcher implements SegmentFetcher {

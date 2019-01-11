@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.minion.rollup;
+package org.apache.pinot.core.minion.rollup;
 
 import java.util.HashMap;
 import java.util.Map;

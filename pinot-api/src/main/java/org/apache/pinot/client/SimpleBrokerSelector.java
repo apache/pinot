@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.client;
+package org.apache.pinot.client;
 
 import java.util.List;
 import java.util.Random;

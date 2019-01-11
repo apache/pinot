@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.common.utils;
+package org.apache.pinot.common.utils;
 
-import com.linkedin.pinot.common.response.ProcessingException;
+import org.apache.pinot.common.response.ProcessingException;
 import java.io.IOException;
 import java.util.Map;
 import javax.annotation.Nonnull;

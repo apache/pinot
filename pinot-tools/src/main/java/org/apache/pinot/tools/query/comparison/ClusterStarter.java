@@ -16,22 +16,22 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.tools.query.comparison;
+package org.apache.pinot.tools.query.comparison;
 
-import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.NetUtil;
-import com.linkedin.pinot.controller.helix.ControllerRequestURLBuilder;
-import com.linkedin.pinot.tools.admin.command.AddTableCommand;
-import com.linkedin.pinot.tools.admin.command.CreateSegmentCommand;
-import com.linkedin.pinot.tools.admin.command.DeleteClusterCommand;
-import com.linkedin.pinot.tools.admin.command.PostQueryCommand;
-import com.linkedin.pinot.tools.admin.command.StartBrokerCommand;
-import com.linkedin.pinot.tools.admin.command.StartControllerCommand;
-import com.linkedin.pinot.tools.admin.command.StartServerCommand;
-import com.linkedin.pinot.tools.admin.command.StartZookeeperCommand;
-import com.linkedin.pinot.tools.admin.command.UploadSegmentCommand;
-import com.linkedin.pinot.tools.perf.PerfBenchmarkDriver;
+import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.NetUtil;
+import org.apache.pinot.controller.helix.ControllerRequestURLBuilder;
+import org.apache.pinot.tools.admin.command.AddTableCommand;
+import org.apache.pinot.tools.admin.command.CreateSegmentCommand;
+import org.apache.pinot.tools.admin.command.DeleteClusterCommand;
+import org.apache.pinot.tools.admin.command.PostQueryCommand;
+import org.apache.pinot.tools.admin.command.StartBrokerCommand;
+import org.apache.pinot.tools.admin.command.StartControllerCommand;
+import org.apache.pinot.tools.admin.command.StartServerCommand;
+import org.apache.pinot.tools.admin.command.StartZookeeperCommand;
+import org.apache.pinot.tools.admin.command.UploadSegmentCommand;
+import org.apache.pinot.tools.perf.PerfBenchmarkDriver;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -44,7 +44,7 @@ import java.net.UnknownHostException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static com.linkedin.pinot.tools.admin.command.AbstractBaseAdminCommand.sendPostRequest;
+import static org.apache.pinot.tools.admin.command.AbstractBaseAdminCommand.sendPostRequest;
 
 
 public class ClusterStarter {

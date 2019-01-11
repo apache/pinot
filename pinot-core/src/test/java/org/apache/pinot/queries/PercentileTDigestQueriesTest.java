@@ -16,32 +16,32 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.queries;
+package org.apache.pinot.queries;
 
-import com.linkedin.pinot.common.data.DimensionFieldSpec;
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.data.MetricFieldSpec;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.response.broker.AggregationResult;
-import com.linkedin.pinot.common.response.broker.BrokerResponseNative;
-import com.linkedin.pinot.common.response.broker.GroupByResult;
-import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.data.manager.SegmentDataManager;
-import com.linkedin.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
-import com.linkedin.pinot.core.data.readers.GenericRowRecordReader;
-import com.linkedin.pinot.core.data.readers.RecordReader;
-import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
-import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
-import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
-import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
-import com.linkedin.pinot.core.operator.query.AggregationGroupByOperator;
-import com.linkedin.pinot.core.operator.query.AggregationOperator;
-import com.linkedin.pinot.core.query.aggregation.function.PercentileTDigestAggregationFunction;
-import com.linkedin.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
-import com.linkedin.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
-import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.common.data.DimensionFieldSpec;
+import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.common.data.MetricFieldSpec;
+import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.common.response.broker.AggregationResult;
+import org.apache.pinot.common.response.broker.BrokerResponseNative;
+import org.apache.pinot.common.response.broker.GroupByResult;
+import org.apache.pinot.common.segment.ReadMode;
+import org.apache.pinot.core.data.GenericRow;
+import org.apache.pinot.core.data.manager.SegmentDataManager;
+import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
+import org.apache.pinot.core.data.readers.GenericRowRecordReader;
+import org.apache.pinot.core.data.readers.RecordReader;
+import org.apache.pinot.core.indexsegment.IndexSegment;
+import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
+import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
+import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
+import org.apache.pinot.core.operator.query.AggregationGroupByOperator;
+import org.apache.pinot.core.operator.query.AggregationOperator;
+import org.apache.pinot.core.query.aggregation.function.PercentileTDigestAggregationFunction;
+import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
+import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
+import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import com.tdunning.math.stats.TDigest;
 import it.unimi.dsi.fastutil.doubles.DoubleList;
 import java.io.File;

@@ -16,13 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.operator.transform.function;
+package org.apache.pinot.core.operator.transform.function;
 
-import com.linkedin.pinot.core.common.DataSource;
-import com.linkedin.pinot.core.operator.blocks.ProjectionBlock;
-import com.linkedin.pinot.core.operator.transform.TransformResultMetadata;
-import com.linkedin.pinot.core.plan.DocIdSetPlanNode;
-import com.linkedin.pinot.core.util.ArrayCopyUtils;
+import org.apache.pinot.core.common.DataSource;
+import org.apache.pinot.core.operator.blocks.ProjectionBlock;
+import org.apache.pinot.core.operator.transform.TransformResultMetadata;
+import org.apache.pinot.core.plan.DocIdSetPlanNode;
+import org.apache.pinot.core.util.ArrayCopyUtils;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;

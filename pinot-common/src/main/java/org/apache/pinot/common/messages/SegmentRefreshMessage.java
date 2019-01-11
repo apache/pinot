@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.common.messages;
+package org.apache.pinot.common.messages;
 
 import java.util.UUID;
 import org.apache.helix.model.Message;

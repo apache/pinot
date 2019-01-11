@@ -16,12 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.tools.segment.converter;
+package org.apache.pinot.tools.segment.converter;
 
-import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
-import com.linkedin.pinot.core.data.readers.FileFormat;
-import com.linkedin.pinot.tools.AbstractBaseCommand;
-import com.linkedin.pinot.tools.Command;
+import org.apache.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.core.data.readers.FileFormat;
+import org.apache.pinot.tools.AbstractBaseCommand;
+import org.apache.pinot.tools.Command;
 import java.io.File;
 import java.util.HashMap;
 import java.util.Map;

@@ -16,20 +16,20 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.queries;
+package org.apache.pinot.queries;
 
-import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.common.response.ServerInstance;
-import com.linkedin.pinot.common.response.broker.BrokerResponseNative;
-import com.linkedin.pinot.common.utils.DataTable;
-import com.linkedin.pinot.core.common.Operator;
-import com.linkedin.pinot.core.data.manager.SegmentDataManager;
-import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.plan.Plan;
-import com.linkedin.pinot.core.plan.maker.InstancePlanMakerImplV2;
-import com.linkedin.pinot.core.plan.maker.PlanMaker;
-import com.linkedin.pinot.core.query.reduce.BrokerReduceService;
-import com.linkedin.pinot.pql.parsers.Pql2Compiler;
+import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.response.ServerInstance;
+import org.apache.pinot.common.response.broker.BrokerResponseNative;
+import org.apache.pinot.common.utils.DataTable;
+import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.data.manager.SegmentDataManager;
+import org.apache.pinot.core.indexsegment.IndexSegment;
+import org.apache.pinot.core.plan.Plan;
+import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
+import org.apache.pinot.core.plan.maker.PlanMaker;
+import org.apache.pinot.core.query.reduce.BrokerReduceService;
+import org.apache.pinot.pql.parsers.Pql2Compiler;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;

@@ -16,13 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.startree.hll;
+package org.apache.pinot.startree.hll;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.config.ConfigKey;
-import com.linkedin.pinot.common.utils.JsonUtils;
+import org.apache.pinot.common.config.ConfigKey;
+import org.apache.pinot.common.utils.JsonUtils;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -31,7 +31,7 @@ import java.util.Set;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 
-import static com.linkedin.pinot.common.utils.EqualityUtils.*;
+import static org.apache.pinot.common.utils.EqualityUtils.*;
 
 
 /**

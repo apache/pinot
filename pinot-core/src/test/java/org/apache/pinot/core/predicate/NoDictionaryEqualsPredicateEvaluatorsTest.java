@@ -16,14 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.predicate;
+package org.apache.pinot.core.predicate;
 
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.core.common.predicate.EqPredicate;
-import com.linkedin.pinot.core.common.predicate.NEqPredicate;
-import com.linkedin.pinot.core.operator.filter.predicate.EqualsPredicateEvaluatorFactory;
-import com.linkedin.pinot.core.operator.filter.predicate.NotEqualsPredicateEvaluatorFactory;
-import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluator;
+import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.core.common.predicate.EqPredicate;
+import org.apache.pinot.core.common.predicate.NEqPredicate;
+import org.apache.pinot.core.operator.filter.predicate.EqualsPredicateEvaluatorFactory;
+import org.apache.pinot.core.operator.filter.predicate.NotEqualsPredicateEvaluatorFactory;
+import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import java.util.Collections;
 import java.util.Random;
 import org.apache.commons.lang.ArrayUtils;

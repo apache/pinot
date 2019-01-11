@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.common.data;
+package org.apache.pinot.common.data;
 
-import com.linkedin.pinot.common.utils.EqualityUtils;
+import org.apache.pinot.common.utils.EqualityUtils;
 import java.util.TimeZone;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -26,7 +26,7 @@ import org.joda.time.DateTimeZone;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
 
-import static com.linkedin.pinot.common.data.DateTimeFieldSpec.*;
+import static org.apache.pinot.common.data.DateTimeFieldSpec.*;
 
 
 public class DateTimeFormatPatternSpec {

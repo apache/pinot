@@ -16,10 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.startree.v2.builder;
+package org.apache.pinot.core.startree.v2.builder;
 
-import com.linkedin.pinot.common.config.StarTreeIndexConfig;
-import com.linkedin.pinot.core.startree.v2.AggregationFunctionColumnPair;
+import org.apache.pinot.common.config.StarTreeIndexConfig;
+import org.apache.pinot.core.startree.v2.AggregationFunctionColumnPair;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;

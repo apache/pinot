@@ -16,15 +16,15 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.plan;
+package org.apache.pinot.core.plan;
 
-import com.linkedin.pinot.common.request.AggregationInfo;
-import com.linkedin.pinot.core.common.Operator;
-import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.operator.query.DictionaryBasedAggregationOperator;
-import com.linkedin.pinot.core.query.aggregation.AggregationFunctionContext;
-import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionUtils;
-import com.linkedin.pinot.core.segment.index.readers.Dictionary;
+import org.apache.pinot.common.request.AggregationInfo;
+import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.indexsegment.IndexSegment;
+import org.apache.pinot.core.operator.query.DictionaryBasedAggregationOperator;
+import org.apache.pinot.core.query.aggregation.AggregationFunctionContext;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
+import org.apache.pinot.core.segment.index.readers.Dictionary;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;

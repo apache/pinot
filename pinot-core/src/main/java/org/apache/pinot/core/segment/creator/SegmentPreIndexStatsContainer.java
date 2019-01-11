@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.segment.creator;
+package org.apache.pinot.core.segment.creator;
 
 /**
  * Container for per-column stats for a segment

@@ -36,7 +36,7 @@ push.to.port=8888
 
 Pinot data schema file needs to be checked in locally and put the schema file in job properties file.
 
-The `com.linkedin.pinot.hadoop.PinotHadoopJobLauncher` class (the main class of the shaded JAR in `pinot-hadoop`) should be run to accomplish this:
+The `org.apache.pinot.hadoop.PinotHadoopJobLauncher` class (the main class of the shaded JAR in `pinot-hadoop`) should be run to accomplish this:
 
 ```
 # Segment creation

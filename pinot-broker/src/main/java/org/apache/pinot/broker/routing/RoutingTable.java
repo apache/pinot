@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.broker.routing;
+package org.apache.pinot.broker.routing;
 
 import java.util.List;
 import java.util.Map;

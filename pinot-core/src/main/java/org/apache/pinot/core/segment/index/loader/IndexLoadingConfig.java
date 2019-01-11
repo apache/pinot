@@ -16,15 +16,15 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.segment.index.loader;
+package org.apache.pinot.core.segment.index.loader;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.linkedin.pinot.common.config.IndexingConfig;
-import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.core.data.manager.config.InstanceDataManagerConfig;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
-import com.linkedin.pinot.core.segment.index.loader.columnminmaxvalue.ColumnMinMaxValueGeneratorMode;
+import org.apache.pinot.common.config.IndexingConfig;
+import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.common.segment.ReadMode;
+import org.apache.pinot.core.data.manager.config.InstanceDataManagerConfig;
+import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
+import org.apache.pinot.core.segment.index.loader.columnminmaxvalue.ColumnMinMaxValueGeneratorMode;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;

@@ -16,16 +16,16 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.tools.admin.command;
+package org.apache.pinot.tools.admin.command;
 
-import com.linkedin.pinot.common.data.StarTreeIndexSpec;
-import com.linkedin.pinot.common.utils.JsonUtils;
-import com.linkedin.pinot.core.data.readers.FileFormat;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
-import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
-import com.linkedin.pinot.startree.hll.HllConfig;
-import com.linkedin.pinot.startree.hll.HllConstants;
-import com.linkedin.pinot.tools.Command;
+import org.apache.pinot.common.data.StarTreeIndexSpec;
+import org.apache.pinot.common.utils.JsonUtils;
+import org.apache.pinot.core.data.readers.FileFormat;
+import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.startree.hll.HllConfig;
+import org.apache.pinot.startree.hll.HllConstants;
+import org.apache.pinot.tools.Command;
 import java.io.File;
 import java.io.FilenameFilter;
 import java.io.IOException;

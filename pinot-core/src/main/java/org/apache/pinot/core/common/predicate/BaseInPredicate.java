@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.common.predicate;
+package org.apache.pinot.core.common.predicate;
 
-import com.linkedin.pinot.core.common.Predicate;
+import org.apache.pinot.core.common.Predicate;
 import java.util.Arrays;
 import java.util.List;
 

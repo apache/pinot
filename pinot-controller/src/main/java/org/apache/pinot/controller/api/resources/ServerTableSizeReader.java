@@ -16,13 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.controller.api.resources;
+package org.apache.pinot.controller.api.resources;
 
 import com.google.common.collect.BiMap;
-import com.linkedin.pinot.common.http.MultiGetRequest;
-import com.linkedin.pinot.common.restlet.resources.SegmentSizeInfo;
-import com.linkedin.pinot.common.restlet.resources.TableSizeInfo;
-import com.linkedin.pinot.common.utils.JsonUtils;
+import org.apache.pinot.common.http.MultiGetRequest;
+import org.apache.pinot.common.restlet.resources.SegmentSizeInfo;
+import org.apache.pinot.common.restlet.resources.TableSizeInfo;
+import org.apache.pinot.common.utils.JsonUtils;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;

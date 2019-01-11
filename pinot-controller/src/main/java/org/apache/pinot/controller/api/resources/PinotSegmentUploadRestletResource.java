@@ -16,32 +16,32 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.controller.api.resources;
+package org.apache.pinot.controller.api.resources;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.metrics.ControllerMeter;
-import com.linkedin.pinot.common.metrics.ControllerMetrics;
-import com.linkedin.pinot.common.segment.SegmentMetadata;
-import com.linkedin.pinot.common.segment.fetcher.SegmentFetcherFactory;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.FileUploadDownloadClient;
-import com.linkedin.pinot.common.utils.JsonUtils;
-import com.linkedin.pinot.common.utils.StringUtil;
-import com.linkedin.pinot.common.utils.helix.HelixHelper;
-import com.linkedin.pinot.controller.ControllerConf;
-import com.linkedin.pinot.controller.api.access.AccessControl;
-import com.linkedin.pinot.controller.api.access.AccessControlFactory;
-import com.linkedin.pinot.controller.api.upload.SegmentValidator;
-import com.linkedin.pinot.controller.api.upload.ZKOperator;
-import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
-import com.linkedin.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
-import com.linkedin.pinot.core.crypt.NoOpPinotCrypter;
-import com.linkedin.pinot.core.crypt.PinotCrypter;
-import com.linkedin.pinot.core.crypt.PinotCrypterFactory;
-import com.linkedin.pinot.core.metadata.DefaultMetadataExtractor;
-import com.linkedin.pinot.core.metadata.MetadataExtractorFactory;
+import org.apache.pinot.common.config.TableNameBuilder;
+import org.apache.pinot.common.metrics.ControllerMeter;
+import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.common.segment.SegmentMetadata;
+import org.apache.pinot.common.segment.fetcher.SegmentFetcherFactory;
+import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.FileUploadDownloadClient;
+import org.apache.pinot.common.utils.JsonUtils;
+import org.apache.pinot.common.utils.StringUtil;
+import org.apache.pinot.common.utils.helix.HelixHelper;
+import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.controller.api.access.AccessControl;
+import org.apache.pinot.controller.api.access.AccessControlFactory;
+import org.apache.pinot.controller.api.upload.SegmentValidator;
+import org.apache.pinot.controller.api.upload.ZKOperator;
+import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
+import org.apache.pinot.core.crypt.NoOpPinotCrypter;
+import org.apache.pinot.core.crypt.PinotCrypter;
+import org.apache.pinot.core.crypt.PinotCrypterFactory;
+import org.apache.pinot.core.metadata.DefaultMetadataExtractor;
+import org.apache.pinot.core.metadata.MetadataExtractorFactory;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;

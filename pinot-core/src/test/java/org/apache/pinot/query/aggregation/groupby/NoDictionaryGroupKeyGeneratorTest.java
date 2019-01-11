@@ -16,29 +16,29 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.query.aggregation.groupby;
+package org.apache.pinot.query.aggregation.groupby;
 
-import com.linkedin.pinot.common.data.DimensionFieldSpec;
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.request.transform.TransformExpressionTree;
-import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.data.readers.GenericRowRecordReader;
-import com.linkedin.pinot.core.data.readers.RecordReader;
-import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
-import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
-import com.linkedin.pinot.core.operator.blocks.TransformBlock;
-import com.linkedin.pinot.core.operator.transform.TransformOperator;
-import com.linkedin.pinot.core.plan.TransformPlanNode;
-import com.linkedin.pinot.core.plan.maker.InstancePlanMakerImplV2;
-import com.linkedin.pinot.core.query.aggregation.groupby.AggregationGroupByTrimmingService;
-import com.linkedin.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
-import com.linkedin.pinot.core.query.aggregation.groupby.NoDictionaryMultiColumnGroupKeyGenerator;
-import com.linkedin.pinot.core.query.aggregation.groupby.NoDictionarySingleColumnGroupKeyGenerator;
-import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
-import com.linkedin.pinot.pql.parsers.Pql2Compiler;
+import org.apache.pinot.common.data.DimensionFieldSpec;
+import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.common.request.transform.TransformExpressionTree;
+import org.apache.pinot.common.segment.ReadMode;
+import org.apache.pinot.core.data.GenericRow;
+import org.apache.pinot.core.data.readers.GenericRowRecordReader;
+import org.apache.pinot.core.data.readers.RecordReader;
+import org.apache.pinot.core.indexsegment.IndexSegment;
+import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
+import org.apache.pinot.core.operator.blocks.TransformBlock;
+import org.apache.pinot.core.operator.transform.TransformOperator;
+import org.apache.pinot.core.plan.TransformPlanNode;
+import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
+import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByTrimmingService;
+import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
+import org.apache.pinot.core.query.aggregation.groupby.NoDictionaryMultiColumnGroupKeyGenerator;
+import org.apache.pinot.core.query.aggregation.groupby.NoDictionarySingleColumnGroupKeyGenerator;
+import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.pql.parsers.Pql2Compiler;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -97,7 +97,7 @@ public class NoDictionaryGroupKeyGeneratorTest {
   }
 
   /**
-   * Unit test for {@link com.linkedin.pinot.core.query.aggregation.groupby.NoDictionarySingleColumnGroupKeyGenerator}
+   * Unit test for {@link org.apache.pinot.core.query.aggregation.groupby.NoDictionarySingleColumnGroupKeyGenerator}
    * @throws Exception
    */
   @Test

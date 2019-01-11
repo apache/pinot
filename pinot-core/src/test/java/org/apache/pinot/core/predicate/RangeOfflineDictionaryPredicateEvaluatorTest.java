@@ -16,12 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.predicate;
+package org.apache.pinot.core.predicate;
 
-import com.linkedin.pinot.core.common.predicate.RangePredicate;
-import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluator;
-import com.linkedin.pinot.core.operator.filter.predicate.RangePredicateEvaluatorFactory;
-import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
+import org.apache.pinot.core.common.predicate.RangePredicate;
+import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
+import org.apache.pinot.core.operator.filter.predicate.RangePredicateEvaluatorFactory;
+import org.apache.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 

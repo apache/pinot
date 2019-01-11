@@ -16,12 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.operator.filter;
+package org.apache.pinot.core.operator.filter;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.core.operator.blocks.FilterBlock;
-import com.linkedin.pinot.core.operator.docidsets.AndBlockDocIdSet;
-import com.linkedin.pinot.core.operator.docidsets.FilterBlockDocIdSet;
+import org.apache.pinot.core.operator.blocks.FilterBlock;
+import org.apache.pinot.core.operator.docidsets.AndBlockDocIdSet;
+import org.apache.pinot.core.operator.docidsets.FilterBlockDocIdSet;
 import java.util.ArrayList;
 import java.util.List;
 

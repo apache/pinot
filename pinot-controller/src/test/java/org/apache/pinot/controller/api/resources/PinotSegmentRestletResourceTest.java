@@ -16,17 +16,17 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.controller.api.resources;
+package org.apache.pinot.controller.api.resources;
 
-import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.segment.SegmentMetadata;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.JsonUtils;
-import com.linkedin.pinot.common.utils.ZkStarter;
-import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
-import com.linkedin.pinot.controller.helix.ControllerTest;
-import com.linkedin.pinot.controller.utils.SegmentMetadataMockUtils;
+import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.common.config.TableNameBuilder;
+import org.apache.pinot.common.segment.SegmentMetadata;
+import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.JsonUtils;
+import org.apache.pinot.common.utils.ZkStarter;
+import org.apache.pinot.controller.helix.ControllerRequestBuilderUtil;
+import org.apache.pinot.controller.helix.ControllerTest;
+import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
 import java.util.HashMap;
 import java.util.Map;
 import org.testng.Assert;

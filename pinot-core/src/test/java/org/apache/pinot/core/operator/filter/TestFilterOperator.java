@@ -16,12 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.operator.filter;
+package org.apache.pinot.core.operator.filter;
 
-import com.linkedin.pinot.core.common.BlockDocIdIterator;
-import com.linkedin.pinot.core.operator.blocks.FilterBlock;
-import com.linkedin.pinot.core.operator.dociditerators.ArrayBasedDocIdIterator;
-import com.linkedin.pinot.core.operator.docidsets.FilterBlockDocIdSet;
+import org.apache.pinot.core.common.BlockDocIdIterator;
+import org.apache.pinot.core.operator.blocks.FilterBlock;
+import org.apache.pinot.core.operator.dociditerators.ArrayBasedDocIdIterator;
+import org.apache.pinot.core.operator.docidsets.FilterBlockDocIdSet;
 
 
 public class TestFilterOperator extends BaseFilterOperator {

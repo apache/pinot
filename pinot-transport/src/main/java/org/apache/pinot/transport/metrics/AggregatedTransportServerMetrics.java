@@ -16,13 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.transport.metrics;
+package org.apache.pinot.transport.metrics;
 
-import com.linkedin.pinot.common.metrics.AggregatedCounter;
-import com.linkedin.pinot.common.metrics.AggregatedHistogram;
-import com.linkedin.pinot.common.metrics.AggregatedMetricsRegistry;
-import com.linkedin.pinot.common.metrics.LatencyMetric;
-import com.linkedin.pinot.common.metrics.MetricsHelper;
+import org.apache.pinot.common.metrics.AggregatedCounter;
+import org.apache.pinot.common.metrics.AggregatedHistogram;
+import org.apache.pinot.common.metrics.AggregatedMetricsRegistry;
+import org.apache.pinot.common.metrics.LatencyMetric;
+import org.apache.pinot.common.metrics.MetricsHelper;
 import com.yammer.metrics.core.MetricName;
 import com.yammer.metrics.core.Sampling;
 import com.yammer.metrics.core.Summarizable;

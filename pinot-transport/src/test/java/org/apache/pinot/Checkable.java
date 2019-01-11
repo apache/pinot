@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot;
+package org.apache.pinot;
 
 /**
  * To verify asynchronous conditions

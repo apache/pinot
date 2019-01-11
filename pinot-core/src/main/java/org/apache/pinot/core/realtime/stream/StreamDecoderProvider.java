@@ -16,10 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.realtime.stream;
+package org.apache.pinot.core.realtime.stream;
 
-import com.linkedin.pinot.common.Utils;
-import com.linkedin.pinot.common.data.Schema;
+import org.apache.pinot.common.Utils;
+import org.apache.pinot.common.data.Schema;
 import java.util.Map;
 
 

@@ -16,19 +16,19 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.broker.queryquota;
+package org.apache.pinot.broker.queryquota;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
 import com.google.common.util.concurrent.RateLimiter;
-import com.linkedin.pinot.common.config.QuotaConfig;
-import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
-import com.linkedin.pinot.common.metrics.BrokerGauge;
-import com.linkedin.pinot.common.metrics.BrokerMetrics;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.helix.HelixHelper;
+import org.apache.pinot.common.config.QuotaConfig;
+import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.common.config.TableNameBuilder;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.metrics.BrokerGauge;
+import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.helix.HelixHelper;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -39,7 +39,7 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static com.linkedin.pinot.common.utils.CommonConstants.Helix.*;
+import static org.apache.pinot.common.utils.CommonConstants.Helix.*;
 
 
 public class TableQueryQuotaManager {

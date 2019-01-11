@@ -16,11 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.realtime.stream;
+package org.apache.pinot.core.realtime.stream;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.utils.EqualityUtils;
-import com.linkedin.pinot.common.utils.time.TimeUtils;
+import org.apache.pinot.common.utils.EqualityUtils;
+import org.apache.pinot.common.utils.time.TimeUtils;
 
 
 /**

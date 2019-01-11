@@ -16,11 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.common.segment.fetcher;
+package org.apache.pinot.common.segment.fetcher;
 
-import com.linkedin.pinot.common.utils.ClientSSLContextGenerator;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.FileUploadDownloadClient;
+import org.apache.pinot.common.utils.ClientSSLContextGenerator;
+import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import java.util.Set;
 import java.util.stream.Collectors;
 import javax.net.ssl.SSLContext;

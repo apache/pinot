@@ -16,16 +16,16 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.startree.v2.store;
+package org.apache.pinot.core.startree.v2.store;
 
-import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
-import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
-import com.linkedin.pinot.core.segment.index.column.ColumnIndexContainer;
-import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
-import com.linkedin.pinot.core.startree.v2.StarTreeV2;
-import com.linkedin.pinot.core.startree.v2.StarTreeV2Constants;
-import com.linkedin.pinot.core.startree.v2.StarTreeV2Metadata;
+import org.apache.pinot.common.segment.ReadMode;
+import org.apache.pinot.core.segment.creator.impl.V1Constants;
+import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
+import org.apache.pinot.core.segment.index.column.ColumnIndexContainer;
+import org.apache.pinot.core.segment.memory.PinotDataBuffer;
+import org.apache.pinot.core.startree.v2.StarTreeV2;
+import org.apache.pinot.core.startree.v2.StarTreeV2Constants;
+import org.apache.pinot.core.startree.v2.StarTreeV2Metadata;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
@@ -34,7 +34,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.commons.configuration.ConfigurationException;
 
-import static com.linkedin.pinot.core.startree.v2.store.StarTreeIndexMapUtils.*;
+import static org.apache.pinot.core.startree.v2.store.StarTreeIndexMapUtils.*;
 
 
 /**

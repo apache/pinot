@@ -16,12 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.tools.admin.command;
+package org.apache.pinot.tools.admin.command;
 
-import com.linkedin.pinot.common.utils.NetUtil;
-import com.linkedin.pinot.controller.ControllerConf;
-import com.linkedin.pinot.controller.ControllerStarter;
-import com.linkedin.pinot.tools.Command;
+import org.apache.pinot.common.utils.NetUtil;
+import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.controller.ControllerStarter;
+import org.apache.pinot.tools.Command;
 import java.io.File;
 import org.apache.commons.configuration.ConfigurationException;
 import org.kohsuke.args4j.Option;

@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.startree.v2;
+package org.apache.pinot.core.startree.v2;
 
-import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionType;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunctionType;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 

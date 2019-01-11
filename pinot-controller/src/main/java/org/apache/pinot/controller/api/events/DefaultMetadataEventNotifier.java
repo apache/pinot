@@ -16,10 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.controller.api.events;
+package org.apache.pinot.controller.api.events;
 
-import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.data.Schema;
+import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.common.data.Schema;
 
 public class DefaultMetadataEventNotifier implements MetadataEventNotifier {
   public void notifyOnSchemaEvents(Schema schema, SchemaEventType eventType) {

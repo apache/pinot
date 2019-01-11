@@ -16,13 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.io.reader.impl.v1;
+package org.apache.pinot.core.io.reader.impl.v1;
 
-import com.linkedin.pinot.core.io.compression.ChunkCompressorFactory;
-import com.linkedin.pinot.core.io.compression.ChunkDecompressor;
-import com.linkedin.pinot.core.io.reader.BaseSingleColumnSingleValueReader;
-import com.linkedin.pinot.core.io.reader.impl.ChunkReaderContext;
-import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
+import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
+import org.apache.pinot.core.io.compression.ChunkDecompressor;
+import org.apache.pinot.core.io.reader.BaseSingleColumnSingleValueReader;
+import org.apache.pinot.core.io.reader.impl.ChunkReaderContext;
+import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import org.slf4j.Logger;

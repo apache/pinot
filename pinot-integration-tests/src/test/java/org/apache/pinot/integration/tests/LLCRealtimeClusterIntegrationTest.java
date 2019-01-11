@@ -16,13 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.integration.tests;
+package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Function;
-import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.util.TestUtils;
+import org.apache.pinot.common.config.TableNameBuilder;
+import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.util.TestUtils;
 import java.io.File;
 import java.util.Arrays;
 import java.util.List;

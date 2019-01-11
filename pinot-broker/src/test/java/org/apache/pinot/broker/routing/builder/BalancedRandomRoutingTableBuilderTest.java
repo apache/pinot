@@ -16,10 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.broker.routing.builder;
+package org.apache.pinot.broker.routing.builder;
 
-import com.linkedin.pinot.broker.routing.RoutingTableLookupRequest;
-import com.linkedin.pinot.common.config.TableConfig;
+import org.apache.pinot.broker.routing.RoutingTableLookupRequest;
+import org.apache.pinot.common.config.TableConfig;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Iterator;

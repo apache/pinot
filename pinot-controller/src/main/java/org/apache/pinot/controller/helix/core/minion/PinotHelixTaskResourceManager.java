@@ -16,12 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.controller.helix.core.minion;
+package org.apache.pinot.controller.helix.core.minion;
 
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.Uninterruptibles;
-import com.linkedin.pinot.common.config.PinotTaskConfig;
-import com.linkedin.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.config.PinotTaskConfig;
+import org.apache.pinot.common.utils.CommonConstants;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;

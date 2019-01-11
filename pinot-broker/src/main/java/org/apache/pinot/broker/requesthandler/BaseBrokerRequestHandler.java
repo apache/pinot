@@ -16,31 +16,31 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.broker.requesthandler;
+package org.apache.pinot.broker.requesthandler;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Splitter;
-import com.linkedin.pinot.broker.api.RequestStatistics;
-import com.linkedin.pinot.broker.api.RequesterIdentity;
-import com.linkedin.pinot.broker.broker.AccessControlFactory;
-import com.linkedin.pinot.broker.queryquota.TableQueryQuotaManager;
-import com.linkedin.pinot.broker.routing.RoutingTable;
-import com.linkedin.pinot.broker.routing.RoutingTableLookupRequest;
-import com.linkedin.pinot.broker.routing.TimeBoundaryService;
-import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.exception.QueryException;
-import com.linkedin.pinot.common.metrics.BrokerMeter;
-import com.linkedin.pinot.common.metrics.BrokerMetrics;
-import com.linkedin.pinot.common.metrics.BrokerQueryPhase;
-import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.common.request.FilterOperator;
-import com.linkedin.pinot.common.request.FilterQuery;
-import com.linkedin.pinot.common.request.FilterQueryMap;
-import com.linkedin.pinot.common.response.BrokerResponse;
-import com.linkedin.pinot.common.response.broker.BrokerResponseNative;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.core.query.reduce.BrokerReduceService;
-import com.linkedin.pinot.pql.parsers.Pql2Compiler;
+import org.apache.pinot.broker.api.RequestStatistics;
+import org.apache.pinot.broker.api.RequesterIdentity;
+import org.apache.pinot.broker.broker.AccessControlFactory;
+import org.apache.pinot.broker.queryquota.TableQueryQuotaManager;
+import org.apache.pinot.broker.routing.RoutingTable;
+import org.apache.pinot.broker.routing.RoutingTableLookupRequest;
+import org.apache.pinot.broker.routing.TimeBoundaryService;
+import org.apache.pinot.common.config.TableNameBuilder;
+import org.apache.pinot.common.exception.QueryException;
+import org.apache.pinot.common.metrics.BrokerMeter;
+import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.common.metrics.BrokerQueryPhase;
+import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.request.FilterOperator;
+import org.apache.pinot.common.request.FilterQuery;
+import org.apache.pinot.common.request.FilterQueryMap;
+import org.apache.pinot.common.response.BrokerResponse;
+import org.apache.pinot.common.response.broker.BrokerResponseNative;
+import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.core.query.reduce.BrokerReduceService;
+import org.apache.pinot.pql.parsers.Pql2Compiler;
 import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -55,8 +55,8 @@ import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static com.linkedin.pinot.common.utils.CommonConstants.Broker.*;
-import static com.linkedin.pinot.common.utils.CommonConstants.Broker.Request.*;
+import static org.apache.pinot.common.utils.CommonConstants.Broker.*;
+import static org.apache.pinot.common.utils.CommonConstants.Broker.Request.*;
 
 
 @ThreadSafe

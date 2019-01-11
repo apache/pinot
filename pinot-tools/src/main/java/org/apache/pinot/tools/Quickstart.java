@@ -16,13 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.tools;
+package org.apache.pinot.tools;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
-import com.linkedin.pinot.core.data.readers.FileFormat;
-import com.linkedin.pinot.tools.admin.command.QuickstartRunner;
+import org.apache.pinot.core.data.readers.FileFormat;
+import org.apache.pinot.tools.admin.command.QuickstartRunner;
 import java.io.File;
 import java.net.URL;
 import java.util.Enumeration;

@@ -16,18 +16,18 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.startree.v2.store;
+package org.apache.pinot.core.startree.v2.store;
 
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.core.common.Block;
-import com.linkedin.pinot.core.common.DataSource;
-import com.linkedin.pinot.core.common.DataSourceMetadata;
-import com.linkedin.pinot.core.io.reader.impl.v1.FixedBitSingleValueReader;
-import com.linkedin.pinot.core.operator.blocks.SingleValueBlock;
-import com.linkedin.pinot.core.segment.index.readers.BloomFilterReader;
-import com.linkedin.pinot.core.segment.index.readers.Dictionary;
-import com.linkedin.pinot.core.segment.index.readers.InvertedIndexReader;
-import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
+import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.core.common.Block;
+import org.apache.pinot.core.common.DataSource;
+import org.apache.pinot.core.common.DataSourceMetadata;
+import org.apache.pinot.core.io.reader.impl.v1.FixedBitSingleValueReader;
+import org.apache.pinot.core.operator.blocks.SingleValueBlock;
+import org.apache.pinot.core.segment.index.readers.BloomFilterReader;
+import org.apache.pinot.core.segment.index.readers.Dictionary;
+import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
+import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 
 
 /**

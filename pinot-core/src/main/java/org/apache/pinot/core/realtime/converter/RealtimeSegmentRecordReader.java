@@ -16,12 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.realtime.converter;
+package org.apache.pinot.core.realtime.converter;
 
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.data.readers.RecordReader;
-import com.linkedin.pinot.core.indexsegment.mutable.MutableSegmentImpl;
+import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.core.data.GenericRow;
+import org.apache.pinot.core.data.readers.RecordReader;
+import org.apache.pinot.core.indexsegment.mutable.MutableSegmentImpl;
 
 
 /**

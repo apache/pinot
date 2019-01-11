@@ -16,11 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.broker.requesthandler;
+package org.apache.pinot.broker.requesthandler;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
-import com.linkedin.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.request.BrokerRequest;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;

@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.startree.hll;
+package org.apache.pinot.startree.hll;
 
 public class HllConstants {
     public static final int DEFAULT_LOG2M = 8;

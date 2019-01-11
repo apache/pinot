@@ -16,14 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.startree.v2;
+package org.apache.pinot.core.startree.v2;
 
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import org.apache.commons.configuration.Configuration;
 
-import static com.linkedin.pinot.core.startree.v2.StarTreeV2Constants.MetadataKey.*;
+import static org.apache.pinot.core.startree.v2.StarTreeV2Constants.MetadataKey.*;
 
 
 /**

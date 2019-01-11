@@ -16,11 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.data.readers;
+package org.apache.pinot.core.data.readers;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import java.io.File;
 
 

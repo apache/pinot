@@ -16,10 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.util;
+package org.apache.pinot.util;
 
 import com.google.common.base.Function;
-import com.linkedin.pinot.common.response.broker.GroupByResult;
+import org.apache.pinot.common.response.broker.GroupByResult;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;

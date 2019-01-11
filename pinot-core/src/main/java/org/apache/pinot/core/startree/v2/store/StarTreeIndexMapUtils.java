@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.startree.v2.store;
+package org.apache.pinot.core.startree.v2.store;
 
 import com.google.common.base.Preconditions;
 import java.io.File;

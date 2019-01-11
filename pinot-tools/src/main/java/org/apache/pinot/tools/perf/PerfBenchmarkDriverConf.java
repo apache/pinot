@@ -16,13 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.tools.perf;
+package org.apache.pinot.tools.perf;
 
 import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.DumperOptions.FlowStyle;
 import org.yaml.snakeyaml.Yaml;
 
-import com.linkedin.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.CommonConstants;
 
 
 public class PerfBenchmarkDriverConf {

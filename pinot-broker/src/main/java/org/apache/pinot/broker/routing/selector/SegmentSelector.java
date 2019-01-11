@@ -16,10 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.broker.routing.selector;
+package org.apache.pinot.broker.routing.selector;
 
-import com.linkedin.pinot.broker.routing.RoutingTableLookupRequest;
-import com.linkedin.pinot.common.config.TableConfig;
+import org.apache.pinot.broker.routing.RoutingTableLookupRequest;
+import org.apache.pinot.common.config.TableConfig;
 import java.util.Set;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;

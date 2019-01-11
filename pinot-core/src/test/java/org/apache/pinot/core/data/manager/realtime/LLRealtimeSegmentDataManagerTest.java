@@ -16,25 +16,25 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.data.manager.realtime;
+package org.apache.pinot.core.data.manager.realtime;
 
-import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
-import com.linkedin.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
-import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
-import com.linkedin.pinot.common.metrics.ServerMetrics;
-import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
-import com.linkedin.pinot.common.utils.JsonUtils;
-import com.linkedin.pinot.common.utils.LLCSegmentName;
-import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.data.manager.config.InstanceDataManagerConfig;
-import com.linkedin.pinot.core.indexsegment.mutable.MutableSegmentImpl;
-import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentStatsHistory;
-import com.linkedin.pinot.core.realtime.stream.PermanentConsumerException;
-import com.linkedin.pinot.core.realtime.stream.StreamConfigProperties;
-import com.linkedin.pinot.core.realtime.stream.StreamMessageDecoder;
-import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
+import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
+import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
+import org.apache.pinot.common.utils.JsonUtils;
+import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.core.data.GenericRow;
+import org.apache.pinot.core.data.manager.config.InstanceDataManagerConfig;
+import org.apache.pinot.core.indexsegment.mutable.MutableSegmentImpl;
+import org.apache.pinot.core.realtime.impl.RealtimeSegmentStatsHistory;
+import org.apache.pinot.core.realtime.stream.PermanentConsumerException;
+import org.apache.pinot.core.realtime.stream.StreamConfigProperties;
+import org.apache.pinot.core.realtime.stream.StreamMessageDecoder;
+import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
 import com.yammer.metrics.core.MetricsRegistry;
 import java.io.File;
 import java.io.IOException;
@@ -86,7 +86,7 @@ public class LLRealtimeSegmentDataManagerTest {
       + "      \"stream.kafka.broker.list\": \"broker:7777\", \n"
       + "      \"stream.kafka.consumer.prop.auto.offset.reset\": \"smallest\", \n"
       + "      \"stream.kafka.consumer.type\": \"simple\", \n"
-      + "      \"stream.kafka.consumer.factory.class.name\": \"com.linkedin.pinot.core.realtime.impl.kafka.KafkaConsumerFactory\", \n"
+      + "      \"stream.kafka.consumer.factory.class.name\": \"org.apache.pinot.core.realtime.impl.kafka.KafkaConsumerFactory\", \n"
       + "      \"stream.kafka.decoder.class.name\": \"" + FakeStreamMessageDecoder.class.getName() + "\", \n"
       + "      \"stream.kafka.decoder.prop.schema.registry.rest.url\": \"http://schema-registry-host.corp.ceo:1766/schemas\", \n"
       + "      \"stream.kafka.decoder.prop.schema.registry.schema.name\": \"UnknownSchema\", \n"

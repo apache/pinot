@@ -16,13 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.operator.docidsets;
+package org.apache.pinot.core.operator.docidsets;
 
-import com.linkedin.pinot.core.common.BlockMetadata;
-import com.linkedin.pinot.core.common.BlockValSet;
-import com.linkedin.pinot.core.operator.dociditerators.SVScanDocIdIterator;
-import com.linkedin.pinot.core.operator.dociditerators.ScanBasedDocIdIterator;
-import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluator;
+import org.apache.pinot.core.common.BlockMetadata;
+import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.operator.dociditerators.SVScanDocIdIterator;
+import org.apache.pinot.core.operator.dociditerators.ScanBasedDocIdIterator;
+import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 
 
 public class ScanBasedSingleValueDocIdSet implements FilterBlockDocIdSet {

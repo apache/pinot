@@ -16,14 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.realtime.impl.dictionary;
+package org.apache.pinot.core.realtime.impl.dictionary;
 
 import java.io.IOException;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
-import com.linkedin.pinot.core.segment.index.readers.Dictionary;
+import org.apache.pinot.core.segment.index.readers.Dictionary;
 
 
 /**

@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.segment.index.converter;
+package org.apache.pinot.core.segment.index.converter;
 
-import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
+import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
 
 
 public class SegmentFormatConverterFactory {

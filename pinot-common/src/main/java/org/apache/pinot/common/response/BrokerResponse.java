@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.common.response;
+package org.apache.pinot.common.response;
 
-import com.linkedin.pinot.common.response.broker.QueryProcessingException;
+import org.apache.pinot.common.response.broker.QueryProcessingException;
 import java.util.List;
 
 

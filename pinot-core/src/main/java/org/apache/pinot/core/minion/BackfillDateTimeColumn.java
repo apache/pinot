@@ -16,25 +16,25 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.minion;
+package org.apache.pinot.core.minion;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.data.DateTimeFieldSpec;
-import com.linkedin.pinot.common.data.DateTimeFormatSpec;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.data.StarTreeIndexSpec;
-import com.linkedin.pinot.common.data.TimeFieldSpec;
-import com.linkedin.pinot.common.data.TimeGranularitySpec;
-import com.linkedin.pinot.common.segment.StarTreeMetadata;
-import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.data.readers.FileFormat;
-import com.linkedin.pinot.core.data.readers.PinotSegmentRecordReader;
-import com.linkedin.pinot.core.data.readers.RecordReader;
-import com.linkedin.pinot.core.data.recordtransformer.CompoundTransformer;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
-import com.linkedin.pinot.core.segment.creator.RecordReaderSegmentCreationDataSource;
-import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
-import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+import org.apache.pinot.common.data.DateTimeFieldSpec;
+import org.apache.pinot.common.data.DateTimeFormatSpec;
+import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.common.data.StarTreeIndexSpec;
+import org.apache.pinot.common.data.TimeFieldSpec;
+import org.apache.pinot.common.data.TimeGranularitySpec;
+import org.apache.pinot.common.segment.StarTreeMetadata;
+import org.apache.pinot.core.data.GenericRow;
+import org.apache.pinot.core.data.readers.FileFormat;
+import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
+import org.apache.pinot.core.data.readers.RecordReader;
+import org.apache.pinot.core.data.recordtransformer.CompoundTransformer;
+import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import org.apache.pinot.core.segment.creator.RecordReaderSegmentCreationDataSource;
+import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
 import java.io.File;
 import java.io.IOException;
 import javax.annotation.Nonnull;
@@ -146,7 +146,7 @@ public class BackfillDateTimeColumn {
     /**
      * Reads the next row from the baseRecordReader, and adds a dateTimeFieldSPec column to it
      * {@inheritDoc}
-     * @see com.linkedin.pinot.core.data.readers.RecordReader#next(com.linkedin.pinot.core.data.GenericRow)
+     * @see org.apache.pinot.core.data.readers.RecordReader#next(org.apache.pinot.core.data.GenericRow)
      */
     @Override
     public GenericRow next(GenericRow reuse) throws IOException {

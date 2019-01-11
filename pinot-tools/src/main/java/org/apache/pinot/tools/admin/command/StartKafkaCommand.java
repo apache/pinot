@@ -16,10 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.tools.admin.command;
+package org.apache.pinot.tools.admin.command;
 
-import com.linkedin.pinot.common.utils.KafkaStarterUtils;
-import com.linkedin.pinot.tools.Command;
+import org.apache.pinot.common.utils.KafkaStarterUtils;
+import org.apache.pinot.tools.Command;
 import java.io.File;
 import java.io.IOException;
 import org.kohsuke.args4j.Option;

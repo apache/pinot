@@ -16,10 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.tools.query.comparison;
+package org.apache.pinot.tools.query.comparison;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.linkedin.pinot.common.utils.JsonUtils;
+import org.apache.pinot.common.utils.JsonUtils;
 import java.io.File;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.util;
+package org.apache.pinot.core.util;
 
 import java.util.Random;
 import org.testng.Assert;

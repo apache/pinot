@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.minion.rollup.aggregate;
+package org.apache.pinot.core.minion.rollup.aggregate;
 
-import com.linkedin.pinot.common.data.MetricFieldSpec;
+import org.apache.pinot.common.data.MetricFieldSpec;
 
 
 /**

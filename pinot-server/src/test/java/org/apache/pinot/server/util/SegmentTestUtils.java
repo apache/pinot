@@ -16,13 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.server.util;
+package org.apache.pinot.server.util;
 
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.core.data.readers.FileFormat;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
-import com.linkedin.pinot.core.util.AvroUtils;
+import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.core.data.readers.FileFormat;
+import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
+import org.apache.pinot.core.util.AvroUtils;
 import java.io.File;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;

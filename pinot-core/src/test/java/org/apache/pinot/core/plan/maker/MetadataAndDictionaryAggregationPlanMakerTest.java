@@ -16,26 +16,26 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.plan.maker;
+package org.apache.pinot.core.plan.maker;
 
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.data.StarTreeIndexSpec;
-import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
-import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
-import com.linkedin.pinot.core.plan.AggregationGroupByPlanNode;
-import com.linkedin.pinot.core.plan.AggregationPlanNode;
-import com.linkedin.pinot.core.plan.DictionaryBasedAggregationPlanNode;
-import com.linkedin.pinot.core.plan.MetadataBasedAggregationPlanNode;
-import com.linkedin.pinot.core.plan.PlanNode;
-import com.linkedin.pinot.core.plan.SelectionPlanNode;
-import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
-import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
-import com.linkedin.pinot.pql.parsers.Pql2Compiler;
+import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.common.data.FieldSpec.DataType;
+import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.common.data.StarTreeIndexSpec;
+import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.segment.ReadMode;
+import org.apache.pinot.core.indexsegment.IndexSegment;
+import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
+import org.apache.pinot.core.plan.AggregationGroupByPlanNode;
+import org.apache.pinot.core.plan.AggregationPlanNode;
+import org.apache.pinot.core.plan.DictionaryBasedAggregationPlanNode;
+import org.apache.pinot.core.plan.MetadataBasedAggregationPlanNode;
+import org.apache.pinot.core.plan.PlanNode;
+import org.apache.pinot.core.plan.SelectionPlanNode;
+import org.apache.pinot.core.segment.creator.SegmentIndexCreationDriver;
+import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.pql.parsers.Pql2Compiler;
 import java.io.File;
 import java.net.URL;
 import java.util.ArrayList;

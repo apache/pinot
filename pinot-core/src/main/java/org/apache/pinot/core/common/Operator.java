@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.common;
+package org.apache.pinot.core.common;
 
-import com.linkedin.pinot.core.operator.ExecutionStatistics;
+import org.apache.pinot.core.operator.ExecutionStatistics;
 
 
 public interface Operator<T extends Block> {

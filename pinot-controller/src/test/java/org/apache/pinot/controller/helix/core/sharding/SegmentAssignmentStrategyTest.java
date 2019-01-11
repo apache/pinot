@@ -16,24 +16,24 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.controller.helix.core.sharding;
+package org.apache.pinot.controller.helix.core.sharding;
 
-import com.linkedin.pinot.common.config.ColumnPartitionConfig;
-import com.linkedin.pinot.common.config.IndexingConfig;
-import com.linkedin.pinot.common.config.ReplicaGroupStrategyConfig;
-import com.linkedin.pinot.common.config.SegmentPartitionConfig;
-import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.partition.ReplicaGroupPartitionAssignment;
-import com.linkedin.pinot.common.partition.ReplicaGroupPartitionAssignmentGenerator;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.ZkStarter;
-import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
-import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
-import com.linkedin.pinot.controller.helix.core.util.HelixSetupUtils;
-import com.linkedin.pinot.controller.helix.starter.HelixConfig;
-import com.linkedin.pinot.controller.utils.ReplicaGroupTestUtils;
-import com.linkedin.pinot.controller.utils.SegmentMetadataMockUtils;
+import org.apache.pinot.common.config.ColumnPartitionConfig;
+import org.apache.pinot.common.config.IndexingConfig;
+import org.apache.pinot.common.config.ReplicaGroupStrategyConfig;
+import org.apache.pinot.common.config.SegmentPartitionConfig;
+import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.common.config.TableNameBuilder;
+import org.apache.pinot.common.partition.ReplicaGroupPartitionAssignment;
+import org.apache.pinot.common.partition.ReplicaGroupPartitionAssignmentGenerator;
+import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.ZkStarter;
+import org.apache.pinot.controller.helix.ControllerRequestBuilderUtil;
+import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.helix.core.util.HelixSetupUtils;
+import org.apache.pinot.controller.helix.starter.HelixConfig;
+import org.apache.pinot.controller.utils.ReplicaGroupTestUtils;
+import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;

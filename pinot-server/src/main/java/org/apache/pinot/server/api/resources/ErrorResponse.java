@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.server.api.resources;
+package org.apache.pinot.server.api.resources;
 
 import org.slf4j.LoggerFactory;
 import org.slf4j.Logger;

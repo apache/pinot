@@ -16,11 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.controller.api.resources;
+package org.apache.pinot.controller.api.resources;
 
-import com.linkedin.pinot.common.Utils;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.NetUtil;
+import org.apache.pinot.common.Utils;
+import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.NetUtil;
 import java.io.IOException;
 import javax.inject.Singleton;
 import javax.ws.rs.container.ContainerRequestContext;

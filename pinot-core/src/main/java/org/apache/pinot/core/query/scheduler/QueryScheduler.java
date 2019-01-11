@@ -16,23 +16,23 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.query.scheduler;
+package org.apache.pinot.core.query.scheduler;
 
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListenableFutureTask;
-import com.linkedin.pinot.common.exception.QueryException;
-import com.linkedin.pinot.common.metrics.ServerMeter;
-import com.linkedin.pinot.common.metrics.ServerMetrics;
-import com.linkedin.pinot.common.metrics.ServerQueryPhase;
-import com.linkedin.pinot.common.response.ProcessingException;
-import com.linkedin.pinot.common.utils.DataTable;
-import com.linkedin.pinot.core.common.datatable.DataTableImplV2;
-import com.linkedin.pinot.core.query.executor.QueryExecutor;
-import com.linkedin.pinot.core.query.request.ServerQueryRequest;
-import com.linkedin.pinot.core.query.request.context.TimerContext;
-import com.linkedin.pinot.core.query.scheduler.resources.ResourceManager;
+import org.apache.pinot.common.exception.QueryException;
+import org.apache.pinot.common.metrics.ServerMeter;
+import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.metrics.ServerQueryPhase;
+import org.apache.pinot.common.response.ProcessingException;
+import org.apache.pinot.common.utils.DataTable;
+import org.apache.pinot.core.common.datatable.DataTableImplV2;
+import org.apache.pinot.core.query.executor.QueryExecutor;
+import org.apache.pinot.core.query.request.ServerQueryRequest;
+import org.apache.pinot.core.query.request.context.TimerContext;
+import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.LongAccumulator;

@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.minion.exception;
+package org.apache.pinot.minion.exception;
 
 /**
  * The class <code>TaskCancelledException</code> defines the exception should be thrown when task has been cancelled.

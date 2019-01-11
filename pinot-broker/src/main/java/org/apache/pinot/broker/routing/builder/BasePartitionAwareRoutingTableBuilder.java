@@ -16,16 +16,16 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.broker.routing.builder;
+package org.apache.pinot.broker.routing.builder;
 
-import com.linkedin.pinot.broker.pruner.SegmentPrunerContext;
-import com.linkedin.pinot.broker.pruner.SegmentZKMetadataPrunerService;
-import com.linkedin.pinot.broker.routing.RoutingTableLookupRequest;
-import com.linkedin.pinot.broker.routing.selector.SegmentSelector;
-import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
-import com.linkedin.pinot.common.metrics.BrokerMeter;
-import com.linkedin.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.broker.pruner.SegmentPrunerContext;
+import org.apache.pinot.broker.pruner.SegmentZKMetadataPrunerService;
+import org.apache.pinot.broker.routing.RoutingTableLookupRequest;
+import org.apache.pinot.broker.routing.selector.SegmentSelector;
+import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.metrics.BrokerMeter;
+import org.apache.pinot.common.metrics.BrokerMetrics;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;

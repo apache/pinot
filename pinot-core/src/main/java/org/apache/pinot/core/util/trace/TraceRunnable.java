@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.util.trace;
+package org.apache.pinot.core.util.trace;
 
 /**
  * Wrapper class for {@link Runnable} to automatically register/un-register itself to/from a request.

@@ -24,10 +24,10 @@
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <artifactId>pinot</artifactId>
-    <groupId>com.linkedin.pinot</groupId>
+    <groupId>org.apache.pinot</groupId>
     <version>0.016</version>
   </parent>
-  <groupId>com.linkedin.pinot</groupId>
+  <groupId>org.apache.pinot</groupId>
   <artifactId>pinot-tools</artifactId>
   <version>0.016</version>
   <name>pinot-tools</name>
@@ -37,23 +37,23 @@
   </properties>
   <dependencies>
     <dependency>
-      <groupId>com.linkedin.pinot</groupId>
+      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-core</artifactId>
     </dependency>
     <dependency>
-      <groupId>com.linkedin.pinot</groupId>
+      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-common</artifactId>
     </dependency>
      <dependency>
-      <groupId>com.linkedin.pinot</groupId>
+      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-server</artifactId>
     </dependency>
      <dependency>
-      <groupId>com.linkedin.pinot</groupId>
+      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-controller</artifactId>
     </dependency>
      <dependency>
-      <groupId>com.linkedin.pinot</groupId>
+      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-broker</artifactId>
     </dependency>
     <dependency>
@@ -90,7 +90,7 @@
         <configuration>
           <programs>
             <program>
-              <mainClass>com.linkedin.pinot.tools.PinotToolLauncher</mainClass>
+              <mainClass>org.apache.pinot.tools.PinotToolLauncher</mainClass>
               <name>pinot-tools</name>
               <jvmSettings>
                 <initialMemorySize>1G</initialMemorySize>
@@ -101,7 +101,7 @@
               </jvmSettings>
             </program>
             <program>
-              <mainClass>com.linkedin.pinot.tools.admin.PinotAdministrator</mainClass>
+              <mainClass>org.apache.pinot.tools.admin.PinotAdministrator</mainClass>
               <name>pinot-admin</name>
               <jvmSettings>
                 <initialMemorySize>4G</initialMemorySize>
@@ -113,7 +113,7 @@
               </jvmSettings>
             </program>
             <program>
-              <mainClass>com.linkedin.pinot.tools.scan.query.ScanBasedQueryProcessor</mainClass>
+              <mainClass>org.apache.pinot.tools.scan.query.ScanBasedQueryProcessor</mainClass>
               <name>scan-query</name>
               <jvmSettings>
                 <initialMemorySize>1G</initialMemorySize>
@@ -125,7 +125,7 @@
               </jvmSettings>
             </program>
             <program>
-              <mainClass>com.linkedin.pinot.tools.query.comparison.QueryComparison</mainClass>
+              <mainClass>org.apache.pinot.tools.query.comparison.QueryComparison</mainClass>
               <name>query-comparator</name>
               <jvmSettings>
                 <initialMemorySize>10G</initialMemorySize>
@@ -137,7 +137,7 @@
               </jvmSettings>
             </program>
             <program>
-              <mainClass>com.linkedin.pinot.tools.query.comparison.StarQueryComparison</mainClass>
+              <mainClass>org.apache.pinot.tools.query.comparison.StarQueryComparison</mainClass>
               <name>star-query-comparator</name>
               <jvmSettings>
                 <initialMemorySize>10G</initialMemorySize>
@@ -149,7 +149,7 @@
               </jvmSettings>
             </program>
             <program>
-              <mainClass>com.linkedin.pinot.tools.query.comparison.StatsGenerator</mainClass>
+              <mainClass>org.apache.pinot.tools.query.comparison.StatsGenerator</mainClass>
               <name>stats-generator</name>
               <jvmSettings>
                 <initialMemorySize>1G</initialMemorySize>
@@ -160,7 +160,7 @@
               </jvmSettings>
             </program>
             <program>
-              <mainClass>com.linkedin.pinot.tools.StarTreeIndexViewer</mainClass>
+              <mainClass>org.apache.pinot.tools.StarTreeIndexViewer</mainClass>
               <name>star-tree-index-viewer</name>
               <jvmSettings>
                 <initialMemorySize>1G</initialMemorySize>
@@ -171,7 +171,7 @@
               </jvmSettings>
             </program>
             <program>
-              <mainClass>com.linkedin.pinot.tools.admin.PinotController</mainClass>
+              <mainClass>org.apache.pinot.tools.admin.PinotController</mainClass>
               <name>start-controller</name>
               <jvmSettings>
                 <initialMemorySize>1G</initialMemorySize>
@@ -182,7 +182,7 @@
               </jvmSettings>
             </program>
             <program>
-              <mainClass>com.linkedin.pinot.tools.admin.PinotBroker</mainClass>
+              <mainClass>org.apache.pinot.tools.admin.PinotBroker</mainClass>
               <name>start-broker</name>
               <jvmSettings>
                 <initialMemorySize>1G</initialMemorySize>
@@ -193,7 +193,7 @@
               </jvmSettings>
             </program>
             <program>
-              <mainClass>com.linkedin.pinot.tools.admin.PinotServer</mainClass>
+              <mainClass>org.apache.pinot.tools.admin.PinotServer</mainClass>
               <name>start-server</name>
               <jvmSettings>
                 <initialMemorySize>1G</initialMemorySize>
@@ -204,7 +204,7 @@
               </jvmSettings>
             </program>
             <program>
-              <mainClass>com.linkedin.pinot.tools.Quickstart</mainClass>
+              <mainClass>org.apache.pinot.tools.Quickstart</mainClass>
               <name>quick-start-offline</name>
               <jvmSettings>
                 <initialMemorySize>1G</initialMemorySize>
@@ -215,7 +215,7 @@
               </jvmSettings>
             </program>
             <program>
-              <mainClass>com.linkedin.pinot.tools.HybridQuickstart</mainClass>
+              <mainClass>org.apache.pinot.tools.HybridQuickstart</mainClass>
               <name>quick-start-hybrid</name>
               <jvmSettings>
                 <initialMemorySize>1G</initialMemorySize>
@@ -227,7 +227,7 @@
               </jvmSettings>
             </program>
             <program>
-              <mainClass>com.linkedin.pinot.tools.RealtimeQuickStart</mainClass>
+              <mainClass>org.apache.pinot.tools.RealtimeQuickStart</mainClass>
               <name>quick-start-realtime</name>
               <jvmSettings>
                 <initialMemorySize>1G</initialMemorySize>
@@ -269,7 +269,7 @@
               </descriptorRefs>
               <archive>
                 <manifest>
-                  <mainClass>com.linkedin.pinot.tools.PinotToolLauncher</mainClass>
+                  <mainClass>org.apache.pinot.tools.PinotToolLauncher</mainClass>
                 </manifest>
               </archive>
               <finalName>pinot-tool-launcher</finalName>
@@ -287,7 +287,7 @@
               </descriptorRefs>
               <archive>
                 <manifest>
-                  <mainClass>com.linkedin.pinot.tools.query.comparison.QueryComparison</mainClass>
+                  <mainClass>org.apache.pinot.tools.query.comparison.QueryComparison</mainClass>
                 </manifest>
               </archive>
               <finalName>query-comparison</finalName>

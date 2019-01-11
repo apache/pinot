@@ -16,17 +16,17 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.minion.rollup;
+package org.apache.pinot.core.minion.rollup;
 
-import com.linkedin.pinot.common.config.IndexingConfig;
-import com.linkedin.pinot.common.data.DimensionFieldSpec;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.exception.InvalidConfigException;
-import com.linkedin.pinot.common.segment.SegmentMetadata;
-import com.linkedin.pinot.core.minion.SegmentConverter;
-import com.linkedin.pinot.core.minion.segment.RecordAggregator;
-import com.linkedin.pinot.core.minion.segment.RecordTransformer;
-import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+import org.apache.pinot.common.config.IndexingConfig;
+import org.apache.pinot.common.data.DimensionFieldSpec;
+import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.common.exception.InvalidConfigException;
+import org.apache.pinot.common.segment.SegmentMetadata;
+import org.apache.pinot.core.minion.SegmentConverter;
+import org.apache.pinot.core.minion.segment.RecordAggregator;
+import org.apache.pinot.core.minion.segment.RecordTransformer;
+import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;

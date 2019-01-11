@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.controller;
+package org.apache.pinot.controller;
 
 /**
  * Interface for a subscriber to the {@link ControllerLeadershipManager}

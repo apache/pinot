@@ -16,12 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.pql.parsers.pql2.ast;
+package org.apache.pinot.pql.parsers.pql2.ast;
 
-import com.linkedin.pinot.common.request.AggregationInfo;
-import com.linkedin.pinot.common.request.transform.TransformExpressionTree;
-import com.linkedin.pinot.common.utils.EqualityUtils;
-import com.linkedin.pinot.pql.parsers.Pql2CompilationException;
+import org.apache.pinot.common.request.AggregationInfo;
+import org.apache.pinot.common.request.transform.TransformExpressionTree;
+import org.apache.pinot.common.utils.EqualityUtils;
+import org.apache.pinot.pql.parsers.Pql2CompilationException;
 import java.util.List;
 
 

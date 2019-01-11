@@ -16,11 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.controller.api.pojos;
+package org.apache.pinot.controller.api.pojos;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.linkedin.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.helix.model.InstanceConfig;
 
 

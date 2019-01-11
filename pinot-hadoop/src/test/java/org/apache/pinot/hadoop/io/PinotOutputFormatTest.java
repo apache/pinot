@@ -16,13 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.hadoop.io;
+package org.apache.pinot.hadoop.io;
 
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
-import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.data.readers.PinotSegmentRecordReader;
-import com.linkedin.pinot.core.data.readers.RecordReader;
+import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.core.data.GenericRow;
+import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
+import org.apache.pinot.core.data.readers.RecordReader;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;

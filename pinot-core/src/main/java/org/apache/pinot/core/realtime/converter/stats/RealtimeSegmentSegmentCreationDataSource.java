@@ -16,15 +16,15 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.realtime.converter.stats;
+package org.apache.pinot.core.realtime.converter.stats;
 
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.core.data.readers.RecordReader;
-import com.linkedin.pinot.core.indexsegment.mutable.MutableSegmentImpl;
-import com.linkedin.pinot.core.realtime.converter.RealtimeSegmentRecordReader;
-import com.linkedin.pinot.core.segment.creator.SegmentCreationDataSource;
-import com.linkedin.pinot.core.segment.creator.SegmentPreIndexStatsContainer;
-import com.linkedin.pinot.core.segment.creator.StatsCollectorConfig;
+import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.core.data.readers.RecordReader;
+import org.apache.pinot.core.indexsegment.mutable.MutableSegmentImpl;
+import org.apache.pinot.core.realtime.converter.RealtimeSegmentRecordReader;
+import org.apache.pinot.core.segment.creator.SegmentCreationDataSource;
+import org.apache.pinot.core.segment.creator.SegmentPreIndexStatsContainer;
+import org.apache.pinot.core.segment.creator.StatsCollectorConfig;
 
 
 /**

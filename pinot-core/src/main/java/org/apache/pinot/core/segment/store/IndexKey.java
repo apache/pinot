@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.segment.store;
+package org.apache.pinot.core.segment.store;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

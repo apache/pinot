@@ -16,21 +16,21 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.query.scheduler;
+package org.apache.pinot.core.query.scheduler;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListenableFutureTask;
 import com.google.common.util.concurrent.MoreExecutors;
-import com.linkedin.pinot.common.exception.QueryException;
-import com.linkedin.pinot.common.metrics.ServerMeter;
-import com.linkedin.pinot.common.metrics.ServerMetrics;
-import com.linkedin.pinot.common.metrics.ServerQueryPhase;
-import com.linkedin.pinot.core.query.executor.QueryExecutor;
-import com.linkedin.pinot.core.query.request.ServerQueryRequest;
-import com.linkedin.pinot.core.query.scheduler.resources.QueryExecutorService;
-import com.linkedin.pinot.core.query.scheduler.resources.ResourceManager;
+import org.apache.pinot.common.exception.QueryException;
+import org.apache.pinot.common.metrics.ServerMeter;
+import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.metrics.ServerQueryPhase;
+import org.apache.pinot.core.query.executor.QueryExecutor;
+import org.apache.pinot.core.query.request.ServerQueryRequest;
+import org.apache.pinot.core.query.scheduler.resources.QueryExecutorService;
+import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import java.util.List;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.LongAccumulator;

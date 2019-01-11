@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.plan;
+package org.apache.pinot.core.plan;
 
-import com.linkedin.pinot.common.utils.DataTable;
+import org.apache.pinot.common.utils.DataTable;
 
 
 /**

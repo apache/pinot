@@ -16,19 +16,19 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.startree.hll;
+package org.apache.pinot.core.startree.hll;
 
-import com.linkedin.pinot.common.data.DimensionFieldSpec;
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
-import com.linkedin.pinot.common.data.MetricFieldSpec;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.data.TimeFieldSpec;
-import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.startree.OffHeapStarTreeBuilder;
-import com.linkedin.pinot.core.startree.StarTreeBuilderConfig;
-import com.linkedin.pinot.startree.hll.HllConstants;
-import com.linkedin.pinot.startree.hll.HllSizeUtils;
+import org.apache.pinot.common.data.DimensionFieldSpec;
+import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.common.data.FieldSpec.DataType;
+import org.apache.pinot.common.data.MetricFieldSpec;
+import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.common.data.TimeFieldSpec;
+import org.apache.pinot.core.data.GenericRow;
+import org.apache.pinot.core.startree.OffHeapStarTreeBuilder;
+import org.apache.pinot.core.startree.StarTreeBuilderConfig;
+import org.apache.pinot.startree.hll.HllConstants;
+import org.apache.pinot.startree.hll.HllSizeUtils;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;

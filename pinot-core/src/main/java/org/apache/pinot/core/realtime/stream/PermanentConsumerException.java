@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.realtime.stream;
+package org.apache.pinot.core.realtime.stream;
 
 /**
  * A stream subsystem error that indicates a situation that is not likely to clear up by retrying the request (for

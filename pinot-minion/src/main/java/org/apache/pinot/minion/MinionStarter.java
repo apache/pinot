@@ -16,25 +16,25 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.minion;
+package org.apache.pinot.minion;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.Utils;
-import com.linkedin.pinot.common.metrics.MetricsHelper;
-import com.linkedin.pinot.common.segment.fetcher.SegmentFetcherFactory;
-import com.linkedin.pinot.common.utils.ClientSSLContextGenerator;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.NetUtil;
-import com.linkedin.pinot.common.utils.ServiceStatus;
-import com.linkedin.pinot.core.crypt.PinotCrypterFactory;
-import com.linkedin.pinot.filesystem.PinotFSFactory;
-import com.linkedin.pinot.minion.events.EventObserverFactoryRegistry;
-import com.linkedin.pinot.minion.events.MinionEventObserverFactory;
-import com.linkedin.pinot.minion.executor.PinotTaskExecutorFactory;
-import com.linkedin.pinot.minion.executor.TaskExecutorFactoryRegistry;
-import com.linkedin.pinot.minion.metrics.MinionMeter;
-import com.linkedin.pinot.minion.metrics.MinionMetrics;
-import com.linkedin.pinot.minion.taskfactory.TaskFactoryRegistry;
+import org.apache.pinot.common.Utils;
+import org.apache.pinot.common.metrics.MetricsHelper;
+import org.apache.pinot.common.segment.fetcher.SegmentFetcherFactory;
+import org.apache.pinot.common.utils.ClientSSLContextGenerator;
+import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.NetUtil;
+import org.apache.pinot.common.utils.ServiceStatus;
+import org.apache.pinot.core.crypt.PinotCrypterFactory;
+import org.apache.pinot.filesystem.PinotFSFactory;
+import org.apache.pinot.minion.events.EventObserverFactoryRegistry;
+import org.apache.pinot.minion.events.MinionEventObserverFactory;
+import org.apache.pinot.minion.executor.PinotTaskExecutorFactory;
+import org.apache.pinot.minion.executor.TaskExecutorFactoryRegistry;
+import org.apache.pinot.minion.metrics.MinionMeter;
+import org.apache.pinot.minion.metrics.MinionMetrics;
+import org.apache.pinot.minion.taskfactory.TaskFactoryRegistry;
 import com.yammer.metrics.core.MetricsRegistry;
 import java.io.File;
 import java.io.IOException;

@@ -16,12 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.startree.hll;
+package org.apache.pinot.core.startree.hll;
 
 import com.clearspring.analytics.stream.cardinality.CardinalityMergeException;
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
-import com.linkedin.pinot.common.Utils;
-import com.linkedin.pinot.core.data.GenericRow;
+import org.apache.pinot.common.Utils;
+import org.apache.pinot.core.data.GenericRow;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;

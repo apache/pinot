@@ -16,14 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.data.manager.offline;
+package org.apache.pinot.core.data.manager.offline;
 
-import com.linkedin.pinot.common.metrics.ServerMetrics;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.core.data.manager.TableDataManager;
-import com.linkedin.pinot.core.data.manager.config.InstanceDataManagerConfig;
-import com.linkedin.pinot.core.data.manager.config.TableDataManagerConfig;
-import com.linkedin.pinot.core.data.manager.realtime.RealtimeTableDataManager;
+import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.core.data.manager.TableDataManager;
+import org.apache.pinot.core.data.manager.config.InstanceDataManagerConfig;
+import org.apache.pinot.core.data.manager.config.TableDataManagerConfig;
+import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 import java.util.concurrent.Semaphore;
 import javax.annotation.Nonnull;
 import org.apache.helix.ZNRecord;

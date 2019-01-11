@@ -25,7 +25,7 @@
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <artifactId>pinot</artifactId>
-    <groupId>com.linkedin.pinot</groupId>
+    <groupId>org.apache.pinot</groupId>
     <version>0.016</version>
   </parent>
   <artifactId>pinot-server</artifactId>
@@ -61,22 +61,22 @@
 
   <dependencies>
     <dependency>
-      <groupId>com.linkedin.pinot</groupId>
+      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-common</artifactId>
     </dependency>
     <dependency>
-      <groupId>com.linkedin.pinot</groupId>
+      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-core</artifactId>
     </dependency>
     <dependency>
-      <groupId>com.linkedin.pinot</groupId>
+      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-core</artifactId>
       <version>${project.version}</version>
       <type>test-jar</type>
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>com.linkedin.pinot</groupId>
+      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-transport</artifactId>
     </dependency>
     <dependency>
@@ -269,15 +269,15 @@
         <configuration>
           <programs>
             <program>
-              <mainClass>com.linkedin.pinot.server.starter.SingleNodeServerStarter</mainClass>
+              <mainClass>org.apache.pinot.server.starter.SingleNodeServerStarter</mainClass>
               <name>pinot-server</name>
             </program>
             <program>
-              <mainClass>com.linkedin.pinot.server.starter.BrokerStarter</mainClass>
+              <mainClass>org.apache.pinot.server.starter.BrokerStarter</mainClass>
               <name>pinot-broker</name>
             </program>
             <program>
-              <mainClass>com.linkedin.pinot.server.starter.InteractiveBroker</mainClass>
+              <mainClass>org.apache.pinot.server.starter.InteractiveBroker</mainClass>
               <name>interactive-broker</name>
             </program>
           </programs>

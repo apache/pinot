@@ -16,14 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.segment.index.readers;
+package org.apache.pinot.core.segment.index.readers;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.utils.StringUtil;
-import com.linkedin.pinot.common.utils.primitive.ByteArray;
-import com.linkedin.pinot.core.io.util.FixedByteValueReaderWriter;
-import com.linkedin.pinot.core.io.util.ValueReader;
-import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
+import org.apache.pinot.common.utils.StringUtil;
+import org.apache.pinot.common.utils.primitive.ByteArray;
+import org.apache.pinot.core.io.util.FixedByteValueReaderWriter;
+import org.apache.pinot.core.io.util.ValueReader;
+import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.IOException;
 import java.util.Arrays;
 

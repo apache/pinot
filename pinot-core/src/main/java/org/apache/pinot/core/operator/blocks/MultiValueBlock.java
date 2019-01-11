@@ -16,17 +16,17 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.operator.blocks;
+package org.apache.pinot.core.operator.blocks;
 
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.core.common.Block;
-import com.linkedin.pinot.core.common.BlockDocIdSet;
-import com.linkedin.pinot.core.common.BlockDocIdValueSet;
-import com.linkedin.pinot.core.common.BlockMetadata;
-import com.linkedin.pinot.core.common.BlockValSet;
-import com.linkedin.pinot.core.io.reader.SingleColumnMultiValueReader;
-import com.linkedin.pinot.core.operator.docvalsets.MultiValueSet;
-import com.linkedin.pinot.core.segment.index.readers.Dictionary;
+import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.core.common.Block;
+import org.apache.pinot.core.common.BlockDocIdSet;
+import org.apache.pinot.core.common.BlockDocIdValueSet;
+import org.apache.pinot.core.common.BlockMetadata;
+import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.io.reader.SingleColumnMultiValueReader;
+import org.apache.pinot.core.operator.docvalsets.MultiValueSet;
+import org.apache.pinot.core.segment.index.readers.Dictionary;
 
 
 public final class MultiValueBlock implements Block {

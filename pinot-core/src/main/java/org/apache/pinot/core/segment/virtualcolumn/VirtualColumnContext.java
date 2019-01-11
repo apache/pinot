@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.segment.virtualcolumn;
+package org.apache.pinot.core.segment.virtualcolumn;
 
 /**
  * Context used to pass arguments to the virtual column provider.

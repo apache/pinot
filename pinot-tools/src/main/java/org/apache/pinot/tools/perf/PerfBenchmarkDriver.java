@@ -16,25 +16,25 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.tools.perf;
+package org.apache.pinot.tools.perf;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.broker.broker.helix.HelixBrokerStarter;
-import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.config.Tenant;
-import com.linkedin.pinot.common.config.Tenant.TenantBuilder;
-import com.linkedin.pinot.common.segment.SegmentMetadata;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.FileUploadDownloadClient;
-import com.linkedin.pinot.common.utils.JsonUtils;
-import com.linkedin.pinot.common.utils.TenantRole;
-import com.linkedin.pinot.controller.ControllerConf;
-import com.linkedin.pinot.controller.ControllerStarter;
-import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
-import com.linkedin.pinot.server.starter.helix.HelixServerStarter;
+import org.apache.pinot.broker.broker.helix.HelixBrokerStarter;
+import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.common.config.TableNameBuilder;
+import org.apache.pinot.common.config.Tenant;
+import org.apache.pinot.common.config.Tenant.TenantBuilder;
+import org.apache.pinot.common.segment.SegmentMetadata;
+import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.FileUploadDownloadClient;
+import org.apache.pinot.common.utils.JsonUtils;
+import org.apache.pinot.common.utils.TenantRole;
+import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.controller.ControllerStarter;
+import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.server.starter.helix.HelixServerStarter;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;

@@ -16,19 +16,19 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.segment.creator.impl.fwd;
+package org.apache.pinot.core.segment.creator.impl.fwd;
 
-import com.linkedin.pinot.core.io.compression.ChunkCompressorFactory;
-import com.linkedin.pinot.core.io.writer.impl.FixedByteSingleValueMultiColWriter;
-import com.linkedin.pinot.core.io.writer.impl.v1.FixedByteChunkSingleValueWriter;
-import com.linkedin.pinot.core.segment.creator.BaseSingleValueRawIndexCreator;
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
+import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
+import org.apache.pinot.core.io.writer.impl.FixedByteSingleValueMultiColWriter;
+import org.apache.pinot.core.io.writer.impl.v1.FixedByteChunkSingleValueWriter;
+import org.apache.pinot.core.segment.creator.BaseSingleValueRawIndexCreator;
+import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import java.io.File;
 import java.io.IOException;
 
 
 /**
- * Implementation of {@link com.linkedin.pinot.core.segment.creator.SingleValueRawIndexCreator}
+ * Implementation of {@link org.apache.pinot.core.segment.creator.SingleValueRawIndexCreator}
  * <ul>
  *   <li> Uses {@link FixedByteSingleValueMultiColWriter} as the underlying writer. </li>
  *   <li> Should be used for writing fixed byte data (int, long, float & double). </li>

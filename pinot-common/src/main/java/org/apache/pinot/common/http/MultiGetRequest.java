@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.common.http;
+package org.apache.pinot.common.http;
 
 import java.util.List;
 import java.util.concurrent.CompletionService;

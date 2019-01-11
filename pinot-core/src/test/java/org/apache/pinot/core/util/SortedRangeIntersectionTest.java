@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.util;
+package org.apache.pinot.core.util;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
@@ -31,8 +31,8 @@ import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import com.linkedin.pinot.common.utils.Pairs;
-import com.linkedin.pinot.common.utils.Pairs.IntPair;
+import org.apache.pinot.common.utils.Pairs;
+import org.apache.pinot.common.utils.Pairs.IntPair;
 
 
 /**

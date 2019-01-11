@@ -16,12 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.index.reader;
+package org.apache.pinot.index.reader;
 
-import com.linkedin.pinot.core.io.reader.ReaderContext;
-import com.linkedin.pinot.core.io.reader.SingleColumnMultiValueReader;
-import com.linkedin.pinot.core.io.writer.SingleColumnMultiValueWriter;
-import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
+import org.apache.pinot.core.io.reader.ReaderContext;
+import org.apache.pinot.core.io.reader.SingleColumnMultiValueReader;
+import org.apache.pinot.core.io.writer.SingleColumnMultiValueWriter;
+import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.File;
 import java.io.RandomAccessFile;
 import java.lang.reflect.Constructor;
@@ -37,11 +37,11 @@ public class FixedBitMultiValueTest {
   @Test
   public void testSingleColMultiValue() throws Exception {
     testSingleColMultiValue(
-        com.linkedin.pinot.core.io.writer.impl.v1.FixedBitMultiValueWriter.class,
-        com.linkedin.pinot.core.io.reader.impl.v1.FixedBitMultiValueReader.class);
+        org.apache.pinot.core.io.writer.impl.v1.FixedBitMultiValueWriter.class,
+        org.apache.pinot.core.io.reader.impl.v1.FixedBitMultiValueReader.class);
     testSingleColMultiValueWithContext(
-        com.linkedin.pinot.core.io.writer.impl.v1.FixedBitMultiValueWriter.class,
-        com.linkedin.pinot.core.io.reader.impl.v1.FixedBitMultiValueReader.class);
+        org.apache.pinot.core.io.writer.impl.v1.FixedBitMultiValueWriter.class,
+        org.apache.pinot.core.io.reader.impl.v1.FixedBitMultiValueReader.class);
   }
 
   public void testSingleColMultiValue(Class<? extends SingleColumnMultiValueWriter> writerClazz,

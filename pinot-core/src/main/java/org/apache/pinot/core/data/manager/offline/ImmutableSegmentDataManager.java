@@ -16,10 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.data.manager.offline;
+package org.apache.pinot.core.data.manager.offline;
 
-import com.linkedin.pinot.core.data.manager.SegmentDataManager;
-import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
+import org.apache.pinot.core.data.manager.SegmentDataManager;
+import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
 
 
 /**

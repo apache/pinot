@@ -16,11 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.util;
+package org.apache.pinot.util;
 
-import com.linkedin.pinot.common.utils.Pairs;
-import com.linkedin.pinot.core.query.aggregation.function.customobject.AvgPair;
-import com.linkedin.pinot.core.util.IntObjectIndexedPriorityQueue;
+import org.apache.pinot.common.utils.Pairs;
+import org.apache.pinot.core.query.aggregation.function.customobject.AvgPair;
+import org.apache.pinot.core.util.IntObjectIndexedPriorityQueue;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;

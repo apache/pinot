@@ -16,13 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.broker.routing.selector;
+package org.apache.pinot.broker.routing.selector;
 
-import com.linkedin.pinot.broker.routing.RoutingTableLookupRequest;
-import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.lineage.SegmentGroup;
-import com.linkedin.pinot.common.lineage.SegmentMergeLineage;
-import com.linkedin.pinot.common.lineage.SegmentMergeLineageAccessHelper;
+import org.apache.pinot.broker.routing.RoutingTableLookupRequest;
+import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.common.lineage.SegmentGroup;
+import org.apache.pinot.common.lineage.SegmentMergeLineage;
+import org.apache.pinot.common.lineage.SegmentMergeLineageAccessHelper;
 import java.util.HashSet;
 import java.util.Set;
 import org.apache.helix.ZNRecord;

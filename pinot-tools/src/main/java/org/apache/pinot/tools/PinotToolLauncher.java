@@ -16,10 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.tools;
+package org.apache.pinot.tools;
 
-import com.linkedin.pinot.tools.perf.PerfBenchmarkRunner;
-import com.linkedin.pinot.tools.perf.QueryRunner;
+import org.apache.pinot.tools.perf.PerfBenchmarkRunner;
+import org.apache.pinot.tools.perf.QueryRunner;
 import java.lang.reflect.Field;
 import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.CmdLineException;

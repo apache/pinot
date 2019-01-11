@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.segment.memory;
+package org.apache.pinot.core.segment.memory;
 
 import java.io.File;
 import java.io.IOException;

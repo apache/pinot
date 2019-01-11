@@ -16,10 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.segment.name;
+package org.apache.pinot.core.segment.name;
 
-import com.linkedin.pinot.common.utils.StringUtil;
-import com.linkedin.pinot.core.segment.creator.ColumnStatistics;
+import org.apache.pinot.common.utils.StringUtil;
+import org.apache.pinot.core.segment.creator.ColumnStatistics;
 
 
 public class DefaultSegmentNameGenerator implements SegmentNameGenerator {

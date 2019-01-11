@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.query.reduce;
+package org.apache.pinot.core.query.reduce;
 
-import com.linkedin.pinot.common.request.AggregationInfo;
+import org.apache.pinot.common.request.AggregationInfo;
 import org.slf4j.LoggerFactory;
 
 

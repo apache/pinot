@@ -16,14 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.minion.segment;
+package org.apache.pinot.core.minion.segment;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.data.readers.PinotSegmentRecordReader;
-import com.linkedin.pinot.core.data.readers.RecordReader;
-import com.linkedin.pinot.core.data.readers.RecordReaderUtils;
+import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.core.data.GenericRow;
+import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
+import org.apache.pinot.core.data.readers.RecordReader;
+import org.apache.pinot.core.data.readers.RecordReaderUtils;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;

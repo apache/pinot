@@ -16,14 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.realtime.converter;
+package org.apache.pinot.realtime.converter;
 
-import com.linkedin.pinot.common.data.DimensionFieldSpec;
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.data.TimeFieldSpec;
-import com.linkedin.pinot.core.realtime.converter.RealtimeSegmentConverter;
-import com.linkedin.pinot.core.segment.virtualcolumn.VirtualColumnProviderFactory;
+import org.apache.pinot.common.data.DimensionFieldSpec;
+import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.common.data.TimeFieldSpec;
+import org.apache.pinot.core.realtime.converter.RealtimeSegmentConverter;
+import org.apache.pinot.core.segment.virtualcolumn.VirtualColumnProviderFactory;
 import java.util.concurrent.TimeUnit;
 import org.testng.Assert;
 import org.testng.annotations.Test;

@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.transport.netty;
+package org.apache.pinot.transport.netty;
 
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.ChannelInitializer;
@@ -26,10 +26,10 @@ import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
 import io.netty.handler.codec.LengthFieldPrepender;
 
-import com.linkedin.pinot.common.Utils;
-import com.linkedin.pinot.common.metrics.AggregatedMetricsRegistry;
-import com.linkedin.pinot.transport.metrics.AggregatedTransportServerMetrics;
-import com.linkedin.pinot.transport.metrics.NettyServerMetrics;
+import org.apache.pinot.common.Utils;
+import org.apache.pinot.common.metrics.AggregatedMetricsRegistry;
+import org.apache.pinot.transport.metrics.AggregatedTransportServerMetrics;
+import org.apache.pinot.transport.metrics.NettyServerMetrics;
 import com.yammer.metrics.core.MetricsRegistry;
 
 

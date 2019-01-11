@@ -16,13 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.minion.executor;
+package org.apache.pinot.minion.executor;
 
-import com.linkedin.pinot.common.config.PinotTaskConfig;
-import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
-import com.linkedin.pinot.core.common.MinionConstants;
-import com.linkedin.pinot.core.minion.SegmentPurger;
+import org.apache.pinot.common.config.PinotTaskConfig;
+import org.apache.pinot.common.config.TableNameBuilder;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
+import org.apache.pinot.core.common.MinionConstants;
+import org.apache.pinot.core.minion.SegmentPurger;
 import java.io.File;
 import java.util.Collections;
 import java.util.Map;

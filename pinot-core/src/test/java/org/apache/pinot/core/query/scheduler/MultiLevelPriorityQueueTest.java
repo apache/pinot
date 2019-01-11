@@ -16,14 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.query.scheduler;
+package org.apache.pinot.core.query.scheduler;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.metrics.ServerMetrics;
-import com.linkedin.pinot.core.query.scheduler.resources.PolicyBasedResourceManager;
-import com.linkedin.pinot.core.query.scheduler.resources.ResourceLimitPolicy;
-import com.linkedin.pinot.core.query.scheduler.resources.ResourceManager;
-import com.linkedin.pinot.core.query.scheduler.resources.UnboundedResourceManager;
+import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.core.query.scheduler.resources.PolicyBasedResourceManager;
+import org.apache.pinot.core.query.scheduler.resources.ResourceLimitPolicy;
+import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
+import org.apache.pinot.core.query.scheduler.resources.UnboundedResourceManager;
 import com.yammer.metrics.core.MetricsRegistry;
 import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -35,7 +35,7 @@ import org.apache.commons.configuration.PropertiesConfiguration;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import static com.linkedin.pinot.core.query.scheduler.TestHelper.*;
+import static org.apache.pinot.core.query.scheduler.TestHelper.*;
 import static org.testng.Assert.*;
 
 

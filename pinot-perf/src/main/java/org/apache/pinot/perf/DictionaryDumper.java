@@ -16,14 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.perf;
+package org.apache.pinot.perf;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
-import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
-import com.linkedin.pinot.core.segment.index.readers.Dictionary;
-import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
+import org.apache.pinot.common.segment.ReadMode;
+import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
+import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
+import org.apache.pinot.core.segment.index.readers.Dictionary;
+import org.apache.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 import java.io.File;
 import java.util.Arrays;
 import java.util.List;

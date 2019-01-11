@@ -16,11 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.controller.helix.core.sharding;
+package org.apache.pinot.controller.helix.core.sharding;
 
-import com.linkedin.pinot.common.config.TagNameUtils;
-import com.linkedin.pinot.common.segment.SegmentMetadata;
-import com.linkedin.pinot.common.utils.helix.HelixHelper;
+import org.apache.pinot.common.config.TagNameUtils;
+import org.apache.pinot.common.segment.SegmentMetadata;
+import org.apache.pinot.common.utils.helix.HelixHelper;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;

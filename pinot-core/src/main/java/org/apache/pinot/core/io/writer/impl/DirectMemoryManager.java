@@ -16,12 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.io.writer.impl;
+package org.apache.pinot.core.io.writer.impl;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.linkedin.pinot.common.metrics.ServerMetrics;
-import com.linkedin.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
-import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
+import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
+import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import com.yammer.metrics.core.MetricsRegistry;
 
 

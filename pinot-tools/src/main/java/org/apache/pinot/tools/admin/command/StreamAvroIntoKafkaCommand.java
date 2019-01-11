@@ -16,14 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.tools.admin.command;
+package org.apache.pinot.tools.admin.command;
 
 import com.google.common.primitives.Longs;
 import com.google.common.util.concurrent.Uninterruptibles;
-import com.linkedin.pinot.common.utils.HashUtil;
-import com.linkedin.pinot.common.utils.KafkaStarterUtils;
-import com.linkedin.pinot.core.util.AvroUtils;
-import com.linkedin.pinot.tools.Command;
+import org.apache.pinot.common.utils.HashUtil;
+import org.apache.pinot.common.utils.KafkaStarterUtils;
+import org.apache.pinot.core.util.AvroUtils;
+import org.apache.pinot.tools.Command;
 import java.io.File;
 import java.io.IOException;
 import java.util.Properties;
@@ -81,7 +81,7 @@ public class StreamAvroIntoKafkaCommand extends AbstractBaseAdminCommand impleme
   @Override
   public String description() {
     return "Stream the specified Avro file into a Kafka topic, which can be read by Pinot\n" +
-        "by using com.linkedin.pinot.core.realtime.impl.kafka.KafkaJSONMessageDecoder as the\n" +
+        "by using org.apache.pinot.core.realtime.impl.kafka.KafkaJSONMessageDecoder as the\n" +
         "message decoder class name (stream.kafka.decoder.class.name).";
   }
 

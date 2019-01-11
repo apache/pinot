@@ -16,19 +16,19 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.common.metadata.instance;
+package org.apache.pinot.common.metadata.instance;
 
-import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.metadata.ZKMetadata;
-import com.linkedin.pinot.common.utils.StringUtil;
+import org.apache.pinot.common.config.TableNameBuilder;
+import org.apache.pinot.common.metadata.ZKMetadata;
+import org.apache.pinot.common.utils.StringUtil;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.helix.ZNRecord;
 
-import static com.linkedin.pinot.common.utils.EqualityUtils.hashCodeOf;
-import static com.linkedin.pinot.common.utils.EqualityUtils.isEqual;
-import static com.linkedin.pinot.common.utils.EqualityUtils.isNullOrNotSameClass;
-import static com.linkedin.pinot.common.utils.EqualityUtils.isSameReference;
+import static org.apache.pinot.common.utils.EqualityUtils.hashCodeOf;
+import static org.apache.pinot.common.utils.EqualityUtils.isEqual;
+import static org.apache.pinot.common.utils.EqualityUtils.isNullOrNotSameClass;
+import static org.apache.pinot.common.utils.EqualityUtils.isSameReference;
 
 
 public final class InstanceZKMetadata implements ZKMetadata {

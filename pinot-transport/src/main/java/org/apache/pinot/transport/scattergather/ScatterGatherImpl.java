@@ -16,19 +16,19 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.transport.scattergather;
+package org.apache.pinot.transport.scattergather;
 
-import com.linkedin.pinot.common.metrics.BrokerMeter;
-import com.linkedin.pinot.common.metrics.BrokerMetrics;
-import com.linkedin.pinot.common.metrics.BrokerQueryPhase;
-import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.common.response.ServerInstance;
-import com.linkedin.pinot.transport.common.CompositeFuture;
-import com.linkedin.pinot.transport.common.CompositeFuture.GatherModeOnError;
-import com.linkedin.pinot.transport.common.ServerResponseFuture;
-import com.linkedin.pinot.transport.netty.NettyClientConnection.ResponseFuture;
-import com.linkedin.pinot.transport.netty.PooledNettyClientResourceManager;
-import com.linkedin.pinot.transport.pool.KeyedPool;
+import org.apache.pinot.common.metrics.BrokerMeter;
+import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.common.metrics.BrokerQueryPhase;
+import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.response.ServerInstance;
+import org.apache.pinot.transport.common.CompositeFuture;
+import org.apache.pinot.transport.common.CompositeFuture.GatherModeOnError;
+import org.apache.pinot.transport.common.ServerResponseFuture;
+import org.apache.pinot.transport.netty.NettyClientConnection.ResponseFuture;
+import org.apache.pinot.transport.netty.PooledNettyClientResourceManager;
+import org.apache.pinot.transport.pool.KeyedPool;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import java.util.ArrayList;

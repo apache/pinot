@@ -16,10 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.operator.filter;
+package org.apache.pinot.core.operator.filter;
 
-import com.linkedin.pinot.core.common.BlockDocIdIterator;
-import com.linkedin.pinot.core.common.Constants;
+import org.apache.pinot.core.common.BlockDocIdIterator;
+import org.apache.pinot.core.common.Constants;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;

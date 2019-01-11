@@ -16,22 +16,22 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.core.startree.operator;
+package org.apache.pinot.core.startree.operator;
 
-import com.linkedin.pinot.common.utils.request.FilterQueryTree;
-import com.linkedin.pinot.core.common.DataSource;
-import com.linkedin.pinot.core.common.Predicate;
-import com.linkedin.pinot.core.operator.blocks.EmptyFilterBlock;
-import com.linkedin.pinot.core.operator.blocks.FilterBlock;
-import com.linkedin.pinot.core.operator.filter.BaseFilterOperator;
-import com.linkedin.pinot.core.operator.filter.BitmapBasedFilterOperator;
-import com.linkedin.pinot.core.operator.filter.EmptyFilterOperator;
-import com.linkedin.pinot.core.operator.filter.FilterOperatorUtils;
-import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluator;
-import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
-import com.linkedin.pinot.core.startree.StarTree;
-import com.linkedin.pinot.core.startree.StarTreeNode;
-import com.linkedin.pinot.core.startree.v2.StarTreeV2;
+import org.apache.pinot.common.utils.request.FilterQueryTree;
+import org.apache.pinot.core.common.DataSource;
+import org.apache.pinot.core.common.Predicate;
+import org.apache.pinot.core.operator.blocks.EmptyFilterBlock;
+import org.apache.pinot.core.operator.blocks.FilterBlock;
+import org.apache.pinot.core.operator.filter.BaseFilterOperator;
+import org.apache.pinot.core.operator.filter.BitmapBasedFilterOperator;
+import org.apache.pinot.core.operator.filter.EmptyFilterOperator;
+import org.apache.pinot.core.operator.filter.FilterOperatorUtils;
+import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
+import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
+import org.apache.pinot.core.startree.StarTree;
+import org.apache.pinot.core.startree.StarTreeNode;
+import org.apache.pinot.core.startree.v2.StarTreeV2;
 import it.unimi.dsi.fastutil.ints.IntIterator;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;

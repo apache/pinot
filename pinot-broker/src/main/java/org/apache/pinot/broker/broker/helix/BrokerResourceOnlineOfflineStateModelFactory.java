@@ -16,14 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinot.broker.broker.helix;
+package org.apache.pinot.broker.broker.helix;
 
-import com.linkedin.pinot.broker.queryquota.TableQueryQuotaManager;
-import com.linkedin.pinot.broker.routing.HelixExternalViewBasedRouting;
-import com.linkedin.pinot.common.Utils;
-import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
-import com.linkedin.pinot.common.utils.helix.HelixHelper;
+import org.apache.pinot.broker.queryquota.TableQueryQuotaManager;
+import org.apache.pinot.broker.routing.HelixExternalViewBasedRouting;
+import org.apache.pinot.common.Utils;
+import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.utils.helix.HelixHelper;
 
 import java.util.List;
 import org.apache.helix.HelixAdmin;
@@ -42,7 +42,7 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static com.linkedin.pinot.common.utils.CommonConstants.Helix.*;
+import static org.apache.pinot.common.utils.CommonConstants.Helix.*;
 
 
 /**
