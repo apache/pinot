@@ -18,7 +18,9 @@
  */
 package com.linkedin.pinot.tools.admin.command;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
+import com.linkedin.pinot.common.utils.JsonUtils;
 import com.linkedin.pinot.common.utils.TenantRole;
 import com.linkedin.pinot.tools.QuickstartTableRequest;
 import java.io.File;
@@ -27,7 +29,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
-import org.json.JSONObject;
 
 
 public class QuickstartRunner {
@@ -211,9 +212,9 @@ public class QuickstartRunner {
     }
   }
 
-  public JSONObject runQuery(String query)
+  public JsonNode runQuery(String query)
       throws Exception {
     int brokerPort = _brokerPorts.get(RANDOM.nextInt(_brokerPorts.size()));
-    return new JSONObject(new PostQueryCommand().setBrokerPort(String.valueOf(brokerPort)).setQuery(query).run());
+    return JsonUtils.stringToJsonNode(new PostQueryCommand().setBrokerPort(String.valueOf(brokerPort)).setQuery(query).run());
   }
 }

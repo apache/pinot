@@ -18,10 +18,12 @@
  */
 package com.linkedin.pinot.tools.data.generator;
 
-import com.google.gson.JsonArray;
-import com.google.gson.JsonObject;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.utils.JsonUtils;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
@@ -44,16 +46,16 @@ public class AvroWriter implements Closeable {
   }
 
   public static org.apache.avro.Schema getAvroSchema(Schema schema) {
-    JsonObject avroSchema = new JsonObject();
-    avroSchema.addProperty("name", "data_gen_record");
-    avroSchema.addProperty("type", "record");
+    ObjectNode avroSchema = JsonUtils.newObjectNode();
+    avroSchema.put("name", "data_gen_record");
+    avroSchema.put("type", "record");
 
-    JsonArray fields = new JsonArray();
+    ArrayNode fields = JsonUtils.newArrayNode();
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
-      JsonObject jsonObject = fieldSpec.toAvroSchemaJsonObject();
+      JsonNode jsonObject = fieldSpec.toAvroSchemaJsonObject();
       fields.add(jsonObject);
     }
-    avroSchema.add("fields", fields);
+    avroSchema.set("fields", fields);
 
     return new org.apache.avro.Schema.Parser().parse(avroSchema.toString());
   }

@@ -18,10 +18,10 @@
  */
 package com.linkedin.pinot.integration.tests;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Function;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.util.TestUtils;
 import java.io.File;
 import java.util.Arrays;
@@ -31,7 +31,6 @@ import org.apache.avro.reflect.Nullable;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.ZNRecord;
-import org.json.JSONObject;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -113,10 +112,10 @@ public class LLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegratio
 
     final long numTotalDocs = getCountStarResult();
 
-    JSONObject queryResponse = postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY);
-    Assert.assertEquals(queryResponse.getLong("totalDocs"), numTotalDocs);
+    JsonNode queryResponse = postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY);
+    Assert.assertEquals(queryResponse.get("totalDocs").asLong(), numTotalDocs);
     // TODO: investigate why assert for a specific value fails intermittently
-    Assert.assertNotSame(queryResponse.getLong("numEntriesScannedInFilter"), 0);
+    Assert.assertNotSame(queryResponse.get("numEntriesScannedInFilter").asLong(), 0);
 
     updateRealtimeTableConfig(getTableName(), UPDATED_INVERTED_INDEX_COLUMNS, null);
 
@@ -126,10 +125,10 @@ public class LLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegratio
       @Override
       public Boolean apply(@javax.annotation.Nullable Void aVoid) {
         try {
-          JSONObject queryResponse = postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY);
+          JsonNode queryResponse = postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY);
           // Total docs should not change during reload
-          Assert.assertEquals(queryResponse.getLong("totalDocs"), numTotalDocs);
-          return queryResponse.getLong("numEntriesScannedInFilter") == 0;
+          Assert.assertEquals(queryResponse.get("totalDocs").asLong(), numTotalDocs);
+          return queryResponse.get("numEntriesScannedInFilter").asLong() == 0;
         } catch (Exception e) {
           throw new RuntimeException(e);
         }

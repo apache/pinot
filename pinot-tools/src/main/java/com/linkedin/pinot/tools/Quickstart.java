@@ -18,6 +18,7 @@
  */
 package com.linkedin.pinot.tools;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.linkedin.pinot.core.data.readers.FileFormat;
@@ -29,9 +30,6 @@ import org.apache.commons.io.FileUtils;
 import org.apache.log4j.Category;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
 
 
 public class Quickstart {
@@ -58,24 +56,23 @@ public class Quickstart {
     System.out.println(color._code + message + Color.RESET._code);
   }
 
-  public static String prettyPrintResponse(JSONObject response)
-      throws JSONException {
+  public static String prettyPrintResponse(JsonNode response) {
     StringBuilder responseBuilder = new StringBuilder();
 
     // Selection query
     if (response.has("selectionResults")) {
-      JSONArray columns = response.getJSONObject("selectionResults").getJSONArray("columns");
-      int numColumns = columns.length();
+      JsonNode columns = response.get("selectionResults").get("columns");
+      int numColumns = columns.size();
       for (int i = 0; i < numColumns; i++) {
-        responseBuilder.append(columns.getString(i)).append(TAB);
+        responseBuilder.append(columns.get(i).asText()).append(TAB);
       }
       responseBuilder.append(NEW_LINE);
-      JSONArray rows = response.getJSONObject("selectionResults").getJSONArray("results");
-      int numRows = rows.length();
+      JsonNode rows = response.get("selectionResults").get("results");
+      int numRows = rows.size();
       for (int i = 0; i < numRows; i++) {
-        JSONArray row = rows.getJSONArray(i);
+        JsonNode row = rows.get(i);
         for (int j = 0; j < numColumns; j++) {
-          responseBuilder.append(row.getString(j)).append(TAB);
+          responseBuilder.append(row.get(j).asText()).append(TAB);
         }
         responseBuilder.append(NEW_LINE);
       }
@@ -83,40 +80,40 @@ public class Quickstart {
     }
 
     // Aggregation only query
-    if (!response.getJSONArray("aggregationResults").getJSONObject(0).has("groupByResult")) {
-      JSONArray aggregationResults = response.getJSONArray("aggregationResults");
-      int numAggregations = aggregationResults.length();
+    if (!response.get("aggregationResults").get(0).has("groupByResult")) {
+      JsonNode aggregationResults = response.get("aggregationResults");
+      int numAggregations = aggregationResults.size();
       for (int i = 0; i < numAggregations; i++) {
-        responseBuilder.append(aggregationResults.getJSONObject(i).getString("function")).append(TAB);
+        responseBuilder.append(aggregationResults.get(i).get("function").asText()).append(TAB);
       }
       responseBuilder.append(NEW_LINE);
       for (int i = 0; i < numAggregations; i++) {
-        responseBuilder.append(aggregationResults.getJSONObject(i).getString("value")).append(TAB);
+        responseBuilder.append(aggregationResults.get(i).get("value").asText()).append(TAB);
       }
       responseBuilder.append(NEW_LINE);
       return responseBuilder.toString();
     }
 
     // Aggregation group-by query
-    JSONArray groupByResults = response.getJSONArray("aggregationResults");
-    int numGroupBys = groupByResults.length();
+    JsonNode groupByResults = response.get("aggregationResults");
+    int numGroupBys = groupByResults.size();
     for (int i = 0; i < numGroupBys; i++) {
-      JSONObject groupByResult = groupByResults.getJSONObject(i);
-      responseBuilder.append(groupByResult.getString("function")).append(TAB);
-      JSONArray columns = groupByResult.getJSONArray("groupByColumns");
-      int numColumns = columns.length();
+      JsonNode groupByResult = groupByResults.get(i);
+      responseBuilder.append(groupByResult.get("function").asText()).append(TAB);
+      JsonNode columns = groupByResult.get("groupByColumns");
+      int numColumns = columns.size();
       for (int j = 0; j < numColumns; j++) {
-        responseBuilder.append(columns.getString(j)).append(TAB);
+        responseBuilder.append(columns.get(j).asText()).append(TAB);
       }
       responseBuilder.append(NEW_LINE);
-      JSONArray rows = groupByResult.getJSONArray("groupByResult");
-      int numRows = rows.length();
+      JsonNode rows = groupByResult.get("groupByResult");
+      int numRows = rows.size();
       for (int j = 0; j < numRows; j++) {
-        JSONObject row = rows.getJSONObject(j);
-        responseBuilder.append(row.getString("value")).append(TAB);
-        JSONArray columnValues = row.getJSONArray("group");
+        JsonNode row = rows.get(j);
+        responseBuilder.append(row.get("value").asText()).append(TAB);
+        JsonNode columnValues = row.get("group");
         for (int k = 0; k < numColumns; k++) {
-          responseBuilder.append(columnValues.getString(k)).append(TAB);
+          responseBuilder.append(columnValues.get(k).asText()).append(TAB);
         }
         responseBuilder.append(NEW_LINE);
       }

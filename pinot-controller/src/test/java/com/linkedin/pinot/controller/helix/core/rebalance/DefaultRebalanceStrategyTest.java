@@ -33,7 +33,6 @@ import com.linkedin.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineSt
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaAvroMessageDecoder;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaConsumerFactory;
 import com.linkedin.pinot.core.realtime.stream.StreamConfigProperties;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -45,7 +44,6 @@ import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.helix.HelixManager;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.builder.CustomModeISBuilder;
-import org.json.JSONException;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -281,8 +279,7 @@ public class DefaultRebalanceStrategyTest {
   }
 
   @Test
-  public void testGetRebalancedIdealStateOffline() throws IOException, JSONException {
-
+  public void testGetRebalancedIdealStateOffline() {
     String offlineTableName = "letsRebalanceThisTable_OFFLINE";
     TableConfig tableConfig;
 
@@ -380,8 +377,7 @@ public class DefaultRebalanceStrategyTest {
   }
 
   @Test
-  public void testGetRebalancedIdealStateRealtime() throws IOException, JSONException {
-
+  public void testGetRebalancedIdealStateRealtime() {
     String realtimeTableName = "letsRebalanceThisTable_REALTIME";
     TableConfig tableConfig;
 

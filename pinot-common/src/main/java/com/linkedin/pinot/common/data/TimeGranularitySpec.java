@@ -18,14 +18,15 @@
  */
 package com.linkedin.pinot.common.data;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
-import com.google.gson.JsonObject;
 import com.linkedin.pinot.common.config.ConfigKey;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.utils.EqualityUtils;
+import com.linkedin.pinot.common.utils.JsonUtils;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
-import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 import org.joda.time.DateTime;
 import org.joda.time.format.DateTimeFormat;
 
@@ -249,20 +250,20 @@ public class TimeGranularitySpec {
   }
 
   /**
-   * Returns the {@link JsonObject} representing the time granularity spec.
+   * Returns the {@link ObjectNode} representing the time granularity spec.
    * <p>Only contains fields with non-default value.
-   * <p>NOTE: here we use {@link JsonObject} to preserve the insertion order.
+   * <p>NOTE: here we use {@link ObjectNode} to preserve the insertion order.
    */
-  public JsonObject toJsonObject() {
-    JsonObject jsonObject = new JsonObject();
-    jsonObject.addProperty("name", _name);
-    jsonObject.addProperty("dataType", _dataType.name());
-    jsonObject.addProperty("timeType", _timeType.name());
+  public ObjectNode toJsonObject() {
+    ObjectNode jsonObject = JsonUtils.newObjectNode();
+    jsonObject.put("name", _name);
+    jsonObject.put("dataType", _dataType.name());
+    jsonObject.put("timeType", _timeType.name());
     if (_timeUnitSize != DEFAULT_TIME_UNIT_SIZE) {
-      jsonObject.addProperty("timeUnitSize", _timeUnitSize);
+      jsonObject.put("timeUnitSize", _timeUnitSize);
     }
     if (!_timeFormat.equals(DEFAULT_TIME_FORMAT)) {
-      jsonObject.addProperty("timeFormat", _timeFormat);
+      jsonObject.put("timeFormat", _timeFormat);
     }
     return jsonObject;
   }

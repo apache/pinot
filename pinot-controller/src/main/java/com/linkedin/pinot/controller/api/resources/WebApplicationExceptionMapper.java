@@ -21,7 +21,7 @@ package com.linkedin.pinot.controller.api.resources;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.linkedin.pinot.common.utils.JsonUtils;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
@@ -33,7 +33,6 @@ import org.slf4j.LoggerFactory;
 @Provider
 public class WebApplicationExceptionMapper implements ExceptionMapper<Throwable> {
   private static final Logger LOGGER = LoggerFactory.getLogger(WebApplicationExceptionMapper.class);
-  private static final ObjectMapper JSON_MAPPER = new ObjectMapper();
 
   @Override
   public Response toResponse(Throwable t) {
@@ -46,14 +45,10 @@ public class WebApplicationExceptionMapper implements ExceptionMapper<Throwable>
 
     ErrorInfo einfo = new ErrorInfo(status, t.getMessage());
     try {
-      return Response.status(status).entity(JSON_MAPPER.writeValueAsString(einfo))
-          .type(MediaType.APPLICATION_JSON)
-          .build();
+      return Response.status(status).entity(JsonUtils.objectToString(einfo)).type(MediaType.APPLICATION_JSON).build();
     } catch (JsonProcessingException e) {
       String err = String.format("{\"status\":%d, \"error\":%s}", einfo.code, einfo.error);
-      return Response.status(status).entity(err)
-          .type(MediaType.APPLICATION_JSON)
-          .build();
+      return Response.status(status).entity(err).type(MediaType.APPLICATION_JSON).build();
     }
   }
 

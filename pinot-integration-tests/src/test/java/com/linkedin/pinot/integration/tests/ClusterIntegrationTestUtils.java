@@ -18,9 +18,11 @@
  */
 package com.linkedin.pinot.integration.tests;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.math.DoubleMath;
 import com.google.common.primitives.Longs;
 import com.linkedin.pinot.client.ResultSetGroup;
+import com.linkedin.pinot.common.utils.JsonUtils;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
@@ -60,8 +62,6 @@ import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.io.BinaryEncoder;
 import org.apache.avro.io.EncoderFactory;
 import org.apache.avro.util.Utf8;
-import org.json.JSONArray;
-import org.json.JSONObject;
 import org.testng.Assert;
 
 
@@ -504,7 +504,7 @@ public class ClusterIntegrationTestUtils {
       @Nonnull com.linkedin.pinot.client.Connection pinotConnection, @Nullable List<String> sqlQueries,
       @Nullable Connection h2Connection) throws Exception {
     // Use broker response for metadata check, connection response for value check
-    JSONObject pinotResponse = ClusterTest.postQuery(pqlQuery, brokerUrl);
+    JsonNode pinotResponse = ClusterTest.postQuery(pqlQuery, brokerUrl);
     ResultSetGroup pinotResultSetGroup = pinotConnection.execute(pqlQuery);
 
     // Skip comparison if SQL queries are not specified
@@ -515,7 +515,7 @@ public class ClusterIntegrationTestUtils {
     Assert.assertNotNull(h2Connection);
     Statement h2statement = h2Connection.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
 
-    int pinotNumRecordsSelected = pinotResponse.getInt("numDocsScanned");
+    long pinotNumRecordsSelected = pinotResponse.get("numDocsScanned").asLong();
 
     // Aggregation results
     if (pinotResponse.has("aggregationResults")) {
@@ -530,7 +530,7 @@ public class ClusterIntegrationTestUtils {
       }
 
       // Get aggregation type
-      JSONObject pinotFirstAggregationResult = pinotResponse.getJSONArray("aggregationResults").getJSONObject(0);
+      JsonNode pinotFirstAggregationResult = pinotResponse.get("aggregationResults").get(0);
 
       // Aggregation-only results
       if (pinotFirstAggregationResult.has("value")) {
@@ -767,11 +767,11 @@ public class ClusterIntegrationTestUtils {
             // TODO: Find a better way to identify multi-value column
             if (columnResult.charAt(0) == '[') {
               // Multi-value column
-              JSONArray columnValues = new JSONArray(columnResult);
+              JsonNode columnValues = JsonUtils.stringToJsonNode(columnResult);
               List<String> multiValue = new ArrayList<>();
-              int length = columnValues.length();
+              int length = columnValues.size();
               for (int elementIndex = 0; elementIndex < length; elementIndex++) {
-                multiValue.add(columnValues.getString(elementIndex));
+                multiValue.add(columnValues.get(elementIndex).asText());
               }
               for (int elementIndex = length; elementIndex < MAX_NUM_ELEMENTS_IN_MULTI_VALUE_TO_COMPARE;
                   elementIndex++) {

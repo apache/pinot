@@ -18,22 +18,19 @@
  */
 package com.linkedin.pinot.common.response.broker;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.common.response.BrokerResponse;
 import com.linkedin.pinot.common.response.ProcessingException;
+import com.linkedin.pinot.common.utils.JsonUtils;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.codehaus.jackson.annotate.JsonIgnore;
-import org.codehaus.jackson.annotate.JsonProperty;
-import org.codehaus.jackson.annotate.JsonPropertyOrder;
-import org.codehaus.jackson.map.ObjectMapper;
-import org.codehaus.jackson.map.annotate.JsonSerialize;
-import org.codehaus.jackson.type.TypeReference;
-import org.json.JSONException;
-import org.json.JSONObject;
 
 
 /**
@@ -42,12 +39,11 @@ import org.json.JSONObject;
  *
  * Supports serialization via JSON.
  */
-@JsonPropertyOrder({ "selectionResults", "aggregationResults", "exceptions", "numServersQueried", "numServersResponded", "numSegmentsQueried",
-    "numSegmentsProcessed", "numSegmentsMatched", "numDocsScanned", "numEntriesScannedInFilter", "numEntriesScannedPostFilter", "numGroupsLimitReached",
-    "totalDocs", "timeUsedMs", "segmentStatistics", "traceInfo" })
+@JsonPropertyOrder({"selectionResults", "aggregationResults", "exceptions", "numServersQueried", "numServersResponded",
+    "numSegmentsQueried", "numSegmentsProcessed", "numSegmentsMatched", "numDocsScanned", "numEntriesScannedInFilter",
+    "numEntriesScannedPostFilter", "numGroupsLimitReached", "totalDocs", "timeUsedMs", "segmentStatistics",
+    "traceInfo"})
 public class BrokerResponseNative implements BrokerResponse {
-  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-
   public static final BrokerResponseNative EMPTY_RESULT = BrokerResponseNative.empty();
   public static final BrokerResponseNative NO_TABLE_RESULT =
       new BrokerResponseNative(QueryException.BROKER_RESOURCE_MISSING_ERROR);
@@ -60,7 +56,7 @@ public class BrokerResponseNative implements BrokerResponse {
   private long _numSegmentsQueried = 0L;
   private long _numSegmentsProcessed = 0L;
   private long _numSegmentsMatched = 0L;
-  
+
   private long _totalDocs = 0L;
   private boolean _numGroupsLimitReached = false;
   private long _timeUsedMs = 0L;
@@ -93,7 +89,7 @@ public class BrokerResponseNative implements BrokerResponse {
   }
 
   @JsonProperty("selectionResults")
-  @JsonSerialize(include = JsonSerialize.Inclusion.NON_NULL)
+  @JsonInclude(JsonInclude.Include.NON_NULL)
   public SelectionResults getSelectionResults() {
     return _selectionResults;
   }
@@ -104,7 +100,7 @@ public class BrokerResponseNative implements BrokerResponse {
   }
 
   @JsonProperty("aggregationResults")
-  @JsonSerialize(include = JsonSerialize.Inclusion.NON_NULL)
+  @JsonInclude(JsonInclude.Include.NON_NULL)
   public List<AggregationResult> getAggregationResults() {
     return _aggregationResults;
   }
@@ -265,21 +261,11 @@ public class BrokerResponseNative implements BrokerResponse {
 
   @Override
   public String toJsonString() throws IOException {
-    return OBJECT_MAPPER.writeValueAsString(this);
-  }
-
-  @Override
-  public JSONObject toJson() throws IOException, JSONException {
-    return new JSONObject(toJsonString());
+    return JsonUtils.objectToString(this);
   }
 
   public static BrokerResponseNative fromJsonString(String jsonString) throws IOException {
-    return OBJECT_MAPPER.readValue(jsonString, new TypeReference<BrokerResponseNative>() {
-    });
-  }
-
-  public static BrokerResponseNative fromJsonObject(JSONObject jsonObject) throws IOException {
-    return fromJsonString(jsonObject.toString());
+    return JsonUtils.stringToObject(jsonString, BrokerResponseNative.class);
   }
 
   @JsonIgnore
@@ -299,6 +285,4 @@ public class BrokerResponseNative implements BrokerResponse {
   public int getExceptionsSize() {
     return _processingExceptions.size();
   }
-
-
 }

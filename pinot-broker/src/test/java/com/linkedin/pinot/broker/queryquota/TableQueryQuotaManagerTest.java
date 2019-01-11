@@ -24,7 +24,6 @@ import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.ZkStarter;
-import java.io.IOException;
 import org.apache.commons.lang.StringUtils;
 import org.apache.helix.HelixManager;
 import org.apache.helix.InstanceType;
@@ -35,7 +34,6 @@ import org.apache.helix.manager.zk.ZkBaseDataAccessor;
 import org.apache.helix.manager.zk.ZkClient;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.json.JSONException;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.AfterTest;
@@ -358,7 +356,7 @@ public class TableQueryQuotaManagerTest {
     Assert.assertEquals(_tableQueryQuotaManager.getRateLimiterMapSize(), 1);
   }
 
-  private TableConfig generateDefaultTableConfig(String tableName) throws IOException, JSONException {
+  private TableConfig generateDefaultTableConfig(String tableName) {
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
     TableConfig.Builder builder = new TableConfig.Builder(tableType);
     builder.setTableName(tableName);

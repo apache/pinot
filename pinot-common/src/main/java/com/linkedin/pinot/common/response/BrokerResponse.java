@@ -20,7 +20,6 @@ package com.linkedin.pinot.common.response;
 
 import com.linkedin.pinot.common.response.broker.QueryProcessingException;
 import java.util.List;
-import org.json.JSONObject;
 
 
 /**
@@ -53,16 +52,9 @@ public interface BrokerResponse {
   void setTimeUsedMs(long timeUsedMs);
 
   /**
-   * Convert the broker response to JSONObject.
-   */
-  JSONObject toJson()
-      throws Exception;
-
-  /**
    * Convert the broker response to JSON String.
    */
-  String toJsonString()
-      throws Exception;
+  String toJsonString() throws Exception;
 
   /**
    * Returns the number of servers queried.

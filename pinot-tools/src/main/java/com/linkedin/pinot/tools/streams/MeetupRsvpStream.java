@@ -18,28 +18,26 @@
  */
 package com.linkedin.pinot.tools.streams;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.utils.JsonUtils;
+import com.linkedin.pinot.common.utils.KafkaStarterUtils;
+import com.linkedin.pinot.core.realtime.impl.kafka.KafkaJSONMessageDecoder;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Properties;
-
 import javax.websocket.ClientEndpointConfig;
 import javax.websocket.Endpoint;
 import javax.websocket.EndpointConfig;
 import javax.websocket.MessageHandler;
 import javax.websocket.Session;
-
 import kafka.javaapi.producer.Producer;
 import kafka.producer.KeyedMessage;
 import kafka.producer.ProducerConfig;
-
 import org.glassfish.tyrus.client.ClientManager;
-import org.json.JSONObject;
-
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.utils.KafkaStarterUtils;
-import com.linkedin.pinot.core.realtime.impl.kafka.KafkaJSONMessageDecoder;
 
 
 public class MeetupRsvpStream {
@@ -82,31 +80,30 @@ public class MeetupRsvpStream {
               @Override
               public void onMessage(String message) {
                 try {
+                  JsonNode messageJSON = JsonUtils.stringToJsonNode(message);
+                  ObjectNode extracted = JsonUtils.newObjectNode();
 
-                  JSONObject messageJSON = new JSONObject(message);
-                  JSONObject extracted = new JSONObject();
-
-                  if (messageJSON.has("venue")) {
-                    JSONObject venue = messageJSON.getJSONObject("venue");
-                    extracted.put("venue_name", venue.getString("venue_name"));
+                  JsonNode venue = messageJSON.get("venue");
+                  if (venue != null) {
+                    extracted.set("venue_name", venue.get("venue_name"));
                   }
 
-                  if (messageJSON.has("event")) {
-                    JSONObject event = messageJSON.getJSONObject("event");
-                    extracted.put("event_name", event.getString("event_name"));
-                    extracted.put("event_id", event.getString("event_id"));
-                    extracted.put("event_time", event.getLong("time"));
+                  JsonNode event = messageJSON.get("event");
+                  if (event != null) {
+                    extracted.set("event_name", event.get("event_name"));
+                    extracted.set("event_id", event.get("event_id"));
+                    extracted.set("event_time", event.get("time"));
                   }
 
-                  if (messageJSON.has("group")) {
-                    JSONObject group = messageJSON.getJSONObject("group");
-                    extracted.put("group_city", group.getString("group_city"));
-                    extracted.put("group_country", group.getString("group_country"));
-                    extracted.put("group_id", group.getLong("group_id"));
-                    extracted.put("group_name", group.getString("group_name"));
+                  JsonNode group = messageJSON.get("group");
+                  if (group != null) {
+                    extracted.set("group_city", group.get("group_city"));
+                    extracted.set("group_country", group.get("group_country"));
+                    extracted.set("group_id", group.get("group_id"));
+                    extracted.set("group_name", group.get("group_name"));
                   }
 
-                  extracted.put("mtime", messageJSON.getLong("mtime"));
+                  extracted.set("mtime", messageJSON.get("mtime"));
                   extracted.put("rsvp_count", 1);
 
                   if (keepPublishing) {

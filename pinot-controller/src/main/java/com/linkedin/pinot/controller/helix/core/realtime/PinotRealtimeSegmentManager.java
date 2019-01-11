@@ -35,13 +35,12 @@ import com.linkedin.pinot.common.utils.HLCSegmentName;
 import com.linkedin.pinot.common.utils.SegmentName;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
 import com.linkedin.pinot.common.utils.retry.RetryPolicies;
-import com.linkedin.pinot.controller.LeadershipChangeSubscriber;
 import com.linkedin.pinot.controller.ControllerLeadershipManager;
+import com.linkedin.pinot.controller.LeadershipChangeSubscriber;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.PinotTableIdealStateBuilder;
 import com.linkedin.pinot.core.query.utils.Pair;
 import com.linkedin.pinot.core.realtime.stream.StreamConfig;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -60,7 +59,6 @@ import org.apache.helix.manager.zk.ZkClient;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.HelixPropertyListener;
 import org.apache.zookeeper.data.Stat;
-import org.json.JSONException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -115,8 +113,7 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
     _pinotHelixResourceManager.getPropertyStore().stop();
   }
 
-  private synchronized void assignRealtimeSegmentsToServerInstancesIfNecessary()
-      throws JSONException, IOException {
+  private synchronized void assignRealtimeSegmentsToServerInstancesIfNecessary() {
     // Fetch current ideal state snapshot
     Map<String, IdealState> idealStateMap = new HashMap<>();
 

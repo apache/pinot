@@ -31,7 +31,6 @@ import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.PinotTableIdealStateBuilder;
 import com.linkedin.pinot.controller.helix.core.SegmentDeletionManager;
 import com.linkedin.pinot.controller.helix.core.util.ZKMetadataUtils;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -40,7 +39,6 @@ import org.apache.helix.HelixAdmin;
 import org.apache.helix.model.IdealState;
 import org.joda.time.Duration;
 import org.joda.time.Interval;
-import org.json.JSONException;
 import org.mockito.ArgumentMatchers;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
@@ -151,7 +149,7 @@ public class RetentionManagerTest {
         .build();
   }
 
-  private TableConfig createRealtimeTableConfig1(int replicaCount) throws IOException, JSONException {
+  private TableConfig createRealtimeTableConfig1(int replicaCount) {
     return new TableConfig.Builder(CommonConstants.Helix.TableType.REALTIME).setTableName(TEST_TABLE_NAME)
         .setLLC(true)
         .setRetentionTimeUnit("DAYS")

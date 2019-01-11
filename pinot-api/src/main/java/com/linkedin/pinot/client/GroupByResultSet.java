@@ -18,27 +18,22 @@
  */
 package com.linkedin.pinot.client;
 
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
+import com.fasterxml.jackson.databind.JsonNode;
+
 
 /**
  * A Pinot query result set for group by results, of which there is one of per aggregation function
  * in the query.
  */
 class GroupByResultSet extends AbstractResultSet {
-  private final JSONArray _groupByResults;
-  private final JSONArray _groupByColumns;
+  private final JsonNode _groupByResults;
+  private final JsonNode _groupByColumns;
   private final String _functionName;
 
-  public GroupByResultSet(JSONObject jsonObject) {
-    try {
-      _groupByResults = jsonObject.getJSONArray("groupByResult");
-      _groupByColumns = jsonObject.getJSONArray("groupByColumns");
-      _functionName = jsonObject.getString("function");
-    } catch (JSONException e) {
-      throw new PinotClientException(e);
-    }
+  public GroupByResultSet(JsonNode jsonObject) {
+    _groupByResults = jsonObject.get("groupByResult");
+    _groupByColumns = jsonObject.get("groupByColumns");
+    _functionName = jsonObject.get("function").asText();
   }
 
   /**
@@ -47,7 +42,7 @@ class GroupByResultSet extends AbstractResultSet {
    */
   @Override
   public int getRowCount() {
-    return _groupByResults.length();
+    return _groupByResults.size();
   }
 
   @Override
@@ -63,38 +58,24 @@ class GroupByResultSet extends AbstractResultSet {
   @Override
   public String getString(int rowIndex, int columnIndex) {
     if (columnIndex != 0) {
-      throw new IllegalArgumentException(
-          "Column index must always be 0 for aggregation result sets");
+      throw new IllegalArgumentException("Column index must always be 0 for aggregation result sets");
     }
-
-    try {
-      return _groupByResults.getJSONObject(rowIndex).get("value").toString();
-    } catch (Exception e) {
-      throw new PinotClientException(e);
-    }
+    return _groupByResults.get(rowIndex).get("value").asText();
   }
 
   @Override
   public int getGroupKeyLength() {
-    return _groupByColumns.length();
+    return _groupByColumns.size();
   }
 
   @Override
   public String getGroupKeyString(int rowIndex, int groupKeyColumnIndex) {
-    try {
-      return _groupByResults.getJSONObject(rowIndex).getJSONArray("group").getString(groupKeyColumnIndex);
-    } catch (Exception e) {
-      throw new PinotClientException(e);
-    }
+    return _groupByResults.get(rowIndex).get("group").get(groupKeyColumnIndex).asText();
   }
 
   @Override
   public String getGroupKeyColumnName(int groupKeyColumnIndex) {
-    try {
-      return _groupByColumns.getString(groupKeyColumnIndex);
-    } catch (Exception e) {
-      throw new PinotClientException(e);
-    }
+    return _groupByColumns.get(groupKeyColumnIndex).asText();
   }
 
   @Override

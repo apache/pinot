@@ -42,7 +42,6 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.util.HashedWheelTimer;
 import io.netty.util.Timer;
 import java.io.BufferedReader;
-import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
@@ -61,7 +60,6 @@ import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.GnuParser;
 import org.apache.commons.cli.Options;
 import org.apache.commons.configuration.PropertiesConfiguration;
-import org.json.JSONException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -276,11 +274,8 @@ public class ScatterGatherPerfClient implements Runnable {
 
   /**
    * Build a request from the JSON query and partition passed
-   * @return
-   * @throws IOException
-   * @throws JSONException
    */
-  public SimpleScatterGatherRequest getRequest() throws IOException, JSONException {
+  public SimpleScatterGatherRequest getRequest() {
 
     PerTableRoutingConfig cfg = _routingConfig.getPerTableRoutingCfg().get(_resourceName);
     if (null == cfg) {

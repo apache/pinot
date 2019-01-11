@@ -26,13 +26,10 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
-import java.io.UnsupportedEncodingException;
 import java.net.URL;
 import java.net.URLConnection;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
-import org.json.JSONException;
-import org.json.JSONObject;
 
 
 /**
@@ -65,8 +62,7 @@ public class AbstractBaseAdminCommand extends AbstractBaseCommand {
     pidFile.close();
   }
 
-  public static String sendPostRequest(String urlString, String payload) throws UnsupportedEncodingException,
-      IOException, JSONException {
+  public static String sendPostRequest(String urlString, String payload) throws IOException {
     final URL url = new URL(urlString);
     final URLConnection conn = url.openConnection();
 
@@ -85,37 +81,6 @@ public class AbstractBaseAdminCommand extends AbstractBaseCommand {
     }
 
     return sb.toString();
-  }
-
-  public static JSONObject postQuery(String query, String brokerBaseApiUrl) throws Exception {
-    final JSONObject json = new JSONObject();
-    json.put("pql", query);
-
-    final long start = System.currentTimeMillis();
-    final URLConnection conn = new URL(brokerBaseApiUrl + "/query").openConnection();
-    conn.setDoOutput(true);
-    final BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(conn.getOutputStream(), "UTF-8"));
-    final String reqStr = json.toString();
-    System.out.println("reqStr = " + reqStr);
-
-    writer.write(reqStr, 0, reqStr.length());
-    writer.flush();
-    final BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
-
-    final StringBuilder sb = new StringBuilder();
-    String line = null;
-    while ((line = reader.readLine()) != null) {
-      sb.append(line);
-    }
-
-    final long stop = System.currentTimeMillis();
-
-    final String res = sb.toString();
-    System.out.println("res = " + res);
-    final JSONObject ret = new JSONObject(res);
-    ret.put("totalTime", (stop - start));
-
-    return ret;
   }
 
   PropertiesConfiguration readConfigFromFile(String configFileName) throws ConfigurationException {

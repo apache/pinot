@@ -18,35 +18,31 @@
  */
 package com.linkedin.pinot.common.config;
 
+import com.linkedin.pinot.common.utils.JsonUtils;
 import com.linkedin.pinot.common.utils.TenantRole;
 import java.io.IOException;
-import org.codehaus.jackson.JsonNode;
-import org.codehaus.jackson.map.ObjectMapper;
-import org.json.JSONException;
-import org.json.JSONObject;
-import org.testng.Assert;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.*;
+
 
 public class TenantTest {
 
   @Test
-  public void testDeserializeFromJson()
-      throws JSONException, IOException {
-    JSONObject json = new JSONObject();
-    json.put("tenantRole", "SERVER");
-    json.put("tenantName", "newTenant");
-    json.put("numberOfInstances", 10);
-    json.put("offlineInstances", 5);
-    json.put("realtimeInstances", 5);
-    json.put("keyIDontKnow", "blahblahblah");
+  public void testDeserializeFromJson() throws IOException {
+    Tenant tenant = new Tenant();
+    tenant.setTenantRole(TenantRole.SERVER);
+    tenant.setTenantName("newTenant");
+    tenant.setNumberOfInstances(10);
+    tenant.setOfflineInstances(5);
+    tenant.setRealtimeInstances(5);
 
-    ObjectMapper mapper = new ObjectMapper();
-    JsonNode jsonNode = mapper.readTree(json.toString());
-    Tenant tenant = mapper.readValue(jsonNode, Tenant.class);
-    Assert.assertEquals(5, tenant.getOfflineInstances());
-    Assert.assertEquals(10, tenant.getNumberOfInstances());
-    Assert.assertEquals("newTenant", tenant.getTenantName());
-    Assert.assertEquals(TenantRole.SERVER, tenant.getTenantRole());
+    tenant = JsonUtils.stringToObject(JsonUtils.objectToString(tenant), Tenant.class);
+
+    assertEquals(tenant.getTenantRole(), TenantRole.SERVER);
+    assertEquals(tenant.getTenantName(), "newTenant");
+    assertEquals(tenant.getNumberOfInstances(), 10);
+    assertEquals(tenant.getOfflineInstances(), 5);
+    assertEquals(tenant.getRealtimeInstances(), 5);
   }
-
 }

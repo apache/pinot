@@ -18,11 +18,11 @@
  */
 package com.linkedin.pinot.controller.api.resources;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
 import com.linkedin.pinot.common.restlet.resources.SegmentSizeInfo;
 import com.linkedin.pinot.common.restlet.resources.TableSizeInfo;
+import com.linkedin.pinot.common.utils.JsonUtils;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
@@ -123,7 +123,7 @@ public class ServerTableSizeReaderTest {
             LOGGER.info("Handler interrupted during sleep");
           }
         }
-        String json = new ObjectMapper().writeValueAsString(tableSize);
+        String json = JsonUtils.objectToString(tableSize);
         httpExchange.sendResponseHeaders(status, json.length());
         OutputStream responseBody = httpExchange.getResponseBody();
         responseBody.write(json.getBytes());

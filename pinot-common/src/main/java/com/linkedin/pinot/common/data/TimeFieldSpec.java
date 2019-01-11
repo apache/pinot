@@ -18,14 +18,15 @@
  */
 package com.linkedin.pinot.common.data;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
-import com.google.gson.JsonObject;
 import com.linkedin.pinot.common.config.ConfigKey;
 import com.linkedin.pinot.common.utils.EqualityUtils;
+import com.linkedin.pinot.common.utils.JsonUtils;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
-import org.codehaus.jackson.annotate.JsonIgnore;
-import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 
 
 @SuppressWarnings("unused")
@@ -205,11 +206,11 @@ public final class TimeFieldSpec extends FieldSpec {
 
   @Nonnull
   @Override
-  public JsonObject toJsonObject() {
-    JsonObject jsonObject = new JsonObject();
-    jsonObject.add("incomingGranularitySpec", _incomingGranularitySpec.toJsonObject());
+  public ObjectNode toJsonObject() {
+    ObjectNode jsonObject = JsonUtils.newObjectNode();
+    jsonObject.set("incomingGranularitySpec", _incomingGranularitySpec.toJsonObject());
     if (!getOutgoingGranularitySpec().equals(_incomingGranularitySpec)) {
-      jsonObject.add("outgoingGranularitySpec", _outgoingGranularitySpec.toJsonObject());
+      jsonObject.set("outgoingGranularitySpec", _outgoingGranularitySpec.toJsonObject());
     }
     appendDefaultNullValue(jsonObject);
     return jsonObject;

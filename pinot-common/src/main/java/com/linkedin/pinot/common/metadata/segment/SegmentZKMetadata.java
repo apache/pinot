@@ -18,9 +18,11 @@
  */
 package com.linkedin.pinot.common.metadata.segment;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.linkedin.pinot.common.metadata.ZKMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.CommonConstants.Segment.SegmentType;
+import com.linkedin.pinot.common.utils.JsonUtils;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
@@ -29,7 +31,6 @@ import javax.annotation.Nonnull;
 import org.apache.helix.ZNRecord;
 import org.joda.time.Duration;
 import org.joda.time.Interval;
-import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -336,8 +337,11 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
     if (_customMap == null) {
       configMap.put(CommonConstants.Segment.CUSTOM_MAP, null);
     } else {
-      JSONObject jsonObject = new JSONObject(_customMap);
-      configMap.put(CommonConstants.Segment.CUSTOM_MAP, jsonObject.toString());
+      try {
+        configMap.put(CommonConstants.Segment.CUSTOM_MAP, JsonUtils.objectToString(_customMap));
+      } catch (JsonProcessingException e) {
+        throw new RuntimeException(e);
+      }
     }
 
     return configMap;

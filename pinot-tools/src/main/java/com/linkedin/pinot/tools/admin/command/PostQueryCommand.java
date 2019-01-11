@@ -18,21 +18,14 @@
  */
 package com.linkedin.pinot.tools.admin.command;
 
+import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.JsonUtils;
+import com.linkedin.pinot.common.utils.NetUtil;
 import com.linkedin.pinot.tools.Command;
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
-import java.io.InputStreamReader;
-import java.io.OutputStreamWriter;
-import java.net.URL;
-import java.net.URLConnection;
-
-import org.json.JSONObject;
+import java.util.Collections;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.NetUtil;
 
 
 public class PostQueryCommand extends AbstractBaseAdminCommand implements Command {
@@ -47,8 +40,8 @@ public class PostQueryCommand extends AbstractBaseAdminCommand implements Comman
   @Option(name = "-query", required = true, metaVar = "<string>", usage = "Query string to perform.")
   private String _query;
 
-  @Option(name = "-help", required = false, help = true, aliases = { "-h", "--h", "--help" },
-      usage = "Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h",
+      "--help"}, usage = "Print this message.")
   private boolean _help = false;
 
   @Override
@@ -80,7 +73,7 @@ public class PostQueryCommand extends AbstractBaseAdminCommand implements Comman
     _brokerHost = host;
     return this;
   }
-  
+
   public PostQueryCommand setBrokerPort(String port) {
     _brokerPort = port;
     return this;
@@ -96,28 +89,9 @@ public class PostQueryCommand extends AbstractBaseAdminCommand implements Comman
       _brokerHost = NetUtil.getHostAddress();
     }
     LOGGER.info("Executing command: " + toString());
-    final JSONObject json = new JSONObject();
-    json.put("pql", _query);
 
-    String brokerUrl = "http://" + _brokerHost + ":" + _brokerPort;
-    final URLConnection conn = new URL(brokerUrl + "/query").openConnection();
-    conn.setDoOutput(true);
-
-    final BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(conn.getOutputStream(), "UTF-8"));
-    String request = json.toString();
-
-    writer.write(request, 0, request.length());
-    writer.flush();
-
-    final BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
-    final StringBuilder sb = new StringBuilder();
-
-    String line = null;
-    while ((line = reader.readLine()) != null) {
-      sb.append(line);
-    }
-
-    return sb.toString();
+    String request = JsonUtils.objectToString(Collections.singletonMap("pql", _query));
+    return sendPostRequest("http://" + _brokerHost + ":" + _brokerPort + "/query", request);
   }
 
   @Override

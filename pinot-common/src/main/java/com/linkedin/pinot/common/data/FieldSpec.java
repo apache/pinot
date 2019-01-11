@@ -18,13 +18,13 @@
  */
 package com.linkedin.pinot.common.data;
 
-import com.google.gson.JsonArray;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonPrimitive;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.config.ConfigKey;
 import com.linkedin.pinot.common.config.ConfigNodeLifecycleAware;
 import com.linkedin.pinot.common.utils.EqualityUtils;
+import com.linkedin.pinot.common.utils.JsonUtils;
 import javax.annotation.Nullable;
 import org.apache.avro.Schema.Type;
 import org.apache.commons.codec.DecoderException;
@@ -267,63 +267,63 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, ConfigNodeLife
   }
 
   /**
-   * Returns the {@link JsonObject} representing the field spec.
+   * Returns the {@link ObjectNode} representing the field spec.
    * <p>Only contains fields with non-default value.
-   * <p>NOTE: here we use {@link JsonObject} to preserve the insertion order.
+   * <p>NOTE: here we use {@link ObjectNode} to preserve the insertion order.
    */
-  public JsonObject toJsonObject() {
-    JsonObject jsonObject = new JsonObject();
-    jsonObject.addProperty("name", _name);
-    jsonObject.addProperty("dataType", _dataType.name());
+  public ObjectNode toJsonObject() {
+    ObjectNode jsonObject = JsonUtils.newObjectNode();
+    jsonObject.put("name", _name);
+    jsonObject.put("dataType", _dataType.name());
     if (!_isSingleValueField) {
-      jsonObject.addProperty("singleValueField", false);
+      jsonObject.put("singleValueField", false);
     }
     if (_maxLength != DEFAULT_MAX_LENGTH) {
-      jsonObject.addProperty("maxLength", _maxLength);
+      jsonObject.put("maxLength", _maxLength);
     }
     appendDefaultNullValue(jsonObject);
     return jsonObject;
   }
 
-  protected void appendDefaultNullValue(JsonObject jsonObject) {
+  protected void appendDefaultNullValue(ObjectNode jsonNode) {
     assert _defaultNullValue != null;
     if (!_defaultNullValue.equals(getDefaultNullValue(getFieldType(), _dataType, null))) {
       if (_defaultNullValue instanceof Number) {
-        jsonObject.add("defaultNullValue", new JsonPrimitive((Number) _defaultNullValue));
+        jsonNode.set("defaultNullValue", JsonUtils.objectToJsonNode(_defaultNullValue));
       } else {
-        jsonObject.addProperty("defaultNullValue", getStringValue(_defaultNullValue));
+        jsonNode.put("defaultNullValue", getStringValue(_defaultNullValue));
       }
     }
   }
 
-  public JsonObject toAvroSchemaJsonObject() {
-    JsonObject jsonSchema = new JsonObject();
-    jsonSchema.addProperty("name", _name);
+  public ObjectNode toAvroSchemaJsonObject() {
+    ObjectNode jsonSchema = JsonUtils.newObjectNode();
+    jsonSchema.put("name", _name);
     switch (_dataType) {
       case INT:
-        jsonSchema.add("type", convertStringsToJsonArray("null", "int"));
+        jsonSchema.set("type", convertStringsToJsonArray("null", "int"));
         return jsonSchema;
       case LONG:
-        jsonSchema.add("type", convertStringsToJsonArray("null", "long"));
+        jsonSchema.set("type", convertStringsToJsonArray("null", "long"));
         return jsonSchema;
       case FLOAT:
-        jsonSchema.add("type", convertStringsToJsonArray("null", "float"));
+        jsonSchema.set("type", convertStringsToJsonArray("null", "float"));
         return jsonSchema;
       case DOUBLE:
-        jsonSchema.add("type", convertStringsToJsonArray("null", "double"));
+        jsonSchema.set("type", convertStringsToJsonArray("null", "double"));
         return jsonSchema;
       case STRING:
-        jsonSchema.add("type", convertStringsToJsonArray("null", "string"));
+        jsonSchema.set("type", convertStringsToJsonArray("null", "string"));
         return jsonSchema;
       default:
         throw new UnsupportedOperationException();
     }
   }
 
-  private static JsonArray convertStringsToJsonArray(String... strings) {
-    JsonArray jsonArray = new JsonArray();
+  private static ArrayNode convertStringsToJsonArray(String... strings) {
+    ArrayNode jsonArray = JsonUtils.newArrayNode();
     for (String string : strings) {
-      jsonArray.add(new JsonPrimitive(string));
+      jsonArray.add(string);
     }
     return jsonArray;
   }

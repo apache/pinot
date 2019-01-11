@@ -24,15 +24,14 @@ import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.core.data.readers.FileFormat;
 import com.linkedin.pinot.core.data.readers.PinotSegmentRecordReader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
-import com.linkedin.pinot.core.segment.name.DefaultSegmentNameGenerator;
-import com.linkedin.pinot.core.segment.name.SegmentNameGenerator;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+import com.linkedin.pinot.core.segment.name.DefaultSegmentNameGenerator;
+import com.linkedin.pinot.core.segment.name.SegmentNameGenerator;
 import java.io.File;
 import java.lang.reflect.Field;
 import org.apache.commons.io.FileUtils;
-import org.codehaus.jackson.map.ObjectMapper;
 import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.Option;
 
@@ -42,7 +41,6 @@ import org.kohsuke.args4j.Option;
  */
 public class ColumnarToStarTreeConverter {
   private static final String TMP_DIR_PREFIX = "_tmp_";
-  private static final ObjectMapper objectMapper = new ObjectMapper();
 
   @Option(name = "-inputDir", required = true, usage = "Path to input directory containing Pinot segments")
   private String _inputDirName = null;

@@ -20,11 +20,12 @@ package com.linkedin.pinot.controller.api.resources;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.Tenant;
 import com.linkedin.pinot.common.metrics.ControllerMeter;
 import com.linkedin.pinot.common.metrics.ControllerMetrics;
+import com.linkedin.pinot.common.utils.JsonUtils;
 import com.linkedin.pinot.common.utils.TenantRole;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse;
@@ -49,8 +50,6 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.json.JSONException;
-import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -220,10 +219,9 @@ public class PinotTenantRestletResource {
     return getTablesServedFromTenant(tenantName);
   }
 
-  private String getTablesServedFromTenant(String tenantName)
-      throws JSONException {
-    Set<String> tables = new HashSet<String>();
-    JSONObject resourceGetRet = new JSONObject();
+  private String getTablesServedFromTenant(String tenantName) {
+    Set<String> tables = new HashSet<>();
+    ObjectNode resourceGetRet = JsonUtils.newObjectNode();
 
     for (String table : pinotHelixResourceManager.getAllTables()) {
       TableConfig tableConfig = pinotHelixResourceManager.getTableConfig(table);
@@ -233,14 +231,14 @@ public class PinotTenantRestletResource {
       }
     }
 
-    resourceGetRet.put(TABLES, tables);
+    resourceGetRet.set(TABLES, JsonUtils.objectToJsonNode(tables));
     return resourceGetRet.toString();
   }
 
-  private String toggleTenantState(String tenantName, String stateStr, @Nullable String tenantType) throws JSONException{
-    Set<String> serverInstances = new HashSet<String>();
-    Set<String> brokerInstances = new HashSet<String>();
-    JSONObject instanceResult = new JSONObject();
+  private String toggleTenantState(String tenantName, String stateStr, @Nullable String tenantType) {
+    Set<String> serverInstances = new HashSet<>();
+    Set<String> brokerInstances = new HashSet<>();
+    ObjectNode instanceResult = JsonUtils.newObjectNode();
 
     if ((tenantType == null) || tenantType.equalsIgnoreCase("server")) {
       serverInstances = pinotHelixResourceManager.getAllInstancesForServerTenant(tenantName);
@@ -267,27 +265,30 @@ public class PinotTenantRestletResource {
     boolean enable = StateType.ENABLE.name().equalsIgnoreCase(stateStr) ? true : false;
     for (String instance : allInstances) {
       if (enable) {
-        instanceResult.put(instance, pinotHelixResourceManager.enableInstance(instance));
+        instanceResult.put(instance, JsonUtils.objectToJsonNode(pinotHelixResourceManager.enableInstance(instance)));
       } else {
-        instanceResult.put(instance, pinotHelixResourceManager.disableInstance(instance));
+        instanceResult.put(instance, JsonUtils.objectToJsonNode(pinotHelixResourceManager.disableInstance(instance)));
       }
     }
 
     return null;
   }
 
-  private String listInstancesForTenant(String tenantName, String tenantType)
-      throws JSONException {
-    JSONObject resourceGetRet = new JSONObject();
+  private String listInstancesForTenant(String tenantName, String tenantType) {
+    ObjectNode resourceGetRet = JsonUtils.newObjectNode();
     if (tenantType == null) {
-      resourceGetRet.put("ServerInstances", pinotHelixResourceManager.getAllInstancesForServerTenant(tenantName));
-      resourceGetRet.put("BrokerInstances", pinotHelixResourceManager.getAllInstancesForBrokerTenant(tenantName));
+      resourceGetRet.set("ServerInstances",
+          JsonUtils.objectToJsonNode(pinotHelixResourceManager.getAllInstancesForServerTenant(tenantName)));
+      resourceGetRet.set("BrokerInstances",
+          JsonUtils.objectToJsonNode(pinotHelixResourceManager.getAllInstancesForBrokerTenant(tenantName)));
     } else {
       if (tenantType.equalsIgnoreCase("server")) {
-        resourceGetRet.put("ServerInstances", pinotHelixResourceManager.getAllInstancesForServerTenant(tenantName));
+        resourceGetRet.set("ServerInstances",
+            JsonUtils.objectToJsonNode(pinotHelixResourceManager.getAllInstancesForServerTenant(tenantName)));
       }
       if (tenantType.equalsIgnoreCase("broker")) {
-        resourceGetRet.put("BrokerInstances", pinotHelixResourceManager.getAllInstancesForBrokerTenant(tenantName));
+        resourceGetRet.set("BrokerInstances",
+            JsonUtils.objectToJsonNode(pinotHelixResourceManager.getAllInstancesForBrokerTenant(tenantName)));
       }
     }
     resourceGetRet.put(TENANT_NAME, tenantName);
@@ -374,7 +375,7 @@ public class PinotTenantRestletResource {
       pinotHelixResourceManager.deleteOfflineServerTenantFor(tenantName);
       pinotHelixResourceManager.deleteRealtimeServerTenantFor(tenantName);
       try {
-        return new ObjectMapper().writeValueAsString(new SuccessResponse("Deleted tenant " + tenantName));
+        return JsonUtils.objectToString(new SuccessResponse("Deleted tenant " + tenantName));
       } catch (JsonProcessingException e) {
          LOGGER.error("Error serializing response to json");
         return "{\"message\" : \"Deleted tenant\" " + tenantName + "}";
@@ -382,15 +383,15 @@ public class PinotTenantRestletResource {
     }
 
     boolean enable = StateType.ENABLE.name().equalsIgnoreCase(state) ? true : false;
-    JSONObject instanceResult = new JSONObject();
+    ObjectNode instanceResult = JsonUtils.newObjectNode();
     String instance = null;
     try {
       for (String i : allInstances) {
         instance = i;
         if (enable) {
-          instanceResult.put(instance, pinotHelixResourceManager.enableInstance(instance));
+          instanceResult.set(instance, JsonUtils.objectToJsonNode(pinotHelixResourceManager.enableInstance(instance)));
         } else {
-          instanceResult.put(instance, pinotHelixResourceManager.disableInstance(instance));
+          instanceResult.set(instance, JsonUtils.objectToJsonNode(pinotHelixResourceManager.disableInstance(instance)));
         }
       }
     } catch (Exception e) {

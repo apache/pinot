@@ -744,7 +744,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       throw new RuntimeException("Segment file does not exist:" + segTarFileName);
     }
     SegmentCompletionProtocol.Response returnedResponse;
-    if (response.getIsSplitCommit() && _indexLoadingConfig.isEnableSplitCommit()) {
+    if (response.isSplitCommit() && _indexLoadingConfig.isEnableSplitCommit()) {
       // Send segmentStart, segmentUpload, & segmentCommitEnd to the controller
       // if that succeeds, swap in-memory segment with the one built.
       returnedResponse = doSplitCommit(response);
@@ -1062,7 +1062,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             .setOffHeap(_isOffHeap)
             .setMemoryManager(_memoryManager)
             .setStatsHistory(realtimeTableDataManager.getStatsHistory())
-            .setAggregateMetrics(indexingConfig.getAggregateMetrics());
+            .setAggregateMetrics(indexingConfig.isAggregateMetrics());
 
     // Create message decoder
     _messageDecoder = StreamDecoderProvider.create(_partitionLevelStreamConfig, _schema);

@@ -18,18 +18,15 @@
  */
 package com.linkedin.pinot.common.config;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.linkedin.pinot.common.utils.EqualityUtils;
 import java.util.Map;
-import org.codehaus.jackson.annotate.JsonIgnore;
-import org.codehaus.jackson.annotate.JsonIgnoreProperties;
-import org.json.JSONException;
-import org.json.JSONObject;
 
 
 @SuppressWarnings("unused")
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class TableTaskConfig {
-  private static final String TASK_TYPE_CONFIGS_MAP_KEY = "taskTypeConfigsMap";
 
   @ConfigKey("taskConfig")
   @UseChildKeyHandler(TaskConfigMapChildKeyHandler.class)
@@ -51,17 +48,6 @@ public class TableTaskConfig {
   @JsonIgnore
   public Map<String, String> getConfigsForTaskType(String taskType) {
     return _taskTypeConfigsMap.get(taskType);
-  }
-
-  @Override
-  public String toString() {
-    JSONObject jsonTaskConfigsMap = new JSONObject();
-    try {
-      jsonTaskConfigsMap.put(TASK_TYPE_CONFIGS_MAP_KEY, _taskTypeConfigsMap);
-      return jsonTaskConfigsMap.toString(2);
-    } catch (JSONException e) {
-      return e.toString();
-    }
   }
 
   @Override

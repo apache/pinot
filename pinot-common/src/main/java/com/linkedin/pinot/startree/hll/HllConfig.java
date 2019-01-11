@@ -18,9 +18,11 @@
  */
 package com.linkedin.pinot.startree.hll;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.config.ConfigKey;
+import com.linkedin.pinot.common.utils.JsonUtils;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -28,13 +30,8 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
-import org.codehaus.jackson.annotate.JsonIgnore;
-import org.codehaus.jackson.map.ObjectMapper;
 
-import static com.linkedin.pinot.common.utils.EqualityUtils.hashCodeOf;
-import static com.linkedin.pinot.common.utils.EqualityUtils.isEqual;
-import static com.linkedin.pinot.common.utils.EqualityUtils.isNullOrNotSameClass;
-import static com.linkedin.pinot.common.utils.EqualityUtils.isSameReference;
+import static com.linkedin.pinot.common.utils.EqualityUtils.*;
 
 
 /**
@@ -57,8 +54,6 @@ public class HllConfig {
   private Set<String> columnsToDeriveHllFields = new HashSet<>();
 
   private transient Map<String, String> derivedHllFieldToOriginMap;
-
-  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   /**
    * HllConfig with default hll log2m. No Hll derived field is generated.
@@ -149,11 +144,11 @@ public class HllConfig {
   }
 
   public String toJsonString() throws Exception {
-    return OBJECT_MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(this);
+    return JsonUtils.objectToPrettyString(this);
   }
 
   public static HllConfig fromJsonString(String jsonString) throws IOException {
-    return OBJECT_MAPPER.readValue(jsonString, HllConfig.class);
+    return JsonUtils.stringToObject(jsonString, HllConfig.class);
   }
 
   @Override

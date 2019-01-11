@@ -169,7 +169,7 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     tableStreamName = tableName + "_" + _streamConfig.getTopicName();
 
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
-    if (indexingConfig != null && indexingConfig.getAggregateMetrics()) {
+    if (indexingConfig != null && indexingConfig.isAggregateMetrics()) {
       LOGGER.warn("Updating of metrics only supported for LLC consumer, ignoring.");
     }
 

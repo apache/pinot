@@ -19,6 +19,7 @@
 package com.linkedin.pinot.common.config;
 
 import com.linkedin.pinot.common.data.StarTreeIndexSpec;
+import com.linkedin.pinot.common.utils.JsonUtils;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -27,79 +28,44 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
-import org.codehaus.jackson.JsonNode;
-import org.codehaus.jackson.map.ObjectMapper;
-import org.json.JSONException;
-import org.json.JSONObject;
-import org.testng.Assert;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.*;
 
 
 public class IndexingConfigTest {
 
   @Test
-  public void testSerDe()
-      throws JSONException, IOException {
-    JSONObject json = new JSONObject();
-    json.put("invertedIndexColumns", Arrays.asList("a", "b", "c"));
-    json.put("sortedColumn", Arrays.asList("d", "e", "f"));
+  public void testSerDe() throws IOException {
+    IndexingConfig indexingConfig = new IndexingConfig();
+    indexingConfig.setLoadMode("MMAP");
+    indexingConfig.setAggregateMetrics(true);
+    List<String> invertedIndexColumns = Arrays.asList("a", "b", "c");
+    indexingConfig.setInvertedIndexColumns(invertedIndexColumns);
+    List<String> sortedColumn = Arrays.asList("d", "e", "f");
+    indexingConfig.setSortedColumn(sortedColumn);
+    List<String> onHeapDictionaryColumns = Arrays.asList("x", "y", "z");
+    indexingConfig.setOnHeapDictionaryColumns(onHeapDictionaryColumns);
+    List<String> bloomFilterColumns = Arrays.asList("a", "b");
+    indexingConfig.setBloomFilterColumns(bloomFilterColumns);
+    Map<String, String> noDictionaryConfig = new HashMap<>();
+    noDictionaryConfig.put("a", "SNAPPY");
+    noDictionaryConfig.put("b", "PASS_THROUGH");
+    indexingConfig.setnoDictionaryConfig(noDictionaryConfig);
 
-    String[] expectedOnHeapDictionaryColumns = new String[] {"x", "y", "z"};
-    json.put("onHeapDictionaryColumns", Arrays.asList(expectedOnHeapDictionaryColumns));
+    indexingConfig = JsonUtils.stringToObject(JsonUtils.objectToString(indexingConfig), IndexingConfig.class);
 
-    json.put("loadMode", "MMAP");
-    json.put("keyThatIsUnknown", "randomValue");
-    json.put("aggregateMetrics", "true");
-
-    JSONObject noDictConfig = new JSONObject();
-    noDictConfig.put("a", "SNAPPY");
-    noDictConfig.put("b", "PASS_THROUGH");
-    json.put("noDictionaryConfig", noDictConfig);
-
-    String[] expectedBloomFilterColumns = new String[] {"a", "b"};
-    json.put("bloomFilterColumns", Arrays.asList(expectedBloomFilterColumns));
-
-    ObjectMapper mapper = new ObjectMapper();
-    JsonNode jsonNode = mapper.readTree(json.toString());
-    IndexingConfig indexingConfig = mapper.readValue(jsonNode, IndexingConfig.class);
-
-    Assert.assertEquals("MMAP", indexingConfig.getLoadMode());
-    List<String> invertedIndexColumns = indexingConfig.getInvertedIndexColumns();
-    Assert.assertEquals(3, invertedIndexColumns.size());
-    Assert.assertEquals("a", invertedIndexColumns.get(0));
-    Assert.assertEquals("b", invertedIndexColumns.get(1));
-    Assert.assertEquals("c", invertedIndexColumns.get(2));
-
-    List<String> sortedIndexColumns = indexingConfig.getSortedColumn();
-    Assert.assertEquals(3, sortedIndexColumns.size());
-    Assert.assertEquals("d", sortedIndexColumns.get(0));
-    Assert.assertEquals("e", sortedIndexColumns.get(1));
-    Assert.assertEquals("f", sortedIndexColumns.get(2));
-
-    // Test for noDictionaryConfig.
-    Map<String, String> noDictConfigMap = indexingConfig.getnoDictionaryConfig();
-    Assert.assertEquals(noDictConfigMap.size(), 2);
-    Assert.assertEquals(noDictConfig.get("a"), "SNAPPY");
-    Assert.assertEquals(noDictConfig.get("b"), "PASS_THROUGH");
-
-    List<String> actualOnHeapDictionaryColumns = indexingConfig.getOnHeapDictionaryColumns();
-    Assert.assertEquals(actualOnHeapDictionaryColumns.size(), expectedOnHeapDictionaryColumns.length);
-    for (int i = 0; i < expectedOnHeapDictionaryColumns.length; i++) {
-      Assert.assertEquals(actualOnHeapDictionaryColumns.get(i), expectedOnHeapDictionaryColumns[i]);
-    }
-
-    Assert.assertTrue(indexingConfig.getAggregateMetrics());
-
-    List<String> bloomFilterColumns = indexingConfig.getBloomFilterColumns();
-    Assert.assertEquals(bloomFilterColumns.size(), 2);
-    for (int i = 0; i < bloomFilterColumns.size(); i++) {
-      Assert.assertEquals(bloomFilterColumns.get(i), expectedBloomFilterColumns[i]);
-    }
+    assertEquals(indexingConfig.getLoadMode(), "MMAP");
+    assertTrue(indexingConfig.isAggregateMetrics());
+    assertEquals(indexingConfig.getInvertedIndexColumns(), invertedIndexColumns);
+    assertEquals(indexingConfig.getSortedColumn(), sortedColumn);
+    assertEquals(indexingConfig.getOnHeapDictionaryColumns(), onHeapDictionaryColumns);
+    assertEquals(indexingConfig.getBloomFilterColumns(), bloomFilterColumns);
+    assertEquals(indexingConfig.getNoDictionaryConfig(), noDictionaryConfig);
   }
 
   @Test
-  public void testSegmentPartitionConfig()
-      throws IOException {
+  public void testSegmentPartitionConfig() throws IOException {
     int numColumns = 5;
     Map<String, ColumnPartitionConfig> expectedColumnPartitionMap = new HashMap<>(5);
     for (int i = 0; i < numColumns; i++) {
@@ -110,19 +76,16 @@ public class IndexingConfigTest {
     IndexingConfig expectedIndexingConfig = new IndexingConfig();
     expectedIndexingConfig.setSegmentPartitionConfig(expectedPartitionConfig);
 
-    ObjectMapper mapper = new ObjectMapper();
-    String indexingConfigString = mapper.writeValueAsString(expectedIndexingConfig);
-    IndexingConfig actualIndexingConfig = mapper.readValue(indexingConfigString, IndexingConfig.class);
+    IndexingConfig actualIndexingConfig =
+        JsonUtils.stringToObject(JsonUtils.objectToString(expectedIndexingConfig), IndexingConfig.class);
 
     SegmentPartitionConfig actualPartitionConfig = actualIndexingConfig.getSegmentPartitionConfig();
     Map<String, ColumnPartitionConfig> actualColumnPartitionMap = actualPartitionConfig.getColumnPartitionMap();
-    Assert.assertEquals(actualColumnPartitionMap.size(), expectedColumnPartitionMap.size());
+    assertEquals(actualColumnPartitionMap.size(), expectedColumnPartitionMap.size());
 
     for (String column : expectedColumnPartitionMap.keySet()) {
-      Assert.assertEquals(actualPartitionConfig.getFunctionName(column),
-          expectedPartitionConfig.getFunctionName(column));
-      Assert.assertEquals(actualPartitionConfig.getNumPartitions(column),
-          expectedPartitionConfig.getNumPartitions(column));
+      assertEquals(actualPartitionConfig.getFunctionName(column), expectedPartitionConfig.getFunctionName(column));
+      assertEquals(actualPartitionConfig.getNumPartitions(column), expectedPartitionConfig.getNumPartitions(column));
     }
   }
 
@@ -133,11 +96,9 @@ public class IndexingConfigTest {
    *   <li> Indexing config is first serialized into a string, and then read back from string. </li>
    *   <li> Test to ensure star tree index spec values are correct after serialization and de-serialization. </li>
    * </ul>
-   * @throws IOException
    */
   @Test
-  public void testStarTreeSpec()
-      throws IOException {
+  public void testStarTreeSpec() throws IOException {
     Random random = new Random(System.nanoTime());
     StarTreeIndexSpec expectedStarTreeSpec = new StarTreeIndexSpec();
 
@@ -150,29 +111,24 @@ public class IndexingConfigTest {
     int expectedSkipMaterializationThreshold = random.nextInt();
     expectedStarTreeSpec.setSkipMaterializationCardinalityThreshold(expectedSkipMaterializationThreshold);
 
-    Set<String> expectedSkipMaterializationDimensions = new HashSet<>(Arrays.asList(new String[]{"col4", "col5"}));
+    Set<String> expectedSkipMaterializationDimensions = new HashSet<>(Arrays.asList("col4", "col5"));
     expectedStarTreeSpec.setSkipMaterializationForDimensions(expectedSkipMaterializationDimensions);
 
-    Set<String> expectedSkipStarNodeCreationForDimension = new HashSet<>(Arrays.asList(new String[]{"col6", "col7"}));
+    Set<String> expectedSkipStarNodeCreationForDimension = new HashSet<>(Arrays.asList("col6", "col7"));
     expectedStarTreeSpec.setSkipStarNodeCreationForDimensions(expectedSkipStarNodeCreationForDimension);
 
     IndexingConfig expectedIndexingConfig = new IndexingConfig();
     expectedIndexingConfig.setStarTreeIndexSpec(expectedStarTreeSpec);
 
-    ObjectMapper objectMapper = new ObjectMapper();
-    String indexingConfigString = objectMapper.writeValueAsString(expectedIndexingConfig);
-
-    IndexingConfig actualIndexingConfig = objectMapper.readValue(indexingConfigString, IndexingConfig.class);
+    IndexingConfig actualIndexingConfig =
+        JsonUtils.stringToObject(JsonUtils.objectToString(expectedIndexingConfig), IndexingConfig.class);
     StarTreeIndexSpec actualStarTreeSpec = actualIndexingConfig.getStarTreeIndexSpec();
 
-    Assert.assertEquals(actualStarTreeSpec.getDimensionsSplitOrder(), expectedDimensionSplitOrder);
-    Assert.assertEquals(actualStarTreeSpec.getMaxLeafRecords(), expectedMaxLeafRecords);
+    assertEquals(actualStarTreeSpec.getDimensionsSplitOrder(), expectedDimensionSplitOrder);
+    assertEquals(actualStarTreeSpec.getMaxLeafRecords(), expectedMaxLeafRecords);
 
-    Assert.assertEquals(actualStarTreeSpec.getSkipMaterializationCardinalityThreshold(),
-        expectedSkipMaterializationThreshold);
-    Assert.assertEquals(actualStarTreeSpec.getSkipMaterializationForDimensions(),
-        expectedSkipMaterializationDimensions);
-    Assert.assertEquals(actualStarTreeSpec.getSkipStarNodeCreationForDimensions(),
-        expectedSkipStarNodeCreationForDimension);
+    assertEquals(actualStarTreeSpec.getSkipMaterializationCardinalityThreshold(), expectedSkipMaterializationThreshold);
+    assertEquals(actualStarTreeSpec.getSkipMaterializationForDimensions(), expectedSkipMaterializationDimensions);
+    assertEquals(actualStarTreeSpec.getSkipStarNodeCreationForDimensions(), expectedSkipStarNodeCreationForDimension);
   }
 }

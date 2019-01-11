@@ -18,14 +18,13 @@
  */
 package com.linkedin.pinot.integration.tests;
 
-import com.alibaba.fastjson.JSON;
-import com.alibaba.fastjson.JSONArray;
-import com.alibaba.fastjson.JSONObject;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
-import java.util.Collections;
+import com.linkedin.pinot.common.utils.JsonUtils;
+import java.util.Iterator;
 import junit.framework.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -50,13 +49,12 @@ public class DeleteAPIHybridClusterIntegrationTest extends HybridClusterIntegrat
   }
 
   private long numRowsReturned(CommonConstants.Helix.TableType tableType) throws Exception {
-    org.json.JSONObject response = postQuery("select count(*) from '" + TABLE_NAME + "_" + tableType + "'");
-    if (response.get("numDocsScanned").equals(new Integer(0))) {
+    JsonNode response = postQuery("select count(*) from '" + TABLE_NAME + "_" + tableType + "'");
+    if (response.get("numDocsScanned").asLong() == 0) {
       return 0;
     } else {
       // Throws a null pointer exception when there are no rows because it can't find "aggregationResults"
-      String pinotValue =
-          ((org.json.JSONArray) response.get("aggregationResults")).getJSONObject(0).get("value").toString();
+      String pinotValue = response.get("aggregationResults").get(0).get("value").asText();
       return Long.parseLong(pinotValue);
     }
   }
@@ -106,10 +104,10 @@ public class DeleteAPIHybridClusterIntegrationTest extends HybridClusterIntegrat
 
     String segmentList = sendGetRequest(_controllerRequestURLBuilder.
         forSegmentListAPIWithTableType(TABLE_NAME, CommonConstants.Helix.TableType.REALTIME.toString()));
-    JSONArray realtimeSegmentsList =
+    JsonNode realtimeSegmentsList =
         getSegmentsFromJsonSegmentAPI(segmentList, CommonConstants.Helix.TableType.REALTIME.toString());
 
-    String removedSegment = realtimeSegmentsList.get(0).toString();
+    String removedSegment = realtimeSegmentsList.get(0).asText();
     long removedSegmentRows = getNumRowsFromRealtimeMetadata(removedSegment);
     Assert.assertNotSame(removedSegmentRows, 0L);
 
@@ -121,9 +119,9 @@ public class DeleteAPIHybridClusterIntegrationTest extends HybridClusterIntegrat
     String postDeleteSegmentList = sendGetRequest(
         _controllerRequestURLBuilder.forSegmentListAPIWithTableType(TABLE_NAME,
             CommonConstants.Helix.TableType.REALTIME.toString()));
-    JSONArray realtimeSegmentsListReturn =
+    JsonNode realtimeSegmentsListReturn =
         getSegmentsFromJsonSegmentAPI(postDeleteSegmentList, CommonConstants.Helix.TableType.REALTIME.toString());
-    realtimeSegmentsList.remove(removedSegment);
+    removeValue(realtimeSegmentsList, removedSegment);
     Assert.assertEquals(realtimeSegmentsListReturn, realtimeSegmentsList);
   }
 
@@ -133,10 +131,10 @@ public class DeleteAPIHybridClusterIntegrationTest extends HybridClusterIntegrat
 
     String segmentList = sendGetRequest(_controllerRequestURLBuilder.forSegmentListAPIWithTableType(TABLE_NAME,
         CommonConstants.Helix.TableType.REALTIME.toString()));
-    JSONArray realtimeSegmentsList =
+    JsonNode realtimeSegmentsList =
         getSegmentsFromJsonSegmentAPI(segmentList, CommonConstants.Helix.TableType.REALTIME.toString());
 
-    String removedSegment = realtimeSegmentsList.get(0).toString();
+    String removedSegment = realtimeSegmentsList.get(0).asText();
     long removedSegmentRows = getNumRowsFromRealtimeMetadata(removedSegment);
     Assert.assertNotSame(removedSegmentRows, 0L);
 
@@ -148,9 +146,9 @@ public class DeleteAPIHybridClusterIntegrationTest extends HybridClusterIntegrat
     String postDeleteSegmentList = sendGetRequest(
         _controllerRequestURLBuilder.forSegmentListAPIWithTableType(TABLE_NAME,
             CommonConstants.Helix.TableType.REALTIME.toString()));
-    JSONArray realtimeSegmentsListReturn =
+    JsonNode realtimeSegmentsListReturn =
         getSegmentsFromJsonSegmentAPI(postDeleteSegmentList, CommonConstants.Helix.TableType.REALTIME.toString());
-    realtimeSegmentsList.remove(removedSegment);
+    removeValue(realtimeSegmentsList, removedSegment);
     Assert.assertEquals(realtimeSegmentsListReturn, realtimeSegmentsList);
   }
 
@@ -166,11 +164,11 @@ public class DeleteAPIHybridClusterIntegrationTest extends HybridClusterIntegrat
   public void deleteFromDeleteAPI() throws Exception {
     String segmentList = sendGetRequest(_controllerRequestURLBuilder.
         forSegmentListAPIWithTableType(TABLE_NAME, CommonConstants.Helix.TableType.OFFLINE.toString()));
-    JSONArray offlineSegmentsList =
+    JsonNode offlineSegmentsList =
         getSegmentsFromJsonSegmentAPI(segmentList, CommonConstants.Helix.TableType.OFFLINE.toString());
     Assert.assertNotNull(offlineSegmentsList);
 
-    String removedSegment = offlineSegmentsList.get(0).toString();
+    String removedSegment = offlineSegmentsList.get(0).asText();
     long removedSegmentRows = getNumRowsFromOfflineMetadata(removedSegment);
     Assert.assertNotSame(removedSegmentRows, 0L);
 
@@ -181,9 +179,9 @@ public class DeleteAPIHybridClusterIntegrationTest extends HybridClusterIntegrat
 
     String postDeleteSegmentList = sendGetRequest(_controllerRequestURLBuilder.
         forSegmentListAPIWithTableType(TABLE_NAME, CommonConstants.Helix.TableType.OFFLINE.toString()));
-    JSONArray offlineSegmentsListReturn =
+    JsonNode offlineSegmentsListReturn =
         getSegmentsFromJsonSegmentAPI(postDeleteSegmentList, CommonConstants.Helix.TableType.OFFLINE.toString());
-    offlineSegmentsList.remove(removedSegment);
+    removeValue(offlineSegmentsList, removedSegment);
     Assert.assertEquals(offlineSegmentsListReturn, offlineSegmentsList);
 
     // Testing Delete All API here
@@ -195,9 +193,8 @@ public class DeleteAPIHybridClusterIntegrationTest extends HybridClusterIntegrat
     String postDeleteSegmentListAll = sendGetRequest(_controllerRequestURLBuilder.
         forSegmentListAPIWithTableType(TABLE_NAME, CommonConstants.Helix.TableType.OFFLINE.toString()));
 
-    Assert.assertEquals(
-        getSegmentsFromJsonSegmentAPI(postDeleteSegmentListAll, CommonConstants.Helix.TableType.OFFLINE.toString()),
-        Collections.emptyList());
+    Assert.assertEquals(getSegmentsFromJsonSegmentAPI(postDeleteSegmentListAll,
+        CommonConstants.Helix.TableType.OFFLINE.toString()).size(), 0);
 
     waitForSegmentsToBeInDeleteDirectory();
     repushOfflineSegments();
@@ -214,10 +211,10 @@ public class DeleteAPIHybridClusterIntegrationTest extends HybridClusterIntegrat
     String segmentList = sendGetRequest(_controllerRequestURLBuilder.
         forSegmentListAPIWithTableType(TABLE_NAME, CommonConstants.Helix.TableType.OFFLINE.toString()));
 
-    JSONArray offlineSegmentsList =
+    JsonNode offlineSegmentsList =
         getSegmentsFromJsonSegmentAPI(segmentList, CommonConstants.Helix.TableType.OFFLINE.toString());
 
-    String removedSegment = offlineSegmentsList.get(0).toString();
+    String removedSegment = offlineSegmentsList.get(0).asText();
 
     long removedSegmentRows = getNumRowsFromOfflineMetadata(removedSegment);
     Assert.assertNotSame(removedSegmentRows, 0L);
@@ -229,9 +226,9 @@ public class DeleteAPIHybridClusterIntegrationTest extends HybridClusterIntegrat
 
     String postDeleteSegmentList = sendGetRequest(_controllerRequestURLBuilder.
         forSegmentListAPIWithTableType(TABLE_NAME, CommonConstants.Helix.TableType.OFFLINE.toString()));
-    JSONArray offlineSegmentsListReturn =
+    JsonNode offlineSegmentsListReturn =
         getSegmentsFromJsonSegmentAPI(postDeleteSegmentList, CommonConstants.Helix.TableType.OFFLINE.toString());
-    offlineSegmentsList.remove(removedSegment);
+    removeValue(offlineSegmentsList, removedSegment);
     Assert.assertEquals(offlineSegmentsListReturn, offlineSegmentsList);
 
     // Testing Delete All API here
@@ -243,9 +240,8 @@ public class DeleteAPIHybridClusterIntegrationTest extends HybridClusterIntegrat
     String postDeleteSegmentListAll = sendGetRequest(_controllerRequestURLBuilder.
         forSegmentListAPIWithTableType(TABLE_NAME, CommonConstants.Helix.TableType.OFFLINE.toString()));
 
-    Assert.assertEquals(
-        getSegmentsFromJsonSegmentAPI(postDeleteSegmentListAll, CommonConstants.Helix.TableType.OFFLINE.toString()),
-        Collections.emptyList());
+    Assert.assertEquals(getSegmentsFromJsonSegmentAPI(postDeleteSegmentListAll,
+        CommonConstants.Helix.TableType.OFFLINE.toString()).size(), 0);
 
     waitForSegmentsToBeInDeleteDirectory();
     repushOfflineSegments();
@@ -263,13 +259,22 @@ public class DeleteAPIHybridClusterIntegrationTest extends HybridClusterIntegrat
     return segmentZKMetadata.getTotalRawDocs();
   }
 
-  private com.alibaba.fastjson.JSONArray getSegmentsFromJsonSegmentAPI(String json, String type) throws Exception {
-    JSONObject tableTypeAndSegments = (JSONObject) JSON.parseArray(json).get(0);
-    return (JSONArray) tableTypeAndSegments.get(type);
+  private JsonNode getSegmentsFromJsonSegmentAPI(String json, String type) throws Exception {
+    return JsonUtils.stringToJsonNode(json).get(0).get(type);
   }
 
   private void repushOfflineSegments() throws Exception {
     uploadSegments(_tarDir);
     waitForNumRows(nOfflineRows, CommonConstants.Helix.TableType.OFFLINE);
+  }
+
+  private static void removeValue(JsonNode jsonArray, String value) {
+    Iterator<JsonNode> elements = jsonArray.elements();
+    while (elements.hasNext()) {
+      if (elements.next().asText().equals(value)) {
+        elements.remove();
+        return;
+      }
+    }
   }
 }

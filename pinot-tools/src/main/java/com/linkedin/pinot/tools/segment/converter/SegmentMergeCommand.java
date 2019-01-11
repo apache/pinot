@@ -18,22 +18,7 @@
  */
 package com.linkedin.pinot.tools.segment.converter;
 
-import com.linkedin.pinot.core.segment.name.NormalizedDateSegmentNameGenerator;
-import java.io.File;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-
 import com.google.common.base.Preconditions;
-import org.apache.commons.io.FileUtils;
-import org.json.JSONObject;
-import org.kohsuke.args4j.Option;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.data.Schema;
@@ -43,8 +28,20 @@ import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.core.minion.rollup.MergeRollupSegmentConverter;
 import com.linkedin.pinot.core.minion.rollup.MergeType;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+import com.linkedin.pinot.core.segment.name.NormalizedDateSegmentNameGenerator;
 import com.linkedin.pinot.tools.Command;
 import com.linkedin.pinot.tools.admin.command.AbstractBaseAdminCommand;
+import java.io.File;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+import org.apache.commons.io.FileUtils;
+import org.kohsuke.args4j.Option;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -146,8 +143,7 @@ public class SegmentMergeCommand extends AbstractBaseAdminCommand implements Com
       // Read table config
       String tableConfigString =
           new String(Files.readAllBytes(Paths.get(_tableConfigFilePath)), StandardCharsets.UTF_8);
-      JSONObject tableConfigJson = new JSONObject(tableConfigString);
-      TableConfig tableConfig = TableConfig.fromJSONConfig(tableConfigJson);
+      TableConfig tableConfig = TableConfig.fromJsonString(tableConfigString);
 
       // Read schema
       Schema schema = Schema.fromFile(new File(_schemaFilePath));

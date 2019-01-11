@@ -21,6 +21,7 @@ package com.linkedin.pinot.hadoop.job.mapper;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.utils.DataSize;
+import com.linkedin.pinot.common.utils.JsonUtils;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.core.data.readers.CSVRecordReaderConfig;
 import com.linkedin.pinot.core.data.readers.FileFormat;
@@ -31,6 +32,7 @@ import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverIm
 import com.linkedin.pinot.hadoop.job.JobConfigConstants;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -39,10 +41,9 @@ import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
-import org.json.JSONException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.codehaus.jackson.map.ObjectMapper;
+
 
 public class HadoopSegmentCreationMapReduceJob {
 
@@ -110,16 +111,16 @@ public class HadoopSegmentCreationMapReduceJob {
                 + "\n\ttableName: " + _properties.get(JobConfigConstants.SEGMENT_TABLE_NAME));
       }
 
-        String tableConfigString = _properties.get(JobConfigConstants.TABLE_CONFIG);
-        if (tableConfigString != null) {
-          try {
-            _tableConfig = TableConfig.init(tableConfigString);
-          } catch (JSONException e) {
-            // Though we get table config directly from the controller of hosts and port of push location are set,
-            // it is possible for the user to pass in a table config as a parameter
-            LOGGER.error("Exception when parsing table config: {}", tableConfigString);
-          }
+      String tableConfigString = _properties.get(JobConfigConstants.TABLE_CONFIG);
+      if (tableConfigString != null) {
+        try {
+          _tableConfig = TableConfig.fromJsonString(tableConfigString);
+        } catch (IOException e) {
+          // Though we get table config directly from the controller of hosts and port of push location are set,
+          // it is possible for the user to pass in a table config as a parameter
+          LOGGER.error("Exception when parsing table config: {}", tableConfigString);
         }
+      }
     }
 
     protected String getTableName() {
@@ -212,7 +213,8 @@ public class HadoopSegmentCreationMapReduceJob {
       LOGGER.info("Finished the job successfully");
     }
 
-    protected void setSegmentNameGenerator(SegmentGeneratorConfig segmentGeneratorConfig, Integer seqId, Path hdfsAvroPath, File dataPath) {
+    protected void setSegmentNameGenerator(SegmentGeneratorConfig segmentGeneratorConfig, Integer seqId,
+        Path hdfsAvroPath, File dataPath) {
     }
 
     protected String createSegment(String dataFilePath, Schema schema, Integer seqId, Path hdfsInputFilePath,
@@ -284,13 +286,14 @@ public class HadoopSegmentCreationMapReduceJob {
       RecordReaderConfig readerConfig = null;
       switch (fileFormat) {
         case CSV:
-          if(_readerConfigFile == null) {
+          if (_readerConfigFile == null) {
             readerConfig = new CSVRecordReaderConfig();
-          }
-          else {
+          } else {
             LOGGER.info("Reading CSV Record Reader Config from: {}", _readerConfigFile);
             Path readerConfigPath = new Path(_readerConfigFile);
-            readerConfig = new ObjectMapper().readValue(_fileSystem.open(readerConfigPath), CSVRecordReaderConfig.class);
+            try (InputStream inputStream = _fileSystem.open(readerConfigPath)) {
+              readerConfig = JsonUtils.inputStreamToObject(inputStream, CSVRecordReaderConfig.class);
+            }
             LOGGER.info("CSV Record Reader Config: {}", readerConfig.toString());
           }
           break;

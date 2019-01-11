@@ -18,13 +18,14 @@
  */
 package com.linkedin.pinot.integration.tests;
 
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.linkedin.pinot.common.utils.JsonUtils;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.helix.model.IdealState;
-import org.json.JSONObject;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -47,7 +48,7 @@ public class BalanceNumSegmentAssignmentStrategyIntegrationTest extends UploadRe
 
     // Create eight dummy server instances
     for(int i = 0; i < 8; ++i) {
-      JSONObject serverInstance = new JSONObject();
+      ObjectNode serverInstance = JsonUtils.newObjectNode();
       serverInstance.put("host", hostName);
       serverInstance.put("port", Integer.toString(basePort + i));
       serverInstance.put("tag", serverTenant);

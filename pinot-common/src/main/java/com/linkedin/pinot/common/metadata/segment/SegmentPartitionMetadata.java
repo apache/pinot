@@ -34,17 +34,17 @@ package com.linkedin.pinot.common.metadata.segment;
  * limitations under the License.
  */
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
+import com.linkedin.pinot.common.utils.JsonUtils;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.commons.lang.math.IntRange;
-import org.codehaus.jackson.annotate.JsonIgnore;
-import org.codehaus.jackson.annotate.JsonIgnoreProperties;
-import org.codehaus.jackson.annotate.JsonProperty;
-import org.codehaus.jackson.map.ObjectMapper;
 
 
 /**
@@ -53,8 +53,6 @@ import org.codehaus.jackson.map.ObjectMapper;
 @SuppressWarnings("unused") // Suppress incorrect warning, as methods are used for json ser/de.
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class SegmentPartitionMetadata {
-  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-
   public static final int INVALID_NUM_PARTITIONS = -1;
   private final Map<String, ColumnPartitionMetadata> _columnPartitionMap;
 
@@ -109,9 +107,8 @@ public class SegmentPartitionMetadata {
    * @return Instance of {@link SegmentPartitionMetadata} built from the input string.
    * @throws IOException
    */
-  public static SegmentPartitionMetadata fromJsonString(String jsonString)
-      throws IOException {
-    return OBJECT_MAPPER.readValue(jsonString, SegmentPartitionMetadata.class);
+  public static SegmentPartitionMetadata fromJsonString(String jsonString) throws IOException {
+    return JsonUtils.stringToObject(jsonString, SegmentPartitionMetadata.class);
   }
 
   /**
@@ -120,9 +117,8 @@ public class SegmentPartitionMetadata {
    * @return JSON string equivalent of the object.
    * @throws IOException
    */
-  public String toJsonString()
-      throws IOException {
-    return OBJECT_MAPPER.writeValueAsString(this);
+  public String toJsonString() throws IOException {
+    return JsonUtils.objectToString(this);
   }
 
   /**

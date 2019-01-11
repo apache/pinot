@@ -19,6 +19,7 @@
 package com.linkedin.pinot.tools.admin.command;
 
 import com.linkedin.pinot.common.data.StarTreeIndexSpec;
+import com.linkedin.pinot.common.utils.JsonUtils;
 import com.linkedin.pinot.core.data.readers.FileFormat;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
@@ -35,7 +36,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.codehaus.jackson.map.ObjectMapper;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,7 +47,6 @@ import org.slf4j.LoggerFactory;
  */
 public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(CreateSegmentCommand.class);
-  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   @Option(name = "-generatorConfigFile", metaVar = "<string>", usage = "Config file for segment generator.")
   private String _generatorConfigFile;
@@ -211,7 +210,7 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
     // Load generator config if exist.
     final SegmentGeneratorConfig segmentGeneratorConfig;
     if (_generatorConfigFile != null) {
-      segmentGeneratorConfig = OBJECT_MAPPER.readValue(new File(_generatorConfigFile), SegmentGeneratorConfig.class);
+      segmentGeneratorConfig = JsonUtils.fileToObject(new File(_generatorConfigFile), SegmentGeneratorConfig.class);
     } else {
       segmentGeneratorConfig = new SegmentGeneratorConfig();
     }

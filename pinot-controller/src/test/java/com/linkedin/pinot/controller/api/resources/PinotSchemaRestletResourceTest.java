@@ -18,27 +18,20 @@
  */
 package com.linkedin.pinot.controller.api.resources;
 
+import com.linkedin.pinot.common.data.DimensionFieldSpec;
+import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.controller.helix.ControllerTest;
 import java.io.IOException;
 import org.apache.commons.httpclient.methods.PostMethod;
 import org.apache.commons.httpclient.methods.PutMethod;
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.linkedin.pinot.common.data.DimensionFieldSpec;
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.data.MetricFieldSpec;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.controller.helix.ControllerTest;
 
 
 public class PinotSchemaRestletResourceTest extends ControllerTest {
-  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   @BeforeClass
   public void setUp() {
@@ -46,29 +39,8 @@ public class PinotSchemaRestletResourceTest extends ControllerTest {
     startController();
   }
 
-  public JSONObject createDefaultSchema() throws JSONException, JsonProcessingException {
-    JSONObject schemaJson = new JSONObject();
-    schemaJson.put("schemaName", "testSchema");
-    JSONArray dimFieldSpec = new JSONArray();
-    schemaJson.put("dimensionFieldSpecs", dimFieldSpec);
-    JSONArray metricFieldSpec = new JSONArray();
-    schemaJson.put("metricFieldSpecs", metricFieldSpec);
-
-    DimensionFieldSpec df = new DimensionFieldSpec("dimA", FieldSpec.DataType.STRING, true, "");
-    dimFieldSpec.put(new JSONObject(OBJECT_MAPPER.writeValueAsString(df)));
-    df = new DimensionFieldSpec("dimB", FieldSpec.DataType.LONG, true, 0);
-    dimFieldSpec.put(new JSONObject(OBJECT_MAPPER.writeValueAsString(df)));
-
-    MetricFieldSpec mf = new MetricFieldSpec("metricA", FieldSpec.DataType.INT, 0);
-    metricFieldSpec.put(new JSONObject(OBJECT_MAPPER.writeValueAsString(mf)));
-
-    mf = new MetricFieldSpec("metricB", FieldSpec.DataType.DOUBLE, -1);
-    metricFieldSpec.put(new JSONObject(OBJECT_MAPPER.writeValueAsString(mf)));
-    return schemaJson;
-  }
-
   @Test
-  public void testBadContentType() throws JSONException, JsonProcessingException {
+  public void testBadContentType() {
     Schema schema = createDummySchema("testSchema");
     try {
       sendPostRequest(_controllerRequestURLBuilder.forSchemaCreate(), schema.getJSONSchema());
@@ -82,7 +54,7 @@ public class PinotSchemaRestletResourceTest extends ControllerTest {
   }
 
   @Test
-  public void testCreateUpdateSchema() throws JSONException, IOException {
+  public void testCreateUpdateSchema() throws IOException {
     String schemaName = "testSchema";
     Schema schema = createDummySchema(schemaName);
     String url = _controllerRequestURLBuilder.forSchemaCreate();

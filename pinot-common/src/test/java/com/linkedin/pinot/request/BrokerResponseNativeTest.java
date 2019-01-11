@@ -22,7 +22,6 @@ import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.common.response.broker.BrokerResponseNative;
 import com.linkedin.pinot.common.response.broker.QueryProcessingException;
 import java.io.IOException;
-import org.json.JSONException;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -30,8 +29,7 @@ import org.testng.annotations.Test;
 public class BrokerResponseNativeTest {
 
   @Test
-  public void testEmptyResponse()
-      throws JSONException, IOException {
+  public void testEmptyResponse() throws IOException {
     BrokerResponseNative expected = BrokerResponseNative.EMPTY_RESULT;
     String brokerString = expected.toJsonString();
     BrokerResponseNative actual = BrokerResponseNative.fromJsonString(brokerString);
@@ -42,8 +40,7 @@ public class BrokerResponseNativeTest {
   }
 
   @Test
-  public void testNullResponse()
-      throws JSONException, IOException {
+  public void testNullResponse() throws IOException {
     BrokerResponseNative expected = BrokerResponseNative.NO_TABLE_RESULT;
     String brokerString = expected.toJsonString();
     BrokerResponseNative actual = BrokerResponseNative.fromJsonString(brokerString);
@@ -54,8 +51,7 @@ public class BrokerResponseNativeTest {
   }
 
   @Test
-  public void testMultipleExceptionsResponse()
-      throws JSONException, IOException {
+  public void testMultipleExceptionsResponse() throws IOException {
     BrokerResponseNative expected = BrokerResponseNative.NO_TABLE_RESULT;
     String errorMsgStr = "Some random string!";
     QueryProcessingException processingException = new QueryProcessingException(400, errorMsgStr);

@@ -18,6 +18,7 @@
  */
 package com.linkedin.pinot.tools.perf;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.linkedin.pinot.tools.AbstractBaseCommand;
 import com.linkedin.pinot.tools.Command;
 import java.io.File;
@@ -32,7 +33,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.math.stat.descriptive.DescriptiveStatistics;
-import org.json.JSONObject;
 import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
@@ -240,11 +240,11 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     int numTimesExecuted = 0;
     while (numTimesToRunQueries == 0 || numTimesExecuted < numTimesToRunQueries) {
       for (String query : queries) {
-        JSONObject response = driver.postQuery(query);
+        JsonNode response = driver.postQuery(query);
         numQueriesExecuted++;
-        long brokerTime = response.getLong("timeUsedMs");
+        long brokerTime = response.get("timeUsedMs").asLong();
         totalBrokerTime += brokerTime;
-        long clientTime = response.getLong("totalTime");
+        long clientTime = response.get("totalTime").asLong();
         totalClientTime += clientTime;
         statisticsList.get(0).addValue(clientTime);
 
@@ -645,11 +645,11 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
       AtomicInteger numQueriesExecuted, AtomicLong totalBrokerTime, AtomicLong totalClientTime,
       List<Statistics> statisticsList)
       throws Exception {
-    JSONObject response = driver.postQuery(query);
+    JsonNode response = driver.postQuery(query);
     numQueriesExecuted.getAndIncrement();
-    long brokerTime = response.getLong("timeUsedMs");
+    long brokerTime = response.get("timeUsedMs").asLong();
     totalBrokerTime.getAndAdd(brokerTime);
-    long clientTime = response.getLong("totalTime");
+    long clientTime = response.get("totalTime").asLong();
     totalClientTime.getAndAdd(clientTime);
     statisticsList.get(0).addValue(clientTime);
   }

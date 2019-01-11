@@ -31,7 +31,6 @@ import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import com.linkedin.pinot.common.utils.HLCSegmentName;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
 import com.yammer.metrics.core.MetricsRegistry;
-import java.io.IOException;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -42,7 +41,6 @@ import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.commons.lang.mutable.MutableBoolean;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
-import org.json.JSONException;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -288,7 +286,7 @@ public class RoutingTableTest {
     return configs;
   }
 
-  private TableConfig generateTableConfig(String tableName) throws IOException, JSONException {
+  private TableConfig generateTableConfig(String tableName) {
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
     Builder builder = new TableConfig.Builder(tableType);
     builder.setTableName(tableName);

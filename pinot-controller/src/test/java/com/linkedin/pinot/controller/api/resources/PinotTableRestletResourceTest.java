@@ -18,9 +18,11 @@
  */
 package com.linkedin.pinot.controller.api.resources;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.linkedin.pinot.common.config.QuotaConfig;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
+import com.linkedin.pinot.common.utils.JsonUtils;
 import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
@@ -32,8 +34,6 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
-import org.json.JSONException;
-import org.json.JSONObject;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -211,7 +211,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
 
   private TableConfig getTableConfig(String tableName, String tableType) throws Exception {
     String tableConfigString = sendGetRequest(_controllerRequestURLBuilder.forTableGet(tableName));
-    return TableConfig.fromJSONConfig(new JSONObject(tableConfigString).getJSONObject(tableType));
+    return TableConfig.fromJSONConfig(JsonUtils.stringToJsonNode(tableConfigString).get(tableType));
   }
 
   @Test
@@ -228,11 +228,9 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     tableConfig.getValidationConfig().setRetentionTimeUnit("HOURS");
     tableConfig.getValidationConfig().setRetentionTimeValue("10");
 
-    JSONObject jsonResponse = new JSONObject(
+    JsonNode jsonResponse = JsonUtils.stringToJsonNode(
         sendPutRequest(_controllerRequestURLBuilder.forUpdateTableConfig(tableName), tableConfig.toJSONConfigString()));
     Assert.assertTrue(jsonResponse.has("status"));
-    // TODO Verify success code, not success response string (Jersey API change)
-//    Assert.assertEquals(jsonResponse.getString("status"), "Success");
 
     TableConfig modifiedConfig = getTableConfig(tableName, "OFFLINE");
     Assert.assertEquals(modifiedConfig.getValidationConfig().getRetentionTimeUnit(), "HOURS");
@@ -277,14 +275,14 @@ public class PinotTableRestletResourceTest extends ControllerTest {
   }
 
   @Test(expectedExceptions = FileNotFoundException.class)
-  public void rebalanceNonExistentOfflineTable() throws IOException, JSONException {
+  public void rebalanceNonExistentOfflineTable() throws IOException {
     String tableName = "nonExistentTable";
     // should result in file not found exception
     sendPostRequest(_controllerRequestURLBuilder.forTableRebalance(tableName, "offline"), null);
   }
 
   @Test(expectedExceptions = FileNotFoundException.class)
-  public void rebalanceNonExistentRealtimeTable() throws IOException, JSONException {
+  public void rebalanceNonExistentRealtimeTable() throws IOException {
     String tableName = "nonExistentTable";
     // should result in file not found exception
     sendPostRequest(_controllerRequestURLBuilder.forTableRebalance(tableName, "realtime"), null);

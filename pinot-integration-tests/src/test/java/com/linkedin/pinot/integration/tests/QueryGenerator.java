@@ -18,6 +18,8 @@
  */
 package com.linkedin.pinot.integration.tests;
 
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.linkedin.pinot.common.utils.JsonUtils;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
@@ -37,8 +39,6 @@ import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.commons.lang.StringUtils;
-import org.json.JSONArray;
-import org.json.JSONObject;
 
 
 /**
@@ -220,9 +220,9 @@ public class QueryGenerator {
     try (BufferedWriter writer = new BufferedWriter(new FileWriter(outputFile))) {
       for (int i = 0; i < 10000; i++) {
         Query query = queryGenerator.generateQuery();
-        JSONObject queryJson = new JSONObject();
+        ObjectNode queryJson = JsonUtils.newObjectNode();
         queryJson.put("pql", query.generatePql());
-        queryJson.put("hsqls", new JSONArray(query.generateH2Sql()));
+        queryJson.set("hsqls", JsonUtils.objectToJsonNode(query.generateH2Sql()));
         writer.write(queryJson.toString());
         writer.newLine();
       }
@@ -357,7 +357,6 @@ public class QueryGenerator {
       return new PredicateQueryFragment(predicates, operators);
     }
   }
-
 
   /**
    * Query interface with capability of generating PQL and H2 SQL query.
@@ -830,12 +829,11 @@ public class QueryGenerator {
       }
       //Generate a HAVING predicate
       ArrayList<String> arrayOfAggregationColumnsAndFunctions = new ArrayList<>(aggregationColumnsAndFunctions);
-      HavingQueryFragment havingPredicate= generateHavingPredicate(arrayOfAggregationColumnsAndFunctions);
+      HavingQueryFragment havingPredicate = generateHavingPredicate(arrayOfAggregationColumnsAndFunctions);
       // Generate a result limit of at most MAX_RESULT_LIMIT.
       TopQueryFragment top = new TopQueryFragment(RANDOM.nextInt(MAX_RESULT_LIMIT + 1));
       return new AggregationQuery(arrayOfAggregationColumnsAndFunctions, predicate, groupColumns, top, havingPredicate);
     }
-
 
     /**
      * Helper method to generate a having predicate query fragment.
@@ -849,9 +847,9 @@ public class QueryGenerator {
       List<String> havingClauseBooleanOperators = new ArrayList<String>();
       createHavingClause(arrayOfAggregationColumnsAndFunctions, havingClauseAggregationFunctions,
           havingClauseOperatorsAndValues, havingClauseBooleanOperators);
-      return new HavingQueryFragment(havingClauseAggregationFunctions,havingClauseOperatorsAndValues,havingClauseBooleanOperators);
+      return new HavingQueryFragment(havingClauseAggregationFunctions, havingClauseOperatorsAndValues,
+          havingClauseBooleanOperators);
     }
-
 
     private void createHavingClause(ArrayList<String> arrayOfAggregationColumnsAndFunctions,
         List<String> havingClauseAggregationFunctions, List<String> havingClauseOperatorsAndValues,

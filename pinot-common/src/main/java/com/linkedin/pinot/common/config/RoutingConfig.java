@@ -18,28 +18,20 @@
  */
 package com.linkedin.pinot.common.config;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.linkedin.pinot.common.utils.EqualityUtils;
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
-
-import org.codehaus.jackson.annotate.JsonIgnoreProperties;
-import org.codehaus.jackson.map.ObjectMapper;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class RoutingConfig {
-  private static final Logger LOGGER = LoggerFactory.getLogger(RoutingConfig.class);
-
   public static final String ENABLE_DYNAMIC_COMPUTING_KEY = "enableDynamicComputing";
-  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   @ConfigKey("routingTableBuilderName")
   private String _routingTableBuilderName;
 
-  private Map<String,String> _routingTableBuilderOptions = new HashMap<>();
+  private Map<String, String> _routingTableBuilderOptions = new HashMap<>();
 
   public String getRoutingTableBuilderName() {
     return _routingTableBuilderName;
@@ -55,15 +47,6 @@ public class RoutingConfig {
 
   public void setRoutingTableBuilderOptions(Map<String, String> routingTableBuilderOptions) {
     _routingTableBuilderOptions = routingTableBuilderOptions;
-  }
-
-  public String toString() {
-    try {
-      return OBJECT_MAPPER.writeValueAsString(this);
-    } catch (IOException e) {
-      //ignore
-    }
-    return "";
   }
 
   @Override

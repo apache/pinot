@@ -18,6 +18,9 @@
  */
 package com.linkedin.pinot.client;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectReader;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -29,18 +32,18 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
-
 import java.util.zip.GZIPInputStream;
 import org.I0Itec.zkclient.ZkClient;
-import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 
 /**
  * Reads brokers external view from Zookeeper
  */
 public class ExternalViewReader {
   private static final Logger LOGGER = LoggerFactory.getLogger(ExternalViewReader.class);
+  private static final ObjectReader OBJECT_READER = new ObjectMapper().reader();
 
   private ZkClient zkClient;
 
@@ -53,23 +56,21 @@ public class ExternalViewReader {
   }
 
   public List<String> getLiveBrokers() {
-    List<String> brokerUrls = new ArrayList<String>();
+    List<String> brokerUrls = new ArrayList<>();
     try {
-
       byte[] brokerResourceNodeData = zkClient.readData(BROKER_EXTERNAL_VIEW_PATH, true);
       brokerResourceNodeData = unpackZnodeIfNecessary(brokerResourceNodeData);
-      JSONObject jsonObject = new JSONObject(new String(brokerResourceNodeData));
-      JSONObject brokerResourceNode = jsonObject.getJSONObject("mapFields");
+      JsonNode jsonObject = OBJECT_READER.readTree(new ByteArrayInputStream(brokerResourceNodeData));
+      JsonNode brokerResourceNode = jsonObject.get("mapFields");
 
-      Iterator<String> resourceNames = brokerResourceNode.keys();
-      while (resourceNames.hasNext()) {
-        String resourceName = resourceNames.next();
-        JSONObject resource = brokerResourceNode.getJSONObject(resourceName);
-
-        Iterator<String> brokerNames = resource.keys();
-        while (brokerNames.hasNext()) {
-          String brokerName = brokerNames.next();
-          if (brokerName.startsWith("Broker_") && "ONLINE".equals(resource.getString(brokerName))) {
+      Iterator<Entry<String, JsonNode>> resourceEntries = brokerResourceNode.fields();
+      while (resourceEntries.hasNext()) {
+        JsonNode resource = resourceEntries.next().getValue();
+        Iterator<Entry<String, JsonNode>> brokerEntries = resource.fields();
+        while (brokerEntries.hasNext()) {
+          Entry<String, JsonNode> brokerEntry = brokerEntries.next();
+          String brokerName = brokerEntry.getKey();
+          if (brokerName.startsWith("Broker_") && "ONLINE".equals(brokerEntry.getValue().asText())) {
             // Turn Broker_12.34.56.78_1234 into 12.34.56.78:1234
             String brokerHostPort = brokerName.replace("Broker_", "").replace("_", ":");
             brokerUrls.add(brokerHostPort);
@@ -83,29 +84,26 @@ public class ExternalViewReader {
     return brokerUrls;
   }
 
-  @SuppressWarnings("unchecked")
   public Map<String, List<String>> getTableToBrokersMap() {
     Map<String, Set<String>> brokerUrlsMap = new HashMap<>();
     try {
       byte[] brokerResourceNodeData = zkClient.readData("/EXTERNALVIEW/brokerResource", true);
       brokerResourceNodeData = unpackZnodeIfNecessary(brokerResourceNodeData);
-      JSONObject jsonObject = new JSONObject(new String(brokerResourceNodeData));
-      JSONObject brokerResourceNode = jsonObject.getJSONObject("mapFields");
+      JsonNode jsonObject = OBJECT_READER.readTree(new ByteArrayInputStream(brokerResourceNodeData));
+      JsonNode brokerResourceNode = jsonObject.get("mapFields");
 
-      Iterator<String> resourceNames = brokerResourceNode.keys();
-      while (resourceNames.hasNext()) {
-        String resourceName = resourceNames.next();
+      Iterator<Entry<String, JsonNode>> resourceEntries = brokerResourceNode.fields();
+      while (resourceEntries.hasNext()) {
+        Entry<String, JsonNode> resourceEntry = resourceEntries.next();
+        String resourceName = resourceEntry.getKey();
         String tableName = resourceName.replace(OFFLINE_SUFFIX, "").replace(REALTIME_SUFFIX, "");
-        Set<String> brokerUrls = brokerUrlsMap.get(tableName);
-        if (brokerUrls == null) {
-          brokerUrls = new HashSet<>();
-          brokerUrlsMap.put(tableName, brokerUrls);
-        }
-        JSONObject resource = brokerResourceNode.getJSONObject(resourceName);
-        Iterator<String> brokerNames = resource.keys();
-        while (brokerNames.hasNext()) {
-          String brokerName = brokerNames.next();
-          if (brokerName.startsWith("Broker_") && "ONLINE".equals(resource.getString(brokerName))) {
+        Set<String> brokerUrls = brokerUrlsMap.computeIfAbsent(tableName, k -> new HashSet<>());
+        JsonNode resource = resourceEntry.getValue();
+        Iterator<Entry<String, JsonNode>> brokerEntries = resource.fields();
+        while (brokerEntries.hasNext()) {
+          Entry<String, JsonNode> brokerEntry = brokerEntries.next();
+          String brokerName = brokerEntry.getKey();
+          if (brokerName.startsWith("Broker_") && "ONLINE".equals(brokerEntry.getValue().asText())) {
             // Turn Broker_12.34.56.78_1234 into 12.34.56.78:1234
             String brokerHostPort = brokerName.replace("Broker_", "").replace("_", ":");
             brokerUrls.add(brokerHostPort);

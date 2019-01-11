@@ -33,8 +33,6 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.json.JSONException;
-import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -60,13 +58,12 @@ public class PinotTableIndexingConfigs {
       @ApiParam(value = "Table name (without type)", required = true) @PathParam("tableName") String tableName,
       String body
   ) {
-    TableConfig tableConfig = null;
     try {
-      tableConfig = TableConfig.fromJSONConfig(new JSONObject(body));
+      TableConfig tableConfig = TableConfig.fromJsonString(body);
       pinotHelixResourceManager.updateIndexingConfigFor(tableConfig.getTableName(), tableConfig.getTableType(),
           tableConfig.getIndexingConfig());
       return new SuccessResponse("Updated indexing config for table " + tableName);
-    } catch (JSONException | IOException e) {
+    } catch (IOException e) {
       String errStr = "Error converting request to table config for table: " + tableName;
       throw new ControllerApplicationException(LOGGER, errStr, Response.Status.BAD_REQUEST, e);
     } catch (Exception e) {

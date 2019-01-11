@@ -18,6 +18,7 @@
  */
 package com.linkedin.pinot.common.config;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.linkedin.pinot.common.data.StarTreeIndexSpec;
 import com.linkedin.pinot.common.utils.EqualityUtils;
 import java.lang.reflect.Field;
@@ -25,7 +26,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -172,7 +172,7 @@ public class IndexingConfig {
     return _noDictionaryColumns;
   }
 
-  public Map<String, String> getnoDictionaryConfig() {
+  public Map<String, String> getNoDictionaryConfig() {
     return _noDictionaryConfig;
   }
 
@@ -220,7 +220,7 @@ public class IndexingConfig {
     return _segmentPartitionConfig;
   }
 
-  public boolean getAggregateMetrics() {
+  public boolean isAggregateMetrics() {
     return _aggregateMetrics;
   }
 

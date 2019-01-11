@@ -18,20 +18,16 @@
  */
 package com.linkedin.pinot.tools.admin.command;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.linkedin.pinot.common.utils.JsonUtils;
+import com.linkedin.pinot.common.utils.NetUtil;
+import com.linkedin.pinot.controller.helix.ControllerRequestURLBuilder;
 import com.linkedin.pinot.tools.Command;
-import java.io.FileInputStream;
+import java.io.File;
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
-
-import org.codehaus.jackson.JsonNode;
-import org.codehaus.jackson.map.ObjectMapper;
-import org.json.JSONException;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.linkedin.pinot.common.utils.NetUtil;
-import com.linkedin.pinot.controller.helix.ControllerRequestURLBuilder;
 
 
 /**
@@ -103,7 +99,7 @@ public class AddTableCommand extends AbstractBaseAdminCommand implements Command
     return this;
   }
 
-  public boolean execute(JsonNode node) throws UnsupportedEncodingException, IOException, JSONException {
+  public boolean execute(JsonNode node) throws IOException {
     if (_controllerHost == null) {
       _controllerHost = NetUtil.getHostAddress();
     }
@@ -126,7 +122,6 @@ public class AddTableCommand extends AbstractBaseAdminCommand implements Command
 
   @Override
   public boolean execute() throws Exception {
-    JsonNode node = new ObjectMapper().readTree(new FileInputStream(_filePath));
-    return execute(node);
+    return execute(JsonUtils.fileToJsonNode(new File(_filePath)));
   }
 }

@@ -18,6 +18,8 @@
  */
 package com.linkedin.pinot.integration.tests;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.linkedin.pinot.broker.broker.BrokerServerBuilder;
 import com.linkedin.pinot.broker.broker.BrokerTestUtils;
 import com.linkedin.pinot.broker.broker.helix.HelixBrokerStarter;
@@ -30,6 +32,7 @@ import com.linkedin.pinot.common.utils.CommonConstants.Helix;
 import com.linkedin.pinot.common.utils.CommonConstants.Minion;
 import com.linkedin.pinot.common.utils.CommonConstants.Server;
 import com.linkedin.pinot.common.utils.FileUploadDownloadClient;
+import com.linkedin.pinot.common.utils.JsonUtils;
 import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
 import com.linkedin.pinot.controller.helix.ControllerTest;
@@ -69,7 +72,6 @@ import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.http.HttpStatus;
-import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
@@ -463,34 +465,34 @@ public abstract class ClusterTest extends ControllerTest {
   }
 
   protected void createBrokerTenant(String tenantName, int brokerCount) throws Exception {
-    JSONObject request = ControllerRequestBuilderUtil.buildBrokerTenantCreateRequestJSON(tenantName, brokerCount);
-    sendPostRequest(_controllerRequestURLBuilder.forBrokerTenantCreate(), request.toString());
+    String request = ControllerRequestBuilderUtil.buildBrokerTenantCreateRequestJSON(tenantName, brokerCount);
+    sendPostRequest(_controllerRequestURLBuilder.forBrokerTenantCreate(), request);
   }
 
   protected void createServerTenant(String tenantName, int offlineServerCount, int realtimeServerCount)
       throws Exception {
-    JSONObject request = ControllerRequestBuilderUtil.buildServerTenantCreateRequestJSON(tenantName,
+    String request = ControllerRequestBuilderUtil.buildServerTenantCreateRequestJSON(tenantName,
         offlineServerCount + realtimeServerCount, offlineServerCount, realtimeServerCount);
-    sendPostRequest(_controllerRequestURLBuilder.forServerTenantCreate(), request.toString());
+    sendPostRequest(_controllerRequestURLBuilder.forServerTenantCreate(), request);
   }
 
-  protected JSONObject getDebugInfo(final String uri) throws Exception {
-    return new JSONObject(sendGetRequest(_brokerBaseApiUrl + "/" + uri));
+  protected JsonNode getDebugInfo(final String uri) throws Exception {
+    return JsonUtils.stringToJsonNode(sendGetRequest(_brokerBaseApiUrl + "/" + uri));
   }
 
-  protected JSONObject postQuery(String query) throws Exception {
+  protected JsonNode postQuery(String query) throws Exception {
     return postQuery(query, _brokerBaseApiUrl);
   }
 
-  public static JSONObject postQuery(String query, String brokerBaseApiUrl) throws Exception {
+  public static JsonNode postQuery(String query, String brokerBaseApiUrl) throws Exception {
     return postQuery(query, brokerBaseApiUrl, false);
   }
 
-  public static JSONObject postQuery(String query, String brokerBaseApiUrl, boolean enableTrace) throws Exception {
-    JSONObject payload = new JSONObject();
+  public static JsonNode postQuery(String query, String brokerBaseApiUrl, boolean enableTrace) throws Exception {
+    ObjectNode payload = JsonUtils.newObjectNode();
     payload.put("pql", query);
     payload.put("trace", enableTrace);
 
-    return new JSONObject(sendPostRequest(brokerBaseApiUrl + "/query", payload.toString()));
+    return JsonUtils.stringToJsonNode(sendPostRequest(brokerBaseApiUrl + "/query", payload.toString()));
   }
 }

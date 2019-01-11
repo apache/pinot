@@ -19,39 +19,32 @@
 package com.linkedin.pinot.server.api.resources;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.linkedin.pinot.common.utils.JsonUtils;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.ext.ExceptionMapper;
 import javax.ws.rs.ext.Provider;
 
+
 @Provider
-public class DefaultExceptionMapper implements ExceptionMapper<WebApplicationException>
-{
-  private static final transient ObjectMapper MAPPER = new ObjectMapper();
+public class DefaultExceptionMapper implements ExceptionMapper<WebApplicationException> {
 
   @Override
-  public Response toResponse(final WebApplicationException exception)
-  {
-    Response.ResponseBuilder builder = Response.status(exception.getResponse().getStatus())
-                                      .entity(toJson(exception))
-                                      .type(MediaType.APPLICATION_JSON);
+  public Response toResponse(final WebApplicationException exception) {
+    Response.ResponseBuilder builder =
+        Response.status(exception.getResponse().getStatus()).entity(toJson(exception)).type(MediaType.APPLICATION_JSON);
     return builder.build();
   }
 
-  private String toJson(final WebApplicationException exception)
-  {
+  private String toJson(final WebApplicationException exception) {
     ErrorInfo errorInfo = new ErrorInfo(exception);
 
     // difference between try and catch block is that
     // ErrorInfo can contain more information that just message
-    try
-    {
-      return MAPPER.writeValueAsString(errorInfo);
-    }
-    catch (JsonProcessingException e)
-    {
+    try {
+      return JsonUtils.objectToString(errorInfo);
+    } catch (JsonProcessingException e) {
       return "{\"message\":\"Error converting error message: " + e.getMessage() + " to string\"}";
     }
   }

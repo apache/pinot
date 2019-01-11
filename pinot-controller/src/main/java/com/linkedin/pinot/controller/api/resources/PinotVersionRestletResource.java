@@ -18,7 +18,9 @@
  */
 package com.linkedin.pinot.controller.api.resources;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.linkedin.pinot.common.Utils;
+import com.linkedin.pinot.common.utils.JsonUtils;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiResponse;
@@ -27,7 +29,6 @@ import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
-import org.json.JSONObject;
 
 
 /**
@@ -42,7 +43,10 @@ public class PinotVersionRestletResource {
   @ApiOperation(value = "Get version number of Pinot components")
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Success")})
   public String getVersionNumber() {
-    JSONObject jsonObject = new JSONObject(Utils.getComponentVersions());
-    return jsonObject.toString();
+    try {
+      return JsonUtils.objectToString(Utils.getComponentVersions());
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException(e);
+    }
   }
 }

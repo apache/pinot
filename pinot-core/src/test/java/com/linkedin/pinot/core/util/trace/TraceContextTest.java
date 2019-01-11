@@ -18,7 +18,8 @@
  */
 package com.linkedin.pinot.core.util.trace;
 
-import java.util.Collections;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.linkedin.pinot.common.utils.JsonUtils;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Queue;
@@ -27,7 +28,6 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import org.json.JSONObject;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -117,6 +117,8 @@ public class TraceContextTest {
   }
 
   private static String getTraceString(String key, Object value) {
-    return new JSONObject(Collections.singletonMap(key, value)).toString();
+    ObjectNode jsonTrace = JsonUtils.newObjectNode();
+    jsonTrace.set(key, JsonUtils.objectToJsonNode(value));
+    return jsonTrace.toString();
   }
 }

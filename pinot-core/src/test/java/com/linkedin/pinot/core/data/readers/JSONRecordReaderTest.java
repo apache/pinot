@@ -18,11 +18,11 @@
  */
 package com.linkedin.pinot.core.data.readers;
 
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.linkedin.pinot.common.utils.JsonUtils;
 import java.io.File;
 import java.io.FileWriter;
 import org.apache.commons.io.FileUtils;
-import org.json.JSONArray;
-import org.json.JSONObject;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -38,12 +38,12 @@ public class JSONRecordReaderTest extends RecordReaderTest {
 
     try (FileWriter fileWriter = new FileWriter(DATA_FILE)) {
       for (Object[] record : RECORDS) {
-        JSONObject jsonRecord = new JSONObject();
+        ObjectNode jsonRecord = JsonUtils.newObjectNode();
         if (record[0] != null) {
-          jsonRecord.put(COLUMNS[0], record[0]);
+          jsonRecord.set(COLUMNS[0], JsonUtils.objectToJsonNode(record[0]));
         }
         if (record[1] != null) {
-          jsonRecord.put(COLUMNS[1], new JSONArray(record[1]));
+          jsonRecord.set(COLUMNS[1], JsonUtils.objectToJsonNode(record[1]));
         }
         fileWriter.write(jsonRecord.toString());
       }

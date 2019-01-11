@@ -18,11 +18,11 @@
  */
 package com.linkedin.pinot.common.response.broker;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import java.io.Serializable;
 import java.util.List;
-import org.codehaus.jackson.annotate.JsonProperty;
-import org.codehaus.jackson.annotate.JsonPropertyOrder;
-import org.codehaus.jackson.map.annotate.JsonSerialize;
 
 
 /**
@@ -72,7 +72,7 @@ public class AggregationResult {
    * @return
    */
   @JsonProperty("function")
-  @JsonSerialize(include = JsonSerialize.Inclusion.NON_NULL)
+  @JsonInclude(JsonInclude.Include.NON_NULL)
   public String getFunction() {
     return _function;
   }
@@ -91,7 +91,7 @@ public class AggregationResult {
    * @return
    */
   @JsonProperty("value")
-  @JsonSerialize(include = JsonSerialize.Inclusion.NON_NULL)
+  @JsonInclude(JsonInclude.Include.NON_NULL)
   public Serializable getValue() {
     return _value;
   }
@@ -110,7 +110,7 @@ public class AggregationResult {
    * @return
    */
   @JsonProperty("groupByResult")
-  @JsonSerialize(include = JsonSerialize.Inclusion.NON_NULL)
+  @JsonInclude(JsonInclude.Include.NON_NULL)
   public List<GroupByResult> getGroupByResult() {
     return _groupByResults;
   }
@@ -129,7 +129,7 @@ public class AggregationResult {
    * @return
    */
   @JsonProperty("groupByColumns")
-  @JsonSerialize(include = JsonSerialize.Inclusion.NON_NULL)
+  @JsonInclude(JsonInclude.Include.NON_NULL)
   public List<String> getGroupByColumns() {
     return _groupByColumns;
   }

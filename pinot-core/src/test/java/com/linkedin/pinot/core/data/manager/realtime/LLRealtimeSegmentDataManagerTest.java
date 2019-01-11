@@ -25,6 +25,7 @@ import com.linkedin.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
+import com.linkedin.pinot.common.utils.JsonUtils;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.manager.config.InstanceDataManagerConfig;
@@ -42,10 +43,9 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.LinkedList;
 import java.util.Map;
-import junit.framework.Assert;
 import org.apache.commons.io.FileUtils;
 import org.apache.kafka.common.protocol.Errors;
-import org.json.JSONObject;
+import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -115,7 +115,7 @@ public class LLRealtimeSegmentDataManagerTest {
 
   private TableConfig createTableConfig()
       throws Exception {
-    return TableConfig.fromJSONConfig(new JSONObject(_tableConfigJson));
+    return TableConfig.fromJsonString(_tableConfigJson);
   }
 
   private RealtimeTableDataManager createTableDataManager() {
@@ -684,7 +684,7 @@ public class LLRealtimeSegmentDataManagerTest {
 
     public boolean invokeCommit(String segTarFileName) {
       SegmentCompletionProtocol.Response response = mock(SegmentCompletionProtocol.Response.class);
-      when(response.getIsSplitCommit()).thenReturn(false);
+      when(response.isSplitCommit()).thenReturn(false);
       return super.commitSegment(response);
     }
 

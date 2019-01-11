@@ -18,10 +18,10 @@
  */
 package com.linkedin.pinot.common.restlet.resources;
 
+import com.linkedin.pinot.common.utils.JsonUtils;
 import java.io.IOException;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Response;
-import org.codehaus.jackson.map.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,9 +36,8 @@ public class ResourceUtils {
   }
 
   public static String convertToJsonString(Object object) {
-    ObjectMapper mapper = new ObjectMapper();
     try {
-      return mapper.writerWithDefaultPrettyPrinter().writeValueAsString(object);
+      return JsonUtils.objectToPrettyString(object);
     } catch (IOException e) {
       LOGGER.error("Failed to convert json into string: ", e);
       throw new WebApplicationException("Failed to convert json into string.", Response.Status.INTERNAL_SERVER_ERROR);

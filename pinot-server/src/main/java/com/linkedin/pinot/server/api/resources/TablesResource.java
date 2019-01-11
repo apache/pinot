@@ -18,6 +18,7 @@
  */
 package com.linkedin.pinot.server.api.resources;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.linkedin.pinot.common.restlet.resources.ResourceUtils;
 import com.linkedin.pinot.common.restlet.resources.TableSegments;
 import com.linkedin.pinot.common.restlet.resources.TablesList;
@@ -47,7 +48,6 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.json.JSONException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -150,7 +150,7 @@ public class TablesResource {
       }
       try {
         return segmentMetadata.toJson(columnSet).toString();
-      } catch (JSONException e) {
+      } catch (JsonProcessingException e) {
         LOGGER.error("Failed to convert table {} segment {} to json", tableName, segmentMetadata);
         throw new WebApplicationException("Failed to convert segment metadata to json",
             Response.Status.INTERNAL_SERVER_ERROR);

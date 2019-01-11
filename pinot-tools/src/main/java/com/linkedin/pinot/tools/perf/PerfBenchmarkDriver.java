@@ -18,8 +18,9 @@
  */
 package com.linkedin.pinot.tools.perf;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
 import com.linkedin.pinot.broker.broker.helix.HelixBrokerStarter;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
@@ -28,6 +29,7 @@ import com.linkedin.pinot.common.config.Tenant.TenantBuilder;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.FileUploadDownloadClient;
+import com.linkedin.pinot.common.utils.JsonUtils;
 import com.linkedin.pinot.common.utils.TenantRole;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.ControllerStarter;
@@ -51,7 +53,6 @@ import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.helix.manager.zk.ZKHelixAdmin;
 import org.apache.helix.tools.ClusterVerifiers.StrictMatchExternalViewVerifier;
-import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
@@ -354,14 +355,14 @@ public class PerfBenchmarkDriver {
     }
   }
 
-  public JSONObject postQuery(String query)
+  public JsonNode postQuery(String query)
       throws Exception {
     return postQuery(query, null);
   }
 
-  public JSONObject postQuery(String query, String optimizationFlags)
+  public JsonNode postQuery(String query, String optimizationFlags)
       throws Exception {
-    JSONObject requestJson = new JSONObject();
+    ObjectNode requestJson = JsonUtils.newObjectNode();
     requestJson.put("pql", query);
 
     if (optimizationFlags != null && !optimizationFlags.isEmpty()) {
@@ -387,10 +388,10 @@ public class PerfBenchmarkDriver {
 
       long totalTime = System.currentTimeMillis() - start;
       String responseString = stringBuilder.toString();
-      JSONObject responseJson = new JSONObject(responseString);
+      ObjectNode responseJson = (ObjectNode) JsonUtils.stringToJsonNode(responseString);
       responseJson.put("totalTime", totalTime);
 
-      if (_verbose && (responseJson.getLong("numDocsScanned") > 0)) {
+      if (_verbose && (responseJson.get("numDocsScanned").asLong() > 0)) {
         LOGGER.info("requestString: {}", requestString);
         LOGGER.info("responseString: {}", responseString);
       }

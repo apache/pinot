@@ -29,7 +29,6 @@ import java.util.Arrays;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.json.JSONObject;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -142,7 +141,7 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
     TableConfig tableConfig;
     try (FileInputStream fis = new FileInputStream(new File(_tableConfigFile))) {
       String tableConfigString = IOUtils.toString(fis);
-      tableConfig = TableConfig.fromJSONConfig(new JSONObject(tableConfigString));
+      tableConfig = TableConfig.fromJsonString(tableConfigString);
     } catch (IOException e) {
       throw new RuntimeException("Exception in reading table config from file " + _tableConfigFile, e);
     }

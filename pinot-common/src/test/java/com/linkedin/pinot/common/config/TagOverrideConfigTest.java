@@ -19,10 +19,8 @@
 package com.linkedin.pinot.common.config;
 
 import com.linkedin.pinot.common.utils.CommonConstants;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import org.json.JSONException;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -31,7 +29,7 @@ import org.testng.annotations.Test;
 public class TagOverrideConfigTest {
 
   @DataProvider(name = "realtimeTagConfigTestDataProvider")
-  public Object[][] realtimeTagConfigTestDataProvider() throws IOException, JSONException {
+  public Object[][] realtimeTagConfigTestDataProvider() {
     TableConfig.Builder tableConfigBuilder = new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE);
     tableConfigBuilder.setTableName("testRealtimeTable")
         .setTimeColumnName("timeColumn")
@@ -85,7 +83,7 @@ public class TagOverrideConfigTest {
   }
 
   @DataProvider(name = "offlineTagConfigTestDataProvider")
-  public Object[][] offlineTagConfigTestDataProvider() throws IOException, JSONException {
+  public Object[][] offlineTagConfigTestDataProvider() {
     TableConfig.Builder tableConfigBuilder = new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE);
     tableConfigBuilder.setTableName("testOfflineTable")
         .setTimeColumnName("timeColumn")

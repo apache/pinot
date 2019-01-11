@@ -18,14 +18,12 @@
  */
 package com.linkedin.pinot.core.data.readers;
 
+import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.JsonParser;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.utils.JsonUtils;
 import com.linkedin.pinot.core.data.GenericRow;
-
-import org.codehaus.jackson.JsonFactory;
-import org.codehaus.jackson.JsonParser;
-import org.codehaus.jackson.map.ObjectMapper;
-
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -37,8 +35,6 @@ import java.util.Map;
  * Record reader for JSON file.
  */
 public class JSONRecordReader implements RecordReader {
-  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-
   private final JsonFactory _factory = new JsonFactory();
   private final File _dataFile;
   private final Schema _schema;
@@ -54,9 +50,9 @@ public class JSONRecordReader implements RecordReader {
   }
 
   private void init() throws IOException {
-    _parser = _factory.createJsonParser(RecordReaderUtils.getFileReader(_dataFile));
+    _parser = _factory.createParser(RecordReaderUtils.getFileReader(_dataFile));
     try {
-      _iterator = OBJECT_MAPPER.readValues(_parser, Map.class);
+      _iterator = JsonUtils.DEFAULT_MAPPER.readValues(_parser, Map.class);
     } catch (Exception e) {
       _parser.close();
       throw e;

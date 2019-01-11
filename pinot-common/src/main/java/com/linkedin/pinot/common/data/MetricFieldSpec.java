@@ -18,13 +18,13 @@
  */
 package com.linkedin.pinot.common.data;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
-import com.google.gson.JsonObject;
 import com.linkedin.pinot.common.config.ConfigKey;
 import com.linkedin.pinot.common.utils.EqualityUtils;
 import javax.annotation.Nonnull;
-import org.codehaus.jackson.annotate.JsonIgnore;
-import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 
 
 /**
@@ -141,13 +141,13 @@ public final class MetricFieldSpec extends FieldSpec {
 
   @Nonnull
   @Override
-  public JsonObject toJsonObject() {
-    JsonObject jsonObject = super.toJsonObject();
+  public ObjectNode toJsonObject() {
+    ObjectNode jsonObject = super.toJsonObject();
     if (_dataType == DataType.STRING && _fieldSize != UNDEFINED_METRIC_SIZE) {
-      jsonObject.addProperty("fieldSize", _fieldSize);
+      jsonObject.put("fieldSize", _fieldSize);
     }
     if (_derivedMetricType != null) {
-      jsonObject.addProperty("derivedMetricType", _derivedMetricType.name());
+      jsonObject.put("derivedMetricType", _derivedMetricType.name());
     }
     return jsonObject;
   }

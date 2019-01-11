@@ -22,8 +22,6 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import org.apache.helix.model.InstanceConfig;
-import org.json.JSONException;
-import org.json.JSONObject;
 
 
 /**
@@ -109,15 +107,6 @@ public class Instance {
       bld.append("tag : " + _tag + "\n");
     }
     return bld.toString();
-  }
-
-  public JSONObject toJSON() throws JSONException {
-    final JSONObject ret = new JSONObject();
-    ret.put("host", _host);
-    ret.put("port", _port);
-    ret.put("type", _type);
-    ret.put("tag", getTagOrDefaultTag());
-    return ret;
   }
 
   public InstanceConfig toInstanceConfig() {

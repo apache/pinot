@@ -18,8 +18,8 @@
  */
 package com.linkedin.pinot.client;
 
-import org.json.JSONException;
-import org.json.JSONObject;
+import com.fasterxml.jackson.databind.JsonNode;
+
 
 /**
  * A Pinot query result set for aggregation results without group by clauses, of which there is one
@@ -27,9 +27,9 @@ import org.json.JSONObject;
  * function in the query.
  */
 class AggregationResultSet extends AbstractResultSet {
-  private final JSONObject _jsonObject;
+  private final JsonNode _jsonObject;
 
-  public AggregationResultSet(JSONObject jsonObject) {
+  public AggregationResultSet(JsonNode jsonObject) {
     _jsonObject = jsonObject;
   }
 
@@ -45,29 +45,20 @@ class AggregationResultSet extends AbstractResultSet {
 
   @Override
   public String getColumnName(int columnIndex) {
-    try {
-      return _jsonObject.getString("function");
-    } catch (JSONException e) {
-      throw new PinotClientException(e);
-    }
+    return _jsonObject.get("function").asText();
   }
 
   @Override
   public String getString(int rowIndex, int columnIndex) {
     if (columnIndex != 0) {
-      throw new IllegalArgumentException(
-          "Column index must always be 0 for aggregation result sets");
+      throw new IllegalArgumentException("Column index must always be 0 for aggregation result sets");
     }
 
     if (rowIndex != 0) {
       throw new IllegalArgumentException("Row index must always be 0 for aggregation result sets");
     }
 
-    try {
-      return _jsonObject.get("value").toString();
-    } catch (Exception e) {
-      throw new PinotClientException(e);
-    }
+    return _jsonObject.get("value").asText();
   }
 
   @Override

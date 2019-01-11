@@ -18,52 +18,39 @@
  */
 package com.linkedin.pinot.client;
 
-import java.util.List;
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
+import com.fasterxml.jackson.databind.JsonNode;
 
 
 /**
  * Reimplementation of BrokerResponse from pinot-common, so that pinot-api does not depend on pinot-common.
  */
 class BrokerResponse {
-  private JSONArray _aggregationResults;
-  private JSONObject _selectionResults;
-  private JSONArray _exceptions;
+  private JsonNode _aggregationResults;
+  private JsonNode _selectionResults;
+  private JsonNode _exceptions;
 
   private BrokerResponse() {
   }
 
-  private BrokerResponse(JSONObject brokerResponse) {
-    try {
-      if (brokerResponse.has("aggregationResults")) {
-        _aggregationResults = brokerResponse.getJSONArray("aggregationResults");
-      }
-      if (brokerResponse.has("exceptions")) {
-        _exceptions = brokerResponse.getJSONArray("exceptions");
-      }
-      if (brokerResponse.has("selectionResults")) {
-        _selectionResults = brokerResponse.getJSONObject("selectionResults");
-      }
-    } catch (JSONException e) {
-      throw new PinotClientException(e);
-    }
+  private BrokerResponse(JsonNode brokerResponse) {
+    _aggregationResults = brokerResponse.get("aggregationResults");
+    _exceptions = brokerResponse.get("exceptions");
+    _selectionResults = brokerResponse.get("selectionResults");
   }
 
   boolean hasExceptions() {
-    return _exceptions != null && _exceptions.length() != 0;
+    return _exceptions != null && _exceptions.size() != 0;
   }
 
-  JSONArray getExceptions() {
+  JsonNode getExceptions() {
     return _exceptions;
   }
 
-  JSONArray getAggregationResults() {
+  JsonNode getAggregationResults() {
     return _aggregationResults;
   }
 
-  JSONObject getSelectionResults() {
+  JsonNode getSelectionResults() {
     return _selectionResults;
   }
 
@@ -71,11 +58,11 @@ class BrokerResponse {
     if (_aggregationResults == null) {
       return 0;
     } else {
-      return _aggregationResults.length();
+      return _aggregationResults.size();
     }
   }
 
-  static BrokerResponse fromJson(JSONObject json) {
+  static BrokerResponse fromJson(JsonNode json) {
     return new BrokerResponse(json);
   }
 

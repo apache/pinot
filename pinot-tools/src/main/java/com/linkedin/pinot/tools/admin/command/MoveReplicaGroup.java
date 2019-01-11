@@ -19,12 +19,12 @@
 package com.linkedin.pinot.tools.admin.command;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Function;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.JsonUtils;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
 import com.linkedin.pinot.common.utils.retry.RetryPolicies;
 import com.linkedin.pinot.tools.Command;
@@ -49,7 +49,6 @@ import org.apache.helix.manager.zk.ZKHelixAdmin;
 import org.apache.helix.manager.zk.ZNRecordSerializer;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.json.JSONException;
 import org.kohsuke.args4j.CmdLineException;
 import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.Option;
@@ -122,8 +121,7 @@ public class MoveReplicaGroup extends AbstractBaseAdminCommand implements Comman
 
   }
 
-  public boolean execute()
-      throws IOException, JSONException, InterruptedException {
+  public boolean execute() throws IOException, InterruptedException {
     validateParams();
 
     zkChanger = new PinotZKChanger(zkHost, zkPath);
@@ -200,8 +198,7 @@ public class MoveReplicaGroup extends AbstractBaseAdminCommand implements Comman
 
   private void printIdealState(Map<String, Map<String, String>> idealState)
       throws JsonProcessingException {
-    String output = new ObjectMapper().writerWithDefaultPrettyPrinter().writeValueAsString(idealState);
-    System.out.println(output);
+    System.out.println(JsonUtils.objectToPrettyString(idealState));
   }
 
   private void applyIdealState(final Map<String, Map<String, String>> proposedIdealState) {
@@ -417,13 +414,11 @@ public class MoveReplicaGroup extends AbstractBaseAdminCommand implements Comman
     LOGGER.info("Using zkHost: {}, zkPath: {}", zkHost, zkPath);
   }
 
-  private String getServerTenantName(String tableName)
-      throws IOException, JSONException {
+  private String getServerTenantName(String tableName) throws IOException {
     return getTableConfig(tableName).getTenantConfig().getServer();
   }
 
-  private TableConfig getTableConfig(String tableName)
-      throws IOException, JSONException {
+  private TableConfig getTableConfig(String tableName) throws IOException {
     ZNRecordSerializer serializer = new ZNRecordSerializer();
     String path = PropertyPathConfig.getPath(PropertyType.PROPERTYSTORE, zkPath);
     ZkHelixPropertyStore<ZNRecord> propertyStore = new ZkHelixPropertyStore<>(zkHost, serializer, path);
@@ -437,8 +432,7 @@ public class MoveReplicaGroup extends AbstractBaseAdminCommand implements Comman
     return helix.getResourcesInCluster(zkPath).contains(tableName);
   }
 
-  private List<String> readDestinationServers()
-      throws IOException, JSONException {
+  private List<String> readDestinationServers() throws IOException {
     if (destHostsFile.isEmpty()) {
       String serverTenant = getServerTenantName(tableName) + "_OFFLINE";
       LOGGER.debug("Using server tenant: {}", serverTenant);

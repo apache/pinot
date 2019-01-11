@@ -18,8 +18,8 @@
  */
 package com.linkedin.pinot.common.config;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.util.List;
-import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 
 
 @SuppressWarnings("unused")

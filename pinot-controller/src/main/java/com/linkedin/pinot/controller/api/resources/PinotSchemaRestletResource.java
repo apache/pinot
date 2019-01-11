@@ -18,10 +18,12 @@
  */
 package com.linkedin.pinot.controller.api.resources;
 
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metrics.ControllerMeter;
 import com.linkedin.pinot.common.metrics.ControllerMetrics;
+import com.linkedin.pinot.common.utils.JsonUtils;
 import com.linkedin.pinot.controller.api.events.MetadataEventNotifierFactory;
 import com.linkedin.pinot.controller.api.events.SchemaEventType;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -47,7 +49,6 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.glassfish.jersey.media.multipart.FormDataBodyPart;
 import org.glassfish.jersey.media.multipart.FormDataMultiPart;
-import org.json.JSONArray;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -72,11 +73,11 @@ public class PinotSchemaRestletResource {
   @ApiOperation(value = "List all schema names", notes = "Lists all schema names")
   public String listSchemaNames() {
     List<String> schemaNames = _pinotHelixResourceManager.getSchemaNames();
-    JSONArray ret = new JSONArray();
+    ArrayNode ret = JsonUtils.newArrayNode();
 
     if (schemaNames != null) {
       for (String schema : schemaNames) {
-        ret.put(schema);
+        ret.add(schema);
       }
     }
     return ret.toString();

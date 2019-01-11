@@ -18,21 +18,20 @@
  */
 package com.linkedin.pinot.server.api.resources;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.linkedin.pinot.common.restlet.resources.TableSegments;
 import com.linkedin.pinot.common.restlet.resources.TablesList;
+import com.linkedin.pinot.common.utils.JsonUtils;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import java.util.List;
 import javax.ws.rs.core.Response;
-import org.codehaus.jackson.map.ObjectMapper;
-import org.json.JSONObject;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
 public class TablesResourceTest extends BaseResourceTest {
-  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   @Test
   public void getTables() throws Exception {
@@ -40,7 +39,7 @@ public class TablesResourceTest extends BaseResourceTest {
 
     Response response = _webTarget.path(tablesPath).request().get(Response.class);
     String responseBody = response.readEntity(String.class);
-    TablesList tablesList = OBJECT_MAPPER.readValue(responseBody, TablesList.class);
+    TablesList tablesList = JsonUtils.stringToObject(responseBody, TablesList.class);
 
     Assert.assertNotNull(tablesList);
     List<String> tables = tablesList.getTables();
@@ -52,7 +51,7 @@ public class TablesResourceTest extends BaseResourceTest {
     addTable(secondTable);
     response = _webTarget.path(tablesPath).request().get(Response.class);
     responseBody = response.readEntity(String.class);
-    tablesList = OBJECT_MAPPER.readValue(responseBody, TablesList.class);
+    tablesList = JsonUtils.stringToObject(responseBody, TablesList.class);
 
     Assert.assertNotNull(tablesList);
     tables = tablesList.getTables();
@@ -94,32 +93,32 @@ public class TablesResourceTest extends BaseResourceTest {
     IndexSegment defaultSegment = _indexSegments.get(0);
     String segmentMetadataPath = "/tables/" + TABLE_NAME + "/segments/" + defaultSegment.getSegmentName() + "/metadata";
 
-    JSONObject jsonResponse = new JSONObject(_webTarget.path(segmentMetadataPath).request().get(String.class));
+    JsonNode jsonResponse = JsonUtils.stringToJsonNode(_webTarget.path(segmentMetadataPath).request().get(String.class));
     SegmentMetadataImpl segmentMetadata = (SegmentMetadataImpl) defaultSegment.getSegmentMetadata();
-    Assert.assertEquals(jsonResponse.getString("segmentName"), segmentMetadata.getName());
-    Assert.assertEquals(jsonResponse.get("crc").toString(), segmentMetadata.getCrc());
-    Assert.assertEquals(jsonResponse.getLong("creationTimeMillis"), segmentMetadata.getIndexCreationTime());
-    Assert.assertEquals(jsonResponse.getString("paddingCharacter"),
+    Assert.assertEquals(jsonResponse.get("segmentName").asText(), segmentMetadata.getName());
+    Assert.assertEquals(jsonResponse.get("crc").asText(), segmentMetadata.getCrc());
+    Assert.assertEquals(jsonResponse.get("creationTimeMillis").asLong(), segmentMetadata.getIndexCreationTime());
+    Assert.assertEquals(jsonResponse.get("paddingCharacter").asText(),
         String.valueOf(segmentMetadata.getPaddingCharacter()));
-    Assert.assertEquals(jsonResponse.getLong("refreshTimeMillis"), segmentMetadata.getRefreshTime());
-    Assert.assertEquals(jsonResponse.getLong("pushTimeMillis"), segmentMetadata.getPushTime());
+    Assert.assertEquals(jsonResponse.get("refreshTimeMillis").asLong(), segmentMetadata.getRefreshTime());
+    Assert.assertEquals(jsonResponse.get("pushTimeMillis").asLong(), segmentMetadata.getPushTime());
     Assert.assertTrue(jsonResponse.has("pushTimeReadable"));
     Assert.assertTrue(jsonResponse.has("refreshTimeReadable"));
     Assert.assertTrue(jsonResponse.has("startTimeReadable"));
     Assert.assertTrue(jsonResponse.has("endTimeReadable"));
     Assert.assertTrue(jsonResponse.has("creationTimeReadable"));
-    Assert.assertEquals(jsonResponse.getJSONArray("columns").length(), 0);
+    Assert.assertEquals(jsonResponse.get("columns").size(), 0);
 
-    jsonResponse = new JSONObject(_webTarget.path(segmentMetadataPath)
+    jsonResponse = JsonUtils.stringToJsonNode(_webTarget.path(segmentMetadataPath)
         .queryParam("columns", "column1")
         .queryParam("columns", "column2")
         .request()
         .get(String.class));
-    Assert.assertEquals(jsonResponse.getJSONArray("columns").length(), 2);
+    Assert.assertEquals(jsonResponse.get("columns").size(), 2);
 
-    jsonResponse =
-        new JSONObject(_webTarget.path(segmentMetadataPath).queryParam("columns", "*").request().get(String.class));
-    Assert.assertEquals(jsonResponse.getJSONArray("columns").length(), segmentMetadata.getAllColumns().size());
+    jsonResponse = JsonUtils.stringToJsonNode(
+        (_webTarget.path(segmentMetadataPath).queryParam("columns", "*").request().get(String.class)));
+    Assert.assertEquals(jsonResponse.get("columns").size(), segmentMetadata.getAllColumns().size());
 
     Response response = _webTarget.path("/tables/UNKNOWN_TABLE/segments/" + defaultSegment.getSegmentName())
         .request()
@@ -139,13 +138,13 @@ public class TablesResourceTest extends BaseResourceTest {
 
     // Trigger crc api to fetch crc information
     String response = _webTarget.path(segmentsCrcPath).request().get(String.class);
-    JSONObject segmentsCrc = new JSONObject(response);
+    JsonNode segmentsCrc = JsonUtils.stringToJsonNode(response);
 
     // Check that crc info is correct
     for (ImmutableSegment immutableSegment : immutableSegments) {
       String segmentName = immutableSegment.getSegmentName();
       String crc = immutableSegment.getSegmentMetadata().getCrc();
-      Assert.assertEquals(segmentsCrc.getString(segmentName), crc);
+      Assert.assertEquals(segmentsCrc.get(segmentName).asText(), crc);
     }
   }
 }

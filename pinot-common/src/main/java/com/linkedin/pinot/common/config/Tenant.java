@@ -18,118 +18,89 @@
  */
 package com.linkedin.pinot.common.config;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.linkedin.pinot.common.utils.EqualityUtils;
-import org.codehaus.jackson.annotate.JsonIgnore;
-import org.codehaus.jackson.annotate.JsonIgnoreProperties;
-import org.codehaus.jackson.map.ObjectMapper;
-import org.json.JSONException;
-import org.json.JSONObject;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import com.google.common.base.Objects;
 import com.linkedin.pinot.common.utils.TenantRole;
+
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class Tenant {
-
-  private static final Logger LOGGER = LoggerFactory.getLogger(Tenant.class);
-
-  private String tenantRole;
-  private String tenantName;
-  private int numberOfInstances = 0;
-  private int offlineInstances = 0;
-  private int realtimeInstances = 0;
-
-  // private boolean colocated = false;
-
-  public void setTenantRole(String tenantRole) {
-    this.tenantRole = tenantRole;
-  }
-
-  public void setTenantName(String tenantName) {
-    this.tenantName = tenantName;
-  }
-
-  public void setNumberOfInstances(int numberOfInstances) {
-    this.numberOfInstances = numberOfInstances;
-  }
-
-  public void setOfflineInstances(int offlineInstances) {
-    this.offlineInstances = offlineInstances;
-  }
-
-  public void setRealtimeInstances(int realtimeInstances) {
-    this.realtimeInstances = realtimeInstances;
-  }
+  private TenantRole _tenantRole;
+  private String _tenantName;
+  private int _numberOfInstances = 0;
+  private int _offlineInstances = 0;
+  private int _realtimeInstances = 0;
 
   public TenantRole getTenantRole() {
-    return TenantRole.valueOf(tenantRole.toUpperCase());
+    return _tenantRole;
+  }
+
+  public void setTenantRole(TenantRole tenantRole) {
+    _tenantRole = tenantRole;
   }
 
   public String getTenantName() {
-    return tenantName;
+    return _tenantName;
+  }
+
+  public void setTenantName(String tenantName) {
+    _tenantName = tenantName;
   }
 
   public int getNumberOfInstances() {
-    return numberOfInstances;
+    return _numberOfInstances;
+  }
+
+  public void setNumberOfInstances(int numberOfInstances) {
+    _numberOfInstances = numberOfInstances;
   }
 
   public int getOfflineInstances() {
-    return offlineInstances;
+    return _offlineInstances;
+  }
+
+  public void setOfflineInstances(int offlineInstances) {
+    _offlineInstances = offlineInstances;
   }
 
   public int getRealtimeInstances() {
-    return realtimeInstances;
+    return _realtimeInstances;
+  }
+
+  public void setRealtimeInstances(int realtimeInstances) {
+    _realtimeInstances = realtimeInstances;
   }
 
   @JsonIgnore
   public boolean isCoLocated() {
-    return (realtimeInstances + offlineInstances > numberOfInstances);
+    return _realtimeInstances + _offlineInstances > _numberOfInstances;
   }
 
   @Override
-  public boolean equals(Object o) {
-    if (EqualityUtils.isSameReference(this, o)) {
+  public boolean equals(Object obj) {
+    if (this == obj) {
       return true;
     }
-
-    if (EqualityUtils.isNullOrNotSameClass(this, o)) {
-      return false;
+    if (obj instanceof Tenant) {
+      Tenant that = (Tenant) obj;
+      return EqualityUtils.isEqual(_numberOfInstances, that._numberOfInstances)
+          && EqualityUtils.isEqual(_offlineInstances, that._offlineInstances)
+          && EqualityUtils.isEqual(_realtimeInstances, that._realtimeInstances)
+          && EqualityUtils.isEqual(_tenantRole, that._tenantRole)
+          && EqualityUtils.isEqual(_tenantName, that._tenantName);
     }
-
-    Tenant tenant = (Tenant) o;
-
-    return EqualityUtils.isEqual(numberOfInstances, tenant.numberOfInstances) &&
-        EqualityUtils.isEqual(offlineInstances, tenant.offlineInstances) &&
-        EqualityUtils.isEqual(realtimeInstances, tenant.realtimeInstances) &&
-        EqualityUtils.isEqual(tenantRole, tenant.tenantRole) &&
-        EqualityUtils.isEqual(tenantName, tenant.tenantName);
+    return false;
   }
 
   @Override
   public int hashCode() {
-    int result = EqualityUtils.hashCodeOf(tenantRole);
-    result = EqualityUtils.hashCodeOf(result, tenantName);
-    result = EqualityUtils.hashCodeOf(result, numberOfInstances);
-    result = EqualityUtils.hashCodeOf(result, offlineInstances);
-    result = EqualityUtils.hashCodeOf(result, realtimeInstances);
+    int result = EqualityUtils.hashCodeOf(_tenantRole);
+    result = EqualityUtils.hashCodeOf(result, _tenantName);
+    result = EqualityUtils.hashCodeOf(result, _numberOfInstances);
+    result = EqualityUtils.hashCodeOf(result, _offlineInstances);
+    result = EqualityUtils.hashCodeOf(result, _realtimeInstances);
     return result;
-  }
-
-  @Override
-  public String toString() {
-    String ret = null;
-    try {
-      ret = new ObjectMapper().writeValueAsString(this);
-    } catch (Exception e) {
-      LOGGER.error("error toString for tenant ", e);
-    }
-    return ret;
-  }
-
-  public JSONObject toJSON() throws JSONException {
-    return new JSONObject(toString());
   }
 
   public static class TenantBuilder {
@@ -141,7 +112,7 @@ public class Tenant {
     }
 
     public TenantBuilder setRole(TenantRole role) {
-      tenant.setTenantRole(role.toString());
+      tenant.setTenantRole(role);
       return this;
     }
 

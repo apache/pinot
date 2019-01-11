@@ -18,7 +18,6 @@
  */
 package com.linkedin.pinot.controller.api.resources;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
 import com.linkedin.pinot.common.config.TableNameBuilder;
@@ -27,6 +26,7 @@ import com.linkedin.pinot.common.metrics.ControllerGauge;
 import com.linkedin.pinot.common.metrics.ControllerMetrics;
 import com.linkedin.pinot.common.restlet.resources.SegmentSizeInfo;
 import com.linkedin.pinot.common.restlet.resources.TableSizeInfo;
+import com.linkedin.pinot.common.utils.JsonUtils;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.util.TableSizeReader;
 import com.sun.net.httpserver.HttpExchange;
@@ -156,7 +156,7 @@ public class TableSizeReaderTest {
           tableInfo.diskSizeInBytes += segmentSize.diskSizeInBytes;
         }
 
-        String json = new ObjectMapper().writeValueAsString(tableInfo);
+        String json = JsonUtils.objectToString(tableInfo);
         httpExchange.sendResponseHeaders(status, json.length());
         OutputStream responseBody = httpExchange.getResponseBody();
         responseBody.write(json.getBytes());

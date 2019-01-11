@@ -18,7 +18,7 @@
  */
 package com.linkedin.pinot.common.restlet.resources;
 
-import org.codehaus.jackson.annotate.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 
 @JsonIgnoreProperties(ignoreUnknown = true)

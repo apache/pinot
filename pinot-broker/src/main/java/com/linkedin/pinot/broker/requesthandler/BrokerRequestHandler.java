@@ -18,12 +18,12 @@
  */
 package com.linkedin.pinot.broker.requesthandler;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.linkedin.pinot.broker.api.RequestStatistics;
 import com.linkedin.pinot.broker.api.RequesterIdentity;
 import com.linkedin.pinot.common.response.BrokerResponse;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
-import org.json.JSONObject;
 
 
 @ThreadSafe
@@ -33,10 +33,6 @@ public interface BrokerRequestHandler {
 
   void shutDown();
 
-  @Deprecated
-  BrokerResponse handleRequest(JSONObject request, @Nullable RequesterIdentity requesterIdentity)
-      throws Exception;
-
-  BrokerResponse handleRequest(JSONObject request, @Nullable RequesterIdentity requesterIdentity,
+  BrokerResponse handleRequest(JsonNode request, @Nullable RequesterIdentity requesterIdentity,
       RequestStatistics requestStatistics) throws Exception;
 }

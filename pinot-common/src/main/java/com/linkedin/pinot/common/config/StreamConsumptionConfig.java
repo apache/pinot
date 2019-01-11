@@ -18,20 +18,11 @@
  */
 package com.linkedin.pinot.common.config;
 
-import java.io.IOException;
-import org.codehaus.jackson.annotate.JsonIgnoreProperties;
-import org.codehaus.jackson.map.ObjectMapper;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class StreamConsumptionConfig {
-
-  private static final Logger LOGGER = LoggerFactory.getLogger(StreamConsumptionConfig.class);
-
-  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-
   private String _streamPartitionAssignmentStrategy;
 
   public String getStreamPartitionAssignmentStrategy() {
@@ -41,14 +32,4 @@ public class StreamConsumptionConfig {
   public void setStreamPartitionAssignmentStrategy(String streamPartitionAssignmentStrategy) {
     _streamPartitionAssignmentStrategy = streamPartitionAssignmentStrategy;
   }
-
-  @Override
-  public String toString() {
-    try {
-      return OBJECT_MAPPER.writeValueAsString(this);
-    } catch (IOException e) {
-      return e.toString();
-    }
-  }
-
 }

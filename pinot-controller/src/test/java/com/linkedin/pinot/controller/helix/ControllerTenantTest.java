@@ -18,13 +18,13 @@
  */
 package com.linkedin.pinot.controller.helix;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.linkedin.pinot.common.config.TagNameUtils;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.JsonUtils;
 import com.linkedin.pinot.common.utils.ZkStarter;
 import java.io.IOException;
-import org.json.JSONException;
-import org.json.JSONObject;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -56,41 +56,43 @@ public class ControllerTenantTest extends ControllerTest {
   }
 
   @Test
-  public void testBrokerTenant() throws IOException, JSONException {
+  public void testBrokerTenant() throws IOException {
     // Create broker tenants
     for (int i = 1; i <= NUM_BROKER_TAGS; i++) {
       String brokerTenant = BROKER_TAG_PREFIX + i;
-      JSONObject payload =
+      String payload =
           ControllerRequestBuilderUtil.buildBrokerTenantCreateRequestJSON(brokerTenant, NUM_BROKERS_PER_TAG);
-      sendPostRequest(_controllerRequestURLBuilder.forTenantCreate(), payload.toString());
-      Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(_helixClusterName,
-          TagNameUtils.getBrokerTagForTenant(brokerTenant)).size(), NUM_BROKERS_PER_TAG);
+      sendPostRequest(_controllerRequestURLBuilder.forTenantCreate(), payload);
+      Assert.assertEquals(
+          _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, TagNameUtils.getBrokerTagForTenant(brokerTenant))
+              .size(), NUM_BROKERS_PER_TAG);
       Assert.assertEquals(
           _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE)
               .size(), NUM_INSTANCES - i * NUM_BROKERS_PER_TAG);
     }
 
     // Get broker tenants
-    JSONObject response = new JSONObject(sendGetRequest(_controllerRequestURLBuilder.forTenantGet()));
-    Assert.assertEquals(response.getJSONArray("BROKER_TENANTS").length(), NUM_BROKER_TAGS);
+    JsonNode response = JsonUtils.stringToJsonNode(sendGetRequest(_controllerRequestURLBuilder.forTenantGet()));
+    Assert.assertEquals(response.get("BROKER_TENANTS").size(), NUM_BROKER_TAGS);
     for (int i = 1; i <= NUM_BROKER_TAGS; i++) {
       String brokerTag = BROKER_TAG_PREFIX + i;
-      response = new JSONObject(sendGetRequest(_controllerRequestURLBuilder.forBrokerTenantGet(brokerTag)));
-      Assert.assertEquals(response.getJSONArray("BrokerInstances").length(), NUM_BROKERS_PER_TAG);
-      Assert.assertEquals(response.getString("tenantName"), brokerTag);
-      response = new JSONObject(sendGetRequest(_controllerRequestURLBuilder.forTenantGet(brokerTag)));
-      Assert.assertEquals(response.getJSONArray("BrokerInstances").length(), NUM_BROKERS_PER_TAG);
-      Assert.assertEquals(response.getJSONArray("ServerInstances").length(), 0);
-      Assert.assertEquals(response.getString("tenantName"), brokerTag);
+      response = JsonUtils.stringToJsonNode(sendGetRequest(_controllerRequestURLBuilder.forBrokerTenantGet(brokerTag)));
+      Assert.assertEquals(response.get("BrokerInstances").size(), NUM_BROKERS_PER_TAG);
+      Assert.assertEquals(response.get("tenantName").asText(), brokerTag);
+      response = JsonUtils.stringToJsonNode(sendGetRequest(_controllerRequestURLBuilder.forTenantGet(brokerTag)));
+      Assert.assertEquals(response.get("BrokerInstances").size(), NUM_BROKERS_PER_TAG);
+      Assert.assertEquals(response.get("ServerInstances").size(), 0);
+      Assert.assertEquals(response.get("tenantName").asText(), brokerTag);
     }
 
     // Update broker tenants
     for (int i = 0; i <= NUM_INSTANCES - (NUM_BROKER_TAGS - 1) * NUM_BROKERS_PER_TAG; i++) {
       String brokerTenant = BROKER_TAG_PREFIX + 1;
-      JSONObject payload = ControllerRequestBuilderUtil.buildBrokerTenantCreateRequestJSON(brokerTenant, i);
-      sendPutRequest(_controllerRequestURLBuilder.forTenantCreate(), payload.toString());
-      Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(_helixClusterName,
-          TagNameUtils.getBrokerTagForTenant(brokerTenant)).size(), i);
+      String payload = ControllerRequestBuilderUtil.buildBrokerTenantCreateRequestJSON(brokerTenant, i);
+      sendPutRequest(_controllerRequestURLBuilder.forTenantCreate(), payload);
+      Assert.assertEquals(
+          _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, TagNameUtils.getBrokerTagForTenant(brokerTenant))
+              .size(), i);
       Assert.assertEquals(
           _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE)
               .size(), NUM_INSTANCES - (NUM_BROKER_TAGS - 1) * NUM_BROKERS_PER_TAG - i);
@@ -109,16 +111,17 @@ public class ControllerTenantTest extends ControllerTest {
   }
 
   @Test
-  public void testServerTenant() throws IOException, JSONException {
+  public void testServerTenant() throws IOException {
     // Create server tenants
     for (int i = 1; i <= NUM_SERVER_TAGS; i++) {
       String serverTenant = SERVER_TAG_PREFIX + i;
-      JSONObject payload =
+      String payload =
           ControllerRequestBuilderUtil.buildServerTenantCreateRequestJSON(serverTenant, NUM_SERVERS_PER_TAG,
               NUM_OFFLINE_SERVERS_PER_TAG, NUM_REALTIME_SERVERS_PER_TAG);
-      sendPostRequest(_controllerRequestURLBuilder.forTenantCreate(), payload.toString());
-      Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(_helixClusterName,
-          TagNameUtils.getOfflineTagForTenant(serverTenant)).size(), NUM_OFFLINE_SERVERS_PER_TAG);
+      sendPostRequest(_controllerRequestURLBuilder.forTenantCreate(), payload);
+      Assert.assertEquals(
+          _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, TagNameUtils.getOfflineTagForTenant(serverTenant))
+              .size(), NUM_OFFLINE_SERVERS_PER_TAG);
       Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(_helixClusterName,
           TagNameUtils.getRealtimeTagForTenant(serverTenant)).size(), NUM_REALTIME_SERVERS_PER_TAG);
       Assert.assertEquals(
@@ -127,27 +130,27 @@ public class ControllerTenantTest extends ControllerTest {
     }
 
     // Get server tenants
-    JSONObject response = new JSONObject(sendGetRequest(_controllerRequestURLBuilder.forTenantGet()));
-    Assert.assertEquals(response.getJSONArray("SERVER_TENANTS").length(), NUM_SERVER_TAGS);
+    JsonNode response = JsonUtils.stringToJsonNode(sendGetRequest(_controllerRequestURLBuilder.forTenantGet()));
+    Assert.assertEquals(response.get("SERVER_TENANTS").size(), NUM_SERVER_TAGS);
     for (int i = 1; i <= NUM_SERVER_TAGS; i++) {
       String serverTag = SERVER_TAG_PREFIX + i;
-      response = new JSONObject(sendGetRequest(_controllerRequestURLBuilder.forServerTenantGet(serverTag)));
-      Assert.assertEquals(response.getJSONArray("ServerInstances").length(), NUM_SERVERS_PER_TAG);
-      Assert.assertEquals(response.getString("tenantName"), serverTag);
-      response = new JSONObject(sendGetRequest(_controllerRequestURLBuilder.forTenantGet(serverTag)));
-      Assert.assertEquals(response.getJSONArray("BrokerInstances").length(), 0);
-      Assert.assertEquals(response.getJSONArray("ServerInstances").length(), NUM_SERVERS_PER_TAG);
-      Assert.assertEquals(response.getString("tenantName"), serverTag);
+      response = JsonUtils.stringToJsonNode(sendGetRequest(_controllerRequestURLBuilder.forServerTenantGet(serverTag)));
+      Assert.assertEquals(response.get("ServerInstances").size(), NUM_SERVERS_PER_TAG);
+      Assert.assertEquals(response.get("tenantName").asText(), serverTag);
+      response = JsonUtils.stringToJsonNode(sendGetRequest(_controllerRequestURLBuilder.forTenantGet(serverTag)));
+      Assert.assertEquals(response.get("BrokerInstances").size(), 0);
+      Assert.assertEquals(response.get("ServerInstances").size(), NUM_SERVERS_PER_TAG);
+      Assert.assertEquals(response.get("tenantName").asText(), serverTag);
     }
 
     // Update server tenants
     // Note: server tenants cannot scale down
     for (int i = 0; i <= (NUM_INSTANCES - NUM_SERVER_TAGS * NUM_SERVERS_PER_TAG) / 2; i++) {
       String serverTenant = SERVER_TAG_PREFIX + 1;
-      JSONObject payload =
+      String payload =
           ControllerRequestBuilderUtil.buildServerTenantCreateRequestJSON(serverTenant, NUM_SERVERS_PER_TAG + i * 2,
               NUM_OFFLINE_SERVERS_PER_TAG + i, NUM_REALTIME_SERVERS_PER_TAG + i);
-      sendPutRequest(_controllerRequestURLBuilder.forTenantCreate(), payload.toString());
+      sendPutRequest(_controllerRequestURLBuilder.forTenantCreate(), payload);
       Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(_helixClusterName,
           TagNameUtils.getOfflineTagForTenant(serverTenant)).size(),
           NUM_OFFLINE_SERVERS_PER_TAG + i);
