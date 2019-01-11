@@ -49,9 +49,11 @@ public class HighLevelConsumerRoutingTableBuilderTest {
 
     Random random = new Random();
 
+    TableConfig tableConfig = new TableConfig();
+    tableConfig.setTableName("tableName");
     HighLevelConsumerBasedRoutingTableBuilder routingTableBuilder =
         new HighLevelConsumerBasedRoutingTableBuilder();
-    routingTableBuilder.init(new BaseConfiguration(), new TableConfig(), null, null);
+    routingTableBuilder.init(new BaseConfiguration(), tableConfig, null, null);
 
     String tableNameWithType = "table_REALTIME";
     String groupPrefix = "table_REALTIME_" + System.currentTimeMillis();
