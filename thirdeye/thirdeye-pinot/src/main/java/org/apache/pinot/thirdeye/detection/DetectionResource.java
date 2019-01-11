@@ -21,7 +21,7 @@ package org.apache.pinot.thirdeye.detection;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableMap;
-import com.linkedin.pinot.common.utils.ServiceStatus;
+import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.thirdeye.api.Constants;
 import org.apache.pinot.thirdeye.constant.AnomalyResultSource;
 import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;

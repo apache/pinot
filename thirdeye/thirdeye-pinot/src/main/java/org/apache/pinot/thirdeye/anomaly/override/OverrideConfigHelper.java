@@ -19,7 +19,7 @@
 
 package org.apache.pinot.thirdeye.anomaly.override;
 
-import com.linkedin.pinot.pql.parsers.utils.Pair;
+import org.apache.pinot.pql.parsers.utils.Pair;
 import org.apache.pinot.thirdeye.datalayer.bao.OverrideConfigManager;
 import org.apache.pinot.thirdeye.datalayer.dto.OverrideConfigDTO;
 import org.apache.pinot.thirdeye.detector.metric.transfer.ScalingFactor;

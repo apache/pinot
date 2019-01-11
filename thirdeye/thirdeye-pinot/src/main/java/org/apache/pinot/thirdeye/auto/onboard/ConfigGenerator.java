@@ -25,10 +25,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
-import com.linkedin.pinot.common.data.MetricFieldSpec;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.data.TimeGranularitySpec;
-import com.linkedin.pinot.common.data.TimeGranularitySpec.TimeFormat;
+import org.apache.pinot.common.data.MetricFieldSpec;
+import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.common.data.TimeGranularitySpec;
+import org.apache.pinot.common.data.TimeGranularitySpec.TimeFormat;
 import org.apache.pinot.thirdeye.api.MetricType;
 import org.apache.pinot.thirdeye.api.TimeGranularity;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;

@@ -17,8 +17,8 @@
 package org.apache.pinot.thirdeye.datasource.pinot.resultset;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.client.PinotClientException;
-import com.linkedin.pinot.client.ResultSet;
+import org.apache.pinot.client.PinotClientException;
+import org.apache.pinot.client.ResultSet;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
 import org.apache.pinot.thirdeye.dataframe.ObjectSeries;
 import org.apache.pinot.thirdeye.dataframe.StringSeries;

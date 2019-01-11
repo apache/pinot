@@ -24,7 +24,7 @@ import com.google.common.base.Predicate;
 import com.google.common.collect.Collections2;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
-import com.linkedin.pinot.common.data.TimeGranularitySpec;
+import org.apache.pinot.common.data.TimeGranularitySpec;
 import org.apache.pinot.thirdeye.api.TimeGranularity;
 import org.apache.pinot.thirdeye.api.TimeSpec;
 import org.apache.pinot.thirdeye.constant.MetricAggFunction;

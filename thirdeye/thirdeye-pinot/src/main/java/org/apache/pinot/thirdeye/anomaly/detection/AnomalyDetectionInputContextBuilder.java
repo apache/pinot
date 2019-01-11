@@ -22,7 +22,7 @@ package org.apache.pinot.thirdeye.anomaly.detection;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
-import com.linkedin.pinot.pql.parsers.utils.Pair;
+import org.apache.pinot.pql.parsers.utils.Pair;
 import org.apache.pinot.thirdeye.anomaly.override.OverrideConfigHelper;
 import org.apache.pinot.thirdeye.api.DimensionKey;
 import org.apache.pinot.thirdeye.api.DimensionMap;

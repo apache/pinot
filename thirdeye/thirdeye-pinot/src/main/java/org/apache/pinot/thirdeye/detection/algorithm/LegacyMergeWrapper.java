@@ -24,7 +24,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.SetMultimap;
-import com.linkedin.pinot.pql.parsers.utils.Pair;
+import org.apache.pinot.pql.parsers.utils.Pair;
 import org.apache.pinot.thirdeye.anomaly.merge.AnomalyMergeConfig;
 import org.apache.pinot.thirdeye.anomaly.merge.AnomalyMergeStrategy;
 import org.apache.pinot.thirdeye.anomaly.merge.AnomalyTimeBasedSummarizer;

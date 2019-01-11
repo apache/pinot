@@ -24,7 +24,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import com.linkedin.pinot.client.TextTable;
+import org.apache.pinot.client.TextTable;
 import org.apache.pinot.thirdeye.api.TimeSpec;
 import org.apache.pinot.thirdeye.datasource.BaseThirdEyeResponse;
 import org.apache.pinot.thirdeye.datasource.MetricFunction;

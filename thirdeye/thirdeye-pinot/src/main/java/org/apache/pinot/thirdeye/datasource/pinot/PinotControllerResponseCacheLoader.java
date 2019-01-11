@@ -19,11 +19,11 @@
 
 package org.apache.pinot.thirdeye.datasource.pinot;
 
-import com.linkedin.pinot.client.Connection;
-import com.linkedin.pinot.client.ConnectionFactory;
-import com.linkedin.pinot.client.PinotClientException;
-import com.linkedin.pinot.client.ResultSet;
-import com.linkedin.pinot.client.ResultSetGroup;
+import org.apache.pinot.client.Connection;
+import org.apache.pinot.client.ConnectionFactory;
+import org.apache.pinot.client.PinotClientException;
+import org.apache.pinot.client.ResultSet;
+import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.thirdeye.datasource.pinot.resultset.ThirdEyeResultSetGroup;
 import java.util.ArrayList;
 import java.util.Collection;

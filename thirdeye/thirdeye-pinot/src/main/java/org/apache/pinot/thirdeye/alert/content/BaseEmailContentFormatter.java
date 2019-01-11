@@ -24,7 +24,7 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Strings;
 import com.google.common.base.Throwables;
 import com.google.common.collect.Multimap;
-import com.linkedin.pinot.pql.parsers.utils.Pair;
+import org.apache.pinot.pql.parsers.utils.Pair;
 import org.apache.pinot.thirdeye.alert.commons.EmailEntity;
 import org.apache.pinot.thirdeye.anomaly.alert.util.DataReportHelper;
 import org.apache.pinot.thirdeye.anomaly.alert.v2.AlertTaskRunnerV2;

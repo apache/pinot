@@ -22,7 +22,7 @@
 package org.apache.pinot.thirdeye.util;
 
 import com.google.common.collect.HashMultimap;
-import com.linkedin.pinot.common.data.TimeGranularitySpec.TimeFormat;
+import org.apache.pinot.common.data.TimeGranularitySpec.TimeFormat;
 import org.apache.pinot.thirdeye.api.DimensionMap;
 
 import org.apache.pinot.thirdeye.dashboard.ThirdEyeDashboardConfiguration;

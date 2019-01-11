@@ -19,7 +19,7 @@
 
 package org.apache.pinot.thirdeye.anomalydetection.function;
 
-import com.linkedin.pinot.pql.parsers.utils.Pair;
+import org.apache.pinot.pql.parsers.utils.Pair;
 import org.apache.pinot.thirdeye.anomalydetection.AnomalyDetectionUtils;
 import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyDetectionContext;
 import org.apache.pinot.thirdeye.anomalydetection.context.TimeSeries;

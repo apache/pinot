@@ -20,7 +20,7 @@
 package org.apache.pinot.thirdeye.datasource.pinot.resultset;
 
 /**
- * An interface to mimic {@link com.linkedin.pinot.client.ResultSet}. Note that this class is used to decouple
+ * An interface to mimic {@link org.apache.pinot.client.ResultSet}. Note that this class is used to decouple
  * ThirdEye's data structure from Pinot's. During the initial migration, this class provides a similar interface for
  * backward compatibility.
  *

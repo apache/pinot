@@ -20,8 +20,8 @@
 package org.apache.pinot.thirdeye.datasource.pinot.resultset;
 
 import com.google.common.collect.ImmutableList;
-import com.linkedin.pinot.client.ResultSet;
-import com.linkedin.pinot.client.ResultSetGroup;
+import org.apache.pinot.client.ResultSet;
+import org.apache.pinot.client.ResultSetGroup;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.commons.collections.CollectionUtils;

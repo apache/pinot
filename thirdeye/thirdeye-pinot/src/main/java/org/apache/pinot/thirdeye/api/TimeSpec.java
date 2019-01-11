@@ -22,7 +22,7 @@ package org.apache.pinot.thirdeye.api;
 import java.util.concurrent.TimeUnit;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.linkedin.pinot.common.data.TimeGranularitySpec.TimeFormat;
+import org.apache.pinot.common.data.TimeGranularitySpec.TimeFormat;
 
 public class TimeSpec {
   private static final TimeGranularity DEFAULT_TIME_GRANULARITY= new TimeGranularity(1, TimeUnit.DAYS);
