@@ -124,7 +124,7 @@
   </developers>
 
   <scm>
-    <developerConnection>scm:git:git://git@github.com/linkedin/pinot.git</developerConnection>
+    <developerConnection>scm:git:git://git@github.com/apache/incubator-pinot.git</developerConnection>
   </scm>
 
   <inceptionYear>2014-2018</inceptionYear>
@@ -158,17 +158,17 @@
     <dependencies>
       <!-- project dependencies -->
       <dependency>
-        <groupId>com.linkedin.pinot</groupId>
+        <groupId>org.apache.pinot</groupId>
         <artifactId>pinot-api</artifactId>
         <version>${pinot.version}</version>
       </dependency>
       <dependency>
-        <groupId>com.linkedin.pinot</groupId>
+        <groupId>org.apache.pinot</groupId>
         <artifactId>pinot-common</artifactId>
         <version>${pinot.version}</version>
       </dependency>
       <dependency>
-        <groupId>com.linkedin.pinot</groupId>
+        <groupId>org.apache.pinot</groupId>
         <artifactId>pinot-core</artifactId>
         <version>${pinot.version}</version>
       </dependency>
