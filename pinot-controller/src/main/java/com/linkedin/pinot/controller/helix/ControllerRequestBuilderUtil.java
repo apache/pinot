@@ -18,11 +18,13 @@
  */
 package com.linkedin.pinot.controller.helix;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.config.TagNameUtils;
 import com.linkedin.pinot.common.config.Tenant;
 import com.linkedin.pinot.common.config.Tenant.TenantBuilder;
 import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.JsonUtils;
 import com.linkedin.pinot.common.utils.TenantRole;
 import java.util.HashMap;
 import java.util.Map;
@@ -33,11 +35,8 @@ import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.helix.participant.StateMachineEngine;
 import org.apache.helix.participant.statemachine.StateModelFactory;
-import org.json.JSONException;
-import org.json.JSONObject;
 
-import static com.linkedin.pinot.common.utils.CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE;
-import static com.linkedin.pinot.common.utils.CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE;
+import static com.linkedin.pinot.common.utils.CommonConstants.Helix.*;
 
 
 public class ControllerRequestBuilderUtil {
@@ -130,23 +129,23 @@ public class ControllerRequestBuilderUtil {
     helixZkManager.getClusterManagmentTool().setConfig(scope, props);
   }
 
-  public static JSONObject buildBrokerTenantCreateRequestJSON(String tenantName, int numberOfInstances)
-      throws JSONException {
+  public static String buildBrokerTenantCreateRequestJSON(String tenantName, int numberOfInstances)
+      throws JsonProcessingException {
     Tenant tenant = new TenantBuilder(tenantName).setRole(TenantRole.BROKER)
         .setTotalInstances(numberOfInstances)
         .setOfflineInstances(0)
         .setRealtimeInstances(0)
         .build();
-    return tenant.toJSON();
+    return JsonUtils.objectToString(tenant);
   }
 
-  public static JSONObject buildServerTenantCreateRequestJSON(String tenantName, int numberOfInstances,
-      int offlineInstances, int realtimeInstances) throws JSONException {
+  public static String buildServerTenantCreateRequestJSON(String tenantName, int numberOfInstances,
+      int offlineInstances, int realtimeInstances) throws JsonProcessingException {
     Tenant tenant = new TenantBuilder(tenantName).setRole(TenantRole.SERVER)
         .setTotalInstances(numberOfInstances)
         .setOfflineInstances(offlineInstances)
         .setRealtimeInstances(realtimeInstances)
         .build();
-    return tenant.toJSON();
+    return JsonUtils.objectToString(tenant);
   }
 }

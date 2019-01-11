@@ -18,10 +18,9 @@
  */
 package com.linkedin.pinot.client;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import java.util.ArrayList;
 import java.util.List;
-import org.json.JSONException;
-import org.json.JSONObject;
 
 
 /**
@@ -31,7 +30,7 @@ public class ResultSetGroup {
   private final List<ResultSet> _resultSets;
 
   ResultSetGroup(BrokerResponse brokerResponse) {
-    _resultSets = new ArrayList<ResultSet>();
+    _resultSets = new ArrayList<>();
 
     if (brokerResponse.getSelectionResults() != null) {
       _resultSets.add(new SelectionResultSet(brokerResponse.getSelectionResults()));
@@ -39,12 +38,7 @@ public class ResultSetGroup {
 
     int aggregationResultCount = brokerResponse.getAggregationResultsSize();
     for (int i = 0; i < aggregationResultCount; i++) {
-      JSONObject aggregationResult;
-      try {
-        aggregationResult = brokerResponse.getAggregationResults().getJSONObject(i);
-      } catch (JSONException e) {
-        throw new PinotClientException(e);
-      }
+      JsonNode aggregationResult = brokerResponse.getAggregationResults().get(i);
       if (aggregationResult.has("value")) {
         _resultSets.add(new AggregationResultSet(aggregationResult));
       } else if (aggregationResult.has("groupByResult")) {
@@ -74,11 +68,11 @@ public class ResultSetGroup {
   public ResultSet getResultSet(int index) {
     return _resultSets.get(index);
   }
-  
+
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
-    for(ResultSet resultSet:_resultSets){
+    for (ResultSet resultSet : _resultSets) {
       sb.append(resultSet);
       sb.append("\n");
     }

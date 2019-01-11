@@ -18,9 +18,12 @@
  */
 package com.linkedin.pinot.tools.streams;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.TimeFieldSpec;
+import com.linkedin.pinot.common.utils.JsonUtils;
 import com.linkedin.pinot.common.utils.KafkaStarterUtils;
 import com.linkedin.pinot.tools.Quickstart;
 import java.io.File;
@@ -36,8 +39,6 @@ import kafka.producer.ProducerConfig;
 import org.apache.avro.file.DataFileStream;
 import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericRecord;
-import org.json.JSONException;
-import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -87,7 +88,7 @@ public class AirlineDataStream {
     avroDataStream = null;
   }
 
-  private void publish(JSONObject message) throws JSONException, IOException {
+  private void publish(JsonNode message) throws IOException {
     if (!keepIndexing) {
       avroDataStream.close();
       avroDataStream = null;
@@ -98,7 +99,7 @@ public class AirlineDataStream {
     producer.send(data);
   }
 
-  public void run() throws IOException, JSONException {
+  public void run() {
 
     service.submit(new Runnable() {
 
@@ -111,32 +112,20 @@ public class AirlineDataStream {
             }
 
             GenericRecord record = avroDataStream.next();
-            JSONObject message = new JSONObject();
+            ObjectNode message = JsonUtils.newObjectNode();
 
             for (FieldSpec spec : pinotSchema.getDimensionFieldSpecs()) {
-              try {
-                message.put(spec.getName(), record.get(spec.getName()));
-              } catch (JSONException e) {
-                logger.error(e.getMessage());
-              }
+              message.set(spec.getName(), JsonUtils.objectToJsonNode(record.get(spec.getName())));
             }
 
             for (FieldSpec spec : pinotSchema.getDimensionFieldSpecs()) {
-              try {
-                message.put(spec.getName(), record.get(spec.getName()));
-              } catch (JSONException e) {
-                logger.error(e.getMessage());
-              }
+              message.set(spec.getName(), JsonUtils.objectToJsonNode(record.get(spec.getName())));
             }
 
             TimeFieldSpec spec = pinotSchema.getTimeFieldSpec();
-
             String timeColumn = spec.getIncomingTimeColumnName();
-            try {
-              message.put(timeColumn, currentTimeValue);
-            } catch (JSONException e) {
-              logger.error(e.getMessage());
-            }
+            message.put(timeColumn, currentTimeValue);
+
             try {
               publish(message);
               counter++;

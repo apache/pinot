@@ -18,10 +18,14 @@
  */
 package com.linkedin.pinot.common.config;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.data.StarTreeIndexSpec;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import com.linkedin.pinot.common.utils.EqualityUtils;
+import com.linkedin.pinot.common.utils.JsonUtils;
 import com.linkedin.pinot.startree.hll.HllConfig;
 import java.io.IOException;
 import java.util.Collections;
@@ -31,16 +35,12 @@ import java.util.Map;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.helix.ZNRecord;
-import org.codehaus.jackson.map.ObjectMapper;
-import org.json.JSONException;
-import org.json.JSONObject;
 
 
+@SuppressWarnings("unused")
 @ConfigDoc(value = "Configuration for a table", mandatory = true)
 @ConfigKey("table")
 public class TableConfig {
-  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-
   private static final String TABLE_NAME_KEY = "tableName";
   private static final String TABLE_TYPE_KEY = "tableType";
   private static final String VALIDATION_CONFIG_KEY = "segmentsConfig";
@@ -106,95 +106,106 @@ public class TableConfig {
   @Deprecated
   @Nonnull
   public static TableConfig init(@Nonnull String jsonConfigString)
-      throws IOException, JSONException {
-    return fromJSONConfig(new JSONObject(jsonConfigString));
+      throws IOException {
+    return fromJsonString(jsonConfigString);
+  }
+
+  public static TableConfig fromJsonString(String jsonString) throws IOException {
+    return fromJSONConfig(JsonUtils.stringToJsonNode(jsonString));
   }
 
   @Nonnull
-  public static TableConfig fromJSONConfig(@Nonnull JSONObject jsonConfig)
-      throws IOException, JSONException {
-    TableType tableType = TableType.valueOf(jsonConfig.getString(TABLE_TYPE_KEY).toUpperCase());
-    String tableName = TableNameBuilder.forType(tableType).tableNameWithType(jsonConfig.getString(TABLE_NAME_KEY));
+  public static TableConfig fromJSONConfig(@Nonnull JsonNode jsonConfig) throws IOException {
+    TableType tableType = TableType.valueOf(jsonConfig.get(TABLE_TYPE_KEY).asText().toUpperCase());
+    String tableName = TableNameBuilder.forType(tableType).tableNameWithType(jsonConfig.get(TABLE_NAME_KEY).asText());
+
     SegmentsValidationAndRetentionConfig validationConfig =
-        OBJECT_MAPPER.readValue(jsonConfig.getJSONObject(VALIDATION_CONFIG_KEY).toString(),
-            SegmentsValidationAndRetentionConfig.class);
-    TenantConfig tenantConfig =
-        OBJECT_MAPPER.readValue(jsonConfig.getJSONObject(TENANT_CONFIG_KEY).toString(), TenantConfig.class);
-    IndexingConfig indexingConfig =
-        OBJECT_MAPPER.readValue(jsonConfig.getJSONObject(INDEXING_CONFIG_KEY).toString(), IndexingConfig.class);
-    TableCustomConfig customConfig =
-        OBJECT_MAPPER.readValue(jsonConfig.getJSONObject(CUSTOM_CONFIG_KEY).toString(), TableCustomConfig.class);
+        extractChildConfig(jsonConfig, VALIDATION_CONFIG_KEY, SegmentsValidationAndRetentionConfig.class);
+    TenantConfig tenantConfig = extractChildConfig(jsonConfig, TENANT_CONFIG_KEY, TenantConfig.class);
+    IndexingConfig indexingConfig = extractChildConfig(jsonConfig, INDEXING_CONFIG_KEY, IndexingConfig.class);
+    TableCustomConfig customConfig = extractChildConfig(jsonConfig, CUSTOM_CONFIG_KEY, TableCustomConfig.class);
     QuotaConfig quotaConfig = null;
     if (jsonConfig.has(QUOTA_CONFIG_KEY)) {
-      quotaConfig = OBJECT_MAPPER.readValue(jsonConfig.getJSONObject(QUOTA_CONFIG_KEY).toString(), QuotaConfig.class);
+      quotaConfig = extractChildConfig(jsonConfig, QUOTA_CONFIG_KEY, QuotaConfig.class);
       quotaConfig.validate();
     }
     TableTaskConfig taskConfig = null;
     if (jsonConfig.has(TASK_CONFIG_KEY)) {
-      taskConfig = OBJECT_MAPPER.readValue(jsonConfig.getJSONObject(TASK_CONFIG_KEY).toString(), TableTaskConfig.class);
+      taskConfig = extractChildConfig(jsonConfig, TASK_CONFIG_KEY, TableTaskConfig.class);
     }
     RoutingConfig routingConfig = null;
     if (jsonConfig.has(ROUTING_CONFIG_KEY)) {
-      routingConfig =
-          OBJECT_MAPPER.readValue(jsonConfig.getJSONObject(ROUTING_CONFIG_KEY).toString(), RoutingConfig.class);
+      routingConfig = extractChildConfig(jsonConfig, ROUTING_CONFIG_KEY, RoutingConfig.class);
     }
 
     return new TableConfig(tableName, tableType, validationConfig, tenantConfig, indexingConfig, customConfig,
         quotaConfig, taskConfig, routingConfig);
   }
 
+  /**
+   * Extracts the child config from the table config.
+   * <p>
+   * NOTE: for historical reason, we support two kinds of nested config values: normal json and serialized json string
+   */
+  private static <T> T extractChildConfig(JsonNode jsonConfig, String childConfigKey, Class<T> childConfigClass)
+      throws IOException {
+    JsonNode childConfigNode = jsonConfig.get(childConfigKey);
+    if (childConfigNode.isObject()) {
+      return JsonUtils.jsonNodeToObject(childConfigNode, childConfigClass);
+    } else {
+      return JsonUtils.stringToObject(childConfigNode.asText(), childConfigClass);
+    }
+  }
+
   @Nonnull
-  public static JSONObject toJSONConfig(@Nonnull TableConfig tableConfig)
-      throws IOException, JSONException {
-    JSONObject jsonConfig = new JSONObject();
+  public static JsonNode toJSONConfig(@Nonnull TableConfig tableConfig) throws JsonProcessingException {
+    ObjectNode jsonConfig = JsonUtils.newObjectNode();
     jsonConfig.put(TABLE_NAME_KEY, tableConfig._tableName);
     jsonConfig.put(TABLE_TYPE_KEY, tableConfig._tableType.toString());
-    jsonConfig.put(VALIDATION_CONFIG_KEY,
-        new JSONObject(OBJECT_MAPPER.writeValueAsString(tableConfig._validationConfig)));
-    jsonConfig.put(TENANT_CONFIG_KEY, new JSONObject(OBJECT_MAPPER.writeValueAsString(tableConfig._tenantConfig)));
-    jsonConfig.put(INDEXING_CONFIG_KEY, new JSONObject(OBJECT_MAPPER.writeValueAsString(tableConfig._indexingConfig)));
-    jsonConfig.put(CUSTOM_CONFIG_KEY, new JSONObject(OBJECT_MAPPER.writeValueAsString(tableConfig._customConfig)));
+    jsonConfig.put(VALIDATION_CONFIG_KEY, JsonUtils.objectToString(tableConfig._validationConfig));
+    jsonConfig.put(TENANT_CONFIG_KEY, JsonUtils.objectToString(tableConfig._tenantConfig));
+    jsonConfig.put(INDEXING_CONFIG_KEY, JsonUtils.objectToString(tableConfig._indexingConfig));
+    jsonConfig.put(CUSTOM_CONFIG_KEY, JsonUtils.objectToString(tableConfig._customConfig));
     if (tableConfig._quotaConfig != null) {
-      jsonConfig.put(QUOTA_CONFIG_KEY, new JSONObject(OBJECT_MAPPER.writeValueAsString(tableConfig._quotaConfig)));
+      jsonConfig.put(QUOTA_CONFIG_KEY, JsonUtils.objectToString(tableConfig._quotaConfig));
     }
     if (tableConfig._taskConfig != null) {
-      jsonConfig.put(TASK_CONFIG_KEY, new JSONObject(OBJECT_MAPPER.writeValueAsString(tableConfig._taskConfig)));
+      jsonConfig.put(TASK_CONFIG_KEY, JsonUtils.objectToString(tableConfig._taskConfig));
     }
     if (tableConfig._routingConfig != null) {
-      jsonConfig.put(ROUTING_CONFIG_KEY, new JSONObject(OBJECT_MAPPER.writeValueAsString(tableConfig._routingConfig)));
+      jsonConfig.put(ROUTING_CONFIG_KEY, JsonUtils.objectToString(tableConfig._routingConfig));
     }
     return jsonConfig;
   }
 
   @Nonnull
-  public static TableConfig fromZnRecord(@Nonnull ZNRecord znRecord)
-      throws IOException, JSONException {
+  public static TableConfig fromZnRecord(@Nonnull ZNRecord znRecord) throws IOException {
     Map<String, String> simpleFields = znRecord.getSimpleFields();
     TableType tableType = TableType.valueOf(simpleFields.get(TABLE_TYPE_KEY).toUpperCase());
     String tableName = TableNameBuilder.forType(tableType).tableNameWithType(simpleFields.get(TABLE_NAME_KEY));
     SegmentsValidationAndRetentionConfig validationConfig =
-        OBJECT_MAPPER.readValue(simpleFields.get(VALIDATION_CONFIG_KEY), SegmentsValidationAndRetentionConfig.class);
-    TenantConfig tenantConfig = OBJECT_MAPPER.readValue(simpleFields.get(TENANT_CONFIG_KEY), TenantConfig.class);
+        JsonUtils.stringToObject(simpleFields.get(VALIDATION_CONFIG_KEY), SegmentsValidationAndRetentionConfig.class);
+    TenantConfig tenantConfig = JsonUtils.stringToObject(simpleFields.get(TENANT_CONFIG_KEY), TenantConfig.class);
     IndexingConfig indexingConfig =
-        OBJECT_MAPPER.readValue(simpleFields.get(INDEXING_CONFIG_KEY), IndexingConfig.class);
+        JsonUtils.stringToObject(simpleFields.get(INDEXING_CONFIG_KEY), IndexingConfig.class);
     TableCustomConfig customConfig =
-        OBJECT_MAPPER.readValue(simpleFields.get(CUSTOM_CONFIG_KEY), TableCustomConfig.class);
+        JsonUtils.stringToObject(simpleFields.get(CUSTOM_CONFIG_KEY), TableCustomConfig.class);
     QuotaConfig quotaConfig = null;
     String quotaConfigString = simpleFields.get(QUOTA_CONFIG_KEY);
     if (quotaConfigString != null) {
-      quotaConfig = OBJECT_MAPPER.readValue(quotaConfigString, QuotaConfig.class);
+      quotaConfig = JsonUtils.stringToObject(quotaConfigString, QuotaConfig.class);
       quotaConfig.validate();
     }
     TableTaskConfig taskConfig = null;
     String taskConfigString = simpleFields.get(TASK_CONFIG_KEY);
     if (taskConfigString != null) {
-      taskConfig = OBJECT_MAPPER.readValue(taskConfigString, TableTaskConfig.class);
+      taskConfig = JsonUtils.stringToObject(taskConfigString, TableTaskConfig.class);
     }
     String routingConfigString = simpleFields.get(ROUTING_CONFIG_KEY);
 
     RoutingConfig routingConfig = null;
     if (routingConfigString != null) {
-      routingConfig = OBJECT_MAPPER.readValue(routingConfigString, RoutingConfig.class);
+      routingConfig = JsonUtils.stringToObject(routingConfigString, RoutingConfig.class);
     }
 
     return new TableConfig(tableName, tableType, validationConfig, tenantConfig, indexingConfig, customConfig,
@@ -208,18 +219,18 @@ public class TableConfig {
     simpleFields.put(TABLE_NAME_KEY, tableConfig._tableName);
     simpleFields.put(TABLE_TYPE_KEY, tableConfig._tableType.toString());
     try {
-      simpleFields.put(VALIDATION_CONFIG_KEY, OBJECT_MAPPER.writeValueAsString(tableConfig._validationConfig));
-      simpleFields.put(TENANT_CONFIG_KEY, OBJECT_MAPPER.writeValueAsString(tableConfig._tenantConfig));
-      simpleFields.put(INDEXING_CONFIG_KEY, OBJECT_MAPPER.writeValueAsString(tableConfig._indexingConfig));
-      simpleFields.put(CUSTOM_CONFIG_KEY, OBJECT_MAPPER.writeValueAsString(tableConfig._customConfig));
+      simpleFields.put(VALIDATION_CONFIG_KEY, JsonUtils.objectToString(tableConfig._validationConfig));
+      simpleFields.put(TENANT_CONFIG_KEY, JsonUtils.objectToString(tableConfig._tenantConfig));
+      simpleFields.put(INDEXING_CONFIG_KEY, JsonUtils.objectToString(tableConfig._indexingConfig));
+      simpleFields.put(CUSTOM_CONFIG_KEY, JsonUtils.objectToString(tableConfig._customConfig));
       if (tableConfig._quotaConfig != null) {
-        simpleFields.put(QUOTA_CONFIG_KEY, OBJECT_MAPPER.writeValueAsString(tableConfig._quotaConfig));
+        simpleFields.put(QUOTA_CONFIG_KEY, JsonUtils.objectToString(tableConfig._quotaConfig));
       }
       if (tableConfig._taskConfig != null) {
-        simpleFields.put(TASK_CONFIG_KEY, OBJECT_MAPPER.writeValueAsString(tableConfig._taskConfig));
+        simpleFields.put(TASK_CONFIG_KEY, JsonUtils.objectToString(tableConfig._taskConfig));
       }
       if (tableConfig._routingConfig != null) {
-        simpleFields.put(ROUTING_CONFIG_KEY, OBJECT_MAPPER.writeValueAsString(tableConfig._routingConfig));
+        simpleFields.put(ROUTING_CONFIG_KEY, JsonUtils.objectToString(tableConfig._routingConfig));
       }
     } catch (IOException e) {
       throw new RuntimeException(e);
@@ -309,43 +320,38 @@ public class TableConfig {
   }
 
   @Nonnull
-  public String toJSONConfigString()
-      throws IOException, JSONException {
+  public String toJSONConfigString() throws IOException {
     return toJSONConfig(this).toString();
   }
 
   @Override
   public String toString() {
     try {
-      return toJSONConfig(this).toString(2);
-    } catch (Exception e) {
-      return e.toString();
+      return JsonUtils.objectToPrettyString(toJSONConfig(this));
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException(e);
     }
   }
 
   @Override
-  public boolean equals(Object o) {
-    if (EqualityUtils.isSameReference(this, o)) {
+  public boolean equals(Object obj) {
+    if (this == obj) {
       return true;
     }
-
-    if (EqualityUtils.isNullOrNotSameClass(this, o)) {
-      return false;
+    if (obj instanceof TableConfig) {
+      TableConfig that = (TableConfig) obj;
+      return EqualityUtils.isEqual(_tableName, that._tableName)
+          && EqualityUtils.isEqual(_tableType, that._tableType)
+          && EqualityUtils.isEqual(_validationConfig, that._validationConfig)
+          && EqualityUtils.isEqual(_tenantConfig, that._tenantConfig)
+          && EqualityUtils.isEqual(_indexingConfig, that._indexingConfig)
+          && EqualityUtils.isEqual(_customConfig, that._customConfig)
+          && EqualityUtils.isEqual(_quotaConfig, that._quotaConfig)
+          && EqualityUtils.isEqual(_taskConfig, that._taskConfig)
+          && EqualityUtils.isEqual(_routingConfig, that._routingConfig);
     }
-
-    TableConfig that = (TableConfig) o;
-
-    return EqualityUtils.isEqual(_tableName, that._tableName) &&
-        EqualityUtils.isEqual(_tableType, that._tableType) &&
-        EqualityUtils.isEqual(_validationConfig, that._validationConfig) &&
-        EqualityUtils.isEqual(_tenantConfig, that._tenantConfig) &&
-        EqualityUtils.isEqual(_indexingConfig, that._indexingConfig) &&
-        EqualityUtils.isEqual(_customConfig, that._customConfig) &&
-        EqualityUtils.isEqual(_quotaConfig, that._quotaConfig) &&
-        EqualityUtils.isEqual(_taskConfig, that._taskConfig) &&
-        EqualityUtils.isEqual(_routingConfig, that._routingConfig);
+    return false;
   }
-
 
   @Override
   public int hashCode() {
@@ -558,8 +564,7 @@ public class TableConfig {
       return this;
     }
 
-    public TableConfig build()
-        throws IOException, JSONException {
+    public TableConfig build() {
       // Validation config
       SegmentsValidationAndRetentionConfig validationConfig = new SegmentsValidationAndRetentionConfig();
       validationConfig.setTimeColumnName(_timeColumnName);
@@ -600,7 +605,7 @@ public class TableConfig {
 
       if (_customConfig == null) {
         _customConfig = new TableCustomConfig();
-        _customConfig.setCustomConfigs(new HashMap<String, String>());
+        _customConfig.setCustomConfigs(new HashMap<>());
       }
 
       if (_routingConfig == null) {

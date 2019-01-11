@@ -18,13 +18,15 @@
  */
 package com.linkedin.pinot.integration.tests;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Function;
-import com.linkedin.pinot.common.config.CombinedConfig;
-import com.linkedin.pinot.common.config.Serializer;
 import com.linkedin.pinot.client.ResultSet;
 import com.linkedin.pinot.client.ResultSetGroup;
+import com.linkedin.pinot.common.config.CombinedConfig;
+import com.linkedin.pinot.common.config.Serializer;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.JsonUtils;
 import com.linkedin.pinot.util.TestUtils;
 import java.io.BufferedReader;
 import java.io.File;
@@ -39,10 +41,7 @@ import java.util.Random;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.helix.model.InstanceConfig;
-import org.json.JSONArray;
-import org.json.JSONObject;
 import org.testng.Assert;
-import org.testng.annotations.Test;
 
 
 /**
@@ -142,7 +141,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
   }
   /**
    * Test to ensure that broker response contains expected stats
-   * 
+   *
    * @throws Exception
    */
   public void testBrokerResponseMetadata() throws Exception {
@@ -155,7 +154,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
         "numSegmentsMatched", "numDocsScanned", "totalDocs", "timeUsedMs", "numEntriesScannedInFilter", "numEntriesScannedPostFilter" };
 
     for (String query : pqlQueries) {
-      JSONObject response = postQuery(query);
+      JsonNode response = postQuery(query);
       for (String statName : statNames) {
         Assert.assertTrue(response.has(statName));
       }
@@ -201,13 +200,13 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
           return;
         }
 
-        JSONObject query = new JSONObject(queryString);
-        String pqlQuery = query.getString("pql");
-        JSONArray hsqls = query.getJSONArray("hsqls");
+        JsonNode query = JsonUtils.stringToJsonNode(queryString);
+        String pqlQuery = query.get("pql").asText();
+        JsonNode hsqls = query.get("hsqls");
         List<String> sqlQueries = new ArrayList<>();
-        int length = hsqls.length();
+        int length = hsqls.size();
         for (int i = 0; i < length; i++) {
-          sqlQueries.add(hsqls.getString(i));
+          sqlQueries.add(hsqls.get(i).asText());
         }
         testQuery(pqlQuery, sqlQueries);
       }
@@ -255,8 +254,8 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
   }
 
   private void testQueryException(String query) throws Exception {
-    JSONObject jsonObject = postQuery(query);
-    Assert.assertTrue(jsonObject.getJSONArray("exceptions").length() > 0);
+    JsonNode jsonObject = postQuery(query);
+    Assert.assertTrue(jsonObject.get("exceptions").size() > 0);
   }
 
   /**
@@ -327,17 +326,17 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
       @Override
       public Boolean apply(@Nullable Void aVoid) {
         try {
-          JSONArray routingTableSnapshot =
-              getDebugInfo("debug/routingTable/" + getTableName()).getJSONArray("routingTableSnapshot");
-          int numTables = routingTableSnapshot.length();
+          JsonNode routingTableSnapshot =
+              getDebugInfo("debug/routingTable/" + getTableName()).get("routingTableSnapshot");
+          int numTables = routingTableSnapshot.size();
           for (int i = 0; i < numTables; i++) {
-            JSONObject tableRouting = routingTableSnapshot.getJSONObject(i);
-            String tableNameWithType = tableRouting.getString("tableName");
+            JsonNode tableRouting = routingTableSnapshot.get(i);
+            String tableNameWithType = tableRouting.get("tableName").asText();
             if (TableNameBuilder.extractRawTableName(tableNameWithType).equals(getTableName())) {
-              JSONArray routingTableEntries = tableRouting.getJSONArray("routingTableEntries");
-              int numRoutingTableEntries = routingTableEntries.length();
+              JsonNode routingTableEntries = tableRouting.get("routingTableEntries");
+              int numRoutingTableEntries = routingTableEntries.size();
               for (int j = 0; j < numRoutingTableEntries; j++) {
-                JSONObject routingTableEntry = routingTableEntries.getJSONObject(j);
+                JsonNode routingTableEntry = routingTableEntries.get(j);
                 if (routingTableEntry.has(instanceName)) {
                   return shouldExist;
                 }
@@ -364,18 +363,18 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
       @Override
       public Boolean apply(@Nullable Void aVoid) {
         try {
-          JSONArray routingTableSnapshot =
-              getDebugInfo("debug/routingTable/" + getTableName()).getJSONArray("routingTableSnapshot");
-          int numTables = routingTableSnapshot.length();
+          JsonNode routingTableSnapshot =
+              getDebugInfo("debug/routingTable/" + getTableName()).get("routingTableSnapshot");
+          int numTables = routingTableSnapshot.size();
           for (int i = 0; i < numTables; i++) {
-            JSONObject tableRouting = routingTableSnapshot.getJSONObject(i);
-            String tableNameWithType = tableRouting.getString("tableName");
+            JsonNode tableRouting = routingTableSnapshot.get(i);
+            String tableNameWithType = tableRouting.get("tableName").asText();
             if (TableNameBuilder.extractRawTableName(tableNameWithType).equals(getTableName())) {
-              JSONArray routingTableEntries = tableRouting.getJSONArray("routingTableEntries");
-              int numRoutingTableEntries = routingTableEntries.length();
+              JsonNode routingTableEntries = tableRouting.get("routingTableEntries");
+              int numRoutingTableEntries = routingTableEntries.size();
               for (int j = 0; j < numRoutingTableEntries; j++) {
-                JSONObject routingTableEntry = routingTableEntries.getJSONObject(j);
-                if (routingTableEntry.length() == 0) {
+                JsonNode routingTableEntry = routingTableEntries.get(j);
+                if (routingTableEntry.size() == 0) {
                   if (!shouldBeEmpty) {
                     return false;
                   }

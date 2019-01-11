@@ -18,6 +18,7 @@
  */
 package com.linkedin.pinot.broker.requesthandler;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Splitter;
 import com.linkedin.pinot.broker.api.RequestStatistics;
 import com.linkedin.pinot.broker.api.RequesterIdentity;
@@ -51,7 +52,6 @@ import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.lang3.StringUtils;
-import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -109,13 +109,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   }
 
   @Override
-  public BrokerResponse handleRequest(JSONObject request, @Nullable RequesterIdentity requesterIdentity)
-      throws Exception {
-    return handleRequest(request, requesterIdentity, new RequestStatistics());
-  }
-
-  @Override
-  public BrokerResponse handleRequest(JSONObject request, @Nullable RequesterIdentity requesterIdentity,
+  public BrokerResponse handleRequest(JsonNode request, @Nullable RequesterIdentity requesterIdentity,
       RequestStatistics requestStatistics)
       throws Exception {
     long requestId = _requestIdGenerator.incrementAndGet();
@@ -123,7 +117,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     requestStatistics.setRequestId(requestId);
     requestStatistics.setRequestArrivalTimeMillis(System.currentTimeMillis());
 
-    String query = request.getString(PQL);
+    String query = request.get(PQL).asText();
     LOGGER.debug("Query string for request {}: {}", requestId, query);
     requestStatistics.setPql(query);
 
@@ -211,7 +205,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     }
 
     // Set extra settings into broker request
-    if (request.has(TRACE) && request.getBoolean(TRACE)) {
+    if (request.has(TRACE) && request.get(TRACE).asBoolean()) {
       LOGGER.debug("Enable trace for request {}: {}", requestId, query);
       brokerRequest.setEnableTrace(true);
     }
@@ -220,7 +214,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
           .omitEmptyStrings()
           .trimResults()
           .withKeyValueSeparator('=')
-          .split(request.getString(DEBUG_OPTIONS));
+          .split(request.get(DEBUG_OPTIONS).asText());
       LOGGER.debug("Debug options are set to: {} for request {}: {}", debugOptions, requestId, query);
       brokerRequest.setDebugOptions(debugOptions);
     }

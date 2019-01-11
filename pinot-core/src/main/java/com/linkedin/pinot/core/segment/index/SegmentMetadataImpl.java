@@ -18,12 +18,17 @@
  */
 package com.linkedin.pinot.core.segment.index;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.segment.StarTreeMetadata;
+import com.linkedin.pinot.common.utils.JsonUtils;
 import com.linkedin.pinot.common.utils.time.TimeUtils;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
@@ -52,12 +57,8 @@ import javax.annotation.Nullable;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.lang.StringEscapeUtils;
-import org.codehaus.jackson.map.ObjectMapper;
 import org.joda.time.Duration;
 import org.joda.time.Interval;
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -596,62 +597,53 @@ public class SegmentMetadataImpl implements SegmentMetadata {
    *                     the parameter value is null
    * @return json representation of segment metadata
    */
-  public JSONObject toJson(@Nullable Set<String> columnFilter) throws JSONException {
-    JSONObject rootMeta = new JSONObject();
-    try {
-      rootMeta.put("segmentName", _segmentName);
-      rootMeta.put("schemaName", _schema != null ? _schema.getSchemaName() : JSONObject.NULL);
-      rootMeta.put("crc", _crc);
-      rootMeta.put("creationTimeMillis", _creationTime);
-      TimeZone timeZone = TimeZone.getTimeZone("UTC");
-      DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss:SSS' UTC'");
-      dateFormat.setTimeZone(timeZone);
-      String creationTimeStr = _creationTime != Long.MIN_VALUE ? dateFormat.format(new Date(_creationTime)) : "";
-      rootMeta.put("creationTimeReadable", creationTimeStr);
-      rootMeta.put("timeGranularitySec", _timeGranularity != null ? _timeGranularity.getStandardSeconds() : null);
-      if (_timeInterval == null) {
-        rootMeta.put("startTimeMillis", (String) null);
-        rootMeta.put("startTimeReadable", "null");
-        rootMeta.put("endTimeMillis", (String) null);
-        rootMeta.put("endTimeReadable", "null");
-      } else {
-        rootMeta.put("startTimeMillis", _timeInterval.getStartMillis());
-        rootMeta.put("startTimeReadable", _timeInterval.getStart().toString());
-        rootMeta.put("endTimeMillis", _timeInterval.getEndMillis());
-        rootMeta.put("endTimeReadable", _timeInterval.getEnd().toString());
-      }
-
-      rootMeta.put("pushTimeMillis", _pushTime);
-      String pushTimeStr = _pushTime != Long.MIN_VALUE ? dateFormat.format(new Date(_pushTime)) : "";
-      rootMeta.put("pushTimeReadable", pushTimeStr);
-
-      rootMeta.put("refreshTimeMillis", _refreshTime);
-      String refreshTimeStr = _refreshTime != Long.MIN_VALUE ? dateFormat.format(new Date(_refreshTime)) : "";
-      rootMeta.put("refreshTimeReadable", refreshTimeStr);
-
-      rootMeta.put("segmentVersion", _segmentVersion.toString());
-      rootMeta.put("hasStarTree", hasStarTree());
-      rootMeta.put("creatorName", _creatorName == null ? JSONObject.NULL : _creatorName);
-      rootMeta.put("paddingCharacter", String.valueOf(_paddingCharacter));
-      rootMeta.put("hllLog2m", _hllLog2m);
-
-      JSONArray columnsJson = new JSONArray();
-      ObjectMapper mapper = new ObjectMapper();
-
-      for (String column : _allColumns) {
-        if (columnFilter != null && !columnFilter.contains(column)) {
-          continue;
-        }
-        ColumnMetadata columnMetadata = _columnMetadataMap.get(column);
-        JSONObject columnJson = new JSONObject(mapper.writeValueAsString(columnMetadata));
-        columnsJson.put(columnJson);
-      }
-
-      rootMeta.put("columns", columnsJson);
-      return rootMeta;
-    } catch (Exception e) {
-      LOGGER.error("Failed to convert field to json for segment: {}", _segmentName, e);
-      throw new RuntimeException("Failed to convert segment metadata to json", e);
+  public JsonNode toJson(@Nullable Set<String> columnFilter) throws JsonProcessingException {
+    ObjectNode segmentMetadata = JsonUtils.newObjectNode();
+    segmentMetadata.put("segmentName", _segmentName);
+    segmentMetadata.put("schemaName", _schema != null ? _schema.getSchemaName() : null);
+    segmentMetadata.put("crc", _crc);
+    segmentMetadata.put("creationTimeMillis", _creationTime);
+    TimeZone timeZone = TimeZone.getTimeZone("UTC");
+    DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss:SSS' UTC'");
+    dateFormat.setTimeZone(timeZone);
+    String creationTimeStr = _creationTime != Long.MIN_VALUE ? dateFormat.format(new Date(_creationTime)) : null;
+    segmentMetadata.put("creationTimeReadable", creationTimeStr);
+    segmentMetadata.put("timeGranularitySec", _timeGranularity != null ? _timeGranularity.getStandardSeconds() : null);
+    if (_timeInterval == null) {
+      segmentMetadata.set("startTimeMillis", null);
+      segmentMetadata.set("startTimeReadable", null);
+      segmentMetadata.set("endTimeMillis", null);
+      segmentMetadata.set("endTimeReadable", null);
+    } else {
+      segmentMetadata.put("startTimeMillis", _timeInterval.getStartMillis());
+      segmentMetadata.put("startTimeReadable", _timeInterval.getStart().toString());
+      segmentMetadata.put("endTimeMillis", _timeInterval.getEndMillis());
+      segmentMetadata.put("endTimeReadable", _timeInterval.getEnd().toString());
     }
+
+    segmentMetadata.put("pushTimeMillis", _pushTime);
+    String pushTimeStr = _pushTime != Long.MIN_VALUE ? dateFormat.format(new Date(_pushTime)) : null;
+    segmentMetadata.put("pushTimeReadable", pushTimeStr);
+
+    segmentMetadata.put("refreshTimeMillis", _refreshTime);
+    String refreshTimeStr = _refreshTime != Long.MIN_VALUE ? dateFormat.format(new Date(_refreshTime)) : null;
+    segmentMetadata.put("refreshTimeReadable", refreshTimeStr);
+
+    segmentMetadata.put("segmentVersion", _segmentVersion.toString());
+    segmentMetadata.put("hasStarTree", hasStarTree());
+    segmentMetadata.put("creatorName", _creatorName);
+    segmentMetadata.put("paddingCharacter", String.valueOf(_paddingCharacter));
+    segmentMetadata.put("hllLog2m", _hllLog2m);
+
+    ArrayNode columnsMetadata = JsonUtils.newArrayNode();
+    for (String column : _allColumns) {
+      if (columnFilter != null && !columnFilter.contains(column)) {
+        continue;
+      }
+      columnsMetadata.add(JsonUtils.objectToJsonNode(_columnMetadataMap.get(column)));
+    }
+    segmentMetadata.set("columns", columnsMetadata);
+
+    return segmentMetadata;
   }
 }

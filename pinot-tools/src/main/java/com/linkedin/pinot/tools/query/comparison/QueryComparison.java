@@ -18,6 +18,8 @@
  */
 package com.linkedin.pinot.tools.query.comparison;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.linkedin.pinot.common.utils.JsonUtils;
 import com.linkedin.pinot.tools.scan.query.GroupByOperator;
 import com.linkedin.pinot.tools.scan.query.QueryResponse;
 import com.linkedin.pinot.tools.scan.query.ScanBasedQueryProcessor;
@@ -29,10 +31,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.codehaus.jackson.map.ObjectMapper;
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -130,23 +128,23 @@ public class QueryComparison {
           continue;
         }
 
-        JSONObject expectedJson = null;
+        JsonNode expectedJson = null;
         try {
           if (resultReader != null) {
-            expectedJson = new JSONObject(resultReader.readLine());
+            expectedJson = JsonUtils.stringToJsonNode(resultReader.readLine());
           } else {
             QueryResponse expectedResponse = scanBasedQueryProcessor.processQuery(query);
-            expectedJson = new JSONObject(new ObjectMapper().writeValueAsString(expectedResponse));
+            expectedJson = JsonUtils.objectToJsonNode(expectedResponse);
           }
         } catch (Exception e) {
           LOGGER.error("Comparison FAILED: Id: {} Exception caught while getting expected response for query: '{}'",
               total, query, e);
         }
 
-        JSONObject actualJson = null;
+        JsonNode actualJson = null;
         if (expectedJson != null) {
           try {
-            actualJson = new JSONObject(_clusterStarter.query(query));
+            actualJson = JsonUtils.stringToJsonNode(_clusterStarter.query(query));
           } catch (Exception e) {
             LOGGER.error("Comparison FAILED: Id: {} Exception caught while running query: '{}'", total, query, e);
           }
@@ -218,14 +216,13 @@ public class QueryComparison {
     FAILED
   }
 
-  public static ComparisonStatus compareWithEmpty(JSONObject actualJson, JSONObject expectedJson)
-      throws JSONException {
-    if (actualJson.getJSONArray(EXCEPTIONS).length() != 0) {
+  public static ComparisonStatus compareWithEmpty(JsonNode actualJson, JsonNode expectedJson) {
+    if (actualJson.get(EXCEPTIONS).size() != 0) {
       return ComparisonStatus.FAILED;
     }
 
     // If no records found, nothing to compare.
-    if ((actualJson.getInt(NUM_DOCS_SCANNED) == 0) && expectedJson.getInt(NUM_DOCS_SCANNED) == 0) {
+    if ((actualJson.get(NUM_DOCS_SCANNED).asLong() == 0) && expectedJson.get(NUM_DOCS_SCANNED).asLong() == 0) {
       LOGGER.info("Empty results, nothing to compare.");
       return ComparisonStatus.EMPTY;
     }
@@ -241,8 +238,7 @@ public class QueryComparison {
     return ComparisonStatus.PASSED;
   }
 
-  public static boolean compare(JSONObject actualJson, JSONObject expectedJson)
-      throws JSONException {
+  public static boolean compare(JsonNode actualJson, JsonNode expectedJson) {
     ComparisonStatus comparisonStatus = compareWithEmpty(actualJson, expectedJson);
     return !comparisonStatus.equals(ComparisonStatus.FAILED);
   }
@@ -255,8 +251,7 @@ public class QueryComparison {
    * @param compareNumDocs
    * @return
    */
-  public static boolean compare(JSONObject actualJson, JSONObject expectedJson, boolean compareNumDocs)
-      throws JSONException {
+  public static boolean compare(JsonNode actualJson, JsonNode expectedJson, boolean compareNumDocs) {
     _compareNumDocs = compareNumDocs;
     return compare(actualJson, expectedJson);
   }
@@ -265,13 +260,12 @@ public class QueryComparison {
     _compareNumDocs = compareNumDocs;
   }
 
-  public static boolean compareAggregation(JSONObject actualJson, JSONObject expectedJson)
-      throws JSONException {
+  public static boolean compareAggregation(JsonNode actualJson, JsonNode expectedJson) {
     if (!actualJson.has(AGGREGATION_RESULTS) && !expectedJson.has(AGGREGATION_RESULTS)) {
       return true;
     }
-    JSONArray actualAggregation = actualJson.getJSONArray(AGGREGATION_RESULTS);
-    if (actualAggregation.length() == 0) {
+    JsonNode actualAggregation = actualJson.get(AGGREGATION_RESULTS);
+    if (actualAggregation.size() == 0) {
       return !expectedJson.has(AGGREGATION_RESULTS);
     }
 
@@ -279,27 +273,26 @@ public class QueryComparison {
       return false;
     }
 
-    if (actualAggregation.getJSONObject(0).has(GROUP_BY_RESULT)) {
+    if (actualAggregation.get(0).has(GROUP_BY_RESULT)) {
       return compareAggregationGroupBy(actualJson, expectedJson);
     }
 
-    JSONArray expectedAggregation = expectedJson.getJSONArray(AGGREGATION_RESULTS);
+    JsonNode expectedAggregation = expectedJson.get(AGGREGATION_RESULTS);
     return compareAggregationArrays(actualAggregation, expectedAggregation);
   }
 
-  private static boolean compareAggregationArrays(JSONArray actualAggregation, JSONArray expectedAggregation)
-      throws JSONException {
+  private static boolean compareAggregationArrays(JsonNode actualAggregation, JsonNode expectedAggregation) {
     Map<String, Double> map = new HashMap<>();
 
-    for (int i = 0; i < expectedAggregation.length(); ++i) {
-      JSONObject object = expectedAggregation.getJSONObject(i);
-      map.put(object.getString(FUNCTION).toLowerCase(), Double.valueOf(object.getString(VALUE)));
+    for (int i = 0; i < expectedAggregation.size(); ++i) {
+      JsonNode object = expectedAggregation.get(i);
+      map.put(object.get(FUNCTION).asText().toLowerCase(), object.get(VALUE).asDouble());
     }
 
-    for (int i = 0; i < actualAggregation.length(); ++i) {
-      JSONObject object = actualAggregation.getJSONObject(i);
-      String function = object.getString(FUNCTION).toLowerCase();
-      String valueString = object.getString(VALUE);
+    for (int i = 0; i < actualAggregation.size(); ++i) {
+      JsonNode object = actualAggregation.get(i);
+      String function = object.get(FUNCTION).asText().toLowerCase();
+      String valueString = object.get(VALUE).asText();
 
       if (!isNumeric(valueString)) {
         LOGGER.warn("Found non-numeric value for aggregation ignoring Function: {} Value: {}", function, valueString);
@@ -323,32 +316,31 @@ public class QueryComparison {
     return true;
   }
 
-  private static boolean compareAggregationGroupBy(JSONObject actualJson, JSONObject expectedJson)
-      throws JSONException {
-    JSONArray actualGroupByResults = actualJson.getJSONArray(AGGREGATION_RESULTS);
-    JSONArray expectedGroupByResults = expectedJson.getJSONArray(AGGREGATION_RESULTS);
+  private static boolean compareAggregationGroupBy(JsonNode actualJson, JsonNode expectedJson) {
+    JsonNode actualGroupByResults = actualJson.get(AGGREGATION_RESULTS);
+    JsonNode expectedGroupByResults = expectedJson.get(AGGREGATION_RESULTS);
 
-    int numActualGroupBy = actualGroupByResults.length();
-    int numExpectedGroupBy = expectedGroupByResults.length();
+    int numActualGroupBy = actualGroupByResults.size();
+    int numExpectedGroupBy = expectedGroupByResults.size();
 
     // Build map based on function (function_column name) to match individual entries.
     Map<String, Integer> functionMap = new HashMap<>();
     for (int i = 0; i < numExpectedGroupBy; ++i) {
-      JSONObject expectedAggr = expectedGroupByResults.getJSONObject(i);
-      String expectedFunction = expectedAggr.getString(FUNCTION).toLowerCase();
+      JsonNode expectedAggr = expectedGroupByResults.get(i);
+      String expectedFunction = expectedAggr.get(FUNCTION).asText().toLowerCase();
       functionMap.put(expectedFunction, i);
     }
 
     for (int i = 0; i < numActualGroupBy; ++i) {
-      JSONObject actualAggr = actualGroupByResults.getJSONObject(i);
-      String actualFunction = actualAggr.getString(FUNCTION).toLowerCase();
+      JsonNode actualAggr = actualGroupByResults.get(i);
+      String actualFunction = actualAggr.get(FUNCTION).asText().toLowerCase();
 
       if (!functionMap.containsKey(actualFunction)) {
         LOGGER.error("Missing group by function in expected response: {}", actualFunction);
         return false;
       }
 
-      JSONObject expectedAggr = expectedGroupByResults.getJSONObject(functionMap.get(actualFunction));
+      JsonNode expectedAggr = expectedGroupByResults.get(functionMap.get(actualFunction));
       if (!compareGroupByColumns(actualAggr, expectedAggr)) {
         return false;
       }
@@ -360,32 +352,30 @@ public class QueryComparison {
     return true;
   }
 
-  private static List<Object> jsonArrayToList(JSONArray jsonArray)
-      throws JSONException {
+  private static List<Object> jsonArrayToList(JsonNode jsonArray) {
     List<Object> list = new ArrayList<>();
-    for (int i = 0; i < jsonArray.length(); ++i) {
+    for (int i = 0; i < jsonArray.size(); ++i) {
       list.add(jsonArray.get(i));
     }
     return list;
   }
 
-  private static boolean compareAggregationValues(JSONObject actualAggr, JSONObject expectedAggr)
-      throws JSONException {
-    JSONArray actualResult = actualAggr.getJSONArray(GROUP_BY_RESULT);
-    JSONArray expectedResult = expectedAggr.getJSONArray(GROUP_BY_RESULT);
+  private static boolean compareAggregationValues(JsonNode actualAggr, JsonNode expectedAggr) {
+    JsonNode actualResult = actualAggr.get(GROUP_BY_RESULT);
+    JsonNode expectedResult = expectedAggr.get(GROUP_BY_RESULT);
 
     Map<GroupByOperator, Double> expectedMap = new HashMap<>();
-    for (int i = 0; i < expectedResult.length(); ++i) {
-      List<Object> group = jsonArrayToList(expectedResult.getJSONObject(i).getJSONArray(GROUP));
+    for (int i = 0; i < expectedResult.size(); ++i) {
+      List<Object> group = jsonArrayToList(expectedResult.get(i).get(GROUP));
       GroupByOperator groupByOperator = new GroupByOperator(group);
-      expectedMap.put(groupByOperator, expectedResult.getJSONObject(i).getDouble(VALUE));
+      expectedMap.put(groupByOperator, expectedResult.get(i).get(VALUE).asDouble());
     }
 
-    for (int i = 0; i < actualResult.length(); ++i) {
-      List<Object> group = jsonArrayToList(actualResult.getJSONObject(i).getJSONArray(GROUP));
+    for (int i = 0; i < actualResult.size(); ++i) {
+      List<Object> group = jsonArrayToList(actualResult.get(i).get(GROUP));
       GroupByOperator groupByOperator = new GroupByOperator(group);
 
-      double actualValue = actualResult.getJSONObject(i).getDouble(VALUE);
+      double actualValue = actualResult.get(i).get(VALUE).asDouble();
       if (!expectedMap.containsKey(groupByOperator)) {
         LOGGER.error("Missing group by value for group: {}", group);
         return false;
@@ -401,10 +391,9 @@ public class QueryComparison {
     return true;
   }
 
-  private static boolean compareGroupByColumns(JSONObject actualAggr, JSONObject expectedAggr)
-      throws JSONException {
-    JSONArray actualCols = actualAggr.getJSONArray(GROUP_BY_COLUMNS);
-    JSONArray expectedCols = expectedAggr.getJSONArray(GROUP_BY_COLUMNS);
+  private static boolean compareGroupByColumns(JsonNode actualAggr, JsonNode expectedAggr) {
+    JsonNode actualCols = actualAggr.get(GROUP_BY_COLUMNS);
+    JsonNode expectedCols = expectedAggr.get(GROUP_BY_COLUMNS);
 
     if (!compareLists(actualCols, expectedCols, null)) {
       return false;
@@ -412,8 +401,7 @@ public class QueryComparison {
     return true;
   }
 
-  private static boolean compareSelection(JSONObject actualJson, JSONObject expectedJson)
-      throws JSONException {
+  private static boolean compareSelection(JsonNode actualJson, JsonNode expectedJson) {
     if (!actualJson.has(SELECTION_RESULTS) && !expectedJson.has(SELECTION_RESULTS)) {
       return true;
     }
@@ -421,27 +409,26 @@ public class QueryComparison {
     /* We cannot compare numDocsScanned in selection because when we just return part of the selection result (has a
        low limit), this number can change over time. */
 
-    JSONObject actualSelection = actualJson.getJSONObject(SELECTION_RESULTS);
-    JSONObject expectedSelection = expectedJson.getJSONObject(SELECTION_RESULTS);
-    Map<Integer, Integer> expectedToActualColMap = new HashMap<Integer, Integer>(actualSelection.getJSONArray(COLUMNS).length());
+    JsonNode actualSelection = actualJson.get(SELECTION_RESULTS);
+    JsonNode expectedSelection = expectedJson.get(SELECTION_RESULTS);
+    Map<Integer, Integer> expectedToActualColMap = new HashMap<>(actualSelection.get(COLUMNS).size());
 
-    return compareLists(actualSelection.getJSONArray(COLUMNS), expectedSelection.getJSONArray(COLUMNS),
-        expectedToActualColMap) && compareSelectionRows(actualSelection.getJSONArray(RESULTS),
-        expectedSelection.getJSONArray(RESULTS), expectedToActualColMap);
+    return compareLists(actualSelection.get(COLUMNS), expectedSelection.get(COLUMNS),
+        expectedToActualColMap) && compareSelectionRows(actualSelection.get(RESULTS),
+        expectedSelection.get(RESULTS), expectedToActualColMap);
   }
 
-  private static boolean compareSelectionRows(JSONArray actualRows, JSONArray expectedRows,
-      Map<Integer, Integer> expectedToActualColMap)
-      throws JSONException {
-    final int numActualRows = actualRows.length();
-    final int numExpectedRows = expectedRows.length();
+  private static boolean compareSelectionRows(JsonNode actualRows, JsonNode expectedRows,
+      Map<Integer, Integer> expectedToActualColMap) {
+    final int numActualRows = actualRows.size();
+    final int numExpectedRows = expectedRows.size();
     if (numActualRows > numExpectedRows) {
       LOGGER.error("In selection, number of actual rows: {} more than expected rows: {}", numActualRows, numExpectedRows);
       return false;
     }
     Map<String, Integer> expectedRowMap = new HashMap<>(numExpectedRows);
     for (int i = 0; i < numExpectedRows; i++) {
-      String serialized = serializeRow(expectedRows.getJSONArray(i), expectedToActualColMap);
+      String serialized = serializeRow(expectedRows.get(i), expectedToActualColMap);
       Integer count = expectedRowMap.get(serialized);
       if (count == null) {
         expectedRowMap.put(serialized, 1);
@@ -451,7 +438,7 @@ public class QueryComparison {
     }
 
     for (int i = 0; i < numActualRows; i++) {
-      String serialized = serializeRow(actualRows.getJSONArray(i), null);
+      String serialized = serializeRow(actualRows.get(i), null);
       Integer count = expectedRowMap.get(serialized);
       if (count == null || count == 0) {
         LOGGER.error("Cannot find match for row {} in actual result", i);
@@ -462,16 +449,16 @@ public class QueryComparison {
     return true;
   }
 
-  private static String serializeRow(JSONArray row, Map<Integer, Integer> expectedToActualColMap) throws JSONException {
+  private static String serializeRow(JsonNode row, Map<Integer, Integer> expectedToActualColMap) {
     StringBuilder sb = new StringBuilder();
-    final int numCols = row.length();
+    final int numCols = row.size();
     sb.append(numCols).append('_');
     for (int i = 0; i < numCols; i++) {
       String toAppend;
       if (expectedToActualColMap == null) {
-        toAppend = row.getString(i);
+        toAppend = row.get(i).asText();
       } else {
-        toAppend = row.getString(expectedToActualColMap.get(i));
+        toAppend = row.get(expectedToActualColMap.get(i)).asText();
       }
       // For number value, uniform the format and do fuzzy comparison
       try {
@@ -497,11 +484,10 @@ public class QueryComparison {
     return true;
   }
 
-  private static boolean compareLists(JSONArray actualList, JSONArray expectedList,
-      Map<Integer, Integer> expectedToActualColMap)
-      throws JSONException {
-    int actualSize = actualList.length();
-    int expectedSize = expectedList.length();
+  private static boolean compareLists(JsonNode actualList, JsonNode expectedList,
+      Map<Integer, Integer> expectedToActualColMap) {
+    int actualSize = actualList.size();
+    int expectedSize = expectedList.size();
 
     if (actualSize != expectedSize) {
       LOGGER.error("Number of columns mis-match: actual: {} expected: {}", actualSize, expectedSize);
@@ -509,9 +495,9 @@ public class QueryComparison {
     }
 
     if (expectedToActualColMap == null) {
-      for (int i = 0; i < expectedList.length(); ++i) {
-        String actualColumn = actualList.getString(i);
-        String expectedColumn = expectedList.getString(i);
+      for (int i = 0; i < expectedList.size(); ++i) {
+        String actualColumn = actualList.get(i).asText();
+        String expectedColumn = expectedList.get(i).asText();
 
         if (!actualColumn.equals(expectedColumn)) {
           LOGGER.error("Column name mis-match: actual: {} expected: {}", actualColumn, expectedColumn);
@@ -519,11 +505,11 @@ public class QueryComparison {
         }
       }
     } else {
-      for (int i = 0; i < expectedList.length(); i++) {
+      for (int i = 0; i < expectedList.size(); i++) {
         boolean found = false;
-        final String expectedColumn = expectedList.getString(i);
-        for (int j = 0; j < actualList.length(); j++) {
-          if (expectedColumn.equals(actualList.getString(j))) {
+        final String expectedColumn = expectedList.get(i).asText();
+        for (int j = 0; j < actualList.size(); j++) {
+          if (expectedColumn.equals(actualList.get(j).asText())) {
             expectedToActualColMap.put(i, j);
             found = true;
             break;
@@ -539,10 +525,9 @@ public class QueryComparison {
     return true;
   }
 
-  private static boolean compareNumDocsScanned(JSONObject actualJson, JSONObject expectedJson)
-      throws JSONException {
-    int actualDocs = actualJson.getInt(NUM_DOCS_SCANNED);
-    int expectedDocs = expectedJson.getInt(NUM_DOCS_SCANNED);
+  private static boolean compareNumDocsScanned(JsonNode actualJson, JsonNode expectedJson) {
+    long actualDocs = actualJson.get(NUM_DOCS_SCANNED).asLong();
+    long expectedDocs = expectedJson.get(NUM_DOCS_SCANNED).asLong();
 
     if (actualDocs != expectedDocs) {
       LOGGER.error("Mis-match in number of docs scanned: actual: {} expected: {}", actualDocs, expectedDocs);

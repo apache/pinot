@@ -27,6 +27,7 @@ import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 import io.swagger.annotations.ApiResponse;
 import io.swagger.annotations.ApiResponses;
+import java.io.IOException;
 import javax.inject.Inject;
 import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
@@ -34,8 +35,6 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.json.JSONException;
-import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -64,11 +63,11 @@ public class PinotTableSegmentConfigs {
       String requestBody
   ) {
     try {
-      TableConfig tableConfig = TableConfig.fromJSONConfig(new JSONObject(requestBody));
+      TableConfig tableConfig = TableConfig.fromJsonString(requestBody);
       pinotHelixResourceManager.updateSegmentsValidationAndRetentionConfigFor(tableConfig.getTableName(),
           tableConfig.getTableType(), tableConfig.getValidationConfig());
       return new SuccessResponse("Update segmentsConfig for table: " + tableName);
-    } catch (JSONException e) {
+    } catch (IOException e) {
       metrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_SCHEMA_UPDATE_ERROR, 1L);
       throw new ControllerApplicationException(LOGGER,
           String.format("Invalid json while updating segments config for table: %s", tableName),

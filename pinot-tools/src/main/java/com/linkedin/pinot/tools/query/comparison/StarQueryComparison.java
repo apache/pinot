@@ -18,8 +18,9 @@
  */
 package com.linkedin.pinot.tools.query.comparison;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.linkedin.pinot.common.utils.JsonUtils;
 import java.io.File;
-import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -86,8 +87,8 @@ public class StarQueryComparison {
       String query = queryGenerator.nextQuery();
       LOGGER.info("QUERY: {}", query);
 
-      JSONObject refResponse = new JSONObject(_refCluster.query(query));
-      JSONObject starTreeResponse = new JSONObject((_startTreeCluster.query(query)));
+      JsonNode refResponse = JsonUtils.stringToJsonNode(_refCluster.query(query));
+      JsonNode starTreeResponse = JsonUtils.stringToJsonNode((_startTreeCluster.query(query)));
 
       if (QueryComparison.compare(refResponse, starTreeResponse, false)) {
         LOGGER.error("Comparison PASSED: {}", query);

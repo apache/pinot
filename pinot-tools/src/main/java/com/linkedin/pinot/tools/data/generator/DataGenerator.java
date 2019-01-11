@@ -34,7 +34,6 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.math.IntRange;
-import org.json.JSONException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -89,7 +88,7 @@ public class DataGenerator {
     }
   }
 
-  public void generate(long totalDocs, int numFiles) throws IOException, JSONException {
+  public void generate(long totalDocs, int numFiles) throws IOException {
     final int numPerFiles = (int) (totalDocs / numFiles);
     for (int i = 0; i < numFiles; i++) {
       try (AvroWriter writer = new AvroWriter(outDir, i, generators, fetchSchema())) {
@@ -138,7 +137,7 @@ public class DataGenerator {
     return spec;
   }
 
-  public static void main(String[] args) throws IOException, JSONException {
+  public static void main(String[] args) throws IOException {
     final String[] columns = { "column1", "column2", "column3", "column4", "column5" };
     final Map<String, DataType> dataTypes = new HashMap<String, DataType>();
     final Map<String, FieldType> fieldTypes = new HashMap<String, FieldType>();

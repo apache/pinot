@@ -18,13 +18,15 @@
  */
 package com.linkedin.pinot.common.metadata.segment;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.linkedin.pinot.common.utils.JsonUtils;
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import org.json.JSONException;
-import org.json.JSONObject;
 
 
 /**
@@ -52,28 +54,27 @@ public class SegmentZKMetadataCustomMapModifier {
     }
   }
 
-  public SegmentZKMetadataCustomMapModifier(@Nonnull String jsonString) throws JSONException {
-    JSONObject jsonObject = new JSONObject(jsonString);
-    _modifyMode = ModifyMode.valueOf(jsonObject.getString(MAP_MODIFY_MODE_KEY));
-    JSONObject jsonMap = jsonObject.getJSONObject(MAP_KEY);
-    if (jsonMap == null || jsonMap.length() == 0) {
+  public SegmentZKMetadataCustomMapModifier(@Nonnull String jsonString) throws IOException {
+    JsonNode jsonNode = JsonUtils.stringToJsonNode(jsonString);
+    _modifyMode = ModifyMode.valueOf(jsonNode.get(MAP_MODIFY_MODE_KEY).asText());
+    JsonNode jsonMap = jsonNode.get(MAP_KEY);
+    if (jsonMap == null || jsonMap.size() == 0) {
       _map = null;
     } else {
       _map = new HashMap<>();
-      @SuppressWarnings("unchecked")
-      Iterator<String> keys = jsonMap.keys();
+      Iterator<String> keys = jsonMap.fieldNames();
       while (keys.hasNext()) {
         String key = keys.next();
-        _map.put(key, jsonMap.getString(key));
+        _map.put(key, jsonMap.get(key).asText());
       }
     }
   }
 
-  public String toJsonString() throws JSONException {
-    JSONObject jsonObject = new JSONObject();
-    jsonObject.put(MAP_MODIFY_MODE_KEY, _modifyMode);
-    jsonObject.put(MAP_KEY, _map);
-    return jsonObject.toString();
+  public String toJsonString() {
+    ObjectNode objectNode = JsonUtils.newObjectNode();
+    objectNode.put(MAP_MODIFY_MODE_KEY, _modifyMode.toString());
+    objectNode.set(MAP_KEY, JsonUtils.objectToJsonNode(_map));
+    return objectNode.toString();
   }
 
   public Map<String, String> modifyMap(@Nullable Map<String, String> existingMap) {

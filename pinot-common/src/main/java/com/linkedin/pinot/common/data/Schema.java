@@ -18,15 +18,18 @@
  */
 package com.linkedin.pinot.common.data;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
-import com.google.gson.GsonBuilder;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonObject;
 import com.linkedin.pinot.common.config.ConfigKey;
 import com.linkedin.pinot.common.config.UseChildKeyHandler;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.FieldSpec.FieldType;
 import com.linkedin.pinot.common.utils.EqualityUtils;
+import com.linkedin.pinot.common.utils.JsonUtils;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -39,9 +42,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
-import org.codehaus.jackson.annotate.JsonIgnore;
-import org.codehaus.jackson.annotate.JsonIgnoreProperties;
-import org.codehaus.jackson.map.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -60,7 +60,6 @@ import org.slf4j.LoggerFactory;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public final class Schema {
   private static final Logger LOGGER = LoggerFactory.getLogger(Schema.class);
-  private static final ObjectMapper MAPPER = new ObjectMapper();
 
   @ConfigKey("schemaName")
   private String _schemaName;
@@ -88,17 +87,17 @@ public final class Schema {
 
   @Nonnull
   public static Schema fromFile(@Nonnull File schemaFile) throws IOException {
-    return MAPPER.readValue(schemaFile, Schema.class);
+    return JsonUtils.fileToObject(schemaFile, Schema.class);
   }
 
   @Nonnull
   public static Schema fromString(@Nonnull String schemaString) throws IOException {
-    return MAPPER.readValue(schemaString, Schema.class);
+    return JsonUtils.stringToObject(schemaString, Schema.class);
   }
 
   @Nonnull
   public static Schema fromInputSteam(@Nonnull InputStream schemaInputStream) throws IOException {
-    return MAPPER.readValue(schemaInputStream, Schema.class);
+    return JsonUtils.inputStreamToObject(schemaInputStream, Schema.class);
   }
 
   /**
@@ -362,33 +361,37 @@ public final class Schema {
   @JsonIgnore
   @Nonnull
   public String getJSONSchema() {
-    JsonObject jsonSchema = new JsonObject();
-    jsonSchema.addProperty("schemaName", _schemaName);
+    ObjectNode jsonSchema = JsonUtils.newObjectNode();
+    jsonSchema.put("schemaName", _schemaName);
     if (!_dimensionFieldSpecs.isEmpty()) {
-      JsonArray jsonArray = new JsonArray();
+      ArrayNode jsonArray = JsonUtils.newArrayNode();
       for (DimensionFieldSpec dimensionFieldSpec : _dimensionFieldSpecs) {
         jsonArray.add(dimensionFieldSpec.toJsonObject());
       }
-      jsonSchema.add("dimensionFieldSpecs", jsonArray);
+      jsonSchema.set("dimensionFieldSpecs", jsonArray);
     }
     if (!_metricFieldSpecs.isEmpty()) {
-      JsonArray jsonArray = new JsonArray();
+      ArrayNode jsonArray = JsonUtils.newArrayNode();
       for (MetricFieldSpec metricFieldSpec : _metricFieldSpecs) {
         jsonArray.add(metricFieldSpec.toJsonObject());
       }
-      jsonSchema.add("metricFieldSpecs", jsonArray);
+      jsonSchema.set("metricFieldSpecs", jsonArray);
     }
     if (_timeFieldSpec != null) {
-      jsonSchema.add("timeFieldSpec", _timeFieldSpec.toJsonObject());
+      jsonSchema.set("timeFieldSpec", _timeFieldSpec.toJsonObject());
     }
     if (!_dateTimeFieldSpecs.isEmpty()) {
-      JsonArray jsonArray = new JsonArray();
+      ArrayNode jsonArray = JsonUtils.newArrayNode();
       for (DateTimeFieldSpec dateTimeFieldSpec : _dateTimeFieldSpecs) {
         jsonArray.add(dateTimeFieldSpec.toJsonObject());
       }
-      jsonSchema.add("dateTimeFieldSpecs", jsonArray);
+      jsonSchema.set("dateTimeFieldSpecs", jsonArray);
     }
-    return new GsonBuilder().setPrettyPrinting().create().toJson(jsonSchema);
+    try {
+      return JsonUtils.objectToPrettyString(jsonSchema);
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   /**

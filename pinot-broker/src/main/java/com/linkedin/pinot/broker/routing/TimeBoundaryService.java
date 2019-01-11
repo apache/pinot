@@ -18,7 +18,8 @@
  */
 package com.linkedin.pinot.broker.routing;
 
-import org.json.JSONObject;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.linkedin.pinot.common.utils.JsonUtils;
 
 
 public interface TimeBoundaryService {
@@ -37,7 +38,7 @@ public interface TimeBoundaryService {
    */
   void remove(String tableName);
 
-  public class TimeBoundaryInfo {
+  class TimeBoundaryInfo {
     private String _timeColumn;
     private String _timeValue;
 
@@ -57,11 +58,8 @@ public interface TimeBoundaryService {
       _timeValue = timeValue;
     }
 
-    public String toJsonString() throws Exception {
-      JSONObject obj = new JSONObject();
-      obj.put("timeColumnName", _timeColumn);
-      obj.put("timeColumnValue",_timeValue);
-      return obj.toString(2);
+    public String toJsonString() throws JsonProcessingException {
+      return JsonUtils.objectToPrettyString(this);
     }
   }
 }

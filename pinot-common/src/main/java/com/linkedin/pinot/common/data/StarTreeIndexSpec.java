@@ -18,18 +18,19 @@
  */
 package com.linkedin.pinot.common.data;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.Sets;
+import com.linkedin.pinot.common.config.ConfigKey;
 import com.linkedin.pinot.common.segment.StarTreeMetadata;
 import com.linkedin.pinot.common.utils.EqualityUtils;
-import com.linkedin.pinot.common.config.ConfigKey;
+import com.linkedin.pinot.common.utils.JsonUtils;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import java.util.Set;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
-import org.codehaus.jackson.annotate.JsonIgnoreProperties;
-import org.codehaus.jackson.map.ObjectMapper;
 
 
 @SuppressWarnings("unused")
@@ -37,8 +38,6 @@ import org.codehaus.jackson.map.ObjectMapper;
 public class StarTreeIndexSpec {
   public static final int DEFAULT_MAX_LEAF_RECORDS = 100000; // TODO: determine a good number via experiment
   public static final int DEFAULT_SKIP_MATERIALIZATION_CARDINALITY_THRESHOLD = 10000;
-
-  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   /** The upper bound on the number of leaf records to be scanned for any query */
   @ConfigKey("maxLeafRecords")
@@ -115,8 +114,8 @@ public class StarTreeIndexSpec {
     return ToStringBuilder.reflectionToString(this, ToStringStyle.SHORT_PREFIX_STYLE);
   }
 
-  public String toJsonString() throws Exception {
-    return OBJECT_MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(this);
+  public String toJsonString() throws JsonProcessingException {
+    return JsonUtils.objectToString(this);
   }
 
   /**
@@ -127,11 +126,11 @@ public class StarTreeIndexSpec {
    * @throws IOException
    */
   public static StarTreeIndexSpec fromFile(File starTreeIndexSpecFile) throws IOException {
-    return OBJECT_MAPPER.readValue(starTreeIndexSpecFile, StarTreeIndexSpec.class);
+    return JsonUtils.fileToObject(starTreeIndexSpecFile, StarTreeIndexSpec.class);
   }
 
   public static StarTreeIndexSpec fromJsonString(String jsonString) throws IOException {
-    return OBJECT_MAPPER.readValue(jsonString, StarTreeIndexSpec.class);
+    return JsonUtils.stringToObject(jsonString, StarTreeIndexSpec.class);
   }
 
   public static StarTreeIndexSpec fromStarTreeMetadata(StarTreeMetadata starTreeMetadata) {

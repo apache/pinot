@@ -18,8 +18,13 @@
  */
 package com.linkedin.pinot.common.protocols;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.linkedin.pinot.common.utils.JsonUtils;
+import java.io.IOException;
 import java.util.concurrent.TimeUnit;
-import com.alibaba.fastjson.JSONObject;
+
 
 /*
  * This class encapsulates the segment completion protocol used by the server and the controller for
@@ -365,113 +370,116 @@ public class SegmentCompletionProtocol {
   }
 
   public static class Response {
-    final ControllerResponseStatus _status;
-    final long _offset;
-    final long _buildTimeSeconds;
-    final boolean _isSplitCommit;
-    final String _segmentLocation;
-    final String _controllerVipUrl;
+    private ControllerResponseStatus _status;
+    private long _offset = -1;
+    private long _buildTimeSeconds = -1;
+    private boolean _splitCommit;
+    private String _segmentLocation;
+    private String _controllerVipUrl;
 
-    public Response(String jsonRespStr) {
-      JSONObject jsonObject = JSONObject.parseObject(jsonRespStr);
-      long offset = -1;
-      if (jsonObject.containsKey(OFFSET_KEY)) {
-        offset = jsonObject.getLong(OFFSET_KEY);
-      }
-      _offset = offset;
-
-      String statusStr = jsonObject.getString(STATUS_KEY);
-      ControllerResponseStatus status;
-      try {
-        status = ControllerResponseStatus.valueOf(statusStr);
-      } catch (Exception e) {
-        status = ControllerResponseStatus.FAILED;
-      }
-      _status = status;
-
-      Long buildTimeObj = jsonObject.getLong(BUILD_TIME_KEY);
-      if (buildTimeObj == null) {
-        _buildTimeSeconds = -1;
-      } else {
-        _buildTimeSeconds = buildTimeObj;
-      }
-
-      boolean isSplitCommit = false;
-      if (jsonObject.containsKey(COMMIT_TYPE_KEY) && jsonObject.getBoolean(COMMIT_TYPE_KEY)) {
-        isSplitCommit = true;
-      }
-      _isSplitCommit = isSplitCommit;
-
-      String segmentLocation = null;
-      if (jsonObject.containsKey(SEGMENT_LOCATION_KEY)) {
-        segmentLocation = jsonObject.getString(SEGMENT_LOCATION_KEY);
-      }
-      _segmentLocation = segmentLocation;
-
-      String controllerVipUrl= null;
-      if (jsonObject.containsKey(CONTROLLER_VIP_URL_KEY)) {
-        controllerVipUrl = jsonObject.getString(CONTROLLER_VIP_URL_KEY);
-      }
-      _controllerVipUrl = controllerVipUrl;
+    public Response() {
     }
 
     public Response(Params params) {
       _status = params.getStatus();
       _offset = params.getOffset();
       _buildTimeSeconds = params.getBuildTimeSeconds();
-      _isSplitCommit = params.getIsSplitCommit();
+      _splitCommit = params.isSplitCommit();
       _segmentLocation = params.getSegmentLocation();
       _controllerVipUrl = params.getControllerVipUrl();
     }
 
+    @JsonProperty(STATUS_KEY)
     public ControllerResponseStatus getStatus() {
       return _status;
     }
 
+    @JsonProperty(STATUS_KEY)
+    public void setStatus(ControllerResponseStatus status) {
+      _status = status;
+    }
+
+    @JsonProperty(OFFSET_KEY)
     public long getOffset() {
       return _offset;
     }
 
+    @JsonProperty(OFFSET_KEY)
+    public void setOffset(long offset) {
+      _offset = offset;
+    }
+
+    @JsonProperty(BUILD_TIME_KEY)
     public long getBuildTimeSeconds() {
       return _buildTimeSeconds;
     }
 
-    public boolean getIsSplitCommit() {
-      return _isSplitCommit;
+    @JsonProperty(BUILD_TIME_KEY)
+    public void setBuildTimeSeconds(long buildTimeSeconds) {
+      _buildTimeSeconds = buildTimeSeconds;
     }
 
+    @JsonProperty(COMMIT_TYPE_KEY)
+    public boolean isSplitCommit() {
+      return _splitCommit;
+    }
+
+    @JsonProperty(COMMIT_TYPE_KEY)
+    public void setSplitCommit(boolean splitCommit) {
+      _splitCommit = splitCommit;
+    }
+
+    @JsonProperty(CONTROLLER_VIP_URL_KEY)
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     public String getControllerVipUrl() {
       return _controllerVipUrl;
     }
 
+    @JsonProperty(CONTROLLER_VIP_URL_KEY)
+    public void setControllerVipUrl(String controllerVipUrl) {
+      _controllerVipUrl = controllerVipUrl;
+    }
+
+    @JsonProperty(SEGMENT_LOCATION_KEY)
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     public String getSegmentLocation() {
       return _segmentLocation;
     }
 
+    @JsonProperty(SEGMENT_LOCATION_KEY)
+    public void setSegmentLocation(String segmentLocation) {
+      _segmentLocation = segmentLocation;
+    }
+
     public String toJsonString() {
-      StringBuilder builder = new StringBuilder();
-      builder.append("{\"" + STATUS_KEY + "\":" + "\"" + _status.name() + "\"," + "\""
-          + OFFSET_KEY + "\":" + _offset + ",\""
-          + COMMIT_TYPE_KEY + "\":" + _isSplitCommit
-          + (_segmentLocation != null ? ",\"" + SEGMENT_LOCATION_KEY + "\":\"" + _segmentLocation + "\"" : "")
-          + (_controllerVipUrl != null ? "," + "\"" + CONTROLLER_VIP_URL_KEY + "\":\"" + _controllerVipUrl + "\"" : ""));
-      builder.append("}");
-      return builder.toString();
+      try {
+        return JsonUtils.objectToString(this);
+      } catch (JsonProcessingException e) {
+        throw new RuntimeException(e);
+      }
+    }
+
+    public static Response fromJsonString(String jsonString) {
+      try {
+        return JsonUtils.stringToObject(jsonString, Response.class);
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
     }
 
     public static class Params {
       private ControllerResponseStatus _status;
       private long _offset;
-      private long _buildTimeSec;
-      private boolean _isSplitCommit;
+      private long _buildTimeSeconds;
+      private boolean _splitCommit;
       private String _segmentLocation;
       private String _controllerVipUrl;
 
       public Params() {
         _offset = -1L;
         _status = ControllerResponseStatus.FAILED;
-        _buildTimeSec = -1;
-        _isSplitCommit = false;
+        _buildTimeSeconds = -1;
+        _splitCommit = false;
         _segmentLocation = null;
         _controllerVipUrl = null;
       }
@@ -487,12 +495,12 @@ public class SegmentCompletionProtocol {
       }
 
       public Params withBuildTimeSeconds(long buildTimeSeconds) {
-        _buildTimeSec = buildTimeSeconds;
+        _buildTimeSeconds = buildTimeSeconds;
         return this;
       }
 
-      public Params withSplitCommit(boolean isSplitCommit) {
-        _isSplitCommit = isSplitCommit;
+      public Params withSplitCommit(boolean splitCommit) {
+        _splitCommit = splitCommit;
         return this;
       }
 
@@ -513,10 +521,10 @@ public class SegmentCompletionProtocol {
         return _offset;
       }
       public long getBuildTimeSeconds() {
-        return _buildTimeSec;
+        return _buildTimeSeconds;
       }
-      public boolean getIsSplitCommit() {
-        return _isSplitCommit;
+      public boolean isSplitCommit() {
+        return _splitCommit;
       }
       public String getSegmentLocation() {
         return _segmentLocation;

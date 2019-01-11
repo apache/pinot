@@ -18,10 +18,12 @@
  */
 package com.linkedin.pinot.integration.tests;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Function;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.JsonUtils;
 import com.linkedin.pinot.common.utils.KafkaStarterUtils;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.util.TestUtils;
@@ -34,8 +36,6 @@ import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import kafka.server.KafkaServerStartable;
 import org.apache.commons.io.FileUtils;
-import org.json.JSONArray;
-import org.json.JSONObject;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -180,40 +180,40 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
     {
       String jsonOutputStr = sendGetRequest(_controllerRequestURLBuilder.
           forSegmentListAPIWithTableType(getTableName(), CommonConstants.Helix.TableType.OFFLINE.toString()));
-      JSONArray array = new JSONArray(jsonOutputStr);
+      JsonNode array = JsonUtils.stringToJsonNode(jsonOutputStr);
       // There should be one element in the array
-      JSONObject element = (JSONObject) array.get(0);
-      JSONArray segments = (JSONArray) element.get("OFFLINE");
-      Assert.assertEquals(segments.length(), 8);
+      JsonNode element = array.get(0);
+      JsonNode segments = element.get("OFFLINE");
+      Assert.assertEquals(segments.size(), 8);
     }
     {
       String jsonOutputStr = sendGetRequest(_controllerRequestURLBuilder.
           forSegmentListAPIWithTableType(getTableName(), CommonConstants.Helix.TableType.REALTIME.toString()));
-      JSONArray array = new JSONArray(jsonOutputStr);
+      JsonNode array = JsonUtils.stringToJsonNode(jsonOutputStr);
       // There should be one element in the array
-      JSONObject element = (JSONObject) array.get(0);
-      JSONArray segments = (JSONArray) element.get("REALTIME");
-      Assert.assertEquals(segments.length(), 3);
+      JsonNode element = array.get(0);
+      JsonNode segments = element.get("REALTIME");
+      Assert.assertEquals(segments.size(), 3);
     }
     {
       String jsonOutputStr = sendGetRequest(_controllerRequestURLBuilder. forSegmentListAPI(getTableName()));
-      JSONArray array = new JSONArray(jsonOutputStr);
+      JsonNode array = JsonUtils.stringToJsonNode(jsonOutputStr);
       // there should be 2 elements in the array now.
       int realtimeIndex = 0;
       int offlineIndex = 1;
-      JSONObject element = (JSONObject) array.get(realtimeIndex);
+      JsonNode element = array.get(realtimeIndex);
       if (!element.has("REALTIME")) {
         realtimeIndex = 1;
         offlineIndex = 0;
       }
-      JSONObject offlineElement = (JSONObject)array.get(offlineIndex);
-      JSONObject realtimeElement = (JSONObject)array.get(realtimeIndex);
+      JsonNode offlineElement = array.get(offlineIndex);
+      JsonNode realtimeElement = array.get(realtimeIndex);
 
-      JSONArray realtimeSegments = (JSONArray) realtimeElement.get("REALTIME");
-      Assert.assertEquals(realtimeSegments.length(), 3);
+      JsonNode realtimeSegments = realtimeElement.get("REALTIME");
+      Assert.assertEquals(realtimeSegments.size(), 3);
 
-      JSONArray offlineSegments = (JSONArray) offlineElement.get("OFFLINE");
-      Assert.assertEquals(offlineSegments.length(), 8);
+      JsonNode offlineSegments = offlineElement.get("OFFLINE");
+      Assert.assertEquals(offlineSegments.size(), 8);
     }
   }
 
@@ -277,9 +277,8 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
       @Override
       public Boolean apply(@Nullable Void aVoid) {
         try {
-          JSONArray routingTableSnapshot =
-              getDebugInfo("debug/routingTable/" + tableName).getJSONArray("routingTableSnapshot");
-          return routingTableSnapshot.length() == 0;
+          JsonNode routingTableSnapshot = getDebugInfo("debug/routingTable/" + tableName).get("routingTableSnapshot");
+          return routingTableSnapshot.size() == 0;
         } catch (Exception e) {
           return null;
         }

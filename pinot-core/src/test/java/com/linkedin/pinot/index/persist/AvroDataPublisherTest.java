@@ -18,8 +18,10 @@
  */
 package com.linkedin.pinot.index.persist;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.utils.JsonUtils;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.readers.AvroRecordReader;
 import com.linkedin.pinot.core.data.readers.FileFormat;
@@ -32,7 +34,6 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
-import org.json.JSONObject;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -63,13 +64,12 @@ public class AvroDataPublisherTest {
 
     int cnt = 0;
     for (String line : FileUtils.readLines(new File(jsonPath))) {
-
-      JSONObject obj = new JSONObject(line);
+      JsonNode jsonNode = JsonUtils.stringToJsonNode(line);
       if (avroDataPublisher.hasNext()) {
         GenericRow recordRow = avroDataPublisher.next();
 
         for (String column : recordRow.getFieldNames()) {
-          String valueFromJson = obj.get(column).toString();
+          String valueFromJson = jsonNode.get(column).asText();
           String valueFromAvro = recordRow.getValue(column).toString();
           if (cnt > 1) {
             Assert.assertEquals(valueFromJson, valueFromAvro);
@@ -104,14 +104,13 @@ public class AvroDataPublisherTest {
 
     int cnt = 0;
     for (final String line : FileUtils.readLines(new File(jsonPath))) {
-
-      final JSONObject obj = new JSONObject(line);
+      JsonNode jsonNode = JsonUtils.stringToJsonNode(line);
       if (avroDataPublisher.hasNext()) {
         final GenericRow recordRow = avroDataPublisher.next();
         // System.out.println(recordRow);
         Assert.assertEquals(recordRow.getFieldNames().length, 2);
         for (final String column : recordRow.getFieldNames()) {
-          final String valueFromJson = obj.get(column).toString();
+          final String valueFromJson = jsonNode.get(column).asText();
           final String valueFromAvro = recordRow.getValue(column).toString();
           if (cnt > 1) {
             Assert.assertEquals(valueFromAvro, valueFromJson);

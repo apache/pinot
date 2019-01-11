@@ -18,6 +18,8 @@
  */
 package com.linkedin.pinot.core.indexsegment.generator;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.config.IndexingConfig;
 import com.linkedin.pinot.common.config.SegmentPartitionConfig;
@@ -29,6 +31,7 @@ import com.linkedin.pinot.common.data.FieldSpec.FieldType;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.StarTreeIndexSpec;
 import com.linkedin.pinot.common.data.TimeFieldSpec;
+import com.linkedin.pinot.common.utils.JsonUtils;
 import com.linkedin.pinot.core.data.readers.CSVRecordReaderConfig;
 import com.linkedin.pinot.core.data.readers.FileFormat;
 import com.linkedin.pinot.core.data.readers.RecordReaderConfig;
@@ -53,9 +56,6 @@ import java.util.stream.Collectors;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.commons.lang.StringUtils;
-import org.codehaus.jackson.annotate.JsonIgnore;
-import org.codehaus.jackson.annotate.JsonIgnoreProperties;
-import org.codehaus.jackson.map.ObjectMapper;
 import org.joda.time.format.DateTimeFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -172,7 +172,7 @@ public class SegmentGeneratorConfig {
 
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
     List<String> noDictionaryColumns = indexingConfig.getNoDictionaryColumns();
-    Map<String, String> noDictionaryColumnMap = indexingConfig.getnoDictionaryConfig();
+    Map<String, String> noDictionaryColumnMap = indexingConfig.getNoDictionaryConfig();
 
     if (noDictionaryColumns != null) {
       this.setRawIndexCreationColumns(noDictionaryColumns);
@@ -584,8 +584,6 @@ public class SegmentGeneratorConfig {
    */
   @Deprecated
   public void loadConfigFiles() throws IOException {
-    ObjectMapper objectMapper = new ObjectMapper();
-
     Schema schema;
     if (_schemaFile != null) {
       schema = Schema.fromFile(new File(_schemaFile));
@@ -605,7 +603,7 @@ public class SegmentGeneratorConfig {
     }
 
     if (_readerConfigFile != null) {
-      setReaderConfig(objectMapper.readValue(new File(_readerConfigFile), CSVRecordReaderConfig.class));
+      setReaderConfig(JsonUtils.fileToObject(new File(_readerConfigFile), CSVRecordReaderConfig.class));
     }
   }
 

@@ -32,7 +32,6 @@ import java.util.concurrent.TimeUnit;
 import org.I0Itec.zkclient.ZkClient;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.manager.zk.ZNRecordSerializer;
-import org.json.JSONObject;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
@@ -53,9 +52,7 @@ import org.openjdk.jmh.runner.options.TimeValue;
 @Fork(value = 1, jvmArgs = {"-server", "-Xmx8G", "-XX:MaxDirectMemorySize=16G"})
 public class BenchmarkQueryEngine {
   /** List of query patterns used in the benchmark */
-  private static final String[] QUERY_PATTERNS = new String[] {
-      "SELECT count(*) from myTable"
-  };
+  private static final String[] QUERY_PATTERNS = new String[]{"SELECT count(*) from myTable"};
 
   /** List of optimization flags to test,
    * see {@link OptimizationFlags#getOptimizationFlags(BrokerRequest)} for the syntax
@@ -144,22 +141,18 @@ public class BenchmarkQueryEngine {
 
     ranOnce = false;
 
-    System.out.println(
-        _perfBenchmarkDriver.postQuery(QUERY_PATTERNS[queryPattern], optimizationFlags).toString(2)
-    );
+    System.out.println(_perfBenchmarkDriver.postQuery(QUERY_PATTERNS[queryPattern], optimizationFlags).toString());
   }
 
   @Benchmark
   @BenchmarkMode({Mode.SampleTime})
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
   public int sendQueryToPinot() throws Exception {
-    JSONObject returnValue = _perfBenchmarkDriver.postQuery(QUERY_PATTERNS[queryPattern], optimizationFlags);
-    return returnValue.getInt("totalDocs");
+    return _perfBenchmarkDriver.postQuery(QUERY_PATTERNS[queryPattern], optimizationFlags).get("totalDocs").asInt();
   }
 
   public static void main(String[] args) throws Exception {
-    ChainedOptionsBuilder opt = new OptionsBuilder()
-        .include(BenchmarkQueryEngine.class.getSimpleName())
+    ChainedOptionsBuilder opt = new OptionsBuilder().include(BenchmarkQueryEngine.class.getSimpleName())
         .warmupTime(TimeValue.seconds(30))
         .warmupIterations(4)
         .measurementTime(TimeValue.seconds(30))

@@ -18,6 +18,7 @@
  */
 package com.linkedin.pinot.perf;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.util.concurrent.Uninterruptibles;
 import com.linkedin.pinot.common.utils.KafkaStarterUtils;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
@@ -30,8 +31,6 @@ import java.util.List;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import kafka.server.KafkaServerStartable;
-import org.json.JSONArray;
-import org.json.JSONObject;
 
 
 /**
@@ -110,11 +109,8 @@ public class BenchmarkRealtimeConsumptionSpeed extends RealtimeClusterIntegratio
 
       // Run the query
       try {
-        JSONObject response = postQuery("select count(*) from mytable");
-        JSONArray aggregationResultsArray = response.getJSONArray("aggregationResults");
-        JSONObject firstAggregationResult = aggregationResultsArray.getJSONObject(0);
-        String pinotValue = firstAggregationResult.get("value").toString();
-        pinotRecordCount = Integer.parseInt(pinotValue);
+        JsonNode response = postQuery("select count(*) from mytable");
+        pinotRecordCount = response.get("aggregationResults").get(0).get("value").asInt();
       } catch (Exception e) {
         // Ignore
         continue;

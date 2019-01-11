@@ -18,11 +18,13 @@
  */
 package com.linkedin.pinot.controller.api.resources;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.JsonUtils;
 import com.linkedin.pinot.controller.helix.ControllerTest;
 import com.linkedin.pinot.util.TestUtils;
 import java.io.IOException;
-import org.json.JSONObject;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -42,23 +44,25 @@ public class PinotInstanceRestletResourceTest extends ControllerTest {
   @Test
   public void testInstanceListingAndCreation() throws Exception {
     // Check that there are no instances
-    JSONObject instanceList = new JSONObject(sendGetRequest(_controllerRequestURLBuilder.forInstanceList()));
-    assertEquals(instanceList.getJSONArray("instances").length(), 0,
-        "Expected empty instance list at beginning of test");
+    JsonNode instanceList = JsonUtils.stringToJsonNode(sendGetRequest(_controllerRequestURLBuilder.forInstanceList()));
+    assertEquals(instanceList.get("instances").size(), 0, "Expected empty instance list at beginning of test");
 
     // Create untagged broker and server instances
-    JSONObject brokerInstance = new JSONObject("{\"host\":\"1.2.3.4\", \"type\":\"broker\", \"port\":\"1234\"}");
+    ObjectNode brokerInstance =
+        (ObjectNode) JsonUtils.stringToJsonNode("{\"host\":\"1.2.3.4\", \"type\":\"broker\", \"port\":\"1234\"}");
     sendPostRequest(_controllerRequestURLBuilder.forInstanceCreate(), brokerInstance.toString());
 
-    JSONObject serverInstance = new JSONObject("{\"host\":\"1.2.3.4\", \"type\":\"server\", \"port\":\"2345\"}");
+    ObjectNode serverInstance =
+        (ObjectNode) JsonUtils.stringToJsonNode("{\"host\":\"1.2.3.4\", \"type\":\"server\", \"port\":\"2345\"}");
     sendPostRequest(_controllerRequestURLBuilder.forInstanceCreate(), serverInstance.toString());
 
     // Check that there are two instances
     TestUtils.waitForCondition(aVoid -> {
       try {
-        // Check that there are four instances
-        JSONObject instanceList1 = new JSONObject(sendGetRequest(_controllerRequestURLBuilder.forInstanceList()));
-        return instanceList1.getJSONArray("instances").length() == 2;
+        // Check that there are two instances
+        return JsonUtils.stringToJsonNode(sendGetRequest(_controllerRequestURLBuilder.forInstanceList()))
+            .get("instances")
+            .size() == 2;
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
@@ -77,8 +81,9 @@ public class PinotInstanceRestletResourceTest extends ControllerTest {
     TestUtils.waitForCondition(aVoid -> {
       try {
         // Check that there are four instances
-        JSONObject instanceList1 = new JSONObject(sendGetRequest(_controllerRequestURLBuilder.forInstanceList()));
-        return instanceList1.getJSONArray("instances").length() == 4;
+        return JsonUtils.stringToJsonNode(sendGetRequest(_controllerRequestURLBuilder.forInstanceList()))
+            .get("instances")
+            .size() == 4;
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
@@ -100,46 +105,47 @@ public class PinotInstanceRestletResourceTest extends ControllerTest {
     }
 
     // Check that there are four instances
-    instanceList = new JSONObject(sendGetRequest(_controllerRequestURLBuilder.forInstanceList()));
-    assertEquals(instanceList.getJSONArray("instances").length(), 4,
-        "Expected four instances after creation of duplicate instances");
+    JsonUtils.stringToJsonNode(sendGetRequest(_controllerRequestURLBuilder.forInstanceList()));
+    assertEquals(JsonUtils.stringToJsonNode(sendGetRequest(_controllerRequestURLBuilder.forInstanceList()))
+        .get("instances")
+        .size(), 4, "Expected fore instances after creation of duplicate instances");
 
     // Check that the instances are properly created
-    JSONObject instance =
-        new JSONObject(sendGetRequest(_controllerRequestURLBuilder.forInstanceInformation("Broker_1.2.3.4_1234")));
-    assertEquals(instance.get("instanceName"), "Broker_1.2.3.4_1234");
-    assertEquals(instance.get("hostName"), "1.2.3.4");
-    assertEquals(instance.get("port"), "1234");
-    assertEquals(instance.get("enabled"), true);
-    assertEquals(instance.getJSONArray("tags").length(), 1);
-    assertEquals(instance.getJSONArray("tags").get(0), CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE);
+    JsonNode instance = JsonUtils.stringToJsonNode(
+        sendGetRequest(_controllerRequestURLBuilder.forInstanceInformation("Broker_1.2.3.4_1234")));
+    assertEquals(instance.get("instanceName").asText(), "Broker_1.2.3.4_1234");
+    assertEquals(instance.get("hostName").asText(), "1.2.3.4");
+    assertEquals(instance.get("port").asText(), "1234");
+    assertTrue(instance.get("enabled").asBoolean());
+    assertEquals(instance.get("tags").size(), 1);
+    assertEquals(instance.get("tags").get(0).asText(), CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE);
 
-    instance =
-        new JSONObject(sendGetRequest(_controllerRequestURLBuilder.forInstanceInformation("Server_1.2.3.4_2345")));
-    assertEquals(instance.get("instanceName"), "Server_1.2.3.4_2345");
-    assertEquals(instance.get("hostName"), "1.2.3.4");
-    assertEquals(instance.get("port"), "2345");
-    assertEquals(instance.get("enabled"), true);
-    assertEquals(instance.getJSONArray("tags").length(), 1);
-    assertEquals(instance.getJSONArray("tags").get(0), CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE);
+    instance = JsonUtils.stringToJsonNode(
+        sendGetRequest(_controllerRequestURLBuilder.forInstanceInformation("Server_1.2.3.4_2345")));
+    assertEquals(instance.get("instanceName").asText(), "Server_1.2.3.4_2345");
+    assertEquals(instance.get("hostName").asText(), "1.2.3.4");
+    assertEquals(instance.get("port").asText(), "2345");
+    assertTrue(instance.get("enabled").asBoolean());
+    assertEquals(instance.get("tags").size(), 1);
+    assertEquals(instance.get("tags").get(0).asText(), CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE);
 
-    instance =
-        new JSONObject(sendGetRequest(_controllerRequestURLBuilder.forInstanceInformation("Broker_2.3.4.5_1234")));
-    assertEquals(instance.get("instanceName"), "Broker_2.3.4.5_1234");
-    assertEquals(instance.get("hostName"), "2.3.4.5");
-    assertEquals(instance.get("port"), "1234");
-    assertEquals(instance.get("enabled"), true);
-    assertEquals(instance.getJSONArray("tags").length(), 1);
-    assertEquals(instance.getJSONArray("tags").get(0), "someTag");
+    instance = JsonUtils.stringToJsonNode(
+        sendGetRequest(_controllerRequestURLBuilder.forInstanceInformation("Broker_2.3.4.5_1234")));
+    assertEquals(instance.get("instanceName").asText(), "Broker_2.3.4.5_1234");
+    assertEquals(instance.get("hostName").asText(), "2.3.4.5");
+    assertEquals(instance.get("port").asText(), "1234");
+    assertTrue(instance.get("enabled").asBoolean());
+    assertEquals(instance.get("tags").size(), 1);
+    assertEquals(instance.get("tags").get(0).asText(), "someTag");
 
-    instance =
-        new JSONObject(sendGetRequest(_controllerRequestURLBuilder.forInstanceInformation("Server_2.3.4.5_2345")));
-    assertEquals(instance.get("instanceName"), "Server_2.3.4.5_2345");
-    assertEquals(instance.get("hostName"), "2.3.4.5");
-    assertEquals(instance.get("port"), "2345");
-    assertEquals(instance.get("enabled"), true);
-    assertEquals(instance.getJSONArray("tags").length(), 1);
-    assertEquals(instance.getJSONArray("tags").get(0), "someTag");
+    instance = JsonUtils.stringToJsonNode(
+        sendGetRequest(_controllerRequestURLBuilder.forInstanceInformation("Server_2.3.4.5_2345")));
+    assertEquals(instance.get("instanceName").asText(), "Server_2.3.4.5_2345");
+    assertEquals(instance.get("hostName").asText(), "2.3.4.5");
+    assertEquals(instance.get("port").asText(), "2345");
+    assertTrue(instance.get("enabled").asBoolean());
+    assertEquals(instance.get("tags").size(), 1);
+    assertEquals(instance.get("tags").get(0).asText(), "someTag");
 
     // Check that an error is given for an instance that does not exist
     try {

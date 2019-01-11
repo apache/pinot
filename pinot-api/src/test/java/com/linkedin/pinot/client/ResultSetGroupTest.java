@@ -18,9 +18,9 @@
  */
 package com.linkedin.pinot.client;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.InputStream;
 import java.util.concurrent.Future;
-import org.json.JSONObject;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -133,7 +133,7 @@ public class ResultSetGroupTest {
           lastByte = stream.read();
         }
         String jsonText = builder.toString();
-        return BrokerResponse.fromJson(new JSONObject(jsonText));
+        return BrokerResponse.fromJson(new ObjectMapper().readTree(jsonText));
       } catch (Exception e) {
         Assert.fail("Unexpected exception", e);
         return null;

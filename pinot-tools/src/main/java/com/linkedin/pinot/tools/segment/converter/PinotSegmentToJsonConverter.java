@@ -18,13 +18,13 @@
  */
 package com.linkedin.pinot.tools.segment.converter;
 
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.linkedin.pinot.common.utils.JsonUtils;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.readers.PinotSegmentRecordReader;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
-import org.json.JSONArray;
-import org.json.JSONObject;
 
 
 /**
@@ -46,17 +46,10 @@ public class PinotSegmentToJsonConverter implements PinotSegmentConverter {
       GenericRow row = new GenericRow();
       while (recordReader.hasNext()) {
         row = recordReader.next(row);
-        JSONObject record = new JSONObject();
-
-        for (String field : row.getFieldNames()) {
-          Object value = row.getValue(field);
-          if (value instanceof Object[]) {
-            record.put(field, new JSONArray(value));
-          } else {
-            record.put(field, value);
-          }
+        ObjectNode record = JsonUtils.newObjectNode();
+        for (String column : row.getFieldNames()) {
+          record.set(column, JsonUtils.objectToJsonNode(row.getValue(column)));
         }
-
         recordWriter.write(record.toString());
         recordWriter.newLine();
       }

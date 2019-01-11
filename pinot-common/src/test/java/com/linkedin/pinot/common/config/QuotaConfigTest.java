@@ -18,11 +18,12 @@
  */
 package com.linkedin.pinot.common.config;
 
+import com.linkedin.pinot.common.utils.JsonUtils;
 import java.io.IOException;
 import org.apache.commons.configuration.ConfigurationRuntimeException;
-import org.codehaus.jackson.map.ObjectMapper;
 import org.testng.Assert;
 import org.testng.annotations.Test;
+
 
 public class QuotaConfigTest {
 
@@ -30,14 +31,14 @@ public class QuotaConfigTest {
   public void testQuotaConfig() throws IOException {
     {
       String quotaConfigStr = "{\"storage\" : \"100g\"}";
-      QuotaConfig quotaConfig = new ObjectMapper().readValue(quotaConfigStr, QuotaConfig.class);
+      QuotaConfig quotaConfig = JsonUtils.stringToObject(quotaConfigStr, QuotaConfig.class);
 
       Assert.assertEquals(quotaConfig.getStorage(), "100g");
       Assert.assertEquals(quotaConfig.storageSizeBytes(), 100 * 1024 * 1024 * 1024L);
     }
     {
       String quotaConfigStr = "{}";
-      QuotaConfig quotaConfig = new ObjectMapper().readValue(quotaConfigStr, QuotaConfig.class);
+      QuotaConfig quotaConfig = JsonUtils.stringToObject(quotaConfigStr, QuotaConfig.class);
       Assert.assertNull(quotaConfig.getStorage());
       Assert.assertEquals(quotaConfig.storageSizeBytes(), -1);
     }
@@ -47,7 +48,7 @@ public class QuotaConfigTest {
   public void testBadQuotaConfig() throws IOException {
     {
       String quotaConfigStr = "{\"storage\" : \"124GB3GB\"}";
-      QuotaConfig quotaConfig = new ObjectMapper().readValue(quotaConfigStr, QuotaConfig.class);
+      QuotaConfig quotaConfig = JsonUtils.stringToObject(quotaConfigStr, QuotaConfig.class);
       Assert.assertNotNull(quotaConfig.getStorage());
       Assert.assertEquals(quotaConfig.storageSizeBytes(), -1);
     }
@@ -56,7 +57,7 @@ public class QuotaConfigTest {
   @Test(expectedExceptions = ConfigurationRuntimeException.class)
   public void testBadConfig() throws IOException {
     String quotaConfigStr = "{\"storage\":\"-1M\"}";
-    QuotaConfig quotaConfig = new ObjectMapper().readValue(quotaConfigStr, QuotaConfig.class);
+    QuotaConfig quotaConfig = JsonUtils.stringToObject(quotaConfigStr, QuotaConfig.class);
     quotaConfig.validate();
   }
 
@@ -64,7 +65,7 @@ public class QuotaConfigTest {
   public void testQpsQuota() throws IOException {
     {
       String quotaConfigStr = "{\"maxQueriesPerSecond\" : \"100.00\"}";
-      QuotaConfig quotaConfig = new ObjectMapper().readValue(quotaConfigStr, QuotaConfig.class);
+      QuotaConfig quotaConfig = JsonUtils.stringToObject(quotaConfigStr, QuotaConfig.class);
 
       Assert.assertNotNull(quotaConfig.getMaxQueriesPerSecond());
       Assert.assertEquals(quotaConfig.getMaxQueriesPerSecond(), "100.00");
@@ -72,7 +73,7 @@ public class QuotaConfigTest {
     }
     {
       String quotaConfigStr = "{\"maxQueriesPerSecond\" : \"0.5\"}";
-      QuotaConfig quotaConfig = new ObjectMapper().readValue(quotaConfigStr, QuotaConfig.class);
+      QuotaConfig quotaConfig = JsonUtils.stringToObject(quotaConfigStr, QuotaConfig.class);
 
       Assert.assertNotNull(quotaConfig.getMaxQueriesPerSecond());
       Assert.assertEquals(quotaConfig.getMaxQueriesPerSecond(), "0.5");
@@ -80,7 +81,7 @@ public class QuotaConfigTest {
     }
     {
       String quotaConfigStr = "{}";
-      QuotaConfig quotaConfig = new ObjectMapper().readValue(quotaConfigStr, QuotaConfig.class);
+      QuotaConfig quotaConfig = JsonUtils.stringToObject(quotaConfigStr, QuotaConfig.class);
       Assert.assertNull(quotaConfig.getMaxQueriesPerSecond());
       Assert.assertTrue(quotaConfig.isMaxQueriesPerSecondValid());
     }
@@ -89,7 +90,7 @@ public class QuotaConfigTest {
   @Test(expectedExceptions = ConfigurationRuntimeException.class)
   public void testInvalidQpsQuota() throws IOException {
     String quotaConfigStr = "{\"maxQueriesPerSecond\" : \"InvalidQpsQuota\"}";
-    QuotaConfig quotaConfig = new ObjectMapper().readValue(quotaConfigStr, QuotaConfig.class);
+    QuotaConfig quotaConfig = JsonUtils.stringToObject(quotaConfigStr, QuotaConfig.class);
     Assert.assertNotNull(quotaConfig.getMaxQueriesPerSecond());
     quotaConfig.validate();
   }
@@ -97,7 +98,7 @@ public class QuotaConfigTest {
   @Test(expectedExceptions = ConfigurationRuntimeException.class)
   public void testNegativeQpsQuota() throws IOException {
     String quotaConfigStr = "{\"maxQueriesPerSecond\" : \"-1.0\"}";
-    QuotaConfig quotaConfig = new ObjectMapper().readValue(quotaConfigStr, QuotaConfig.class);
+    QuotaConfig quotaConfig = JsonUtils.stringToObject(quotaConfigStr, QuotaConfig.class);
     Assert.assertNotNull(quotaConfig.getMaxQueriesPerSecond());
     quotaConfig.validate();
   }
@@ -105,7 +106,7 @@ public class QuotaConfigTest {
   @Test(expectedExceptions = ConfigurationRuntimeException.class)
   public void testBadQpsQuota() throws IOException {
     String quotaConfigStr = "{\"maxQueriesPerSecond\" : \"1.0Test\"}";
-    QuotaConfig quotaConfig = new ObjectMapper().readValue(quotaConfigStr, QuotaConfig.class);
+    QuotaConfig quotaConfig = JsonUtils.stringToObject(quotaConfigStr, QuotaConfig.class);
     Assert.assertNotNull(quotaConfig.getMaxQueriesPerSecond());
     quotaConfig.validate();
   }

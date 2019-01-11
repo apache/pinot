@@ -18,12 +18,14 @@
  */
 package com.linkedin.pinot.controller.api.resources;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.JsonUtils;
 import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
 import com.linkedin.pinot.controller.helix.ControllerTest;
-import org.json.JSONObject;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -48,13 +50,11 @@ public class PinotTenantRestletResourceTest extends ControllerTest {
 
   @Test
   public void testTableListForTenant() throws Exception {
-    JSONObject tableList = null;
-
     // Create untagged broker and server instances
-    JSONObject brokerInstance = new JSONObject("{\"host\":\"1.2.3.4\", \"type\":\"broker\", \"port\":\"1234\"}");
+    ObjectNode brokerInstance = (ObjectNode) JsonUtils.stringToJsonNode("{\"host\":\"1.2.3.4\", \"type\":\"broker\", \"port\":\"1234\"}");
     sendPostRequest(_controllerRequestURLBuilder.forInstanceCreate(), brokerInstance.toString());
 
-    JSONObject serverInstance = new JSONObject("{\"host\":\"1.2.3.4\", \"type\":\"server\", \"port\":\"2345\"}");
+    ObjectNode serverInstance = (ObjectNode) JsonUtils.stringToJsonNode("{\"host\":\"1.2.3.4\", \"type\":\"server\", \"port\":\"2345\"}");
     sendPostRequest(_controllerRequestURLBuilder.forInstanceCreate(), serverInstance.toString());
 
     // Create tagged broker and server instances
@@ -67,12 +67,13 @@ public class PinotTenantRestletResourceTest extends ControllerTest {
     sendPostRequest(_controllerRequestURLBuilder.forInstanceCreate(), serverInstance.toString());
 
     // Check that no tables on tenant works
-    tableList = new JSONObject(sendGetRequest(_controllerRequestURLBuilder.forTablesFromTenant("server_REALTIME")));
-    assertEquals(tableList.getJSONArray("tables").length(), 0, "Expected no tables");
+    JsonNode tableList =
+        JsonUtils.stringToJsonNode(sendGetRequest(_controllerRequestURLBuilder.forTablesFromTenant("server_REALTIME")));
+    assertEquals(tableList.get("tables").size(), 0, "Expected no tables");
 
     // Try to make sure both kinds of tags work
-    tableList = new JSONObject(sendGetRequest(_controllerRequestURLBuilder.forTablesFromTenant("server")));
-    assertEquals(tableList.getJSONArray("tables").length(), 0, "Expected no tables");
+    tableList = JsonUtils.stringToJsonNode(sendGetRequest(_controllerRequestURLBuilder.forTablesFromTenant("server")));
+    assertEquals(tableList.get("tables").size(), 0, "Expected no tables");
 
     // Add a table to the server
     String createTableUrl = _controllerRequestURLBuilder.forTableCreate();
@@ -95,9 +96,9 @@ public class PinotTenantRestletResourceTest extends ControllerTest {
     sendPostRequest(createTableUrl, offlineTableJSONConfigString);
 
     // Try to make sure both kinds of tags work
-    tableList = new JSONObject(sendGetRequest(_controllerRequestURLBuilder.forTablesFromTenant("DefaultTenant")));
-    assertEquals(tableList.getJSONArray("tables").length(), 1, "Expected 1 table");
-    assertEquals(tableList.getJSONArray("tables").get(0), "mytable_OFFLINE");
+    tableList = JsonUtils.stringToJsonNode(sendGetRequest(_controllerRequestURLBuilder.forTablesFromTenant("DefaultTenant")));
+    assertEquals(tableList.get("tables").size(), 1, "Expected 1 table");
+    assertEquals(tableList.get("tables").get(0).asText(), "mytable_OFFLINE");
   }
 
   @AfterClass

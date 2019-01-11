@@ -18,6 +18,7 @@
  */
 package com.linkedin.pinot.common.utils;
 
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.linkedin.pinot.common.utils.FileUploadDownloadClient.FileUploadType;
 import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpExchange;
@@ -35,8 +36,6 @@ import org.apache.http.Header;
 import org.apache.http.HttpStatus;
 import org.apache.http.NameValuePair;
 import org.apache.http.message.BasicHeader;
-import org.json.JSONException;
-import org.json.JSONObject;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -68,20 +67,15 @@ public class FileUploadDownloadClientTest {
       FileUploadType uploadType = FileUploadType.valueOf(uploadTypeStr);
 
       String downloadUri = null;
-      String crypter = null;
 
       if (uploadType == FileUploadType.JSON) {
         InputStream bodyStream = httpExchange.getRequestBody();
-        try {
-          JSONObject jsonObject = new JSONObject(IOUtils.toString(bodyStream, "UTF-8"));
-          downloadUri = (String) jsonObject.get(CommonConstants.Segment.Offline.DOWNLOAD_URL);
-        } catch (JSONException e) {
-          throw new RuntimeException(e);
-        }
-        Assert.assertEquals(downloadUri, TEST_URI);
+        downloadUri = JsonUtils.stringToJsonNode(IOUtils.toString(bodyStream, "UTF-8"))
+            .get(CommonConstants.Segment.Offline.DOWNLOAD_URL)
+            .asText();
       } else if (uploadType == FileUploadType.URI) {
         downloadUri = requestHeaders.getFirst(FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI);
-        crypter = requestHeaders.getFirst(FileUploadDownloadClient.CustomHeaders.CRYPTER);
+        String crypter = requestHeaders.getFirst(FileUploadDownloadClient.CustomHeaders.CRYPTER);
         Assert.assertEquals(crypter, TEST_CRYPTER);
       } else {
         Assert.fail();
@@ -117,7 +111,7 @@ public class FileUploadDownloadClientTest {
 
   @Test
   public void testSendFileWithJson() throws Exception {
-    JSONObject segmentJson = new JSONObject();
+    ObjectNode segmentJson = JsonUtils.newObjectNode();
     segmentJson.put(CommonConstants.Segment.Offline.DOWNLOAD_URL, TEST_URI);
     String jsonString = segmentJson.toString();
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {

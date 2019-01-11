@@ -18,11 +18,14 @@
  */
 package com.linkedin.pinot.broker.api.resources;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.linkedin.pinot.broker.api.RequestStatistics;
 import com.linkedin.pinot.broker.requesthandler.BrokerRequestHandler;
 import com.linkedin.pinot.common.metrics.BrokerMeter;
 import com.linkedin.pinot.common.metrics.BrokerMetrics;
 import com.linkedin.pinot.common.response.BrokerResponse;
+import com.linkedin.pinot.common.utils.JsonUtils;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
@@ -37,7 +40,6 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -67,10 +69,9 @@ public class PinotClientRequest {
       // Query param "bql" is for backward compatibility
       @ApiParam(value = "Query", required = true) @QueryParam("bql") String query,
       @ApiParam(value = "Trace enabled") @QueryParam(TRACE) String traceEnabled,
-      @ApiParam(value = "Debug options") @QueryParam(DEBUG_OPTIONS) String debugOptions
-  ) {
+      @ApiParam(value = "Debug options") @QueryParam(DEBUG_OPTIONS) String debugOptions) {
     try {
-      JSONObject requestJson = new JSONObject();
+      ObjectNode requestJson = JsonUtils.newObjectNode();
       requestJson.put(PQL, query);
       if (traceEnabled != null) {
         requestJson.put(TRACE, traceEnabled);
@@ -97,7 +98,7 @@ public class PinotClientRequest {
   })
   public String processQueryPost(String query) {
     try {
-      JSONObject requestJson = new JSONObject(query);
+      JsonNode requestJson = JsonUtils.stringToJsonNode(query);
       BrokerResponse brokerResponse = requestHandler.handleRequest(requestJson, null, new RequestStatistics());
       return brokerResponse.toJsonString();
     } catch (Exception e) {

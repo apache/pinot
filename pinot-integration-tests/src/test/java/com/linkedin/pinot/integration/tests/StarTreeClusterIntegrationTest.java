@@ -18,6 +18,7 @@
  */
 package com.linkedin.pinot.integration.tests;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.tools.query.comparison.QueryComparison;
 import com.linkedin.pinot.tools.query.comparison.SegmentInfoProvider;
@@ -33,7 +34,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
 import org.apache.commons.io.FileUtils;
-import org.json.JSONObject;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -182,14 +182,13 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
 
   private void testStarQuery(String starQuery) throws Exception {
     String referenceQuery = starQuery.replace(STAR_TREE_TABLE_NAME, DEFAULT_TABLE_NAME) + " TOP 10000";
-    JSONObject starResponse = postQuery(starQuery);
-    JSONObject referenceResponse = postQuery(referenceQuery);
+    JsonNode starResponse = postQuery(starQuery);
+    JsonNode referenceResponse = postQuery(referenceQuery);
 
     // Skip comparison if not all results returned in reference response
     if (referenceResponse.has("aggregationResults")) {
-      JSONObject aggregationResults = referenceResponse.getJSONArray("aggregationResults").getJSONObject(0);
-      if (aggregationResults.has("groupByResult")
-          && aggregationResults.getJSONArray("groupByResult").length() == 10000) {
+      JsonNode aggregationResults = referenceResponse.get("aggregationResults").get(0);
+      if (aggregationResults.has("groupByResult") && aggregationResults.get("groupByResult").size() == 10000) {
         return;
       }
     }

@@ -22,6 +22,7 @@ import com.google.common.collect.BiMap;
 import com.linkedin.pinot.common.http.MultiGetRequest;
 import com.linkedin.pinot.common.restlet.resources.SegmentSizeInfo;
 import com.linkedin.pinot.common.restlet.resources.TableSizeInfo;
+import com.linkedin.pinot.common.utils.JsonUtils;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -31,7 +32,6 @@ import java.util.concurrent.Executor;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.httpclient.URI;
 import org.apache.commons.httpclient.methods.GetMethod;
-import org.codehaus.jackson.map.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -42,7 +42,6 @@ import org.slf4j.LoggerFactory;
  */
 public class ServerTableSizeReader {
   private static final Logger LOGGER = LoggerFactory.getLogger(ServerTableSizeReader.class);
-  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   private final Executor _executor;
   private final HttpConnectionManager _connectionManager;
@@ -80,7 +79,8 @@ public class ServerTableSizeReader {
           LOGGER.error("Server: {} returned error: {}", instance, getMethod.getStatusCode());
           continue;
         }
-        TableSizeInfo tableSizeInfo = OBJECT_MAPPER.readValue(getMethod.getResponseBodyAsStream(), TableSizeInfo.class);
+        TableSizeInfo tableSizeInfo =
+            JsonUtils.inputStreamToObject(getMethod.getResponseBodyAsStream(), TableSizeInfo.class);
         serverToSegmentSizeInfoListMap.put(instance, tableSizeInfo.segments);
       } catch (Exception e) {
         // Ignore individual exceptions because the exception has been logged in MultiGetRequest

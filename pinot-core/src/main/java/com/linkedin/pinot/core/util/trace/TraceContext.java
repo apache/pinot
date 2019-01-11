@@ -18,17 +18,18 @@
  */
 package com.linkedin.pinot.core.util.trace;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.annotations.VisibleForTesting;
+import com.linkedin.pinot.common.utils.JsonUtils;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import javax.annotation.Nullable;
-import org.json.JSONArray;
-import org.json.JSONObject;
 
 
 /**
@@ -60,8 +61,10 @@ public final class TraceContext {
         _value = value;
       }
 
-      JSONObject toJson() {
-        return new JSONObject(Collections.singletonMap(_key, _value));
+      JsonNode toJson() {
+        ObjectNode jsonLog = JsonUtils.newObjectNode();
+        jsonLog.set(_key, JsonUtils.objectToJsonNode(_value));
+        return jsonLog;
       }
     }
 
@@ -85,12 +88,14 @@ public final class TraceContext {
       return _traceId + "_" + _numChildren++;
     }
 
-    JSONObject toJson() {
-      JSONArray jsonLogs = new JSONArray();
+    JsonNode toJson() {
+      ArrayNode jsonLogs = JsonUtils.newArrayNode();
       for (LogEntry log : _logs) {
-        jsonLogs.put(log.toJson());
+        jsonLogs.add(log.toJson());
       }
-      return new JSONObject(Collections.singletonMap(_traceId, jsonLogs));
+      ObjectNode jsonTrace = JsonUtils.newObjectNode();
+      jsonTrace.set(_traceId, jsonLogs);
+      return jsonTrace;
     }
   }
 
@@ -184,9 +189,9 @@ public final class TraceContext {
    * Get the trace information added so far.
    */
   public static String getTraceInfo() {
-    JSONArray jsonTraces = new JSONArray();
+    ArrayNode jsonTraces = JsonUtils.newArrayNode();
     for (Trace trace : REQUEST_TO_TRACES_MAP.get(TRACE_ENTRY_THREAD_LOCAL.get()._requestId)) {
-      jsonTraces.put(trace.toJson());
+      jsonTraces.add(trace.toJson());
     }
     return jsonTraces.toString();
   }

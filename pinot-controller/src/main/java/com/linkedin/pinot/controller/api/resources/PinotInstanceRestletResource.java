@@ -19,6 +19,8 @@
 package com.linkedin.pinot.controller.api.resources;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.linkedin.pinot.common.utils.JsonUtils;
 import com.linkedin.pinot.controller.api.pojos.Instance;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse;
@@ -39,9 +41,6 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.helix.model.InstanceConfig;
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -100,16 +99,12 @@ public class PinotInstanceRestletResource {
           Response.Status.NOT_FOUND);
     }
     InstanceConfig instanceConfig = pinotHelixResourceManager.getHelixInstanceConfig(instanceName);
-    JSONObject response = new JSONObject();
-    try {
-      response.put("instanceName", instanceConfig.getInstanceName());
-      response.put("hostName", instanceConfig.getHostName());
-      response.put("enabled", instanceConfig.getInstanceEnabled());
-      response.put("port", instanceConfig.getPort());
-      response.put("tags", new JSONArray(instanceConfig.getTags()));
-    } catch (JSONException e) {
-      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
-    }
+    ObjectNode response = JsonUtils.newObjectNode();
+    response.put("instanceName", instanceConfig.getInstanceName());
+    response.put("hostName", instanceConfig.getHostName());
+    response.put("enabled", instanceConfig.getInstanceEnabled());
+    response.put("port", instanceConfig.getPort());
+    response.set("tags", JsonUtils.objectToJsonNode(instanceConfig.getTags()));
     return response.toString();
   }
 

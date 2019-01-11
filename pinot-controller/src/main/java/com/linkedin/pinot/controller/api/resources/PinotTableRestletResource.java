@@ -18,6 +18,8 @@
  */
 package com.linkedin.pinot.controller.api.resources;
 
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.config.SegmentsValidationAndRetentionConfig;
 import com.linkedin.pinot.common.config.TableConfig;
@@ -30,6 +32,7 @@ import com.linkedin.pinot.common.restlet.resources.RebalanceResult;
 import com.linkedin.pinot.common.restlet.resources.ResourceUtils;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
+import com.linkedin.pinot.common.utils.JsonUtils;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse;
@@ -38,7 +41,6 @@ import com.linkedin.pinot.core.realtime.stream.StreamConfig;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
-import java.io.IOException;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
@@ -60,9 +62,6 @@ import javax.ws.rs.core.Response;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.lang3.EnumUtils;
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
 import org.slf4j.LoggerFactory;
 
 
@@ -106,15 +105,14 @@ public class PinotTableRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables")
   @ApiOperation(value = "Adds a table", notes = "Adds a table")
-  public SuccessResponse addTable(String tableConfigStr) throws Exception {
+  public SuccessResponse addTable(String tableConfigStr) {
     // TODO introduce a table config ctor with json string.
     TableConfig tableConfig;
     String tableName;
     try {
-      JSONObject tableConfigJson = new JSONObject(tableConfigStr);
-      tableConfig = TableConfig.fromJSONConfig(tableConfigJson);
+      tableConfig = TableConfig.fromJsonString(tableConfigStr);
       tableName = tableConfig.getTableName();
-    } catch (IOException | JSONException | IllegalArgumentException e) {
+    } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST, e);
     }
     try {
@@ -160,10 +158,7 @@ public class PinotTableRestletResource {
       }
 
       Collections.sort(tableNames);
-      JSONArray tableArray = new JSONArray(tableNames);
-      JSONObject resultObject = new JSONObject();
-      resultObject.put("tables", tableArray);
-      return resultObject.toString();
+      return JsonUtils.newObjectNode().set("tables", JsonUtils.objectToJsonNode(tableNames)).toString();
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
     }
@@ -171,20 +166,20 @@ public class PinotTableRestletResource {
 
   private String listTableConfigs(@Nonnull String tableName, @Nullable String tableTypeStr) {
     try {
-      JSONObject ret = new JSONObject();
+      ObjectNode ret = JsonUtils.newObjectNode();
 
       if ((tableTypeStr == null || CommonConstants.Helix.TableType.OFFLINE.name().equalsIgnoreCase(tableTypeStr))
           && _pinotHelixResourceManager.hasOfflineTable(tableName)) {
         TableConfig tableConfig = _pinotHelixResourceManager.getOfflineTableConfig(tableName);
         Preconditions.checkNotNull(tableConfig);
-        ret.put(CommonConstants.Helix.TableType.OFFLINE.name(), TableConfig.toJSONConfig(tableConfig));
+        ret.set(CommonConstants.Helix.TableType.OFFLINE.name(), TableConfig.toJSONConfig(tableConfig));
       }
 
       if ((tableTypeStr == null || CommonConstants.Helix.TableType.REALTIME.name().equalsIgnoreCase(tableTypeStr))
           && _pinotHelixResourceManager.hasRealtimeTable(tableName)) {
         TableConfig tableConfig = _pinotHelixResourceManager.getRealtimeTableConfig(tableName);
         Preconditions.checkNotNull(tableConfig);
-        ret.put(CommonConstants.Helix.TableType.REALTIME.name(), TableConfig.toJSONConfig(tableConfig));
+        ret.set(CommonConstants.Helix.TableType.REALTIME.name(), TableConfig.toJSONConfig(tableConfig));
       }
       return ret.toString();
     } catch (Exception e) {
@@ -207,29 +202,29 @@ public class PinotTableRestletResource {
         return listTableConfigs(tableName, tableTypeStr);
       }
       Constants.validateState(stateStr);
-      JSONArray ret = new JSONArray();
+      ArrayNode ret = JsonUtils.newArrayNode();
       boolean tableExists = false;
 
       if ((tableTypeStr == null || CommonConstants.Helix.TableType.OFFLINE.name().equalsIgnoreCase(tableTypeStr))
           && _pinotHelixResourceManager.hasOfflineTable(tableName)) {
         String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
-        JSONObject offline = new JSONObject();
+        ObjectNode offline = JsonUtils.newObjectNode();
         tableExists = true;
 
         offline.put(FileUploadPathProvider.TABLE_NAME, offlineTableName);
-        offline.put(FileUploadPathProvider.STATE, toggleTableState(offlineTableName, stateStr));
-        ret.put(offline);
+        offline.set(FileUploadPathProvider.STATE, JsonUtils.objectToJsonNode(toggleTableState(offlineTableName, stateStr)));
+        ret.add(offline);
       }
 
       if ((tableTypeStr == null || CommonConstants.Helix.TableType.REALTIME.name().equalsIgnoreCase(tableTypeStr))
           && _pinotHelixResourceManager.hasRealtimeTable(tableName)) {
         String realTimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
-        JSONObject realTime = new JSONObject();
+        ObjectNode realTime = JsonUtils.newObjectNode();
         tableExists = true;
 
         realTime.put(FileUploadPathProvider.TABLE_NAME, realTimeTableName);
-        realTime.put(FileUploadPathProvider.STATE, toggleTableState(realTimeTableName, stateStr));
-        ret.put(realTime);
+        realTime.set(FileUploadPathProvider.STATE, JsonUtils.objectToJsonNode(toggleTableState(realTimeTableName, stateStr)));
+        ret.add(realTime);
       }
       if (tableExists) {
         return ret.toString();
@@ -274,8 +269,7 @@ public class PinotTableRestletResource {
       String tableConfigStr) throws Exception {
     TableConfig tableConfig;
     try {
-      JSONObject tableConfigJson = new JSONObject(tableConfigStr);
-      tableConfig = TableConfig.fromJSONConfig(tableConfigJson);
+      tableConfig = TableConfig.fromJsonString(tableConfigStr);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST);
     }
@@ -323,15 +317,15 @@ public class PinotTableRestletResource {
   @ApiOperation(value = "Validate table config for a table", notes =
       "This API returns the table config that matches the one you get from 'GET /tables/{tableName}'."
           + " This allows us to validate table config before apply.")
-  public String checkTableConfig(String tableConfigStr) throws Exception {
+  public String checkTableConfig(String tableConfigStr) {
     try {
-      JSONObject tableConfigValidateStr = new JSONObject();
-      TableConfig tableConfig = TableConfig.fromJSONConfig(new JSONObject(tableConfigStr));
+      ObjectNode tableConfigValidateStr = JsonUtils.newObjectNode();
+      TableConfig tableConfig = TableConfig.fromJsonString(tableConfigStr);
       if (tableConfig.getTableType() == CommonConstants.Helix.TableType.OFFLINE) {
-        tableConfigValidateStr.put(CommonConstants.Helix.TableType.OFFLINE.name(),
+        tableConfigValidateStr.set(CommonConstants.Helix.TableType.OFFLINE.name(),
             TableConfig.toJSONConfig(tableConfig));
       } else {
-        tableConfigValidateStr.put(CommonConstants.Helix.TableType.REALTIME.name(),
+        tableConfigValidateStr.set(CommonConstants.Helix.TableType.REALTIME.name(),
             TableConfig.toJSONConfig(tableConfig));
       }
       return tableConfigValidateStr.toString();

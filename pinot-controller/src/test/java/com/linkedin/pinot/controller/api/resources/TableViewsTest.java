@@ -18,10 +18,10 @@
  */
 package com.linkedin.pinot.controller.api.resources;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.JsonUtils;
 import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
 import com.linkedin.pinot.controller.helix.ControllerTest;
@@ -42,7 +42,6 @@ import org.testng.annotations.Test;
 
 
 public class TableViewsTest extends ControllerTest {
-  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private static final String OFFLINE_TABLE_NAME = "offlineTable";
   private static final String OFFLINE_SEGMENT_NAME = "offlineSegment";
   private static final String HYBRID_TABLE_NAME = "hybridTable";
@@ -183,7 +182,7 @@ public class TableViewsTest extends ControllerTest {
   }
 
   private TableViews.TableView getTableView(String tableName, String view, String tableType) throws Exception {
-    return OBJECT_MAPPER.readValue(
+    return JsonUtils.stringToObject(
         sendGetRequest(_controllerRequestURLBuilder.forTableView(tableName, view, tableType)),
         TableViews.TableView.class);
   }

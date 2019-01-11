@@ -18,13 +18,13 @@
  */
 package com.linkedin.pinot.common.data;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
-import com.google.gson.JsonObject;
 import com.linkedin.pinot.common.config.ConfigKey;
 import com.linkedin.pinot.common.utils.EqualityUtils;
 import javax.annotation.Nonnull;
-import org.codehaus.jackson.annotate.JsonIgnore;
-import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 
 
 @SuppressWarnings("unused")
@@ -121,10 +121,10 @@ public final class DateTimeFieldSpec extends FieldSpec {
 
   @Nonnull
   @Override
-  public JsonObject toJsonObject() {
-    JsonObject jsonObject = super.toJsonObject();
-    jsonObject.addProperty("format", _format);
-    jsonObject.addProperty("granularity", _granularity);
+  public ObjectNode toJsonObject() {
+    ObjectNode jsonObject = super.toJsonObject();
+    jsonObject.put("format", _format);
+    jsonObject.put("granularity", _granularity);
     return jsonObject;
   }
 

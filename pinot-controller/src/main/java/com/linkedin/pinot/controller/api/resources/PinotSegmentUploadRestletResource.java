@@ -18,6 +18,8 @@
  */
 package com.linkedin.pinot.controller.api.resources;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metrics.ControllerMeter;
 import com.linkedin.pinot.common.metrics.ControllerMetrics;
@@ -25,6 +27,7 @@ import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.segment.fetcher.SegmentFetcherFactory;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.FileUploadDownloadClient;
+import com.linkedin.pinot.common.utils.JsonUtils;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
 import com.linkedin.pinot.controller.ControllerConf;
@@ -81,8 +84,6 @@ import org.glassfish.grizzly.http.server.Request;
 import org.glassfish.jersey.media.multipart.FormDataBodyPart;
 import org.glassfish.jersey.media.multipart.FormDataMultiPart;
 import org.glassfish.jersey.server.ManagedAsync;
-import org.json.JSONArray;
-import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -118,7 +119,7 @@ public class PinotSegmentUploadRestletResource {
   @Deprecated
   public String listAllSegmentNames() throws Exception {
     FileUploadPathProvider provider = new FileUploadPathProvider(_controllerConf);
-    final JSONArray ret = new JSONArray();
+    ArrayNode ret = JsonUtils.newArrayNode();
     for (final File file : provider.getBaseDataDir().listFiles()) {
       final String fileName = file.getName();
       if (fileName.equalsIgnoreCase("fileUploadTemp") || fileName.equalsIgnoreCase("schemasTemp")) {
@@ -126,7 +127,7 @@ public class PinotSegmentUploadRestletResource {
       }
 
       final String url = _controllerConf.generateVipUrl() + "/segments/" + fileName;
-      ret.put(url);
+      ret.add(url);
     }
     return ret.toString();
   }
@@ -138,14 +139,13 @@ public class PinotSegmentUploadRestletResource {
   public String listAllSegmentNames(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "realtime|offline") @QueryParam("type") String tableTypeStr) {
-    JSONArray ret = new JSONArray();
-
+    ArrayNode ret = JsonUtils.newArrayNode();
     CommonConstants.Helix.TableType tableType = Constants.validateTableType(tableTypeStr);
     if (tableTypeStr == null) {
-      ret.put(formatSegments(tableName, CommonConstants.Helix.TableType.OFFLINE));
-      ret.put(formatSegments(tableName, CommonConstants.Helix.TableType.REALTIME));
+      ret.add(formatSegments(tableName, CommonConstants.Helix.TableType.OFFLINE));
+      ret.add(formatSegments(tableName, CommonConstants.Helix.TableType.REALTIME));
     } else {
-      ret.put(formatSegments(tableName, tableType));
+      ret.add(formatSegments(tableName, tableType));
     }
     return ret.toString();
   }
@@ -490,12 +490,12 @@ public class PinotSegmentUploadRestletResource {
     }
   }
 
-  private JSONObject formatSegments(String tableName, CommonConstants.Helix.TableType tableType) {
-    return new JSONObject().put(tableType.toString(), getSegments(tableName, tableType.toString()));
+  private JsonNode formatSegments(String tableName, CommonConstants.Helix.TableType tableType) {
+    return JsonUtils.newObjectNode().set(tableType.toString(), getSegments(tableName, tableType.toString()));
   }
 
-  private JSONArray getSegments(String tableName, String tableType) {
-    JSONArray segments = new JSONArray();
+  private ArrayNode getSegments(String tableName, String tableType) {
+    ArrayNode segments = JsonUtils.newArrayNode();
 
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
@@ -517,7 +517,7 @@ public class PinotSegmentUploadRestletResource {
         continue;
       }
       if (!map.containsValue(PinotHelixSegmentOnlineOfflineStateModelGenerator.OFFLINE_STATE)) {
-        segments.put(segmentName);
+        segments.add(segmentName);
       }
     }
 

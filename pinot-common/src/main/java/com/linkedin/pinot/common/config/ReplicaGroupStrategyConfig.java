@@ -18,9 +18,9 @@
  */
 package com.linkedin.pinot.common.config;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.linkedin.pinot.common.utils.EqualityUtils;
 import javax.annotation.Nullable;
-import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 
 /**
  * Class representing configurations related to segment assignment strategy.

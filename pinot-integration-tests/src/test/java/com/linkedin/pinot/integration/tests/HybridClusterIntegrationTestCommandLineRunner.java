@@ -18,8 +18,10 @@
  */
 package com.linkedin.pinot.integration.tests;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.utils.JsonUtils;
 import com.linkedin.pinot.common.utils.KafkaStarterUtils;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.tools.query.comparison.QueryComparison;
@@ -40,7 +42,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import javax.annotation.Nonnull;
 import kafka.server.KafkaServerStartable;
 import org.apache.commons.io.FileUtils;
-import org.json.JSONObject;
 import org.testng.Assert;
 import org.testng.ITestResult;
 import org.testng.TestListenerAdapter;
@@ -240,9 +241,7 @@ public class HybridClusterIntegrationTestCommandLineRunner {
 
     @Override
     protected long getCurrentCountStarResult() throws Exception {
-      return postQuery("SELECT COUNT(*) FROM " + getTableName()).getJSONArray("aggregationResults")
-          .getJSONObject(0)
-          .getLong("value");
+      return postQuery("SELECT COUNT(*) FROM " + getTableName()).get("aggregationResults").get(0).get("value").asLong();
     }
 
     @BeforeClass
@@ -317,7 +316,7 @@ public class HybridClusterIntegrationTestCommandLineRunner {
           try (BufferedReader queryFileReader = new BufferedReader(new FileReader(_queryFile))) {
             // Set the expected COUNT(*) result and wait for all documents loaded
             responseFileReader.mark(4096);
-            _countStarResult = new JSONObject(responseFileReader.readLine()).getLong("totalDocs");
+            _countStarResult = JsonUtils.stringToJsonNode(responseFileReader.readLine()).get("totalDocs").asLong();
             responseFileReader.reset();
             waitForAllDocsLoaded(600_000L);
 
@@ -327,20 +326,20 @@ public class HybridClusterIntegrationTestCommandLineRunner {
                     new ThreadPoolExecutor.CallerRunsPolicy());
             String query;
             while ((query = queryFileReader.readLine()) != null) {
-              final String currentQuery = query;
-              final JSONObject expectedResponse = new JSONObject(responseFileReader.readLine());
+              String currentQuery = query;
+              JsonNode expectedResponse = JsonUtils.stringToJsonNode(responseFileReader.readLine());
               executorService.execute(new Runnable() {
                 @Override
                 public void run() {
                   try {
-                    JSONObject actualResponse = postQuery(currentQuery, "http://localhost:" + BROKER_BASE_PORT);
+                    JsonNode actualResponse = postQuery(currentQuery, "http://localhost:" + BROKER_BASE_PORT);
                     if (QueryComparison.compareWithEmpty(actualResponse, expectedResponse)
                         == QueryComparison.ComparisonStatus.FAILED) {
                       numFailedQueries.getAndIncrement();
                       System.out.println(
                           "Query comparison failed for query: " + currentQuery
-                              + "\nActual: " + actualResponse.toString(2)
-                              + "\nExpected: " + expectedResponse.toString(2));
+                              + "\nActual: " + actualResponse.toString()
+                              + "\nExpected: " + expectedResponse.toString());
                     }
                   } catch (Exception e) {
                     numFailedQueries.getAndIncrement();

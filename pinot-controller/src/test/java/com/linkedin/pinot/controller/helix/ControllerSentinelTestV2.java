@@ -24,7 +24,6 @@ import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.controller.utils.SegmentMetadataMockUtils;
 import java.io.IOException;
-import org.json.JSONException;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -51,7 +50,7 @@ public class ControllerSentinelTestV2 extends ControllerTest {
   }
 
   @Test
-  public void testOfflineTableLifeCycle() throws IOException, JSONException {
+  public void testOfflineTableLifeCycle() throws IOException {
     // Create offline table creation request
     String tableName = "testTable";
     String tableJSONConfigString =

@@ -18,13 +18,13 @@
  */
 package com.linkedin.pinot.tools.scan.query;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.linkedin.pinot.common.utils.JsonUtils;
 import com.linkedin.pinot.core.query.utils.Pair;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import org.codehaus.jackson.annotate.JsonProperty;
-import org.codehaus.jackson.map.ObjectMapper;
-import org.codehaus.jackson.map.annotate.JsonSerialize;
 
 
 public class QueryResponse {
@@ -165,13 +165,13 @@ public class QueryResponse {
   }
 
   @JsonProperty("selectionResults")
-  @JsonSerialize(include= JsonSerialize.Inclusion.NON_NULL)
+  @JsonInclude(JsonInclude.Include.NON_NULL)
   SelectionResults getSelectionResults() {
     return _selectionResults;
   }
 
   @JsonProperty("aggregationResults")
-  @JsonSerialize(include= JsonSerialize.Inclusion.NON_NULL)
+  @JsonInclude(JsonInclude.Include.NON_NULL)
   List<AggregationResult> getAggregationResults() {
     return _aggregationResults;
   }
@@ -219,19 +219,19 @@ public class QueryResponse {
     }
 
     @JsonProperty("function")
-    @JsonSerialize(include = JsonSerialize.Inclusion.NON_NULL)
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     public String getFunction() {
       return _function;
     }
 
     @JsonProperty("value")
-    @JsonSerialize(include = JsonSerialize.Inclusion.NON_NULL)
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     public String getValue() {
       return _value;
     }
 
     @JsonProperty("groupByResult")
-    @JsonSerialize(include = JsonSerialize.Inclusion.NON_NULL)
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     public List<GroupValue> getGroupValues() {
       return _groupValues;
     }
@@ -265,7 +265,7 @@ public class QueryResponse {
   @Override
   public String toString() {
     try {
-      return new ObjectMapper().writeValueAsString(this);
+      return JsonUtils.objectToString(this);
     } catch (IOException e) {
       return null;
     }

@@ -18,22 +18,21 @@
  */
 package com.linkedin.pinot.common.config;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.utils.EqualityUtils;
+import com.linkedin.pinot.common.utils.JsonUtils;
 import java.io.IOException;
 import java.util.Map;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import org.codehaus.jackson.annotate.JsonIgnore;
-import org.codehaus.jackson.annotate.JsonIgnoreProperties;
-import org.codehaus.jackson.annotate.JsonProperty;
-import org.codehaus.jackson.map.ObjectMapper;
 
 
 @SuppressWarnings("unused") // Suppress incorrect warning, as methods are used for json ser/de.
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class SegmentPartitionConfig {
-  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   public static final int INVALID_NUM_PARTITIONS = -1;
 
   @ConfigKey("columnPartitionMap")
@@ -96,9 +95,8 @@ public class SegmentPartitionConfig {
    * @return Instance of {@link SegmentPartitionConfig} built from the input string.
    * @throws IOException
    */
-  public static SegmentPartitionConfig fromJsonString(String jsonString)
-      throws IOException {
-    return OBJECT_MAPPER.readValue(jsonString, SegmentPartitionConfig.class);
+  public static SegmentPartitionConfig fromJsonString(String jsonString) throws IOException {
+    return JsonUtils.stringToObject(jsonString, SegmentPartitionConfig.class);
   }
 
   /**
@@ -107,9 +105,8 @@ public class SegmentPartitionConfig {
    * @return JSON string equivalent of the object.
    * @throws IOException
    */
-  public String toJsonString()
-      throws IOException {
-    return OBJECT_MAPPER.writeValueAsString(this);
+  public String toJsonString() throws IOException {
+    return JsonUtils.objectToString(this);
   }
 
   /**
@@ -143,10 +140,5 @@ public class SegmentPartitionConfig {
   public int hashCode() {
     int result = EqualityUtils.hashCodeOf(_columnPartitionMap);
     return result;
-  }
-
-  @Override
-  public String toString() {
-    return "SegmentPartitionConfig{" + "_columnPartitionMap=" + _columnPartitionMap + '}';
   }
 }

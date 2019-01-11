@@ -21,6 +21,7 @@ package com.linkedin.pinot.tools.scan.query;
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.GroupBy;
+import com.linkedin.pinot.common.utils.JsonUtils;
 import com.linkedin.pinot.pql.parsers.Pql2Compiler;
 import java.io.BufferedReader;
 import java.io.File;
@@ -35,7 +36,6 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import org.codehaus.jackson.map.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -170,15 +170,13 @@ public class ScanBasedQueryProcessor implements Cloneable {
       QueryResponse queryResponse = scanBasedQueryProcessor.processQuery(query);
       printResult(queryResponse);
       printWriter.println("Query: " + query);
-      printWriter.println("Result: " + new ObjectMapper().writeValueAsString(queryResponse));
+      printWriter.println("Result: " + JsonUtils.objectToString(queryResponse));
     }
     bufferedReader.close();
     printWriter.close();
   }
 
-  public static void printResult(QueryResponse queryResponse)
-      throws IOException {
-    ObjectMapper objectMapper = new ObjectMapper();
-    LOGGER.info(objectMapper.writeValueAsString(queryResponse));
+  public static void printResult(QueryResponse queryResponse) throws IOException {
+    LOGGER.info(JsonUtils.objectToString(queryResponse));
   }
 }

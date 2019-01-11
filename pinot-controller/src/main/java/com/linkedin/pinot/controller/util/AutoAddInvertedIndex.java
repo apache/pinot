@@ -18,6 +18,7 @@
  */
 package com.linkedin.pinot.controller.util;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.config.IndexingConfig;
 import com.linkedin.pinot.common.config.TableConfig;
@@ -26,6 +27,7 @@ import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.TimeFieldSpec;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
+import com.linkedin.pinot.common.utils.JsonUtils;
 import com.linkedin.pinot.controller.helix.ControllerRequestURLBuilder;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -45,7 +47,6 @@ import org.apache.helix.ZNRecord;
 import org.apache.helix.manager.zk.ZKHelixAdmin;
 import org.apache.helix.manager.zk.ZNRecordSerializer;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -240,8 +241,8 @@ public class AutoAddInvertedIndex {
       }
 
       // Only add inverted index to table larger than a threshold
-      JSONObject queryResponse = sendQuery("SELECT COUNT(*) FROM " + tableNameWithType);
-      long numTotalDocs = queryResponse.getLong("totalDocs");
+      JsonNode queryResponse = sendQuery("SELECT COUNT(*) FROM " + tableNameWithType);
+      long numTotalDocs = queryResponse.get("totalDocs").asLong();
       LOGGER.info("Table: {}, number of total documents: {}", tableNameWithType, numTotalDocs);
       if (numTotalDocs <= _tableSizeThreshold) {
         LOGGER.info("Table: {}, skip adding inverted index because the table is too small", tableNameWithType);
@@ -250,8 +251,7 @@ public class AutoAddInvertedIndex {
 
       // Get each dimension's cardinality on one timestamp's data
       queryResponse = sendQuery("SELECT Max(" + timeColumnName + ") FROM " + tableNameWithType);
-      long maxTimeStamp =
-          new Double(queryResponse.getJSONArray("aggregationResults").getJSONObject(0).getDouble("value")).longValue();
+      long maxTimeStamp = queryResponse.get("aggregationResults").get(0).get("value").asLong();
 
       LOGGER.info("Table: {}, max time column {}: {}", tableNameWithType, timeColumnName, maxTimeStamp);
 
@@ -262,9 +262,9 @@ public class AutoAddInvertedIndex {
             "SELECT DISTINCTCOUNT(" + dimensionName + ") FROM " + tableNameWithType + " WHERE " + timeColumnName + " = "
                 + maxTimeStamp;
         queryResponse = sendQuery(query);
-        JSONObject result = queryResponse.getJSONArray("aggregationResults").getJSONObject(0);
-        resultPairs.add(
-            new ResultPair(result.getString("function").substring("distinctCount_".length()), result.getLong("value")));
+        JsonNode result = queryResponse.get("aggregationResults").get(0);
+        resultPairs.add(new ResultPair(result.get("function").asText().substring("distinctCount_".length()),
+            result.get("value").asLong()));
       }
 
       // Sort the dimensions based on their cardinalities
@@ -315,16 +315,16 @@ public class AutoAddInvertedIndex {
     }
   }
 
-  private JSONObject sendQuery(String query) throws Exception {
+  private JsonNode sendQuery(String query) throws Exception {
     URLConnection urlConnection = new URL("http://" + _brokerAddress + "/query").openConnection();
     urlConnection.setDoOutput(true);
 
     BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(urlConnection.getOutputStream(), "UTF-8"));
-    writer.write(new JSONObject().put("pql", query).toString());
+    writer.write(JsonUtils.newObjectNode().put("pql", query).toString());
     writer.flush();
 
     BufferedReader reader = new BufferedReader(new InputStreamReader(urlConnection.getInputStream(), "UTF-8"));
-    return new JSONObject(reader.readLine());
+    return JsonUtils.stringToJsonNode(reader.readLine());
   }
 
   private boolean updateIndexConfig(String tableName, TableConfig tableConfig) throws Exception {

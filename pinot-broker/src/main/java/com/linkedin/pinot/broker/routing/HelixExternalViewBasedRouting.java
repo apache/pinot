@@ -18,6 +18,8 @@
  */
 package com.linkedin.pinot.broker.routing;
 
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.collect.Sets;
 import com.linkedin.pinot.broker.routing.builder.RoutingTableBuilder;
 import com.linkedin.pinot.broker.routing.selector.SegmentSelector;
@@ -29,6 +31,7 @@ import com.linkedin.pinot.common.metrics.BrokerMetrics;
 import com.linkedin.pinot.common.metrics.BrokerTimer;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.EqualityUtils;
+import com.linkedin.pinot.common.utils.JsonUtils;
 import com.linkedin.pinot.common.utils.NetUtil;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
 import java.util.ArrayList;
@@ -50,8 +53,6 @@ import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.zookeeper.data.Stat;
-import org.json.JSONArray;
-import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -574,27 +575,27 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
 
   @Override
   public String dumpSnapshot(String tableName) throws Exception {
-    JSONObject ret = new JSONObject();
-    JSONArray routingTableSnapshot = new JSONArray();
+    ObjectNode ret = JsonUtils.newObjectNode();
+    ArrayNode routingTableSnapshot = JsonUtils.newArrayNode();
 
     for (String currentTable : _routingTableBuilderMap.keySet()) {
       if (tableName == null || currentTable.startsWith(tableName)) {
-        JSONObject tableEntry = new JSONObject();
+        ObjectNode tableEntry = JsonUtils.newObjectNode();
         tableEntry.put("tableName", currentTable);
 
-        JSONArray entries = new JSONArray();
+        ArrayNode entries = JsonUtils.newArrayNode();
         RoutingTableBuilder routingTableBuilder = _routingTableBuilderMap.get(currentTable);
         List<Map<String, List<String>>> routingTables = routingTableBuilder.getRoutingTables();
         for (Map<String, List<String>> routingTable : routingTables) {
-          entries.put(new JSONObject(routingTable));
+          entries.add(JsonUtils.objectToJsonNode(routingTable));
         }
-        tableEntry.put("routingTableEntries", entries);
-        routingTableSnapshot.put(tableEntry);
+        tableEntry.set("routingTableEntries", entries);
+        routingTableSnapshot.add(tableEntry);
       }
     }
-    ret.put("routingTableSnapshot", routingTableSnapshot);
+    ret.set("routingTableSnapshot", routingTableSnapshot);
     ret.put("host", NetUtil.getHostnameOrAddress());
 
-    return ret.toString(2);
+    return JsonUtils.objectToPrettyString(ret);
   }
 }

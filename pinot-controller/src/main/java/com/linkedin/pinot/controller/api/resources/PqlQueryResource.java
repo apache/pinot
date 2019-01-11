@@ -18,10 +18,13 @@
  */
 package com.linkedin.pinot.controller.api.resources;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.common.utils.JsonUtils;
 import com.linkedin.pinot.controller.api.access.AccessControl;
 import com.linkedin.pinot.controller.api.access.AccessControlFactory;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -47,7 +50,6 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import org.apache.helix.model.InstanceConfig;
-import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -68,8 +70,8 @@ public class PqlQueryResource {
   @Path("pql")
   public String post(String requestJsonStr, @Context HttpHeaders httpHeaders) {
     try {
-      JSONObject requestJson = new JSONObject(requestJsonStr);
-      String pqlQuery = requestJson.getString("pql");
+      JsonNode requestJson = JsonUtils.stringToJsonNode(requestJsonStr);
+      String pqlQuery = requestJson.get("pql").asText();
       String traceEnabled = "false";
       if (requestJson.has("trace")) {
         traceEnabled = requestJson.get("trace").toString();
@@ -216,7 +218,7 @@ public class PqlQueryResource {
   public String sendPQLRaw(String url, String pqlRequest, String traceEnabled) {
     try {
       final long startTime = System.currentTimeMillis();
-      final JSONObject bqlJson = new JSONObject().put("pql", pqlRequest);
+      ObjectNode bqlJson = JsonUtils.newObjectNode().put("pql", pqlRequest);
       if (traceEnabled != null && !traceEnabled.isEmpty()) {
         bqlJson.put("trace", traceEnabled);
       }

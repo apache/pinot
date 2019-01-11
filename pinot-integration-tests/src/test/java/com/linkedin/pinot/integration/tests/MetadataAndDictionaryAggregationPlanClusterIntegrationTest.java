@@ -18,6 +18,7 @@
  */
 package com.linkedin.pinot.integration.tests;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.collect.Lists;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.util.TestUtils;
@@ -29,11 +30,11 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
 import org.apache.commons.io.FileUtils;
-import org.json.JSONObject;
-import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.*;
 
 
 /**
@@ -81,7 +82,6 @@ public class MetadataAndDictionaryAggregationPlanClusterIntegrationTest extends 
   protected String getTableName() {
     return _currentTable;
   }
-
 
   @BeforeClass
   public void setUp() throws Exception {
@@ -155,31 +155,31 @@ public class MetadataAndDictionaryAggregationPlanClusterIntegrationTest extends 
     testQuery(pqlQuery, Collections.singletonList(sqlQuery));
     testQuery(pqlStarTreeQuery, Collections.singletonList(sqlQuery));
     pqlQuery = "SELECT MIN(ArrTime) FROM " + DEFAULT_TABLE_NAME;
-    pqlStarTreeQuery =  "SELECT MIN(ArrTime) FROM " + STAR_TREE_TABLE_NAME;
+    pqlStarTreeQuery = "SELECT MIN(ArrTime) FROM " + STAR_TREE_TABLE_NAME;
     sqlQuery = "SELECT MIN(ArrTime) FROM " + DEFAULT_TABLE_NAME;
     testQuery(pqlQuery, Collections.singletonList(sqlQuery));
     testQuery(pqlStarTreeQuery, Collections.singletonList(sqlQuery));
     pqlQuery = "SELECT MINMAXRANGE(ArrTime) FROM " + DEFAULT_TABLE_NAME;
-    pqlStarTreeQuery =  "SELECT MINMAXRANGE(ArrTime) FROM "+ STAR_TREE_TABLE_NAME;
+    pqlStarTreeQuery = "SELECT MINMAXRANGE(ArrTime) FROM " + STAR_TREE_TABLE_NAME;
     sqlQuery = "SELECT MAX(ArrTime)-MIN(ArrTime) FROM " + DEFAULT_TABLE_NAME;
     testQuery(pqlQuery, Collections.singletonList(sqlQuery));
     testQuery(pqlStarTreeQuery, Collections.singletonList(sqlQuery));
     pqlQuery = "SELECT MIN(ArrTime), MAX(ArrTime), MINMAXRANGE(ArrTime) FROM " + DEFAULT_TABLE_NAME;
-    pqlStarTreeQuery =  "SELECT MIN(ArrTime), MAX(ArrTime), MINMAXRANGE(ArrTime) FROM "+ STAR_TREE_TABLE_NAME;
+    pqlStarTreeQuery = "SELECT MIN(ArrTime), MAX(ArrTime), MINMAXRANGE(ArrTime) FROM " + STAR_TREE_TABLE_NAME;
     sqlQuery1 = "SELECT MIN(ArrTime) FROM " + DEFAULT_TABLE_NAME;
     sqlQuery2 = "SELECT MAX(ArrTime) FROM " + DEFAULT_TABLE_NAME;
     sqlQuery3 = "SELECT MAX(ArrTime)-MIN(ArrTime) FROM " + DEFAULT_TABLE_NAME;
     testQuery(pqlQuery, Lists.newArrayList(sqlQuery1, sqlQuery2, sqlQuery3));
     testQuery(pqlStarTreeQuery, Lists.newArrayList(sqlQuery1, sqlQuery2, sqlQuery3));
     pqlQuery = "SELECT MIN(ArrTime), COUNT(*) FROM " + DEFAULT_TABLE_NAME;
-    pqlStarTreeQuery =  "SELECT MIN(ArrTime), COUNT(*) FROM "+ STAR_TREE_TABLE_NAME;
+    pqlStarTreeQuery = "SELECT MIN(ArrTime), COUNT(*) FROM " + STAR_TREE_TABLE_NAME;
     sqlQuery1 = "SELECT MIN(ArrTime) FROM " + DEFAULT_TABLE_NAME;
     sqlQuery2 = "SELECT COUNT(*) FROM " + DEFAULT_TABLE_NAME;
     testQuery(pqlQuery, Lists.newArrayList(sqlQuery1, sqlQuery2));
     testQuery(pqlStarTreeQuery, Lists.newArrayList(sqlQuery1, sqlQuery2));
     // float
     pqlQuery = "SELECT MAX(DepDelayMinutes) FROM " + DEFAULT_TABLE_NAME;
-    pqlStarTreeQuery =  "SELECT MAX(DepDelayMinutes) FROM "+ STAR_TREE_TABLE_NAME;
+    pqlStarTreeQuery = "SELECT MAX(DepDelayMinutes) FROM " + STAR_TREE_TABLE_NAME;
     sqlQuery = "SELECT MAX(DepDelayMinutes) FROM " + DEFAULT_TABLE_NAME;
     testQuery(pqlQuery, Collections.singletonList(sqlQuery));
     testQuery(pqlStarTreeQuery, Collections.singletonList(sqlQuery));
@@ -189,19 +189,21 @@ public class MetadataAndDictionaryAggregationPlanClusterIntegrationTest extends 
     testQuery(pqlQuery, Collections.singletonList(sqlQuery));
     testQuery(pqlStarTreeQuery, Collections.singletonList(sqlQuery));
     pqlQuery = "SELECT MINMAXRANGE(DepDelayMinutes) FROM " + DEFAULT_TABLE_NAME;
-    pqlStarTreeQuery =  "SELECT MINMAXRANGE(DepDelayMinutes) FROM "+ STAR_TREE_TABLE_NAME;
+    pqlStarTreeQuery = "SELECT MINMAXRANGE(DepDelayMinutes) FROM " + STAR_TREE_TABLE_NAME;
     sqlQuery = "SELECT MAX(DepDelayMinutes)-MIN(DepDelayMinutes) FROM " + DEFAULT_TABLE_NAME;
     testQuery(pqlQuery, Collections.singletonList(sqlQuery));
     testQuery(pqlStarTreeQuery, Collections.singletonList(sqlQuery));
-    pqlQuery = "SELECT MIN(DepDelayMinutes), MAX(DepDelayMinutes), MINMAXRANGE(DepDelayMinutes) FROM " + DEFAULT_TABLE_NAME;
-    pqlStarTreeQuery =  "SELECT MIN(DepDelayMinutes), MAX(DepDelayMinutes), MINMAXRANGE(DepDelayMinutes) FROM "+ STAR_TREE_TABLE_NAME;
+    pqlQuery =
+        "SELECT MIN(DepDelayMinutes), MAX(DepDelayMinutes), MINMAXRANGE(DepDelayMinutes) FROM " + DEFAULT_TABLE_NAME;
+    pqlStarTreeQuery =
+        "SELECT MIN(DepDelayMinutes), MAX(DepDelayMinutes), MINMAXRANGE(DepDelayMinutes) FROM " + STAR_TREE_TABLE_NAME;
     sqlQuery1 = "SELECT MIN(DepDelayMinutes) FROM " + DEFAULT_TABLE_NAME;
     sqlQuery2 = "SELECT MAX(DepDelayMinutes) FROM " + DEFAULT_TABLE_NAME;
     sqlQuery3 = "SELECT MAX(DepDelayMinutes)-MIN(DepDelayMinutes) FROM " + DEFAULT_TABLE_NAME;
     testQuery(pqlQuery, Lists.newArrayList(sqlQuery1, sqlQuery2, sqlQuery3));
     testQuery(pqlStarTreeQuery, Lists.newArrayList(sqlQuery1, sqlQuery2, sqlQuery3));
     pqlQuery = "SELECT MIN(DepDelayMinutes), COUNT(*) FROM " + DEFAULT_TABLE_NAME;
-    pqlStarTreeQuery =  "SELECT MIN(DepDelayMinutes), COUNT(*) FROM "+ STAR_TREE_TABLE_NAME;
+    pqlStarTreeQuery = "SELECT MIN(DepDelayMinutes), COUNT(*) FROM " + STAR_TREE_TABLE_NAME;
     sqlQuery1 = "SELECT MIN(DepDelayMinutes) FROM " + DEFAULT_TABLE_NAME;
     sqlQuery2 = "SELECT COUNT(*) FROM " + DEFAULT_TABLE_NAME;
     testQuery(pqlQuery, Lists.newArrayList(sqlQuery1, sqlQuery2));
@@ -209,22 +211,24 @@ public class MetadataAndDictionaryAggregationPlanClusterIntegrationTest extends 
 
     // double
     pqlQuery = "SELECT MAX(ArrDelayMinutes) FROM " + DEFAULT_TABLE_NAME;
-    pqlStarTreeQuery =  "SELECT MAX(ArrDelayMinutes) FROM "+ STAR_TREE_TABLE_NAME;
+    pqlStarTreeQuery = "SELECT MAX(ArrDelayMinutes) FROM " + STAR_TREE_TABLE_NAME;
     sqlQuery = "SELECT MAX(ArrDelayMinutes) FROM " + DEFAULT_TABLE_NAME;
     testQuery(pqlQuery, Collections.singletonList(sqlQuery));
     testQuery(pqlStarTreeQuery, Collections.singletonList(sqlQuery));
     pqlQuery = "SELECT MIN(ArrDelayMinutes) FROM " + DEFAULT_TABLE_NAME;
-    pqlStarTreeQuery =  "SELECT MIN(ArrDelayMinutes) FROM "+ STAR_TREE_TABLE_NAME;
+    pqlStarTreeQuery = "SELECT MIN(ArrDelayMinutes) FROM " + STAR_TREE_TABLE_NAME;
     sqlQuery = "SELECT MIN(ArrDelayMinutes) FROM " + DEFAULT_TABLE_NAME;
     testQuery(pqlQuery, Collections.singletonList(sqlQuery));
     testQuery(pqlStarTreeQuery, Collections.singletonList(sqlQuery));
     pqlQuery = "SELECT MINMAXRANGE(ArrDelayMinutes) FROM " + DEFAULT_TABLE_NAME;
-    pqlStarTreeQuery =  "SELECT MINMAXRANGE(ArrDelayMinutes) FROM "+ STAR_TREE_TABLE_NAME;
+    pqlStarTreeQuery = "SELECT MINMAXRANGE(ArrDelayMinutes) FROM " + STAR_TREE_TABLE_NAME;
     sqlQuery = "SELECT MAX(ArrDelayMinutes)-MIN(ArrDelayMinutes) FROM " + DEFAULT_TABLE_NAME;
     testQuery(pqlQuery, Collections.singletonList(sqlQuery));
     testQuery(pqlStarTreeQuery, Collections.singletonList(sqlQuery));
-    pqlQuery = "SELECT MIN(ArrDelayMinutes), MAX(ArrDelayMinutes), MINMAXRANGE(ArrDelayMinutes) FROM " + DEFAULT_TABLE_NAME;
-    pqlStarTreeQuery = "SELECT MIN(ArrDelayMinutes), MAX(ArrDelayMinutes), MINMAXRANGE(ArrDelayMinutes) FROM " + STAR_TREE_TABLE_NAME;
+    pqlQuery =
+        "SELECT MIN(ArrDelayMinutes), MAX(ArrDelayMinutes), MINMAXRANGE(ArrDelayMinutes) FROM " + DEFAULT_TABLE_NAME;
+    pqlStarTreeQuery =
+        "SELECT MIN(ArrDelayMinutes), MAX(ArrDelayMinutes), MINMAXRANGE(ArrDelayMinutes) FROM " + STAR_TREE_TABLE_NAME;
     sqlQuery1 = "SELECT MIN(ArrDelayMinutes) FROM " + DEFAULT_TABLE_NAME;
     sqlQuery2 = "SELECT MAX(ArrDelayMinutes) FROM " + DEFAULT_TABLE_NAME;
     sqlQuery3 = "SELECT MAX(ArrDelayMinutes)-MIN(ArrDelayMinutes) FROM " + DEFAULT_TABLE_NAME;
@@ -239,7 +243,7 @@ public class MetadataAndDictionaryAggregationPlanClusterIntegrationTest extends 
 
     // long
     pqlQuery = "SELECT MAX(AirlineID) FROM " + DEFAULT_TABLE_NAME;
-    pqlStarTreeQuery =  "SELECT MAX(AirlineID) FROM "+ STAR_TREE_TABLE_NAME;
+    pqlStarTreeQuery = "SELECT MAX(AirlineID) FROM " + STAR_TREE_TABLE_NAME;
     sqlQuery = "SELECT MAX(AirlineID) FROM " + DEFAULT_TABLE_NAME;
     testQuery(pqlQuery, Collections.singletonList(sqlQuery));
     testQuery(pqlStarTreeQuery, Collections.singletonList(sqlQuery));
@@ -287,8 +291,10 @@ public class MetadataAndDictionaryAggregationPlanClusterIntegrationTest extends 
     sqlQuery = "SELECT MAX(ActualElapsedTime)-MIN(ActualElapsedTime) FROM " + DEFAULT_TABLE_NAME;
     testQuery(pqlQuery, Collections.singletonList(sqlQuery));
     testQuery(pqlStarTreeQuery, Collections.singletonList(sqlQuery));
-    pqlQuery = "SELECT MIN(ActualElapsedTime), MAX(ActualElapsedTime), MINMAXRANGE(ActualElapsedTime) FROM " + DEFAULT_TABLE_NAME;
-    pqlStarTreeQuery = "SELECT MIN(ActualElapsedTime), MAX(ActualElapsedTime), MINMAXRANGE(ActualElapsedTime) FROM " + STAR_TREE_TABLE_NAME;
+    pqlQuery = "SELECT MIN(ActualElapsedTime), MAX(ActualElapsedTime), MINMAXRANGE(ActualElapsedTime) FROM "
+        + DEFAULT_TABLE_NAME;
+    pqlStarTreeQuery = "SELECT MIN(ActualElapsedTime), MAX(ActualElapsedTime), MINMAXRANGE(ActualElapsedTime) FROM "
+        + STAR_TREE_TABLE_NAME;
     sqlQuery1 = "SELECT MIN(ActualElapsedTime) FROM " + DEFAULT_TABLE_NAME;
     sqlQuery2 = "SELECT MAX(ActualElapsedTime) FROM " + DEFAULT_TABLE_NAME;
     sqlQuery3 = "SELECT MAX(ActualElapsedTime)-MIN(ActualElapsedTime) FROM " + DEFAULT_TABLE_NAME;
@@ -365,50 +371,49 @@ public class MetadataAndDictionaryAggregationPlanClusterIntegrationTest extends 
     // TODO: add test cases for string column when we add support for min and max on string datatype columns
 
     // Check execution stats
-    JSONObject response;
+    JsonNode response;
 
     // Dictionary column: answered by DictionaryBasedAggregationOperator
     pqlQuery = "SELECT MAX(ArrTime) FROM " + DEFAULT_TABLE_NAME;
     response = postQuery(pqlQuery);
-    Assert.assertEquals(response.getLong("numEntriesScannedPostFilter"), 0);
-    Assert.assertEquals(response.getLong("numEntriesScannedInFilter"), 0);
-    Assert.assertEquals(response.getLong("totalDocs"), response.getLong("numDocsScanned"));
+    assertEquals(response.get("numEntriesScannedPostFilter").asLong(), 0);
+    assertEquals(response.get("numEntriesScannedInFilter").asLong(), 0);
+    assertEquals(response.get("totalDocs").asLong(), response.get("numDocsScanned").asLong());
 
     // Non dictionary column: not answered by DictionaryBasedAggregationOperator
     pqlQuery = "SELECT MAX(DepDelay) FROM " + DEFAULT_TABLE_NAME;
     response = postQuery(pqlQuery);
-    Assert.assertEquals(response.getLong("numEntriesScannedPostFilter"), response.getLong("numDocsScanned"));
-    Assert.assertEquals(response.getLong("numEntriesScannedInFilter"), 0);
-    Assert.assertEquals(response.getLong("totalDocs"), response.getLong("numDocsScanned"));
+    assertEquals(response.get("numEntriesScannedPostFilter").asLong(), response.get("numDocsScanned").asLong());
+    assertEquals(response.get("numEntriesScannedInFilter").asLong(), 0);
+    assertEquals(response.get("totalDocs").asLong(), response.get("numDocsScanned").asLong());
 
     // multiple dictionary based aggregation functions, dictionary columns: answered by DictionaryBasedAggregationOperator
     pqlQuery = "SELECT MAX(ArrTime),MIN(ArrTime) FROM " + DEFAULT_TABLE_NAME;
     response = postQuery(pqlQuery);
-    Assert.assertEquals(response.getLong("numEntriesScannedPostFilter"), 0);
-    Assert.assertEquals(response.getLong("numEntriesScannedInFilter"), 0);
-    Assert.assertEquals(response.getLong("totalDocs"), response.getLong("numDocsScanned"));
+    assertEquals(response.get("numEntriesScannedPostFilter").asLong(), 0);
+    assertEquals(response.get("numEntriesScannedInFilter").asLong(), 0);
+    assertEquals(response.get("totalDocs").asLong(), response.get("numDocsScanned").asLong());
 
     // multiple aggregation functions, mix of dictionary based and non dictionary based: not answered by DictionaryBasedAggregationOperator
     pqlQuery = "SELECT MAX(ArrTime),COUNT(ArrTime) FROM " + DEFAULT_TABLE_NAME;
     response = postQuery(pqlQuery);
-    Assert.assertEquals(response.getLong("numEntriesScannedPostFilter"), response.getLong("numDocsScanned"));
-    Assert.assertEquals(response.getLong("numEntriesScannedInFilter"), 0);
-    Assert.assertEquals(response.getLong("totalDocs"), response.getLong("numDocsScanned"));
+    assertEquals(response.get("numEntriesScannedPostFilter").asLong(), response.get("numDocsScanned").asLong());
+    assertEquals(response.get("numEntriesScannedInFilter").asLong(), 0);
+    assertEquals(response.get("totalDocs").asLong(), response.get("numDocsScanned").asLong());
 
     // group by in query : not answered by DictionaryBasedAggregationOperator
     pqlQuery = "SELECT MAX(ArrTime) FROM " + DEFAULT_TABLE_NAME + "  group by DaysSinceEpoch";
     response = postQuery(pqlQuery);
-    Assert.assertEquals(response.getLong("numEntriesScannedPostFilter") > 0, true);
-    Assert.assertEquals(response.getLong("numEntriesScannedInFilter"), 0);
-    Assert.assertEquals(response.getLong("totalDocs"), response.getLong("numDocsScanned"));
+    assertTrue(response.get("numEntriesScannedPostFilter").asLong() > 0);
+    assertEquals(response.get("numEntriesScannedInFilter").asLong(), 0);
+    assertEquals(response.get("totalDocs").asLong(), response.get("numDocsScanned").asLong());
 
     // filter in query: not answered by DictionaryBasedAggregationOperator
     pqlQuery = "SELECT MAX(ArrTime) FROM " + DEFAULT_TABLE_NAME + " where DaysSinceEpoch > 16100";
     response = postQuery(pqlQuery);
-    Assert.assertEquals(response.getLong("numEntriesScannedPostFilter") > 0, true);
-    Assert.assertEquals(response.getLong("numEntriesScannedInFilter") > 0, true);
+    assertTrue(response.get("numEntriesScannedPostFilter").asLong() > 0);
+    assertTrue(response.get("numEntriesScannedInFilter").asLong() > 0);
   }
-
 
   @Test
   public void testMetadataBasedQueries() throws Exception {
@@ -432,50 +437,47 @@ public class MetadataAndDictionaryAggregationPlanClusterIntegrationTest extends 
     testQuery(pqlStarTreeQuery, Collections.singletonList(sqlQuery));
 
     // Check execution stats
-    JSONObject response;
+    JsonNode response;
 
     pqlQuery = "SELECT COUNT(*) FROM " + DEFAULT_TABLE_NAME;
     response = postQuery(pqlQuery);
-    Assert.assertEquals(response.getLong("numEntriesScannedPostFilter"), 0);
-    Assert.assertEquals(response.getLong("numEntriesScannedInFilter"), 0);
-    Assert.assertEquals(response.getLong("totalDocs"), response.getLong("numDocsScanned"));
+    assertEquals(response.get("numEntriesScannedPostFilter").asLong(), 0);
+    assertEquals(response.get("numEntriesScannedInFilter").asLong(), 0);
+    assertEquals(response.get("totalDocs").asLong(), response.get("numDocsScanned").asLong());
 
     pqlStarTreeQuery = "SELECT COUNT(*) FROM " + STAR_TREE_TABLE_NAME;
     response = postQuery(pqlStarTreeQuery);
-    Assert.assertEquals(response.getLong("numEntriesScannedPostFilter"), 0);
-    Assert.assertEquals(response.getLong("numEntriesScannedInFilter"), 0);
-    Assert.assertEquals(response.getLong("totalDocs"), response.getLong("numDocsScanned"));
-
+    assertEquals(response.get("numEntriesScannedPostFilter").asLong(), 0);
+    assertEquals(response.get("numEntriesScannedInFilter").asLong(), 0);
+    assertEquals(response.get("totalDocs").asLong(), response.get("numDocsScanned").asLong());
 
     // group by present in query: not answered by MetadataBasedAggregationOperator
     pqlQuery = "SELECT COUNT(*) FROM " + DEFAULT_TABLE_NAME + " GROUP BY DaysSinceEpoch";
     response = postQuery(pqlQuery);
-    Assert.assertEquals(response.getLong("numEntriesScannedPostFilter") > 0, true);
-    Assert.assertEquals(response.getLong("numEntriesScannedInFilter"), 0);
-    Assert.assertEquals(response.getLong("totalDocs"), response.getLong("numDocsScanned"));
+    assertTrue(response.get("numEntriesScannedPostFilter").asLong() > 0);
+    assertEquals(response.get("numEntriesScannedInFilter").asLong(), 0);
+    assertEquals(response.get("totalDocs").asLong(), response.get("numDocsScanned").asLong());
 
     // filter present in query: not answered by MetadataBasedAggregationOperator
     pqlQuery = "SELECT COUNT(*) FROM " + DEFAULT_TABLE_NAME + " WHERE DaysSinceEpoch > 16100";
     response = postQuery(pqlQuery);
-    Assert.assertEquals(response.getLong("numEntriesScannedPostFilter"), 0);
-    Assert.assertEquals(response.getLong("numEntriesScannedInFilter") > 0, true);
+    assertEquals(response.get("numEntriesScannedPostFilter").asLong(), 0);
+    assertTrue(response.get("numEntriesScannedInFilter").asLong() > 0);
 
     // mixed aggregation functions in query: not answered by MetadataBasedAggregationOperator
     pqlQuery = "SELECT COUNT(*),MAX(ArrTime) FROM " + DEFAULT_TABLE_NAME;
     response = postQuery(pqlQuery);
-    Assert.assertEquals(response.getLong("numEntriesScannedPostFilter") > 0, true);
-    Assert.assertEquals(response.getLong("numEntriesScannedInFilter"), 0);
-    Assert.assertEquals(response.getLong("totalDocs"), response.getLong("numDocsScanned"));
+    assertTrue(response.get("numEntriesScannedPostFilter").asLong() > 0);
+    assertEquals(response.get("numEntriesScannedInFilter").asLong(), 0);
+    assertEquals(response.get("totalDocs").asLong(), response.get("numDocsScanned").asLong());
 
     // mixed aggregation functions in star tree query: not answered by MetadataBasedAggregationOperator
     pqlStarTreeQuery = "SELECT COUNT(*),MAX(DaysSinceEpoch) FROM " + STAR_TREE_TABLE_NAME;
     response = postQuery(pqlStarTreeQuery);
-    Assert.assertEquals(response.getLong("numEntriesScannedPostFilter") > 0, true);
-    Assert.assertEquals(response.getLong("numEntriesScannedInFilter"), 0);
-    Assert.assertEquals(response.getLong("totalDocs"), response.getLong("numDocsScanned"));
+    assertTrue(response.get("numEntriesScannedPostFilter").asLong() > 0);
+    assertEquals(response.get("numEntriesScannedInFilter").asLong(), 0);
+    assertEquals(response.get("totalDocs").asLong(), response.get("numDocsScanned").asLong());
   }
-
-
 
   @AfterClass
   public void tearDown() throws Exception {

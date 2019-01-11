@@ -18,22 +18,22 @@
  */
 package com.linkedin.pinot.common.metadata.segment;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.core.JsonGenerator;
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.databind.DeserializationContext;
+import com.fasterxml.jackson.databind.JsonDeserializer;
+import com.fasterxml.jackson.databind.JsonSerializer;
+import com.fasterxml.jackson.databind.SerializerProvider;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.linkedin.pinot.common.config.ColumnPartitionConfig;
 import com.linkedin.pinot.common.utils.EqualityUtils;
 import java.io.IOException;
 import java.util.List;
 import javax.annotation.Nonnull;
 import org.apache.commons.lang.math.IntRange;
-import org.codehaus.jackson.JsonGenerator;
-import org.codehaus.jackson.JsonParser;
-import org.codehaus.jackson.annotate.JsonIgnoreProperties;
-import org.codehaus.jackson.annotate.JsonProperty;
-import org.codehaus.jackson.map.DeserializationContext;
-import org.codehaus.jackson.map.JsonDeserializer;
-import org.codehaus.jackson.map.JsonSerializer;
-import org.codehaus.jackson.map.SerializerProvider;
-import org.codehaus.jackson.map.annotate.JsonDeserialize;
-import org.codehaus.jackson.map.annotate.JsonSerialize;
 
 
 /**
@@ -43,7 +43,6 @@ import org.codehaus.jackson.map.annotate.JsonSerialize;
  *   <li> Number of partitions. </li>
  *   <li> List of partition ranges. </li>
  * </ul>
-
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class ColumnPartitionMetadata extends ColumnPartitionConfig {
@@ -113,8 +112,7 @@ public class ColumnPartitionMetadata extends ColumnPartitionConfig {
   public static class PartitionRangesDeserializer extends JsonDeserializer<List<IntRange>> {
 
     @Override
-    public List<IntRange> deserialize(JsonParser jsonParser, DeserializationContext context)
-        throws IOException {
+    public List<IntRange> deserialize(JsonParser jsonParser, DeserializationContext context) throws IOException {
       return ColumnPartitionConfig.rangesFromString(jsonParser.getText());
     }
   }

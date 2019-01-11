@@ -18,15 +18,16 @@
  */
 package com.linkedin.pinot.hadoop.job;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.utils.FileUploadDownloadClient;
+import com.linkedin.pinot.common.utils.JsonUtils;
 import com.linkedin.pinot.common.utils.SimpleHttpResponse;
 import com.linkedin.pinot.hadoop.utils.PushLocation;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.List;
-import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -60,10 +61,9 @@ public class ControllerRestApi {
     for (URI uri : tableConfigURIs) {
       try {
         SimpleHttpResponse response = fileUploadDownloadClient.getTableConfig(uri);
-        JSONObject queryResponse = new JSONObject(response.getResponse());
-        JSONObject offlineTableConfig = queryResponse.getJSONObject(OFFLINE);
-        LOGGER.info("Got table config {}", offlineTableConfig);
-        if (!queryResponse.isNull(OFFLINE)) {
+        JsonNode offlineTableConfig = JsonUtils.stringToJsonNode(response.getResponse()).get(OFFLINE);
+        if (offlineTableConfig != null) {
+          LOGGER.info("Got table config {}", offlineTableConfig);
           return TableConfig.fromJSONConfig(offlineTableConfig);
         }
       } catch (Exception e) {

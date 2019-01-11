@@ -18,34 +18,28 @@
  */
 package com.linkedin.pinot.tools.admin.command;
 
-import com.linkedin.pinot.tools.Command;
-import java.io.File;
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.concurrent.TimeUnit;
-
-import org.apache.commons.lang.math.IntRange;
-import org.codehaus.jackson.JsonGenerationException;
-import org.codehaus.jackson.JsonParseException;
-import org.codehaus.jackson.map.JsonMappingException;
-import org.codehaus.jackson.map.ObjectMapper;
-import org.codehaus.jackson.type.TypeReference;
-import org.kohsuke.args4j.Option;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.FieldSpec.FieldType;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.Schema.SchemaBuilder;
 import com.linkedin.pinot.common.data.TimeFieldSpec;
+import com.linkedin.pinot.common.utils.JsonUtils;
 import com.linkedin.pinot.core.data.readers.FileFormat;
+import com.linkedin.pinot.tools.Command;
 import com.linkedin.pinot.tools.data.generator.DataGenerator;
 import com.linkedin.pinot.tools.data.generator.DataGeneratorSpec;
 import com.linkedin.pinot.tools.data.generator.SchemaAnnotation;
+import java.io.File;
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+import org.apache.commons.lang.math.IntRange;
+import org.kohsuke.args4j.Option;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -141,16 +135,12 @@ public class GenerateDataCommand extends AbstractBaseAdminCommand implements Com
   }
 
   private void buildCardinalityRangeMaps(String file, HashMap<String, Integer> cardinality,
-      HashMap<String, IntRange> range) throws JsonParseException, JsonMappingException, IOException {
-    List<SchemaAnnotation> saList;
-
+      HashMap<String, IntRange> range) throws IOException {
     if (file == null) {
       return; // Nothing to do here.
     }
 
-    ObjectMapper objectMapper = new ObjectMapper();
-    saList = objectMapper.readValue(new File(file), new TypeReference<List<SchemaAnnotation>>() {
-    });
+    List<SchemaAnnotation> saList = JsonUtils.fileToObject(new File(file), List.class);
 
     for (SchemaAnnotation sa : saList) {
       String column = sa.getColumn();
@@ -204,7 +194,7 @@ public class GenerateDataCommand extends AbstractBaseAdminCommand implements Com
         timeUnits, FileFormat.AVRO, _outDir, _overwrite);
   }
 
-  public static void main(String[] args) throws JsonGenerationException, JsonMappingException, IOException {
+  public static void main(String[] args) throws IOException {
     SchemaBuilder schemaBuilder = new SchemaBuilder();
 
     schemaBuilder.addSingleValueDimension("name", DataType.STRING);
@@ -213,7 +203,6 @@ public class GenerateDataCommand extends AbstractBaseAdminCommand implements Com
     schemaBuilder.addTime("days", TimeUnit.DAYS, DataType.LONG);
 
     Schema schema = schemaBuilder.build();
-    ObjectMapper objectMapper = new ObjectMapper();
-    System.out.println(objectMapper.writeValueAsString(schema));
+    System.out.println(JsonUtils.objectToPrettyString(schema));
   }
 }

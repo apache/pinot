@@ -27,13 +27,11 @@ import com.linkedin.pinot.core.realtime.impl.kafka.KafkaAvroMessageDecoder;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaConsumerFactory;
 import com.linkedin.pinot.core.realtime.stream.StreamConfig;
 import com.linkedin.pinot.core.realtime.stream.StreamConfigProperties;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
-import org.json.JSONException;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -272,11 +270,9 @@ public class FlushThresholdUpdaterTest {
 
   /**
    * Tests that the flush threshold manager returns the right updater given various scenarios of flush threshold setting in the table config
-   * @throws IOException
-   * @throws JSONException
    */
   @Test
-  public void testFlushThresholdUpdater() throws IOException, JSONException {
+  public void testFlushThresholdUpdater() {
     FlushThresholdUpdateManager manager = new FlushThresholdUpdateManager();
     TableConfig.Builder tableConfigBuilder = new TableConfig.Builder(CommonConstants.Helix.TableType.REALTIME);
     tableConfigBuilder.setTableName("tableName_REALTIME");

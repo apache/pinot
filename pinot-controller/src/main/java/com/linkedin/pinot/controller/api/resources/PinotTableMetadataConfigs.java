@@ -31,7 +31,6 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -54,7 +53,7 @@ public class PinotTableMetadataConfigs {
   public SuccessResponse updateTableMetadata(@PathParam("tableName")String tableName, String requestBody
   ) {
     try {
-      TableConfig tableConfig = TableConfig.fromJSONConfig(new JSONObject(requestBody));
+      TableConfig tableConfig = TableConfig.fromJsonString(requestBody);
       pinotHelixResourceManager.updateMetadataConfigFor(tableConfig.getTableName(), tableConfig.getTableType(),
         tableConfig.getCustomConfig());
       return new SuccessResponse("Successfully updated " + tableName + " configuration");

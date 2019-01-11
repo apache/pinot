@@ -18,10 +18,8 @@
  */
 package com.linkedin.pinot.common.config;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.linkedin.pinot.common.utils.EqualityUtils;
-import org.codehaus.jackson.annotate.JsonIgnoreProperties;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -44,7 +42,6 @@ import org.slf4j.LoggerFactory;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class TagOverrideConfig {
-  private static final Logger LOGGER = LoggerFactory.getLogger(TagOverrideConfig.class);
 
   @ConfigKey("realtimeConsuming")
   @ConfigDoc("Tag override for realtime consuming segments")

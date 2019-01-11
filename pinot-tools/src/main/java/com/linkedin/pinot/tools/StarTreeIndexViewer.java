@@ -18,8 +18,10 @@
  */
 package com.linkedin.pinot.tools;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.google.common.collect.MinMaxPriorityQueue;
 import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.common.utils.JsonUtils;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockSingleValIterator;
 import com.linkedin.pinot.core.common.BlockValSet;
@@ -48,8 +50,6 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
-import org.codehaus.jackson.map.ObjectMapper;
-import org.codehaus.jackson.map.annotate.JsonSerialize.Inclusion;
 import org.glassfish.grizzly.http.server.HttpServer;
 import org.glassfish.jersey.grizzly2.httpserver.GrizzlyHttpServerFactory;
 import org.glassfish.jersey.server.ResourceConfig;
@@ -77,6 +77,7 @@ public class StarTreeIndexViewer {
       return _name;
     }
 
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     public List<StarTreeJsonNode> getChildren() {
       return _children;
     }
@@ -113,9 +114,7 @@ public class StarTreeIndexViewer {
     build(tree.getRoot(), jsonRoot);
     indexSegment.destroy();
 
-    ObjectMapper objectMapper = new ObjectMapper();
-    objectMapper.getSerializationConfig().withSerializationInclusion(Inclusion.NON_NULL);
-    String writeValueAsString = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(jsonRoot);
+    String writeValueAsString = JsonUtils.objectToPrettyString(jsonRoot);
     LOGGER.info(writeValueAsString);
     startServer(segmentDir, writeValueAsString);
   }

@@ -18,8 +18,10 @@
  */
 package com.linkedin.pinot.integration.tests;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.linkedin.pinot.common.utils.FileUploadDownloadClient;
+import com.linkedin.pinot.common.utils.JsonUtils;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.util.TestUtils;
@@ -44,8 +46,6 @@ import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.commons.httpclient.HttpStatus;
 import org.apache.commons.io.FileUtils;
-import org.apache.htrace.fasterxml.jackson.databind.JsonNode;
-import org.apache.htrace.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.http.Header;
 import org.apache.http.HttpHost;
 import org.apache.http.HttpResponse;
@@ -244,7 +244,7 @@ public class PinotURIUploadIntegrationTest extends BaseClusterIntegrationTest {
         throw new IllegalStateException(res.getStatusLine().toString());
       }
       InputStream content = res.getEntity().getContent();
-      JsonNode segmentsData = new ObjectMapper().readTree(content);
+      JsonNode segmentsData = JsonUtils.inputStreamToJsonNode(content);
 
       if (segmentsData != null) {
         JsonNode offlineSegments = segmentsData.get(0).get("OFFLINE");

@@ -18,13 +18,13 @@
  */
 package com.linkedin.pinot.common.data;
 
+import com.linkedin.pinot.common.utils.JsonUtils;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import org.apache.avro.Schema;
-import org.codehaus.jackson.map.ObjectMapper;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -39,7 +39,6 @@ public class FieldSpecTest {
   private static final long RANDOM_SEED = System.currentTimeMillis();
   private static final Random RANDOM = new Random(RANDOM_SEED);
   private static final String ERROR_MESSAGE = "Random seed is: " + RANDOM_SEED;
-  private static final ObjectMapper MAPPER = new ObjectMapper();
 
   /**
    * Test all {@link FieldSpec.DataType}.
@@ -134,7 +133,7 @@ public class FieldSpecTest {
 
     // Test serialize deserialize.
     MetricFieldSpec derivedMetricField2 =
-        MAPPER.readValue(derivedMetricField.toJsonObject().toString(), MetricFieldSpec.class);
+        JsonUtils.stringToObject(derivedMetricField.toJsonObject().toString(), MetricFieldSpec.class);
     Assert.assertEquals(derivedMetricField2, derivedMetricField);
   }
 
@@ -278,7 +277,8 @@ public class FieldSpecTest {
   public void testOrderOfFields() throws Exception {
     // Metric field with default null value.
     String[] metricFields = {"\"name\":\"metric\"", "\"dataType\":\"INT\"", "\"defaultNullValue\":-1"};
-    MetricFieldSpec metricFieldSpec1 = MAPPER.readValue(getRandomOrderJsonString(metricFields), MetricFieldSpec.class);
+    MetricFieldSpec metricFieldSpec1 =
+        JsonUtils.stringToObject(getRandomOrderJsonString(metricFields), MetricFieldSpec.class);
     MetricFieldSpec metricFieldSpec2 = new MetricFieldSpec("metric", INT, -1);
     Assert.assertEquals(metricFieldSpec1, metricFieldSpec2, ERROR_MESSAGE);
     Assert.assertEquals(metricFieldSpec1.getDefaultNullValue(), -1, ERROR_MESSAGE);
@@ -286,7 +286,7 @@ public class FieldSpecTest {
     // Single-value boolean type dimension field with default null value.
     String[] dimensionFields = {"\"name\":\"dimension\"", "\"dataType\":\"BOOLEAN\"", "\"defaultNullValue\":false"};
     DimensionFieldSpec dimensionFieldSpec1 =
-        MAPPER.readValue(getRandomOrderJsonString(dimensionFields), DimensionFieldSpec.class);
+        JsonUtils.stringToObject(getRandomOrderJsonString(dimensionFields), DimensionFieldSpec.class);
     DimensionFieldSpec dimensionFieldSpec2 = new DimensionFieldSpec("dimension", BOOLEAN, true, false);
     Assert.assertEquals(dimensionFieldSpec1, dimensionFieldSpec2, ERROR_MESSAGE);
     Assert.assertEquals(dimensionFieldSpec1.getDefaultNullValue(), "false", ERROR_MESSAGE);
@@ -294,7 +294,7 @@ public class FieldSpecTest {
     // Multi-value dimension field with default null value.
     dimensionFields =
         new String[]{"\"name\":\"dimension\"", "\"dataType\":\"STRING\"", "\"singleValueField\":false", "\"defaultNullValue\":\"default\""};
-    dimensionFieldSpec1 = MAPPER.readValue(getRandomOrderJsonString(dimensionFields), DimensionFieldSpec.class);
+    dimensionFieldSpec1 = JsonUtils.stringToObject(getRandomOrderJsonString(dimensionFields), DimensionFieldSpec.class);
     dimensionFieldSpec2 = new DimensionFieldSpec("dimension", STRING, false, "default");
     Assert.assertEquals(dimensionFieldSpec1, dimensionFieldSpec2, ERROR_MESSAGE);
     Assert.assertEquals(dimensionFieldSpec1.getDefaultNullValue(), "default", ERROR_MESSAGE);
@@ -302,7 +302,7 @@ public class FieldSpecTest {
     // Time field with default null value.
     String[] timeFields =
         {"\"incomingGranularitySpec\":{\"timeType\":\"MILLISECONDS\",\"dataType\":\"LONG\",\"name\":\"incomingTime\"}", "\"outgoingGranularitySpec\":{\"timeType\":\"SECONDS\",\"dataType\":\"INT\",\"name\":\"outgoingTime\"}", "\"defaultNullValue\":-1"};
-    TimeFieldSpec timeFieldSpec1 = MAPPER.readValue(getRandomOrderJsonString(timeFields), TimeFieldSpec.class);
+    TimeFieldSpec timeFieldSpec1 = JsonUtils.stringToObject(getRandomOrderJsonString(timeFields), TimeFieldSpec.class);
     TimeFieldSpec timeFieldSpec2 =
         new TimeFieldSpec("incomingTime", LONG, TimeUnit.MILLISECONDS, "outgoingTime", INT, TimeUnit.SECONDS, -1);
     Assert.assertEquals(timeFieldSpec1, timeFieldSpec2, ERROR_MESSAGE);
@@ -312,7 +312,7 @@ public class FieldSpecTest {
     String[] dateTimeFields =
         {"\"name\":\"Date\"", "\"dataType\":\"LONG\"", "\"format\":\"1:MILLISECONDS:EPOCH\"", "\"granularity\":\"5:MINUTES\"", "\"dateTimeType\":\"PRIMARY\""};
     DateTimeFieldSpec dateTimeFieldSpec1 =
-        MAPPER.readValue(getRandomOrderJsonString(dateTimeFields), DateTimeFieldSpec.class);
+        JsonUtils.stringToObject(getRandomOrderJsonString(dateTimeFields), DateTimeFieldSpec.class);
     DateTimeFieldSpec dateTimeFieldSpec2 = new DateTimeFieldSpec("Date", LONG, "1:MILLISECONDS:EPOCH", "5:MINUTES");
     Assert.assertEquals(dateTimeFieldSpec1, dateTimeFieldSpec2, ERROR_MESSAGE);
   }
@@ -327,29 +327,29 @@ public class FieldSpecTest {
 
     // Single-value boolean type dimension field with default null value.
     String[] dimensionFields = {"\"name\":\"dimension\"", "\"dataType\":\"BOOLEAN\"", "\"defaultNullValue\":false"};
-    first = MAPPER.readValue(getRandomOrderJsonString(dimensionFields), DimensionFieldSpec.class);
-    second = MAPPER.readValue(first.toJsonObject().toString(), DimensionFieldSpec.class);
+    first = JsonUtils.stringToObject(getRandomOrderJsonString(dimensionFields), DimensionFieldSpec.class);
+    second = JsonUtils.stringToObject(first.toJsonObject().toString(), DimensionFieldSpec.class);
     Assert.assertEquals(first, second, ERROR_MESSAGE);
 
     // Multi-value dimension field with default null value.
     dimensionFields =
         new String[]{"\"name\":\"dimension\"", "\"dataType\":\"STRING\"", "\"singleValueField\":false", "\"defaultNullValue\":\"default\""};
-    first = MAPPER.readValue(getRandomOrderJsonString(dimensionFields), DimensionFieldSpec.class);
-    second = MAPPER.readValue(first.toJsonObject().toString(), DimensionFieldSpec.class);
+    first = JsonUtils.stringToObject(getRandomOrderJsonString(dimensionFields), DimensionFieldSpec.class);
+    second = JsonUtils.stringToObject(first.toJsonObject().toString(), DimensionFieldSpec.class);
     Assert.assertEquals(first, second, ERROR_MESSAGE);
 
     // Time field with default value.
     String[] timeFields =
         {"\"incomingGranularitySpec\":{\"timeUnitSize\":1, \"timeType\":\"MILLISECONDS\",\"dataType\":\"LONG\",\"name\":\"incomingTime\"}", "\"outgoingGranularitySpec\":{\"timeType\":\"SECONDS\",\"dataType\":\"INT\",\"name\":\"outgoingTime\"}", "\"defaultNullValue\":-1"};
-    first = MAPPER.readValue(getRandomOrderJsonString(timeFields), TimeFieldSpec.class);
-    second = MAPPER.readValue(first.toJsonObject().toString(), TimeFieldSpec.class);
+    first = JsonUtils.stringToObject(getRandomOrderJsonString(timeFields), TimeFieldSpec.class);
+    second = JsonUtils.stringToObject(first.toJsonObject().toString(), TimeFieldSpec.class);
     Assert.assertEquals(first, second, ERROR_MESSAGE);
 
     // DateTime field
     String[] dateTimeFields =
         {"\"name\":\"Date\"", "\"dataType\":\"LONG\"", "\"format\":\"1:MILLISECONDS:EPOCH\"", "\"granularity\":\"5:MINUTES\"", "\"dateTimeType\":\"PRIMARY\""};
-    first = MAPPER.readValue(getRandomOrderJsonString(dateTimeFields), DateTimeFieldSpec.class);
-    second = MAPPER.readValue(first.toJsonObject().toString(), DateTimeFieldSpec.class);
+    first = JsonUtils.stringToObject(getRandomOrderJsonString(dateTimeFields), DateTimeFieldSpec.class);
+    second = JsonUtils.stringToObject(first.toJsonObject().toString(), DateTimeFieldSpec.class);
     Assert.assertEquals(first, second, ERROR_MESSAGE);
   }
 

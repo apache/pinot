@@ -18,12 +18,11 @@
  */
 package com.linkedin.pinot.controller.api.resources;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.JsonUtils;
 import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
 import com.linkedin.pinot.controller.helix.ControllerTest;
@@ -39,7 +38,6 @@ import org.testng.annotations.Test;
 public class PinotSegmentRestletResourceTest extends ControllerTest {
   private final static String ZK_SERVER = ZkStarter.DEFAULT_ZK_STR;
   private final static String TABLE_NAME = "testTable";
-  private final static ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   @BeforeClass
   public void setUp() throws Exception {
@@ -113,8 +111,7 @@ public class PinotSegmentRestletResourceTest extends ControllerTest {
 
   private void checkCrcRequest(Map<String, SegmentMetadata> metadataTable, int expectedSize) throws Exception {
     String crcMapStr = sendGetRequest(_controllerRequestURLBuilder.forListAllCrcInformationForTable(TABLE_NAME));
-    Map<String, String> crcMap = OBJECT_MAPPER.readValue(crcMapStr, new TypeReference<Map<String, Object>>() {
-    });
+    Map<String, String> crcMap = JsonUtils.stringToObject(crcMapStr, Map.class);
     for (String segmentName : crcMap.keySet()) {
       SegmentMetadata metadata = metadataTable.get(segmentName);
       Assert.assertTrue(metadata != null);

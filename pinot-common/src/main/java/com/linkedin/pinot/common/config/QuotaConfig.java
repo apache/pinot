@@ -18,13 +18,12 @@
  */
 package com.linkedin.pinot.common.config;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.linkedin.pinot.common.utils.DataSize;
 import com.linkedin.pinot.common.utils.EqualityUtils;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration.ConfigurationRuntimeException;
-import org.codehaus.jackson.annotate.JsonIgnoreProperties;
-import org.json.JSONException;
-import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,8 +34,6 @@ import org.slf4j.LoggerFactory;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class QuotaConfig {
   private static final Logger LOGGER = LoggerFactory.getLogger(QuotaConfig.class);
-  private static final String STORAGE_FIELD_NAME = "storage";
-  private static final String MAX_QUERIES_PER_SECOND_FIELD_NAME = "maxQueriesPerSecond";
 
   @ConfigKey("storage")
   @ConfigDoc(value = "Storage allocated for this table", exampleValue = "10 GiB")
@@ -70,21 +67,6 @@ public class QuotaConfig {
     return DataSize.toBytes(_storage);
   }
 
-  public JSONObject toJson() {
-    JSONObject quotaObject = new JSONObject();
-    try {
-      quotaObject.put(STORAGE_FIELD_NAME, _storage);
-      quotaObject.put(MAX_QUERIES_PER_SECOND_FIELD_NAME, _maxQueriesPerSecond);
-    } catch (JSONException e) {
-      LOGGER.error("Failed to convert to json", e);
-    }
-    return quotaObject;
-  }
-
-  public String toString() {
-    return toJson().toString();
-  }
-
   public void validate() {
     if (!isStorageValid()) {
       LOGGER.error("Failed to convert storage quota config: {} to bytes", _storage);
@@ -96,10 +78,12 @@ public class QuotaConfig {
     }
   }
 
+  @JsonIgnore
   public boolean isStorageValid() {
     return _storage == null || DataSize.toBytes(_storage) >= 0;
   }
 
+  @JsonIgnore
   public boolean isMaxQueriesPerSecondValid() {
     Double qps = null;
     if (_maxQueriesPerSecond != null) {

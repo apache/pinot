@@ -165,7 +165,7 @@ public class ServerSegmentCompletionProtocolHandler {
       String responseStr =
           _fileUploadDownloadClient.sendSegmentCompletionProtocolRequest(new URI(url), OTHER_REQUESTS_TIMEOUT)
               .getResponse();
-      response = new SegmentCompletionProtocol.Response(responseStr);
+      response = SegmentCompletionProtocol.Response.fromJsonString(responseStr);
       LOGGER.info("Controller response {} for {}", response.toJsonString(), url);
       if (response.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.NOT_LEADER)) {
         ControllerLeaderLocator.getInstance().invalidateCachedControllerLeader();
@@ -189,7 +189,7 @@ public class ServerSegmentCompletionProtocolHandler {
       String responseStr =
           _fileUploadDownloadClient.uploadSegment(new URI(url), segmentName, segmentTarFile, null, null,
               SEGMENT_UPLOAD_REQUEST_TIMEOUT_MS).getResponse();
-      response = new SegmentCompletionProtocol.Response(responseStr);
+      response = SegmentCompletionProtocol.Response.fromJsonString(responseStr);
       LOGGER.info("Controller response {} for {}", response.toJsonString(), url);
       if (response.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.NOT_LEADER)) {
         ControllerLeaderLocator.getInstance().invalidateCachedControllerLeader();

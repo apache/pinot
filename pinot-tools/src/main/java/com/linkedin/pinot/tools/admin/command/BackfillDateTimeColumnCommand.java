@@ -18,6 +18,7 @@
  */
 package com.linkedin.pinot.tools.admin.command;
 
+import com.linkedin.pinot.common.utils.JsonUtils;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
@@ -40,7 +41,6 @@ import com.linkedin.pinot.tools.backfill.BackfillSegmentUtils;
  *
  */
 public class BackfillDateTimeColumnCommand extends AbstractBaseAdminCommand implements Command {
-  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private static final String OUTPUT_FOLDER = "output";
   private static final String DOWNLOAD_FOLDER = "download";
   private static final String BACKUP_FOLDER = "backup";
@@ -160,8 +160,9 @@ public class BackfillDateTimeColumnCommand extends AbstractBaseAdminCommand impl
     if (_srcTimeFieldSpec == null || _destDateTimeFieldSpec == null) {
       throw new RuntimeException("Must specify srcTimeFieldSpec and destTimeFieldSpec.");
     }
-    TimeFieldSpec timeFieldSpec = OBJECT_MAPPER.readValue(new File(_srcTimeFieldSpec), TimeFieldSpec.class);
-    DateTimeFieldSpec dateTimeFieldSpec = OBJECT_MAPPER.readValue(new File(_destDateTimeFieldSpec), DateTimeFieldSpec.class);
+    TimeFieldSpec timeFieldSpec = JsonUtils.fileToObject(new File(_srcTimeFieldSpec), TimeFieldSpec.class);
+    DateTimeFieldSpec dateTimeFieldSpec =
+        JsonUtils.fileToObject(new File(_destDateTimeFieldSpec), DateTimeFieldSpec.class);
 
     if (_tableName == null) {
       throw new RuntimeException("Must specify tableName.");

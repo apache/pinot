@@ -29,8 +29,6 @@ import java.util.Map;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
-import org.json.JSONArray;
-import org.json.JSONException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
@@ -118,40 +116,6 @@ public class TestUtils {
       }
     }
     LOGGER.info("group overlap rate: " + (cnt+0.0)/mapEstimate.keySet().size());
-  }
-
-  public static void assertJSONArrayApproximation(JSONArray jsonArrayEstimate, JSONArray jsonArrayActual, double precision) {
-    LOGGER.info("====== assertJSONArrayApproximation ======");
-    try {
-      HashMap<String, Double> mapEstimate = genMapFromJSONArray(jsonArrayEstimate);
-      HashMap<String, Double> mapActual = genMapFromJSONArray(jsonArrayActual);
-
-      // estimation should not affect number of groups formed
-      Assert.assertEquals(mapEstimate.keySet().size(), mapActual.keySet().size());
-      LOGGER.info("estimate: " + mapEstimate.keySet());
-      LOGGER.info("actual: " + mapActual.keySet());
-      int cnt = 0;
-      for (String key: mapEstimate.keySet()) {
-        // Not strictly enforced, since in quantile, top 100 groups from accurate maybe not be top 100 from estimate
-        // Assert.assertEquals(mapActual.keySet().contains(key), true);
-        if (mapActual.keySet().contains(key)) {
-          assertApproximation(mapEstimate.get(key), mapActual.get(key), precision);
-          cnt += 1;
-        }
-      }
-      LOGGER.info("group overlap rate: " + (cnt+0.0)/mapEstimate.keySet().size());
-    } catch (JSONException e) {
-      e.printStackTrace();
-    }
-  }
-
-  private static HashMap<String, Double> genMapFromJSONArray(JSONArray array) throws JSONException {
-    HashMap<String, Double> map = new HashMap<String, Double>();
-    for (int i = 0; i < array.length(); ++i) {
-      map.put(array.getJSONObject(i).getJSONArray("group").getString(0),
-          array.getJSONObject(i).getDouble("value"));
-    }
-    return map;
   }
 
   /**

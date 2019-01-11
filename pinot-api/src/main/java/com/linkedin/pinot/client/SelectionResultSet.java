@@ -18,51 +18,43 @@
  */
 package com.linkedin.pinot.client;
 
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
+import com.fasterxml.jackson.databind.JsonNode;
+
 
 /**
  * Selection result set, which contains the results of a selection query.
  */
 class SelectionResultSet extends AbstractResultSet {
-  private JSONArray _resultsArray;
-  private JSONArray _columnsArray;
+  private JsonNode _resultsArray;
+  private JsonNode _columnsArray;
 
-  public SelectionResultSet(JSONObject selectionResults) {
-    try {
-      _resultsArray = selectionResults.getJSONArray("results");
-      _columnsArray = selectionResults.getJSONArray("columns");
-    } catch (JSONException e) {
-      throw new PinotClientException(e);
-    }
+  public SelectionResultSet(JsonNode selectionResults) {
+    _resultsArray = selectionResults.get("results");
+    _columnsArray = selectionResults.get("columns");
   }
 
   @Override
   public int getRowCount() {
-    return _resultsArray.length();
+    return _resultsArray.size();
   }
 
   @Override
   public int getColumnCount() {
-    return _columnsArray.length();
+    return _columnsArray.size();
   }
 
   @Override
   public String getColumnName(int columnIndex) {
-    try {
-      return _columnsArray.getString(columnIndex);
-    } catch (JSONException e) {
-      throw new PinotClientException(e);
-    }
+    return _columnsArray.get(columnIndex).asText();
   }
 
   @Override
   public String getString(int rowIndex, int columnIndex) {
-    try {
-      return _resultsArray.getJSONArray(rowIndex).get(columnIndex).toString();
-    } catch (JSONException e) {
-      throw new PinotClientException(e);
+    JsonNode jsonValue = _resultsArray.get(rowIndex).get(columnIndex);
+    if (jsonValue.isTextual()) {
+      return jsonValue.textValue();
+    } else {
+      return jsonValue.toString();
     }
   }
 
@@ -87,11 +79,7 @@ class SelectionResultSet extends AbstractResultSet {
     TextTable table = new TextTable();
     String[] columnNames = new String[numColumns];
     for (int c = 0; c < numColumns; c++) {
-      try {
-        columnNames[c] = _columnsArray.getString(c);
-      } catch (JSONException e) {
-        columnNames[c] = "ERROR";
-      }
+      columnNames[c] = _columnsArray.get(c).asText();
     }
     table.addHeader(columnNames);
 
@@ -108,6 +96,5 @@ class SelectionResultSet extends AbstractResultSet {
       table.addRow(columnValues);
     }
     return table.toString();
-
   }
 }

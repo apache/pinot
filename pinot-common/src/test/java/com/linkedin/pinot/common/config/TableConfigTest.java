@@ -25,7 +25,6 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 import org.apache.helix.ZNRecord;
-import org.json.JSONObject;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -45,8 +44,7 @@ public class TableConfigTest {
       Assert.assertNull(tableConfig.getQuotaConfig());
 
       // Serialize then de-serialize
-      JSONObject jsonConfig = TableConfig.toJSONConfig(tableConfig);
-      TableConfig tableConfigToCompare = TableConfig.fromJSONConfig(jsonConfig);
+      TableConfig tableConfigToCompare = TableConfig.fromJSONConfig(TableConfig.toJSONConfig(tableConfig));
       Assert.assertEquals(tableConfigToCompare.getTableName(), tableConfig.getTableName());
       Assert.assertNull(tableConfigToCompare.getQuotaConfig());
       Assert.assertNull(tableConfigToCompare.getValidationConfig().getReplicaGroupStrategyConfig());
@@ -75,12 +73,12 @@ public class TableConfigTest {
       // With qps quota
       quotaConfig.setMaxQueriesPerSecond("100.00");
       tableConfig = tableConfigBuilder.setQuotaConfig(quotaConfig).build();
+      Assert.assertNotNull(tableConfig.getQuotaConfig());
       Assert.assertNotNull(tableConfig.getQuotaConfig().getMaxQueriesPerSecond());
       Assert.assertEquals(tableConfig.getQuotaConfig().getMaxQueriesPerSecond(), "100.00");
 
       // Serialize then de-serialize
-      JSONObject jsonConfig = TableConfig.toJSONConfig(tableConfig);
-      TableConfig tableConfigToCompare = TableConfig.fromJSONConfig(jsonConfig);
+      TableConfig tableConfigToCompare = TableConfig.fromJSONConfig(TableConfig.toJSONConfig(tableConfig));
       Assert.assertEquals(tableConfigToCompare.getTableName(), tableConfig.getTableName());
       Assert.assertNotNull(tableConfigToCompare.getQuotaConfig());
       Assert.assertEquals(tableConfigToCompare.getQuotaConfig().getStorage(),
@@ -106,8 +104,7 @@ public class TableConfigTest {
       Assert.assertNull(tableConfig.getTenantConfig().getTagOverrideConfig());
 
       // Serialize then de-serialize
-      JSONObject jsonConfig = TableConfig.toJSONConfig(tableConfig);
-      TableConfig tableConfigToCompare = TableConfig.fromJSONConfig(jsonConfig);
+      TableConfig tableConfigToCompare = TableConfig.fromJSONConfig(TableConfig.toJSONConfig(tableConfig));
       Assert.assertEquals(tableConfigToCompare.getTableName(), tableConfig.getTableName());
       Assert.assertNotNull(tableConfigToCompare.getTenantConfig());
       Assert.assertEquals(tableConfigToCompare.getTenantConfig().getServer(),
@@ -140,8 +137,7 @@ public class TableConfigTest {
       Assert.assertNull(tableConfig.getTenantConfig().getTagOverrideConfig().getRealtimeCompleted());
 
       // Serialize then de-serialize
-      jsonConfig = TableConfig.toJSONConfig(tableConfig);
-      tableConfigToCompare = TableConfig.fromJSONConfig(jsonConfig);
+      tableConfigToCompare = TableConfig.fromJSONConfig(TableConfig.toJSONConfig(tableConfig));
       Assert.assertEquals(tableConfigToCompare.getTableName(), tableConfig.getTableName());
       Assert.assertNotNull(tableConfigToCompare.getTenantConfig());
       Assert.assertEquals(tableConfigToCompare.getTenantConfig().getServer(),
@@ -176,8 +172,7 @@ public class TableConfigTest {
       tableConfig.getValidationConfig().setReplicaGroupStrategyConfig(replicaGroupConfig);
 
       // Serialize then de-serialize
-      JSONObject jsonConfig = TableConfig.toJSONConfig(tableConfig);
-      TableConfig tableConfigToCompare = TableConfig.fromJSONConfig(jsonConfig);
+      TableConfig tableConfigToCompare = TableConfig.fromJSONConfig(TableConfig.toJSONConfig(tableConfig));
       checkTableConfigWithAssignmentConfig(tableConfig, tableConfigToCompare);
 
       ZNRecord znRecord = TableConfig.toZnRecord(tableConfig);
@@ -199,8 +194,7 @@ public class TableConfigTest {
               .getStreamPartitionAssignmentStrategy(), "BalancedStreamPartitionAssignment");
 
       // Serialize then de-serialize
-      JSONObject jsonConfig = TableConfig.toJSONConfig(tableConfig);
-      TableConfig tableConfigToCompare = TableConfig.fromJSONConfig(jsonConfig);
+      TableConfig tableConfigToCompare = TableConfig.fromJSONConfig(TableConfig.toJSONConfig(tableConfig));
       Assert.assertEquals(
           tableConfigToCompare.getIndexingConfig().getStreamConsumptionConfig()
               .getStreamPartitionAssignmentStrategy(), "BalancedStreamPartitionAssignment");
@@ -226,8 +220,7 @@ public class TableConfigTest {
       tableConfig.getIndexingConfig().setStarTreeIndexSpec(starTreeIndexSpec);
 
       // Serialize then de-serialize
-      JSONObject jsonConfig = TableConfig.toJSONConfig(tableConfig);
-      TableConfig tableConfigToCompare = TableConfig.fromJSONConfig(jsonConfig);
+      TableConfig tableConfigToCompare = TableConfig.fromJSONConfig(TableConfig.toJSONConfig(tableConfig));
       checkTableConfigWithStarTreeConfig(tableConfig, tableConfigToCompare);
 
       ZNRecord znRecord = TableConfig.toZnRecord(tableConfig);
@@ -255,8 +248,7 @@ public class TableConfigTest {
       tableConfig.getValidationConfig().setHllConfig(hllConfig);
 
       // Serialize then de-serialize
-      JSONObject jsonConfig = TableConfig.toJSONConfig(tableConfig);
-      TableConfig tableConfigToCompare = TableConfig.fromJSONConfig(jsonConfig);
+      TableConfig tableConfigToCompare = TableConfig.fromJSONConfig(TableConfig.toJSONConfig(tableConfig));
       checkTableConfigWithHllConfig(tableConfig, tableConfigToCompare);
 
       ZNRecord znRecord = TableConfig.toZnRecord(tableConfig);
@@ -275,7 +267,7 @@ public class TableConfigTest {
     // Check that the configurations are correct.
     ReplicaGroupStrategyConfig strategyConfig =
         tableConfigToCompare.getValidationConfig().getReplicaGroupStrategyConfig();
-    Assert.assertEquals(strategyConfig.getMirrorAssignmentAcrossReplicaGroups(), true);
+    Assert.assertTrue(strategyConfig.getMirrorAssignmentAcrossReplicaGroups());
     Assert.assertEquals(strategyConfig.getNumInstancesPerPartition(), 5);
     Assert.assertEquals(strategyConfig.getPartitionColumn(), "memberId");
   }
@@ -318,7 +310,7 @@ public class TableConfigTest {
     columns.add("column");
     columns.add("column2");
 
-    Assert.assertTrue(hllConfig.getColumnsToDeriveHllFields().equals(columns));
+    Assert.assertEquals(hllConfig.getColumnsToDeriveHllFields(), columns);
     Assert.assertEquals(hllConfig.getHllLog2m(), 9);
     Assert.assertEquals(hllConfig.getHllDeriveColumnSuffix(), "suffix");
   }

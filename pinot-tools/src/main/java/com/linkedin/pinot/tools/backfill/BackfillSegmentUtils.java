@@ -19,9 +19,9 @@
 package com.linkedin.pinot.tools.backfill;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.pinot.common.utils.CommonConstants.Segment.SegmentType;
 import com.linkedin.pinot.common.utils.FileUploadDownloadClient;
+import com.linkedin.pinot.common.utils.JsonUtils;
 import com.linkedin.pinot.common.utils.SimpleHttpResponse;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import java.io.File;
@@ -73,10 +73,11 @@ public class BackfillSegmentUtils {
     List<String> allSegments = new ArrayList<>();
     String urlString = String.format(SEGMENTS_ENDPOINT, _controllerHttpHost.toURI(), tableName);
     URL url = new URL(urlString);
-    InputStream is = url.openConnection().getInputStream();
 
-    String response = IOUtils.toString(is);
-    JsonNode segmentsData = new ObjectMapper().readTree(response);
+    JsonNode segmentsData;
+    try (InputStream inputStream = url.openConnection().getInputStream()) {
+      segmentsData = JsonUtils.inputStreamToJsonNode(inputStream);
+    }
 
     if (segmentsData != null) {
       if (segmentType == null || SegmentType.OFFLINE.equals(segmentType)) {

@@ -18,21 +18,18 @@
  */
 package com.linkedin.pinot.common.restlet.resources;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
-import org.codehaus.jackson.annotate.JsonProperty;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 public class TablesList {
-  private static final Logger LOGGER = LoggerFactory.getLogger(TablesList.class);
-  List<String> tables;
+  private List<String> _tables;
 
   public TablesList(@JsonProperty("tables") List<String> tables) {
-    this.tables = tables;
+    _tables = tables;
   }
 
   public List<String> getTables() {
-    return tables;
+    return _tables;
   }
 }

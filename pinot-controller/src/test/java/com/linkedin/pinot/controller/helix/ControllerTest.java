@@ -18,7 +18,6 @@
  */
 package com.linkedin.pinot.controller.helix;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.pinot.common.data.DimensionFieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
@@ -49,7 +48,6 @@ import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.manager.zk.ZkClient;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.json.JSONException;
 import org.testng.Assert;
 
 
@@ -58,7 +56,6 @@ import org.testng.Assert;
  */
 public abstract class ControllerTest {
   public static final String LOCAL_HOST = "localhost";
-  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   private static final int DEFAULT_CONTROLLER_PORT = 8998;
   private static final String DEFAULT_DATA_DIR =
@@ -148,7 +145,7 @@ public abstract class ControllerTest {
     _zkClient.close();
   }
 
-  protected Schema createDummySchema(String tableName) throws JSONException {
+  protected Schema createDummySchema(String tableName) {
     Schema schema = new Schema();
     schema.setSchemaName(tableName);
     schema.addField(new DimensionFieldSpec("dimA", FieldSpec.DataType.STRING, true, ""));
@@ -160,7 +157,7 @@ public abstract class ControllerTest {
     return schema;
   }
 
-  protected void addDummySchema(String tableName) throws JSONException, IOException {
+  protected void addDummySchema(String tableName) throws IOException {
     addSchema(createDummySchema(tableName).getJSONSchema());
   }
 

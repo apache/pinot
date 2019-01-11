@@ -91,7 +91,7 @@ public class IndexLoadingConfig {
       _noDictionaryColumns.addAll(noDictionaryColumns);
     }
 
-    Map<String, String> noDictionaryConfig = indexingConfig.getnoDictionaryConfig();
+    Map<String, String> noDictionaryConfig = indexingConfig.getNoDictionaryConfig();
     if (noDictionaryConfig != null) {
       _noDictionaryConfig.putAll(noDictionaryConfig);
     }

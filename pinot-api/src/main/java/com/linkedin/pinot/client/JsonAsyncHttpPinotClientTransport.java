@@ -18,13 +18,15 @@
  */
 package com.linkedin.pinot.client;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectReader;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.ning.http.client.AsyncHttpClient;
 import com.ning.http.client.Response;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -34,6 +36,8 @@ import org.slf4j.LoggerFactory;
  */
 class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
   private static final Logger LOGGER = LoggerFactory.getLogger(JsonAsyncHttpPinotClientTransport.class);
+  private static final ObjectReader OBJECT_READER = new ObjectMapper().reader();
+
   AsyncHttpClient _httpClient = new AsyncHttpClient();
 
   @Override
@@ -48,7 +52,7 @@ class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
   @Override
   public Future<BrokerResponse> executeQueryAsync(String brokerAddress, final String query) {
     try {
-      final JSONObject json = new JSONObject();
+      ObjectNode json = JsonNodeFactory.instance.objectNode();
       json.put("pql", query);
 
       final String url = "http://" + brokerAddress + "/query";
@@ -88,19 +92,12 @@ class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
     }
 
     @Override
-    public BrokerResponse get()
-        throws InterruptedException, ExecutionException {
-      try {
-        return get(1000L, TimeUnit.DAYS);
-      } catch (TimeoutException e) {
-        LOGGER.error("Caught timeout during synchronous get", e);
-        throw new InterruptedException();
-      }
+    public BrokerResponse get() throws ExecutionException {
+      return get(1000L, TimeUnit.DAYS);
     }
 
     @Override
-    public BrokerResponse get(long timeout, TimeUnit unit)
-        throws InterruptedException, ExecutionException, TimeoutException {
+    public BrokerResponse get(long timeout, TimeUnit unit) throws ExecutionException {
       try {
         LOGGER.debug("Sending query {} to {}", _query, _url);
 
@@ -109,12 +106,12 @@ class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
         LOGGER.debug("Completed query, HTTP status is {}", httpResponse.getStatusCode());
 
         if (httpResponse.getStatusCode() != 200) {
-          throw new PinotClientException("Pinot returned HTTP status " + httpResponse.getStatusCode() +
-              ", expected 200");
+          throw new PinotClientException(
+              "Pinot returned HTTP status " + httpResponse.getStatusCode() + ", expected 200");
         }
 
         String responseBody = httpResponse.getResponseBody();
-        return BrokerResponse.fromJson(new JSONObject(responseBody));
+        return BrokerResponse.fromJson(OBJECT_READER.readTree(responseBody));
       } catch (Exception e) {
         throw new ExecutionException(e);
       }

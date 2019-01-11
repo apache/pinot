@@ -18,6 +18,7 @@
  */
 package com.linkedin.pinot.core.segment.index;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
@@ -27,34 +28,30 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.util.concurrent.TimeUnit;
-import junit.framework.Assert;
-import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.io.FileUtils;
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.*;
+
 
 public class SegmentMetadataImplTest {
- private static final String AVRO_DATA = "data/test_data-mv.avro";
+  private static final String AVRO_DATA = "data/test_data-mv.avro";
   private File INDEX_DIR;
   private File segmentDirectory;
 
   @BeforeMethod
-  public void setUp()
-      throws Exception {
+  public void setUp() throws Exception {
     INDEX_DIR = Files.createTempDirectory(SegmentMetadataImplTest.class.getName() + "_segmentDir").toFile();
 
     final String filePath =
         TestUtils.getFileFromResourceUrl(SegmentMetadataImplTest.class.getClassLoader().getResource(AVRO_DATA));
 
     // intentionally changed this to TimeUnit.Hours to make it non-default for testing
-    final SegmentGeneratorConfig config = SegmentTestUtils
-        .getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, "daysSinceEpoch", TimeUnit.HOURS,
-            "testTable");
+    final SegmentGeneratorConfig config =
+        SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, "daysSinceEpoch",
+            TimeUnit.HOURS, "testTable");
     config.setSegmentNamePostfix("1");
     config.setTimeColumnName("daysSinceEpoch");
     final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
@@ -69,33 +66,35 @@ public class SegmentMetadataImplTest {
   }
 
   @Test
-  public void testToJson()
-      throws IOException, ConfigurationException, JSONException {
+  public void testToJson() throws IOException {
     SegmentMetadataImpl metadata = new SegmentMetadataImpl(segmentDirectory);
-    Assert.assertNotNull(metadata);
-    JSONObject jsonMeta = metadata.toJson(null);
-    Assert.assertEquals(jsonMeta.get("segmentName"), metadata.getName());
-    Assert.assertEquals(jsonMeta.getLong("crc"), Long.valueOf(metadata.getCrc()).longValue());
-    Assert.assertEquals(jsonMeta.getString("paddingCharacter"), String.valueOf(metadata.getPaddingCharacter()));
-    Assert.assertEquals(jsonMeta.get("creatorName"), metadata.getCreatorName());
-    Assert.assertEquals(jsonMeta.get("creationTimeMillis"), metadata.getIndexCreationTime());
-    Assert.assertEquals(jsonMeta.get("startTimeMillis"), metadata.getTimeInterval().getStartMillis());
-    Assert.assertEquals(jsonMeta.get("endTimeMillis"), metadata.getTimeInterval().getEndMillis());
-    Assert.assertEquals(jsonMeta.get("pushTimeMillis"), metadata.getPushTime());
-    Assert.assertEquals(jsonMeta.get("refreshTimeMillis"), metadata.getPushTime());
-    JSONArray jsonColumnList = jsonMeta.getJSONArray("columns");
-    Assert.assertEquals(jsonColumnList.length(), metadata.getAllColumns().size());
-    for (int i = 0; i < jsonColumnList.length(); i++) {
-      JSONObject  jsonColumn = jsonColumnList.getJSONObject(i);
-      ColumnMetadata colMeta = metadata.getColumnMetadataFor(jsonColumn.getString("columnName"));
-      Assert.assertEquals(jsonColumn.get("cardinality"), colMeta.getCardinality());
-      Assert.assertEquals(jsonColumn.get("totalRawDocs"), colMeta.getTotalRawDocs());
-      Assert.assertEquals(jsonColumn.get("bitsPerElement"), colMeta.getBitsPerElement());
-      Assert.assertEquals(jsonColumn.getBoolean("sorted"), colMeta.isSorted());
-      Assert.assertEquals(jsonColumn.get("totalAggDocs"), colMeta.getTotalAggDocs());
-      Assert.assertEquals(jsonColumn.get("containsNulls"), colMeta.hasNulls());
-      Assert.assertEquals(jsonColumn.getBoolean("hasDictionary"), colMeta.hasDictionary());
-    }
+    assertNotNull(metadata);
 
+    JsonNode jsonMeta = metadata.toJson(null);
+    assertEquals(jsonMeta.get("segmentName").asText(), metadata.getName());
+    assertEquals(jsonMeta.get("crc").asLong(), Long.valueOf(metadata.getCrc()).longValue());
+    assertEquals(jsonMeta.get("paddingCharacter").asText(), String.valueOf(metadata.getPaddingCharacter()));
+    assertTrue(jsonMeta.get("creatorName").isNull());
+    assertEquals(jsonMeta.get("creationTimeMillis").asLong(), metadata.getIndexCreationTime());
+    assertEquals(jsonMeta.get("startTimeMillis").asLong(), metadata.getTimeInterval().getStartMillis());
+    assertEquals(jsonMeta.get("endTimeMillis").asLong(), metadata.getTimeInterval().getEndMillis());
+    assertEquals(jsonMeta.get("pushTimeMillis").asLong(), metadata.getPushTime());
+    assertEquals(jsonMeta.get("refreshTimeMillis").asLong(), metadata.getPushTime());
+
+    JsonNode jsonColumnsMeta = jsonMeta.get("columns");
+    int numColumns = jsonColumnsMeta.size();
+    assertEquals(numColumns, metadata.getAllColumns().size());
+    for (int i = 0; i < numColumns; i++) {
+      JsonNode jsonColumnMeta = jsonColumnsMeta.get(i);
+      ColumnMetadata columnMeta = metadata.getColumnMetadataFor(jsonColumnMeta.get("columnName").asText());
+      assertNotNull(columnMeta);
+      assertEquals(jsonColumnMeta.get("cardinality").asInt(), columnMeta.getCardinality());
+      assertEquals(jsonColumnMeta.get("totalRawDocs").asInt(), columnMeta.getTotalRawDocs());
+      assertEquals(jsonColumnMeta.get("bitsPerElement").asInt(), columnMeta.getBitsPerElement());
+      assertEquals(jsonColumnMeta.get("sorted").asBoolean(), columnMeta.isSorted());
+      assertEquals(jsonColumnMeta.get("totalAggDocs").asInt(), columnMeta.getTotalAggDocs());
+      assertEquals(jsonColumnMeta.get("containsNulls").asBoolean(), columnMeta.hasNulls());
+      assertEquals(jsonColumnMeta.get("hasDictionary").asBoolean(), columnMeta.hasDictionary());
+    }
   }
 }
