@@ -131,6 +131,11 @@
       <groupId>org.reflections</groupId>
       <artifactId>reflections</artifactId>
     </dependency>
+    <dependency>
+      <!-- TODO: replace code dependencies and remove -->
+      <groupId>org.json</groupId>
+      <artifactId>json</artifactId>
+    </dependency>
 
     <!-- dataframe specific -->
     <dependency>

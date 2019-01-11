@@ -80,6 +80,7 @@
     <kafka.clients.version>0.10.2.1</kafka.clients.version>
     <swagger.version>0.7.0</swagger.version>
     <calendar-api.version>v3-rev300-1.23.0</calendar-api.version>
+    <json.version>20170516</json.version>
   </properties>
 
   <licenses>
@@ -460,6 +461,12 @@
         <groupId>org.hsqldb</groupId>
         <artifactId>hsqldb</artifactId>
         <version>${hsqldb.version}</version>
+      </dependency>
+      <dependency>
+        <!-- TODO: replace code dependencies and remove -->
+        <groupId>org.json</groupId>
+        <artifactId>json</artifactId>
+        <version>${json.version}</version>
       </dependency>
 
       <!-- swagger -->
