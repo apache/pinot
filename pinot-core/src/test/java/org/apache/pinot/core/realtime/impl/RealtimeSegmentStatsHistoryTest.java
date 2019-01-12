@@ -224,7 +224,7 @@ public class RealtimeSegmentStatsHistoryTest {
   // "v1col2".
   @Test
   public void testVersion1() throws Exception {
-    final String fileName = "realtime-segment-stats-history.ser";
+    final String fileName = "realtime-segment-stats-history-v1.ser";
     File v1StatsFile = new File(TestUtils.getFileFromResourceUrl(RealtimeSegmentStatsHistoryTest.class.getClassLoader().getResource("data")), fileName);
     RealtimeSegmentStatsHistory statsHistory = RealtimeSegmentStatsHistory.deserialzeFrom(v1StatsFile);
     RealtimeSegmentStatsHistory.SegmentStats segmentStats = statsHistory.getSegmentStatsAt(0);
