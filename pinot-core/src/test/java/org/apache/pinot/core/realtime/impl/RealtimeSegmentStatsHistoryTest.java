@@ -222,9 +222,9 @@ public class RealtimeSegmentStatsHistoryTest {
   // This test attempts to ensure that future modifications to RealtimeSegmentStatsHistory does not prevent the software
   // from reading data serialized by earlier versions. The serialized data has one segment, with 2 columns -- "v1col1" and
   // "v1col2".
-  //@Test
+  @Test
   public void testVersion1() throws Exception {
-    final String fileName = "realtime-segment-stats-history-v1.ser";
+    final String fileName = "realtime-segment-stats-history.ser";
     File v1StatsFile = new File(TestUtils.getFileFromResourceUrl(RealtimeSegmentStatsHistoryTest.class.getClassLoader().getResource("data")), fileName);
     RealtimeSegmentStatsHistory statsHistory = RealtimeSegmentStatsHistory.deserialzeFrom(v1StatsFile);
     RealtimeSegmentStatsHistory.SegmentStats segmentStats = statsHistory.getSegmentStatsAt(0);

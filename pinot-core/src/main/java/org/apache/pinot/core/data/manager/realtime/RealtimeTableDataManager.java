@@ -65,7 +65,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   private RealtimeSegmentStatsHistory _statsHistory;
   private final Semaphore _segmentBuildSemaphore;
 
-  private static final String STATS_FILE_NAME = "stats.ser";
+  private static final String STATS_FILE_NAME = "statsV2.ser";
   private static final String CONSUMERS_DIR = "consumers";
 
   // Topics tend to have similar cardinality for values across partitions consumed during the same time.
