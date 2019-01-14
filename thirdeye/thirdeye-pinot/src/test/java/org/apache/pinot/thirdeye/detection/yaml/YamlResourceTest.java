@@ -39,7 +39,7 @@ public class YamlResourceTest {
     testDAOProvider.cleanup();
   }
 
-  @Test
+  @Test(priority=1)
   public void testCreateDetectionAlertConfig() throws IOException {
     Map<String, String> responseMessage = new HashMap<>();
     DetectionAlertConfigDTO alertDTO;
@@ -91,7 +91,7 @@ public class YamlResourceTest {
     Assert.assertEquals(alertDTO.getName(), "Subscription Group Name");
   }
 
-  @Test
+  @Test(priority=2)
   public void testUpdateDetectionAlertConfig() throws IOException {
     DetectionAlertConfigDTO oldAlertDTO = new DetectionAlertConfigDTO();
     oldAlertDTO.setName("Subscription Group Name");
