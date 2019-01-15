@@ -29,11 +29,11 @@ import org.joda.time.Interval;
  */
 public interface Tunable<T extends AbstractSpec> extends BaseComponent<T> {
   /**
-   * Returns the new spec for the component it's tuning
-   * @param currentSpec current spec for the component. empty if not exist
+   * Returns the new spec for the component it's tuning for a given metric urn.
+   * @param currentSpec current spec for the component. empty if not exist.
    * @param tuningWindow the tuning window
-   * @param metricUrn the metric detection runs on
-   * @return the init spec for the component it's tuning
+   * @param metricUrn the metric anomaly detection to run on
+   * @return the specs for the component it's tuning. Will be used to initialize the tuned component.
    */
   Map<String, Object> tune(Map<String, Object> currentSpec, Interval tuningWindow, String metricUrn);
 }
