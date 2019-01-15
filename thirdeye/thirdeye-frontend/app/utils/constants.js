@@ -139,3 +139,25 @@ rules:
 
 `;
 };
+
+export const yamlAlertSettings = `# Below are all dummy example. Please update accordingly.
+subscriptionGroupName: test_subscription_group
+cron: "0 0/5 * 1/1 * ? *"
+application: "parity-check"
+active: true
+
+detectionConfigIds:
+ - 5773069
+
+fromAddress: your_from@company.com
+recipients:
+ to:
+  - "me@company.com"
+ cc:
+  - "cc_email@company.com"
+
+alertSchemes:
+- type: EMAIL
+
+referenceLinks:
+ "My Company FAQs": "http://www.company.com/faq"`;
