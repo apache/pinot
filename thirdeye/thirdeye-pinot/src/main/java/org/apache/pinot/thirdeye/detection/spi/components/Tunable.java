@@ -32,8 +32,9 @@ public interface Tunable<T extends AbstractSpec> extends BaseComponent<T> {
    * Returns the new spec for the component it's tuning for a given metric urn.
    * @param currentSpec current spec for the component. empty if not exist.
    * @param tuningWindow the tuning window
-   * @param metricUrn the metric anomaly detection to run on
-   * @return the specs for the component it's tuning. Will be used to initialize the tuned component.
+   * @param metricUrn the metric urn to tune. When detection runs,the tuned spec will be used for detection
+   *                  to run on this metric urn.
+   * @return the specs for the component it's tuning. Will be used to initialize the tuned component when detection runs.
    */
   Map<String, Object> tune(Map<String, Object> currentSpec, Interval tuningWindow, String metricUrn);
 }
