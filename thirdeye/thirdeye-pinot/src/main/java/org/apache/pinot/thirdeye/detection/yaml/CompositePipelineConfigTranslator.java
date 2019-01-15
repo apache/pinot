@@ -408,7 +408,8 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
         this.existingComponentSpecs.containsKey(componentName) ? MapUtils.getMap(this.existingComponentSpecs,
             componentName) : Collections.emptyMap();
 
-    return tunable.tune(existingComponentSpec, window);
+    // TODO: if dimension drill down applied, pass in the metric urn of top dimension
+    return tunable.tune(existingComponentSpec, window, this.metricUrn);
   }
 
   private Tunable getTunable(String componentClassName, Map<String, Object> params, InputDataFetcher dataFetcher)
