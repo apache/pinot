@@ -30,6 +30,7 @@ import static org.apache.pinot.thirdeye.detection.yaml.YamlDetectionAlertConfigT
 public class DetectionAlertConfigValidator extends ConfigValidator {
 
   private static final DetectionAlertConfigValidator INSTANCE = new DetectionAlertConfigValidator();
+  private static final String PROP_CLASS_NAME = "className";
 
   public static DetectionAlertConfigValidator getInstance() {
     return INSTANCE;
@@ -53,6 +54,11 @@ public class DetectionAlertConfigValidator extends ConfigValidator {
     }
     if (StringUtils.isEmpty(alertConfig.getFrom())) {
       responseMessage.put("message", "From address field cannot be left empty");
+      return false;
+    }
+    if (alertConfig.getProperties() == null || alertConfig.getProperties().get(PROP_CLASS_NAME) == null
+        || StringUtils.isEmpty(alertConfig.getProperties().get(PROP_CLASS_NAME).toString())) {
+      responseMessage.put("message", "'Type' field cannot be left empty.");
       return false;
     }
 

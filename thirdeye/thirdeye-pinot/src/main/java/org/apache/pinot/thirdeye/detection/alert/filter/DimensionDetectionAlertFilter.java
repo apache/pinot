@@ -38,6 +38,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.collections.MapUtils;
+import org.apache.pinot.thirdeye.detection.annotation.AlertFilter;
 
 
 /**
@@ -45,6 +46,7 @@ import org.apache.commons.collections.MapUtils;
  * of unconditional and another set of conditional recipients, based on the value
  * of a specified anomaly dimension
  */
+@AlertFilter(type = "DIMENSION_ALERTER_PIPELINE")
 public class DimensionDetectionAlertFilter extends StatefulDetectionAlertFilter {
   private static final String PROP_DETECTION_CONFIG_IDS = "detectionConfigIds";
   private static final String PROP_TO = "to";

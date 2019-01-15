@@ -20,8 +20,11 @@
 package org.apache.pinot.thirdeye.detection.annotation.registry;
 
 import com.google.common.base.Preconditions;
+import org.apache.commons.collections.MapUtils;
+import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilter;
 import org.apache.pinot.thirdeye.detection.alert.scheme.DetectionAlertScheme;
 import org.apache.pinot.thirdeye.detection.alert.suppress.DetectionAlertSuppressor;
+import org.apache.pinot.thirdeye.detection.annotation.AlertFilter;
 import org.apache.pinot.thirdeye.detection.annotation.AlertScheme;
 import org.apache.pinot.thirdeye.detection.annotation.AlertSuppressor;
 import java.lang.annotation.Annotation;
@@ -45,6 +48,9 @@ public class DetectionAlertRegistry {
   // Alert Suppressor type to Alert Suppressor class name
   private static final Map<String, String> ALERT_SUPPRESSOR_MAP = new HashMap<>();
 
+  // Alert Filter Type Map
+  private static final Map<String, String> ALERT_FILTER_MAP = new HashMap<>();
+
   private static final DetectionAlertRegistry INSTANCE = new DetectionAlertRegistry();
 
   public static DetectionAlertRegistry getInstance() {
@@ -57,6 +63,17 @@ public class DetectionAlertRegistry {
   public static void init() {
     try {
       Reflections reflections = new Reflections();
+
+      // register alert filters
+      Set<Class<? extends DetectionAlertFilter>> alertFilterClasses =
+          reflections.getSubTypesOf(DetectionAlertFilter.class);
+      for (Class clazz : alertFilterClasses) {
+        for (Annotation annotation : clazz.getAnnotations()) {
+          if (annotation instanceof AlertFilter) {
+            ALERT_FILTER_MAP.put(((AlertFilter) annotation).type(), clazz.getName());
+          }
+        }
+      }
 
       // register alert schemes
       Set<Class<? extends DetectionAlertScheme>> alertSchemeClasses =
@@ -84,12 +101,25 @@ public class DetectionAlertRegistry {
     }
   }
 
+  public void registerAlertFilter(String type, String className) {
+    ALERT_FILTER_MAP.put(type, className);
+  }
+
   public void registerAlertScheme(String type, String className) {
     ALERT_SCHEME_MAP.put(type, className);
   }
 
   public void registerAlertSuppressor(String type, String className) {
     ALERT_SUPPRESSOR_MAP.put(type, className);
+  }
+
+  /**
+   * Look up the class name for a given alert filter
+   * @param type the type used in the YAML configs
+   */
+  public String lookupAlertFilters(String type) {
+    Preconditions.checkArgument(ALERT_FILTER_MAP.containsKey(type.toUpperCase()), type + " not found in registry");
+    return ALERT_FILTER_MAP.get(type.toUpperCase());
   }
 
   /**

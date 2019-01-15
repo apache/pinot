@@ -132,10 +132,10 @@ public class YamlDetectionAlertConfigTranslatorTest {
 
   @BeforeMethod
   public void setUp() {
-    DetectionRegistry.registerComponent("testclassname", "TO_ALL_RECIPIENTS");
+    DetectionAlertRegistry.getInstance().registerAlertFilter("DEFAULT_ALERTER_PIPELINE", "RECIPIENTClass");
     this.alertYamlConfigs = new HashMap<>();
     alertYamlConfigs.put(PROP_SUBS_GROUP_NAME, "test_alert");
-    alertYamlConfigs.put("type", "TO_ALL_RECIPIEnts");
+    alertYamlConfigs.put("type", "DEFAULT_ALerTeR_PipeLIne");
     Map<String, Object> recipients = new HashMap<>();
     recipients.put("to", Arrays.asList("test1", "test2"));
     alertYamlConfigs.put("recipients", recipients);
