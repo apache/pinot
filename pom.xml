@@ -1036,20 +1036,33 @@
         <configuration>
           <header>license.header</header>
           <excludes>
+            <!-- Text and log files -->
             <exclude>**/*.txt</exclude>
             <exclude>**/*.log</exclude>
-            <exclude>**/target/**/*.*</exclude>
-            <!-- Top level resources under main and test -->
-            <exclude>**/main/resources/**/*.*</exclude>
-            <exclude>**/test/resources/**/*.*</exclude>
-            <exclude>thirdeye/**/*</exclude>
-            <!-- Documentation files -->
-            <exclude>**/docs/_build/**</exclude>
-            <exclude>**/?*</exclude>
+
+            <!-- Resource directories under main and test -->
+            <exclude>**/src/main/resources/**</exclude>
+            <exclude>**/src/test/resources/**</exclude>
+
+            <!-- Auto-generated target directories -->
+            <exclude>target/**</exclude>
+            <exclude>pinot-*/target/**</exclude>
+
+            <!-- Top level directories -->
+            <exclude>thirdeye/**</exclude>
+            <exclude>docs/**</exclude>
+            <!-- Note: this will exclude all single character directories under the root directory.
+            We use this to exclude the temporary files generated during build -->
+            <exclude>?/**</exclude>
+
+            <!-- Top level files -->
+            <exclude>.codecov*</exclude>
+            <exclude>license.header</exclude>
+            <exclude>LICENSE</exclude>
+            <exclude>NOTICE</exclude>
           </excludes>
           <mapping>
             <thrift>JAVADOC_STYLE</thrift>
-            <g>DOUBLESLASH_STYLE</g>
             <g4>JAVADOC_STYLE</g4>
           </mapping>
         </configuration>
