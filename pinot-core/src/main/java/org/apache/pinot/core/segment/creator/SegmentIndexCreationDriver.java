@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.core.segment.creator;
 
-import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import java.io.File;
+import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 
 
 /**

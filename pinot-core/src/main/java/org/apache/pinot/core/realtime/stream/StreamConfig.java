@@ -19,15 +19,15 @@
 package org.apache.pinot.core.realtime.stream;
 
 import com.google.common.base.Preconditions;
-import org.apache.pinot.common.utils.DataSize;
-import org.apache.pinot.common.utils.EqualityUtils;
-import org.apache.pinot.common.utils.time.TimeUtils;
-import org.apache.pinot.core.realtime.impl.kafka.KafkaConsumerFactory;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.common.utils.DataSize;
+import org.apache.pinot.common.utils.EqualityUtils;
+import org.apache.pinot.common.utils.time.TimeUtils;
+import org.apache.pinot.core.realtime.impl.kafka.KafkaConsumerFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

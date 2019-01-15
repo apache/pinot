@@ -19,6 +19,12 @@
 package org.apache.pinot.perf;
 
 import com.google.common.base.Preconditions;
+import java.io.File;
+import java.io.IOException;
+import java.net.URL;
+import java.util.Random;
+import java.util.concurrent.TimeUnit;
+import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.core.io.reader.ReaderContext;
@@ -39,12 +45,6 @@ import org.apache.pinot.core.segment.store.SegmentDirectory;
 import org.apache.pinot.integration.tests.ClusterTest;
 import org.apache.pinot.segments.v1.creator.SegmentTestUtils;
 import org.apache.pinot.util.TestUtils;
-import java.io.File;
-import java.io.IOException;
-import java.net.URL;
-import java.util.Random;
-import java.util.concurrent.TimeUnit;
-import org.apache.commons.io.FileUtils;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Mode;

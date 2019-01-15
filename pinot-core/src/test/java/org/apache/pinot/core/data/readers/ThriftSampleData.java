@@ -23,6 +23,22 @@
 
 package org.apache.pinot.core.data.readers;
 
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.BitSet;
+import java.util.Collections;
+import java.util.EnumMap;
+import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
 import org.apache.thrift.EncodingUtils;
 import org.apache.thrift.TBase;
 import org.apache.thrift.TBaseHelper;
@@ -47,23 +63,6 @@ import org.apache.thrift.scheme.SchemeFactory;
 import org.apache.thrift.scheme.StandardScheme;
 import org.apache.thrift.scheme.TupleScheme;
 import org.apache.thrift.transport.TIOStreamTransport;
-
-import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
-import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.BitSet;
-import java.util.Collections;
-import java.util.EnumMap;
-import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Set;
 
 public class ThriftSampleData implements TBase<ThriftSampleData, ThriftSampleData._Fields>, Serializable, Cloneable, Comparable<ThriftSampleData> {
     private static final TStruct STRUCT_DESC = new TStruct("ThriftSampleData");

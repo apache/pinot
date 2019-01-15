@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.transport.scattergather;
 
-import org.apache.pinot.common.request.BrokerRequest;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.common.request.BrokerRequest;
 
 
 /**

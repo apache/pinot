@@ -18,10 +18,10 @@
  */
 package org.apache.pinot.common.utils;
 
-import org.apache.pinot.common.response.ProcessingException;
 import java.io.IOException;
 import java.util.Map;
 import javax.annotation.Nonnull;
+import org.apache.pinot.common.response.ProcessingException;
 
 
 /**

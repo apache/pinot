@@ -18,13 +18,13 @@
  */
 package org.apache.pinot.index.reader;
 
+import java.io.File;
+import java.util.Random;
 import org.apache.pinot.core.io.reader.ReaderContext;
 import org.apache.pinot.core.io.reader.impl.v1.SortedIndexReader;
 import org.apache.pinot.core.io.reader.impl.v1.SortedIndexReaderImpl;
 import org.apache.pinot.core.io.writer.impl.FixedByteSingleValueMultiColWriter;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
-import java.io.File;
-import java.util.Random;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;

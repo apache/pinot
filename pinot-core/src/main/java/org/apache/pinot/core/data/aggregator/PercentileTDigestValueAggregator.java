@@ -18,11 +18,11 @@
  */
 package org.apache.pinot.core.data.aggregator;
 
+import com.tdunning.math.stats.TDigest;
 import org.apache.pinot.common.data.FieldSpec.DataType;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionType;
 import org.apache.pinot.core.query.aggregation.function.PercentileTDigestAggregationFunction;
-import com.tdunning.math.stats.TDigest;
 
 
 public class PercentileTDigestValueAggregator implements ValueAggregator<Object, TDigest> {

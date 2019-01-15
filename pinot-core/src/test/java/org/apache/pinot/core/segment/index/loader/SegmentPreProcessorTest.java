@@ -18,6 +18,14 @@
  */
 package org.apache.pinot.core.segment.index.loader;
 
+import java.io.File;
+import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.attribute.FileTime;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
+import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.segment.ReadMode;
@@ -34,14 +42,6 @@ import org.apache.pinot.core.segment.store.ColumnIndexType;
 import org.apache.pinot.core.segment.store.SegmentDirectory;
 import org.apache.pinot.core.segment.store.SegmentDirectoryPaths;
 import org.apache.pinot.segments.v1.creator.SegmentTestUtils;
-import java.io.File;
-import java.net.URL;
-import java.nio.file.Files;
-import java.nio.file.attribute.FileTime;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashSet;
-import org.apache.commons.io.FileUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;

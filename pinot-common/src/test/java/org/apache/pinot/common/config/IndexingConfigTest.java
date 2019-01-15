@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.common.config;
 
-import org.apache.pinot.common.data.StarTreeIndexSpec;
-import org.apache.pinot.common.utils.JsonUtils;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -28,9 +26,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import org.apache.pinot.common.data.StarTreeIndexSpec;
+import org.apache.pinot.common.utils.JsonUtils;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 
 public class IndexingConfigTest {

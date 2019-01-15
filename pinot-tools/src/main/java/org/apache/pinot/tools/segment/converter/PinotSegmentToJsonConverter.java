@@ -19,12 +19,12 @@
 package org.apache.pinot.tools.segment.converter;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import org.apache.pinot.common.utils.JsonUtils;
-import org.apache.pinot.core.data.GenericRow;
-import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
+import org.apache.pinot.common.utils.JsonUtils;
+import org.apache.pinot.core.data.GenericRow;
+import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
 
 
 /**

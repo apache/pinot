@@ -18,10 +18,10 @@
  */
 package org.apache.pinot.core.realtime.impl.invertedindex;
 
-import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 

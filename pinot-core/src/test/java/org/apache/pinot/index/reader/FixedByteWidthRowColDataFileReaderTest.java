@@ -18,13 +18,13 @@
  */
 package org.apache.pinot.index.reader;
 
-import org.apache.pinot.core.io.reader.impl.FixedByteSingleValueMultiColReader;
-import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.RandomAccessFile;
 import java.util.Random;
+import org.apache.pinot.core.io.reader.impl.FixedByteSingleValueMultiColReader;
+import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 

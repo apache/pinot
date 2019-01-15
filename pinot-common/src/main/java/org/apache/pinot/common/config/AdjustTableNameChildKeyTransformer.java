@@ -18,10 +18,10 @@
  */
 package org.apache.pinot.common.config;
 
-import org.apache.pinot.common.utils.CommonConstants;
 import io.vavr.collection.List;
 import io.vavr.collection.Map;
 import java.util.Collection;
+import org.apache.pinot.common.utils.CommonConstants;
 
 
 /**

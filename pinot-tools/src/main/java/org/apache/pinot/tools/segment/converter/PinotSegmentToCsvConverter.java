@@ -18,14 +18,14 @@
  */
 package org.apache.pinot.tools.segment.converter;
 
-import org.apache.pinot.core.data.GenericRow;
-import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.commons.lang.StringUtils;
+import org.apache.pinot.core.data.GenericRow;
+import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
 
 
 /**

@@ -18,14 +18,14 @@
  */
 package org.apache.pinot.common.data;
 
-import org.apache.pinot.common.data.TimeGranularitySpec.TimeFormat;
-import org.apache.pinot.common.utils.SchemaUtils;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.codec.DecoderException;
 import org.apache.commons.codec.binary.Hex;
+import org.apache.pinot.common.data.TimeGranularitySpec.TimeFormat;
+import org.apache.pinot.common.utils.SchemaUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;

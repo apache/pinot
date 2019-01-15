@@ -18,14 +18,6 @@
  */
 package org.apache.pinot.controller.helix.core.sharding;
 
-import org.apache.pinot.common.config.ReplicaGroupStrategyConfig;
-import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.config.TableNameBuilder;
-import org.apache.pinot.common.metadata.ZKMetadataProvider;
-import org.apache.pinot.common.partition.ReplicaGroupPartitionAssignment;
-import org.apache.pinot.common.partition.ReplicaGroupPartitionAssignmentGenerator;
-import org.apache.pinot.common.segment.SegmentMetadata;
-import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -34,6 +26,14 @@ import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.pinot.common.config.ReplicaGroupStrategyConfig;
+import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.common.config.TableNameBuilder;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.partition.ReplicaGroupPartitionAssignment;
+import org.apache.pinot.common.partition.ReplicaGroupPartitionAssignmentGenerator;
+import org.apache.pinot.common.segment.SegmentMetadata;
+import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.core.query.pruner;
 
+import org.apache.commons.configuration.Configuration;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
-import org.apache.commons.configuration.Configuration;
 
 
 public interface SegmentPruner {

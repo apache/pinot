@@ -18,13 +18,13 @@
  */
 package org.apache.pinot.core.segment.creator.impl.fwd;
 
+import java.io.File;
+import java.io.IOException;
 import org.apache.pinot.core.io.util.PinotDataBitSet;
 import org.apache.pinot.core.io.writer.SingleColumnMultiValueWriter;
 import org.apache.pinot.core.io.writer.impl.v1.FixedBitMultiValueWriter;
 import org.apache.pinot.core.segment.creator.MultiValueForwardIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
-import java.io.File;
-import java.io.IOException;
 
 
 public class MultiValueUnsortedForwardIndexCreator implements MultiValueForwardIndexCreator {

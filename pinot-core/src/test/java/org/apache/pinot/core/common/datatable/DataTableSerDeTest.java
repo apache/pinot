@@ -18,15 +18,15 @@
  */
 package org.apache.pinot.core.common.datatable;
 
-import org.apache.pinot.common.exception.QueryException;
-import org.apache.pinot.common.response.ProcessingException;
-import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.common.utils.DataTable;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Random;
 import org.apache.commons.lang.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.exception.QueryException;
+import org.apache.pinot.common.response.ProcessingException;
+import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataTable;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 

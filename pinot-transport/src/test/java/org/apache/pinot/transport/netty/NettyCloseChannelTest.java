@@ -18,15 +18,15 @@
  */
 package org.apache.pinot.transport.netty;
 
-import org.apache.pinot.common.response.ServerInstance;
-import org.apache.pinot.transport.metrics.NettyClientMetrics;
-import org.apache.pinot.transport.netty.NettyClientConnection.ResponseFuture;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.util.HashedWheelTimer;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import org.apache.pinot.common.response.ServerInstance;
+import org.apache.pinot.transport.metrics.NettyClientMetrics;
+import org.apache.pinot.transport.netty.NettyClientConnection.ResponseFuture;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;

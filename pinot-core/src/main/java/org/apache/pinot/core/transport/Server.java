@@ -21,7 +21,8 @@ package org.apache.pinot.core.transport;
 import com.google.common.net.InternetDomainName;
 import javax.annotation.concurrent.ThreadSafe;
 
-import static org.apache.pinot.common.utils.CommonConstants.Helix.*;
+import static org.apache.pinot.common.utils.CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE;
+import static org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
 
 
 /**

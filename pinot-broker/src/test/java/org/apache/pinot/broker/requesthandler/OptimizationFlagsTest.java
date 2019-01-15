@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.broker.requesthandler;
 
-import org.apache.pinot.common.request.BrokerRequest;
 import java.util.Collections;
+import org.apache.pinot.common.request.BrokerRequest;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 

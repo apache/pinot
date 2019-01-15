@@ -18,10 +18,10 @@
  */
 package org.apache.pinot.transport.metrics;
 
-import org.apache.pinot.common.metrics.LatencyMetric;
-import org.apache.pinot.transport.pool.AsyncPool;
 import com.yammer.metrics.core.Sampling;
 import com.yammer.metrics.core.Summarizable;
+import org.apache.pinot.common.metrics.LatencyMetric;
+import org.apache.pinot.transport.pool.AsyncPool;
 
 
 public interface PoolStats<T extends Sampling & Summarizable> {

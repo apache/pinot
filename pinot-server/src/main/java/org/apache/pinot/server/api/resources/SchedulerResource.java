@@ -18,10 +18,10 @@
  */
 package org.apache.pinot.server.api.resources;
 
-import org.apache.pinot.server.starter.ServerInstance;
 import javax.inject.Inject;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
+import org.apache.pinot.server.starter.ServerInstance;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

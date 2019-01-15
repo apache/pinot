@@ -19,9 +19,9 @@
 package org.apache.pinot.core.query.scheduler.resources;
 
 import com.google.common.base.Preconditions;
+import org.apache.commons.configuration.Configuration;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.scheduler.SchedulerGroupAccountant;
-import org.apache.commons.configuration.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

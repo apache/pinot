@@ -19,12 +19,12 @@
 package org.apache.pinot.server.api.resources;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import org.apache.pinot.common.utils.JsonUtils;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.ext.ExceptionMapper;
 import javax.ws.rs.ext.Provider;
+import org.apache.pinot.common.utils.JsonUtils;
 
 
 @Provider

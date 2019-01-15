@@ -18,9 +18,6 @@
  */
 package org.apache.pinot.core.common.docidsets;
 
-import org.apache.pinot.core.common.BlockDocIdIterator;
-import org.apache.pinot.core.common.Constants;
-import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -29,6 +26,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import java.util.TreeSet;
+import org.apache.pinot.core.common.BlockDocIdIterator;
+import org.apache.pinot.core.common.Constants;
+import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.Assert;

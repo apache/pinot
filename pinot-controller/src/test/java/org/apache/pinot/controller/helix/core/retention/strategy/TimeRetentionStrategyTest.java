@@ -18,12 +18,13 @@
  */
 package org.apache.pinot.controller.helix.core.retention.strategy;
 
+import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
-import java.util.concurrent.TimeUnit;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
 
 
 /**

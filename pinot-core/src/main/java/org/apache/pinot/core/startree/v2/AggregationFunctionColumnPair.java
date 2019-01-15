@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.core.startree.v2;
 
-import org.apache.pinot.core.query.aggregation.function.AggregationFunctionType;
 import javax.annotation.Nonnull;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunctionType;
 
 
 public class AggregationFunctionColumnPair {

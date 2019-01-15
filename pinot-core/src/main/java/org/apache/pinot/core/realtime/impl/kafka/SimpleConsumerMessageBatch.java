@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.core.realtime.impl.kafka;
 
-import org.apache.pinot.core.realtime.stream.MessageBatch;
 import java.util.ArrayList;
 import kafka.message.MessageAndOffset;
+import org.apache.pinot.core.realtime.stream.MessageBatch;
 
 
 public class SimpleConsumerMessageBatch implements MessageBatch<byte[]> {

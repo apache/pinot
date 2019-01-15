@@ -20,13 +20,13 @@ package org.apache.pinot.core.startree;
 
 import com.google.common.base.MoreObjects;
 import com.google.common.base.Preconditions;
-import org.apache.pinot.common.utils.StringUtil;
-import org.apache.pinot.core.segment.index.readers.Dictionary;
-import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.common.utils.StringUtil;
+import org.apache.pinot.core.segment.index.readers.Dictionary;
+import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 
 
 /**

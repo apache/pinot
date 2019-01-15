@@ -19,11 +19,9 @@
 package org.apache.pinot.transport.common;
 
 import java.net.InetAddress;
-
+import org.apache.pinot.common.response.ServerInstance;
 import org.testng.Assert;
 import org.testng.annotations.Test;
-
-import org.apache.pinot.common.response.ServerInstance;
 
 
 public class ServerInstanceTest {

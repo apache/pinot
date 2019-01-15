@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.reduce;
 
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.FilterOperator;
 import org.apache.pinot.core.query.reduce.BetweenComparison;
@@ -30,9 +33,6 @@ import org.apache.pinot.core.query.reduce.LessEqualComparison;
 import org.apache.pinot.core.query.reduce.LessThanComparison;
 import org.apache.pinot.core.query.reduce.NotEqualComparison;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
-import java.util.List;
-import java.util.Map;
-import java.util.TreeMap;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 

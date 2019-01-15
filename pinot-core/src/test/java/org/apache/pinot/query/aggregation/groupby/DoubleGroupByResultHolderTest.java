@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.query.aggregation.groupby;
 
+import java.util.Random;
 import org.apache.pinot.core.query.aggregation.groupby.DoubleGroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
-import java.util.Random;
 import org.testng.Assert;
 import org.testng.annotations.BeforeSuite;
 import org.testng.annotations.Test;

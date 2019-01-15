@@ -18,9 +18,6 @@
  */
 package org.apache.pinot.controller.helix.core.util;
 
-import org.apache.pinot.common.utils.EqualityUtils;
-import org.apache.pinot.controller.helix.core.TableRebalancer;
-import org.apache.pinot.controller.helix.core.rebalance.RebalanceUserConfigConstants;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -29,6 +26,9 @@ import java.util.Set;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.helix.model.IdealState;
+import org.apache.pinot.common.utils.EqualityUtils;
+import org.apache.pinot.controller.helix.core.TableRebalancer;
+import org.apache.pinot.controller.helix.core.rebalance.RebalanceUserConfigConstants;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;

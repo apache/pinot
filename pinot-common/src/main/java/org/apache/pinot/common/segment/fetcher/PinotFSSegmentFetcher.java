@@ -18,13 +18,13 @@
  */
 package org.apache.pinot.common.segment.fetcher;
 
-import org.apache.pinot.filesystem.PinotFS;
-import org.apache.pinot.filesystem.PinotFSFactory;
 import java.io.File;
 import java.net.URI;
 import java.util.Collections;
 import java.util.Set;
 import org.apache.commons.configuration.Configuration;
+import org.apache.pinot.filesystem.PinotFS;
+import org.apache.pinot.filesystem.PinotFSFactory;
 
 
 public class PinotFSSegmentFetcher implements SegmentFetcher {

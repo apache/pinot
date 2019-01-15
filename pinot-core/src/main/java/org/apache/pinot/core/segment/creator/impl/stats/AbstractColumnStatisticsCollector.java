@@ -18,16 +18,16 @@
  */
 package org.apache.pinot.core.segment.creator.impl.stats;
 
+import java.util.Arrays;
+import java.util.List;
+import org.apache.avro.reflect.Nullable;
+import org.apache.commons.lang.math.IntRange;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.FieldSpec.DataType;
 import org.apache.pinot.core.data.partition.PartitionFunction;
 import org.apache.pinot.core.segment.creator.ColumnStatistics;
 import org.apache.pinot.core.segment.creator.StatsCollectorConfig;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
-import java.util.Arrays;
-import java.util.List;
-import org.apache.avro.reflect.Nullable;
-import org.apache.commons.lang.math.IntRange;
 
 
 /**

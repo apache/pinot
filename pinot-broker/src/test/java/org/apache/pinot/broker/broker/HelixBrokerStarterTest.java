@@ -19,6 +19,22 @@
 package org.apache.pinot.broker.broker;
 
 import com.google.common.util.concurrent.Uninterruptibles;
+import com.yammer.metrics.core.MetricsRegistry;
+import java.io.IOException;
+import java.lang.reflect.Field;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.Callable;
+import java.util.concurrent.TimeUnit;
+import org.I0Itec.zkclient.ZkClient;
+import org.apache.commons.configuration.Configuration;
+import org.apache.helix.HelixAdmin;
+import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.IdealState;
+import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.broker.broker.helix.DefaultHelixBrokerConfig;
 import org.apache.pinot.broker.broker.helix.HelixBrokerStarter;
 import org.apache.pinot.broker.routing.HelixExternalViewBasedRouting;
@@ -36,20 +52,6 @@ import org.apache.pinot.controller.helix.ControllerRequestBuilderUtil;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
-
-import java.io.IOException;
-import java.lang.reflect.Field;
-import java.util.*;
-import java.util.concurrent.Callable;
-import java.util.concurrent.TimeUnit;
-
-import com.yammer.metrics.core.MetricsRegistry;
-import org.I0Itec.zkclient.ZkClient;
-import org.apache.commons.configuration.Configuration;
-import org.apache.helix.HelixAdmin;
-import org.apache.helix.model.ExternalView;
-import org.apache.helix.model.IdealState;
-import org.apache.helix.model.InstanceConfig;
 import org.testng.Assert;
 import org.testng.annotations.AfterTest;
 import org.testng.annotations.BeforeTest;

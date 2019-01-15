@@ -19,9 +19,6 @@
 package org.apache.pinot.core.segment.store;
 
 import com.google.common.base.Preconditions;
-import org.apache.pinot.common.segment.ReadMode;
-import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
-import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
@@ -37,6 +34,9 @@ import java.util.SortedMap;
 import java.util.TreeMap;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.pinot.common.segment.ReadMode;
+import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
+import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

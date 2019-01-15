@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.core.startree;
 
-import org.apache.pinot.common.utils.StringUtil;
-import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteOrder;
@@ -28,6 +26,8 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
+import org.apache.pinot.common.utils.StringUtil;
+import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 
 
 /**

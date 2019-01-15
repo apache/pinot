@@ -19,6 +19,13 @@
 package org.apache.pinot.core.data.readers;
 
 import com.google.common.base.Preconditions;
+import java.io.File;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.segment.ReadMode;
@@ -28,13 +35,6 @@ import org.apache.pinot.core.data.readers.sort.PinotSegmentSorter;
 import org.apache.pinot.core.data.readers.sort.SegmentSorter;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
-import java.io.File;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 
 
 /**

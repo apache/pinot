@@ -18,10 +18,6 @@
  */
 package org.apache.pinot.core.data.readers;
 
-import org.apache.pinot.common.data.FieldSpec;
-import org.apache.pinot.common.data.FieldSpec.DataType;
-
-import org.apache.pinot.core.data.GenericRow;
 import java.io.BufferedInputStream;
 import java.io.BufferedReader;
 import java.io.File;
@@ -34,6 +30,9 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.zip.GZIPInputStream;
+import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.common.data.FieldSpec.DataType;
+import org.apache.pinot.core.data.GenericRow;
 
 
 public class RecordReaderUtils {

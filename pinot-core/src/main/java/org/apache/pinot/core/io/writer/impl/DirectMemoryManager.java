@@ -19,10 +19,10 @@
 package org.apache.pinot.core.io.writer.impl;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.yammer.metrics.core.MetricsRegistry;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
-import com.yammer.metrics.core.MetricsRegistry;
 
 
 // Allocates memory using direct allocation

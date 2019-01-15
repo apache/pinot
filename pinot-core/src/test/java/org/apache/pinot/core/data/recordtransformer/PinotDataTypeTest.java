@@ -20,7 +20,8 @@ package org.apache.pinot.core.data.recordtransformer;
 
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.fail;
 
 
 public class PinotDataTypeTest {

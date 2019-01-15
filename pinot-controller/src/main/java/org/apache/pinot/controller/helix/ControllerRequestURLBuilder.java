@@ -22,7 +22,6 @@ import java.io.IOException;
 import java.net.URLEncoder;
 import org.apache.avro.reflect.Nullable;
 import org.apache.commons.lang.StringUtils;
-
 import org.apache.pinot.common.utils.StringUtil;
 
 

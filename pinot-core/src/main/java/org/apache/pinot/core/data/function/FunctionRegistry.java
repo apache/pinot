@@ -18,14 +18,13 @@
  */
 package org.apache.pinot.core.data.function;
 
+import com.google.common.base.Preconditions;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
-import com.google.common.base.Preconditions;
 
 public class FunctionRegistry {
 

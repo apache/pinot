@@ -19,13 +19,13 @@
 package org.apache.pinot.common.config;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import org.apache.pinot.common.data.StarTreeIndexSpec;
-import org.apache.pinot.common.utils.EqualityUtils;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.common.data.StarTreeIndexSpec;
+import org.apache.pinot.common.utils.EqualityUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

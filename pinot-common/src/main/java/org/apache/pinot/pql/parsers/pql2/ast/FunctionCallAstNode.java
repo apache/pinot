@@ -18,11 +18,11 @@
  */
 package org.apache.pinot.pql.parsers.pql2.ast;
 
+import java.util.List;
 import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.utils.EqualityUtils;
 import org.apache.pinot.pql.parsers.Pql2CompilationException;
-import java.util.List;
 
 
 /**

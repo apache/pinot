@@ -18,14 +18,6 @@
  */
 package org.apache.pinot.core.operator;
 
-import org.apache.pinot.common.exception.QueryException;
-import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.core.common.Block;
-import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
-import org.apache.pinot.core.query.reduce.CombineService;
-import org.apache.pinot.core.util.trace.TraceCallable;
-import org.apache.pinot.core.util.trace.TraceRunnable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -35,6 +27,14 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import org.apache.pinot.common.exception.QueryException;
+import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.core.common.Block;
+import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
+import org.apache.pinot.core.query.reduce.CombineService;
+import org.apache.pinot.core.util.trace.TraceCallable;
+import org.apache.pinot.core.util.trace.TraceRunnable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

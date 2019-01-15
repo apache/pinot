@@ -18,6 +18,10 @@
  */
 package org.apache.pinot.core.operator.transform;
 
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
+import javax.annotation.Nonnull;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.operator.BaseOperator;
@@ -28,10 +32,6 @@ import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.operator.transform.function.TransformFunctionFactory;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Set;
-import javax.annotation.Nonnull;
 
 
 /**

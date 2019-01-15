@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.core.startree;
 
-import org.apache.pinot.core.segment.index.readers.Dictionary;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.core.segment.index.readers.Dictionary;
 
 
 /**

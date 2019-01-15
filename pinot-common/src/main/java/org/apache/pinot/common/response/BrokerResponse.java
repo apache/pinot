@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.common.response;
 
-import org.apache.pinot.common.response.broker.QueryProcessingException;
 import java.util.List;
+import org.apache.pinot.common.response.broker.QueryProcessingException;
 
 
 /**

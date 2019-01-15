@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.tools.admin.command;
 
-import org.apache.pinot.tools.Command;
 import org.apache.helix.manager.zk.ZkClient;
+import org.apache.pinot.tools.Command;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

@@ -25,7 +25,8 @@ import org.apache.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 
 public class RangeOfflineDictionaryPredicateEvaluatorTest {

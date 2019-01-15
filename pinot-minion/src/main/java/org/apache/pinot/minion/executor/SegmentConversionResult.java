@@ -18,10 +18,10 @@
  */
 package org.apache.pinot.minion.executor;
 
-import org.apache.pinot.common.config.PinotTaskConfig;
 import java.io.File;
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.pinot.common.config.PinotTaskConfig;
 
 
 /**

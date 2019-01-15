@@ -18,18 +18,18 @@
  */
 package org.apache.pinot.server.starter.helix;
 
-import org.apache.pinot.common.Utils;
-import org.apache.pinot.common.messages.SegmentRefreshMessage;
-import org.apache.pinot.common.messages.SegmentReloadMessage;
-import org.apache.pinot.common.metrics.ServerMeter;
-import org.apache.pinot.common.metrics.ServerMetrics;
-import org.apache.pinot.core.data.manager.InstanceDataManager;
 import java.util.concurrent.Semaphore;
 import org.apache.helix.NotificationContext;
 import org.apache.helix.messaging.handling.HelixTaskResult;
 import org.apache.helix.messaging.handling.MessageHandler;
 import org.apache.helix.messaging.handling.MessageHandlerFactory;
 import org.apache.helix.model.Message;
+import org.apache.pinot.common.Utils;
+import org.apache.pinot.common.messages.SegmentRefreshMessage;
+import org.apache.pinot.common.messages.SegmentReloadMessage;
+import org.apache.pinot.common.metrics.ServerMeter;
+import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

@@ -18,10 +18,10 @@
  */
 package org.apache.pinot.core.segment.creator.impl.stats;
 
-import org.apache.pinot.core.segment.creator.StatsCollectorConfig;
 import it.unimi.dsi.fastutil.floats.FloatOpenHashSet;
 import it.unimi.dsi.fastutil.floats.FloatSet;
 import java.util.Arrays;
+import org.apache.pinot.core.segment.creator.StatsCollectorConfig;
 
 
 public class FloatColumnPreIndexStatsCollector extends AbstractColumnStatisticsCollector {

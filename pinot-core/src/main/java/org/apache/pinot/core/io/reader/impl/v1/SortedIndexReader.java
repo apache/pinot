@@ -18,11 +18,11 @@
  */
 package org.apache.pinot.core.io.reader.impl.v1;
 
+import java.io.IOException;
 import org.apache.pinot.common.utils.Pairs;
 import org.apache.pinot.core.io.reader.ReaderContext;
 import org.apache.pinot.core.io.reader.SingleColumnSingleValueReader;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
-import java.io.IOException;
 
 
 /**

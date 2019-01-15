@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.common.utils;
 
-import org.apache.pinot.common.data.FieldSpec;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
@@ -26,6 +25,7 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.util.Arrays;
 import javax.annotation.Nonnull;
+import org.apache.pinot.common.data.FieldSpec;
 
 
 /**

@@ -19,10 +19,6 @@
 package org.apache.pinot.controller.helix.core.util;
 
 import com.google.common.io.Files;
-import org.apache.pinot.common.utils.CommonConstants;
-import org.apache.pinot.controller.helix.core.SegmentDeletionManager;
-import org.apache.pinot.filesystem.LocalPinotFS;
-import org.apache.pinot.filesystem.PinotFSFactory;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -38,6 +34,10 @@ import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.controller.helix.core.SegmentDeletionManager;
+import org.apache.pinot.filesystem.LocalPinotFS;
+import org.apache.pinot.filesystem.PinotFSFactory;
 import org.joda.time.DateTime;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
@@ -46,7 +46,8 @@ import org.testng.annotations.Test;
 import static org.mockito.Matchers.anyInt;
 import static org.mockito.Matchers.anyList;
 import static org.mockito.Matchers.anyString;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 
 public class SegmentDeletionManagerTest {

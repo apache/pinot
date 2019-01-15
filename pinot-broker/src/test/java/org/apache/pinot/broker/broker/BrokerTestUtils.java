@@ -19,7 +19,6 @@
 package org.apache.pinot.broker.broker;
 
 import org.apache.commons.configuration.Configuration;
-
 import org.apache.pinot.broker.broker.helix.DefaultHelixBrokerConfig;
 import org.apache.pinot.broker.broker.helix.HelixBrokerStarter;
 

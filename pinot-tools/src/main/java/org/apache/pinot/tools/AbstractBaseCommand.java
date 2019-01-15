@@ -19,7 +19,6 @@
 package org.apache.pinot.tools;
 
 import java.lang.reflect.Field;
-
 import org.kohsuke.args4j.Option;
 public class AbstractBaseCommand {
   public static final String DEFAULT_ZK_ADDRESS = "localhost:2181";

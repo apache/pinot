@@ -18,13 +18,14 @@
  */
 package org.apache.pinot.core.query.scheduler.fcfs;
 
+import com.yammer.metrics.core.MetricsRegistry;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.query.scheduler.SchedulerQueryContext;
-import com.yammer.metrics.core.MetricsRegistry;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.core.query.scheduler.TestHelper.*;
-import static org.testng.Assert.*;
+import static org.apache.pinot.core.query.scheduler.TestHelper.createQueryRequest;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNull;
 
 
 public class FCFSSchedulerGroupTest {

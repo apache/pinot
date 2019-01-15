@@ -18,6 +18,12 @@
  */
 package org.apache.pinot.segments.v1.creator;
 
+import java.io.File;
+import java.io.IOException;
+import java.util.HashSet;
+import java.util.Random;
+import java.util.Set;
+import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.data.DimensionFieldSpec;
 import org.apache.pinot.common.data.FieldSpec.DataType;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
@@ -25,12 +31,6 @@ import org.apache.pinot.core.segment.creator.impl.inv.OffHeapBitmapInvertedIndex
 import org.apache.pinot.core.segment.creator.impl.inv.OnHeapBitmapInvertedIndexCreator;
 import org.apache.pinot.core.segment.index.readers.BitmapInvertedIndexReader;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
-import java.io.File;
-import java.io.IOException;
-import java.util.HashSet;
-import java.util.Random;
-import java.util.Set;
-import org.apache.commons.io.FileUtils;
 import org.roaringbitmap.IntIterator;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.testng.Assert;

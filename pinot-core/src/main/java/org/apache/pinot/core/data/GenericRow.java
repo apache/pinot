@@ -18,13 +18,13 @@
  */
 package org.apache.pinot.core.data;
 
-import org.apache.pinot.common.data.RowEvent;
-import org.apache.pinot.common.utils.JsonUtils;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import org.apache.pinot.common.data.RowEvent;
+import org.apache.pinot.common.utils.JsonUtils;
 
 
 /**

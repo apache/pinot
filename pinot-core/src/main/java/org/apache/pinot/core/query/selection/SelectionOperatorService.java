@@ -18,17 +18,6 @@
  */
 package org.apache.pinot.core.query.selection;
 
-import org.apache.pinot.common.request.Selection;
-import org.apache.pinot.common.request.SelectionSort;
-import org.apache.pinot.common.response.ServerInstance;
-import org.apache.pinot.common.response.broker.SelectionResults;
-import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.common.utils.DataTable;
-import org.apache.pinot.core.common.Block;
-import org.apache.pinot.core.common.BlockDocIdIterator;
-import org.apache.pinot.core.common.Constants;
-import org.apache.pinot.core.indexsegment.IndexSegment;
-import org.apache.pinot.core.query.selection.comparator.CompositeDocIdValComparator;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -40,6 +29,17 @@ import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Set;
 import javax.annotation.Nonnull;
+import org.apache.pinot.common.request.Selection;
+import org.apache.pinot.common.request.SelectionSort;
+import org.apache.pinot.common.response.ServerInstance;
+import org.apache.pinot.common.response.broker.SelectionResults;
+import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataTable;
+import org.apache.pinot.core.common.Block;
+import org.apache.pinot.core.common.BlockDocIdIterator;
+import org.apache.pinot.core.common.Constants;
+import org.apache.pinot.core.indexsegment.IndexSegment;
+import org.apache.pinot.core.query.selection.comparator.CompositeDocIdValComparator;
 
 
 /**

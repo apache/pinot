@@ -19,21 +19,11 @@
 package org.apache.pinot.tools.admin;
 
 import java.lang.reflect.Field;
-
-import org.kohsuke.args4j.Argument;
-import org.kohsuke.args4j.CmdLineException;
-import org.kohsuke.args4j.CmdLineParser;
-import org.kohsuke.args4j.Option;
-import org.kohsuke.args4j.spi.SubCommand;
-import org.kohsuke.args4j.spi.SubCommandHandler;
-import org.kohsuke.args4j.spi.SubCommands;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import org.apache.pinot.tools.Command;
 import org.apache.pinot.tools.admin.command.AddSchemaCommand;
 import org.apache.pinot.tools.admin.command.AddTableCommand;
 import org.apache.pinot.tools.admin.command.AddTenantCommand;
+import org.apache.pinot.tools.admin.command.ApplyTableConfigCommand;
 import org.apache.pinot.tools.admin.command.AvroSchemaToPinotSchema;
 import org.apache.pinot.tools.admin.command.BackfillDateTimeColumnCommand;
 import org.apache.pinot.tools.admin.command.ChangeNumReplicasCommand;
@@ -41,7 +31,9 @@ import org.apache.pinot.tools.admin.command.ChangeTableState;
 import org.apache.pinot.tools.admin.command.CreateSegmentCommand;
 import org.apache.pinot.tools.admin.command.DeleteClusterCommand;
 import org.apache.pinot.tools.admin.command.GenerateDataCommand;
+import org.apache.pinot.tools.admin.command.MoveReplicaGroup;
 import org.apache.pinot.tools.admin.command.PostQueryCommand;
+import org.apache.pinot.tools.admin.command.RealtimeProvisioningHelperCommand;
 import org.apache.pinot.tools.admin.command.RebalanceTableCommand;
 import org.apache.pinot.tools.admin.command.ShowClusterInfoCommand;
 import org.apache.pinot.tools.admin.command.StartBrokerCommand;
@@ -55,11 +47,17 @@ import org.apache.pinot.tools.admin.command.UploadSegmentCommand;
 import org.apache.pinot.tools.admin.command.ValidateConfigCommand;
 import org.apache.pinot.tools.admin.command.VerifyClusterStateCommand;
 import org.apache.pinot.tools.admin.command.VerifySegmentState;
-import org.apache.pinot.tools.admin.command.ApplyTableConfigCommand;
-import org.apache.pinot.tools.admin.command.MoveReplicaGroup;
-import org.apache.pinot.tools.admin.command.RealtimeProvisioningHelperCommand;
 import org.apache.pinot.tools.segment.converter.PinotSegmentConvertCommand;
 import org.apache.pinot.tools.segment.converter.SegmentMergeCommand;
+import org.kohsuke.args4j.Argument;
+import org.kohsuke.args4j.CmdLineException;
+import org.kohsuke.args4j.CmdLineParser;
+import org.kohsuke.args4j.Option;
+import org.kohsuke.args4j.spi.SubCommand;
+import org.kohsuke.args4j.spi.SubCommandHandler;
+import org.kohsuke.args4j.spi.SubCommands;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**

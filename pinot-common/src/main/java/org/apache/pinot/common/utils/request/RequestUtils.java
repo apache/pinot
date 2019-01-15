@@ -18,14 +18,6 @@
  */
 package org.apache.pinot.common.utils.request;
 
-import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.request.FilterQuery;
-import org.apache.pinot.common.request.FilterQueryMap;
-import org.apache.pinot.common.request.HavingFilterQuery;
-import org.apache.pinot.common.request.HavingFilterQueryMap;
-import org.apache.pinot.common.request.Selection;
-import org.apache.pinot.common.request.SelectionSort;
-import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -34,6 +26,14 @@ import java.util.Map;
 import java.util.Set;
 import java.util.Stack;
 import org.apache.commons.lang.mutable.MutableInt;
+import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.request.FilterQuery;
+import org.apache.pinot.common.request.FilterQueryMap;
+import org.apache.pinot.common.request.HavingFilterQuery;
+import org.apache.pinot.common.request.HavingFilterQueryMap;
+import org.apache.pinot.common.request.Selection;
+import org.apache.pinot.common.request.SelectionSort;
+import org.apache.pinot.common.request.transform.TransformExpressionTree;
 
 
 public class RequestUtils {

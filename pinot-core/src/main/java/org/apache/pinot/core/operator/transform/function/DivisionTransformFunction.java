@@ -18,15 +18,15 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import javax.annotation.Nonnull;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.core.util.ArrayCopyUtils;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
-import javax.annotation.Nonnull;
 
 
 public class DivisionTransformFunction extends BaseTransformFunction {

@@ -18,6 +18,13 @@
  */
 package org.apache.pinot.server.starter;
 
+import com.yammer.metrics.core.MetricsRegistry;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.concurrent.atomic.LongAccumulator;
+import org.apache.commons.configuration.ConfigurationException;
+import org.apache.helix.ZNRecord;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.metrics.MetricsHelper;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
@@ -29,13 +36,6 @@ import org.apache.pinot.core.query.scheduler.QuerySchedulerFactory;
 import org.apache.pinot.server.conf.ServerConf;
 import org.apache.pinot.transport.netty.NettyServer;
 import org.apache.pinot.transport.netty.NettyTCPServer;
-import com.yammer.metrics.core.MetricsRegistry;
-import java.util.HashSet;
-import java.util.Set;
-import java.util.concurrent.atomic.LongAccumulator;
-import org.apache.commons.configuration.ConfigurationException;
-import org.apache.helix.ZNRecord;
-import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

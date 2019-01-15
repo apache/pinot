@@ -19,12 +19,12 @@
 package org.apache.pinot.controller.helix;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import java.io.IOException;
 import org.apache.pinot.common.config.TagNameUtils;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.JsonUtils;
 import org.apache.pinot.common.utils.ZkStarter;
-import java.io.IOException;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;

@@ -19,14 +19,14 @@
 package org.apache.pinot.server.api.resources;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import java.util.List;
+import javax.ws.rs.core.Response;
 import org.apache.pinot.common.restlet.resources.TableSegments;
 import org.apache.pinot.common.restlet.resources.TablesList;
 import org.apache.pinot.common.utils.JsonUtils;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
 import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
-import java.util.List;
-import javax.ws.rs.core.Response;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 

@@ -18,6 +18,16 @@
  */
 package org.apache.pinot.segments.v1.creator;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.net.URL;
+import java.util.HashSet;
+import java.util.Set;
+import org.apache.avro.file.DataFileStream;
+import org.apache.avro.generic.GenericDatumReader;
+import org.apache.avro.generic.GenericRecord;
+import org.apache.avro.util.Utf8;
+import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.common.utils.Pairs;
 import org.apache.pinot.core.common.DataSource;
@@ -29,16 +39,6 @@ import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl
 import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
-import java.io.File;
-import java.io.FileInputStream;
-import java.net.URL;
-import java.util.HashSet;
-import java.util.Set;
-import org.apache.avro.file.DataFileStream;
-import org.apache.avro.generic.GenericDatumReader;
-import org.apache.avro.generic.GenericRecord;
-import org.apache.avro.util.Utf8;
-import org.apache.commons.io.FileUtils;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;

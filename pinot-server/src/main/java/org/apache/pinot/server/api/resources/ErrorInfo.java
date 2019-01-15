@@ -19,8 +19,8 @@
 package org.apache.pinot.server.api.resources;
 
 import javax.ws.rs.WebApplicationException;
-import org.slf4j.LoggerFactory;
 import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class ErrorInfo {

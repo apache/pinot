@@ -19,8 +19,6 @@
 package org.apache.pinot.core.startree;
 
 import com.google.common.base.Preconditions;
-import org.apache.pinot.common.utils.Pairs.IntPair;
-import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import it.unimi.dsi.fastutil.Arrays;
 import it.unimi.dsi.fastutil.Swapper;
 import it.unimi.dsi.fastutil.ints.Int2ObjectLinkedOpenHashMap;
@@ -31,6 +29,8 @@ import java.io.IOException;
 import java.util.Iterator;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.common.utils.Pairs.IntPair;
+import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 
 
 /**

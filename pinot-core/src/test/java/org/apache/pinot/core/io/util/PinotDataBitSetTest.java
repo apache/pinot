@@ -18,13 +18,13 @@
  */
 package org.apache.pinot.core.io.util;
 
-import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.IOException;
 import java.nio.ByteOrder;
 import java.util.Random;
+import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertEquals;
 
 
 public class PinotDataBitSetTest {

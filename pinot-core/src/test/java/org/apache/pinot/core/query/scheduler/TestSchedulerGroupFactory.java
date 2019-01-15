@@ -22,7 +22,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.configuration.Configuration;
 
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertNull;
 
 
 class TestSchedulerGroupFactory implements SchedulerGroupFactory {

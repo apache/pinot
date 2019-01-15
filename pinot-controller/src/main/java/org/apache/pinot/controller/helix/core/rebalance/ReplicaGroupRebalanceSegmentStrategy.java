@@ -19,16 +19,6 @@
 package org.apache.pinot.controller.helix.core.rebalance;
 
 import com.google.common.base.Function;
-import org.apache.pinot.common.config.OfflineTagConfig;
-import org.apache.pinot.common.config.ReplicaGroupStrategyConfig;
-import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.exception.InvalidConfigException;
-import org.apache.pinot.common.partition.PartitionAssignment;
-import org.apache.pinot.common.partition.ReplicaGroupPartitionAssignment;
-import org.apache.pinot.common.partition.ReplicaGroupPartitionAssignmentGenerator;
-import org.apache.pinot.common.utils.CommonConstants;
-import org.apache.pinot.common.utils.helix.HelixHelper;
-import org.apache.pinot.common.utils.retry.RetryPolicies;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -45,6 +35,16 @@ import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.pinot.common.config.OfflineTagConfig;
+import org.apache.pinot.common.config.ReplicaGroupStrategyConfig;
+import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.common.exception.InvalidConfigException;
+import org.apache.pinot.common.partition.PartitionAssignment;
+import org.apache.pinot.common.partition.ReplicaGroupPartitionAssignment;
+import org.apache.pinot.common.partition.ReplicaGroupPartitionAssignmentGenerator;
+import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.helix.HelixHelper;
+import org.apache.pinot.common.utils.retry.RetryPolicies;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

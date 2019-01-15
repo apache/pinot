@@ -18,10 +18,10 @@
  */
 package org.apache.pinot.broker.broker;
 
+import org.apache.commons.configuration.Configuration;
 import org.apache.pinot.broker.api.AccessControl;
 import org.apache.pinot.broker.api.RequesterIdentity;
 import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.commons.configuration.Configuration;
 
 
 public class AllowAllAccessControlFactory extends AccessControlFactory {

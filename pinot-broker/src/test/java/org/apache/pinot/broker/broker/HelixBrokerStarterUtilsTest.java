@@ -18,10 +18,9 @@
  */
 package org.apache.pinot.broker.broker;
 
+import org.apache.pinot.broker.broker.helix.HelixBrokerStarter;
 import org.testng.Assert;
 import org.testng.annotations.Test;
-
-import org.apache.pinot.broker.broker.helix.HelixBrokerStarter;
 
 
 public class HelixBrokerStarterUtilsTest {

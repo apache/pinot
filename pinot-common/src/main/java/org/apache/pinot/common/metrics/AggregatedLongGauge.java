@@ -18,11 +18,10 @@
  */
 package org.apache.pinot.common.metrics;
 
+import com.yammer.metrics.core.Gauge;
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
-
-import com.yammer.metrics.core.Gauge;
 
 
 /**

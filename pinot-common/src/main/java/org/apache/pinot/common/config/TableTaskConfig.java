@@ -20,8 +20,8 @@ package org.apache.pinot.common.config;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import org.apache.pinot.common.utils.EqualityUtils;
 import java.util.Map;
+import org.apache.pinot.common.utils.EqualityUtils;
 
 
 @SuppressWarnings("unused")

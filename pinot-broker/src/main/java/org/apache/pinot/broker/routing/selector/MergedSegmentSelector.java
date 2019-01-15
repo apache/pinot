@@ -18,15 +18,15 @@
  */
 package org.apache.pinot.broker.routing.selector;
 
+import java.util.HashSet;
+import java.util.Set;
+import org.apache.helix.ZNRecord;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.broker.routing.RoutingTableLookupRequest;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.lineage.SegmentGroup;
 import org.apache.pinot.common.lineage.SegmentMergeLineage;
 import org.apache.pinot.common.lineage.SegmentMergeLineageAccessHelper;
-import java.util.HashSet;
-import java.util.Set;
-import org.apache.helix.ZNRecord;
-import org.apache.helix.store.zk.ZkHelixPropertyStore;
 
 
 /**

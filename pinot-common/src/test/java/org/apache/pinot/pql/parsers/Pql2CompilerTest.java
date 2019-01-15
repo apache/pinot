@@ -18,14 +18,14 @@
  */
 package org.apache.pinot.pql.parsers;
 
+import java.util.Collections;
+import java.util.List;
 import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.FilterOperator;
 import org.apache.pinot.common.request.GroupBy;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.pql.parsers.pql2.ast.TopAstNode;
-import java.util.Collections;
-import java.util.List;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 

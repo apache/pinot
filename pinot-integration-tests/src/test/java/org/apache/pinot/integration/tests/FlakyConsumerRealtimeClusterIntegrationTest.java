@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.integration.tests;
 
+import java.util.Random;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -28,7 +29,6 @@ import org.apache.pinot.core.realtime.stream.StreamConfig;
 import org.apache.pinot.core.realtime.stream.StreamConsumerFactory;
 import org.apache.pinot.core.realtime.stream.StreamLevelConsumer;
 import org.apache.pinot.core.realtime.stream.StreamMetadataProvider;
-import java.util.Random;
 import org.testng.annotations.BeforeClass;
 
 

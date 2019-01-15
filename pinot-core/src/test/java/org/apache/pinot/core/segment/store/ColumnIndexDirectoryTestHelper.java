@@ -18,10 +18,10 @@
  */
 package org.apache.pinot.core.segment.store;
 
+import java.io.IOException;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
 import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
-import java.io.IOException;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 import org.slf4j.Logger;
@@ -29,7 +29,8 @@ import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 
 import static org.mockito.Matchers.anyString;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 
 public class ColumnIndexDirectoryTestHelper {
@@ -79,7 +80,7 @@ public class ColumnIndexDirectoryTestHelper {
       case BLOOM_FILTER:
         buf = columnDirectory.getBloomFilterBufferFor(columnName);
         break;
-        
+
     }
     return buf;
   }

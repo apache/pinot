@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.core.realtime.impl.kafka;
 
+import com.yammer.metrics.core.Meter;
+import kafka.consumer.ConsumerIterator;
+import kafka.javaapi.consumer.ConsumerConnector;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
 import org.apache.pinot.common.metrics.ServerMeter;
@@ -27,9 +30,6 @@ import org.apache.pinot.core.realtime.stream.StreamConfig;
 import org.apache.pinot.core.realtime.stream.StreamDecoderProvider;
 import org.apache.pinot.core.realtime.stream.StreamLevelConsumer;
 import org.apache.pinot.core.realtime.stream.StreamMessageDecoder;
-import com.yammer.metrics.core.Meter;
-import kafka.consumer.ConsumerIterator;
-import kafka.javaapi.consumer.ConsumerConnector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

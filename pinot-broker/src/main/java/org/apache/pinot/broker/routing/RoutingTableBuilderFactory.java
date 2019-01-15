@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.broker.routing;
 
+import org.apache.commons.configuration.Configuration;
+import org.apache.helix.ZNRecord;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.broker.routing.builder.BalancedRandomRoutingTableBuilder;
 import org.apache.pinot.broker.routing.builder.DefaultOfflineRoutingTableBuilder;
 import org.apache.pinot.broker.routing.builder.DefaultRealtimeRoutingTableBuilder;
@@ -32,9 +35,6 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
 import org.apache.pinot.core.realtime.stream.StreamConfig;
-import org.apache.commons.configuration.Configuration;
-import org.apache.helix.ZNRecord;
-import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

@@ -18,11 +18,6 @@
  */
 package org.apache.pinot.broker.routing.builder;
 
-import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.metrics.BrokerMetrics;
-import org.apache.pinot.common.utils.CommonConstants;
-import org.apache.pinot.common.utils.LLCUtils;
-import org.apache.pinot.common.utils.SegmentName;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -33,6 +28,11 @@ import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.LLCUtils;
+import org.apache.pinot.common.utils.SegmentName;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

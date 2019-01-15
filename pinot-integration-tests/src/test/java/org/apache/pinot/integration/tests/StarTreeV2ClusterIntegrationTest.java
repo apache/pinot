@@ -18,12 +18,6 @@
  */
 package org.apache.pinot.integration.tests;
 
-import org.apache.pinot.core.query.aggregation.function.AggregationFunctionType;
-import org.apache.pinot.core.startree.v2.AggregationFunctionColumnPair;
-import org.apache.pinot.core.startree.v2.builder.StarTreeV2BuilderConfig;
-import org.apache.pinot.tools.query.comparison.SegmentInfoProvider;
-import org.apache.pinot.tools.query.comparison.StarTreeQueryGenerator;
-import org.apache.pinot.util.TestUtils;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -35,6 +29,12 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunctionType;
+import org.apache.pinot.core.startree.v2.AggregationFunctionColumnPair;
+import org.apache.pinot.core.startree.v2.builder.StarTreeV2BuilderConfig;
+import org.apache.pinot.tools.query.comparison.SegmentInfoProvider;
+import org.apache.pinot.tools.query.comparison.StarTreeQueryGenerator;
+import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.Test;
 
 

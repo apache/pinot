@@ -18,14 +18,14 @@
  */
 package org.apache.pinot.core.startree.v2.builder;
 
-import org.apache.pinot.common.config.StarTreeIndexConfig;
-import org.apache.pinot.core.startree.v2.AggregationFunctionColumnPair;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
+import org.apache.pinot.common.config.StarTreeIndexConfig;
+import org.apache.pinot.core.startree.v2.AggregationFunctionColumnPair;
 
 
 /**

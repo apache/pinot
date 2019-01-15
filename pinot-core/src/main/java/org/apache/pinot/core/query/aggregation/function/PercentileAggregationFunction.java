@@ -18,15 +18,15 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
+import java.util.Arrays;
+import javax.annotation.Nonnull;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
-import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
-import java.util.Arrays;
-import javax.annotation.Nonnull;
 
 
 public class PercentileAggregationFunction implements AggregationFunction<DoubleArrayList, Double> {

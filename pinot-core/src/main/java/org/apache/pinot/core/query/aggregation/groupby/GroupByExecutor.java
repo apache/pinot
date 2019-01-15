@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.core.query.aggregation.groupby;
 
-import org.apache.pinot.core.operator.blocks.TransformBlock;
 import javax.annotation.Nonnull;
+import org.apache.pinot.core.operator.blocks.TransformBlock;
 
 
 /**

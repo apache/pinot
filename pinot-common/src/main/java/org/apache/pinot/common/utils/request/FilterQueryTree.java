@@ -19,11 +19,11 @@
 package org.apache.pinot.common.utils.request;
 
 import com.google.common.collect.Lists;
-import org.apache.pinot.common.request.FilterOperator;
-import org.apache.pinot.common.utils.StringUtil;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import org.apache.pinot.common.request.FilterOperator;
+import org.apache.pinot.common.utils.StringUtil;
 
 
 public class FilterQueryTree {

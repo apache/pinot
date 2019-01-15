@@ -20,12 +20,12 @@ package org.apache.pinot.broker.routing;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Splitter;
-import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.request.QuerySource;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nonnull;
+import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.request.QuerySource;
 
 
 /**

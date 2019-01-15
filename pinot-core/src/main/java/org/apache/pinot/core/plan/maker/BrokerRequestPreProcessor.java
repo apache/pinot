@@ -18,14 +18,14 @@
  */
 package org.apache.pinot.core.plan.maker;
 
+import java.util.List;
+import java.util.Objects;
 import org.apache.pinot.common.data.MetricFieldSpec;
 import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.segment.SegmentMetadata;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
-import java.util.List;
-import java.util.Objects;
 
 
 /**

@@ -19,22 +19,25 @@
 package org.apache.pinot.common.metadata.segment;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import org.apache.pinot.common.metadata.ZKMetadata;
-import org.apache.pinot.common.utils.CommonConstants;
-import org.apache.pinot.common.utils.CommonConstants.Segment.SegmentType;
-import org.apache.pinot.common.utils.JsonUtils;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
 import org.apache.helix.ZNRecord;
+import org.apache.pinot.common.metadata.ZKMetadata;
+import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.CommonConstants.Segment.SegmentType;
+import org.apache.pinot.common.utils.JsonUtils;
 import org.joda.time.Duration;
 import org.joda.time.Interval;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.common.utils.EqualityUtils.*;
+import static org.apache.pinot.common.utils.EqualityUtils.hashCodeOf;
+import static org.apache.pinot.common.utils.EqualityUtils.isEqual;
+import static org.apache.pinot.common.utils.EqualityUtils.isNullOrNotSameClass;
+import static org.apache.pinot.common.utils.EqualityUtils.isSameReference;
 
 
 public abstract class SegmentZKMetadata implements ZKMetadata {

@@ -19,11 +19,11 @@
 package org.apache.pinot.core.operator.filter;
 
 import com.google.common.base.Preconditions;
+import java.util.ArrayList;
+import java.util.List;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.docidsets.FilterBlockDocIdSet;
 import org.apache.pinot.core.operator.docidsets.OrBlockDocIdSet;
-import java.util.ArrayList;
-import java.util.List;
 
 
 public class OrFilterOperator extends BaseFilterOperator {

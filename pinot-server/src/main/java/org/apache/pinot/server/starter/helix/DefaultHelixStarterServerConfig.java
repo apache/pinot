@@ -18,11 +18,11 @@
  */
 package org.apache.pinot.server.starter.helix;
 
-import org.apache.pinot.common.utils.CommonConstants;
-import org.apache.pinot.server.conf.ServerConf;
 import java.util.Iterator;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.server.conf.ServerConf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

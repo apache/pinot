@@ -25,14 +25,12 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
 import java.util.Set;
-
+import org.apache.pinot.common.utils.Pairs;
+import org.apache.pinot.common.utils.Pairs.IntPair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.Test;
-
-import org.apache.pinot.common.utils.Pairs;
-import org.apache.pinot.common.utils.Pairs.IntPair;
 
 
 /**

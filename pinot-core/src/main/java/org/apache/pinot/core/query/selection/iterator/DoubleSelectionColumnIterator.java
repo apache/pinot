@@ -19,7 +19,6 @@
 package org.apache.pinot.core.query.selection.iterator;
 
 import java.io.Serializable;
-
 import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.BlockSingleValIterator;
 

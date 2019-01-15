@@ -18,11 +18,11 @@
  */
 package org.apache.pinot.broker.routing.builder;
 
-import org.apache.pinot.common.utils.CommonConstants;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.helix.model.InstanceConfig;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

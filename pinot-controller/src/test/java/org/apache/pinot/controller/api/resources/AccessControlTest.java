@@ -18,12 +18,12 @@
  */
 package org.apache.pinot.controller.api.resources;
 
+import java.io.IOException;
+import javax.ws.rs.core.HttpHeaders;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AccessControl;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.helix.ControllerTest;
-import java.io.IOException;
-import javax.ws.rs.core.HttpHeaders;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;

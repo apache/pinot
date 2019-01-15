@@ -19,6 +19,9 @@
 package org.apache.pinot.broker.broker;
 
 import com.google.common.base.Preconditions;
+import com.yammer.metrics.core.MetricsRegistry;
+import java.util.concurrent.atomic.AtomicReference;
+import org.apache.commons.configuration.Configuration;
 import org.apache.pinot.broker.broker.helix.LiveInstancesChangeListenerImpl;
 import org.apache.pinot.broker.queryquota.TableQueryQuotaManager;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
@@ -30,9 +33,6 @@ import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.MetricsHelper;
 import org.apache.pinot.common.utils.CommonConstants;
-import com.yammer.metrics.core.MetricsRegistry;
-import java.util.concurrent.atomic.AtomicReference;
-import org.apache.commons.configuration.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

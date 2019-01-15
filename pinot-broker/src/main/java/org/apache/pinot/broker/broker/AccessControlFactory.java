@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.broker.broker;
 
-import org.apache.pinot.broker.api.AccessControl;
 import org.apache.commons.configuration.Configuration;
+import org.apache.pinot.broker.api.AccessControl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

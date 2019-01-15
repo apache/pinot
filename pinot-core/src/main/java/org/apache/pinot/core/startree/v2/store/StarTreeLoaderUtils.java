@@ -18,6 +18,14 @@
  */
 package org.apache.pinot.core.startree.v2.store;
 
+import java.nio.ByteOrder;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import org.apache.pinot.common.data.MetricFieldSpec;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.segment.StarTreeMetadata;
@@ -34,16 +42,11 @@ import org.apache.pinot.core.startree.StarTree;
 import org.apache.pinot.core.startree.v2.AggregationFunctionColumnPair;
 import org.apache.pinot.core.startree.v2.StarTreeV2;
 import org.apache.pinot.core.startree.v2.StarTreeV2Metadata;
-import java.nio.ByteOrder;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
 
-import static org.apache.pinot.core.startree.v2.store.StarTreeIndexMapUtils.*;
+import static org.apache.pinot.core.startree.v2.store.StarTreeIndexMapUtils.IndexKey;
+import static org.apache.pinot.core.startree.v2.store.StarTreeIndexMapUtils.IndexType;
+import static org.apache.pinot.core.startree.v2.store.StarTreeIndexMapUtils.IndexValue;
+import static org.apache.pinot.core.startree.v2.store.StarTreeIndexMapUtils.STAR_TREE_INDEX_KEY;
 
 
 /**

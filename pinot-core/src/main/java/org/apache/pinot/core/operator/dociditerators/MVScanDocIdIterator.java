@@ -18,12 +18,12 @@
  */
 package org.apache.pinot.core.operator.dociditerators;
 
+import java.util.Arrays;
 import org.apache.pinot.core.common.BlockMetadata;
 import org.apache.pinot.core.common.BlockMultiValIterator;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.Constants;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
-import java.util.Arrays;
 import org.roaringbitmap.IntIterator;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 

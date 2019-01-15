@@ -18,6 +18,12 @@
  */
 package org.apache.pinot.queries;
 
+import com.tdunning.math.stats.TDigest;
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
 import org.apache.pinot.common.data.DimensionFieldSpec;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.MetricFieldSpec;
@@ -28,12 +34,6 @@ import org.apache.pinot.core.data.readers.RecordReader;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.query.aggregation.function.PercentileTDigestAggregationFunction;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
-import com.tdunning.math.stats.TDigest;
-import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
 
 
 /**

@@ -19,14 +19,13 @@
 package org.apache.pinot.core.query.selection.iterator;
 
 import java.io.Serializable;
-
 import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.BlockMultiValIterator;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 
 /**
  * Iterator on multi-value column selection query.
- * 
+ *
  */
 public abstract class SelectionMultiValueColumnIterator implements SelectionColumnIterator {
   protected BlockMultiValIterator bvIter;

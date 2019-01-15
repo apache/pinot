@@ -18,12 +18,12 @@
  */
 package org.apache.pinot.common.metadata.instance;
 
-import org.apache.pinot.common.config.TableNameBuilder;
-import org.apache.pinot.common.metadata.ZKMetadata;
-import org.apache.pinot.common.utils.StringUtil;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.helix.ZNRecord;
+import org.apache.pinot.common.config.TableNameBuilder;
+import org.apache.pinot.common.metadata.ZKMetadata;
+import org.apache.pinot.common.utils.StringUtil;
 
 import static org.apache.pinot.common.utils.EqualityUtils.hashCodeOf;
 import static org.apache.pinot.common.utils.EqualityUtils.isEqual;

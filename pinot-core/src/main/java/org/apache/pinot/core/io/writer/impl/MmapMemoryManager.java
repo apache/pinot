@@ -19,18 +19,17 @@
 package org.apache.pinot.core.io.writer.impl;
 
 import com.google.common.annotations.VisibleForTesting;
-import org.apache.pinot.common.metrics.ServerMetrics;
-import org.apache.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
-import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import com.yammer.metrics.core.MetricsRegistry;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.RandomAccessFile;
-import java.nio.ByteOrder;
 import java.util.LinkedList;
 import java.util.List;
+import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
+import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

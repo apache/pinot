@@ -18,11 +18,11 @@
  */
 package org.apache.pinot.core.query.pruner;
 
+import java.util.ArrayList;
+import java.util.List;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.query.config.SegmentPrunerConfig;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
-import java.util.ArrayList;
-import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

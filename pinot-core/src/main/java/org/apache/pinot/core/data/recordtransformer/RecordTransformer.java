@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.core.data.recordtransformer;
 
-import org.apache.pinot.core.data.GenericRow;
 import javax.annotation.Nullable;
+import org.apache.pinot.core.data.GenericRow;
 
 
 /**

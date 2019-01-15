@@ -20,7 +20,6 @@ package org.apache.pinot.core.query.config;
 
 import java.util.ArrayList;
 import java.util.List;
-
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 

@@ -19,8 +19,6 @@
 package org.apache.pinot.common.segment.fetcher;
 
 import com.google.common.base.Strings;
-import org.apache.pinot.common.utils.retry.RetryPolicies;
-import org.apache.pinot.common.utils.retry.RetryPolicy;
 import java.io.File;
 import java.io.IOException;
 import java.util.Collections;
@@ -29,11 +27,18 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.pinot.common.utils.retry.RetryPolicies;
+import org.apache.pinot.common.utils.retry.RetryPolicy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.common.utils.CommonConstants.SegmentOperations.HadoopSegmentOperations.*;
-import static org.apache.pinot.common.utils.CommonConstants.SegmentOperations.*;
+import static org.apache.pinot.common.utils.CommonConstants.SegmentOperations.HadoopSegmentOperations.HADOOP_CONF_PATH;
+import static org.apache.pinot.common.utils.CommonConstants.SegmentOperations.HadoopSegmentOperations.KEYTAB;
+import static org.apache.pinot.common.utils.CommonConstants.SegmentOperations.HadoopSegmentOperations.PRINCIPAL;
+import static org.apache.pinot.common.utils.CommonConstants.SegmentOperations.RETRY;
+import static org.apache.pinot.common.utils.CommonConstants.SegmentOperations.RETRY_DEFAULT;
+import static org.apache.pinot.common.utils.CommonConstants.SegmentOperations.RETRY_WAITIME_MS;
+import static org.apache.pinot.common.utils.CommonConstants.SegmentOperations.RETRY_WAITIME_MS_DEFAULT;
 
 
 public class HdfsSegmentFetcher implements SegmentFetcher {

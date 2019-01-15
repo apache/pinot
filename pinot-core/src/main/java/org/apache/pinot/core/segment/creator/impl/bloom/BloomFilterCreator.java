@@ -18,15 +18,14 @@
  */
 package org.apache.pinot.core.segment.creator.impl.bloom;
 
-import org.apache.pinot.core.bloom.BloomFilterUtil;
-import org.apache.pinot.core.bloom.BloomFilter;
-import org.apache.pinot.core.bloom.SegmentBloomFilterFactory;
-import org.apache.pinot.core.segment.creator.impl.V1Constants;
-
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import org.apache.pinot.core.bloom.BloomFilter;
+import org.apache.pinot.core.bloom.BloomFilterUtil;
+import org.apache.pinot.core.bloom.SegmentBloomFilterFactory;
+import org.apache.pinot.core.segment.creator.impl.V1Constants;
 
 
 /**

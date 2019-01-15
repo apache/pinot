@@ -18,6 +18,14 @@
  */
 package org.apache.pinot.core.data.readers;
 
+import java.io.File;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Random;
+import java.util.concurrent.TimeUnit;
+import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.pinot.common.data.DateTimeFieldSpec;
 import org.apache.pinot.common.data.DateTimeFormatSpec;
 import org.apache.pinot.common.data.DimensionFieldSpec;
@@ -30,14 +38,6 @@ import org.apache.pinot.common.data.TimeGranularitySpec;
 import org.apache.pinot.core.data.GenericRow;
 import org.apache.pinot.core.minion.BackfillDateTimeColumn;
 import org.apache.pinot.core.minion.BackfillDateTimeColumn.BackfillDateTimeRecordReader;
-import java.io.File;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Random;
-import java.util.concurrent.TimeUnit;
-import org.apache.commons.lang3.RandomStringUtils;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;

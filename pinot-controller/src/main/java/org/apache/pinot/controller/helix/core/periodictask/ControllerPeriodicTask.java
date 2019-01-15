@@ -19,10 +19,10 @@
 package org.apache.pinot.controller.helix.core.periodictask;
 
 import com.google.common.annotations.VisibleForTesting;
-import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
-import org.apache.pinot.core.periodictask.BasePeriodicTask;
 import java.util.List;
 import java.util.Random;
+import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.core.periodictask.BasePeriodicTask;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

@@ -19,7 +19,6 @@
 package org.apache.pinot.core.util;
 
 import com.google.common.base.Preconditions;
-import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -31,6 +30,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.zip.Adler32;
 import java.util.zip.Checksum;
+import org.apache.pinot.core.segment.creator.impl.V1Constants;
 
 
 @SuppressWarnings("Duplicates")

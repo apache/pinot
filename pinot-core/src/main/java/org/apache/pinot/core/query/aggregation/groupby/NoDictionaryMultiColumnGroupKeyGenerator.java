@@ -18,6 +18,10 @@
  */
 package org.apache.pinot.core.query.aggregation.groupby;
 
+import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
+import java.util.Iterator;
+import java.util.Map;
+import javax.annotation.Nonnull;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.core.common.BlockValSet;
@@ -28,10 +32,6 @@ import org.apache.pinot.core.query.aggregation.groupby.utils.ValueToIdMap;
 import org.apache.pinot.core.query.aggregation.groupby.utils.ValueToIdMapFactory;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.core.util.FixedIntArray;
-import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
-import java.util.Iterator;
-import java.util.Map;
-import javax.annotation.Nonnull;
 
 
 /**

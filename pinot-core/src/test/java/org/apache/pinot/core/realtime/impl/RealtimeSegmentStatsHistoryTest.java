@@ -18,10 +18,10 @@
  */
 package org.apache.pinot.core.realtime.impl;
 
-import org.apache.pinot.util.TestUtils;
 import java.io.File;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 

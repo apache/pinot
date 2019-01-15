@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.common.config;
 
-import org.apache.pinot.common.utils.EqualityUtils;
 import io.vavr.Tuple;
 import io.vavr.Tuple2;
 import io.vavr.collection.List;
@@ -26,6 +25,7 @@ import io.vavr.collection.Map;
 import io.vavr.collection.Seq;
 import io.vavr.collection.Set;
 import io.vavr.control.Option;
+import org.apache.pinot.common.utils.EqualityUtils;
 
 
 /**

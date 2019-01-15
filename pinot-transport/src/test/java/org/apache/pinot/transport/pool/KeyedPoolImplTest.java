@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.transport.pool;
 
+import com.google.common.util.concurrent.MoreExecutors;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -32,18 +33,15 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-
+import org.apache.pinot.common.response.ServerInstance;
+import org.apache.pinot.transport.common.AsyncResponseFuture;
+import org.apache.pinot.transport.common.NoneType;
+import org.apache.pinot.transport.common.ServerResponseFuture;
+import org.apache.pinot.transport.metrics.AggregatedPoolStats;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.Test;
-
-import com.google.common.util.concurrent.MoreExecutors;
-import org.apache.pinot.common.response.ServerInstance;
-import org.apache.pinot.transport.common.AsyncResponseFuture;
-import org.apache.pinot.transport.common.ServerResponseFuture;
-import org.apache.pinot.transport.common.NoneType;
-import org.apache.pinot.transport.metrics.AggregatedPoolStats;
 
 
 public class KeyedPoolImplTest {

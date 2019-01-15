@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.core.util;
 
+import java.io.File;
+import java.util.concurrent.TimeUnit;
+import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.common.segment.SegmentMetadata;
 import org.apache.pinot.core.indexsegment.IndexSegment;
@@ -27,9 +30,6 @@ import org.apache.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
 import org.apache.pinot.segments.v1.creator.SegmentTestUtils;
 import org.apache.pinot.util.TestUtils;
-import java.io.File;
-import java.util.concurrent.TimeUnit;
-import org.apache.commons.io.FileUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 

@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.core.realtime.stream;
 
-import org.apache.pinot.common.utils.time.TimeUtils;
 import java.util.Map;
+import org.apache.pinot.common.utils.time.TimeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

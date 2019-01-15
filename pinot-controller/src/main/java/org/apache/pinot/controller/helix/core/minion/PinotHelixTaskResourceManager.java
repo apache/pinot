@@ -20,8 +20,6 @@ package org.apache.pinot.controller.helix.core.minion;
 
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.Uninterruptibles;
-import org.apache.pinot.common.config.PinotTaskConfig;
-import org.apache.pinot.common.utils.CommonConstants;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -37,6 +35,8 @@ import org.apache.helix.task.TaskConfig;
 import org.apache.helix.task.TaskDriver;
 import org.apache.helix.task.TaskState;
 import org.apache.helix.task.WorkflowConfig;
+import org.apache.pinot.common.config.PinotTaskConfig;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

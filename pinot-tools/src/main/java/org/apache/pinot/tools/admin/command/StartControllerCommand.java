@@ -18,12 +18,12 @@
  */
 package org.apache.pinot.tools.admin.command;
 
+import java.io.File;
+import org.apache.commons.configuration.ConfigurationException;
 import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.ControllerStarter;
 import org.apache.pinot.tools.Command;
-import java.io.File;
-import org.apache.commons.configuration.ConfigurationException;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

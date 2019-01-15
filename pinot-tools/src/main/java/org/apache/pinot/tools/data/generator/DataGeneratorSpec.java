@@ -23,9 +23,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-
 import org.apache.commons.lang.math.IntRange;
-
 import org.apache.pinot.common.data.FieldSpec.DataType;
 import org.apache.pinot.common.data.FieldSpec.FieldType;
 import org.apache.pinot.core.data.readers.FileFormat;

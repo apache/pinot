@@ -18,12 +18,6 @@
  */
 package org.apache.pinot.broker.api.resources;
 
-import org.apache.pinot.broker.routing.RoutingTable;
-import org.apache.pinot.broker.routing.TimeBoundaryService;
-import org.apache.pinot.common.config.TableNameBuilder;
-import org.apache.pinot.common.metrics.BrokerMeter;
-import org.apache.pinot.common.metrics.BrokerMetrics;
-import org.apache.pinot.common.utils.CommonConstants;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
@@ -37,6 +31,12 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.pinot.broker.routing.RoutingTable;
+import org.apache.pinot.broker.routing.TimeBoundaryService;
+import org.apache.pinot.common.config.TableNameBuilder;
+import org.apache.pinot.common.metrics.BrokerMeter;
+import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

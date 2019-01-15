@@ -18,10 +18,10 @@
  */
 package org.apache.pinot.broker.routing;
 
-import org.apache.pinot.transport.config.PerTableRoutingConfig;
-import org.apache.pinot.transport.config.RoutingTableConfig;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.transport.config.PerTableRoutingConfig;
+import org.apache.pinot.transport.config.RoutingTableConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

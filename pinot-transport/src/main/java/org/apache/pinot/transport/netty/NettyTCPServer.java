@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.transport.netty;
 
+import com.yammer.metrics.core.MetricsRegistry;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
@@ -25,12 +26,10 @@ import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
 import io.netty.handler.codec.LengthFieldPrepender;
-
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.metrics.AggregatedMetricsRegistry;
 import org.apache.pinot.transport.metrics.AggregatedTransportServerMetrics;
 import org.apache.pinot.transport.metrics.NettyServerMetrics;
-import com.yammer.metrics.core.MetricsRegistry;
 
 
 /**

@@ -21,8 +21,6 @@ package org.apache.pinot.startree.hll;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.google.common.base.Preconditions;
-import org.apache.pinot.common.config.ConfigKey;
-import org.apache.pinot.common.utils.JsonUtils;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -30,8 +28,13 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
+import org.apache.pinot.common.config.ConfigKey;
+import org.apache.pinot.common.utils.JsonUtils;
 
-import static org.apache.pinot.common.utils.EqualityUtils.*;
+import static org.apache.pinot.common.utils.EqualityUtils.hashCodeOf;
+import static org.apache.pinot.common.utils.EqualityUtils.isEqual;
+import static org.apache.pinot.common.utils.EqualityUtils.isNullOrNotSameClass;
+import static org.apache.pinot.common.utils.EqualityUtils.isSameReference;
 
 
 /**

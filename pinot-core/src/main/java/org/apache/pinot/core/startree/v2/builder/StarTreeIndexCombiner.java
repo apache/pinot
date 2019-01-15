@@ -19,7 +19,6 @@
 package org.apache.pinot.core.startree.v2.builder;
 
 import com.google.common.base.Preconditions;
-import org.apache.pinot.core.startree.v2.AggregationFunctionColumnPair;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
@@ -28,10 +27,15 @@ import java.nio.channels.FileChannel;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.core.startree.v2.AggregationFunctionColumnPair;
 
-import static org.apache.pinot.core.segment.creator.impl.V1Constants.Indexes.*;
-import static org.apache.pinot.core.startree.v2.StarTreeV2Constants.*;
-import static org.apache.pinot.core.startree.v2.store.StarTreeIndexMapUtils.*;
+import static org.apache.pinot.core.segment.creator.impl.V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION;
+import static org.apache.pinot.core.segment.creator.impl.V1Constants.Indexes.UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION;
+import static org.apache.pinot.core.startree.v2.StarTreeV2Constants.STAR_TREE_INDEX_FILE_NAME;
+import static org.apache.pinot.core.startree.v2.store.StarTreeIndexMapUtils.IndexKey;
+import static org.apache.pinot.core.startree.v2.store.StarTreeIndexMapUtils.IndexType;
+import static org.apache.pinot.core.startree.v2.store.StarTreeIndexMapUtils.IndexValue;
+import static org.apache.pinot.core.startree.v2.store.StarTreeIndexMapUtils.STAR_TREE_INDEX_KEY;
 
 
 /**

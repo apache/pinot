@@ -18,13 +18,13 @@
  */
 package org.apache.pinot.core.query.aggregation;
 
+import java.util.ArrayList;
+import java.util.List;
+import javax.annotation.Nonnull;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionType;
-import java.util.ArrayList;
-import java.util.List;
-import javax.annotation.Nonnull;
 
 
 /**

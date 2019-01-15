@@ -20,11 +20,6 @@ package org.apache.pinot.tools.admin.command;
 
 import com.google.common.base.Charsets;
 import com.google.common.base.Splitter;
-import org.apache.pinot.common.config.CombinedConfig;
-import org.apache.pinot.common.config.CombinedConfigLoader;
-import org.apache.pinot.common.config.Serializer;
-import org.apache.pinot.controller.helix.ControllerRequestURLBuilder;
-import org.apache.pinot.tools.Command;
 import java.io.File;
 import java.io.InputStream;
 import org.apache.commons.io.IOUtils;
@@ -36,6 +31,11 @@ import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.methods.HttpPut;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.HttpClients;
+import org.apache.pinot.common.config.CombinedConfig;
+import org.apache.pinot.common.config.CombinedConfigLoader;
+import org.apache.pinot.common.config.Serializer;
+import org.apache.pinot.controller.helix.ControllerRequestURLBuilder;
+import org.apache.pinot.tools.Command;
 import org.kohsuke.args4j.Option;
 
 

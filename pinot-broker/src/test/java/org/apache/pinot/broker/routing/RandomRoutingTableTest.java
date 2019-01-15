@@ -18,10 +18,6 @@
  */
 package org.apache.pinot.broker.routing;
 
-import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.config.TableConfig.Builder;
-import org.apache.pinot.common.config.TableNameBuilder;
-import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
 import java.io.FileInputStream;
 import java.net.URL;
 import java.util.ArrayList;
@@ -35,6 +31,10 @@ import org.apache.helix.ZNRecord;
 import org.apache.helix.manager.zk.ZNRecordSerializer;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
+import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.common.config.TableConfig.Builder;
+import org.apache.pinot.common.config.TableNameBuilder;
+import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 

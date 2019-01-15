@@ -18,14 +18,13 @@
  */
 package org.apache.pinot.core.common.docidsets;
 
+import java.util.ArrayList;
+import java.util.List;
 import org.apache.pinot.common.utils.Pairs;
 import org.apache.pinot.common.utils.Pairs.IntPair;
 import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.common.Constants;
 import org.apache.pinot.core.operator.docidsets.SortedDocIdSet;
-import java.util.ArrayList;
-import java.util.List;
-import org.apache.commons.lang3.tuple.Pair;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 

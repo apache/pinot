@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.core.data.function;
 
-import org.apache.pinot.core.data.GenericRow;
 import java.lang.reflect.Method;
+import org.apache.pinot.core.data.GenericRow;
 import org.joda.time.DateTime;
 import org.joda.time.Days;
 import org.joda.time.MutableDateTime;

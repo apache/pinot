@@ -20,13 +20,13 @@ package org.apache.pinot.core.startree;
 
 import com.clearspring.analytics.stream.cardinality.CardinalityMergeException;
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
+import java.nio.ByteBuffer;
+import java.util.List;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.MetricFieldSpec;
 import org.apache.pinot.common.data.MetricFieldSpec.DerivedMetricType;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.apache.pinot.core.startree.hll.HllUtil;
-import java.nio.ByteBuffer;
-import java.util.List;
 
 
 public class MetricBuffer {

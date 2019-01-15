@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.core.query.scheduler.tokenbucket;
 
+import java.util.concurrent.atomic.LongAccumulator;
+import javax.annotation.Nonnull;
+import org.apache.commons.configuration.Configuration;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.scheduler.MultiLevelPriorityQueue;
@@ -27,9 +30,6 @@ import org.apache.pinot.core.query.scheduler.SchedulerGroupFactory;
 import org.apache.pinot.core.query.scheduler.TableBasedGroupMapper;
 import org.apache.pinot.core.query.scheduler.resources.PolicyBasedResourceManager;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
-import java.util.concurrent.atomic.LongAccumulator;
-import javax.annotation.Nonnull;
-import org.apache.commons.configuration.Configuration;
 
 /**
  * Schedules queries from a {@link SchedulerGroup} with highest number of tokens on priority.

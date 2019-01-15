@@ -18,15 +18,15 @@
  */
 package org.apache.pinot.core.segment.name;
 
+import java.io.File;
+import java.util.concurrent.TimeUnit;
+import org.apache.commons.io.FileUtils;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
 import org.apache.pinot.core.segment.index.ColumnMetadataTest;
 import org.apache.pinot.segments.v1.creator.SegmentTestUtils;
 import org.apache.pinot.util.TestUtils;
-import java.io.File;
-import java.util.concurrent.TimeUnit;
-import org.apache.commons.io.FileUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;

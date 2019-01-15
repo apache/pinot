@@ -20,12 +20,12 @@ package org.apache.pinot.segments.v1.creator;
 
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
+import java.io.IOException;
+import java.util.Random;
 import org.apache.pinot.core.io.writer.impl.DirectMemoryManager;
 import org.apache.pinot.core.util.FixedIntArray;
 import org.apache.pinot.core.util.FixedIntArrayOffHeapIdMap;
 import org.apache.pinot.core.util.IdMap;
-import java.io.IOException;
-import java.util.Random;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -75,7 +75,7 @@ public class FixedIntArrayIdMapTest {
 
     BiMap<FixedIntArray, Integer> expectedMap = addValues(_idMap);
     int numValues = expectedMap.size();
-    
+
     // Test invalid Value
     Assert.assertEquals(_idMap.getId(new FixedIntArray(new int[]{})), IdMap.INVALID_ID);
 

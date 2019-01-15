@@ -19,8 +19,8 @@
 package org.apache.pinot.common.utils.time;
 
 import com.google.common.base.Preconditions;
-import org.apache.pinot.common.data.TimeGranularitySpec;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.common.data.TimeGranularitySpec;
 
 
 /**

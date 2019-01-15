@@ -19,14 +19,14 @@
 package org.apache.pinot.core.realtime.impl.kafka;
 
 import com.google.common.base.Preconditions;
-import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
-import org.apache.pinot.common.utils.EqualityUtils;
-import org.apache.pinot.core.realtime.stream.StreamConfig;
-import org.apache.pinot.core.realtime.stream.StreamConfigProperties;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 import kafka.consumer.ConsumerConfig;
+import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
+import org.apache.pinot.common.utils.EqualityUtils;
+import org.apache.pinot.core.realtime.stream.StreamConfig;
+import org.apache.pinot.core.realtime.stream.StreamConfigProperties;
 
 
 /**

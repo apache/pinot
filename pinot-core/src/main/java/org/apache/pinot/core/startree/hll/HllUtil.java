@@ -20,11 +20,11 @@ package org.apache.pinot.core.startree.hll;
 
 import com.clearspring.analytics.stream.cardinality.CardinalityMergeException;
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
-import org.apache.pinot.common.Utils;
-import org.apache.pinot.core.data.GenericRow;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
+import org.apache.pinot.common.Utils;
+import org.apache.pinot.core.data.GenericRow;
 
 
 /**

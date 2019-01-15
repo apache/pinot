@@ -21,7 +21,6 @@ package org.apache.pinot.hadoop;
 import java.io.FileInputStream;
 import java.util.Arrays;
 import java.util.Properties;
-
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.hadoop.job.SegmentCreationJob;
 import org.apache.pinot.hadoop.job.SegmentTarPushJob;

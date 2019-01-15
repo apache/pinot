@@ -19,8 +19,6 @@
 package org.apache.pinot.tools.perf;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import org.apache.pinot.tools.AbstractBaseCommand;
-import org.apache.pinot.tools.Command;
 import java.io.File;
 import java.io.FileInputStream;
 import java.util.Collections;
@@ -33,6 +31,8 @@ import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.math.stat.descriptive.DescriptiveStatistics;
+import org.apache.pinot.tools.AbstractBaseCommand;
+import org.apache.pinot.tools.Command;
 import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;

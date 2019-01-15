@@ -20,10 +20,6 @@ package org.apache.pinot.tools.streams;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import org.apache.pinot.common.data.Schema;
-import org.apache.pinot.common.utils.JsonUtils;
-import org.apache.pinot.common.utils.KafkaStarterUtils;
-import org.apache.pinot.core.realtime.impl.kafka.KafkaJSONMessageDecoder;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
@@ -37,6 +33,10 @@ import javax.websocket.Session;
 import kafka.javaapi.producer.Producer;
 import kafka.producer.KeyedMessage;
 import kafka.producer.ProducerConfig;
+import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.common.utils.JsonUtils;
+import org.apache.pinot.common.utils.KafkaStarterUtils;
+import org.apache.pinot.core.realtime.impl.kafka.KafkaJSONMessageDecoder;
 import org.glassfish.tyrus.client.ClientManager;
 
 

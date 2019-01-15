@@ -18,9 +18,8 @@
  */
 package org.apache.pinot.core.operator.dociditerators;
 
-import org.roaringbitmap.IntIterator;
-
 import org.apache.pinot.core.common.Constants;
+import org.roaringbitmap.IntIterator;
 
 public final class BitmapDocIdIterator implements IndexBasedDocIdIterator {
   final private IntIterator iterator;

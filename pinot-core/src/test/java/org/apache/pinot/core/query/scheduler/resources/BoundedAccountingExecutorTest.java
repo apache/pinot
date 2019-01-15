@@ -18,16 +18,19 @@
  */
 package org.apache.pinot.core.query.scheduler.resources;
 
-import org.apache.pinot.core.query.scheduler.SchedulerGroupAccountant;
 import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.pinot.core.query.scheduler.SchedulerGroupAccountant;
 import org.testng.annotations.Test;
 
-import static org.mockito.Mockito.*;
-import static org.testng.Assert.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.testng.Assert.assertEquals;
 
 
 public class BoundedAccountingExecutorTest {

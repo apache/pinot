@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
+import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.core.query.exception.BadQueryRequestException;
-import java.util.concurrent.TimeUnit;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;

@@ -19,13 +19,10 @@
 package org.apache.pinot.core.operator.dociditerators;
 
 import java.util.Arrays;
-import java.util.concurrent.atomic.AtomicLong;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.common.Constants;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public final class AndDocIdIterator implements BlockDocIdIterator {
 

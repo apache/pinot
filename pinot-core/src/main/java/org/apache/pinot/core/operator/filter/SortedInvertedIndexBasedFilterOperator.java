@@ -19,15 +19,15 @@
 package org.apache.pinot.core.operator.filter;
 
 import com.google.common.base.Preconditions;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import org.apache.pinot.common.utils.Pairs.IntPair;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.io.reader.impl.v1.SortedIndexReader;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.docidsets.SortedDocIdSet;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
 
 
 public class SortedInvertedIndexBasedFilterOperator extends BaseFilterOperator {

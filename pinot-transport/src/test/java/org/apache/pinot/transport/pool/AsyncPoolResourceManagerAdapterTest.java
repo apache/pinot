@@ -18,12 +18,11 @@
  */
 package org.apache.pinot.transport.pool;
 
-import org.testng.Assert;
-import org.testng.annotations.Test;
-
 import com.google.common.util.concurrent.MoreExecutors;
 import org.apache.pinot.common.response.ServerInstance;
 import org.apache.pinot.transport.common.Callback;
+import org.testng.Assert;
+import org.testng.annotations.Test;
 
 
 public class AsyncPoolResourceManagerAdapterTest {

@@ -18,12 +18,6 @@
  */
 package org.apache.pinot.transport.perf;
 
-import org.apache.pinot.common.metrics.AggregatedHistogram;
-import org.apache.pinot.common.metrics.LatencyMetric;
-import org.apache.pinot.common.response.ServerInstance;
-import org.apache.pinot.common.utils.CommonConstants;
-import org.apache.pinot.transport.config.PerTableRoutingConfig;
-import org.apache.pinot.transport.config.RoutingTableConfig;
 import com.yammer.metrics.core.Histogram;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -35,6 +29,12 @@ import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.GnuParser;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
+import org.apache.pinot.common.metrics.AggregatedHistogram;
+import org.apache.pinot.common.metrics.LatencyMetric;
+import org.apache.pinot.common.response.ServerInstance;
+import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.transport.config.PerTableRoutingConfig;
+import org.apache.pinot.transport.config.RoutingTableConfig;
 
 public class ScatterGatherPerfTester {
 

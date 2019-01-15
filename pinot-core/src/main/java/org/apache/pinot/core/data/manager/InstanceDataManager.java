@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.core.data.manager;
 
-import org.apache.pinot.common.metrics.ServerMetrics;
-import org.apache.pinot.common.segment.SegmentMetadata;
 import java.io.File;
 import java.util.List;
 import java.util.Set;
@@ -30,6 +28,8 @@ import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.segment.SegmentMetadata;
 
 
 /**

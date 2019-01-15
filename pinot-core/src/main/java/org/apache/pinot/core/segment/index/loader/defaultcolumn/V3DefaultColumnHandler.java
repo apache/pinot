@@ -19,6 +19,7 @@
 package org.apache.pinot.core.segment.index.loader.defaultcolumn;
 
 import com.google.common.base.Preconditions;
+import java.io.File;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
@@ -27,7 +28,6 @@ import org.apache.pinot.core.segment.index.loader.LoaderUtils;
 import org.apache.pinot.core.segment.index.loader.V3RemoveIndexException;
 import org.apache.pinot.core.segment.store.ColumnIndexType;
 import org.apache.pinot.core.segment.store.SegmentDirectory;
-import java.io.File;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

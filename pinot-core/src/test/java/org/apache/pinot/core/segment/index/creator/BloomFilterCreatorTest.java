@@ -19,30 +19,20 @@
 package org.apache.pinot.core.segment.index.creator;
 
 import com.google.common.base.Preconditions;
-import com.google.common.hash.BloomFilter;
-import org.apache.pinot.common.data.DimensionFieldSpec;
-import org.apache.pinot.common.data.FieldSpec;
-import org.apache.pinot.core.bloom.BloomFilterType;
-import org.apache.pinot.core.bloom.GuavaOnHeapBloomFilter;
-import org.apache.pinot.core.segment.creator.impl.V1Constants;
-import org.apache.pinot.core.segment.creator.impl.bloom.BloomFilterCreator;
-import org.apache.pinot.core.bloom.BloomFilterUtil;
-
-import org.apache.pinot.core.segment.index.ColumnMetadata;
-import org.apache.pinot.core.segment.index.readers.BloomFilterReader;
 import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStream;
-import java.nio.charset.Charset;
-
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
+import org.apache.pinot.core.bloom.BloomFilterType;
+import org.apache.pinot.core.bloom.BloomFilterUtil;
+import org.apache.pinot.core.bloom.GuavaOnHeapBloomFilter;
+import org.apache.pinot.core.segment.creator.impl.V1Constants;
+import org.apache.pinot.core.segment.creator.impl.bloom.BloomFilterCreator;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.Test;
-
-import com.google.common.hash.Funnels;
 
 
 public class BloomFilterCreatorTest {

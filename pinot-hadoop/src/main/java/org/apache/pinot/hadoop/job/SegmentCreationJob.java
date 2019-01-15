@@ -18,12 +18,6 @@
  */
 package org.apache.pinot.hadoop.job;
 
-import org.apache.pinot.common.Utils;
-import org.apache.pinot.common.config.SegmentsValidationAndRetentionConfig;
-import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.data.Schema;
-import org.apache.pinot.hadoop.job.mapper.HadoopSegmentCreationMapReduceJob;
-import org.apache.pinot.hadoop.utils.PushLocation;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -45,6 +39,12 @@ import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
+import org.apache.pinot.common.Utils;
+import org.apache.pinot.common.config.SegmentsValidationAndRetentionConfig;
+import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.hadoop.job.mapper.HadoopSegmentCreationMapReduceJob;
+import org.apache.pinot.hadoop.utils.PushLocation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

@@ -18,17 +18,17 @@
  */
 package org.apache.pinot.core.startree;
 
-import org.apache.pinot.common.segment.ReadMode;
-import org.apache.pinot.core.common.BlockDocIdIterator;
-import org.apache.pinot.core.common.Constants;
-import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.segment.ReadMode;
+import org.apache.pinot.core.common.BlockDocIdIterator;
+import org.apache.pinot.core.common.Constants;
+import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;

@@ -18,15 +18,15 @@
  */
 package org.apache.pinot.common.data;
 
-import org.apache.pinot.common.utils.EqualityUtils;
 import java.util.TimeZone;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.apache.pinot.common.utils.EqualityUtils;
 import org.joda.time.DateTimeZone;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
 
-import static org.apache.pinot.common.data.DateTimeFieldSpec.*;
+import static org.apache.pinot.common.data.DateTimeFieldSpec.TimeFormat;
 
 
 public class DateTimeFormatPatternSpec {

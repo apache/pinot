@@ -19,7 +19,6 @@
 package org.apache.pinot.core.query.utils;
 
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
-
 import java.io.Serializable;
 import java.util.List;
 

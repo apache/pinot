@@ -19,10 +19,6 @@
 package org.apache.pinot.core.segment.index.loader;
 
 import com.google.common.base.Preconditions;
-import org.apache.pinot.common.utils.CommonConstants;
-import org.apache.pinot.core.segment.memory.PinotDataBuffer;
-import org.apache.pinot.core.segment.store.ColumnIndexType;
-import org.apache.pinot.core.segment.store.SegmentDirectory;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -30,6 +26,10 @@ import java.util.List;
 import javax.annotation.Nonnull;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.core.segment.memory.PinotDataBuffer;
+import org.apache.pinot.core.segment.store.ColumnIndexType;
+import org.apache.pinot.core.segment.store.SegmentDirectory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

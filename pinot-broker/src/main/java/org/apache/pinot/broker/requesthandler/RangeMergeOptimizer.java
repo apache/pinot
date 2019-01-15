@@ -18,14 +18,14 @@
  */
 package org.apache.pinot.broker.requesthandler;
 
-import org.apache.pinot.common.request.FilterOperator;
-import org.apache.pinot.common.utils.request.FilterQueryTree;
-import org.apache.pinot.core.common.predicate.RangePredicate;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.request.FilterOperator;
+import org.apache.pinot.common.utils.request.FilterQueryTree;
+import org.apache.pinot.core.common.predicate.RangePredicate;
 
 
 /**

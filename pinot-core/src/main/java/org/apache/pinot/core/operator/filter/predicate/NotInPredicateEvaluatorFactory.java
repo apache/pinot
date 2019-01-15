@@ -18,11 +18,6 @@
  */
 package org.apache.pinot.core.operator.filter.predicate;
 
-import org.apache.pinot.common.data.FieldSpec;
-import org.apache.pinot.common.utils.HashUtil;
-import org.apache.pinot.core.common.Predicate;
-import org.apache.pinot.core.common.predicate.NotInPredicate;
-import org.apache.pinot.core.segment.index.readers.Dictionary;
 import it.unimi.dsi.fastutil.doubles.DoubleOpenHashSet;
 import it.unimi.dsi.fastutil.doubles.DoubleSet;
 import it.unimi.dsi.fastutil.floats.FloatOpenHashSet;
@@ -34,6 +29,11 @@ import it.unimi.dsi.fastutil.longs.LongSet;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
+import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.common.utils.HashUtil;
+import org.apache.pinot.core.common.Predicate;
+import org.apache.pinot.core.common.predicate.NotInPredicate;
+import org.apache.pinot.core.segment.index.readers.Dictionary;
 
 
 /**

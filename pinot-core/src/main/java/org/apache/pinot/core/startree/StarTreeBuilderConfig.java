@@ -18,10 +18,10 @@
  */
 package org.apache.pinot.core.startree;
 
-import org.apache.pinot.common.data.Schema;
 import java.io.File;
 import java.util.List;
 import java.util.Set;
+import org.apache.pinot.common.data.Schema;
 
 
 public class StarTreeBuilderConfig {

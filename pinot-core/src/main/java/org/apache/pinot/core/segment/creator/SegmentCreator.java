@@ -18,14 +18,14 @@
  */
 package org.apache.pinot.core.segment.creator;
 
-import org.apache.pinot.common.data.Schema;
-import org.apache.pinot.core.data.GenericRow;
-import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.util.Map;
 import org.apache.commons.configuration.ConfigurationException;
+import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.core.data.GenericRow;
+import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 
 
 /**

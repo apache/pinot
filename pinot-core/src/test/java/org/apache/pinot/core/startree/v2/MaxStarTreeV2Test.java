@@ -18,12 +18,12 @@
  */
 package org.apache.pinot.core.startree.v2;
 
+import java.util.Random;
 import org.apache.pinot.common.data.FieldSpec.DataType;
 import org.apache.pinot.core.data.aggregator.MaxValueAggregator;
 import org.apache.pinot.core.data.aggregator.ValueAggregator;
-import java.util.Random;
 
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertEquals;
 
 
 public class MaxStarTreeV2Test extends BaseStarTreeV2Test<Number, Double> {

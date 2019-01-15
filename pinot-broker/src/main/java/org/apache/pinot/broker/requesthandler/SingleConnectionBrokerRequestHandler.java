@@ -18,6 +18,12 @@
  */
 package org.apache.pinot.broker.requesthandler;
 
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import javax.annotation.Nullable;
+import javax.annotation.concurrent.ThreadSafe;
+import org.apache.commons.configuration.Configuration;
 import org.apache.pinot.broker.api.RequestStatistics;
 import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.queryquota.TableQueryQuotaManager;
@@ -37,12 +43,6 @@ import org.apache.pinot.core.transport.AsyncQueryResponse;
 import org.apache.pinot.core.transport.QueryRouter;
 import org.apache.pinot.core.transport.Server;
 import org.apache.pinot.core.transport.ServerResponse;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import javax.annotation.Nullable;
-import javax.annotation.concurrent.ThreadSafe;
-import org.apache.commons.configuration.Configuration;
 
 
 /**

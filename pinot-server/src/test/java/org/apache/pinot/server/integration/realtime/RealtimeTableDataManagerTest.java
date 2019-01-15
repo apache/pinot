@@ -18,6 +18,18 @@
  */
 package org.apache.pinot.server.integration.realtime;
 
+import com.yammer.metrics.core.MetricsRegistry;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.TimerTask;
+import java.util.concurrent.TimeUnit;
+import org.apache.commons.configuration.Configuration;
+import org.apache.commons.configuration.ConfigurationException;
+import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.helix.ZNRecord;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.FieldSpec.FieldType;
@@ -44,23 +56,12 @@ import org.apache.pinot.core.indexsegment.mutable.MutableSegment;
 import org.apache.pinot.core.indexsegment.mutable.MutableSegmentImplTest;
 import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segments.v1.creator.SegmentTestUtils;
-import com.yammer.metrics.core.MetricsRegistry;
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.TimerTask;
-import java.util.concurrent.TimeUnit;
-import org.apache.commons.configuration.Configuration;
-import org.apache.commons.configuration.ConfigurationException;
-import org.apache.commons.configuration.PropertiesConfiguration;
-import org.apache.helix.ZNRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.annotations.BeforeClass;
 
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 
 public class RealtimeTableDataManagerTest {

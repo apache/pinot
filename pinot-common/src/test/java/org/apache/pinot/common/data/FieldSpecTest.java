@@ -18,13 +18,13 @@
  */
 package org.apache.pinot.common.data;
 
-import org.apache.pinot.common.utils.JsonUtils;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import org.apache.avro.Schema;
+import org.apache.pinot.common.utils.JsonUtils;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;

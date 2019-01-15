@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.common.utils.request;
 
-import org.apache.pinot.common.request.FilterOperator;
 import java.util.List;
+import org.apache.pinot.common.request.FilterOperator;
 
 
 public abstract class QueryTree {

@@ -18,13 +18,13 @@
  */
 package org.apache.pinot.core.startree.v2;
 
+import java.util.Random;
 import org.apache.pinot.common.data.FieldSpec.DataType;
 import org.apache.pinot.core.data.aggregator.AvgValueAggregator;
 import org.apache.pinot.core.data.aggregator.ValueAggregator;
 import org.apache.pinot.core.query.aggregation.function.customobject.AvgPair;
-import java.util.Random;
 
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertEquals;
 
 
 public class AvgStarTreeV2Test extends BaseStarTreeV2Test<Object, AvgPair> {

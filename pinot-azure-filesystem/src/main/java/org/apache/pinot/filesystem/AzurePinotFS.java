@@ -19,7 +19,6 @@
 package org.apache.pinot.filesystem;
 
 import com.google.common.annotations.VisibleForTesting;
-import org.apache.pinot.common.utils.CommonConstants;
 import com.microsoft.azure.datalake.store.ADLStoreClient;
 import com.microsoft.azure.datalake.store.DirectoryEntry;
 import com.microsoft.azure.datalake.store.DirectoryEntryType;
@@ -41,6 +40,7 @@ import java.util.List;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

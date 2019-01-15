@@ -18,12 +18,12 @@
  */
 package org.apache.pinot.core.realtime.impl.dictionary;
 
-import org.apache.pinot.common.utils.StringUtil;
-import org.apache.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
-import org.apache.pinot.core.io.writer.impl.MutableOffHeapByteArrayStore;
 import java.io.IOException;
 import java.util.Arrays;
 import javax.annotation.Nonnull;
+import org.apache.pinot.common.utils.StringUtil;
+import org.apache.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
+import org.apache.pinot.core.io.writer.impl.MutableOffHeapByteArrayStore;
 
 
 public class StringOffHeapMutableDictionary extends BaseOffHeapMutableDictionary {

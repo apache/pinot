@@ -18,10 +18,10 @@
  */
 package org.apache.pinot.core.startree;
 
-import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import java.util.Iterator;
+import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 
-import static org.apache.pinot.core.startree.StarTreeBuilderUtils.*;
+import static org.apache.pinot.core.startree.StarTreeBuilderUtils.INVALID_ID;
 
 
 public class OffHeapStarTreeNode implements StarTreeNode {

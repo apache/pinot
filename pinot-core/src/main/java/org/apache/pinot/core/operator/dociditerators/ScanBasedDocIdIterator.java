@@ -18,9 +18,8 @@
  */
 package org.apache.pinot.core.operator.dociditerators;
 
-import org.roaringbitmap.buffer.MutableRoaringBitmap;
-
 import org.apache.pinot.core.common.BlockDocIdIterator;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 /**
  * All scan based filter iterators must implement this interface. This allows interesection to be

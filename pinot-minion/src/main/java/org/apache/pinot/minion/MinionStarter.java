@@ -19,6 +19,18 @@
 package org.apache.pinot.minion;
 
 import com.google.common.base.Preconditions;
+import com.yammer.metrics.core.MetricsRegistry;
+import java.io.File;
+import java.io.IOException;
+import javax.annotation.Nonnull;
+import javax.net.ssl.SSLContext;
+import org.apache.commons.configuration.Configuration;
+import org.apache.helix.HelixAdmin;
+import org.apache.helix.HelixManager;
+import org.apache.helix.InstanceType;
+import org.apache.helix.manager.zk.ZKHelixManager;
+import org.apache.helix.model.InstanceConfig;
+import org.apache.helix.task.TaskStateModelFactory;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.metrics.MetricsHelper;
 import org.apache.pinot.common.segment.fetcher.SegmentFetcherFactory;
@@ -35,18 +47,6 @@ import org.apache.pinot.minion.executor.TaskExecutorFactoryRegistry;
 import org.apache.pinot.minion.metrics.MinionMeter;
 import org.apache.pinot.minion.metrics.MinionMetrics;
 import org.apache.pinot.minion.taskfactory.TaskFactoryRegistry;
-import com.yammer.metrics.core.MetricsRegistry;
-import java.io.File;
-import java.io.IOException;
-import javax.annotation.Nonnull;
-import javax.net.ssl.SSLContext;
-import org.apache.commons.configuration.Configuration;
-import org.apache.helix.HelixAdmin;
-import org.apache.helix.HelixManager;
-import org.apache.helix.InstanceType;
-import org.apache.helix.manager.zk.ZKHelixManager;
-import org.apache.helix.model.InstanceConfig;
-import org.apache.helix.task.TaskStateModelFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

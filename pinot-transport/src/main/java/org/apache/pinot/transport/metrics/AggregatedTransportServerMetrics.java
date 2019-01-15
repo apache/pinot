@@ -18,14 +18,14 @@
  */
 package org.apache.pinot.transport.metrics;
 
+import com.yammer.metrics.core.MetricName;
+import com.yammer.metrics.core.Sampling;
+import com.yammer.metrics.core.Summarizable;
 import org.apache.pinot.common.metrics.AggregatedCounter;
 import org.apache.pinot.common.metrics.AggregatedHistogram;
 import org.apache.pinot.common.metrics.AggregatedMetricsRegistry;
 import org.apache.pinot.common.metrics.LatencyMetric;
 import org.apache.pinot.common.metrics.MetricsHelper;
-import com.yammer.metrics.core.MetricName;
-import com.yammer.metrics.core.Sampling;
-import com.yammer.metrics.core.Summarizable;
 
 
 /**

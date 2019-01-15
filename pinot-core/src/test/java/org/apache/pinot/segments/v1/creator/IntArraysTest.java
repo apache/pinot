@@ -18,6 +18,13 @@
  */
 package org.apache.pinot.segments.v1.creator;
 
+import java.io.File;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
+import org.apache.avro.Schema.Field;
+import org.apache.avro.file.DataFileStream;
+import org.apache.avro.generic.GenericRecord;
+import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
@@ -31,13 +38,6 @@ import org.apache.pinot.core.segment.index.ColumnMetadata;
 import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
 import org.apache.pinot.core.util.AvroUtils;
 import org.apache.pinot.util.TestUtils;
-import java.io.File;
-import java.util.Map;
-import java.util.concurrent.TimeUnit;
-import org.apache.avro.Schema.Field;
-import org.apache.avro.file.DataFileStream;
-import org.apache.avro.generic.GenericRecord;
-import org.apache.commons.io.FileUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;

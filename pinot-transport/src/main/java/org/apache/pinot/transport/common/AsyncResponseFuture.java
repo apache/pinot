@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.transport.common;
 
-import org.apache.pinot.common.response.ServerInstance;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -30,6 +29,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import org.apache.pinot.common.response.ServerInstance;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

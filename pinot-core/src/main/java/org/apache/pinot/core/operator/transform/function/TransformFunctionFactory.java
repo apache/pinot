@@ -18,15 +18,15 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
-import org.apache.pinot.common.request.transform.TransformExpressionTree;
-import org.apache.pinot.core.common.DataSource;
-import org.apache.pinot.core.query.exception.BadQueryRequestException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nonnull;
+import org.apache.pinot.common.request.transform.TransformExpressionTree;
+import org.apache.pinot.core.common.DataSource;
+import org.apache.pinot.core.query.exception.BadQueryRequestException;
 
 
 /**

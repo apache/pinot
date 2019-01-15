@@ -18,18 +18,21 @@
  */
 package org.apache.pinot.common.segment.fetcher;
 
-import org.apache.pinot.common.exception.HttpErrorStatusException;
-import org.apache.pinot.common.utils.FileUploadDownloadClient;
-import org.apache.pinot.common.utils.retry.RetryPolicies;
 import java.io.File;
 import java.net.URI;
 import java.util.Collections;
 import java.util.Set;
 import org.apache.commons.configuration.Configuration;
+import org.apache.pinot.common.exception.HttpErrorStatusException;
+import org.apache.pinot.common.utils.FileUploadDownloadClient;
+import org.apache.pinot.common.utils.retry.RetryPolicies;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.common.utils.CommonConstants.SegmentOperations.*;
+import static org.apache.pinot.common.utils.CommonConstants.SegmentOperations.RETRY;
+import static org.apache.pinot.common.utils.CommonConstants.SegmentOperations.RETRY_DEFAULT;
+import static org.apache.pinot.common.utils.CommonConstants.SegmentOperations.RETRY_WAITIME_MS;
+import static org.apache.pinot.common.utils.CommonConstants.SegmentOperations.RETRY_WAITIME_MS_DEFAULT;
 
 
 public class HttpSegmentFetcher implements SegmentFetcher {

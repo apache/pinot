@@ -21,14 +21,14 @@ package org.apache.pinot.controller.api.resources;
 import java.io.IOException;
 import java.net.URI;
 import javax.annotation.Priority;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.container.ContainerRequestFilter;
 import javax.ws.rs.container.PreMatching;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.ext.Provider;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 // A class to add the headers that we expect from clients. Pre-jersey API, the clients have been lax in specifying the

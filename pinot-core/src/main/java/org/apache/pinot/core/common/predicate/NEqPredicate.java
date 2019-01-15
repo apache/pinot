@@ -20,9 +20,7 @@ package org.apache.pinot.core.common.predicate;
 
 import java.util.Arrays;
 import java.util.List;
-
 import org.apache.pinot.core.common.Predicate;
-import org.apache.pinot.core.common.Predicate.Type;
 
 
 public class NEqPredicate extends Predicate {

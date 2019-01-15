@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.segment.virtualcolumn;
 
+import java.io.IOException;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.utils.Pairs;
 import org.apache.pinot.core.io.reader.BaseSingleColumnSingleValueReader;
@@ -28,11 +29,9 @@ import org.apache.pinot.core.io.reader.impl.v1.SortedIndexReaderImpl;
 import org.apache.pinot.core.io.util.DictionaryDelegatingValueReader;
 import org.apache.pinot.core.io.util.ValueReader;
 import org.apache.pinot.core.segment.index.ColumnMetadata;
-import org.apache.pinot.core.segment.index.readers.BaseDictionary;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.core.segment.index.readers.IntDictionary;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
-import java.io.IOException;
 
 
 /**

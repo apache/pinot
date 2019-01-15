@@ -18,17 +18,14 @@
  */
 package org.apache.pinot.core.operator.transform.transformer.datetime;
 
+import java.util.concurrent.TimeUnit;
+import javax.annotation.Nonnull;
 import org.apache.pinot.common.data.DateTimeFormatSpec;
 import org.apache.pinot.common.data.DateTimeFormatUnitSpec.DateTimeTransformUnit;
 import org.apache.pinot.common.data.DateTimeGranularitySpec;
 import org.apache.pinot.core.operator.transform.transformer.DataTransformer;
-import java.util.concurrent.TimeUnit;
-import javax.annotation.Nonnull;
-
 import org.joda.time.DateTime;
 import org.joda.time.format.DateTimeFormatter;
-
-import static java.util.concurrent.TimeUnit.SECONDS;
 
 
 /**

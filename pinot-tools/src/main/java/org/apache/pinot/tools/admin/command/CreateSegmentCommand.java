@@ -18,14 +18,6 @@
  */
 package org.apache.pinot.tools.admin.command;
 
-import org.apache.pinot.common.data.StarTreeIndexSpec;
-import org.apache.pinot.common.utils.JsonUtils;
-import org.apache.pinot.core.data.readers.FileFormat;
-import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
-import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
-import org.apache.pinot.startree.hll.HllConfig;
-import org.apache.pinot.startree.hll.HllConstants;
-import org.apache.pinot.tools.Command;
 import java.io.File;
 import java.io.FilenameFilter;
 import java.io.IOException;
@@ -36,6 +28,14 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.data.StarTreeIndexSpec;
+import org.apache.pinot.common.utils.JsonUtils;
+import org.apache.pinot.core.data.readers.FileFormat;
+import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.startree.hll.HllConfig;
+import org.apache.pinot.startree.hll.HllConstants;
+import org.apache.pinot.tools.Command;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

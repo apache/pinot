@@ -18,9 +18,6 @@
  */
 package org.apache.pinot.core.plan;
 
-import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -28,6 +25,9 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 import junit.framework.Assert;
+import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.testng.annotations.Test;
 
 

@@ -19,8 +19,8 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import com.google.common.base.Preconditions;
-import org.apache.pinot.core.query.exception.BadQueryRequestException;
 import javax.annotation.Nonnull;
+import org.apache.pinot.core.query.exception.BadQueryRequestException;
 
 
 /**

@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
+import java.util.List;
+import java.util.Map;
+import javax.annotation.Nonnull;
 import org.apache.pinot.common.data.DateTimeFieldSpec;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
@@ -29,9 +32,6 @@ import org.apache.pinot.core.operator.transform.transformer.datetime.EpochToSDFT
 import org.apache.pinot.core.operator.transform.transformer.datetime.SDFToEpochTransformer;
 import org.apache.pinot.core.operator.transform.transformer.datetime.SDFToSDFTransformer;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
-import java.util.List;
-import java.util.Map;
-import javax.annotation.Nonnull;
 
 
 /**

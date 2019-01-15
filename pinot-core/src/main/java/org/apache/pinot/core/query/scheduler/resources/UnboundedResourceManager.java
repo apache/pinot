@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.core.query.scheduler.resources;
 
+import org.apache.commons.configuration.Configuration;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.scheduler.SchedulerGroupAccountant;
-import org.apache.commons.configuration.Configuration;
 
 
 /**

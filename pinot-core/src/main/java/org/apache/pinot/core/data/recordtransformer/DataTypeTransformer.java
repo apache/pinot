@@ -18,11 +18,11 @@
  */
 package org.apache.pinot.core.data.recordtransformer;
 
+import java.util.HashMap;
+import java.util.Map;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.core.data.GenericRow;
-import java.util.HashMap;
-import java.util.Map;
 
 
 /**

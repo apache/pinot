@@ -19,10 +19,10 @@
 package org.apache.pinot.core.query.scheduler.resources;
 
 import com.google.common.base.Preconditions;
-import org.apache.pinot.core.query.scheduler.SchedulerGroupAccountant;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Semaphore;
 import javax.annotation.Nonnull;
+import org.apache.pinot.core.query.scheduler.SchedulerGroupAccountant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

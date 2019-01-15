@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.common.utils;
 
-import org.apache.pinot.common.response.BrokerResponseFactory;
 import java.io.File;
+import org.apache.pinot.common.response.BrokerResponseFactory;
 
 
 public class CommonConstants {

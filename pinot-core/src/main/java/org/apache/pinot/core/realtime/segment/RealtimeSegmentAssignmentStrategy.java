@@ -18,11 +18,11 @@
  */
 package org.apache.pinot.core.realtime.segment;
 
-import org.apache.pinot.common.exception.InvalidConfigException;
-import org.apache.pinot.common.partition.PartitionAssignment;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.common.exception.InvalidConfigException;
+import org.apache.pinot.common.partition.PartitionAssignment;
 
 
 /**

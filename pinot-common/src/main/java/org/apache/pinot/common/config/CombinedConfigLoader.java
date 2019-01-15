@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.common.config;
 
-import org.apache.pinot.common.utils.EqualityUtils;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
 import com.typesafe.config.ConfigIncludeContext;
@@ -33,6 +32,7 @@ import io.vavr.collection.Set;
 import java.io.File;
 import java.util.Arrays;
 import java.util.Map;
+import org.apache.pinot.common.utils.EqualityUtils;
 
 
 /**

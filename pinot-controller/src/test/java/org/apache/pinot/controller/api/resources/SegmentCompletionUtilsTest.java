@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.controller.api.resources;
 
-import org.apache.pinot.controller.util.SegmentCompletionUtils;
 import junit.framework.Assert;
+import org.apache.pinot.controller.util.SegmentCompletionUtils;
 import org.testng.annotations.Test;
 
 

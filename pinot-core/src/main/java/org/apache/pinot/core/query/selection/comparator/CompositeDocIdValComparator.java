@@ -21,7 +21,6 @@ package org.apache.pinot.core.query.selection.comparator;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
-
 import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.core.common.Block;
 

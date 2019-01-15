@@ -18,12 +18,12 @@
  */
 package org.apache.pinot.broker.requesthandler;
 
+import java.util.Arrays;
+import java.util.List;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.FilterQuery;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
 import org.apache.pinot.common.utils.request.RequestUtils;
-import java.util.Arrays;
-import java.util.List;
 
 
 public class BrokerRequestOptimizer {

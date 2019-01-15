@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.core.realtime.impl.dictionary;
 
-import org.apache.pinot.common.utils.primitive.ByteArray;
 import java.util.Arrays;
 import javax.annotation.Nonnull;
+import org.apache.pinot.common.utils.primitive.ByteArray;
 
 
 /**

@@ -18,11 +18,11 @@
  */
 package org.apache.pinot.core.operator.docvaliterators;
 
+import java.io.IOException;
+import java.util.Random;
 import org.apache.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import org.apache.pinot.core.io.readerwriter.impl.FixedByteSingleColumnSingleValueReaderWriter;
 import org.apache.pinot.core.io.writer.impl.DirectMemoryManager;
-import java.io.IOException;
-import java.util.Random;
 import org.testng.Assert;
 import org.testng.annotations.AfterTest;
 import org.testng.annotations.BeforeClass;

@@ -18,17 +18,17 @@
  */
 package org.apache.pinot.broker.routing.selector;
 
-import org.apache.pinot.broker.util.FakePropertyStore;
-import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.lineage.SegmentMergeLineage;
-import org.apache.pinot.common.lineage.SegmentMergeLineageAccessHelper;
-import org.apache.pinot.common.utils.CommonConstants;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.pinot.broker.util.FakePropertyStore;
+import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.common.lineage.SegmentMergeLineage;
+import org.apache.pinot.common.lineage.SegmentMergeLineageAccessHelper;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 

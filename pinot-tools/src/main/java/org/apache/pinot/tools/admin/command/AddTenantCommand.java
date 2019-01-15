@@ -18,15 +18,14 @@
  */
 package org.apache.pinot.tools.admin.command;
 
-import org.apache.pinot.tools.Command;
-import org.kohsuke.args4j.Option;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import org.apache.pinot.common.config.Tenant;
 import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.common.utils.TenantRole;
 import org.apache.pinot.controller.helix.ControllerRequestURLBuilder;
+import org.apache.pinot.tools.Command;
+import org.kohsuke.args4j.Option;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class AddTenantCommand extends AbstractBaseAdminCommand implements Command {

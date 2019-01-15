@@ -18,10 +18,6 @@
  */
 package org.apache.pinot.controller.api.resources;
 
-import javax.ws.rs.Produces;
-import javax.ws.rs.core.MediaType;
-import org.apache.commons.lang.StringUtils;
-import org.apache.pinot.controller.ControllerConf;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiResponse;
@@ -29,6 +25,10 @@ import io.swagger.annotations.ApiResponses;
 import javax.inject.Inject;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
+import javax.ws.rs.Produces;
+import javax.ws.rs.core.MediaType;
+import org.apache.commons.lang.StringUtils;
+import org.apache.pinot.controller.ControllerConf;
 
 @Api(tags = Constants.HEALTH_TAG)
 @Path("/pinot-controller/admin")

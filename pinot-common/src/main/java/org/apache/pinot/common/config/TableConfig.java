@@ -22,11 +22,6 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
-import org.apache.pinot.common.data.StarTreeIndexSpec;
-import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
-import org.apache.pinot.common.utils.EqualityUtils;
-import org.apache.pinot.common.utils.JsonUtils;
-import org.apache.pinot.startree.hll.HllConfig;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
@@ -35,6 +30,11 @@ import java.util.Map;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.helix.ZNRecord;
+import org.apache.pinot.common.data.StarTreeIndexSpec;
+import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
+import org.apache.pinot.common.utils.EqualityUtils;
+import org.apache.pinot.common.utils.JsonUtils;
+import org.apache.pinot.startree.hll.HllConfig;
 
 
 @SuppressWarnings("unused")

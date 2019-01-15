@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.predicate;
 
+import java.util.Arrays;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.utils.EqualityUtils;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
@@ -26,7 +27,6 @@ import org.apache.pinot.core.common.Predicate;
 import org.apache.pinot.core.common.predicate.BaseInPredicate;
 import org.apache.pinot.core.common.predicate.InPredicate;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
-import java.util.Arrays;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 

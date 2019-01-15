@@ -19,13 +19,13 @@
 package org.apache.pinot.core.segment.store;
 
 import com.google.common.base.Preconditions;
+import java.io.Closeable;
+import java.io.File;
+import java.io.IOException;
 import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
-import java.io.Closeable;
-import java.io.File;
-import java.io.IOException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

@@ -19,10 +19,10 @@
 package org.apache.pinot.common.config;
 
 import com.google.common.base.Preconditions;
-import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
-import org.apache.pinot.common.utils.SegmentName;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
+import org.apache.pinot.common.utils.SegmentName;
 
 
 public class TableNameBuilder {

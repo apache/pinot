@@ -18,13 +18,12 @@
  */
 package org.apache.pinot.transport.common;
 
+import com.google.common.util.concurrent.ListenableFuture;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-
-import com.google.common.util.concurrent.ListenableFuture;
 import org.apache.pinot.common.response.ServerInstance;
 
 

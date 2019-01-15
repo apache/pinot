@@ -18,11 +18,11 @@
  */
 package org.apache.pinot.core.segment.virtualcolumn;
 
+import java.io.IOException;
+import java.util.Arrays;
 import org.apache.pinot.core.io.reader.BaseSingleColumnSingleValueReader;
 import org.apache.pinot.core.io.reader.DataFileReader;
 import org.apache.pinot.core.io.reader.impl.ChunkReaderContext;
-import java.io.IOException;
-import java.util.Arrays;
 
 
 /**

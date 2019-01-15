@@ -21,8 +21,6 @@ package org.apache.pinot.tools;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
-import org.apache.pinot.core.data.readers.FileFormat;
-import org.apache.pinot.tools.admin.command.QuickstartRunner;
 import java.io.File;
 import java.net.URL;
 import java.util.Enumeration;
@@ -30,6 +28,8 @@ import org.apache.commons.io.FileUtils;
 import org.apache.log4j.Category;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
+import org.apache.pinot.core.data.readers.FileFormat;
+import org.apache.pinot.tools.admin.command.QuickstartRunner;
 
 
 public class Quickstart {

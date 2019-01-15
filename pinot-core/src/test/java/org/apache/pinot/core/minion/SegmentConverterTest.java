@@ -18,6 +18,12 @@
  */
 package org.apache.pinot.core.minion;
 
+import java.io.File;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.data.DimensionFieldSpec;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.MetricFieldSpec;
@@ -31,12 +37,6 @@ import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.operator.transform.transformer.datetime.BaseDateTimeTransformer;
 import org.apache.pinot.core.operator.transform.transformer.datetime.DateTimeTransformerFactory;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
-import java.io.File;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.concurrent.TimeUnit;
-import org.apache.commons.io.FileUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;

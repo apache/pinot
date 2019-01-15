@@ -19,8 +19,8 @@
 package org.apache.pinot.common.config;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import org.apache.pinot.common.utils.EqualityUtils;
 import java.lang.reflect.Field;
+import org.apache.pinot.common.utils.EqualityUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

@@ -19,12 +19,6 @@
 package org.apache.pinot.core.realtime.kafka;
 
 import com.google.common.base.Preconditions;
-import org.apache.pinot.core.realtime.impl.kafka.KafkaPartitionLevelConsumer;
-import org.apache.pinot.core.realtime.impl.kafka.KafkaSimpleConsumerFactory;
-import org.apache.pinot.core.realtime.impl.kafka.KafkaStreamConfigProperties;
-import org.apache.pinot.core.realtime.impl.kafka.KafkaStreamMetadataProvider;
-import org.apache.pinot.core.realtime.stream.OffsetCriteria;
-import org.apache.pinot.core.realtime.stream.StreamConfig;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -43,6 +37,12 @@ import kafka.javaapi.consumer.SimpleConsumer;
 import kafka.javaapi.message.ByteBufferMessageSet;
 import kafka.message.Message;
 import org.apache.kafka.common.protocol.Errors;
+import org.apache.pinot.core.realtime.impl.kafka.KafkaPartitionLevelConsumer;
+import org.apache.pinot.core.realtime.impl.kafka.KafkaSimpleConsumerFactory;
+import org.apache.pinot.core.realtime.impl.kafka.KafkaStreamConfigProperties;
+import org.apache.pinot.core.realtime.impl.kafka.KafkaStreamMetadataProvider;
+import org.apache.pinot.core.realtime.stream.OffsetCriteria;
+import org.apache.pinot.core.realtime.stream.StreamConfig;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 import scala.Some;

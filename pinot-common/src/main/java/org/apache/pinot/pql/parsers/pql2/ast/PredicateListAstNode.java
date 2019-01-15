@@ -18,11 +18,11 @@
  */
 package org.apache.pinot.pql.parsers.pql2.ast;
 
+import java.util.ArrayList;
+import java.util.List;
 import org.apache.pinot.common.request.FilterOperator;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
 import org.apache.pinot.common.utils.request.HavingQueryTree;
-import java.util.ArrayList;
-import java.util.List;
 
 
 /**

@@ -18,13 +18,13 @@
  */
 package org.apache.pinot.core.io.reader.impl.v1;
 
+import java.io.IOException;
 import org.apache.pinot.core.io.reader.BaseSingleColumnMultiValueReader;
 import org.apache.pinot.core.io.reader.ReaderContext;
 import org.apache.pinot.core.io.util.FixedBitIntReaderWriter;
 import org.apache.pinot.core.io.util.FixedByteValueReaderWriter;
 import org.apache.pinot.core.io.util.PinotDataBitSet;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
-import java.io.IOException;
 
 
 /**

@@ -20,14 +20,6 @@ package org.apache.pinot.request;
 
 import java.util.ArrayList;
 import java.util.List;
-
-import org.apache.thrift.TException;
-import org.apache.thrift.TSerializer;
-import org.apache.thrift.protocol.TCompactProtocol;
-import org.testng.annotations.Test;
-
-import org.apache.pinot.common.metrics.MetricsHelper;
-import org.apache.pinot.common.metrics.MetricsHelper.TimerContext;
 import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.FilterOperator;
@@ -38,6 +30,10 @@ import org.apache.pinot.common.request.QuerySource;
 import org.apache.pinot.common.request.QueryType;
 import org.apache.pinot.common.request.Selection;
 import org.apache.pinot.common.request.SelectionSort;
+import org.apache.thrift.TException;
+import org.apache.thrift.TSerializer;
+import org.apache.thrift.protocol.TCompactProtocol;
+import org.testng.annotations.Test;
 
 
 public class BrokerRequestSerializationTest {

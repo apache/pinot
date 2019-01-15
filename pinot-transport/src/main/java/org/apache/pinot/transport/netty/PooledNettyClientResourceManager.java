@@ -18,16 +18,16 @@
  */
 package org.apache.pinot.transport.netty;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import io.netty.channel.EventLoopGroup;
+import io.netty.util.Timer;
 import org.apache.pinot.common.response.ServerInstance;
 import org.apache.pinot.transport.common.Callback;
 import org.apache.pinot.transport.common.NoneType;
 import org.apache.pinot.transport.metrics.NettyClientMetrics;
 import org.apache.pinot.transport.pool.KeyedPool;
 import org.apache.pinot.transport.pool.PooledResourceManager;
-import io.netty.channel.EventLoopGroup;
-import io.netty.util.Timer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class PooledNettyClientResourceManager implements PooledResourceManager<PooledNettyClientResourceManager.PooledClientConnection> {

@@ -19,16 +19,16 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import com.google.common.math.DoubleMath;
-import org.apache.pinot.common.request.AggregationInfo;
-import org.apache.pinot.common.segment.SegmentMetadata;
-import org.apache.pinot.core.plan.AggregationFunctionInitializer;
-import org.apache.pinot.core.query.aggregation.AggregationFunctionContext;
-import org.apache.pinot.core.startree.v2.AggregationFunctionColumnPair;
 import java.io.Serializable;
 import java.util.List;
 import java.util.Locale;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.request.AggregationInfo;
+import org.apache.pinot.common.segment.SegmentMetadata;
+import org.apache.pinot.core.plan.AggregationFunctionInitializer;
+import org.apache.pinot.core.query.aggregation.AggregationFunctionContext;
+import org.apache.pinot.core.startree.v2.AggregationFunctionColumnPair;
 
 
 /**

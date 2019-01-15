@@ -18,20 +18,6 @@
  */
 package org.apache.pinot.core.startree.operator;
 
-import org.apache.pinot.common.utils.request.FilterQueryTree;
-import org.apache.pinot.core.common.DataSource;
-import org.apache.pinot.core.common.Predicate;
-import org.apache.pinot.core.operator.blocks.EmptyFilterBlock;
-import org.apache.pinot.core.operator.blocks.FilterBlock;
-import org.apache.pinot.core.operator.filter.BaseFilterOperator;
-import org.apache.pinot.core.operator.filter.BitmapBasedFilterOperator;
-import org.apache.pinot.core.operator.filter.EmptyFilterOperator;
-import org.apache.pinot.core.operator.filter.FilterOperatorUtils;
-import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
-import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
-import org.apache.pinot.core.startree.StarTree;
-import org.apache.pinot.core.startree.StarTreeNode;
-import org.apache.pinot.core.startree.v2.StarTreeV2;
 import it.unimi.dsi.fastutil.ints.IntIterator;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
@@ -48,6 +34,20 @@ import java.util.Queue;
 import java.util.Set;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.utils.request.FilterQueryTree;
+import org.apache.pinot.core.common.DataSource;
+import org.apache.pinot.core.common.Predicate;
+import org.apache.pinot.core.operator.blocks.EmptyFilterBlock;
+import org.apache.pinot.core.operator.blocks.FilterBlock;
+import org.apache.pinot.core.operator.filter.BaseFilterOperator;
+import org.apache.pinot.core.operator.filter.BitmapBasedFilterOperator;
+import org.apache.pinot.core.operator.filter.EmptyFilterOperator;
+import org.apache.pinot.core.operator.filter.FilterOperatorUtils;
+import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
+import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
+import org.apache.pinot.core.startree.StarTree;
+import org.apache.pinot.core.startree.StarTreeNode;
+import org.apache.pinot.core.startree.v2.StarTreeV2;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 

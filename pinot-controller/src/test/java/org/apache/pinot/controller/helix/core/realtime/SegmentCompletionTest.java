@@ -18,23 +18,24 @@
  */
 package org.apache.pinot.controller.helix.core.realtime;
 
-import org.apache.pinot.controller.helix.core.realtime.segment.CommittingSegmentDescriptor;
+import com.yammer.metrics.core.MetricsRegistry;
 import java.lang.reflect.Field;
 import java.util.List;
 import java.util.Map;
 import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
-import org.apache.zookeeper.data.Stat;
-import org.testng.Assert;
-import org.testng.annotations.BeforeMethod;
-import org.testng.annotations.Test;
 import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.controller.ControllerConf;
-import com.yammer.metrics.core.MetricsRegistry;
+import org.apache.pinot.controller.helix.core.realtime.segment.CommittingSegmentDescriptor;
+import org.apache.zookeeper.data.Stat;
+import org.testng.Assert;
+import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.Test;
+
 import static org.apache.pinot.common.protocols.SegmentCompletionProtocol.ControllerResponseStatus;
 import static org.apache.pinot.common.protocols.SegmentCompletionProtocol.Request;
 import static org.mockito.Mockito.mock;

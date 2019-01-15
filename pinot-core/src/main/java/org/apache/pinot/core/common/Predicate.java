@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.core.common;
 
+import java.util.Arrays;
+import java.util.List;
 import org.apache.pinot.common.request.FilterOperator;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
 import org.apache.pinot.core.common.predicate.EqPredicate;
@@ -26,8 +28,6 @@ import org.apache.pinot.core.common.predicate.NEqPredicate;
 import org.apache.pinot.core.common.predicate.NotInPredicate;
 import org.apache.pinot.core.common.predicate.RangePredicate;
 import org.apache.pinot.core.common.predicate.RegexpLikePredicate;
-import java.util.Arrays;
-import java.util.List;
 
 
 public abstract class Predicate {

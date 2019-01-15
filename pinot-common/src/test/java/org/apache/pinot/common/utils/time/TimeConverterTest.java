@@ -18,12 +18,12 @@
  */
 package org.apache.pinot.common.utils.time;
 
+import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.TimeGranularitySpec;
-import java.util.concurrent.TimeUnit;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertEquals;
 
 
 public class TimeConverterTest {

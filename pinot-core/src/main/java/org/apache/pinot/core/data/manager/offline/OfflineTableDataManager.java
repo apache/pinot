@@ -18,14 +18,14 @@
  */
 package org.apache.pinot.core.data.manager.offline;
 
+import java.io.File;
+import javax.annotation.Nonnull;
+import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.core.data.manager.BaseTableDataManager;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
-import java.io.File;
-import javax.annotation.Nonnull;
-import javax.annotation.concurrent.ThreadSafe;
 
 
 /**

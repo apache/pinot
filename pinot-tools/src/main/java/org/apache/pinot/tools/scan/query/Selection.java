@@ -18,13 +18,13 @@
  */
 package org.apache.pinot.tools.scan.query;
 
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
 import org.apache.pinot.core.query.utils.Pair;
 import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 
 
 public class Selection {

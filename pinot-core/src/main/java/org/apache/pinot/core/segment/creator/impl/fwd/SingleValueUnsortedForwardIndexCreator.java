@@ -18,13 +18,13 @@
  */
 package org.apache.pinot.core.segment.creator.impl.fwd;
 
+import java.io.File;
+import java.io.IOException;
 import org.apache.pinot.core.io.util.PinotDataBitSet;
 import org.apache.pinot.core.io.writer.SingleColumnSingleValueWriter;
 import org.apache.pinot.core.io.writer.impl.v1.FixedBitSingleValueWriter;
 import org.apache.pinot.core.segment.creator.SingleValueForwardIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
-import java.io.File;
-import java.io.IOException;
 
 
 public class SingleValueUnsortedForwardIndexCreator implements SingleValueForwardIndexCreator {

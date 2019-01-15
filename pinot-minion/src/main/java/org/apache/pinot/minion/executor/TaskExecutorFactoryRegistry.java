@@ -18,11 +18,11 @@
  */
 package org.apache.pinot.minion.executor;
 
-import org.apache.pinot.core.common.MinionConstants;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nonnull;
+import org.apache.pinot.core.common.MinionConstants;
 
 
 /**

@@ -21,11 +21,11 @@ package org.apache.pinot.common.config;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
-import org.apache.pinot.common.utils.EqualityUtils;
 import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nonnull;
 import org.apache.commons.lang.math.IntRange;
+import org.apache.pinot.common.utils.EqualityUtils;
 
 
 @SuppressWarnings("unused") // Suppress incorrect warnings as methods used for ser/de.

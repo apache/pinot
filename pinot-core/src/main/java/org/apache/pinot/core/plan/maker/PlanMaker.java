@@ -18,13 +18,13 @@
  */
 package org.apache.pinot.core.plan.maker;
 
+import java.util.List;
+import java.util.concurrent.ExecutorService;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.core.data.manager.SegmentDataManager;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.plan.Plan;
 import org.apache.pinot.core.plan.PlanNode;
-import java.util.List;
-import java.util.concurrent.ExecutorService;
 
 
 /**

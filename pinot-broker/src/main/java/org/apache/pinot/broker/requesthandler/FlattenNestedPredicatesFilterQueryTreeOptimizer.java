@@ -18,11 +18,11 @@
  */
 package org.apache.pinot.broker.requesthandler;
 
-import org.apache.pinot.common.request.FilterOperator;
-import org.apache.pinot.common.utils.request.FilterQueryTree;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import org.apache.pinot.common.request.FilterOperator;
+import org.apache.pinot.common.utils.request.FilterQueryTree;
 
 
 /**

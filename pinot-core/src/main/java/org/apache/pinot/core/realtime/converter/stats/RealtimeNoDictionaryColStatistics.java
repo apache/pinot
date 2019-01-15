@@ -18,15 +18,15 @@
  */
 package org.apache.pinot.core.realtime.converter.stats;
 
+import java.util.List;
+import org.apache.commons.lang.math.IntRange;
 import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.data.partition.PartitionFunction;
 import org.apache.pinot.core.segment.creator.ColumnStatistics;
 import org.apache.pinot.core.segment.index.data.source.ColumnDataSource;
-import java.util.List;
-import org.apache.commons.lang.math.IntRange;
 
-import static org.apache.pinot.core.common.Constants.*;
+import static org.apache.pinot.core.common.Constants.UNKNOWN_CARDINALITY;
 
 public class RealtimeNoDictionaryColStatistics implements ColumnStatistics {
 

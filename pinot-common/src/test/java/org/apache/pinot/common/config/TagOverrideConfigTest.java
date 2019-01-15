@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.common.config;
 
-import org.apache.pinot.common.utils.CommonConstants;
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;

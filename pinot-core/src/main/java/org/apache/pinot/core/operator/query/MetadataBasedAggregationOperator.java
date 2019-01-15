@@ -19,6 +19,9 @@
 package org.apache.pinot.core.operator.query;
 
 import com.google.common.base.Preconditions;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import org.apache.pinot.common.segment.SegmentMetadata;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.operator.BaseOperator;
@@ -26,9 +29,6 @@ import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.query.aggregation.AggregationFunctionContext;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionType;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
 
 
 /**

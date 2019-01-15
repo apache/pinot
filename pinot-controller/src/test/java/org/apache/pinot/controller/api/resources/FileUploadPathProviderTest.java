@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.controller.api.resources;
 
+import java.io.File;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.ControllerTest;
-import java.io.File;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;

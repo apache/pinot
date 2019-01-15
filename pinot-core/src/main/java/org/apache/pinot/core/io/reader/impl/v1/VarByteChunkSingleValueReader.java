@@ -18,11 +18,11 @@
  */
 package org.apache.pinot.core.io.reader.impl.v1;
 
+import java.nio.ByteBuffer;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.core.io.reader.impl.ChunkReaderContext;
 import org.apache.pinot.core.io.writer.impl.v1.VarByteChunkSingleValueWriter;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
-import java.nio.ByteBuffer;
 
 
 /**

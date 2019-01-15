@@ -18,10 +18,10 @@
  */
 package org.apache.pinot.core.realtime.impl.dictionary;
 
+import java.util.Random;
 import org.apache.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import org.apache.pinot.core.io.readerwriter.impl.FixedByteSingleColumnMultiValueReaderWriter;
 import org.apache.pinot.core.io.writer.impl.DirectMemoryManager;
-import java.util.Random;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;

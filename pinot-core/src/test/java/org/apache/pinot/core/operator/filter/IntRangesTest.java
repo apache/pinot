@@ -21,7 +21,9 @@ package org.apache.pinot.core.operator.filter;
 import org.apache.pinot.common.utils.Pairs;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
 
 
 /**

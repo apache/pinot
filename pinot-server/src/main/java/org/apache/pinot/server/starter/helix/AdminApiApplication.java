@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.server.starter.helix;
 
-import org.apache.pinot.server.starter.ServerInstance;
 import io.swagger.jaxrs.config.BeanConfig;
 import java.io.IOException;
 import java.net.URI;
@@ -27,6 +26,7 @@ import java.net.URLClassLoader;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.container.ContainerResponseContext;
 import javax.ws.rs.container.ContainerResponseFilter;
+import org.apache.pinot.server.starter.ServerInstance;
 import org.glassfish.grizzly.http.server.CLStaticHttpHandler;
 import org.glassfish.grizzly.http.server.HttpServer;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;

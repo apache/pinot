@@ -20,6 +20,10 @@ package org.apache.pinot.controller.validation;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
+import java.io.File;
+import javax.annotation.Nonnegative;
+import javax.annotation.Nonnull;
+import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.config.QuotaConfig;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.exception.InvalidConfigException;
@@ -29,10 +33,6 @@ import org.apache.pinot.common.utils.DataSize;
 import org.apache.pinot.controller.ControllerLeadershipManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.util.TableSizeReader;
-import java.io.File;
-import javax.annotation.Nonnegative;
-import javax.annotation.Nonnull;
-import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.selection;
 
+import java.io.Serializable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.query.selection.iterator.DoubleArraySelectionColumnIterator;
@@ -32,7 +33,6 @@ import org.apache.pinot.core.query.selection.iterator.SelectionColumnIterator;
 import org.apache.pinot.core.query.selection.iterator.SelectionSingleValueColumnWithDictIterator;
 import org.apache.pinot.core.query.selection.iterator.StringArraySelectionColumnIterator;
 import org.apache.pinot.core.query.selection.iterator.StringSelectionColumnIterator;
-import java.io.Serializable;
 
 
 /**

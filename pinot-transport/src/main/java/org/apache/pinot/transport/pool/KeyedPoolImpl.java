@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.transport.pool;
 
+import com.yammer.metrics.core.Histogram;
+import com.yammer.metrics.core.MetricsRegistry;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -26,21 +28,19 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.apache.pinot.common.response.ServerInstance;
 import org.apache.pinot.transport.common.AsyncResponseFuture;
 import org.apache.pinot.transport.common.Callback;
 import org.apache.pinot.transport.common.Cancellable;
 import org.apache.pinot.transport.common.CompositeFuture;
 import org.apache.pinot.transport.common.CompositeFuture.GatherModeOnError;
-import org.apache.pinot.transport.common.ServerResponseFuture;
 import org.apache.pinot.transport.common.NoneType;
+import org.apache.pinot.transport.common.ServerResponseFuture;
 import org.apache.pinot.transport.metrics.AggregatedPoolStats;
 import org.apache.pinot.transport.metrics.PoolStats;
 import org.apache.pinot.transport.pool.AsyncPoolImpl.Strategy;
-import com.yammer.metrics.core.Histogram;
-import com.yammer.metrics.core.MetricsRegistry;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class KeyedPoolImpl<T> implements KeyedPool<T> {

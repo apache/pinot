@@ -18,6 +18,14 @@
  */
 package org.apache.pinot.controller.helix.core;
 
+import java.util.List;
+import java.util.Map;
+import org.apache.helix.HelixAdmin;
+import org.apache.helix.HelixManager;
+import org.apache.helix.ZNRecord;
+import org.apache.helix.model.IdealState;
+import org.apache.helix.model.builder.CustomModeISBuilder;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.config.RealtimeTagConfig;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.exception.InvalidConfigException;
@@ -30,14 +38,6 @@ import org.apache.pinot.common.utils.retry.RetryPolicies;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.core.realtime.stream.PartitionCountFetcher;
 import org.apache.pinot.core.realtime.stream.StreamConfig;
-import java.util.List;
-import java.util.Map;
-import org.apache.helix.HelixAdmin;
-import org.apache.helix.HelixManager;
-import org.apache.helix.ZNRecord;
-import org.apache.helix.model.IdealState;
-import org.apache.helix.model.builder.CustomModeISBuilder;
-import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

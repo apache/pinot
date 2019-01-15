@@ -18,14 +18,14 @@
  */
 package org.apache.pinot.core.startree.v2;
 
+import com.tdunning.math.stats.TDigest;
+import java.util.Random;
 import org.apache.pinot.common.data.FieldSpec.DataType;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.data.aggregator.PercentileTDigestValueAggregator;
 import org.apache.pinot.core.data.aggregator.ValueAggregator;
-import com.tdunning.math.stats.TDigest;
-import java.util.Random;
 
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertEquals;
 
 
 public class PreAggregatedPercentileTDigestStarTreeV2Test extends BaseStarTreeV2Test<Object, TDigest> {

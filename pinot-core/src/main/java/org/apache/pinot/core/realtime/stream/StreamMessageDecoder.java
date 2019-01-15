@@ -19,7 +19,6 @@
 package org.apache.pinot.core.realtime.stream;
 
 import java.util.Map;
-
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.core.data.GenericRow;
 

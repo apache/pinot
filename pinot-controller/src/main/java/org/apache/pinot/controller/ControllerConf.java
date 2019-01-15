@@ -18,10 +18,6 @@
  */
 package org.apache.pinot.controller;
 
-import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
-import org.apache.pinot.common.utils.CommonConstants;
-import org.apache.pinot.common.utils.StringUtil;
-import org.apache.pinot.filesystem.LocalPinotFS;
 import java.io.File;
 import java.io.UnsupportedEncodingException;
 import java.net.URI;
@@ -32,6 +28,10 @@ import java.util.List;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
+import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.StringUtil;
+import org.apache.pinot.filesystem.LocalPinotFS;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

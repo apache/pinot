@@ -18,16 +18,16 @@
  */
 package org.apache.pinot.pql.parsers.pql2.ast;
 
-import org.apache.pinot.common.request.FilterOperator;
-import org.apache.pinot.common.utils.StringUtil;
-import org.apache.pinot.common.utils.request.FilterQueryTree;
-import org.apache.pinot.common.utils.request.HavingQueryTree;
-import org.apache.pinot.pql.parsers.Pql2CompilationException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.TreeSet;
+import org.apache.pinot.common.request.FilterOperator;
+import org.apache.pinot.common.utils.StringUtil;
+import org.apache.pinot.common.utils.request.FilterQueryTree;
+import org.apache.pinot.common.utils.request.HavingQueryTree;
+import org.apache.pinot.pql.parsers.Pql2CompilationException;
 
 
 /**

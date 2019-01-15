@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.core.common.datatable;
 
-import org.apache.pinot.common.utils.DataSchema;
 import javax.annotation.Nonnull;
+import org.apache.pinot.common.utils.DataSchema;
 
 
 /**

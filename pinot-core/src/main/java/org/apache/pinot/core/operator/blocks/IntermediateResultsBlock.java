@@ -18,6 +18,13 @@
  */
 package org.apache.pinot.core.operator.blocks;
 
+import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
@@ -32,13 +39,6 @@ import org.apache.pinot.core.common.datatable.DataTableImplV2;
 import org.apache.pinot.core.query.aggregation.AggregationFunctionContext;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
-import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 
 
 /**
@@ -177,7 +177,7 @@ public class IntermediateResultsBlock implements Block {
   public void setNumEntriesScannedPostFilter(long numEntriesScannedPostFilter) {
     _numEntriesScannedPostFilter = numEntriesScannedPostFilter;
   }
-  
+
   public long getNumSegmentsProcessed() {
     return _numSegmentsProcessed;
   }
@@ -302,7 +302,7 @@ public class IntermediateResultsBlock implements Block {
         .put(DataTable.NUM_ENTRIES_SCANNED_POST_FILTER_METADATA_KEY, String.valueOf(_numEntriesScannedPostFilter));
     dataTable.getMetadata().put(DataTable.NUM_SEGMENTS_PROCESSED, String.valueOf(_numSegmentsProcessed));
     dataTable.getMetadata().put(DataTable.NUM_SEGMENTS_MATCHED, String.valueOf(_numSegmentsMatched));
-    
+
     dataTable.getMetadata().put(DataTable.TOTAL_DOCS_METADATA_KEY, String.valueOf(_numTotalRawDocs));
     if (_numGroupsLimitReached) {
       dataTable.getMetadata().put(DataTable.NUM_GROUPS_LIMIT_REACHED_KEY, "true");

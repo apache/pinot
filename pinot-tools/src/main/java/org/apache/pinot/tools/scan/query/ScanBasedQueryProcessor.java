@@ -18,11 +18,6 @@
  */
 package org.apache.pinot.tools.scan.query;
 
-import org.apache.pinot.common.request.AggregationInfo;
-import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.request.GroupBy;
-import org.apache.pinot.common.utils.JsonUtils;
-import org.apache.pinot.pql.parsers.Pql2Compiler;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
@@ -36,6 +31,11 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.common.request.AggregationInfo;
+import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.request.GroupBy;
+import org.apache.pinot.common.utils.JsonUtils;
+import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

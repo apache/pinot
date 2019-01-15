@@ -19,11 +19,6 @@
 package org.apache.pinot.core.segment.creator.impl;
 
 import com.google.common.base.Preconditions;
-import org.apache.pinot.common.data.FieldSpec;
-import org.apache.pinot.common.utils.StringUtil;
-import org.apache.pinot.common.utils.primitive.ByteArray;
-import org.apache.pinot.core.io.util.FixedByteValueReaderWriter;
-import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import it.unimi.dsi.fastutil.doubles.Double2IntOpenHashMap;
 import it.unimi.dsi.fastutil.floats.Float2IntOpenHashMap;
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
@@ -35,6 +30,11 @@ import java.io.IOException;
 import java.nio.ByteOrder;
 import java.util.Arrays;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.common.utils.StringUtil;
+import org.apache.pinot.common.utils.primitive.ByteArray;
+import org.apache.pinot.core.io.util.FixedByteValueReaderWriter;
+import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

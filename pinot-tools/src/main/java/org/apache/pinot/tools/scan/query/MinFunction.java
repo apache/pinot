@@ -19,8 +19,6 @@
 package org.apache.pinot.tools.scan.query;
 
 import java.util.ArrayList;
-import java.util.Collections;
-
 import org.apache.pinot.core.query.utils.Pair;
 
 

@@ -18,10 +18,10 @@
  */
 package org.apache.pinot.broker.pruner;
 
-import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nonnull;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

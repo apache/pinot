@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.server.api.resources;
 
+import javax.ws.rs.core.Response;
 import org.apache.pinot.common.restlet.resources.TableSizeInfo;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
-import javax.ws.rs.core.Response;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 

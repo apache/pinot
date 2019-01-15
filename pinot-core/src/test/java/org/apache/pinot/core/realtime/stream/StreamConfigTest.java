@@ -18,12 +18,12 @@
  */
 package org.apache.pinot.core.realtime.stream;
 
+import java.util.HashMap;
+import java.util.Map;
 import org.apache.pinot.common.utils.DataSize;
 import org.apache.pinot.common.utils.time.TimeUtils;
 import org.apache.pinot.core.realtime.impl.kafka.KafkaAvroMessageDecoder;
 import org.apache.pinot.core.realtime.impl.kafka.KafkaConsumerFactory;
-import java.util.HashMap;
-import java.util.Map;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 

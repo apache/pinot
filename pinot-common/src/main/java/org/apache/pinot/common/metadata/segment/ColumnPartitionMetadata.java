@@ -28,12 +28,12 @@ import com.fasterxml.jackson.databind.JsonSerializer;
 import com.fasterxml.jackson.databind.SerializerProvider;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
-import org.apache.pinot.common.config.ColumnPartitionConfig;
-import org.apache.pinot.common.utils.EqualityUtils;
 import java.io.IOException;
 import java.util.List;
 import javax.annotation.Nonnull;
 import org.apache.commons.lang.math.IntRange;
+import org.apache.pinot.common.config.ColumnPartitionConfig;
+import org.apache.pinot.common.utils.EqualityUtils;
 
 
 /**

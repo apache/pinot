@@ -18,13 +18,13 @@
  */
 package org.apache.pinot.transport.metrics;
 
-import org.apache.pinot.common.metrics.LatencyMetric;
-import org.apache.pinot.common.metrics.MetricsHelper;
 import com.yammer.metrics.core.Counter;
 import com.yammer.metrics.core.Gauge;
 import com.yammer.metrics.core.Histogram;
 import com.yammer.metrics.core.MetricName;
 import com.yammer.metrics.core.MetricsRegistry;
+import org.apache.pinot.common.metrics.LatencyMetric;
+import org.apache.pinot.common.metrics.MetricsHelper;
 
 
 public class NettyClientMetrics implements TransportClientMetrics {

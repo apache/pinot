@@ -19,11 +19,6 @@
 package org.apache.pinot.tools.query.comparison;
 
 import com.google.common.base.Preconditions;
-import org.apache.pinot.common.segment.ReadMode;
-import org.apache.pinot.common.segment.SegmentMetadata;
-import org.apache.pinot.core.indexsegment.IndexSegment;
-import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
-import org.apache.pinot.pql.parsers.Pql2Compiler;
 import java.io.File;
 import java.util.Arrays;
 import java.util.Collections;
@@ -32,6 +27,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import org.apache.pinot.common.segment.ReadMode;
+import org.apache.pinot.common.segment.SegmentMetadata;
+import org.apache.pinot.core.indexsegment.IndexSegment;
+import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
+import org.apache.pinot.pql.parsers.Pql2Compiler;
 
 
 /**

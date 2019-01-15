@@ -19,13 +19,13 @@
 package org.apache.pinot.core.segment.name;
 
 import com.google.common.base.Joiner;
-import org.apache.pinot.common.data.TimeGranularitySpec;
-import org.apache.pinot.core.segment.creator.ColumnStatistics;
 import java.text.SimpleDateFormat;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.common.data.TimeGranularitySpec;
+import org.apache.pinot.core.segment.creator.ColumnStatistics;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

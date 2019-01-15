@@ -18,12 +18,6 @@
  */
 package org.apache.pinot.integration.tests;
 
-import org.apache.pinot.common.data.Schema;
-import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
-import org.apache.pinot.hadoop.job.JobConfigConstants;
-import org.apache.pinot.hadoop.job.SegmentCreationJob;
-import org.apache.pinot.hadoop.job.SegmentTarPushJob;
-import org.apache.pinot.util.TestUtils;
 import java.io.File;
 import java.util.List;
 import java.util.Properties;
@@ -33,6 +27,12 @@ import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapreduce.v2.MiniMRYarnCluster;
+import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
+import org.apache.pinot.hadoop.job.JobConfigConstants;
+import org.apache.pinot.hadoop.job.SegmentCreationJob;
+import org.apache.pinot.hadoop.job.SegmentTarPushJob;
+import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;

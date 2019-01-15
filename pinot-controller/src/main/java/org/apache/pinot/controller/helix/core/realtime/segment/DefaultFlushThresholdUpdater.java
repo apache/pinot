@@ -19,13 +19,13 @@
 package org.apache.pinot.controller.helix.core.realtime.segment;
 
 import com.google.common.annotations.VisibleForTesting;
-import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
-import org.apache.pinot.common.partition.PartitionAssignment;
-import org.apache.pinot.common.utils.LLCSegmentName;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nonnull;
+import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
+import org.apache.pinot.common.partition.PartitionAssignment;
+import org.apache.pinot.common.utils.LLCSegmentName;
 
 
 /**
