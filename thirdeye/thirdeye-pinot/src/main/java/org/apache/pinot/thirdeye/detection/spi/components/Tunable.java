@@ -19,10 +19,8 @@
 
 package org.apache.pinot.thirdeye.detection.spi.components;
 
-import org.apache.pinot.thirdeye.detection.spec.AbstractSpec;
-import org.apache.pinot.thirdeye.detection.spi.model.InputData;
-import org.apache.pinot.thirdeye.detection.spi.model.InputDataSpec;
 import java.util.Map;
+import org.apache.pinot.thirdeye.detection.spec.AbstractSpec;
 import org.joda.time.Interval;
 
 /**
@@ -33,7 +31,9 @@ public interface Tunable<T extends AbstractSpec> extends BaseComponent<T> {
   /**
    * Returns the new spec for the component it's tuning
    * @param currentSpec current spec for the component. empty if not exist
+   * @param tuningWindow the tuning window
+   * @param metricUrn the metric detection runs on
    * @return the init spec for the component it's tuning
    */
-  Map<String, Object> tune(Map<String, Object> currentSpec, Interval trainingWindow);
+  Map<String, Object> tune(Map<String, Object> currentSpec, Interval tuningWindow, String metricUrn);
 }

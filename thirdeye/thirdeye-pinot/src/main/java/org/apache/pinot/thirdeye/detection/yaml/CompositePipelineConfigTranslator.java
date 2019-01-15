@@ -144,6 +144,7 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
   private static final String PROP_PARAMS = "params";
   private static final String PROP_METRIC_URN = "metricUrn";
   private static final String PROP_DIMENSION_FILTER_METRIC = "dimensionFilterMetric";
+  private static final String PROP_DIMENSIONS = "dimensions";
   private static final String PROP_NESTED_METRIC_URNS = "nestedMetricUrns";
   private static final String PROP_RULES = "rules";
   private static final String PROP_NESTED = "nested";
@@ -408,7 +409,8 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
         this.existingComponentSpecs.containsKey(componentName) ? MapUtils.getMap(this.existingComponentSpecs,
             componentName) : Collections.emptyMap();
 
-    return tunable.tune(existingComponentSpec, window);
+    // TODO: if dimension drill down applied, pass in the metric urn of top dimension
+    return tunable.tune(existingComponentSpec, window, this.metricUrn);
   }
 
   private Tunable getTunable(String componentClassName, Map<String, Object> params, InputDataFetcher dataFetcher)
