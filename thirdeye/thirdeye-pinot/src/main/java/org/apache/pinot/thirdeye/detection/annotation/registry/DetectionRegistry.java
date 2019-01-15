@@ -33,6 +33,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.collections.MapUtils;
+import org.junit.Assert;
 import org.reflections.Reflections;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -52,21 +53,24 @@ public class DetectionRegistry {
   private static final String KEY_CLASS_NAME = "className";
   private static final String KEY_ANNOTATION = "annotation";
 
-  /**
-   * Singleton
-   */
+  private static DetectionRegistry INSTANCE;
+
   public static DetectionRegistry getInstance() {
+    if (INSTANCE == null) {
+      INSTANCE = new DetectionRegistry();
+    }
+
     return INSTANCE;
   }
 
-  public static void registerComponent(String className, String type) {
-    REGISTRY_MAP.put(type, ImmutableMap.of(KEY_CLASS_NAME, className));
+  private DetectionRegistry () {
+    init();
   }
 
   /**
    * Read all the components, tune, and yaml annotations and initialize the registry.
    */
-  public static void init() {
+  private static void init() {
     try {
       Reflections reflections = new Reflections();
       // register components
@@ -100,7 +104,13 @@ public class DetectionRegistry {
     }
   }
 
-  private static final DetectionRegistry INSTANCE = new DetectionRegistry();
+  public static void registerComponent(String className, String type) {
+    REGISTRY_MAP.put(type, ImmutableMap.of(KEY_CLASS_NAME, className));
+  }
+
+  public static void registerYamlConvertor(String className, String type) {
+    YAML_MAP.put(type, className);
+  }
 
   /**
    * Look up the class name for a given component
@@ -147,5 +157,9 @@ public class DetectionRegistry {
       }
     }
     return annotations;
+  }
+
+  public String printAnnotations() {
+    return String.join(", ", YAML_MAP.keySet());
   }
 }

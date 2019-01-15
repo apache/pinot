@@ -23,6 +23,8 @@ import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang.StringUtils;
+import org.apache.pinot.thirdeye.datasource.DAORegistry;
+import org.junit.Assert;
 
 import static org.apache.pinot.thirdeye.detection.yaml.YamlDetectionAlertConfigTranslator.*;
 
@@ -31,7 +33,7 @@ public class DetectionAlertConfigValidator extends ConfigValidator {
 
   private static final DetectionAlertConfigValidator INSTANCE = new DetectionAlertConfigValidator();
   private static final String PROP_CLASS_NAME = "className";
-  
+
   public static DetectionAlertConfigValidator getInstance() {
     return INSTANCE;
   }
@@ -87,7 +89,7 @@ public class DetectionAlertConfigValidator extends ConfigValidator {
       return false;
     }
     // Application name should be valid
-    if (super.applicationDAO.findByName(alertConfig.getApplication()).size() == 0) {
+    if (DAORegistry.getInstance().getApplicationDAO().findByName(alertConfig.getApplication()).size() == 0) {
       responseMessage.put("message", "Application name doesn't exist in our registry. Please use an existing"
           + " application name. You may search for registered applications from the ThirdEye dashboard or reach out"
           + " to ask_thirdeye if you wish to setup a new application.");

@@ -117,10 +117,6 @@ public class ThirdEyeAnomalyApplication
       LOG.error("Exception while loading caches", e);
     }
 
-    // instantiate registry
-    DetectionRegistry.init();
-    DetectionAlertRegistry.init();
-
     environment.getObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
     environment.getObjectMapper().registerModule(makeMapperModule());
 

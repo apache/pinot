@@ -51,16 +51,24 @@ public class DetectionAlertRegistry {
   // Alert Filter Type Map
   private static final Map<String, String> ALERT_FILTER_MAP = new HashMap<>();
 
-  private static final DetectionAlertRegistry INSTANCE = new DetectionAlertRegistry();
+  private static DetectionAlertRegistry INSTANCE;
 
   public static DetectionAlertRegistry getInstance() {
+    if (INSTANCE == null) {
+      INSTANCE = new DetectionAlertRegistry();
+    }
+
     return INSTANCE;
+  }
+
+  private DetectionAlertRegistry () {
+    init();
   }
 
   /**
    * Read all the alert schemes and suppressors and initialize the registry.
    */
-  public static void init() {
+  private static void init() {
     try {
       Reflections reflections = new Reflections();
 

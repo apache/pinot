@@ -25,6 +25,7 @@ import org.apache.pinot.thirdeye.detection.annotation.registry.DetectionRegistry
 import java.lang.reflect.Constructor;
 import java.util.Map;
 
+
 /**
  * Loads the detection config translator fo a pipeline type
  */
