@@ -64,7 +64,6 @@ public class YamlDetectionAlertConfigTranslator {
   static final String PROP_TIME_WINDOWS = "timeWindows";
   static final String CRON_SCHEDULE_DEFAULT = "0 0/5 * * * ? *"; // Every 5 min
 
-  private static final DetectionRegistry DETECTION_REGISTRY = DetectionRegistry.getInstance();
   private static final DetectionAlertRegistry DETECTION_ALERT_REGISTRY = DetectionAlertRegistry.getInstance();
   private static final Set<String> PROPERTY_KEYS = new HashSet<>(
       Arrays.asList(PROP_DETECTION_CONFIG_IDS, PROP_RECIPIENTS, PROP_DIMENSION, PROP_DIMENSION_RECIPIENTS));
@@ -115,7 +114,7 @@ public class YamlDetectionAlertConfigTranslator {
     Map<String, Object> properties = new HashMap<>();
     for (Map.Entry<String, Object> entry : alertYamlConfigs.entrySet()) {
       if (entry.getKey().equals(PROP_TYPE)) {
-        properties.put(PROP_CLASS_NAME, DETECTION_REGISTRY.lookup(MapUtils.getString(alertYamlConfigs, PROP_TYPE)));
+        properties.put(PROP_CLASS_NAME, DETECTION_ALERT_REGISTRY.lookupAlertFilters(MapUtils.getString(alertYamlConfigs, PROP_TYPE)));
       } else {
         if (PROPERTY_KEYS.contains(entry.getKey())) {
           properties.put(entry.getKey(), entry.getValue());

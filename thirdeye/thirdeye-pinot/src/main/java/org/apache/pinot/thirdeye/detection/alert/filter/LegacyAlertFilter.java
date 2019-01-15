@@ -24,6 +24,7 @@ import com.google.common.collect.Collections2;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterRecipients;
+import org.apache.pinot.thirdeye.detection.annotation.AlertFilter;
 import org.apache.pinot.thirdeye.detection.spi.model.AnomalySlice;
 import org.apache.pinot.thirdeye.detection.ConfigUtils;
 import org.apache.pinot.thirdeye.detection.DataProvider;
@@ -43,6 +44,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+@AlertFilter(type = "LEGACY_ALERTER_PIPELINE")
 public class LegacyAlertFilter extends DetectionAlertFilter {
   private final static Logger LOG = LoggerFactory.getLogger(LegacyAlertFilter.class);
 

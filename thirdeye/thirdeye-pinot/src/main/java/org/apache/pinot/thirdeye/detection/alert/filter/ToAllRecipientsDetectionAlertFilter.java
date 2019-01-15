@@ -32,11 +32,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.collections.MapUtils;
+import org.apache.pinot.thirdeye.detection.annotation.AlertFilter;
 
 
 /**
  * The detection alert filter that sends the anomaly email to all recipients
  */
+@AlertFilter(type = "DEFAULT_ALERTER_PIPELINE")
 public class ToAllRecipientsDetectionAlertFilter extends StatefulDetectionAlertFilter {
 
   private static final String PROP_RECIPIENTS = "recipients";

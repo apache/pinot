@@ -31,7 +31,7 @@ public class YamlResourceTest {
     DetectionAlertRegistry.getInstance().registerAlertScheme("EMAIL", "EmailClass");
     DetectionAlertRegistry.getInstance().registerAlertScheme("IRIS", "IrisClass");
     DetectionAlertRegistry.getInstance().registerAlertSuppressor("TIME_WINDOW", "TimeWindowClass");
-    DetectionRegistry.registerComponent("TimeWindowClass", "DIMENSIONAL_ALERTER_PIPELINE");
+    DetectionAlertRegistry.getInstance().registerAlertFilter("DIMENSIONAL_ALERTER_PIPELINE", "DimClass");
   }
 
   @AfterClass(alwaysRun = true)
