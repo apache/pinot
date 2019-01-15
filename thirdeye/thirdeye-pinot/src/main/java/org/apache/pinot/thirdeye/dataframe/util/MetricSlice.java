@@ -26,6 +26,7 @@ import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang.builder.ToStringBuilder;
 import org.apache.commons.lang.builder.ToStringStyle;
+import org.apache.pinot.thirdeye.datasource.comparison.Row;
 
 
 /**
@@ -95,6 +96,11 @@ public final class MetricSlice {
 
   public static MetricSlice from(long metricId, long start, long end, Multimap<String, String> filters, TimeGranularity granularity) {
     return new MetricSlice(metricId, start, end, filters, granularity);
+  }
+
+  public boolean containSlice(MetricSlice slice) {
+    return slice.metricId == this.metricId && slice.granularity.equals(this.granularity) && slice.getFilters().equals(this.getFilters()) &&
+        slice.start >= this.start && slice.end <= this.end;
   }
 
   @Override

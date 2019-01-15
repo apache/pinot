@@ -20,6 +20,12 @@
 package org.apache.pinot.thirdeye.detection.wrapper;
 
 import com.google.common.base.Preconditions;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
+import org.apache.commons.collections.MapUtils;
 import org.apache.pinot.thirdeye.anomaly.detection.DetectionJobSchedulerUtils;
 import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.common.time.TimeSpec;
@@ -37,12 +43,6 @@ import org.apache.pinot.thirdeye.detection.DetectionUtils;
 import org.apache.pinot.thirdeye.detection.spi.components.AnomalyDetector;
 import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
 import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.TimeUnit;
-import org.apache.commons.collections.MapUtils;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.Interval;
@@ -130,6 +130,9 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
   public DetectionPipelineResult run() throws Exception {
     List<Interval> monitoringWindows = this.getMonitoringWindows();
     List<MergedAnomalyResultDTO> anomalies = new ArrayList<>();
+    MetricEntity me = MetricEntity.fromURN(this.metricUrn);
+    MetricSlice slice = MetricSlice.from(me.getId(), startTime, endTime, me.getFilters(), new TimeGranularity(1, TimeUnit.DAYS));
+    this.provider.fetchTimeseries(Collections.singleton(slice));
     for (Interval window : monitoringWindows) {
       List<MergedAnomalyResultDTO> anomaliesForOneWindow = new ArrayList<>();
       try {

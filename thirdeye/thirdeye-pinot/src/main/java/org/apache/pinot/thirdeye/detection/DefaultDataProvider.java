@@ -34,6 +34,7 @@ import org.apache.pinot.thirdeye.datalayer.dto.EventDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.util.Predicate;
+import org.apache.pinot.thirdeye.datasource.comparison.Row;
 import org.apache.pinot.thirdeye.datasource.loader.AggregationLoader;
 import org.apache.pinot.thirdeye.datasource.loader.TimeSeriesLoader;
 import org.apache.pinot.thirdeye.detection.alert.StatefulDetectionAlertFilter;
@@ -53,6 +54,8 @@ import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
+
 
 public class DefaultDataProvider implements DataProvider {
   private static final Logger LOG = LoggerFactory.getLogger(DefaultDataProvider.class);
@@ -67,6 +70,7 @@ public class DefaultDataProvider implements DataProvider {
   private final TimeSeriesLoader timeseriesLoader;
   private final AggregationLoader aggregationLoader;
   private final DetectionPipelineLoader loader;
+  private final Map<MetricSlice, DataFrame> timeseriesCache;
 
   public DefaultDataProvider(MetricConfigManager metricDAO, DatasetConfigManager datasetDAO, EventManager eventDAO,
       MergedAnomalyResultManager anomalyDAO, TimeSeriesLoader timeseriesLoader, AggregationLoader aggregationLoader,
@@ -78,26 +82,44 @@ public class DefaultDataProvider implements DataProvider {
     this.timeseriesLoader = timeseriesLoader;
     this.aggregationLoader = aggregationLoader;
     this.loader = loader;
+    this.timeseriesCache = new HashMap<>();
   }
+
 
   @Override
   public Map<MetricSlice, DataFrame> fetchTimeseries(Collection<MetricSlice> slices) {
     try {
-      Map<MetricSlice, Future<DataFrame>> futures = new HashMap<>();
-      for (final MetricSlice slice : slices) {
-        futures.put(slice, this.executor.submit(new Callable<DataFrame>() {
-          @Override
-          public DataFrame call() throws Exception {
-            return DefaultDataProvider.this.timeseriesLoader.load(slice);
+      Map<MetricSlice, DataFrame> output = new HashMap<>();
+      for (MetricSlice slice : slices){
+        for (Map.Entry<MetricSlice, DataFrame> entry : this.timeseriesCache.entrySet()) {
+          if (entry.getKey().containSlice(slice)){
+            DataFrame df = entry.getValue().filter(entry.getValue().getLongs(COL_TIME).between(slice.getStart(), slice.getEnd())).dropNull(COL_TIME);
+            output.put(slice, df);
+            break;
           }
-        }));
+        }
       }
 
-      final long deadline = System.currentTimeMillis() + TIMEOUT;
-      Map<MetricSlice, DataFrame> output = new HashMap<>();
-      for (MetricSlice slice : slices) {
-        output.put(slice, futures.get(slice).get(makeTimeout(deadline), TimeUnit.MILLISECONDS));
+      Map<MetricSlice, Future<DataFrame>> futures = new HashMap<>();
+      for (final MetricSlice slice : slices) {
+        if (!output.containsKey(slice)){
+          futures.put(slice, this.executor.submit(new Callable<DataFrame>() {
+            @Override
+            public DataFrame call() throws Exception {
+              return DefaultDataProvider.this.timeseriesLoader.load(slice);
+            }
+          }));
+        }
       }
+      LOG.info("Fetch {} slices of timeseries, {} cache hit, {} cache miss", slices.size(), futures.size());
+      final long deadline = System.currentTimeMillis() + TIMEOUT;
+      for (MetricSlice slice : slices) {
+        if (!output.containsKey(slice)) {
+          output.put(slice, futures.get(slice).get(makeTimeout(deadline), TimeUnit.MILLISECONDS));
+        }
+      }
+
+      this.timeseriesCache.putAll(output);
       return output;
 
     } catch (Exception e) {
