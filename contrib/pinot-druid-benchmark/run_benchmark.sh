@@ -18,7 +18,6 @@
 # under the License.
 #
 
-
 echo "Compiling the benchmark driver..."
 mvn clean install > /dev/null
 rm -rf temp results
