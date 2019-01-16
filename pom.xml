@@ -1006,7 +1006,7 @@
         <artifactId>license-maven-plugin</artifactId>
         <version>2.8</version>
         <configuration>
-          <header>license.header</header>
+          <header>HEADER</header>
           <excludes>
             <!-- Text and log files -->
             <exclude>**/*.txt</exclude>
@@ -1029,7 +1029,7 @@
 
             <!-- Top level files -->
             <exclude>.codecov*</exclude>
-            <exclude>license.header</exclude>
+            <exclude>HEADER</exclude>
             <exclude>LICENSE</exclude>
             <exclude>NOTICE</exclude>
           </excludes>
@@ -1083,6 +1083,58 @@
               </excludes>
             </filter>
           </filters>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.rat</groupId>
+        <artifactId>apache-rat-plugin</artifactId>
+        <version>0.13</version>
+        <executions>
+          <execution>
+            <phase>verify</phase>
+            <goals>
+              <goal>check</goal>
+            </goals>
+          </execution>
+        </executions>
+        <configuration>
+          <excludes>
+            <!-- Documentation -->
+            <exclude>**/*.md</exclude>
+            <exclude>docs/**</exclude>
+
+            <!-- js, css files for controller UI -->
+            <exclude>**/*.js*</exclude>
+            <exclude>**/*.css</exclude>
+            <exclude>**/*.map</exclude>
+
+            <!-- Binary files -->
+            <exclude>**/*.json</exclude>
+            <exclude>**/*.pql</exclude>
+            <exclude>**/*.log</exclude>
+            <exclude>**/*.csv</exclude>
+            <exclude>**/*.avro</exclude>
+            <exclude>**/*.conf</exclude>
+            <exclude>**/*.yml</exclude>
+            <exclude>**/*.yaml</exclude>
+            <exclude>**/*.properties</exclude>
+
+            <!-- Top level -->
+            <exclude>.codecov*</exclude>
+
+            <!-- Test Resources -->
+            <exclude>**/test/resources/**</exclude>
+
+            <!-- Pinot-Druid Benchmark (not part of the distribution) -->
+            <exclude>contrib/**</exclude>
+
+            <!-- Third eye (not part of the distribution) -->
+            <exclude>thirdeye/**</exclude>
+
+            <!-- Remove html files for swagger -->
+            <exclude>**/api/index.html</exclude>
+            <exclude>**/swagger-ui/index.html</exclude>
+          </excludes>
         </configuration>
       </plugin>
     </plugins>
