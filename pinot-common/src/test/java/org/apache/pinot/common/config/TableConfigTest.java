@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.common.config;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
@@ -43,8 +45,16 @@ public class TableConfigTest {
       Assert.assertEquals(tableConfig.getIndexingConfig().getLoadMode(), "HEAP");
       Assert.assertNull(tableConfig.getQuotaConfig());
 
-      // Serialize then de-serialize
-      TableConfig tableConfigToCompare = TableConfig.fromJSONConfig(TableConfig.toJSONConfig(tableConfig));
+      // Serialize
+      JsonNode jsonTableConfig = TableConfig.toJSONConfig(tableConfig);
+      // All nested configs should be json objects instead of serialized strings
+      Assert.assertTrue(jsonTableConfig.get(TableConfig.VALIDATION_CONFIG_KEY) instanceof ObjectNode);
+      Assert.assertTrue(jsonTableConfig.get(TableConfig.TENANT_CONFIG_KEY) instanceof ObjectNode);
+      Assert.assertTrue(jsonTableConfig.get(TableConfig.INDEXING_CONFIG_KEY) instanceof ObjectNode);
+      Assert.assertTrue(jsonTableConfig.get(TableConfig.CUSTOM_CONFIG_KEY) instanceof ObjectNode);
+
+      // De-serialize
+      TableConfig tableConfigToCompare = TableConfig.fromJSONConfig(jsonTableConfig);
       Assert.assertEquals(tableConfigToCompare.getTableName(), tableConfig.getTableName());
       Assert.assertNull(tableConfigToCompare.getQuotaConfig());
       Assert.assertNull(tableConfigToCompare.getValidationConfig().getReplicaGroupStrategyConfig());

@@ -18,29 +18,27 @@
  */
 package org.apache.pinot.broker.routing.builder;
 
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.common.config.RoutingConfig;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.config.TableNameBuilder;
-import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
 
 
 /**
  * Util class for routing table builder tests
  */
 public class RoutingTableBuilderTestUtil {
-
   private RoutingTableBuilderTestUtil() {
   }
 
-  public static TableConfig getDynamicComputingTableConfig(String tableName) throws IOException {
-    CommonConstants.Helix.TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
-    TableConfig tableConfig = new TableConfig.Builder(tableType).setTableName(tableName).build();
-    Map<String, String> option = new HashMap<>();
-    option.put(RoutingConfig.ENABLE_DYNAMIC_COMPUTING_KEY, "true");
-    tableConfig.getRoutingConfig().setRoutingTableBuilderOptions(option);
-    return tableConfig;
+  public static TableConfig getDynamicComputingTableConfig(String tableName) {
+    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
+    RoutingConfig routingConfig = new RoutingConfig();
+    Map<String, String> routingTableBuilderOptions = new HashMap<>();
+    routingTableBuilderOptions.put(RoutingConfig.ENABLE_DYNAMIC_COMPUTING_KEY, "true");
+    routingConfig.setRoutingTableBuilderOptions(routingTableBuilderOptions);
+    return new TableConfig.Builder(tableType).setTableName(tableName).setRoutingConfig(routingConfig).build();
   }
 }
