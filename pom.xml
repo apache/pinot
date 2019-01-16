@@ -26,7 +26,11 @@
   <artifactId>pinot</artifactId>
   <version>0.016</version>
   <packaging>pom</packaging>
-  <name>pinot</name>
+
+  <name>Pinot</name>
+  <description>A realtime distributed OLAP datastore</description>
+  <url>https://pinot.apache.org</url>
+
   <modules>
     <module>pinot-broker</module>
     <module>pinot-common</module>
@@ -45,60 +49,49 @@
     <module>pinot-hadoop-filesystem</module>
     <module>pinot-azure-filesystem</module>
   </modules>
+
   <licenses>
     <license>
       <name>Apache License, Version 2.0</name>
       <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
       <distribution>repo</distribution>
-      <comments>A business-friendly OSS license</comments>
     </license>
   </licenses>
+
   <organization>
-    <name>LinkedIn Corp.</name>
-    <url>http://www.linkedin.com/</url>
+    <name>Apache Software Foundation</name>
+    <url>http://www.apache.org</url>
   </organization>
-  <developers>
-    <developer>
-      <id>antumbde</id>
-      <name>Adwait Tumbde</name>
-    </developer>
-    <developer>
-      <id>dpatel</id>
-      <name>Dhaval Patel</name>
-    </developer>
-    <developer>
-      <id>Jackie-Jiang</id>
-      <name>Jackie Jiang</name>
-    </developer>
-    <developer>
-      <id>jfim</id>
-      <name>Jean-Francois Im</name>
-    </developer>
-    <developer>
-      <id>kgopalak</id>
-      <name>Kishore Gopalakrishna</name>
-    </developer>
-    <developer>
-      <id>mayankshriv</id>
-      <name>Mayank Shrivastava</name>
-    </developer>
-    <developer>
-      <id>mcvsubbu</id>
-      <name>Subbu Subramaniam</name>
-    </developer>
-    <developer>
-      <id>rven</id>
-      <name>Venkatesh Radhakrishnan</name>
-    </developer>
-    <developer>
-      <id>xiafu</id>
-      <name>Xiang Fu</name>
-    </developer>
-  </developers>
+
+  <mailingLists>
+    <mailingList>
+      <name>Dev Mailing List</name>
+      <post>dev@pinot.apache.org</post>
+      <subscribe>dev-subscribe@pinot.apache.org</subscribe>
+      <unsubscribe>dev-unsubscribe@pinot.apache.org</unsubscribe>
+    </mailingList>
+
+    <mailingList>
+      <name>User Mailing List</name>
+      <post>user@pinot.apache.org</post>
+      <subscribe>user-subscribe@pinot.apache.org</subscribe>
+      <unsubscribe>user-unsubscribe@pinot.apache.org</unsubscribe>
+    </mailingList>
+
+    <mailingList>
+      <name>Commits Mailing List</name>
+      <post>commits@pinot.apache.org</post>
+      <subscribe>commits-subscribe@pinot.apache.org</subscribe>
+      <unsubscribe>commits-unsubscribe@pinot.apache.org</unsubscribe>
+    </mailingList>
+  </mailingLists>
+
   <scm>
-    <developerConnection>scm:git:git://git@github.com/linkedin/pinot.git</developerConnection>
+    <developerConnection>scm:git:git://apache/incubator-pinot.git</developerConnection>
   </scm>
-  <inceptionYear>2014-2018</inceptionYear>
+
+  <inceptionYear>2014</inceptionYear>
+
   <properties>
     <build.profile.id>dev</build.profile.id>
     <jdk.version>1.8</jdk.version>
@@ -127,7 +120,7 @@
     <antlr.version>4.6</antlr.version>
     <!-- commons-configuration, hadoop-common, hadoop-client use commons-lang -->
     <commons-lang.version>2.6</commons-lang.version>
-    <!-- pinot-common, commons-validator, commons-configuration, hadoop-common, hadoop-client use commons-logging-->
+    <!-- pinot-common, commons-configuration, hadoop-common, hadoop-client use commons-logging-->
     <commons-logging.version>1.2</commons-logging.version>
     <snappy-java.version>1.1.1.7</snappy-java.version>
 
@@ -340,11 +333,6 @@
         <version>1.6</version>
       </dependency>
       <dependency>
-        <groupId>commons-fileupload</groupId>
-        <artifactId>commons-fileupload</artifactId>
-        <version>1.2.2</version>
-      </dependency>
-      <dependency>
         <groupId>commons-httpclient</groupId>
         <artifactId>commons-httpclient</artifactId>
         <version>3.1</version>
@@ -353,11 +341,6 @@
         <groupId>commons-io</groupId>
         <artifactId>commons-io</artifactId>
         <version>2.4</version>
-      </dependency>
-      <dependency>
-        <groupId>commons-validator</groupId>
-        <artifactId>commons-validator</artifactId>
-        <version>1.4.0</version>
       </dependency>
       <dependency>
         <groupId>io.netty</groupId>
@@ -599,17 +582,6 @@
         <groupId>org.codehaus.jackson</groupId>
         <artifactId>jackson-xc</artifactId>
         <version>1.9.13</version>
-      </dependency>
-
-      <dependency>
-        <groupId>org.twitter4j</groupId>
-        <artifactId>twitter4j-core</artifactId>
-        <version>4.0.3</version>
-      </dependency>
-      <dependency>
-        <groupId>com.github.nkzawa</groupId>
-        <artifactId>socket.io-client</artifactId>
-        <version>0.5.1</version>
       </dependency>
       <dependency>
         <groupId>org.webjars</groupId>
