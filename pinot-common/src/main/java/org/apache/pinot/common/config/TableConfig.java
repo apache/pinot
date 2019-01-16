@@ -41,15 +41,15 @@ import org.apache.pinot.startree.hll.HllConfig;
 @ConfigDoc(value = "Configuration for a table", mandatory = true)
 @ConfigKey("table")
 public class TableConfig {
-  private static final String TABLE_NAME_KEY = "tableName";
-  private static final String TABLE_TYPE_KEY = "tableType";
-  private static final String VALIDATION_CONFIG_KEY = "segmentsConfig";
-  private static final String TENANT_CONFIG_KEY = "tenants";
-  private static final String INDEXING_CONFIG_KEY = "tableIndexConfig";
-  private static final String CUSTOM_CONFIG_KEY = "metadata";
-  private static final String QUOTA_CONFIG_KEY = "quota";
-  private static final String TASK_CONFIG_KEY = "task";
-  private static final String ROUTING_CONFIG_KEY = "routing";
+  public static final String TABLE_NAME_KEY = "tableName";
+  public static final String TABLE_TYPE_KEY = "tableType";
+  public static final String VALIDATION_CONFIG_KEY = "segmentsConfig";
+  public static final String TENANT_CONFIG_KEY = "tenants";
+  public static final String INDEXING_CONFIG_KEY = "tableIndexConfig";
+  public static final String CUSTOM_CONFIG_KEY = "metadata";
+  public static final String QUOTA_CONFIG_KEY = "quota";
+  public static final String TASK_CONFIG_KEY = "task";
+  public static final String ROUTING_CONFIG_KEY = "routing";
 
   @ConfigKey("name")
   @ConfigDoc(value = "The name for the table.", mandatory = true, exampleValue = "myTable")
@@ -158,22 +158,22 @@ public class TableConfig {
   }
 
   @Nonnull
-  public static JsonNode toJSONConfig(@Nonnull TableConfig tableConfig) throws JsonProcessingException {
+  public static JsonNode toJSONConfig(@Nonnull TableConfig tableConfig) {
     ObjectNode jsonConfig = JsonUtils.newObjectNode();
     jsonConfig.put(TABLE_NAME_KEY, tableConfig._tableName);
     jsonConfig.put(TABLE_TYPE_KEY, tableConfig._tableType.toString());
-    jsonConfig.put(VALIDATION_CONFIG_KEY, JsonUtils.objectToString(tableConfig._validationConfig));
-    jsonConfig.put(TENANT_CONFIG_KEY, JsonUtils.objectToString(tableConfig._tenantConfig));
-    jsonConfig.put(INDEXING_CONFIG_KEY, JsonUtils.objectToString(tableConfig._indexingConfig));
-    jsonConfig.put(CUSTOM_CONFIG_KEY, JsonUtils.objectToString(tableConfig._customConfig));
+    jsonConfig.set(VALIDATION_CONFIG_KEY, JsonUtils.objectToJsonNode(tableConfig._validationConfig));
+    jsonConfig.set(TENANT_CONFIG_KEY, JsonUtils.objectToJsonNode(tableConfig._tenantConfig));
+    jsonConfig.set(INDEXING_CONFIG_KEY, JsonUtils.objectToJsonNode(tableConfig._indexingConfig));
+    jsonConfig.set(CUSTOM_CONFIG_KEY, JsonUtils.objectToJsonNode(tableConfig._customConfig));
     if (tableConfig._quotaConfig != null) {
-      jsonConfig.put(QUOTA_CONFIG_KEY, JsonUtils.objectToString(tableConfig._quotaConfig));
+      jsonConfig.set(QUOTA_CONFIG_KEY, JsonUtils.objectToJsonNode(tableConfig._quotaConfig));
     }
     if (tableConfig._taskConfig != null) {
-      jsonConfig.put(TASK_CONFIG_KEY, JsonUtils.objectToString(tableConfig._taskConfig));
+      jsonConfig.set(TASK_CONFIG_KEY, JsonUtils.objectToJsonNode(tableConfig._taskConfig));
     }
     if (tableConfig._routingConfig != null) {
-      jsonConfig.put(ROUTING_CONFIG_KEY, JsonUtils.objectToString(tableConfig._routingConfig));
+      jsonConfig.set(ROUTING_CONFIG_KEY, JsonUtils.objectToJsonNode(tableConfig._routingConfig));
     }
     return jsonConfig;
   }
@@ -311,6 +311,7 @@ public class TableConfig {
     _taskConfig = taskConfig;
   }
 
+  @Nullable
   public RoutingConfig getRoutingConfig() {
     return _routingConfig;
   }
@@ -606,10 +607,6 @@ public class TableConfig {
       if (_customConfig == null) {
         _customConfig = new TableCustomConfig();
         _customConfig.setCustomConfigs(new HashMap<>());
-      }
-
-      if (_routingConfig == null) {
-        _routingConfig = new RoutingConfig();
       }
 
       return new TableConfig(_tableName, _tableType, validationConfig, tenantConfig, indexingConfig, _customConfig,
