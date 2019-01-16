@@ -161,6 +161,15 @@ public class LocalPinotFS extends PinotFS {
     return file.lastModified();
   }
 
+  @Override
+  public boolean touch(URI uri) throws IOException {
+    File file = new File(decodeURI(uri.getRawPath()));
+    if (!exists(uri)) {
+      return file.createNewFile();
+    }
+    return file.setLastModified(System.currentTimeMillis());
+  }
+
   private String encodeURI(String uri) {
     String encodedStr;
     try {

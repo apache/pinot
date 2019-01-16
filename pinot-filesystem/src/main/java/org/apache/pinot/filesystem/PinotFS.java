@@ -137,12 +137,20 @@ public abstract class PinotFS implements Closeable {
 
   /**
    * Returns the age of the file
-   * @param uri
+   * @param uri location of file or directory
    * @return A long value representing the time the file was last modified, measured in milliseconds since epoch
    * (00:00:00 GMT, January 1, 1970) or 0L if the file does not exist or if an I/O error occurs
    * @throws Exception if uri is not valid or present
    */
   public abstract long lastModified(URI uri);
+
+  /**
+   * Updates the last modified time of an existing file or directory to be current time. If the file system object
+   * does not exist, creates an empty file.
+   * @param uri location of file or directory
+   * @throws IOException if the parent directory doesn't exist.
+   */
+  public abstract boolean touch(URI uri) throws IOException;
 
   /**
    * For certain filesystems, we may need to close the filesystem and do relevant operations to prevent leaks.

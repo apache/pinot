@@ -124,5 +124,10 @@ public class PinotFSFactoryTest {
     public long lastModified(URI uri) {
       return 0L;
     }
+
+    @Override
+    public boolean touch(URI uri) throws IOException {
+      return true;
+    }
   }
 }

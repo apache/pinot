@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import org.apache.commons.configuration.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RemoteIterator;
@@ -80,9 +81,7 @@ public class HadoopPinotFS extends PinotFS {
   @Override
   public boolean delete(URI segmentUri, boolean forceDelete) throws IOException {
     // Returns false if we are moving a directory and that directory is not empty
-    if (isDirectory(segmentUri)
-        && listFiles(segmentUri, false).length > 0
-        && !forceDelete) {
+    if (isDirectory(segmentUri) && listFiles(segmentUri, false).length > 0 && !forceDelete) {
       return false;
     }
     return _hadoopFS.delete(new Path(segmentUri), true);
@@ -107,7 +106,8 @@ public class HadoopPinotFS extends PinotFS {
     RemoteIterator<LocatedFileStatus> sourceFiles = _hadoopFS.listFiles(source, true);
     if (sourceFiles != null) {
       while (sourceFiles.hasNext()) {
-        boolean succeeded = FileUtil.copy(_hadoopFS, sourceFiles.next().getPath(), _hadoopFS, target, true, _hadoopConf);
+        boolean succeeded =
+            FileUtil.copy(_hadoopFS, sourceFiles.next().getPath(), _hadoopFS, target, true, _hadoopConf);
         if (!succeeded) {
           return false;
         }
@@ -196,15 +196,29 @@ public class HadoopPinotFS extends PinotFS {
     }
   }
 
-  private void authenticate(org.apache.hadoop.conf.Configuration hadoopConf, org.apache.commons.configuration.Configuration configs) {
+  @Override
+  public boolean touch(URI uri) throws IOException {
+    Path path = new Path(uri);
+    if (!exists(uri)) {
+      FSDataOutputStream fos = _hadoopFS.create(path);
+      fos.close();
+    } else {
+      _hadoopFS.setTimes(path, System.currentTimeMillis(), -1);
+    }
+    return true;
+  }
+
+  private void authenticate(org.apache.hadoop.conf.Configuration hadoopConf,
+      org.apache.commons.configuration.Configuration configs) {
     String principal = configs.getString(PRINCIPAL);
     String keytab = configs.getString(KEYTAB);
     if (!Strings.isNullOrEmpty(principal) && !Strings.isNullOrEmpty(keytab)) {
       UserGroupInformation.setConfiguration(hadoopConf);
       if (UserGroupInformation.isSecurityEnabled()) {
         try {
-          if (!UserGroupInformation.getCurrentUser().hasKerberosCredentials()
-              || !UserGroupInformation.getCurrentUser().getUserName().equals(principal)) {
+          if (!UserGroupInformation.getCurrentUser().hasKerberosCredentials() || !UserGroupInformation.getCurrentUser()
+              .getUserName()
+              .equals(principal)) {
             LOGGER.info("Trying to authenticate user [%s] with keytab [%s]..", principal, keytab);
             UserGroupInformation.loginUserFromKeytab(principal, keytab);
           }
