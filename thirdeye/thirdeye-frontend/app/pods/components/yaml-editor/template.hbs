@@ -1,6 +1,25 @@
 <fieldset class="te-form__section te-form__section--first row">
   <div class="col-xs-12">
     <legend class="te-form__section-title">{{alertTitle}}</legend>
+    <label for="select-metric" class="control-label te-label te-label--taller required">Can't find your metric?
+      <a class="thirdeye-link-secondary" target="_blank">Import from InGraphs</a>
+    </label>
+    <div class="pull-right">
+      {{bs-button
+        defaultText="Reset"
+        type="outline-primary"
+        buttonType="reset"
+        onClick=(action "resetYAML" "anomaly")
+        class="te-button te-button--link"
+      }}
+      {{bs-button
+        defaultText="View Documentation"
+        type="outline-primary"
+        buttonType="modal"
+        onClick=(action "triggerDocModal" "Anomaly")
+        class="te-button te-button--cancel"
+      }}
+    </div>
     {{ember-ace
       lines=35
       value=currentYamlValues
@@ -24,6 +43,7 @@
       {{!--  subscription group --}}
       {{#power-select
         options=subscriptionGroupNames
+        placeholder="Create a subscription group"
         selected=groupName
         searchField="name"
         onchange=(action 'onYAMLGroupSelectionAction')
@@ -31,6 +51,30 @@
       }}
         {{groupName.name}} ({{groupName.id}})
       {{/power-select}}
+    </div>
+    <div class="col-xs-12">
+      <legend class="te-form__section-title">Configure new subscription group</legend>
+    </div>
+    <div class="col-xs-12">
+      <label for="select-metric" class="control-label te-label te-label--taller required">Can't find your team? Contact
+        <a class="thirdeye-link-secondary" target="_blank" href="mailto:ask_thirdeye@linkedin.com">ask_thirdeye@linkedin.com</a>
+      </label>
+      <div class="pull-right">
+        {{bs-button
+          defaultText="Reset"
+          type="outline-primary"
+          buttonType="reset"
+          onClick=(action "resetYAML" "notification")
+          class="te-button te-button--link"
+        }}
+        {{bs-button
+          defaultText="View Documentation"
+          type="outline-primary"
+          buttonType="modal"
+          onClick=(action "triggerDocModal" "Notification")
+          class="te-button te-button--cancel"
+        }}
+      </div>
     </div>
     <div class="col-xs-12">
       {{!-- notification settings editor --}}
@@ -80,3 +124,9 @@
     }}
   {{/if}}
 </fieldset>
+
+{{modals/yaml-documentation
+  showAnomalyModal=showAnomalyModal
+  showNotificationModal=showNotificationModal
+  YAMLField=YAMLField
+}}
