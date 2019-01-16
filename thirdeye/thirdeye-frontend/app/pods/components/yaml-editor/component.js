@@ -39,7 +39,7 @@ export default Component.extend({
   /**
    * Properties we expect to receive for the yaml-editor
    */
-   //isForm: true,
+  //isForm: true,
   currentMetric: null,
   isYamlParseable: true,
   alertTitle: 'Define anomaly detection in YAML',
@@ -53,6 +53,9 @@ export default Component.extend({
   yamlAlertProps: yamlAlertProps,
   yamlAlertSettings: yamlAlertSettings,
   subscriptionGroupNames: [],
+  showAnomalyModal: false,
+  showNotificationModal: false,
+  YAMLField: '',
 
   /**
    * params passed to yaml-editor component
@@ -78,7 +81,7 @@ export default Component.extend({
   ),
 
   /**
-   * sets Yaml value displayed to contents of alertYaml or yamlAlertProps
+   * sets Yaml value displayed to contents of detectionSettingsYaml or yamlAlertSettings
    * @method currentYamlValues
    * @return {String}
    */
@@ -122,21 +125,21 @@ export default Component.extend({
    * Calls api's for specific metric's autocomplete
    * @method _loadAutocompleteById
    * @return Promise
-   */
-   _loadAutocompleteById(metricId) {
-     const promiseHash = {
-       filters: fetch(selfServeApiGraph.metricFilters(metricId)).then(res => checkStatus(res, 'get', true)),
-       dimensions: fetch(selfServeApiGraph.metricDimensions(metricId)).then(res => checkStatus(res, 'get', true))
-     };
-     return RSVP.hash(promiseHash);
-   },
+  */
+  _loadAutocompleteById(metricId) {
+    const promiseHash = {
+      filters: fetch(selfServeApiGraph.metricFilters(metricId)).then(res => checkStatus(res, 'get', true)),
+      dimensions: fetch(selfServeApiGraph.metricDimensions(metricId)).then(res => checkStatus(res, 'get', true))
+    };
+    return RSVP.hash(promiseHash);
+  },
 
   /**
    * Get autocomplete suggestions from relevant api
    * @method _buildYamlSuggestions
    * @return Promise
    */
-   _buildYamlSuggestions(currentMetric, yamlAsObject, prefix, noResultsArray, filtersCache, dimensionsCache) {
+  _buildYamlSuggestions(currentMetric, yamlAsObject, prefix, noResultsArray, filtersCache, dimensionsCache) {
     // holds default result to return if all checks fail
     let defaultReturn = Promise.resolve(noResultsArray);
     // when metric is being autocompleted, entire text field will be replaced and metricId stored in editor
@@ -154,16 +157,16 @@ export default Component.extend({
                 dataset,
                 id: metric.id,
                 completer:{
-                insertMatch: (editor, data) => {
-                  editor.setValue(yamIt(data.metricname, data.dataset));
-                  editor.metricId = data.id;
-                  //editor.completer.insertMatch({value: data.value});
-                  // editor.insert('abc');
-                }
-              }}
-            })
+                  insertMatch: (editor, data) => {
+                    editor.setValue(yamIt(data.metricname, data.dataset));
+                    editor.metricId = data.id;
+                    //editor.completer.insertMatch({value: data.value});
+                    // editor.insert('abc');
+                  }
+                }};
+            });
           }
-          return noResultsArray
+          return noResultsArray;
         })
         .catch(() => {
           return noResultsArray;
@@ -178,7 +181,7 @@ export default Component.extend({
           // wraps result in Promise.resolve because return of Promise is expected by yamlSuggestions
           return Promise.resolve(dimensionsCache.map(dimension => {
             return {
-              value: dimension,
+              value: dimension
             };
           }));
         }
@@ -207,7 +210,7 @@ export default Component.extend({
         return Promise.resolve(filtersCache[filterKey].map(filterParam => {
           return {
             value: filterParam
-          }
+          };
         }));
       }
     }
@@ -215,6 +218,27 @@ export default Component.extend({
   },
 
   actions: {
+    /**
+     * resets given yaml field to default value
+     */
+    resetYAML(field) {
+      if (field === 'anomaly') {
+        const yamlAlertProps = get(this, 'yamlAlertProps');
+        set(this, 'alertYaml', yamlAlertProps);
+      } else if (field === 'notification') {
+        const yamlAlertSettings = get(this, 'yamlAlertSettings');
+        set(this, 'detectionSettingsYaml', yamlAlertSettings);
+      }
+    },
+
+    /**
+     * Brings up appropriate modal, based on which yaml field is clicked
+     */
+    triggerDocModal(field) {
+      set(this, `show${field}Modal`, true);
+      set(this, 'YAMLField', field);
+    },
+
     /**
      * Updates the notification settings yaml with user section
      */
@@ -233,7 +257,7 @@ export default Component.extend({
         alertYaml,
         noResultsArray
       } = getProperties(this, 'alertYaml', 'noResultsArray');
-      let yamlAsObject = {}
+      let yamlAsObject = {};
       try {
         yamlAsObject = yamljs.parse(alertYaml);
         set(this, 'isYamlParseable', true);
@@ -257,7 +281,7 @@ export default Component.extend({
           .then(() => {
             return get(this, '_buildYamlSuggestions')(currentMetric, yamlAsObject, prefix, noResultsArray, get(this, 'filtersCache'), get(this, 'dimensionsCache'))
               .then(results => results);
-          })
+          });
       }
       const currentMetric = get(this, 'currentMetric');
       // deals with no metricId, which could be autocomplete for metric or for filters and dimensions already cached
@@ -267,7 +291,7 @@ export default Component.extend({
     },
 
     /**
-     * Activates 'save changes' button and stores YAML content in alertYaml
+     * Activates 'Create Alert' button and stores YAML content in alertYaml
      */
     onYMLSelectorAction(value) {
       set(this, 'disableYamlSave', false);
@@ -276,11 +300,11 @@ export default Component.extend({
     },
 
     /**
-     * Activates 'save changes' button and stores YAML content in alertYaml
+     * Activates 'Create Alert' button and stores YAML content in detectionSettingsYaml
      */
     onYMLSettingsSelectorAction(value) {
       set(this, 'disableYamlSave', false);
-      set(this, 'currentYamlSettings', value);
+      set(this, 'detectionSettingsYaml', value);
     },
 
     cancelAlertYamlAction() {
@@ -296,7 +320,7 @@ export default Component.extend({
       const content = {
         detection: get(this, 'alertYaml'),
         notification: get(this, 'currentYamlSettings')
-      }
+      };
       const url = '/yaml/create-alert';
       const postProps = {
         method: 'post',
