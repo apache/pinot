@@ -52,7 +52,7 @@ export function powerSort(targetArray, targetProperty) {
       a = a[targetProperty];
       b = b[targetProperty];
     }
-    return a.toLowerCase().trim().localeCompare(b.toLowerCase().trim());
+    return (a || '').toLowerCase().trim().localeCompare((b || '').toLowerCase().trim());
   });
   return sortedArray;
 }
