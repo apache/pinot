@@ -79,35 +79,31 @@ public class ControllerStarter {
   private final ControllerConf _config;
   private final ControllerAdminApiApplication _adminApp;
   private final PinotHelixResourceManager _helixResourceManager;
-  private final RetentionManager _retentionManager;
   private final MetricsRegistry _metricsRegistry;
   private final ControllerMetrics _controllerMetrics;
-  private final PinotRealtimeSegmentManager _realtimeSegmentsManager;
-  private final SegmentStatusChecker _segmentStatusChecker;
   private final ExecutorService _executorService;
-  private final ControllerPeriodicTaskScheduler _controllerPeriodicTaskScheduler;
 
   // Can only be constructed after resource manager getting started
   private OfflineSegmentIntervalChecker _offlineSegmentIntervalChecker;
   private RealtimeSegmentValidationManager _realtimeSegmentValidationManager;
   private BrokerResourceValidationManager _brokerResourceValidationManager;
   private RealtimeSegmentRelocator _realtimeSegmentRelocator;
-  private PinotHelixTaskResourceManager _helixTaskResourceManager;
+  private RetentionManager _retentionManager;
+  private SegmentStatusChecker _segmentStatusChecker;
   private PinotTaskManager _taskManager;
+  private ControllerPeriodicTaskScheduler _controllerPeriodicTaskScheduler;
+  private PinotHelixTaskResourceManager _helixTaskResourceManager;
+  private PinotRealtimeSegmentManager _realtimeSegmentsManager;
 
   public ControllerStarter(ControllerConf conf) {
     _config = conf;
     _adminApp = new ControllerAdminApiApplication(_config.getQueryConsoleWebappPath(), _config.getQueryConsoleUseHttps());
+    // Do not use this before the invocation of {@link PinotHelixResourceManager::start()}, which happens in {@link ControllerStarter::start()}
     _helixResourceManager = new PinotHelixResourceManager(_config);
-    _retentionManager = new RetentionManager(_helixResourceManager, _config);
     _metricsRegistry = new MetricsRegistry();
     _controllerMetrics = new ControllerMetrics(_metricsRegistry);
-    _realtimeSegmentsManager = new PinotRealtimeSegmentManager(_helixResourceManager);
     _executorService =
         Executors.newCachedThreadPool(new ThreadFactoryBuilder().setNameFormat("restapi-multiget-thread-%d").build());
-    _segmentStatusChecker = new SegmentStatusChecker(_helixResourceManager, _config, _controllerMetrics);
-    _realtimeSegmentRelocator = new RealtimeSegmentRelocator(_helixResourceManager, _config);
-    _controllerPeriodicTaskScheduler = new ControllerPeriodicTaskScheduler();
   }
 
   public PinotHelixResourceManager getHelixResourceManager() {
@@ -184,6 +180,7 @@ public class ControllerStarter {
     // Helix resource manager must be started in order to create PinotLLCRealtimeSegmentManager
     LOGGER.info("Starting realtime segment manager");
     PinotLLCRealtimeSegmentManager.create(_helixResourceManager, _config, _controllerMetrics);
+    _realtimeSegmentsManager = new PinotRealtimeSegmentManager(_helixResourceManager);
     _realtimeSegmentsManager.start(_controllerMetrics);
 
     // Setting up periodic tasks
@@ -191,24 +188,26 @@ public class ControllerStarter {
     List<PeriodicTask> periodicTasks = new ArrayList<>();
     _taskManager = new PinotTaskManager(_helixTaskResourceManager, _helixResourceManager, _config, _controllerMetrics);
     periodicTasks.add(_taskManager);
+    _retentionManager = new RetentionManager(_helixResourceManager, _config);
     periodicTasks.add(_retentionManager);
     _offlineSegmentIntervalChecker =
         new OfflineSegmentIntervalChecker(_config, _helixResourceManager, new ValidationMetrics(_metricsRegistry));
+    periodicTasks.add(_offlineSegmentIntervalChecker);
     _realtimeSegmentValidationManager =
         new RealtimeSegmentValidationManager(_config, _helixResourceManager, PinotLLCRealtimeSegmentManager.getInstance(),
             new ValidationMetrics(_metricsRegistry));
+    periodicTasks.add(_realtimeSegmentValidationManager);
     _brokerResourceValidationManager =
         new BrokerResourceValidationManager(_config, _helixResourceManager);
-
-    periodicTasks.add(_offlineSegmentIntervalChecker);
-    periodicTasks.add(_realtimeSegmentValidationManager);
     periodicTasks.add(_brokerResourceValidationManager);
+    _segmentStatusChecker = new SegmentStatusChecker(_helixResourceManager, _config, _controllerMetrics);
     periodicTasks.add(_segmentStatusChecker);
+    _realtimeSegmentRelocator = new RealtimeSegmentRelocator(_helixResourceManager, _config);
     periodicTasks.add(_realtimeSegmentRelocator);
 
     LOGGER.info("Init controller periodic tasks scheduler");
+    _controllerPeriodicTaskScheduler = new ControllerPeriodicTaskScheduler();
     _controllerPeriodicTaskScheduler.init(periodicTasks);
-
 
     LOGGER.info("Creating rebalance segments factory");
     RebalanceSegmentStrategyFactory.createInstance(helixManager);
@@ -329,7 +328,6 @@ public class ControllerStarter {
 
       LOGGER.info("Stopping realtime segment manager");
       _realtimeSegmentsManager.stop();
-
 
       LOGGER.info("Stopping resource manager");
       _helixResourceManager.stop();
