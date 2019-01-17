@@ -27,6 +27,8 @@ import java.util.Map;
 import org.apache.commons.collections.MapUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.yaml.snakeyaml.DumperOptions;
+import org.yaml.snakeyaml.Yaml;
 
 
 /**
@@ -84,6 +86,12 @@ public abstract class YamlDetectionConfigTranslator {
     config.setProperties(translationResult.getProperties());
     config.setComponentSpecs(translationResult.getComponents());
     config.setCron(translationResult.getCron());
+
+    DumperOptions options = new DumperOptions();
+    options.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
+    options.setPrettyFlow(true);
+    config.setYaml(new Yaml(options).dump(yamlConfig));
+
     if (existingConfig != null) {
       config.setId(existingConfig.getId());
       config.setLastTimestamp(existingConfig.getLastTimestamp());
