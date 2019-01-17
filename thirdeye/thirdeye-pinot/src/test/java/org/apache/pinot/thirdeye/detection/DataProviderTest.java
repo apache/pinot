@@ -304,6 +304,21 @@ public class DataProviderTest {
     Assert.assertTrue(anomalies.contains(makeAnomaly(this.anomalyIds.get(3), 200L, 14400000L, 18000000L, Arrays.asList("a=1", "c=3"))));
   }
 
+  // cache
+
+  @Test
+  public void testTimeseriesCache(){
+    MetricSlice slice = MetricSlice.from(this.metricIds.get(0), 604800000L, 1814400000L);
+    this.provider.cacheTimeseries(Collect);
+
+    DataFrame df = this.provider.fetchTimeseries(Collections.singleton(slice)).get(slice);
+
+    Assert.assertEquals(df.size(), 336);
+
+    double mean = df.getDoubles(COL_VALUE).mean().doubleValue();
+    Assert.assertTrue(Math.abs(mean - 1000) < EPSILON_MEAN);
+  }
+
   //
   // utils
   //

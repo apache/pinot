@@ -71,6 +71,7 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
   private static final String PROP_DETECTOR = "detector";
   private static final String PROP_DETECTOR_COMPONENT_NAME = "detectorComponentName";
   private static final String PROP_TIMEZONE = "timezone";
+  private static final String PROP_BUCKET_PERIOD = "bucketPeriod";
 
   private static final Logger LOG = LoggerFactory.getLogger(
       AnomalyDetectorWrapper.class);
@@ -91,6 +92,7 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
   private final long windowSizeMillis;
   private final DatasetConfigDTO dataset;
   private final DateTimeZone dateTimeZone;
+  private final Period bucketPeriod;
 
 
   public AnomalyDetectorWrapper(DataProvider provider, DetectionConfigDTO config, long startTime, long endTime) {
@@ -123,16 +125,16 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
     this.dataset = this.provider.fetchDatasets(Collections.singletonList(metricConfigDTO.getDataset()))
         .get(metricConfigDTO.getDataset());
     // date time zone for moving windows. use dataset time zone as default
-    this.dateTimeZone = DateTimeZone.forID(MapUtils.getString(config.getProperties(), PROP_TIMEZONE, this.dataset.getTimezone()));
+    this.dateTimeZone = DateTimeZone.forID(MapUtils.getString(config.getProperties(), PROP_TIMEZONE, "America/Los_Angeles"));
+
+    String bucketStr = MapUtils.getString(config.getProperties(), PROP_BUCKET_PERIOD);
+    this.bucketPeriod = bucketStr == null ? this.getBucketSizePeriodForDataset() : Period.parse(bucketStr);
   }
 
   @Override
   public DetectionPipelineResult run() throws Exception {
     List<Interval> monitoringWindows = this.getMonitoringWindows();
     List<MergedAnomalyResultDTO> anomalies = new ArrayList<>();
-    MetricEntity me = MetricEntity.fromURN(this.metricUrn);
-    MetricSlice slice = MetricSlice.from(me.getId(), startTime, endTime, me.getFilters(), new TimeGranularity(1, TimeUnit.DAYS));
-    this.provider.fetchTimeseries(Collections.singleton(slice));
     for (Interval window : monitoringWindows) {
       List<MergedAnomalyResultDTO> anomaliesForOneWindow = new ArrayList<>();
       try {
@@ -195,6 +197,10 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
         for (Interval window : monitoringWindows){
           LOG.info("running detections in windows {}", window);
         }
+//         pre-cache time series if using moving window detection
+        MetricEntity me = MetricEntity.fromURN(this.metricUrn);
+        MetricSlice cacheSlice = MetricSlice.from(me.getId(), startTime - TimeUnit.DAYS.toMillis(90), endTime, me.getFilters(), toTimeGranularity(this.bucketPeriod));
+        this.provider.cacheTimeseries(Collections.singleton(cacheSlice));
         return monitoringWindows;
       } catch (Exception e) {
         LOG.info("can't generate moving monitoring windows, calling with single detection window", e);
@@ -211,9 +217,8 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
     DateTime currentEndTime = new DateTime(getBoundaryAlignedTimeForDataset(new DateTime(endTime, dateTimeZone)), dateTimeZone);
 
     DateTime lastDateTime = new DateTime(getBoundaryAlignedTimeForDataset(new DateTime(startTime, dateTimeZone)), dateTimeZone);
-    Period bucketSizePeriod = getBucketSizePeriodForDataset();
     while (lastDateTime.isBefore(currentEndTime)) {
-      lastDateTime = lastDateTime.plus(bucketSizePeriod);
+      lastDateTime = lastDateTime.plus(this.bucketPeriod);
       endTimes.add(lastDateTime.getMillis());
     }
     return endTimes;
@@ -274,4 +279,17 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
     }
     return bucketSizePeriod;
   }
+
+  public static TimeGranularity toTimeGranularity(Period period) {
+    if (period.getDays() > 0) {
+      return new TimeGranularity(period.getDays(), TimeUnit.DAYS);
+    } else if (period.getHours() > 0) {
+      return new TimeGranularity(period.getHours(), TimeUnit.HOURS);
+    } else if (period.getMinutes() > 0)  {
+      return new TimeGranularity(period.getMinutes(), TimeUnit.MINUTES);
+    } else {
+      return new TimeGranularity(period.getMillis(), TimeUnit.MILLISECONDS);
+    }
+  }
+
 }

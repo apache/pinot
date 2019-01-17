@@ -22,6 +22,7 @@ package org.apache.pinot.thirdeye.detection;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Collections2;
 import com.google.common.collect.Multimap;
+import java.util.stream.Collectors;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
 import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
@@ -70,7 +71,7 @@ public class DefaultDataProvider implements DataProvider {
   private final TimeSeriesLoader timeseriesLoader;
   private final AggregationLoader aggregationLoader;
   private final DetectionPipelineLoader loader;
-  private final Map<MetricSlice, DataFrame> timeseriesCache;
+  final Map<MetricSlice, DataFrame> timeseriesCache;
 
   public DefaultDataProvider(MetricConfigManager metricDAO, DatasetConfigManager datasetDAO, EventManager eventDAO,
       MergedAnomalyResultManager anomalyDAO, TimeSeriesLoader timeseriesLoader, AggregationLoader aggregationLoader,
@@ -89,6 +90,7 @@ public class DefaultDataProvider implements DataProvider {
   @Override
   public Map<MetricSlice, DataFrame> fetchTimeseries(Collection<MetricSlice> slices) {
     try {
+      long ts = System.currentTimeMillis();
       Map<MetricSlice, DataFrame> output = new HashMap<>();
       for (MetricSlice slice : slices){
         for (Map.Entry<MetricSlice, DataFrame> entry : this.timeseriesCache.entrySet()) {
@@ -111,20 +113,26 @@ public class DefaultDataProvider implements DataProvider {
           }));
         }
       }
-      LOG.info("Fetch {} slices of timeseries, {} cache hit, {} cache miss", slices.size(), futures.size());
+      LOG.info("Fetching {} slices of timeseries, {} cache hit, {} cache miss", slices.size(), output.size(), futures.size());
       final long deadline = System.currentTimeMillis() + TIMEOUT;
       for (MetricSlice slice : slices) {
         if (!output.containsKey(slice)) {
           output.put(slice, futures.get(slice).get(makeTimeout(deadline), TimeUnit.MILLISECONDS));
         }
       }
-
-      this.timeseriesCache.putAll(output);
+      LOG.info("Fetching {} slices used {} milliseconds", slices.size(), System.currentTimeMillis() - ts);
       return output;
 
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
+  }
+
+  @Override
+  public void cacheTimeseries(Collection<MetricSlice> slices) {
+    // caches .
+    Collection<MetricSlice> slicesToFetch = slices.stream().filter(slice -> !this.timeseriesCache.containsKey(slice)).collect(Collectors.toList());
+    this.timeseriesCache.putAll(this.fetchTimeseries(slicesToFetch));
   }
 
   @Override

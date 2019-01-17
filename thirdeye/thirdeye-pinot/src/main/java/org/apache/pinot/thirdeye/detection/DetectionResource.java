@@ -196,7 +196,9 @@ public class DetectionResource {
     config.setComponentSpecs(MapUtils.getMap(properties, "componentSpecs"));
 
     DetectionPipeline pipeline = this.loader.from(this.provider, config, start, end);
+    long t = System.currentTimeMillis();
     DetectionPipelineResult result = pipeline.run();
+    LOG.info("preview used {} seconds", (System.currentTimeMillis() - t)/1000.0);
 
     if (diagnostics == null || !diagnostics) {
       result.setDiagnostics(Collections.<String, Object>emptyMap());

@@ -101,6 +101,10 @@ public class DetectionRegistry {
     } catch (Exception e) {
       LOG.warn("initialize detection registry error", e);
     }
+
+    // extra component not came from registry
+    registerComponent("com.linkedin.thirdeye.detection.components.AdLibAlertFilter", "LEGACY_ALGORITHM_FILTER");
+    registerComponent("com.linkedin.thirdeye.detection.components.AdLibAnomalyDetector", "LEGACY_ALGORITHM");
   }
 
   public static void registerComponent(String className, String type) {
