@@ -35,6 +35,7 @@ import org.apache.pinot.core.data.readers.sort.PinotSegmentSorter;
 import org.apache.pinot.core.data.readers.sort.SegmentSorter;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
+import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
 
 
 /**
@@ -72,7 +73,9 @@ public class PinotSegmentRecordReader implements RecordReader {
       SegmentMetadata segmentMetadata = _immutableSegment.getSegmentMetadata();
       _numDocs = segmentMetadata.getTotalRawDocs();
       if (schema == null) {
-        _schema = segmentMetadata.getSchema();
+        // In order not to expose virtual columns to client, schema shouldn't be fetched from segmentMetadata;
+        // otherwise the original metadata will be modified. Hence, initialize a new schema.
+        _schema = new SegmentMetadataImpl(indexDir).getSchema();
         Collection<String> columnNames = _schema.getColumnNames();
         _columnReaderMap = new HashMap<>(columnNames.size());
         for (String columnName : columnNames) {
