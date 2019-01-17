@@ -119,12 +119,14 @@ public class ConnectionPoolBrokerRequestHandler extends BaseBrokerRequestHandler
 
   @Override
   public synchronized void start() {
+    super.start();
     _connPool.start();
     _liveInstanceChangeListener.init(_connPool, CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS);
   }
 
   @Override
   public synchronized void shutDown() {
+    super.shutDown();
     _connPool.shutdown();
     _requestSenderPool.shutdown();
     _poolTimeoutExecutor.shutdown();

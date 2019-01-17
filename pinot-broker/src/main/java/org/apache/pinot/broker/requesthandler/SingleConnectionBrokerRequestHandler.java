@@ -62,10 +62,12 @@ public class SingleConnectionBrokerRequestHandler extends BaseBrokerRequestHandl
 
   @Override
   public void start() {
+    super.start();
   }
 
   @Override
   public synchronized void shutDown() {
+    super.shutDown();
     _queryRouter.shutDown();
   }
 

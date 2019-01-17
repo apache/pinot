@@ -56,9 +56,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.pinot.common.utils.CommonConstants.Broker.*;
-import static org.apache.pinot.common.utils.CommonConstants.Broker.Request.DEBUG_OPTIONS;
-import static org.apache.pinot.common.utils.CommonConstants.Broker.Request.PQL;
-import static org.apache.pinot.common.utils.CommonConstants.Broker.Request.TRACE;
+import static org.apache.pinot.common.utils.CommonConstants.Broker.Request.*;
 
 
 @ThreadSafe
@@ -76,11 +74,13 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   protected final AtomicLong _requestIdGenerator = new AtomicLong();
   protected final BrokerRequestOptimizer _brokerRequestOptimizer = new BrokerRequestOptimizer();
   protected final BrokerReduceService _brokerReduceService = new BrokerReduceService();
+  private BrokerQPSMetricsHandler _brokerQPSMetricsHandler;
 
   protected final String _brokerId;
   protected final long _brokerTimeoutMs;
   protected final int _queryResponseLimit;
   protected final int _queryLogLength;
+  private final boolean _enableBrokerQPSMetricsHandler;
 
   public BaseBrokerRequestHandler(Configuration config, RoutingTable routingTable,
       TimeBoundaryService timeBoundaryService, AccessControlFactory accessControlFactory,
@@ -96,9 +96,23 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     _brokerTimeoutMs = config.getLong(CONFIG_OF_BROKER_TIMEOUT_MS, DEFAULT_BROKER_TIMEOUT_MS);
     _queryResponseLimit = config.getInt(CONFIG_OF_BROKER_QUERY_RESPONSE_LIMIT, DEFAULT_BROKER_QUERY_RESPONSE_LIMIT);
     _queryLogLength = config.getInt(CONFIG_OF_BROKER_QUERY_LOG_LENGTH, DEFAULT_BROKER_QUERY_LOG_LENGTH);
+    _enableBrokerQPSMetricsHandler = config.getBoolean(CONFIG_OF_BROKER_EMIT_QPS_METRICS, DEFAULT_BROKER_EMIT_QPS_METRICS);
+
+    if (_enableBrokerQPSMetricsHandler) {
+      _brokerQPSMetricsHandler = new BrokerQPSMetricsHandler(_brokerMetrics);
+    }
 
     LOGGER.info("Broker Id: {}, timeout: {}ms, query response limit: {}, query log length: {}", _brokerId,
         _brokerTimeoutMs, _queryResponseLimit, _queryLogLength);
+
+  }
+
+  @Override
+  public void start() {
+    if (_enableBrokerQPSMetricsHandler) {
+      LOGGER.info("Starting BrokerQPSMetricsHandler");
+      _brokerQPSMetricsHandler.start();
+    }
   }
 
   private String getDefaultBrokerId() {
@@ -141,6 +155,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.REQUEST_COMPILATION,
         compilationEndTimeNs - compilationStartTimeNs);
     _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.QUERIES, 1);
+    if (_enableBrokerQPSMetricsHandler) {
+      _brokerQPSMetricsHandler.incrementQueryCount(rawTableName);
+    }
 
     // Check table access
     boolean hasAccess = _accessControlFactory.create().hasAccess(requesterIdentity, brokerRequest);
@@ -428,6 +445,13 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       @Nullable BrokerRequest offlineBrokerRequest, @Nullable Map<String, List<String>> offlineRoutingTable,
       @Nullable BrokerRequest realtimeBrokerRequest, @Nullable Map<String, List<String>> realtimeRoutingTable,
       long timeoutMs, ServerStats serverStats, RequestStatistics requestStatistics) throws Exception;
+
+  @Override
+  public void shutDown() {
+    if (_enableBrokerQPSMetricsHandler) {
+      _brokerQPSMetricsHandler.stop();
+    }
+  }
 
   /**
    * Helper class to pass the per server statistics.

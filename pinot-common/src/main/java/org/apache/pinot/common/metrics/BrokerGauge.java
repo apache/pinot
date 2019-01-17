@@ -27,7 +27,8 @@ import org.apache.pinot.common.Utils;
 */
 public enum BrokerGauge implements AbstractMetrics.Gauge {
   QUERY_QUOTA_CAPACITY_UTILIZATION_RATE("tables", false),
-  NETTY_CONNECTION_CONNECT_TIME_MS("nettyConnection", true);
+  NETTY_CONNECTION_CONNECT_TIME_MS("nettyConnection", true),
+  MAX_QUERIES_PER_10_SEC_IN_MINUTE("maxQueriesPer10SecInMinute", false);
 
   private final String brokerGaugeName;
   private final String unit;

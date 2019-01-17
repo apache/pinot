@@ -121,6 +121,9 @@ public class CommonConstants {
     public static final String CONFIG_OF_BROKER_REFRESH_TIMEBOUNDARY_INFO_SLEEP_INTERVAL =
             "pinot.broker.refresh.timeBoundaryInfo.sleepInterval";
     public static final long DEFAULT_BROKER_REFRESH_TIMEBOUNDARY_INFO_SLEEP_INTERVAL_MS = 10000L;
+    public static final String CONFIG_OF_BROKER_EMIT_QPS_METRICS = "pinot.broker.emit.qps.metrics";
+    public static final boolean DEFAULT_BROKER_EMIT_QPS_METRICS = false;
+
     public static class Request {
       public static final String PQL = "pql";
       public static final String TRACE = "trace";
