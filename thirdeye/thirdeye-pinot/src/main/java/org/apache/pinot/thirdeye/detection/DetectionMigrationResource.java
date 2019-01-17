@@ -94,7 +94,7 @@ public class DetectionMigrationResource {
     AnomalyFunctionDTO anomalyFunctionDTO = this.anomalyFunctionDAO.findById(anomalyFunctionId);
     Preconditions.checkArgument(anomalyFunctionDTO.getIsActive(), "try to migrate inactive anomaly function");
     Map<String, Object> yamlConfigs = new LinkedHashMap<>();
-    yamlConfigs.put("detectionName", "new_pipeline_" + anomalyFunctionDTO.getFunctionName());
+    yamlConfigs.put("detectionName", anomalyFunctionDTO.getFunctionName());
     yamlConfigs.put("metric", anomalyFunctionDTO.getMetric());
     yamlConfigs.put("dataset", anomalyFunctionDTO.getCollection());
     yamlConfigs.put("pipelineType", "Composite");
