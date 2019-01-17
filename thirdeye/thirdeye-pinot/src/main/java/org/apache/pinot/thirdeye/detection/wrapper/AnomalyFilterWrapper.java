@@ -21,6 +21,8 @@ package org.apache.pinot.thirdeye.detection.wrapper;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Collections2;
+import java.util.HashSet;
+import java.util.Set;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.detection.ConfigUtils;
@@ -71,6 +73,7 @@ public class AnomalyFilterWrapper extends DetectionPipeline {
   @Override
   public final DetectionPipelineResult run() throws Exception {
     List<MergedAnomalyResultDTO> candidates = new ArrayList<>();
+    Set<Long> lastTimeStamps = new HashSet<>();
     for (Map<String, Object> properties : this.nestedProperties) {
       DetectionConfigDTO nestedConfig = new DetectionConfigDTO();
 
@@ -86,12 +89,13 @@ public class AnomalyFilterWrapper extends DetectionPipeline {
       DetectionPipeline pipeline = this.provider.loadPipeline(nestedConfig, this.startTime, this.endTime);
 
       DetectionPipelineResult intermediate = pipeline.run();
+      lastTimeStamps.add(intermediate.getLastTimestamp());
       candidates.addAll(intermediate.getAnomalies());
     }
 
     Collection<MergedAnomalyResultDTO> anomalies =
         Collections2.filter(candidates, mergedAnomaly -> mergedAnomaly != null && !mergedAnomaly.isChild() && anomalyFilter.isQualified(mergedAnomaly));
 
-    return new DetectionPipelineResult(new ArrayList<>(anomalies));
+    return new DetectionPipelineResult(new ArrayList<>(anomalies), DetectionUtils.consolidateNestedLastTimeStamps(lastTimeStamps));
   }
 }

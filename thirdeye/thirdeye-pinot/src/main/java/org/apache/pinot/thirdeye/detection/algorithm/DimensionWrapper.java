@@ -22,6 +22,8 @@ package org.apache.pinot.thirdeye.detection.algorithm;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
+import java.util.HashSet;
+import java.util.Set;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
@@ -30,6 +32,7 @@ import org.apache.pinot.thirdeye.detection.ConfigUtils;
 import org.apache.pinot.thirdeye.detection.DataProvider;
 import org.apache.pinot.thirdeye.detection.DetectionPipeline;
 import org.apache.pinot.thirdeye.detection.DetectionPipelineResult;
+import org.apache.pinot.thirdeye.detection.DetectionUtils;
 import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -135,7 +138,7 @@ public class DimensionWrapper extends DetectionPipeline {
       DataFrame aggregates = this.provider.fetchAggregates(Collections.singletonList(slice), this.dimensions).get(slice);
 
       if (aggregates.isEmpty()) {
-        return new DetectionPipelineResult(Collections.<MergedAnomalyResultDTO>emptyList());
+        return new DetectionPipelineResult(Collections.<MergedAnomalyResultDTO>emptyList(), -1);
       }
 
       final double total = aggregates.getDoubles(COL_VALUE).sum().fillNull().doubleValue();
@@ -194,19 +197,19 @@ public class DimensionWrapper extends DetectionPipeline {
 
     List<MergedAnomalyResultDTO> anomalies = new ArrayList<>();
     Map<String, Object> diagnostics = new HashMap<>();
-
+    Set<Long> lastTimeStamps = new HashSet<>();
     LOG.info("exploring {} metrics", nestedMetrics.size());
     for (MetricEntity metric : nestedMetrics) {
       for (Map<String, Object> properties : this.nestedProperties) {
         LOG.info("running detection for {}", metric.toString());
         DetectionPipelineResult intermediate = this.runNested(metric, properties);
-
+        lastTimeStamps.add(intermediate.getLastTimestamp());
         anomalies.addAll(intermediate.getAnomalies());
         diagnostics.put(metric.getUrn(), intermediate.getDiagnostics());
       }
     }
 
-    return new DetectionPipelineResult(anomalies)
+    return new DetectionPipelineResult(anomalies, DetectionUtils.consolidateNestedLastTimeStamps(lastTimeStamps))
         .setDiagnostics(diagnostics);
   }
 

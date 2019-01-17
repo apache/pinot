@@ -130,7 +130,6 @@ public class MergeDimensionThresholdIntegrationTest {
     DetectionPipelineResult result = pipeline.run();
 
     Assert.assertEquals(result.getAnomalies().size(), 3);
-    Assert.assertEquals(result.getLastTimestamp(), 18000);
 
     Assert.assertTrue(result.getAnomalies().contains(makeAnomaly(9500, 18000, "thirdeye:metric:2")));
     Assert.assertTrue(result.getAnomalies().contains(makeAnomaly(0, 7200, "thirdeye:metric:2:a%3D1:b%3D2")));

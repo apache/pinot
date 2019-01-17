@@ -24,6 +24,9 @@ import org.apache.pinot.thirdeye.anomaly.detection.DetectionJobSchedulerUtils;
 import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyResult;
 import org.apache.pinot.thirdeye.api.TimeGranularity;
 import org.apache.pinot.thirdeye.api.TimeSpec;
+import org.apache.pinot.thirdeye.dataframe.DataFrame;
+import org.apache.pinot.thirdeye.dataframe.DoubleSeries;
+import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
 import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
@@ -48,6 +51,8 @@ import org.joda.time.Interval;
 import org.joda.time.Period;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
 
 
 /**
@@ -116,8 +121,7 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
     Map<String, Object> frequency = MapUtils.getMap(config.getProperties(), PROP_FREQUENCY, Collections.emptyMap());
     this.functionFrequency = new TimeGranularity(MapUtils.getIntValue(frequency, "size", 15), TimeUnit.valueOf(MapUtils.getString(frequency, "unit", "MINUTES")));
 
-    MetricEntity me = MetricEntity.fromURN(this.metricUrn);
-    MetricConfigDTO metricConfigDTO = this.provider.fetchMetrics(Collections.singletonList(me.getId())).get(me.getId());
+    MetricConfigDTO metricConfigDTO = this.provider.fetchMetrics(Collections.singletonList(this.metricEntity.getId())).get(this.metricEntity.getId());
     this.dataset = this.provider.fetchDatasets(Collections.singletonList(metricConfigDTO.getDataset()))
         .get(metricConfigDTO.getDataset());
     // date time zone for moving windows. use dataset time zone as default
@@ -147,7 +151,33 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
       anomaly.setDimensions(DetectionUtils.toFilterMap(this.metricEntity.getFilters()));
       anomaly.getProperties().put(PROP_DETECTOR_COMPONENT_NAME, this.detectorName);
     }
-    return new DetectionPipelineResult(anomalies);
+    return new DetectionPipelineResult(anomalies, this.getLastTimeStamp());
+  }
+
+  // guess-timate next time stamp
+  // there are two cases. If the data is complete, next detection starts from the end time of this detection
+  // If data is incomplete, next detection starts from the latest available data's time stamp plus the one time granularity.
+  long getLastTimeStamp(){
+    long end = this.endTime;
+    if (this.dataset != null) {
+      MetricSlice metricSlice = MetricSlice.from(this.metricEntity.getId(),
+          this.startTime,
+          this.endTime,
+          this.metricEntity.getFilters());
+      DoubleSeries timestamps = this.provider.fetchTimeseries(Collections.singleton(metricSlice)).get(metricSlice).getDoubles(COL_TIME);
+      if (timestamps.size() == 0) {
+        // no data available, don't update time stamp
+        return -1;
+      }
+      Period period = dataset.bucketTimeGranularity().toPeriod();
+      DateTimeZone timezone = DateTimeZone.forID(dataset.getTimezone());
+      long lastTimestamp = timestamps.getLong(timestamps.size() - 1);
+
+      end = new DateTime(lastTimestamp, timezone).plus(period).getMillis();
+    }
+
+    // truncate at analysis end time
+    return Math.min(end, this.endTime);
   }
 
   // get a list of the monitoring window, if no sliding window used, use start time and end time as window
