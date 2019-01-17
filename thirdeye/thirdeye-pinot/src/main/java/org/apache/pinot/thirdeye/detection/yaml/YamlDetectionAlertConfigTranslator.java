@@ -44,25 +44,25 @@ public class YamlDetectionAlertConfigTranslator {
   public static final String PROP_DETECTION_CONFIG_IDS = "detectionConfigIds";
   public static final String PROP_RECIPIENTS = "recipients";
 
-  static final String PROP_SUBS_GROUP_NAME = "subscriptionGroupName";
-  static final String PROP_CRON = "cron";
-  static final String PROP_ACTIVE = "active";
-  static final String PROP_APPLICATION = "application";
-  static final String PROP_FROM = "fromAddress";
-  static final String PROP_ONLY_FETCH_LEGACY_ANOMALIES = "onlyFetchLegacyAnomalies";
-  static final String PROP_EMAIL_SUBJECT_TYPE = "emailSubjectStyle";
-  static final String PROP_ALERT_SCHEMES = "alertSchemes";
-  static final String PROP_ALERT_SUPPRESSORS = "alertSuppressors";
-  static final String PROP_REFERENCE_LINKS = "referenceLinks";
+  public static final String PROP_SUBS_GROUP_NAME = "subscriptionGroupName";
+  public static final String PROP_CRON = "cron";
+  public static final String PROP_ACTIVE = "active";
+  public static final String PROP_APPLICATION = "application";
+  public static final String PROP_FROM = "fromAddress";
+  public static final String PROP_ONLY_FETCH_LEGACY_ANOMALIES = "onlyFetchLegacyAnomalies";
+  public static final String PROP_EMAIL_SUBJECT_TYPE = "emailSubjectStyle";
+  public static final String PROP_ALERT_SCHEMES = "alertSchemes";
+  public static final String PROP_ALERT_SUPPRESSORS = "alertSuppressors";
+  public static final String PROP_REFERENCE_LINKS = "referenceLinks";
 
-  static final String PROP_TYPE = "type";
-  static final String PROP_CLASS_NAME = "className";
-  static final String PROP_PARAM = "params";
+  public static final String PROP_TYPE = "type";
+  public static final String PROP_CLASS_NAME = "className";
+  public static final String PROP_PARAM = "params";
 
-  static final String PROP_DIMENSION = "dimension";
-  static final String PROP_DIMENSION_RECIPIENTS = "dimensionRecipients";
-  static final String PROP_TIME_WINDOWS = "timeWindows";
-  static final String CRON_SCHEDULE_DEFAULT = "0 0/5 * * * ? *"; // Every 5 min
+  public static final String PROP_DIMENSION = "dimension";
+  public static final String PROP_DIMENSION_RECIPIENTS = "dimensionRecipients";
+  public static final String PROP_TIME_WINDOWS = "timeWindows";
+  public static final String CRON_SCHEDULE_DEFAULT = "0 0/5 * * * ? *"; // Every 5 min
 
   private static final DetectionAlertRegistry DETECTION_ALERT_REGISTRY = DetectionAlertRegistry.getInstance();
   private static final Set<String> PROPERTY_KEYS = new HashSet<>(
@@ -192,7 +192,10 @@ public class YamlDetectionAlertConfigTranslator {
 
     alertConfigDTO.setCronExpression(MapUtils.getString(yamlAlertConfig, PROP_CRON, CRON_SCHEDULE_DEFAULT));
     alertConfigDTO.setActive(MapUtils.getBooleanValue(yamlAlertConfig, PROP_ACTIVE, true));
+
+    // TODO: Remove all references to onlyFetchLegacyAnomalies after migration
     alertConfigDTO.setOnlyFetchLegacyAnomalies(MapUtils.getBooleanValue(yamlAlertConfig, PROP_ONLY_FETCH_LEGACY_ANOMALIES, false));
+
     alertConfigDTO.setSubjectType((AlertConfigBean.SubjectType) MapUtils.getObject(yamlAlertConfig, PROP_EMAIL_SUBJECT_TYPE, AlertConfigBean.SubjectType.METRICS));
 
     Map<String, String> refLinks = MapUtils.getMap(yamlAlertConfig, PROP_REFERENCE_LINKS);

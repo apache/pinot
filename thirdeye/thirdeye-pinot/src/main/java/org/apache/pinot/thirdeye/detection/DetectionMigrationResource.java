@@ -26,25 +26,21 @@ import org.apache.pinot.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
+import org.apache.pinot.thirdeye.datalayer.dto.AlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
-import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.detector.email.filter.AlertFilterFactory;
 import org.apache.pinot.thirdeye.detector.function.AnomalyFunctionFactory;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 import javax.ws.rs.GET;
-import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.QueryParam;
-import javax.ws.rs.WebApplicationException;
-import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
 import org.joda.time.Period;
 import org.slf4j.Logger;
@@ -53,6 +49,7 @@ import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.Yaml;
 
 import static org.apache.pinot.thirdeye.anomaly.merge.AnomalyMergeStrategy.*;
+import static org.apache.pinot.thirdeye.detection.yaml.YamlDetectionAlertConfigTranslator.*;
 
 
 /**
@@ -66,7 +63,6 @@ public class DetectionMigrationResource {
   private static final String PROP_WINDOW_SIZE = "windowSize";
   private static final String PROP_WINDOW_UNIT = "windowUnit";
 
-  private final LegacyAnomalyFunctionTranslator translator;
   private final AnomalyFunctionManager anomalyFunctionDAO;
   private final DetectionConfigManager detectionConfigDAO;
   private final DatasetConfigManager datasetConfigDAO;
@@ -74,18 +70,13 @@ public class DetectionMigrationResource {
 
   /**
    * Instantiates a new Detection migration resource.
-   *
-   * @param anomalyFunctionFactory the anomaly function factory
    */
-  public DetectionMigrationResource(MetricConfigManager metricConfigDAO, AnomalyFunctionManager anomalyFunctionDAO,
+  public DetectionMigrationResource(AnomalyFunctionManager anomalyFunctionDAO,
       DetectionConfigManager detectionConfigDAO,
-      DatasetConfigManager datasetConfigDAO,
-      AnomalyFunctionFactory anomalyFunctionFactory,
-      AlertFilterFactory alertFilterFactory) {
+      DatasetConfigManager datasetConfigDAO) {
     this.anomalyFunctionDAO = anomalyFunctionDAO;
     this.detectionConfigDAO = detectionConfigDAO;
     this.datasetConfigDAO = datasetConfigDAO;
-    this.translator = new LegacyAnomalyFunctionTranslator(metricConfigDAO, anomalyFunctionFactory, alertFilterFactory);
     DumperOptions options = new DumperOptions();
     options.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
     options.setPrettyFlow(true);
@@ -279,35 +270,30 @@ public class DetectionMigrationResource {
     return detectorYaml;
   }
 
-  /**
-   * This endpoint takes in a anomaly function Id and translate the anomaly function config to a
-   * detection config of the new pipeline and then persist it in to database.
-   *
-   * @param anomalyFunctionId the anomaly function id
-   * @return the response
-   * @throws Exception the exception
-   */
-  @POST
-  public Response migrateToDetectionPipeline(@QueryParam("id") long anomalyFunctionId, @QueryParam("name") String name,
-      @QueryParam("lastTimestamp") Long lastTimestamp) throws Exception {
-    AnomalyFunctionDTO anomalyFunctionDTO = this.anomalyFunctionDAO.findById(anomalyFunctionId);
-    DetectionConfigDTO config = this.translator.translate(anomalyFunctionDTO);
+  Map<String, Object> translateAlertToYaml(AlertConfigDTO alertConfigDTO) {
+    Map<String, Object> yamlConfigs = new LinkedHashMap<>();
 
-    if (!StringUtils.isBlank(name)) {
-      config.setName(name);
-    }
+    yamlConfigs.put(PROP_SUBS_GROUP_NAME, alertConfigDTO.getName());
+    yamlConfigs.put(PROP_CRON, alertConfigDTO.getCronExpression());
+    yamlConfigs.put(PROP_ACTIVE, alertConfigDTO.isActive());
+    yamlConfigs.put(PROP_APPLICATION, alertConfigDTO.getApplication());
+    yamlConfigs.put(PROP_EMAIL_SUBJECT_TYPE, alertConfigDTO.getSubjectType());
+    yamlConfigs.put(PROP_FROM, alertConfigDTO.getFromAddress());
 
-    config.setLastTimestamp(System.currentTimeMillis());
-    if (lastTimestamp != null) {
-      config.setLastTimestamp(lastTimestamp);
-    }
+    yamlConfigs.put(PROP_TYPE, "DEFAULT_ALERTER_PIPELINE");
 
-    this.detectionConfigDAO.save(config);
-    if (config.getId() == null) {
-      throw new WebApplicationException(String.format("Could not migrate anomaly function %d", anomalyFunctionId));
-    }
+    Map<String, Object> recipients = new LinkedHashMap<>();
+    recipients.put("to", alertConfigDTO.getReceiverAddresses().getTo());
+    recipients.put("cc", alertConfigDTO.getReceiverAddresses().getCc());
+    recipients.put("bcc", alertConfigDTO.getReceiverAddresses().getBcc());
+    yamlConfigs.put(PROP_RECIPIENTS, recipients);
 
-    LOGGER.info("Created detection config {} for anomaly function {}", config.getId(), anomalyFunctionDTO.getId());
-    return Response.ok(config.getId()).build();
+    Map<String, Object> alertSchemes = new LinkedHashMap<>();
+    alertSchemes.put(PROP_TYPE, "EMAIL");
+    yamlConfigs.put(PROP_ALERT_SCHEMES, alertSchemes);
+
+    yamlConfigs.put(PROP_DETECTION_CONFIG_IDS, alertConfigDTO.getEmailConfig().getFunctionIds());
+
+    return yamlConfigs;
   }
 }

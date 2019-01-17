@@ -126,15 +126,15 @@ public class DetectionAlertRegistry {
    * Look up the {@link #ALERT_SCHEME_MAP} for the Alert scheme class name from the type
    */
   public String lookupAlertSchemes(String schemeType) {
-    Preconditions.checkArgument(ALERT_SCHEME_MAP.containsKey(schemeType), schemeType + " not found in registry");
-    return ALERT_SCHEME_MAP.get(schemeType);
+    Preconditions.checkArgument(ALERT_SCHEME_MAP.containsKey(schemeType.toUpperCase()), schemeType + " not found in registry");
+    return ALERT_SCHEME_MAP.get(schemeType.toUpperCase());
   }
 
   /**
    * Look up the {@link #ALERT_SUPPRESSOR_MAP} for the Alert suppressor class name from the type
    */
   public String lookupAlertSuppressors(String suppressorType) {
-    Preconditions.checkArgument(ALERT_SUPPRESSOR_MAP.containsKey(suppressorType), suppressorType + " not found in registry");
-    return ALERT_SUPPRESSOR_MAP.get(suppressorType);
+    Preconditions.checkArgument(ALERT_SUPPRESSOR_MAP.containsKey(suppressorType.toUpperCase()), suppressorType + " not found in registry");
+    return ALERT_SUPPRESSOR_MAP.get(suppressorType.toUpperCase());
   }
 }

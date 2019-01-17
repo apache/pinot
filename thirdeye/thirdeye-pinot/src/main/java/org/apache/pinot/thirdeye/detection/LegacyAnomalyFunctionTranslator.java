@@ -34,6 +34,7 @@ import org.slf4j.LoggerFactory;
 /**
  * The Legacy Anomaly function translator.
  */
+@Deprecated
 public class LegacyAnomalyFunctionTranslator {
   private static final Logger LOGGER = LoggerFactory.getLogger(LegacyAnomalyFunctionTranslator.class);
 
