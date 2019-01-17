@@ -234,7 +234,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask {
             nReplicasIdealMax);
       }
     } catch (Exception e) {
-      LOGGER.warn("Caught exception while updating segment status for table {}", tableNameWithType, e);
+      LOGGER.error("Caught exception while updating segment status for table {}", tableNameWithType, e);
 
       // Remove the metric for this table
       resetTableMetrics(tableNameWithType);
