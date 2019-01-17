@@ -23,12 +23,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.helix.AccessOption;
-import org.apache.helix.HelixAdmin;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.config.TableNameBuilder;
+import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.utils.CommonConstants;
@@ -38,8 +38,7 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 
 public class SegmentStatusCheckerTest {
@@ -71,17 +70,11 @@ public class SegmentStatusCheckerTest {
     externalView.setState("myTable_1","pinot1","ERROR");
     externalView.setState("myTable_1","pinot2","ONLINE");
 
-    HelixAdmin helixAdmin;
-    {
-      helixAdmin = mock(HelixAdmin.class);
-      when(helixAdmin.getResourceIdealState("StatusChecker",tableName)).thenReturn(idealState);
-      when(helixAdmin.getResourceExternalView("StatusChecker",tableName)).thenReturn(externalView);
-    }
     {
       helixResourceManager = mock(PinotHelixResourceManager.class);
       when(helixResourceManager.getAllTables()).thenReturn(allTableNames);
-      when(helixResourceManager.getHelixClusterName()).thenReturn("StatusChecker");
-      when(helixResourceManager.getHelixAdmin()).thenReturn(helixAdmin);
+      when(helixResourceManager.getTableIdealState(tableName)).thenReturn(idealState);
+      when(helixResourceManager.getTableExternalView(tableName)).thenReturn(externalView);
     }
     {
       config = mock(ControllerConf.class);
@@ -136,17 +129,11 @@ public class SegmentStatusCheckerTest {
     externalView.setState(seg3.getSegmentName(),"pinot2","CONSUMING");
     externalView.setState(seg3.getSegmentName(),"pinot3","OFFLINE");
 
-    HelixAdmin helixAdmin;
-    {
-      helixAdmin = mock(HelixAdmin.class);
-      when(helixAdmin.getResourceIdealState("StatusChecker",tableName)).thenReturn(idealState);
-      when(helixAdmin.getResourceExternalView("StatusChecker",tableName)).thenReturn(externalView);
-    }
     {
       helixResourceManager = mock(PinotHelixResourceManager.class);
       when(helixResourceManager.getAllTables()).thenReturn(allTableNames);
-      when(helixResourceManager.getHelixClusterName()).thenReturn("StatusChecker");
-      when(helixResourceManager.getHelixAdmin()).thenReturn(helixAdmin);
+      when(helixResourceManager.getTableIdealState(tableName)).thenReturn(idealState);
+      when(helixResourceManager.getTableExternalView(tableName)).thenReturn(externalView);
     }
     {
       config = mock(ControllerConf.class);
@@ -212,18 +199,13 @@ public class SegmentStatusCheckerTest {
       when(propertyStore.get("/SEGMENTS/myTable_OFFLINE/myTable_3",null, AccessOption.PERSISTENT)).thenReturn(znrecord);
     }
 
-    HelixAdmin helixAdmin;
-    {
-      helixAdmin = mock(HelixAdmin.class);
-      when(helixAdmin.getResourceIdealState("StatusChecker",tableName)).thenReturn(idealState);
-      when(helixAdmin.getResourceExternalView("StatusChecker",tableName)).thenReturn(externalView);
-    }
     {
       helixResourceManager = mock(PinotHelixResourceManager.class);
       when(helixResourceManager.getAllTables()).thenReturn(allTableNames);
-      when(helixResourceManager.getHelixClusterName()).thenReturn("StatusChecker");
-      when(helixResourceManager.getHelixAdmin()).thenReturn(helixAdmin);
-      when(helixResourceManager.getPropertyStore()).thenReturn(propertyStore);
+      when(helixResourceManager.getTableIdealState(tableName)).thenReturn(idealState);
+      when(helixResourceManager.getTableExternalView(tableName)).thenReturn(externalView);
+      when(helixResourceManager.getOfflineSegmentZKMetadata(tableName, "myTable_3")).thenReturn(
+          new OfflineSegmentZKMetadata(znrecord));
     }
     {
       config = mock(ControllerConf.class);
@@ -259,17 +241,11 @@ public class SegmentStatusCheckerTest {
     idealState.setReplicas("2");
     idealState.setRebalanceMode(IdealState.RebalanceMode.CUSTOMIZED);
 
-    HelixAdmin helixAdmin;
-    {
-      helixAdmin = mock(HelixAdmin.class);
-      when(helixAdmin.getResourceIdealState("StatusChecker",tableName)).thenReturn(idealState);
-      when(helixAdmin.getResourceExternalView("StatusChecker",tableName)).thenReturn(null);
-    }
     {
       helixResourceManager = mock(PinotHelixResourceManager.class);
       when(helixResourceManager.getAllTables()).thenReturn(allTableNames);
-      when(helixResourceManager.getHelixClusterName()).thenReturn("StatusChecker");
-      when(helixResourceManager.getHelixAdmin()).thenReturn(helixAdmin);
+      when(helixResourceManager.getTableIdealState(tableName)).thenReturn(idealState);
+      when(helixResourceManager.getTableExternalView(tableName)).thenReturn(null);
     }
     {
       config = mock(ControllerConf.class);
@@ -293,17 +269,11 @@ public class SegmentStatusCheckerTest {
     List<String> allTableNames = new ArrayList<String>();
     allTableNames.add(tableName);
 
-    HelixAdmin helixAdmin;
-    {
-      helixAdmin = mock(HelixAdmin.class);
-      when(helixAdmin.getResourceIdealState("StatusChecker",tableName)).thenReturn(null);
-      when(helixAdmin.getResourceExternalView("StatusChecker",tableName)).thenReturn(null);
-    }
     {
       helixResourceManager = mock(PinotHelixResourceManager.class);
       when(helixResourceManager.getAllTables()).thenReturn(allTableNames);
-      when(helixResourceManager.getHelixClusterName()).thenReturn("StatusChecker");
-      when(helixResourceManager.getHelixAdmin()).thenReturn(helixAdmin);
+      when(helixResourceManager.getTableIdealState(tableName)).thenReturn(null);
+      when(helixResourceManager.getTableExternalView(tableName)).thenReturn(null);
     }
     {
       config = mock(ControllerConf.class);
@@ -339,12 +309,6 @@ public class SegmentStatusCheckerTest {
     externalView.setState("myTable_1","pinot1","ONLINE");
     externalView.setState("myTable_1","pinot2","ONLINE");
 
-    HelixAdmin helixAdmin;
-    {
-      helixAdmin = mock(HelixAdmin.class);
-      when(helixAdmin.getResourceIdealState("StatusChecker","myTable_OFFLINE")).thenReturn(idealState);
-      when(helixAdmin.getResourceExternalView("StatusChecker","myTable_OFFLINE")).thenReturn(externalView);
-    }
     ZNRecord znrecord =  new ZNRecord("myTable_0");
     znrecord.setSimpleField(CommonConstants.Segment.SEGMENT_NAME,"myTable_0");
     znrecord.setSimpleField(CommonConstants.Segment.TABLE_NAME, "myTable_OFFLINE");
@@ -360,18 +324,13 @@ public class SegmentStatusCheckerTest {
     znrecord.setLongField(CommonConstants.Segment.Offline.PUSH_TIME, System.currentTimeMillis());
     znrecord.setLongField(CommonConstants.Segment.Offline.REFRESH_TIME,System.currentTimeMillis());
 
-    ZkHelixPropertyStore<ZNRecord> propertyStore;
-    {
-      propertyStore = (ZkHelixPropertyStore<ZNRecord>) mock(ZkHelixPropertyStore.class);
-      when(propertyStore.get("/SEGMENTS/myTable_OFFLINE/myTable_0",null, AccessOption.PERSISTENT)).thenReturn(znrecord);
-    }
-
     {
       helixResourceManager = mock(PinotHelixResourceManager.class);
       when(helixResourceManager.getAllTables()).thenReturn(allTableNames);
-      when(helixResourceManager.getHelixClusterName()).thenReturn("StatusChecker");
-      when(helixResourceManager.getHelixAdmin()).thenReturn(helixAdmin);
-      when(helixResourceManager.getPropertyStore()).thenReturn(propertyStore);
+      when(helixResourceManager.getTableIdealState(tableName)).thenReturn(idealState);
+      when(helixResourceManager.getTableExternalView(tableName)).thenReturn(externalView);
+      when(helixResourceManager.getOfflineSegmentZKMetadata(tableName, "myTable_0")).thenReturn(
+          new OfflineSegmentZKMetadata(znrecord));
     }
     {
       config = mock(ControllerConf.class);
@@ -405,17 +364,11 @@ public class SegmentStatusCheckerTest {
     idealState.setReplicas("0");
     idealState.setRebalanceMode(IdealState.RebalanceMode.CUSTOMIZED);
 
-    HelixAdmin helixAdmin;
-    {
-      helixAdmin = mock(HelixAdmin.class);
-      when(helixAdmin.getResourceIdealState("StatusChecker",tableName)).thenReturn(idealState);
-      when(helixAdmin.getResourceExternalView("StatusChecker",tableName)).thenReturn(null);
-    }
     {
       helixResourceManager = mock(PinotHelixResourceManager.class);
       when(helixResourceManager.getAllTables()).thenReturn(allTableNames);
-      when(helixResourceManager.getHelixClusterName()).thenReturn("StatusChecker");
-      when(helixResourceManager.getHelixAdmin()).thenReturn(helixAdmin);
+      when(helixResourceManager.getTableIdealState(tableName)).thenReturn(idealState);
+      when(helixResourceManager.getTableExternalView(tableName)).thenReturn(null);
     }
     {
       config = mock(ControllerConf.class);
@@ -443,17 +396,11 @@ public class SegmentStatusCheckerTest {
     List<String> allTableNames = new ArrayList<String>();
     allTableNames.add(tableName);
     IdealState idealState = null;
-    HelixAdmin helixAdmin;
-    {
-      helixAdmin = mock(HelixAdmin.class);
-      when(helixAdmin.getResourceIdealState("StatusChecker",tableName)).thenReturn(idealState);
-      when(helixAdmin.getResourceExternalView("StatusChecker",tableName)).thenReturn(null);
-    }
     {
       helixResourceManager = mock(PinotHelixResourceManager.class);
       when(helixResourceManager.getAllTables()).thenReturn(allTableNames);
-      when(helixResourceManager.getHelixClusterName()).thenReturn("StatusChecker");
-      when(helixResourceManager.getHelixAdmin()).thenReturn(helixAdmin);
+      when(helixResourceManager.getTableIdealState(tableName)).thenReturn(idealState);
+      when(helixResourceManager.getTableExternalView(tableName)).thenReturn(null);
     }
     {
       config = mock(ControllerConf.class);
@@ -489,17 +436,12 @@ public class SegmentStatusCheckerTest {
     idealState.setPartitionState("myTable_OFFLINE", "pinot3", "OFFLINE");
     idealState.setReplicas("1");
     idealState.setRebalanceMode(IdealState.RebalanceMode.CUSTOMIZED);
-    HelixAdmin helixAdmin;
-    {
-      helixAdmin = mock(HelixAdmin.class);
-      when(helixAdmin.getResourceIdealState("StatusChecker",tableName)).thenReturn(idealState);
-      when(helixAdmin.getResourceExternalView("StatusChecker",tableName)).thenReturn(null);
-    }
+
     {
       helixResourceManager = mock(PinotHelixResourceManager.class);
       when(helixResourceManager.getAllTables()).thenReturn(allTableNames);
-      when(helixResourceManager.getHelixClusterName()).thenReturn("StatusChecker");
-      when(helixResourceManager.getHelixAdmin()).thenReturn(helixAdmin);
+      when(helixResourceManager.getTableIdealState(tableName)).thenReturn(idealState);
+      when(helixResourceManager.getTableExternalView(tableName)).thenReturn(null);
     }
     {
       config = mock(ControllerConf.class);
@@ -540,17 +482,11 @@ public class SegmentStatusCheckerTest {
     idealState.setReplicas(nReplicasStr);
     idealState.setRebalanceMode(IdealState.RebalanceMode.CUSTOMIZED);
 
-    HelixAdmin helixAdmin;
-    {
-      helixAdmin = mock(HelixAdmin.class);
-      when(helixAdmin.getResourceIdealState("StatusChecker",tableName)).thenReturn(idealState);
-      when(helixAdmin.getResourceExternalView("StatusChecker",tableName)).thenReturn(null);
-    }
     {
       helixResourceManager = mock(PinotHelixResourceManager.class);
       when(helixResourceManager.getAllTables()).thenReturn(allTableNames);
-      when(helixResourceManager.getHelixClusterName()).thenReturn("StatusChecker");
-      when(helixResourceManager.getHelixAdmin()).thenReturn(helixAdmin);
+      when(helixResourceManager.getTableIdealState(tableName)).thenReturn(idealState);
+      when(helixResourceManager.getTableExternalView(tableName)).thenReturn(null);
     }
     {
       config = mock(ControllerConf.class);

@@ -21,13 +21,9 @@ package org.apache.pinot.controller.helix;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import org.apache.helix.HelixAdmin;
-import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
-import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.config.TableNameBuilder;
-import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
@@ -50,9 +46,6 @@ public class SegmentStatusChecker extends ControllerPeriodicTask {
   public static final String ERROR = "ERROR";
   public static final String CONSUMING = "CONSUMING";
   private final ControllerMetrics _metricsRegistry;
-  private final HelixAdmin _helixAdmin;
-  private final String _helixClusterName;
-  private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private final int _waitForPushTimeSeconds;
 
   // log messages about disabled tables atmost once a day
@@ -72,9 +65,6 @@ public class SegmentStatusChecker extends ControllerPeriodicTask {
   public SegmentStatusChecker(PinotHelixResourceManager pinotHelixResourceManager, ControllerConf config,
       ControllerMetrics metricsRegistry) {
     super("SegmentStatusChecker", config.getStatusCheckerFrequencyInSeconds(), pinotHelixResourceManager);
-    _helixAdmin = pinotHelixResourceManager.getHelixAdmin();
-    _helixClusterName = pinotHelixResourceManager.getHelixClusterName();
-    _propertyStore = _pinotHelixResourceManager.getPropertyStore();
 
     _waitForPushTimeSeconds = config.getStatusCheckerWaitForPushTimeInSeconds();
     _metricsRegistry = metricsRegistry;
@@ -128,7 +118,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask {
       } else {
         _realTimeTableCount++;
       }
-      IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableNameWithType);
+      IdealState idealState = _pinotHelixResourceManager.getTableIdealState(tableNameWithType);
       if ((idealState == null) || (idealState.getPartitionSet().isEmpty())) {
         int nReplicasFromIdealState = 1;
         try {
@@ -157,7 +147,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask {
           idealState.toString().length());
       _metricsRegistry.setValueOfTableGauge(tableNameWithType, ControllerGauge.SEGMENT_COUNT,
           (long) (idealState.getPartitionSet().size()));
-      ExternalView externalView = _helixAdmin.getResourceExternalView(_helixClusterName, tableNameWithType);
+      ExternalView externalView = _pinotHelixResourceManager.getTableExternalView(tableNameWithType);
 
       int nReplicasIdealMax = 0; // Keeps track of maximum number of replicas in ideal state
       int nReplicasExternal = -1; // Keeps track of minimum number of replicas in external view
@@ -190,7 +180,8 @@ public class SegmentStatusChecker extends ControllerPeriodicTask {
           TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
           if ((tableType != null) && (tableType.equals(TableType.OFFLINE))) {
             OfflineSegmentZKMetadata segmentZKMetadata =
-                ZKMetadataProvider.getOfflineSegmentZKMetadata(_propertyStore, tableNameWithType, partitionName);
+                _pinotHelixResourceManager.getOfflineSegmentZKMetadata(tableNameWithType, partitionName);
+
             if (segmentZKMetadata != null
                 && segmentZKMetadata.getPushTime() > System.currentTimeMillis() - _waitForPushTimeSeconds * 1000) {
               // push not yet finished, skip
@@ -243,7 +234,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask {
             nReplicasIdealMax);
       }
     } catch (Exception e) {
-      LOGGER.warn("Caught exception while updating segment status for table {}", tableNameWithType, e);
+      LOGGER.error("Caught exception while updating segment status for table {}", tableNameWithType, e);
 
       // Remove the metric for this table
       resetTableMetrics(tableNameWithType);
