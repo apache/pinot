@@ -64,6 +64,10 @@ public class ImmutableSegmentLoader {
 
   /**
    * For segments from REALTIME table.
+   * <p>
+   * NOTE: Currently REALTIME data manager does not have mechanism to download a new segment copy from controller and
+   * reload the segment when encountering exception during segment load (HLC maintains segment on server side only),
+   * so REALTIME table should always use this method without passing schema.
    */
   public static ImmutableSegment load(@Nonnull File indexDir, @Nonnull IndexLoadingConfig indexLoadingConfig)
       throws Exception {

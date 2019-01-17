@@ -150,7 +150,7 @@ public class TablesResource {
       }
       try {
         return segmentMetadata.toJson(columnSet).toString();
-      } catch (JsonProcessingException e) {
+      } catch (Exception e) {
         LOGGER.error("Failed to convert table {} segment {} to json", tableName, segmentMetadata);
         throw new WebApplicationException("Failed to convert segment metadata to json",
             Response.Status.INTERNAL_SERVER_ERROR);

@@ -758,7 +758,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       return false;
     }
 
-    _realtimeTableDataManager.replaceLLSegment(_segmentNameStr, _indexLoadingConfig, _schema);
+    _realtimeTableDataManager.replaceLLSegment(_segmentNameStr, _indexLoadingConfig);
     removeSegmentFile();
     return true;
   }
@@ -787,7 +787,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       return false;
     }
 
-    _realtimeTableDataManager.replaceLLSegment(_segmentNameStr, _indexLoadingConfig, _schema);
+    _realtimeTableDataManager.replaceLLSegment(_segmentNameStr, _indexLoadingConfig);
     return true;
   }
 
@@ -896,7 +896,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   }
 
   protected void downloadSegmentAndReplace(LLCRealtimeSegmentZKMetadata metadata) {
-    _realtimeTableDataManager.downloadAndReplaceSegment(_segmentNameStr, metadata, _indexLoadingConfig, _schema);
+    _realtimeTableDataManager.downloadAndReplaceSegment(_segmentNameStr, metadata, _indexLoadingConfig);
   }
 
   protected long now() {
