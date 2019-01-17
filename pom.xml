@@ -1007,14 +1007,20 @@
         <artifactId>license-maven-plugin</artifactId>
         <version>2.8</version>
         <configuration>
-          <header>license.header</header>
+          <header>HEADER</header>
           <excludes>
             <!-- Text and log files -->
             <exclude>**/*.txt</exclude>
             <exclude>**/*.log</exclude>
 
-            <!-- Resource directories under main and test -->
-            <exclude>**/src/main/resources/**</exclude>
+            <exclude>**/*.pql</exclude>
+            <exclude>**/*.config</exclude>
+            <exclude>**/*.csv</exclude>
+            <exclude>**/*.avro</exclude>
+            <exclude>**/*.conf</exclude>
+            <exclude>**/appAssemblerScriptTemplate</exclude>
+
+            <!-- Resource directories under test -->
             <exclude>**/src/test/resources/**</exclude>
 
             <!-- Auto-generated target directories -->
@@ -1030,9 +1036,22 @@
 
             <!-- Top level files -->
             <exclude>.codecov*</exclude>
-            <exclude>license.header</exclude>
+            <exclude>HEADER</exclude>
             <exclude>LICENSE</exclude>
             <exclude>NOTICE</exclude>
+
+            <!-- js, css files that are exact copies of the third-party works. In this case, the original header has to
+            be kept. Please refer to 'Treatment of Third-party works' in https://www.apache.org/legal/src-headers.html
+            -->
+            <exclude>**/codemirror/**</exclude>
+            <exclude>**/codemirror*</exclude>
+            <exclude>**/foundation*</exclude>
+            <exclude>**/angular*</exclude>
+            <exclude>**/underscore*</exclude>
+            <exclude>**/jquery*</exclude>
+            <exclude>**/normalize*</exclude>
+            <exclude>**/handlebars*</exclude>
+            <exclude>**/beautify*</exclude>
           </excludes>
           <mapping>
             <thrift>JAVADOC_STYLE</thrift>
