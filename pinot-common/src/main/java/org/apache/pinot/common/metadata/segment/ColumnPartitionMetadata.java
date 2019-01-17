@@ -30,7 +30,7 @@ import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import java.io.IOException;
 import java.util.List;
-import javax.annotation.Nonnull;
+import java.util.Objects;
 import org.apache.commons.lang.math.IntRange;
 import org.apache.pinot.common.config.ColumnPartitionConfig;
 import org.apache.pinot.common.utils.EqualityUtils;
@@ -47,9 +47,6 @@ import org.apache.pinot.common.utils.EqualityUtils;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class ColumnPartitionMetadata extends ColumnPartitionConfig {
 
-  @JsonSerialize(using = PartitionRangesSerializer.class)
-  @JsonDeserialize(using = PartitionRangesDeserializer.class)
-  @JsonProperty("partitionRanges")
   private final List<IntRange> _partitionRanges;
 
   /**
@@ -58,9 +55,9 @@ public class ColumnPartitionMetadata extends ColumnPartitionConfig {
    * @param numPartitions Number of partitions for this column.
    * @param partitionRanges Partition ranges for the column.
    */
-  public ColumnPartitionMetadata(@Nonnull @JsonProperty("functionName") String functionName,
+  public ColumnPartitionMetadata(@JsonProperty("functionName") String functionName,
       @JsonProperty("numPartitions") int numPartitions,
-      @JsonProperty("partitionRanges") List<IntRange> partitionRanges) {
+      @JsonProperty("partitionRanges") @JsonDeserialize(using = PartitionRangesDeserializer.class) List<IntRange> partitionRanges) {
     super(functionName, numPartitions);
     _partitionRanges = partitionRanges;
   }
@@ -70,6 +67,7 @@ public class ColumnPartitionMetadata extends ColumnPartitionConfig {
    *
    * @return List of partition ranges.
    */
+  @JsonSerialize(using = PartitionRangesSerializer.class)
   public List<IntRange> getPartitionRanges() {
     return _partitionRanges;
   }
@@ -84,8 +82,7 @@ public class ColumnPartitionMetadata extends ColumnPartitionConfig {
     }
 
     ColumnPartitionMetadata that = (ColumnPartitionMetadata) o;
-    return super.equals(that) && (_partitionRanges != null ? _partitionRanges.equals(that._partitionRanges)
-        : that._partitionRanges == null);
+    return super.equals(that) && Objects.equals(_partitionRanges, that._partitionRanges);
   }
 
   @Override
@@ -112,7 +109,8 @@ public class ColumnPartitionMetadata extends ColumnPartitionConfig {
   public static class PartitionRangesDeserializer extends JsonDeserializer<List<IntRange>> {
 
     @Override
-    public List<IntRange> deserialize(JsonParser jsonParser, DeserializationContext context) throws IOException {
+    public List<IntRange> deserialize(JsonParser jsonParser, DeserializationContext context)
+        throws IOException {
       return ColumnPartitionConfig.rangesFromString(jsonParser.getText());
     }
   }
