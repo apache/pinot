@@ -1928,8 +1928,8 @@ public class PinotHelixResourceManager {
 
   /**
    * Gets the ideal state of the table
-   * @param tableNameWithType
-   * @return
+   * @param tableNameWithType Table name with suffix
+   * @return IdealState of tableNameWithType
    */
   public IdealState getTableIdealState(String tableNameWithType) {
     return _helixAdmin.getResourceIdealState(_helixClusterName, tableNameWithType);
@@ -1937,8 +1937,8 @@ public class PinotHelixResourceManager {
 
   /**
    * Gets the external view of the table
-   * @param tableNameWithType
-   * @return
+   * @param tableNameWithType Table name with suffix
+   * @return ExternalView of tableNameWithType
    */
   public ExternalView getTableExternalView(String tableNameWithType) {
     return _helixAdmin.getResourceExternalView(_helixClusterName, tableNameWithType);
