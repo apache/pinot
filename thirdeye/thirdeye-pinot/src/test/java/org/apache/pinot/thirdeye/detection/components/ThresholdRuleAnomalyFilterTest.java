@@ -141,7 +141,7 @@ public class ThresholdRuleAnomalyFilterTest {
 
     DetectionPipelineResult result = this.thresholdRuleFilter.run();
     List<MergedAnomalyResultDTO> anomalies = result.getAnomalies();
-    Assert.assertEquals(result.getLastTimestamp(), 8);
+    Assert.assertEquals(result.getLastTimestamp(), 10);
     Assert.assertEquals(anomalies.size(), 3);
     Assert.assertEquals(anomalies.get(0), this.anomalies.get(0));
     Assert.assertEquals(anomalies.get(1), this.anomalies.get(1));
@@ -156,7 +156,7 @@ public class ThresholdRuleAnomalyFilterTest {
 
     DetectionPipelineResult result = this.thresholdRuleFilter.run();
     List<MergedAnomalyResultDTO> anomalies = result.getAnomalies();
-    Assert.assertEquals(result.getLastTimestamp(), 8);
+    Assert.assertEquals(result.getLastTimestamp(), 10);
     Assert.assertEquals(anomalies.size(), 2);
     Assert.assertEquals(anomalies.get(0), this.anomalies.get(1));
     Assert.assertEquals(anomalies.get(1), this.anomalies.get(2));

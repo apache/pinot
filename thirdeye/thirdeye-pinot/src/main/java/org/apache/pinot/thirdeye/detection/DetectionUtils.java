@@ -163,4 +163,16 @@ public class DetectionUtils {
 
     return anomaly;
   }
+
+  /**
+   * Helper for consolidate last time stamps in all nested detection pipelines
+   * @param nestedLastTimeStamps all nested last time stamps
+   * @return the last time stamp
+   */
+  public static long consolidateNestedLastTimeStamps(Collection<Long> nestedLastTimeStamps){
+    if(nestedLastTimeStamps.isEmpty() || nestedLastTimeStamps.contains(-1L)){
+      return -1L;
+    }
+    return Collections.min(nestedLastTimeStamps);
+  }
 }

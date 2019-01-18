@@ -18,6 +18,8 @@ package org.apache.pinot.thirdeye.detection.wrapper;
 
 import com.google.common.collect.ImmutableMap;
 import org.apache.pinot.thirdeye.api.TimeSpec;
+import org.apache.pinot.thirdeye.dataframe.DataFrame;
+import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
@@ -34,6 +36,8 @@ import org.joda.time.Interval;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
+
+import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
 
 
 public class AnomalyDetectorWrapperTest {
@@ -66,6 +70,13 @@ public class AnomalyDetectorWrapperTest {
     dataset.setTimeUnit(TimeUnit.DAYS);
     dataset.setTimeDuration(1);
     this.provider.setDatasets(Collections.singletonList(dataset));
+    this.provider.setTimeseries(ImmutableMap.of(
+        MetricSlice.from(1L, 1546646400000L, 1546732800000L),
+        new DataFrame().addSeries(COL_VALUE, 500, 1000).addSeries(COL_TIME, 1546646400000L, 1546732800000L),
+        MetricSlice.from(1L, 1546819200000L, 1546905600000L),
+        DataFrame.builder(COL_TIME, COL_VALUE).build(),
+        MetricSlice.from(1L, 1546300800000L, 1546560000000L),
+        new DataFrame().addSeries(COL_VALUE, 500, 1000).addSeries(COL_TIME, 1546300800000L, 1546387200000L)));
   }
 
   @Test
@@ -104,4 +115,24 @@ public class AnomalyDetectorWrapperTest {
             new Interval(1540252800000L, 1540339200000L, timeZone), new Interval(1540339200000L, 1540425600000L, timeZone)));
   }
 
+  @Test
+  public void testGetLastTimestampWithEstimate() {
+    AnomalyDetectorWrapper detectionPipeline =
+        new AnomalyDetectorWrapper(this.provider, this.config, 1546300800000L, 1546560000000L);
+    Assert.assertEquals(detectionPipeline.getLastTimeStamp(), 1546473600000L);
+  }
+
+  @Test
+  public void testGetLastTimestampTruncate() {
+    AnomalyDetectorWrapper detectionPipeline =
+        new AnomalyDetectorWrapper(this.provider, this.config, 1546646400000L, 1546732800000L);
+    Assert.assertEquals(detectionPipeline.getLastTimeStamp(), 1546732800000L);
+  }
+
+  @Test
+  public void testGetLastTimestampNoData() {
+    AnomalyDetectorWrapper detectionPipeline =
+        new AnomalyDetectorWrapper(this.provider, this.config, 1546819200000L, 1546905600000L);
+    Assert.assertEquals(detectionPipeline.getLastTimeStamp(), -1);
+  }
 }
