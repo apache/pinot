@@ -150,11 +150,12 @@ alertSchemes:
 - type: EMAIL
 recipients:
  to:
-  - "me@company.com"
+  - "me@company.com"buildAlerterProperties
  cc:
   - "cc_email@company.com"
-fromAddress: thirdeye-dev@linkedin.com
+fromAddress: your_from@company.com
 
+cron: "0 0/5 * 1/1 * ? *"	
 active: true
 referenceLinks:
  "My Company FAQs": "http://www.company.com/faq"`;

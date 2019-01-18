@@ -29,7 +29,7 @@ public class YamlDetectionAlertConfigTranslatorTest {
   private DAOTestBase testDAOProvider;
   private DetectionConfigManager detectionConfigManager;
 
-  @Test(priority=1)
+  @Test
   public void testTranslateAlert() {
     DetectionAlertRegistry.getInstance().registerAlertScheme("EMAIL", "EmailClass");
     DetectionAlertRegistry.getInstance().registerAlertSuppressor("TIME_WINDOW", "TimeWindowClass");
