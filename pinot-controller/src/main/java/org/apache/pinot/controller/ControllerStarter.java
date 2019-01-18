@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.primitives.Longs;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.yammer.metrics.core.MetricsRegistry;
@@ -130,6 +131,8 @@ public class ControllerStarter {
     return _taskManager;
   }
 
+
+
   public void start() {
     LOGGER.info("Starting Pinot controller");
 
@@ -184,30 +187,10 @@ public class ControllerStarter {
     _realtimeSegmentsManager.start(_controllerMetrics);
 
     // Setting up periodic tasks
-    LOGGER.info("Setting up periodic tasks");
-    List<PeriodicTask> periodicTasks = new ArrayList<>();
-    _taskManager = new PinotTaskManager(_helixTaskResourceManager, _helixResourceManager, _config, _controllerMetrics);
-    periodicTasks.add(_taskManager);
-    _retentionManager = new RetentionManager(_helixResourceManager, _config);
-    periodicTasks.add(_retentionManager);
-    _offlineSegmentIntervalChecker =
-        new OfflineSegmentIntervalChecker(_config, _helixResourceManager, new ValidationMetrics(_metricsRegistry));
-    periodicTasks.add(_offlineSegmentIntervalChecker);
-    _realtimeSegmentValidationManager =
-        new RealtimeSegmentValidationManager(_config, _helixResourceManager, PinotLLCRealtimeSegmentManager.getInstance(),
-            new ValidationMetrics(_metricsRegistry));
-    periodicTasks.add(_realtimeSegmentValidationManager);
-    _brokerResourceValidationManager =
-        new BrokerResourceValidationManager(_config, _helixResourceManager);
-    periodicTasks.add(_brokerResourceValidationManager);
-    _segmentStatusChecker = new SegmentStatusChecker(_helixResourceManager, _config, _controllerMetrics);
-    periodicTasks.add(_segmentStatusChecker);
-    _realtimeSegmentRelocator = new RealtimeSegmentRelocator(_helixResourceManager, _config);
-    periodicTasks.add(_realtimeSegmentRelocator);
-
+    List<PeriodicTask> controllerPeriodicTasks = setupControllerPeriodicTasks();
     LOGGER.info("Init controller periodic tasks scheduler");
     _controllerPeriodicTaskScheduler = new ControllerPeriodicTaskScheduler();
-    _controllerPeriodicTaskScheduler.init(periodicTasks);
+    _controllerPeriodicTaskScheduler.init(controllerPeriodicTasks);
 
     LOGGER.info("Creating rebalance segments factory");
     RebalanceSegmentStrategyFactory.createInstance(helixManager);
@@ -309,6 +292,32 @@ public class ControllerStarter {
     helixManager.addPreConnectCallback(
         () -> _controllerMetrics.addMeteredGlobalValue(ControllerMeter.HELIX_ZOOKEEPER_RECONNECTS, 1L));
     _controllerMetrics.initializeGlobalMeters();
+  }
+
+  @VisibleForTesting
+  protected List<PeriodicTask> setupControllerPeriodicTasks() {
+    LOGGER.info("Setting up periodic tasks");
+    List<PeriodicTask> periodicTasks = new ArrayList<>();
+    _taskManager = new PinotTaskManager(_helixTaskResourceManager, _helixResourceManager, _config, _controllerMetrics);
+    periodicTasks.add(_taskManager);
+    _retentionManager = new RetentionManager(_helixResourceManager, _config);
+    periodicTasks.add(_retentionManager);
+    _offlineSegmentIntervalChecker =
+        new OfflineSegmentIntervalChecker(_config, _helixResourceManager, new ValidationMetrics(_metricsRegistry));
+    periodicTasks.add(_offlineSegmentIntervalChecker);
+    _realtimeSegmentValidationManager =
+        new RealtimeSegmentValidationManager(_config, _helixResourceManager, PinotLLCRealtimeSegmentManager.getInstance(),
+            new ValidationMetrics(_metricsRegistry));
+    periodicTasks.add(_realtimeSegmentValidationManager);
+    _brokerResourceValidationManager =
+        new BrokerResourceValidationManager(_config, _helixResourceManager);
+    periodicTasks.add(_brokerResourceValidationManager);
+    _segmentStatusChecker = new SegmentStatusChecker(_helixResourceManager, _config, _controllerMetrics);
+    periodicTasks.add(_segmentStatusChecker);
+    _realtimeSegmentRelocator = new RealtimeSegmentRelocator(_helixResourceManager, _config);
+    periodicTasks.add(_realtimeSegmentRelocator);
+
+    return periodicTasks;
   }
 
   public void stop() {
