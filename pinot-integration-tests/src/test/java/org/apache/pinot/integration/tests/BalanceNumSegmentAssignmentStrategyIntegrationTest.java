@@ -58,7 +58,13 @@ public class BalanceNumSegmentAssignmentStrategyIntegrationTest extends UploadRe
     }
   }
 
-  @Test(dataProvider = "configProvider")
+  @DataProvider(name = "tableNameProvider")
+  public Object[][] configProvider() {
+    Object[][] configs = {{"disabledInstancesTable", SegmentVersion.v3}};
+    return configs;
+  }
+
+  @Test(dataProvider = "tableNameProvider")
   public void testSegmentAssignmentStrategy(String tableName, SegmentVersion version)
       throws Exception {
     // Upload nine segments
@@ -89,12 +95,6 @@ public class BalanceNumSegmentAssignmentStrategyIntegrationTest extends UploadRe
       }
     }
     return segmentsPerInstance;
-  }
-
-  @DataProvider(name = "tableNameProvider")
-  public Object[][] configProvider() {
-    Object[][] configs = {{"disabledInstancesTable", SegmentVersion.v3}};
-    return configs;
   }
 
   @Test(dataProvider = "tableNameProvider")

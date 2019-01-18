@@ -84,10 +84,6 @@
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-tools</artifactId>
     </dependency>
-    <dependency>
-      <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-perf</artifactId>
-    </dependency>
   </dependencies>
   <build>
     <plugins>
