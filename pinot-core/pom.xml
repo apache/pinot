@@ -19,14 +19,21 @@
     under the License.
 
 -->
-<project xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd" xmlns="http://maven.apache.org/POM/4.0.0"
-    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <artifactId>pinot</artifactId>
     <groupId>org.apache.pinot</groupId>
     <version>0.016</version>
   </parent>
+  <artifactId>pinot-core</artifactId>
+  <version>0.016</version>
+  <name>Pinot Core</name>
+  <url>https://pinot.apache.org/</url>
+  <properties>
+    <pinot.root>${basedir}/..</pinot.root>
+  </properties>
   <build>
     <plugins>
       <plugin>
@@ -45,14 +52,6 @@
       </plugin>
     </plugins>
   </build>
-  <artifactId>pinot-core</artifactId>
-  <version>0.016</version>
-  <name>pinot-core</name>
-  <url>http://maven.apache.org</url>
-
-  <properties>
-    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-  </properties>
   <dependencies>
     <dependency>
       <groupId>me.lemire.integercompression</groupId>
@@ -215,5 +214,5 @@
       <groupId>org.apache.commons</groupId>
       <artifactId>commons-math</artifactId>
     </dependency>
-   </dependencies>
+  </dependencies>
 </project>

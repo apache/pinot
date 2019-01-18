@@ -26,10 +26,9 @@
   <artifactId>pinot</artifactId>
   <version>0.016</version>
   <packaging>pom</packaging>
-
   <name>Pinot</name>
   <description>A realtime distributed OLAP datastore</description>
-  <url>https://pinot.apache.org</url>
+  <url>https://pinot.apache.org/</url>
 
   <modules>
     <module>pinot-broker</module>
@@ -93,13 +92,13 @@
   <inceptionYear>2014</inceptionYear>
 
   <properties>
+    <pinot.root>${basedir}</pinot.root>
     <build.profile.id>dev</build.profile.id>
     <jdk.version>1.8</jdk.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <!-- Only unit tests are run by default. -->
     <skip.integration.tests>true</skip.integration.tests>
     <skip.unit.tests>false</skip.unit.tests>
-    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <!-- Configuration for unit/integration tests section 1 of 3 (properties) STARTS HERE.
       Property for running integration tests with profiles
       at the command line, where you do:
@@ -925,8 +924,8 @@
         <artifactId>maven-checkstyle-plugin</artifactId>
         <version>3.0.0</version>
         <configuration>
-          <configLocation>config/checkstyle.xml</configLocation>
-          <propertyExpansion>config_loc=config</propertyExpansion>
+          <configLocation>${pinot.root}/config/checkstyle.xml</configLocation>
+          <propertyExpansion>config_loc=${pinot.root}/config</propertyExpansion>
           <consoleOutput>true</consoleOutput>
         </configuration>
         <!--Uncomment to enable style check during build-->
@@ -1025,7 +1024,7 @@
         <artifactId>license-maven-plugin</artifactId>
         <version>2.8</version>
         <configuration>
-          <header>HEADER</header>
+          <header>${pinot.root}/HEADER</header>
           <excludes>
             <!-- Text and log files -->
             <exclude>**/*.txt</exclude>
