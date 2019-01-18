@@ -12,7 +12,6 @@
         {{/if}}
       </div>
       {{#if (eq displayMode "list")}}
-      {{alertData.isNewPipeline}}
         {{#if alertData.isNewPipeline}}
           {{#link-to "manage.yaml" alertData.id}}
             <div class="te-search-results__title-name" title={{alertData.functionName}}>{{alertData.functionName}}</div>
