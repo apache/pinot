@@ -142,22 +142,19 @@ rules:
 
 export const yamlAlertSettings = `# Below are all dummy example. Please update accordingly.
 subscriptionGroupName: test_subscription_group
-cron: "0 0/5 * 1/1 * ? *"
 application: "parity-check"
-active: true
+subscribedDetections: 
+  - your_detection_name
 
-detectionConfigIds:
- - 5773069
-
-fromAddress: your_from@company.com
+alertSchemes:
+- type: EMAIL
 recipients:
  to:
   - "me@company.com"
  cc:
   - "cc_email@company.com"
+fromAddress: thirdeye-dev@linkedin.com
 
-alertSchemes:
-- type: EMAIL
-
+active: true
 referenceLinks:
  "My Company FAQs": "http://www.company.com/faq"`;

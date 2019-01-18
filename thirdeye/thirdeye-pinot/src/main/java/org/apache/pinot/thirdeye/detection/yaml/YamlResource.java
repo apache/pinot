@@ -98,7 +98,7 @@ public class YamlResource {
     this.detectionAlertConfigDAO = DAORegistry.getInstance().getDetectionAlertConfigManager();
     this.translatorLoader = new YamlDetectionTranslatorLoader();
     this.alertValidator = DetectionAlertConfigValidator.getInstance();
-    this.alertConfigTranslator = YamlDetectionAlertConfigTranslator.getInstance();
+    this.alertConfigTranslator = new YamlDetectionAlertConfigTranslator(this.detectionConfigDAO);
     this.metricDAO = DAORegistry.getInstance().getMetricConfigDAO();
     this.datasetDAO = DAORegistry.getInstance().getDatasetConfigDAO();
     this.eventDAO = DAORegistry.getInstance().getEventDAO();
@@ -370,7 +370,13 @@ public class YamlResource {
     }
 
     // Translate config from YAML to detection alert config (JSON)
-    DetectionAlertConfigDTO alertConfig = this.alertConfigTranslator.translate(newAlertConfigMap);
+    DetectionAlertConfigDTO alertConfig;
+    try {
+      alertConfig = this.alertConfigTranslator.translate(newAlertConfigMap);
+    } catch (Exception e){
+      responseMessage.put("message", e.getMessage());
+      return null;
+    }
     alertConfig.setYaml(yamlAlertConfig);
 
     // Validate the config before saving it
@@ -434,7 +440,14 @@ public class YamlResource {
       responseMessage.put("message", "Subscription group name field cannot be left empty.");
       return null;
     }
-    DetectionAlertConfigDTO newAlertConfig = this.alertConfigTranslator.translate(newAlertConfigMap);
+
+    DetectionAlertConfigDTO newAlertConfig;
+    try {
+      newAlertConfig = this.alertConfigTranslator.translate(newAlertConfigMap);
+    } catch (Exception e){
+      responseMessage.put("message", e.getMessage());
+      return null;
+    }
 
     // Translate config from YAML to detection alert config (JSON)
     DetectionAlertConfigDTO updatedAlertConfig = updateDetectionAlertConfig(oldAlertConfig, newAlertConfig);
