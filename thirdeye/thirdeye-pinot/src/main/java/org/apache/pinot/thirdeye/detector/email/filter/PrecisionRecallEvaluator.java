@@ -22,8 +22,6 @@ package org.apache.pinot.thirdeye.detector.email.filter;
 import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyFeedback;
 import org.apache.pinot.thirdeye.constant.AnomalyFeedbackType;
 import org.apache.pinot.thirdeye.constant.AnomalyResultSource;
-import org.apache.pinot.thirdeye.dashboard.resources.v2.ResourceUtils;
-import org.apache.pinot.thirdeye.dashboard.resources.v2.pojo.AnomalyClassificationType;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -202,14 +200,12 @@ public class PrecisionRecallEvaluator {
       AnomalyFeedback feedback = anomaly.getFeedback();
       boolean isLabeledTrueAnomaly = false;
       boolean isLabeledTrueAnomalyNewTrend = false;
-      if (feedback != null && feedback.getFeedbackType() != null) {
-        AnomalyClassificationType anomalyClassificationType = ResourceUtils.getClassificationType(feedback.getFeedbackType());
-        if (anomalyClassificationType == AnomalyClassificationType.TRUE_POSITIVE) {
-          isLabeledTrueAnomaly = true;
-        }
-        if (feedback.getFeedbackType() == AnomalyFeedbackType.ANOMALY_NEW_TREND) {
-          isLabeledTrueAnomalyNewTrend = true;
-        }
+      if (feedback != null && feedback.getFeedbackType() != null && feedback.getFeedbackType()
+          .equals(AnomalyFeedbackType.ANOMALY_NEW_TREND)) {
+        isLabeledTrueAnomalyNewTrend = true;
+      } else if (feedback != null && feedback.getFeedbackType() != null &&
+          (feedback.getFeedbackType().equals(AnomalyFeedbackType.ANOMALY) || feedback.getFeedbackType().equals(AnomalyFeedbackType.ANOMALY_EXPECTED))) {
+        isLabeledTrueAnomaly = true;
       }
 
       // TODO handle AnomalyFeedbackType.ANOMALY_EXPECTED

@@ -22,7 +22,6 @@ package org.apache.pinot.thirdeye.dashboard.resources.v2;
 import com.google.common.collect.SetMultimap;
 import com.google.common.collect.TreeMultimap;
 import org.apache.pinot.thirdeye.api.TimeGranularity;
-import org.apache.pinot.thirdeye.constant.AnomalyFeedbackType;
 import org.apache.pinot.thirdeye.constant.AnomalyResultSource;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.pojo.AnomalyClassificationType;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
@@ -357,11 +356,7 @@ public class ResourceUtils {
       return AnomalyClassificationType.NONE;
     }
 
-    return getClassificationType(anomaly.getFeedback().getFeedbackType());
-  }
-
-  public static AnomalyClassificationType getClassificationType(AnomalyFeedbackType type) {
-    switch (type) {
+    switch (anomaly.getFeedback().getFeedbackType()) {
       case NO_FEEDBACK:
         return AnomalyClassificationType.NONE;
       case ANOMALY:
@@ -370,8 +365,8 @@ public class ResourceUtils {
         return AnomalyClassificationType.TRUE_POSITIVE;
       case NOT_ANOMALY:
         return AnomalyClassificationType.FALSE_POSITIVE;
-      default:
-        throw new IllegalStateException(String.format("Could not classify feedback status of type %s", type));
     }
+
+    throw new IllegalStateException(String.format("Could not classify feedback status of anomaly id %d", anomaly.getId()));
   }
 }
