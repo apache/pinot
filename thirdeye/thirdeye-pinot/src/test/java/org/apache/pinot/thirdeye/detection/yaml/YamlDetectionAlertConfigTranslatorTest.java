@@ -1,13 +1,10 @@
 package org.apache.pinot.thirdeye.detection.yaml;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import org.apache.pinot.thirdeye.datalayer.bao.DAOTestBase;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
@@ -46,9 +43,6 @@ public class YamlDetectionAlertConfigTranslatorTest {
     Map<String, String> refLinks = new HashMap<>();
     refLinks.put("Test Link", "test_url");
     alertYamlConfigs.put(PROP_REFERENCE_LINKS, refLinks);
-
-    Set<Integer> detectionIds = new HashSet<>(Arrays.asList(1234, 6789));
-    alertYamlConfigs.put(PROP_DETECTION_CONFIG_IDS, detectionIds);
 
     Map<String, Object> alertSchemes = new HashMap<>();
     alertSchemes.put(PROP_TYPE, "EMAIL");
@@ -95,7 +89,7 @@ public class YamlDetectionAlertConfigTranslatorTest {
     Assert.assertEquals(timeWindow.get("windowEndTime"), 1543215600000L);
 
     Assert.assertNotNull(alertConfig.getProperties());
-    Assert.assertEquals(ConfigUtils.getLongs(alertConfig.getProperties().get(PROP_DETECTION_CONFIG_IDS)).size(), 3);
+    Assert.assertEquals(ConfigUtils.getLongs(alertConfig.getProperties().get(PROP_DETECTION_CONFIG_IDS)).size(), 1);
 
     Map<String, Object> recipient = (Map<String, Object>) alertConfig.getProperties().get(PROP_RECIPIENTS);
     Assert.assertEquals(recipient.size(), 2);

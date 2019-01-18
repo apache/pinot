@@ -2,8 +2,8 @@ subscriptionGroupName: "Subscription Group Name"
 cron: "0 0/5 * 1/1 * ? *"
 application: "test_application"
 active: true
-fromAddress: thirdeye@thirdeye.com
-
+subscribedDetections:
+  - test_detection_1
 type: DIMENSIONAL_ALERTER_PIPELINE
 dimensionRecipients:
  "android":
@@ -12,8 +12,6 @@ dimensionRecipients:
   - "ios-thirdeye@thirdeye.com"
 dimension: app_name
 
-detectionConfigIds:
- - 5773069
 
 fromAddress: thirdeye-dev@linkedin.com
 
