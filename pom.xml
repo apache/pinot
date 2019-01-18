@@ -922,6 +922,24 @@
     <plugins>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-checkstyle-plugin</artifactId>
+        <version>3.0.0</version>
+        <configuration>
+          <configLocation>config/checkstyle.xml</configLocation>
+          <propertyExpansion>config_loc=config</propertyExpansion>
+          <consoleOutput>true</consoleOutput>
+        </configuration>
+        <!--Uncomment to enable style check during build-->
+        <!--<executions>-->
+          <!--<execution>-->
+            <!--<goals>-->
+              <!--<goal>check</goal>-->
+            <!--</goals>-->
+          <!--</execution>-->
+        <!--</executions>-->
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
         <!--
       Configuration for unit/integration tests section 2 of 3 (plugins) STARTS HERE.
@@ -972,7 +990,7 @@
             <phase>site</phase>
             <configuration>
               <!-- Specific configuration for the aggregate report -->
-			  <excludePackageNames>org.apache.pinot.pql.parsers:org.apache.pinot.common.response</excludePackageNames>
+              <excludePackageNames>org.apache.pinot.pql.parsers:org.apache.pinot.common.response</excludePackageNames>
               <skip>false</skip>
             </configuration>
           </execution>
@@ -1133,7 +1151,7 @@
             <id>non-aggregate</id>
             <configuration>
               <!-- Specific configuration for the non aggregate report -->
-			  <excludePackageNames>org.apache.pinot.pql.parsers:org.apache.pinot.common.response</excludePackageNames>
+              <excludePackageNames>org.apache.pinot.pql.parsers:org.apache.pinot.common.response</excludePackageNames>
               <skip>true</skip>
             </configuration>
             <reports>
@@ -1143,7 +1161,7 @@
           <reportSet>
             <id>aggregate</id>
             <configuration>
-			  <excludePackageNames>org.apache.pinot.pql.parsers:org.apache.pinot.common.response</excludePackageNames>
+              <excludePackageNames>org.apache.pinot.pql.parsers:org.apache.pinot.common.response</excludePackageNames>
               <skip>true</skip>
             </configuration>
             <reports>
