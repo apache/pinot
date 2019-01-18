@@ -21,6 +21,7 @@ package org.apache.pinot.thirdeye.detection.alert;
 
 import com.google.common.base.Predicate;
 import com.google.common.collect.Collections2;
+import org.apache.pinot.thirdeye.constant.AnomalyResultSource;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.detection.spi.model.AnomalySlice;
@@ -69,7 +70,8 @@ public abstract class StatefulDetectionAlertFilter extends DetectionAlertFilter 
               return mergedAnomalyResultDTO != null
                   && !mergedAnomalyResultDTO.isChild()
                   && !AlertUtils.hasFeedback(mergedAnomalyResultDTO)
-                  && (mergedAnomalyResultDTO.getId() == null || mergedAnomalyResultDTO.getId() >= minId);
+                  && (mergedAnomalyResultDTO.getId() == null || mergedAnomalyResultDTO.getId() >= minId)
+                  && mergedAnomalyResultDTO.getAnomalyResultSource().equals(AnomalyResultSource.DEFAULT_ANOMALY_DETECTION);
             }
           });
 
