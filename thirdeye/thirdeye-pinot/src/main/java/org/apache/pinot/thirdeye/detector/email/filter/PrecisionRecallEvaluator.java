@@ -203,8 +203,8 @@ public class PrecisionRecallEvaluator {
       if (feedback != null && feedback.getFeedbackType() != null && feedback.getFeedbackType()
           .equals(AnomalyFeedbackType.ANOMALY_NEW_TREND)) {
         isLabeledTrueAnomalyNewTrend = true;
-      } else if (feedback != null && feedback.getFeedbackType() != null && feedback.getFeedbackType()
-          .equals(AnomalyFeedbackType.ANOMALY)) {
+      } else if (feedback != null && feedback.getFeedbackType() != null &&
+          (feedback.getFeedbackType().isAnomaly())) {
         isLabeledTrueAnomaly = true;
       }
 
