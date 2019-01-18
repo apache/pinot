@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.segment.index;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -31,10 +30,10 @@ import java.lang.reflect.Field;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -53,6 +52,7 @@ import org.apache.pinot.common.utils.JsonUtils;
 import org.apache.pinot.common.utils.time.TimeUtils;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
+import org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys;
 import org.apache.pinot.core.segment.store.SegmentDirectoryPaths;
 import org.apache.pinot.core.startree.v2.StarTreeV2Constants;
 import org.apache.pinot.core.startree.v2.StarTreeV2Metadata;
@@ -62,9 +62,8 @@ import org.joda.time.Interval;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys;
-import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment;
-import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.TIME_UNIT;
+import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.*;
+import static org.apache.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.StarTree.*;
 
 
 public class SegmentMetadataImpl implements SegmentMetadata {
@@ -102,7 +101,8 @@ public class SegmentMetadataImpl implements SegmentMetadata {
    * <p>Index directory passed in should be top level segment directory.
    * <p>If segment metadata file exists in multiple segment version, load the one in highest segment version.
    */
-  public SegmentMetadataImpl(File indexDir) throws IOException {
+  public SegmentMetadataImpl(File indexDir)
+      throws IOException {
     _indexDir = indexDir;
     PropertiesConfiguration segmentMetadataPropertiesConfiguration = getPropertiesConfiguration(indexDir);
     _columnMetadataMap = new HashMap<>();
@@ -116,10 +116,8 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     }
 
     setTimeInfo(segmentMetadataPropertiesConfiguration);
-    _totalDocs = segmentMetadataPropertiesConfiguration.getInt(V1Constants.MetadataKeys.Segment.SEGMENT_TOTAL_DOCS);
-    _totalRawDocs =
-        segmentMetadataPropertiesConfiguration.getInt(V1Constants.MetadataKeys.Segment.SEGMENT_TOTAL_RAW_DOCS,
-            _totalDocs);
+    _totalDocs = segmentMetadataPropertiesConfiguration.getInt(SEGMENT_TOTAL_DOCS);
+    _totalRawDocs = segmentMetadataPropertiesConfiguration.getInt(SEGMENT_TOTAL_RAW_DOCS, _totalDocs);
   }
 
   /**
@@ -128,25 +126,22 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   public SegmentMetadataImpl(RealtimeSegmentZKMetadata segmentMetadata, Schema schema) {
     _indexDir = null;
     PropertiesConfiguration segmentMetadataPropertiesConfiguration = new PropertiesConfiguration();
-    segmentMetadataPropertiesConfiguration.addProperty(Segment.SEGMENT_CREATOR_VERSION, null);
-    segmentMetadataPropertiesConfiguration.addProperty(Segment.SEGMENT_PADDING_CHARACTER,
-        V1Constants.Str.DEFAULT_STRING_PAD_CHAR);
-    segmentMetadataPropertiesConfiguration.addProperty(V1Constants.MetadataKeys.Segment.SEGMENT_START_TIME,
-        Long.toString(segmentMetadata.getStartTime()));
-    segmentMetadataPropertiesConfiguration.addProperty(V1Constants.MetadataKeys.Segment.SEGMENT_END_TIME,
-        Long.toString(segmentMetadata.getEndTime()));
-    segmentMetadataPropertiesConfiguration.addProperty(V1Constants.MetadataKeys.Segment.TABLE_NAME,
-        segmentMetadata.getTableName());
+    segmentMetadataPropertiesConfiguration.addProperty(SEGMENT_CREATOR_VERSION, null);
+    segmentMetadataPropertiesConfiguration
+        .addProperty(SEGMENT_PADDING_CHARACTER, V1Constants.Str.DEFAULT_STRING_PAD_CHAR);
+    segmentMetadataPropertiesConfiguration
+        .addProperty(SEGMENT_START_TIME, Long.toString(segmentMetadata.getStartTime()));
+    segmentMetadataPropertiesConfiguration.addProperty(SEGMENT_END_TIME, Long.toString(segmentMetadata.getEndTime()));
+    segmentMetadataPropertiesConfiguration.addProperty(TABLE_NAME, segmentMetadata.getTableName());
 
     TimeUnit timeUnit = segmentMetadata.getTimeUnit();
     if (timeUnit != null) {
-      segmentMetadataPropertiesConfiguration.addProperty(V1Constants.MetadataKeys.Segment.TIME_UNIT,
-          timeUnit.toString());
+      segmentMetadataPropertiesConfiguration.addProperty(TIME_UNIT, timeUnit.toString());
     } else {
-      segmentMetadataPropertiesConfiguration.addProperty(V1Constants.MetadataKeys.Segment.TIME_UNIT, null);
+      segmentMetadataPropertiesConfiguration.addProperty(TIME_UNIT, null);
     }
 
-    segmentMetadataPropertiesConfiguration.addProperty(Segment.SEGMENT_TOTAL_DOCS, segmentMetadata.getTotalRawDocs());
+    segmentMetadataPropertiesConfiguration.addProperty(SEGMENT_TOTAL_DOCS, segmentMetadata.getTotalRawDocs());
 
     _crc = segmentMetadata.getCrc();
     _creationTime = segmentMetadata.getCreationTime();
@@ -156,10 +151,8 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     _segmentName = segmentMetadata.getSegmentName();
     _allColumns = schema.getColumnNames();
     _schema = schema;
-    _totalDocs = segmentMetadataPropertiesConfiguration.getInt(V1Constants.MetadataKeys.Segment.SEGMENT_TOTAL_DOCS);
-    _totalRawDocs =
-        segmentMetadataPropertiesConfiguration.getInt(V1Constants.MetadataKeys.Segment.SEGMENT_TOTAL_RAW_DOCS,
-            _totalDocs);
+    _totalDocs = segmentMetadataPropertiesConfiguration.getInt(SEGMENT_TOTAL_DOCS);
+    _totalRawDocs = segmentMetadataPropertiesConfiguration.getInt(SEGMENT_TOTAL_RAW_DOCS, _totalDocs);
   }
 
   public static PropertiesConfiguration getPropertiesConfiguration(File indexDir) {
@@ -182,18 +175,14 @@ public class SegmentMetadataImpl implements SegmentMetadata {
    * </ul>
    */
   private void setTimeInfo(PropertiesConfiguration segmentMetadataPropertiesConfiguration) {
-    _timeColumn = segmentMetadataPropertiesConfiguration.getString(Segment.TIME_COLUMN_NAME);
-    if (segmentMetadataPropertiesConfiguration.containsKey(V1Constants.MetadataKeys.Segment.SEGMENT_START_TIME)
-        && segmentMetadataPropertiesConfiguration.containsKey(V1Constants.MetadataKeys.Segment.SEGMENT_END_TIME)
-        && segmentMetadataPropertiesConfiguration.containsKey(V1Constants.MetadataKeys.Segment.TIME_UNIT)) {
-
+    _timeColumn = segmentMetadataPropertiesConfiguration.getString(TIME_COLUMN_NAME);
+    if (segmentMetadataPropertiesConfiguration.containsKey(SEGMENT_START_TIME) && segmentMetadataPropertiesConfiguration
+        .containsKey(SEGMENT_END_TIME) && segmentMetadataPropertiesConfiguration.containsKey(TIME_UNIT)) {
       try {
         _timeUnit = TimeUtils.timeUnitFromString(segmentMetadataPropertiesConfiguration.getString(TIME_UNIT));
         _timeGranularity = new Duration(_timeUnit.toMillis(1));
-        String startTimeString =
-            segmentMetadataPropertiesConfiguration.getString(V1Constants.MetadataKeys.Segment.SEGMENT_START_TIME);
-        String endTimeString =
-            segmentMetadataPropertiesConfiguration.getString(V1Constants.MetadataKeys.Segment.SEGMENT_END_TIME);
+        String startTimeString = segmentMetadataPropertiesConfiguration.getString(SEGMENT_START_TIME);
+        String endTimeString = segmentMetadataPropertiesConfiguration.getString(SEGMENT_END_TIME);
         _segmentStartTime = Long.parseLong(startTimeString);
         _segmentEndTime = Long.parseLong(endTimeString);
         _timeInterval = new Interval(_timeUnit.toMillis(_segmentStartTime), _timeUnit.toMillis(_segmentEndTime));
@@ -207,7 +196,8 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     }
   }
 
-  private void loadCreationMeta(File crcFile) throws IOException {
+  private void loadCreationMeta(File crcFile)
+      throws IOException {
     if (crcFile.exists()) {
       final DataInputStream ds = new DataInputStream(new FileInputStream(crcFile));
       _crc = ds.readLong();
@@ -221,71 +211,35 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   }
 
   private void init(PropertiesConfiguration segmentMetadataPropertiesConfiguration) {
-    if (segmentMetadataPropertiesConfiguration.containsKey(Segment.SEGMENT_CREATOR_VERSION)) {
-      _creatorName = segmentMetadataPropertiesConfiguration.getString(Segment.SEGMENT_CREATOR_VERSION);
+    if (segmentMetadataPropertiesConfiguration.containsKey(SEGMENT_CREATOR_VERSION)) {
+      _creatorName = segmentMetadataPropertiesConfiguration.getString(SEGMENT_CREATOR_VERSION);
     }
 
-    if (segmentMetadataPropertiesConfiguration.containsKey(Segment.SEGMENT_PADDING_CHARACTER)) {
-      String padding = segmentMetadataPropertiesConfiguration.getString(Segment.SEGMENT_PADDING_CHARACTER);
+    if (segmentMetadataPropertiesConfiguration.containsKey(SEGMENT_PADDING_CHARACTER)) {
+      String padding = segmentMetadataPropertiesConfiguration.getString(SEGMENT_PADDING_CHARACTER);
       _paddingCharacter = StringEscapeUtils.unescapeJava(padding).charAt(0);
     }
 
     String versionString =
-        segmentMetadataPropertiesConfiguration.getString(V1Constants.MetadataKeys.Segment.SEGMENT_VERSION,
-            SegmentVersion.v1.toString());
+        segmentMetadataPropertiesConfiguration.getString(SEGMENT_VERSION, SegmentVersion.v1.toString());
     _segmentVersion = SegmentVersion.valueOf(versionString);
 
-    final Iterator<String> metrics =
-        segmentMetadataPropertiesConfiguration.getList(V1Constants.MetadataKeys.Segment.METRICS).iterator();
-    while (metrics.hasNext()) {
-      final String columnName = metrics.next();
-      if (columnName.trim().length() > 0) {
-        _allColumns.add(columnName);
-      }
-    }
+    // NOTE: here we only add physical columns as virtual columns should not be loaded from metadata file
+    // NOTE: getList() will always return an non-null List with trimmed strings:
+    // - If key does not exist, it will return an empty list
+    // - If key exists but value is missing, it will return a singleton list with an empty string
+    addPhysicalColumns(segmentMetadataPropertiesConfiguration.getList(DIMENSIONS), _allColumns);
+    addPhysicalColumns(segmentMetadataPropertiesConfiguration.getList(METRICS), _allColumns);
+    addPhysicalColumns(segmentMetadataPropertiesConfiguration.getList(TIME_COLUMN_NAME), _allColumns);
+    addPhysicalColumns(segmentMetadataPropertiesConfiguration.getList(DATETIME_COLUMNS), _allColumns);
 
-    final Iterator<String> dimensions =
-        segmentMetadataPropertiesConfiguration.getList(V1Constants.MetadataKeys.Segment.DIMENSIONS).iterator();
-    while (dimensions.hasNext()) {
-      final String columnName = dimensions.next();
-      if (columnName.trim().length() > 0) {
-        _allColumns.add(columnName);
-      }
-    }
-
-    final Iterator<String> unknowns =
-        segmentMetadataPropertiesConfiguration.getList(V1Constants.MetadataKeys.Segment.UNKNOWN_COLUMNS).iterator();
-    while (unknowns.hasNext()) {
-      final String columnName = unknowns.next();
-      if (columnName.trim().length() > 0) {
-        _allColumns.add(columnName);
-      }
-    }
-
-    final Iterator<String> timeStamps =
-        segmentMetadataPropertiesConfiguration.getList(V1Constants.MetadataKeys.Segment.TIME_COLUMN_NAME).iterator();
-    while (timeStamps.hasNext()) {
-      final String columnName = timeStamps.next();
-      if (columnName.trim().length() > 0) {
-        _allColumns.add(columnName);
-      }
-    }
-
-    final Iterator<String> dateTime =
-        segmentMetadataPropertiesConfiguration.getList(V1Constants.MetadataKeys.Segment.DATETIME_COLUMNS).iterator();
-    while (dateTime.hasNext()) {
-      final String columnName = dateTime.next();
-      if (columnName.trim().length() > 0) {
-        _allColumns.add(columnName);
-      }
-    }
     //set the table name
-    _tableName = segmentMetadataPropertiesConfiguration.getString(V1Constants.MetadataKeys.Segment.TABLE_NAME);
+    _tableName = segmentMetadataPropertiesConfiguration.getString(TABLE_NAME);
     // Set segment name.
-    _segmentName = segmentMetadataPropertiesConfiguration.getString(Segment.SEGMENT_NAME);
+    _segmentName = segmentMetadataPropertiesConfiguration.getString(SEGMENT_NAME);
 
     // Set hll log2m.
-    _hllLog2m = segmentMetadataPropertiesConfiguration.getInt(Segment.SEGMENT_HLL_LOG2M, HllConstants.DEFAULT_LOG2M);
+    _hllLog2m = segmentMetadataPropertiesConfiguration.getInt(SEGMENT_HLL_LOG2M, HllConstants.DEFAULT_LOG2M);
 
     // Build column metadata map, schema and hll derived column map.
     for (String column : _allColumns) {
@@ -317,52 +271,49 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   }
 
   /**
+   * Helper method to add the physical columns from source list to destination collection.
+   */
+  private static void addPhysicalColumns(List src, Collection<String> dest) {
+    for (Object o : src) {
+      String column = (String) o;
+      if (!column.isEmpty() && column.charAt(0) != '$') {
+        dest.add(column);
+      }
+    }
+  }
+
+  /**
    * Reads and initializes the star tree metadata from segment metadata properties.
    */
   private void initStarTreeMetadata(PropertiesConfiguration segmentMetadataPropertiesConfiguration) {
     _starTreeMetadata = new StarTreeMetadata();
 
-    // Set the splitOrder
-    Iterator<String> iterator =
-        segmentMetadataPropertiesConfiguration.getList(MetadataKeys.StarTree.STAR_TREE_SPLIT_ORDER).iterator();
-    List<String> splitOrder = new ArrayList<String>();
-    while (iterator.hasNext()) {
-      final String splitColumn = iterator.next();
-      splitOrder.add(splitColumn);
-    }
-    _starTreeMetadata.setDimensionsSplitOrder(splitOrder);
+    // Set the dimensions split order
+    List<String> dimensionsSplitOrder = new ArrayList<>();
+    addPhysicalColumns(segmentMetadataPropertiesConfiguration.getList(STAR_TREE_SPLIT_ORDER), dimensionsSplitOrder);
+    _starTreeMetadata.setDimensionsSplitOrder(dimensionsSplitOrder);
 
     // Set dimensions for which star node creation is to be skipped.
-    iterator = segmentMetadataPropertiesConfiguration.getList(
-        MetadataKeys.StarTree.STAR_TREE_SKIP_STAR_NODE_CREATION_FOR_DIMENSIONS).iterator();
-    List<String> skipStarNodeCreationForDimensions = new ArrayList<String>();
-    while (iterator.hasNext()) {
-      final String column = iterator.next();
-      skipStarNodeCreationForDimensions.add(column);
-    }
+    List<String> skipStarNodeCreationForDimensions = new ArrayList<>();
+    addPhysicalColumns(segmentMetadataPropertiesConfiguration.getList(STAR_TREE_SKIP_STAR_NODE_CREATION_FOR_DIMENSIONS),
+        skipStarNodeCreationForDimensions);
     _starTreeMetadata.setSkipStarNodeCreationForDimensions(skipStarNodeCreationForDimensions);
 
     // Set dimensions for which to skip materialization.
-    iterator = segmentMetadataPropertiesConfiguration.getList(
-        MetadataKeys.StarTree.STAR_TREE_SKIP_MATERIALIZATION_FOR_DIMENSIONS).iterator();
-    List<String> skipMaterializationForDimensions = new ArrayList<String>();
-
-    while (iterator.hasNext()) {
-      final String column = iterator.next();
-      skipMaterializationForDimensions.add(column);
-    }
+    List<String> skipMaterializationForDimensions = new ArrayList<>();
+    addPhysicalColumns(segmentMetadataPropertiesConfiguration.getList(STAR_TREE_SKIP_MATERIALIZATION_FOR_DIMENSIONS),
+        skipMaterializationForDimensions);
     _starTreeMetadata.setSkipMaterializationForDimensions(skipMaterializationForDimensions);
 
     // Set the maxLeafRecords
-    String maxLeafRecordsString =
-        segmentMetadataPropertiesConfiguration.getString(MetadataKeys.StarTree.STAR_TREE_MAX_LEAF_RECORDS);
+    String maxLeafRecordsString = segmentMetadataPropertiesConfiguration.getString(STAR_TREE_MAX_LEAF_RECORDS);
     if (maxLeafRecordsString != null) {
       _starTreeMetadata.setMaxLeafRecords(Integer.parseInt(maxLeafRecordsString));
     }
 
     // Skip skip materialization cardinality.
-    String skipMaterializationCardinalityString = segmentMetadataPropertiesConfiguration.getString(
-        MetadataKeys.StarTree.STAR_TREE_SKIP_MATERIALIZATION_CARDINALITY);
+    String skipMaterializationCardinalityString =
+        segmentMetadataPropertiesConfiguration.getString(STAR_TREE_SKIP_MATERIALIZATION_CARDINALITY);
     if (skipMaterializationCardinalityString != null) {
       _starTreeMetadata.setSkipMaterializationCardinality(Integer.parseInt(skipMaterializationCardinalityString));
     }
@@ -597,7 +548,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
    *                     the parameter value is null
    * @return json representation of segment metadata
    */
-  public JsonNode toJson(@Nullable Set<String> columnFilter) throws JsonProcessingException {
+  public JsonNode toJson(@Nullable Set<String> columnFilter) {
     ObjectNode segmentMetadata = JsonUtils.newObjectNode();
     segmentMetadata.put("segmentName", _segmentName);
     segmentMetadata.put("schemaName", _schema != null ? _schema.getSchemaName() : null);
