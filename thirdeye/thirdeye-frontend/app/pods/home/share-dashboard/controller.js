@@ -22,19 +22,23 @@ import { reads } from '@ember/object/computed';
 const CUSTOMIZE_OPTIONS = [{
   id: 0,
   label: 'Nothing',
-  value: 'Nothing'
+  value: 'Nothing',
+  selected: null
 }, {
   id: 1,
   label: 'WoW',
-  value: 'Wow'
+  value: 'Wow',
+  selected: null
 }, {
   id: 2,
   label: 'Wo2W',
-  value: 'Wo2w'
+  value: 'Wo2w',
+  selected: null
 }, {
   id: 3,
   label: 'Median4W',
-  value: 'Median4w'
+  value: 'Median4w',
+  selected: null
 }];
 
 export default Controller.extend({
@@ -48,9 +52,9 @@ export default Controller.extend({
   showWow: reads('tree.firstObject.showWow'),
   showWo2w: reads('tree.firstObject.showWo2w'),
   showMedian4w: reads('tree.firstObject.showMedian4w'),
-  options: [],
-  options_two: [],
-  colspanNum: 4,
+  options: reads('tree.firstObject.options'),
+  options_two: reads('tree.firstObject.options_two'),
+  colspanNum: reads('tree.firstObject.colspanNum'),
 
   init() {
     this._super(...arguments);
@@ -62,9 +66,6 @@ export default Controller.extend({
       status: 'All Resolutions'
     });
     set(this, 'anomalyResponseFilterTypes', anomalyResponseFilterTypes);
-
-    // Add the options for compare
-    set(this, 'options_two', set(this, 'options', CUSTOMIZE_OPTIONS));
   },
 
   /**
@@ -197,7 +198,10 @@ export default Controller.extend({
         showWo2w: false,
         showMedian4w: false,
         showDashboardSummary: false,
-        showCustomizeEmailTemplate: false
+        showCustomizeEmailTemplate: false,
+        options: [ ...CUSTOMIZE_OPTIONS],
+        options_two: [ ...CUSTOMIZE_OPTIONS],
+        colspan: 4
       }];
 
       viewTreeFirstChild = viewTree.get('firstObject').children;
@@ -302,9 +306,30 @@ export default Controller.extend({
     set(currentState, property, !currentState[property]);
   },
 
+  /**
+   * Helper for setting selected in email selectors
+   * @param {string} selectedBaseline - Wow, Wo2w, Median4w
+   * @param {Array} choices - [{}, {}, ...]
+   * @return {none} - this helper is just a setter
+   */
+  _selectOption(choices, selectedBaseline) {
+    const newChoices = [];
+    choices.forEach(choice => {
+      const newObj = { ...choice};
+      if (newObj.value === selectedBaseline) {
+        newObj.selected = 'selected';
+      } else {
+        newObj.selected = null;
+      }
+      newChoices.push(newObj);
+    });
+    return newChoices;
+  },
+
   _customizeEmailHelper(option, type) {
     //reset both selects' options
-    set(this, 'options_two', set(this, 'options', CUSTOMIZE_OPTIONS));
+    set(this, 'tree.firstObject.options', [ ...CUSTOMIZE_OPTIONS]);
+    set(this, 'tree.firstObject.options_two', [ ...CUSTOMIZE_OPTIONS]);
     //hide all except if the sibling's value and not `nothing`
     let currentState = get(this, 'tree.firstObject');
     setProperties(currentState, {
@@ -317,35 +342,30 @@ export default Controller.extend({
     const customizeEmail1 = document.getElementById('customizeEmail1').value;
     const customizeEmail2 = document.getElementById('customizeEmail2').value;
 
-    const sibingValue = type === 'one' ? customizeEmail2 : customizeEmail1;
-    this._toggleTreeProperty(`show${sibingValue}`);
+    const siblingValue = type === 'one' ? customizeEmail2 : customizeEmail1;
+    this._toggleTreeProperty(`show${siblingValue}`);
 
     //Calculates colspan Number
     const showCustomizeEmailTemplate = get(this, 'showCustomizeEmailTemplate');
     if(showCustomizeEmailTemplate && (customizeEmail1 === 'Nothing' || customizeEmail2 === 'Nothing')) {
-      set(this, 'colspanNum', 5);
+      set(this, 'tree.firstObject.colspanNum', 5);
     } else if (showCustomizeEmailTemplate) {
-      set(this, 'colspanNum', 6);
+      set(this, 'tree.firstObject.colspanNum', 6);
     } else {
-      set(this, 'colspanNum', 4);
+      set(this, 'tree.firstObject.colspanNum', 4);
     }
 
+    let limitedSelfOptions = this._selectOption([ ...CUSTOMIZE_OPTIONS], option);
+    let limitedSiblingOptions = this._selectOption([ ...CUSTOMIZE_OPTIONS], siblingValue);
+
     //limited sibling list to selected choice
-    const limitedSiblingOptions = CUSTOMIZE_OPTIONS.filter(function(item){
+    limitedSiblingOptions = limitedSiblingOptions.filter(function(item){
       return item.value !== option;
     });
     //limited current list to sibling's existing selected
-    const limitedSelfOptions = CUSTOMIZE_OPTIONS.filter(function(item){
-      return item.value !== sibingValue;
+    limitedSelfOptions = limitedSelfOptions.filter(function(item){
+      return item.value !== siblingValue;
     });
-
-    if (type === 'one') {
-      set(this, 'options_two', limitedSiblingOptions);
-      set(this, 'options', limitedSelfOptions);
-    } else {
-      set(this, 'options', limitedSiblingOptions);
-      set(this, 'options_two', limitedSelfOptions);
-    }
 
     switch(option) {
       case 'Nothing':
@@ -363,6 +383,14 @@ export default Controller.extend({
         //show median4w column and it's sibling
         this._toggleTreeProperty('showMedian4w');
         break;
+    }
+
+    if (type === 'one') {
+      set(this, 'tree.firstObject.options_two', limitedSiblingOptions);
+      set(this, 'tree.firstObject.options', limitedSelfOptions);
+    } else {
+      set(this, 'tree.firstObject.options', limitedSiblingOptions);
+      set(this, 'tree.firstObject.options_two', limitedSelfOptions);
     }
   },
 

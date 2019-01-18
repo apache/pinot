@@ -139,14 +139,16 @@ export default Route.extend(AuthenticatedRouteMixin, {
     yield Object.keys(anomalyMapping).some(function(metric) {
       Object.keys(anomalyMapping[metric].items).some(function(alert) {
         anomalyMapping[metric].items[alert].items.forEach(async (item) => {
-          const metricName = get(item.anomaly, 'metricName');
-          const metricId = get(item.anomaly, 'metricId');
-          const functionName = get(item.anomaly, 'functionName');
-          const functionId = get(item.anomaly, 'functionId');
 
-          const dimensions = get(item.anomaly, 'dimensions');
-          const start = get(item.anomaly, 'start');
-          const end = get(item.anomaly, 'end');
+          const anomaly = item.anomaly;
+          const metricName = get(anomaly, 'metricName');
+          const metricId = get(anomaly, 'metricId');
+          const functionName = get(anomaly, 'functionName');
+          const functionId = get(anomaly, 'functionId');
+
+          const dimensions = get(anomaly, 'dimensions');
+          const start = get(anomaly, 'start');
+          const end = get(anomaly, 'end');
 
           if (!map[metricName]) {
             map[metricName] = { 'metricId': metricId, items: {}, count: index };
@@ -163,7 +165,7 @@ export default Route.extend(AuthenticatedRouteMixin, {
           //Get all in the following order - current,wo2w,median4w
           const offsets = await fetch(`/rootcause/metric/aggregate/batch?urn=${metricUrn}&start=${start}&end=${end}&offsets=wo1w,wo2w,median4w&timezone=America/Los_Angeles`).then(checkStatus).then(res => res);
 
-          const current = get(item.anomaly, 'current');
+          const current = get(anomaly, 'current');
           const wow = humanizeFloat(offsets[0]);
           const wo2w = humanizeFloat(offsets[1]);
           const median4w = humanizeFloat(offsets[2]);
@@ -174,7 +176,7 @@ export default Route.extend(AuthenticatedRouteMixin, {
           const wo2wHumanizeChange = humanizeChange(Number((current - offsets[1]) / offsets[1]));
           const median4wHumanizeChange = humanizeChange(Number((current - offsets[2]) / offsets[2]));
 
-          set(item.anomaly, 'offsets',  offsets ? {
+          set(anomaly, 'offsets',  offsets ? {
             'wow': { value: wow, change: wowChange, humanizedChangeDisplay: wowHumanizeChange },
             'wo2w': { value: wo2w, change: wo2wChange, humanizedChangeDisplay: wo2wHumanizeChange },
             'median4w': { value: median4w, change: median4wChange, humanizedChangeDisplay: median4wHumanizeChange }
