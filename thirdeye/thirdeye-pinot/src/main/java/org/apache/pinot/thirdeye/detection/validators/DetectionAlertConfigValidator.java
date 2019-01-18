@@ -31,7 +31,7 @@ public class DetectionAlertConfigValidator extends ConfigValidator {
 
   private static final DetectionAlertConfigValidator INSTANCE = new DetectionAlertConfigValidator();
   private static final String PROP_CLASS_NAME = "className";
-
+  
   public static DetectionAlertConfigValidator getInstance() {
     return INSTANCE;
   }
@@ -61,7 +61,6 @@ public class DetectionAlertConfigValidator extends ConfigValidator {
       responseMessage.put("message", "'Type' field cannot be left empty.");
       return false;
     }
-
     // At least one alertScheme is required
     if (alertConfig.getAlertSchemes() == null || alertConfig.getAlertSchemes().size() == 0) {
       responseMessage.put("message", "Alert scheme cannot be left empty");
@@ -70,7 +69,7 @@ public class DetectionAlertConfigValidator extends ConfigValidator {
     // Properties cannot be empty
     if (alertConfig.getProperties() == null || alertConfig.getProperties().isEmpty()) {
       responseMessage.put("message", "Alert properties cannot be left empty. Please specify the recipients,"
-          + " detection ids, and type.");
+          + " subscribed detections, and type.");
       return false;
     }
     // detectionConfigIds cannot be empty

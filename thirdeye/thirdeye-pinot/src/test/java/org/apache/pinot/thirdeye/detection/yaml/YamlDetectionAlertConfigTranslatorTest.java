@@ -1,18 +1,20 @@
 package org.apache.pinot.thirdeye.detection.yaml;
 
-import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
-import org.apache.pinot.thirdeye.datalayer.pojo.AlertConfigBean;
-import org.apache.pinot.thirdeye.detection.annotation.registry.DetectionAlertRegistry;
-import org.apache.pinot.thirdeye.detection.annotation.registry.DetectionRegistry;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
+import org.apache.pinot.thirdeye.datalayer.bao.DAOTestBase;
+import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.pojo.AlertConfigBean;
+import org.apache.pinot.thirdeye.datasource.DAORegistry;
+import org.apache.pinot.thirdeye.detection.ConfigUtils;
+import org.apache.pinot.thirdeye.detection.annotation.registry.DetectionAlertRegistry;
 import org.testng.Assert;
+import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
@@ -20,41 +22,9 @@ import static org.apache.pinot.thirdeye.detection.yaml.YamlDetectionAlertConfigT
 
 
 public class YamlDetectionAlertConfigTranslatorTest {
-  private Map<String, Object> alertYamlConfigs;
-  private YamlDetectionAlertConfigTranslator translator;
 
-  @Test
-  public void testGenerateDetectionAlertConfig() {
-    List<Long> ids = Collections.singletonList(1234567L);
-    DetectionAlertConfigDTO
-        alertConfigDTO = this.translator.generateDetectionAlertConfig(this.alertYamlConfigs, ids, null);
-    Assert.assertEquals(alertConfigDTO.getName(), alertYamlConfigs.get(PROP_SUBS_GROUP_NAME));
-    Assert.assertEquals(alertConfigDTO.getApplication(), alertYamlConfigs.get("application"));
-    Assert.assertEquals(alertConfigDTO.getVectorClocks().get(ids.get(0)), new Long(0L));
-    Assert.assertEquals(alertConfigDTO.getCronExpression(), CRON_SCHEDULE_DEFAULT);
-    Map<String, Object> properties = alertConfigDTO.getProperties();
-    Assert.assertEquals(properties.get(PROP_DETECTION_CONFIG_IDS), ids);
-    Assert.assertEquals(properties.get("to"), alertYamlConfigs.get("to"));
-  }
-
-  @Test
-  public void testGenerateDetectionAlertConfigWithExistingVectorClocks() {
-    List<Long> ids = Arrays.asList(1234567L, 7654321L);
-    Map<Long, Long> vectorClocks = new HashMap<>();
-    vectorClocks.put(ids.get(0), 1536173395000L);
-    vectorClocks.put(7654321L, 1536173395000L);
-    DetectionAlertConfigDTO
-        alertConfigDTO = this.translator.generateDetectionAlertConfig(this.alertYamlConfigs, ids, vectorClocks);
-    Assert.assertEquals(alertConfigDTO.getName(), alertYamlConfigs.get(PROP_SUBS_GROUP_NAME));
-    Assert.assertEquals(alertConfigDTO.getApplication(), alertYamlConfigs.get("application"));
-    Assert.assertEquals(alertConfigDTO.getVectorClocks().get(ids.get(0)), vectorClocks.get(ids.get(0)));
-    Assert.assertEquals(alertConfigDTO.getVectorClocks().get(7654321L), vectorClocks.get(7654321L));
-    Assert.assertEquals(alertConfigDTO.getCronExpression(), CRON_SCHEDULE_DEFAULT);
-
-    Map<String, Object> properties = alertConfigDTO.getProperties();
-    Assert.assertEquals(properties.get("detectionConfigIds"), ids);
-    Assert.assertEquals(properties.get("to"), alertYamlConfigs.get("to"));
-  }
+  private DAOTestBase testDAOProvider;
+  private DetectionConfigManager detectionConfigManager;
 
   @Test
   public void testTranslateAlert() {
@@ -67,13 +37,12 @@ public class YamlDetectionAlertConfigTranslatorTest {
     alertYamlConfigs.put(PROP_FROM, "thirdeye@thirdeye");
     alertYamlConfigs.put(PROP_CRON, CRON_SCHEDULE_DEFAULT);
     alertYamlConfigs.put(PROP_ACTIVE, true);
+    alertYamlConfigs.put(PROP_DETECTION_NAMES, Collections.singletonList("test_pipeline_1"));
+
 
     Map<String, String> refLinks = new HashMap<>();
     refLinks.put("Test Link", "test_url");
     alertYamlConfigs.put(PROP_REFERENCE_LINKS, refLinks);
-
-    Set<Integer> detectionIds = new HashSet<>(Arrays.asList(1234, 6789));
-    alertYamlConfigs.put(PROP_DETECTION_CONFIG_IDS, detectionIds);
 
     Map<String, Object> alertSchemes = new HashMap<>();
     alertSchemes.put(PROP_TYPE, "EMAIL");
@@ -96,7 +65,7 @@ public class YamlDetectionAlertConfigTranslatorTest {
     recipients.put("cc", new ArrayList<>(Collections.singleton("userCc@thirdeye.com")));
     alertYamlConfigs.put(PROP_RECIPIENTS, recipients);
 
-    DetectionAlertConfigDTO alertConfig = YamlDetectionAlertConfigTranslator.getInstance().translate(alertYamlConfigs);
+    DetectionAlertConfigDTO alertConfig = new YamlDetectionAlertConfigTranslator(this.detectionConfigManager).translate(alertYamlConfigs);
 
     Assert.assertTrue(alertConfig.isActive());
     Assert.assertFalse(alertConfig.isOnlyFetchLegacyAnomalies());
@@ -120,26 +89,30 @@ public class YamlDetectionAlertConfigTranslatorTest {
     Assert.assertEquals(timeWindow.get("windowEndTime"), 1543215600000L);
 
     Assert.assertNotNull(alertConfig.getProperties());
-    Assert.assertEquals(((Set<Long>) alertConfig.getProperties().get(PROP_DETECTION_CONFIG_IDS)).size(), 2);
+    Assert.assertEquals(ConfigUtils.getLongs(alertConfig.getProperties().get(PROP_DETECTION_CONFIG_IDS)).size(), 1);
 
     Map<String, Object> recipient = (Map<String, Object>) alertConfig.getProperties().get(PROP_RECIPIENTS);
     Assert.assertEquals(recipient.size(), 2);
     Assert.assertEquals(((List<String>) recipient.get("to")).get(0), "userTo@thirdeye.com");
     Assert.assertEquals(((List<String>) recipient.get("cc")).get(0), "userCc@thirdeye.com");
 
-    Assert.assertEquals(((Set<Long>) alertConfig.getProperties().get(PROP_DETECTION_CONFIG_IDS)).size(), 2);
   }
 
-  @BeforeMethod
+  @BeforeMethod(alwaysRun = true)
   public void setUp() {
+    testDAOProvider = DAOTestBase.getInstance();
+    DAORegistry daoRegistry = DAORegistry.getInstance();
+    detectionConfigManager = daoRegistry.getDetectionConfigManager();
+    DetectionConfigDTO detectionConfigDTO = new DetectionConfigDTO();
+    detectionConfigDTO.setName("test_pipeline_1");
+    detectionConfigManager.save(detectionConfigDTO);
+
     DetectionAlertRegistry.getInstance().registerAlertFilter("DEFAULT_ALERTER_PIPELINE", "RECIPIENTClass");
-    this.alertYamlConfigs = new HashMap<>();
-    alertYamlConfigs.put(PROP_SUBS_GROUP_NAME, "test_alert");
-    alertYamlConfigs.put("type", "DEFAULT_ALerTeR_PipeLIne");
-    Map<String, Object> recipients = new HashMap<>();
-    recipients.put("to", Arrays.asList("test1", "test2"));
-    alertYamlConfigs.put("recipients", recipients);
-    alertYamlConfigs.put("application", "TestApplication");
-    this.translator = new YamlDetectionAlertConfigTranslator();
   }
+
+  @AfterMethod(alwaysRun = true)
+  void afterMethod() {
+    testDAOProvider.cleanup();
+  }
+
 }

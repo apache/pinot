@@ -1,8 +1,10 @@
 package org.apache.pinot.thirdeye.detection.yaml;
 
 import org.apache.pinot.thirdeye.datalayer.bao.DAOTestBase;
+import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
 import org.apache.pinot.thirdeye.datalayer.dto.ApplicationDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.apache.pinot.thirdeye.detection.annotation.registry.DetectionAlertRegistry;
 import org.apache.pinot.thirdeye.detection.annotation.registry.DetectionRegistry;
@@ -27,6 +29,10 @@ public class YamlResourceTest {
     testDAOProvider = DAOTestBase.getInstance();
     this.yamlResource = new YamlResource();
     this.daoRegistry = DAORegistry.getInstance();
+    DetectionConfigManager detectionDAO = this.daoRegistry.getDetectionConfigManager();
+    DetectionConfigDTO config = new DetectionConfigDTO();
+    config.setName("test_detection_1");
+    detectionDAO.save(config);
 
     DetectionAlertRegistry.getInstance().registerAlertScheme("EMAIL", "EmailClass");
     DetectionAlertRegistry.getInstance().registerAlertScheme("IRIS", "IrisClass");
