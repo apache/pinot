@@ -87,13 +87,13 @@
               Compare current with
               <select id="customizeEmail1" onchange={{action "onCustomizeEmail1" value="target.value"}}>
               {{#each options as |option|}}
-                <option value={{option.value}}>{{option.label}}</option>
+                <option value={{option.value}} selected={{option.selected}}>{{option.label}}</option>
               {{/each}}
               </select>
               and
               <select id="customizeEmail2" onchange={{action "onCustomizeEmail2" value="target.value"}}>
               {{#each options_two as |option|}}
-                <option value={{option.value}}>{{option.label}}</option>
+                <option value={{option.value}} selected={{option.selected}}>{{option.label}}</option>
               {{/each}}
               </select>
             {{/if}}
