@@ -150,7 +150,7 @@ alertSchemes:
 - type: EMAIL
 recipients:
  to:
-  - "me@company.com"buildAlerterProperties
+  - "me@company.com"
  cc:
   - "cc_email@company.com"
 fromAddress: your_from@company.com
