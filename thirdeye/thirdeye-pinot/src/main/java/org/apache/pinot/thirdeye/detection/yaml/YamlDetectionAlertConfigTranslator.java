@@ -188,7 +188,7 @@ public class YamlDetectionAlertConfigTranslator {
     alertConfigDTO.setHighWaterMark(0L);
 
     // NOTE: The below fields will/should be hidden from the YAML/UI. They will only be updated by the backend pipeline.
-    List<Long> detectionConfigIds = ConfigUtils.getLongs(yamlAlertConfig.get(PROP_DETECTION_CONFIG_IDS));
+    List<Long> detectionConfigIds = new ArrayList<>();
     List<String> detectionNames = ConfigUtils.getList(yamlAlertConfig.get(PROP_DETECTION_NAMES));
 
     try {

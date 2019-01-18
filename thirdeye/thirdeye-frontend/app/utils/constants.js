@@ -10,7 +10,8 @@ export default {
 };
 
 
-export const yamlAlertProps = `# give a name for this detection
+export const yamlAlertProps = `# Below are all dummy example. Please update accordingly.
+# give a name for this detection
 detectionName: name_of_the_detection
 # the metric to detect the anomalies
 metric: metric_name
@@ -75,7 +76,8 @@ rules:
 `;
 
 export const yamIt = function(metric, dataset){
-  return `# give a name for this detection
+  return `# Below are all dummy example. Please update accordingly.
+# give a name for this detection
 detectionName: name_of_the_detection
 # the metric to detect the anomalies
 metric: ${metric}
@@ -142,7 +144,7 @@ rules:
 
 export const yamlAlertSettings = `# Below are all dummy example. Please update accordingly.
 subscriptionGroupName: test_subscription_group
-application: "parity-check"
+application: your_application_name
 subscribedDetections: 
   - your_detection_name
 
@@ -153,9 +155,10 @@ recipients:
   - "me@company.com"
  cc:
   - "cc_email@company.com"
-fromAddress: your_from@company.com
+fromAddress: thirdeye-dev@linkedin.com
 
-cron: "0 0/5 * 1/1 * ? *"	
+cron: "0 0/5 * 1/1 * ? *"
+type: DEFAULT_ALERTER_PIPELINE
 active: true
 referenceLinks:
  "My Company FAQs": "http://www.company.com/faq"`;
