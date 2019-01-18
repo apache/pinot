@@ -127,22 +127,30 @@ public abstract class ControllerTest {
       _zkClient.deleteRecursive("/" + helixClusterName);
     }
 
-    _controllerStarter = new ControllerStarter(config);
-    _controllerStarter.start();
+    startControllerStarter(config);
 
-    _helixResourceManager = _controllerStarter.getHelixResourceManager();
     _helixManager = _helixResourceManager.getHelixZkManager();
     _helixAdmin = _helixResourceManager.getHelixAdmin();
     _propertyStore = _helixResourceManager.getPropertyStore();
   }
 
+  protected void startControllerStarter(ControllerConf config) {
+    _controllerStarter = new ControllerStarter(config);
+    _controllerStarter.start();
+    _helixResourceManager = _controllerStarter.getHelixResourceManager();
+  }
+
   protected void stopController() {
+    stopControllerStarter();
+    FileUtils.deleteQuietly(new File(_controllerDataDir));
+    _zkClient.close();
+  }
+
+  protected void stopControllerStarter() {
     Assert.assertNotNull(_controllerStarter);
 
     _controllerStarter.stop();
     _controllerStarter = null;
-    FileUtils.deleteQuietly(new File(_controllerDataDir));
-    _zkClient.close();
   }
 
   protected Schema createDummySchema(String tableName) {
