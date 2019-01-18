@@ -204,7 +204,7 @@ public class PrecisionRecallEvaluator {
           .equals(AnomalyFeedbackType.ANOMALY_NEW_TREND)) {
         isLabeledTrueAnomalyNewTrend = true;
       } else if (feedback != null && feedback.getFeedbackType() != null &&
-          (feedback.getFeedbackType().equals(AnomalyFeedbackType.ANOMALY) || feedback.getFeedbackType().equals(AnomalyFeedbackType.ANOMALY_EXPECTED))) {
+          (feedback.getFeedbackType().isAnomaly())) {
         isLabeledTrueAnomaly = true;
       }
 
