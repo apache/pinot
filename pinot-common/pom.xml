@@ -71,6 +71,25 @@
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-enforcer-plugin</artifactId>
       </plugin>
+       <plugin>
+              <groupId>org.codehaus.mojo</groupId>
+              <artifactId>build-helper-maven-plugin</artifactId>
+              <version>3.0.0</version>
+              <executions>
+                <execution>
+                  <id>add-source</id>
+                  <phase>generate-sources</phase>
+                  <goals>
+                    <goal>add-source</goal>
+                  </goals>
+                  <configuration>
+                    <sources>
+                      <source>${basedir}/target/generated-sources/thrift</source>
+                    </sources>
+                  </configuration>
+                </execution>
+              </executions>
+            </plugin>
     </plugins>
   </build>
   <dependencies>
@@ -348,7 +367,7 @@
         </plugins>
       </build>
     </profile>
-    <profile>
+        <profile>
       <id>profile-buildthrift</id>
       <activation>
         <file>
@@ -362,40 +381,24 @@
       <build>
         <plugins>
           <plugin>
-            <artifactId>maven-antrun-plugin</artifactId>
+            <groupId>org.apache.thrift.tools</groupId>
+            <artifactId>maven-thrift-plugin</artifactId>
+            <version>0.1.11</version>
+            <configuration>
+              <thriftExecutable>/usr/local/bin/thrift</thriftExecutable>
+              <thriftSourceRoot>${basedir}/src/main/thrift</thriftSourceRoot>
+              <generator>java</generator>
+            </configuration>
             <executions>
               <execution>
-                <id>generate-sources</id>
+                <id>thrift-sources</id>
                 <phase>generate-sources</phase>
-                <configuration>
-                  <tasks>
-                    <delete dir="target/generated-sources/gen-javabean"/>
-                    <mkdir dir="target/generated-sources"/>
-                    <exec executable="/usr/local/bin/thrift">
-                      <arg value="--gen"/>
-                      <arg value="java:beans"/>
-                      <arg value="-o"/>
-                      <arg value="target/generated-sources"/>
-                      <arg value="src/thrift/request.thrift"/>
-                    </exec>
-                    <exec executable="/usr/local/bin/thrift">
-                      <arg value="--gen"/>
-                      <arg value="java:beans"/>
-                      <arg value="-o"/>
-                      <arg value="target/generated-sources"/>
-                      <arg value="src/thrift/response.thrift"/>
-                    </exec>
-                    <copy todir="src/main/java/">
-                      <fileset dir="target/generated-sources/gen-javabean"/>
-                    </copy>
-                  </tasks>
-                </configuration>
                 <goals>
-                  <goal>run</goal>
+                  <goal>compile</goal>
                 </goals>
               </execution>
             </executions>
-          </plugin>
+            </plugin>
         </plugins>
       </build>
     </profile>
