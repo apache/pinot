@@ -21,10 +21,7 @@ package org.apache.pinot.common.config;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
-import java.util.ArrayList;
-import java.util.List;
 import javax.annotation.Nonnull;
-import org.apache.commons.lang.math.IntRange;
 import org.apache.pinot.common.utils.EqualityUtils;
 
 
@@ -32,7 +29,6 @@ import org.apache.pinot.common.utils.EqualityUtils;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class ColumnPartitionConfig {
   public static final String PARTITION_VALUE_DELIMITER = ",";
-  public static final String PARTITIONER_DELIMITER = "\t\t";
 
   @ConfigKey("functionName")
   private String _functionName;
@@ -80,75 +76,16 @@ public class ColumnPartitionConfig {
     _numPartitions = numPartitions;
   }
 
-  /**
-   * Helper method to convert an array of ranges in string form (eg [2 3]) into a list
-   * of {@link IntRange}. Expects each string range to be formatted correctly.
-   *
-   * @param inputs Array of ranges in string form.
-   * @return List of IntRange's for the given input.
-   */
-  public static List<IntRange> rangesFromString(String[] inputs) {
-    List<IntRange> ranges = new ArrayList<>(inputs.length);
-    for (String input : inputs) {
-
-      String trimmed = input.trim();
-      String[] split = trimmed.split("\\s+");
-      String startString = split[0].substring(1, split[0].length());
-      String endString = split[1].substring(0, split[1].length() - 1);
-      ranges.add(new IntRange(Integer.parseInt(startString), Integer.parseInt(endString)));
-    }
-    return ranges;
-  }
-
-  /**
-   * Helper method to convert ranges (one or more) in string form (eg "[1 2],[3 4]") into a
-   * list of {@link IntRange}. Expects string is formatted correctly.
-   *
-   * @param input String representation of ranges.
-   * @return List of IntRange's for the specified string.
-   */
-  public static List<IntRange> rangesFromString(String input) {
-    return rangesFromString(input.split(PARTITION_VALUE_DELIMITER));
-  }
-
-  /**
-   * Helper method to convert a list of {@link IntRange} to a delimited string.
-   * The delimiter used is {@link #PARTITION_VALUE_DELIMITER}
-   * @param ranges List of ranges to be converted to String.
-   * @return String representation of the lis tof ranges.
-   */
-  public static String rangesToString(List<IntRange> ranges) {
-    StringBuilder builder = new StringBuilder();
-
-    for (int i = 0; i < ranges.size(); i++) {
-      builder.append("[");
-      IntRange range = ranges.get(i);
-
-      builder.append(range.getMinimumInteger());
-      builder.append(" ");
-      builder.append(range.getMaximumInteger());
-      builder.append("]");
-
-      if (i < ranges.size() - 1) {
-        builder.append(PARTITION_VALUE_DELIMITER);
-      }
-    }
-    return builder.toString();
-  }
-
   @Override
-  public boolean equals(Object o) {
-    if (EqualityUtils.isSameReference(this, o)) {
+  public boolean equals(Object obj) {
+    if (this == obj) {
       return true;
     }
-
-    if (EqualityUtils.isNullOrNotSameClass(this, o)) {
-      return false;
+    if (obj instanceof ColumnPartitionConfig) {
+      ColumnPartitionConfig that = (ColumnPartitionConfig) obj;
+      return _functionName.equals(that._functionName) && _numPartitions == that._numPartitions;
     }
-
-    ColumnPartitionConfig that = (ColumnPartitionConfig) o;
-    return EqualityUtils.isEqual(this._numPartitions, that._numPartitions) &&
-        EqualityUtils.isEqual(this._functionName, that._functionName);
+    return false;
   }
 
   @Override

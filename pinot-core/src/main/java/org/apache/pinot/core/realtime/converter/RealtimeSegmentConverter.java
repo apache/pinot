@@ -134,9 +134,8 @@ public class RealtimeSegmentConverter {
     if (segmentPartitionConfig != null && segmentPartitionConfig.getColumnPartitionMap() != null) {
       Map<String, ColumnPartitionConfig> columnPartitionMap = segmentPartitionConfig.getColumnPartitionMap();
       for (String columnName : columnPartitionMap.keySet()) {
-        int partitionRangeWidth = driver.getSegmentStats().getColumnProfileFor(columnName).getPartitionRangeWidth();
-        serverMetrics.addValueToTableGauge(tableName, ServerGauge.REALTIME_SEGMENT_PARTITION_WIDTH,
-            partitionRangeWidth);
+        int numPartitions = driver.getSegmentStats().getColumnProfileFor(columnName).getPartitions().size();
+        serverMetrics.addValueToTableGauge(tableName, ServerGauge.REALTIME_SEGMENT_NUM_PARTITIONS, numPartitions);
       }
     }
   }

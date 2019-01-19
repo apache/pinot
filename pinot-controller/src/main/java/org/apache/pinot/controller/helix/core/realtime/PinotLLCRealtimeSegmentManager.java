@@ -46,7 +46,6 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang.math.IntRange;
 import org.apache.helix.AccessOption;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
@@ -290,7 +289,7 @@ public class PinotLLCRealtimeSegmentManager {
         ColumnPartitionConfig columnPartitionConfig = entry.getValue();
         partitionMetadataMap.put(column,
             new ColumnPartitionMetadata(columnPartitionConfig.getFunctionName(), numPartitions,
-                Collections.singletonList(new IntRange(partitionId))));
+                Collections.singleton(partitionId)));
       }
       partitionMetadata = new SegmentPartitionMetadata(partitionMetadataMap);
     }
@@ -309,10 +308,10 @@ public class PinotLLCRealtimeSegmentManager {
       String columnName = entry.getKey();
       ColumnMetadata columnMetadata = entry.getValue();
       // Check if the column metadata contains the partition information
-      if (columnMetadata.getPartitionFunction() != null && columnMetadata.getPartitionRanges() != null) {
+      if (columnMetadata.getPartitionFunction() != null) {
         partitionMetadataMap.put(columnName,
             new ColumnPartitionMetadata(columnMetadata.getPartitionFunction().toString(),
-                columnMetadata.getNumPartitions(), columnMetadata.getPartitionRanges()));
+                columnMetadata.getNumPartitions(), columnMetadata.getPartitions()));
       }
     }
     return new SegmentPartitionMetadata(partitionMetadataMap);

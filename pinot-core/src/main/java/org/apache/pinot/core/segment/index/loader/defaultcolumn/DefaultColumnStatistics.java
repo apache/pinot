@@ -18,8 +18,7 @@
  */
 package org.apache.pinot.core.segment.index.loader.defaultcolumn;
 
-import java.util.List;
-import org.apache.commons.lang.math.IntRange;
+import java.util.Set;
 import org.apache.pinot.core.data.partition.PartitionFunction;
 import org.apache.pinot.core.segment.creator.ColumnStatistics;
 
@@ -36,10 +35,6 @@ public class DefaultColumnStatistics implements ColumnStatistics {
   private final int _totalNumberOfEntries;
   private final int _maxNumberOfMultiValues;
   private final boolean _hasNull = false;
-  private final PartitionFunction _partitionFunction = null;
-  private final int _numPartitions = -1;
-  private final List<IntRange> _partitionRanges = null;
-  private final int _partitionRangeWidth = -1;
 
   public DefaultColumnStatistics(
       Object minValue,
@@ -109,21 +104,16 @@ public class DefaultColumnStatistics implements ColumnStatistics {
 
   @Override
   public PartitionFunction getPartitionFunction() {
-    return _partitionFunction;
+    return null;
   }
 
   @Override
   public int getNumPartitions() {
-    return _numPartitions;
+    return 0;
   }
 
   @Override
-  public List<IntRange> getPartitionRanges() {
-    return _partitionRanges;
-  }
-
-  @Override
-  public int getPartitionRangeWidth() {
-    return _partitionRangeWidth;
+  public Set<Integer> getPartitions() {
+    return null;
   }
 }

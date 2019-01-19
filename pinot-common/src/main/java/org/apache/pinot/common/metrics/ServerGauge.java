@@ -44,7 +44,7 @@ public enum ServerGauge implements AbstractMetrics.Gauge {
   STREAM_PARTITION_OFFSET_LAG("messages", false),
   REALTIME_OFFHEAP_MEMORY_USED("bytes", false),
   RUNNING_QUERIES("runningQueries", false),
-  REALTIME_SEGMENT_PARTITION_WIDTH("realtimeSegmentPartitionWidth", false),
+  REALTIME_SEGMENT_NUM_PARTITIONS("realtimeSegmentNumPartitions", false),
   LLC_SIMULTANEOUS_SEGMENT_BUILDS("llcSimultaneousSegmentBuilds", true);
 
   private final String gaugeName;
