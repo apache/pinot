@@ -97,7 +97,7 @@ regexpLikeClause:
   REGEXP_LIKE '(' expression ',' literal ')';
 
 matchesClause:
-  expression MATCHES '(' literal ',' literal ')';
+  expression MATCHES '(' literal (',' literal)? ')';
 
 booleanOperator: OR | AND;
 

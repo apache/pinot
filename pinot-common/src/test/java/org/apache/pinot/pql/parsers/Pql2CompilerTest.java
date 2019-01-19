@@ -238,4 +238,20 @@ public class Pql2CompilerTest {
     Assert.assertEquals(expressions.size(), 1);
     Assert.assertEquals(expressions.get(0), "sub('foo',bar)");
   }
+  
+  @Test
+  public void testMatchPredicate() {
+    BrokerRequest brokerRequest = COMPILER.compileToBrokerRequest("select a from T where col matches ('name=adam')");
+    Assert.assertEquals(brokerRequest.getFilterQuery().getColumn(), "col");
+    Assert.assertEquals(brokerRequest.getFilterQuery().getValueSize(), 1);
+    Assert.assertEquals(brokerRequest.getFilterQuery().getValue().get(0), "name=adam");
+    
+     brokerRequest = COMPILER.compileToBrokerRequest("select a from T where col matches ('name=adam', '{syntax:lucene}')");
+    Assert.assertEquals(brokerRequest.getFilterQuery().getColumn(), "col");
+    Assert.assertEquals(brokerRequest.getFilterQuery().getValueSize(), 2);
+    Assert.assertEquals(brokerRequest.getFilterQuery().getValue().get(0), "name=adam");
+    Assert.assertEquals(brokerRequest.getFilterQuery().getValue().get(0), "name=adam");
+
+
+  }
 }

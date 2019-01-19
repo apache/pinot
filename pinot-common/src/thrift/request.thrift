@@ -30,7 +30,8 @@ enum FilterOperator {
   RANGE,
   REGEXP_LIKE,
   NOT_IN,
-  IN
+  IN,
+  MATCHES
 }
 
 /**

@@ -101,7 +101,7 @@ public abstract class Predicate {
     case IN:
       predicate = new InPredicate(column, value);
       break;
-    case TEXT_MATCH:
+    case MATCHES:
       predicate = new MatchesPredicate(column, value);
       break;
     default:
