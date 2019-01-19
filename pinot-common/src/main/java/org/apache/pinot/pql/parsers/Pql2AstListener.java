@@ -35,6 +35,7 @@ import org.apache.pinot.pql.parsers.pql2.ast.InPredicateAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.IntegerLiteralAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.IsPredicateAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.LimitAstNode;
+import org.apache.pinot.pql.parsers.pql2.ast.MatchesPredicateAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.OptionAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.OptionsAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.OrderByAstNode;
@@ -290,6 +291,16 @@ public class Pql2AstListener extends PQL2BaseListener {
     popNode();
   }
 
+  @Override
+  public void enterMatchesPredicate(@NotNull PQL2Parser.MatchesPredicateContext ctx) {
+    pushNode(new MatchesPredicateAstNode());
+  }
+
+  @Override
+  public void exitMatchesPredicate(@NotNull PQL2Parser.MatchesPredicateContext ctx) {
+    popNode();
+  }
+  
   @Override
   public void enterHaving(@NotNull PQL2Parser.HavingContext ctx) {
     pushNode(new HavingAstNode());

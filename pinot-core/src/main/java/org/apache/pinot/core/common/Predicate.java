@@ -28,6 +28,7 @@ import org.apache.pinot.core.common.predicate.NEqPredicate;
 import org.apache.pinot.core.common.predicate.NotInPredicate;
 import org.apache.pinot.core.common.predicate.RangePredicate;
 import org.apache.pinot.core.common.predicate.RegexpLikePredicate;
+import org.apache.pinot.core.common.predicate.MatchesPredicate;
 
 
 public abstract class Predicate {
@@ -38,7 +39,8 @@ public abstract class Predicate {
     REGEXP_LIKE,
     RANGE,
     IN,
-    NOT_IN;
+    NOT_IN,
+    MATCHES;
 
     public boolean isExclusive() {
       return this == NEQ || this == NOT_IN;
@@ -98,6 +100,9 @@ public abstract class Predicate {
       break;
     case IN:
       predicate = new InPredicate(column, value);
+      break;
+    case TEXT_MATCH:
+      predicate = new MatchesPredicate(column, value);
       break;
     default:
       throw new UnsupportedOperationException("Unsupported filterType:" + filterType);

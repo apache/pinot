@@ -77,6 +77,7 @@ predicate:
   | betweenClause                         # BetweenPredicate
   | isClause                              # IsPredicate
   | regexpLikeClause                      # RegexpLikePredicate
+  | matchesClause                         # MatchesPredicate  
   ;
 
 inClause:
@@ -94,6 +95,9 @@ betweenClause:
 
 regexpLikeClause:
   REGEXP_LIKE '(' expression ',' literal ')';
+
+matchesClause:
+  expression MATCHES '(' literal ',' literal ')';
 
 booleanOperator: OR | AND;
 
@@ -131,6 +135,7 @@ LIMIT: L I M I T;
 NOT : N O T;
 OR: O R;
 REGEXP_LIKE: R E G E X P '_' L I K E;
+MATCHES: M A T C H E S;
 ORDER: O R D E R;
 SELECT: S E L E C T;
 TOP: T O P;

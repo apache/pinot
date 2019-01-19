@@ -27,6 +27,7 @@ import org.apache.pinot.core.common.predicate.NEqPredicate;
 import org.apache.pinot.core.common.predicate.NotInPredicate;
 import org.apache.pinot.core.common.predicate.RangePredicate;
 import org.apache.pinot.core.common.predicate.RegexpLikePredicate;
+import org.apache.pinot.core.common.predicate.MatchesPredicate;
 import org.apache.pinot.core.query.exception.BadQueryRequestException;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 
@@ -53,6 +54,7 @@ public class PredicateEvaluatorProvider {
           case REGEXP_LIKE:
             return RegexpLikePredicateEvaluatorFactory.newDictionaryBasedEvaluator((RegexpLikePredicate) predicate,
                 dictionary);
+          case MATCHES:
           default:
             throw new UnsupportedOperationException("Unsupported predicate type: " + predicate.getType());
         }
@@ -72,7 +74,10 @@ public class PredicateEvaluatorProvider {
           case REGEXP_LIKE:
             return RegexpLikePredicateEvaluatorFactory.newRawValueBasedEvaluator((RegexpLikePredicate) predicate,
                 dataType);
-          default:
+          case MATCHES:
+            return MatchesPredicateEvaluatorFactory
+              .newRawValueBasedEvaluator((MatchesPredicate) predicate, dataType);
+        default:
             throw new UnsupportedOperationException("Unsupported predicate type: " + predicate.getType());
         }
       }
