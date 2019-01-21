@@ -402,6 +402,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         String.valueOf(PinotDataBitSet.getNumBitsPerValue(cardinality - 1)));
     properties.setProperty(getKeyFor(column, DICTIONARY_ELEMENT_SIZE), String.valueOf(dictionaryElementSize));
     properties.setProperty(getKeyFor(column, COLUMN_TYPE), String.valueOf(fieldSpec.getFieldType()));
+    properties.setProperty(getKeyFor(column, OBJECT_TYPE), fieldSpec.getObjectType());
     properties.setProperty(getKeyFor(column, IS_SORTED), String.valueOf(columnIndexCreationInfo.isSorted()));
     properties.setProperty(getKeyFor(column, HAS_NULL_VALUE), String.valueOf(columnIndexCreationInfo.hasNulls()));
     properties.setProperty(getKeyFor(column, HAS_DICTIONARY), String.valueOf(hasDictionary));

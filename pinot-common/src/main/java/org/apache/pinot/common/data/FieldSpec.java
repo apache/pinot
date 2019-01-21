@@ -86,6 +86,10 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, ConfigNodeLife
 
   @ConfigKey("virtualColumnProvider")
   protected String _virtualColumnProvider;
+  
+  //Complex type that can be constructed from raw bytes stored e.g. map, json, text
+  @ConfigKey("objectType")
+  protected String _objectType;
 
   // Default constructor required by JSON de-serializer. DO NOT REMOVE.
   public FieldSpec() {
@@ -98,15 +102,21 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, ConfigNodeLife
   public FieldSpec(String name, DataType dataType, boolean isSingleValueField, @Nullable Object defaultNullValue) {
     this(name, dataType, isSingleValueField, DEFAULT_MAX_LENGTH, defaultNullValue);
   }
-
+  
   public FieldSpec(String name, DataType dataType, boolean isSingleValueField, int maxLength,
       @Nullable Object defaultNullValue) {
+    this(name, dataType, isSingleValueField, maxLength, defaultNullValue, null);
+  }
+  
+  public FieldSpec(String name, DataType dataType, boolean isSingleValueField, int maxLength,
+      @Nullable Object defaultNullValue, @Nullable String objectType) {
     _name = name;
     _dataType = dataType.getStoredType();
     _isSingleValueField = isSingleValueField;
     _maxLength = maxLength;
     setDefaultNullValue(defaultNullValue);
   }
+  
 
   public abstract FieldType getFieldType();
 
@@ -182,6 +192,16 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, ConfigNodeLife
     if (_dataType != null) {
       _defaultNullValue = getDefaultNullValue(getFieldType(), _dataType, _stringDefaultNullValue);
     }
+  }
+  
+  
+  
+  public String getObjectType() {
+    return _objectType;
+  }
+
+  public void setObjectType(String objectType) {
+    _objectType = objectType;
   }
 
   private static Object getDefaultNullValue(FieldType fieldType, DataType dataType,
@@ -353,6 +373,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, ConfigNodeLife
     result = EqualityUtils.hashCodeOf(result, _isSingleValueField);
     result = EqualityUtils.hashCodeOf(result, getStringValue(_defaultNullValue));
     result = EqualityUtils.hashCodeOf(result, _maxLength);
+    result = EqualityUtils.hashCodeOf(result, _objectType);
     return result;
   }
 
