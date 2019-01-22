@@ -411,7 +411,7 @@
       <dependency>
         <groupId>org.glassfish.hk2</groupId>
         <artifactId>hk2-api</artifactId>
-        <version>2.1.58</version>
+        <version>2.5.0</version>
       </dependency>
       <dependency>
         <groupId>org.apache.helix</groupId>
@@ -644,13 +644,13 @@
         <version>3.19.0-GA</version>
       </dependency>
       <dependency>
-        <groupId>org.glassfish.jersey.inject</groupId>
-        <artifactId>jersey-hk2</artifactId>
+        <groupId>org.glassfish.jersey.core</groupId>
+        <artifactId>jersey-common</artifactId>
         <version>${jersey.version}</version>
       </dependency>
       <dependency>
-        <groupId>org.glassfish.jersey.core</groupId>
-        <artifactId>jersey-common</artifactId>
+        <groupId>org.glassfish.jersey.inject</groupId>
+        <artifactId>jersey-hk2</artifactId>
         <version>${jersey.version}</version>
       </dependency>
       <dependency>
@@ -688,11 +688,6 @@
             <artifactId>javax.inject</artifactId>
           </exclusion>
         </exclusions>
-      </dependency>
-      <dependency>
-        <groupId>org.glassfish.hk2.external</groupId>
-        <artifactId>javax.inject</artifactId>
-        <version>2.4.0-b34</version>
       </dependency>
       <dependency>
         <groupId>org.apache.commons</groupId>
