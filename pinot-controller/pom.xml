@@ -140,6 +140,10 @@
       <artifactId>swagger-jaxrs</artifactId>
     </dependency>
     <dependency>
+      <groupId>org.glassfish.hk2</groupId>
+      <artifactId>hk2-api</artifactId>
+    </dependency>
+    <dependency>
       <groupId>commons-logging</groupId>
       <artifactId>commons-logging</artifactId>
     </dependency>

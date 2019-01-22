@@ -111,11 +111,10 @@
     <!-- jfim: for Kafka 0.9.0.0, use zkclient 0.7 -->
     <kafka.version>0.9.0.1</kafka.version>
     <zkclient.version>0.7</zkclient.version>
-    <!-- TODO: bump up the jackson version once we update jersey version to 2.28 or later -->
-    <jackson.version>2.8.3</jackson.version>
+    <jackson.version>2.9.8</jackson.version>
     <async-http-client.version>1.9.21</async-http-client.version>
-    <jersey.version>2.23</jersey.version>
-    <swagger.version>1.5.10</swagger.version>
+    <jersey.version>2.28-RC4</jersey.version>
+    <swagger.version>1.5.21</swagger.version>
     <hadoop.version>2.7.0</hadoop.version>
     <antlr.version>4.6</antlr.version>
     <!-- commons-configuration, hadoop-common, hadoop-client use commons-lang -->
@@ -403,6 +402,16 @@
         <groupId>org.slf4j</groupId>
         <artifactId>slf4j-log4j12</artifactId>
         <version>1.7.7</version>
+      </dependency>
+      <dependency>
+        <groupId>javax.validation</groupId>
+        <artifactId>validation-api</artifactId>
+        <version>2.0.1.Final</version>
+      </dependency>
+      <dependency>
+        <groupId>org.glassfish.hk2</groupId>
+        <artifactId>hk2-api</artifactId>
+        <version>2.1.58</version>
       </dependency>
       <dependency>
         <groupId>org.apache.helix</groupId>
@@ -774,7 +783,7 @@
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-compiler-plugin</artifactId>
-          <version>2.5.1</version>
+          <version>3.8.0</version>
           <configuration>
             <source>${jdk.version}</source>
             <target>${jdk.version}</target>
@@ -1098,7 +1107,7 @@
       </plugin>
       <plugin>
         <artifactId>maven-shade-plugin</artifactId>
-        <version>2.4.3</version>
+        <version>3.2.1</version>
         <configuration>
           <shadedArtifactAttached>true</shadedArtifactAttached>
           <transformers>
