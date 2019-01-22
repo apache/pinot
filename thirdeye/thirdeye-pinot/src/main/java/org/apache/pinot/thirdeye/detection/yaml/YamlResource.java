@@ -187,6 +187,10 @@ public class YamlResource {
     return Response.ok().entity(ImmutableMap.of("detectionConfigId", detectionConfig.getId(), "detectionAlertConfigId", alertConfig.getId())).build();
   }
 
+  public DetectionConfigDTO translateToDetectionConfig(Map<String, Object> yamlConfig, Map<String, String> responseMessage) {
+    return buildDetectionConfigFromYaml(0, 0, yamlConfig, null, responseMessage);
+  }
+
   /*
    * Build the detection config from a yaml.
    * Returns null if building or validation failed. Error messages stored in responseMessage.

@@ -24,6 +24,7 @@ import com.google.common.base.Preconditions;
 import java.util.stream.Collectors;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionAlertConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
+import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.pojo.AlertConfigBean;
@@ -41,6 +42,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.collections.MapUtils;
+import org.yaml.snakeyaml.DumperOptions;
+import org.yaml.snakeyaml.Yaml;
 
 
 /**
@@ -57,19 +60,19 @@ public class YamlDetectionAlertConfigTranslator {
   public static final String PROP_FROM = "fromAddress";
   public static final String PROP_EMAIL_SUBJECT_TYPE = "emailSubjectStyle";
   public static final String PROP_ALERT_SCHEMES = "alertSchemes";
-
+  public static final String PROP_DETECTION_NAMES = "subscribedDetections";
   public static final String PROP_TYPE = "type";
   public static final String PROP_CLASS_NAME = "className";
+
   static final String PROP_PARAM = "params";
   static final String PROP_ALERT_SUPPRESSORS = "alertSuppressors";
   static final String PROP_REFERENCE_LINKS = "referenceLinks";
-  static final String PROP_ONLY_FETCH_LEGACY_ANOMALIES = "onlyFetchLegacyAnomalies";
-  static final String PROP_DETECTION_NAMES = "subscribedDetections";
-
-  static final String PROP_DIMENSION = "dimension";
-  static final String PROP_DIMENSION_RECIPIENTS = "dimensionRecipients";
   static final String PROP_TIME_WINDOWS = "timeWindows";
   static final String CRON_SCHEDULE_DEFAULT = "0 0/5 * * * ? *"; // Every 5 min
+
+  private static final String PROP_ONLY_FETCH_LEGACY_ANOMALIES = "onlyFetchLegacyAnomalies";
+  private static final String PROP_DIMENSION = "dimension";
+  private static final String PROP_DIMENSION_RECIPIENTS = "dimensionRecipients";
 
   private static final DetectionAlertRegistry DETECTION_ALERT_REGISTRY = DetectionAlertRegistry.getInstance();
   private static final Set<String> PROPERTY_KEYS = new HashSet<>(
@@ -200,10 +203,16 @@ public class YamlDetectionAlertConfigTranslator {
 
     alertConfigDTO.setProperties(buildAlerterProperties(yamlAlertConfig, detectionConfigIds));
     Map<Long, Long> vectorClocks = new HashMap<>();
+    long currentTimestamp = System.currentTimeMillis();
     for (long detectionConfigId : detectionConfigIds) {
-      vectorClocks.put(detectionConfigId, 0L);
+      vectorClocks.put(detectionConfigId, currentTimestamp);
     }
     alertConfigDTO.setVectorClocks(vectorClocks);
+
+    DumperOptions options = new DumperOptions();
+    options.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
+    options.setPrettyFlow(true);
+    alertConfigDTO.setYaml(new Yaml(options).dump(yamlAlertConfig));
 
     return alertConfigDTO;
   }

@@ -155,10 +155,6 @@ public class ThirdEyeDashboardApplication
       LOG.error("Exception while loading caches", e);
     }
 
-    // instantiate registry
-    DetectionRegistry.init();
-    DetectionAlertRegistry.init();
-
     AnomalyFunctionFactory anomalyFunctionFactory = new AnomalyFunctionFactory(config.getFunctionConfigPath());
     AlertFilterFactory alertFilterFactory = new AlertFilterFactory(config.getAlertFilterConfigPath());
     AlertFilterAutotuneFactory alertFilterAutotuneFactory = new AlertFilterAutotuneFactory(config.getFilterAutotuneConfigPath());
@@ -177,8 +173,10 @@ public class ThirdEyeDashboardApplication
     env.jersey().register(new ThirdEyeResource());
     env.jersey().register(new DataResource(anomalyFunctionFactory, alertFilterFactory));
     env.jersey().register(new AnomaliesResource(anomalyFunctionFactory, alertFilterFactory));
-    env.jersey().register(new DetectionMigrationResource(DAO_REGISTRY.getAnomalyFunctionDAO(),
-        DAO_REGISTRY.getDetectionConfigManager(), DAO_REGISTRY.getDatasetConfigDAO()));
+    env.jersey().register(new DetectionMigrationResource(
+        DAO_REGISTRY.getAnomalyFunctionDAO(), DAO_REGISTRY.getAlertConfigDAO(),
+        DAO_REGISTRY.getDetectionConfigManager(), DAO_REGISTRY.getDetectionAlertConfigManager(),
+        DAO_REGISTRY.getDatasetConfigDAO(), DAO_REGISTRY.getMergedAnomalyResultDAO()));
     env.jersey().register(new OnboardResource(config));
     env.jersey().register(new EntityMappingResource());
     env.jersey().register(new OnboardDatasetMetricResource());
