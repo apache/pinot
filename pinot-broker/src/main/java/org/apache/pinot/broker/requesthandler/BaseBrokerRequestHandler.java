@@ -120,7 +120,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     requestStatistics.setRequestArrivalTimeMillis(System.currentTimeMillis());
 
     String query = request.get(PQL).asText();
-    LOGGER.debug("Query string for request {}: {}", requestId, query);
+    String queryLoggable = StringUtils.substring(query.replace("\n", "\\n"), 0, _queryLogLength);
+    LOGGER.debug("Query string for request {}: {}", requestId, queryLoggable);
     requestStatistics.setPql(query);
 
     // Compile the request
@@ -129,7 +130,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     try {
       brokerRequest = REQUEST_COMPILER.compileToBrokerRequest(query);
     } catch (Exception e) {
-      LOGGER.info("Caught exception while compiling request {}: {}, {}", requestId, query, e.getMessage());
+      LOGGER.info("Caught exception while compiling request {}: {}, {}", requestId, queryLoggable, e.getMessage());
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_COMPILATION_EXCEPTIONS, 1);
       requestStatistics.setErrorCode(QueryException.PQL_PARSING_ERROR_CODE);
       return new BrokerResponseNative(QueryException.getException(QueryException.PQL_PARSING_ERROR, e));
@@ -180,7 +181,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     }
     if ((offlineTableName == null) && (realtimeTableName == null)) {
       // No table matches the request
-      LOGGER.info("No table matches for request {}: {}", requestId, query);
+      LOGGER.info("No table matches for request {}: {}", requestId, queryLoggable);
       requestStatistics.setErrorCode(QueryException.BROKER_RESOURCE_MISSING_ERROR_CODE);
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.RESOURCE_MISSING_EXCEPTIONS, 1);
       return BrokerResponseNative.NO_TABLE_RESULT;
@@ -189,7 +190,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     // Validate QPS quota
     if (!_tableQueryQuotaManager.acquire(tableName)) {
       String errorMessage =
-          String.format("Request %d exceeds query quota for table:%s, query:%s", requestId, tableName, query);
+          String.format("Request %d exceeds query quota for table:%s, query:%s", requestId, tableName, queryLoggable);
       LOGGER.info(errorMessage);
       requestStatistics.setErrorCode(QueryException.TOO_MANY_REQUESTS_ERROR_CODE);
       _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.QUERY_QUOTA_EXCEEDED, 1);
@@ -200,7 +201,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     try {
       validateRequest(brokerRequest);
     } catch (Exception e) {
-      LOGGER.info("Caught exception while validating request {}: {}, {}", requestId, query, e.getMessage());
+      LOGGER.info("Caught exception while validating request {}: {}, {}", requestId, queryLoggable, e.getMessage());
       requestStatistics.setErrorCode(QueryException.QUERY_VALIDATION_ERROR_CODE);
       _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.QUERY_VALIDATION_EXCEPTIONS, 1);
       return new BrokerResponseNative(QueryException.getException(QueryException.QUERY_VALIDATION_ERROR, e));
@@ -208,7 +209,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
     // Set extra settings into broker request
     if (request.has(TRACE) && request.get(TRACE).asBoolean()) {
-      LOGGER.debug("Enable trace for request {}: {}", requestId, query);
+      LOGGER.debug("Enable trace for request {}: {}", requestId, queryLoggable);
       brokerRequest.setEnableTrace(true);
     }
     if (request.has(DEBUG_OPTIONS)) {
@@ -217,7 +218,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
           .trimResults()
           .withKeyValueSeparator('=')
           .split(request.get(DEBUG_OPTIONS).asText());
-      LOGGER.debug("Debug options are set to: {} for request {}: {}", debugOptions, requestId, query);
+      LOGGER.debug("Debug options are set to: {} for request {}: {}", debugOptions, requestId, queryLoggable);
       brokerRequest.setDebugOptions(debugOptions);
     }
 
@@ -251,7 +252,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     if (offlineBrokerRequest != null) {
       offlineRoutingTable = _routingTable.getRoutingTable(new RoutingTableLookupRequest(offlineBrokerRequest));
       if (offlineRoutingTable.isEmpty()) {
-        LOGGER.debug("No OFFLINE server found for request {}: {}", requestId, query);
+        LOGGER.debug("No OFFLINE server found for request {}: {}", requestId, queryLoggable);
         offlineBrokerRequest = null;
         offlineRoutingTable = null;
       }
@@ -259,13 +260,13 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     if (realtimeBrokerRequest != null) {
       realtimeRoutingTable = _routingTable.getRoutingTable(new RoutingTableLookupRequest(realtimeBrokerRequest));
       if (realtimeRoutingTable.isEmpty()) {
-        LOGGER.debug("No REALTIME server found for request {}: {}", requestId, query);
+        LOGGER.debug("No REALTIME server found for request {}: {}", requestId, queryLoggable);
         realtimeBrokerRequest = null;
         realtimeRoutingTable = null;
       }
     }
     if (offlineBrokerRequest == null && realtimeBrokerRequest == null) {
-      LOGGER.info("No server found for request {}: {}", requestId, query);
+      LOGGER.info("No server found for request {}: {}", requestId, queryLoggable);
       _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.NO_SERVER_FOUND_EXCEPTIONS, 1);
       return BrokerResponseNative.EMPTY_RESULT;
     }
@@ -305,7 +306,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         brokerResponse.getNumSegmentsProcessed(), brokerResponse.getNumSegmentsMatched(),
         brokerResponse.getNumServersResponded(), brokerResponse.getNumServersQueried(),
         brokerResponse.isNumGroupsLimitReached(), brokerResponse.getExceptionsSize(), serverStats.getServerStats(),
-        StringUtils.substring(query, 0, _queryLogLength));
+        queryLoggable);
 
     return brokerResponse;
   }
