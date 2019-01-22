@@ -195,25 +195,17 @@ public class YamlDetectionAlertConfigTranslator {
     List<String> detectionNames = ConfigUtils.getList(yamlAlertConfig.get(PROP_DETECTION_NAMES));
 
     try {
-      detectionConfigIds.addAll(detectionNames.stream().map(detectionName -> {
-        List<DetectionConfigDTO> detectionConfigDTOs = DAORegistry.getInstance().getDetectionConfigManager()
-            .findByPredicate(Predicate.EQ("name", detectionName));
-
-        if (!detectionConfigDTOs.isEmpty()) {
-          return detectionConfigDTOs.get(0).getId();
-        } else {
-          return DAORegistry.getInstance().getAnomalyFunctionDAO()
-              .findByPredicate(Predicate.EQ("functionName", detectionName)).get(0).getId();
-        }
-      }).collect(Collectors.toList()));
+      detectionConfigIds.addAll(detectionNames.stream().map(detectionName ->  this.detectionConfigDAO.findByPredicate(
+          Predicate.EQ("name", detectionName)).get(0).getId()).collect(Collectors.toList()));
     } catch (Exception e){
       throw new IllegalArgumentException("cannot find detection pipeline, please check the subscribed detections.");
     }
 
     alertConfigDTO.setProperties(buildAlerterProperties(yamlAlertConfig, detectionConfigIds));
     Map<Long, Long> vectorClocks = new HashMap<>();
+    long currentTimestamp = System.currentTimeMillis();
     for (long detectionConfigId : detectionConfigIds) {
-      vectorClocks.put(detectionConfigId, 0L);
+      vectorClocks.put(detectionConfigId, currentTimestamp);
     }
     alertConfigDTO.setVectorClocks(vectorClocks);
 

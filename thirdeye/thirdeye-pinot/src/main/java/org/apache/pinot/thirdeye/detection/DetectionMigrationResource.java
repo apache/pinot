@@ -431,26 +431,17 @@ public class DetectionMigrationResource {
           continue;
         }
 
-        // Build the new alert object
+        // Translate the old alert and capture the state
         Map<String, Object> detectionAlertYaml = translateAlertToYaml(alertConfigDTO);
-        DetectionAlertConfigDTO alertConfig = new YamlDetectionAlertConfigTranslator(detectionConfigDAO).translate(detectionAlertYaml);
 
-        // Migrate all the subscribed anomaly functions
-        long currentTimestamp = System.currentTimeMillis();
-        List<Long> newDetectionIds = new ArrayList<>();
-        Map<Long, Long> vectorClocks = new HashMap<>();
-        List<Long> detectionIds = ConfigUtils.getLongs(alertConfig.getProperties().get(PROP_DETECTION_CONFIG_IDS));
+        // Migrate all the subscribed anomaly functions. Note that this will update the state of old anomaly functions.
+        List<Long> detectionIds = ConfigUtils.getLongs(alertConfigDTO.getEmailConfig().getFunctionIds());
         for (long detectionId : detectionIds) {
-          Long newDetectionConfigId = migrateLegacyAnomalyFunction(detectionId);
-          vectorClocks.put(newDetectionConfigId, currentTimestamp);
-          newDetectionIds.add(newDetectionConfigId);
+          migrateLegacyAnomalyFunction(detectionId);
         }
 
-        // Update the new detection ids and reset the clocks
-        alertConfig.setVectorClocks(vectorClocks);
-        alertConfig.getProperties().put(PROP_DETECTION_CONFIG_IDS, newDetectionIds);
-
-        // Save the migrated alert
+        // Migrate the alert/notification group
+        DetectionAlertConfigDTO alertConfig = new YamlDetectionAlertConfigTranslator(detectionConfigDAO).translate(detectionAlertYaml);
         detectionAlertConfigDAO.save(alertConfig);
         if (alertConfig.getId() == null) {
           throw new RuntimeException("Error while saving the migrated alert config for " + alertConfigDTO.getName());
