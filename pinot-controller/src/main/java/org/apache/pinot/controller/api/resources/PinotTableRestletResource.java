@@ -25,7 +25,6 @@ import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 import java.util.Collections;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import javax.annotation.Nonnull;
@@ -40,6 +39,8 @@ import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
+import javax.ws.rs.container.AsyncResponse;
+import javax.ws.rs.container.Suspended;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.configuration.Configuration;
@@ -243,20 +244,15 @@ public class PinotTableRestletResource {
   @ApiOperation(value = "Deletes a table", notes = "Deletes a table")
   public SuccessResponse deleteTable(
       @ApiParam(value = "Name of the table to delete", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "realtime|offline", required = false) @QueryParam("type") String tableTypeStr) {
-    List<String> tablesDeleted = new LinkedList<>();
+      @ApiParam(value = "realtime|offline", required = false, allowableValues = "OFFLINE, REALTIME") @QueryParam("type") String tableTypeStr,
+      @Suspended final AsyncResponse asyncResponse) {
+    TableDeletionRequest tableDeletionRequest = new TableDeletionRequest(tableName, tableTypeStr);
     try {
-      if (tableTypeStr == null || tableTypeStr.equalsIgnoreCase(CommonConstants.Helix.TableType.OFFLINE.name())) {
-        _pinotHelixResourceManager.deleteOfflineTable(tableName);
-        tablesDeleted.add(TableNameBuilder.OFFLINE.tableNameWithType(tableName));
-      }
-      if (tableTypeStr == null || tableTypeStr.equalsIgnoreCase(CommonConstants.Helix.TableType.REALTIME.name())) {
-        _pinotHelixResourceManager.deleteRealtimeTable(tableName);
-        tablesDeleted.add(TableNameBuilder.REALTIME.tableNameWithType(tableName));
-      }
-      return new SuccessResponse("Table deleted " + tablesDeleted);
-    } catch (Exception e) {
-      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
+      _pinotHelixResourceManager.deleteTable(tableDeletionRequest, _executorService, asyncResponse);
+      return new SuccessResponse("Table deleted " + tableDeletionRequest.getTablesDeleted());
+    } catch (Throwable t) {
+      asyncResponse.resume(t);
+      throw new ControllerApplicationException(LOGGER, t.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, t);
     }
   }
 

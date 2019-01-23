@@ -41,6 +41,7 @@ import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.TenantRole;
 import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.controller.api.resources.TableDeletionRequest;
 import org.apache.pinot.controller.helix.ControllerRequestBuilderUtil;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.testng.Assert;
@@ -220,7 +221,8 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
     }
 
     // Delete the table
-    _helixResourceManager.deleteOfflineTable(TABLE_NAME);
+    TableDeletionRequest tableDeletionRequest = new TableDeletionRequest(OFFLINE_TABLE_NAME, null);
+    _helixResourceManager.deleteTable(tableDeletionRequest, null, null);
   }
 
   @Test

@@ -36,6 +36,7 @@ import org.apache.pinot.common.partition.ReplicaGroupPartitionAssignment;
 import org.apache.pinot.common.partition.ReplicaGroupPartitionAssignmentGenerator;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.ZkStarter;
+import org.apache.pinot.controller.api.resources.TableDeletionRequest;
 import org.apache.pinot.controller.helix.ControllerRequestBuilderUtil;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.util.HelixSetupUtils;
@@ -200,7 +201,8 @@ public class SegmentAssignmentStrategyTest {
 
   @Test
   public void testReplicaGroupPartitionAssignment() throws Exception {
-    String tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME_REPLICA_GROUP_PARTITION_ASSIGNMENT);
+    String rawTableName = TABLE_NAME_REPLICA_GROUP_PARTITION_ASSIGNMENT;
+    String tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
 
     // Adding a table without replica group
     TableConfig tableConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(
@@ -236,7 +238,7 @@ public class SegmentAssignmentStrategyTest {
     Assert.assertTrue(partitionAssignment != null);
 
     // After table deletion, check that the replica group partition assignment is deleted
-    _pinotHelixResourceManager.deleteOfflineTable(tableNameWithType);
+    _pinotHelixResourceManager.deleteTable(new TableDeletionRequest(tableNameWithType, null), null, null);
     partitionAssignment = _partitionAssignmentGenerator.getReplicaGroupPartitionAssignment(tableNameWithType);
     Assert.assertTrue(partitionAssignment == null);
 
@@ -246,7 +248,7 @@ public class SegmentAssignmentStrategyTest {
     Assert.assertTrue(partitionAssignment != null);
 
     // Check that the replica group partition assignment is deleted
-    _pinotHelixResourceManager.deleteOfflineTable(tableNameWithType);
+    _pinotHelixResourceManager.deleteTable(new TableDeletionRequest(tableNameWithType, null), null, null);
     partitionAssignment = _partitionAssignmentGenerator.getReplicaGroupPartitionAssignment(tableNameWithType);
     Assert.assertTrue(partitionAssignment == null);
   }
