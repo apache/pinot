@@ -33,6 +33,7 @@ import java.util.stream.Collectors;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang.exception.ExceptionUtils;
@@ -396,8 +397,8 @@ public class DetectionMigrationResource {
   }
 
   @GET
-  @Path("/legacy-anomaly-function-to-yaml")
-  public Response getYamlFromLegacyAnomalyFunction(long anomalyFunctionID) throws Exception {
+  @Path("/legacy-anomaly-function-to-yaml/{id}")
+  public Response getYamlFromLegacyAnomalyFunction(@PathParam("id") long anomalyFunctionID) throws Exception {
     AnomalyFunctionDTO anomalyFunctionDTO = this.anomalyFunctionDAO.findById(anomalyFunctionID);
     if (anomalyFunctionDTO == null) {
       return Response.status(Response.Status.BAD_REQUEST)
@@ -408,8 +409,8 @@ public class DetectionMigrationResource {
   }
 
   @GET
-  @Path("/legacy-alert-to-yaml")
-  public Response getYamlFromLegacyAlert(long alertId) throws Exception {
+  @Path("/legacy-alert-to-yaml/{id}")
+  public Response getYamlFromLegacyAlert(@PathParam("id") long alertId) throws Exception {
     AlertConfigDTO alertConfigDTO = this.alertConfigDAO.findById(alertId);
     if (alertConfigDTO == null) {
       return Response.status(Response.Status.BAD_REQUEST)
@@ -420,8 +421,8 @@ public class DetectionMigrationResource {
   }
 
   @POST
-  @Path("/application")
-  public Response migrateApplication(@QueryParam("id") String application) throws Exception {
+  @Path("/application/{name}")
+  public Response migrateApplication(@PathParam("name") String application) throws Exception {
     List<AlertConfigDTO> alertConfigDTOList = alertConfigDAO.findByPredicate(Predicate.EQ("application", application));
     Map<String, String> responseMessage = new HashMap<>();
 
@@ -475,8 +476,8 @@ public class DetectionMigrationResource {
   }
 
   @POST
-  @Path("/anomaly-function")
-  public Response migrateAnomalyFunction(@QueryParam("id") long anomalyFunctionId) throws Exception {
+  @Path("/anomaly-function/{id}")
+  public Response migrateAnomalyFunction(@PathParam("id") long anomalyFunctionId) throws Exception {
     return Response.ok(migrateLegacyAnomalyFunction(anomalyFunctionId)).build();
   }
 }
