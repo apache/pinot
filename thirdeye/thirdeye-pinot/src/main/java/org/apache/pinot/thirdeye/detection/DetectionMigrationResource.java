@@ -396,6 +396,7 @@ public class DetectionMigrationResource {
   }
 
   @GET
+  @Path("/legacy-anomaly-function-to-yaml")
   public Response getYamlFromLegacyAnomalyFunction(long anomalyFunctionID) throws Exception {
     AnomalyFunctionDTO anomalyFunctionDTO = this.anomalyFunctionDAO.findById(anomalyFunctionID);
     if (anomalyFunctionDTO == null) {
@@ -407,6 +408,7 @@ public class DetectionMigrationResource {
   }
 
   @GET
+  @Path("/legacy-alert-to-yaml")
   public Response getYamlFromLegacyAlert(long alertId) throws Exception {
     AlertConfigDTO alertConfigDTO = this.alertConfigDAO.findById(alertId);
     if (alertConfigDTO == null) {
@@ -418,6 +420,7 @@ public class DetectionMigrationResource {
   }
 
   @POST
+  @Path("/application")
   public Response migrateApplication(@QueryParam("id") String application) throws Exception {
     List<AlertConfigDTO> alertConfigDTOList = alertConfigDAO.findByPredicate(Predicate.EQ("application", application));
     Map<String, String> responseMessage = new HashMap<>();
@@ -472,6 +475,7 @@ public class DetectionMigrationResource {
   }
 
   @POST
+  @Path("/anomaly-function")
   public Response migrateAnomalyFunction(@QueryParam("id") long anomalyFunctionId) throws Exception {
     return Response.ok(migrateLegacyAnomalyFunction(anomalyFunctionId)).build();
   }
