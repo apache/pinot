@@ -38,7 +38,7 @@ import org.yaml.snakeyaml.Yaml;
 public abstract class YamlDetectionConfigTranslator {
   protected static final Logger LOG = LoggerFactory.getLogger(YamlDetectionConfigTranslator.class);
   private static final String PROP_NAME = "detectionName";
-
+  private static final String PROP_ACTIVE = "active";
 
   protected Map<String, Object> yamlConfig;
   protected long startTime;
@@ -86,6 +86,7 @@ public abstract class YamlDetectionConfigTranslator {
     config.setProperties(translationResult.getProperties());
     config.setComponentSpecs(translationResult.getComponents());
     config.setCron(translationResult.getCron());
+    config.setActive(MapUtils.getBooleanValue(yamlConfig, PROP_ACTIVE, true));
 
     DumperOptions options = new DumperOptions();
     options.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
