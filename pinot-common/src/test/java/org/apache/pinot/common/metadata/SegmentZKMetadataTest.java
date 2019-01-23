@@ -23,7 +23,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import org.apache.commons.lang.math.IntRange;
 import org.apache.helix.ZNRecord;
 import org.apache.pinot.common.metadata.segment.ColumnPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
@@ -78,18 +77,19 @@ public class SegmentZKMetadataTest {
   @Test
   public void segmentPartitionMetadataTest()
       throws IOException {
-
     // Test for partition metadata serialization/de-serialization.
-    String expectedMetadataString =
-        "{\"columnPartitionMap\":{"
-            + "\"column1\":{\"functionName\":\"func1\",\"numPartitions\":7,\"partitionRanges\":\"[5 5],[7 7]\"},"
-            + "\"column2\":{\"functionName\":\"func2\",\"numPartitions\":11,\"partitionRanges\":\"[11 11],[13 13]\"}}}";
-
+    String legacyMetadataString = "{\"columnPartitionMap\":{"
+        + "\"column1\":{\"functionName\":\"func1\",\"numPartitions\":7,\"partitionRanges\":\"[5 5],[7 7]\"},"
+        + "\"column2\":{\"functionName\":\"func2\",\"numPartitions\":11,\"partitionRanges\":\"[11 11],[13 13]\"}}}";
+    String expectedMetadataString = "{\"columnPartitionMap\":{"
+        + "\"column1\":{\"functionName\":\"func1\",\"numPartitions\":7,\"partitions\":[5,7]},"
+        + "\"column2\":{\"functionName\":\"func2\",\"numPartitions\":11,\"partitions\":[11,13]}}}";
+    assertEquals(SegmentPartitionMetadata.fromJsonString(legacyMetadataString).toJsonString(), expectedMetadataString);
     assertEquals(SegmentPartitionMetadata.fromJsonString(expectedMetadataString).toJsonString(),
         expectedMetadataString);
 
     Map<String, ColumnPartitionMetadata> columnPartitionMetadataMap = new HashMap<>();
-    columnPartitionMetadataMap.put("column", new ColumnPartitionMetadata("foo", 7, Collections.singletonList(new IntRange(11))));
+    columnPartitionMetadataMap.put("column", new ColumnPartitionMetadata("foo", 7, Collections.singleton(11)));
     SegmentPartitionMetadata expectedPartitionMetadata = new SegmentPartitionMetadata(columnPartitionMetadataMap);
 
     // Test partition metadata in OfflineSegmentZkMetadata

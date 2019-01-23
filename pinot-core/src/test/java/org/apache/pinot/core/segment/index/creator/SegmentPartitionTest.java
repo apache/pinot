@@ -21,12 +21,14 @@ package org.apache.pinot.core.segment.index.creator;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang.math.IntRange;
 import org.apache.pinot.common.config.ColumnPartitionConfig;
 import org.apache.pinot.common.config.SegmentPartitionConfig;
 import org.apache.pinot.common.data.DimensionFieldSpec;
@@ -38,6 +40,7 @@ import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.data.GenericRow;
+import org.apache.pinot.core.data.partition.ModuloPartitionFunction;
 import org.apache.pinot.core.data.readers.GenericRowRecordReader;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
@@ -47,10 +50,11 @@ import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl
 import org.apache.pinot.core.segment.index.ColumnMetadata;
 import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
-import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.*;
 
 
 /**
@@ -74,8 +78,9 @@ public class SegmentPartitionTest {
   private static final int NUM_PARTITIONS = 20; // For modulo function
   private static final int PARTITION_DIVISOR = 5; // Allowed partition values
   private static final int MAX_PARTITION_VALUE = (PARTITION_DIVISOR - 1);
-  private static final String EXPECTED_PARTITION_VALUE_STRING = "[0 " + MAX_PARTITION_VALUE + "]";
-  private static final String EXPECTED_PARTITION_FUNCTION = "MoDuLo";
+  private static final String PARTITION_FUNCTION_NAME = "MoDuLo";
+
+  private final Set<Integer> _expectedPartitions = new HashSet<>();
   private IndexSegment _segment;
 
   @BeforeClass
@@ -99,29 +104,20 @@ public class SegmentPartitionTest {
    *   <li> Partitioning metadata is dropped for column that does not comply to partitioning scheme. </li>
    *   <li> Partitioning metadata is not written out for column for which the metadata was not specified. </li>
    * </ul>
-   * @throws Exception
    */
   @Test
-  public void testMetadata()
-      throws Exception {
+  public void testMetadata() {
     SegmentMetadataImpl metadata = (SegmentMetadataImpl) _segment.getSegmentMetadata();
     ColumnMetadata columnMetadata = metadata.getColumnMetadataFor(PARTITIONED_COLUMN_NAME);
 
-    Assert.assertEquals(columnMetadata.getPartitionFunction().toString().toLowerCase(),
-        EXPECTED_PARTITION_FUNCTION.toLowerCase());
+    assertTrue(columnMetadata.getPartitionFunction() instanceof ModuloPartitionFunction);
 
-    List<IntRange> partitionValues = columnMetadata.getPartitionRanges();
-    Assert.assertEquals(partitionValues.size(), 1);
-    List<IntRange> expectedPartitionValues = ColumnPartitionConfig.rangesFromString(EXPECTED_PARTITION_VALUE_STRING);
-
-    IntRange actualValue = partitionValues.get(0);
-    IntRange expectedPartitionValue = expectedPartitionValues.get(0);
-    Assert.assertEquals(actualValue.getMinimumInteger(), expectedPartitionValue.getMinimumInteger());
-    Assert.assertEquals(actualValue.getMaximumInteger(), expectedPartitionValue.getMaximumInteger());
+    Set<Integer> actualPartitions = columnMetadata.getPartitions();
+    assertEquals(actualPartitions, _expectedPartitions);
 
     columnMetadata = metadata.getColumnMetadataFor(NON_PARTITIONED_COLUMN_NAME);
-    Assert.assertNull(columnMetadata.getPartitionFunction());
-    Assert.assertNull(columnMetadata.getPartitionRanges());
+    assertNull(columnMetadata.getPartitionFunction());
+    assertNull(columnMetadata.getPartitions());
   }
 
   /**
@@ -147,14 +143,14 @@ public class SegmentPartitionTest {
       BrokerRequest brokerRequest = compiler.compileToBrokerRequest(query);
       FilterQueryTree filterQueryTree = RequestUtils.generateFilterQueryTree(brokerRequest);
 
-      Assert.assertEquals(pruner.prune(_segment, filterQueryTree), (columnValue % NUM_PARTITIONS > MAX_PARTITION_VALUE),
+      assertEquals(pruner.prune(_segment, filterQueryTree), (columnValue % NUM_PARTITIONS > MAX_PARTITION_VALUE),
           "Failed for column value: " + columnValue);
 
       // Test for non partitioned column.
       query = buildQuery(TABLE_NAME, NON_PARTITIONED_COLUMN_NAME, columnValue);
       brokerRequest = compiler.compileToBrokerRequest(query);
       filterQueryTree = RequestUtils.generateFilterQueryTree(brokerRequest);
-      Assert.assertFalse(pruner.prune(_segment, filterQueryTree));
+      assertFalse(pruner.prune(_segment, filterQueryTree));
 
       // Test for AND query: Segment can be pruned out if partitioned column has value outside of range.
       int partitionColumnValue = Math.abs(random.nextInt());
@@ -164,7 +160,7 @@ public class SegmentPartitionTest {
 
       brokerRequest = compiler.compileToBrokerRequest(query);
       filterQueryTree = RequestUtils.generateFilterQueryTree(brokerRequest);
-      Assert.assertEquals(pruner.prune(_segment, filterQueryTree),
+      assertEquals(pruner.prune(_segment, filterQueryTree),
           (partitionColumnValue % NUM_PARTITIONS) > MAX_PARTITION_VALUE);
 
       // Test for OR query: Segment should never be pruned as there's an OR with non partitioned column.
@@ -172,54 +168,7 @@ public class SegmentPartitionTest {
           nonPartitionColumnValue, FilterOperator.OR);
       brokerRequest = compiler.compileToBrokerRequest(query);
       filterQueryTree = RequestUtils.generateFilterQueryTree(brokerRequest);
-      Assert.assertFalse(pruner.prune(_segment, filterQueryTree));
-    }
-  }
-
-  /**
-   * Unit test for utility the converts String ranges into IntRanges and back.
-   * <ul>
-   *   <li> Generates a list of String ranges</li>
-   *   <li> Ensures that conversion to IntRanges is as expected</li>
-   *   <li> Ensures that the IntRanges when converted back to String ranges are as expected. </li>
-   * </ul>
-   */
-  @Test
-  public void testStringRangeConversions() {
-    Random random = new Random();
-
-    for (int i = 0; i < 1000; i++) {
-      int numRanges = 1 + random.nextInt(1000);
-      String[] ranges = new String[numRanges];
-      List<IntRange> expected = new ArrayList<>(numRanges);
-      StringBuilder builder = new StringBuilder();
-
-      for (int j = 0; j < numRanges; j++) {
-        int start = random.nextInt();
-        int end = random.nextInt();
-
-        // Generate random ranges such that start <= end.
-        if (start > end) {
-          start ^= end;
-          end = start ^ end;
-          start = start ^ end;
-        }
-
-        ranges[j] = buildRangeString(start, end);
-        expected.add(new IntRange(start, end));
-
-        builder.append(ranges[j]);
-        if (j < numRanges - 1) {
-          builder.append(ColumnPartitionConfig.PARTITION_VALUE_DELIMITER);
-        }
-      }
-      String expectedString = builder.toString();
-
-      List<IntRange> actual = ColumnPartitionConfig.rangesFromString(ranges);
-      Assert.assertEquals(actual, expected);
-
-      String actualString = ColumnPartitionConfig.rangesToString(actual);
-      Assert.assertEquals(actualString, expectedString);
+      assertFalse(pruner.prune(_segment, filterQueryTree));
     }
   }
 
@@ -249,10 +198,10 @@ public class SegmentPartitionTest {
       String partitionColumn = entry.getKey();
 
       ColumnPartitionConfig expectedColumnConfig = expectedMap.get(partitionColumn);
-      Assert.assertNotNull(expectedColumnConfig);
+      assertNotNull(expectedColumnConfig);
       ColumnPartitionConfig actualColumnConfig = entry.getValue();
 
-      Assert.assertEquals(actualColumnConfig.getFunctionName(), expectedColumnConfig.getFunctionName());
+      assertEquals(actualColumnConfig.getFunctionName(), expectedColumnConfig.getFunctionName());
     }
 
     // Test that adding new fields does not break json de-serialization.
@@ -261,7 +210,7 @@ public class SegmentPartitionTest {
     String jsonStringWithoutNewField =
         "{\"columnPartitionMap\":{\"column_0\":{\"functionName\":\"function\",\"numPartitions\":10}}}";
 
-    Assert.assertEquals(jsonStringWithoutNewField,
+    assertEquals(jsonStringWithoutNewField,
         SegmentPartitionConfig.fromJsonString(jsonStringWithNewField).toJsonString());
   }
 
@@ -275,8 +224,8 @@ public class SegmentPartitionTest {
         + operator + " " + nonPartitionColumn + " = " + nonPartitionedColumnValue;
   }
 
-  private String buildRangeString(int start, int end) {
-    return "[" + start + " " + end + "]";
+  private List buildPartitionList(int partition) {
+    return Collections.singletonList(partition);
   }
 
   /**
@@ -297,8 +246,8 @@ public class SegmentPartitionTest {
     Random random = new Random();
     Map<String, ColumnPartitionConfig> partitionFunctionMap = new HashMap<>();
 
-    partitionFunctionMap.put(PARTITIONED_COLUMN_NAME, new ColumnPartitionConfig(EXPECTED_PARTITION_FUNCTION,
-        NUM_PARTITIONS));
+    partitionFunctionMap
+        .put(PARTITIONED_COLUMN_NAME, new ColumnPartitionConfig(PARTITION_FUNCTION_NAME, NUM_PARTITIONS));
 
     SegmentPartitionConfig segmentPartitionConfig = new SegmentPartitionConfig(partitionFunctionMap);
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(schema);
@@ -312,7 +261,9 @@ public class SegmentPartitionTest {
     for (int i = 0; i < NUM_ROWS; i++) {
       HashMap<String, Object> map = new HashMap<>();
 
-      int validPartitionedValue = random.nextInt(100) * 20 + random.nextInt(PARTITION_DIVISOR);
+      int partition = random.nextInt(PARTITION_DIVISOR);
+      int validPartitionedValue = random.nextInt(100) * 20 + partition;
+      _expectedPartitions.add(partition);
       map.put(PARTITIONED_COLUMN_NAME, validPartitionedValue);
       map.put(NON_PARTITIONED_COLUMN_NAME, validPartitionedValue);
 

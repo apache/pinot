@@ -18,16 +18,14 @@
  */
 package org.apache.pinot.common.metadata.segment;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
-import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import org.apache.commons.lang.math.IntRange;
 import org.apache.pinot.common.utils.JsonUtils;
 
 
@@ -73,25 +71,13 @@ public class SegmentPartitionMetadata {
   }
 
   /**
-   * Set the number of partitions for the specified column.
-   *
-   * @param column Column for which to set the number of partitions.
-   * @param numPartitions Number of partitions to set.
-   */
-  @JsonIgnore
-  public void setNumPartitions(String column, int numPartitions) {
-    ColumnPartitionMetadata columnPartitionMetadata = _columnPartitionMap.get(column);
-    columnPartitionMetadata.setNumPartitions(numPartitions);
-  }
-
-  /**
    * Given a JSON string, de-serialize and return an instance of {@link SegmentPartitionMetadata}
    *
    * @param jsonString Input JSON string
    * @return Instance of {@link SegmentPartitionMetadata} built from the input string.
-   * @throws IOException
    */
-  public static SegmentPartitionMetadata fromJsonString(String jsonString) throws IOException {
+  public static SegmentPartitionMetadata fromJsonString(String jsonString)
+      throws IOException {
     return JsonUtils.stringToObject(jsonString, SegmentPartitionMetadata.class);
   }
 
@@ -99,9 +85,9 @@ public class SegmentPartitionMetadata {
    * Returns the JSON equivalent of the object.
    *
    * @return JSON string equivalent of the object.
-   * @throws IOException
    */
-  public String toJsonString() throws IOException {
+  public String toJsonString()
+      throws IOException {
     return JsonUtils.objectToString(this);
   }
 
@@ -118,15 +104,14 @@ public class SegmentPartitionMetadata {
   }
 
   /**
-   * Returns the list of partition ranges for the specified column.
-   * Returns null if the column is not partitioned.
+   * Returns the set of partitions for the specified column, or {@code null} if the column is not partitioned.
    *
-   * @param column Column for which to return the list of partition ranges.
-   * @return List of partition ranges for the specified column.
+   * @param column Column for which to return the set of partitions
+   * @return Set of partitions for the specified column
    */
-  public List<IntRange> getPartitionRanges(String column) {
+  public Set<Integer> getPartitions(String column) {
     ColumnPartitionMetadata columnPartitionMetadata = _columnPartitionMap.get(column);
-    return (columnPartitionMetadata != null) ? columnPartitionMetadata.getPartitionRanges() : null;
+    return (columnPartitionMetadata != null) ? columnPartitionMetadata.getPartitions() : null;
   }
 
   @Override

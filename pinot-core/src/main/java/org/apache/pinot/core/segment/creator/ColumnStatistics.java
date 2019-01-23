@@ -18,8 +18,7 @@
  */
 package org.apache.pinot.core.segment.creator;
 
-import java.util.List;
-import org.apache.commons.lang.math.IntRange;
+import java.util.Set;
 import org.apache.pinot.core.data.partition.PartitionFunction;
 
 
@@ -86,10 +85,5 @@ public interface ColumnStatistics {
 
     int getNumPartitions();
 
-    List<IntRange> getPartitionRanges();
-
-    /**
-     * Returns the width of the partition range for this column, used when doing per-column partitioning.
-     */
-    int getPartitionRangeWidth();
+    Set<Integer> getPartitions();
 }

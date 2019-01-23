@@ -21,7 +21,6 @@ package org.apache.pinot.broker.pruner;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nonnull;
-import org.apache.commons.lang.math.IntRange;
 import org.apache.pinot.common.metadata.segment.ColumnPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
@@ -86,22 +85,11 @@ public class PartitionZKMetadataPruner implements SegmentZKMetadataPruner {
       return false;
     }
 
-    List<IntRange> partitionRanges = metadata.getPartitionRanges();
-    if (partitionRanges == null || partitionRanges.isEmpty()) {
-      return false;
-    }
-
     String value = filterQueryTree.getValue().get(0);
     PartitionFunction partitionFunction =
         PartitionFunctionFactory.getPartitionFunction(metadata.getFunctionName(), metadata.getNumPartitions());
     int partition = partitionFunction.getPartition(value);
-
-    for (IntRange partitionRange : partitionRanges) {
-      if (partitionRange.containsInteger(partition)) {
-        return false;
-      }
-    }
-    return true;
+    return !metadata.getPartitions().contains(partition);
   }
 
   /**

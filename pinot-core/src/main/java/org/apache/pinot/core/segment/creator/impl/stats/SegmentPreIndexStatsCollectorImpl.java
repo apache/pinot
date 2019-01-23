@@ -156,7 +156,7 @@ public class SegmentPreIndexStatsCollectorImpl implements SegmentPreIndexStatsCo
         LOGGER.info("column type : " + _statsCollectorConfig.getSchema().getFieldSpecFor(column).getDataType());
 
         if (statisticsCollector.getPartitionFunction() != null) {
-          LOGGER.info("min partition value: " + statisticsCollector.getPartitionRanges().toString());
+          LOGGER.info("partitions: " + statisticsCollector.getPartitions().toString());
         }
         LOGGER.info("***********************************************");
       }

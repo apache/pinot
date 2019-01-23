@@ -26,7 +26,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
-import org.apache.commons.lang.math.IntRange;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.broker.routing.RoutingTableLookupRequest;
@@ -359,8 +358,8 @@ public class PartitionAwareRealtimeRoutingTableBuilderTest {
   private SegmentZKMetadata buildSegmentZKMetadata(String segmentName, int partition) {
     LLCRealtimeSegmentZKMetadata metadata = new LLCRealtimeSegmentZKMetadata();
     Map<String, ColumnPartitionMetadata> columnPartitionMap = new HashMap<>();
-    columnPartitionMap.put(PARTITION_COLUMN, new ColumnPartitionMetadata(PARTITION_FUNCTION_NAME, NUM_PARTITION,
-        Collections.singletonList(new IntRange(partition))));
+    columnPartitionMap.put(PARTITION_COLUMN,
+        new ColumnPartitionMetadata(PARTITION_FUNCTION_NAME, NUM_PARTITION, Collections.singleton(partition)));
     SegmentPartitionMetadata segmentPartitionMetadata = new SegmentPartitionMetadata(columnPartitionMap);
 
     metadata.setSegmentName(segmentName);
