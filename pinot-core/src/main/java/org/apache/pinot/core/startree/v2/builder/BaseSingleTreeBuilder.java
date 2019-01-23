@@ -498,11 +498,11 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
   }
 
   private void writeMetadata() {
-    _metadataProperties.addProperty(MetadataKey.TOTAL_DOCS, _numDocs);
-    _metadataProperties.addProperty(MetadataKey.DIMENSIONS_SPLIT_ORDER, _dimensionsSplitOrder);
-    _metadataProperties.addProperty(MetadataKey.FUNCTION_COLUMN_PAIRS, _metrics);
-    _metadataProperties.addProperty(MetadataKey.MAX_LEAF_RECORDS, _maxLeafRecords);
-    _metadataProperties.addProperty(MetadataKey.SKIP_STAR_NODE_CREATION_FOR_DIMENSIONS,
+    _metadataProperties.setProperty(MetadataKey.TOTAL_DOCS, _numDocs);
+    _metadataProperties.setProperty(MetadataKey.DIMENSIONS_SPLIT_ORDER, _dimensionsSplitOrder);
+    _metadataProperties.setProperty(MetadataKey.FUNCTION_COLUMN_PAIRS, _metrics);
+    _metadataProperties.setProperty(MetadataKey.MAX_LEAF_RECORDS, _maxLeafRecords);
+    _metadataProperties.setProperty(MetadataKey.SKIP_STAR_NODE_CREATION_FOR_DIMENSIONS,
         _builderConfig.getSkipStarNodeCreationForDimensions());
   }
 }
