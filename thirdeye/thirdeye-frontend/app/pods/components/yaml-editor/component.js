@@ -22,7 +22,7 @@
 import Component from '@ember/component';
 import { computed, set, get, getProperties } from '@ember/object';
 import { checkStatus } from 'thirdeye-frontend/utils/utils';
-import { yamlAlertProps, yamlAlertSettings, yamIt } from 'thirdeye-frontend/utils/constants';
+import { yamlAlertProps, yamlAlertSettings } from 'thirdeye-frontend/utils/constants';
 import yamljs from 'yamljs';
 import RSVP from "rsvp";
 import fetch from 'fetch';
@@ -139,7 +139,8 @@ export default Component.extend({
    * @method _buildYamlSuggestions
    * @return Promise
    */
-  _buildYamlSuggestions(currentMetric, yamlAsObject, prefix, noResultsArray, filtersCache, dimensionsCache) {
+  _buildYamlSuggestions(currentMetric, yamlAsObject, prefix, noResultsArray,
+    filtersCache, dimensionsCache, position) {
     // holds default result to return if all checks fail
     let defaultReturn = Promise.resolve(noResultsArray);
     // when metric is being autocompleted, entire text field will be replaced and metricId stored in editor
@@ -153,15 +154,22 @@ export default Component.extend({
               return {
                 value: metricname,
                 caption: metric.alias,
+                row: position.row,
+                column: position.column,
                 metricname,
                 dataset,
                 id: metric.id,
                 completer:{
                   insertMatch: (editor, data) => {
-                    editor.setValue(yamIt(data.metricname, data.dataset));
+                    editor.session.replace({
+                      start: { row: data.row, column: 0 },
+                      end: { row: data.row, column: Number.MAX_VALUE }},
+                    `metric: ${data.metricname}`);
+                    editor.session.replace({
+                      start: { row: data.row+2, column: 0},
+                      end: { row: data.row+2, column: Number.MAX_VALUE }},
+                    `dataset: ${data.dataset}`);
                     editor.metricId = data.id;
-                    //editor.completer.insertMatch({value: data.value});
-                    // editor.insert('abc');
                   }
                 }};
             });
@@ -279,13 +287,17 @@ export default Component.extend({
             });
           })
           .then(() => {
-            return get(this, '_buildYamlSuggestions')(currentMetric, yamlAsObject, prefix, noResultsArray, get(this, 'filtersCache'), get(this, 'dimensionsCache'))
+            return get(this, '_buildYamlSuggestions')(currentMetric,
+              yamlAsObject, prefix, noResultsArray, get(this, 'filtersCache'),
+              get(this, 'dimensionsCache'), position)
               .then(results => results);
           });
       }
       const currentMetric = get(this, 'currentMetric');
       // deals with no metricId, which could be autocomplete for metric or for filters and dimensions already cached
-      return get(this, '_buildYamlSuggestions')(currentMetric, yamlAsObject, prefix, noResultsArray, get(this, 'filtersCache'), get(this, 'dimensionsCache'))
+      return get(this, '_buildYamlSuggestions')(currentMetric, yamlAsObject,
+        prefix, noResultsArray, get(this, 'filtersCache'),
+        get(this, 'dimensionsCache'), position)
         .then(results => results);
 
     },
