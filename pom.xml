@@ -409,11 +409,6 @@
         <version>2.0.1.Final</version>
       </dependency>
       <dependency>
-        <groupId>org.glassfish.hk2</groupId>
-        <artifactId>hk2-api</artifactId>
-        <version>2.5.0</version>
-      </dependency>
-      <dependency>
         <groupId>org.apache.helix</groupId>
         <artifactId>helix-core</artifactId>
         <version>${helix.version}</version>
