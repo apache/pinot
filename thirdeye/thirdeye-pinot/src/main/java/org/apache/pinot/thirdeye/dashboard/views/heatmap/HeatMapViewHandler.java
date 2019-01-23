@@ -19,6 +19,7 @@
 
 package org.apache.pinot.thirdeye.dashboard.views.heatmap;
 
+import com.google.common.collect.Lists;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -52,7 +53,6 @@ import org.apache.pinot.thirdeye.datasource.comparison.TimeOnTimeComparisonReque
 import org.apache.pinot.thirdeye.datasource.comparison.TimeOnTimeComparisonResponse;
 import org.apache.pinot.thirdeye.datasource.comparison.Row.Metric;
 
-import jersey.repackaged.com.google.common.collect.Lists;
 
 public class HeatMapViewHandler implements ViewHandler<HeatMapViewRequest, HeatMapViewResponse> {
 
