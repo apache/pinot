@@ -144,9 +144,9 @@ rules:
 
 export const yamlAlertSettings = `# Below are all dummy example. Please update accordingly.
 subscriptionGroupName: test_subscription_group
-application: your_application_name
-subscribedDetections: 
-  - your_detection_name
+application: thirdeye-internal
+subscribedDetections:
+  - name_of_the_detection_above
 
 alertSchemes:
 - type: EMAIL
