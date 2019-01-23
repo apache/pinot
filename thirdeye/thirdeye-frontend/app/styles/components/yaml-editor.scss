@@ -13,6 +13,12 @@
   .col-xs-4 {
     margin-bottom: 20px;
   }
+
+  .col-xs-12 {
+    &.bottom-margin {
+      margin-bottom: 10px;
+    }
+  }
 }
 
 .ace_editor.ace_autocomplete {

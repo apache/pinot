@@ -1,9 +1,15 @@
 <fieldset class="te-form__section te-form__section--first row">
   <div class="col-xs-12">
     <legend class="te-form__section-title">{{alertTitle}}</legend>
-    <label for="select-metric" class="control-label te-label te-label--taller required">Can't find your metric?
-      <a class="thirdeye-link-secondary" target="_blank">Import from InGraphs</a>
-    </label>
+  </div>
+  <div class="col-xs-12 {{if isEditMode "bottom-margin"}}">
+    {{#unless isEditMode}}
+      <label for="select-metric" class="control-label te-label te-label--taller required">Can't find your metric?
+        {{#link-to "self-serve.import-metric" class="thirdeye-link-secondary thirdeye-link-secondary--inside"}}
+          Import a Metric From InGraphs
+        {{/link-to}}
+      </label>
+    {{/unless}}
     <div class="pull-right">
       {{bs-button
         defaultText="Reset"
@@ -20,9 +26,11 @@
         class="te-button te-button--cancel"
       }}
     </div>
+  </div>
+  <div class="col-xs-12">
     {{ember-ace
       lines=35
-      value=currentYamlValues
+      value=currentYamlAlert
       suggestCompletions=(action 'yamlSuggestions')
       enableLiveAutocompletion=true
       update=(action "onYMLSelectorAction")
@@ -33,7 +41,6 @@
   <div class="col-xs-12">
     <hr/>
   </div>
-  {{!-- TOD: save for Alert settings --}}
   {{#if showSettings}}
     <div class="col-xs-12">
       <legend class="te-form__section-title">{{alertSettingsTitle}}</legend>
@@ -42,8 +49,8 @@
       <label class="te-label te-label--small">Add this alert to a subscription group</label>
       {{!--  subscription group --}}
       {{#power-select
-        options=subscriptionGroupNames
         placeholder="Create a subscription group"
+        options=subscriptionGroupNamesDisplay
         selected=groupName
         searchField="name"
         onchange=(action 'onYAMLGroupSelectionAction')
@@ -51,9 +58,6 @@
       }}
         {{groupName.name}} ({{groupName.id}})
       {{/power-select}}
-    </div>
-    <div class="col-xs-12">
-      <legend class="te-form__section-title">Configure new subscription group</legend>
     </div>
     <div class="col-xs-12">
       <label for="select-metric" class="control-label te-label te-label--taller required">Can't find your team? Contact
@@ -79,7 +83,7 @@
     <div class="col-xs-12">
       {{!-- notification settings editor --}}
       {{ember-ace
-        lines=20
+        lines=25
         value=currentYamlSettings
         update=(action "onYMLSettingsSelectorAction")
         mode="ace/mode/yaml"
@@ -99,18 +103,11 @@
 <fieldset class="te-form__section-submit">
   {{#if isEditMode}}
     {{bs-button
-      defaultText="Cancel"
-      type="outline-primary"
-      buttonType="cancel"
-      onClick=(action "cancelAlertYamlAction")
-      class="te-button te-button--cancel"
-    }}
-    {{bs-button
       defaultText="Save changes"
       type="primary"
       buttonType="submit"
       disabled=disableYamlSave
-      onClick=(action "saveAlertYamlAction")
+      onClick=(action "saveEditYamlAction")
       class="te-button te-button--submit"
     }}
   {{else}}
@@ -119,7 +116,7 @@
       type="primary"
       buttonType="submit"
       disabled=disableYamlSave
-      onClick=(action "saveAlertYamlAction")
+      onClick=(action "createAlertYamlAction")
       class="te-button te-button--submit"
     }}
   {{/if}}

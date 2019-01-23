@@ -1,22 +1,24 @@
 /**
- * Component to render pre-set time range selection pills and a 'custom' one using date-range-picker.
- * @module components/range-pill-selectors
- * @property {Object} timeRangeOptions - object containing our range options
- * @property {Number} timePickerIncrement - determines selectable time increment in date-range-picker
- * @property {Date} activeRangeStart - default start date for range picker
- * @property {Date} activeRangeEnd - default end date for range picker
- * @property {String} uiDateFormat - date format specified by parent route (often specific to metric granularity)
- * @property {Action} selectAction - closure action from parent
+ * Component to render the alert and subscription group yaml editors.
+ * @module components/yaml-editor
+ * @property {number} alertId - the alert id
+ * @property {number} subscriptionGroupId - the subscription group id
+ * @property {boolean} isEditMode - to activate the edit mode
+ * @property {boolean} showSettings - to show the subscriber groups yaml editor
+ * @property {Object} subscriptionGroupNames - the list of subscription groups
+ * @property {Object} alertYaml - the alert yaml to display
+ * @property {Object} detectionSettingsYaml - the subscription group yaml to display
  * @example
-  {{yaml-editor
-    alertTitle="New Editor Title"
-    isEditMode=true
-    showSettings=true
-    onYMLSelector=(action "onYMLSelector")
-    saveAlertYaml=(action "saveAlertYaml")
-    cancelAlertYaml=(action "cancelAlertYaml")
-  }}
- * @author
+   {{yaml-editor
+     alertId=model.alertId
+     subscriptionGroupId=model.subscriptionGroupId
+     isEditMode=true
+     showSettings=true
+     subscriptionGroupNames=model.detectionSettingsYaml
+     alertYaml=model.detectionYaml
+     detectionSettingsYaml=model.detectionSettingsYaml
+   }}
+ * @author lohuynh
  */
 
 import Component from '@ember/component';
@@ -39,7 +41,7 @@ export default Component.extend({
   /**
    * Properties we expect to receive for the yaml-editor
    */
-  //isForm: true,
+   //isForm: true,
   currentMetric: null,
   isYamlParseable: true,
   alertTitle: 'Define anomaly detection in YAML',
@@ -52,44 +54,57 @@ export default Component.extend({
   detectionSettingsYaml:  null,   // The YAML for the subscription group
   yamlAlertProps: yamlAlertProps,
   yamlAlertSettings: yamlAlertSettings,
-  subscriptionGroupNames: [],
   showAnomalyModal: false,
   showNotificationModal: false,
   YAMLField: '',
+  currentYamlAlertOriginal: '',
+  currentYamlSettingsOriginal: '',
 
-  /**
-   * params passed to yaml-editor component
-   */
-  async didReceiveAttrs() {
+
+  init() {
     this._super(...arguments);
 
-    // fetch the subscription group list
-    await get(this, '_fetchSubscriptionGroups').perform();
+    if(get(this, 'isEditMode')) {
+      set(this, 'currentYamlAlertOriginal', get(this, 'alertYaml') || get(this, 'yamlAlertProps'));
+      set(this, 'currentYamlSettingsOriginal', get(this, 'detectionSettingsYaml') || get(this, 'yamlAlertSettings'));
+    }
   },
+  /**
+   * sets Yaml value displayed to contents of alertYaml or yamlAlertProps
+   * @method currentYamlAlert
+   * @return {String}
+   */
+  subscriptionGroupNamesDisplay: computed(
+    'subscriptionGroupNames',
+    async function() {
+      const subscriptionGroups = await get(this, '_fetchSubscriptionGroups').perform();
+      return get(this, 'subscriptionGroupNames') || subscriptionGroups;
+    }
+  ),
 
   /**
    * sets Yaml value displayed to contents of alertYaml or yamlAlertProps
-   * @method currentYamlValues
+   * @method currentYamlAlert
    * @return {String}
    */
-  currentYamlValues: computed(
+  currentYamlAlert: computed(
     'alertYaml',
     function() {
-      const inputYaml = this.get('alertYaml');
-      return inputYaml || this.get('yamlAlertProps');
+      const inputYaml = get(this, 'alertYaml');
+      return inputYaml || get(this, 'yamlAlertProps');
     }
   ),
 
   /**
    * sets Yaml value displayed to contents of detectionSettingsYaml or yamlAlertSettings
-   * @method currentYamlValues
+   * @method currentYamlAlert
    * @return {String}
    */
   currentYamlSettings: computed(
     'detectionSettingsYaml',
     function() {
-      const inputYaml = this.get('detectionSettingsYaml');
-      return inputYaml || this.get('yamlAlertSettings');
+      const detectionSettingsYaml = get(this, 'detectionSettingsYaml');
+      return detectionSettingsYaml || get(this, 'yamlAlertSettings');
     }
   ),
 
@@ -97,7 +112,7 @@ export default Component.extend({
   isErrorMsg: computed(
     'errorMsg',
     function() {
-      const errorMsg = this.get('errorMsg');
+      const errorMsg = get(this, 'errorMsg');
       return errorMsg !== '';
     }
   ),
@@ -115,7 +130,8 @@ export default Component.extend({
       const response = yield fetch(url2, postProps2);
       const json = yield response.json();
       //filter subscription groups with yaml
-      set(this, 'subscriptionGroupNames', json.filterBy('yaml'));
+      //set(this, 'subscriptionGroupNames', json.filterBy('yaml'));
+      return json.filterBy('yaml');
     } catch (error) {
       notifications.error('Failed to retrieve subscription groups.', 'Error');
     }
@@ -125,14 +141,14 @@ export default Component.extend({
    * Calls api's for specific metric's autocomplete
    * @method _loadAutocompleteById
    * @return Promise
-  */
-  _loadAutocompleteById(metricId) {
+   */
+   _loadAutocompleteById(metricId) {
     const promiseHash = {
       filters: fetch(selfServeApiGraph.metricFilters(metricId)).then(res => checkStatus(res, 'get', true)),
       dimensions: fetch(selfServeApiGraph.metricDimensions(metricId)).then(res => checkStatus(res, 'get', true))
     };
     return RSVP.hash(promiseHash);
-  },
+   },
 
   /**
    * Get autocomplete suggestions from relevant api
@@ -157,13 +173,11 @@ export default Component.extend({
                 dataset,
                 id: metric.id,
                 completer:{
-                  insertMatch: (editor, data) => {
-                    editor.setValue(yamIt(data.metricname, data.dataset));
-                    editor.metricId = data.id;
-                    //editor.completer.insertMatch({value: data.value});
-                    // editor.insert('abc');
-                  }
-                }};
+                insertMatch: (editor, data) => {
+                  editor.setValue(yamIt(data.metricname, data.dataset));
+                  editor.metricId = data.id;
+                }
+              }};
             });
           }
           return noResultsArray;
@@ -219,19 +233,28 @@ export default Component.extend({
 
   actions: {
     /**
-     * resets given yaml field to default value
+     * resets given yaml field to default value for creation mode and server value for edit mode
      */
     resetYAML(field) {
+      const isEditMode = get(this, 'isEditMode');
       if (field === 'anomaly') {
-        const yamlAlertProps = get(this, 'yamlAlertProps');
-        set(this, 'alertYaml', yamlAlertProps);
+        if(isEditMode) {
+          set(this, 'alertYaml', get(this, 'currentYamlAlertOriginal'));
+        } else {
+          const yamlAlertProps = get(this, 'yamlAlertProps');
+          set(this, 'alertYaml', yamlAlertProps);
+        }
       } else if (field === 'notification') {
-        const yamlAlertSettings = get(this, 'yamlAlertSettings');
-        set(this, 'detectionSettingsYaml', yamlAlertSettings);
+        if(isEditMode) {
+          set(this, 'detectionSettingsYaml', get(this, 'currentYamlSettingsOriginal'));
+        } else {
+          const yamlAlertSettings = get(this, 'yamlAlertSettings');
+          set(this, 'detectionSettingsYaml', yamlAlertSettings);
+        }
       }
     },
 
-    /**
+     /**
      * Brings up appropriate modal, based on which yaml field is clicked
      */
     triggerDocModal(field) {
@@ -291,7 +314,7 @@ export default Component.extend({
     },
 
     /**
-     * Activates 'Create Alert' button and stores YAML content in alertYaml
+     * Activates 'Create changes' button and stores YAML content in alertYaml
      */
     onYMLSelectorAction(value) {
       set(this, 'disableYamlSave', false);
@@ -300,26 +323,21 @@ export default Component.extend({
     },
 
     /**
-     * Activates 'Create Alert' button and stores YAML content in detectionSettingsYaml
+     * Activates 'Create changes' button and stores YAML content in detectionSettingsYaml
      */
     onYMLSettingsSelectorAction(value) {
       set(this, 'disableYamlSave', false);
       set(this, 'detectionSettingsYaml', value);
     },
 
-    cancelAlertYamlAction() {
-      //call the onConfirm property to invoke the passed in action
-      get(this, 'cancelAlertYaml')();
-    },
-
     /**
-     * Fired by save button in YAML UI
+     * Fired by create button in YAML UI
      * Grabs YAML content and sends it
      */
-    saveAlertYamlAction() {
+    createAlertYamlAction() {
       const content = {
         detection: get(this, 'alertYaml'),
-        notification: get(this, 'currentYamlSettings')
+        notification: get(this, 'detectionSettingsYaml')
       };
       const url = '/yaml/create-alert';
       const postProps = {
@@ -327,7 +345,7 @@ export default Component.extend({
         body: JSON.stringify(content),
         headers: { 'content-type': 'application/json' }
       };
-      const notifications = this.get('notifications');
+      const notifications = get(this, 'notifications');
 
       fetch(url, postProps).then((res) => {
         res.json().then((result) => {
@@ -342,6 +360,62 @@ export default Component.extend({
       }).catch((error) => {
         notifications.error('Save alert yaml file failed.', error);
       });
+    },
+
+    /**
+     * Fired by save button in YAML UI
+     * Grabs each yaml (alert and settings) and save them to their respective apis.
+     */
+    async saveEditYamlAction() {
+      const {
+        alertYaml,
+        detectionSettingsYaml,
+        notifications,
+        alertId,
+        subscriptionGroupId
+      } = getProperties(this, 'alertYaml', 'detectionSettingsYaml', 'notifications', 'alertId', 'subscriptionGroupId');
+
+      //PUT alert
+      const alert_url = `/yaml/${alertId}`;
+      const alertPostProps = {
+        method: 'PUT',
+        body: alertYaml,
+        headers: { 'content-type': 'text/plain' }
+      };
+      try {
+        const alert_result = await fetch(alert_url, alertPostProps);
+        const alert_status  = get(alert_result, 'status');
+        const alert_json = await alert_result.json();
+        if (alert_status !== 200) {
+          set(this, 'errorMsg', get(alert_json, 'message'));
+          notifications.error('Save alert yaml file failed.', 'Error');
+        } else {
+          notifications.success('Alert saved successfully', 'Done', alert_json);
+        }
+      } catch (error) {
+        notifications.error('Save alert yaml file failed.', error);
+      }
+
+      //PUT settings
+      const setting_url = `/yaml/notification/${subscriptionGroupId}`;
+      const settingsPostProps = {
+        method: 'PUT',
+        body: detectionSettingsYaml,
+        headers: { 'content-type': 'text/plain' }
+      };
+      try {
+        const settings_result = await fetch(setting_url, settingsPostProps);
+        const settings_status  = get(settings_result, 'status');
+        const settings_json = await settings_result.json();
+        if (settings_status !== 200) {
+          set(this, 'errorMsg', get(settings_json, 'message'));
+          notifications.error('Save settings yaml file failed.', 'Error');
+        } else {
+          notifications.success('Settings saved successfully', 'Done', settings_json);
+        }
+      } catch (error) {
+        notifications.error('Save settings yaml file failed.', error);
+      }
     }
   }
 });
