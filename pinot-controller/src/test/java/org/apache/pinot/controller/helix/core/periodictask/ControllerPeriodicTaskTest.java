@@ -54,23 +54,22 @@ public class ControllerPeriodicTaskTest {
       _initTaskCalled.set(true);
     }
 
-        @Override
-        public void stopTask() {
-          _stopTaskCalled.set(true);
-        }
+    @Override
+    public void stopTask() {
+      _stopTaskCalled.set(true);
+    }
 
-        @Override
-        public void process(List<String> tableNamesWithType) {
-          _processCalled.set(true);
-          super.process(tableNamesWithType);
-        }
+    @Override
+    public void process(List<String> tableNamesWithType) {
+      _processCalled.set(true);
+      super.process(tableNamesWithType);
+    }
 
-        @Override
-        public void processTable(String tableNameWithType) {
-          _numTablesProcessed.getAndIncrement();
-        }
-
-      };
+    @Override
+    public void processTable(String tableNameWithType) {
+      _numTablesProcessed.getAndIncrement();
+    }
+  };
 
   @BeforeTest
   public void beforeTest() {
