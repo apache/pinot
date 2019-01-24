@@ -122,6 +122,12 @@ public class SegmentStatusChecker extends ControllerPeriodicTask {
 
       IdealState idealState = _pinotHelixResourceManager.getTableIdealState(tableNameWithType);
 
+      if (idealState == null) {
+        LOGGER.warn("Table {} has null ideal state. Skipping segment status checks", tableNameWithType);
+        resetTableMetrics(tableNameWithType);
+        return;
+      }
+
       if (!idealState.isEnabled()) {
         if (_logDisabledTables) {
           LOGGER.warn("Table {} is disabled. Skipping segment status checks", tableNameWithType);
@@ -131,12 +137,10 @@ public class SegmentStatusChecker extends ControllerPeriodicTask {
         return;
       }
 
-      if ((idealState == null) || (idealState.getPartitionSet().isEmpty())) {
+      if (idealState.getPartitionSet().isEmpty()) {
         int nReplicasFromIdealState = 1;
         try {
-          if (idealState != null) {
-            nReplicasFromIdealState = Integer.valueOf(idealState.getReplicas());
-          }
+          nReplicasFromIdealState = Integer.valueOf(idealState.getReplicas());
         } catch (NumberFormatException e) {
           // Ignore
         }
