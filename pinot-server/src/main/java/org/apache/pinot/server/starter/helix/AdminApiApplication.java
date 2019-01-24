@@ -99,8 +99,8 @@ public class AdminApiApplication extends ResourceConfig {
 
     CLStaticHttpHandler staticHttpHandler = new CLStaticHttpHandler(AdminApiApplication.class.getClassLoader(), "/api/");
     // map both /api and /help to swagger docs. /api because it looks nice. /help for backward compatibility
-    httpServer.getServerConfiguration().addHttpHandler(staticHttpHandler, "/api");
-    httpServer.getServerConfiguration().addHttpHandler(staticHttpHandler, "/help");
+    httpServer.getServerConfiguration().addHttpHandler(staticHttpHandler, "/api/");
+    httpServer.getServerConfiguration().addHttpHandler(staticHttpHandler, "/help/");
 
     URL swaggerDistLocation = AdminApiApplication.class.getClassLoader()
         .getResource("META-INF/resources/webjars/swagger-ui/2.2.2/");

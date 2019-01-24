@@ -77,7 +77,7 @@ public class BrokerAdminApiApplication extends ResourceConfig {
 
     HttpHandler httpHandler = new CLStaticHttpHandler(BrokerAdminApiApplication.class.getClassLoader(), "/api/");
     // map both /api and /help to swagger docs. /api because it looks nice. /help for backward compatibility
-    _httpServer.getServerConfiguration().addHttpHandler(httpHandler, "/api", "/help");
+    _httpServer.getServerConfiguration().addHttpHandler(httpHandler, "/api/", "/help/");
 
     URL swaggerDistLocation =
         BrokerAdminApiApplication.class.getClassLoader().getResource("META-INF/resources/webjars/swagger-ui/2.2.2/");
