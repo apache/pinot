@@ -58,7 +58,7 @@ public class SegmentStatusCheckerIntegrationTest extends BaseClusterIntegrationT
   private String errorOfflineTable = "table4_OFFLINE";
   private String realtimeTableErrorState = "table5_REALTIME";
 
-  private static final int SEGMENT_STATUS_CHECKER_INITIAL_DELAY_SECONDS = 40;
+  private static final int SEGMENT_STATUS_CHECKER_INITIAL_DELAY_SECONDS = 60;
 
   @BeforeClass
   public void setUp() throws Exception {
@@ -66,7 +66,7 @@ public class SegmentStatusCheckerIntegrationTest extends BaseClusterIntegrationT
 
     startZk();
 
-    // Set initial delay of 40 seconds for the segment status checker, to allow time for tables setup.
+    // Set initial delay of 60 seconds for the segment status checker, to allow time for tables setup.
     // By default, it will pick a random delay between 120s and 300s
     ControllerConf controllerConf = getDefaultControllerConfiguration();
     controllerConf.setStatusCheckerInitialDelayInSeconds(SEGMENT_STATUS_CHECKER_INITIAL_DELAY_SECONDS);
@@ -109,7 +109,7 @@ public class SegmentStatusCheckerIntegrationTest extends BaseClusterIntegrationT
     setupRealtimeTable(realtimeTableErrorState);
 
     // we need to wait for SegmentStatusChecker to finish at least 1 run
-    Thread.sleep(TimeUnit.MILLISECONDS.convert(SEGMENT_STATUS_CHECKER_INITIAL_DELAY_SECONDS, TimeUnit.SECONDS));
+    Thread.sleep(TimeUnit.MILLISECONDS.convert(SEGMENT_STATUS_CHECKER_INITIAL_DELAY_SECONDS + 10, TimeUnit.SECONDS));
   }
 
   private void setupOfflineTable(String table) throws Exception {
