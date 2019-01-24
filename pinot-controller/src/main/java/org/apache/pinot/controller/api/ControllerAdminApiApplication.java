@@ -117,7 +117,7 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     BeanConfig beanConfig = new BeanConfig();
     beanConfig.setTitle("Pinot Controller API");
     beanConfig.setDescription("APIs for accessing Pinot Controller information");
-    beanConfig.setContact("https://github.com/linkedin/pinot");
+    beanConfig.setContact("https://github.com/apache/incubator-pinot");
     beanConfig.setVersion("1.0");
     if (_useHttps) {
       beanConfig.setSchemes(new String[]{"https"});

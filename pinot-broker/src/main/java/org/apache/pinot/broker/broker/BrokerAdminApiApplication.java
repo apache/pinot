@@ -68,7 +68,7 @@ public class BrokerAdminApiApplication extends ResourceConfig {
     BeanConfig beanConfig = new BeanConfig();
     beanConfig.setTitle("Pinot Broker API");
     beanConfig.setDescription("APIs for accessing Pinot broker information");
-    beanConfig.setContact("https://github.com/linkedin/pinot");
+    beanConfig.setContact("https://github.com/apache/incubator-pinot");
     beanConfig.setVersion("1.0");
     beanConfig.setSchemes(new String[]{"http"});
     beanConfig.setBasePath(_baseUri.getPath());
