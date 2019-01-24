@@ -73,7 +73,7 @@ page.onLoadFinished = function(status) {
         page.render(options.output);
         phantom.exit();
     }
-  }, 5000);
+  }, 10000);
 
   interval();
 
