@@ -95,11 +95,11 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     // by a jersey handler
 
     httpServer.getServerConfiguration().addHttpHandler(
-        new CLStaticHttpHandler(classLoader,"/static/query/"), "/query");
+        new CLStaticHttpHandler(classLoader,"/static/query/"), "/query/");
     httpServer.getServerConfiguration().addHttpHandler(
-        new CLStaticHttpHandler(classLoader, "/static/css/"), "/css");
+        new CLStaticHttpHandler(classLoader, "/static/css/"), "/css/");
     httpServer.getServerConfiguration().addHttpHandler(
-        new CLStaticHttpHandler(classLoader, "/static/js/"), "/js");
+        new CLStaticHttpHandler(classLoader, "/static/js/"), "/js/");
     // without this explicit request to /index.html will not work
     httpServer.getServerConfiguration().addHttpHandler(
         new CLStaticHttpHandler(classLoader, "/static/"), "/index.html");
@@ -128,14 +128,14 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     beanConfig.setResourcePackage(RESOURCE_PACKAGE);
     beanConfig.setScan(true);
 
-    CLStaticHttpHandler apiStaticHttpHandler = new CLStaticHttpHandler(ControllerAdminApiApplication.class.getClassLoader(),
+    ClassLoader loader = this.getClass().getClassLoader();
+    CLStaticHttpHandler apiStaticHttpHandler = new CLStaticHttpHandler(loader,
         "/api/");
     // map both /api and /help to swagger docs. /api because it looks nice. /help for backward compatibility
-    httpServer.getServerConfiguration().addHttpHandler(apiStaticHttpHandler, "/api");
-    httpServer.getServerConfiguration().addHttpHandler(apiStaticHttpHandler, "/help");
+    httpServer.getServerConfiguration().addHttpHandler(apiStaticHttpHandler, "/api/");
+    httpServer.getServerConfiguration().addHttpHandler(apiStaticHttpHandler, "/help/");
 
-    URL swaggerDistLocation = ControllerAdminApiApplication.class.getClassLoader()
-        .getResource("META-INF/resources/webjars/swagger-ui/2.2.2/");
+    URL swaggerDistLocation = loader.getResource("META-INF/resources/webjars/swagger-ui/2.2.2/");
     CLStaticHttpHandler swaggerDist = new CLStaticHttpHandler(
         new URLClassLoader(new URL[] {swaggerDistLocation}));
     httpServer.getServerConfiguration().addHttpHandler(swaggerDist, "/swaggerui-dist/");
