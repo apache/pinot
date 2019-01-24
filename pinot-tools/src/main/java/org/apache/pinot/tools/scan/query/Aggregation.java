@@ -114,8 +114,9 @@ public class Aggregation {
   }
 
   public ResultTable run() {
-    Projection projection = new Projection(_immutableSegment, _metadata, _filteredDocIds, _projectionColumns,
-        _dictionaryMap, _addCountStar);
+    Projection projection =
+        new Projection(_immutableSegment, _metadata, _filteredDocIds, _projectionColumns, _dictionaryMap,
+            _addCountStar);
     return aggregate(projection.run());
   }
 
@@ -190,8 +191,7 @@ public class Aggregation {
       String column = (String) pair.getFirst();
       String function = (String) pair.getSecond();
 
-      AggregationFunc aggregationFunc =
-          AggregationFuncFactory.getAggregationFunc(input, column, function);
+      AggregationFunc aggregationFunc = AggregationFuncFactory.getAggregationFunc(input, column, function);
       ResultTable aggregationResult = aggregationFunc.run();
       results.add(0, aggregationResult.get(0, 0));
     }

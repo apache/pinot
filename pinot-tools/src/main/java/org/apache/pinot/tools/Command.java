@@ -24,8 +24,11 @@ package org.apache.pinot.tools;
  *
  */
 public interface Command {
-  public boolean execute() throws Exception;
+  public boolean execute()
+      throws Exception;
+
   public void printUsage();
+
   public String description();
 
   // Should return true if -help option is specified for the command, false otherwise.

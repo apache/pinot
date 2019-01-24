@@ -31,7 +31,6 @@ public class SortedIndexReaderImpl extends BaseSingleColumnSingleValueReader<Sor
   private final FixedByteValueReaderWriter _reader;
   private final int _cardinality;
 
-
   public SortedIndexReaderImpl(PinotDataBuffer dataBuffer, int cardinality) {
     // 2 values per dictionary id
     Preconditions.checkState(dataBuffer.size() == 2 * cardinality * Integer.BYTES);
@@ -126,7 +125,8 @@ public class SortedIndexReaderImpl extends BaseSingleColumnSingleValueReader<Sor
   }
 
   @Override
-  public void close() throws IOException {
+  public void close()
+      throws IOException {
     _reader.close();
   }
 

@@ -42,9 +42,9 @@ public class RealtimeSegmentConfig {
 
   private RealtimeSegmentConfig(String segmentName, String streamName, Schema schema, int capacity,
       int avgNumMultiValues, Set<String> noDictionaryColumns, Set<String> invertedIndexColumns,
-      RealtimeSegmentZKMetadata realtimeSegmentZKMetadata, boolean offHeap,
-      PinotDataBufferMemoryManager memoryManager, RealtimeSegmentStatsHistory statsHistory,
-      SegmentPartitionConfig segmentPartitionConfig, boolean aggregateMetrics) {
+      RealtimeSegmentZKMetadata realtimeSegmentZKMetadata, boolean offHeap, PinotDataBufferMemoryManager memoryManager,
+      RealtimeSegmentStatsHistory statsHistory, SegmentPartitionConfig segmentPartitionConfig,
+      boolean aggregateMetrics) {
     _segmentName = segmentName;
     _streamName = streamName;
     _schema = schema;

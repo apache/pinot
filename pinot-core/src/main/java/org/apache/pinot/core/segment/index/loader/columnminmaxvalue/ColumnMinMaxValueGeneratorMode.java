@@ -31,10 +31,7 @@ import org.apache.pinot.common.utils.CommonConstants;
  * </ul>
  */
 public enum ColumnMinMaxValueGeneratorMode {
-  NONE,
-  TIME,
-  NON_METRIC,
-  ALL;
+  NONE, TIME, NON_METRIC, ALL;
 
   public static final ColumnMinMaxValueGeneratorMode DEFAULT_MODE =
       ColumnMinMaxValueGeneratorMode.valueOf(CommonConstants.Server.DEFAULT_COLUMN_MIN_MAX_VALUE_GENERATOR_MODE);

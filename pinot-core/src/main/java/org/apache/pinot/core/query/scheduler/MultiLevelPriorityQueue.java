@@ -67,10 +67,8 @@ public class MultiLevelPriorityQueue implements SchedulerPriorityQueue {
   private final SchedulerGroupFactory groupFactory;
   private final Configuration config;
 
-
   public MultiLevelPriorityQueue(@Nonnull Configuration config, @Nonnull ResourceManager resourceManager,
-      @Nonnull  SchedulerGroupFactory groupFactory,
-      @Nonnull SchedulerGroupMapper groupMapper) {
+      @Nonnull SchedulerGroupFactory groupFactory, @Nonnull SchedulerGroupMapper groupMapper) {
     Preconditions.checkNotNull(config);
     Preconditions.checkNotNull(resourceManager);
     Preconditions.checkNotNull(groupFactory);
@@ -88,7 +86,8 @@ public class MultiLevelPriorityQueue implements SchedulerPriorityQueue {
   }
 
   @Override
-  public void put(@Nonnull SchedulerQueryContext query) throws OutOfCapacityException {
+  public void put(@Nonnull SchedulerQueryContext query)
+      throws OutOfCapacityException {
     Preconditions.checkNotNull(query);
     queueLock.lock();
     String groupName = groupSelector.getSchedulerGroupName(query);
@@ -107,13 +106,14 @@ public class MultiLevelPriorityQueue implements SchedulerPriorityQueue {
    * Blocking call to read the next query in order of priority
    * @return
    */
+  @Nullable
   @Override
-  public @Nullable SchedulerQueryContext take() {
+  public SchedulerQueryContext take() {
     queueLock.lock();
     try {
       while (true) {
         SchedulerQueryContext schedulerQueryContext;
-        while ( (schedulerQueryContext = takeNextInternal()) == null) {
+        while ((schedulerQueryContext = takeNextInternal()) == null) {
           try {
             queryReaderCondition.await(wakeUpTimeMicros, TimeUnit.MICROSECONDS);
           } catch (InterruptedException e) {
@@ -177,15 +177,15 @@ public class MultiLevelPriorityQueue implements SchedulerPriorityQueue {
       //     ii. continue with currentWinnerGroup otherwise
       int comparison = group.compareTo(currentWinnerGroup);
       if (comparison < 0) {
-        if (currentWinnerGroup.totalReservedThreads() > resourceManager.getTableThreadsSoftLimit() &&
-            group.totalReservedThreads() < resourceManager.getTableThreadsSoftLimit()) {
+        if (currentWinnerGroup.totalReservedThreads() > resourceManager.getTableThreadsSoftLimit()
+            && group.totalReservedThreads() < resourceManager.getTableThreadsSoftLimit()) {
           currentWinnerGroup = group;
         }
         continue;
       }
       if (comparison >= 0) {
-        if (group.totalReservedThreads() < resourceManager.getTableThreadsSoftLimit() ||
-            group.totalReservedThreads() < currentWinnerGroup.totalReservedThreads()) {
+        if (group.totalReservedThreads() < resourceManager.getTableThreadsSoftLimit()
+            || group.totalReservedThreads() < currentWinnerGroup.totalReservedThreads()) {
           currentWinnerGroup = group;
         }
       }
@@ -207,14 +207,14 @@ public class MultiLevelPriorityQueue implements SchedulerPriorityQueue {
     return query;
   }
 
-  private void checkGroupHasCapacity(SchedulerGroup groupContext) throws OutOfCapacityException {
-    if (groupContext.numPending() >= maxPendingPerGroup &&
-        groupContext.totalReservedThreads() >= resourceManager.getTableThreadsHardLimit()) {
-      throw new OutOfCapacityException(
-          String.format("SchedulerGroup %s is out of capacity. numPending: %d, maxPending: %d, reservedThreads: %d threadsHardLimit: %d",
-              groupContext.name(),
-              groupContext.numPending(), maxPendingPerGroup,
-              groupContext.totalReservedThreads(), resourceManager.getTableThreadsHardLimit()));
+  private void checkGroupHasCapacity(SchedulerGroup groupContext)
+      throws OutOfCapacityException {
+    if (groupContext.numPending() >= maxPendingPerGroup && groupContext.totalReservedThreads() >= resourceManager
+        .getTableThreadsHardLimit()) {
+      throw new OutOfCapacityException(String.format(
+          "SchedulerGroup %s is out of capacity. numPending: %d, maxPending: %d, reservedThreads: %d threadsHardLimit: %d",
+          groupContext.name(), groupContext.numPending(), maxPendingPerGroup, groupContext.totalReservedThreads(),
+          resourceManager.getTableThreadsHardLimit()));
     }
   }
 

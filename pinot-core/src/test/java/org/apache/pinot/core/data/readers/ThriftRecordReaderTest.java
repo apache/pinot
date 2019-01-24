@@ -50,7 +50,8 @@ public class ThriftRecordReaderTest {
   private File _tempFile;
 
   @BeforeClass
-  public void setUp() throws Exception {
+  public void setUp()
+      throws Exception {
     FileUtils.deleteQuietly(_tempFile);
 
     ThriftSampleData t1 = new ThriftSampleData();
@@ -110,7 +111,8 @@ public class ThriftRecordReaderTest {
   }
 
   @Test
-  public void testRewind() throws ClassNotFoundException, InstantiationException, IllegalAccessException, IOException {
+  public void testRewind()
+      throws ClassNotFoundException, InstantiationException, IllegalAccessException, IOException {
     ThriftRecordReader recordReader = new ThriftRecordReader(_tempFile, getSchema(), getThriftRecordReaderConfig());
     List<GenericRow> genericRows = new ArrayList<>();
     while (recordReader.hasNext()) {
@@ -126,7 +128,8 @@ public class ThriftRecordReaderTest {
     Assert.assertEquals(genericRows.size(), 4, "The number of rows return after the rewind is incorrect");
   }
 
-  private File getSampleDataPath() throws IOException {
+  private File getSampleDataPath()
+      throws IOException {
     return File.createTempFile(ThriftRecordReaderTest.class.getName(), THRIFT_DATA);
   }
 
@@ -144,8 +147,7 @@ public class ThriftRecordReaderTest {
         .addSingleValueDimension("active", FieldSpec.DataType.BOOLEAN)
         .addMultiValueDimension("groups", FieldSpec.DataType.INT)
         .addMultiValueDimension("map_values", FieldSpec.DataType.STRING)
-        .addMultiValueDimension("set_values", FieldSpec.DataType.STRING)
-        .build();
+        .addMultiValueDimension("set_values", FieldSpec.DataType.STRING).build();
   }
 
   @AfterClass

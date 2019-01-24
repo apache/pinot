@@ -20,12 +20,12 @@ package org.apache.pinot.core.io.reader;
 
 import java.io.IOException;
 
-public abstract class BaseSingleColumnSingleValueReader<T extends ReaderContext>
-    implements SingleColumnSingleValueReader<T> {
- 
+
+public abstract class BaseSingleColumnSingleValueReader<T extends ReaderContext> implements SingleColumnSingleValueReader<T> {
 
   @Override
-  public void close() throws IOException {
+  public void close()
+      throws IOException {
     throw new UnsupportedOperationException();
   }
 

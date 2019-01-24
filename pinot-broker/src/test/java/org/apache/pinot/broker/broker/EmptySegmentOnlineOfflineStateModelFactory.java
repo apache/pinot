@@ -68,5 +68,4 @@ public class EmptySegmentOnlineOfflineStateModelFactory extends StateModelFactor
       LOGGER.debug("EmptySegmentOnlineOfflineStateModel.onBecomeDroppedFromOnline() : {}", message);
     }
   }
-
 }

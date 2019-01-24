@@ -72,7 +72,8 @@ public class ConvertToRawIndexMinionClusterIntegrationTest extends HybridCluster
   }
 
   @BeforeClass
-  public void setUp() throws Exception {
+  public void setUp()
+      throws Exception {
     // The parent setUp() sets up Zookeeper, Kafka, controller, broker and servers
     super.setUp();
 
@@ -83,7 +84,8 @@ public class ConvertToRawIndexMinionClusterIntegrationTest extends HybridCluster
   }
 
   @Test
-  public void testConvertToRawIndexTask() throws Exception {
+  public void testConvertToRawIndexTask()
+      throws Exception {
     final String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
 
     File testDataDir = new File(CommonConstants.Server.DEFAULT_INSTANCE_DATA_DIR + "-0", offlineTableName);
@@ -117,19 +119,19 @@ public class ConvertToRawIndexMinionClusterIntegrationTest extends HybridCluster
     // Wait at most 600 seconds for all tasks COMPLETED and new segments refreshed
     TestUtils.waitForCondition(input -> {
       // Check task state
-      for (TaskState taskState : _helixTaskResourceManager.getTaskStates(
-          MinionConstants.ConvertToRawIndexTask.TASK_TYPE).values()) {
+      for (TaskState taskState : _helixTaskResourceManager
+          .getTaskStates(MinionConstants.ConvertToRawIndexTask.TASK_TYPE).values()) {
         if (taskState != TaskState.COMPLETED) {
           return false;
         }
       }
 
       // Check segment ZK metadata
-      for (OfflineSegmentZKMetadata offlineSegmentZKMetadata : _helixResourceManager.getOfflineSegmentMetadata(
-          offlineTableName)) {
+      for (OfflineSegmentZKMetadata offlineSegmentZKMetadata : _helixResourceManager
+          .getOfflineSegmentMetadata(offlineTableName)) {
         Map<String, String> customMap = offlineSegmentZKMetadata.getCustomMap();
-        if (customMap == null || customMap.size() != 1 || !customMap.containsKey(
-            MinionConstants.ConvertToRawIndexTask.TASK_TYPE + MinionConstants.TASK_TIME_SUFFIX)) {
+        if (customMap == null || customMap.size() != 1 || !customMap
+            .containsKey(MinionConstants.ConvertToRawIndexTask.TASK_TYPE + MinionConstants.TASK_TIME_SUFFIX)) {
           return false;
         }
       }
@@ -191,7 +193,8 @@ public class ConvertToRawIndexMinionClusterIntegrationTest extends HybridCluster
   }
 
   @AfterClass
-  public void tearDown() throws Exception {
+  public void tearDown()
+      throws Exception {
     stopMinion();
 
     super.tearDown();

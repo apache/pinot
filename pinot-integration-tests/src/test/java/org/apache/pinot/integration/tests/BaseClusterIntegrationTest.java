@@ -217,7 +217,8 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    * @param executor Executor
    * @throws Exception
    */
-  protected void setUpH2Connection(@Nonnull final List<File> avroFiles, @Nonnull Executor executor) throws Exception {
+  protected void setUpH2Connection(@Nonnull final List<File> avroFiles, @Nonnull Executor executor)
+      throws Exception {
     Assert.assertNull(_h2Connection);
     Class.forName("org.h2.Driver");
     _h2Connection = DriverManager.getConnection("jdbc:h2:mem:");
@@ -270,7 +271,8 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    * @throws Exception
    */
   @Nonnull
-  protected List<File> unpackAvroData(@Nonnull File outputDir) throws Exception {
+  protected List<File> unpackAvroData(@Nonnull File outputDir)
+      throws Exception {
     URL resourceUrl = BaseClusterIntegrationTest.class.getClassLoader().getResource(getAvroTarFileName());
     Assert.assertNotNull(resourceUrl);
     return TarGzCompressionUtils.unTar(new File(resourceUrl.getFile()), outputDir);
@@ -304,7 +306,8 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    * @return Current count start result
    * @throws Exception
    */
-  protected long getCurrentCountStarResult() throws Exception {
+  protected long getCurrentCountStarResult()
+      throws Exception {
     return getPinotConnection().execute("SELECT COUNT(*) FROM " + getTableName()).getResultSet(0).getLong(0);
   }
 
@@ -314,7 +317,8 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    * @param timeoutMs Timeout in milliseconds
    * @throws Exception
    */
-  protected void waitForAllDocsLoaded(long timeoutMs) throws Exception {
+  protected void waitForAllDocsLoaded(long timeoutMs)
+      throws Exception {
     final long countStarResult = getCountStarResult();
     TestUtils.waitForCondition(new Function<Void, Boolean>() {
       @Nullable
@@ -336,8 +340,9 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    * @param sqlQueries H2 query
    * @throws Exception
    */
-  protected void testQuery(@Nonnull String pqlQuery, @Nullable List<String> sqlQueries) throws Exception {
-    ClusterIntegrationTestUtils.testQuery(pqlQuery, _brokerBaseApiUrl, getPinotConnection(), sqlQueries,
-        getH2Connection());
+  protected void testQuery(@Nonnull String pqlQuery, @Nullable List<String> sqlQueries)
+      throws Exception {
+    ClusterIntegrationTestUtils
+        .testQuery(pqlQuery, _brokerBaseApiUrl, getPinotConnection(), sqlQueries, getH2Connection());
   }
 }

@@ -240,10 +240,10 @@ public class AggregatedPoolStats<T extends Sampling & Summarizable> implements P
     return "AggregatedPoolStats [_refreshMs=" + _refreshMs + ", _lastRefreshedTime=" + _lastRefreshedTime
         + ", _totalCreated=" + _totalCreated + ", _totalDestroyed=" + _totalDestroyed + ", _totalCreateErrors="
         + _totalCreateErrors + ", _totalDestroyErrors=" + _totalDestroyErrors + ", _totalBadDestroyed="
-        + _totalBadDestroyed + ", _totalTimedOut=" + _totalTimedOut + ", _checkedOut=" + _checkedOut
-        + ", _maxPoolSize=" + _maxPoolSize + ", _minPoolSize=" + _minPoolSize + ", _poolSize=" + _poolSize
-        + ", _sampleMaxCheckedOut=" + _sampleMaxCheckedOut + ", _sampleMaxPoolSize=" + _sampleMaxPoolSize
-        + ", _idleCount=" + _idleCount + ", _waitTime=" + _waitTime + ", _lifecycleStats=" + _lifecycleStats
-        + ", _poolStatsProvider=" + _poolStatsProvider + "]";
+        + _totalBadDestroyed + ", _totalTimedOut=" + _totalTimedOut + ", _checkedOut=" + _checkedOut + ", _maxPoolSize="
+        + _maxPoolSize + ", _minPoolSize=" + _minPoolSize + ", _poolSize=" + _poolSize + ", _sampleMaxCheckedOut="
+        + _sampleMaxCheckedOut + ", _sampleMaxPoolSize=" + _sampleMaxPoolSize + ", _idleCount=" + _idleCount
+        + ", _waitTime=" + _waitTime + ", _lifecycleStats=" + _lifecycleStats + ", _poolStatsProvider="
+        + _poolStatsProvider + "]";
   }
 }

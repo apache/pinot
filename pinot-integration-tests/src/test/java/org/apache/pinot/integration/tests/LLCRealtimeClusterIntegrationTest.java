@@ -55,7 +55,8 @@ public class LLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegratio
 
   @BeforeClass
   @Override
-  public void setUp() throws Exception {
+  public void setUp()
+      throws Exception {
     // TODO Avoid printing to stdout. Instead, we need to add the seed to every assert in this (and super-classes)
     System.out.println("========== Using random seed value " + RANDOM_SEED);
     // Remove the consumer directory
@@ -95,7 +96,8 @@ public class LLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegratio
   }
 
   @Test
-  public void testSegmentFlushSize() throws Exception {
+  public void testSegmentFlushSize()
+      throws Exception {
 
     String zkSegmentsPath = "/SEGMENTS/" + TableNameBuilder.REALTIME.tableNameWithType(getTableName());
     List<String> segmentNames = _propertyStore.getChildNames(zkSegmentsPath, 0);
@@ -108,7 +110,8 @@ public class LLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegratio
   }
 
   @Test
-  public void testInvertedIndexTriggering() throws Exception {
+  public void testInvertedIndexTriggering()
+      throws Exception {
 
     final long numTotalDocs = getCountStarResult();
 

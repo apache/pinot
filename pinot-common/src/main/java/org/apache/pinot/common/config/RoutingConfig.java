@@ -61,8 +61,8 @@ public class RoutingConfig {
 
     RoutingConfig that = (RoutingConfig) o;
 
-    return EqualityUtils.isEqual(_routingTableBuilderName, that._routingTableBuilderName) && EqualityUtils.isEqual(
-        _routingTableBuilderOptions, that._routingTableBuilderOptions);
+    return EqualityUtils.isEqual(_routingTableBuilderName, that._routingTableBuilderName) && EqualityUtils
+        .isEqual(_routingTableBuilderOptions, that._routingTableBuilderOptions);
   }
 
   @Override

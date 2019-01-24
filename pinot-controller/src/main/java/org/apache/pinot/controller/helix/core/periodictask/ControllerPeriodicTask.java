@@ -140,9 +140,8 @@ public abstract class ControllerPeriodicTask extends BasePeriodicTask {
       }
 
       postprocess();
-      _metricsRegistry.setValueOfGlobalGauge(ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED, getTaskName(),
-          numTablesProcessed);
-
+      _metricsRegistry
+          .setValueOfGlobalGauge(ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED, getTaskName(), numTablesProcessed);
     } else {
       LOGGER.info("Skip processing all tables for task {}", getTaskName());
     }

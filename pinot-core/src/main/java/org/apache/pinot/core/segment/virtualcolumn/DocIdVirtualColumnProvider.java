@@ -54,12 +54,8 @@ public class DocIdVirtualColumnProvider extends BaseVirtualColumnProvider {
   @Override
   public ColumnMetadata buildMetadata(VirtualColumnContext context) {
     ColumnMetadata.Builder columnMetadataBuilder = super.getColumnMetadataBuilder(context);
-    columnMetadataBuilder.setCardinality(context.getTotalDocCount())
-        .setHasDictionary(true)
-        .setHasInvertedIndex(true)
-        .setFieldType(FieldSpec.FieldType.DIMENSION)
-        .setDataType(FieldSpec.DataType.INT)
-        .setSingleValue(true)
+    columnMetadataBuilder.setCardinality(context.getTotalDocCount()).setHasDictionary(true).setHasInvertedIndex(true)
+        .setFieldType(FieldSpec.FieldType.DIMENSION).setDataType(FieldSpec.DataType.INT).setSingleValue(true)
         .setIsSorted(true);
 
     return columnMetadataBuilder.build();
@@ -102,7 +98,8 @@ public class DocIdVirtualColumnProvider extends BaseVirtualColumnProvider {
     }
 
     @Override
-    public void close() throws IOException {
+    public void close()
+        throws IOException {
     }
   }
 
@@ -113,7 +110,8 @@ public class DocIdVirtualColumnProvider extends BaseVirtualColumnProvider {
     }
 
     @Override
-    public void close() throws IOException {
+    public void close()
+        throws IOException {
     }
 
     @Override
@@ -198,7 +196,8 @@ public class DocIdVirtualColumnProvider extends BaseVirtualColumnProvider {
     }
 
     @Override
-    public void close() throws IOException {
+    public void close()
+        throws IOException {
     }
   }
 }

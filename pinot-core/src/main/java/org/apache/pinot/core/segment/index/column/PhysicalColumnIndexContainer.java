@@ -61,7 +61,8 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
   private final BloomFilterReader _bloomFilterReader;
 
   public PhysicalColumnIndexContainer(SegmentDirectory.Reader segmentReader, ColumnMetadata metadata,
-      IndexLoadingConfig indexLoadingConfig) throws IOException {
+      IndexLoadingConfig indexLoadingConfig)
+      throws IOException {
     String columnName = metadata.getColumnName();
     boolean loadInvertedIndex = false;
     boolean loadOnHeapDictionary = false;
@@ -139,7 +140,6 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
     return _bloomFilterReader;
   }
 
-
   private static ImmutableDictionaryReader loadDictionary(PinotDataBuffer dictionaryBuffer, ColumnMetadata metadata,
       boolean loadOnHeap) {
     FieldSpec.DataType dataType = metadata.getDataType();
@@ -197,5 +197,4 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
         throw new IllegalStateException("Illegal data type for raw forward index: " + dataType);
     }
   }
-
 }

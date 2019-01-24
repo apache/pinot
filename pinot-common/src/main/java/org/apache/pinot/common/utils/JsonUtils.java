@@ -45,53 +45,65 @@ public class JsonUtils {
   public static final ObjectWriter DEFAULT_WRITER = DEFAULT_MAPPER.writer();
   public static final ObjectWriter DEFAULT_PRETTY_WRITER = DEFAULT_MAPPER.writerWithDefaultPrettyPrinter();
 
-  public static <T> T stringToObject(String jsonString, Class<T> valueType) throws IOException {
+  public static <T> T stringToObject(String jsonString, Class<T> valueType)
+      throws IOException {
     return DEFAULT_MAPPER.readValue(jsonString, valueType);
   }
 
-  public static JsonNode stringToJsonNode(String jsonString) throws IOException {
+  public static JsonNode stringToJsonNode(String jsonString)
+      throws IOException {
     return DEFAULT_READER.readTree(jsonString);
   }
 
-  public static <T> T fileToObject(File jsonFile, Class<T> valueType) throws IOException {
+  public static <T> T fileToObject(File jsonFile, Class<T> valueType)
+      throws IOException {
     return DEFAULT_MAPPER.readValue(jsonFile, valueType);
   }
 
-  public static JsonNode fileToJsonNode(File jsonFile) throws IOException {
+  public static JsonNode fileToJsonNode(File jsonFile)
+      throws IOException {
     try (InputStream inputStream = new FileInputStream(jsonFile)) {
       return inputStreamToJsonNode(inputStream);
     }
   }
 
-  public static <T> T inputStreamToObject(InputStream jsonInputStream, Class<T> valueType) throws IOException {
+  public static <T> T inputStreamToObject(InputStream jsonInputStream, Class<T> valueType)
+      throws IOException {
     return DEFAULT_MAPPER.readValue(jsonInputStream, valueType);
   }
 
-  public static JsonNode inputStreamToJsonNode(InputStream jsonInputStream) throws IOException {
+  public static JsonNode inputStreamToJsonNode(InputStream jsonInputStream)
+      throws IOException {
     return DEFAULT_READER.readTree(jsonInputStream);
   }
 
-  public static <T> T bytesToObject(byte[] jsonBytes, Class<T> valueType) throws IOException {
+  public static <T> T bytesToObject(byte[] jsonBytes, Class<T> valueType)
+      throws IOException {
     return DEFAULT_MAPPER.readValue(jsonBytes, valueType);
   }
 
-  public static JsonNode bytesToJsonNode(byte[] jsonBytes) throws IOException {
+  public static JsonNode bytesToJsonNode(byte[] jsonBytes)
+      throws IOException {
     return inputStreamToJsonNode(new ByteArrayInputStream(jsonBytes));
   }
 
-  public static <T> T jsonNodeToObject(JsonNode jsonNode, Class<T> valueType) throws JsonProcessingException {
+  public static <T> T jsonNodeToObject(JsonNode jsonNode, Class<T> valueType)
+      throws JsonProcessingException {
     return DEFAULT_READER.treeToValue(jsonNode, valueType);
   }
 
-  public static String objectToString(Object object) throws JsonProcessingException {
+  public static String objectToString(Object object)
+      throws JsonProcessingException {
     return DEFAULT_WRITER.writeValueAsString(object);
   }
 
-  public static String objectToPrettyString(Object object) throws JsonProcessingException {
+  public static String objectToPrettyString(Object object)
+      throws JsonProcessingException {
     return DEFAULT_PRETTY_WRITER.writeValueAsString(object);
   }
 
-  public static byte[] objectToBytes(Object object) throws JsonProcessingException {
+  public static byte[] objectToBytes(Object object)
+      throws JsonProcessingException {
     return DEFAULT_WRITER.writeValueAsBytes(object);
   }
 

@@ -117,7 +117,8 @@ public class PinotSegmentUploadRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/segments")
   @Deprecated
-  public String listAllSegmentNames() throws Exception {
+  public String listAllSegmentNames()
+      throws Exception {
     FileUploadPathProvider provider = new FileUploadPathProvider(_controllerConf);
     ArrayNode ret = JsonUtils.newArrayNode();
     for (final File file : provider.getBaseDataDir().listFiles()) {
@@ -213,8 +214,8 @@ public class PinotSegmentUploadRestletResource {
       String errStr = "Could not decode segment name '" + segmentName + "'";
       throw new ControllerApplicationException(LOGGER, errStr, Response.Status.BAD_REQUEST);
     }
-    PinotSegmentRestletResource.toggleStateInternal(tableName, StateType.DROP, tableType, segmentName,
-        _pinotHelixResourceManager);
+    PinotSegmentRestletResource
+        .toggleStateInternal(tableName, StateType.DROP, tableType, segmentName, _pinotHelixResourceManager);
 
     return new SuccessResponse("Segment deleted");
   }
@@ -230,8 +231,8 @@ public class PinotSegmentUploadRestletResource {
     if (tableType == null) {
       throw new ControllerApplicationException(LOGGER, "Table type must not be null", Response.Status.BAD_REQUEST);
     }
-    PinotSegmentRestletResource.toggleStateInternal(tableName, StateType.DROP, tableType, null,
-        _pinotHelixResourceManager);
+    PinotSegmentRestletResource
+        .toggleStateInternal(tableName, StateType.DROP, tableType, null, _pinotHelixResourceManager);
 
     return new SuccessResponse(
         "All segments of table " + TableNameBuilder.forType(tableType).tableNameWithType(tableName) + " deleted");
@@ -309,8 +310,9 @@ public class PinotSegmentUploadRestletResource {
       String clientAddress = InetAddress.getByName(request.getRemoteAddr()).getHostName();
       String segmentName = segmentMetadata.getName();
       String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(segmentMetadata.getTableName());
-      LOGGER.info("Processing upload request for segment: {} of table: {} from client: {}", segmentName,
-          offlineTableName, clientAddress);
+      LOGGER
+          .info("Processing upload request for segment: {} of table: {} from client: {}", segmentName, offlineTableName,
+              clientAddress);
 
       // Validate segment
       new SegmentValidator(_pinotHelixResourceManager, _controllerConf, _executor, _connectionManager,
@@ -320,8 +322,9 @@ public class PinotSegmentUploadRestletResource {
       completeZkOperations(enableParallelPushProtection, headers, tempEncryptedFile, provider, segmentMetadata,
           segmentName, zkDownloadUri, moveSegmentToFinalLocation);
 
-      return new SuccessResponse("Successfully uploaded segment: " + segmentMetadata.getName() + " of table: "
-          + segmentMetadata.getTableName());
+      return new SuccessResponse(
+          "Successfully uploaded segment: " + segmentMetadata.getName() + " of table: " + segmentMetadata
+              .getTableName());
     } catch (WebApplicationException e) {
       throw e;
     } catch (Exception e) {
@@ -335,10 +338,11 @@ public class PinotSegmentUploadRestletResource {
     }
   }
 
-  private String getZkDownloadURIForSegmentUpload(SegmentMetadata segmentMetadata, FileUploadPathProvider provider) throws UnsupportedEncodingException {
+  private String getZkDownloadURIForSegmentUpload(SegmentMetadata segmentMetadata, FileUploadPathProvider provider)
+      throws UnsupportedEncodingException {
     if (provider.getBaseDataDirURI().getScheme().equalsIgnoreCase(CommonConstants.Segment.LOCAL_SEGMENT_SCHEME)) {
-      return ControllerConf.constructDownloadUrl(segmentMetadata.getTableName(), segmentMetadata.getName(),
-          provider.getVip());
+      return ControllerConf
+          .constructDownloadUrl(segmentMetadata.getTableName(), segmentMetadata.getName(), provider.getVip());
     } else {
       // Receiving .tar.gz segment upload for pluggable storage
       LOGGER.info("Using configured data dir {} for segment {} of table {}", _controllerConf.getDataDir(),
@@ -357,8 +361,7 @@ public class PinotSegmentUploadRestletResource {
           Response.Status.BAD_REQUEST);
     }
     LOGGER.info("Downloading segment from {} to {}", currentSegmentLocationURI, tempEncryptedFile.getAbsolutePath());
-    SegmentFetcherFactory.getInstance()
-        .getSegmentFetcherBasedOnURI(currentSegmentLocationURI)
+    SegmentFetcherFactory.getInstance().getSegmentFetcherBasedOnURI(currentSegmentLocationURI)
         .fetchSegmentToLocal(currentSegmentLocationURI, tempEncryptedFile);
     segmentMetadata = getSegmentMetadata(crypterClassHeader, tempEncryptedFile, tempDecryptedFile, tempSegmentDir,
         metadataProviderClass);
@@ -366,7 +369,8 @@ public class PinotSegmentUploadRestletResource {
   }
 
   private SegmentMetadata getSegmentMetadata(String crypterClassHeader, File tempEncryptedFile, File tempDecryptedFile,
-      File tempSegmentDir, String metadataProviderClass) throws Exception {
+      File tempSegmentDir, String metadataProviderClass)
+      throws Exception {
 
     decryptFile(crypterClassHeader, tempEncryptedFile, tempDecryptedFile);
 
@@ -378,8 +382,8 @@ public class PinotSegmentUploadRestletResource {
       FileUploadPathProvider provider, SegmentMetadata segmentMetadata, String segmentName, String zkDownloadURI,
       boolean moveSegmentToFinalLocation)
       throws Exception {
-    String finalSegmentPath =
-        StringUtil.join("/", provider.getBaseDataDirURI().toString(), segmentMetadata.getTableName(),
+    String finalSegmentPath = StringUtil
+        .join("/", provider.getBaseDataDirURI().toString(), segmentMetadata.getTableName(),
             URLEncoder.encode(segmentName, "UTF-8"));
     URI finalSegmentLocationURI = new URI(finalSegmentPath);
     ZKOperator zkOperator = new ZKOperator(_pinotHelixResourceManager, _controllerConf, _controllerMetrics);
@@ -465,7 +469,8 @@ public class PinotSegmentUploadRestletResource {
     }
   }
 
-  private File getFileFromMultipart(FormDataMultiPart multiPart, File dstFile) throws IOException {
+  private File getFileFromMultipart(FormDataMultiPart multiPart, File dstFile)
+      throws IOException {
     // Read segment file or segment metadata file and directly use that information to update zk
     Map<String, List<FormDataBodyPart>> segmentMetadataMap = multiPart.getFields();
     if (!validateMultiPart(segmentMetadataMap, null)) {

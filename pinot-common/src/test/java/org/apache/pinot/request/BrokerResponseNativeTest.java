@@ -29,7 +29,8 @@ import org.testng.annotations.Test;
 public class BrokerResponseNativeTest {
 
   @Test
-  public void testEmptyResponse() throws IOException {
+  public void testEmptyResponse()
+      throws IOException {
     BrokerResponseNative expected = BrokerResponseNative.EMPTY_RESULT;
     String brokerString = expected.toJsonString();
     BrokerResponseNative actual = BrokerResponseNative.fromJsonString(brokerString);
@@ -40,7 +41,8 @@ public class BrokerResponseNativeTest {
   }
 
   @Test
-  public void testNullResponse() throws IOException {
+  public void testNullResponse()
+      throws IOException {
     BrokerResponseNative expected = BrokerResponseNative.NO_TABLE_RESULT;
     String brokerString = expected.toJsonString();
     BrokerResponseNative actual = BrokerResponseNative.fromJsonString(brokerString);
@@ -51,7 +53,8 @@ public class BrokerResponseNativeTest {
   }
 
   @Test
-  public void testMultipleExceptionsResponse() throws IOException {
+  public void testMultipleExceptionsResponse()
+      throws IOException {
     BrokerResponseNative expected = BrokerResponseNative.NO_TABLE_RESULT;
     String errorMsgStr = "Some random string!";
     QueryProcessingException processingException = new QueryProcessingException(400, errorMsgStr);

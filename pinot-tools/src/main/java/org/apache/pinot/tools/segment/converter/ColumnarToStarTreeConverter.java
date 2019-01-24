@@ -122,7 +122,7 @@ public class ColumnarToStarTreeConverter {
 
     StarTreeIndexSpec starTreeIndexSpec = null;
     if (_starTreeConfigFileName != null) {
-       starTreeIndexSpec = StarTreeIndexSpec.fromFile(new File(_starTreeConfigFileName));
+      starTreeIndexSpec = StarTreeIndexSpec.fromFile(new File(_starTreeConfigFileName));
     }
     config.enableStarTreeIndex(starTreeIndexSpec);
 
@@ -147,8 +147,8 @@ public class ColumnarToStarTreeConverter {
       if (field.isAnnotationPresent(Option.class)) {
         Option option = field.getAnnotation(Option.class);
 
-        System.out.println(
-            String.format("\t%-15s: %s (required=%s)", option.name(), option.usage(), option.required()));
+        System.out
+            .println(String.format("\t%-15s: %s (required=%s)", option.name(), option.usage(), option.required()));
       }
     }
   }

@@ -53,8 +53,8 @@ public class FlushThresholdUpdateManager {
     final long desiredSegmentSize = streamConfig.getFlushSegmentDesiredSizeBytes();
 
     if (tableFlushSize == 0) {
-      return _flushThresholdUpdaterMap.computeIfAbsent(tableName,
-          k -> new SegmentSizeBasedFlushThresholdUpdater(desiredSegmentSize));
+      return _flushThresholdUpdaterMap
+          .computeIfAbsent(tableName, k -> new SegmentSizeBasedFlushThresholdUpdater(desiredSegmentSize));
     } else {
       _flushThresholdUpdaterMap.remove(tableName);
       return new DefaultFlushThresholdUpdater(tableFlushSize);

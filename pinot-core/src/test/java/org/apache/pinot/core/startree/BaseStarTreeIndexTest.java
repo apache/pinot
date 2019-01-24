@@ -58,7 +58,8 @@ public abstract class BaseStarTreeIndexTest {
 
   protected abstract List<String> getMetricColumns();
 
-  protected void testHardCodedQueries() throws Exception {
+  protected void testHardCodedQueries()
+      throws Exception {
     Assert.assertNotNull(_segment);
 
     List<String> metricColumns = getMetricColumns();
@@ -95,16 +96,16 @@ public abstract class BaseStarTreeIndexTest {
   /**
    * Helper method to compute the result using raw docs.
    */
-  private Map<List<Integer>, List<Double>> computeWithStarTree() throws Exception {
+  private Map<List<Integer>, List<Double>> computeWithStarTree()
+      throws Exception {
     FilterQueryTree rootFilterNode = RequestUtils.generateFilterQueryTree(_brokerRequest);
     Operator filterOperator;
     if (_numGroupByColumns > 0) {
-      filterOperator =
-          new StarTreeFilterPlanNode(_segment.getStarTrees().get(0), rootFilterNode,
-              _groupByColumns, _brokerRequest.getDebugOptions()).run();
+      filterOperator = new StarTreeFilterPlanNode(_segment.getStarTrees().get(0), rootFilterNode, _groupByColumns,
+          _brokerRequest.getDebugOptions()).run();
     } else {
-      filterOperator = new StarTreeFilterPlanNode(_segment.getStarTrees().get(0), rootFilterNode,
-          null, _brokerRequest.getDebugOptions()).run();
+      filterOperator = new StarTreeFilterPlanNode(_segment.getStarTrees().get(0), rootFilterNode, null,
+          _brokerRequest.getDebugOptions()).run();
     }
     return compute(filterOperator);
   }
@@ -112,7 +113,8 @@ public abstract class BaseStarTreeIndexTest {
   /**
    * Helper method to compute the result using aggregated docs.
    */
-  private Map<List<Integer>, List<Double>> computeWithoutStarTree() throws Exception {
+  private Map<List<Integer>, List<Double>> computeWithoutStarTree()
+      throws Exception {
     Operator filterOperator = new FilterPlanNode(_segment, _brokerRequest).run();
     return compute(filterOperator);
   }
@@ -121,5 +123,6 @@ public abstract class BaseStarTreeIndexTest {
    * Compute the result by scanning the docIds filtered out from the given filter operator.
    * <p>The result is a map from a list of dictIds (group key) to an array (results for aggregations)
    */
-  protected abstract Map<List<Integer>, List<Double>> compute(Operator filterOperator) throws Exception;
+  protected abstract Map<List<Integer>, List<Double>> compute(Operator filterOperator)
+      throws Exception;
 }

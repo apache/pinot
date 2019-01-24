@@ -34,7 +34,8 @@ public class BloomFilterReader {
 
   private BloomFilter _bloomFilter;
 
-  public BloomFilterReader(PinotDataBuffer bloomFilterBuffer) throws IOException {
+  public BloomFilterReader(PinotDataBuffer bloomFilterBuffer)
+      throws IOException {
     byte[] buffer = new byte[(int) bloomFilterBuffer.size()];
     bloomFilterBuffer.copyTo(0, buffer);
 

@@ -92,7 +92,6 @@ public class StreamConfigProperties {
   // Time threshold that controller will wait for the segment to be built by the server
   public static final String SEGMENT_COMMIT_TIMEOUT_SECONDS = "realtime.segment.commit.timeoutSeconds";
 
-
   /**
    * Helper method to create a stream specific property
    * @param streamType
@@ -106,6 +105,5 @@ public class StreamConfigProperties {
   public static String getPropertySuffix(String incoming, String propertyPrefix) {
     return incoming.split(propertyPrefix + ".")[1];
   }
-
 }
 

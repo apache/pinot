@@ -51,8 +51,7 @@ public class HighLevelConsumerRoutingTableBuilderTest {
 
     TableConfig tableConfig = new TableConfig();
     tableConfig.setTableName("tableName");
-    HighLevelConsumerBasedRoutingTableBuilder routingTableBuilder =
-        new HighLevelConsumerBasedRoutingTableBuilder();
+    HighLevelConsumerBasedRoutingTableBuilder routingTableBuilder = new HighLevelConsumerBasedRoutingTableBuilder();
     routingTableBuilder.init(new BaseConfiguration(), tableConfig, null, null);
 
     String tableNameWithType = "table_REALTIME";

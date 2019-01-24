@@ -29,7 +29,8 @@ public class NettyServerConfig {
 
   private Configuration _serverNettyConfig;
 
-  public NettyServerConfig(Configuration serverNettyConfig) throws ConfigurationException {
+  public NettyServerConfig(Configuration serverNettyConfig)
+      throws ConfigurationException {
     _serverNettyConfig = serverNettyConfig;
     if (!_serverNettyConfig.containsKey(NETTY_SERVER_PORT)) {
       throw new ConfigurationException("Cannot find Key : " + NETTY_SERVER_PORT);

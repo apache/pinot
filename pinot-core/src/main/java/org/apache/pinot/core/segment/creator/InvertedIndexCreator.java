@@ -69,5 +69,6 @@ public interface InvertedIndexCreator extends Closeable {
   /**
    * Seals the index and flushes it to disk.
    */
-  void seal() throws IOException;
+  void seal()
+      throws IOException;
 }

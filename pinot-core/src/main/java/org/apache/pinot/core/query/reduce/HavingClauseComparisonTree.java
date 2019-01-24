@@ -120,11 +120,12 @@ public class HavingClauseComparisonTree {
   public boolean isThisGroupPassPredicates(Map<String, Comparable> singleGroupAggResults) {
     if (_subComparisonTree == null || _subComparisonTree.isEmpty()) {
       if (singleGroupAggResults.get(_comparisonFunction.getFunctionExpression()) == null) {
-        throw new IllegalStateException("All the columns in the HAVING clause expect to be in the input;"
-            + _comparisonFunction.getFunctionExpression() + " is missing");
+        throw new IllegalStateException(
+            "All the columns in the HAVING clause expect to be in the input;" + _comparisonFunction
+                .getFunctionExpression() + " is missing");
       }
-      if (_comparisonFunction.isComparisonValid(
-          singleGroupAggResults.get(_comparisonFunction.getFunctionExpression()).toString())) {
+      if (_comparisonFunction
+          .isComparisonValid(singleGroupAggResults.get(_comparisonFunction.getFunctionExpression()).toString())) {
         return true;
       } else {
         return false;

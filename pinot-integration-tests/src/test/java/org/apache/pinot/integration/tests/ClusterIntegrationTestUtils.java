@@ -82,7 +82,8 @@ public class ClusterIntegrationTestUtils {
    */
   @SuppressWarnings("SqlNoDataSourceInspection")
   public static void setUpH2TableWithAvro(@Nonnull List<File> avroFiles, @Nonnull String tableName,
-      @Nonnull Connection h2Connection) throws Exception {
+      @Nonnull Connection h2Connection)
+      throws Exception {
     int numFields;
 
     // Pick a sample Avro file to extract the H2 schema and create the H2 table
@@ -135,8 +136,8 @@ public class ClusterIntegrationTestUtils {
       }
 
       h2Connection.prepareCall("DROP TABLE IF EXISTS " + tableName).execute();
-      h2Connection.prepareCall("CREATE TABLE " + tableName + "(" + StringUtil.join(",",
-          h2FieldNameAndTypes.toArray(new String[h2FieldNameAndTypes.size()])) + ")").execute();
+      h2Connection.prepareCall("CREATE TABLE " + tableName + "(" + StringUtil
+          .join(",", h2FieldNameAndTypes.toArray(new String[h2FieldNameAndTypes.size()])) + ")").execute();
     }
 
     // Insert Avro records into H2 table
@@ -275,8 +276,8 @@ public class ClusterIntegrationTestUtils {
           Assert.assertNotNull(files);
           File segmentFile = files[0];
           String segmentName = segmentFile.getName();
-          TarGzCompressionUtils.createTarGzOfDirectory(segmentFile.getAbsolutePath(),
-              new File(tarDir, segmentName).getAbsolutePath());
+          TarGzCompressionUtils
+              .createTarGzOfDirectory(segmentFile.getAbsolutePath(), new File(tarDir, segmentName).getAbsolutePath());
         } catch (Exception e) {
           // Ignored
         }
@@ -313,7 +314,8 @@ public class ClusterIntegrationTestUtils {
    */
   public static void pushAvroIntoKafka(@Nonnull List<File> avroFiles, @Nonnull String kafkaBroker,
       @Nonnull String kafkaTopic, int maxNumKafkaMessagesPerBatch, @Nullable byte[] header,
-      @Nullable String partitionColumn) throws Exception {
+      @Nullable String partitionColumn)
+      throws Exception {
     Properties properties = new Properties();
     properties.put("metadata.broker.list", kafkaBroker);
     properties.put("serializer.class", "kafka.serializer.DefaultEncoder");
@@ -374,7 +376,8 @@ public class ClusterIntegrationTestUtils {
   @SuppressWarnings("unused")
   public static void pushRandomAvroIntoKafka(@Nonnull File avroFile, @Nonnull String kafkaBroker,
       @Nonnull String kafkaTopic, int numKafkaMessagesToPush, int maxNumKafkaMessagesPerBatch, @Nullable byte[] header,
-      @Nullable String partitionColumn) throws Exception {
+      @Nullable String partitionColumn)
+      throws Exception {
     Properties properties = new Properties();
     properties.put("metadata.broker.list", kafkaBroker);
     properties.put("serializer.class", "kafka.serializer.DefaultEncoder");
@@ -502,7 +505,8 @@ public class ClusterIntegrationTestUtils {
    */
   public static void testQuery(@Nonnull String pqlQuery, @Nonnull String brokerUrl,
       @Nonnull org.apache.pinot.client.Connection pinotConnection, @Nullable List<String> sqlQueries,
-      @Nullable Connection h2Connection) throws Exception {
+      @Nullable Connection h2Connection)
+      throws Exception {
     // Use broker response for metadata check, connection response for value check
     JsonNode pinotResponse = ClusterTest.postQuery(pqlQuery, brokerUrl);
     ResultSetGroup pinotResultSetGroup = pinotConnection.execute(pqlQuery);

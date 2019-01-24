@@ -45,7 +45,8 @@ public class RandomRoutingTableTest {
   private static final int MAX_NUM_SEGMENTS_PER_SERVER = 31;
 
   @Test
-  public void testHelixExternalViewBasedRoutingTable() throws Exception {
+  public void testHelixExternalViewBasedRoutingTable()
+      throws Exception {
     URL resourceUrl = getClass().getClassLoader().getResource("SampleExternalView.json");
     Assert.assertNotNull(resourceUrl);
     String fileName = resourceUrl.getFile();
@@ -91,7 +92,8 @@ public class RandomRoutingTableTest {
     return instanceConfigs;
   }
 
-  private TableConfig generateTableConfig(String tableName) throws Exception {
+  private TableConfig generateTableConfig(String tableName)
+      throws Exception {
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
     Builder builder = new TableConfig.Builder(tableType);
     builder.setTableName(tableName);

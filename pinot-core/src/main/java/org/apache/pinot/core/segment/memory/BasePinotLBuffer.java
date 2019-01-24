@@ -102,7 +102,8 @@ public abstract class BasePinotLBuffer extends PinotDataBuffer {
   }
 
   @Override
-  public void readFrom(long offset, File file, long srcOffset, long size) throws IOException {
+  public void readFrom(long offset, File file, long srcOffset, long size)
+      throws IOException {
     try (FileChannel fileChannel = new RandomAccessFile(file, "r").getChannel()) {
       if (size <= Integer.MAX_VALUE) {
         fileChannel.read(_buffer.toDirectByteBuffer(offset, (int) size), srcOffset);
@@ -154,7 +155,8 @@ public abstract class BasePinotLBuffer extends PinotDataBuffer {
   }
 
   @Override
-  protected void release() throws IOException {
+  protected void release()
+      throws IOException {
     if (_buffer instanceof LBuffer) {
       _buffer.release();
     } else if (_buffer instanceof MMapBuffer) {

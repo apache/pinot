@@ -91,7 +91,8 @@ public class TableRebalancer {
    * the main logic and retries according to the rebalance algorithm. Some amount of code is duplicated from HelixHelper.
    */
   public RebalanceResult rebalance(TableConfig tableConfig, RebalanceSegmentStrategy strategy,
-      Configuration rebalanceConfig) throws InvalidConfigException{
+      Configuration rebalanceConfig)
+      throws InvalidConfigException {
 
     RebalanceResult result = new RebalanceResult();
 
@@ -102,11 +103,11 @@ public class TableRebalancer {
     PropertyKey idealStateKey = dataAccessor.keyBuilder().idealStates(tableName);
     IdealState previousIdealState = dataAccessor.getProperty(idealStateKey);
 
-    if(rebalanceConfig.getBoolean(RebalanceUserConfigConstants.DRYRUN, RebalanceUserConfigConstants.DEFAULT_DRY_RUN)) {
-      PartitionAssignment partitionAssignment = strategy.rebalancePartitionAssignment(previousIdealState, tableConfig,
-          rebalanceConfig );
-      IdealState idealState = strategy.getRebalancedIdealState(previousIdealState, tableConfig, rebalanceConfig,
-          partitionAssignment);
+    if (rebalanceConfig.getBoolean(RebalanceUserConfigConstants.DRYRUN, RebalanceUserConfigConstants.DEFAULT_DRY_RUN)) {
+      PartitionAssignment partitionAssignment =
+          strategy.rebalancePartitionAssignment(previousIdealState, tableConfig, rebalanceConfig);
+      IdealState idealState =
+          strategy.getRebalancedIdealState(previousIdealState, tableConfig, rebalanceConfig, partitionAssignment);
       result.setIdealStateMapping(idealState.getRecord().getMapFields());
       result.setPartitionAssignment(partitionAssignment);
       return result;
@@ -131,10 +132,10 @@ public class TableRebalancer {
         // list fields
         IdealState idealStateCopy = HelixHelper.cloneIdealState(currentIdealState);
         // rebalance; can throw InvalidConfigException - in which case we bail out
-        targetPartitionAssignment = strategy.rebalancePartitionAssignment(previousIdealState, tableConfig,
-            rebalanceConfig );
-        targetIdealState = strategy.getRebalancedIdealState(idealStateCopy, tableConfig, rebalanceConfig,
-            targetPartitionAssignment);
+        targetPartitionAssignment =
+            strategy.rebalancePartitionAssignment(previousIdealState, tableConfig, rebalanceConfig);
+        targetIdealState =
+            strategy.getRebalancedIdealState(idealStateCopy, tableConfig, rebalanceConfig, targetPartitionAssignment);
       }
 
       if (EqualityUtils.isEqual(targetIdealState, currentIdealState)) {
@@ -158,8 +159,9 @@ public class TableRebalancer {
       // Check version and set ideal state
       try {
         LOGGER.info("Updating IdealState for table {}", tableName);
-        if (zkBaseDataAccessor.set(idealStateKey.getPath(), nextIdealState.getRecord(),
-            currentIdealState.getRecord().getVersion(), AccessOption.PERSISTENT)) {
+        if (zkBaseDataAccessor
+            .set(idealStateKey.getPath(), nextIdealState.getRecord(), currentIdealState.getRecord().getVersion(),
+                AccessOption.PERSISTENT)) {
           // if we succeeded, wait for the change to stabilize
           waitForStable(tableName);
           // clear retries as it tracks failures with each idealstate update attempt
@@ -225,8 +227,8 @@ public class TableRebalancer {
       return;
     }
 
-    if (rebalanceUserConfig.getBoolean(RebalanceUserConfigConstants.DOWNTIME,
-        RebalanceUserConfigConstants.DEFAULT_DOWNTIME)) {
+    if (rebalanceUserConfig
+        .getBoolean(RebalanceUserConfigConstants.DOWNTIME, RebalanceUserConfigConstants.DEFAULT_DOWNTIME)) {
       setTargetState(idealState, segmentId, targetMap);
       return;
     }
@@ -281,7 +283,8 @@ public class TableRebalancer {
   /**
    * Wait till state has stabilized {@link #isStable(String)}
    */
-  private void waitForStable(String resourceName) throws InterruptedException {
+  private void waitForStable(String resourceName)
+      throws InterruptedException {
     int diff;
     int INITIAL_WAIT_MS = 3000;
     Thread.sleep(INITIAL_WAIT_MS);

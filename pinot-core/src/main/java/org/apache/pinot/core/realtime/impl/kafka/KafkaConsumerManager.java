@@ -92,8 +92,9 @@ public class KafkaConsumerManager {
           kafka.consumer.Consumer.createJavaConsumerConnector(kafkaHighLevelStreamConfig.getKafkaConsumerConfig());
 
       // Create the iterator (can only be done once per consumer)
-      ConsumerIterator<byte[], byte[]> iterator = consumer.createMessageStreams(kafkaHighLevelStreamConfig.getTopicMap(1)).
-          get(kafkaHighLevelStreamConfig.getKafkaTopicName()).get(0).iterator();
+      ConsumerIterator<byte[], byte[]> iterator =
+          consumer.createMessageStreams(kafkaHighLevelStreamConfig.getTopicMap(1)).
+              get(kafkaHighLevelStreamConfig.getKafkaTopicName()).get(0).iterator();
 
       // Mark both the consumer and iterator as acquired
       ConsumerAndIterator consumerAndIterator = new ConsumerAndIterator(consumer, iterator);
@@ -125,8 +126,8 @@ public class KafkaConsumerManager {
 
             // Shutdown all consumers that have not been re-acquired
             synchronized (KafkaConsumerManager.class) {
-              LOGGER.info("Executing release check for consumer/iterator {} at {}, scheduled at ", consumerAndIterator.getId(),
-                  System.currentTimeMillis(), releaseTime);
+              LOGGER.info("Executing release check for consumer/iterator {} at {}, scheduled at ",
+                  consumerAndIterator.getId(), System.currentTimeMillis(), releaseTime);
 
               Iterator<Map.Entry<ImmutableTriple<String, String, String>, ConsumerAndIterator>> configIterator =
                   CONSUMER_AND_ITERATOR_FOR_CONFIG_KEY.entrySet().iterator();
@@ -142,13 +143,15 @@ public class KafkaConsumerManager {
                   try {
                     consumerAndIterator.getConsumer().shutdown();
                   } catch (Exception e) {
-                    LOGGER.warn("Caught exception while shutting down Kafka consumer with id {}", consumerAndIterator.getId(), e);
+                    LOGGER.warn("Caught exception while shutting down Kafka consumer with id {}",
+                        consumerAndIterator.getId(), e);
                   }
 
                   configIterator.remove();
                   CONSUMER_RELEASE_TIME.remove(consumerAndIterator);
                 } else {
-                  LOGGER.info("Not releasing consumer/iterator {}, it has been reacquired", consumerAndIterator.getId());
+                  LOGGER
+                      .info("Not releasing consumer/iterator {}, it has been reacquired", consumerAndIterator.getId());
                 }
               }
             }
@@ -173,7 +176,8 @@ public class KafkaConsumerManager {
           try {
             consumerAndIterator.getConsumer().shutdown();
           } catch (Exception e) {
-            LOGGER.warn("Caught exception while shutting down Kafka consumer with id {}", consumerAndIterator.getId(), e);
+            LOGGER
+                .warn("Caught exception while shutting down Kafka consumer with id {}", consumerAndIterator.getId(), e);
           }
           consumerIterator.remove();
         }

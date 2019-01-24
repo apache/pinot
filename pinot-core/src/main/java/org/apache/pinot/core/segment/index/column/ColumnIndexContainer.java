@@ -43,6 +43,6 @@ public interface ColumnIndexContainer {
    * Returns the dictionary for the column, or {@code null} if it does not exist.
    */
   Dictionary getDictionary();
-  
+
   BloomFilterReader getBloomFilter();
 }

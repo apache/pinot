@@ -45,7 +45,8 @@ public class BitmapInvertedIndexReader implements InvertedIndexReader<ImmutableR
    *          the dictionary.
    * @throws IOException
    */
-  public BitmapInvertedIndexReader(PinotDataBuffer indexDataBuffer, int cardinality) throws IOException {
+  public BitmapInvertedIndexReader(PinotDataBuffer indexDataBuffer, int cardinality)
+      throws IOException {
     this.file = file;
     numberOfBitmaps = cardinality;
     load(indexDataBuffer);
@@ -110,14 +111,16 @@ public class BitmapInvertedIndexReader implements InvertedIndexReader<ImmutableR
     return buffer.getInt(index * Integer.BYTES);
   }
 
-  private void load(PinotDataBuffer indexDataBuffer) throws IOException {
+  private void load(PinotDataBuffer indexDataBuffer)
+      throws IOException {
     final int lastOffset = indexDataBuffer.getInt(numberOfBitmaps * Integer.BYTES);
     assert lastOffset == indexDataBuffer.size();
     this.buffer = indexDataBuffer;
   }
 
   @Override
-  public void close() throws IOException {
+  public void close()
+      throws IOException {
     buffer.close();
   }
 }

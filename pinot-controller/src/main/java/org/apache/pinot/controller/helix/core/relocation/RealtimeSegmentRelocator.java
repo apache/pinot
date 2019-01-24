@@ -140,8 +140,8 @@ public class RealtimeSegmentRelocator extends ControllerPeriodicTask {
 
     if (completedServers.size() < Integer.valueOf(idealState.getReplicas())) {
       throw new IllegalStateException(
-          "Number of completed servers: " + completedServers.size() + " is less than num replicas: "
-              + idealState.getReplicas());
+          "Number of completed servers: " + completedServers.size() + " is less than num replicas: " + idealState
+              .getReplicas());
     }
     // TODO: use segment assignment strategy to decide where to place relocated segment
 

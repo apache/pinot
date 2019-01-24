@@ -30,7 +30,8 @@ public interface StreamLevelConsumer {
    * Initialize and start the stream level consumer
    * @throws Exception
    */
-  void start() throws Exception;
+  void start()
+      throws Exception;
 
   /**
    * Get next row from the stream and decode it into a generic row
@@ -49,5 +50,6 @@ public interface StreamLevelConsumer {
    * Shutdown the stream consumer
    * @throws Exception
    */
-  void shutdown() throws Exception;
+  void shutdown()
+      throws Exception;
 }

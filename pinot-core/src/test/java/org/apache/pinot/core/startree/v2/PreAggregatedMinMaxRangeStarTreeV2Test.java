@@ -44,8 +44,8 @@ public class PreAggregatedMinMaxRangeStarTreeV2Test extends BaseStarTreeV2Test<O
   Object getRandomRawValue(Random random) {
     long value1 = random.nextInt();
     long value2 = random.nextInt();
-    return ObjectSerDeUtils.MIN_MAX_RANGE_PAIR_SER_DE.serialize(
-        new MinMaxRangePair(Math.min(value1, value2), Math.max(value1, value2)));
+    return ObjectSerDeUtils.MIN_MAX_RANGE_PAIR_SER_DE
+        .serialize(new MinMaxRangePair(Math.min(value1, value2), Math.max(value1, value2)));
   }
 
   @Override

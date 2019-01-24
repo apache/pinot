@@ -84,7 +84,8 @@ public class PinotSegmentRebalancer extends PinotZKChanger {
    * rebalances all tables for the tenant
    * @param tenantName
    */
-  public void rebalanceTenantTables(String tenantName) throws Exception {
+  public void rebalanceTenantTables(String tenantName)
+      throws Exception {
     String tableConfigPath = "/CONFIGS/TABLE";
     List<Stat> stats = new ArrayList<>();
     List<ZNRecord> tableConfigs = propertyStore.getChildren(tableConfigPath, stats, 0);
@@ -114,7 +115,8 @@ public class PinotSegmentRebalancer extends PinotZKChanger {
    * @param tableName
    * @throws Exception
    */
-  public void rebalanceTable(String tableName) throws Exception {
+  public void rebalanceTable(String tableName)
+      throws Exception {
     String tableConfigPath = "/CONFIGS/TABLE/" + tableName;
     Stat stat = new Stat();
     ZNRecord znRecord = propertyStore.get(tableConfigPath, stat, 0);
@@ -130,7 +132,8 @@ public class PinotSegmentRebalancer extends PinotZKChanger {
    * @param tenantName
    * @throws Exception
    */
-  public void rebalanceTable(String tableName, String tenantName) throws Exception {
+  public void rebalanceTable(String tableName, String tenantName)
+      throws Exception {
 
     final TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
     if (!tableType.equals(TableType.OFFLINE)) {
@@ -149,7 +152,8 @@ public class PinotSegmentRebalancer extends PinotZKChanger {
     if (numReplicasInTableConfig < numReplicasInIdealState) {
       // AutoRebalanceStrategy,computePartitionAssignment works correctly if we increase the number of partitions,
       // but not if we decrease it. We need to use the PinotNumReplicaChanger to reduce the number of replicas.
-      LOGGER.info("You first need to reduce the number of replicas from {} to {} for table {}. Use the ChangeNumReplicas command",
+      LOGGER.info(
+          "You first need to reduce the number of replicas from {} to {} for table {}. Use the ChangeNumReplicas command",
           numReplicasInIdealState, numReplicasInTableConfig, tableName);
       return;
     }
@@ -165,14 +169,14 @@ public class PinotSegmentRebalancer extends PinotZKChanger {
 
     String serverTenant = TableNameBuilder.forType(tableType).tableNameWithType(tenantName);
     List<String> instancesInClusterWithTag = HelixHelper.getInstancesWithTag(helixManager, serverTenant);
-    List<String> enabledInstancesWithTag =
-        HelixHelper.getEnabledInstancesWithTag(helixManager, serverTenant);
+    List<String> enabledInstancesWithTag = HelixHelper.getEnabledInstancesWithTag(helixManager, serverTenant);
     LOGGER.info("Current nodes: {}", currentHosts);
     LOGGER.info("New nodes: {}", instancesInClusterWithTag);
     LOGGER.info("Enabled nodes: {}", enabledInstancesWithTag);
     Map<String, Map<String, String>> currentMapping = currentIdealState.getRecord().getMapFields();
     ZNRecord newZnRecord = rebalanceStrategy
-        .computePartitionAssignment(instancesInClusterWithTag, enabledInstancesWithTag, currentMapping, new ClusterDataCache());
+        .computePartitionAssignment(instancesInClusterWithTag, enabledInstancesWithTag, currentMapping,
+            new ClusterDataCache());
     final Map<String, Map<String, String>> newMapping = newZnRecord.getMapFields();
     LOGGER.info("Current segment Assignment:");
     printSegmentAssignment(currentMapping);
@@ -182,8 +186,8 @@ public class PinotSegmentRebalancer extends PinotZKChanger {
       if (EqualityUtils.isEqual(newMapping, currentMapping)) {
         LOGGER.info("Skipping rebalancing for table:" + tableName + " since its already balanced");
       } else {
-        HelixHelper.updateIdealState(helixManager, tableName,
-            new com.google.common.base.Function<IdealState, IdealState>() {
+        HelixHelper
+            .updateIdealState(helixManager, tableName, new com.google.common.base.Function<IdealState, IdealState>() {
               @Nullable
               @Override
               public IdealState apply(@Nullable IdealState idealState) {
@@ -205,13 +209,15 @@ public class PinotSegmentRebalancer extends PinotZKChanger {
   }
 
   private static void usage() {
-    System.out.println(
-        "Usage: PinotRebalancer [" + rebalanceTableCmd + "|"  + rebalanceTenantCmd + "] <zkAddress> <clusterName> <tableName|tenantName>");
+    System.out.println("Usage: PinotRebalancer [" + rebalanceTableCmd + "|" + rebalanceTenantCmd
+        + "] <zkAddress> <clusterName> <tableName|tenantName>");
     System.out.println("Example: " + rebalanceTableCmd + " localhost:2181 PinotCluster myTable_OFFLINE");
     System.out.println("         " + rebalanceTenantCmd + " localhost:2181 PinotCluster beanCounter");
     System.exit(1);
   }
-  public static void main(String[] args) throws Exception {
+
+  public static void main(String[] args)
+      throws Exception {
 
     final boolean dryRun = true;
     if (args.length != 4) {

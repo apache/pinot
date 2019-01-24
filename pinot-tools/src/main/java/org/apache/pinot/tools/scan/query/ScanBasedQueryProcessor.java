@@ -47,7 +47,8 @@ public class ScanBasedQueryProcessor implements Cloneable {
   private long _timeoutInSeconds = 10000;
   private boolean _ownsQueryProcessors = false;
 
-  private ScanBasedQueryProcessor() {}
+  private ScanBasedQueryProcessor() {
+  }
 
   public ScanBasedQueryProcessor(String segmentsDirName)
       throws Exception {
@@ -176,7 +177,8 @@ public class ScanBasedQueryProcessor implements Cloneable {
     printWriter.close();
   }
 
-  public static void printResult(QueryResponse queryResponse) throws IOException {
+  public static void printResult(QueryResponse queryResponse)
+      throws IOException {
     LOGGER.info(JsonUtils.objectToString(queryResponse));
   }
 }

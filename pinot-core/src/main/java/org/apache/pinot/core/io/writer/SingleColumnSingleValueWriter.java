@@ -74,5 +74,4 @@ public interface SingleColumnSingleValueWriter extends DataFileWriter {
    * @param bytes
    */
   public void setBytes(int row, byte[] bytes);
-
 }

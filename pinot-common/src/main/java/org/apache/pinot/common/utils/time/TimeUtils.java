@@ -32,10 +32,8 @@ import org.joda.time.format.PeriodFormatterBuilder;
 public class TimeUtils {
   private static final Map<String, TimeUnit> TIME_UNIT_MAP = new HashMap<>();
 
-  private static final long VALID_MIN_TIME_MILLIS =
-      new DateTime(1971, 1, 1, 0, 0, 0, 0, DateTimeZone.UTC).getMillis();
-  private static final long VALID_MAX_TIME_MILLIS =
-      new DateTime(2071, 1, 1, 0, 0, 0, 0, DateTimeZone.UTC).getMillis();
+  private static final long VALID_MIN_TIME_MILLIS = new DateTime(1971, 1, 1, 0, 0, 0, 0, DateTimeZone.UTC).getMillis();
+  private static final long VALID_MAX_TIME_MILLIS = new DateTime(2071, 1, 1, 0, 0, 0, 0, DateTimeZone.UTC).getMillis();
 
   static {
     for (TimeUnit timeUnit : TimeUnit.values()) {
@@ -96,12 +94,9 @@ public class TimeUtils {
     return VALID_MAX_TIME_MILLIS;
   }
 
-  private static final PeriodFormatter PERIOD_FORMATTER = new PeriodFormatterBuilder()
-      .appendDays().appendSuffix("d")
-      .appendHours().appendSuffix("h")
-      .appendMinutes().appendSuffix("m")
-      .appendSeconds().appendSuffix("s")
-      .toFormatter();
+  private static final PeriodFormatter PERIOD_FORMATTER =
+      new PeriodFormatterBuilder().appendDays().appendSuffix("d").appendHours().appendSuffix("h").appendMinutes()
+          .appendSuffix("m").appendSeconds().appendSuffix("s").toFormatter();
 
   /**
    * Converts a string representing a period/duration to corresponding milliseconds.
@@ -133,7 +128,7 @@ public class TimeUtils {
    * @param millis the value in milliseconds to be converted
    * @return the corresponding human readable string or empty string if value cannot be converted
    */
-  public static  String convertMillisToPeriod(Long millis) {
+  public static String convertMillisToPeriod(Long millis) {
     String periodStr = null;
     if (millis != null) {
       Period p = new Period(new Duration(millis));

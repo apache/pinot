@@ -53,7 +53,7 @@ public class BoundedFCFSScheduler extends PriorityScheduler {
       }
     };
     MultiLevelPriorityQueue queue = new MultiLevelPriorityQueue(config, rm, groupFactory, new TableBasedGroupMapper());
-    return new BoundedFCFSScheduler(rm , queryExecutor, queue, serverMetrics, latestQueryTime);
+    return new BoundedFCFSScheduler(rm, queryExecutor, queue, serverMetrics, latestQueryTime);
   }
 
   private BoundedFCFSScheduler(@Nonnull ResourceManager resourceManager, @Nonnull QueryExecutor queryExecutor,

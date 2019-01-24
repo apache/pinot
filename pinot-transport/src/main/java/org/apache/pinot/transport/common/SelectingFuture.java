@@ -99,7 +99,8 @@ public class SelectingFuture<T> extends AbstractCompositeListenableFuture<T> {
   }
 
   @Override
-  public Map<ServerInstance, T> get() throws InterruptedException, ExecutionException {
+  public Map<ServerInstance, T> get()
+      throws InterruptedException, ExecutionException {
     _latch.await();
     return _delayedResponse;
   }
@@ -110,13 +111,15 @@ public class SelectingFuture<T> extends AbstractCompositeListenableFuture<T> {
   }
 
   @Override
-  public Map<ServerInstance, T> get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException {
+  public Map<ServerInstance, T> get(long timeout, TimeUnit unit)
+      throws InterruptedException, ExecutionException, TimeoutException {
     _latch.await(timeout, unit);
     return _delayedResponse;
   }
 
   @Override
-  public T getOne() throws InterruptedException, ExecutionException {
+  public T getOne()
+      throws InterruptedException, ExecutionException {
     _latch.await();
     if ((null == _delayedResponse) || (_delayedResponse.isEmpty())) {
       return null;
@@ -127,10 +130,11 @@ public class SelectingFuture<T> extends AbstractCompositeListenableFuture<T> {
   @Override
   public T getOne(long timeout, TimeUnit unit)
       throws InterruptedException, ExecutionException, TimeoutException {
-    boolean notElapsed = _latch.await(timeout,unit);
+    boolean notElapsed = _latch.await(timeout, unit);
 
-    if (!notElapsed)
+    if (!notElapsed) {
       throw new TimeoutException("Timedout waiting for async result for selecting future " + _name);
+    }
 
     if ((null == _delayedResponse) || (_delayedResponse.isEmpty())) {
       return null;
@@ -144,7 +148,8 @@ public class SelectingFuture<T> extends AbstractCompositeListenableFuture<T> {
   }
 
   @Override
-  protected boolean processFutureResult(ServerInstance server, Map<ServerInstance, T> response, Map<ServerInstance, Throwable> error, long durationMillis) {
+  protected boolean processFutureResult(ServerInstance server, Map<ServerInstance, T> response,
+      Map<ServerInstance, Throwable> error, long durationMillis) {
     // Add an argument here to get the time of completion of the future.
     boolean done = false;
     if ((null != response)) {

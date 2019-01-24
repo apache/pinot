@@ -50,12 +50,14 @@ public class ZkStarter {
    */
   static class PublicZooKeeperServerMain extends ZooKeeperServerMain {
     @Override
-    public void initializeAndRun(String[] args) throws QuorumPeerConfig.ConfigException, IOException {
+    public void initializeAndRun(String[] args)
+        throws QuorumPeerConfig.ConfigException, IOException {
       super.initializeAndRun(args);
     }
 
     @Override
-    public void runFromConfig(final ServerConfig config) throws IOException {
+    public void runFromConfig(final ServerConfig config)
+        throws IOException {
       ServerConfig newServerConfig = new ServerConfig() {
 
         public void parse(String[] args) {
@@ -142,7 +144,7 @@ public class ZkStarter {
     // Start the local ZK server
     try {
       final PublicZooKeeperServerMain zookeeperServerMain = new PublicZooKeeperServerMain();
-      final String[] args = new String[] { Integer.toString(port), dataDirPath };
+      final String[] args = new String[]{Integer.toString(port), dataDirPath};
       new Thread() {
         @Override
         public void run() {

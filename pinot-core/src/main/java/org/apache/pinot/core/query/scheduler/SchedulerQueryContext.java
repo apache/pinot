@@ -42,11 +42,13 @@ public class SchedulerQueryContext {
     this.resultFuture = SettableFuture.create();
   }
 
-  public @Nonnull ServerQueryRequest getQueryRequest() {
+  @Nonnull
+  public ServerQueryRequest getQueryRequest() {
     return queryRequest;
   }
 
-  public @Nonnull SettableFuture<byte[]> getResultFuture() {
+  @Nonnull
+  public SettableFuture<byte[]> getResultFuture() {
     return resultFuture;
   }
 
@@ -58,8 +60,8 @@ public class SchedulerQueryContext {
     this.schedulerGroup = schedulerGroup;
   }
 
-  public @Nullable
-  SchedulerGroup getSchedulerGroup() {
+  @Nullable
+  public SchedulerGroup getSchedulerGroup() {
     return schedulerGroup;
   }
 

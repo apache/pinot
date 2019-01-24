@@ -68,10 +68,11 @@ public class ValidationMetrics {
     public Long value() {
       Long gaugeValue = _gaugeValues.get(key);
 
-      if (gaugeValue != null && gaugeValue != Long.MIN_VALUE)
+      if (gaugeValue != null && gaugeValue != Long.MIN_VALUE) {
         return System.currentTimeMillis() - gaugeValue;
-      else
+      } else {
         return Long.MIN_VALUE;
+      }
     }
   }
 
@@ -92,10 +93,11 @@ public class ValidationMetrics {
     public Double value() {
       Long gaugeValue = _gaugeValues.get(key);
 
-      if (gaugeValue != null && gaugeValue != Long.MIN_VALUE)
+      if (gaugeValue != null && gaugeValue != Long.MIN_VALUE) {
         return (System.currentTimeMillis() - gaugeValue) / MILLIS_PER_HOUR;
-      else
+      } else {
         return Double.MIN_VALUE;
+      }
     }
   }
 
@@ -125,8 +127,10 @@ public class ValidationMetrics {
   }
 
   private final StoredValueGaugeFactory _storedValueGaugeFactory = new StoredValueGaugeFactory();
-  private final CurrentTimeMillisDeltaGaugeFactory _currentTimeMillisDeltaGaugeFactory = new CurrentTimeMillisDeltaGaugeFactory();
-  private final CurrentTimeMillisDeltaGaugeHoursFactory _currentTimeMillisDeltaGaugeHoursFactory = new CurrentTimeMillisDeltaGaugeHoursFactory();
+  private final CurrentTimeMillisDeltaGaugeFactory _currentTimeMillisDeltaGaugeFactory =
+      new CurrentTimeMillisDeltaGaugeFactory();
+  private final CurrentTimeMillisDeltaGaugeHoursFactory _currentTimeMillisDeltaGaugeHoursFactory =
+      new CurrentTimeMillisDeltaGaugeHoursFactory();
 
   /**
    * Builds the validation metrics.
@@ -157,9 +161,11 @@ public class ValidationMetrics {
    */
   public void updateOfflineSegmentDelayGauge(final String resource, final long lastOfflineSegmentTime) {
     final String fullGaugeName = makeGaugeName(resource, "offlineSegmentDelayMillis");
-    makeGauge(fullGaugeName, makeMetricName(fullGaugeName), _currentTimeMillisDeltaGaugeFactory, lastOfflineSegmentTime);
+    makeGauge(fullGaugeName, makeMetricName(fullGaugeName), _currentTimeMillisDeltaGaugeFactory,
+        lastOfflineSegmentTime);
     final String fullGaugeNameHours = makeGaugeName(resource, "offlineSegmentDelayHours");
-    makeGauge(fullGaugeNameHours, makeMetricName(fullGaugeNameHours), _currentTimeMillisDeltaGaugeHoursFactory, lastOfflineSegmentTime);
+    makeGauge(fullGaugeNameHours, makeMetricName(fullGaugeNameHours), _currentTimeMillisDeltaGaugeHoursFactory,
+        lastOfflineSegmentTime);
   }
 
   /**
@@ -173,7 +179,8 @@ public class ValidationMetrics {
     final String fullGaugeName = makeGaugeName(resource, "lastPushTimeDelayMillis");
     makeGauge(fullGaugeName, makeMetricName(fullGaugeName), _currentTimeMillisDeltaGaugeFactory, lastPushTimeMillis);
     final String fullGaugeNameHours = makeGaugeName(resource, "lastPushTimeDelayHours");
-    makeGauge(fullGaugeNameHours, makeMetricName(fullGaugeNameHours), _currentTimeMillisDeltaGaugeHoursFactory, lastPushTimeMillis);
+    makeGauge(fullGaugeNameHours, makeMetricName(fullGaugeNameHours), _currentTimeMillisDeltaGaugeHoursFactory,
+        lastPushTimeMillis);
   }
 
   /**
@@ -182,8 +189,7 @@ public class ValidationMetrics {
    * @param resource The resource for which the gauge is updated
    * @param documentCount Total document count for the given resource name or table name
    */
-  public void updateTotalDocumentCountGauge(final String resource, final long documentCount)
-  {
+  public void updateTotalDocumentCountGauge(final String resource, final long documentCount) {
     final String fullGaugeName = makeGaugeName(resource, "TotalDocumentCount");
     makeGauge(fullGaugeName, makeMetricName(fullGaugeName), _storedValueGaugeFactory, documentCount);
   }
@@ -205,8 +211,7 @@ public class ValidationMetrics {
    * @param resource The resource for which the gauge is updated
    * @param segmentCount Total segment count for the given resource name or table name
    */
-  public void updateSegmentCountGauge(final String resource, final long segmentCount)
-  {
+  public void updateSegmentCountGauge(final String resource, final long segmentCount) {
     final String fullGaugeName = makeGaugeName(resource, "SegmentCount");
     makeGauge(fullGaugeName, makeMetricName(fullGaugeName), _storedValueGaugeFactory, segmentCount);
   }
@@ -219,7 +224,8 @@ public class ValidationMetrics {
     return new MetricName(ValidationMetrics.class, gaugeName);
   }
 
-  private void makeGauge(final String gaugeName, final MetricName metricName, final GaugeFactory<?> gaugeFactory, final long value) {
+  private void makeGauge(final String gaugeName, final MetricName metricName, final GaugeFactory<?> gaugeFactory,
+      final long value) {
     if (!_gaugeValues.containsKey(gaugeName)) {
       _gaugeValues.put(gaugeName, value);
       MetricsHelper.newGauge(_metricsRegistry, metricName, gaugeFactory.buildGauge(gaugeName));

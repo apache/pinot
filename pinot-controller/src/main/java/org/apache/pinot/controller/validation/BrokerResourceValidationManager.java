@@ -58,11 +58,10 @@ public class BrokerResourceValidationManager extends ControllerPeriodicTask {
     }
 
     // Rebuild broker resource
-    Set<String> brokerInstances = _pinotHelixResourceManager.getAllInstancesForBrokerTenant(_instanceConfigs,
-        tableConfig.getTenantConfig().getBroker());
+    Set<String> brokerInstances = _pinotHelixResourceManager
+        .getAllInstancesForBrokerTenant(_instanceConfigs, tableConfig.getTenantConfig().getBroker());
     _pinotHelixResourceManager.rebuildBrokerResource(tableNameWithType, brokerInstances);
   }
-
 
   @Override
   protected void postprocess() {

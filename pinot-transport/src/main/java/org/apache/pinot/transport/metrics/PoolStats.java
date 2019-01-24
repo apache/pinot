@@ -160,6 +160,5 @@ public interface PoolStats<T extends Sampling & Summarizable> {
     public String toString() {
       return "LifecycleStats [_latencyMetric=" + _latencyMetric + "]";
     }
-
   }
 }

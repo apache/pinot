@@ -46,7 +46,5 @@ public abstract class BlockMultiValIterator implements BlockValIterator {
 
   public byte[][] nextBytesArrayVal(byte[][] bytesArrays) {
     throw new UnsupportedOperationException();
-
   }
-
 }

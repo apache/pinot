@@ -61,12 +61,14 @@ public interface BloomFilter {
    * @param out output stream
    * @throws IOException
    */
-  void writeTo(OutputStream out) throws IOException;
+  void writeTo(OutputStream out)
+      throws IOException;
 
   /**
    * Deserialize the bloom filter from input stream.
    * @param in input stream
    * @throws IOException
    */
-  void readFrom(InputStream in) throws IOException;
+  void readFrom(InputStream in)
+      throws IOException;
 }

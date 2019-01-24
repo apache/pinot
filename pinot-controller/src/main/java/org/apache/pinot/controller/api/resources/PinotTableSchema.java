@@ -48,16 +48,14 @@ public class PinotTableSchema {
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables/{tableName}/schema")
   @ApiOperation(value = "Get table schema", notes = "Read table schema")
-  @ApiResponses(value = {@ApiResponse(code=200, message = "Success"),
-      @ApiResponse(code = 404, message = "Table not found")})
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 404, message = "Table not found")})
   public String getTableSchema(
-      @ApiParam(value = "Table name (without type)", required = true) @PathParam("tableName") String tableName
-  ) {
+      @ApiParam(value = "Table name (without type)", required = true) @PathParam("tableName") String tableName) {
     Schema schema = pinotHelixResourceManager.getTableSchema(tableName);
     if (schema != null) {
       return schema.getJSONSchema();
     }
     throw new ControllerApplicationException(LOGGER, "Schema not found for table: " + tableName,
-         Response.Status.NOT_FOUND);
+        Response.Status.NOT_FOUND);
   }
 }

@@ -29,6 +29,7 @@ import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
 /**
  * Class for command to start ZooKeeper.
  *
@@ -37,13 +38,13 @@ import org.slf4j.LoggerFactory;
 public class StartZookeeperCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(StartZookeeperCommand.class);
 
-  @Option(name="-zkPort", required=false, metaVar="<int>", usage="Port to start zookeeper server on.")
-  private int _zkPort=2181;
+  @Option(name = "-zkPort", required = false, metaVar = "<int>", usage = "Port to start zookeeper server on.")
+  private int _zkPort = 2181;
 
-  @Option(name="-dataDir", required=false, metaVar="<string>", usage="Directory for zookeper data.")
+  @Option(name = "-dataDir", required = false, metaVar = "<string>", usage = "Directory for zookeper data.")
   private String _dataDir = TMP_DIR + "PinotAdmin/zkData";
 
-  @Option(name="-help", required=false, help=true, aliases={"-h", "--h", "--help"}, usage="Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
   private boolean _help = false;
 
   @Override
@@ -59,7 +60,6 @@ public class StartZookeeperCommand extends AbstractBaseAdminCommand implements C
   @Override
   public String toString() {
     return ("StartZookeeper -zkPort " + _zkPort + " -dataDir " + _dataDir);
-
   }
 
   @Override
@@ -97,7 +97,8 @@ public class StartZookeeperCommand extends AbstractBaseAdminCommand implements C
   }
 
   @Override
-  public boolean execute() throws IOException {
+  public boolean execute()
+      throws IOException {
     LOGGER.info("Executing command: " + toString());
     _tmpdir = createAutoDeleteTempDir();
 
@@ -113,8 +114,7 @@ public class StartZookeeperCommand extends AbstractBaseAdminCommand implements C
 
     _zookeeperInstance = ZkStarter.startLocalZkServer(_zkPort, datadir.getAbsolutePath());
 
-    LOGGER.info("Start zookeeper at localhost:" + _zkPort + " in thread "
-        + Thread.currentThread().getName());
+    LOGGER.info("Start zookeeper at localhost:" + _zkPort + " in thread " + Thread.currentThread().getName());
 
     savePID(System.getProperty("java.io.tmpdir") + File.separator + ".zooKeeper.pid");
     return true;
@@ -134,7 +134,8 @@ public class StartZookeeperCommand extends AbstractBaseAdminCommand implements C
     return true;
   }
 
-  public static void main(String[] args) throws Exception {
+  public static void main(String[] args)
+      throws Exception {
     StartZookeeperCommand zkc = new StartZookeeperCommand();
     zkc.execute();
   }

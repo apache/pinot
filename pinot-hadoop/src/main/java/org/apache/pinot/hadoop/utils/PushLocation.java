@@ -35,7 +35,7 @@ public class PushLocation {
     return _port;
   }
 
-  public static class PushLocationBuilder{
+  public static class PushLocationBuilder {
     private String _host;
     private int _port;
 

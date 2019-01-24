@@ -50,13 +50,15 @@ public class LocalPinotFS extends PinotFS {
   }
 
   @Override
-  public boolean mkdir(URI uri) throws IOException {
+  public boolean mkdir(URI uri)
+      throws IOException {
     FileUtils.forceMkdir(new File(decodeURI(uri.getRawPath())));
     return true;
   }
 
   @Override
-  public boolean delete(URI segmentUri, boolean forceDelete) throws IOException {
+  public boolean delete(URI segmentUri, boolean forceDelete)
+      throws IOException {
     File file = new File(decodeURI(segmentUri.getRawPath()));
     if (file.isDirectory()) {
       // Returns false if directory isn't empty
@@ -73,7 +75,8 @@ public class LocalPinotFS extends PinotFS {
   }
 
   @Override
-  public boolean move(URI srcUri, URI dstUri, boolean overwrite) throws IOException {
+  public boolean move(URI srcUri, URI dstUri, boolean overwrite)
+      throws IOException {
     File srcFile = new File(decodeURI(srcUri.getRawPath()));
     File dstFile = new File(decodeURI(dstUri.getRawPath()));
     if (dstFile.exists()) {
@@ -94,7 +97,8 @@ public class LocalPinotFS extends PinotFS {
   }
 
   @Override
-  public boolean copy(URI srcUri, URI dstUri) throws IOException {
+  public boolean copy(URI srcUri, URI dstUri)
+      throws IOException {
     File srcFile = new File(decodeURI(srcUri.getRawPath()));
     File dstFile = new File(decodeURI(dstUri.getRawPath()));
     if (dstFile.exists()) {
@@ -111,13 +115,15 @@ public class LocalPinotFS extends PinotFS {
   }
 
   @Override
-  public boolean exists(URI fileUri) throws IOException {
+  public boolean exists(URI fileUri)
+      throws IOException {
     File file = new File(decodeURI(fileUri.getRawPath()));
     return file.exists();
   }
 
   @Override
-  public long length(URI fileUri) throws IOException {
+  public long length(URI fileUri)
+      throws IOException {
     File file = new File(decodeURI(fileUri.getRawPath()));
     if (file.isDirectory()) {
       throw new IllegalArgumentException("File is directory");
@@ -126,26 +132,26 @@ public class LocalPinotFS extends PinotFS {
   }
 
   @Override
-  public String[] listFiles(URI fileUri, boolean recursive) throws IOException {
+  public String[] listFiles(URI fileUri, boolean recursive)
+      throws IOException {
     File file = new File(decodeURI(fileUri.getRawPath()));
     if (!recursive) {
-      return Arrays.stream(file.list())
-          .map(s -> new File(file, s))
-          .map(File::getAbsolutePath).toArray(String[]::new);
+      return Arrays.stream(file.list()).map(s -> new File(file, s)).map(File::getAbsolutePath).toArray(String[]::new);
     } else {
-       return Files.walk(Paths.get(fileUri)).
-           filter(s -> !s.equals(file.toPath()))
-           .map(Path::toString).toArray(String[]::new);
+      return Files.walk(Paths.get(fileUri)).
+          filter(s -> !s.equals(file.toPath())).map(Path::toString).toArray(String[]::new);
     }
   }
 
   @Override
-  public void copyToLocalFile(URI srcUri, File dstFile) throws Exception {
+  public void copyToLocalFile(URI srcUri, File dstFile)
+      throws Exception {
     copy(srcUri, new URI(encodeURI(dstFile.getAbsolutePath())));
   }
 
   @Override
-  public void copyFromLocalFile(File srcFile, URI dstUri) throws Exception {
+  public void copyFromLocalFile(File srcFile, URI dstUri)
+      throws Exception {
     copy(new URI(encodeURI(srcFile.getAbsolutePath())), dstUri);
   }
 
@@ -162,7 +168,8 @@ public class LocalPinotFS extends PinotFS {
   }
 
   @Override
-  public boolean touch(URI uri) throws IOException {
+  public boolean touch(URI uri)
+      throws IOException {
     File file = new File(decodeURI(uri.getRawPath()));
     if (!exists(uri)) {
       return file.createNewFile();

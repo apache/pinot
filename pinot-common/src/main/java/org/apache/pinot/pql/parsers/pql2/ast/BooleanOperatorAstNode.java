@@ -26,8 +26,7 @@ import org.apache.pinot.common.request.BrokerRequest;
  * AST node for boolean operators (AND, OR). There are an enum so that we can reuse them, as they have no state.
  */
 public enum BooleanOperatorAstNode implements AstNode {
-  AND,
-  OR;
+  AND, OR;
 
   @Override
   public List<? extends AstNode> getChildren() {
@@ -75,7 +74,7 @@ public enum BooleanOperatorAstNode implements AstNode {
   @Override
   public String toString(int indent) {
     String str = "";
-    for(int i = 0; i < indent; ++i) {
+    for (int i = 0; i < indent; ++i) {
       str += " ";
     }
     str += toString();

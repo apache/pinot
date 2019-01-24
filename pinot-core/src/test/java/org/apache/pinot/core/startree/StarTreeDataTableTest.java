@@ -31,7 +31,8 @@ import org.testng.annotations.Test;
 public class StarTreeDataTableTest {
 
   @Test
-  public void testSort() throws Exception {
+  public void testSort()
+      throws Exception {
     Random random = new Random();
     int numRows = 10;
     final int numDimensions = 10;

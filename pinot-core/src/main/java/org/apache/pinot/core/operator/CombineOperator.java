@@ -105,8 +105,8 @@ public class CombineOperator extends BaseOperator<IntermediateResultsBlock> {
                   CombineService.mergeTwoBlocks(_brokerRequest, mergedBlock, blockToMerge);
                 } catch (Exception e) {
                   LOGGER.error("Caught exception while merging two blocks (step 1).", e);
-                  mergedBlock.addToProcessingExceptions(
-                      QueryException.getException(QueryException.MERGE_RESPONSE_ERROR, e));
+                  mergedBlock
+                      .addToProcessingExceptions(QueryException.getException(QueryException.MERGE_RESPONSE_ERROR, e));
                 }
               }
             }
@@ -131,16 +131,15 @@ public class CombineOperator extends BaseOperator<IntermediateResultsBlock> {
             IntermediateResultsBlock mergedBlock = null;
             while (mergedBlocksNumber < numGroups) {
               if (mergedBlock == null) {
-                mergedBlock = (IntermediateResultsBlock) blockingQueue.poll(queryEndTime - System.currentTimeMillis(),
-                    TimeUnit.MILLISECONDS);
+                mergedBlock = (IntermediateResultsBlock) blockingQueue
+                    .poll(queryEndTime - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
                 if (mergedBlock != null) {
                   mergedBlocksNumber++;
                 }
                 LOGGER.debug("Got response from operator 0 after: {}", (System.currentTimeMillis() - startTime));
               } else {
-                IntermediateResultsBlock blockToMerge =
-                    (IntermediateResultsBlock) blockingQueue.poll(queryEndTime - System.currentTimeMillis(),
-                        TimeUnit.MILLISECONDS);
+                IntermediateResultsBlock blockToMerge = (IntermediateResultsBlock) blockingQueue
+                    .poll(queryEndTime - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
                 if (blockToMerge != null) {
                   try {
                     LOGGER.debug("Got response from operator {} after: {}", mergedBlocksNumber,
@@ -150,8 +149,8 @@ public class CombineOperator extends BaseOperator<IntermediateResultsBlock> {
                         (System.currentTimeMillis() - startTime));
                   } catch (Exception e) {
                     LOGGER.error("Caught exception while merging two blocks (step 2).", e);
-                    mergedBlock.addToProcessingExceptions(
-                        QueryException.getException(QueryException.MERGE_RESPONSE_ERROR, e));
+                    mergedBlock
+                        .addToProcessingExceptions(QueryException.getException(QueryException.MERGE_RESPONSE_ERROR, e));
                   }
                   mergedBlocksNumber++;
                 }

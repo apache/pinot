@@ -21,20 +21,21 @@ package org.apache.pinot.core.data.readers;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 
+
 public class ThriftRecordReaderConfig implements RecordReaderConfig {
 
-    private String _thriftClass;
+  private String _thriftClass;
 
-    public String getThriftClass() {
-        return _thriftClass;
-    }
+  public String getThriftClass() {
+    return _thriftClass;
+  }
 
-    public void setThriftClass(String thriftClass) {
-        this._thriftClass = thriftClass;
-    }
+  public void setThriftClass(String thriftClass) {
+    this._thriftClass = thriftClass;
+  }
 
-    @Override
-    public String toString() {
-        return ToStringBuilder.reflectionToString(this, ToStringStyle.SHORT_PREFIX_STYLE);
-    }
+  @Override
+  public String toString() {
+    return ToStringBuilder.reflectionToString(this, ToStringStyle.SHORT_PREFIX_STYLE);
+  }
 }

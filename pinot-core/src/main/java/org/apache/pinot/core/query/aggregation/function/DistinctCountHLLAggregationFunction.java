@@ -291,7 +291,8 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
    * @param value HyperLogLog value for the group key
    */
   private static void setValueForGroupKey(@Nonnull GroupByResultHolder groupByResultHolder, int groupKey,
-      HyperLogLog value) throws CardinalityMergeException {
+      HyperLogLog value)
+      throws CardinalityMergeException {
     HyperLogLog hyperLogLog = getHyperLogLog(groupByResultHolder, groupKey);
     hyperLogLog.addAll(value);
   }
@@ -318,7 +319,8 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
    * @param value HyperLogLog value to set
    */
   private static void setValueForGroupKeys(@Nonnull GroupByResultHolder groupByResultHolder, int[] groupKeys,
-      HyperLogLog value) throws CardinalityMergeException {
+      HyperLogLog value)
+      throws CardinalityMergeException {
     for (int groupKey : groupKeys) {
       setValueForGroupKey(groupByResultHolder, groupKey, value);
     }

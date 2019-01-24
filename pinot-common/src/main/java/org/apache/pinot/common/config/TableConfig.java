@@ -110,12 +110,14 @@ public class TableConfig {
     return fromJsonString(jsonConfigString);
   }
 
-  public static TableConfig fromJsonString(String jsonString) throws IOException {
+  public static TableConfig fromJsonString(String jsonString)
+      throws IOException {
     return fromJSONConfig(JsonUtils.stringToJsonNode(jsonString));
   }
 
   @Nonnull
-  public static TableConfig fromJSONConfig(@Nonnull JsonNode jsonConfig) throws IOException {
+  public static TableConfig fromJSONConfig(@Nonnull JsonNode jsonConfig)
+      throws IOException {
     TableType tableType = TableType.valueOf(jsonConfig.get(TABLE_TYPE_KEY).asText().toUpperCase());
     String tableName = TableNameBuilder.forType(tableType).tableNameWithType(jsonConfig.get(TABLE_NAME_KEY).asText());
 
@@ -179,7 +181,8 @@ public class TableConfig {
   }
 
   @Nonnull
-  public static TableConfig fromZnRecord(@Nonnull ZNRecord znRecord) throws IOException {
+  public static TableConfig fromZnRecord(@Nonnull ZNRecord znRecord)
+      throws IOException {
     Map<String, String> simpleFields = znRecord.getSimpleFields();
     TableType tableType = TableType.valueOf(simpleFields.get(TABLE_TYPE_KEY).toUpperCase());
     String tableName = TableNameBuilder.forType(tableType).tableNameWithType(simpleFields.get(TABLE_NAME_KEY));
@@ -321,7 +324,8 @@ public class TableConfig {
   }
 
   @Nonnull
-  public String toJSONConfigString() throws IOException {
+  public String toJSONConfigString()
+      throws IOException {
     return toJSONConfig(this).toString();
   }
 
@@ -341,14 +345,11 @@ public class TableConfig {
     }
     if (obj instanceof TableConfig) {
       TableConfig that = (TableConfig) obj;
-      return EqualityUtils.isEqual(_tableName, that._tableName)
-          && EqualityUtils.isEqual(_tableType, that._tableType)
-          && EqualityUtils.isEqual(_validationConfig, that._validationConfig)
-          && EqualityUtils.isEqual(_tenantConfig, that._tenantConfig)
-          && EqualityUtils.isEqual(_indexingConfig, that._indexingConfig)
-          && EqualityUtils.isEqual(_customConfig, that._customConfig)
-          && EqualityUtils.isEqual(_quotaConfig, that._quotaConfig)
-          && EqualityUtils.isEqual(_taskConfig, that._taskConfig)
+      return EqualityUtils.isEqual(_tableName, that._tableName) && EqualityUtils.isEqual(_tableType, that._tableType)
+          && EqualityUtils.isEqual(_validationConfig, that._validationConfig) && EqualityUtils
+          .isEqual(_tenantConfig, that._tenantConfig) && EqualityUtils.isEqual(_indexingConfig, that._indexingConfig)
+          && EqualityUtils.isEqual(_customConfig, that._customConfig) && EqualityUtils
+          .isEqual(_quotaConfig, that._quotaConfig) && EqualityUtils.isEqual(_taskConfig, that._taskConfig)
           && EqualityUtils.isEqual(_routingConfig, that._routingConfig);
     }
     return false;

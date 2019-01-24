@@ -74,7 +74,8 @@ public class SchemaUtils {
    * @return schema on success.
    * <P><code>null</code> on failure.
    */
-  public static @Nullable Schema getSchema(@Nonnull String host, int port, @Nonnull String schemaName) {
+  public static @Nullable
+  Schema getSchema(@Nonnull String host, int port, @Nonnull String schemaName) {
     Preconditions.checkNotNull(host);
     Preconditions.checkNotNull(schemaName);
 
@@ -177,8 +178,8 @@ public class SchemaUtils {
     Preconditions.checkNotNull(schema1);
     Preconditions.checkNotNull(schema2);
 
-    return schema1.getSchemaName().equals(schema2.getSchemaName())
-        && schema1.getFieldSpecMap().equals(schema2.getFieldSpecMap());
+    return schema1.getSchemaName().equals(schema2.getSchemaName()) && schema1.getFieldSpecMap()
+        .equals(schema2.getFieldSpecMap());
   }
 
   /**
@@ -186,10 +187,8 @@ public class SchemaUtils {
    */
   public static void main(String[] args) {
     Schema schema = new Schema.SchemaBuilder().setSchemaName("testSchema")
-        .addSingleValueDimension("dimension", FieldSpec.DataType.DOUBLE)
-        .addMetric("metric", FieldSpec.DataType.INT)
-        .addTime("time", TimeUnit.DAYS, FieldSpec.DataType.INT)
-        .build();
+        .addSingleValueDimension("dimension", FieldSpec.DataType.DOUBLE).addMetric("metric", FieldSpec.DataType.INT)
+        .addTime("time", TimeUnit.DAYS, FieldSpec.DataType.INT).build();
     System.out.println(postSchema("localhost", 8100, schema));
     Schema fetchedSchema = getSchema("localhost", 8100, "testSchema");
     Preconditions.checkNotNull(fetchedSchema);

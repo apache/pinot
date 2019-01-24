@@ -27,9 +27,11 @@ import static org.testng.Assert.assertTrue;
 public class TokenSchedulerGroupTest {
 
   int timeMillis = 100;
+
   class TestTokenSchedulerGroup extends TokenSchedulerGroup {
     static final int numTokensPerMs = 100;
     static final int tokenLifetimeMs = 100;
+
     TestTokenSchedulerGroup() {
       super("testGroup", numTokensPerMs, tokenLifetimeMs);
     }
@@ -39,8 +41,10 @@ public class TokenSchedulerGroupTest {
       return timeMillis;
     }
   }
+
   @Test
-  public void testIncrementThreads() throws Exception {
+  public void testIncrementThreads()
+      throws Exception {
     // set test time first
     timeMillis = 100;
     TestTokenSchedulerGroup group = new TestTokenSchedulerGroup();
@@ -66,7 +70,6 @@ public class TokenSchedulerGroupTest {
     group.decrementThreads();
     assertEquals(group.getThreadsInUse(), 0);
     assertEquals(group.getAvailableTokens(), availableTokens - timeIncrement * nThreads);
-
 
     // more threads
     availableTokens = group.getAvailableTokens();
@@ -97,14 +100,16 @@ public class TokenSchedulerGroupTest {
     timeMillis = startTime + TestTokenSchedulerGroup.tokenLifetimeMs + timeIncrement;
     int timeAdvance = pendingTimeInQuantum + timeIncrement;
     // these are "roughly" the tokens in use since we apply decay. So we don't test for exact value
-    int expectedTokens = TestTokenSchedulerGroup.numTokensPerMs * TestTokenSchedulerGroup.tokenLifetimeMs - timeAdvance * nThreads;
+    int expectedTokens =
+        TestTokenSchedulerGroup.numTokensPerMs * TestTokenSchedulerGroup.tokenLifetimeMs - timeAdvance * nThreads;
     assertTrue(group.getAvailableTokens() < expectedTokens);
     availableTokens = group.getAvailableTokens();
 
     // increment by multiple quantums
     timeMillis = startTime + 3 * TestTokenSchedulerGroup.tokenLifetimeMs + timeIncrement;
-    expectedTokens = TestTokenSchedulerGroup.numTokensPerMs * TestTokenSchedulerGroup.tokenLifetimeMs - timeIncrement * nThreads;
-    assertTrue(group.getAvailableTokens() < expectedTokens );
+    expectedTokens =
+        TestTokenSchedulerGroup.numTokensPerMs * TestTokenSchedulerGroup.tokenLifetimeMs - timeIncrement * nThreads;
+    assertTrue(group.getAvailableTokens() < expectedTokens);
   }
 
   @Test

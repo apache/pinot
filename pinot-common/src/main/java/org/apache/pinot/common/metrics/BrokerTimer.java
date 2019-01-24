@@ -22,12 +22,11 @@ import org.apache.pinot.common.Utils;
 
 
 /**
-* Enumeration containing all the timers exposed by the Pinot broker.
-*
-*/
+ * Enumeration containing all the timers exposed by the Pinot broker.
+ *
+ */
 public enum BrokerTimer implements AbstractMetrics.Timer {
-  ROUTING_TABLE_UPDATE_TIME(true),
-  ROUTING_TABLE_UPDATE_QUEUE_TIME(true);
+  ROUTING_TABLE_UPDATE_TIME(true), ROUTING_TABLE_UPDATE_QUEUE_TIME(true);
   private final String timerName;
   private final boolean global;
 

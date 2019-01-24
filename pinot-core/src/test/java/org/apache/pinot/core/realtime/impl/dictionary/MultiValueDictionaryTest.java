@@ -39,7 +39,8 @@ public class MultiValueDictionaryTest {
   }
 
   @AfterClass
-  public void tearDown() throws Exception {
+  public void tearDown()
+      throws Exception {
     _memoryManager.close();
   }
 
@@ -53,7 +54,8 @@ public class MultiValueDictionaryTest {
     }
   }
 
-  private void testMultiValueIndexing(final long seed) throws Exception {
+  private void testMultiValueIndexing(final long seed)
+      throws Exception {
     final LongOnHeapMutableDictionary dict = new LongOnHeapMutableDictionary();
     final FixedByteSingleColumnMultiValueReaderWriter indexer =
         new FixedByteSingleColumnMultiValueReaderWriter(MAX_N_VALUES, MAX_N_VALUES / 2, NROWS / 3, Integer.BYTES,

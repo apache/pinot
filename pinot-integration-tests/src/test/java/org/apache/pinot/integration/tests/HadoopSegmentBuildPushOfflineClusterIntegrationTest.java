@@ -54,7 +54,8 @@ public class HadoopSegmentBuildPushOfflineClusterIntegrationTest extends BaseClu
   }
 
   @BeforeClass
-  public void setUp() throws Exception {
+  public void setUp()
+      throws Exception {
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _avroDir, _segmentDir, _tarDir);
 
     // Start the Pinot cluster
@@ -102,7 +103,8 @@ public class HadoopSegmentBuildPushOfflineClusterIntegrationTest extends BaseClu
   }
 
   @AfterClass
-  public void tearDown() throws Exception {
+  public void tearDown()
+      throws Exception {
     stopServer();
     stopBroker();
     stopController();
@@ -114,29 +116,34 @@ public class HadoopSegmentBuildPushOfflineClusterIntegrationTest extends BaseClu
 
   @Test
   @Override
-  public void testQueriesFromQueryFile() throws Exception {
+  public void testQueriesFromQueryFile()
+      throws Exception {
     super.testQueriesFromQueryFile();
   }
 
   @Test
   @Override
-  public void testGeneratedQueriesWithMultiValues() throws Exception {
+  public void testGeneratedQueriesWithMultiValues()
+      throws Exception {
     super.testGeneratedQueriesWithMultiValues();
   }
 
   @Test
   @Override
-  public void testQueryExceptions() throws Exception {
+  public void testQueryExceptions()
+      throws Exception {
     super.testQueryExceptions();
   }
 
   @Test
   @Override
-  public void testInstanceShutdown() throws Exception {
+  public void testInstanceShutdown()
+      throws Exception {
     super.testInstanceShutdown();
   }
 
-  private void generateAndPushSegmentsFromHadoop() throws Exception {
+  private void generateAndPushSegmentsFromHadoop()
+      throws Exception {
     // Configure Hadoop segment generate and push job
     Properties properties = new Properties();
     properties.setProperty(JobConfigConstants.PATH_TO_INPUT, _avroDir.getPath());

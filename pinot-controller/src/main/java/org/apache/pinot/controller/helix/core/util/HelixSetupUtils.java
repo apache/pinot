@@ -63,8 +63,8 @@ public class HelixSetupUtils {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixSetupUtils.class);
 
-  public static synchronized HelixManager setup(String helixClusterName, String zkPath, String pinotControllerInstanceId,
-      boolean isUpdateStateModel, boolean enableBatchMessageMode) {
+  public static synchronized HelixManager setup(String helixClusterName, String zkPath,
+      String pinotControllerInstanceId, boolean isUpdateStateModel, boolean enableBatchMessageMode) {
 
     try {
       createHelixClusterIfNeeded(helixClusterName, zkPath, isUpdateStateModel, enableBatchMessageMode);
@@ -84,7 +84,8 @@ public class HelixSetupUtils {
   public static void createHelixClusterIfNeeded(String helixClusterName, String zkPath, boolean isUpdateStateModel,
       boolean enableBatchMessageMode) {
     final HelixAdmin admin = new ZKHelixAdmin(zkPath);
-    final String segmentStateModelName = PinotHelixSegmentOnlineOfflineStateModelGenerator.PINOT_SEGMENT_ONLINE_OFFLINE_STATE_MODEL;
+    final String segmentStateModelName =
+        PinotHelixSegmentOnlineOfflineStateModelGenerator.PINOT_SEGMENT_ONLINE_OFFLINE_STATE_MODEL;
 
     if (admin.getClusters().contains(helixClusterName)) {
       LOGGER.info("cluster already exists ********************************************* ");
@@ -96,11 +97,13 @@ public class HelixSetupUtils {
           return;
         } else {
           LOGGER.info("Updating {} to add states for low level consumers", segmentStateModelName);
-          StateModelDefinition newStateModelDef = PinotHelixSegmentOnlineOfflineStateModelGenerator.generatePinotStateModelDefinition();
+          StateModelDefinition newStateModelDef =
+              PinotHelixSegmentOnlineOfflineStateModelGenerator.generatePinotStateModelDefinition();
           ZkClient zkClient = new ZkClient(zkPath);
           zkClient.waitUntilConnected(CommonConstants.Helix.ZkClient.DEFAULT_CONNECT_TIMEOUT_SEC, TimeUnit.SECONDS);
           zkClient.setZkSerializer(new ZNRecordSerializer());
-          HelixDataAccessor accessor = new ZKHelixDataAccessor(helixClusterName, new ZkBaseDataAccessor<ZNRecord>(zkClient));
+          HelixDataAccessor accessor =
+              new ZKHelixDataAccessor(helixClusterName, new ZkBaseDataAccessor<ZNRecord>(zkClient));
           PropertyKey.Builder keyBuilder = accessor.keyBuilder();
           accessor.setProperty(keyBuilder.stateModelDef(segmentStateModelName), newStateModelDef);
           LOGGER.info("Completed updating statemodel {}", segmentStateModelName);
@@ -125,8 +128,9 @@ public class HelixSetupUtils {
 
     admin.setConfig(scope, props);
 
-    LOGGER.info("Adding state model {} (with CONSUMED state) generated using {} **********************************************",
-        segmentStateModelName , PinotHelixSegmentOnlineOfflineStateModelGenerator.class.toString());
+    LOGGER.info(
+        "Adding state model {} (with CONSUMED state) generated using {} **********************************************",
+        segmentStateModelName, PinotHelixSegmentOnlineOfflineStateModelGenerator.class.toString());
 
     // If this is a fresh cluster we are creating, then the cluster will see the CONSUMING state in the
     // state model. But then the servers will never be asked to go to that STATE (whether they have the code
@@ -146,8 +150,8 @@ public class HelixSetupUtils {
     LOGGER.info("Adding empty ideal state for Broker!");
     HelixHelper.updateResourceConfigsFor(new HashMap<String, String>(), CommonConstants.Helix.BROKER_RESOURCE_INSTANCE,
         helixClusterName, admin);
-    IdealState idealState = PinotTableIdealStateBuilder.buildEmptyIdealStateForBrokerResource(admin, helixClusterName,
-        enableBatchMessageMode);
+    IdealState idealState = PinotTableIdealStateBuilder
+        .buildEmptyIdealStateForBrokerResource(admin, helixClusterName, enableBatchMessageMode);
     admin.setResourceIdealState(helixClusterName, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE, idealState);
     initPropertyStorePath(helixClusterName, zkPath);
     LOGGER.info("New Cluster setup completed... ********************************************** ");
@@ -155,7 +159,8 @@ public class HelixSetupUtils {
 
   private static void initPropertyStorePath(String helixClusterName, String zkPath) {
     String propertyStorePath = PropertyPathConfig.getPath(PropertyType.PROPERTYSTORE, helixClusterName);
-    ZkHelixPropertyStore<ZNRecord> propertyStore = new ZkHelixPropertyStore<ZNRecord>(zkPath, new ZNRecordSerializer(), propertyStorePath);
+    ZkHelixPropertyStore<ZNRecord> propertyStore =
+        new ZkHelixPropertyStore<ZNRecord>(zkPath, new ZNRecordSerializer(), propertyStorePath);
     propertyStore.create("/CONFIGS", new ZNRecord(""), AccessOption.PERSISTENT);
     propertyStore.create("/CONFIGS/CLUSTER", new ZNRecord(""), AccessOption.PERSISTENT);
     propertyStore.create("/CONFIGS/TABLE", new ZNRecord(""), AccessOption.PERSISTENT);
@@ -167,7 +172,7 @@ public class HelixSetupUtils {
   private static HelixManager startHelixControllerInStandadloneMode(String helixClusterName, String zkUrl,
       String pinotControllerInstanceId) {
     LOGGER.info("Starting Helix Standalone Controller ... ");
-    return HelixControllerMain.startHelixController(zkUrl, helixClusterName, pinotControllerInstanceId,
-        HelixControllerMain.STANDALONE);
+    return HelixControllerMain
+        .startHelixController(zkUrl, helixClusterName, pinotControllerInstanceId, HelixControllerMain.STANDALONE);
   }
 }

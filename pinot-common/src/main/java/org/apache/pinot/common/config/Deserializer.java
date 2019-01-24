@@ -48,8 +48,7 @@ import org.slf4j.LoggerFactory;
 public class Deserializer {
   private static final Logger LOGGER = LoggerFactory.getLogger(Deserializer.class);
 
-  private static final java.util.Map<Tuple2<Class, Class>, Function<Object, Object>>
-    typeConverters = new HashMap<>();
+  private static final java.util.Map<Tuple2<Class, Class>, Function<Object, Object>> typeConverters = new HashMap<>();
 
   private static final java.util.Set<Class> simpleTypes;
 
@@ -169,13 +168,13 @@ public class Deserializer {
 
     // Mark all types that have a converter as simple types
     simpleTypes = new HashSet<>();
-    typeConverters
-        .keySet()
-        .forEach(t2 -> simpleTypes.add(t2._2));
+    typeConverters.keySet().forEach(t2 -> simpleTypes.add(t2._2));
   }
 
-  public static <T> T deserialize(Class<T> clazz, Map<String, ?> config, String configPath) throws Exception {
-    LOGGER.debug("Deserializing object of class {} at config path {} using config {}", clazz.getName(), configPath, config);
+  public static <T> T deserialize(Class<T> clazz, Map<String, ?> config, String configPath)
+      throws Exception {
+    LOGGER.debug("Deserializing object of class {} at config path {} using config {}", clazz.getName(), configPath,
+        config);
 
     if (config == null) {
       LOGGER.debug("Config is null, returning null value");
@@ -264,7 +263,8 @@ public class Deserializer {
             String suffix = keyName + ".";
             String newPath = configPath + suffix;
             LOGGER.debug("Recursively deserializing complex type");
-            valueInjected |= coerceValueIntoField(rootObject, declaredField, deserialize(declaredField.getType(), subset(suffix, config), newPath));
+            valueInjected |= coerceValueIntoField(rootObject, declaredField,
+                deserialize(declaredField.getType(), subset(suffix, config), newPath));
           }
         } else if (isKeylessConfigField) {
           if (useChildKeyHandler != null) {
@@ -274,7 +274,8 @@ public class Deserializer {
             valueInjected |= coerceValueIntoField(rootObject, declaredField, value);
           } else {
             // Complex type, recurse without changing the current path
-            valueInjected |= coerceValueIntoField(rootObject, declaredField, deserialize(declaredField.getType(), config, configPath));
+            valueInjected |= coerceValueIntoField(rootObject, declaredField,
+                deserialize(declaredField.getType(), config, configPath));
           }
         } else {
           // Skip this field, it is not annotated with @ConfigKey or @ConfigWithoutKey
@@ -305,10 +306,12 @@ public class Deserializer {
     }
   }
 
-  private static <T> boolean coerceValueIntoField(T parentObject, Field field, Object value) throws
-                                                                                          ReflectiveOperationException {
+  private static <T> boolean coerceValueIntoField(T parentObject, Field field, Object value)
+      throws ReflectiveOperationException {
     try {
-      if (value == null) return false;
+      if (value == null) {
+        return false;
+      }
 
       Object destinationValue;
       Class<?> objectType = value.getClass();
@@ -334,7 +337,8 @@ public class Deserializer {
             destinationValue = value;
           } else if (Number.class.isAssignableFrom(fieldType) || fieldType.isPrimitive()) { // field instanceof Number
             Number numberValue = (Number) value;
-            if(Integer.class.isAssignableFrom(fieldType) || int.class.isAssignableFrom(fieldType)) { // field instanceof int/Integer
+            if (Integer.class.isAssignableFrom(fieldType) || int.class
+                .isAssignableFrom(fieldType)) { // field instanceof int/Integer
               destinationValue = numberValue.intValue();
             } else {
               throw new RuntimeException("Unsupported conversion from " + objectType + " -> " + fieldType);
@@ -345,7 +349,8 @@ public class Deserializer {
         } else if (value instanceof String) {
           String stringValue = (String) value;
           try {
-            if (Integer.class.isAssignableFrom(fieldType) || int.class.isAssignableFrom(fieldType)) { // field instanceof int/Integer
+            if (Integer.class.isAssignableFrom(fieldType) || int.class
+                .isAssignableFrom(fieldType)) { // field instanceof int/Integer
               destinationValue = Integer.parseInt(stringValue);
             } else if (Long.class.isAssignableFrom(fieldType)) { // field instanceof long/Long
               destinationValue = Long.parseLong(stringValue);
@@ -374,15 +379,16 @@ public class Deserializer {
         return true;
       }
     } catch (Exception e) {
-      throw new ReflectiveOperationException("Caught exception while processing field " + field.getName() + " of class " + field.getDeclaringClass(), e);
+      throw new ReflectiveOperationException(
+          "Caught exception while processing field " + field.getName() + " of class " + field.getDeclaringClass(), e);
     }
 
     return false;
   }
 
   public static <T> T deserializeFromString(Class<T> clazz, String string) {
-    Config config = ConfigFactory.parseString(string,
-        ConfigParseOptions.defaults().prependIncluder(new ConfigIncluder() {
+    Config config =
+        ConfigFactory.parseString(string, ConfigParseOptions.defaults().prependIncluder(new ConfigIncluder() {
           private ConfigIncluder parent = null;
 
           public ConfigObject include(ConfigIncludeContext context, String what) {
@@ -410,7 +416,7 @@ public class Deserializer {
     List<Field> fields = List.of(clazz.getDeclaredFields());
 
     // Recursively add all parent fields
-    while(clazz.getSuperclass() != null) {
+    while (clazz.getSuperclass() != null) {
       clazz = clazz.getSuperclass();
       fields = fields.appendAll(Arrays.asList(clazz.getDeclaredFields()));
     }
@@ -420,17 +426,12 @@ public class Deserializer {
 
   private static Map<String, ?> subset(String prefix, Map<String, ?> config) {
     final int prefixLength = prefix.length();
-    return config
-        .filter((key, value) -> key.startsWith(prefix))
+    return config.filter((key, value) -> key.startsWith(prefix))
         .map((key, value) -> Tuple.of(key.substring(prefixLength), value));
   }
 
   public static boolean isSimpleType(Class<?> fieldType) {
-    return simpleTypes.contains(fieldType) ||
-        fieldType.equals(boolean.class) ||
-        fieldType.equals(String.class) ||
-        fieldType.equals(TimeUnit.class) ||
-        fieldType.isArray() ||
-        Enum.class.isAssignableFrom(fieldType);
+    return simpleTypes.contains(fieldType) || fieldType.equals(boolean.class) || fieldType.equals(String.class)
+        || fieldType.equals(TimeUnit.class) || fieldType.isArray() || Enum.class.isAssignableFrom(fieldType);
   }
 }

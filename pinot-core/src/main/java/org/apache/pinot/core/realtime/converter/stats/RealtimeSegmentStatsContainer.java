@@ -57,7 +57,8 @@ public class RealtimeSegmentStatsContainer implements SegmentPreIndexStatsContai
   }
 
   @Override
-  public ColumnStatistics getColumnProfileFor(String column) throws Exception {
+  public ColumnStatistics getColumnProfileFor(String column)
+      throws Exception {
     return _columnStatisticsMap.get(column);
   }
 

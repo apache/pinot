@@ -53,22 +53,22 @@ public class LowLevelRoutingTableBuilderUtil {
         // Only keep the segment if all replicas have it in CONSUMING state
         for (String externalViewState : helixPartitionState.values()) {
           // Ignore ERROR state
-          if (externalViewState.equalsIgnoreCase(
-              CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel.ERROR)) {
+          if (externalViewState
+              .equalsIgnoreCase(CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel.ERROR)) {
             continue;
           }
 
           // Not all segments are in CONSUMING state, therefore don't consider the last segment assignable to CONSUMING
           // replicas
-          if (externalViewState.equalsIgnoreCase(
-              CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel.ONLINE)) {
+          if (externalViewState
+              .equalsIgnoreCase(CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel.ONLINE)) {
             allInConsumingState = false;
             break;
           }
 
           // Otherwise count the replica as being in CONSUMING state
-          if (externalViewState.equalsIgnoreCase(
-              CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel.CONSUMING)) {
+          if (externalViewState
+              .equalsIgnoreCase(CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel.CONSUMING)) {
             replicasInConsumingState++;
           }
         }

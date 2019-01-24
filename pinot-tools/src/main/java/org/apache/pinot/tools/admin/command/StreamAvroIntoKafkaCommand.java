@@ -44,22 +44,22 @@ import org.slf4j.LoggerFactory;
 public class StreamAvroIntoKafkaCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(StreamAvroIntoKafkaCommand.class);
 
-  @Option(name="-avroFile", required=true, metaVar="<String>", usage="Avro file to stream.")
+  @Option(name = "-avroFile", required = true, metaVar = "<String>", usage = "Avro file to stream.")
   private String _avroFile = null;
 
-  @Option(name="-help", required=false, help=true, aliases={"-h", "--h", "--help"}, usage="Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
   private boolean _help = false;
 
-  @Option(name="-kafkaBrokerList", required=false, metaVar="<String>", usage="Kafka broker list.")
+  @Option(name = "-kafkaBrokerList", required = false, metaVar = "<String>", usage = "Kafka broker list.")
   private String _kafkaBrokerList = KafkaStarterUtils.DEFAULT_KAFKA_BROKER;
 
-  @Option(name="-kafkaTopic", required=true, metaVar="<String>", usage="Kafka topic to stream into.")
+  @Option(name = "-kafkaTopic", required = true, metaVar = "<String>", usage = "Kafka topic to stream into.")
   private String _kafkaTopic = null;
 
-  @Option(name="-zkAddress", required=false, metaVar="<string>", usage="Address of Zookeeper.")
+  @Option(name = "-zkAddress", required = false, metaVar = "<string>", usage = "Address of Zookeeper.")
   private String _zkAddress = "localhost:2181";
 
-  @Option(name="-millisBetweenMessages", required=false, metaVar="<int>", usage="Delay in milliseconds between messages (default 1000 ms)")
+  @Option(name = "-millisBetweenMessages", required = false, metaVar = "<int>", usage = "Delay in milliseconds between messages (default 1000 ms)")
   private String _millisBetweenMessages = "1000";
 
   @Override
@@ -74,19 +74,20 @@ public class StreamAvroIntoKafkaCommand extends AbstractBaseAdminCommand impleme
 
   @Override
   public String toString() {
-    return "StreamAvroInfoKafka -avroFile " + _avroFile + " -kafkaBrokerList " + _kafkaBrokerList + " -kafkaTopic " +
-        _kafkaTopic + " -millisBetweenMessages " + _millisBetweenMessages;
+    return "StreamAvroInfoKafka -avroFile " + _avroFile + " -kafkaBrokerList " + _kafkaBrokerList + " -kafkaTopic "
+        + _kafkaTopic + " -millisBetweenMessages " + _millisBetweenMessages;
   }
 
   @Override
   public String description() {
-    return "Stream the specified Avro file into a Kafka topic, which can be read by Pinot\n" +
-        "by using org.apache.pinot.core.realtime.impl.kafka.KafkaJSONMessageDecoder as the\n" +
-        "message decoder class name (stream.kafka.decoder.class.name).";
+    return "Stream the specified Avro file into a Kafka topic, which can be read by Pinot\n"
+        + "by using org.apache.pinot.core.realtime.impl.kafka.KafkaJSONMessageDecoder as the\n"
+        + "message decoder class name (stream.kafka.decoder.class.name).";
   }
 
   @Override
-  public boolean execute() throws IOException {
+  public boolean execute()
+      throws IOException {
     int messageDelayMillis = Integer.parseInt(_millisBetweenMessages);
     final boolean sleepRequired = 0 < messageDelayMillis;
 
@@ -114,8 +115,9 @@ public class StreamAvroIntoKafkaCommand extends AbstractBaseAdminCommand impleme
         // Write the message to Kafka
         String recordJson = genericRecord.toString();
         byte[] bytes = recordJson.getBytes("utf-8");
-        KeyedMessage<byte[], byte[]> data = new KeyedMessage<byte[], byte[]>(_kafkaTopic,
-            Longs.toByteArray(HashUtil.hash64(bytes, bytes.length)), bytes);
+        KeyedMessage<byte[], byte[]> data =
+            new KeyedMessage<byte[], byte[]>(_kafkaTopic, Longs.toByteArray(HashUtil.hash64(bytes, bytes.length)),
+                bytes);
 
         producer.send(data);
 

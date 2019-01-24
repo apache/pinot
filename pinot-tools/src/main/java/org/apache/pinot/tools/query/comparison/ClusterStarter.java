@@ -205,13 +205,8 @@ public class ClusterStarter {
     String controllerAddress = "http://" + _localhost + ":" + _controllerPort;
     String tableJSONConfigString =
         new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(_tableName)
-            .setTimeColumnName(_timeColumnName)
-            .setTimeType(_timeUnit)
-            .setNumReplicas(3)
-            .setBrokerTenant("broker")
-            .setServerTenant("server")
-            .build()
-            .toJSONConfigString();
+            .setTimeColumnName(_timeColumnName).setTimeType(_timeUnit).setNumReplicas(3).setBrokerTenant("broker")
+            .setServerTenant("server").build().toJSONConfigString();
     sendPostRequest(ControllerRequestURLBuilder.baseUrl(controllerAddress).forTableCreate(), tableJSONConfigString);
   }
 
@@ -228,8 +223,8 @@ public class ClusterStarter {
       throws Exception {
     if (_inputDataDir != null) {
       CreateSegmentCommand segmentCreator =
-          new CreateSegmentCommand().setDataDir(_inputDataDir).setSchemaFile(_schemaFileName)
-              .setTableName(_tableName).setSegmentName(_segmentName).setOutDir(_segmentDirName).setOverwrite(true)
+          new CreateSegmentCommand().setDataDir(_inputDataDir).setSchemaFile(_schemaFileName).setTableName(_tableName)
+              .setSegmentName(_segmentName).setOutDir(_segmentDirName).setOverwrite(true)
               .setEnableStarTreeIndex(_enableStarTreeIndex);
 
       segmentCreator.execute();

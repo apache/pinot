@@ -42,7 +42,8 @@ public class PinotFileUploadTest extends ControllerTest {
   private static final String TABLE_NAME = "testTable";
 
   @Test
-  public void testUploadBogusData() throws Exception {
+  public void testUploadBogusData()
+      throws Exception {
     org.apache.http.client.HttpClient httpClient = new DefaultHttpClient();
     HttpPost httpPost = new HttpPost(_controllerRequestURLBuilder.forDataFileUpload());
     HttpEntity entity = new StringEntity("blah");
@@ -54,27 +55,27 @@ public class PinotFileUploadTest extends ControllerTest {
   }
 
   @BeforeClass
-  public void setUp() throws Exception {
+  public void setUp()
+      throws Exception {
     startZk();
     startController();
-    ControllerRequestBuilderUtil.addFakeBrokerInstancesToAutoJoinHelixCluster(getHelixClusterName(),
-        ZkStarter.DEFAULT_ZK_STR, 5, true);
-    ControllerRequestBuilderUtil.addFakeDataInstancesToAutoJoinHelixCluster(getHelixClusterName(),
-        ZkStarter.DEFAULT_ZK_STR, 5, true);
+    ControllerRequestBuilderUtil
+        .addFakeBrokerInstancesToAutoJoinHelixCluster(getHelixClusterName(), ZkStarter.DEFAULT_ZK_STR, 5, true);
+    ControllerRequestBuilderUtil
+        .addFakeDataInstancesToAutoJoinHelixCluster(getHelixClusterName(), ZkStarter.DEFAULT_ZK_STR, 5, true);
 
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_BROKER").size(),
         5);
 
     // Adding table
     TableConfig tableConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setSegmentAssignmentStrategy("RandomAssignmentStrategy")
-        .setNumReplicas(2)
-        .build();
+        .setSegmentAssignmentStrategy("RandomAssignmentStrategy").setNumReplicas(2).build();
     _helixResourceManager.addTable(tableConfig);
   }
 
   @AfterClass
-  public void tearDown() throws Exception {
+  public void tearDown()
+      throws Exception {
     stopController();
     stopZk();
   }

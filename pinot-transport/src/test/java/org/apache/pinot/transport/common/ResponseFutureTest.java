@@ -49,11 +49,11 @@ public class ResponseFutureTest {
     public ResponseFuture(ServerInstance key) {
       super(key, "");
     }
-
   }
 
   @Test
-  public void testResponseFutureOtherCases() throws Exception {
+  public void testResponseFutureOtherCases()
+      throws Exception {
     ServerInstance s = new ServerInstance("localhost", 8080);
 
     // A Future is cancelled but gets a message after that. get() called before cancellation
@@ -306,7 +306,8 @@ public class ResponseFutureTest {
   }
 
   @Test
-  public void testResponseFuture() throws Exception {
+  public void testResponseFuture()
+      throws Exception {
     ServerInstance s = new ServerInstance("localhost", 8080);
     //Cancelled Future. Future Client calls get() before cancel()
     {
@@ -420,7 +421,8 @@ public class ResponseFutureTest {
   }
 
   @Test
-  public void testResponseFutureListener() throws Exception {
+  public void testResponseFutureListener()
+      throws Exception {
     ServerInstance s = new ServerInstance("localhost", 8080);
 
     // Cancelled future. Listener added before cancelling
@@ -535,7 +537,8 @@ public class ResponseFutureTest {
     }
 
     @Override
-    public boolean runCheck() throws AssertionError {
+    public boolean runCheck()
+        throws AssertionError {
       boolean isCalled = false;
       synchronized (_listener) {
         isCalled = _listener.isCalled();
@@ -557,11 +560,13 @@ public class ResponseFutureTest {
       _future = f;
     }
 
-    public void waitForAboutToGet() throws InterruptedException {
+    public void waitForAboutToGet()
+        throws InterruptedException {
       _latch.await();
     }
 
-    public void waitForDone() throws InterruptedException {
+    public void waitForDone()
+        throws InterruptedException {
       _endLatch.await();
     }
 

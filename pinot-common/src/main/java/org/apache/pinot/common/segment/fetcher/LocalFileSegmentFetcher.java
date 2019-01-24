@@ -36,7 +36,8 @@ public class LocalFileSegmentFetcher implements SegmentFetcher {
   }
 
   @Override
-  public void fetchSegmentToLocal(String uri, File tempFile) throws Exception {
+  public void fetchSegmentToLocal(String uri, File tempFile)
+      throws Exception {
     FileUtils.copyFile(new File(uri), tempFile);
     LOGGER.info("Copy file from {} to {}; Length of file: {}", uri, tempFile, tempFile.length());
   }

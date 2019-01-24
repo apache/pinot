@@ -63,7 +63,8 @@ public class MergeRollupSegmentConverterTest {
   private final long _referenceTimestamp = System.currentTimeMillis();
 
   @BeforeClass
-  public void setUp() throws Exception {
+  public void setUp()
+      throws Exception {
     FileUtils.deleteDirectory(WORKING_DIR);
     _segmentIndexDirList = new ArrayList<>(NUM_SEGMENTS);
 
@@ -102,15 +103,12 @@ public class MergeRollupSegmentConverterTest {
   }
 
   @Test
-  public void testSegmentConcatenate() throws Exception {
+  public void testSegmentConcatenate()
+      throws Exception {
     // Run roll-up segment converter with "CONCATENATE" merge type
-    MergeRollupSegmentConverter rollupSegmentConverter = new MergeRollupSegmentConverter.Builder()
-        .setInputIndexDirs(_segmentIndexDirList)
-        .setWorkingDir(WORKING_DIR)
-        .setTableName(TABLE_NAME)
-        .setSegmentName("TestConcatenate")
-        .setMergeType("CONCATENATE")
-        .build();
+    MergeRollupSegmentConverter rollupSegmentConverter =
+        new MergeRollupSegmentConverter.Builder().setInputIndexDirs(_segmentIndexDirList).setWorkingDir(WORKING_DIR)
+            .setTableName(TABLE_NAME).setSegmentName("TestConcatenate").setMergeType("CONCATENATE").build();
     List<File> result = rollupSegmentConverter.convert();
     Assert.assertEquals(result.size(), 1);
 
@@ -140,20 +138,17 @@ public class MergeRollupSegmentConverterTest {
   }
 
   @Test
-  public void testSegmentSimpleRollup() throws Exception {
+  public void testSegmentSimpleRollup()
+      throws Exception {
     // Generate aggregate type map
     Map<String, String> preAggregateType = new HashMap<>();
     preAggregateType.put(M1, "SUM");
 
     // Run roll-up segment converter with "ROLLUP" merge type
-    MergeRollupSegmentConverter rollupSegmentConverter = new MergeRollupSegmentConverter.Builder()
-        .setInputIndexDirs(_segmentIndexDirList)
-        .setWorkingDir(WORKING_DIR)
-        .setTableName(TABLE_NAME)
-        .setSegmentName("TestSimpleRollup")
-        .setMergeType("ROLLUP")
-        .setRollupPreAggregateType(preAggregateType)
-        .build();
+    MergeRollupSegmentConverter rollupSegmentConverter =
+        new MergeRollupSegmentConverter.Builder().setInputIndexDirs(_segmentIndexDirList).setWorkingDir(WORKING_DIR)
+            .setTableName(TABLE_NAME).setSegmentName("TestSimpleRollup").setMergeType("ROLLUP")
+            .setRollupPreAggregateType(preAggregateType).build();
     List<File> result = rollupSegmentConverter.convert();
     Assert.assertEquals(result.size(), 1);
 
@@ -180,7 +175,8 @@ public class MergeRollupSegmentConverterTest {
   }
 
   @AfterClass
-  public void tearDown() throws Exception {
+  public void tearDown()
+      throws Exception {
     FileUtils.deleteDirectory(WORKING_DIR);
   }
 }

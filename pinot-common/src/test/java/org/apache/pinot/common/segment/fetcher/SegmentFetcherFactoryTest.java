@@ -35,7 +35,8 @@ public class SegmentFetcherFactoryTest {
   private SegmentFetcherFactory _segmentFetcherFactory;
 
   @BeforeMethod
-  public void setUp() throws Exception {
+  public void setUp()
+      throws Exception {
     // Use reflection to get a new segment fetcher factory
     Constructor<SegmentFetcherFactory> constructor = SegmentFetcherFactory.class.getDeclaredConstructor();
     constructor.setAccessible(true);
@@ -43,7 +44,8 @@ public class SegmentFetcherFactoryTest {
   }
 
   @Test
-  public void testDefaultSegmentFetcherFactory() throws Exception {
+  public void testDefaultSegmentFetcherFactory()
+      throws Exception {
     _segmentFetcherFactory.init(new PropertiesConfiguration());
     Assert.assertTrue(_segmentFetcherFactory.containsProtocol("file"));
     Assert.assertTrue(_segmentFetcherFactory.containsProtocol("http"));
@@ -52,7 +54,8 @@ public class SegmentFetcherFactoryTest {
   }
 
   @Test
-  public void testCustomizedSegmentFetcherFactory() throws Exception {
+  public void testCustomizedSegmentFetcherFactory()
+      throws Exception {
     Configuration config = new PropertiesConfiguration();
     config.addProperty("something", "abc");
     config.addProperty("protocols", Arrays.asList("http", "https", "test"));
@@ -70,13 +73,14 @@ public class SegmentFetcherFactoryTest {
   }
 
   @Test
-  public void testGetSegmentFetcherBasedOnURI() throws Exception {
+  public void testGetSegmentFetcherBasedOnURI()
+      throws Exception {
     _segmentFetcherFactory.init(new PropertiesConfiguration());
 
     Assert.assertTrue(
         _segmentFetcherFactory.getSegmentFetcherBasedOnURI("http://something:wer:") instanceof HttpSegmentFetcher);
-    Assert.assertTrue(_segmentFetcherFactory.getSegmentFetcherBasedOnURI(
-        "file://a/asdf/wer/fd/e") instanceof PinotFSSegmentFetcher);
+    Assert.assertTrue(
+        _segmentFetcherFactory.getSegmentFetcherBasedOnURI("file://a/asdf/wer/fd/e") instanceof PinotFSSegmentFetcher);
     Assert.assertNull(_segmentFetcherFactory.getSegmentFetcherBasedOnURI("abc:///something"));
     Assert.assertNull(_segmentFetcherFactory.getSegmentFetcherBasedOnURI("https://something"));
     try {

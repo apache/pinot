@@ -92,11 +92,11 @@ public class QueryGenerator {
 
   private final List<QueryGenerationStrategy> _queryGenerationStrategies =
       Arrays.asList(new SelectionQueryGenerationStrategy(), new AggregationQueryGenerationStrategy());
-  private final List<PredicateGenerator> _singleValuePredicateGenerators =
-      Arrays.asList(new SingleValueComparisonPredicateGenerator(), new SingleValueInPredicateGenerator(),
+  private final List<PredicateGenerator> _singleValuePredicateGenerators = Arrays
+      .asList(new SingleValueComparisonPredicateGenerator(), new SingleValueInPredicateGenerator(),
           new SingleValueBetweenPredicateGenerator(), new SingleValueRegexPredicateGenerator());
-  private final List<PredicateGenerator> _multiValuePredicateGenerators =
-      Arrays.asList(new MultiValueComparisonPredicateGenerator(), new MultiValueInPredicateGenerator(),
+  private final List<PredicateGenerator> _multiValuePredicateGenerators = Arrays
+      .asList(new MultiValueComparisonPredicateGenerator(), new MultiValueInPredicateGenerator(),
           new MultiValueBetweenPredicateGenerator());
 
   private final String _pinotTableName;
@@ -212,7 +212,8 @@ public class QueryGenerator {
    *
    * @param args arguments.
    */
-  public static void main(String[] args) throws Exception {
+  public static void main(String[] args)
+      throws Exception {
     File avroFile = new File("pinot-integration-tests/src/test/resources/On_Time_On_Time_Performance_2014_1.avro");
     QueryGenerator queryGenerator = new QueryGenerator(Collections.singletonList(avroFile), "mytable", "mytable");
     File outputFile = new File(
@@ -680,9 +681,7 @@ public class QueryGenerator {
         // One less than the number of predicates.
         int operatorCount = _operators.size();
         for (int i = 0; i < operatorCount; i++) {
-          sql.append(_predicates.get(i).generateH2Sql())
-              .append(' ')
-              .append(_operators.get(i).generateH2Sql())
+          sql.append(_predicates.get(i).generateH2Sql()).append(' ').append(_operators.get(i).generateH2Sql())
               .append(' ');
         }
         sql.append(_predicates.get(operatorCount).generateH2Sql());

@@ -86,7 +86,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
   @Override
   public void init(SegmentGeneratorConfig segmentCreationSpec, SegmentIndexCreationInfo segmentIndexCreationInfo,
-      Map<String, ColumnIndexCreationInfo> indexCreationInfoMap, Schema schema, File outDir) throws Exception {
+      Map<String, ColumnIndexCreationInfo> indexCreationInfoMap, Schema schema, File outDir)
+      throws Exception {
     docIdCounter = 0;
     config = segmentCreationSpec;
     this.indexCreationInfoMap = indexCreationInfoMap;
@@ -143,8 +144,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         int cardinality = indexCreationInfo.getDistinctValueCount();
         if (fieldSpec.isSingleValueField()) {
           if (indexCreationInfo.isSorted()) {
-            _forwardIndexCreatorMap.put(columnName,
-                new SingleValueSortedForwardIndexCreator(_indexDir, columnName, cardinality));
+            _forwardIndexCreatorMap
+                .put(columnName, new SingleValueSortedForwardIndexCreator(_indexDir, columnName, cardinality));
           } else {
             _forwardIndexCreatorMap.put(columnName,
                 new SingleValueUnsortedForwardIndexCreator(_indexDir, columnName, cardinality, totalDocs));
@@ -158,8 +159,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         // Initialize inverted index creator
         if (invertedIndexColumns.contains(columnName)) {
           if (segmentCreationSpec.isOnHeap()) {
-            _invertedIndexCreatorMap.put(columnName,
-                new OnHeapBitmapInvertedIndexCreator(_indexDir, columnName, cardinality));
+            _invertedIndexCreatorMap
+                .put(columnName, new OnHeapBitmapInvertedIndexCreator(_indexDir, columnName, cardinality));
           } else {
             _invertedIndexCreatorMap.put(columnName,
                 new OffHeapBitmapInvertedIndexCreator(_indexDir, fieldSpec, cardinality, totalDocs,
@@ -263,8 +264,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
             _invertedIndexCreatorMap.get(columnName).add(dictId);
           }
         } else {
-          ((SingleValueRawIndexCreator) _forwardIndexCreatorMap.get(columnName)).index(docIdCounter,
-              columnValueToIndex);
+          ((SingleValueRawIndexCreator) _forwardIndexCreatorMap.get(columnName))
+              .index(docIdCounter, columnValueToIndex);
         }
       } else {
         int[] dictIds = dictionaryCreator.indexOfMV(columnValueToIndex);
@@ -283,14 +284,16 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   }
 
   @Override
-  public void seal() throws ConfigurationException, IOException {
+  public void seal()
+      throws ConfigurationException, IOException {
     for (InvertedIndexCreator invertedIndexCreator : _invertedIndexCreatorMap.values()) {
       invertedIndexCreator.seal();
     }
     writeMetadata();
   }
 
-  void writeMetadata() throws ConfigurationException {
+  void writeMetadata()
+      throws ConfigurationException {
     PropertiesConfiguration properties =
         new PropertiesConfiguration(new File(_indexDir, V1Constants.MetadataKeys.METADATA_FILE_NAME));
 
@@ -489,7 +492,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
    */
   public static SingleValueRawIndexCreator getRawIndexCreatorForColumn(File file,
       ChunkCompressorFactory.CompressionType compressionType, String column, FieldSpec.DataType dataType, int totalDocs,
-      int lengthOfLongestEntry) throws IOException {
+      int lengthOfLongestEntry)
+      throws IOException {
 
     SingleValueRawIndexCreator indexCreator;
     switch (dataType) {
@@ -523,7 +527,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   }
 
   @Override
-  public void close() throws IOException {
+  public void close()
+      throws IOException {
     for (SegmentDictionaryCreator dictionaryCreator : _dictionaryCreatorMap.values()) {
       dictionaryCreator.close();
     }

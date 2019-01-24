@@ -32,16 +32,16 @@ import org.slf4j.LoggerFactory;
  */
 public class StartKafkaCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(StartKafkaCommand.class);
-  @Option(name="-port", required=false, metaVar="<int>", usage="Port to start Kafka server on.")
+  @Option(name = "-port", required = false, metaVar = "<int>", usage = "Port to start Kafka server on.")
   private int _port = KafkaStarterUtils.DEFAULT_KAFKA_PORT;
 
-  @Option(name="-help", required=false, help=true, aliases={"-h", "--h", "--help"}, usage="Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
   private boolean _help = false;
 
-  @Option(name="-brokerId", required=false, metaVar="<int>", usage="Kafka broker ID.")
+  @Option(name = "-brokerId", required = false, metaVar = "<int>", usage = "Kafka broker ID.")
   private int _brokerId = KafkaStarterUtils.DEFAULT_BROKER_ID;
 
-  @Option(name="-zkAddress", required=false, metaVar="<string>", usage="Address of Zookeeper.")
+  @Option(name = "-zkAddress", required = false, metaVar = "<string>", usage = "Address of Zookeeper.")
   private String _zkAddress = "localhost:2181";
 
   @Override
@@ -57,7 +57,6 @@ public class StartKafkaCommand extends AbstractBaseAdminCommand implements Comma
   @Override
   public String toString() {
     return "StartKafka -port " + _port + " -brokerId " + _brokerId + " -zkAddress " + _zkAddress;
-
   }
 
   @Override
@@ -66,7 +65,8 @@ public class StartKafkaCommand extends AbstractBaseAdminCommand implements Comma
   }
 
   @Override
-  public boolean execute() throws IOException {
+  public boolean execute()
+      throws IOException {
     KafkaStarterUtils.startServer(_port, _brokerId, _zkAddress, KafkaStarterUtils.getDefaultKafkaConfiguration());
 
     LOGGER.info("Start kafka at localhost:" + _port + " in thread " + Thread.currentThread().getName());

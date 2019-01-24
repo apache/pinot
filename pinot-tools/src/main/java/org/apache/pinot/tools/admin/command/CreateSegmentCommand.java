@@ -181,10 +181,10 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
   public String toString() {
     return ("CreateSegment  -generatorConfigFile " + _generatorConfigFile + " -dataDir " + _dataDir + " -format "
         + _format + " -outDir " + _outDir + " -overwrite " + _overwrite + " -tableName " + _tableName + " -segmentName "
-        + _segmentName + " -timeColumnName " + _timeColumnName + " -schemaFile " + _schemaFile
-        + " -readerConfigFile " + _readerConfigFile + " -enableStarTreeIndex " + _enableStarTreeIndex
-        + " -starTreeIndexSpecFile " + _starTreeIndexSpecFile + " -hllSize " + _hllSize + " -hllColumns "
-        + _hllColumns + " -hllSuffix " + _hllSuffix + " -numThreads " + _numThreads);
+        + _segmentName + " -timeColumnName " + _timeColumnName + " -schemaFile " + _schemaFile + " -readerConfigFile "
+        + _readerConfigFile + " -enableStarTreeIndex " + _enableStarTreeIndex + " -starTreeIndexSpecFile "
+        + _starTreeIndexSpecFile + " -hllSize " + _hllSize + " -hllColumns " + _hllColumns + " -hllSuffix " + _hllSuffix
+        + " -numThreads " + _numThreads);
   }
 
   @Override

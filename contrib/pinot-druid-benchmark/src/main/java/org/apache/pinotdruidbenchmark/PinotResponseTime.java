@@ -108,10 +108,8 @@ public class PinotResponseTime {
         if (resultDir != null) {
           File resultFile = new File(resultDir, queryFile.getName() + ".result");
           CloseableHttpResponse httpResponse = httpClient.execute(httpPost);
-          try (
-              BufferedInputStream bufferedInputStream = new BufferedInputStream(httpResponse.getEntity().getContent());
-              BufferedWriter bufferedWriter = new BufferedWriter(new FileWriter(resultFile))
-          ) {
+          try (BufferedInputStream bufferedInputStream = new BufferedInputStream(httpResponse.getEntity().getContent());
+              BufferedWriter bufferedWriter = new BufferedWriter(new FileWriter(resultFile))) {
             int length;
             while ((length = bufferedInputStream.read(BYTE_BUFFER)) > 0) {
               bufferedWriter.write(new String(BYTE_BUFFER, 0, length));

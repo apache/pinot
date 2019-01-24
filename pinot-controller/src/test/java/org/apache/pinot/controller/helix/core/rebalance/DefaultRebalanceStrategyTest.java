@@ -147,7 +147,8 @@ public class DefaultRebalanceStrategyTest {
   }
 
   @BeforeClass
-  public void setUp() throws Exception {
+  public void setUp()
+      throws Exception {
     _mockHelixManager = mock(HelixManager.class);
     _rebalanceSegmentsStrategy = new TestDefaultRebalanceStrategy(_mockHelixManager);
 
@@ -174,9 +175,11 @@ public class DefaultRebalanceStrategyTest {
    * @throws InvalidConfigException
    */
   @Test
-  public void testGetRebalancedPartitionAssignment() throws InvalidConfigException {
+  public void testGetRebalancedPartitionAssignment()
+      throws InvalidConfigException {
     HelixManager mockHelixManager = mock(HelixManager.class);
-    TestStreamPartitionAssignmentGenerator partitionAssignmentGenerator = new TestStreamPartitionAssignmentGenerator(mockHelixManager);
+    TestStreamPartitionAssignmentGenerator partitionAssignmentGenerator =
+        new TestStreamPartitionAssignmentGenerator(mockHelixManager);
     TestRebalanceSegmentsStrategy rebalanceSegmentsStrategy = new TestRebalanceSegmentsStrategy(mockHelixManager);
     rebalanceSegmentsStrategy.setStreamPartitionAssignmentGenerator(partitionAssignmentGenerator);
 
@@ -242,14 +245,9 @@ public class DefaultRebalanceStrategyTest {
     Assert.assertEquals(partitionAssignment.getAllInstances().size(), instances.size());
     Assert.assertTrue(partitionAssignment.getAllInstances().containsAll(instances));
 
-    idealState = idealStateBuilderUtil.setSegmentState(0, 0, "ONLINE")
-        .setSegmentState(1, 0, "ONLINE")
-        .setSegmentState(2, 0, "ONLINE")
-        .setSegmentState(3, 0, "ONLINE")
-        .setSegmentState(4, 0, "ONLINE")
-        .setSegmentState(5, 0, "ONLINE")
-        .setSegmentState(6, 0, "ONLINE")
-        .setSegmentState(7, 0, "ONLINE")
+    idealState = idealStateBuilderUtil.setSegmentState(0, 0, "ONLINE").setSegmentState(1, 0, "ONLINE")
+        .setSegmentState(2, 0, "ONLINE").setSegmentState(3, 0, "ONLINE").setSegmentState(4, 0, "ONLINE")
+        .setSegmentState(5, 0, "ONLINE").setSegmentState(6, 0, "ONLINE").setSegmentState(7, 0, "ONLINE")
         .addConsumingSegments(nPartitions, 1, nReplicas, instances).build();
     partitionAssignment =
         rebalanceSegmentsStrategy.rebalancePartitionAssignment(idealState, tableConfig, rebalanceUserConfig);
@@ -271,12 +269,12 @@ public class DefaultRebalanceStrategyTest {
     Map<String, String> instanceStateMap = new HashMap<>(2);
     instanceStateMap.put(instances.get(0), "ONLINE");
     instanceStateMap.put(instances.get(1), "ONLINE");
-    idealState = idealStateBuilderUtil.addSegment("anHlcSegment", instanceStateMap).build();partitionAssignment =
+    idealState = idealStateBuilderUtil.addSegment("anHlcSegment", instanceStateMap).build();
+    partitionAssignment =
         rebalanceSegmentsStrategy.rebalancePartitionAssignment(idealState, tableConfig, rebalanceUserConfig);
     Assert.assertEquals(partitionAssignment.getNumPartitions(), nPartitions);
     Assert.assertEquals(partitionAssignment.getAllInstances().size(), instances.size());
     Assert.assertTrue(partitionAssignment.getAllInstances().containsAll(instances));
-
   }
 
   @Test
@@ -294,11 +292,9 @@ public class DefaultRebalanceStrategyTest {
     _rebalanceSegmentsStrategy.setTagToInstances(offlineServerTag, instances);
 
     final CustomModeISBuilder customModeIdealStateBuilder = new CustomModeISBuilder(offlineTableName);
-    customModeIdealStateBuilder.setStateModel(
-        PinotHelixSegmentOnlineOfflineStateModelGenerator.PINOT_SEGMENT_ONLINE_OFFLINE_STATE_MODEL)
-        .setNumPartitions(0)
-        .setNumReplica(nReplicas)
-        .setMaxPartitionsPerNode(1);
+    customModeIdealStateBuilder
+        .setStateModel(PinotHelixSegmentOnlineOfflineStateModelGenerator.PINOT_SEGMENT_ONLINE_OFFLINE_STATE_MODEL)
+        .setNumPartitions(0).setNumReplica(nReplicas).setMaxPartitionsPerNode(1);
     IdealState idealState = customModeIdealStateBuilder.build();
     idealState.setInstanceGroupTag(offlineTableName);
     setInstanceStateMapForIdealStateOffline(idealState, nSegments, nReplicas, instances, offlineTableName);
@@ -313,8 +309,7 @@ public class DefaultRebalanceStrategyTest {
 
     // rebalance with no change
     tableConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(offlineTableName)
-        .setNumReplicas(targetNumReplicas).setServerTenant(serverTenant)
-        .build();
+        .setNumReplicas(targetNumReplicas).setServerTenant(serverTenant).build();
     rebalancedIdealState =
         testRebalance(idealState, tableConfig, rebalanceUserConfig, targetNumReplicas, nSegments, instances, false);
 
@@ -362,8 +357,7 @@ public class DefaultRebalanceStrategyTest {
     // reduce targetNumReplicas
     targetNumReplicas = 1;
     tableConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(offlineTableName)
-        .setNumReplicas(targetNumReplicas).setServerTenant(serverTenant)
-        .build();
+        .setNumReplicas(targetNumReplicas).setServerTenant(serverTenant).build();
     rebalancedIdealState =
         testRebalance(rebalancedIdealState, tableConfig, rebalanceUserConfig, targetNumReplicas, nSegments, instances,
             true);
@@ -371,8 +365,7 @@ public class DefaultRebalanceStrategyTest {
     // increase targetNumReplicas
     targetNumReplicas = 3;
     tableConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(offlineTableName)
-        .setNumReplicas(targetNumReplicas).setServerTenant(serverTenant)
-        .build();
+        .setNumReplicas(targetNumReplicas).setServerTenant(serverTenant).build();
     testRebalance(rebalancedIdealState, tableConfig, rebalanceUserConfig, targetNumReplicas, nSegments, instances,
         true);
   }
@@ -394,15 +387,13 @@ public class DefaultRebalanceStrategyTest {
     String realtimeTagForTenant = TagNameUtils.getRealtimeTagForTenant(serverTenant);
     PartitionAssignment newPartitionAssignment = new PartitionAssignment(realtimeTableName);
     List<String> completedInstances = getInstanceList(nCompletedInstances);
-  _rebalanceSegmentsStrategy.setTagToInstances(realtimeTagForTenant, completedInstances);
+    _rebalanceSegmentsStrategy.setTagToInstances(realtimeTagForTenant, completedInstances);
 
     List<String> consumingInstances = getConsumingInstanceList(nConsumingInstances);
     final CustomModeISBuilder customModeIdealStateBuilder = new CustomModeISBuilder(realtimeTableName);
-    customModeIdealStateBuilder.setStateModel(
-        PinotHelixSegmentOnlineOfflineStateModelGenerator.PINOT_SEGMENT_ONLINE_OFFLINE_STATE_MODEL)
-        .setNumPartitions(0)
-        .setNumReplica(nReplicas)
-        .setMaxPartitionsPerNode(1);
+    customModeIdealStateBuilder
+        .setStateModel(PinotHelixSegmentOnlineOfflineStateModelGenerator.PINOT_SEGMENT_ONLINE_OFFLINE_STATE_MODEL)
+        .setNumPartitions(0).setNumReplica(nReplicas).setMaxPartitionsPerNode(1);
     IdealState idealState = customModeIdealStateBuilder.build();
     idealState.setInstanceGroupTag(realtimeTableName);
     setInstanceStateMapForIdealStateRealtimeCompleted(idealState, nPartitions, nIterationsCompleted, nReplicas,
@@ -416,10 +407,9 @@ public class DefaultRebalanceStrategyTest {
 
     IdealState rebalancedIdealState;
     int targetNumReplicas = nReplicas;
-    tableConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.REALTIME).setTableName(realtimeTableName)
-        .setLLC(true)
-        .setNumReplicas(targetNumReplicas).setServerTenant(serverTenant)
-        .build();
+    tableConfig =
+        new TableConfig.Builder(CommonConstants.Helix.TableType.REALTIME).setTableName(realtimeTableName).setLLC(true)
+            .setNumReplicas(targetNumReplicas).setServerTenant(serverTenant).build();
 
     // no change
     rebalancedIdealState =
@@ -431,10 +421,9 @@ public class DefaultRebalanceStrategyTest {
     for (Map.Entry<String, List<String>> entry : newPartitionAssignment.getPartitionToInstances().entrySet()) {
       entry.getValue().remove(1);
     }
-    tableConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.REALTIME).setTableName(realtimeTableName)
-        .setLLC(true)
-        .setNumReplicas(targetNumReplicas).setServerTenant(serverTenant)
-        .build();
+    tableConfig =
+        new TableConfig.Builder(CommonConstants.Helix.TableType.REALTIME).setTableName(realtimeTableName).setLLC(true)
+            .setNumReplicas(targetNumReplicas).setServerTenant(serverTenant).build();
     rebalancedIdealState =
         testRebalanceRealtime(rebalancedIdealState, tableConfig, rebalanceUserConfig, newPartitionAssignment,
             targetNumReplicas, nCompletedSegments, nConsumingSegments, completedInstances, consumingInstances);
@@ -442,10 +431,9 @@ public class DefaultRebalanceStrategyTest {
     // increase replicas
     targetNumReplicas = 2;
     setPartitionAssignment(newPartitionAssignment, targetNumReplicas, consumingInstances);
-    tableConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.REALTIME).setTableName(realtimeTableName)
-        .setLLC(true)
-        .setNumReplicas(targetNumReplicas).setServerTenant(serverTenant)
-        .build();
+    tableConfig =
+        new TableConfig.Builder(CommonConstants.Helix.TableType.REALTIME).setTableName(realtimeTableName).setLLC(true)
+            .setNumReplicas(targetNumReplicas).setServerTenant(serverTenant).build();
     rebalancedIdealState =
         testRebalanceRealtime(rebalancedIdealState, tableConfig, rebalanceUserConfig, newPartitionAssignment,
             targetNumReplicas, nCompletedSegments, nConsumingSegments, completedInstances, consumingInstances);
@@ -521,9 +509,8 @@ public class DefaultRebalanceStrategyTest {
       Configuration rebalanceUserConfig, PartitionAssignment newPartitionAssignment, int targetNumReplicas,
       int nSegmentsCompleted, int nSegmentsConsuming, List<String> instancesCompleted,
       List<String> instancesConsuming) {
-    IdealState rebalancedIdealState =
-        _rebalanceSegmentsStrategy.getRebalancedIdealState(idealState, tableConfig, rebalanceUserConfig,
-            newPartitionAssignment);
+    IdealState rebalancedIdealState = _rebalanceSegmentsStrategy
+        .getRebalancedIdealState(idealState, tableConfig, rebalanceUserConfig, newPartitionAssignment);
     validateIdealStateRealtime(rebalancedIdealState, nSegmentsCompleted, nSegmentsConsuming, targetNumReplicas,
         instancesCompleted, instancesConsuming, rebalanceUserConfig);
     return rebalancedIdealState;
@@ -600,16 +587,18 @@ public class DefaultRebalanceStrategyTest {
     String consumerFactoryClass = KafkaConsumerFactory.class.getName();
     String decoderClass = KafkaAvroMessageDecoder.class.getName();
     streamConfigMap.put(StreamConfigProperties.STREAM_TYPE, streamType);
-    streamConfigMap.put(
-        StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_TOPIC_NAME), topic);
-    streamConfigMap.put(
-        StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
-        consumerTypesCSV);
-    streamConfigMap.put(StreamConfigProperties.constructStreamProperty(streamType,
-        StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS), consumerFactoryClass);
-    streamConfigMap.put(
-        StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_DECODER_CLASS),
-        decoderClass);
+    streamConfigMap
+        .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_TOPIC_NAME),
+            topic);
+    streamConfigMap
+        .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
+            consumerTypesCSV);
+    streamConfigMap.put(StreamConfigProperties
+            .constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS),
+        consumerFactoryClass);
+    streamConfigMap
+        .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_DECODER_CLASS),
+            decoderClass);
     IndexingConfig mockIndexConfig = mock(IndexingConfig.class);
     when(mockIndexConfig.getStreamConfigs()).thenReturn(streamConfigMap);
     when(mockTableConfig.getIndexingConfig()).thenReturn(mockIndexConfig);

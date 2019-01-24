@@ -68,7 +68,8 @@ public class ServerConf {
     return _serverConf.subset(PINOT_SERVER_METRICS);
   }
 
-  public NettyServerConfig getNettyConfig() throws ConfigurationException {
+  public NettyServerConfig getNettyConfig()
+      throws ConfigurationException {
     return new NettyServerConfig(_serverConf.subset(PINOT_SERVER_NETTY));
   }
 

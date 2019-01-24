@@ -22,9 +22,9 @@ import org.apache.pinot.common.Utils;
 
 
 /**
-* Enumeration containing all the gauges exposed by the Pinot server.
-*
-*/
+ * Enumeration containing all the gauges exposed by the Pinot server.
+ *
+ */
 public enum ServerGauge implements AbstractMetrics.Gauge {
   DOCUMENT_COUNT("documents", false),
   SEGMENT_COUNT("segments", false),

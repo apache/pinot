@@ -21,6 +21,7 @@ package org.apache.pinot.controller.api.events;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.data.Schema;
 
+
 public class DefaultMetadataEventNotifier implements MetadataEventNotifier {
   public void notifyOnSchemaEvents(Schema schema, SchemaEventType eventType) {
 

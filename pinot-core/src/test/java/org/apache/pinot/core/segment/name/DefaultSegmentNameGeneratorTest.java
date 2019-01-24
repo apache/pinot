@@ -39,7 +39,8 @@ public class DefaultSegmentNameGeneratorTest {
   private static final File INDEX_DIR = new File(ColumnMetadataTest.class.toString());
 
   @BeforeMethod
-  public void setUp() throws Exception {
+  public void setUp()
+      throws Exception {
     FileUtils.deleteQuietly(INDEX_DIR);
   }
 
@@ -53,16 +54,17 @@ public class DefaultSegmentNameGeneratorTest {
     final String filePath =
         TestUtils.getFileFromResourceUrl(DefaultSegmentNameGeneratorTest.class.getClassLoader().getResource(AVRO_DATA));
     // Intentionally changed this to TimeUnit.Hours to make it non-default for testing.
-    SegmentGeneratorConfig config =
-        SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, "daysSinceEpoch",
-            TimeUnit.HOURS, "testTable");
+    SegmentGeneratorConfig config = SegmentTestUtils
+        .getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, "daysSinceEpoch", TimeUnit.HOURS,
+            "testTable");
     config.setSegmentNamePostfix("1");
     config.setTimeColumnName("daysSinceEpoch");
     return config;
   }
 
   @Test
-  public void testPostfix() throws Exception {
+  public void testPostfix()
+      throws Exception {
     ColumnMetadataTest columnMetadataTest = new ColumnMetadataTest();
     // Build the Segment metadata.
     SegmentGeneratorConfig config = columnMetadataTest.CreateSegmentConfigWithoutCreator();
@@ -75,7 +77,8 @@ public class DefaultSegmentNameGeneratorTest {
   }
 
   @Test
-  public void testAlreadyNamedSegment() throws Exception {
+  public void testAlreadyNamedSegment()
+      throws Exception {
     ColumnMetadataTest columnMetadataTest = new ColumnMetadataTest();
     // Build the Segment metadata.
     SegmentGeneratorConfig config = columnMetadataTest.CreateSegmentConfigWithoutCreator();
@@ -88,7 +91,8 @@ public class DefaultSegmentNameGeneratorTest {
   }
 
   @Test
-  public void testNullTimeColumn() throws Exception {
+  public void testNullTimeColumn()
+      throws Exception {
     ColumnMetadataTest columnMetadataTest = new ColumnMetadataTest();
     // Build the Segment metadata.
     SegmentGeneratorConfig config = columnMetadataTest.CreateSegmentConfigWithoutCreator();
@@ -102,7 +106,8 @@ public class DefaultSegmentNameGeneratorTest {
   }
 
   @Test
-  public void testNullTimeColumnThroughDefaultSegment() throws Exception {
+  public void testNullTimeColumnThroughDefaultSegment()
+      throws Exception {
     ColumnMetadataTest columnMetadataTest = new ColumnMetadataTest();
     // Build the Segment metadata.
     SegmentGeneratorConfig config = columnMetadataTest.CreateSegmentConfigWithoutCreator();
@@ -115,7 +120,8 @@ public class DefaultSegmentNameGeneratorTest {
   }
 
   @Test
-  public void testNullPostfix() throws Exception {
+  public void testNullPostfix()
+      throws Exception {
     ColumnMetadataTest columnMetadataTest = new ColumnMetadataTest();
     // Build the Segment metadata.
     SegmentGeneratorConfig config = columnMetadataTest.CreateSegmentConfigWithoutCreator();
@@ -128,7 +134,8 @@ public class DefaultSegmentNameGeneratorTest {
   }
 
   @Test
-  public void testNullPostfixWithNonNegSequenceId() throws Exception {
+  public void testNullPostfixWithNonNegSequenceId()
+      throws Exception {
     ColumnMetadataTest columnMetadataTest = new ColumnMetadataTest();
     // Build the Segment metadata.
     SegmentGeneratorConfig config = columnMetadataTest.CreateSegmentConfigWithoutCreator();
@@ -141,7 +148,8 @@ public class DefaultSegmentNameGeneratorTest {
   }
 
   @Test
-  public void testOnlyTableName() throws Exception {
+  public void testOnlyTableName()
+      throws Exception {
     ColumnMetadataTest columnMetadataTest = new ColumnMetadataTest();
     // Build the Segment metadata.
     SegmentGeneratorConfig config = columnMetadataTest.CreateSegmentConfigWithoutCreator();

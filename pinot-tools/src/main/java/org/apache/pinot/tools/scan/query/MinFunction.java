@@ -24,6 +24,7 @@ import org.apache.pinot.core.query.utils.Pair;
 
 public class MinFunction extends AggregationFunc {
   private static final String _name = "min";
+
   MinFunction(ResultTable rows, String columnId) {
     super(rows, columnId);
   }

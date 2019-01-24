@@ -51,8 +51,8 @@ public abstract class AbstractSegmentPruner implements SegmentPruner {
    *
    * @return True to prune, false otherwise
    */
-  protected boolean pruneNonLeaf(@Nonnull FilterQueryTree filterQueryTree, @Nonnull Map<String, ColumnMetadata> columnMetadataMap,
-      Map<String, BloomFilterReader> bloomFilterMap) {
+  protected boolean pruneNonLeaf(@Nonnull FilterQueryTree filterQueryTree,
+      @Nonnull Map<String, ColumnMetadata> columnMetadataMap, Map<String, BloomFilterReader> bloomFilterMap) {
     List<FilterQueryTree> children = filterQueryTree.getChildren();
 
     if (children.isEmpty()) {

@@ -71,8 +71,8 @@ public class OnHeapDoubleDictionary extends OnHeapDictionary {
       value = (double) rawValue;
     } else {
       throw new IllegalArgumentException(
-          "Illegal data type for argument, actual: " + rawValue.getClass().getName() + " expected: "
-              + Double.class.getName());
+          "Illegal data type for argument, actual: " + rawValue.getClass().getName() + " expected: " + Double.class
+              .getName());
     }
     return value;
   }

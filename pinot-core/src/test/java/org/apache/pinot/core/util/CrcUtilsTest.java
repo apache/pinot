@@ -44,7 +44,8 @@ public class CrcUtilsTest {
   private static File INDEX_DIR = new File("/tmp/testingCrc");
 
   @Test
-  public void test1() throws Exception {
+  public void test1()
+      throws Exception {
     if (INDEX_DIR.exists()) {
       FileUtils.deleteQuietly(INDEX_DIR);
     }
@@ -73,12 +74,13 @@ public class CrcUtilsTest {
     FileUtils.deleteQuietly(INDEX_DIR);
   }
 
-  private String makeSegmentAndReturnPath() throws Exception {
+  private String makeSegmentAndReturnPath()
+      throws Exception {
     final String filePath = TestUtils.getFileFromResourceUrl(CrcUtils.class.getClassLoader().getResource(AVRO_DATA));
 
-    final SegmentGeneratorConfig config =
-        SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR,
-            "daysSinceEpoch", TimeUnit.DAYS, "testTable");
+    final SegmentGeneratorConfig config = SegmentTestUtils
+        .getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, "daysSinceEpoch", TimeUnit.DAYS,
+            "testTable");
     config.setSegmentNamePostfix("1");
     config.setTimeColumnName("daysSinceEpoch");
     final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);

@@ -135,11 +135,12 @@ public class BackfillDateTimeRecordReaderTest {
 
   @Test(dataProvider = "backfillRecordReaderDataProvider")
   public void testBackfillDateTimeRecordReader(RecordReader baseRecordReader, TimeFieldSpec timeFieldSpec,
-      DateTimeFieldSpec dateTimeFieldSpec, Schema schemaExpected) throws Exception {
+      DateTimeFieldSpec dateTimeFieldSpec, Schema schemaExpected)
+      throws Exception {
     BackfillDateTimeColumn backfillDateTimeColumn =
         new BackfillDateTimeColumn(new File("original"), new File("backup"), timeFieldSpec, dateTimeFieldSpec);
-    try (BackfillDateTimeRecordReader wrapperReader = backfillDateTimeColumn.getBackfillDateTimeRecordReader(
-        baseRecordReader)) {
+    try (BackfillDateTimeRecordReader wrapperReader = backfillDateTimeColumn
+        .getBackfillDateTimeRecordReader(baseRecordReader)) {
 
       // check that schema has new column
       Schema schemaActual = wrapperReader.getSchema();
@@ -170,7 +171,8 @@ public class BackfillDateTimeRecordReaderTest {
   }
 
   @DataProvider(name = "backfillRecordReaderDataProvider")
-  public Object[][] getDataForTestBackfillRecordReader() throws Exception {
+  public Object[][] getDataForTestBackfillRecordReader()
+      throws Exception {
     List<Object[]> entries = new ArrayList<>();
 
     List<GenericRow> inputData;
@@ -204,8 +206,7 @@ public class BackfillDateTimeRecordReaderTest {
     inputData = createTestDataWithTimespec(timeFieldSpec);
     inputSchema = createPinotSchemaWithTimeSpec(timeFieldSpec);
     inputRecordReader = new GenericRowRecordReader(inputData, inputSchema);
-    dateTimeFieldSpec =
-        new DateTimeFieldSpec("timestampInEpoch", DataType.LONG, "1:HOURS:EPOCH", "1:HOURS");
+    dateTimeFieldSpec = new DateTimeFieldSpec("timestampInEpoch", DataType.LONG, "1:HOURS:EPOCH", "1:HOURS");
     wrapperSchema = createPinotSchemaWrapperWithDateTimeSpec(inputSchema, dateTimeFieldSpec);
     entries.add(new Object[]{inputRecordReader, timeFieldSpec, dateTimeFieldSpec, wrapperSchema});
 
@@ -238,8 +239,7 @@ public class BackfillDateTimeRecordReaderTest {
 
     // timeSpec in hoursSinceEpoch, dateTimeFieldSpec in hoursSinceEpoch, add new dateTimeFieldSpec in millisSinceEpoch
     timeFieldSpec = new TimeFieldSpec(new TimeGranularitySpec(DataType.LONG, TimeUnit.HOURS, "Date"));
-    dateTimeFieldSpec =
-        new DateTimeFieldSpec("hoursSinceEpoch", DataType.LONG, "1:HOURS:EPOCH", "1:HOURS");
+    dateTimeFieldSpec = new DateTimeFieldSpec("hoursSinceEpoch", DataType.LONG, "1:HOURS:EPOCH", "1:HOURS");
     inputData = createTestDataWithTimespec(timeFieldSpec, dateTimeFieldSpec);
     inputSchema = createPinotSchemaWithTimeSpec(timeFieldSpec, dateTimeFieldSpec);
     inputRecordReader = new GenericRowRecordReader(inputData, inputSchema);

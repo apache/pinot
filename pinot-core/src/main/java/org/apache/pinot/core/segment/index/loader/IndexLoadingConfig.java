@@ -178,7 +178,6 @@ public class IndexLoadingConfig {
     _bloomFilterColumns = bloomFilterColumns;
   }
 
-
   @VisibleForTesting
   public void setOnHeapDictionaryColumns(@Nonnull Set<String> onHeapDictionaryColumns) {
     _onHeapDictionaryColumns = onHeapDictionaryColumns;

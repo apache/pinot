@@ -146,10 +146,10 @@ public class PinotTaskManager extends ControllerPeriodicTask {
       List<PinotTaskConfig> pinotTaskConfigs = pinotTaskGenerator.generateTasks(_enabledTableConfigMap.get(taskType));
       int numTasks = pinotTaskConfigs.size();
       if (numTasks > 0) {
-        LOGGER.info("Submitting {} tasks for task type: {} with task configs: {}", numTasks, taskType,
-            pinotTaskConfigs);
-        _tasksScheduled.put(taskType, _helixTaskResourceManager.submitTask(pinotTaskConfigs,
-            pinotTaskGenerator.getNumConcurrentTasksPerInstance()));
+        LOGGER
+            .info("Submitting {} tasks for task type: {} with task configs: {}", numTasks, taskType, pinotTaskConfigs);
+        _tasksScheduled.put(taskType, _helixTaskResourceManager
+            .submitTask(pinotTaskConfigs, pinotTaskGenerator.getNumConcurrentTasksPerInstance()));
         _metricsRegistry.addMeteredTableValue(taskType, ControllerMeter.NUMBER_TASKS_SUBMITTED, numTasks);
       }
     }

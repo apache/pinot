@@ -33,7 +33,8 @@ import static org.testng.Assert.assertTrue;
 public class ResourceManagerTest {
 
   @Test
-  public void testCanSchedule() throws Exception {
+  public void testCanSchedule()
+      throws Exception {
     ResourceManager rm = getResourceManager(2, 5, 1, 3);
 
     SchedulerGroupAccountant accountant = mock(SchedulerGroupAccountant.class);
@@ -69,6 +70,7 @@ public class ResourceManagerTest {
       }
     };
   }
+
   private Configuration getConfig(int runners, int workers) {
     Configuration config = new PropertiesConfiguration();
     config.setProperty(ResourceManager.QUERY_RUNNER_CONFIG_KEY, runners);

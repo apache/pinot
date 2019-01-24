@@ -38,10 +38,7 @@ public abstract class AbstractCompositeListenableFuture<T> implements ServerResp
    * Response Future State
    */
   private enum State {
-    PENDING,
-    STARTED,
-    CANCELLED,
-    DONE;
+    PENDING, STARTED, CANCELLED, DONE;
 
     public boolean isCompleted() {
       return (this != PENDING) && (this != STARTED);
@@ -82,8 +79,7 @@ public abstract class AbstractCompositeListenableFuture<T> implements ServerResp
    * listeners to the non-cancelled underlying future, it can still see the future getting complete.
    * If using Composite futures, only listen to the composite instance and not to the underlying futures directly.
    *
-   */
-  public boolean cancel(boolean mayInterruptIfRunning) {
+   */ public boolean cancel(boolean mayInterruptIfRunning) {
     try {
       _futureLock.lock();
       if (_state.isCompleted()) {
@@ -180,8 +176,8 @@ public abstract class AbstractCompositeListenableFuture<T> implements ServerResp
    * @param durationMillis
    * @return true if processing done
    */
-  protected abstract boolean processFutureResult(ServerInstance server, Map<ServerInstance, T> responses, Map<ServerInstance, Throwable> error,
-      long durationMillis);
+  protected abstract boolean processFutureResult(ServerInstance server, Map<ServerInstance, T> responses,
+      Map<ServerInstance, Throwable> error, long durationMillis);
 
   protected void addResponseFutureListener(ServerResponseFuture<T> future) {
     future.addListener(new ResponseFutureListener(future), null); // no need for separate Executors

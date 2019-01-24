@@ -27,12 +27,12 @@ import org.testng.Assert;
 public abstract class RecordReaderTest {
   protected static final String[] COLUMNS = {"INT_SV", "INT_MV"};
   protected static final Schema SCHEMA = new Schema.SchemaBuilder().addMetric(COLUMNS[0], FieldSpec.DataType.INT)
-      .addMultiValueDimension(COLUMNS[1], FieldSpec.DataType.INT, -1)
-      .build();
+      .addMultiValueDimension(COLUMNS[1], FieldSpec.DataType.INT, -1).build();
   protected static final Object[][] RECORDS = {{5, new int[]{10, 15, 20}}, {25, new int[]{30, 35, 40}}, {null, null}};
   private static final Object[] DEFAULT_VALUES = {0, new int[]{-1}};
 
-  protected static void checkValue(RecordReader recordReader) throws Exception {
+  protected static void checkValue(RecordReader recordReader)
+      throws Exception {
     for (Object[] expectedRecord : RECORDS) {
       GenericRow actualRecord = recordReader.next();
       int numColumns = COLUMNS.length;

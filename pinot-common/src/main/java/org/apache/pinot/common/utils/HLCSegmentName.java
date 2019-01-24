@@ -89,8 +89,7 @@ public class HLCSegmentName extends SegmentName {
    * @param sequenceNumber
    */
   public HLCSegmentName(String groupId, String partitionRange, String sequenceNumber) {
-    if (isValidComponentName(groupId) && isValidComponentName(partitionRange) &&
-        isValidComponentName(sequenceNumber)) {
+    if (isValidComponentName(groupId) && isValidComponentName(partitionRange) && isValidComponentName(sequenceNumber)) {
       _isOldStyleNaming = false;
       _groupId = groupId;
       _partitionRange = partitionRange;
@@ -99,8 +98,9 @@ public class HLCSegmentName extends SegmentName {
       _tableName = _groupId.substring(0, _groupId.indexOf(REALTIME_SUFFIX) + REALTIME_SUFFIX_LENGTH);
       _segmentType = RealtimeSegmentType.HLC_SHORT;
     } else {
-      throw new IllegalArgumentException("Invalid group id (" + groupId + "), partition range (" + partitionRange +
-          ") or sequence number (" + sequenceNumber + ")");
+      throw new IllegalArgumentException(
+          "Invalid group id (" + groupId + "), partition range (" + partitionRange + ") or sequence number ("
+              + sequenceNumber + ")");
     }
   }
 

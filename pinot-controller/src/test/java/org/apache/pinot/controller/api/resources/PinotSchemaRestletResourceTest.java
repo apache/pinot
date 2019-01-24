@@ -54,7 +54,8 @@ public class PinotSchemaRestletResourceTest extends ControllerTest {
   }
 
   @Test
-  public void testCreateUpdateSchema() throws IOException {
+  public void testCreateUpdateSchema()
+      throws IOException {
     String schemaName = "testSchema";
     Schema schema = createDummySchema(schemaName);
     String url = _controllerRequestURLBuilder.forSchemaCreate();

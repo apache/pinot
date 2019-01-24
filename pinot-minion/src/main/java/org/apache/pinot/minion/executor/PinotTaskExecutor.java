@@ -34,7 +34,8 @@ public interface PinotTaskExecutor {
    * @return Execution result
    * @throws Exception
    */
-  Object executeTask(@Nonnull PinotTaskConfig pinotTaskConfig) throws Exception;
+  Object executeTask(@Nonnull PinotTaskConfig pinotTaskConfig)
+      throws Exception;
 
   /**
    * Try to cancel the task.

@@ -98,7 +98,8 @@ public class DefaultAggregationExecutorTest {
    * @throws Exception
    */
   @BeforeClass
-  public void setUp() throws Exception {
+  public void setUp()
+      throws Exception {
     _random = new Random(System.currentTimeMillis());
 
     int numColumns = AGGREGATION_FUNCTIONS.length;
@@ -168,7 +169,8 @@ public class DefaultAggregationExecutorTest {
    *
    * @throws Exception
    */
-  private void setupSegment() throws Exception {
+  private void setupSegment()
+      throws Exception {
     if (INDEX_DIR.exists()) {
       FileUtils.deleteQuietly(INDEX_DIR);
     }

@@ -75,7 +75,8 @@ public class PrioritySchedulerTest {
 
   // Tests that there is no "hang" on stop
   @Test
-  public void testStartStop() throws InterruptedException {
+  public void testStartStop()
+      throws InterruptedException {
     TestPriorityScheduler scheduler = TestPriorityScheduler.create();
     scheduler.start();
     // 100 is arbitrary.. we need to wait for scheduler thread to have completely started
@@ -88,7 +89,8 @@ public class PrioritySchedulerTest {
   }
 
   @Test
-  public void testStartStopQueries() throws ExecutionException, InterruptedException, IOException {
+  public void testStartStopQueries()
+      throws ExecutionException, InterruptedException, IOException {
     TestPriorityScheduler scheduler = TestPriorityScheduler.create();
     scheduler.start();
 
@@ -103,20 +105,22 @@ public class PrioritySchedulerTest {
     results.add(scheduler.submit(createServerQueryRequest("1", metrics)));
 
     scheduler.stop();
-     long queueWakeTimeMicros = ((MultiLevelPriorityQueue) scheduler.getQueue()).getWakeupTimeMicros();
+    long queueWakeTimeMicros = ((MultiLevelPriorityQueue) scheduler.getQueue()).getWakeupTimeMicros();
     long sleepTimeMs = queueWakeTimeMicros >= 1000 ? queueWakeTimeMicros / 1000 + 10 : 10;
     Thread.sleep(sleepTimeMs);
     int hasServerShuttingDownError = 0;
     for (ListenableFuture<byte[]> result : results) {
       DataTable table = DataTableFactory.getDataTable(result.get());
-      hasServerShuttingDownError += table.getMetadata().containsKey(
-          DataTable.EXCEPTION_METADATA_KEY + QueryException.SERVER_SCHEDULER_DOWN_ERROR.getErrorCode()) ? 1 : 0;
+      hasServerShuttingDownError += table.getMetadata()
+          .containsKey(DataTable.EXCEPTION_METADATA_KEY + QueryException.SERVER_SCHEDULER_DOWN_ERROR.getErrorCode()) ? 1
+          : 0;
     }
     assertTrue(hasServerShuttingDownError > 0);
   }
 
   @Test
-  public void testOneQuery() throws InterruptedException, ExecutionException, IOException, BrokenBarrierException {
+  public void testOneQuery()
+      throws InterruptedException, ExecutionException, IOException, BrokenBarrierException {
     PropertiesConfiguration conf = new PropertiesConfiguration();
     conf.setProperty(ResourceLimitPolicy.THREADS_PER_QUERY_PCT, 50);
     conf.setProperty(ResourceLimitPolicy.TABLE_THREADS_HARD_LIMIT, 40);
@@ -128,8 +132,7 @@ public class PrioritySchedulerTest {
     TestPriorityScheduler scheduler = TestPriorityScheduler.create(conf);
     int totalPermits = scheduler.getRunningQueriesSemaphore().availablePermits();
     scheduler.start();
-    ListenableFuture<byte[]> result = scheduler.submit(
-        createServerQueryRequest("1", metrics));
+    ListenableFuture<byte[]> result = scheduler.submit(createServerQueryRequest("1", metrics));
     startupBarrier.await();
     TestSchedulerGroup group = TestPriorityScheduler.groupFactory.groupMap.get("1");
     assertEquals(group.numRunning(), 1);
@@ -148,13 +151,13 @@ public class PrioritySchedulerTest {
     assertEquals(group.totalReservedThreads(), 0);
     // -1 because we expect that 1 permit is blocked by the scheduler main thread
     assertEquals(scheduler.getRunningQueriesSemaphore().availablePermits(), totalPermits - 1);
-    assertTrue(scheduler.getLatestQueryTime() > 0 &&
-        scheduler.getLatestQueryTime() <= System.currentTimeMillis());
+    assertTrue(scheduler.getLatestQueryTime() > 0 && scheduler.getLatestQueryTime() <= System.currentTimeMillis());
     scheduler.stop();
   }
 
   @Test
-  public void testMultiThreaded() throws InterruptedException {
+  public void testMultiThreaded()
+      throws InterruptedException {
     // add queries from multiple threads and verify that all those are executed
     PropertiesConfiguration conf = new PropertiesConfiguration();
     conf.setProperty(ResourceManager.QUERY_WORKER_CONFIG_KEY, 60);
@@ -191,9 +194,9 @@ public class PrioritySchedulerTest {
   /*
    * Disabled because of race condition
    */
-  @Test (enabled = false)
+  @Test(enabled = false)
   public void testOutOfCapacityResponse()
-      throws Exception{
+      throws Exception {
     PropertiesConfiguration conf = new PropertiesConfiguration();
     conf.setProperty(ResourceLimitPolicy.TABLE_THREADS_HARD_LIMIT, 5);
     conf.setProperty(MultiLevelPriorityQueue.MAX_PENDING_PER_GROUP_KEY, 1);
@@ -206,20 +209,20 @@ public class PrioritySchedulerTest {
     group.addLast(createQueryRequest("1", metrics));
     results.add(scheduler.submit(createServerQueryRequest("1", metrics)));
     DataTable dataTable = DataTableFactory.getDataTable(results.get(1).get());
-    assertTrue(dataTable.getMetadata().containsKey(
-        DataTable.EXCEPTION_METADATA_KEY + QueryException.SERVER_OUT_OF_CAPACITY_ERROR.getErrorCode()));
+    assertTrue(dataTable.getMetadata()
+        .containsKey(DataTable.EXCEPTION_METADATA_KEY + QueryException.SERVER_OUT_OF_CAPACITY_ERROR.getErrorCode()));
     scheduler.stop();
   }
 
   @Test
-  public void testSubmitBeforeRunning() throws ExecutionException, InterruptedException, IOException {
+  public void testSubmitBeforeRunning()
+      throws ExecutionException, InterruptedException, IOException {
     TestPriorityScheduler scheduler = TestPriorityScheduler.create();
-    ListenableFuture<byte[]> result = scheduler.submit(
-        createServerQueryRequest("1", metrics));
+    ListenableFuture<byte[]> result = scheduler.submit(createServerQueryRequest("1", metrics));
     // start is not called
     DataTable response = DataTableFactory.getDataTable(result.get());
-    assertTrue(response.getMetadata().containsKey(
-        DataTable.EXCEPTION_METADATA_KEY + QueryException.SERVER_SCHEDULER_DOWN_ERROR.getErrorCode()));
+    assertTrue(response.getMetadata()
+        .containsKey(DataTable.EXCEPTION_METADATA_KEY + QueryException.SERVER_SCHEDULER_DOWN_ERROR.getErrorCode()));
     assertFalse(response.getMetadata().containsKey("table"));
     scheduler.stop();
   }
@@ -232,8 +235,7 @@ public class PrioritySchedulerTest {
       ResourceManager rm = new PolicyBasedResourceManager(conf);
       QueryExecutor qe = new TestQueryExecutor();
       groupFactory = new TestSchedulerGroupFactory();
-      MultiLevelPriorityQueue queue = new MultiLevelPriorityQueue(conf, rm,
-          groupFactory, new TableBasedGroupMapper());
+      MultiLevelPriorityQueue queue = new MultiLevelPriorityQueue(conf, rm, groupFactory, new TableBasedGroupMapper());
       latestQueryTime = new LongAccumulator(Long::max, 0);
       return new TestPriorityScheduler(rm, qe, queue, metrics, latestQueryTime);
     }

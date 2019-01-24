@@ -56,7 +56,8 @@ public final class FixedBitSingleValueReader extends BaseSingleColumnSingleValue
   }
 
   @Override
-  public void close() throws IOException {
+  public void close()
+      throws IOException {
     _reader.close();
   }
 }

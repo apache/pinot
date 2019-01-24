@@ -53,10 +53,11 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
   @Option(name = "-numPartitions", required = true, metaVar = "<int>", usage = "number of stream partitions for the table")
   private int _numPartitions;
 
-  @Option(name = "-retentionHours", metaVar = "<int>", usage = "Number of hours the segments will need to be retained in memory. "
-      + "\nThe realtime segments will need to be in memory only until the offline segments are available and used for queries"
-      + "\nThis will be picked from the table config  by looking at the segmentPushFrequency (72h if daily, 24h if hourly, buffer added as TimeBoundaryService doesn't query the last offline timestamp), "
-      + "\nIt can be overridden using this option")
+  @Option(name = "-retentionHours", metaVar = "<int>", usage =
+      "Number of hours the segments will need to be retained in memory. "
+          + "\nThe realtime segments will need to be in memory only until the offline segments are available and used for queries"
+          + "\nThis will be picked from the table config  by looking at the segmentPushFrequency (72h if daily, 24h if hourly, buffer added as TimeBoundaryService doesn't query the last offline timestamp), "
+          + "\nIt can be overridden using this option")
   private int _retentionHours;
 
   @Option(name = "-numHosts", metaVar = "<String>", usage = "number of hosts as comma separated values (default 2,4,6,8,10,12,14,16)")
@@ -135,7 +136,8 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
   }
 
   @Override
-  public boolean execute() throws IOException {
+  public boolean execute()
+      throws IOException {
     LOGGER.info("Executing command: {}", toString());
 
     TableConfig tableConfig;
@@ -171,8 +173,8 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
     MemoryEstimator memoryEstimator =
         new MemoryEstimator(tableConfig, sampleCompletedSegmentFile, sampleSegmentConsumedSeconds);
     File sampleStatsHistory = memoryEstimator.initializeStatsHistory();
-    memoryEstimator.estimateMemoryUsed(sampleStatsHistory, numHosts, numHours, totalConsumingPartitions,
-        _retentionHours);
+    memoryEstimator
+        .estimateMemoryUsed(sampleStatsHistory, numHosts, numHours, totalConsumingPartitions, _retentionHours);
 
     // TODO: Make a recommendation of what config to choose by considering more inputs such as qps
     LOGGER.info("\nMemory used per host");

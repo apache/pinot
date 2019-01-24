@@ -83,8 +83,8 @@ public class ClusterInfoProvider {
   @Nonnull
   public List<OfflineSegmentZKMetadata> getOfflineSegmentsMetadata(@Nonnull String offlineTableName) {
     Preconditions.checkArgument(TableNameBuilder.OFFLINE.tableHasTypeSuffix(offlineTableName));
-    return ZKMetadataProvider.getOfflineSegmentZKMetadataListForTable(_pinotHelixResourceManager.getPropertyStore(),
-        offlineTableName);
+    return ZKMetadataProvider
+        .getOfflineSegmentZKMetadataListForTable(_pinotHelixResourceManager.getPropertyStore(), offlineTableName);
   }
 
   /**
@@ -96,8 +96,8 @@ public class ClusterInfoProvider {
   @Nonnull
   public List<RealtimeSegmentZKMetadata> getRealtimeSegmentsMetadata(@Nonnull String realtimeTableName) {
     Preconditions.checkArgument(TableNameBuilder.REALTIME.tableHasTypeSuffix(realtimeTableName));
-    return ZKMetadataProvider.getRealtimeSegmentZKMetadataListForTable(_pinotHelixResourceManager.getPropertyStore(),
-        realtimeTableName);
+    return ZKMetadataProvider
+        .getRealtimeSegmentZKMetadataListForTable(_pinotHelixResourceManager.getPropertyStore(), realtimeTableName);
   }
 
   /**

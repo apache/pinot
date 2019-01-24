@@ -53,8 +53,8 @@ public class StarTreeV2ClusterIntegrationTest extends StarTreeClusterIntegration
 
   private static final int NUM_STAR_TREE_DIMENSIONS = 5;
   private static final int NUM_STAR_TREE_METRICS = 5;
-  private static final List<AggregationFunctionType> AGGREGATION_FUNCTION_TYPES =
-      Arrays.asList(AggregationFunctionType.COUNT, AggregationFunctionType.MIN, AggregationFunctionType.MAX,
+  private static final List<AggregationFunctionType> AGGREGATION_FUNCTION_TYPES = Arrays
+      .asList(AggregationFunctionType.COUNT, AggregationFunctionType.MIN, AggregationFunctionType.MAX,
           AggregationFunctionType.SUM, AggregationFunctionType.AVG, AggregationFunctionType.MINMAXRANGE);
 
   private List<String> _starTree1Dimensions = new ArrayList<>(NUM_STAR_TREE_DIMENSIONS);
@@ -65,7 +65,8 @@ public class StarTreeV2ClusterIntegrationTest extends StarTreeClusterIntegration
   private StarTreeQueryGenerator _starTree2QueryGenerator;
 
   @Override
-  protected void setUpSegmentsAndQueryGenerator() throws Exception {
+  protected void setUpSegmentsAndQueryGenerator()
+      throws Exception {
     // Randomly pick some dimensions and metrics for star-tree V2
     List<String> allDimensions = new ArrayList<>(_schema.getDimensionNames());
     Collections.shuffle(allDimensions);
@@ -112,8 +113,9 @@ public class StarTreeV2ClusterIntegrationTest extends StarTreeClusterIntegration
     }
 
     ExecutorService executor = Executors.newCachedThreadPool();
-    ClusterIntegrationTestUtils.buildSegmentsFromAvro(avroFiles, 0, _segmentDir, _tarDir, tableName, false,
-        starTreeV2BuilderConfigs, null, _schema, executor);
+    ClusterIntegrationTestUtils
+        .buildSegmentsFromAvro(avroFiles, 0, _segmentDir, _tarDir, tableName, false, starTreeV2BuilderConfigs, null,
+            _schema, executor);
     executor.shutdown();
     executor.awaitTermination(10, TimeUnit.MINUTES);
 
@@ -128,9 +130,7 @@ public class StarTreeV2ClusterIntegrationTest extends StarTreeClusterIntegration
       }
     }
     return new StarTreeV2BuilderConfig.Builder().setDimensionsSplitOrder(dimensions)
-        .setFunctionColumnPairs(functionColumnPairs)
-        .setMaxLeafRecords(10)
-        .build();
+        .setFunctionColumnPairs(functionColumnPairs).setMaxLeafRecords(10).build();
   }
 
   @Override

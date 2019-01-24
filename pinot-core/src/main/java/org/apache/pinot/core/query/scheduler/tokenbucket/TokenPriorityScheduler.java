@@ -31,6 +31,7 @@ import org.apache.pinot.core.query.scheduler.TableBasedGroupMapper;
 import org.apache.pinot.core.query.scheduler.resources.PolicyBasedResourceManager;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 
+
 /**
  * Schedules queries from a {@link SchedulerGroup} with highest number of tokens on priority.
  * This is a thin wrapper factory class that configures {@link PriorityScheduler} with
@@ -44,7 +45,7 @@ public class TokenPriorityScheduler extends PriorityScheduler {
   public static TokenPriorityScheduler create(@Nonnull Configuration config, @Nonnull QueryExecutor queryExecutor,
       @Nonnull ServerMetrics metrics, @Nonnull LongAccumulator latestQueryTime) {
     final ResourceManager rm = new PolicyBasedResourceManager(config);
-    final SchedulerGroupFactory groupFactory =  new SchedulerGroupFactory() {
+    final SchedulerGroupFactory groupFactory = new SchedulerGroupFactory() {
       @Override
       public SchedulerGroup create(Configuration config, String groupName) {
         // max available tokens per millisecond equals number of threads (total execution capacity)

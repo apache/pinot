@@ -220,8 +220,7 @@ public class LinkedDequeue<T> extends AbstractQueue<T> implements Deque<T> {
   }
 
   private enum Direction {
-    ASCENDING,
-    DESCENDING
+    ASCENDING, DESCENDING
   }
 
   private class LinkedQueueIterator implements Iterator<T> {
@@ -312,7 +311,7 @@ public class LinkedDequeue<T> extends AbstractQueue<T> implements Deque<T> {
 
   @Override
   public boolean removeFirstOccurrence(Object o) {
-    for (Iterator<T> i = iterator(); i.hasNext();) {
+    for (Iterator<T> i = iterator(); i.hasNext(); ) {
       if (i.next().equals(o)) {
         i.remove();
         return true;
@@ -323,7 +322,7 @@ public class LinkedDequeue<T> extends AbstractQueue<T> implements Deque<T> {
 
   @Override
   public boolean removeLastOccurrence(Object o) {
-    for (Iterator<T> i = descendingIterator(); i.hasNext();) {
+    for (Iterator<T> i = descendingIterator(); i.hasNext(); ) {
       if (i.next().equals(o)) {
         i.remove();
         return true;

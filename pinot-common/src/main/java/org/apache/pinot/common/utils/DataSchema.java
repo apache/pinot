@@ -111,7 +111,8 @@ public class DataSchema {
   }
 
   @Nonnull
-  public byte[] toBytes() throws IOException {
+  public byte[] toBytes()
+      throws IOException {
     ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
     DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
     int length = _columnNames.length;
@@ -138,7 +139,8 @@ public class DataSchema {
   }
 
   @Nonnull
-  public static DataSchema fromBytes(@Nonnull byte[] buffer) throws IOException {
+  public static DataSchema fromBytes(@Nonnull byte[] buffer)
+      throws IOException {
     ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(buffer);
     DataInputStream dataInputStream = new DataInputStream(byteArrayInputStream);
 
@@ -194,8 +196,8 @@ public class DataSchema {
     }
     if (anObject instanceof DataSchema) {
       DataSchema anotherDataSchema = (DataSchema) anObject;
-      return Arrays.equals(_columnNames, anotherDataSchema._columnNames) && Arrays.equals(_columnDataTypes,
-          anotherDataSchema._columnDataTypes);
+      return Arrays.equals(_columnNames, anotherDataSchema._columnNames) && Arrays
+          .equals(_columnDataTypes, anotherDataSchema._columnDataTypes);
     }
     return false;
   }

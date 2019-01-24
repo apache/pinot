@@ -171,7 +171,8 @@ public class DataTableBuilder {
     _currentRowDataByteBuffer.putInt(dictId);
   }
 
-  public void setColumn(int colId, @Nonnull Object value) throws IOException {
+  public void setColumn(int colId, @Nonnull Object value)
+      throws IOException {
     _currentRowDataByteBuffer.position(_columnOffsets[colId]);
     _currentRowDataByteBuffer.putInt(_variableSizeDataByteArrayOutputStream.size());
     int objectTypeValue = ObjectSerDeUtils.ObjectType.getObjectType(value).getValue();
@@ -190,7 +191,8 @@ public class DataTableBuilder {
     }
   }
 
-  public void setColumn(int colId, @Nonnull char[] values) throws IOException {
+  public void setColumn(int colId, @Nonnull char[] values)
+      throws IOException {
     _currentRowDataByteBuffer.position(_columnOffsets[colId]);
     _currentRowDataByteBuffer.putInt(_variableSizeDataByteArrayOutputStream.size());
     _currentRowDataByteBuffer.putInt(values.length);
@@ -199,7 +201,8 @@ public class DataTableBuilder {
     }
   }
 
-  public void setColumn(int colId, @Nonnull short[] values) throws IOException {
+  public void setColumn(int colId, @Nonnull short[] values)
+      throws IOException {
     _currentRowDataByteBuffer.position(_columnOffsets[colId]);
     _currentRowDataByteBuffer.putInt(_variableSizeDataByteArrayOutputStream.size());
     _currentRowDataByteBuffer.putInt(values.length);
@@ -208,7 +211,8 @@ public class DataTableBuilder {
     }
   }
 
-  public void setColumn(int colId, @Nonnull int[] values) throws IOException {
+  public void setColumn(int colId, @Nonnull int[] values)
+      throws IOException {
     _currentRowDataByteBuffer.position(_columnOffsets[colId]);
     _currentRowDataByteBuffer.putInt(_variableSizeDataByteArrayOutputStream.size());
     _currentRowDataByteBuffer.putInt(values.length);
@@ -217,7 +221,8 @@ public class DataTableBuilder {
     }
   }
 
-  public void setColumn(int colId, @Nonnull long[] values) throws IOException {
+  public void setColumn(int colId, @Nonnull long[] values)
+      throws IOException {
     _currentRowDataByteBuffer.position(_columnOffsets[colId]);
     _currentRowDataByteBuffer.putInt(_variableSizeDataByteArrayOutputStream.size());
     _currentRowDataByteBuffer.putInt(values.length);
@@ -226,7 +231,8 @@ public class DataTableBuilder {
     }
   }
 
-  public void setColumn(int colId, @Nonnull float[] values) throws IOException {
+  public void setColumn(int colId, @Nonnull float[] values)
+      throws IOException {
     _currentRowDataByteBuffer.position(_columnOffsets[colId]);
     _currentRowDataByteBuffer.putInt(_variableSizeDataByteArrayOutputStream.size());
     _currentRowDataByteBuffer.putInt(values.length);
@@ -235,7 +241,8 @@ public class DataTableBuilder {
     }
   }
 
-  public void setColumn(int colId, @Nonnull double[] values) throws IOException {
+  public void setColumn(int colId, @Nonnull double[] values)
+      throws IOException {
     _currentRowDataByteBuffer.position(_columnOffsets[colId]);
     _currentRowDataByteBuffer.putInt(_variableSizeDataByteArrayOutputStream.size());
     _currentRowDataByteBuffer.putInt(values.length);
@@ -244,7 +251,8 @@ public class DataTableBuilder {
     }
   }
 
-  public void setColumn(int colId, @Nonnull String[] values) throws IOException {
+  public void setColumn(int colId, @Nonnull String[] values)
+      throws IOException {
     _currentRowDataByteBuffer.position(_columnOffsets[colId]);
     _currentRowDataByteBuffer.putInt(_variableSizeDataByteArrayOutputStream.size());
     _currentRowDataByteBuffer.putInt(values.length);
@@ -268,7 +276,8 @@ public class DataTableBuilder {
     }
   }
 
-  public void finishRow() throws IOException {
+  public void finishRow()
+      throws IOException {
     _fixedSizeDataByteArrayOutputStream.write(_currentRowDataByteBuffer.array());
   }
 
@@ -280,7 +289,8 @@ public class DataTableBuilder {
   /**
    * Build an empty data table based on the broker request.
    */
-  public static DataTable buildEmptyDataTable(BrokerRequest brokerRequest) throws IOException {
+  public static DataTable buildEmptyDataTable(BrokerRequest brokerRequest)
+      throws IOException {
     // Selection query.
     if (brokerRequest.isSetSelections()) {
       Selection selection = brokerRequest.getSelections();

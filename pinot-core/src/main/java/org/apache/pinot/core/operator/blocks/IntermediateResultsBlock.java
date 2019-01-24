@@ -270,7 +270,8 @@ public class IntermediateResultsBlock implements Block {
   }
 
   @Nonnull
-  private DataTable getAggregationGroupByResultDataTable() throws Exception {
+  private DataTable getAggregationGroupByResultDataTable()
+      throws Exception {
     String[] columnNames = new String[]{"functionName", "GroupByResultMap"};
     DataSchema.ColumnDataType[] columnDataTypes =
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.OBJECT};

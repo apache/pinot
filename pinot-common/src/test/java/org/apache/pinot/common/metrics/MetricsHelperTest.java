@@ -67,7 +67,8 @@ public class MetricsHelperTest {
     // Initialize the MetricsHelper and create a new timer
     MetricsHelper.initializeMetrics(configuration.subset("pinot.broker.metrics"));
     MetricsHelper.registerMetricsRegistry(registry);
-    MetricsHelper.newTimer(registry, new MetricName(MetricsHelperTest.class, "dummy"), TimeUnit.MILLISECONDS, TimeUnit.MILLISECONDS);
+    MetricsHelper.newTimer(registry, new MetricName(MetricsHelperTest.class, "dummy"), TimeUnit.MILLISECONDS,
+        TimeUnit.MILLISECONDS);
 
     // Check that the two listeners fired
     assertTrue(listenerOneOkay);

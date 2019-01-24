@@ -44,7 +44,8 @@ public class V3DefaultColumnHandler extends BaseDefaultColumnHandler {
   }
 
   @Override
-  protected void updateDefaultColumn(String column, DefaultColumnAction action) throws Exception {
+  protected void updateDefaultColumn(String column, DefaultColumnAction action)
+      throws Exception {
     LOGGER.info("Starting default column action: {} on column: {}", action, column);
 
     // For V3 segment format, only support ADD action

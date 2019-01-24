@@ -68,5 +68,4 @@ public class IndexKey {
   public String toString() {
     return name + "." + type.getIndexName();
   }
-
 }

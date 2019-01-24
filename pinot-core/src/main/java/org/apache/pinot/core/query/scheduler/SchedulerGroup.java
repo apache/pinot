@@ -59,6 +59,7 @@ public interface SchedulerGroup extends SchedulerGroupAccountant {
    * @return true if there are no pending queries for this group
    */
   boolean isEmpty();
+
   /**
    * Number of pending queries
    * @return

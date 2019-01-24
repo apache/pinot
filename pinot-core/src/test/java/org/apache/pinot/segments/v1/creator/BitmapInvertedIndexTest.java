@@ -62,7 +62,8 @@ public class BitmapInvertedIndexTest {
   private File _segmentDirectory;
 
   @BeforeClass
-  public void setUp() throws Exception {
+  public void setUp()
+      throws Exception {
     FileUtils.deleteQuietly(INDEX_DIR);
     URL resourceUrl = getClass().getClassLoader().getResource(AVRO_FILE_PATH);
     Assert.assertNotNull(resourceUrl);
@@ -78,12 +79,14 @@ public class BitmapInvertedIndexTest {
   }
 
   @Test
-  public void testBitmapInvertedIndex() throws Exception {
+  public void testBitmapInvertedIndex()
+      throws Exception {
     testBitmapInvertedIndex(ReadMode.heap);
     testBitmapInvertedIndex(ReadMode.mmap);
   }
 
-  private void testBitmapInvertedIndex(ReadMode readMode) throws Exception {
+  private void testBitmapInvertedIndex(ReadMode readMode)
+      throws Exception {
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
     indexLoadingConfig.setReadMode(readMode);
     indexLoadingConfig.setInvertedIndexColumns(INVERTED_INDEX_COLUMNS);

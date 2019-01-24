@@ -73,17 +73,18 @@ public class SingleConnectionBrokerRequestHandler extends BaseBrokerRequestHandl
   protected BrokerResponse processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
       @Nullable BrokerRequest offlineBrokerRequest, @Nullable Map<String, List<String>> offlineRoutingTable,
       @Nullable BrokerRequest realtimeBrokerRequest, @Nullable Map<String, List<String>> realtimeRoutingTable,
-      long timeoutMs, ServerStats serverStats, RequestStatistics requestStatistics) throws Exception {
+      long timeoutMs, ServerStats serverStats, RequestStatistics requestStatistics)
+      throws Exception {
     assert offlineBrokerRequest != null || realtimeBrokerRequest != null;
 
     String rawTableName = TableNameBuilder.extractRawTableName(originalBrokerRequest.getQuerySource().getTableName());
     long scatterGatherStartTimeNs = System.nanoTime();
-    AsyncQueryResponse asyncQueryResponse =
-        _queryRouter.submitQuery(requestId, rawTableName, offlineBrokerRequest, offlineRoutingTable,
-            realtimeBrokerRequest, realtimeRoutingTable, timeoutMs);
+    AsyncQueryResponse asyncQueryResponse = _queryRouter
+        .submitQuery(requestId, rawTableName, offlineBrokerRequest, offlineRoutingTable, realtimeBrokerRequest,
+            realtimeRoutingTable, timeoutMs);
     Map<Server, ServerResponse> response = asyncQueryResponse.getResponse();
-    _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.SCATTER_GATHER,
-        System.nanoTime() - scatterGatherStartTimeNs);
+    _brokerMetrics
+        .addPhaseTiming(rawTableName, BrokerQueryPhase.SCATTER_GATHER, System.nanoTime() - scatterGatherStartTimeNs);
     // TODO Use scatterGatherStats as serverStats
     serverStats.setServerStats(asyncQueryResponse.getStats());
 

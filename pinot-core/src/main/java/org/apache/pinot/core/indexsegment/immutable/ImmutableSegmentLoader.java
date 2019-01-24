@@ -56,7 +56,8 @@ public class ImmutableSegmentLoader {
   /**
    * For tests only.
    */
-  public static ImmutableSegment load(@Nonnull File indexDir, @Nonnull ReadMode readMode) throws Exception {
+  public static ImmutableSegment load(@Nonnull File indexDir, @Nonnull ReadMode readMode)
+      throws Exception {
     IndexLoadingConfig defaultIndexLoadingConfig = new IndexLoadingConfig();
     defaultIndexLoadingConfig.setReadMode(readMode);
     return load(indexDir, defaultIndexLoadingConfig, null);
@@ -78,9 +79,10 @@ public class ImmutableSegmentLoader {
    * For segments from OFFLINE table.
    */
   public static ImmutableSegment load(@Nonnull File indexDir, @Nonnull IndexLoadingConfig indexLoadingConfig,
-      @Nullable Schema schema) throws Exception {
-    Preconditions.checkArgument(indexDir.isDirectory(), "Index directory: {} does not exist or is not a directory",
-        indexDir);
+      @Nullable Schema schema)
+      throws Exception {
+    Preconditions
+        .checkArgument(indexDir.isDirectory(), "Index directory: {} does not exist or is not a directory", indexDir);
 
     // Convert segment version if necessary
     // NOTE: this step may modify the segment metadata
@@ -116,8 +118,8 @@ public class ImmutableSegmentLoader {
     SegmentDirectory.Reader segmentReader = segmentDirectory.createReader();
     Map<String, ColumnIndexContainer> indexContainerMap = new HashMap<>();
     for (Map.Entry<String, ColumnMetadata> entry : segmentMetadata.getColumnMetadataMap().entrySet()) {
-      indexContainerMap.put(entry.getKey(),
-          new PhysicalColumnIndexContainer(segmentReader, entry.getValue(), indexLoadingConfig));
+      indexContainerMap
+          .put(entry.getKey(), new PhysicalColumnIndexContainer(segmentReader, entry.getValue(), indexLoadingConfig));
     }
 
     if (schema == null) {

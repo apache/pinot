@@ -54,7 +54,8 @@ public class FixedByteChunkSingleValueReaderWriteTest {
   private static final int BYTES_LENGTH = 101;
 
   @Test
-  public void testWithCompression() throws Exception {
+  public void testWithCompression()
+      throws Exception {
     ChunkCompressorFactory.CompressionType compressionType = ChunkCompressorFactory.CompressionType.SNAPPY;
     testInt(compressionType);
     testLong(compressionType);
@@ -64,7 +65,8 @@ public class FixedByteChunkSingleValueReaderWriteTest {
   }
 
   @Test
-  public void testWithoutCompression() throws Exception {
+  public void testWithoutCompression()
+      throws Exception {
     ChunkCompressorFactory.CompressionType compressionType = ChunkCompressorFactory.CompressionType.PASS_THROUGH;
     testInt(compressionType);
     testLong(compressionType);
@@ -73,7 +75,8 @@ public class FixedByteChunkSingleValueReaderWriteTest {
     testBytes(compressionType);
   }
 
-  public void testInt(ChunkCompressorFactory.CompressionType compressionType) throws Exception {
+  public void testInt(ChunkCompressorFactory.CompressionType compressionType)
+      throws Exception {
     int[] expected = new int[NUM_VALUES];
     for (int i = 0; i < NUM_VALUES; i++) {
       expected[i] = _random.nextInt();
@@ -108,7 +111,8 @@ public class FixedByteChunkSingleValueReaderWriteTest {
     FileUtils.deleteQuietly(outFile);
   }
 
-  public void testLong(ChunkCompressorFactory.CompressionType compressionType) throws Exception {
+  public void testLong(ChunkCompressorFactory.CompressionType compressionType)
+      throws Exception {
     long[] expected = new long[NUM_VALUES];
     for (int i = 0; i < NUM_VALUES; i++) {
       expected[i] = _random.nextLong();
@@ -143,7 +147,8 @@ public class FixedByteChunkSingleValueReaderWriteTest {
     FileUtils.deleteQuietly(outFile);
   }
 
-  public void testFloat(ChunkCompressorFactory.CompressionType compressionType) throws Exception {
+  public void testFloat(ChunkCompressorFactory.CompressionType compressionType)
+      throws Exception {
     float[] expected = new float[NUM_VALUES];
     for (int i = 0; i < NUM_VALUES; i++) {
       expected[i] = _random.nextFloat();
@@ -178,7 +183,8 @@ public class FixedByteChunkSingleValueReaderWriteTest {
     FileUtils.deleteQuietly(outFile);
   }
 
-  public void testDouble(ChunkCompressorFactory.CompressionType compressionType) throws Exception {
+  public void testDouble(ChunkCompressorFactory.CompressionType compressionType)
+      throws Exception {
     double[] expected = new double[NUM_VALUES];
     for (int i = 0; i < NUM_VALUES; i++) {
       expected[i] = _random.nextDouble();
@@ -213,7 +219,8 @@ public class FixedByteChunkSingleValueReaderWriteTest {
     FileUtils.deleteQuietly(outFile);
   }
 
-  public void testBytes(ChunkCompressorFactory.CompressionType compressionType) throws Exception {
+  public void testBytes(ChunkCompressorFactory.CompressionType compressionType)
+      throws Exception {
     byte[][] expected = new byte[NUM_VALUES][BYTES_LENGTH];
     for (int i = 0; i < NUM_VALUES; i++) {
       expected[i] = RandomStringUtils.randomAscii(50).getBytes(UTF_8);
@@ -253,7 +260,8 @@ public class FixedByteChunkSingleValueReaderWriteTest {
    * @throws IOException
    */
   @Test
-  public void testBackwardCompatibility() throws IOException {
+  public void testBackwardCompatibility()
+      throws IOException {
     // Get v1 from resources folder
     ClassLoader classLoader = getClass().getClassLoader();
     String fileName = "data/fixedByteSVRDoubles.v1";

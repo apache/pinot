@@ -21,5 +21,6 @@ package org.apache.pinot.tools.scan.query;
 public interface PredicateFilter {
 
   boolean apply(int dictId);
-  boolean apply(int [] dictIds, int length);
+
+  boolean apply(int[] dictIds, int length);
 }

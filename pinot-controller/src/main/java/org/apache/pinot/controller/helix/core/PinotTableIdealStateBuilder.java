@@ -86,9 +86,8 @@ public class PinotTableIdealStateBuilder {
       boolean enableBatchMessageMode) {
     final CustomModeISBuilder customModeIdealStateBuilder =
         new CustomModeISBuilder(CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
-    customModeIdealStateBuilder
-        .setStateModel(
-            PinotHelixBrokerResourceOnlineOfflineStateModelGenerator.PINOT_BROKER_RESOURCE_ONLINE_OFFLINE_STATE_MODEL)
+    customModeIdealStateBuilder.setStateModel(
+        PinotHelixBrokerResourceOnlineOfflineStateModelGenerator.PINOT_BROKER_RESOURCE_ONLINE_OFFLINE_STATE_MODEL)
         .setMaxPartitionsPerNode(Integer.MAX_VALUE).setNumReplica(Integer.MAX_VALUE)
         .setNumPartitions(Integer.MAX_VALUE);
     final IdealState idealState = customModeIdealStateBuilder.build();
@@ -171,8 +170,8 @@ public class PinotTableIdealStateBuilder {
   }
 
   private static void setupInstanceConfigForHighLevelConsumer(String realtimeTableName, int numDataInstances,
-      int numDataReplicas, Map<String, String> streamConfig,
-      ZkHelixPropertyStore<ZNRecord> zkHelixPropertyStore, List<String> instanceList) {
+      int numDataReplicas, Map<String, String> streamConfig, ZkHelixPropertyStore<ZNRecord> zkHelixPropertyStore,
+      List<String> instanceList) {
     int numInstancesPerReplica = numDataInstances / numDataReplicas;
     int partitionId = 0;
     int replicaId = 0;
@@ -199,8 +198,7 @@ public class PinotTableIdealStateBuilder {
     }
   }
 
-  private static String getGroupIdFromRealtimeDataTable(String realtimeTableName,
-      Map<String, String> streamConfigMap) {
+  private static String getGroupIdFromRealtimeDataTable(String realtimeTableName, Map<String, String> streamConfigMap) {
     String groupId = StringUtil.join("_", realtimeTableName, System.currentTimeMillis() + "");
     StreamConfig streamConfig = new StreamConfig(streamConfigMap);
     String streamConfigGroupId = streamConfig.getGroupId();

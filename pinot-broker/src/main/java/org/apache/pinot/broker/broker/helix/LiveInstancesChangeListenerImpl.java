@@ -46,7 +46,8 @@ public class LiveInstancesChangeListenerImpl implements LiveInstanceChangeListen
     this.liveInstanceToSessionIdMap = new HashMap<String, String>();
   }
 
-  public void init(final KeyedPool<PooledNettyClientResourceManager.PooledClientConnection> connectionPool, final long timeout) {
+  public void init(final KeyedPool<PooledNettyClientResourceManager.PooledClientConnection> connectionPool,
+      final long timeout) {
     this.connectionPool = connectionPool;
     this.timeout = timeout;
   }
@@ -75,15 +76,16 @@ public class LiveInstancesChangeListenerImpl implements LiveInstanceChangeListen
         port = Integer.parseInt(namePortStr.split("_")[1]);
       } catch (Exception e) {
         port = CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT;
-        LOGGER.warn("Port for server instance {} does not appear to be numeric, defaulting to {}.", instanceId, port, e);
+        LOGGER
+            .warn("Port for server instance {} does not appear to be numeric, defaulting to {}.", instanceId, port, e);
       }
 
       if (liveInstanceToSessionIdMap.containsKey(instanceId)) {
         // sessionId has changed
         if (!sessionId.equals(liveInstanceToSessionIdMap.get(instanceId))) {
           try {
-            LOGGER.info("Instance {} has changed session id {} -> {}, validating connection pool for this instance.", instanceId, sessionId,
-                liveInstanceToSessionIdMap.get(instanceId));
+            LOGGER.info("Instance {} has changed session id {} -> {}, validating connection pool for this instance.",
+                instanceId, sessionId, liveInstanceToSessionIdMap.get(instanceId));
             ServerInstance ins = ServerInstance.forHostPort(hostName, port);
             connectionPool.validatePool(ins, DO_NOT_RECREATE);
             liveInstanceToSessionIdMap.put(instanceId, sessionId);

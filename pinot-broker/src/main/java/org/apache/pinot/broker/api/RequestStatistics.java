@@ -67,9 +67,7 @@ public class RequestStatistics {
   private long _reduceTimeMillis;
 
   public enum FanoutType {
-    OFFLINE,
-    REALTIME,
-    HYBRID
+    OFFLINE, REALTIME, HYBRID
   }
 
   private FanoutType _fanoutType;

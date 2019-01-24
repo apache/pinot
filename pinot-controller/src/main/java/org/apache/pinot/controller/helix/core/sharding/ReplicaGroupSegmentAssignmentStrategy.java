@@ -51,8 +51,9 @@ public class ReplicaGroupSegmentAssignmentStrategy implements SegmentAssignmentS
   private static final Random RANDOM = new Random();
 
   @Override
-  public List<String> getAssignedInstances(HelixManager helixManager, HelixAdmin helixAdmin, ZkHelixPropertyStore<ZNRecord> propertyStore,
-      String helixClusterName, SegmentMetadata segmentMetadata, int numReplicas, String tenantName) {
+  public List<String> getAssignedInstances(HelixManager helixManager, HelixAdmin helixAdmin,
+      ZkHelixPropertyStore<ZNRecord> propertyStore, String helixClusterName, SegmentMetadata segmentMetadata,
+      int numReplicas, String tenantName) {
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(segmentMetadata.getTableName());
 
     // Fetch the partition mapping table from the property store.
@@ -97,8 +98,8 @@ public class ReplicaGroupSegmentAssignmentStrategy implements SegmentAssignmentS
       selectedInstanceList.add(instancesInReplicaGroup.get(index));
     }
 
-    LOGGER.info("Segment assignment result for : " + segmentMetadata.getName() + ", in resource : "
-        + segmentMetadata.getTableName() + ", selected instances: " + Arrays.toString(selectedInstanceList.toArray()));
+    LOGGER.info("Segment assignment result for : " + segmentMetadata.getName() + ", in resource : " + segmentMetadata
+        .getTableName() + ", selected instances: " + Arrays.toString(selectedInstanceList.toArray()));
 
     return selectedInstanceList;
   }

@@ -43,9 +43,9 @@ public class SegmentBuildTimeLeaseExtender {
   // Always request 120s of extra build time
   private static final int EXTRA_TIME_SECONDS = 120;
   // Retransmit lease request 10% before lease expires.
-  private static final int REPEAT_REQUEST_PERIOD_SEC = (EXTRA_TIME_SECONDS * 9 /10);
+  private static final int REPEAT_REQUEST_PERIOD_SEC = (EXTRA_TIME_SECONDS * 9 / 10);
   private static Logger LOGGER = LoggerFactory.getLogger(SegmentBuildTimeLeaseExtender.class);
-  private static final Map<String, SegmentBuildTimeLeaseExtender> INSTANCE_TO_LEASE_EXTENDER  = new HashMap<>(1);
+  private static final Map<String, SegmentBuildTimeLeaseExtender> INSTANCE_TO_LEASE_EXTENDER = new HashMap<>(1);
 
   private ScheduledExecutorService _executor;
   private final Map<String, Future> _segmentToFutureMap = new ConcurrentHashMap<>();
@@ -56,7 +56,8 @@ public class SegmentBuildTimeLeaseExtender {
     return INSTANCE_TO_LEASE_EXTENDER.get(instanceId);
   }
 
-  public static synchronized  SegmentBuildTimeLeaseExtender create(final String instanceId, ServerMetrics serverMetrics) {
+  public static synchronized SegmentBuildTimeLeaseExtender create(final String instanceId,
+      ServerMetrics serverMetrics) {
     SegmentBuildTimeLeaseExtender leaseExtender = INSTANCE_TO_LEASE_EXTENDER.get(instanceId);
     if (leaseExtender != null) {
       LOGGER.warn("Instance already exists");
@@ -94,8 +95,9 @@ public class SegmentBuildTimeLeaseExtender {
     final SegmentCompletionProtocol.Request.Params reqParams = new SegmentCompletionProtocol.Request.Params();
     reqParams.withOffset(offset).withSegmentName(segmentId).withExtraTimeSec(EXTRA_TIME_SECONDS)
         .withInstanceId(_instanceId);
-    Future future = _executor.scheduleWithFixedDelay(new LeaseExtender(reqParams), initialDelayMs,
-        REPEAT_REQUEST_PERIOD_SEC * 1000L, TimeUnit.MILLISECONDS);
+    Future future = _executor
+        .scheduleWithFixedDelay(new LeaseExtender(reqParams), initialDelayMs, REPEAT_REQUEST_PERIOD_SEC * 1000L,
+            TimeUnit.MILLISECONDS);
     _segmentToFutureMap.put(segmentId, future);
   }
 
@@ -121,7 +123,8 @@ public class SegmentBuildTimeLeaseExtender {
     @Override
     public void run() {
       int nAttempts = 0;
-      SegmentCompletionProtocol.ControllerResponseStatus status = SegmentCompletionProtocol.ControllerResponseStatus.NOT_SENT;
+      SegmentCompletionProtocol.ControllerResponseStatus status =
+          SegmentCompletionProtocol.ControllerResponseStatus.NOT_SENT;
       final String segmentId = _params.getSegmentName();
 
       // Attempt to send a lease renewal message for MAX_NUM_ATTEMPTS number of times. If unsuccessful,

@@ -113,8 +113,8 @@ public class QuotaConfig {
 
     QuotaConfig that = (QuotaConfig) o;
 
-    return EqualityUtils.isEqual(_storage, that._storage) && EqualityUtils.isEqual(
-        _maxQueriesPerSecond, that._maxQueriesPerSecond);
+    return EqualityUtils.isEqual(_storage, that._storage) && EqualityUtils
+        .isEqual(_maxQueriesPerSecond, that._maxQueriesPerSecond);
   }
 
   @Override

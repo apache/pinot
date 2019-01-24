@@ -45,8 +45,7 @@ public class RecordReaderSegmentCreationDataSource implements SegmentCreationDat
   @Override
   public SegmentPreIndexStatsCollector gatherStats(StatsCollectorConfig statsCollectorConfig) {
     try {
-      RecordTransformer recordTransformer =
-          CompoundTransformer.getDefaultTransformer(statsCollectorConfig.getSchema());
+      RecordTransformer recordTransformer = CompoundTransformer.getDefaultTransformer(statsCollectorConfig.getSchema());
 
       SegmentPreIndexStatsCollector collector = new SegmentPreIndexStatsCollectorImpl(statsCollectorConfig);
       collector.init();

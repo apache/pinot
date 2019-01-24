@@ -62,11 +62,11 @@ public class PartitionOffsetFetcher implements Callable<Boolean> {
    * @throws Exception
    */
   @Override
-  public Boolean call() throws Exception {
+  public Boolean call()
+      throws Exception {
     String clientId = PartitionOffsetFetcher.class.getSimpleName() + "-" + _topicName + "-" + _partitionId;
-    try (
-        StreamMetadataProvider streamMetadataProvider = _streamConsumerFactory.createPartitionMetadataProvider(clientId,
-            _partitionId)) {
+    try (StreamMetadataProvider streamMetadataProvider = _streamConsumerFactory
+        .createPartitionMetadataProvider(clientId, _partitionId)) {
       _offset =
           streamMetadataProvider.fetchPartitionOffset(_offsetCriteria, STREAM_PARTITION_OFFSET_FETCH_TIMEOUT_MILLIS);
       if (_exception != null) {

@@ -18,9 +18,7 @@
  */
 package org.apache.pinot.core.io.reader;
 
-
-public abstract class BaseSingleColumnMultiValueReader<T extends ReaderContext>
-    implements SingleColumnMultiValueReader<T> {
+public abstract class BaseSingleColumnMultiValueReader<T extends ReaderContext> implements SingleColumnMultiValueReader<T> {
 
   public int getCharArray(int row, char[] charArray) {
     throw new UnsupportedOperationException();
@@ -63,5 +61,4 @@ public abstract class BaseSingleColumnMultiValueReader<T extends ReaderContext>
   public int getIntArray(int row, int[] intArray, T readerContext) {
     throw new UnsupportedOperationException();
   }
-
 }

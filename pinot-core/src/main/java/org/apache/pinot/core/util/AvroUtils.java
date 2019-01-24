@@ -102,7 +102,8 @@ public class AvroUtils {
    * @throws IOException
    */
   public static Schema getPinotSchemaFromAvroDataFile(@Nonnull File avroDataFile,
-      @Nullable Map<String, FieldSpec.FieldType> fieldTypeMap, @Nullable TimeUnit timeUnit) throws IOException {
+      @Nullable Map<String, FieldSpec.FieldType> fieldTypeMap, @Nullable TimeUnit timeUnit)
+      throws IOException {
     try (DataFileStream<GenericRecord> reader = getAvroReader(avroDataFile)) {
       org.apache.avro.Schema avroSchema = reader.getSchema();
       return getPinotSchemaFromAvroSchema(avroSchema, fieldTypeMap, timeUnit);
@@ -117,7 +118,8 @@ public class AvroUtils {
    * @return Pinot schema
    * @throws IOException
    */
-  public static Schema getPinotSchemaFromAvroDataFile(@Nonnull File avroDataFile) throws IOException {
+  public static Schema getPinotSchemaFromAvroDataFile(@Nonnull File avroDataFile)
+      throws IOException {
     return getPinotSchemaFromAvroDataFile(avroDataFile, null, null);
   }
 
@@ -131,7 +133,8 @@ public class AvroUtils {
    * @throws IOException
    */
   public static Schema getPinotSchemaFromAvroSchemaFile(@Nonnull File avroSchemaFile,
-      @Nullable Map<String, FieldSpec.FieldType> fieldTypeMap, @Nullable TimeUnit timeUnit) throws IOException {
+      @Nullable Map<String, FieldSpec.FieldType> fieldTypeMap, @Nullable TimeUnit timeUnit)
+      throws IOException {
     org.apache.avro.Schema avroSchema = new org.apache.avro.Schema.Parser().parse(avroSchemaFile);
     return getPinotSchemaFromAvroSchema(avroSchema, fieldTypeMap, timeUnit);
   }
@@ -199,7 +202,8 @@ public class AvroUtils {
   /**
    * Get the Avro file reader for the given file.
    */
-  public static DataFileStream<GenericRecord> getAvroReader(File avroFile) throws IOException {
+  public static DataFileStream<GenericRecord> getAvroReader(File avroFile)
+      throws IOException {
     if (avroFile.getName().endsWith(".gz")) {
       return new DataFileStream<>(new GZIPInputStream(new FileInputStream(avroFile)),
           new GenericDatumReader<GenericRecord>());

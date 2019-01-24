@@ -66,7 +66,8 @@ public class TarGzCompressionUtils {
    * @throws IOException
    *           If anything goes wrong
    */
-  public static String createTarGzOfDirectory(String directoryPath, String tarGzPath) throws IOException {
+  public static String createTarGzOfDirectory(String directoryPath, String tarGzPath)
+      throws IOException {
     return createTarGzOfDirectory(directoryPath, tarGzPath, "");
   }
 
@@ -75,12 +76,10 @@ public class TarGzCompressionUtils {
     if (!tarGzPath.endsWith(TAR_GZ_FILE_EXTENSION)) {
       tarGzPath = tarGzPath + TAR_GZ_FILE_EXTENSION;
     }
-    try (
-        FileOutputStream fOut = new FileOutputStream(new File(tarGzPath));
+    try (FileOutputStream fOut = new FileOutputStream(new File(tarGzPath));
         BufferedOutputStream bOut = new BufferedOutputStream(fOut);
         GzipCompressorOutputStream gzOut = new GzipCompressorOutputStream(bOut);
-        TarArchiveOutputStream tOut = new TarArchiveOutputStream(gzOut)
-    ) {
+        TarArchiveOutputStream tOut = new TarArchiveOutputStream(gzOut)) {
       tOut.setLongFileMode(TarArchiveOutputStream.LONGFILE_GNU);
       addFileToTarGz(tOut, directoryPath, entryPrefix);
     } catch (IOException e) {
@@ -90,7 +89,8 @@ public class TarGzCompressionUtils {
     return tarGzPath;
   }
 
-  public static String createTarGzOfDirectory(String directoryPath) throws IOException {
+  public static String createTarGzOfDirectory(String directoryPath)
+      throws IOException {
     String tarGzPath = directoryPath.substring(0);
     while (tarGzPath.endsWith("/")) {
       tarGzPath = tarGzPath.substring(0, tarGzPath.length() - 1);
@@ -114,7 +114,8 @@ public class TarGzCompressionUtils {
    * @throws IOException
    *           If anything goes wrong
    */
-  private static void addFileToTarGz(TarArchiveOutputStream tOut, String path, String base) throws IOException {
+  private static void addFileToTarGz(TarArchiveOutputStream tOut, String path, String base)
+      throws IOException {
     File f = new File(path);
     String entryName = base + f.getName();
     TarArchiveEntry tarEntry = new TarArchiveEntry(f, entryName);
@@ -140,7 +141,6 @@ public class TarGzCompressionUtils {
   }
 
   /** Untar an input file into an output file.
-
    * The output file is created in the output folder, having the same name
    * as the input file, minus the '.tar' extension.
    *

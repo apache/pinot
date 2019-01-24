@@ -89,9 +89,7 @@ public class LLCSegmentCompletionHandlers {
     }
 
     SegmentCompletionProtocol.Request.Params requestParams = new SegmentCompletionProtocol.Request.Params();
-    requestParams.withInstanceId(instanceId)
-        .withSegmentName(segmentName)
-        .withOffset(offset)
+    requestParams.withInstanceId(instanceId).withSegmentName(segmentName).withOffset(offset)
         .withExtraTimeSec(extraTimeSec);
     LOGGER.info("Processing extendBuildTime:{}", requestParams.toString());
 
@@ -118,7 +116,7 @@ public class LLCSegmentCompletionHandlers {
     }
     SegmentCompletionProtocol.Request.Params requestParams = new SegmentCompletionProtocol.Request.Params();
     requestParams.withInstanceId(instanceId).withSegmentName(segmentName).withOffset(offset).withReason(stopReason)
-      .withMemoryUsedBytes(memoryUsedBytes).withNumRows(numRows);
+        .withMemoryUsedBytes(memoryUsedBytes).withNumRows(numRows);
     LOGGER.info("Processing segmentConsumed:{}", requestParams.toString());
 
     SegmentCompletionProtocol.Response response = SegmentCompletionManager.getInstance().segmentConsumed(requestParams);
@@ -167,14 +165,9 @@ public class LLCSegmentCompletionHandlers {
     }
 
     SegmentCompletionProtocol.Request.Params requestParams = new SegmentCompletionProtocol.Request.Params();
-    requestParams.withInstanceId(instanceId)
-        .withSegmentName(segmentName)
-        .withOffset(offset)
-        .withMemoryUsedBytes(memoryUsedBytes)
-        .withBuildTimeMillis(buildTimeMillis)
-        .withWaitTimeMillis(waitTimeMillis)
-        .withNumRows(numRows)
-        .withSegmentSizeBytes(segmentSizeBytes);
+    requestParams.withInstanceId(instanceId).withSegmentName(segmentName).withOffset(offset)
+        .withMemoryUsedBytes(memoryUsedBytes).withBuildTimeMillis(buildTimeMillis).withWaitTimeMillis(waitTimeMillis)
+        .withNumRows(numRows).withSegmentSizeBytes(segmentSizeBytes);
 
     LOGGER.info("Processing segmentCommitStart:{}", requestParams.toString());
 
@@ -205,14 +198,9 @@ public class LLCSegmentCompletionHandlers {
     }
 
     SegmentCompletionProtocol.Request.Params requestParams = new SegmentCompletionProtocol.Request.Params();
-    requestParams.withInstanceId(instanceId)
-        .withSegmentName(segmentName)
-        .withOffset(offset)
-        .withSegmentLocation(segmentLocation)
-        .withSegmentSizeBytes(segmentSizeBytes)
-        .withBuildTimeMillis(buildTimeMillis)
-        .withWaitTimeMillis(waitTimeMillis)
-        .withNumRows(numRows)
+    requestParams.withInstanceId(instanceId).withSegmentName(segmentName).withOffset(offset)
+        .withSegmentLocation(segmentLocation).withSegmentSizeBytes(segmentSizeBytes)
+        .withBuildTimeMillis(buildTimeMillis).withWaitTimeMillis(waitTimeMillis).withNumRows(numRows)
         .withMemoryUsedBytes(memoryUsedBytes);
     LOGGER.info("Processing segmentCommitEnd:{}", requestParams.toString());
 
@@ -237,17 +225,11 @@ public class LLCSegmentCompletionHandlers {
       @QueryParam(SegmentCompletionProtocol.PARAM_BUILD_TIME_MILLIS) long buildTimeMillis,
       @QueryParam(SegmentCompletionProtocol.PARAM_WAIT_TIME_MILLIS) long waitTimeMillis,
       @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_SIZE_BYTES) long segmentSizeBytes,
-      @QueryParam(SegmentCompletionProtocol.PARAM_ROW_COUNT) int numRows,
-      FormDataMultiPart multiPart) {
+      @QueryParam(SegmentCompletionProtocol.PARAM_ROW_COUNT) int numRows, FormDataMultiPart multiPart) {
     SegmentCompletionProtocol.Request.Params requestParams = new SegmentCompletionProtocol.Request.Params();
-    requestParams.withInstanceId(instanceId)
-        .withSegmentName(segmentName)
-        .withOffset(offset)
-        .withSegmentSizeBytes(segmentSizeBytes)
-        .withBuildTimeMillis(buildTimeMillis)
-        .withWaitTimeMillis(waitTimeMillis)
-        .withNumRows(numRows)
-        .withMemoryUsedBytes(memoryUsedBytes);
+    requestParams.withInstanceId(instanceId).withSegmentName(segmentName).withOffset(offset)
+        .withSegmentSizeBytes(segmentSizeBytes).withBuildTimeMillis(buildTimeMillis).withWaitTimeMillis(waitTimeMillis)
+        .withNumRows(numRows).withMemoryUsedBytes(memoryUsedBytes);
     LOGGER.info("Processing segmentCommit:{}", requestParams.toString());
 
     final SegmentCompletionManager segmentCompletionManager = SegmentCompletionManager.getInstance();
@@ -318,11 +300,13 @@ public class LLCSegmentCompletionHandlers {
 
       LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
       final String rawTableName = llcSegmentName.getTableName();
-      final java.net.URI tableDirURI = ControllerConf.getUriFromPath(StringUtil.join("/", provider.getBaseDataDirURI().toString(), rawTableName));
+      final java.net.URI tableDirURI =
+          ControllerConf.getUriFromPath(StringUtil.join("/", provider.getBaseDataDirURI().toString(), rawTableName));
       java.net.URI segmentFileURI;
       if (isSplitCommit) {
         String uniqueSegmentFileName = SegmentCompletionUtils.generateSegmentFileName(segmentName);
-        segmentFileURI = ControllerConf.getUriFromPath(StringUtil.join("/", tableDirURI.toString(), uniqueSegmentFileName));
+        segmentFileURI =
+            ControllerConf.getUriFromPath(StringUtil.join("/", tableDirURI.toString(), uniqueSegmentFileName));
       } else {
         segmentFileURI = ControllerConf.getUriFromPath(StringUtil.join("/", tableDirURI.toString(), segmentName));
       }
@@ -330,7 +314,7 @@ public class LLCSegmentCompletionHandlers {
       PinotFS pinotFS = PinotFSFactory.create(provider.getBaseDataDirURI().getScheme());
       try {
         if (isSplitCommit) {
-            pinotFS.copyFromLocalFile(localTmpFile, segmentFileURI);
+          pinotFS.copyFromLocalFile(localTmpFile, segmentFileURI);
         } else {
           // Multiple threads can reach this point at the same time, if the following scenario happens
           // The server that was asked to commit did so very slowly (due to network speeds). Meanwhile the FSM in
@@ -348,7 +332,8 @@ public class LLCSegmentCompletionHandlers {
           // be used.
           synchronized (SegmentCompletionManager.getInstance()) {
             if (pinotFS.exists(segmentFileURI)) {
-              LOGGER.warn("Segment file {} exists. Replacing with upload from {}", segmentFileURI.toString(), instanceId);
+              LOGGER
+                  .warn("Segment file {} exists. Replacing with upload from {}", segmentFileURI.toString(), instanceId);
               pinotFS.delete(segmentFileURI, true);
             }
             pinotFS.copyFromLocalFile(localTmpFile, segmentFileURI);
@@ -359,7 +344,6 @@ public class LLCSegmentCompletionHandlers {
       } finally {
         FileUtils.deleteQuietly(localTmpFile);
       }
-
 
       LOGGER.info("Moved file {} to {}", localTmpFile.getAbsolutePath(), segmentFileURI.toString());
       return new URI(SCHEME + segmentFileURI.toString(), /* boolean escaped */ false).toString();

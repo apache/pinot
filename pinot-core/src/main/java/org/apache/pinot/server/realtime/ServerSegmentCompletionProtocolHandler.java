@@ -186,9 +186,9 @@ public class ServerSegmentCompletionProtocolHandler {
       final File segmentTarFile) {
     SegmentCompletionProtocol.Response response;
     try {
-      String responseStr =
-          _fileUploadDownloadClient.uploadSegment(new URI(url), segmentName, segmentTarFile, null, null,
-              SEGMENT_UPLOAD_REQUEST_TIMEOUT_MS).getResponse();
+      String responseStr = _fileUploadDownloadClient
+          .uploadSegment(new URI(url), segmentName, segmentTarFile, null, null, SEGMENT_UPLOAD_REQUEST_TIMEOUT_MS)
+          .getResponse();
       response = SegmentCompletionProtocol.Response.fromJsonString(responseStr);
       LOGGER.info("Controller response {} for {}", response.toJsonString(), url);
       if (response.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.NOT_LEADER)) {

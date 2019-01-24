@@ -33,7 +33,6 @@ public class GroupByResult {
   public GroupByResult() {
   }
 
-
   @JsonProperty("value")
   public Serializable getValue() {
     return _value;

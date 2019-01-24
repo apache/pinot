@@ -69,7 +69,8 @@ public class DataFetcherTest {
   private DataFetcher _dataFetcher;
 
   @BeforeClass
-  private void setup() throws Exception {
+  private void setup()
+      throws Exception {
     List<GenericRow> rows = new ArrayList<>(NUM_ROWS);
 
     // Generate random dimension and metric values.
@@ -113,8 +114,8 @@ public class DataFetcherTest {
     FileUtils.deleteQuietly(new File(INDEX_DIR_PATH));
     config.setOutDir(INDEX_DIR_PATH);
     config.setSegmentName(SEGMENT_NAME);
-    config.setRawIndexCreationColumns(
-        Arrays.asList(NO_DICT_INT_METRIC_NAME, NO_DICT_LONG_METRIC_NAME, NO_DICT_FLOAT_METRIC_NAME,
+    config.setRawIndexCreationColumns(Arrays
+        .asList(NO_DICT_INT_METRIC_NAME, NO_DICT_LONG_METRIC_NAME, NO_DICT_FLOAT_METRIC_NAME,
             NO_DICT_DOUBLE_METRIC_NAME));
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();

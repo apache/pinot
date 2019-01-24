@@ -20,6 +20,7 @@ package org.apache.pinot.tools.data.generator;
 
 import java.util.Random;
 
+
 public class RangeDoubleGenerator implements Generator {
   private final double _start;
   private final double _end;
@@ -29,7 +30,7 @@ public class RangeDoubleGenerator implements Generator {
 
   public RangeDoubleGenerator(double r1, double r2) {
     _start = (r1 < r2) ? r1 : r2;
-    _end =   (r1 > r2) ? r1 : r2;
+    _end = (r1 > r2) ? r1 : r2;
 
     _delta = _end - _start;
   }

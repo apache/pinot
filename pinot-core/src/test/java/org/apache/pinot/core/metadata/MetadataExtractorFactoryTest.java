@@ -27,8 +27,10 @@ public class MetadataExtractorFactoryTest {
   public void testDefaultMetadataProvider() {
     Assert.assertTrue(MetadataExtractorFactory.create(null) instanceof DefaultMetadataExtractor);
   }
+
   @Test
   public void testConfiguredMetadataProvider() {
-    Assert.assertTrue(MetadataExtractorFactory.create(DefaultMetadataExtractor.class.getName()) instanceof DefaultMetadataExtractor);
+    Assert.assertTrue(
+        MetadataExtractorFactory.create(DefaultMetadataExtractor.class.getName()) instanceof DefaultMetadataExtractor);
   }
 }

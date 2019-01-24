@@ -39,15 +39,16 @@ public class RealtimeSegmentStatsHistoryTest {
     segmentStats.setNumRowsIndexed(segmentId);
     for (int i = 0; i < 2; i++) {
       RealtimeSegmentStatsHistory.ColumnStats columnStats = new RealtimeSegmentStatsHistory.ColumnStats();
-      columnStats.setAvgColumnSize(segmentId*100 + i);
-      columnStats.setCardinality(segmentId*100 + i);
+      columnStats.setAvgColumnSize(segmentId * 100 + i);
+      columnStats.setCardinality(segmentId * 100 + i);
       segmentStats.setColumnStats(String.valueOf(i), columnStats);
     }
     history.addSegmentStats(segmentStats);
   }
 
   @Test
-  public void zeroStatTest() throws Exception {
+  public void zeroStatTest()
+      throws Exception {
     final String tmpDir = System.getProperty("java.io.tmpdir");
     File serializedFile = new File(tmpDir, STATS_FILE_NAME);
     serializedFile.deleteOnExit();
@@ -78,7 +79,8 @@ public class RealtimeSegmentStatsHistoryTest {
   }
 
   @Test
-  public void serdeTest() throws Exception {
+  public void serdeTest()
+      throws Exception {
     final String tmpDir = System.getProperty("java.io.tmpdir");
     File serializedFile = new File(tmpDir, STATS_FILE_NAME);
     serializedFile.deleteOnExit();
@@ -113,7 +115,7 @@ public class RealtimeSegmentStatsHistoryTest {
       RealtimeSegmentStatsHistory history = RealtimeSegmentStatsHistory.deserialzeFrom(serializedFile);
       Assert.assertEquals(history.isFull(), false);
       Assert.assertEquals(history.getArraySize(), maxNumEntries);
-      Assert.assertEquals(history.getCursor(), prevMax-1);
+      Assert.assertEquals(history.getCursor(), prevMax - 1);
       // Add one segment
       addSegmentStats(segmentId++, history);
       Assert.assertEquals(history.isFull(), false);
@@ -122,11 +124,11 @@ public class RealtimeSegmentStatsHistoryTest {
       Assert.assertEquals(history.getCursor(), segmentId);
       history.getEstimatedAvgColSize("0");
       history.getEstimatedCardinality("0");
-    // Now add 2 more segments for it to go over.
+      // Now add 2 more segments for it to go over.
       addSegmentStats(segmentId++, history);
       Assert.assertEquals(history.isFull(), false);
       Assert.assertEquals(history.getArraySize(), maxNumEntries);
-      Assert.assertEquals(history.getCursor(), prevMax+1);
+      Assert.assertEquals(history.getCursor(), prevMax + 1);
       Assert.assertEquals(history.getCursor(), segmentId);
       history.getEstimatedAvgColSize("0");
       history.getEstimatedCardinality("0");
@@ -151,7 +153,7 @@ public class RealtimeSegmentStatsHistoryTest {
 
     // Now there should be "maxNumEntries" entries in the file, and the cursor is at 1.
     {
-      maxNumEntries -=2;
+      maxNumEntries -= 2;
       RealtimeSegmentStatsHistory.setMaxNumEntries(maxNumEntries);
 
       RealtimeSegmentStatsHistory history = RealtimeSegmentStatsHistory.deserialzeFrom(serializedFile);
@@ -184,7 +186,8 @@ public class RealtimeSegmentStatsHistoryTest {
     {
       RealtimeSegmentStatsHistory history = RealtimeSegmentStatsHistory.deserialzeFrom(serializedFile);
       Assert.assertEquals(history.getEstimatedAvgColSize("new"), RealtimeSegmentStatsHistory.getDefaultEstAvgColSize());
-      Assert.assertEquals(history.getEstimatedCardinality("new"), RealtimeSegmentStatsHistory.getDefaultEstCardinality());
+      Assert
+          .assertEquals(history.getEstimatedCardinality("new"), RealtimeSegmentStatsHistory.getDefaultEstCardinality());
       savedIsFull = history.isFull();
       savedCursor = history.getCursor();
     }
@@ -196,7 +199,8 @@ public class RealtimeSegmentStatsHistoryTest {
   }
 
   @Test
-  public void testMultiThreadedUse() throws Exception {
+  public void testMultiThreadedUse()
+      throws Exception {
     final int numThreads = 8;
     final int numIterations = 10;
     final long avgSleepTimeMs = 300;
@@ -223,9 +227,12 @@ public class RealtimeSegmentStatsHistoryTest {
   // from reading data serialized by earlier versions. The serialized data has one segment, with 2 columns -- "v1col1" and
   // "v1col2".
   @Test
-  public void testVersion1() throws Exception {
+  public void testVersion1()
+      throws Exception {
     final String fileName = "realtime-segment-stats-history-v1.ser";
-    File v1StatsFile = new File(TestUtils.getFileFromResourceUrl(RealtimeSegmentStatsHistoryTest.class.getClassLoader().getResource("data")), fileName);
+    File v1StatsFile = new File(
+        TestUtils.getFileFromResourceUrl(RealtimeSegmentStatsHistoryTest.class.getClassLoader().getResource("data")),
+        fileName);
     RealtimeSegmentStatsHistory statsHistory = RealtimeSegmentStatsHistory.deserialzeFrom(v1StatsFile);
     RealtimeSegmentStatsHistory.SegmentStats segmentStats = statsHistory.getSegmentStatsAt(0);
     RealtimeSegmentStatsHistory.ColumnStats columnStats;
@@ -241,7 +248,6 @@ public class RealtimeSegmentStatsHistoryTest {
     Assert.assertEquals(segmentStats.getNumRowsIndexed(), 0); // Input file does not have this field.
     Assert.assertEquals(segmentStats.getMemUsedBytes(), 600);
     Assert.assertEquals(segmentStats.getNumSeconds(), 700);
-
   }
 
   private static class StatsUpdater implements Runnable {
@@ -254,11 +260,11 @@ public class RealtimeSegmentStatsHistoryTest {
     private static final int MAX_AVGLEN = 200;
     private static final int MAX_CARDINALITY = 50000;
 
-    private StatsUpdater(RealtimeSegmentStatsHistory statsHistory, int numInterations, long avgSleepTimeMs){
+    private StatsUpdater(RealtimeSegmentStatsHistory statsHistory, int numInterations, long avgSleepTimeMs) {
       _statsHistory = statsHistory;
       _numIterations = numInterations;
       _avgSleepTimeMs = avgSleepTimeMs;
-      _sleepVariationMs = (int)_avgSleepTimeMs/10;
+      _sleepVariationMs = (int) _avgSleepTimeMs / 10;
     }
 
     @Override

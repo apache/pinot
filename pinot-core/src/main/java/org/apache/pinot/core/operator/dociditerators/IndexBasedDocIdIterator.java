@@ -19,8 +19,10 @@
 package org.apache.pinot.core.operator.dociditerators;
 
 import org.apache.pinot.core.common.BlockDocIdIterator;
+
+
 /**
- * Marker interface to say that the doc id iteration is based on an index. 
+ * Marker interface to say that the doc id iteration is based on an index.
  */
 public interface IndexBasedDocIdIterator extends BlockDocIdIterator {
 

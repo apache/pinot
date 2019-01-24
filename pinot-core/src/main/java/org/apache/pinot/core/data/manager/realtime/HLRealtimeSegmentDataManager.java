@@ -106,7 +106,7 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     _segmentVersion = indexLoadingConfig.getSegmentVersion();
     this.schema = schema;
     _recordTransformer = CompoundTransformer.getDefaultTransformer(schema);
-    this.serverMetrics =serverMetrics;
+    this.serverMetrics = serverMetrics;
     this.segmentName = realtimeSegmentZKMetadata.getSegmentName();
     this.tableName = tableConfig.getTableName();
     this.timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
@@ -123,9 +123,9 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             firstSortedColumn, segmentName);
         this.sortedColumn = firstSortedColumn;
       } else {
-        LOGGER.warn(
-            "Sorted column name: {} from RealtimeDataResourceZKMetadata is not existed in schema for segment {}.",
-            firstSortedColumn, segmentName);
+        LOGGER
+            .warn("Sorted column name: {} from RealtimeDataResourceZKMetadata is not existed in schema for segment {}.",
+                firstSortedColumn, segmentName);
         this.sortedColumn = null;
       }
     }
@@ -176,26 +176,23 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     // lets create a new realtime segment
     segmentLogger.info("Started {} stream provider", _streamConfig.getType());
     final int capacity = _streamConfig.getFlushThresholdRows();
-    RealtimeSegmentConfig realtimeSegmentConfig = new RealtimeSegmentConfig.Builder().setSegmentName(segmentName)
-        .setStreamName(_streamConfig.getTopicName())
-        .setSchema(schema)
-        .setCapacity(capacity)
-        .setAvgNumMultiValues(indexLoadingConfig.getRealtimeAvgMultiValueCount())
-        .setNoDictionaryColumns(indexLoadingConfig.getNoDictionaryColumns())
-        .setInvertedIndexColumns(invertedIndexColumns)
-        .setRealtimeSegmentZKMetadata(realtimeSegmentZKMetadata)
-        .setOffHeap(indexLoadingConfig.isRealtimeOffheapAllocation())
-        .setMemoryManager(getMemoryManager(realtimeTableDataManager.getConsumerDir(), segmentName,
-            indexLoadingConfig.isRealtimeOffheapAllocation(), indexLoadingConfig.isDirectRealtimeOffheapAllocation(),
-            serverMetrics))
-        .setStatsHistory(realtimeTableDataManager.getStatsHistory())
-        .build();
+    RealtimeSegmentConfig realtimeSegmentConfig =
+        new RealtimeSegmentConfig.Builder().setSegmentName(segmentName).setStreamName(_streamConfig.getTopicName())
+            .setSchema(schema).setCapacity(capacity)
+            .setAvgNumMultiValues(indexLoadingConfig.getRealtimeAvgMultiValueCount())
+            .setNoDictionaryColumns(indexLoadingConfig.getNoDictionaryColumns())
+            .setInvertedIndexColumns(invertedIndexColumns).setRealtimeSegmentZKMetadata(realtimeSegmentZKMetadata)
+            .setOffHeap(indexLoadingConfig.isRealtimeOffheapAllocation()).setMemoryManager(
+            getMemoryManager(realtimeTableDataManager.getConsumerDir(), segmentName,
+                indexLoadingConfig.isRealtimeOffheapAllocation(),
+                indexLoadingConfig.isDirectRealtimeOffheapAllocation(), serverMetrics))
+            .setStatsHistory(realtimeTableDataManager.getStatsHistory()).build();
     realtimeSegment = new MutableSegmentImpl(realtimeSegmentConfig);
 
     notifier = realtimeTableDataManager;
 
-    LOGGER.info("Starting consumption on realtime consuming segment {} maxRowCount {} maxEndTime {}",
-        segmentName, capacity, new DateTime(segmentEndTimeThreshold, DateTimeZone.UTC).toString());
+    LOGGER.info("Starting consumption on realtime consuming segment {} maxRowCount {} maxEndTime {}", segmentName,
+        capacity, new DateTime(segmentEndTimeThreshold, DateTimeZone.UTC).toString());
     segmentStatusTask = new TimerTask() {
       @Override
       public void run() {
@@ -227,8 +224,9 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
               }
             }
           } catch (Exception e) {
-            segmentLogger.warn("Caught exception while indexing row, sleeping for {} ms, row contents {}",
-                exceptionSleepMillis, consumedRow, e);
+            segmentLogger
+                .warn("Caught exception while indexing row, sleeping for {} ms, row contents {}", exceptionSleepMillis,
+                    consumedRow, e);
             numRowsErrored++;
 
             // Sleep for a short time as to avoid filling the logs with exceptions too quickly
@@ -258,9 +256,9 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           // lets convert the segment now
           RealtimeSegmentConverter converter =
               new RealtimeSegmentConverter(realtimeSegment, tempSegmentFolder.getAbsolutePath(), schema,
-                  realtimeSegmentZKMetadata.getTableName(), timeColumnName, realtimeSegmentZKMetadata.getSegmentName(), sortedColumn,
-                  HLRealtimeSegmentDataManager.this.invertedIndexColumns,
-                  noDictionaryColumns, null/*StarTreeIndexSpec*/); // Star tree not supported for HLC.
+                  realtimeSegmentZKMetadata.getTableName(), timeColumnName, realtimeSegmentZKMetadata.getSegmentName(),
+                  sortedColumn, HLRealtimeSegmentDataManager.this.invertedIndexColumns, noDictionaryColumns,
+                  null/*StarTreeIndexSpec*/); // Star tree not supported for HLC.
 
           segmentLogger.info("Trying to build segment");
           final long buildStartTime = System.nanoTime();
@@ -286,7 +284,8 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             _streamLevelConsumer.commit();
             commitSuccessful = true;
             _streamLevelConsumer.shutdown();
-            segmentLogger.info("Successfully committed {} offsets, consumer release requested.", _streamConfig.getType());
+            segmentLogger
+                .info("Successfully committed {} offsets, consumer release requested.", _streamConfig.getType());
           } catch (Throwable e) {
             // If we got here, it means that either the commit or the shutdown failed. Considering that the
             // KafkaConsumerManager delays shutdown and only adds the consumer to be released in a deferred way, this
@@ -335,8 +334,9 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             //   metadata to reflect the new consumer group id, copy the Kafka offsets from the shutdown replica onto
             //   the new consumer group id and then restart both replicas. This should get you the missing rows.
 
-            segmentLogger.error("FATAL: Exception committing or shutting down consumer commitSuccessful={}",
-                commitSuccessful, e);
+            segmentLogger
+                .error("FATAL: Exception committing or shutting down consumer commitSuccessful={}", commitSuccessful,
+                    e);
             serverMetrics.addMeteredTableValue(tableName, ServerMeter.REALTIME_OFFSET_COMMIT_EXCEPTIONS, 1L);
             if (!commitSuccessful) {
               _streamLevelConsumer.shutdown();
@@ -355,12 +355,17 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             metadataToOverwrite.setTimeUnit(timeUnit);
             metadataToOverwrite.setTotalRawDocs(realtimeSegment.getNumDocsIndexed());
             notifier.notifySegmentCommitted(metadataToOverwrite, segment);
-            segmentLogger.info("Completed write of segment completion to Helix, waiting for controller to assign a new segment");
+            segmentLogger
+                .info("Completed write of segment completion to Helix, waiting for controller to assign a new segment");
           } catch (Exception e) {
             if (commitSuccessful) {
-              segmentLogger.error("Offsets were committed to Kafka but we were unable to mark this segment as completed in Helix. Manually mark the segment as completed in Helix; restarting this instance will result in data loss.", e);
+              segmentLogger.error(
+                  "Offsets were committed to Kafka but we were unable to mark this segment as completed in Helix. Manually mark the segment as completed in Helix; restarting this instance will result in data loss.",
+                  e);
             } else {
-              segmentLogger.warn("Caught exception while marking segment as completed in Helix. Offsets were not written, restarting the instance should be safe.", e);
+              segmentLogger.warn(
+                  "Caught exception while marking segment as completed in Helix. Offsets were not written, restarting the instance should be safe.",
+                  e);
             }
           }
         } catch (Exception e) {
@@ -408,7 +413,8 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
   private void updateCurrentDocumentCountMetrics() {
     int currentRawDocs = realtimeSegment.getNumDocsIndexed();
-    serverMetrics.addValueToTableGauge(tableName, ServerGauge.DOCUMENT_COUNT, (currentRawDocs - lastUpdatedRawDocuments.get()));
+    serverMetrics
+        .addValueToTableGauge(tableName, ServerGauge.DOCUMENT_COUNT, (currentRawDocs - lastUpdatedRawDocuments.get()));
     lastUpdatedRawDocuments.set(currentRawDocs);
   }
 

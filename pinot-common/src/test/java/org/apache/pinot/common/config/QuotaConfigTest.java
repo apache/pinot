@@ -28,7 +28,8 @@ import org.testng.annotations.Test;
 public class QuotaConfigTest {
 
   @Test
-  public void testQuotaConfig() throws IOException {
+  public void testQuotaConfig()
+      throws IOException {
     {
       String quotaConfigStr = "{\"storage\" : \"100g\"}";
       QuotaConfig quotaConfig = JsonUtils.stringToObject(quotaConfigStr, QuotaConfig.class);
@@ -45,7 +46,8 @@ public class QuotaConfigTest {
   }
 
   @Test
-  public void testBadQuotaConfig() throws IOException {
+  public void testBadQuotaConfig()
+      throws IOException {
     {
       String quotaConfigStr = "{\"storage\" : \"124GB3GB\"}";
       QuotaConfig quotaConfig = JsonUtils.stringToObject(quotaConfigStr, QuotaConfig.class);
@@ -55,14 +57,16 @@ public class QuotaConfigTest {
   }
 
   @Test(expectedExceptions = ConfigurationRuntimeException.class)
-  public void testBadConfig() throws IOException {
+  public void testBadConfig()
+      throws IOException {
     String quotaConfigStr = "{\"storage\":\"-1M\"}";
     QuotaConfig quotaConfig = JsonUtils.stringToObject(quotaConfigStr, QuotaConfig.class);
     quotaConfig.validate();
   }
 
   @Test
-  public void testQpsQuota() throws IOException {
+  public void testQpsQuota()
+      throws IOException {
     {
       String quotaConfigStr = "{\"maxQueriesPerSecond\" : \"100.00\"}";
       QuotaConfig quotaConfig = JsonUtils.stringToObject(quotaConfigStr, QuotaConfig.class);
@@ -88,7 +92,8 @@ public class QuotaConfigTest {
   }
 
   @Test(expectedExceptions = ConfigurationRuntimeException.class)
-  public void testInvalidQpsQuota() throws IOException {
+  public void testInvalidQpsQuota()
+      throws IOException {
     String quotaConfigStr = "{\"maxQueriesPerSecond\" : \"InvalidQpsQuota\"}";
     QuotaConfig quotaConfig = JsonUtils.stringToObject(quotaConfigStr, QuotaConfig.class);
     Assert.assertNotNull(quotaConfig.getMaxQueriesPerSecond());
@@ -96,7 +101,8 @@ public class QuotaConfigTest {
   }
 
   @Test(expectedExceptions = ConfigurationRuntimeException.class)
-  public void testNegativeQpsQuota() throws IOException {
+  public void testNegativeQpsQuota()
+      throws IOException {
     String quotaConfigStr = "{\"maxQueriesPerSecond\" : \"-1.0\"}";
     QuotaConfig quotaConfig = JsonUtils.stringToObject(quotaConfigStr, QuotaConfig.class);
     Assert.assertNotNull(quotaConfig.getMaxQueriesPerSecond());
@@ -104,7 +110,8 @@ public class QuotaConfigTest {
   }
 
   @Test(expectedExceptions = ConfigurationRuntimeException.class)
-  public void testBadQpsQuota() throws IOException {
+  public void testBadQpsQuota()
+      throws IOException {
     String quotaConfigStr = "{\"maxQueriesPerSecond\" : \"1.0Test\"}";
     QuotaConfig quotaConfig = JsonUtils.stringToObject(quotaConfigStr, QuotaConfig.class);
     Assert.assertNotNull(quotaConfig.getMaxQueriesPerSecond());

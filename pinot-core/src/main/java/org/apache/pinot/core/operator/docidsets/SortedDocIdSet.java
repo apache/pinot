@@ -34,7 +34,7 @@ public class SortedDocIdSet implements FilterBlockDocIdSet {
   int endDocId;
   private String datasourceName;
 
-  public SortedDocIdSet(String datasourceName,List<IntPair> pairs) {
+  public SortedDocIdSet(String datasourceName, List<IntPair> pairs) {
     this.datasourceName = datasourceName;
     this.pairs = pairs;
   }

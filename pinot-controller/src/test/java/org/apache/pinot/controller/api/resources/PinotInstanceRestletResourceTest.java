@@ -44,7 +44,8 @@ public class PinotInstanceRestletResourceTest extends ControllerTest {
   }
 
   @Test
-  public void testInstanceListingAndCreation() throws Exception {
+  public void testInstanceListingAndCreation()
+      throws Exception {
     // Check that there are no instances
     JsonNode instanceList = JsonUtils.stringToJsonNode(sendGetRequest(_controllerRequestURLBuilder.forInstanceList()));
     assertEquals(instanceList.get("instances").size(), 0, "Expected empty instance list at beginning of test");
@@ -62,9 +63,9 @@ public class PinotInstanceRestletResourceTest extends ControllerTest {
     TestUtils.waitForCondition(aVoid -> {
       try {
         // Check that there are two instances
-        return JsonUtils.stringToJsonNode(sendGetRequest(_controllerRequestURLBuilder.forInstanceList()))
-            .get("instances")
-            .size() == 2;
+        return
+            JsonUtils.stringToJsonNode(sendGetRequest(_controllerRequestURLBuilder.forInstanceList())).get("instances")
+                .size() == 2;
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
@@ -83,9 +84,9 @@ public class PinotInstanceRestletResourceTest extends ControllerTest {
     TestUtils.waitForCondition(aVoid -> {
       try {
         // Check that there are four instances
-        return JsonUtils.stringToJsonNode(sendGetRequest(_controllerRequestURLBuilder.forInstanceList()))
-            .get("instances")
-            .size() == 4;
+        return
+            JsonUtils.stringToJsonNode(sendGetRequest(_controllerRequestURLBuilder.forInstanceList())).get("instances")
+                .size() == 4;
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
@@ -108,13 +109,13 @@ public class PinotInstanceRestletResourceTest extends ControllerTest {
 
     // Check that there are four instances
     JsonUtils.stringToJsonNode(sendGetRequest(_controllerRequestURLBuilder.forInstanceList()));
-    assertEquals(JsonUtils.stringToJsonNode(sendGetRequest(_controllerRequestURLBuilder.forInstanceList()))
-        .get("instances")
-        .size(), 4, "Expected fore instances after creation of duplicate instances");
+    assertEquals(
+        JsonUtils.stringToJsonNode(sendGetRequest(_controllerRequestURLBuilder.forInstanceList())).get("instances")
+            .size(), 4, "Expected fore instances after creation of duplicate instances");
 
     // Check that the instances are properly created
-    JsonNode instance = JsonUtils.stringToJsonNode(
-        sendGetRequest(_controllerRequestURLBuilder.forInstanceInformation("Broker_1.2.3.4_1234")));
+    JsonNode instance = JsonUtils
+        .stringToJsonNode(sendGetRequest(_controllerRequestURLBuilder.forInstanceInformation("Broker_1.2.3.4_1234")));
     assertEquals(instance.get("instanceName").asText(), "Broker_1.2.3.4_1234");
     assertEquals(instance.get("hostName").asText(), "1.2.3.4");
     assertEquals(instance.get("port").asText(), "1234");
@@ -122,8 +123,8 @@ public class PinotInstanceRestletResourceTest extends ControllerTest {
     assertEquals(instance.get("tags").size(), 1);
     assertEquals(instance.get("tags").get(0).asText(), CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE);
 
-    instance = JsonUtils.stringToJsonNode(
-        sendGetRequest(_controllerRequestURLBuilder.forInstanceInformation("Server_1.2.3.4_2345")));
+    instance = JsonUtils
+        .stringToJsonNode(sendGetRequest(_controllerRequestURLBuilder.forInstanceInformation("Server_1.2.3.4_2345")));
     assertEquals(instance.get("instanceName").asText(), "Server_1.2.3.4_2345");
     assertEquals(instance.get("hostName").asText(), "1.2.3.4");
     assertEquals(instance.get("port").asText(), "2345");
@@ -131,8 +132,8 @@ public class PinotInstanceRestletResourceTest extends ControllerTest {
     assertEquals(instance.get("tags").size(), 1);
     assertEquals(instance.get("tags").get(0).asText(), CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE);
 
-    instance = JsonUtils.stringToJsonNode(
-        sendGetRequest(_controllerRequestURLBuilder.forInstanceInformation("Broker_2.3.4.5_1234")));
+    instance = JsonUtils
+        .stringToJsonNode(sendGetRequest(_controllerRequestURLBuilder.forInstanceInformation("Broker_2.3.4.5_1234")));
     assertEquals(instance.get("instanceName").asText(), "Broker_2.3.4.5_1234");
     assertEquals(instance.get("hostName").asText(), "2.3.4.5");
     assertEquals(instance.get("port").asText(), "1234");
@@ -140,8 +141,8 @@ public class PinotInstanceRestletResourceTest extends ControllerTest {
     assertEquals(instance.get("tags").size(), 1);
     assertEquals(instance.get("tags").get(0).asText(), "someTag");
 
-    instance = JsonUtils.stringToJsonNode(
-        sendGetRequest(_controllerRequestURLBuilder.forInstanceInformation("Server_2.3.4.5_2345")));
+    instance = JsonUtils
+        .stringToJsonNode(sendGetRequest(_controllerRequestURLBuilder.forInstanceInformation("Server_2.3.4.5_2345")));
     assertEquals(instance.get("instanceName").asText(), "Server_2.3.4.5_2345");
     assertEquals(instance.get("hostName").asText(), "2.3.4.5");
     assertEquals(instance.get("port").asText(), "2345");

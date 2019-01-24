@@ -20,6 +20,7 @@ package org.apache.pinot.tools.data.generator;
 
 import java.util.Random;
 
+
 public class RangeFloatGenerator implements Generator {
   private final float _start;
   private final float _end;
@@ -29,7 +30,7 @@ public class RangeFloatGenerator implements Generator {
 
   public RangeFloatGenerator(float r1, float r2) {
     _start = (r1 < r2) ? r1 : r2;
-    _end =   (r1 > r2) ? r1 : r2;
+    _end = (r1 > r2) ? r1 : r2;
 
     _delta = _end - _start;
   }

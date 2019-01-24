@@ -58,14 +58,9 @@ public class HavingQueryTree extends QueryTree {
     if (_operator == FilterOperator.OR || _operator == FilterOperator.AND) {
       stringBuffer.append(_operator);
     } else {
-      stringBuffer.append(_aggregationInfo.getAggregationType())
-          .append("(")
-          .append(_aggregationInfo.getAggregationParams().toString())
-          .append(")")
-          .append(" ")
-          .append(_operator)
-          .append(" ")
-          .append(_value);
+      stringBuffer.append(_aggregationInfo.getAggregationType()).append("(")
+          .append(_aggregationInfo.getAggregationParams().toString()).append(")").append(" ").append(_operator)
+          .append(" ").append(_value);
     }
     if (_children != null) {
       for (QueryTree child : _children) {

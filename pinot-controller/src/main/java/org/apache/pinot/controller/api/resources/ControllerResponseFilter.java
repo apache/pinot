@@ -38,6 +38,7 @@ public class ControllerResponseFilter implements ContainerResponseFilter {
   private javax.inject.Provider<org.glassfish.grizzly.http.server.Request> request;
 
   public static final Logger LOGGER = LoggerFactory.getLogger(ControllerResponseFilter.class);
+
   @Override
   public void filter(ContainerRequestContext requestContext, ContainerResponseContext responseContext)
       throws IOException {
@@ -47,6 +48,7 @@ public class ControllerResponseFilter implements ContainerResponseFilter {
     final String reasonPhrase = responseContext.getStatusInfo().getReasonPhrase();
     final String srcIpAddr = request.get().getRemoteAddr();
     final String contentType = requestContext.getHeaderString(HttpHeaders.CONTENT_TYPE);
-    LOGGER.info("Handled request from {} {} {}, content-type {} status code {} {}", srcIpAddr, method, uri, contentType, respStatus, reasonPhrase);
+    LOGGER.info("Handled request from {} {} {}, content-type {} status code {} {}", srcIpAddr, method, uri, contentType,
+        respStatus, reasonPhrase);
   }
 }

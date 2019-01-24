@@ -20,15 +20,19 @@ package org.apache.pinot.core.segment.creator;
 
 import org.apache.pinot.core.data.GenericRow;
 
+
 public interface SegmentPreIndexStatsCollector extends SegmentPreIndexStatsContainer {
 
   void init();
 
-  void build() throws Exception;
+  void build()
+      throws Exception;
 
-  void collectRow(GenericRow row) throws Exception;
+  void collectRow(GenericRow row)
+      throws Exception;
 
-  void collectRow(GenericRow row, boolean isAggregated) throws Exception;
+  void collectRow(GenericRow row, boolean isAggregated)
+      throws Exception;
 
   void logStats();
 }

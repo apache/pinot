@@ -36,8 +36,8 @@ import org.testng.annotations.BeforeClass;
 public class BlocksTest {
 
   private static final String AVRO_DATA = "data/test_data-mv.avro";
-  private static File INDEX_DIR = new File(FileUtils.getTempDirectory() + File.separator
-      + IntArraysTest.class.getName());
+  private static File INDEX_DIR =
+      new File(FileUtils.getTempDirectory() + File.separator + IntArraysTest.class.getName());
 
   @AfterClass
   public static void cleanup() {
@@ -45,7 +45,8 @@ public class BlocksTest {
   }
 
   @BeforeClass
-  public static void before() throws Exception {
+  public static void before()
+      throws Exception {
     final String filePath = TestUtils.getFileFromResourceUrl(BlocksTest.class.getClassLoader().getResource(AVRO_DATA));
     if (INDEX_DIR.exists()) {
       FileUtils.deleteQuietly(INDEX_DIR);
@@ -54,9 +55,9 @@ public class BlocksTest {
 //    System.out.println(INDEX_DIR.getAbsolutePath());
     final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
 
-    final SegmentGeneratorConfig config =
-        SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, "daysSinceEpoch",
-            TimeUnit.DAYS, "test");
+    final SegmentGeneratorConfig config = SegmentTestUtils
+        .getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, "daysSinceEpoch", TimeUnit.DAYS,
+            "test");
     config.setTimeColumnName("daysSinceEpoch");
     driver.init(config);
     driver.build();

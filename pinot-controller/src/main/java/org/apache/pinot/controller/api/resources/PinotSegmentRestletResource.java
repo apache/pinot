@@ -371,8 +371,8 @@ public class PinotSegmentRestletResource {
           toggleSegmentsForTable(offlineSegments, offlineTableName, segmentName, state, helixResourceManager);
       if (!responseOffline.isSuccessful() || !responseRealtime.isSuccessful()) {
         throw new ControllerApplicationException(LOGGER,
-            "OFFLINE response : " + responseOffline.getMessage() + ", REALTIME response"
-                + responseRealtime.getMessage(), INTERNAL_ERROR);
+            "OFFLINE response : " + responseOffline.getMessage() + ", REALTIME response" + responseRealtime
+                .getMessage(), INTERNAL_ERROR);
       }
       List<PinotResourceManagerResponse> responses = new ArrayList<>();
       responses.add(responseRealtime);

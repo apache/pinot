@@ -73,7 +73,8 @@ public class BaseTableDataManagerTest {
   private volatile int _hi;
 
   @BeforeSuite
-  public void setUp() throws Exception {
+  public void setUp()
+      throws Exception {
     _tmpDir = File.createTempFile("OfflineTableDataManagerTest", null);
     _tmpDir.deleteOnExit();
   }
@@ -97,7 +98,8 @@ public class BaseTableDataManagerTest {
     _masterThread = null;
   }
 
-  private TableDataManager makeTestableManager() throws Exception {
+  private TableDataManager makeTestableManager()
+      throws Exception {
     TableDataManager tableDataManager = new OfflineTableDataManager();
     TableDataManagerConfig config;
     {
@@ -105,8 +107,8 @@ public class BaseTableDataManagerTest {
       when(config.getTableName()).thenReturn(TABLE_NAME);
       when(config.getDataDir()).thenReturn(_tmpDir.getAbsolutePath());
     }
-    tableDataManager.init(config, "dummyInstance", mock(ZkHelixPropertyStore.class),
-        new ServerMetrics(new MetricsRegistry()));
+    tableDataManager
+        .init(config, "dummyInstance", mock(ZkHelixPropertyStore.class), new ServerMetrics(new MetricsRegistry()));
     tableDataManager.start();
     Field segsMapField = BaseTableDataManager.class.getDeclaredField("_segmentDataManagerMap");
     segsMapField.setAccessible(true);
@@ -129,7 +131,8 @@ public class BaseTableDataManagerTest {
   }
 
   @Test
-  public void basicTest() throws Exception {
+  public void basicTest()
+      throws Exception {
     TableDataManager tableDataManager = makeTestableManager();
     final String segmentName = "TestSegment";
     final int totalDocs = 23456;
@@ -205,7 +208,8 @@ public class BaseTableDataManagerTest {
    */
 
   @Test
-  public void testReplace() throws Exception {
+  public void testReplace()
+      throws Exception {
     _lo = 0;
     _hi = 30;   // Total number of segments we have in the server.
     final int numQueryThreads = 10;

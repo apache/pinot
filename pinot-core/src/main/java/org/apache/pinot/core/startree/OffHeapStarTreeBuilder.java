@@ -134,7 +134,8 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
   private final Set<StarTreeDataTable> _dataTablesToClose = new HashSet<>();
 
   @Override
-  public void init(StarTreeBuilderConfig builderConfig) throws IOException {
+  public void init(StarTreeBuilderConfig builderConfig)
+      throws IOException {
     _tempDir = builderConfig.getOutDir();
     if (_tempDir == null) {
       _tempDir = new File(FileUtils.getTempDirectory(), V1Constants.STAR_TREE_INDEX_DIR + "_" + DateTime.now());
@@ -211,7 +212,8 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
   }
 
   @Override
-  public void append(GenericRow row) throws IOException {
+  public void append(GenericRow row)
+      throws IOException {
     // Dimensions
     DimensionBuffer dimensions = new DimensionBuffer(_numDimensions);
     for (int i = 0; i < _numDimensions; i++) {
@@ -244,23 +246,27 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
     appendToRawBuffer(dimensions, metrics);
   }
 
-  private void appendToRawBuffer(DimensionBuffer dimensions, MetricBuffer metrics) throws IOException {
+  private void appendToRawBuffer(DimensionBuffer dimensions, MetricBuffer metrics)
+      throws IOException {
     appendToBuffer(dimensions, metrics);
     _numRawDocs++;
   }
 
-  private void appendToAggBuffer(DimensionBuffer dimensions, MetricBuffer metrics) throws IOException {
+  private void appendToAggBuffer(DimensionBuffer dimensions, MetricBuffer metrics)
+      throws IOException {
     appendToBuffer(dimensions, metrics);
     _numAggregatedDocs++;
   }
 
-  private void appendToBuffer(DimensionBuffer dimensions, MetricBuffer metrics) throws IOException {
+  private void appendToBuffer(DimensionBuffer dimensions, MetricBuffer metrics)
+      throws IOException {
     _outputStream.write(dimensions.toBytes(), 0, _dimensionSize);
     _outputStream.write(metrics.toBytes(_metricSize), 0, _metricSize);
   }
 
   @Override
-  public void build() throws IOException {
+  public void build()
+      throws IOException {
     // From this point, all raw documents have been appended
     _outputStream.flush();
 
@@ -302,8 +308,8 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
       constructStarTree(_rootNode, _numRawDocs, _numRawDocs + _numAggregatedDocs, 0);
     } else {
       // Sort the documents
-      try (StarTreeDataTable dataTable = new StarTreeDataTable(
-          PinotDataBuffer.mapFile(_dataFile, false, 0, _dataFile.length(), PinotDataBuffer.NATIVE_ORDER,
+      try (StarTreeDataTable dataTable = new StarTreeDataTable(PinotDataBuffer
+          .mapFile(_dataFile, false, 0, _dataFile.length(), PinotDataBuffer.NATIVE_ORDER,
               "OffHeapStarTreeBuilder#build: data buffer"), _dimensionSize, _metricSize, 0)) {
         dataTable.sort(0, _numRawDocs, _sortOrder);
       }
@@ -321,9 +327,10 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
         _numRawDocs, _numAggregatedDocs);
   }
 
-  private void removeSkipMaterializationDimensions() throws IOException {
-    try (StarTreeDataTable dataTable = new StarTreeDataTable(
-        PinotDataBuffer.mapFile(_dataFile, false, 0, _dataFile.length(), PinotDataBuffer.NATIVE_ORDER,
+  private void removeSkipMaterializationDimensions()
+      throws IOException {
+    try (StarTreeDataTable dataTable = new StarTreeDataTable(PinotDataBuffer
+        .mapFile(_dataFile, false, 0, _dataFile.length(), PinotDataBuffer.NATIVE_ORDER,
             "OffHeapStarTreeBuilder#removeSkipMaterializationDimensions: data buffer"), _dimensionSize, _metricSize,
         0)) {
       dataTable.sort(0, _numRawDocs, _sortOrder);
@@ -359,9 +366,10 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
     _outputStream.flush();
   }
 
-  private void createAggregatedDocForAllNodes() throws IOException {
-    try (StarTreeDataTable dataTable = new StarTreeDataTable(
-        PinotDataBuffer.mapFile(_dataFile, true, 0, _dataFile.length(), PinotDataBuffer.NATIVE_ORDER,
+  private void createAggregatedDocForAllNodes()
+      throws IOException {
+    try (StarTreeDataTable dataTable = new StarTreeDataTable(PinotDataBuffer
+        .mapFile(_dataFile, true, 0, _dataFile.length(), PinotDataBuffer.NATIVE_ORDER,
             "OffHeapStarTreeBuilder#createAggregatedDocForAllNodes: data buffer"), _dimensionSize, _metricSize, 0)) {
       DimensionBuffer dimensions = new DimensionBuffer(_numDimensions);
       for (int i = 0; i < _numDimensions; i++) {
@@ -373,7 +381,8 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
   }
 
   private MetricBuffer createAggregatedDocForAllNodesHelper(StarTreeDataTable dataTable, TreeNode node,
-      DimensionBuffer dimensions) throws IOException {
+      DimensionBuffer dimensions)
+      throws IOException {
     MetricBuffer aggregatedMetrics = null;
     if (node._children == null) {
       // Leaf node
@@ -420,13 +429,14 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
    *   <li>Create children nodes for each time value under this leaf node</li>
    * </ul>
    */
-  private void splitLeafNodesOnTimeColumn() throws IOException {
+  private void splitLeafNodesOnTimeColumn()
+      throws IOException {
     String timeColumnName = _schema.getTimeColumnName();
     if (timeColumnName != null) {
       int timeColumnId = _dimensionNames.indexOf(timeColumnName);
       if (!_skipMaterializationDimensions.contains(timeColumnId) && !_dimensionsSplitOrder.contains(timeColumnId)) {
-        try (StarTreeDataTable dataTable = new StarTreeDataTable(
-            PinotDataBuffer.mapFile(_dataFile, false, 0, _dataFile.length(), PinotDataBuffer.NATIVE_ORDER,
+        try (StarTreeDataTable dataTable = new StarTreeDataTable(PinotDataBuffer
+            .mapFile(_dataFile, false, 0, _dataFile.length(), PinotDataBuffer.NATIVE_ORDER,
                 "OffHeapStarTreeBuilder#splitLeafNodesOnTimeColumn: data buffer"), _dimensionSize, _metricSize, 0)) {
           splitLeafNodesOnTimeColumnHelper(dataTable, _rootNode, 0, timeColumnId);
         }
@@ -518,7 +528,8 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
     return defaultSplitOrder;
   }
 
-  private void constructStarTree(TreeNode node, int startDocId, int endDocId, int level) throws IOException {
+  private void constructStarTree(TreeNode node, int startDocId, int endDocId, int level)
+      throws IOException {
     if (level == _dimensionsSplitOrder.size()) {
       return;
     }
@@ -529,10 +540,9 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
 
     int numDocs = endDocId - startDocId;
     Int2ObjectMap<IntPair> dimensionRangeMap;
-    try (StarTreeDataTable dataTable = new StarTreeDataTable(
-        PinotDataBuffer.mapFile(_dataFile, true, startDocId * _docSizeLong, numDocs * _docSizeLong,
-            PinotDataBuffer.NATIVE_ORDER, "OffHeapStarTreeBuilder#constructStarTree: data buffer"), _dimensionSize,
-        _metricSize, startDocId)) {
+    try (StarTreeDataTable dataTable = new StarTreeDataTable(PinotDataBuffer
+        .mapFile(_dataFile, true, startDocId * _docSizeLong, numDocs * _docSizeLong, PinotDataBuffer.NATIVE_ORDER,
+            "OffHeapStarTreeBuilder#constructStarTree: data buffer"), _dimensionSize, _metricSize, startDocId)) {
       dimensionRangeMap = dataTable.groupOnDimension(startDocId, endDocId, splitDimensionId);
     }
     LOGGER.debug("Group stats:{}", dimensionRangeMap);
@@ -596,7 +606,8 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
    * <p>Aggregates the metrics for each unique combination.
    */
   private Iterator<Pair<DimensionBuffer, MetricBuffer>> getUniqueCombinations(final int startDocId, final int endDocId,
-      int dimensionIdToRemove) throws IOException {
+      int dimensionIdToRemove)
+      throws IOException {
     long tempBufferSize = (endDocId - startDocId) * _docSizeLong;
 
     PinotDataBuffer tempBuffer;
@@ -611,8 +622,8 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
           "OffHeapStarTreeBuilder#getUniqueCombinations: temp buffer");
     } else {
       // DIRECT
-      tempBuffer =
-          PinotDataBuffer.loadFile(_dataFile, startDocId * _docSizeLong, tempBufferSize, PinotDataBuffer.NATIVE_ORDER,
+      tempBuffer = PinotDataBuffer
+          .loadFile(_dataFile, startDocId * _docSizeLong, tempBufferSize, PinotDataBuffer.NATIVE_ORDER,
               "OffHeapStarTreeBuilder#getUniqueCombinations: temp buffer");
     }
 
@@ -673,9 +684,10 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
   }
 
   @Override
-  public Iterator<GenericRow> iterator(final int startDocId, final int endDocId) throws IOException {
-    final StarTreeDataTable dataTable = new StarTreeDataTable(
-        PinotDataBuffer.mapFile(_dataFile, true, startDocId * _docSizeLong, (endDocId - startDocId) * _docSizeLong,
+  public Iterator<GenericRow> iterator(final int startDocId, final int endDocId)
+      throws IOException {
+    final StarTreeDataTable dataTable = new StarTreeDataTable(PinotDataBuffer
+        .mapFile(_dataFile, true, startDocId * _docSizeLong, (endDocId - startDocId) * _docSizeLong,
             PinotDataBuffer.NATIVE_ORDER, "OffHeapStarTreeBuilder#iterator: data buffer"), _dimensionSize, _metricSize,
         startDocId);
     _dataTablesToClose.add(dataTable);
@@ -742,8 +754,8 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
     updateTree(_rootNode, indexCreationInfoMap);
 
     // Serialize the star tree into a file
-    StarTreeBuilderUtils.serializeTree(starTreeFile, _rootNode, _dimensionNames.toArray(new String[_numDimensions]),
-        _numNodes);
+    StarTreeBuilderUtils
+        .serializeTree(starTreeFile, _rootNode, _dimensionNames.toArray(new String[_numDimensions]), _numNodes);
 
     LOGGER.info("Finish serializing star tree into file: {}", starTreeFile);
   }
@@ -831,7 +843,8 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
   }
 
   @Override
-  public void close() throws IOException {
+  public void close()
+      throws IOException {
     _outputStream.close();
     for (StarTreeDataTable dataTable : _dataTablesToClose) {
       dataTable.close();

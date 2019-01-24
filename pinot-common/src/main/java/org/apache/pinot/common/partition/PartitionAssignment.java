@@ -72,7 +72,7 @@ public class PartitionAssignment {
    */
   public List<String> getAllInstances() {
     Set<String> serverList = new HashSet<>();
-    for(List<String> servers: getPartitionToInstances().values()) {
+    for (List<String> servers : getPartitionToInstances().values()) {
       serverList.addAll(servers);
     }
     return new ArrayList<>(serverList);
@@ -96,8 +96,8 @@ public class PartitionAssignment {
 
     PartitionAssignment that = (PartitionAssignment) o;
 
-    return EqualityUtils.isEqual(_tableName, that._tableName) && EqualityUtils.isEqual(_partitionToInstances,
-        that._partitionToInstances);
+    return EqualityUtils.isEqual(_tableName, that._tableName) && EqualityUtils
+        .isEqual(_partitionToInstances, that._partitionToInstances);
   }
 
   @Override

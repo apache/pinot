@@ -84,10 +84,9 @@ public class Tenant {
     }
     if (obj instanceof Tenant) {
       Tenant that = (Tenant) obj;
-      return EqualityUtils.isEqual(_numberOfInstances, that._numberOfInstances)
-          && EqualityUtils.isEqual(_offlineInstances, that._offlineInstances)
-          && EqualityUtils.isEqual(_realtimeInstances, that._realtimeInstances)
-          && EqualityUtils.isEqual(_tenantRole, that._tenantRole)
+      return EqualityUtils.isEqual(_numberOfInstances, that._numberOfInstances) && EqualityUtils
+          .isEqual(_offlineInstances, that._offlineInstances) && EqualityUtils
+          .isEqual(_realtimeInstances, that._realtimeInstances) && EqualityUtils.isEqual(_tenantRole, that._tenantRole)
           && EqualityUtils.isEqual(_tenantName, that._tenantName);
     }
     return false;

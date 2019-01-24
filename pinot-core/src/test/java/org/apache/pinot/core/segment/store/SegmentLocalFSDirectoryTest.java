@@ -43,6 +43,7 @@ public class SegmentLocalFSDirectoryTest {
   private static final File TEST_DIRECTORY = new File(SingleFileIndexDirectoryTest.class.toString());
   SegmentLocalFSDirectory segmentDirectory;
   SegmentMetadataImpl metadata;
+
   @BeforeClass
   public void setUp() {
     FileUtils.deleteQuietly(TEST_DIRECTORY);
@@ -57,8 +58,6 @@ public class SegmentLocalFSDirectoryTest {
     segmentDirectory.close();
     FileUtils.deleteQuietly(TEST_DIRECTORY);
   }
-
-
 
   @Test
   public void testMultipleReadersNoWriter()
@@ -95,22 +94,21 @@ public class SegmentLocalFSDirectoryTest {
   private void loadData(PinotDataBuffer buffer) {
     int limit = (int) (buffer.size() / 4);
     for (int i = 0; i < limit; ++i) {
-      buffer.putInt(i*4, 10000 + i);
+      buffer.putInt(i * 4, 10000 + i);
     }
   }
 
   private void verifyData(PinotDataBuffer newDataBuffer) {
-    int limit = (int)newDataBuffer.size() / 4;
+    int limit = (int) newDataBuffer.size() / 4;
     for (int i = 0; i < limit; i++) {
       Assert.assertEquals(newDataBuffer.getInt(i * 4), 10000 + i, "Failed to match at index: " + i);
     }
-
   }
 
   @Test
   public void testWriteAndReadBackData()
       throws java.lang.Exception {
-    try (SegmentLocalFSDirectory.Writer writer = segmentDirectory.createWriter() ) {
+    try (SegmentLocalFSDirectory.Writer writer = segmentDirectory.createWriter()) {
       Assert.assertNotNull(writer);
       PinotDataBuffer buffer = writer.newIndexFor("newColumn", ColumnIndexType.FORWARD_INDEX, 1024);
       loadData(buffer);
@@ -130,13 +128,13 @@ public class SegmentLocalFSDirectoryTest {
     FileUtils.touch(new File(segmentDirectory.getPath().toFile(), V1Constants.STAR_TREE_INDEX_FILE));
     String data = "This is star tree";
     try (SegmentDirectory.Writer writer = segmentDirectory.createWriter();
-        OutputStream starTreeOstream = writer.starTreeOutputStream() ) {
+        OutputStream starTreeOstream = writer.starTreeOutputStream()) {
       starTreeOstream.write(data.getBytes());
     }
     try (SegmentDirectory.Reader reader = segmentDirectory.createReader();
         InputStream starTreeIstream = reader.getStarTreeStream()) {
       byte[] fileDataBytes = new byte[data.length()];
-        starTreeIstream.read(fileDataBytes, 0, fileDataBytes.length);
+      starTreeIstream.read(fileDataBytes, 0, fileDataBytes.length);
       String fileData = new String(fileDataBytes);
       Assert.assertEquals(fileData, data);
     }
@@ -155,12 +153,13 @@ public class SegmentLocalFSDirectoryTest {
     // So, we do what we can do best....HACK HACK HACK
     File sizeTestDirectory = null;
     try {
-       sizeTestDirectory = new File(SegmentLocalFSDirectoryTest.class.getName() + "-size_test");
+      sizeTestDirectory = new File(SegmentLocalFSDirectoryTest.class.getName() + "-size_test");
       if (sizeTestDirectory.exists()) {
         FileUtils.deleteQuietly(sizeTestDirectory);
       }
       FileUtils.copyDirectoryToDirectory(segmentDirectory.getPath().toFile(), sizeTestDirectory);
-      SegmentDirectory sizeSegment = SegmentLocalFSDirectory.createFromLocalFS(sizeTestDirectory, metadata, ReadMode.mmap);
+      SegmentDirectory sizeSegment =
+          SegmentLocalFSDirectory.createFromLocalFS(sizeTestDirectory, metadata, ReadMode.mmap);
       Assert.assertEquals(sizeSegment.getDiskSizeBytes(), segmentDirectory.getDiskSizeBytes());
 
       Assert.assertFalse(SegmentDirectoryPaths.segmentDirectoryFor(sizeTestDirectory, SegmentVersion.v3).exists());
@@ -181,5 +180,4 @@ public class SegmentLocalFSDirectoryTest {
       }
     }
   }
-
 }

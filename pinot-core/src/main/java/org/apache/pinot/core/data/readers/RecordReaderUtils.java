@@ -39,11 +39,13 @@ public class RecordReaderUtils {
   private RecordReaderUtils() {
   }
 
-  public static Reader getFileReader(File dataFile) throws IOException {
+  public static Reader getFileReader(File dataFile)
+      throws IOException {
     return new BufferedReader(new InputStreamReader(getFileStreamReader(dataFile), "UTF-8"));
   }
 
-  public static InputStream getFileStreamReader(File dataFile) throws IOException {
+  public static InputStream getFileStreamReader(File dataFile)
+      throws IOException {
     InputStream inputStream;
     if (dataFile.getName().endsWith(".gz")) {
       inputStream = new GZIPInputStream(new FileInputStream(dataFile));
@@ -53,7 +55,8 @@ public class RecordReaderUtils {
     return inputStream;
   }
 
-  public static BufferedInputStream getFileBufferStream(File dataFile) throws IOException {
+  public static BufferedInputStream getFileBufferStream(File dataFile)
+      throws IOException {
     return new BufferedInputStream(getFileStreamReader(dataFile));
   }
 
@@ -125,7 +128,7 @@ public class RecordReaderUtils {
       int length = tokens.size();
       value = new Object[length];
       int index = 0;
-      for (Object token: tokens) {
+      for (Object token : tokens) {
         if (token == null) {
           value[index] = fieldSpec.getDefaultNullValue();
         } else {

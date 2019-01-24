@@ -50,18 +50,24 @@ public class DictionaryPerfRunner {
     for (int i = 0; i < NUM_VALUES; i++) {
       dictionary.index(i % cardinality);
     }
-    System.out.println("Index time for " + dictionary.getClass().getSimpleName() + ": " + (System.currentTimeMillis() - start));
+    System.out.println(
+        "Index time for " + dictionary.getClass().getSimpleName() + ": " + (System.currentTimeMillis() - start));
     start = System.currentTimeMillis();
     for (int i = 0; i < NUM_VALUES; i++) {
       dictionary.indexOf(i % cardinality);
     }
-    System.out.println("DictId fetching time for " +  dictionary.getClass().getSimpleName() + ": " + (System.currentTimeMillis() - start));
+    System.out.println(
+        "DictId fetching time for " + dictionary.getClass().getSimpleName() + ": " + (System.currentTimeMillis()
+            - start));
     start = System.currentTimeMillis();
     for (int i = 0; i < NUM_VALUES; i++) {
       dictionary.get(i % cardinality);
     }
-    System.out.println("Value fetching time for " + dictionary.getClass().getSimpleName() + ": " + (System.currentTimeMillis() - start));
-    System.out.println("Memory usage for " + dictionary.getClass().getSimpleName() + ": " + (RUNTIME.totalMemory() - usedMemory));
+    System.out.println(
+        "Value fetching time for " + dictionary.getClass().getSimpleName() + ": " + (System.currentTimeMillis()
+            - start));
+    System.out.println(
+        "Memory usage for " + dictionary.getClass().getSimpleName() + ": " + (RUNTIME.totalMemory() - usedMemory));
   }
 
   /**
@@ -108,10 +114,10 @@ public class DictionaryPerfRunner {
       });
     }
     countDownLatch.await();
-    System.out.println(
-        "Total dictId fetching time for " + dictionary.getClass().getSimpleName() + ": " + dictIdFetchingTime);
-    System.out.println(
-        "Total value fetching time for " + dictionary.getClass().getSimpleName() + ": " + valueFetchingTime);
+    System.out
+        .println("Total dictId fetching time for " + dictionary.getClass().getSimpleName() + ": " + dictIdFetchingTime);
+    System.out
+        .println("Total value fetching time for " + dictionary.getClass().getSimpleName() + ": " + valueFetchingTime);
   }
 
   public static void main(String[] args)

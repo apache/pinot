@@ -40,10 +40,7 @@ public class Quickstart {
   private static final String NEW_LINE = "\n";
 
   public enum Color {
-    RESET("\u001B[0m"),
-    GREEN("\u001B[32m"),
-    YELLOW("\u001B[33m"),
-    CYAN("\u001B[36m");
+    RESET("\u001B[0m"), GREEN("\u001B[32m"), YELLOW("\u001B[33m"), CYAN("\u001B[36m");
 
     private String _code;
 

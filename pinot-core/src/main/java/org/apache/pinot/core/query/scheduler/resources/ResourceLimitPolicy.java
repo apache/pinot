@@ -43,23 +43,20 @@ public class ResourceLimitPolicy {
   private final int tableThreadsHardLimit;
 
   ResourceLimitPolicy(Configuration config, int numWorkerThreads) {
-    int softLimit = checkGetOrDefaultPct(config, TABLE_THREADS_SOFT_LIMIT,
-        DEFAULT_TABLE_THREADS_SOFT_LIMIT);
-    tableThreadsSoftLimit = Math.min(numWorkerThreads,
-        Math.max(1, numWorkerThreads * softLimit / 100));
-    int hardLimit = checkGetOrDefaultPct(config, TABLE_THREADS_HARD_LIMIT,
-        DEFAULT_TABLE_THREADS_HARD_LIMIT);
+    int softLimit = checkGetOrDefaultPct(config, TABLE_THREADS_SOFT_LIMIT, DEFAULT_TABLE_THREADS_SOFT_LIMIT);
+    tableThreadsSoftLimit = Math.min(numWorkerThreads, Math.max(1, numWorkerThreads * softLimit / 100));
+    int hardLimit = checkGetOrDefaultPct(config, TABLE_THREADS_HARD_LIMIT, DEFAULT_TABLE_THREADS_HARD_LIMIT);
     // hardLimit <= tableThreadsHardLimit < numWorkerThreads
-    tableThreadsHardLimit = Math.min(numWorkerThreads,
-        Math.max(tableThreadsSoftLimit, numWorkerThreads * hardLimit / 100));
+    tableThreadsHardLimit =
+        Math.min(numWorkerThreads, Math.max(tableThreadsSoftLimit, numWorkerThreads * hardLimit / 100));
 
     int tpqPct = checkGetOrDefaultPct(config, THREADS_PER_QUERY_PCT, DEFAULT_THREADS_PER_QUERY_PCT);
     // 1 <= maxThreadsPerQuery <= tableThreadsHardLimit
-    maxThreadsPerQuery = Math.min(tableThreadsHardLimit,
-        Math.min(MAX_THREAD_LIMIT, Math.max(1, numWorkerThreads * tpqPct / 100)));
+    maxThreadsPerQuery =
+        Math.min(tableThreadsHardLimit, Math.min(MAX_THREAD_LIMIT, Math.max(1, numWorkerThreads * tpqPct / 100)));
 
-    LOGGER.info("MaxThreadsPerQuery: {}, tableThreadsSoftLimit: {}, tableThreadsHardLimit: {}",
-        maxThreadsPerQuery, tableThreadsSoftLimit, tableThreadsHardLimit);
+    LOGGER.info("MaxThreadsPerQuery: {}, tableThreadsSoftLimit: {}, tableThreadsHardLimit: {}", maxThreadsPerQuery,
+        tableThreadsSoftLimit, tableThreadsHardLimit);
   }
 
   private int checkGetOrDefaultPct(Configuration schedulerConfig, String key, int defaultValue) {

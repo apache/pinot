@@ -139,10 +139,10 @@ public interface ResultSet {
   /**
    * Get the group key name for the given key column index. use getGroupKeyLength() to know the number of groupKey
    * @param groupKeyColumnIndex
-   * @return group key column name 
+   * @return group key column name
    */
   String getGroupKeyColumnName(int groupKeyColumnIndex);
-  
+
   /**
    * Obtains the group key value for the given row and key column index.
    *

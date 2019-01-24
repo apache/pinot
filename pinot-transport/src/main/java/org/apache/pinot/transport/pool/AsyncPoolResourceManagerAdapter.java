@@ -48,9 +48,8 @@ public class AsyncPoolResourceManagerAdapter<T> implements Lifecycle<T> {
     _resourceManager = resourceManager;
     _executor = executorService;
     _key = key;
-    _histogram =
-        MetricsHelper.newHistogram(registry, new MetricName(AsyncPoolResourceManagerAdapter.class, key.toString()),
-            false);
+    _histogram = MetricsHelper
+        .newHistogram(registry, new MetricName(AsyncPoolResourceManagerAdapter.class, key.toString()), false);
   }
 
   @Override
@@ -117,7 +116,6 @@ public class AsyncPoolResourceManagerAdapter<T> implements Lifecycle<T> {
         throw new RuntimeException(e);
       }
     }
-
   }
 
   @Override

@@ -120,7 +120,7 @@ public class QueryComparisonConfig extends PropertiesConfiguration {
   }
 
   public String getControllerPort() {
-    String value =  (String) getProperty(CONTROLLER_PORT);
+    String value = (String) getProperty(CONTROLLER_PORT);
     return (value != null) ? value : DEFAULT_CONTROLLER_PORT;
   }
 
@@ -128,6 +128,7 @@ public class QueryComparisonConfig extends PropertiesConfiguration {
     String value = (String) getProperty(BROKER_HOST);
     return (value != null) ? value : DEFAULT_BROKER_HOST;
   }
+
   public String getBrokerPort() {
     String value = (String) getProperty(BROKER_PORT);
     return (value != null) ? value : DEFAULT_BROKER_PORT;
@@ -144,7 +145,7 @@ public class QueryComparisonConfig extends PropertiesConfiguration {
   }
 
   public String getRefControllerPort() {
-    String value =  (String) getProperty(REF_CONTROLLER_PORT);
+    String value = (String) getProperty(REF_CONTROLLER_PORT);
     return (value != null) ? value : DEFAULT_REF_CONTROLLER_PORT;
   }
 
@@ -152,6 +153,7 @@ public class QueryComparisonConfig extends PropertiesConfiguration {
     String value = (String) getProperty(REF_BROKER_HOST);
     return (value != null) ? value : DEFAULT_REF_BROKER_HOST;
   }
+
   public String getRefBrokerPort() {
     String value = (String) getProperty(REF_BROKER_PORT);
     return (value != null) ? value : DEFAULT_REF_BROKER_PORT;
@@ -175,7 +177,7 @@ public class QueryComparisonConfig extends PropertiesConfiguration {
     return (value != null) ? value : DEFAULT_SEGMENT_NAME;
   }
 
-  public String getInputDataDir()  {
+  public String getInputDataDir() {
     return (String) getProperty(INPUT_DATA_DIR);
   }
 
@@ -201,7 +203,7 @@ public class QueryComparisonConfig extends PropertiesConfiguration {
   }
 
   public String getTimeUnit() {
-    String value =  (String) getProperty(TIME_UNIT);
+    String value = (String) getProperty(TIME_UNIT);
     return (value != null) ? value : DEFAULT_TIME_UNIT;
   }
 }

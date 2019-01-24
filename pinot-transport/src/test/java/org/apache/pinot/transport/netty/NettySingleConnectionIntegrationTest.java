@@ -121,9 +121,8 @@ public class NettySingleConnectionIntegrationTest {
   public void testCancelOutstandingRequest()
       throws Exception {
     Assert.assertTrue(_nettyTCPClientConnection.connect());
-    ResponseFuture responseFuture =
-        _nettyTCPClientConnection.sendRequest(Unpooled.wrappedBuffer(NettyTestUtils.DUMMY_REQUEST.getBytes()), 1L,
-            5000L);
+    ResponseFuture responseFuture = _nettyTCPClientConnection
+        .sendRequest(Unpooled.wrappedBuffer(NettyTestUtils.DUMMY_REQUEST.getBytes()), 1L, 5000L);
     responseFuture.cancel(false);
     // Wait for cancel taking effect
     Uninterruptibles.sleepUninterruptibly(1L, TimeUnit.SECONDS);
@@ -135,9 +134,8 @@ public class NettySingleConnectionIntegrationTest {
   public void testConcurrentRequestDispatchError()
       throws Exception {
     Assert.assertTrue(_nettyTCPClientConnection.connect());
-    ResponseFuture responseFuture =
-        _nettyTCPClientConnection.sendRequest(Unpooled.wrappedBuffer(NettyTestUtils.DUMMY_REQUEST.getBytes()), 1L,
-            5000L);
+    ResponseFuture responseFuture = _nettyTCPClientConnection
+        .sendRequest(Unpooled.wrappedBuffer(NettyTestUtils.DUMMY_REQUEST.getBytes()), 1L, 5000L);
     try {
       _nettyTCPClientConnection.sendRequest(Unpooled.wrappedBuffer(NettyTestUtils.DUMMY_REQUEST.getBytes()), 1L, 5000L);
       Assert.fail("Concurrent request should throw IllegalStateException");
@@ -163,7 +161,7 @@ public class NettySingleConnectionIntegrationTest {
     AsyncPoolResourceManagerAdapter<PooledNettyClientResourceManager.PooledClientConnection> rmAdapter =
         new AsyncPoolResourceManagerAdapter<>(_clientServer, resourceManager, executorService, metricsRegistry);
     AsyncPool<PooledNettyClientResourceManager.PooledClientConnection> pool = new AsyncPoolImpl<>(serverName, rmAdapter,
-     /*maxSize=*/5, /*idleTimeoutMs=*/100000L, timeoutExecutor, executorService, /*maxWaiters=*/10,
+        /*maxSize=*/5, /*idleTimeoutMs=*/100000L, timeoutExecutor, executorService, /*maxWaiters=*/10,
         AsyncPoolImpl.Strategy.LRU, /*minSize=*/2, metricsRegistry);
 
     try {

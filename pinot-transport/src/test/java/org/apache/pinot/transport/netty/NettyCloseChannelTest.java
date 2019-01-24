@@ -67,9 +67,8 @@ public class NettyCloseChannelTest {
   public void testCloseClientChannel()
       throws Exception {
     Assert.assertTrue(_nettyTCPClientConnection.connect());
-    ResponseFuture responseFuture =
-        _nettyTCPClientConnection.sendRequest(Unpooled.wrappedBuffer(NettyTestUtils.DUMMY_REQUEST.getBytes()), 1L,
-            5000L);
+    ResponseFuture responseFuture = _nettyTCPClientConnection
+        .sendRequest(Unpooled.wrappedBuffer(NettyTestUtils.DUMMY_REQUEST.getBytes()), 1L, 5000L);
 
     NettyTestUtils.closeClientConnection(_nettyTCPClientConnection);
 
@@ -98,9 +97,8 @@ public class NettyCloseChannelTest {
   public void testCloseServerChannel()
       throws Exception {
     Assert.assertTrue(_nettyTCPClientConnection.connect());
-    ResponseFuture responseFuture =
-        _nettyTCPClientConnection.sendRequest(Unpooled.wrappedBuffer(NettyTestUtils.DUMMY_REQUEST.getBytes()), 1L,
-            5000L);
+    ResponseFuture responseFuture = _nettyTCPClientConnection
+        .sendRequest(Unpooled.wrappedBuffer(NettyTestUtils.DUMMY_REQUEST.getBytes()), 1L, 5000L);
 
     NettyTestUtils.closeServerConnection(_nettyTCPServer);
 

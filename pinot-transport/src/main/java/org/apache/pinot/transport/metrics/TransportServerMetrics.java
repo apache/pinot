@@ -60,5 +60,4 @@ public interface TransportServerMetrics {
    * @return
    */
   public <T extends Sampling & Summarizable> LatencyMetric<T> getProcessingLatencyMs();
-
 }

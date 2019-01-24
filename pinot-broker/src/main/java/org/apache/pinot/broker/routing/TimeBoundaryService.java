@@ -58,7 +58,8 @@ public interface TimeBoundaryService {
       _timeValue = timeValue;
     }
 
-    public String toJsonString() throws JsonProcessingException {
+    public String toJsonString()
+        throws JsonProcessingException {
       return JsonUtils.objectToPrettyString(this);
     }
   }

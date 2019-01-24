@@ -22,6 +22,7 @@ import org.apache.commons.configuration.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
 public class ConnectionPoolConfig {
 
   // ThreadPool config for the Async Connection Pool
@@ -90,14 +91,15 @@ public class ConnectionPoolConfig {
       _maxBacklogPerServer = cfg.getInt(MAX_BACKLOG_PER_SERVER_KEY);
     }
 
-    if (_minConnectionsPerServer > _maxConnectionsPerServer || _maxConnectionsPerServer <= 0 || _minConnectionsPerServer < 1) {
-      LOGGER.warn("Invalid values for " + MIN_CONNECTIONS_PER_SERVER_KEY +  "({}) and " + MAX_CONNECTIONS_PER_SERVER_KEY +
-          "({}). Resetting to defaults:", _minConnectionsPerServer, _maxConnectionsPerServer);
+    if (_minConnectionsPerServer > _maxConnectionsPerServer || _maxConnectionsPerServer <= 0
+        || _minConnectionsPerServer < 1) {
+      LOGGER.warn("Invalid values for " + MIN_CONNECTIONS_PER_SERVER_KEY + "({}) and " + MAX_CONNECTIONS_PER_SERVER_KEY
+          + "({}). Resetting to defaults:", _minConnectionsPerServer, _maxConnectionsPerServer);
       _minConnectionsPerServer = DEFAULT_MIN_CONNECTIONS_PER_SERVER;
       _maxConnectionsPerServer = DEFAULT_MAX_CONNECTIONS_PER_SERVER;
     }
     if (_idleTimeoutMs < 0) {
-      LOGGER.warn("Invalid value for " + IDLE_TIMEOUT_MS_KEY +  "({}). Resetting to default.");
+      LOGGER.warn("Invalid value for " + IDLE_TIMEOUT_MS_KEY + "({}). Resetting to default.");
       _idleTimeoutMs = DEFAULT_IDLE_TIMEOUT_MS;
     }
     if (_maxBacklogPerServer < 0) {
@@ -109,10 +111,9 @@ public class ConnectionPoolConfig {
   }
 
   public String toString() {
-    return "threadPool = "+_threadPool+", idleTimeoutMs = "+_idleTimeoutMs+
-            ", minConnectionsPerServer = "+_minConnectionsPerServer+
-            ", maxConnectionsPerServer = "+_maxConnectionsPerServer+
-            ", maxBacklogPerServer = "+_maxBacklogPerServer;
+    return "threadPool = " + _threadPool + ", idleTimeoutMs = " + _idleTimeoutMs + ", minConnectionsPerServer = "
+        + _minConnectionsPerServer + ", maxConnectionsPerServer = " + _maxConnectionsPerServer
+        + ", maxBacklogPerServer = " + _maxBacklogPerServer;
   }
 
   public ThreadPoolConfig getThreadPool() {
@@ -134,5 +135,4 @@ public class ConnectionPoolConfig {
   public long getIdleTimeoutMs() {
     return _idleTimeoutMs;
   }
-
 }

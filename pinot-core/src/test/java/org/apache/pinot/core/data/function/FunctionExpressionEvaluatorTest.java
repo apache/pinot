@@ -32,7 +32,8 @@ import scala.collection.mutable.StringBuilder;
 public class FunctionExpressionEvaluatorTest {
 
   @Test
-  public void testExpressionWithColumn() throws Exception {
+  public void testExpressionWithColumn()
+      throws Exception {
     Method method = MyFunc.class.getDeclaredMethod("reverseString", String.class);
     FunctionRegistry.registerStaticFunction(method);
     FunctionInfo functionInfo = FunctionRegistry.resolve("reverseString", new Class<?>[]{Object.class});
@@ -50,9 +51,10 @@ public class FunctionExpressionEvaluatorTest {
   }
 
   @Test
-  public void testExpressionWithConstant() throws Exception {
-    FunctionRegistry.registerStaticFunction(
-        MyFunc.class.getDeclaredMethod("daysSinceEpoch", String.class, String.class));
+  public void testExpressionWithConstant()
+      throws Exception {
+    FunctionRegistry
+        .registerStaticFunction(MyFunc.class.getDeclaredMethod("daysSinceEpoch", String.class, String.class));
     String input = "1980-01-01";
     String format = "yyyy-MM-dd";
     String expression = String.format("daysSinceEpoch('%s', '%s')", input, format);
@@ -63,10 +65,11 @@ public class FunctionExpressionEvaluatorTest {
   }
 
   @Test
-  public void testMultiFunctionExpression() throws Exception {
+  public void testMultiFunctionExpression()
+      throws Exception {
     FunctionRegistry.registerStaticFunction(MyFunc.class.getDeclaredMethod("reverseString", String.class));
-    FunctionRegistry.registerStaticFunction(
-        MyFunc.class.getDeclaredMethod("daysSinceEpoch", String.class, String.class));
+    FunctionRegistry
+        .registerStaticFunction(MyFunc.class.getDeclaredMethod("daysSinceEpoch", String.class, String.class));
     String input = "1980-01-01";
     String reversedInput = MyFunc.reverseString(input);
     String format = "yyyy-MM-dd";

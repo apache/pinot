@@ -63,26 +63,30 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
   private final String _helixClusterName = getHelixClusterName();
 
   @BeforeClass
-  public void setUp() throws Exception {
+  public void setUp()
+      throws Exception {
     startZk();
     ControllerConf config = getDefaultControllerConfiguration();
     config.setTenantIsolationEnabled(false);
     startController(config);
 
-    ControllerRequestBuilderUtil.addFakeBrokerInstancesToAutoJoinHelixCluster(_helixClusterName,
-        ZkStarter.DEFAULT_ZK_STR, NUM_INSTANCES, false);
-    ControllerRequestBuilderUtil.addFakeDataInstancesToAutoJoinHelixCluster(_helixClusterName, ZkStarter.DEFAULT_ZK_STR,
-        NUM_INSTANCES, false, BASE_SERVER_ADMIN_PORT);
+    ControllerRequestBuilderUtil
+        .addFakeBrokerInstancesToAutoJoinHelixCluster(_helixClusterName, ZkStarter.DEFAULT_ZK_STR, NUM_INSTANCES,
+            false);
+    ControllerRequestBuilderUtil
+        .addFakeDataInstancesToAutoJoinHelixCluster(_helixClusterName, ZkStarter.DEFAULT_ZK_STR, NUM_INSTANCES, false,
+            BASE_SERVER_ADMIN_PORT);
 
     // Create server tenant on all Servers
-    Tenant serverTenant = new Tenant.TenantBuilder(SERVER_TENANT_NAME).setRole(TenantRole.SERVER)
-        .setOfflineInstances(NUM_INSTANCES)
-        .build();
+    Tenant serverTenant =
+        new Tenant.TenantBuilder(SERVER_TENANT_NAME).setRole(TenantRole.SERVER).setOfflineInstances(NUM_INSTANCES)
+            .build();
     _helixResourceManager.createServerTenant(serverTenant);
   }
 
   @Test
-  public void testGetInstanceEndpoints() throws InvalidConfigException {
+  public void testGetInstanceEndpoints()
+      throws InvalidConfigException {
     Set<String> servers = _helixResourceManager.getAllInstancesForServerTenant(SERVER_TENANT_NAME);
     BiMap<String, String> endpoints = _helixResourceManager.getDataInstanceAdminEndpoints(servers);
     for (int i = 0; i < NUM_INSTANCES; i++) {
@@ -91,7 +95,8 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
   }
 
   @Test
-  public void testGetInstanceConfigs() throws Exception {
+  public void testGetInstanceConfigs()
+      throws Exception {
     Set<String> servers = _helixResourceManager.getAllInstancesForServerTenant(SERVER_TENANT_NAME);
     for (String server : servers) {
       InstanceConfig cachedInstanceConfig = _helixResourceManager.getHelixInstanceConfig(server);
@@ -108,7 +113,8 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
     zkClient.close();
   }
 
-  private void modifyExistingInstanceConfig(ZkClient zkClient) throws InterruptedException {
+  private void modifyExistingInstanceConfig(ZkClient zkClient)
+      throws InterruptedException {
     String instanceName = "Server_localhost_" + new Random().nextInt(NUM_INSTANCES);
     String instanceConfigPath = PropertyPathBuilder.instanceConfig(_helixClusterName, instanceName);
     Assert.assertTrue(zkClient.exists(instanceConfigPath));
@@ -139,7 +145,8 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
     zkClient.writeData(instanceConfigPath, znRecord);
   }
 
-  private void addAndRemoveNewInstanceConfig(ZkClient zkClient) throws Exception {
+  private void addAndRemoveNewInstanceConfig(ZkClient zkClient)
+      throws Exception {
     int biggerRandomNumber = NUM_INSTANCES + new Random().nextInt(NUM_INSTANCES);
     String instanceName = "Server_localhost_" + String.valueOf(biggerRandomNumber);
     String instanceConfigPath = PropertyPathBuilder.instanceConfig(_helixClusterName, instanceName);
@@ -172,18 +179,17 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
   }
 
   @Test
-  public void testRebuildBrokerResourceFromHelixTags() throws Exception {
+  public void testRebuildBrokerResourceFromHelixTags()
+      throws Exception {
     // Create broker tenant on 3 Brokers
     Tenant brokerTenant =
         new Tenant.TenantBuilder(BROKER_TENANT_NAME).setRole(TenantRole.BROKER).setTotalInstances(3).build();
     _helixResourceManager.createBrokerTenant(brokerTenant);
 
     // Create the table
-    TableConfig tableConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setNumReplicas(3)
-        .setBrokerTenant(BROKER_TENANT_NAME)
-        .setServerTenant(SERVER_TENANT_NAME)
-        .build();
+    TableConfig tableConfig =
+        new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(TABLE_NAME).setNumReplicas(3)
+            .setBrokerTenant(BROKER_TENANT_NAME).setServerTenant(SERVER_TENANT_NAME).build();
     _helixResourceManager.addTable(tableConfig);
 
     // Check that the BrokerResource ideal state has 3 Brokers assigned to the table
@@ -193,8 +199,8 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
 
     // Untag all Brokers assigned to broker tenant
     for (String brokerInstance : _helixResourceManager.getAllInstancesForBrokerTenant(BROKER_TENANT_NAME)) {
-      _helixAdmin.removeInstanceTag(_helixClusterName, brokerInstance,
-          TagNameUtils.getBrokerTagForTenant(BROKER_TENANT_NAME));
+      _helixAdmin
+          .removeInstanceTag(_helixClusterName, brokerInstance, TagNameUtils.getBrokerTagForTenant(BROKER_TENANT_NAME));
       _helixAdmin.addInstanceTag(_helixClusterName, brokerInstance, CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE);
     }
 
@@ -214,8 +220,8 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
 
     // Untag all Brokers for other tests
     for (String brokerInstance : _helixResourceManager.getAllInstancesForBrokerTenant(BROKER_TENANT_NAME)) {
-      _helixAdmin.removeInstanceTag(_helixClusterName, brokerInstance,
-          TagNameUtils.getBrokerTagForTenant(BROKER_TENANT_NAME));
+      _helixAdmin
+          .removeInstanceTag(_helixClusterName, brokerInstance, TagNameUtils.getBrokerTagForTenant(BROKER_TENANT_NAME));
       _helixAdmin.addInstanceTag(_helixClusterName, brokerInstance, CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE);
     }
 
@@ -224,7 +230,8 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
   }
 
   @Test
-  public void testRetrieveMetadata() throws Exception {
+  public void testRetrieveMetadata()
+      throws Exception {
     String segmentName = "testSegment";
 
     // Test retrieving OFFLINE segment ZK metadata
@@ -263,7 +270,6 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
     Set<String> fakeInstances = new HashSet<>();
     new Random().nextInt(NUM_INSTANCES);
   }
-
 
   @AfterClass
   public void tearDown() {

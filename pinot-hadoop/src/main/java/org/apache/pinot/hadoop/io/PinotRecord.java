@@ -23,59 +23,61 @@ import java.util.Collection;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.core.data.GenericRow;
 
+
 /**
  * Container Object for {@link PinotOutputFormat}
  */
 public class PinotRecord extends GenericRow {
 
-    private Schema _pinotSchema;
-    private Collection<String> _fieldNames;
+  private Schema _pinotSchema;
+  private Collection<String> _fieldNames;
 
-    public PinotRecord(Schema schema) {
-        _pinotSchema = schema;
-        _fieldNames = _pinotSchema.getColumnNames();
-    }
+  public PinotRecord(Schema schema) {
+    _pinotSchema = schema;
+    _fieldNames = _pinotSchema.getColumnNames();
+  }
 
-    @Override
-    public Object getValue(String fieldName) {
-        if (!containsField(fieldName)) {
-            throw new IllegalArgumentException(String.format("The field name %s not found in the schema", fieldName));
-        }
-        return super.getValue(fieldName);
+  @Override
+  public Object getValue(String fieldName) {
+    if (!containsField(fieldName)) {
+      throw new IllegalArgumentException(String.format("The field name %s not found in the schema", fieldName));
     }
+    return super.getValue(fieldName);
+  }
 
-    @Override
-    public void putField(String key, Object value) {
-        if (!containsField(key)) {
-            throw new IllegalArgumentException(String.format("The field name %s not found in the schema", key));
-        }
-        super.putField(key, value);
+  @Override
+  public void putField(String key, Object value) {
+    if (!containsField(key)) {
+      throw new IllegalArgumentException(String.format("The field name %s not found in the schema", key));
     }
+    super.putField(key, value);
+  }
 
-    @Override
-    public byte[] toBytes() throws IOException {
-        return super.toBytes();
-    }
+  @Override
+  public byte[] toBytes()
+      throws IOException {
+    return super.toBytes();
+  }
 
-    public Schema getSchema() {
-        return _pinotSchema;
-    }
+  public Schema getSchema() {
+    return _pinotSchema;
+  }
 
-    public static PinotRecord createOrReuseRecord(PinotRecord record, Schema schema) {
-        if (record == null) {
-            return new PinotRecord(schema);
-        } else {
-            record.clear();
-            return record;
-        }
+  public static PinotRecord createOrReuseRecord(PinotRecord record, Schema schema) {
+    if (record == null) {
+      return new PinotRecord(schema);
+    } else {
+      record.clear();
+      return record;
     }
+  }
 
-    private boolean containsField(String fieldName) {
-        return _fieldNames.contains(fieldName);
-    }
+  private boolean containsField(String fieldName) {
+    return _fieldNames.contains(fieldName);
+  }
 
-    @Override
-    public String toString() {
-        return super.toString();
-    }
+  @Override
+  public String toString() {
+    return super.toString();
+  }
 }

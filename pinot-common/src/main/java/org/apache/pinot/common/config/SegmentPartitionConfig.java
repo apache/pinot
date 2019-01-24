@@ -95,7 +95,8 @@ public class SegmentPartitionConfig {
    * @return Instance of {@link SegmentPartitionConfig} built from the input string.
    * @throws IOException
    */
-  public static SegmentPartitionConfig fromJsonString(String jsonString) throws IOException {
+  public static SegmentPartitionConfig fromJsonString(String jsonString)
+      throws IOException {
     return JsonUtils.stringToObject(jsonString, SegmentPartitionConfig.class);
   }
 
@@ -105,7 +106,8 @@ public class SegmentPartitionConfig {
    * @return JSON string equivalent of the object.
    * @throws IOException
    */
-  public String toJsonString() throws IOException {
+  public String toJsonString()
+      throws IOException {
     return JsonUtils.objectToString(this);
   }
 

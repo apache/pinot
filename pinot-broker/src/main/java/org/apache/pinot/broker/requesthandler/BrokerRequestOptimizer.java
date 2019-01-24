@@ -27,11 +27,9 @@ import org.apache.pinot.common.utils.request.RequestUtils;
 
 
 public class BrokerRequestOptimizer {
-  private static final List<? extends FilterQueryTreeOptimizer> FILTER_QUERY_TREE_OPTIMIZERS = Arrays.asList(
-      new FlattenNestedPredicatesFilterQueryTreeOptimizer(),
-      new MultipleOrEqualitiesToInClauseFilterQueryTreeOptimizer(),
-      new RangeMergeOptimizer()
-  );
+  private static final List<? extends FilterQueryTreeOptimizer> FILTER_QUERY_TREE_OPTIMIZERS = Arrays
+      .asList(new FlattenNestedPredicatesFilterQueryTreeOptimizer(),
+          new MultipleOrEqualitiesToInClauseFilterQueryTreeOptimizer(), new RangeMergeOptimizer());
 
   /**
    * Optimizes the given broker request.
@@ -61,7 +59,8 @@ public class BrokerRequestOptimizer {
       return;
     }
 
-    filterQueryTree = RequestUtils.buildFilterQuery(q.getId(), brokerRequest.getFilterSubQueryMap().getFilterQueryMap());
+    filterQueryTree =
+        RequestUtils.buildFilterQuery(q.getId(), brokerRequest.getFilterSubQueryMap().getFilterQueryMap());
     FilterQueryOptimizerRequest.FilterQueryOptimizerRequestBuilder builder =
         new FilterQueryOptimizerRequest.FilterQueryOptimizerRequestBuilder();
 
@@ -69,14 +68,16 @@ public class BrokerRequestOptimizer {
     if (optimizationFlags == null) {
       for (FilterQueryTreeOptimizer filterQueryTreeOptimizer : FILTER_QUERY_TREE_OPTIMIZERS) {
         filterQueryTree = filterQueryTreeOptimizer.optimize(request);
-        request.setFilterQueryTree(filterQueryTree); // Optimizers may return a new tree instead of in-place optimization
+        request
+            .setFilterQueryTree(filterQueryTree); // Optimizers may return a new tree instead of in-place optimization
       }
     } else {
       if (optimizationFlags.isOptimizationEnabled("filterQueryTree")) {
         for (FilterQueryTreeOptimizer filterQueryTreeOptimizer : FILTER_QUERY_TREE_OPTIMIZERS) {
           if (optimizationFlags.isOptimizationEnabled(filterQueryTreeOptimizer.getOptimizationName())) {
             filterQueryTree = filterQueryTreeOptimizer.optimize(request);
-            request.setFilterQueryTree(filterQueryTree); // Optimizers may return a new tree instead of in-place optimization
+            request.setFilterQueryTree(
+                filterQueryTree); // Optimizers may return a new tree instead of in-place optimization
           }
         }
       }

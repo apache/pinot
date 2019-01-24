@@ -51,7 +51,7 @@ public class HitCounter {
   @VisibleForTesting
   void hit(long timestamp) {
     long numTimeUnits = timestamp / _timeBucketWidthMs;
-    int index = (int)(numTimeUnits % BUCKET_COUNT);
+    int index = (int) (numTimeUnits % BUCKET_COUNT);
     if (_bucketStartTime.get(index) == numTimeUnits) {
       _bucketHitCount.incrementAndGet(index);
     } else {

@@ -58,7 +58,8 @@ public class PurgeTaskExecutorTest {
   private File _originalIndexDir;
 
   @BeforeClass
-  public void setUp() throws Exception {
+  public void setUp()
+      throws Exception {
     FileUtils.deleteDirectory(TEMP_DIR);
 
     Schema schema = new Schema();
@@ -103,11 +104,11 @@ public class PurgeTaskExecutorTest {
   }
 
   @Test
-  public void testConvert() throws Exception {
+  public void testConvert()
+      throws Exception {
     PurgeTaskExecutor purgeTaskExecutor = new PurgeTaskExecutor();
-    PinotTaskConfig pinotTaskConfig = new PinotTaskConfig(MinionConstants.PurgeTask.TASK_TYPE,
-        Collections.singletonMap(MinionConstants.TABLE_NAME_KEY,
-            TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME)));
+    PinotTaskConfig pinotTaskConfig = new PinotTaskConfig(MinionConstants.PurgeTask.TASK_TYPE, Collections
+        .singletonMap(MinionConstants.TABLE_NAME_KEY, TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME)));
     File purgedIndexDir = purgeTaskExecutor.convert(pinotTaskConfig, _originalIndexDir, PURGED_SEGMENT_DIR).getFile();
 
     try (PinotSegmentRecordReader pinotSegmentRecordReader = new PinotSegmentRecordReader(purgedIndexDir)) {
@@ -129,7 +130,8 @@ public class PurgeTaskExecutorTest {
   }
 
   @AfterClass
-  public void tearDown() throws Exception {
+  public void tearDown()
+      throws Exception {
     FileUtils.deleteDirectory(TEMP_DIR);
   }
 }

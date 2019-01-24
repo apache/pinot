@@ -103,7 +103,7 @@ public final class AndBlockDocIdSet implements FilterBlockDocIdSet {
           List<IntPair> pairs = sortedDocIdSet.getRaw();
           for (IntPair pair : pairs) {
             bitmap.add(pair.getLeft(), pair.getRight() + 1); // add takes [start, end) i.e inclusive
-                                                             // start, exclusive end.
+            // start, exclusive end.
           }
           allBitmaps.add(bitmap);
         } else if (docIdSet instanceof BitmapDocIdSet) {

@@ -25,6 +25,9 @@ import java.util.concurrent.Future;
  * Interface for plugging different client transports.
  */
 interface PinotClientTransport {
-  BrokerResponse executeQuery(String brokerAddress, String query) throws PinotClientException;
-  Future<BrokerResponse> executeQueryAsync(String brokerAddress, String query) throws PinotClientException;
+  BrokerResponse executeQuery(String brokerAddress, String query)
+      throws PinotClientException;
+
+  Future<BrokerResponse> executeQueryAsync(String brokerAddress, String query)
+      throws PinotClientException;
 }

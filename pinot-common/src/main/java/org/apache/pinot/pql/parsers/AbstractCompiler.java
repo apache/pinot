@@ -21,10 +21,12 @@ package org.apache.pinot.pql.parsers;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
 
+
 /**
  * Interface for PQL compilers.
  */
 public interface AbstractCompiler {
   BrokerRequest compileToBrokerRequest(String expression);
+
   TransformExpressionTree compileToExpressionTree(String expression);
 }

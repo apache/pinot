@@ -79,7 +79,8 @@ public class HadoopSegmentCreationMapReduceJob {
     private FileSystem _fileSystem = null;
 
     @Override
-    public void setup(Context context) throws IOException, InterruptedException {
+    public void setup(Context context)
+        throws IOException, InterruptedException {
       // Compute current working HDFS directory
       Path currentHdfsWorkDir = FileOutputFormat.getWorkOutputPath(context);
       _localHdfsSegmentTarPath = currentHdfsWorkDir + SEGMENT_TAR;
@@ -128,14 +129,16 @@ public class HadoopSegmentCreationMapReduceJob {
     }
 
     @Override
-    public void cleanup(Context context) throws IOException, InterruptedException {
+    public void cleanup(Context context)
+        throws IOException, InterruptedException {
       File currentDiskWorkDir = new File(_currentDiskWorkDir);
       LOGGER.info("Clean up directory: {}", currentDiskWorkDir.getAbsolutePath());
       FileUtils.deleteQuietly(currentDiskWorkDir);
     }
 
     @Override
-    protected void map(LongWritable key, Text value, Context context) throws IOException, InterruptedException {
+    protected void map(LongWritable key, Text value, Context context)
+        throws IOException, InterruptedException {
       String line = value.toString();
       String[] lineSplits = line.split(" ");
 
@@ -218,7 +221,8 @@ public class HadoopSegmentCreationMapReduceJob {
     }
 
     protected String createSegment(String dataFilePath, Schema schema, Integer seqId, Path hdfsInputFilePath,
-        File localInputDataDir, FileSystem fs) throws Exception {
+        File localInputDataDir, FileSystem fs)
+        throws Exception {
       SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(_tableConfig, schema);
 
       segmentGeneratorConfig.setTableName(_tableName);
@@ -265,8 +269,8 @@ public class HadoopSegmentCreationMapReduceJob {
           new File(_localDiskSegmentTarPath).getAbsolutePath() + "/" + segmentName + JobConfigConstants.TARGZ;
 
       LOGGER.info("Trying to tar the segment to: {}", localDiskSegmentTarFileAbsolutePath);
-      TarGzCompressionUtils.createTarGzOfDirectory(localDiskOutputSegmentDirAbsolutePath,
-          localDiskSegmentTarFileAbsolutePath);
+      TarGzCompressionUtils
+          .createTarGzOfDirectory(localDiskOutputSegmentDirAbsolutePath, localDiskSegmentTarFileAbsolutePath);
       String hdfsSegmentTarFilePath = _localHdfsSegmentTarPath + "/" + segmentName + JobConfigConstants.TARGZ;
 
       // Log segment size.
@@ -282,7 +286,8 @@ public class HadoopSegmentCreationMapReduceJob {
       return segmentName;
     }
 
-    private RecordReaderConfig getReaderConfig(FileFormat fileFormat) throws IOException {
+    private RecordReaderConfig getReaderConfig(FileFormat fileFormat)
+        throws IOException {
       RecordReaderConfig readerConfig = null;
       switch (fileFormat) {
         case CSV:

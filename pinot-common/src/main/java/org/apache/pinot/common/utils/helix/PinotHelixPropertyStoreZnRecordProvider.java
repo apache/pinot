@@ -33,7 +33,8 @@ public class PinotHelixPropertyStoreZnRecordProvider {
     this.propertyStore = null;
   }
 
-  private PinotHelixPropertyStoreZnRecordProvider(ZkHelixPropertyStore<ZNRecord> propertyStore, String relativePathName) {
+  private PinotHelixPropertyStoreZnRecordProvider(ZkHelixPropertyStore<ZNRecord> propertyStore,
+      String relativePathName) {
     this.propertyStore = propertyStore;
     this.pathPrefix = relativePathName;
   }

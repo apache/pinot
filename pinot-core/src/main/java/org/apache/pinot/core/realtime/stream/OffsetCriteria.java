@@ -35,14 +35,19 @@ public class OffsetCriteria {
    * Enumerates the supported offset types
    */
   private enum OffsetType {
-    /** consume from the smallest available offset */
+
+    // Consumes from the smallest available offset
     SMALLEST,
-    /** consume from the largest seen offset */
+
+    // Consumes from the largest seen offset
     LARGEST,
-    /** consume from the time as provided in the period string */
+
+    // Consumes from the time as provided in the period string
     PERIOD,
-    /** custom offset criteria */
+
+    // Consumes from the custom offset criteria */
     CUSTOM
+
   }
 
   private OffsetType _offsetType;
@@ -195,8 +200,8 @@ public class OffsetCriteria {
 
     OffsetCriteria that = (OffsetCriteria) o;
 
-    return EqualityUtils.isEqual(_offsetType, that._offsetType) && EqualityUtils.isEqual(_offsetString,
-        that._offsetString);
+    return EqualityUtils.isEqual(_offsetType, that._offsetType) && EqualityUtils
+        .isEqual(_offsetString, that._offsetString);
   }
 
   @Override

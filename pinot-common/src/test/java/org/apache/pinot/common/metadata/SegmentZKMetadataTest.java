@@ -56,13 +56,13 @@ public class SegmentZKMetadataTest {
     assertEquals(inProgressSegmentMetadata, new RealtimeSegmentZKMetadata(inProgressZnRecord));
     assertEquals(doneSegmentMetadata, new RealtimeSegmentZKMetadata(doneZnRecord));
 
-    Assert.assertTrue(MetadataUtils.comparisonZNRecords(inProgressZnRecord, new RealtimeSegmentZKMetadata(inProgressZnRecord).toZNRecord()));
-    Assert.assertTrue(MetadataUtils.comparisonZNRecords(doneZnRecord, new RealtimeSegmentZKMetadata(doneZnRecord).toZNRecord()));
+    Assert.assertTrue(MetadataUtils
+        .comparisonZNRecords(inProgressZnRecord, new RealtimeSegmentZKMetadata(inProgressZnRecord).toZNRecord()));
+    Assert.assertTrue(
+        MetadataUtils.comparisonZNRecords(doneZnRecord, new RealtimeSegmentZKMetadata(doneZnRecord).toZNRecord()));
 
-    assertEquals(inProgressSegmentMetadata,
-        new RealtimeSegmentZKMetadata(inProgressSegmentMetadata.toZNRecord()));
+    assertEquals(inProgressSegmentMetadata, new RealtimeSegmentZKMetadata(inProgressSegmentMetadata.toZNRecord()));
     assertEquals(doneSegmentMetadata, new RealtimeSegmentZKMetadata(doneSegmentMetadata.toZNRecord()));
-
   }
 
   @Test
@@ -71,7 +71,8 @@ public class SegmentZKMetadataTest {
     OfflineSegmentZKMetadata offlineSegmentMetadata = getTestOfflineSegmentMetadata();
     Assert.assertTrue(MetadataUtils.comparisonZNRecords(offlineZNRecord, offlineSegmentMetadata.toZNRecord()));
     assertEquals(offlineSegmentMetadata, new OfflineSegmentZKMetadata(offlineZNRecord));
-    Assert.assertTrue(MetadataUtils.comparisonZNRecords(offlineZNRecord, new OfflineSegmentZKMetadata(offlineZNRecord).toZNRecord()));
+    Assert.assertTrue(
+        MetadataUtils.comparisonZNRecords(offlineZNRecord, new OfflineSegmentZKMetadata(offlineZNRecord).toZNRecord()));
     assertEquals(offlineSegmentMetadata, new OfflineSegmentZKMetadata(offlineSegmentMetadata.toZNRecord()));
   }
 

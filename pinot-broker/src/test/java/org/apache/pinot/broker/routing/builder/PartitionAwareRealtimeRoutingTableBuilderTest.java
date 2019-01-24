@@ -60,7 +60,8 @@ public class PartitionAwareRealtimeRoutingTableBuilderTest {
   private int NUM_SEGMENTS;
 
   @Test
-  public void testBrokerSideSegmentPruning() throws Exception {
+  public void testBrokerSideSegmentPruning()
+      throws Exception {
     int numIterations = 50;
 
     for (int iter = 0; iter < numIterations; iter++) {
@@ -135,7 +136,8 @@ public class PartitionAwareRealtimeRoutingTableBuilderTest {
   }
 
   @Test
-  public void testMultipleConsumingSegments() throws Exception {
+  public void testMultipleConsumingSegments()
+      throws Exception {
     NUM_PARTITION = 1;
     NUM_REPLICA = 1;
     NUM_SERVERS = 1;
@@ -200,7 +202,8 @@ public class PartitionAwareRealtimeRoutingTableBuilderTest {
   }
 
   @Test
-  public void testRoutingAfterRebalance() throws Exception {
+  public void testRoutingAfterRebalance()
+      throws Exception {
     NUM_PARTITION = 10;
     NUM_REPLICA = 1;
     NUM_SERVERS = 1;
@@ -265,7 +268,8 @@ public class PartitionAwareRealtimeRoutingTableBuilderTest {
   }
 
   private List<String> updateZkMetadataAndBuildSegmentList(Map<Integer, Integer> partitionSegmentCount,
-      FakePropertyStore propertyStore) throws Exception {
+      FakePropertyStore propertyStore)
+      throws Exception {
     // Update segment zk metadata.
     List<String> segmentList = new ArrayList<>();
     int seqId = 0;
@@ -277,9 +281,9 @@ public class PartitionAwareRealtimeRoutingTableBuilderTest {
       String segmentName = segment.getSegmentName();
 
       SegmentZKMetadata metadata = buildSegmentZKMetadata(segmentName, partitionId);
-      propertyStore.setContents(
-          ZKMetadataProvider.constructPropertyStorePathForSegment(REALTIME_TABLE_NAME, segmentName),
-          metadata.toZNRecord());
+      propertyStore
+          .setContents(ZKMetadataProvider.constructPropertyStorePathForSegment(REALTIME_TABLE_NAME, segmentName),
+              metadata.toZNRecord());
       segmentList.add(segmentName);
       if (partitionId % NUM_PARTITION == 0) {
         seqId++;
@@ -314,7 +318,8 @@ public class PartitionAwareRealtimeRoutingTableBuilderTest {
   }
 
   private ExternalView buildExternalView(String tableName, FakePropertyStore propertyStore,
-      Map<Integer, List<String>> partitionToServerMapping, List<String> segmentList) throws Exception {
+      Map<Integer, List<String>> partitionToServerMapping, List<String> segmentList)
+      throws Exception {
 
     // Create External View
     ExternalView externalView = new ExternalView(tableName);
@@ -332,7 +337,8 @@ public class PartitionAwareRealtimeRoutingTableBuilderTest {
     return new RoutingTableLookupRequest(COMPILER.compileToBrokerRequest(query));
   }
 
-  private TableConfig buildRealtimeTableConfig() throws Exception {
+  private TableConfig buildRealtimeTableConfig()
+      throws Exception {
     // Create partition config
     Map<String, ColumnPartitionConfig> metadataMap = new HashMap<>();
     metadataMap.put(PARTITION_COLUMN, new ColumnPartitionConfig(PARTITION_FUNCTION_NAME, NUM_PARTITION));
@@ -344,10 +350,8 @@ public class PartitionAwareRealtimeRoutingTableBuilderTest {
 
     // Create table config
     TableConfig tableConfig =
-        new TableConfig.Builder(CommonConstants.Helix.TableType.REALTIME)
-            .setTableName(REALTIME_TABLE_NAME)
-            .setNumReplicas(NUM_REPLICA)
-            .build();
+        new TableConfig.Builder(CommonConstants.Helix.TableType.REALTIME).setTableName(REALTIME_TABLE_NAME)
+            .setNumReplicas(NUM_REPLICA).build();
 
     tableConfig.getValidationConfig().setReplicasPerPartition(Integer.toString(NUM_REPLICA));
     tableConfig.getIndexingConfig().setSegmentPartitionConfig(partitionConfig);

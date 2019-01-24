@@ -42,8 +42,8 @@ public class CompositeFutureTest {
   /**
    * Happy path. we got response from all the futures
    * @throws Exception
-   */
-  public void testMultiFutureComposite1() throws Exception {
+   */ public void testMultiFutureComposite1()
+      throws Exception {
     List<ServerInstance> keys = new ArrayList<>();
     int numFutures = 100;
     Map<ServerInstance, ServerResponseFuture<String>> futureMap = new HashMap<>();
@@ -54,8 +54,7 @@ public class CompositeFutureTest {
       AsyncResponseFuture<String> future = new AsyncResponseFuture<>(key, "");
       futureMap.put(key, future);
     }
-    CompositeFuture<String> compositeFuture =
-        new CompositeFuture<String>("test", GatherModeOnError.AND);
+    CompositeFuture<String> compositeFuture = new CompositeFuture<String>("test", GatherModeOnError.AND);
     compositeFuture.start(futureMap.values());
     ResponseCompositeFutureClientRunnerListener runner =
         new ResponseCompositeFutureClientRunnerListener(compositeFuture);
@@ -106,8 +105,8 @@ public class CompositeFutureTest {
   /**
    * We got error from all the futures and stoponFirstError is false
    * @throws Exception
-   */
-  public void testMultiFutureComposite2() throws Exception {
+   */ public void testMultiFutureComposite2()
+      throws Exception {
     List<ServerInstance> keys = new ArrayList<>();
     int numFutures = 100;
     Map<ServerInstance, ServerResponseFuture<String>> futureMap = new HashMap<>();
@@ -169,8 +168,8 @@ public class CompositeFutureTest {
   /**
    * Cancelled Future. Future Client calls get() and another listens before cancel().
    * A response and exception arrives after cancel but they should be discarded.
-   */
-  public void testMultiFutureComposite3() throws Exception {
+   */ public void testMultiFutureComposite3()
+      throws Exception {
 
     List<ServerInstance> keys = new ArrayList<>();
     int numFutures = 100;
@@ -240,8 +239,8 @@ public class CompositeFutureTest {
    * We expect all the futures to be marked done. the 5 futures will have responses. The next one will have error.
    * Rest will be cancelled.
    * @throws Exception
-   */
-  public void testMultiFutureComposite4() throws Exception {
+   */ public void testMultiFutureComposite4()
+      throws Exception {
     List<ServerInstance> keys = new ArrayList<>();
     int numFutures = 100;
     int numSuccessFutures = 5;
@@ -334,8 +333,8 @@ public class CompositeFutureTest {
   /**
    * Tests Composite future with one underlying future.
    * @throws Exception
-   */
-  public void testSingleFutureComposite() throws Exception {
+   */ public void testSingleFutureComposite()
+      throws Exception {
 
     ServerInstance key1 = new ServerInstance("localhost:8080");
 
@@ -602,11 +601,13 @@ public class CompositeFutureTest {
       _future = f;
     }
 
-    public void waitForAboutToGet() throws InterruptedException {
+    public void waitForAboutToGet()
+        throws InterruptedException {
       _latch.await();
     }
 
-    public void waitForDone() throws InterruptedException {
+    public void waitForDone()
+        throws InterruptedException {
       _endLatch.await();
     }
 
@@ -658,5 +659,4 @@ public class CompositeFutureTest {
       return _future;
     }
   }
-
 }

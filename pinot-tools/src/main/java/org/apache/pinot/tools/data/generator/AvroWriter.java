@@ -38,7 +38,8 @@ public class AvroWriter implements Closeable {
   private final org.apache.avro.Schema _avroSchema;
   private final DataFileWriter<GenericData.Record> _recordWriter;
 
-  public AvroWriter(File baseDir, int index, Map<String, Generator> generatorMap, Schema schema) throws IOException {
+  public AvroWriter(File baseDir, int index, Map<String, Generator> generatorMap, Schema schema)
+      throws IOException {
     _generatorMap = generatorMap;
     _avroSchema = getAvroSchema(schema);
     _recordWriter = new DataFileWriter<>(new GenericDatumWriter<GenericData.Record>(_avroSchema));
@@ -60,7 +61,8 @@ public class AvroWriter implements Closeable {
     return new org.apache.avro.Schema.Parser().parse(avroSchema.toString());
   }
 
-  public void writeNext() throws IOException {
+  public void writeNext()
+      throws IOException {
     GenericData.Record nextRecord = new GenericData.Record(_avroSchema);
     for (String column : _generatorMap.keySet()) {
       nextRecord.put(column, _generatorMap.get(column).next());
@@ -69,7 +71,8 @@ public class AvroWriter implements Closeable {
   }
 
   @Override
-  public void close() throws IOException {
+  public void close()
+      throws IOException {
     _recordWriter.close();
   }
 }

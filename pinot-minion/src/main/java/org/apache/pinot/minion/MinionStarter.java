@@ -70,7 +70,8 @@ public class MinionStarter {
 
   private HelixAdmin _helixAdmin;
 
-  public MinionStarter(String zkAddress, String helixClusterName, Configuration config) throws Exception {
+  public MinionStarter(String zkAddress, String helixClusterName, Configuration config)
+      throws Exception {
     _helixClusterName = helixClusterName;
     _config = config;
     _instanceId = config.getString(CommonConstants.Helix.Instance.INSTANCE_ID_KEY,
@@ -109,15 +110,16 @@ public class MinionStarter {
    * Start the Pinot Minion instance.
    * <p>Should be called after all classes of task executor get registered.
    */
-  public void start() throws Exception {
+  public void start()
+      throws Exception {
     LOGGER.info("Starting Pinot minion: {}", _instanceId);
     Utils.logVersions();
     MinionContext minionContext = MinionContext.getInstance();
 
     // Initialize data directory
     LOGGER.info("Initializing data directory");
-    File dataDir = new File(_config.getString(CommonConstants.Helix.Instance.DATA_DIR_KEY,
-        CommonConstants.Minion.DEFAULT_INSTANCE_DATA_DIR));
+    File dataDir = new File(_config
+        .getString(CommonConstants.Helix.Instance.DATA_DIR_KEY, CommonConstants.Minion.DEFAULT_INSTANCE_DATA_DIR));
     if (!dataDir.exists()) {
       Preconditions.checkState(dataDir.mkdirs());
     }
@@ -146,8 +148,7 @@ public class MinionStarter {
     SegmentFetcherFactory.getInstance().init(segmentFetcherFactoryConfig);
 
     LOGGER.info("Initializing pinot crypter");
-    Configuration pinotCrypterConfig =
-        _config.subset(CommonConstants.Minion.PREFIX_OF_CONFIG_OF_PINOT_CRYPTER);
+    Configuration pinotCrypterConfig = _config.subset(CommonConstants.Minion.PREFIX_OF_CONFIG_OF_PINOT_CRYPTER);
     PinotCrypterFactory.init(pinotCrypterConfig);
 
     // Need to do this before we start receiving state transitions.
@@ -162,10 +163,8 @@ public class MinionStarter {
 
     // Join the Helix cluster
     LOGGER.info("Joining the Helix cluster");
-    _helixManager.getStateMachineEngine()
-        .registerStateModelFactory("Task", new TaskStateModelFactory(_helixManager,
-            new TaskFactoryRegistry(_taskExecutorFactoryRegistry,
-                _eventObserverFactoryRegistry).getTaskFactoryRegistry()));
+    _helixManager.getStateMachineEngine().registerStateModelFactory("Task", new TaskStateModelFactory(_helixManager,
+        new TaskFactoryRegistry(_taskExecutorFactoryRegistry, _eventObserverFactoryRegistry).getTaskFactoryRegistry()));
     _helixManager.connect();
     _helixAdmin = _helixManager.getClusterManagmentTool();
     addInstanceTagIfNeeded();

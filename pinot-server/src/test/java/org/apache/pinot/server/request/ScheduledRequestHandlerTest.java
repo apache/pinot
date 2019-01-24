@@ -77,8 +77,8 @@ public class ScheduledRequestHandlerTest {
   public void setUp() {
     serverMetrics = new ServerMetrics(new MetricsRegistry());
     channelHandlerContext = mock(ChannelHandlerContext.class, RETURNS_DEEP_STUBS);
-    when(channelHandlerContext.channel().remoteAddress()).thenAnswer(
-        (Answer<InetSocketAddress>) invocationOnMock -> new InetSocketAddress("localhost", 60000));
+    when(channelHandlerContext.channel().remoteAddress())
+        .thenAnswer((Answer<InetSocketAddress>) invocationOnMock -> new InetSocketAddress("localhost", 60000));
 
     queryScheduler = mock(QueryScheduler.class);
     queryExecutor = new ServerQueryExecutorV1Impl();
@@ -87,7 +87,8 @@ public class ScheduledRequestHandlerTest {
   }
 
   @Test
-  public void testBadRequest() throws Exception {
+  public void testBadRequest()
+      throws Exception {
     ScheduledRequestHandler handler = new ScheduledRequestHandler(queryScheduler, serverMetrics);
     String requestBadString = "foobar";
     byte[] requestData = requestBadString.getBytes();
@@ -116,7 +117,8 @@ public class ScheduledRequestHandlerTest {
   }
 
   @Test
-  public void testQueryProcessingException() throws Exception {
+  public void testQueryProcessingException()
+      throws Exception {
     ScheduledRequestHandler handler =
         new ScheduledRequestHandler(new QueryScheduler(queryExecutor, resourceManager, serverMetrics, latestQueryTime) {
           @Nonnull
@@ -155,7 +157,8 @@ public class ScheduledRequestHandlerTest {
   }
 
   @Test
-  public void testValidQueryResponse() throws InterruptedException, ExecutionException, TimeoutException, IOException {
+  public void testValidQueryResponse()
+      throws InterruptedException, ExecutionException, TimeoutException, IOException {
     ScheduledRequestHandler handler =
         new ScheduledRequestHandler(new QueryScheduler(queryExecutor, resourceManager, serverMetrics, latestQueryTime) {
           @Nonnull

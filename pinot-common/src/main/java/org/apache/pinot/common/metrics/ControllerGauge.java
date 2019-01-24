@@ -25,30 +25,43 @@ import org.apache.pinot.common.Utils;
  * Controller gauges.
  */
 public enum ControllerGauge implements AbstractMetrics.Gauge {
-  NUMBER_OF_REPLICAS("replicas", false), // Number of complete replicas of table in external view containing
-                                         // all segments online in ideal state
-  PERCENT_OF_REPLICAS("percent", false), // Percentage of complete online replicas in external view as compared
-                                         // to replicas in ideal state
+
+  // Number of complete replicas of table in external view containing all segments online in ideal state
+  NUMBER_OF_REPLICAS("replicas", false),
+
+  // Percentage of complete online replicas in external view as compared to replicas in ideal state
+  PERCENT_OF_REPLICAS("percent", false),
+
   SEGMENTS_IN_ERROR_STATE("segments", false),
-  PERCENT_SEGMENTS_AVAILABLE("segments", false), // Percentage of segments with at least one online replica in external view
-                                                 // as compared to total number of segments in ideal state
+
+  // Percentage of segments with at least one online replica in external view as compared to total number of segments in
+  // ideal state
+  PERCENT_SEGMENTS_AVAILABLE("segments", false),
+
   SEGMENT_COUNT("SegmentCount", false),
   IDEALSTATE_ZNODE_SIZE("idealstate", false),
   REALTIME_TABLE_COUNT("TableCount", true),
   OFFLINE_TABLE_COUNT("TableCount", true),
   DISABLED_TABLE_COUNT("TableCount", true),
-
   PERIODIC_TASK_NUM_TABLES_PROCESSED("PeriodicTaskNumTablesProcessed", true),
 
-  SHORT_OF_LIVE_INSTANCES("ShortOfLiveInstances", false), // Number of extra live instances needed.
+  // Number of extra live instances needed
+  SHORT_OF_LIVE_INSTANCES("ShortOfLiveInstances", false),
 
-  REALTIME_TABLE_ESTIMATED_SIZE("RealtimeTableEstimatedSize", false), // Estimated size of realtime table.
-  OFFLINE_TABLE_ESTIMATED_SIZE("OfflineTableEstimatedSize", false),   // Estimated size of offline table.
+  // Estimated size of realtime table
+  REALTIME_TABLE_ESTIMATED_SIZE("RealtimeTableEstimatedSize", false),
 
-  TABLE_QUOTA("TableQuotaBasedOnTableConfig", false), // Table quota based on setting in table config.
+  // Estimated size of offline table
+  OFFLINE_TABLE_ESTIMATED_SIZE("OfflineTableEstimatedSize", false),
 
-  TABLE_STORAGE_QUOTA_UTILIZATION("TableStorageQuotaUtilization", false), // Table storage quota utilization.
-  TABLE_STORAGE_EST_MISSING_SEGMENT_PERCENT("TableStorageEstMissingSegmentPercent", false); // percentage of segments we failed to get size for
+  // Table quota based on setting in table config
+  TABLE_QUOTA("TableQuotaBasedOnTableConfig", false),
+
+  // Table storage quota utilization
+  TABLE_STORAGE_QUOTA_UTILIZATION("TableStorageQuotaUtilization", false),
+
+  // Percentage of segments we failed to get size for
+  TABLE_STORAGE_EST_MISSING_SEGMENT_PERCENT("TableStorageEstMissingSegmentPercent", false);
 
   private final String gaugeName;
   private final String unit;

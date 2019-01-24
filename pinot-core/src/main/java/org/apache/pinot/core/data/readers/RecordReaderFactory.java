@@ -28,7 +28,8 @@ public class RecordReaderFactory {
   private RecordReaderFactory() {
   }
 
-  public static RecordReader getRecordReader(SegmentGeneratorConfig segmentGeneratorConfig) throws Exception {
+  public static RecordReader getRecordReader(SegmentGeneratorConfig segmentGeneratorConfig)
+      throws Exception {
     File dataFile = new File(segmentGeneratorConfig.getInputFilePath());
     Preconditions.checkState(dataFile.exists(), "Input file: " + dataFile.getAbsolutePath() + " does not exist");
 
@@ -45,7 +46,8 @@ public class RecordReaderFactory {
       case PINOT:
         return new PinotSegmentRecordReader(dataFile, schema, segmentGeneratorConfig.getColumnSortOrder());
       case THRIFT:
-        return new ThriftRecordReader(dataFile, schema,(ThriftRecordReaderConfig)segmentGeneratorConfig.getReaderConfig());
+        return new ThriftRecordReader(dataFile, schema,
+            (ThriftRecordReaderConfig) segmentGeneratorConfig.getReaderConfig());
       default:
         throw new UnsupportedOperationException("Unsupported input file format: " + fileFormat);
     }

@@ -72,8 +72,8 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
     _segmentType = znRecord.getEnumField(CommonConstants.Segment.SEGMENT_TYPE, SegmentType.class, SegmentType.OFFLINE);
     _startTime = znRecord.getLongField(CommonConstants.Segment.START_TIME, -1);
     _endTime = znRecord.getLongField(CommonConstants.Segment.END_TIME, -1);
-    if (znRecord.getSimpleFields().containsKey(CommonConstants.Segment.TIME_UNIT) && !znRecord.getSimpleField(
-        CommonConstants.Segment.TIME_UNIT).equals(NULL)) {
+    if (znRecord.getSimpleFields().containsKey(CommonConstants.Segment.TIME_UNIT) && !znRecord
+        .getSimpleField(CommonConstants.Segment.TIME_UNIT).equals(NULL)) {
       setTimeUnit(znRecord.getEnumField(CommonConstants.Segment.TIME_UNIT, TimeUnit.class, TimeUnit.DAYS));
     }
     _indexVersion = znRecord.getSimpleField(CommonConstants.Segment.INDEX_VERSION);
@@ -234,12 +234,13 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
     }
 
     SegmentZKMetadata metadata = (SegmentZKMetadata) segmentMetadata;
-    return isEqual(_segmentName, metadata._segmentName) && isEqual(_crypterName, metadata._crypterName) && isEqual(_tableName,
-        metadata._tableName) && isEqual(_indexVersion, metadata._indexVersion) && isEqual(_timeUnit, metadata._timeUnit)
-        && isEqual(_startTime, metadata._startTime) && isEqual(_endTime, metadata._endTime) && isEqual(_segmentType,
-        metadata._segmentType) && isEqual(_totalRawDocs, metadata._totalRawDocs) && isEqual(_crc, metadata._crc)
-        && isEqual(_creationTime, metadata._creationTime) && isEqual(_partitionMetadata, metadata._partitionMetadata)
-        && isEqual(_segmentUploadStartTime, metadata._segmentUploadStartTime) && isEqual(_customMap, metadata._customMap);
+    return isEqual(_segmentName, metadata._segmentName) && isEqual(_crypterName, metadata._crypterName) && isEqual(
+        _tableName, metadata._tableName) && isEqual(_indexVersion, metadata._indexVersion) && isEqual(_timeUnit,
+        metadata._timeUnit) && isEqual(_startTime, metadata._startTime) && isEqual(_endTime, metadata._endTime)
+        && isEqual(_segmentType, metadata._segmentType) && isEqual(_totalRawDocs, metadata._totalRawDocs) && isEqual(
+        _crc, metadata._crc) && isEqual(_creationTime, metadata._creationTime) && isEqual(_partitionMetadata,
+        metadata._partitionMetadata) && isEqual(_segmentUploadStartTime, metadata._segmentUploadStartTime) && isEqual(
+        _customMap, metadata._customMap);
   }
 
   @Override
@@ -290,9 +291,9 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
         String partitionMetadataJson = _partitionMetadata.toJsonString();
         znRecord.setSimpleField(CommonConstants.Segment.PARTITION_METADATA, partitionMetadataJson);
       } catch (IOException e) {
-        LOGGER.error(
-            "Exception caught while writing partition metadata into ZNRecord for segment '{}', will be dropped",
-            _segmentName, e);
+        LOGGER
+            .error("Exception caught while writing partition metadata into ZNRecord for segment '{}', will be dropped",
+                _segmentName, e);
       }
     }
     if (_segmentUploadStartTime > 0) {

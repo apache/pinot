@@ -45,8 +45,8 @@ public class MergedSegmentSelector implements SegmentSelector {
 
   @Override
   public void computeOnExternalViewChange() {
-    SegmentMergeLineage segmentMergeLineage = SegmentMergeLineageAccessHelper.getSegmentMergeLineage(_propertyStore,
-        _tableNameWithType);
+    SegmentMergeLineage segmentMergeLineage =
+        SegmentMergeLineageAccessHelper.getSegmentMergeLineage(_propertyStore, _tableNameWithType);
     _rootSegmentGroup = segmentMergeLineage.getMergeLineageRootSegmentGroup();
   }
 
@@ -68,13 +68,13 @@ public class MergedSegmentSelector implements SegmentSelector {
       if (segmentGroup.getChildrenGroups() == null || segmentGroup.getChildrenGroups().isEmpty()) {
         return;
       }
-      for (SegmentGroup child: segmentGroup.getChildrenGroups()) {
+      for (SegmentGroup child : segmentGroup.getChildrenGroups()) {
         removeSegmentsForSegmentGroup(child, selectedSegments);
       }
     } else {
       // If the current group is not picked, we compute the selection recursively for children nodes
       selectedSegments.removeAll(segmentsForGroup);
-      for (SegmentGroup child: segmentGroup.getChildrenGroups()) {
+      for (SegmentGroup child : segmentGroup.getChildrenGroups()) {
         computeSelectionProcessForSegmentGroup(child, selectedSegments, availableSegments);
       }
     }

@@ -109,8 +109,9 @@ public class FilterPlanNode implements PlanNode {
 
   @Override
   public void showTree(String prefix) {
-    final String treeStructure = prefix + "Filter Plan Node\n" + prefix + "Operator: Filter\n" + prefix + "Argument 0: "
-        + _brokerRequest.getFilterQuery();
+    final String treeStructure =
+        prefix + "Filter Plan Node\n" + prefix + "Operator: Filter\n" + prefix + "Argument 0: " + _brokerRequest
+            .getFilterQuery();
     LOGGER.debug(treeStructure);
   }
 }

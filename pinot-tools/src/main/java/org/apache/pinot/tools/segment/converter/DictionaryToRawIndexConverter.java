@@ -267,8 +267,8 @@ public class DictionaryToRawIndexConverter {
       if (field.isAnnotationPresent(Option.class)) {
         Option option = field.getAnnotation(Option.class);
 
-        System.out.println(
-            String.format("\t%-15s: %s (required=%s)", option.name(), option.usage(), option.required()));
+        System.out
+            .println(String.format("\t%-15s: %s (required=%s)", option.name(), option.usage(), option.required()));
       }
     }
   }
@@ -306,9 +306,8 @@ public class DictionaryToRawIndexConverter {
 
     ChunkCompressorFactory.CompressionType compressionType =
         ChunkCompressorFactory.CompressionType.valueOf(_compressionType);
-    SingleValueRawIndexCreator rawIndexCreator =
-        SegmentColumnarIndexCreator.getRawIndexCreatorForColumn(newSegment, compressionType, column, dataType,
-            totalDocs, lengthOfLongestEntry);
+    SingleValueRawIndexCreator rawIndexCreator = SegmentColumnarIndexCreator
+        .getRawIndexCreatorForColumn(newSegment, compressionType, column, dataType, totalDocs, lengthOfLongestEntry);
 
     int docId = 0;
     bvIter.reset();
