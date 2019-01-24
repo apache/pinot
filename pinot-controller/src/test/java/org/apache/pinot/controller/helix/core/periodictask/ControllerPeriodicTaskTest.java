@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
+import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
@@ -36,6 +37,7 @@ import static org.testng.Assert.assertTrue;
 
 public class ControllerPeriodicTaskTest {
   private static final long RUN_FREQUENCY_IN_SECONDS = 30;
+  private final ControllerConf _controllerConf = new ControllerConf();
 
   private final PinotHelixResourceManager _resourceManager = mock(PinotHelixResourceManager.class);
   private final AtomicBoolean _stopTaskCalled = new AtomicBoolean();
@@ -44,13 +46,13 @@ public class ControllerPeriodicTaskTest {
   private final AtomicInteger _numTablesProcessed = new AtomicInteger();
   private final int _numTables = 3;
 
-  private final MockControllerPeriodicTask _task =
-      new MockControllerPeriodicTask("TestTask", RUN_FREQUENCY_IN_SECONDS, _resourceManager) {
+  private final MockControllerPeriodicTask _task = new MockControllerPeriodicTask("TestTask", RUN_FREQUENCY_IN_SECONDS,
+      _controllerConf.getPeriodicTaskInitialDelayInSeconds(), _resourceManager) {
 
-        @Override
-        protected void initTask() {
-          _initTaskCalled.set(true);
-        }
+    @Override
+    protected void initTask() {
+      _initTaskCalled.set(true);
+    }
 
         @Override
         public void stopTask() {
@@ -86,8 +88,10 @@ public class ControllerPeriodicTaskTest {
 
   @Test
   public void testRandomInitialDelay() {
-    assertTrue(_task.getInitialDelayInSeconds() >= ControllerPeriodicTask.MIN_INITIAL_DELAY_IN_SECONDS);
-    assertTrue(_task.getInitialDelayInSeconds() < ControllerPeriodicTask.MAX_INITIAL_DELAY_IN_SECONDS);
+    assertTrue(
+        _task.getInitialDelayInSeconds() >= ControllerConf.ControllerPeriodicTasksConf.MIN_INITIAL_DELAY_IN_SECONDS);
+    assertTrue(
+        _task.getInitialDelayInSeconds() < ControllerConf.ControllerPeriodicTasksConf.MAX_INITIAL_DELAY_IN_SECONDS);
 
     assertEquals(_task.getIntervalInSeconds(), RUN_FREQUENCY_IN_SECONDS);
   }
@@ -134,9 +138,9 @@ public class ControllerPeriodicTaskTest {
 
   private class MockControllerPeriodicTask extends ControllerPeriodicTask {
 
-    public MockControllerPeriodicTask(String taskName, long runFrequencyInSeconds,
+    public MockControllerPeriodicTask(String taskName, long runFrequencyInSeconds, long initialDelayInSeconds,
         PinotHelixResourceManager pinotHelixResourceManager) {
-      super(taskName, runFrequencyInSeconds, pinotHelixResourceManager);
+      super(taskName, runFrequencyInSeconds, initialDelayInSeconds, pinotHelixResourceManager);
     }
 
     @Override

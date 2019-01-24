@@ -60,7 +60,8 @@ public class PinotTaskManager extends ControllerPeriodicTask {
   public PinotTaskManager(@Nonnull PinotHelixTaskResourceManager helixTaskResourceManager,
       @Nonnull PinotHelixResourceManager helixResourceManager, @Nonnull ControllerConf controllerConf,
       @Nonnull ControllerMetrics controllerMetrics) {
-    super("PinotTaskManager", controllerConf.getTaskManagerFrequencyInSeconds(), helixResourceManager);
+    super("PinotTaskManager", controllerConf.getTaskManagerFrequencyInSeconds(),
+        controllerConf.getPeriodicTaskInitialDelayInSeconds(), helixResourceManager);
     _helixTaskResourceManager = helixTaskResourceManager;
     _clusterInfoProvider = new ClusterInfoProvider(helixResourceManager, helixTaskResourceManager, controllerConf);
     _taskGeneratorRegistry = new TaskGeneratorRegistry(_clusterInfoProvider);

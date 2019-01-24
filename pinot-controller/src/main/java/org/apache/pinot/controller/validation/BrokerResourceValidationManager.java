@@ -39,7 +39,7 @@ public class BrokerResourceValidationManager extends ControllerPeriodicTask {
 
   public BrokerResourceValidationManager(ControllerConf config, PinotHelixResourceManager pinotHelixResourceManager) {
     super("BrokerResourceValidationManager", config.getBrokerResourceValidationFrequencyInSeconds(),
-        pinotHelixResourceManager);
+        config.getPeriodicTaskInitialDelayInSeconds(), pinotHelixResourceManager);
   }
 
   @Override

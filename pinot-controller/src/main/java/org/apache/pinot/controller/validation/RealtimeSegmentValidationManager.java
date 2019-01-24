@@ -55,7 +55,7 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask {
   public RealtimeSegmentValidationManager(ControllerConf config, PinotHelixResourceManager pinotHelixResourceManager,
       PinotLLCRealtimeSegmentManager llcRealtimeSegmentManager, ValidationMetrics validationMetrics) {
     super("RealtimeSegmentValidationManager", config.getRealtimeSegmentValidationFrequencyInSeconds(),
-        pinotHelixResourceManager);
+        config.getPeriodicTaskInitialDelayInSeconds(), pinotHelixResourceManager);
     _llcRealtimeSegmentManager = llcRealtimeSegmentManager;
     _validationMetrics = validationMetrics;
 

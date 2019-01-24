@@ -25,6 +25,7 @@ import java.net.URISyntaxException;
 import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
@@ -56,6 +57,7 @@ public class ControllerConf extends PropertiesConfiguration {
   private static final String EXTERNAL_VIEW_ONLINE_TO_OFFLINE_TIMEOUT = "controller.upload.onlineToOfflineTimeout";
 
   public static class ControllerPeriodicTasksConf {
+    // frequency configs
     private static final String RETENTION_MANAGER_FREQUENCY_IN_SECONDS = "controller.retention.frequencyInSeconds";
     @Deprecated // The ValidationManager has been split up into 3 separate tasks, each having their own frequency config settings
     private static final String DEPRECATED_VALIDATION_MANAGER_FREQUENCY_IN_SECONDS =
@@ -77,6 +79,18 @@ public class ControllerConf extends PropertiesConfiguration {
     private static final String SEGMENT_LEVEL_VALIDATION_INTERVAL_IN_SECONDS =
         "controller.segment.level.validation.intervalInSeconds";
 
+    // Initial delays
+    private static final String STATUS_CHECKER_INITIAL_DELAY_IN_SECONDS = "controller.statusChecker.initialDelayInSeconds";
+
+    public static final int MIN_INITIAL_DELAY_IN_SECONDS = 120;
+    public static final int MAX_INITIAL_DELAY_IN_SECONDS = 300;
+
+    private static final Random RANDOM = new Random();
+    private static long getRandomInitialDelayInSeconds() {
+      return MIN_INITIAL_DELAY_IN_SECONDS + RANDOM.nextInt(MAX_INITIAL_DELAY_IN_SECONDS - MIN_INITIAL_DELAY_IN_SECONDS);
+    }
+
+    // Default values
     private static final int DEFAULT_RETENTION_CONTROLLER_FREQUENCY_IN_SECONDS = 6 * 60 * 60; // 6 Hours.
     private static final int DEFAULT_OFFLINE_SEGMENT_INTERVAL_CHECKER_FREQUENCY_IN_SECONDS = 24 * 60 * 60; // 24 Hours.
     private static final int DEFAULT_REALTIME_SEGMENT_VALIDATION_FREQUENCY_IN_SECONDS = 60 * 60; // 1 Hour.
@@ -547,5 +561,18 @@ public class ControllerConf extends PropertiesConfiguration {
   public int getSegmentLevelValidationIntervalInSeconds() {
     return getInt(ControllerPeriodicTasksConf.SEGMENT_LEVEL_VALIDATION_INTERVAL_IN_SECONDS,
         ControllerPeriodicTasksConf.DEFAULT_SEGMENT_LEVEL_VALIDATION_INTERVAL_IN_SECONDS);
+  }
+
+  public long getStatusCheckerInitialDelayInSeconds() {
+    return getLong(ControllerPeriodicTasksConf.STATUS_CHECKER_INITIAL_DELAY_IN_SECONDS,
+        ControllerPeriodicTasksConf.getRandomInitialDelayInSeconds());
+  }
+
+  public void setStatusCheckerInitialDelayInSeconds(long initialDelayInSeconds) {
+    setProperty(ControllerPeriodicTasksConf.STATUS_CHECKER_INITIAL_DELAY_IN_SECONDS, initialDelayInSeconds);
+  }
+
+  public long getPeriodicTaskInitialDelayInSeconds() {
+    return ControllerPeriodicTasksConf.getRandomInitialDelayInSeconds();
   }
 }
