@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.util.trace;
 
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Queue;
@@ -117,8 +116,6 @@ public class TraceContextTest {
   }
 
   private static String getTraceString(String key, Object value) {
-    ObjectNode jsonTrace = JsonUtils.newObjectNode();
-    jsonTrace.set(key, JsonUtils.objectToJsonNode(value));
-    return jsonTrace.toString();
+    return JsonUtils.newObjectNode().set(key, JsonUtils.objectToJsonNode(value)).toString();
   }
 }
