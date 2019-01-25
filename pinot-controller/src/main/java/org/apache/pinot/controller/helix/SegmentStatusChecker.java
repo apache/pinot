@@ -64,7 +64,8 @@ public class SegmentStatusChecker extends ControllerPeriodicTask {
    */
   public SegmentStatusChecker(PinotHelixResourceManager pinotHelixResourceManager, ControllerConf config,
       ControllerMetrics metricsRegistry) {
-    super("SegmentStatusChecker", config.getStatusCheckerFrequencyInSeconds(), pinotHelixResourceManager);
+    super("SegmentStatusChecker", config.getStatusCheckerFrequencyInSeconds(),
+        config.getStatusCheckerInitialDelayInSeconds(), pinotHelixResourceManager);
 
     _waitForPushTimeSeconds = config.getStatusCheckerWaitForPushTimeInSeconds();
     _metricsRegistry = metricsRegistry;
@@ -118,19 +119,12 @@ public class SegmentStatusChecker extends ControllerPeriodicTask {
       } else {
         _realTimeTableCount++;
       }
+
       IdealState idealState = _pinotHelixResourceManager.getTableIdealState(tableNameWithType);
-      if ((idealState == null) || (idealState.getPartitionSet().isEmpty())) {
-        int nReplicasFromIdealState = 1;
-        try {
-          if (idealState != null) {
-            nReplicasFromIdealState = Integer.valueOf(idealState.getReplicas());
-          }
-        } catch (NumberFormatException e) {
-          // Ignore
-        }
-        _metricsRegistry.setValueOfTableGauge(tableNameWithType, ControllerGauge.NUMBER_OF_REPLICAS, nReplicasFromIdealState);
-        _metricsRegistry.setValueOfTableGauge(tableNameWithType, ControllerGauge.PERCENT_OF_REPLICAS, 100);
-        _metricsRegistry.setValueOfTableGauge(tableNameWithType, ControllerGauge.PERCENT_SEGMENTS_AVAILABLE, 100);
+
+      if (idealState == null) {
+        LOGGER.warn("Table {} has null ideal state. Skipping segment status checks", tableNameWithType);
+        resetTableMetrics(tableNameWithType);
         return;
       }
 
@@ -140,6 +134,19 @@ public class SegmentStatusChecker extends ControllerPeriodicTask {
         }
         resetTableMetrics(tableNameWithType);
         _disabledTableCount++;
+        return;
+      }
+
+      if (idealState.getPartitionSet().isEmpty()) {
+        int nReplicasFromIdealState = 1;
+        try {
+          nReplicasFromIdealState = Integer.valueOf(idealState.getReplicas());
+        } catch (NumberFormatException e) {
+          // Ignore
+        }
+        _metricsRegistry.setValueOfTableGauge(tableNameWithType, ControllerGauge.NUMBER_OF_REPLICAS, nReplicasFromIdealState);
+        _metricsRegistry.setValueOfTableGauge(tableNameWithType, ControllerGauge.PERCENT_OF_REPLICAS, 100);
+        _metricsRegistry.setValueOfTableGauge(tableNameWithType, ControllerGauge.PERCENT_SEGMENTS_AVAILABLE, 100);
         return;
       }
 

@@ -352,6 +352,11 @@ public class ControllerStarter {
     return _metricsRegistry;
   }
 
+  @VisibleForTesting
+  public ControllerMetrics getControllerMetrics() {
+    return _controllerMetrics;
+  }
+
   public static ControllerStarter startDefault() {
     return startDefault(null);
   }

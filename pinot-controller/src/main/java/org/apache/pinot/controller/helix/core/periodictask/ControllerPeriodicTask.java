@@ -20,7 +20,6 @@ package org.apache.pinot.controller.helix.core.periodictask;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.util.List;
-import java.util.Random;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.periodictask.BasePeriodicTask;
 import org.slf4j.Logger;
@@ -33,10 +32,7 @@ import org.slf4j.LoggerFactory;
  */
 public abstract class ControllerPeriodicTask extends BasePeriodicTask {
   private static final Logger LOGGER = LoggerFactory.getLogger(ControllerPeriodicTask.class);
-  private static final Random RANDOM = new Random();
 
-  public static final int MIN_INITIAL_DELAY_IN_SECONDS = 120;
-  public static final int MAX_INITIAL_DELAY_IN_SECONDS = 300;
 
   private static final long MAX_CONTROLLER_PERIODIC_TASK_STOP_TIME_MILLIS = 30_000L;
 
@@ -49,15 +45,6 @@ public abstract class ControllerPeriodicTask extends BasePeriodicTask {
       PinotHelixResourceManager pinotHelixResourceManager) {
     super(taskName, runFrequencyInSeconds, initialDelayInSeconds);
     _pinotHelixResourceManager = pinotHelixResourceManager;
-  }
-
-  public ControllerPeriodicTask(String taskName, long runFrequencyInSeconds,
-      PinotHelixResourceManager pinotHelixResourceManager) {
-    this(taskName, runFrequencyInSeconds, getRandomInitialDelayInSeconds(), pinotHelixResourceManager);
-  }
-
-  private static long getRandomInitialDelayInSeconds() {
-    return MIN_INITIAL_DELAY_IN_SECONDS + RANDOM.nextInt(MAX_INITIAL_DELAY_IN_SECONDS - MIN_INITIAL_DELAY_IN_SECONDS);
   }
 
   /**

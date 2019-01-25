@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.helix;
 
+import com.google.common.collect.Lists;
 import com.yammer.metrics.core.MetricsRegistry;
 import java.util.ArrayList;
 import java.util.List;
@@ -266,7 +267,7 @@ public class SegmentStatusCheckerTest {
   @Test
   public void missingIdealTest() throws Exception {
     final String tableName = "myTable_REALTIME";
-    List<String> allTableNames = new ArrayList<String>();
+    List<String> allTableNames = new ArrayList<>();
     allTableNames.add(tableName);
 
     {
@@ -288,9 +289,9 @@ public class SegmentStatusCheckerTest {
     Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName,
         ControllerGauge.SEGMENTS_IN_ERROR_STATE), Long.MIN_VALUE);
     Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName,
-        ControllerGauge.NUMBER_OF_REPLICAS), 1);
+        ControllerGauge.NUMBER_OF_REPLICAS), Long.MIN_VALUE);
     Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName,
-        ControllerGauge.PERCENT_OF_REPLICAS), 100);
+        ControllerGauge.PERCENT_OF_REPLICAS), Long.MIN_VALUE);
   }
 
   @Test
@@ -391,11 +392,20 @@ public class SegmentStatusCheckerTest {
   }
 
   @Test
-  public void noIdealState() throws Exception {
-    final String tableName = "myTable_REALTIME";
+  public void disabledTableTest() throws Exception {
+
+    final String tableName = "myTable_OFFLINE";
     List<String> allTableNames = new ArrayList<String>();
     allTableNames.add(tableName);
-    IdealState idealState = null;
+    IdealState idealState = new IdealState(tableName);
+    // disable table in idealstate
+    idealState.enable(false);
+    idealState.setPartitionState("myTable_OFFLINE", "pinot1", "OFFLINE");
+    idealState.setPartitionState("myTable_OFFLINE", "pinot2", "OFFLINE");
+    idealState.setPartitionState("myTable_OFFLINE", "pinot3", "OFFLINE");
+    idealState.setReplicas("1");
+    idealState.setRebalanceMode(IdealState.RebalanceMode.CUSTOMIZED);
+
     {
       helixResourceManager = mock(PinotHelixResourceManager.class);
       when(helixResourceManager.getAllTables()).thenReturn(allTableNames);
@@ -410,30 +420,25 @@ public class SegmentStatusCheckerTest {
     metricsRegistry = new MetricsRegistry();
     controllerMetrics = new ControllerMetrics(metricsRegistry);
     segmentStatusChecker = new SegmentStatusChecker(helixResourceManager, config, controllerMetrics);
+    // verify state before test
+    Assert.assertEquals(controllerMetrics.getValueOfGlobalGauge(
+        ControllerGauge.DISABLED_TABLE_COUNT), 0);
+    // update metrics
     segmentStatusChecker.init();
     segmentStatusChecker.run();
-    Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName,
-        ControllerGauge.SEGMENTS_IN_ERROR_STATE), Long.MIN_VALUE);
-    Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName,
-        ControllerGauge.NUMBER_OF_REPLICAS), 1);
-    Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName,
-        ControllerGauge.PERCENT_OF_REPLICAS), 100);
-    Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName,
-        ControllerGauge.PERCENT_SEGMENTS_AVAILABLE), 100);
+    Assert.assertEquals(controllerMetrics.getValueOfGlobalGauge(
+        ControllerGauge.DISABLED_TABLE_COUNT), 1);
   }
 
+
   @Test
-  public void disabledTableTest() throws Exception {
+  public void disabledEmptyTableTest() throws Exception {
 
     final String tableName = "myTable_OFFLINE";
-    List<String> allTableNames = new ArrayList<String>();
-    allTableNames.add(tableName);
+    List<String> allTableNames = Lists.newArrayList(tableName);
     IdealState idealState = new IdealState(tableName);
     // disable table in idealstate
     idealState.enable(false);
-    idealState.setPartitionState("myTable_OFFLINE", "pinot1", "OFFLINE");
-    idealState.setPartitionState("myTable_OFFLINE", "pinot2", "OFFLINE");
-    idealState.setPartitionState("myTable_OFFLINE", "pinot3", "OFFLINE");
     idealState.setReplicas("1");
     idealState.setRebalanceMode(IdealState.RebalanceMode.CUSTOMIZED);
 
