@@ -22,7 +22,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -45,21 +44,15 @@ import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.BrokerQueryPhase;
-import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.FilterOperator;
 import org.apache.pinot.common.request.FilterQuery;
 import org.apache.pinot.common.request.FilterQueryMap;
-import org.apache.pinot.common.request.GroupBy;
-import org.apache.pinot.common.request.Selection;
-import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.utils.CommonConstants;
-import org.apache.pinot.common.utils.request.FilterQueryTree;
+import org.apache.pinot.common.utils.request.RequestInfo;
 import org.apache.pinot.common.utils.request.RequestUtils;
-import org.apache.pinot.core.query.aggregation.function.AggregationFunctionType;
-import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.reduce.BrokerReduceService;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.slf4j.Logger;
@@ -208,9 +201,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     }
 
     // Validate the request
-    FilterQueryTree[] filterQueryTree = new FilterQueryTree[1];
+    RequestInfo requestInfo;
     try {
-      validateRequest(brokerRequest, requestParams, filterQueryTree);
+      requestInfo = validateRequest(brokerRequest, requestParams);
     } catch (Exception e) {
       LOGGER.info("Caught exception while validating request {}: {}, {}", requestId, query, e.getMessage());
       requestStatistics.setErrorCode(QueryException.QUERY_VALIDATION_ERROR_CODE);
@@ -225,9 +218,6 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     }
     Map<String, String> debugOptions = requestParams.getDebugOptions();
     if (debugOptions != null) {
-//    if (request.has(DEBUG_OPTIONS)) {
-//      Map<String, String> debugOptions = Splitter.on(';').omitEmptyStrings().trimResults().withKeyValueSeparator('=')
-//          .split(request.get(DEBUG_OPTIONS).asText());
       LOGGER.debug("Debug options are set to: {} for request {}: {}", debugOptions, requestId, query);
       brokerRequest.setDebugOptions(debugOptions);
     }
@@ -240,18 +230,18 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     BrokerRequest realtimeBrokerRequest = null;
     if ((offlineTableName != null) && (realtimeTableName != null)) {
       // Hybrid
-      offlineBrokerRequest = _brokerRequestOptimizer.optimize(getOfflineBrokerRequest(brokerRequest), timeColumn, filterQueryTree[0]);
-      realtimeBrokerRequest = _brokerRequestOptimizer.optimize(getRealtimeBrokerRequest(brokerRequest), timeColumn, filterQueryTree[0]);
+      offlineBrokerRequest = _brokerRequestOptimizer.optimize(getOfflineBrokerRequest(brokerRequest), timeColumn, requestInfo);
+      realtimeBrokerRequest = _brokerRequestOptimizer.optimize(getRealtimeBrokerRequest(brokerRequest), timeColumn, requestInfo);
       requestStatistics.setFanoutType(RequestStatistics.FanoutType.HYBRID);
     } else if (offlineTableName != null) {
       // OFFLINE only
       brokerRequest.getQuerySource().setTableName(offlineTableName);
-      offlineBrokerRequest = _brokerRequestOptimizer.optimize(brokerRequest, timeColumn, filterQueryTree[0]);
+      offlineBrokerRequest = _brokerRequestOptimizer.optimize(brokerRequest, timeColumn, requestInfo);
       requestStatistics.setFanoutType(RequestStatistics.FanoutType.OFFLINE);
     } else {
       // REALTIME only
       brokerRequest.getQuerySource().setTableName(realtimeTableName);
-      realtimeBrokerRequest = _brokerRequestOptimizer.optimize(brokerRequest, timeColumn, filterQueryTree[0]);
+      realtimeBrokerRequest = _brokerRequestOptimizer.optimize(brokerRequest, timeColumn, requestInfo);
       requestStatistics.setFanoutType(RequestStatistics.FanoutType.REALTIME);
     }
 
@@ -330,7 +320,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    *   <li>Value for 'LIMIT' for selection query <= configured value</li>
    * </ul>
    */
-  private void validateRequest(BrokerRequest brokerRequest, RequestParams requestParams, FilterQueryTree[] filterQueryTree) {
+  private RequestInfo validateRequest(BrokerRequest brokerRequest, RequestParams requestParams) {
     if (brokerRequest.isSetAggregationsInfo()) {
       if (brokerRequest.isSetGroupBy()) {
         long topN = brokerRequest.getGroupBy().getTopN();
@@ -349,13 +339,14 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
     // Checks whether the query contains non-existent columns.
     // Table name has already been verified before hitting this line.
-    if (requestParams.isValidateQuery()) {
+    RequestInfo requestInfo = null;
+    if (requestParams.shouldValidateQuery()) {
       String tableName = brokerRequest.getQuerySource().getTableName();
       Schema schema = _tableSchemaCache.getIfTableSchemaPresent(tableName);
       if (schema != null) {
-        Set<String> columnsFromBrokerRequest = getAllColumnsFromBrokerRequest(brokerRequest, filterQueryTree);
-        // Filters out virtual columns in the query.
-        columnsFromBrokerRequest.removeIf(column -> column.startsWith("$"));
+        requestInfo = RequestUtils.preComputeRequestInfo(brokerRequest);
+        // gets all the physical columns from broker request
+        Set<String> columnsFromBrokerRequest = requestInfo.getPhysicalColumns();
         columnsFromBrokerRequest.removeAll(schema.getColumnNames());
         if (!columnsFromBrokerRequest.isEmpty()) {
           _brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.QUERY_NON_EXISTENT_COLUMNS, 1L);
@@ -367,50 +358,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         _tableSchemaCache.refreshTableSchema(tableName);
       }
     }
-  }
-
-  /**
-   * Helper to get all the columns from broker request.
-   * Returns the set of all the columns.
-   */
-  private Set<String> getAllColumnsFromBrokerRequest(BrokerRequest brokerRequest, FilterQueryTree[] filterQueryTree) {
-    Set<String> allColumns = new HashSet<>();
-    // Filter
-    filterQueryTree[0] = RequestUtils.generateFilterQueryTree(brokerRequest);
-    if (filterQueryTree[0] != null) {
-      allColumns.addAll(RequestUtils.extractFilterColumns(filterQueryTree[0]));
-    }
-
-    // Aggregation
-    List<AggregationInfo> aggregationsInfo = brokerRequest.getAggregationsInfo();
-    if (aggregationsInfo != null) {
-      Set<TransformExpressionTree> _aggregationExpressions = new HashSet<>();
-      for (AggregationInfo aggregationInfo : aggregationsInfo) {
-        if (!aggregationInfo.getAggregationType().equalsIgnoreCase(AggregationFunctionType.COUNT.getName())) {
-          _aggregationExpressions.add(
-              TransformExpressionTree.compileToExpressionTree(AggregationFunctionUtils.getColumn(aggregationInfo)));
-        }
-      }
-      allColumns.addAll(RequestUtils.extractColumnsFromExpressions(_aggregationExpressions));
-    }
-
-    // Group-by
-    GroupBy groupBy = brokerRequest.getGroupBy();
-    if (groupBy != null) {
-      Set<TransformExpressionTree> groupByExpressions = new HashSet<>();
-      for (String expression : groupBy.getExpressions()) {
-        groupByExpressions.add(TransformExpressionTree.compileToExpressionTree(expression));
-      }
-      allColumns.addAll(RequestUtils.extractColumnsFromExpressions(groupByExpressions));
-    }
-
-    // Selection
-    Selection selection = brokerRequest.getSelections();
-    if (selection != null) {
-      allColumns.addAll(RequestUtils.extractSelectionColumns(selection));
-    }
-
-    return allColumns;
+    return requestInfo;
   }
 
   /**

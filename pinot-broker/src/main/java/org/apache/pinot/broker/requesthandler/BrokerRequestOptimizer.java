@@ -23,6 +23,7 @@ import java.util.List;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.FilterQuery;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
+import org.apache.pinot.common.utils.request.RequestInfo;
 import org.apache.pinot.common.utils.request.RequestUtils;
 
 
@@ -38,9 +39,9 @@ public class BrokerRequestOptimizer {
    * @param timeColumn Time column for the table
    * @return An optimized request
    */
-  public BrokerRequest optimize(BrokerRequest brokerRequest, String timeColumn, FilterQueryTree filterQueryTree) {
+  public BrokerRequest optimize(BrokerRequest brokerRequest, String timeColumn, RequestInfo requestInfo) {
     OptimizationFlags optimizationFlags = OptimizationFlags.getOptimizationFlags(brokerRequest);
-    optimizeFilterQueryTree(brokerRequest, timeColumn, optimizationFlags, filterQueryTree);
+    optimizeFilterQueryTree(brokerRequest, timeColumn, optimizationFlags, requestInfo);
 
     return brokerRequest;
   }
@@ -51,17 +52,21 @@ public class BrokerRequestOptimizer {
    * @param timeColumn time column
    */
   private void optimizeFilterQueryTree(BrokerRequest brokerRequest, String timeColumn,
-      OptimizationFlags optimizationFlags, FilterQueryTree filterQueryTree) {
+      OptimizationFlags optimizationFlags, RequestInfo requestInfo) {
     FilterQuery q = brokerRequest.getFilterQuery();
 
     if (q == null || brokerRequest.getFilterSubQueryMap() == null) {
       return;
     }
 
-    if (filterQueryTree == null) {
+    FilterQueryTree filterQueryTree;
+    if (requestInfo != null && requestInfo.getFilterQueryTree() != null) {
+      filterQueryTree = requestInfo.getFilterQueryTree();
+    } else {
       filterQueryTree =
           RequestUtils.buildFilterQuery(q.getId(), brokerRequest.getFilterSubQueryMap().getFilterQueryMap());
     }
+
     FilterQueryOptimizerRequest.FilterQueryOptimizerRequestBuilder builder =
         new FilterQueryOptimizerRequest.FilterQueryOptimizerRequestBuilder();
 

@@ -57,7 +57,7 @@ public class RequestParams {
     return _trace;
   }
 
-  public boolean isValidateQuery() {
+  public boolean shouldValidateQuery() {
     return _validateQuery;
   }
 }

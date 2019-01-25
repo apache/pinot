@@ -26,9 +26,11 @@ import java.util.Map;
 import java.util.Set;
 import java.util.Stack;
 import org.apache.commons.lang.mutable.MutableInt;
+import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.FilterQuery;
 import org.apache.pinot.common.request.FilterQueryMap;
+import org.apache.pinot.common.request.GroupBy;
 import org.apache.pinot.common.request.HavingFilterQuery;
 import org.apache.pinot.common.request.HavingFilterQueryMap;
 import org.apache.pinot.common.request.Selection;
@@ -37,6 +39,9 @@ import org.apache.pinot.common.request.transform.TransformExpressionTree;
 
 
 public class RequestUtils {
+  private static final String COLUMN_KEY = "column";
+  private static final String COUNT = "count";
+
   private RequestUtils() {
   }
 
@@ -203,5 +208,73 @@ public class RequestUtils {
       }
     }
     return selectionColumns;
+  }
+
+  /**
+   * Extracts all the information from the request
+   * @param brokerRequest broker request
+   * @return RequestInfo
+   */
+  public static RequestInfo preComputeRequestInfo(BrokerRequest brokerRequest) {
+    Set<String> allColumns = new HashSet<>();
+    FilterQueryTree filterQueryTree;
+    Set<String> filterColumns;
+    Set<TransformExpressionTree> aggregationExpressions;
+    Set<String> aggregationColumns;
+    Set<TransformExpressionTree> groupByExpressions;
+    Set<String> groupByColumns;
+    Set<String> selectionColumns;
+
+    // Filter
+    filterQueryTree = generateFilterQueryTree(brokerRequest);
+    if (filterQueryTree != null) {
+      filterColumns = extractFilterColumns(filterQueryTree);
+      allColumns.addAll(filterColumns);
+    } else {
+      filterColumns = null;
+    }
+
+    // Aggregation
+    List<AggregationInfo> aggregationsInfo = brokerRequest.getAggregationsInfo();
+    if (aggregationsInfo != null) {
+      aggregationExpressions = new HashSet<>();
+      for (AggregationInfo aggregationInfo : aggregationsInfo) {
+        if (!aggregationInfo.getAggregationType().equalsIgnoreCase(COUNT)) {
+          aggregationExpressions.add(
+              TransformExpressionTree.compileToExpressionTree(aggregationInfo.getAggregationParams().get(COLUMN_KEY)));
+        }
+      }
+      aggregationColumns = extractColumnsFromExpressions(aggregationExpressions);
+      allColumns.addAll(aggregationColumns);
+    } else {
+      aggregationExpressions = null;
+      aggregationColumns = null;
+    }
+
+    // Group-by
+    GroupBy groupBy = brokerRequest.getGroupBy();
+    if (groupBy != null) {
+      groupByExpressions = new HashSet<>();
+      for (String expression : groupBy.getExpressions()) {
+        groupByExpressions.add(TransformExpressionTree.compileToExpressionTree(expression));
+      }
+      groupByColumns = extractColumnsFromExpressions(groupByExpressions);
+      allColumns.addAll(groupByColumns);
+    } else {
+      groupByExpressions = null;
+      groupByColumns = null;
+    }
+
+    // Selection
+    Selection selection = brokerRequest.getSelections();
+    if (selection != null) {
+      selectionColumns = extractSelectionColumns(selection);
+      allColumns.addAll(selectionColumns);
+    } else {
+      selectionColumns = null;
+    }
+
+    return new RequestInfo(allColumns, filterQueryTree, filterColumns, aggregationExpressions, aggregationColumns,
+        groupByExpressions, groupByColumns, selectionColumns);
   }
 }
