@@ -369,10 +369,9 @@ public class PinotLLCRealtimeSegmentManager {
     String segmentName = committingSegmentDescriptor.getSegmentName();
     String segmentLocation = committingSegmentDescriptor.getSegmentLocation();
     URI segmentFileURI = ControllerConf.getUriFromPath(segmentLocation);
-    URI baseDirURI = ControllerConf.getUriFromPath(_controllerConf.getDataDir());
     URI tableDirURI = ControllerConf.getUriFromPath(StringUtil.join("/", _controllerConf.getDataDir(), tableName));
     URI uriToMoveTo = ControllerConf.getUriFromPath(StringUtil.join("/", tableDirURI.toString(), segmentName));
-    PinotFS pinotFS = PinotFSFactory.create(baseDirURI.getScheme());
+    PinotFS pinotFS = getPinotFS();
 
     if (!isConnected() || !isLeader()) {
       // We can potentially log a different value than what we saw ....
@@ -688,9 +687,14 @@ public class PinotLLCRealtimeSegmentManager {
     try {
       Preconditions.checkState(tempMetadataDir.mkdirs(), "Failed to create directory: %s", tempMetadataDirStr);
 
-      // Extract metadata.properties
+      // Copy the segment file to the local disk tmp data location (i.e., tempMetadataDirStr). The file will be deleted
+      // on this method exit.
+      PinotFS pinotFS = getPinotFS();
+      File segDstFile = new File(StringUtil.join("/", tempMetadataDirStr, segmentNameStr));
+      pinotFS.copyToLocalFile(new URI(segFileStr), segDstFile);
+      // Extract metadata.properties from the segment data file.
       InputStream metadataPropertiesInputStream =
-          TarGzCompressionUtils.unTarOneFile(new FileInputStream(new File(segFileStr)),
+          TarGzCompressionUtils.unTarOneFile(new FileInputStream(segDstFile),
               V1Constants.MetadataKeys.METADATA_FILE_NAME);
       Preconditions.checkNotNull(metadataPropertiesInputStream, "%s does not exist",
           V1Constants.MetadataKeys.METADATA_FILE_NAME);
@@ -700,7 +704,7 @@ public class PinotLLCRealtimeSegmentManager {
 
       // Extract creation.meta
       InputStream creationMetaInputStream =
-          TarGzCompressionUtils.unTarOneFile(new FileInputStream(new File(segFileStr)),
+          TarGzCompressionUtils.unTarOneFile(new FileInputStream(segDstFile),
               V1Constants.SEGMENT_CREATION_META);
       Preconditions.checkNotNull(creationMetaInputStream, "%s does not exist", V1Constants.SEGMENT_CREATION_META);
       Path creationMetaPath = FileSystems.getDefault().getPath(tempMetadataDirStr, V1Constants.SEGMENT_CREATION_META);
@@ -713,6 +717,10 @@ public class PinotLLCRealtimeSegmentManager {
     } finally {
       FileUtils.deleteQuietly(tempMetadataDir);
     }
+  }
+
+  private PinotFS getPinotFS() {
+    return PinotFSFactory.create(ControllerConf.getUriFromPath(_controllerConf.getDataDir()).getScheme());
   }
 
   public LLCRealtimeSegmentZKMetadata getRealtimeSegmentZKMetadata(String realtimeTableName, String segmentName,
