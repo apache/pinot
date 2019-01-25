@@ -468,8 +468,15 @@ public class PinotSegmentRestletResource {
     for (String tableNameWithType : tableNamesWithType) {
       ObjectNode resultForTable = JsonUtils.newObjectNode();
       resultForTable.put(FileUploadPathProvider.TABLE_NAME, tableNameWithType);
-      resultForTable.set("segments",
-          JsonUtils.objectToJsonNode(_pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType)));
+      try {
+        // NOTE: for backward-compatibility, we put serialized map string as the value
+        resultForTable.put("segments",
+            JsonUtils.objectToString(_pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType)));
+      } catch (JsonProcessingException e) {
+        throw new ControllerApplicationException(LOGGER,
+            "Caught JSON exception while getting instance to segments map for table: " + tableNameWithType,
+            Response.Status.INTERNAL_SERVER_ERROR, e);
+      }
       result.add(resultForTable);
     }
 
