@@ -19,8 +19,9 @@
 package org.apache.pinot.common.metadata;
 
 import java.io.IOException;
-import java.util.Collections;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.helix.ZNRecord;
@@ -79,18 +80,21 @@ public class SegmentZKMetadataTest {
       throws IOException {
     // Test for partition metadata serialization/de-serialization.
     String legacyMetadataString = "{\"columnPartitionMap\":{"
-        + "\"column1\":{\"functionName\":\"func1\",\"numPartitions\":7,\"partitionRanges\":\"[5 5],[7 7]\"},"
-        + "\"column2\":{\"functionName\":\"func2\",\"numPartitions\":11,\"partitionRanges\":\"[11 11],[13 13]\"}}}";
-    String expectedMetadataString = "{\"columnPartitionMap\":{"
-        + "\"column1\":{\"functionName\":\"func1\",\"numPartitions\":7,\"partitions\":[5,7]},"
-        + "\"column2\":{\"functionName\":\"func2\",\"numPartitions\":11,\"partitions\":[11,13]}}}";
-    assertEquals(SegmentPartitionMetadata.fromJsonString(legacyMetadataString).toJsonString(), expectedMetadataString);
-    assertEquals(SegmentPartitionMetadata.fromJsonString(expectedMetadataString).toJsonString(),
-        expectedMetadataString);
+        + "\"column1\":{\"functionName\":\"func1\",\"numPartitions\":8,\"partitionRanges\":\"[5 5],[7 7]\"},"
+        + "\"column2\":{\"functionName\":\"func2\",\"numPartitions\":12,\"partitionRanges\":\"[9 11]\"}}}";
+    String metadataString = "{\"columnPartitionMap\":{"
+        + "\"column1\":{\"functionName\":\"func1\",\"numPartitions\":8,\"partitions\":[5,7]},"
+        + "\"column2\":{\"functionName\":\"func2\",\"numPartitions\":12,\"partitions\":[9,10,11]}}}";
 
     Map<String, ColumnPartitionMetadata> columnPartitionMetadataMap = new HashMap<>();
-    columnPartitionMetadataMap.put("column", new ColumnPartitionMetadata("foo", 7, Collections.singleton(11)));
+    columnPartitionMetadataMap
+        .put("column1", new ColumnPartitionMetadata("func1", 8, new HashSet<>(Arrays.asList(5, 7))));
+    columnPartitionMetadataMap
+        .put("column2", new ColumnPartitionMetadata("func2", 12, new HashSet<>(Arrays.asList(9, 10, 11))));
     SegmentPartitionMetadata expectedPartitionMetadata = new SegmentPartitionMetadata(columnPartitionMetadataMap);
+
+    assertEquals(SegmentPartitionMetadata.fromJsonString(legacyMetadataString), expectedPartitionMetadata);
+    assertEquals(SegmentPartitionMetadata.fromJsonString(metadataString), expectedPartitionMetadata);
 
     // Test partition metadata in OfflineSegmentZkMetadata
     ZNRecord znRecord = getTestOfflineSegmentZNRecord();
