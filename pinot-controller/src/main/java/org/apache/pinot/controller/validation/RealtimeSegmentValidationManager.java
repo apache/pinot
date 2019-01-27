@@ -26,6 +26,8 @@ import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import org.apache.pinot.common.metrics.ControllerGauge;
+import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.metrics.ValidationMetrics;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.HLCSegmentName;
@@ -53,9 +55,10 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask {
   private boolean _updateRealtimeDocumentCount;
 
   public RealtimeSegmentValidationManager(ControllerConf config, PinotHelixResourceManager pinotHelixResourceManager,
-      PinotLLCRealtimeSegmentManager llcRealtimeSegmentManager, ValidationMetrics validationMetrics) {
+      PinotLLCRealtimeSegmentManager llcRealtimeSegmentManager, ValidationMetrics validationMetrics,
+      ControllerMetrics controllerMetrics) {
     super("RealtimeSegmentValidationManager", config.getRealtimeSegmentValidationFrequencyInSeconds(),
-        config.getPeriodicTaskInitialDelayInSeconds(), pinotHelixResourceManager);
+        config.getPeriodicTaskInitialDelayInSeconds(), pinotHelixResourceManager, controllerMetrics);
     _llcRealtimeSegmentManager = llcRealtimeSegmentManager;
     _validationMetrics = validationMetrics;
 
@@ -65,6 +68,7 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask {
 
   @Override
   protected void preprocess() {
+    _numTablesProcessed = 0;
     // Update realtime document counts only if certain time has passed after previous run
     _updateRealtimeDocumentCount = false;
     long currentTimeMs = System.currentTimeMillis();
@@ -97,6 +101,7 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask {
         if (streamConfig.hasLowLevelConsumerType()) {
           _llcRealtimeSegmentManager.ensureAllPartitionsConsuming(tableConfig);
         }
+        _numTablesProcessed ++;
       }
     } catch (Exception e) {
       LOGGER.warn("Caught exception while validating realtime table: {}", tableNameWithType, e);
@@ -151,7 +156,8 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask {
 
   @Override
   protected void postprocess() {
-
+    _metricsRegistry.setValueOfGlobalGauge(ControllerGauge.REALTIME_SEGMENTS_VALIDATION_NUM_TABLES_PROCESSED,
+        _numTablesProcessed);
   }
 
   @Override

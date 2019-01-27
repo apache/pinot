@@ -30,6 +30,8 @@ import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import org.apache.pinot.common.metrics.ControllerGauge;
+import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
 import org.apache.pinot.common.utils.SegmentName;
@@ -53,9 +55,10 @@ public class RetentionManager extends ControllerPeriodicTask {
 
   private final int _deletedSegmentsRetentionInDays;
 
-  public RetentionManager(PinotHelixResourceManager pinotHelixResourceManager, ControllerConf config) {
+  public RetentionManager(PinotHelixResourceManager pinotHelixResourceManager, ControllerConf config,
+      ControllerMetrics controllerMetrics) {
     super("RetentionManager", config.getRetentionControllerFrequencyInSeconds(),
-        config.getPeriodicTaskInitialDelayInSeconds(), pinotHelixResourceManager);
+        config.getPeriodicTaskInitialDelayInSeconds(), pinotHelixResourceManager, controllerMetrics);
     _deletedSegmentsRetentionInDays = config.getDeletedSegmentsRetentionInDays();
 
     LOGGER.info("Starting RetentionManager with runFrequencyInSeconds: {}, deletedSegmentsRetentionInDays: {}",
@@ -69,7 +72,7 @@ public class RetentionManager extends ControllerPeriodicTask {
 
   @Override
   protected void preprocess() {
-
+    _numTablesProcessed = 0;
   }
 
   @Override
@@ -77,6 +80,7 @@ public class RetentionManager extends ControllerPeriodicTask {
     try {
       LOGGER.info("Start managing retention for table: {}", tableNameWithType);
       manageRetentionForTable(tableNameWithType);
+      _numTablesProcessed ++;
     } catch (Exception e) {
       LOGGER.error("Caught exception while managing retention for table: {}", tableNameWithType, e);
     }
@@ -86,6 +90,7 @@ public class RetentionManager extends ControllerPeriodicTask {
   protected void postprocess() {
     LOGGER.info("Removing aged (more than {} days) deleted segments for all tables", _deletedSegmentsRetentionInDays);
     _pinotHelixResourceManager.getSegmentDeletionManager().removeAgedDeletedSegments(_deletedSegmentsRetentionInDays);
+    _metricsRegistry.setValueOfGlobalGauge(ControllerGauge.RETENTION_NUM_TABLES_PROCESSED, _numTablesProcessed);
   }
 
   private void manageRetentionForTable(String tableNameWithType) {

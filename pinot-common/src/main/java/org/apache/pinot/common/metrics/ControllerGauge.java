@@ -38,6 +38,14 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   OFFLINE_TABLE_COUNT("TableCount", true),
   DISABLED_TABLE_COUNT("TableCount", true),
 
+  SEGMENT_STATUS_CHECKER_NUM_TABLES_PROCESSED("SegmentStatusCheckerNumTablesProcessed", true),
+  REALTIME_SEGMENTS_VALIDATION_NUM_TABLES_PROCESSED("RealtimeSegmentsValidationNumTablesProcessed", true),
+  OFFLINE_SEGMENT_INTERVAL_CHECKER_NUM_TABLES_PROCESSED("OfflineSegmentIntervalCheckerNumTablesProcessed", true),
+  BROKER_RESOURCE_VALIDATION_NUM_TABLES_PROCESSED("BrokerResourceValidationNumTablesProcessed", true),
+  SEGMENT_RELOCATOR_NUM_TABLES_PROCESSED("SegmentRelocatorNumTablesProcessed", true),
+  RETENTION_NUM_TABLES_PROCESSED("RetentionNumTablesProcessed", true),
+  PINOT_TASK_MANAGER_NUM_TABLES_PROCESSED("PinotTaskManagerNumTablesProcessed", true),
+
   SHORT_OF_LIVE_INSTANCES("ShortOfLiveInstances", false), // Number of extra live instances needed.
 
   REALTIME_TABLE_ESTIMATED_SIZE("RealtimeTableEstimatedSize", false), // Estimated size of realtime table.

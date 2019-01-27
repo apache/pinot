@@ -33,6 +33,9 @@ import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.config.RealtimeTagConfig;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.config.TableNameBuilder;
+import org.apache.pinot.common.metrics.ControllerGauge;
+import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.common.utils.retry.RetryPolicies;
 import org.apache.pinot.common.utils.time.TimeUtils;
@@ -54,9 +57,10 @@ import org.slf4j.LoggerFactory;
 public class RealtimeSegmentRelocator extends ControllerPeriodicTask {
   private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeSegmentRelocator.class);
 
-  public RealtimeSegmentRelocator(PinotHelixResourceManager pinotHelixResourceManager, ControllerConf config) {
+  public RealtimeSegmentRelocator(PinotHelixResourceManager pinotHelixResourceManager, ControllerConf config,
+      ControllerMetrics controllerMetrics) {
     super("RealtimeSegmentRelocator", getRunFrequencySeconds(config.getRealtimeSegmentRelocatorFrequency()),
-        config.getPeriodicTaskInitialDelayInSeconds(), pinotHelixResourceManager);
+        config.getPeriodicTaskInitialDelayInSeconds(), pinotHelixResourceManager, controllerMetrics);
   }
 
   @Override
@@ -66,17 +70,25 @@ public class RealtimeSegmentRelocator extends ControllerPeriodicTask {
 
   @Override
   protected void preprocess() {
-
+    _numTablesProcessed = 0;
   }
 
   @Override
   protected void processTable(String tableNameWithType) {
-    runRelocation(tableNameWithType);
+    try {
+      CommonConstants.Helix.TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
+      if (tableType == CommonConstants.Helix.TableType.REALTIME) {
+        runRelocation(tableNameWithType);
+        _numTablesProcessed ++;
+      }
+    } catch (Exception e) {
+      LOGGER.error("Exception in relocating realtime segments of table {}", tableNameWithType, e);
+    }
   }
 
   @Override
   protected void postprocess() {
-
+    _metricsRegistry.setValueOfGlobalGauge(ControllerGauge.SEGMENT_RELOCATOR_NUM_TABLES_PROCESSED, _numTablesProcessed);
   }
 
   /**
@@ -87,38 +99,30 @@ public class RealtimeSegmentRelocator extends ControllerPeriodicTask {
    * @param tableNameWithType
    */
   private void runRelocation(String tableNameWithType) {
-    // Only consider realtime tables.
-    if (!TableNameBuilder.REALTIME.tableHasTypeSuffix(tableNameWithType)) {
+    LOGGER.info("Starting relocation of segments for table: {}", tableNameWithType);
+
+    TableConfig tableConfig = _pinotHelixResourceManager.getRealtimeTableConfig(tableNameWithType);
+    final RealtimeTagConfig realtimeTagConfig = new RealtimeTagConfig(tableConfig);
+    if (!realtimeTagConfig.isRelocateCompletedSegments()) {
+      LOGGER.info("Skipping relocation of segments for {}", tableNameWithType);
       return;
     }
-    try {
-      LOGGER.info("Starting relocation of segments for table: {}", tableNameWithType);
 
-      TableConfig tableConfig = _pinotHelixResourceManager.getRealtimeTableConfig(tableNameWithType);
-      final RealtimeTagConfig realtimeTagConfig = new RealtimeTagConfig(tableConfig);
-      if (!realtimeTagConfig.isRelocateCompletedSegments()) {
-        LOGGER.info("Skipping relocation of segments for {}", tableNameWithType);
-        return;
-      }
-
-      Function<IdealState, IdealState> updater = new Function<IdealState, IdealState>() {
-        @Nullable
-        @Override
-        public IdealState apply(@Nullable IdealState idealState) {
-          if (!idealState.isEnabled()) {
-            LOGGER.info("Skipping relocation of segments for {} since ideal state is disabled", tableNameWithType);
-            return null;
-          }
-          relocateSegments(realtimeTagConfig, idealState);
-          return idealState;
+    Function<IdealState, IdealState> updater = new Function<IdealState, IdealState>() {
+      @Nullable
+      @Override
+      public IdealState apply(@Nullable IdealState idealState) {
+        if (!idealState.isEnabled()) {
+          LOGGER.info("Skipping relocation of segments for {} since ideal state is disabled", tableNameWithType);
+          return null;
         }
-      };
+        relocateSegments(realtimeTagConfig, idealState);
+        return idealState;
+      }
+    };
 
-      HelixHelper.updateIdealState(_pinotHelixResourceManager.getHelixZkManager(), tableNameWithType, updater,
-          RetryPolicies.exponentialBackoffRetryPolicy(5, 1000, 2.0f));
-    } catch (Exception e) {
-      LOGGER.error("Exception in relocating realtime segments of table {}", tableNameWithType, e);
-    }
+    HelixHelper.updateIdealState(_pinotHelixResourceManager.getHelixZkManager(), tableNameWithType, updater,
+        RetryPolicies.exponentialBackoffRetryPolicy(5, 1000, 2.0f));
   }
 
   /**

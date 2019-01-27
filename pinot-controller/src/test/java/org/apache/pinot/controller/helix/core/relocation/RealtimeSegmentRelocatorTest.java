@@ -19,6 +19,7 @@
 package org.apache.pinot.controller.helix.core.relocation;
 
 import com.google.common.collect.Lists;
+import com.yammer.metrics.core.MetricsRegistry;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -31,6 +32,7 @@ import org.apache.helix.manager.zk.ZNRecordSerializer;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.builder.CustomModeISBuilder;
 import org.apache.pinot.common.config.RealtimeTagConfig;
+import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
@@ -68,7 +70,9 @@ public class RealtimeSegmentRelocatorTest {
     _mockHelixManager = mock(HelixManager.class);
     when(mockPinotHelixResourceManager.getHelixZkManager()).thenReturn(_mockHelixManager);
     ControllerConf controllerConfig = new ControllerConf();
-    _realtimeSegmentRelocator = new TestRealtimeSegmentRelocator(mockPinotHelixResourceManager, controllerConfig);
+    ControllerMetrics controllerMetrics = new ControllerMetrics(new MetricsRegistry());
+    _realtimeSegmentRelocator =
+        new TestRealtimeSegmentRelocator(mockPinotHelixResourceManager, controllerConfig, controllerMetrics);
 
     final int maxInstances = 20;
     serverNames = new String[maxInstances];
@@ -261,8 +265,9 @@ public class RealtimeSegmentRelocatorTest {
 
     private Map<String, List<String>> tagToInstances;
 
-    public TestRealtimeSegmentRelocator(PinotHelixResourceManager pinotHelixResourceManager, ControllerConf config) {
-      super(pinotHelixResourceManager, config);
+    public TestRealtimeSegmentRelocator(PinotHelixResourceManager pinotHelixResourceManager, ControllerConf config,
+        ControllerMetrics controllerMetrics) {
+      super(pinotHelixResourceManager, config, controllerMetrics);
       tagToInstances = new HashedMap();
     }
 

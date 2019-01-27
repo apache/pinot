@@ -26,6 +26,8 @@ import org.apache.pinot.common.config.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
+import org.apache.pinot.common.metrics.ControllerGauge;
+import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.metrics.ValidationMetrics;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.time.TimeUtils;
@@ -48,14 +50,15 @@ public class OfflineSegmentIntervalChecker extends ControllerPeriodicTask {
   private final ValidationMetrics _validationMetrics;
 
   public OfflineSegmentIntervalChecker(ControllerConf config, PinotHelixResourceManager pinotHelixResourceManager,
-      ValidationMetrics validationMetrics) {
+      ValidationMetrics validationMetrics, ControllerMetrics controllerMetrics) {
     super("OfflineSegmentIntervalChecker", config.getOfflineSegmentIntervalCheckerFrequencyInSeconds(),
-        config.getPeriodicTaskInitialDelayInSeconds(), pinotHelixResourceManager);
+        config.getPeriodicTaskInitialDelayInSeconds(), pinotHelixResourceManager, controllerMetrics);
     _validationMetrics = validationMetrics;
   }
 
   @Override
   protected void preprocess() {
+    _numTablesProcessed = 0;
   }
 
   @Override
@@ -72,6 +75,7 @@ public class OfflineSegmentIntervalChecker extends ControllerPeriodicTask {
         }
 
         validateOfflineSegmentPush(tableConfig);
+        _numTablesProcessed ++;
       }
     } catch (Exception e) {
       LOGGER.warn("Caught exception while checking offline segment intervals for table: {}", tableNameWithType, e);
@@ -212,7 +216,8 @@ public class OfflineSegmentIntervalChecker extends ControllerPeriodicTask {
 
   @Override
   protected void postprocess() {
-
+    _metricsRegistry.setValueOfGlobalGauge(ControllerGauge.OFFLINE_SEGMENT_INTERVAL_CHECKER_NUM_TABLES_PROCESSED,
+        _numTablesProcessed);
   }
 
   @Override

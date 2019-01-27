@@ -27,6 +27,7 @@ import javax.annotation.Nonnull;
 import org.apache.pinot.common.config.PinotTaskConfig;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.config.TableTaskConfig;
+import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.ControllerConf;
@@ -50,7 +51,6 @@ public class PinotTaskManager extends ControllerPeriodicTask {
   private final PinotHelixTaskResourceManager _helixTaskResourceManager;
   private final ClusterInfoProvider _clusterInfoProvider;
   private final TaskGeneratorRegistry _taskGeneratorRegistry;
-  private final ControllerMetrics _controllerMetrics;
 
   private Map<String, List<TableConfig>> _enabledTableConfigMap;
   private Set<String> _taskTypes;
@@ -61,11 +61,10 @@ public class PinotTaskManager extends ControllerPeriodicTask {
       @Nonnull PinotHelixResourceManager helixResourceManager, @Nonnull ControllerConf controllerConf,
       @Nonnull ControllerMetrics controllerMetrics) {
     super("PinotTaskManager", controllerConf.getTaskManagerFrequencyInSeconds(),
-        controllerConf.getPeriodicTaskInitialDelayInSeconds(), helixResourceManager);
+        controllerConf.getPeriodicTaskInitialDelayInSeconds(), helixResourceManager, controllerMetrics);
     _helixTaskResourceManager = helixTaskResourceManager;
     _clusterInfoProvider = new ClusterInfoProvider(helixResourceManager, helixTaskResourceManager, controllerConf);
     _taskGeneratorRegistry = new TaskGeneratorRegistry(_clusterInfoProvider);
-    _controllerMetrics = controllerMetrics;
   }
 
   @Override
@@ -104,7 +103,8 @@ public class PinotTaskManager extends ControllerPeriodicTask {
 
   @Override
   protected void preprocess() {
-    _controllerMetrics.addMeteredGlobalValue(ControllerMeter.NUMBER_TIMES_SCHEDULE_TASKS_CALLED, 1L);
+    _numTablesProcessed = 0;
+    _metricsRegistry.addMeteredGlobalValue(ControllerMeter.NUMBER_TIMES_SCHEDULE_TASKS_CALLED, 1L);
 
     _taskTypes = _taskGeneratorRegistry.getAllTaskTypes();
     _numTaskTypes = _taskTypes.size();
@@ -131,6 +131,7 @@ public class PinotTaskManager extends ControllerPeriodicTask {
         }
       }
     }
+    _numTablesProcessed ++;
   }
 
   @Override
@@ -147,9 +148,11 @@ public class PinotTaskManager extends ControllerPeriodicTask {
             pinotTaskConfigs);
         _tasksScheduled.put(taskType, _helixTaskResourceManager.submitTask(pinotTaskConfigs,
             pinotTaskGenerator.getNumConcurrentTasksPerInstance()));
-        _controllerMetrics.addMeteredTableValue(taskType, ControllerMeter.NUMBER_TASKS_SUBMITTED, numTasks);
+        _metricsRegistry.addMeteredTableValue(taskType, ControllerMeter.NUMBER_TASKS_SUBMITTED, numTasks);
       }
     }
+    _metricsRegistry.setValueOfGlobalGauge(ControllerGauge.PINOT_TASK_MANAGER_NUM_TABLES_PROCESSED,
+        _numTablesProcessed);
   }
 
   /**

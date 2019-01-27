@@ -20,6 +20,7 @@ package org.apache.pinot.controller.helix.core.periodictask;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.util.List;
+import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.periodictask.BasePeriodicTask;
 import org.slf4j.Logger;
@@ -33,18 +34,21 @@ import org.slf4j.LoggerFactory;
 public abstract class ControllerPeriodicTask extends BasePeriodicTask {
   private static final Logger LOGGER = LoggerFactory.getLogger(ControllerPeriodicTask.class);
 
-
   private static final long MAX_CONTROLLER_PERIODIC_TASK_STOP_TIME_MILLIS = 30_000L;
 
   protected final PinotHelixResourceManager _pinotHelixResourceManager;
+  protected final ControllerMetrics _metricsRegistry;
 
   private volatile boolean _stopPeriodicTask;
   private volatile boolean _periodicTaskInProgress;
 
+  protected int _numTablesProcessed;
+
   public ControllerPeriodicTask(String taskName, long runFrequencyInSeconds, long initialDelayInSeconds,
-      PinotHelixResourceManager pinotHelixResourceManager) {
+      PinotHelixResourceManager pinotHelixResourceManager, ControllerMetrics controllerMetrics) {
     super(taskName, runFrequencyInSeconds, initialDelayInSeconds);
     _pinotHelixResourceManager = pinotHelixResourceManager;
+    _metricsRegistry = controllerMetrics;
   }
 
   /**

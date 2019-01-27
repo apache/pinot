@@ -22,6 +22,8 @@ import java.util.List;
 import java.util.Set;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.common.metrics.ControllerGauge;
+import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
@@ -37,13 +39,15 @@ public class BrokerResourceValidationManager extends ControllerPeriodicTask {
 
   private List<InstanceConfig> _instanceConfigs;
 
-  public BrokerResourceValidationManager(ControllerConf config, PinotHelixResourceManager pinotHelixResourceManager) {
+  public BrokerResourceValidationManager(ControllerConf config, PinotHelixResourceManager pinotHelixResourceManager,
+      ControllerMetrics controllerMetrics) {
     super("BrokerResourceValidationManager", config.getBrokerResourceValidationFrequencyInSeconds(),
-        config.getPeriodicTaskInitialDelayInSeconds(), pinotHelixResourceManager);
+        config.getPeriodicTaskInitialDelayInSeconds(), pinotHelixResourceManager, controllerMetrics);
   }
 
   @Override
   protected void preprocess() {
+    _numTablesProcessed = 0;
     _instanceConfigs = _pinotHelixResourceManager.getAllHelixInstanceConfigs();
   }
 
@@ -60,6 +64,7 @@ public class BrokerResourceValidationManager extends ControllerPeriodicTask {
       Set<String> brokerInstances = _pinotHelixResourceManager.getAllInstancesForBrokerTenant(_instanceConfigs,
           tableConfig.getTenantConfig().getBroker());
       _pinotHelixResourceManager.rebuildBrokerResource(tableNameWithType, brokerInstances);
+      _numTablesProcessed ++;
     } catch (Exception e) {
       LOGGER.warn("Caught exception while validating broker resource for table: {}", tableNameWithType, e);
     }
@@ -68,7 +73,8 @@ public class BrokerResourceValidationManager extends ControllerPeriodicTask {
 
   @Override
   protected void postprocess() {
-
+    _metricsRegistry.setValueOfGlobalGauge(ControllerGauge.BROKER_RESOURCE_VALIDATION_NUM_TABLES_PROCESSED,
+        _numTablesProcessed);
   }
 
   @Override
