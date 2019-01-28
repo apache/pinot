@@ -440,7 +440,7 @@ public class DetectionResource {
   @POST
   @Path(value = "/report-anomaly/{detectionConfigId}")
   @ApiOperation("Report a missing anomaly for a detection config")
-  public void createUserAnomaly(
+  public Response createUserAnomaly(
       @PathParam("detectionConfigId") @ApiParam(value = "detection config id") long detectionConfigId,
       @QueryParam("startTime") @ApiParam("start time utc (in millis)") Long startTime,
       @QueryParam("endTime") @ApiParam("end time utc (in millis)") Long endTime,
@@ -471,6 +471,8 @@ public class DetectionResource {
     anomaly.setFeedback(feedback);
 
     this.anomalyDAO.save(anomaly);
+
+    return Response.ok(anomaly.getId()).build();
   }
 
 }
