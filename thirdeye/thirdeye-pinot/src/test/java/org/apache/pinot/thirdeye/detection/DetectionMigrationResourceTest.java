@@ -157,7 +157,7 @@ public class DetectionMigrationResourceTest {
     Assert.assertEquals(yamlMap.get(PROP_SUBS_GROUP_NAME), "test_notification");
     Assert.assertEquals(yamlMap.get(PROP_CRON), "0 0 14 * * ? *");
     Assert.assertEquals(yamlMap.get(PROP_APPLICATION), "test_application");
-    Assert.assertEquals(yamlMap.get(PROP_EMAIL_SUBJECT_TYPE), AlertConfigBean.SubjectType.ALERT);
+    Assert.assertEquals(yamlMap.get(PROP_EMAIL_SUBJECT_TYPE), AlertConfigBean.SubjectType.ALERT.name());
     Assert.assertEquals(yamlMap.get(PROP_FROM), "test@thirdeye.com");
     Assert.assertEquals(yamlMap.get(PROP_TYPE), "DEFAULT_ALERTER_PIPELINE");
     Assert.assertEquals(ConfigUtils.getList(yamlMap.get(PROP_DETECTION_NAMES)).size(), 2);
@@ -165,9 +165,9 @@ public class DetectionMigrationResourceTest {
     Assert.assertEquals(ConfigUtils.getList(yamlMap.get(PROP_ALERT_SCHEMES)).size(), 1);
     Assert.assertEquals(ConfigUtils.getMap(ConfigUtils.getList(yamlMap.get(PROP_ALERT_SCHEMES)).get(0)).get(PROP_TYPE), "EMAIL");
     Assert.assertNotNull(yamlMap.get(PROP_RECIPIENTS));
-    Assert.assertEquals((ConfigUtils.getMap(yamlMap.get(PROP_RECIPIENTS)).get("to")), Collections.singleton("to@test"));
-    Assert.assertEquals((ConfigUtils.getMap(yamlMap.get(PROP_RECIPIENTS)).get("cc")), Collections.singleton("cc@test"));
-    Assert.assertEquals((ConfigUtils.getMap(yamlMap.get(PROP_RECIPIENTS)).get("bcc")), Collections.singleton("bcc@test"));
+    Assert.assertEquals((ConfigUtils.getMap(yamlMap.get(PROP_RECIPIENTS)).get("to")), Collections.singletonList("to@test"));
+    Assert.assertEquals((ConfigUtils.getMap(yamlMap.get(PROP_RECIPIENTS)).get("cc")), Collections.singletonList("cc@test"));
+    Assert.assertEquals((ConfigUtils.getMap(yamlMap.get(PROP_RECIPIENTS)).get("bcc")), Collections.singletonList("bcc@test"));
   }
 
   @Test
