@@ -10,7 +10,6 @@ import $ from 'jquery';
 import _ from 'lodash';
 import * as anomalyUtil from 'thirdeye-frontend/utils/anomaly';
 import { isBlank } from '@ember/utils';
-import { task } from 'ember-concurrency';
 import { inject as service } from '@ember/service';
 import {
   get,
@@ -18,26 +17,28 @@ import {
   setProperties,
   computed
 } from '@ember/object';
-import { appendFilters } from 'thirdeye-frontend/utils/rca-utils';
-import { humanizeFloat, humanizeChange, checkStatus } from 'thirdeye-frontend/utils/utils';
-import floatToPercent from 'thirdeye-frontend/utils/float-to-percent';
+import { reads } from '@ember/object/computed';
 
 const CUSTOMIZE_OPTIONS = [{
   id: 0,
   label: 'Nothing',
-  value: 'Nothing'
+  value: 'Nothing',
+  selected: null
 }, {
   id: 1,
   label: 'WoW',
-  value: 'Wow'
+  value: 'Wow',
+  selected: null
 }, {
   id: 2,
   label: 'Wo2W',
-  value: 'Wo2w'
+  value: 'Wo2w',
+  selected: null
 }, {
   id: 3,
   label: 'Median4W',
-  value: 'Median4w'
+  value: 'Median4w',
+  selected: null
 }];
 
 export default Controller.extend({
@@ -46,14 +47,14 @@ export default Controller.extend({
   showCopyTooltip: false,
   showSharedTooltip: false,
   shareUrl: null,
-  showWow: false,
-  showWo2w: false,
-  showMedian4w: false,
-  showDashboardSummary: false,
-  offsetsMap: {},
-  options: [],
-  options_two: [],
-  colspanNum: 4,
+  showDashboardSummary: reads('tree.firstObject.showDashboardSummary'),
+  showCustomizeEmailTemplate: reads('tree.firstObject.showCustomizeEmailTemplate'),
+  showWow: reads('tree.firstObject.showWow'),
+  showWo2w: reads('tree.firstObject.showWo2w'),
+  showMedian4w: reads('tree.firstObject.showMedian4w'),
+  options: reads('tree.firstObject.options'),
+  options_two: reads('tree.firstObject.options_two'),
+  colspanNum: reads('tree.firstObject.colspanNum'),
 
   init() {
     this._super(...arguments);
@@ -65,20 +66,7 @@ export default Controller.extend({
       status: 'All Resolutions'
     });
     set(this, 'anomalyResponseFilterTypes', anomalyResponseFilterTypes);
-
-    // Add the options for compare
-    set(this, 'options_two', set(this, 'options', CUSTOMIZE_OPTIONS));
   },
-
-  /**
-   * @summary Returns the
-   * @return {Array}
-   */
-  _getAnomalyByOffsetsMapping: task (function * () {
-    const applicationAnomalies = get(this, 'model.anomalyMapping');
-    const offsetsMapping = yield get(this, '_fetchOffsets').perform(applicationAnomalies);
-    return offsetsMapping;
-  }).drop(),
 
   /**
    * @summary Returns the config object for the custom share template header.
@@ -184,13 +172,13 @@ export default Controller.extend({
             if (typeof metric === 'string') {
               const metricId = filteredAnomalyMapping[metric].metricId;
               const functionId = filteredAnomalyMapping[metric].items[alert].functionId;
-              filteredAnomalyMapping[metric].items[alert].viewTreeNode = viewTreeFirstChild.find(metric => metric.id === metricId).children.find(alert => alert.id === functionId);
+              set(filteredAnomalyMapping[metric].items[alert], 'viewTreeNode', viewTreeFirstChild.find(metric => metric.id === metricId).children.find(alert => alert.id === functionId));
             }
           });
           // Keeping a reference to this new tree node for this metric in filteredAnomalyMapping
           if (typeof metric === 'string') {
             const metricId = filteredAnomalyMapping[metric].metricId;
-            filteredAnomalyMapping[metric].viewTreeNode = viewTreeFirstChild.find(metric => metric.id === metricId);
+            set(filteredAnomalyMapping[metric], 'viewTreeNode', viewTreeFirstChild.find(metric => metric.id === metricId));
           }
         });
         return viewTree;
@@ -205,7 +193,15 @@ export default Controller.extend({
         isVisible: true,
         isChecked: true,
         comment: null,
-        children: []
+        children: [],
+        showWow: false,
+        showWo2w: false,
+        showMedian4w: false,
+        showDashboardSummary: false,
+        showCustomizeEmailTemplate: false,
+        options: [ ...CUSTOMIZE_OPTIONS],
+        options_two: [ ...CUSTOMIZE_OPTIONS],
+        colspan: 4
       }];
 
       viewTreeFirstChild = viewTree.get('firstObject').children;
@@ -226,7 +222,7 @@ export default Controller.extend({
               children: []
             });
             // Keeping a reference to this new tree node for this alert in filteredAnomalyMapping
-            filteredAnomalyMapping[metric].items[alert].viewTreeNode = tempChildren[index];
+            set(filteredAnomalyMapping[metric].items[alert], 'viewTreeNode', tempChildren[index]);
           });
 
           //add each metric to tree selection
@@ -243,7 +239,7 @@ export default Controller.extend({
             children: tempChildren
           });
           // Keeping a reference to this new tree node for this metric in filteredAnomalyMapping
-          filteredAnomalyMapping[metric].viewTreeNode = viewTreeFirstChild[index];
+          set(filteredAnomalyMapping[metric], 'viewTreeNode', viewTreeFirstChild[index]);
         }
       });
 
@@ -268,68 +264,6 @@ export default Controller.extend({
       return type.name === selected;
     });
   },
-
-  _fetchOffsets: task (function * (anomalyMapping) {
-    if (!anomalyMapping) { return; }
-
-    let map = {};
-    let index = 1;
-    // Iterate through each anomaly
-    yield Object.keys(anomalyMapping).some(function(metric) {
-      Object.keys(anomalyMapping[metric].items).some(function(alert) {
-        anomalyMapping[metric].items[alert].items.forEach(async (item) => {
-          const metricName = get(item.anomaly, 'metricName');
-          const metricId = get(item.anomaly, 'metricId');
-          const functionName = get(item.anomaly, 'functionName');
-          const functionId = get(item.anomaly, 'functionId');
-
-          const dimensions = get(item.anomaly, 'dimensions');
-          const start = get(item.anomaly, 'start');
-          const end = get(item.anomaly, 'end');
-
-          if (!map[metricName]) {
-            map[metricName] = { 'metricId': metricId, items: {}, count: index };
-            index++;
-          }
-
-          if(!map[metricName].items[functionName]) {
-            map[metricName].items[functionName] = { 'functionId': functionId, items: [] };
-          }
-
-          const filteredDimensions = Object.keys(dimensions).map(key => [key, '=', dimensions[key]]);
-          //build new urn
-          const metricUrn = appendFilters(`thirdeye:metric:${metricId}`, filteredDimensions);
-          //Get all in the following order - current,wo2w,median4w
-          const offsets = await fetch(`/rootcause/metric/aggregate/batch?urn=${metricUrn}&start=${start}&end=${end}&offsets=wo1w,wo2w,median4w&timezone=America/Los_Angeles`).then(checkStatus).then(res => res);
-
-          const current = get(item.anomaly, 'current');
-          const wow = humanizeFloat(offsets[0]);
-          const wo2w = humanizeFloat(offsets[1]);
-          const median4w = humanizeFloat(offsets[2]);
-          const wowChange = floatToPercent(Number((current - offsets[0]) / offsets[0]));
-          const wo2wChange = floatToPercent(Number((current - offsets[1]) / offsets[1]));
-          const median4wChange = floatToPercent(Number((current - offsets[2]) / offsets[2]));
-          const wowHumanizeChange = humanizeChange(Number((current - offsets[0]) / offsets[0]));
-          const wo2wHumanizeChange = humanizeChange(Number((current - offsets[1]) / offsets[1]));
-          const median4wHumanizeChange = humanizeChange(Number((current - offsets[2]) / offsets[2]));
-
-          set(item.anomaly, 'offsets',  offsets ? {
-            'wow': { value: wow, change: wowChange, humanizedChangeDisplay: wowHumanizeChange },
-            'wo2w': { value: wo2w, change: wo2wChange, humanizedChangeDisplay: wo2wHumanizeChange },
-            'median4w': { value: median4w, change: median4wChange, humanizedChangeDisplay: median4wHumanizeChange },
-          } : {
-            'wow': '-',
-            'wo2w': '-',
-            'median4w': '-'
-          });
-
-          map[metricName].items[functionName].items.push(item);
-        });
-      });
-    });
-    // return updated anomalyMapping
-    return anomalyMapping;
-  }).drop(),
 
   /**
    * Helper for getting the matching selected response feedback object
@@ -361,45 +295,44 @@ export default Controller.extend({
     return text;
   },
 
-  async _getOffsets() {
-      const map = get(this, 'offsetsMap');
-      if (Object.keys(map).length === 0 ) {//Only fetch if empty
-        const result = await get(this, '_getAnomalyByOffsetsMapping').perform();
-        let index = 1;
-        // Iterate through each anomaly
-        Object.keys(result).some(function(metric) {
-          Object.keys(result[metric].items).some(function(alert) {
-            result[metric].items[alert].items.forEach(item => {
-                const metricName = get(item.anomaly, 'metricName');
-                const metricId = get(item.anomaly, 'metricId');
-                const functionName = get(item.anomaly, 'functionName');
-                const functionId = get(item.anomaly, 'functionId');
 
-                if (!map[metricName]) {
-                  map[metricName] = { 'metricId': metricId, items: {}, count: index };
-                  index++;
-                }
+  /**
+   * Helper for toggling show properties in tree.firstObject
+   * @param {string} property - showWow, showWo2w, showMedian4w, showDashboardSummary, or showCustomizeEmailTemplate
+   * @return {none} - this helper is just a setter
+   */
+  _toggleTreeProperty(property) {
+    let currentState = get(this, 'tree.firstObject');
+    set(currentState, property, !currentState[property]);
+  },
 
-                if(!map[metricName].items[functionName]) {
-                  map[metricName].items[functionName] = { 'functionId': functionId, items: [] };
-                }
-
-                map[metricName].items[functionName].items.push(item);
-            });
-          });
-        });
-        setProperties(this, {
-          'model.anomalyMapping': map,
-          'offsetsMap': map
-        });
+  /**
+   * Helper for setting selected in email selectors
+   * @param {string} selectedBaseline - Wow, Wo2w, Median4w
+   * @param {Array} choices - [{}, {}, ...]
+   * @return {none} - this helper is just a setter
+   */
+  _selectOption(choices, selectedBaseline) {
+    const newChoices = [];
+    choices.forEach(choice => {
+      const newObj = { ...choice};
+      if (newObj.value === selectedBaseline) {
+        newObj.selected = 'selected';
+      } else {
+        newObj.selected = null;
       }
+      newChoices.push(newObj);
+    });
+    return newChoices;
   },
 
   _customizeEmailHelper(option, type) {
     //reset both selects' options
-    set(this, 'options_two', set(this, 'options', CUSTOMIZE_OPTIONS));
+    set(this, 'tree.firstObject.options', [ ...CUSTOMIZE_OPTIONS]);
+    set(this, 'tree.firstObject.options_two', [ ...CUSTOMIZE_OPTIONS]);
     //hide all except if the sibling's value and not `nothing`
-    setProperties(this, {
+    let currentState = get(this, 'tree.firstObject');
+    setProperties(currentState, {
       'showWow': false,
       'showWo2w': false,
       'showMedian4w': false
@@ -409,40 +342,30 @@ export default Controller.extend({
     const customizeEmail1 = document.getElementById('customizeEmail1').value;
     const customizeEmail2 = document.getElementById('customizeEmail2').value;
 
-    const sibingValue = type === 'one' ? customizeEmail2 : customizeEmail1;
-    this.toggleProperty(`show${sibingValue}`);
+    const siblingValue = type === 'one' ? customizeEmail2 : customizeEmail1;
+    this._toggleTreeProperty(`show${siblingValue}`);
 
     //Calculates colspan Number
     const showCustomizeEmailTemplate = get(this, 'showCustomizeEmailTemplate');
     if(showCustomizeEmailTemplate && (customizeEmail1 === 'Nothing' || customizeEmail2 === 'Nothing')) {
-      set(this, 'colspanNum', 5);
+      set(this, 'tree.firstObject.colspanNum', 5);
     } else if (showCustomizeEmailTemplate) {
-      set(this, 'colspanNum', 6);
+      set(this, 'tree.firstObject.colspanNum', 6);
     } else {
-      set(this, 'colspanNum', 4);
+      set(this, 'tree.firstObject.colspanNum', 4);
     }
 
+    let limitedSelfOptions = this._selectOption([ ...CUSTOMIZE_OPTIONS], option);
+    let limitedSiblingOptions = this._selectOption([ ...CUSTOMIZE_OPTIONS], siblingValue);
+
     //limited sibling list to selected choice
-    const limitedSiblingOptions = CUSTOMIZE_OPTIONS.filter(function(item){
+    limitedSiblingOptions = limitedSiblingOptions.filter(function(item){
       return item.value !== option;
     });
     //limited current list to sibling's existing selected
-    const limitedSelfOptions = CUSTOMIZE_OPTIONS.filter(function(item){
-      return item.value !== sibingValue;
+    limitedSelfOptions = limitedSelfOptions.filter(function(item){
+      return item.value !== siblingValue;
     });
-
-    if (type === 'one') {
-      set(this, 'options_two', limitedSiblingOptions);
-      set(this, 'options', limitedSelfOptions);
-    } else {
-      set(this, 'options', limitedSiblingOptions);
-      set(this, 'options_two', limitedSelfOptions);
-    }
-
-    // fetch base on offset
-    if (option !== 'Nothing') {
-      this._getOffsets();
-    }
 
     switch(option) {
       case 'Nothing':
@@ -450,16 +373,24 @@ export default Controller.extend({
         break;
       case 'Wow':
         //show wow column and it's sibling
-        this.toggleProperty('showWow');
+        this._toggleTreeProperty('showWow');
         break;
       case 'Wo2w':
         //show wo2w column and it's sibling
-        this.toggleProperty('showWo2w');
+        this._toggleTreeProperty('showWo2w');
         break;
       case 'Median4w':
         //show median4w column and it's sibling
-        this.toggleProperty('showMedian4w');
+        this._toggleTreeProperty('showMedian4w');
         break;
+    }
+
+    if (type === 'one') {
+      set(this, 'tree.firstObject.options_two', limitedSiblingOptions);
+      set(this, 'tree.firstObject.options', limitedSelfOptions);
+    } else {
+      set(this, 'tree.firstObject.options', limitedSiblingOptions);
+      set(this, 'tree.firstObject.options_two', limitedSelfOptions);
     }
   },
 
@@ -529,7 +460,6 @@ export default Controller.extend({
         let res = get(this, 'tree.firstObject.children').filter(metric => metric.id === id);
         set(res, 'firstObject.comment', userComment);
       }
-
     },
 
     /**
@@ -552,9 +482,9 @@ export default Controller.extend({
       }
 
       if (id === 'dashboard_summary') {
-        this.toggleProperty('showDashboardSummary');
+        this._toggleTreeProperty('showDashboardSummary');
       } else if (id === 'customize_email') {
-        this.toggleProperty('showCustomizeEmailTemplate');
+        this._toggleTreeProperty('showCustomizeEmailTemplate');
       }
     },
 
