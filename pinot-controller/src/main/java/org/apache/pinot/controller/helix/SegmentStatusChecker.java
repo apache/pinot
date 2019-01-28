@@ -77,7 +77,6 @@ public class SegmentStatusChecker extends ControllerPeriodicTask {
 
   @Override
   protected void preprocess() {
-    super.preprocess();
     _realTimeTableCount = 0;
     _offlineTableCount = 0;
     _disabledTableCount = 0;
@@ -94,20 +93,18 @@ public class SegmentStatusChecker extends ControllerPeriodicTask {
 
   @Override
   protected void processTable(String tableNameWithType) {
-    try {
-      updateSegmentMetrics(tableNameWithType);
-      _numTablesProcessed ++;
-    } catch (Exception e) {
-      LOGGER.error("Caught exception while updating segment status for table {}", tableNameWithType, e);
+    updateSegmentMetrics(tableNameWithType);
+  }
 
-      // Remove the metric for this table
-      resetTableMetrics(tableNameWithType);
-    }
+  @Override
+  protected void exceptionHandler(String tableNameWithType, Exception e) {
+    LOGGER.error("Caught exception while updating segment status for table {}", tableNameWithType, e);
+    // Remove the metric for this table
+    resetTableMetrics(tableNameWithType);
   }
 
   @Override
   protected void postprocess() {
-    super.postprocess();
     _metricsRegistry.setValueOfGlobalGauge(ControllerGauge.REALTIME_TABLE_COUNT, _realTimeTableCount);
     _metricsRegistry.setValueOfGlobalGauge(ControllerGauge.OFFLINE_TABLE_COUNT, _offlineTableCount);
     _metricsRegistry.setValueOfGlobalGauge(ControllerGauge.DISABLED_TABLE_COUNT, _disabledTableCount);

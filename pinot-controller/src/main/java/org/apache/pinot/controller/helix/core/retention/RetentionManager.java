@@ -71,60 +71,55 @@ public class RetentionManager extends ControllerPeriodicTask {
 
   @Override
   protected void preprocess() {
-    super.preprocess();
   }
 
   @Override
   protected void processTable(String tableNameWithType) {
-    try {
-      LOGGER.info("Start managing retention for table: {}", tableNameWithType);
-      manageRetentionForTable(tableNameWithType);
-      _numTablesProcessed ++;
-    } catch (Exception e) {
-      LOGGER.error("Caught exception while managing retention for table: {}", tableNameWithType, e);
-    }
+    LOGGER.info("Start managing retention for table: {}", tableNameWithType);
+    manageRetentionForTable(tableNameWithType);
   }
 
   @Override
   protected void postprocess() {
     LOGGER.info("Removing aged (more than {} days) deleted segments for all tables", _deletedSegmentsRetentionInDays);
     _pinotHelixResourceManager.getSegmentDeletionManager().removeAgedDeletedSegments(_deletedSegmentsRetentionInDays);
-    super.postprocess();
+  }
+
+  @Override
+  protected void exceptionHandler(String tableNameWithType, Exception e) {
+    LOGGER.error("Caught exception while managing retention for table: {}", tableNameWithType, e);
   }
 
   private void manageRetentionForTable(String tableNameWithType) {
-    try {
-      // Build retention strategy from table config
-      TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
-      if (tableConfig == null) {
-        LOGGER.error("Failed to get table config for table: {}", tableNameWithType);
-        return;
-      }
-      SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
-      String segmentPushType = validationConfig.getSegmentPushType();
-      if (!"APPEND".equalsIgnoreCase(segmentPushType)) {
-        LOGGER.info("Segment push type is not APPEND for table: {}, skip", tableNameWithType);
-        return;
-      }
-      String retentionTimeUnit = validationConfig.getRetentionTimeUnit();
-      String retentionTimeValue = validationConfig.getRetentionTimeValue();
-      RetentionStrategy retentionStrategy;
-      try {
-        retentionStrategy = new TimeRetentionStrategy(TimeUnit.valueOf(retentionTimeUnit.toUpperCase()),
-            Long.parseLong(retentionTimeValue));
-      } catch (Exception e) {
-        LOGGER.warn("Invalid retention time: {} {} for table: {}, skip", retentionTimeUnit, retentionTimeValue);
-        return;
-      }
 
-      // Scan all segment ZK metadata and purge segments if necessary
-      if (TableNameBuilder.OFFLINE.tableHasTypeSuffix(tableNameWithType)) {
-        manageRetentionForOfflineTable(tableNameWithType, retentionStrategy);
-      } else {
-        manageRetentionForRealtimeTable(tableNameWithType, retentionStrategy);
-      }
+    // Build retention strategy from table config
+    TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
+    if (tableConfig == null) {
+      LOGGER.error("Failed to get table config for table: {}", tableNameWithType);
+      return;
+    }
+    SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
+    String segmentPushType = validationConfig.getSegmentPushType();
+    if (!"APPEND".equalsIgnoreCase(segmentPushType)) {
+      LOGGER.info("Segment push type is not APPEND for table: {}, skip", tableNameWithType);
+      return;
+    }
+    String retentionTimeUnit = validationConfig.getRetentionTimeUnit();
+    String retentionTimeValue = validationConfig.getRetentionTimeValue();
+    RetentionStrategy retentionStrategy;
+    try {
+      retentionStrategy = new TimeRetentionStrategy(TimeUnit.valueOf(retentionTimeUnit.toUpperCase()),
+          Long.parseLong(retentionTimeValue));
     } catch (Exception e) {
-      LOGGER.error("Caught exception while managing retention for table: {}", tableNameWithType, e);
+      LOGGER.warn("Invalid retention time: {} {} for table: {}, skip", retentionTimeUnit, retentionTimeValue);
+      return;
+    }
+
+    // Scan all segment ZK metadata and purge segments if necessary
+    if (TableNameBuilder.OFFLINE.tableHasTypeSuffix(tableNameWithType)) {
+      manageRetentionForOfflineTable(tableNameWithType, retentionStrategy);
+    } else {
+      manageRetentionForRealtimeTable(tableNameWithType, retentionStrategy);
     }
   }
 

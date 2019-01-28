@@ -102,7 +102,6 @@ public class PinotTaskManager extends ControllerPeriodicTask {
 
   @Override
   protected void preprocess() {
-    super.preprocess();
     _metricsRegistry.addMeteredGlobalValue(ControllerMeter.NUMBER_TIMES_SCHEDULE_TASKS_CALLED, 1L);
 
     _taskTypes = _taskGeneratorRegistry.getAllTaskTypes();
@@ -130,7 +129,11 @@ public class PinotTaskManager extends ControllerPeriodicTask {
         }
       }
     }
-    _numTablesProcessed ++;
+  }
+
+  @Override
+  protected void exceptionHandler(String tableNameWithType, Exception e) {
+    LOGGER.error("Exception in PinotTaskManager for table {}", tableNameWithType, e);
   }
 
   @Override
@@ -150,7 +153,6 @@ public class PinotTaskManager extends ControllerPeriodicTask {
         _metricsRegistry.addMeteredTableValue(taskType, ControllerMeter.NUMBER_TASKS_SUBMITTED, numTasks);
       }
     }
-    super.postprocess();
   }
 
   /**

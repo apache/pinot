@@ -69,25 +69,23 @@ public class RealtimeSegmentRelocator extends ControllerPeriodicTask {
 
   @Override
   protected void preprocess() {
-    super.preprocess();
   }
 
   @Override
   protected void processTable(String tableNameWithType) {
-    try {
-      CommonConstants.Helix.TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
-      if (tableType == CommonConstants.Helix.TableType.REALTIME) {
-        runRelocation(tableNameWithType);
-        _numTablesProcessed ++;
-      }
-    } catch (Exception e) {
-      LOGGER.error("Exception in relocating realtime segments of table {}", tableNameWithType, e);
+    CommonConstants.Helix.TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
+    if (tableType == CommonConstants.Helix.TableType.REALTIME) {
+      runRelocation(tableNameWithType);
     }
   }
 
   @Override
   protected void postprocess() {
-    super.postprocess();
+  }
+
+  @Override
+  protected void exceptionHandler(String tableNameWithType, Exception e) {
+    LOGGER.error("Exception in relocating realtime segments of table {}", tableNameWithType, e);
   }
 
   /**

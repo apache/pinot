@@ -43,8 +43,6 @@ public abstract class ControllerPeriodicTask extends BasePeriodicTask {
   private volatile boolean _stopPeriodicTask;
   private volatile boolean _periodicTaskInProgress;
 
-  protected int _numTablesProcessed;
-
   public ControllerPeriodicTask(String taskName, long runFrequencyInSeconds, long initialDelayInSeconds,
       PinotHelixResourceManager pinotHelixResourceManager, ControllerMetrics controllerMetrics) {
     super(taskName, runFrequencyInSeconds, initialDelayInSeconds);
@@ -123,16 +121,28 @@ public abstract class ControllerPeriodicTask extends BasePeriodicTask {
    */
   protected void process(List<String> tableNamesWithType) {
     if (!shouldStopPeriodicTask()) {
+
+      int numTablesProcessed = 0;
       preprocess();
+
       for (String tableNameWithType : tableNamesWithType) {
         if (shouldStopPeriodicTask()) {
           LOGGER.info("Skip processing table {} and all the remaining tables for task {}.", tableNameWithType,
               getTaskName());
           break;
         }
-        processTable(tableNameWithType);
+        try {
+          processTable(tableNameWithType);
+          numTablesProcessed++;
+        } catch (Exception e) {
+          exceptionHandler(tableNameWithType, e);
+        }
       }
+
       postprocess();
+      _metricsRegistry.setValueOfGlobalGauge(ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED, getTaskName(),
+          numTablesProcessed);
+
     } else {
       LOGGER.info("Skip processing all tables for task {}", getTaskName());
     }
@@ -141,9 +151,7 @@ public abstract class ControllerPeriodicTask extends BasePeriodicTask {
   /**
    * This method runs before processing all tables
    */
-  protected void preprocess() {
-    _numTablesProcessed = 0;
-  }
+  protected abstract void preprocess();
 
   /**
    * Execute the controller periodic task for the given table
@@ -154,10 +162,9 @@ public abstract class ControllerPeriodicTask extends BasePeriodicTask {
   /**
    * This method runs after processing all tables
    */
-  protected void postprocess() {
-    _metricsRegistry.setValueOfGlobalGauge(ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED, getTaskName(),
-        _numTablesProcessed);
-  }
+  protected abstract void postprocess();
+
+  protected abstract void exceptionHandler(String tableNameWithType, Exception e);
 
   @VisibleForTesting
   protected boolean shouldStopPeriodicTask() {

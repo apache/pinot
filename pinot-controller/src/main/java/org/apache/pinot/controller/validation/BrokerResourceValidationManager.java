@@ -46,33 +46,31 @@ public class BrokerResourceValidationManager extends ControllerPeriodicTask {
 
   @Override
   protected void preprocess() {
-    super.preprocess();
     _instanceConfigs = _pinotHelixResourceManager.getAllHelixInstanceConfigs();
   }
 
   @Override
   protected void processTable(String tableNameWithType) {
-    try {
-      TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
-      if (tableConfig == null) {
-        LOGGER.warn("Failed to find table config for table: {}, skipping broker resource validation", tableNameWithType);
-        return;
-      }
-
-      // Rebuild broker resource
-      Set<String> brokerInstances = _pinotHelixResourceManager.getAllInstancesForBrokerTenant(_instanceConfigs,
-          tableConfig.getTenantConfig().getBroker());
-      _pinotHelixResourceManager.rebuildBrokerResource(tableNameWithType, brokerInstances);
-      _numTablesProcessed ++;
-    } catch (Exception e) {
-      LOGGER.warn("Caught exception while validating broker resource for table: {}", tableNameWithType, e);
+    TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
+    if (tableConfig == null) {
+      LOGGER.warn("Failed to find table config for table: {}, skipping broker resource validation", tableNameWithType);
+      return;
     }
+
+    // Rebuild broker resource
+    Set<String> brokerInstances = _pinotHelixResourceManager.getAllInstancesForBrokerTenant(_instanceConfigs,
+        tableConfig.getTenantConfig().getBroker());
+    _pinotHelixResourceManager.rebuildBrokerResource(tableNameWithType, brokerInstances);
   }
 
 
   @Override
   protected void postprocess() {
-    super.postprocess();
+  }
+
+  @Override
+  protected void exceptionHandler(String tableNameWithType, Exception e) {
+    LOGGER.error("Caught exception while validating broker resource for table: {}", tableNameWithType, e);
   }
 
   @Override

@@ -67,7 +67,6 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask {
 
   @Override
   protected void preprocess() {
-    super.preprocess();
     // Update realtime document counts only if certain time has passed after previous run
     _updateRealtimeDocumentCount = false;
     long currentTimeMs = System.currentTimeMillis();
@@ -81,29 +80,24 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask {
 
   @Override
   protected void processTable(String tableNameWithType) {
-    try {
-      CommonConstants.Helix.TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
-      if (tableType == CommonConstants.Helix.TableType.REALTIME) {
+    CommonConstants.Helix.TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
+    if (tableType == CommonConstants.Helix.TableType.REALTIME) {
 
-        TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
-        if (tableConfig == null) {
-          LOGGER.warn("Failed to find table config for table: {}, skipping validation", tableNameWithType);
-          return;
-        }
-
-        if (_updateRealtimeDocumentCount) {
-          updateRealtimeDocumentCount(tableConfig);
-        }
-
-        Map<String, String> streamConfigMap = tableConfig.getIndexingConfig().getStreamConfigs();
-        StreamConfig streamConfig = new StreamConfig(streamConfigMap);
-        if (streamConfig.hasLowLevelConsumerType()) {
-          _llcRealtimeSegmentManager.ensureAllPartitionsConsuming(tableConfig);
-        }
-        _numTablesProcessed ++;
+      TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
+      if (tableConfig == null) {
+        LOGGER.warn("Failed to find table config for table: {}, skipping validation", tableNameWithType);
+        return;
       }
-    } catch (Exception e) {
-      LOGGER.warn("Caught exception while validating realtime table: {}", tableNameWithType, e);
+
+      if (_updateRealtimeDocumentCount) {
+        updateRealtimeDocumentCount(tableConfig);
+      }
+
+      Map<String, String> streamConfigMap = tableConfig.getIndexingConfig().getStreamConfigs();
+      StreamConfig streamConfig = new StreamConfig(streamConfigMap);
+      if (streamConfig.hasLowLevelConsumerType()) {
+        _llcRealtimeSegmentManager.ensureAllPartitionsConsuming(tableConfig);
+      }
     }
   }
 
@@ -155,7 +149,11 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask {
 
   @Override
   protected void postprocess() {
-    super.postprocess();
+  }
+
+  @Override
+  protected void exceptionHandler(String tableNameWithType, Exception e) {
+    LOGGER.error("Caught exception while validating realtime table: {}", tableNameWithType, e);
   }
 
   @Override

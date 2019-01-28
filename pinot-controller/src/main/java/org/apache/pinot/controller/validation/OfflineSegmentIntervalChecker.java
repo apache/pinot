@@ -57,27 +57,19 @@ public class OfflineSegmentIntervalChecker extends ControllerPeriodicTask {
 
   @Override
   protected void preprocess() {
-    super.preprocess();
   }
 
   @Override
   protected void processTable(String tableNameWithType) {
-    try {
+    CommonConstants.Helix.TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
+    if (tableType == CommonConstants.Helix.TableType.OFFLINE) {
 
-      CommonConstants.Helix.TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
-      if (tableType == CommonConstants.Helix.TableType.OFFLINE) {
-
-        TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
-        if (tableConfig == null) {
-          LOGGER.warn("Failed to find table config for table: {}, skipping validation", tableNameWithType);
-          return;
-        }
-
-        validateOfflineSegmentPush(tableConfig);
-        _numTablesProcessed ++;
+      TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
+      if (tableConfig == null) {
+        LOGGER.warn("Failed to find table config for table: {}, skipping validation", tableNameWithType);
+        return;
       }
-    } catch (Exception e) {
-      LOGGER.warn("Caught exception while checking offline segment intervals for table: {}", tableNameWithType, e);
+      validateOfflineSegmentPush(tableConfig);
     }
   }
 
@@ -215,7 +207,11 @@ public class OfflineSegmentIntervalChecker extends ControllerPeriodicTask {
 
   @Override
   protected void postprocess() {
-    super.postprocess();
+  }
+
+  @Override
+  protected void exceptionHandler(String tableNameWithType, Exception e) {
+    LOGGER.warn("Caught exception while checking offline segment intervals for table: {}", tableNameWithType, e);
   }
 
   @Override

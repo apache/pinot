@@ -73,7 +73,6 @@ public class ControllerPeriodicTaskTest {
     @Override
     public void processTable(String tableNameWithType) {
       _tablesProcessed.getAndIncrement();
-      _numTablesProcessed ++;
     }
   };
 
@@ -164,7 +163,6 @@ public class ControllerPeriodicTaskTest {
 
     @Override
     protected void preprocess() {
-      super.preprocess();
     }
 
     @Override
@@ -174,9 +172,12 @@ public class ControllerPeriodicTaskTest {
 
     @Override
     public void postprocess() {
-      super.postprocess();
     }
 
+    @Override
+    public void exceptionHandler(String tableNameWithType, Exception e) {
+
+    }
 
     @Override
     public void stopTask() {
