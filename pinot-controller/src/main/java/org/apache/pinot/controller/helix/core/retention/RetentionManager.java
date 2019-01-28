@@ -30,6 +30,7 @@ import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
 import org.apache.pinot.common.utils.SegmentName;
@@ -53,9 +54,10 @@ public class RetentionManager extends ControllerPeriodicTask {
 
   private final int _deletedSegmentsRetentionInDays;
 
-  public RetentionManager(PinotHelixResourceManager pinotHelixResourceManager, ControllerConf config) {
+  public RetentionManager(PinotHelixResourceManager pinotHelixResourceManager, ControllerConf config,
+      ControllerMetrics controllerMetrics) {
     super("RetentionManager", config.getRetentionControllerFrequencyInSeconds(),
-        config.getPeriodicTaskInitialDelayInSeconds(), pinotHelixResourceManager);
+        config.getPeriodicTaskInitialDelayInSeconds(), pinotHelixResourceManager, controllerMetrics);
     _deletedSegmentsRetentionInDays = config.getDeletedSegmentsRetentionInDays();
 
     LOGGER.info("Starting RetentionManager with runFrequencyInSeconds: {}, deletedSegmentsRetentionInDays: {}",
@@ -69,17 +71,12 @@ public class RetentionManager extends ControllerPeriodicTask {
 
   @Override
   protected void preprocess() {
-
   }
 
   @Override
   protected void processTable(String tableNameWithType) {
-    try {
-      LOGGER.info("Start managing retention for table: {}", tableNameWithType);
-      manageRetentionForTable(tableNameWithType);
-    } catch (Exception e) {
-      LOGGER.error("Caught exception while managing retention for table: {}", tableNameWithType, e);
-    }
+    LOGGER.info("Start managing retention for table: {}", tableNameWithType);
+    manageRetentionForTable(tableNameWithType);
   }
 
   @Override
@@ -88,39 +85,41 @@ public class RetentionManager extends ControllerPeriodicTask {
     _pinotHelixResourceManager.getSegmentDeletionManager().removeAgedDeletedSegments(_deletedSegmentsRetentionInDays);
   }
 
-  private void manageRetentionForTable(String tableNameWithType) {
-    try {
-      // Build retention strategy from table config
-      TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
-      if (tableConfig == null) {
-        LOGGER.error("Failed to get table config for table: {}", tableNameWithType);
-        return;
-      }
-      SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
-      String segmentPushType = validationConfig.getSegmentPushType();
-      if (!"APPEND".equalsIgnoreCase(segmentPushType)) {
-        LOGGER.info("Segment push type is not APPEND for table: {}, skip", tableNameWithType);
-        return;
-      }
-      String retentionTimeUnit = validationConfig.getRetentionTimeUnit();
-      String retentionTimeValue = validationConfig.getRetentionTimeValue();
-      RetentionStrategy retentionStrategy;
-      try {
-        retentionStrategy = new TimeRetentionStrategy(TimeUnit.valueOf(retentionTimeUnit.toUpperCase()),
-            Long.parseLong(retentionTimeValue));
-      } catch (Exception e) {
-        LOGGER.warn("Invalid retention time: {} {} for table: {}, skip", retentionTimeUnit, retentionTimeValue);
-        return;
-      }
+  @Override
+  protected void exceptionHandler(String tableNameWithType, Exception e) {
+    LOGGER.error("Caught exception while managing retention for table: {}", tableNameWithType, e);
+  }
 
-      // Scan all segment ZK metadata and purge segments if necessary
-      if (TableNameBuilder.OFFLINE.tableHasTypeSuffix(tableNameWithType)) {
-        manageRetentionForOfflineTable(tableNameWithType, retentionStrategy);
-      } else {
-        manageRetentionForRealtimeTable(tableNameWithType, retentionStrategy);
-      }
+  private void manageRetentionForTable(String tableNameWithType) {
+
+    // Build retention strategy from table config
+    TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
+    if (tableConfig == null) {
+      LOGGER.error("Failed to get table config for table: {}", tableNameWithType);
+      return;
+    }
+    SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
+    String segmentPushType = validationConfig.getSegmentPushType();
+    if (!"APPEND".equalsIgnoreCase(segmentPushType)) {
+      LOGGER.info("Segment push type is not APPEND for table: {}, skip", tableNameWithType);
+      return;
+    }
+    String retentionTimeUnit = validationConfig.getRetentionTimeUnit();
+    String retentionTimeValue = validationConfig.getRetentionTimeValue();
+    RetentionStrategy retentionStrategy;
+    try {
+      retentionStrategy = new TimeRetentionStrategy(TimeUnit.valueOf(retentionTimeUnit.toUpperCase()),
+          Long.parseLong(retentionTimeValue));
     } catch (Exception e) {
-      LOGGER.error("Caught exception while managing retention for table: {}", tableNameWithType, e);
+      LOGGER.warn("Invalid retention time: {} {} for table: {}, skip", retentionTimeUnit, retentionTimeValue);
+      return;
+    }
+
+    // Scan all segment ZK metadata and purge segments if necessary
+    if (TableNameBuilder.OFFLINE.tableHasTypeSuffix(tableNameWithType)) {
+      manageRetentionForOfflineTable(tableNameWithType, retentionStrategy);
+    } else {
+      manageRetentionForRealtimeTable(tableNameWithType, retentionStrategy);
     }
   }
 

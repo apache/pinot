@@ -327,23 +327,22 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
     String gaugeName = gauge.getGaugeName();
     fullGaugeName = gaugeName + "." + getTableName(tableName);
 
-    if (!_gaugeValues.containsKey(fullGaugeName)) {
-      synchronized (_gaugeValues) {
-        if(!_gaugeValues.containsKey(fullGaugeName)) {
-          _gaugeValues.put(fullGaugeName, new AtomicLong(value));
-          addCallbackGauge(fullGaugeName, new Callable<Long>() {
-            @Override
-            public Long call() throws Exception {
-              return _gaugeValues.get(fullGaugeName).get();
-            }
-          });
-        } else {
-          _gaugeValues.get(fullGaugeName).set(value);
-        }
-      }
-    } else {
-      _gaugeValues.get(fullGaugeName).set(value);
-    }
+    setValueOfGauge(value, fullGaugeName);
+  }
+
+  /**
+   * Sets the value of a custom global gauge.
+   *
+   * @param suffix The suffix to attach to the gauge name
+   * @param gauge The gauge to use
+   * @param value The value to set the gauge to
+   */
+  public void setValueOfGlobalGauge(final G gauge, final String suffix, final long value) {
+    final String fullGaugeName;
+    String gaugeName = gauge.getGaugeName();
+    fullGaugeName = gaugeName + "." + suffix;
+
+    setValueOfGauge(value, fullGaugeName);
   }
 
   /**
@@ -355,16 +354,15 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   public void setValueOfGlobalGauge(final G gauge, final long value) {
     final String gaugeName = gauge.getGaugeName();
 
+    setValueOfGauge(value, gaugeName);
+  }
+
+  private void setValueOfGauge(long value, String gaugeName) {
     if (!_gaugeValues.containsKey(gaugeName)) {
       synchronized (_gaugeValues) {
         if(!_gaugeValues.containsKey(gaugeName)) {
           _gaugeValues.put(gaugeName, new AtomicLong(value));
-          addCallbackGauge(gaugeName, new Callable<Long>() {
-            @Override
-            public Long call() throws Exception {
-              return _gaugeValues.get(gaugeName).get();
-            }
-          });
+          addCallbackGauge(gaugeName, () -> _gaugeValues.get(gaugeName).get());
         } else {
           _gaugeValues.get(gaugeName).set(value);
         }
@@ -409,6 +407,17 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
       return 0;
     } else {
       return _gaugeValues.get(gaugeName).get();
+    }
+  }
+
+
+  @VisibleForTesting
+  public long getValueOfGlobalGauge(final G gauge, String suffix) {
+    String fullGaugeName = gauge.getGaugeName() + "." + suffix;
+    if (!_gaugeValues.containsKey(fullGaugeName)) {
+      return 0;
+    } else {
+      return _gaugeValues.get(fullGaugeName).get();
     }
   }
 
