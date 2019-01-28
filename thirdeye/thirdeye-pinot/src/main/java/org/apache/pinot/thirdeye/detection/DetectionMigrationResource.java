@@ -22,6 +22,7 @@ package org.apache.pinot.thirdeye.detection;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -30,11 +31,14 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import javax.ws.rs.Consumes;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
+import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
+import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang.exception.ExceptionUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -366,15 +370,15 @@ public class DetectionMigrationResource {
     yamlConfigs.put(PROP_CRON, alertConfigDTO.getCronExpression());
     yamlConfigs.put(PROP_ACTIVE, alertConfigDTO.isActive());
     yamlConfigs.put(PROP_APPLICATION, alertConfigDTO.getApplication());
-    yamlConfigs.put(PROP_EMAIL_SUBJECT_TYPE, alertConfigDTO.getSubjectType());
+    yamlConfigs.put(PROP_EMAIL_SUBJECT_TYPE, alertConfigDTO.getSubjectType().name());
     yamlConfigs.put(PROP_FROM, alertConfigDTO.getFromAddress());
 
     yamlConfigs.put(PROP_TYPE, "DEFAULT_ALERTER_PIPELINE");
 
     Map<String, Object> recipients = new LinkedHashMap<>();
-    recipients.put("to", alertConfigDTO.getReceiverAddresses().getTo());
-    recipients.put("cc", alertConfigDTO.getReceiverAddresses().getCc());
-    recipients.put("bcc", alertConfigDTO.getReceiverAddresses().getBcc());
+    recipients.put("to", new ArrayList<>(alertConfigDTO.getReceiverAddresses().getTo()));
+    recipients.put("cc", new ArrayList<>(alertConfigDTO.getReceiverAddresses().getCc()));
+    recipients.put("bcc", new ArrayList<>(alertConfigDTO.getReceiverAddresses().getBcc()));
     yamlConfigs.put(PROP_RECIPIENTS, recipients);
 
     List<Map<String, Object>> schemes = new ArrayList<>();
@@ -397,6 +401,8 @@ public class DetectionMigrationResource {
   }
 
   @GET
+  @Produces(MediaType.TEXT_PLAIN)
+  @Consumes(MediaType.APPLICATION_JSON)
   @Path("/legacy-anomaly-function-to-yaml/{id}")
   public Response getYamlFromLegacyAnomalyFunction(@PathParam("id") long anomalyFunctionID) throws Exception {
     AnomalyFunctionDTO anomalyFunctionDTO = this.anomalyFunctionDAO.findById(anomalyFunctionID);
@@ -409,6 +415,8 @@ public class DetectionMigrationResource {
   }
 
   @GET
+  @Produces(MediaType.TEXT_PLAIN)
+  @Consumes(MediaType.APPLICATION_JSON)
   @Path("/legacy-alert-to-yaml/{id}")
   public Response getYamlFromLegacyAlert(@PathParam("id") long alertId) throws Exception {
     AlertConfigDTO alertConfigDTO = this.alertConfigDAO.findById(alertId);
