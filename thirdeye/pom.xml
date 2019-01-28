@@ -162,16 +162,34 @@
         <groupId>org.apache.pinot</groupId>
         <artifactId>pinot-api</artifactId>
         <version>${pinot.version}</version>
+          <exclusions>
+            <exclusion>
+              <groupId>org.glassfish.jersey.core</groupId>
+              <artifactId>jersey-server</artifactId>
+            </exclusion>
+          </exclusions>
       </dependency>
       <dependency>
         <groupId>org.apache.pinot</groupId>
         <artifactId>pinot-common</artifactId>
         <version>${pinot.version}</version>
+          <exclusions>
+            <exclusion>
+              <groupId>org.glassfish.jersey.core</groupId>
+              <artifactId>jersey-server</artifactId>
+            </exclusion>
+          </exclusions>
       </dependency>
       <dependency>
         <groupId>org.apache.pinot</groupId>
         <artifactId>pinot-core</artifactId>
         <version>${pinot.version}</version>
+          <exclusions>
+            <exclusion>
+              <groupId>org.glassfish.jersey.core</groupId>
+              <artifactId>jersey-server</artifactId>
+            </exclusion>
+          </exclusions>
       </dependency>
 
       <!-- hadoop specific -->
