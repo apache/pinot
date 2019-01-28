@@ -35,6 +35,7 @@ Customizing Pinot
    pluggable_streams
    segment_fetcher
    star-tree/star-tree
+   pluggable_storage
 
 ################
 Design Documents
