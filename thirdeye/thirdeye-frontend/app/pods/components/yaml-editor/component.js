@@ -41,7 +41,6 @@ export default Component.extend({
   /**
    * Properties we expect to receive for the yaml-editor
    */
-   //isForm: true,
   currentMetric: null,
   isYamlParseable: true,
   alertTitle: 'Define anomaly detection in YAML',
@@ -59,6 +58,7 @@ export default Component.extend({
   YAMLField: '',
   currentYamlAlertOriginal: '',
   currentYamlSettingsOriginal: '',
+  toggleCollapsed: false,
 
 
   init() {
@@ -142,13 +142,13 @@ export default Component.extend({
    * @method _loadAutocompleteById
    * @return Promise
    */
-   _loadAutocompleteById(metricId) {
+  _loadAutocompleteById(metricId) {
     const promiseHash = {
       filters: fetch(selfServeApiGraph.metricFilters(metricId)).then(res => checkStatus(res, 'get', true)),
       dimensions: fetch(selfServeApiGraph.metricDimensions(metricId)).then(res => checkStatus(res, 'get', true))
     };
     return RSVP.hash(promiseHash);
-   },
+  },
 
   /**
    * Get autocomplete suggestions from relevant api
@@ -173,11 +173,11 @@ export default Component.extend({
                 dataset,
                 id: metric.id,
                 completer:{
-                insertMatch: (editor, data) => {
-                  editor.setValue(yamIt(data.metricname, data.dataset));
-                  editor.metricId = data.id;
-                }
-              }};
+                  insertMatch: (editor, data) => {
+                    editor.setValue(yamIt(data.metricname, data.dataset));
+                    editor.metricId = data.id;
+                  }
+                }};
             });
           }
           return noResultsArray;
@@ -233,6 +233,13 @@ export default Component.extend({
 
   actions: {
     /**
+    * triggered by preview dropdown
+    */
+    showPreview() {
+      this.toggleProperty('toggleCollapsed');
+    },
+
+    /**
      * resets given yaml field to default value for creation mode and server value for edit mode
      */
     resetYAML(field) {
@@ -254,7 +261,7 @@ export default Component.extend({
       }
     },
 
-     /**
+    /**
      * Brings up appropriate modal, based on which yaml field is clicked
      */
     triggerDocModal(field) {
