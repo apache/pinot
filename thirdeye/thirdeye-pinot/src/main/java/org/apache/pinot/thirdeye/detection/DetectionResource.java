@@ -20,30 +20,6 @@
 package org.apache.pinot.thirdeye.detection;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.collect.ImmutableMap;
-import org.apache.pinot.common.utils.ServiceStatus;
-import org.apache.pinot.thirdeye.api.Constants;
-import org.apache.pinot.thirdeye.constant.AnomalyResultSource;
-import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
-import org.apache.pinot.thirdeye.datalayer.bao.DetectionAlertConfigManager;
-import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
-import org.apache.pinot.thirdeye.datalayer.bao.EventManager;
-import org.apache.pinot.thirdeye.datalayer.bao.MergedAnomalyResultManager;
-import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
-import org.apache.pinot.thirdeye.datalayer.dto.AbstractDTO;
-import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
-import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
-import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import org.apache.pinot.thirdeye.datalayer.util.Predicate;
-import org.apache.pinot.thirdeye.datasource.DAORegistry;
-import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
-import org.apache.pinot.thirdeye.datasource.loader.AggregationLoader;
-import org.apache.pinot.thirdeye.datasource.loader.DefaultAggregationLoader;
-import org.apache.pinot.thirdeye.datasource.loader.DefaultTimeSeriesLoader;
-import org.apache.pinot.thirdeye.datasource.loader.TimeSeriesLoader;
-import org.apache.pinot.thirdeye.detection.finetune.GridSearchTuningAlgorithm;
-import org.apache.pinot.thirdeye.detection.finetune.TuningAlgorithm;
-import org.apache.pinot.thirdeye.detection.spi.model.AnomalySlice;
 import com.wordnik.swagger.annotations.Api;
 import com.wordnik.swagger.annotations.ApiOperation;
 import com.wordnik.swagger.annotations.ApiParam;
@@ -58,7 +34,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
@@ -66,13 +41,34 @@ import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
-import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.collections.MapUtils;
+import org.apache.pinot.thirdeye.api.Constants;
+import org.apache.pinot.thirdeye.constant.AnomalyFeedbackType;
+import org.apache.pinot.thirdeye.constant.AnomalyResultSource;
+import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
+import org.apache.pinot.thirdeye.datalayer.bao.DetectionAlertConfigManager;
+import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
+import org.apache.pinot.thirdeye.datalayer.bao.EventManager;
+import org.apache.pinot.thirdeye.datalayer.bao.MergedAnomalyResultManager;
+import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
+import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.datalayer.util.Predicate;
+import org.apache.pinot.thirdeye.datasource.DAORegistry;
+import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
+import org.apache.pinot.thirdeye.datasource.loader.AggregationLoader;
+import org.apache.pinot.thirdeye.datasource.loader.DefaultAggregationLoader;
+import org.apache.pinot.thirdeye.datasource.loader.DefaultTimeSeriesLoader;
+import org.apache.pinot.thirdeye.datasource.loader.TimeSeriesLoader;
+import org.apache.pinot.thirdeye.detection.finetune.GridSearchTuningAlgorithm;
+import org.apache.pinot.thirdeye.detection.finetune.TuningAlgorithm;
+import org.apache.pinot.thirdeye.detection.spi.model.AnomalySlice;
 import org.joda.time.DateTime;
 import org.joda.time.Interval;
-import org.joda.time.format.ISODateTimeFormat;
 import org.quartz.CronExpression;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -427,4 +423,54 @@ public class DetectionResource {
 
     return Response.ok(result).build();
   }
+
+
+  /**
+   * Create a user-reported anomaly for a new detection pipeline
+   *
+   * @param detectionConfigId detection config id (must exist)
+   * @param startTime start time utc (in millis)
+   * @param endTime end time utc (in millis)
+   * @param metricUrn the metric urn of the anomaly
+   * @param feedbackType anomaly feedback type
+   * @param comment anomaly feedback comment (optional)
+   * @throws IllegalArgumentException if the anomaly function id cannot be found
+   * @throws IllegalArgumentException if the anomaly cannot be stored
+   */
+  @POST
+  @Path(value = "/report-anomaly/{detectionConfigId}")
+  @ApiOperation("Report a missing anomaly for a detection config")
+  public void createUserAnomaly(
+      @PathParam("detectionConfigId") @ApiParam(value = "detection config id") long detectionConfigId,
+      @QueryParam("startTime") @ApiParam("start time utc (in millis)") Long startTime,
+      @QueryParam("endTime") @ApiParam("end time utc (in millis)") Long endTime,
+      @QueryParam("metricUrn") @ApiParam("the metric urn of the anomaly") String metricUrn,
+      @QueryParam("feedbackType") @ApiParam("the metric urn of the anomaly") AnomalyFeedbackType feedbackType,
+      @QueryParam("comment") @ApiParam("comments") String comment) {
+
+    DetectionConfigDTO detectionConfigDTO = this.configDAO.findById(detectionConfigId);
+    if (detectionConfigDTO == null) {
+      throw new IllegalArgumentException(String.format("Could not resolve detection config id %d", detectionConfigId));
+    }
+
+    MergedAnomalyResultDTO anomaly = new MergedAnomalyResultDTO();
+    anomaly.setStartTime(startTime);
+    anomaly.setEndTime(endTime);
+    anomaly.setDetectionConfigId(detectionConfigId);
+    anomaly.setAnomalyResultSource(AnomalyResultSource.USER_LABELED_ANOMALY);
+    anomaly.setMetricUrn(metricUrn);
+    anomaly.setProperties(Collections.<String, String>emptyMap());
+
+    if (this.anomalyDAO.save(anomaly) == null) {
+      throw new IllegalArgumentException(String.format("Could not store user reported anomaly: '%s'", anomaly));
+    }
+
+    AnomalyFeedbackDTO feedback = new AnomalyFeedbackDTO();
+    feedback.setFeedbackType(feedbackType);
+    feedback.setComment(comment);
+    anomaly.setFeedback(feedback);
+
+    this.anomalyDAO.save(anomaly);
+  }
+
 }
