@@ -39,6 +39,21 @@
   </div>
 
   <div class="col-xs-12">
+    {{#bs-accordion onChange=(action "showPreview") as |acc|}}
+      {{#acc.item value=preview as |aitem|}}
+        {{#aitem.title}}
+          <section class="dashboard-container__title">Preview alert
+            <span class="pull-right"><i class="glyphicon glyphicon-menu-{{if toggleCollapsed "down" "up"}}"></i></span>
+          </section>
+        {{/aitem.title}}
+        {{#aitem.body}}
+          <p>Preview Alert Component Goes Here</p>
+        {{/aitem.body}}
+      {{/acc.item}}
+    {{/bs-accordion}}
+  </div>
+
+  <div class="col-xs-12">
     <hr/>
   </div>
   {{#if showSettings}}
