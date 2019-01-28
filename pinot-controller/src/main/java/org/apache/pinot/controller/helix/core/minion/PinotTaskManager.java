@@ -27,7 +27,6 @@ import javax.annotation.Nonnull;
 import org.apache.pinot.common.config.PinotTaskConfig;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.config.TableTaskConfig;
-import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.ControllerConf;
@@ -103,7 +102,7 @@ public class PinotTaskManager extends ControllerPeriodicTask {
 
   @Override
   protected void preprocess() {
-    _numTablesProcessed = 0;
+    super.preprocess();
     _metricsRegistry.addMeteredGlobalValue(ControllerMeter.NUMBER_TIMES_SCHEDULE_TASKS_CALLED, 1L);
 
     _taskTypes = _taskGeneratorRegistry.getAllTaskTypes();
@@ -151,8 +150,7 @@ public class PinotTaskManager extends ControllerPeriodicTask {
         _metricsRegistry.addMeteredTableValue(taskType, ControllerMeter.NUMBER_TASKS_SUBMITTED, numTasks);
       }
     }
-    _metricsRegistry.setValueOfGlobalGauge(ControllerGauge.PINOT_TASK_MANAGER_NUM_TABLES_PROCESSED,
-        _numTablesProcessed);
+    super.postprocess();
   }
 
   /**

@@ -26,7 +26,6 @@ import org.apache.pinot.common.config.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
-import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.metrics.ValidationMetrics;
 import org.apache.pinot.common.utils.CommonConstants;
@@ -58,7 +57,7 @@ public class OfflineSegmentIntervalChecker extends ControllerPeriodicTask {
 
   @Override
   protected void preprocess() {
-    _numTablesProcessed = 0;
+    super.preprocess();
   }
 
   @Override
@@ -216,8 +215,7 @@ public class OfflineSegmentIntervalChecker extends ControllerPeriodicTask {
 
   @Override
   protected void postprocess() {
-    _metricsRegistry.setValueOfGlobalGauge(ControllerGauge.OFFLINE_SEGMENT_INTERVAL_CHECKER_NUM_TABLES_PROCESSED,
-        _numTablesProcessed);
+    super.postprocess();
   }
 
   @Override

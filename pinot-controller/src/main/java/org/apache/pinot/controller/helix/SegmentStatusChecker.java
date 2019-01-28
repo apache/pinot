@@ -77,7 +77,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask {
 
   @Override
   protected void preprocess() {
-    _numTablesProcessed = 0;
+    super.preprocess();
     _realTimeTableCount = 0;
     _offlineTableCount = 0;
     _disabledTableCount = 0;
@@ -107,8 +107,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask {
 
   @Override
   protected void postprocess() {
-    _metricsRegistry.setValueOfGlobalGauge(ControllerGauge.SEGMENT_STATUS_CHECKER_NUM_TABLES_PROCESSED,
-        _numTablesProcessed);
+    super.postprocess();
     _metricsRegistry.setValueOfGlobalGauge(ControllerGauge.REALTIME_TABLE_COUNT, _realTimeTableCount);
     _metricsRegistry.setValueOfGlobalGauge(ControllerGauge.OFFLINE_TABLE_COUNT, _offlineTableCount);
     _metricsRegistry.setValueOfGlobalGauge(ControllerGauge.DISABLED_TABLE_COUNT, _disabledTableCount);

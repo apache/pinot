@@ -20,6 +20,7 @@ package org.apache.pinot.controller.helix.core.periodictask;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.util.List;
+import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.periodictask.BasePeriodicTask;
@@ -140,7 +141,9 @@ public abstract class ControllerPeriodicTask extends BasePeriodicTask {
   /**
    * This method runs before processing all tables
    */
-  protected abstract void preprocess();
+  protected void preprocess() {
+    _numTablesProcessed = 0;
+  }
 
   /**
    * Execute the controller periodic task for the given table
@@ -151,7 +154,10 @@ public abstract class ControllerPeriodicTask extends BasePeriodicTask {
   /**
    * This method runs after processing all tables
    */
-  protected abstract void postprocess();
+  protected void postprocess() {
+    _metricsRegistry.setValueOfGlobalGauge(ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED, getTaskName(),
+        _numTablesProcessed);
+  }
 
   @VisibleForTesting
   protected boolean shouldStopPeriodicTask() {

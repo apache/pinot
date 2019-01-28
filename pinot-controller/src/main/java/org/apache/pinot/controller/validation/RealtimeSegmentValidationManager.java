@@ -26,7 +26,6 @@ import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
-import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.metrics.ValidationMetrics;
 import org.apache.pinot.common.utils.CommonConstants;
@@ -68,7 +67,7 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask {
 
   @Override
   protected void preprocess() {
-    _numTablesProcessed = 0;
+    super.preprocess();
     // Update realtime document counts only if certain time has passed after previous run
     _updateRealtimeDocumentCount = false;
     long currentTimeMs = System.currentTimeMillis();
@@ -156,8 +155,7 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask {
 
   @Override
   protected void postprocess() {
-    _metricsRegistry.setValueOfGlobalGauge(ControllerGauge.REALTIME_SEGMENTS_VALIDATION_NUM_TABLES_PROCESSED,
-        _numTablesProcessed);
+    super.postprocess();
   }
 
   @Override

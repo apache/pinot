@@ -33,7 +33,6 @@ import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.config.RealtimeTagConfig;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.config.TableNameBuilder;
-import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.helix.HelixHelper;
@@ -70,7 +69,7 @@ public class RealtimeSegmentRelocator extends ControllerPeriodicTask {
 
   @Override
   protected void preprocess() {
-    _numTablesProcessed = 0;
+    super.preprocess();
   }
 
   @Override
@@ -88,7 +87,7 @@ public class RealtimeSegmentRelocator extends ControllerPeriodicTask {
 
   @Override
   protected void postprocess() {
-    _metricsRegistry.setValueOfGlobalGauge(ControllerGauge.SEGMENT_RELOCATOR_NUM_TABLES_PROCESSED, _numTablesProcessed);
+    super.postprocess();
   }
 
   /**

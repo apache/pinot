@@ -175,8 +175,8 @@ public class SegmentStatusCheckerIntegrationTest extends BaseClusterIntegrationT
     ControllerMetrics controllerMetrics = _controllerStarter.getControllerMetrics();
 
     long millisToWait = TimeUnit.MILLISECONDS.convert(2, TimeUnit.MINUTES);
-    while (controllerMetrics.getValueOfGlobalGauge(ControllerGauge.SEGMENT_STATUS_CHECKER_NUM_TABLES_PROCESSED)
-        < NUM_TABLES && millisToWait > 0) {
+    while (controllerMetrics.getValueOfGlobalGauge(ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED,
+        "SegmentStatusChecker") < NUM_TABLES && millisToWait > 0) {
       try {
         Thread.sleep(1000);
         millisToWait -= 1000;
@@ -185,9 +185,8 @@ public class SegmentStatusCheckerIntegrationTest extends BaseClusterIntegrationT
       }
     }
 
-    Assert.assertEquals(
-        controllerMetrics.getValueOfGlobalGauge(ControllerGauge.SEGMENT_STATUS_CHECKER_NUM_TABLES_PROCESSED),
-        NUM_TABLES);
+    Assert.assertEquals(controllerMetrics.getValueOfGlobalGauge(ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED,
+        "SegmentStatusChecker"), NUM_TABLES);
 
     // empty table - table1_OFFLINE
     // num replicas set from ideal state

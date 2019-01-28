@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
+import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -48,8 +49,9 @@ public class ControllerPeriodicTaskTest {
   private final AtomicBoolean _processCalled = new AtomicBoolean();
   private final AtomicInteger _tablesProcessed = new AtomicInteger();
   private final int _numTables = 3;
+  private static final String TASK_NAME = "TestTask";
 
-  private final MockControllerPeriodicTask _task = new MockControllerPeriodicTask("TestTask", RUN_FREQUENCY_IN_SECONDS,
+  private final MockControllerPeriodicTask _task = new MockControllerPeriodicTask(TASK_NAME, RUN_FREQUENCY_IN_SECONDS,
       _controllerConf.getPeriodicTaskInitialDelayInSeconds(), _resourceManager, _controllerMetrics) {
 
     @Override
@@ -71,6 +73,7 @@ public class ControllerPeriodicTaskTest {
     @Override
     public void processTable(String tableNameWithType) {
       _tablesProcessed.getAndIncrement();
+      _numTablesProcessed ++;
     }
   };
 
@@ -86,6 +89,7 @@ public class ControllerPeriodicTaskTest {
     _stopTaskCalled.set(false);
     _processCalled.set(false);
     _tablesProcessed.set(0);
+    _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED, TASK_NAME,0);
   }
 
   @Test
@@ -108,6 +112,8 @@ public class ControllerPeriodicTaskTest {
     assertEquals(_tablesProcessed.get(), 0);
     assertFalse(_stopTaskCalled.get());
     assertFalse(_task.shouldStopPeriodicTask());
+    assertEquals(_controllerMetrics.getValueOfGlobalGauge(ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED, TASK_NAME),
+        0);
 
     // run task - leadership gained
     resetState();
@@ -115,6 +121,8 @@ public class ControllerPeriodicTaskTest {
     assertFalse(_initTaskCalled.get());
     assertTrue(_processCalled.get());
     assertEquals(_tablesProcessed.get(), _numTables);
+    assertEquals(_controllerMetrics.getValueOfGlobalGauge(ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED, TASK_NAME),
+        _numTables);
     assertFalse(_stopTaskCalled.get());
     assertFalse(_task.shouldStopPeriodicTask());
 
@@ -124,6 +132,8 @@ public class ControllerPeriodicTaskTest {
     assertFalse(_initTaskCalled.get());
     assertFalse(_processCalled.get());
     assertEquals(_tablesProcessed.get(), 0);
+    assertEquals(_controllerMetrics.getValueOfGlobalGauge(ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED, TASK_NAME),
+        0);
     assertTrue(_stopTaskCalled.get());
     assertTrue(_task.shouldStopPeriodicTask());
 
@@ -134,6 +144,8 @@ public class ControllerPeriodicTaskTest {
     assertFalse(_initTaskCalled.get());
     assertTrue(_processCalled.get());
     assertEquals(_tablesProcessed.get(), _numTables);
+    assertEquals(_controllerMetrics.getValueOfGlobalGauge(ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED, TASK_NAME),
+        _numTables);
     assertFalse(_stopTaskCalled.get());
 
   }
@@ -152,7 +164,7 @@ public class ControllerPeriodicTaskTest {
 
     @Override
     protected void preprocess() {
-
+      super.preprocess();
     }
 
     @Override
@@ -162,7 +174,7 @@ public class ControllerPeriodicTaskTest {
 
     @Override
     public void postprocess() {
-
+      super.postprocess();
     }
 
 

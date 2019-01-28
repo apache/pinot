@@ -22,7 +22,6 @@ import java.util.List;
 import java.util.Set;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -47,7 +46,7 @@ public class BrokerResourceValidationManager extends ControllerPeriodicTask {
 
   @Override
   protected void preprocess() {
-    _numTablesProcessed = 0;
+    super.preprocess();
     _instanceConfigs = _pinotHelixResourceManager.getAllHelixInstanceConfigs();
   }
 
@@ -73,8 +72,7 @@ public class BrokerResourceValidationManager extends ControllerPeriodicTask {
 
   @Override
   protected void postprocess() {
-    _metricsRegistry.setValueOfGlobalGauge(ControllerGauge.BROKER_RESOURCE_VALIDATION_NUM_TABLES_PROCESSED,
-        _numTablesProcessed);
+    super.postprocess();
   }
 
   @Override
