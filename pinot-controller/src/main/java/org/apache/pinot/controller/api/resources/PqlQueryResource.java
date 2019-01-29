@@ -129,6 +129,10 @@ public class PqlQueryResource {
     // Send query to a random broker.
     String instanceId = instanceIds.get(RANDOM.nextInt(instanceIds.size()));
     InstanceConfig instanceConfig = _pinotHelixResourceManager.getHelixInstanceConfig(instanceId);
+    if (instanceConfig == null) {
+      LOGGER.error("Instance {} not found", instanceId);
+      return QueryException.INTERNAL_ERROR.toString();
+    }
     String hostNameWithPrefix = instanceConfig.getHostName();
     String url =
         "http://" + hostNameWithPrefix.substring(hostNameWithPrefix.indexOf("_") + 1) + ":" + instanceConfig.getPort()

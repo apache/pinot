@@ -85,12 +85,13 @@ public class PinotInstanceRestletResource {
   @ApiOperation(value = "Get instance information", produces = MediaType.APPLICATION_JSON)
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 404, message = "Instance not found"), @ApiResponse(code = 500, message = "Internal error")})
   public String getInstance(
-      @ApiParam(value = "Instance name", required = true, example = "Server_a.b.com_20000 | Broker_my.broker.com_30000") @PathParam("instanceName") String instanceName) {
-    if (!pinotHelixResourceManager.instanceExists(instanceName)) {
+      @ApiParam(value = "Instance name", required = true, example = "Server_a.b.com_20000 | Broker_my.broker.com_30000")
+      @PathParam("instanceName") String instanceName) {
+    InstanceConfig instanceConfig = pinotHelixResourceManager.getHelixInstanceConfig(instanceName);
+    if (instanceConfig == null) {
       throw new ControllerApplicationException(LOGGER, "Instance " + instanceName + " not found",
           Response.Status.NOT_FOUND);
     }
-    InstanceConfig instanceConfig = pinotHelixResourceManager.getHelixInstanceConfig(instanceName);
     ObjectNode response = JsonUtils.newObjectNode();
     response.put("instanceName", instanceConfig.getInstanceName());
     response.put("hostName", instanceConfig.getHostName());

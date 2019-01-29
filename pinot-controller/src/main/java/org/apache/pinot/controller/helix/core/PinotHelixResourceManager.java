@@ -283,10 +283,9 @@ public class PinotHelixResourceManager {
    * @param instanceId Instance Id
    * @return Helix instance config
    */
-  @Nonnull
   public InstanceConfig getHelixInstanceConfig(@Nonnull String instanceId) {
     ZNRecord znRecord = _cacheInstanceConfigsDataAccessor.get("/" + instanceId, null, AccessOption.PERSISTENT);
-    return new InstanceConfig(znRecord);
+    return znRecord != null ? new InstanceConfig(znRecord) : null;
   }
 
   /**
@@ -2157,9 +2156,8 @@ public class PinotHelixResourceManager {
    * @return True if instance exists in the Helix cluster, False otherwise.
    */
   public boolean instanceExists(String instanceName) {
-    HelixDataAccessor helixDataAccessor = _helixZkManager.getHelixDataAccessor();
-    InstanceConfig config = helixDataAccessor.getProperty(_keyBuilder.instanceConfig(instanceName));
-    return (config != null);
+    ZNRecord znRecord = _cacheInstanceConfigsDataAccessor.get("/" + instanceName, null, AccessOption.PERSISTENT);
+    return (znRecord != null);
   }
 
   public boolean isSingleTenantCluster() {
@@ -2210,6 +2208,10 @@ public class PinotHelixResourceManager {
     BiMap<String, String> endpointToInstance = HashBiMap.create(instances.size());
     for (String instance : instances) {
       InstanceConfig helixInstanceConfig = getHelixInstanceConfig(instance);
+      if (helixInstanceConfig == null) {
+        LOGGER.warn("Instance {} not found", instance);
+        continue;
+      }
       ZNRecord record = helixInstanceConfig.getRecord();
       String[] hostnameSplit = helixInstanceConfig.getHostName().split("_");
       Preconditions.checkState(hostnameSplit.length >= 2);
@@ -2239,13 +2241,14 @@ public class PinotHelixResourceManager {
     final long externalViewOnlineToOfflineTimeoutMillis = 100L;
     final boolean isSingleTenantCluster = false;
     final boolean isUpdateStateModel = false;
+    final boolean enableBatchMessageMode = false;
     MetricsRegistry metricsRegistry = new MetricsRegistry();
     final boolean dryRun = true;
     final String tableName = "testTable";
     final TableType tableType = TableType.OFFLINE;
     PinotHelixResourceManager helixResourceManager =
         new PinotHelixResourceManager(zkURL, helixClusterName, controllerInstanceId, localDiskDir,
-            externalViewOnlineToOfflineTimeoutMillis, isSingleTenantCluster, isUpdateStateModel);
+            externalViewOnlineToOfflineTimeoutMillis, isSingleTenantCluster, isUpdateStateModel, enableBatchMessageMode);
     helixResourceManager.start();
     ZNRecord record = helixResourceManager.rebalanceTable(tableName, dryRun, tableType);
     ObjectMapper mapper = new ObjectMapper();

@@ -19,7 +19,6 @@
 package org.apache.pinot.controller.helix.core;
 
 import com.google.common.collect.BiMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
 import java.util.Set;
@@ -263,12 +262,6 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
       Assert.assertEquals(retrievedMetadata.getSegmentName(), segmentName);
       Assert.assertEquals(realtimeMetadata.getStatus(), CommonConstants.Segment.Realtime.Status.DONE);
     }
-  }
-
-  @Test
-  public void testGetDataInstanceAdminEndpoints() {
-    Set<String> fakeInstances = new HashSet<>();
-    new Random().nextInt(NUM_INSTANCES);
   }
 
   @AfterClass
