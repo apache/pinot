@@ -17,39 +17,33 @@
  * under the License.
  */
 
-package org.apache.pinot.thirdeye.datasource.pinot;
+package org.apache.pinot.thirdeye.datasource;
 
-import org.apache.pinot.thirdeye.datasource.RelationalQuery;
+public abstract class RelationalQuery {
 
+  protected String query;
 
-public class PinotQuery extends RelationalQuery {
-
-  private String tableName;
-
-  public PinotQuery(String pql, String tableName) {
-    super(pql);
-    this.tableName = tableName;
+  public RelationalQuery(String query) {
+    this.query = query;
   }
 
-  // TODO: Remove thirdeye-external's dependency on this method to getQuery() instead
-  public String getPql() {
+  public String getQuery() {
     return query;
   }
 
-  public String getTableName() {
-    return tableName;
-  }
-
-  public void setTableName(String tableName) {
-    this.tableName = tableName;
+  public void setQuery(String query) {
+    this.query = query;
   }
 
   @Override
-  public String toString() {
-    final StringBuilder sb = new StringBuilder("PinotQuery{");
-    sb.append("pql='").append(query).append('\'');
-    sb.append(", tableName='").append(tableName).append('\'');
-    sb.append('}');
-    return sb.toString();
+  public int hashCode() {
+    return query.hashCode();
+  }
+
+  @Override
+  public boolean equals(Object obj) {
+    RelationalQuery that = (RelationalQuery) obj;
+    return this.query.equals(that.query);
   }
 }
+

@@ -45,7 +45,7 @@ import org.slf4j.LoggerFactory;
 public class DefaultAggregationLoader implements AggregationLoader {
   private static Logger LOG = LoggerFactory.getLogger(DefaultAggregationLoader.class);
 
-  private static final long TIMEOUT = 60000;
+  private static final long TIMEOUT = 600000;
 
   private final MetricConfigManager metricDAO;
   private final DatasetConfigManager datasetDAO;

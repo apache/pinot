@@ -21,12 +21,16 @@ package org.apache.pinot.thirdeye.datasource.pinot.resultset;
 
 import com.google.common.base.Preconditions;
 import org.apache.pinot.client.ResultSet;
+import org.apache.pinot.thirdeye.common.time.TimeGranularity;
+import org.apache.pinot.thirdeye.common.time.TimeSpec;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils;
+
 
 /**
  * An unified container that store Select, Aggregation, and Group-By {@link ResultSet} in a data frame.
@@ -85,6 +89,83 @@ public class ThirdEyeDataFrameResultSet extends AbstractThirdEyeResultSet {
   public String getGroupKeyColumnValue(int rowIdx, int columnIdx) {
     Preconditions.checkPositionIndexes(0, columnIdx, getGroupKeyLength() - 1);
     return dataFrame.get(thirdEyeResultSetMetaData.getGroupKeyColumnNames().get(columnIdx)).getString(rowIdx);
+  }
+
+  /**
+   * Constructs a {@link ThirdEyeDataFrameResultSet} from any SQL's {@link java.sql.ResultSet}.
+   *
+   * @param resultSet resultset from SQL query
+   * @param metric the metric the SQL is querying
+   * @param groupByKeys all groupbykeys from query
+   * @param aggGranularity aggregation granualrity of the query
+   * @param timeSpec timeSpec of the query
+   * @return an unified {@link ThirdEyeDataFrameResultSet}
+   */
+  public static ThirdEyeDataFrameResultSet fromSQLResultSet(java.sql.ResultSet resultSet, String metric,
+      List<String> groupByKeys, TimeGranularity aggGranularity, TimeSpec timeSpec) throws Exception {
+
+    List<String> groupKeyColumnNames = new ArrayList<>();
+    if (aggGranularity != null && !groupByKeys.contains(timeSpec.getColumnName())) {
+      groupKeyColumnNames.add(0, DataFrameUtils.COL_TIME);
+    }
+
+    for (String groupByKey: groupByKeys) {
+      groupKeyColumnNames.add(groupByKey);
+    }
+
+    List<String> metrics = new ArrayList<>();
+    metrics.add(metric);
+    ThirdEyeResultSetMetaData thirdEyeResultSetMetaData =
+        new ThirdEyeResultSetMetaData(groupKeyColumnNames, metrics);
+    // Build the DataFrame
+    List<String> columnNameWithDataType = new ArrayList<>();
+    //   Always cast dimension values to STRING type
+
+    for (String groupColumnName : thirdEyeResultSetMetaData.getGroupKeyColumnNames()) {
+      columnNameWithDataType.add(groupColumnName + ":STRING");
+    }
+
+    columnNameWithDataType.addAll(thirdEyeResultSetMetaData.getMetricColumnNames());
+    DataFrame.Builder dfBuilder = DataFrame.builder(columnNameWithDataType);
+
+    int metricColumnCount = metrics.size();
+    int groupByColumnCount = groupKeyColumnNames.size();
+    int totalColumnCount = groupByColumnCount + metricColumnCount;
+
+    outer: while (resultSet.next()) {
+      String[] columnsOfTheRow = new String[totalColumnCount];
+      // GroupBy column value(i.e., dimension values)
+      for (int groupByColumnIdx = 1; groupByColumnIdx <= groupByColumnCount; groupByColumnIdx++) {
+        String valueString = null;
+        try {
+          valueString = resultSet.getString(groupByColumnIdx);
+        } catch (Exception e) {
+          // Do nothing and subsequently insert a null value to the current series.
+        }
+        columnsOfTheRow[groupByColumnIdx - 1] = valueString;
+      }
+      // Metric column's value
+      for (int metricColumnIdx = 1; metricColumnIdx <= metricColumnCount; metricColumnIdx++) {
+        String valueString = null;
+        try {
+          valueString = resultSet.getString(groupByColumnCount + metricColumnIdx);
+          if (valueString == null) {
+            break outer;
+          }
+        } catch (Exception e) {
+          // Do nothing and subsequently insert a null value to the current series.
+        }
+        columnsOfTheRow[metricColumnIdx + groupByColumnCount - 1] = valueString;
+      }
+      dfBuilder.append(columnsOfTheRow);
+    }
+
+    DataFrame dataFrame = dfBuilder.build().dropNull();
+
+    // Build ThirdEye's result set
+    ThirdEyeDataFrameResultSet thirdEyeDataFrameResultSet =
+        new ThirdEyeDataFrameResultSet(thirdEyeResultSetMetaData, dataFrame);
+    return thirdEyeDataFrameResultSet;
   }
 
   /**
@@ -162,7 +243,6 @@ public class ThirdEyeDataFrameResultSet extends AbstractThirdEyeResultSet {
     // Build ThirdEye's result set
     ThirdEyeDataFrameResultSet thirdEyeDataFrameResultSet =
         new ThirdEyeDataFrameResultSet(thirdEyeResultSetMetaData, dataFrame);
-
     return thirdEyeDataFrameResultSet;
   }
 

@@ -1,4 +1,26 @@
 dataSourceConfigs:
+  - className: org.apache.pinot.thirdeye.datasource.sql.SqlThirdEyeDataSource
+    properties:
+      H2:
+        db: jdbc:h2:./config/h2db
+        user: sa
+        password: sa
+        datasets:
+          - tableName: "H2.H2.daily"
+            timeColumn: "date"
+            granularity: "1DAYS"
+            timeFormat: "yyyy-MM-dd"
+            metrics:
+              value: "SUM"
+            dataFile: "daily.csv"
+          - tableName: "H2.H2.hourly"
+            timeColumn: "datetime"
+            granularity: "1HOURS"
+            timeFormat: "yyyy-MM-dd HH:mm:ss"
+            metrics:
+              value: "SUM"
+            dataFile: "hourly.csv"
+
   - className: org.apache.pinot.thirdeye.datasource.mock.MockThirdEyeDataSource
     properties:
       populateMetaData: true
@@ -185,4 +207,3 @@ dataSourceConfigs:
                 edge:
                   mean: 20
                   std: 3
-

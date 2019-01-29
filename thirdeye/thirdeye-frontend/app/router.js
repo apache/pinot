@@ -35,6 +35,7 @@ Router.map(function() {
   this.route('self-serve', function() {
     this.route('create-alert');
     this.route('import-metric');
+    this.route('import-sql-metric');
   });
 
   this.route('screenshot', { path: 'screenshot/:anomaly_id' });

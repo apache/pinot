@@ -134,12 +134,12 @@ public class PinotControllerResponseCacheLoader extends PinotResponseCacheLoader
           int activeConnections = this.activeConnections.incrementAndGet();
 
           long start = System.currentTimeMillis();
-          ResultSetGroup resultSetGroup = connection.execute(pinotQuery.getTableName(), pinotQuery.getPql());
+          ResultSetGroup resultSetGroup = connection.execute(pinotQuery.getTableName(), pinotQuery.getQuery());
           if (LOG.isDebugEnabled()) {
-            LOG.debug("Query:{}  response:{}", pinotQuery.getPql(), format(resultSetGroup));
+            LOG.debug("Query:{}  response:{}", pinotQuery.getQuery(), format(resultSetGroup));
           }
           long end = System.currentTimeMillis();
-          LOG.info("Query:{}  took:{} ms  connections:{}", pinotQuery.getPql(), (end - start), activeConnections);
+          LOG.info("Query:{}  took:{} ms  connections:{}", pinotQuery.getQuery(), (end - start), activeConnections);
 
           return ThirdEyeResultSetGroup.fromPinotResultSetGroup(resultSetGroup);
         }
@@ -147,8 +147,8 @@ public class PinotControllerResponseCacheLoader extends PinotResponseCacheLoader
         this.activeConnections.decrementAndGet();
       }
     } catch (PinotClientException cause) {
-      LOG.error("Error when running pql:" + pinotQuery.getPql(), cause);
-      throw new PinotClientException("Error when running pql:" + pinotQuery.getPql(), cause);
+      LOG.error("Error when running pql:" + pinotQuery.getQuery(), cause);
+      throw new PinotClientException("Error when running pql:" + pinotQuery.getQuery(), cause);
     }
   }
 

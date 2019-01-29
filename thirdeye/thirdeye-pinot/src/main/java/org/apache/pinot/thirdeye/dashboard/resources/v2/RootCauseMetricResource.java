@@ -90,7 +90,7 @@ public class RootCauseMetricResource {
 
   private static final String ROLLUP_NAME = "OTHER";
 
-  private static final long TIMEOUT = 60000;
+  private static final long TIMEOUT = 600000;
 
   private static final String OFFSET_DEFAULT = "current";
   private static final String TIMEZONE_DEFAULT = "UTC";

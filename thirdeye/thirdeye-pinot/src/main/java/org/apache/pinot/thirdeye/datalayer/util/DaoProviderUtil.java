@@ -54,10 +54,8 @@ import org.apache.pinot.thirdeye.datalayer.entity.TaskIndex;
 import io.dropwizard.configuration.ConfigurationFactory;
 import io.dropwizard.jackson.Jackson;
 import java.io.File;
-import java.io.FileReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.net.URL;
 import java.sql.Connection;
 import javax.validation.Validation;
 import org.apache.tomcat.jdbc.pool.DataSource;
@@ -108,7 +106,6 @@ public abstract class DaoProviderUtil {
 
         InputStream createSchema = DaoProviderUtil.class.getResourceAsStream("/schema/create-schema.sql");
         scriptRunner.runScript(new InputStreamReader(createSchema));
-
       } catch (Exception e) {
         LOG.error("Could not create database schema. Attempting to use existing.", e);
       }
