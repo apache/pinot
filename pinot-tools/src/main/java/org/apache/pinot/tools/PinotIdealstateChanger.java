@@ -40,13 +40,12 @@ public class PinotIdealstateChanger extends PinotZKChanger {
   public void updateIdealState() {
     HelixManager helixManager = getHelixManager();
     HelixHelper.updateIdealState(helixManager, _tableNameWithType, new Function<IdealState, IdealState>() {
-          @Nullable
-          @Override
-          public IdealState apply(@Nullable IdealState input) {
-            return applyChangesToIdealState(input);
-          }
-        },
-    RetryPolicies.exponentialBackoffRetryPolicy(5, 100, 1.2));
+      @Nullable
+      @Override
+      public IdealState apply(@Nullable IdealState input) {
+        return applyChangesToIdealState(input);
+      }
+    }, RetryPolicies.exponentialBackoffRetryPolicy(5, 100, 1.2));
   }
 
   private IdealState applyChangesToIdealState(IdealState input) {

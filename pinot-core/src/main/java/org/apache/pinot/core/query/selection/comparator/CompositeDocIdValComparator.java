@@ -24,6 +24,7 @@ import java.util.List;
 import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.core.common.Block;
 
+
 /**
  * Comparator to order the doc id based on sort sequence across multiple blocks
  */
@@ -46,31 +47,25 @@ public final class CompositeDocIdValComparator implements Comparator<Integer> {
       }
 
       if (blocks[i].getMetadata().hasDictionary()) {
-        docIdValComparators[i] =
-            new DocIdIntValComparator(blocks[i], sortSequence.get(i).isIsAsc());
+        docIdValComparators[i] = new DocIdIntValComparator(blocks[i], sortSequence.get(i).isIsAsc());
       } else {
         switch (blocks[i].getMetadata().getDataType()) {
-        case INT:
-          docIdValComparators[i] =
-              new DocIdIntValComparator(blocks[i], sortSequence.get(i).isIsAsc());
-          break;
-        case LONG:
-          docIdValComparators[i] =
-              new DocIdLongValComparator(blocks[i], sortSequence.get(i).isIsAsc());
-          break;
-        case FLOAT:
-          docIdValComparators[i] =
-              new DocIdFloatValComparator(blocks[i], sortSequence.get(i).isIsAsc());
-          break;
-        case DOUBLE:
-          docIdValComparators[i] =
-              new DocIdDoubleValComparator(blocks[i], sortSequence.get(i).isIsAsc());
-          break;
-        default:
-          eligibleToCompare[i] = false;
+          case INT:
+            docIdValComparators[i] = new DocIdIntValComparator(blocks[i], sortSequence.get(i).isIsAsc());
+            break;
+          case LONG:
+            docIdValComparators[i] = new DocIdLongValComparator(blocks[i], sortSequence.get(i).isIsAsc());
+            break;
+          case FLOAT:
+            docIdValComparators[i] = new DocIdFloatValComparator(blocks[i], sortSequence.get(i).isIsAsc());
+            break;
+          case DOUBLE:
+            docIdValComparators[i] = new DocIdDoubleValComparator(blocks[i], sortSequence.get(i).isIsAsc());
+            break;
+          default:
+            eligibleToCompare[i] = false;
         }
       }
-
     }
   }
 
@@ -87,5 +82,4 @@ public final class CompositeDocIdValComparator implements Comparator<Integer> {
     }
     return ret;
   }
-
 }

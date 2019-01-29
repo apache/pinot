@@ -64,7 +64,8 @@ public class StringDictionaryPerfTest {
    * @param dictLength Length of the dictionary
    * @throws Exception
    */
-  public void buildSegment(int dictLength) throws Exception {
+  public void buildSegment(int dictLength)
+      throws Exception {
     Schema schema = new Schema();
     String segmentName = "perfTestSegment" + System.currentTimeMillis();
     _indexDir = new File(TMP_DIR + File.separator + segmentName);
@@ -115,7 +116,8 @@ public class StringDictionaryPerfTest {
    * @param numLookups Number of lookups to perform
    * @throws Exception
    */
-  public void perfTestLookups(int numLookups) throws Exception {
+  public void perfTestLookups(int numLookups)
+      throws Exception {
     ImmutableSegment immutableSegment = ImmutableSegmentLoader.load(_indexDir, ReadMode.heap);
     Dictionary dictionary = immutableSegment.getDictionary(COLUMN_NAME);
 
@@ -131,7 +133,8 @@ public class StringDictionaryPerfTest {
     System.out.println("Total time for " + TOTAL_NUM_LOOKUPS + " lookups: " + (System.currentTimeMillis() - start));
   }
 
-  public static void main(String[] args) throws Exception {
+  public static void main(String[] args)
+      throws Exception {
     if (args.length != 2) {
       System.out.println("Usage: StringDictionaryPerfRunner <dictionary_length> <num_lookups> ");
     }

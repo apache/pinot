@@ -88,7 +88,8 @@ public class SegmentConverter {
     _indexingConfig = indexingConfig;
   }
 
-  public List<File> convertSegment() throws Exception {
+  public List<File> convertSegment()
+      throws Exception {
     List<File> resultFiles = new ArrayList<>();
     for (int currentPartition = 0; currentPartition < _totalNumPartition; currentPartition++) {
       // Mapping stage
@@ -141,7 +142,8 @@ public class SegmentConverter {
    * TODO: Support all kinds of indexing (no dictionary)
    */
   private void buildSegment(String outputPath, String tableName, String segmentName, RecordReader recordReader,
-      IndexingConfig indexingConfig) throws Exception {
+      IndexingConfig indexingConfig)
+      throws Exception {
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(recordReader.getSchema());
     segmentGeneratorConfig.setOutDir(outputPath);
     segmentGeneratorConfig.setTableName(tableName);
@@ -225,8 +227,8 @@ public class SegmentConverter {
     public SegmentConverter build() {
       // Check that the group-by columns and record aggregator are configured together
       if (_groupByColumns != null && _groupByColumns.size() > 0) {
-        Preconditions.checkNotNull(_groupByColumns,
-            "If group-by columns are given, the record aggregator is required.");
+        Preconditions
+            .checkNotNull(_groupByColumns, "If group-by columns are given, the record aggregator is required.");
       } else {
         Preconditions.checkArgument(_recordAggregator == null,
             "If group-by columns are not given, the record aggregator has to be null.");

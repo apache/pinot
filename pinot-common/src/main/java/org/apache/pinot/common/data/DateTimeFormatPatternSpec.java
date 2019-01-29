@@ -84,9 +84,8 @@ public class DateTimeFormatPatternSpec {
 
     DateTimeFormatPatternSpec that = (DateTimeFormatPatternSpec) o;
 
-    return EqualityUtils.isEqual(_timeFormat, that._timeFormat) &&
-        EqualityUtils.isEqual(_sdfPattern, that._sdfPattern) &&
-        EqualityUtils.isEqual(_dateTimeZone, that._dateTimeZone);
+    return EqualityUtils.isEqual(_timeFormat, that._timeFormat) && EqualityUtils.isEqual(_sdfPattern, that._sdfPattern)
+        && EqualityUtils.isEqual(_dateTimeZone, that._dateTimeZone);
   }
 
   @Override

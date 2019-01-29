@@ -21,6 +21,7 @@ package org.apache.pinot.pql.parsers.pql2.ast;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
 import org.apache.pinot.common.utils.request.HavingQueryTree;
 
+
 /**
  * Common interface and implementation for predicate AST nodes.
  */
@@ -72,5 +73,4 @@ public abstract class PredicateAstNode extends BaseAstNode {
   public String getIdentifier() {
     return _identifier;
   }
-
 }

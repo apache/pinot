@@ -146,11 +146,13 @@ public class HllConfig {
     return ToStringBuilder.reflectionToString(this, ToStringStyle.SHORT_PREFIX_STYLE);
   }
 
-  public String toJsonString() throws Exception {
+  public String toJsonString()
+      throws Exception {
     return JsonUtils.objectToPrettyString(this);
   }
 
-  public static HllConfig fromJsonString(String jsonString) throws IOException {
+  public static HllConfig fromJsonString(String jsonString)
+      throws IOException {
     return JsonUtils.stringToObject(jsonString, HllConfig.class);
   }
 
@@ -166,11 +168,10 @@ public class HllConfig {
 
     HllConfig hllConfig = (HllConfig) o;
 
-    return isEqual(hllLog2m, hllConfig.hllLog2m) &&
-        isEqual(hllFieldSize, hllConfig.hllFieldSize) &&
-        isEqual(hllDeriveColumnSuffix, hllConfig.hllDeriveColumnSuffix) &&
-        isEqual(columnsToDeriveHllFields, hllConfig.columnsToDeriveHllFields) &&
-        isEqual(derivedHllFieldToOriginMap, hllConfig.derivedHllFieldToOriginMap);
+    return isEqual(hllLog2m, hllConfig.hllLog2m) && isEqual(hllFieldSize, hllConfig.hllFieldSize) && isEqual(
+        hllDeriveColumnSuffix, hllConfig.hllDeriveColumnSuffix) && isEqual(columnsToDeriveHllFields,
+        hllConfig.columnsToDeriveHllFields) && isEqual(derivedHllFieldToOriginMap,
+        hllConfig.derivedHllFieldToOriginMap);
   }
 
   @Override

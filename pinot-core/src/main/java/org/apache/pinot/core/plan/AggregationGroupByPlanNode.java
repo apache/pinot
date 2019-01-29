@@ -79,8 +79,9 @@ public class AggregationGroupByPlanNode implements PlanNode {
         }
         FilterQueryTree rootFilterNode = RequestUtils.generateFilterQueryTree(brokerRequest);
         for (StarTreeV2 starTreeV2 : starTrees) {
-          if (StarTreeUtils.isFitForStarTree(starTreeV2.getMetadata(), aggregationFunctionColumnPairs,
-              groupByExpressions, rootFilterNode)) {
+          if (StarTreeUtils
+              .isFitForStarTree(starTreeV2.getMetadata(), aggregationFunctionColumnPairs, groupByExpressions,
+                  rootFilterNode)) {
             _transformPlanNode = null;
             _starTreeTransformPlanNode =
                 new StarTreeTransformPlanNode(starTreeV2, aggregationFunctionColumnPairs, groupByExpressions,

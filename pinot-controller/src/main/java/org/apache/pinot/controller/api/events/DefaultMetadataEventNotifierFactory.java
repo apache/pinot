@@ -30,5 +30,4 @@ public class DefaultMetadataEventNotifierFactory extends MetadataEventNotifierFa
   public void init(Configuration configuration) {
 
   }
-
 }

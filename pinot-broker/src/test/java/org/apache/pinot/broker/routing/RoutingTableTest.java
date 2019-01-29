@@ -49,7 +49,8 @@ public class RoutingTableTest {
   public static final String ALL_PARTITIONS = "ALL";
 
   @Test
-  public void testHelixExternalViewBasedRoutingTable() throws Exception {
+  public void testHelixExternalViewBasedRoutingTable()
+      throws Exception {
     HelixExternalViewBasedRouting routingTable = new HelixExternalViewBasedRouting(null, null, new BaseConfiguration());
 
     ExternalView externalView = new ExternalView("testResource0_OFFLINE");
@@ -95,16 +96,17 @@ public class RoutingTableTest {
     }
   }
 
-
   @Test
-  public void testTimeBoundaryRegression() throws Exception {
+  public void testTimeBoundaryRegression()
+      throws Exception {
     final FakePropertyStore propertyStore = new FakePropertyStore();
     final OfflineSegmentZKMetadata offlineSegmentZKMetadata = new OfflineSegmentZKMetadata();
     offlineSegmentZKMetadata.setTimeUnit(TimeUnit.DAYS);
     offlineSegmentZKMetadata.setEndTime(1234L);
 
-    propertyStore.setContents(ZKMetadataProvider.constructPropertyStorePathForSegment("myTable_OFFLINE",
-        "someSegment_0"), offlineSegmentZKMetadata.toZNRecord());
+    propertyStore
+        .setContents(ZKMetadataProvider.constructPropertyStorePathForSegment("myTable_OFFLINE", "someSegment_0"),
+            offlineSegmentZKMetadata.toZNRecord());
 
     final ExternalView offlineExternalView = new ExternalView("myTable_OFFLINE");
     offlineExternalView.setState("someSegment_0", "Server_1.2.3.4_1234", "ONLINE");
@@ -113,18 +115,18 @@ public class RoutingTableTest {
 
     HelixExternalViewBasedRouting routingTable =
         new HelixExternalViewBasedRouting(propertyStore, null, new BaseConfiguration()) {
-      @Override
-      protected ExternalView fetchExternalView(String table) {
-        return offlineExternalView;
-      }
+          @Override
+          protected ExternalView fetchExternalView(String table) {
+            return offlineExternalView;
+          }
 
-      @Override
-      protected void updateTimeBoundary(String tableName, ExternalView externalView) {
-        if (tableName.equals("myTable_OFFLINE")) {
-          timeBoundaryUpdated.setValue(true);
-        }
-      }
-    };
+          @Override
+          protected void updateTimeBoundary(String tableName, ExternalView externalView) {
+            if (tableName.equals("myTable_OFFLINE")) {
+              timeBoundaryUpdated.setValue(true);
+            }
+          }
+        };
     routingTable.setBrokerMetrics(new BrokerMetrics(new MetricsRegistry()));
 
     Assert.assertFalse(timeBoundaryUpdated.booleanValue());
@@ -135,7 +137,8 @@ public class RoutingTableTest {
     TableConfig myTableRealtimeConfig = generateTableConfig("myTable_REALTIME");
 
     routingTable.markDataResourceOnline(myTableOfflineConfig, offlineExternalView, instanceConfigList);
-    routingTable.markDataResourceOnline(myTableRealtimeConfig, new ExternalView("myTable_REALTIME"), new ArrayList<InstanceConfig>());
+    routingTable.markDataResourceOnline(myTableRealtimeConfig, new ExternalView("myTable_REALTIME"),
+        new ArrayList<InstanceConfig>());
 
     Assert.assertTrue(timeBoundaryUpdated.booleanValue());
   }
@@ -153,8 +156,9 @@ public class RoutingTableTest {
     Assert.assertEquals(Arrays.toString(selectedSegmentArray), expectedSegmentList);
   }
 
-  @Test(enabled=false)
-  public void testKafkaHighLevelConsumerBasedRoutingTable() throws Exception {
+  @Test(enabled = false)
+  public void testKafkaHighLevelConsumerBasedRoutingTable()
+      throws Exception {
     RoutingTableBuilder routingStrategy = new HighLevelConsumerBasedRoutingTableBuilder();
     final String group0 = "testResource0_REALTIME_1433316466991_0";
     final String group1 = "testResource1_REALTIME_1433316490099_1";
@@ -171,80 +175,77 @@ public class RoutingTableTest {
     ExternalView externalView = new ExternalView("testResource0_REALTIME");
     // Toss in an llc segment in the mix. Should not affect the results
     externalView.setState(llcSegmentName.getSegmentName(), "dataServer_instance_0", "CONSUMING");
-    externalView.setState(new HLCSegmentName(group0, ALL_PARTITIONS, "0").getSegmentName(),
-        "dataServer_instance_0", "ONLINE");
-    externalView.setState(new HLCSegmentName(group0, ALL_PARTITIONS, "1").getSegmentName(),
-        "dataServer_instance_1", "ONLINE");
-    externalView.setState(new HLCSegmentName(group1, ALL_PARTITIONS, "2").getSegmentName(),
-        "dataServer_instance_2", "ONLINE");
-    externalView.setState(new HLCSegmentName(group1, ALL_PARTITIONS, "3").getSegmentName(),
-        "dataServer_instance_3", "ONLINE");
-    externalView.setState(new HLCSegmentName(group2, ALL_PARTITIONS, "4").getSegmentName(),
-        "dataServer_instance_4", "ONLINE");
-    externalView.setState(new HLCSegmentName(group2, ALL_PARTITIONS, "5").getSegmentName(),
-        "dataServer_instance_5", "ONLINE");
+    externalView
+        .setState(new HLCSegmentName(group0, ALL_PARTITIONS, "0").getSegmentName(), "dataServer_instance_0", "ONLINE");
+    externalView
+        .setState(new HLCSegmentName(group0, ALL_PARTITIONS, "1").getSegmentName(), "dataServer_instance_1", "ONLINE");
+    externalView
+        .setState(new HLCSegmentName(group1, ALL_PARTITIONS, "2").getSegmentName(), "dataServer_instance_2", "ONLINE");
+    externalView
+        .setState(new HLCSegmentName(group1, ALL_PARTITIONS, "3").getSegmentName(), "dataServer_instance_3", "ONLINE");
+    externalView
+        .setState(new HLCSegmentName(group2, ALL_PARTITIONS, "4").getSegmentName(), "dataServer_instance_4", "ONLINE");
+    externalView
+        .setState(new HLCSegmentName(group2, ALL_PARTITIONS, "5").getSegmentName(), "dataServer_instance_5", "ONLINE");
     routingTable.markDataResourceOnline(generateTableConfig("testResource0_REALTIME"), externalView,
         generateInstanceConfigs("dataServer_instance", 0, 5));
     ExternalView externalView1 = new ExternalView("testResource1_REALTIME");
-    externalView1.setState(new HLCSegmentName(group0, ALL_PARTITIONS, "10").getSegmentName(),
-        "dataServer_instance_10", "ONLINE");
-    externalView1.setState(new HLCSegmentName(group0, ALL_PARTITIONS, "11").getSegmentName(),
-        "dataServer_instance_11", "ONLINE");
-    externalView1.setState(new HLCSegmentName(group0, ALL_PARTITIONS, "12").getSegmentName(),
-        "dataServer_instance_12", "ONLINE");
+    externalView1.setState(new HLCSegmentName(group0, ALL_PARTITIONS, "10").getSegmentName(), "dataServer_instance_10",
+        "ONLINE");
+    externalView1.setState(new HLCSegmentName(group0, ALL_PARTITIONS, "11").getSegmentName(), "dataServer_instance_11",
+        "ONLINE");
+    externalView1.setState(new HLCSegmentName(group0, ALL_PARTITIONS, "12").getSegmentName(), "dataServer_instance_12",
+        "ONLINE");
     routingTable.markDataResourceOnline(generateTableConfig("testResource1_REALTIME"), externalView1,
         generateInstanceConfigs("dataServer_instance", 10, 12));
     ExternalView externalView2 = new ExternalView("testResource2_REALTIME");
-    externalView2.setState(new HLCSegmentName(group0, ALL_PARTITIONS, "20").getSegmentName(),
-        "dataServer_instance_20", "ONLINE");
-    externalView2.setState(new HLCSegmentName(group0, ALL_PARTITIONS, "21").getSegmentName(),
-        "dataServer_instance_21", "ONLINE");
-    externalView2.setState(new HLCSegmentName(group0, ALL_PARTITIONS, "22").getSegmentName(),
-        "dataServer_instance_22", "ONLINE");
-    externalView2.setState(new HLCSegmentName(group1, ALL_PARTITIONS, "23").getSegmentName(),
-        "dataServer_instance_23", "ONLINE");
-    externalView2.setState(new HLCSegmentName(group1, ALL_PARTITIONS, "24").getSegmentName(),
-        "dataServer_instance_24", "ONLINE");
-    externalView2.setState(new HLCSegmentName(group1, ALL_PARTITIONS, "25").getSegmentName(),
-        "dataServer_instance_25", "ONLINE");
-    externalView2.setState(new HLCSegmentName(group2, ALL_PARTITIONS, "26").getSegmentName(),
-        "dataServer_instance_26", "ONLINE");
-    externalView2.setState(new HLCSegmentName(group2, ALL_PARTITIONS, "27").getSegmentName(),
-        "dataServer_instance_27", "ONLINE");
-    externalView2.setState(new HLCSegmentName(group2, ALL_PARTITIONS, "28").getSegmentName(),
-        "dataServer_instance_28", "ONLINE");
+    externalView2.setState(new HLCSegmentName(group0, ALL_PARTITIONS, "20").getSegmentName(), "dataServer_instance_20",
+        "ONLINE");
+    externalView2.setState(new HLCSegmentName(group0, ALL_PARTITIONS, "21").getSegmentName(), "dataServer_instance_21",
+        "ONLINE");
+    externalView2.setState(new HLCSegmentName(group0, ALL_PARTITIONS, "22").getSegmentName(), "dataServer_instance_22",
+        "ONLINE");
+    externalView2.setState(new HLCSegmentName(group1, ALL_PARTITIONS, "23").getSegmentName(), "dataServer_instance_23",
+        "ONLINE");
+    externalView2.setState(new HLCSegmentName(group1, ALL_PARTITIONS, "24").getSegmentName(), "dataServer_instance_24",
+        "ONLINE");
+    externalView2.setState(new HLCSegmentName(group1, ALL_PARTITIONS, "25").getSegmentName(), "dataServer_instance_25",
+        "ONLINE");
+    externalView2.setState(new HLCSegmentName(group2, ALL_PARTITIONS, "26").getSegmentName(), "dataServer_instance_26",
+        "ONLINE");
+    externalView2.setState(new HLCSegmentName(group2, ALL_PARTITIONS, "27").getSegmentName(), "dataServer_instance_27",
+        "ONLINE");
+    externalView2.setState(new HLCSegmentName(group2, ALL_PARTITIONS, "28").getSegmentName(), "dataServer_instance_28",
+        "ONLINE");
     routingTable.markDataResourceOnline(generateTableConfig("testResource2_REALTIME"), externalView2,
         generateInstanceConfigs("dataServer_instance", 20, 28));
 
     for (int numRun = 0; numRun < 100; ++numRun) {
-      assertResourceRequest(
-          routingTable,
-          "testResource0_REALTIME",
-          new String[] { "[" + new HLCSegmentName(group0, ALL_PARTITIONS, "0").getSegmentName()
-              + ", " + new HLCSegmentName(group0, ALL_PARTITIONS, "1").getSegmentName() + "]", "["
-              + new HLCSegmentName(group1, ALL_PARTITIONS, "2").getSegmentName()
-              + ", "
-              + new HLCSegmentName(group1, ALL_PARTITIONS, "3").getSegmentName() + "]", "["
-              + new HLCSegmentName(group2, ALL_PARTITIONS, "4").getSegmentName() + ", "
-              + new HLCSegmentName(group2, ALL_PARTITIONS, "5").getSegmentName() + "]" }, 2);
+      assertResourceRequest(routingTable, "testResource0_REALTIME", new String[]{
+          "[" + new HLCSegmentName(group0, ALL_PARTITIONS, "0").getSegmentName() + ", " + new HLCSegmentName(group0,
+              ALL_PARTITIONS, "1").getSegmentName() + "]",
+          "[" + new HLCSegmentName(group1, ALL_PARTITIONS, "2").getSegmentName() + ", " + new HLCSegmentName(group1,
+              ALL_PARTITIONS, "3").getSegmentName() + "]",
+          "[" + new HLCSegmentName(group2, ALL_PARTITIONS, "4").getSegmentName() + ", " + new HLCSegmentName(group2,
+              ALL_PARTITIONS, "5").getSegmentName() + "]"}, 2);
     }
     for (int numRun = 0; numRun < 100; ++numRun) {
-      assertResourceRequest(routingTable, "testResource1_REALTIME",
-          new String[] { "[" + new HLCSegmentName(group0, ALL_PARTITIONS, "10").getSegmentName()
-              + ", " + new HLCSegmentName(group0, ALL_PARTITIONS, "11").getSegmentName() + ", "
-              + new HLCSegmentName(group0, ALL_PARTITIONS, "12").getSegmentName() + "]" }, 3);
+      assertResourceRequest(routingTable, "testResource1_REALTIME", new String[]{
+          "[" + new HLCSegmentName(group0, ALL_PARTITIONS, "10").getSegmentName() + ", " + new HLCSegmentName(group0,
+              ALL_PARTITIONS, "11").getSegmentName() + ", " + new HLCSegmentName(group0, ALL_PARTITIONS, "12")
+              .getSegmentName() + "]"}, 3);
     }
     for (int numRun = 0; numRun < 100; ++numRun) {
-      assertResourceRequest(routingTable, "testResource2_REALTIME",
-          new String[] { "[" + new HLCSegmentName(group0, ALL_PARTITIONS, "20").getSegmentName()
-              + ", " + new HLCSegmentName(group0, ALL_PARTITIONS, "21").getSegmentName() + ", "
-              + new HLCSegmentName(group0, ALL_PARTITIONS, "22").getSegmentName() + "]", "["
-              + new HLCSegmentName(group1, ALL_PARTITIONS, "23").getSegmentName() + ", "
-              + new HLCSegmentName(group1, ALL_PARTITIONS, "24").getSegmentName() + ", "
-              + new HLCSegmentName(group1, ALL_PARTITIONS, "25").getSegmentName() + "]", "["
-              + new HLCSegmentName(group2, ALL_PARTITIONS, "26").getSegmentName() + ", "
-              + new HLCSegmentName(group2, ALL_PARTITIONS, "27").getSegmentName() + ", "
-              + new HLCSegmentName(group2, ALL_PARTITIONS, "28").getSegmentName() + "]" }, 3);
+      assertResourceRequest(routingTable, "testResource2_REALTIME", new String[]{
+          "[" + new HLCSegmentName(group0, ALL_PARTITIONS, "20").getSegmentName() + ", " + new HLCSegmentName(group0,
+              ALL_PARTITIONS, "21").getSegmentName() + ", " + new HLCSegmentName(group0, ALL_PARTITIONS, "22")
+              .getSegmentName() + "]",
+          "[" + new HLCSegmentName(group1, ALL_PARTITIONS, "23").getSegmentName() + ", " + new HLCSegmentName(group1,
+              ALL_PARTITIONS, "24").getSegmentName() + ", " + new HLCSegmentName(group1, ALL_PARTITIONS, "25")
+              .getSegmentName() + "]",
+          "[" + new HLCSegmentName(group2, ALL_PARTITIONS, "26").getSegmentName() + ", " + new HLCSegmentName(group2,
+              ALL_PARTITIONS, "27").getSegmentName() + ", " + new HLCSegmentName(group2, ALL_PARTITIONS, "28")
+              .getSegmentName() + "]"}, 3);
     }
   }
 

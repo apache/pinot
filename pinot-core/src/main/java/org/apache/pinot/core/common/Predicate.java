@@ -33,12 +33,7 @@ import org.apache.pinot.core.common.predicate.RegexpLikePredicate;
 public abstract class Predicate {
 
   public enum Type {
-    EQ,
-    NEQ,
-    REGEXP_LIKE,
-    RANGE,
-    IN,
-    NOT_IN;
+    EQ, NEQ, REGEXP_LIKE, RANGE, IN, NOT_IN;
 
     public boolean isExclusive() {
       return this == NEQ || this == NOT_IN;
@@ -81,26 +76,26 @@ public abstract class Predicate {
 
     Predicate predicate = null;
     switch (filterType) {
-    case EQUALITY:
-      predicate = new EqPredicate(column, value);
-      break;
-    case RANGE:
-      predicate = new RangePredicate(column, value);
-      break;
-    case REGEXP_LIKE:
-      predicate = new RegexpLikePredicate(column, value);
-      break;
-    case NOT:
-      predicate = new NEqPredicate(column, value);
-      break;
-    case NOT_IN:
-      predicate = new NotInPredicate(column, value);
-      break;
-    case IN:
-      predicate = new InPredicate(column, value);
-      break;
-    default:
-      throw new UnsupportedOperationException("Unsupported filterType:" + filterType);
+      case EQUALITY:
+        predicate = new EqPredicate(column, value);
+        break;
+      case RANGE:
+        predicate = new RangePredicate(column, value);
+        break;
+      case REGEXP_LIKE:
+        predicate = new RegexpLikePredicate(column, value);
+        break;
+      case NOT:
+        predicate = new NEqPredicate(column, value);
+        break;
+      case NOT_IN:
+        predicate = new NotInPredicate(column, value);
+        break;
+      case IN:
+        predicate = new InPredicate(column, value);
+        break;
+      default:
+        throw new UnsupportedOperationException("Unsupported filterType:" + filterType);
     }
     return predicate;
   }

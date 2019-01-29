@@ -68,8 +68,8 @@ public class BalanceNumSegmentAssignmentStrategy implements SegmentAssignmentStr
         if (instanceToStateMap != null) {
           for (String instanceName : instanceToStateMap.keySet()) {
             if (currentNumSegmentsPerInstanceMap.containsKey(instanceName)) {
-              currentNumSegmentsPerInstanceMap.put(instanceName,
-                  currentNumSegmentsPerInstanceMap.get(instanceName) + 1);
+              currentNumSegmentsPerInstanceMap
+                  .put(instanceName, currentNumSegmentsPerInstanceMap.get(instanceName) + 1);
             }
             // else, ignore. Do not add servers, that are not tagged, to the map
             // By this approach, new segments will not be allotted to the server if tags changed
@@ -92,8 +92,8 @@ public class BalanceNumSegmentAssignmentStrategy implements SegmentAssignmentStr
       selectedInstances.add(priorityQueue.poll().getB());
     }
 
-    LOGGER.info("Segment assignment result for : " + segmentMetadata.getName() + ", in resource : "
-        + segmentMetadata.getTableName() + ", selected instances: " + Arrays.toString(selectedInstances.toArray()));
+    LOGGER.info("Segment assignment result for : " + segmentMetadata.getName() + ", in resource : " + segmentMetadata
+        .getTableName() + ", selected instances: " + Arrays.toString(selectedInstances.toArray()));
     return selectedInstances;
   }
 }

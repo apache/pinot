@@ -37,8 +37,7 @@ import org.slf4j.LoggerFactory;
  * Common code for metrics implementations.
  *
  */
-public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M extends AbstractMetrics.Meter, G extends
-    AbstractMetrics.Gauge, T extends AbstractMetrics.Timer> {
+public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M extends AbstractMetrics.Meter, G extends AbstractMetrics.Gauge, T extends AbstractMetrics.Timer> {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(AbstractMetrics.class);
 
@@ -61,7 +60,6 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
     _metricsRegistry = metricsRegistry;
     _clazz = clazz;
     _global = global;
-
   }
 
   public interface QueryPhase {
@@ -148,8 +146,8 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
     final MetricName metricName = new MetricName(_clazz, fullTimerName);
     com.yammer.metrics.core.Timer timer =
         MetricsHelper.newTimer(_metricsRegistry, metricName, TimeUnit.MILLISECONDS, TimeUnit.SECONDS);
-    MetricsHelper.newTimer(_metricsRegistry, metricName, TimeUnit.MILLISECONDS, TimeUnit.SECONDS).update(duration,
-        timeUnit);
+    MetricsHelper.newTimer(_metricsRegistry, metricName, TimeUnit.MILLISECONDS, TimeUnit.SECONDS)
+        .update(duration, timeUnit);
   }
 
   /**
@@ -177,7 +175,8 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    * @return The return value of the callable passed as a parameter
    * @throws Exception The exception thrown by the callable
    */
-  public <T> T timeQueryPhase(final BrokerRequest request, final QP phase, final Callable<T> callable) throws Exception {
+  public <T> T timeQueryPhase(final BrokerRequest request, final QP phase, final Callable<T> callable)
+      throws Exception {
     long startTime = System.nanoTime();
     T returnValue = callable.call();
     long totalNanos = System.nanoTime() - startTime;
@@ -204,7 +203,8 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    * @param unitCount The number of units to add to the meter
    * @param reusedMeter The meter to reuse
    */
-  public com.yammer.metrics.core.Meter addMeteredGlobalValue(final M meter, final long unitCount, com.yammer.metrics.core.Meter reusedMeter) {
+  public com.yammer.metrics.core.Meter addMeteredGlobalValue(final M meter, final long unitCount,
+      com.yammer.metrics.core.Meter reusedMeter) {
     if (reusedMeter != null) {
       reusedMeter.mark(unitCount);
       return reusedMeter;
@@ -239,7 +239,8 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    * @param unitCount The number of units to add to the meter
    * @param reusedMeter The meter to reuse
    */
-  public com.yammer.metrics.core.Meter addMeteredTableValue(final String tableName, final M meter, final long unitCount, com.yammer.metrics.core.Meter reusedMeter) {
+  public com.yammer.metrics.core.Meter addMeteredTableValue(final String tableName, final M meter, final long unitCount,
+      com.yammer.metrics.core.Meter reusedMeter) {
     if (reusedMeter != null) {
       reusedMeter.mark(unitCount);
       return reusedMeter;
@@ -298,11 +299,12 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
 
     if (!_gaugeValues.containsKey(fullGaugeName)) {
       synchronized (_gaugeValues) {
-        if(!_gaugeValues.containsKey(fullGaugeName)) {
+        if (!_gaugeValues.containsKey(fullGaugeName)) {
           _gaugeValues.put(fullGaugeName, new AtomicLong(unitCount));
           addCallbackGauge(fullGaugeName, new Callable<Long>() {
             @Override
-            public Long call() throws Exception {
+            public Long call()
+                throws Exception {
               return _gaugeValues.get(fullGaugeName).get();
             }
           });
@@ -360,7 +362,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   private void setValueOfGauge(long value, String gaugeName) {
     if (!_gaugeValues.containsKey(gaugeName)) {
       synchronized (_gaugeValues) {
-        if(!_gaugeValues.containsKey(gaugeName)) {
+        if (!_gaugeValues.containsKey(gaugeName)) {
           _gaugeValues.put(gaugeName, new AtomicLong(value));
           addCallbackGauge(gaugeName, () -> _gaugeValues.get(gaugeName).get());
         } else {
@@ -383,11 +385,12 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
 
     if (!_gaugeValues.containsKey(gaugeName)) {
       synchronized (_gaugeValues) {
-        if(!_gaugeValues.containsKey(gaugeName)) {
+        if (!_gaugeValues.containsKey(gaugeName)) {
           _gaugeValues.put(gaugeName, new AtomicLong(unitCount));
           addCallbackGauge(gaugeName, new Callable<Long>() {
             @Override
-            public Long call() throws Exception {
+            public Long call()
+                throws Exception {
               return _gaugeValues.get(gaugeName).get();
             }
           });
@@ -409,7 +412,6 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
       return _gaugeValues.get(gaugeName).get();
     }
   }
-
 
   @VisibleForTesting
   public long getValueOfGlobalGauge(final G gauge, String suffix) {
@@ -466,19 +468,19 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    * @param valueCallback The callback function used to retrieve the value of the gauge
    */
   public void addCallbackGauge(final String metricName, final Callable<Long> valueCallback) {
-    MetricsHelper.newGauge(_metricsRegistry, new MetricName(_clazz, _metricPrefix + metricName), new
-        com.yammer.metrics.core.Gauge<Long>() {
-      @Override
-      public Long value() {
-        try {
-          return valueCallback.call();
-        } catch (Exception e) {
-          LOGGER.error("Caught exception", e);
-          Utils.rethrowException(e);
-          throw new AssertionError("Should not reach this");
-        }
-      }
-    });
+    MetricsHelper.newGauge(_metricsRegistry, new MetricName(_clazz, _metricPrefix + metricName),
+        new com.yammer.metrics.core.Gauge<Long>() {
+          @Override
+          public Long value() {
+            try {
+              return valueCallback.call();
+            } catch (Exception e) {
+              LOGGER.error("Caught exception", e);
+              Utils.rethrowException(e);
+              throw new AssertionError("Should not reach this");
+            }
+          }
+        });
   }
 
   protected abstract QP[] getQueryPhases();
@@ -487,7 +489,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
 
   protected abstract G[] getGauges();
 
-  protected String getTableName(String tableName){
-     return (_global ? "allTables" : tableName);
+  protected String getTableName(String tableName) {
+    return (_global ? "allTables" : tableName);
   }
 }

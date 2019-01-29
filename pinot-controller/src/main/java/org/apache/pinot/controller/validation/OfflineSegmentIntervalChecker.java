@@ -88,8 +88,8 @@ public class OfflineSegmentIntervalChecker extends ControllerPeriodicTask {
       List<String> segmentsWithInvalidInterval = new ArrayList<>();
       for (OfflineSegmentZKMetadata offlineSegmentZKMetadata : offlineSegmentZKMetadataList) {
         Interval timeInterval = offlineSegmentZKMetadata.getTimeInterval();
-        if (timeInterval != null && TimeUtils.timeValueInValidRange(timeInterval.getStartMillis())
-            && TimeUtils.timeValueInValidRange(timeInterval.getEndMillis())) {
+        if (timeInterval != null && TimeUtils.timeValueInValidRange(timeInterval.getStartMillis()) && TimeUtils
+            .timeValueInValidRange(timeInterval.getEndMillis())) {
           segmentIntervals.add(timeInterval);
         } else {
           segmentsWithInvalidInterval.add(offlineSegmentZKMetadata.getSegmentName());

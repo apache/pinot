@@ -35,6 +35,7 @@ import org.apache.pinot.transport.netty.NettyTCPServer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
 /**
  *
  * This class is used for benchmarking the Scatter-Gather Layer
@@ -61,24 +62,22 @@ public class ScatterGatherPerfServer {
   private final int _responseSize;
   private final long _responseLatencyMs;
 
-
   private byte[] _bakedResponse;
 
   private NettyTCPServer _server;
 
-  public ScatterGatherPerfServer(int serverPort, int responseSize, long responseLatencyMs)
-  {
+  public ScatterGatherPerfServer(int serverPort, int responseSize, long responseLatencyMs) {
     _serverPort = serverPort;
     _responseSize = responseSize;
     _responseLatencyMs = responseLatencyMs;
   }
 
-  public void run()
-  {
+  public void run() {
     AggregatedMetricsRegistry metricsRegistry = new AggregatedMetricsRegistry();
     _bakedResponse = new byte[_responseSize];
-    for (int i = 0 ; i < _responseSize; i++)
+    for (int i = 0; i < _responseSize; i++) {
       _bakedResponse[i] = 'a';
+    }
 
     MyRequestHandler handler = new MyRequestHandler(new String(_bakedResponse), null, _responseLatencyMs);
     MyRequestHandlerFactory handlerFactory = new MyRequestHandlerFactory(handler);
@@ -89,10 +88,8 @@ public class ScatterGatherPerfServer {
     serverThread.start();
   }
 
-  public void shutdown()
-  {
-    if (null != _server)
-    {
+  public void shutdown() {
+    if (null != _server) {
       _server.shutdownGracefully();
       _server = null;
     }
@@ -108,7 +105,8 @@ public class ScatterGatherPerfServer {
   /**
    * @param args
    */
-  public static void main(String[] args) throws Exception{
+  public static void main(String[] args)
+      throws Exception {
 
     CommandLineParser cliParser = new GnuParser();
     Options cliOptions = buildCommandLineOptions();
@@ -121,7 +119,7 @@ public class ScatterGatherPerfServer {
       throw new RuntimeException("Missing required arguments !!");
     }
 
-    int responseSize =  Integer.parseInt(cmd.getOptionValue(RESPONSE_SIZE_OPT_NAME));
+    int responseSize = Integer.parseInt(cmd.getOptionValue(RESPONSE_SIZE_OPT_NAME));
     int serverPort = Integer.parseInt(cmd.getOptionValue(SERVER_PORT_OPT_NAME));
 
     ScatterGatherPerfServer server = new ScatterGatherPerfServer(serverPort, responseSize, 2); // 2ms latency
@@ -139,7 +137,6 @@ public class ScatterGatherPerfServer {
     public RequestHandler createNewRequestHandler() {
       return _requestHandler;
     }
-
   }
 
   private static class MyRequestHandler implements RequestHandler {
@@ -167,8 +164,7 @@ public class ScatterGatherPerfServer {
       }
       _request = new String(b);
 
-      if (_responseLatencyMs > 0)
-      {
+      if (_responseLatencyMs > 0) {
         try {
           Thread.sleep(_responseLatencyMs);
         } catch (InterruptedException e) {

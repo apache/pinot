@@ -33,6 +33,7 @@ import org.apache.pinot.broker.broker.BrokerServerBuilder;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 
+
 @Api(tags = "Health")
 @Path("/")
 public class PinotBrokerHealthCheck {
@@ -47,10 +48,7 @@ public class PinotBrokerHealthCheck {
   @Produces(MediaType.TEXT_PLAIN)
   @Path("health")
   @ApiOperation(value = "Checking broker health")
-  @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Broker is healthy"),
-      @ApiResponse(code = 503, message = "Broker is disabled")
-  })
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Broker is healthy"), @ApiResponse(code = 503, message = "Broker is disabled")})
   public String getBrokerHealth() {
     if (brokerServerBuilder != null
         && this.brokerServerBuilder.getCurrentState() == BrokerServerBuilder.State.RUNNING) {

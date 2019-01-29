@@ -36,8 +36,8 @@ public abstract class BaseInPredicate extends Predicate {
   @Override
   public String toString() {
     List<String> rhs = getRhs();
-    return "Predicate: type: " + getType() + ", left : " + getLhs() + ", right : " + Arrays.toString(
-        rhs.toArray(new String[rhs.size()])) + "\n";
+    return "Predicate: type: " + getType() + ", left : " + getLhs() + ", right : " + Arrays
+        .toString(rhs.toArray(new String[rhs.size()])) + "\n";
   }
 
   public String[] getValues() {

@@ -40,25 +40,29 @@ public class MultiNodesOfflineClusterIntegrationTest extends OfflineClusterInteg
 
   @Test
   @Override
-  public void testQueriesFromQueryFile() throws Exception {
+  public void testQueriesFromQueryFile()
+      throws Exception {
     super.testQueriesFromQueryFile();
   }
 
   @Test
   @Override
-  public void testGeneratedQueriesWithMultiValues() throws Exception {
+  public void testGeneratedQueriesWithMultiValues()
+      throws Exception {
     super.testGeneratedQueriesWithMultiValues();
   }
 
   @Test
   @Override
-  public void testQueryExceptions() throws Exception {
+  public void testQueryExceptions()
+      throws Exception {
     super.testQueryExceptions();
   }
 
   @Test
   @Override
-  public void testInstanceShutdown() throws Exception {
+  public void testInstanceShutdown()
+      throws Exception {
     super.testInstanceShutdown();
   }
 
@@ -66,7 +70,8 @@ public class MultiNodesOfflineClusterIntegrationTest extends OfflineClusterInteg
   // reloaded, which cause the flakiness of the tests.
   @Test(enabled = false)
   @Override
-  public void testInvertedIndexTriggering() throws Exception {
+  public void testInvertedIndexTriggering()
+      throws Exception {
     // Ignored
   }
 
@@ -74,7 +79,8 @@ public class MultiNodesOfflineClusterIntegrationTest extends OfflineClusterInteg
   // reloaded, which cause the flakiness of the tests.
   @Test(enabled = false)
   @Override
-  public void testDefaultColumns() throws Exception {
+  public void testDefaultColumns()
+      throws Exception {
     // Ignored
   }
 }

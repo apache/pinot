@@ -56,7 +56,7 @@ public class ResultTable implements Iterable<ResultTable.Row> {
 
     for (Row row : _rows) {
       for (int colId : averageColumns) {
-        double [] value = (double []) row.get(colId);
+        double[] value = (double[]) row.get(colId);
         double average = (value[1] != 0) ? (value[0] / value[1]) : 0;
         row.set(colId, average);
       }
@@ -101,10 +101,7 @@ public class ResultTable implements Iterable<ResultTable.Row> {
   }
 
   enum ResultType {
-    Selection,
-    Aggregation,
-    AggregationGroupBy,
-    Invalid
+    Selection, Aggregation, AggregationGroupBy, Invalid
   }
 
   List<Row> _rows;
@@ -275,7 +272,7 @@ public class ResultTable implements Iterable<ResultTable.Row> {
     public void print() {
       for (int i = 0; i < _cols.size(); ++i) {
         Object object = _cols.get(i);
-        String value = (object instanceof Object []) ? Arrays.toString((Object []) object) : object.toString();
+        String value = (object instanceof Object[]) ? Arrays.toString((Object[]) object) : object.toString();
         LOGGER.info(_columnList.get(i) + " " + value);
       }
     }

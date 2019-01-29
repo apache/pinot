@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.hadoop.job;
 
-
 public class JobConfigConstants {
   public static final String PATH_TO_INPUT = "path.to.input";
   public static final String PATH_TO_OUTPUT = "path.to.output";

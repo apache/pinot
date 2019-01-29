@@ -49,12 +49,15 @@ public class PinotTenantRestletResourceTest extends ControllerTest {
   }
 
   @Test
-  public void testTableListForTenant() throws Exception {
+  public void testTableListForTenant()
+      throws Exception {
     // Create untagged broker and server instances
-    ObjectNode brokerInstance = (ObjectNode) JsonUtils.stringToJsonNode("{\"host\":\"1.2.3.4\", \"type\":\"broker\", \"port\":\"1234\"}");
+    ObjectNode brokerInstance =
+        (ObjectNode) JsonUtils.stringToJsonNode("{\"host\":\"1.2.3.4\", \"type\":\"broker\", \"port\":\"1234\"}");
     sendPostRequest(_controllerRequestURLBuilder.forInstanceCreate(), brokerInstance.toString());
 
-    ObjectNode serverInstance = (ObjectNode) JsonUtils.stringToJsonNode("{\"host\":\"1.2.3.4\", \"type\":\"server\", \"port\":\"2345\"}");
+    ObjectNode serverInstance =
+        (ObjectNode) JsonUtils.stringToJsonNode("{\"host\":\"1.2.3.4\", \"type\":\"server\", \"port\":\"2345\"}");
     sendPostRequest(_controllerRequestURLBuilder.forInstanceCreate(), serverInstance.toString());
 
     // Create tagged broker and server instances
@@ -78,17 +81,15 @@ public class PinotTenantRestletResourceTest extends ControllerTest {
     // Add a table to the server
     String createTableUrl = _controllerRequestURLBuilder.forTableCreate();
 
-    ControllerRequestBuilderUtil.addFakeBrokerInstancesToAutoJoinHelixCluster(getHelixClusterName(),
-        ZkStarter.DEFAULT_ZK_STR, NUM_BROKER_INSTANCES, true);
-    ControllerRequestBuilderUtil.addFakeDataInstancesToAutoJoinHelixCluster(getHelixClusterName(),
-        ZkStarter.DEFAULT_ZK_STR, NUM_SERVER_INSTANCES, true);
+    ControllerRequestBuilderUtil
+        .addFakeBrokerInstancesToAutoJoinHelixCluster(getHelixClusterName(), ZkStarter.DEFAULT_ZK_STR,
+            NUM_BROKER_INSTANCES, true);
+    ControllerRequestBuilderUtil
+        .addFakeDataInstancesToAutoJoinHelixCluster(getHelixClusterName(), ZkStarter.DEFAULT_ZK_STR,
+            NUM_SERVER_INSTANCES, true);
 
-    _offlineBuilder.setTableName("testOfflineTable")
-        .setTimeColumnName("timeColumn")
-        .setTimeType("DAYS")
-        .setRetentionTimeUnit("DAYS")
-        .setRetentionTimeValue("5")
-        .setServerTenant("DefaultTenant");
+    _offlineBuilder.setTableName("testOfflineTable").setTimeColumnName("timeColumn").setTimeType("DAYS")
+        .setRetentionTimeUnit("DAYS").setRetentionTimeValue("5").setServerTenant("DefaultTenant");
 
     TableConfig offlineTableConfig = _offlineBuilder.build();
     offlineTableConfig.setTableName("mytable_OFFLINE");
@@ -96,7 +97,8 @@ public class PinotTenantRestletResourceTest extends ControllerTest {
     sendPostRequest(createTableUrl, offlineTableJSONConfigString);
 
     // Try to make sure both kinds of tags work
-    tableList = JsonUtils.stringToJsonNode(sendGetRequest(_controllerRequestURLBuilder.forTablesFromTenant("DefaultTenant")));
+    tableList =
+        JsonUtils.stringToJsonNode(sendGetRequest(_controllerRequestURLBuilder.forTablesFromTenant("DefaultTenant")));
     assertEquals(tableList.get("tables").size(), 1, "Expected 1 table");
     assertEquals(tableList.get("tables").get(0).asText(), "mytable_OFFLINE");
   }

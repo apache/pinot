@@ -29,6 +29,7 @@ import org.testng.annotations.Test;
 
 public class FileUploadPathProviderTest extends ControllerTest {
   private static ControllerConf _controllerConf;
+
   @BeforeClass
   public void setUp() {
     startZk();
@@ -37,13 +38,16 @@ public class FileUploadPathProviderTest extends ControllerTest {
   }
 
   @Test
-  public void testFileUploadPathProvider() throws Exception {
+  public void testFileUploadPathProvider()
+      throws Exception {
     FileUploadPathProvider provider = new FileUploadPathProvider(_controllerConf);
     Assert.assertEquals(provider.getBaseDataDir().getAbsolutePath(), _controllerDataDir);
     String fileUploadTmpDirPath = provider.getFileUploadTmpDir().getAbsolutePath();
     Assert.assertEquals(fileUploadTmpDirPath, new File(_controllerDataDir, "fileUploadTemp").getAbsolutePath());
-    Assert.assertEquals(provider.getSchemasTmpDir().getAbsolutePath(), new File(_controllerDataDir, "schemasTemp").getAbsolutePath());
-    Assert.assertEquals(provider.getTmpUntarredPath().getAbsolutePath(), new File(fileUploadTmpDirPath, "untarred").getAbsolutePath());
+    Assert.assertEquals(provider.getSchemasTmpDir().getAbsolutePath(),
+        new File(_controllerDataDir, "schemasTemp").getAbsolutePath());
+    Assert.assertEquals(provider.getTmpUntarredPath().getAbsolutePath(),
+        new File(fileUploadTmpDirPath, "untarred").getAbsolutePath());
   }
 
   @AfterClass

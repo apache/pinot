@@ -67,7 +67,8 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
   @Override
   public synchronized void init(Configuration config, InstanceDataManager instanceDataManager,
-      ServerMetrics serverMetrics) throws ConfigurationException {
+      ServerMetrics serverMetrics)
+      throws ConfigurationException {
     _instanceDataManager = instanceDataManager;
     _serverMetrics = serverMetrics;
     QueryExecutorConfig queryExecutorConfig = new QueryExecutorConfig(config);
@@ -112,8 +113,8 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     // Query scheduler wait time already exceeds query timeout, directly return
     if (remainingTimeMs <= 0) {
       _serverMetrics.addMeteredQueryValue(brokerRequest, ServerMeter.SCHEDULING_TIMEOUT_EXCEPTIONS, 1);
-      String errorMessage =
-          String.format("Query scheduling took %dms (longer than query timeout of %dms)", querySchedulingTimeMs,
+      String errorMessage = String
+          .format("Query scheduling took %dms (longer than query timeout of %dms)", querySchedulingTimeMs,
               queryTimeoutMs);
       DataTable dataTable = new DataTableImplV2();
       dataTable.addException(QueryException.getException(QueryException.QUERY_SCHEDULING_TIMEOUT_ERROR, errorMessage));

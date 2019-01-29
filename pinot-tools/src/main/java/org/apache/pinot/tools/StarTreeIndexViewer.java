@@ -93,7 +93,8 @@ public class StarTreeIndexViewer {
   private Map<String, Dictionary> dictionaries;
   private Map<String, BlockSingleValIterator> valueIterators;
 
-  public StarTreeIndexViewer(File segmentDir) throws Exception {
+  public StarTreeIndexViewer(File segmentDir)
+      throws Exception {
     IndexSegment indexSegment = ImmutableSegmentLoader.load(segmentDir, ReadMode.heap);
 
     dictionaries = new HashMap<>();
@@ -178,7 +179,8 @@ public class StarTreeIndexViewer {
     return totalChildNodes;
   }
 
-  public static void main(String[] args) throws Exception {
+  public static void main(String[] args)
+      throws Exception {
     if (args.length != 1) {
       LOGGER.error("USAGE: StarIndexViewer <segmentDirectory>");
       System.exit(1);
@@ -198,7 +200,8 @@ public class StarTreeIndexViewer {
     }
   }
 
-  private void startServer(final File segmentDirectory, final String json) throws Exception {
+  private void startServer(final File segmentDirectory, final String json)
+      throws Exception {
     int httpPort = 8090;
     URI baseUri = URI.create("http://0.0.0.0:" + Integer.toString(httpPort) + "/");
     HttpServer httpServer = GrizzlyHttpServerFactory.createHttpServer(baseUri, new StarTreeResource(json));

@@ -67,7 +67,8 @@ public class ScatterGatherImpl implements ScatterGather {
   @Override
   public CompositeFuture<byte[]> scatterGather(@Nonnull ScatterGatherRequest scatterGatherRequest,
       @Nonnull ScatterGatherStats scatterGatherStats, @Nullable Boolean isOfflineTable,
-      @Nonnull BrokerMetrics brokerMetrics) throws InterruptedException {
+      @Nonnull BrokerMetrics brokerMetrics)
+      throws InterruptedException {
     return sendRequest(new ScatterGatherRequestContext(scatterGatherRequest), scatterGatherStats, isOfflineTable,
         brokerMetrics);
   }

@@ -34,7 +34,8 @@ public class CSVRecordReaderTest extends RecordReaderTest {
   private static final File DATA_FILE = new File(TEMP_DIR, "data.csv");
 
   @BeforeClass
-  public void setUp() throws Exception {
+  public void setUp()
+      throws Exception {
     FileUtils.forceMkdir(TEMP_DIR);
 
     try (FileWriter fileWriter = new FileWriter(DATA_FILE);
@@ -47,7 +48,8 @@ public class CSVRecordReaderTest extends RecordReaderTest {
   }
 
   @Test
-  public void testCSVRecordReader() throws Exception {
+  public void testCSVRecordReader()
+      throws Exception {
     try (CSVRecordReader recordReader = new CSVRecordReader(DATA_FILE, SCHEMA, new CSVRecordReaderConfig())) {
       checkValue(recordReader);
       recordReader.rewind();
@@ -56,7 +58,8 @@ public class CSVRecordReaderTest extends RecordReaderTest {
   }
 
   @Test
-  public void testCSVRecordReaderWithDefaultConfig() throws Exception {
+  public void testCSVRecordReaderWithDefaultConfig()
+      throws Exception {
     try (CSVRecordReader recordReader = new CSVRecordReader(DATA_FILE, SCHEMA, null)) {
       checkValue(recordReader);
       recordReader.rewind();
@@ -65,7 +68,8 @@ public class CSVRecordReaderTest extends RecordReaderTest {
   }
 
   @AfterClass
-  public void tearDown() throws Exception {
+  public void tearDown()
+      throws Exception {
     FileUtils.forceDelete(TEMP_DIR);
   }
 }

@@ -56,7 +56,8 @@ public class MultiplePinotSegmentRecordReaderTest {
   private List<List<GenericRow>> _rowsList;
 
   @BeforeClass
-  public void setup() throws Exception {
+  public void setup()
+      throws Exception {
     Schema schema = createPinotSchema();
     _segmentOutputDir = Files.createTempDir().toString();
     _rowsList = new ArrayList<>(NUM_SEGMENTS);
@@ -84,7 +85,8 @@ public class MultiplePinotSegmentRecordReaderTest {
   }
 
   @Test
-  public void testMultiplePinotSegmentRecordReader() throws Exception {
+  public void testMultiplePinotSegmentRecordReader()
+      throws Exception {
     List<GenericRow> outputRows = new ArrayList<>();
     try (MultiplePinotSegmentRecordReader pinotSegmentRecordReader = new MultiplePinotSegmentRecordReader(
         _segmentIndexDirList)) {
@@ -111,7 +113,8 @@ public class MultiplePinotSegmentRecordReaderTest {
   }
 
   @Test
-  public void testMultiplePinotSegmentRecordReaderSortedColumn() throws Exception {
+  public void testMultiplePinotSegmentRecordReaderSortedColumn()
+      throws Exception {
     List<String> sortOrder = new ArrayList<>();
     sortOrder.add(D_SV_1);
     sortOrder.add(D_SV_2);

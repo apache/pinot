@@ -42,6 +42,7 @@ import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.Predicate;
 import org.apache.pinot.common.data.FieldSpec.DataType;
 
+
 public class AvroQueryGenerator {
 
   public interface TestAggreationQuery {
@@ -108,7 +109,8 @@ public class AvroQueryGenerator {
   private boolean isRealtimeSegment = false;
 
   public AvroQueryGenerator(File avroFile, List<String> dimensions, List<String> metrics, String time,
-      String resourceName) throws FileNotFoundException, IOException {
+      String resourceName)
+      throws FileNotFoundException, IOException {
     this.avroFile = avroFile;
     this.dimensions = dimensions;
     this.metrics = metrics;
@@ -119,7 +121,8 @@ public class AvroQueryGenerator {
   }
 
   public AvroQueryGenerator(File avroFile, List<String> dimensions, List<String> metrics, String time,
-      String resourceName, boolean isRealtimeSegment) throws FileNotFoundException, IOException {
+      String resourceName, boolean isRealtimeSegment)
+      throws FileNotFoundException, IOException {
     this.avroFile = avroFile;
     this.dimensions = dimensions;
     this.metrics = metrics;
@@ -130,7 +133,8 @@ public class AvroQueryGenerator {
     this.isRealtimeSegment = isRealtimeSegment;
   }
 
-  public void init() throws FileNotFoundException, IOException {
+  public void init()
+      throws FileNotFoundException, IOException {
     dataStream =
         new DataFileStream<GenericRecord>(new FileInputStream(avroFile), new GenericDatumReader<GenericRecord>());
     schema = dataStream.getSchema();
@@ -156,7 +160,8 @@ public class AvroQueryGenerator {
 
   }
 
-  public void generateSimpleAggregationOnSingleColumnFilters() throws IOException {
+  public void generateSimpleAggregationOnSingleColumnFilters()
+      throws IOException {
     final Map<String, Map<Object, Integer>> cardinalityCountsMap = new HashMap<String, Map<Object, Integer>>();
     final Map<String, Map<Object, Map<String, Double>>> sumMap =
         new HashMap<String, Map<Object, Map<String, Double>>>();
@@ -229,8 +234,7 @@ public class AvroQueryGenerator {
               final String groupbyKey = groupbyKeyBase + ":" + dim;
               if (sumGroupBy.containsKey(groupbyKey)) {
                 if (sumGroupBy.get(groupbyKey).containsKey(record.get(dim))) {
-                  sumGroupBy.get(groupbyKey).put(
-                      record.get(dim),
+                  sumGroupBy.get(groupbyKey).put(record.get(dim),
                       getAppropriateNumberType(metricName, record.get(metricName),
                           sumGroupBy.get(groupbyKey).get(record.get(dim))));
                 } else {
@@ -262,11 +266,8 @@ public class AvroQueryGenerator {
           if (!sumMap.get(column).get(value).containsKey(metric)) {
             sumMap.get(column).get(value).put(metric, getAppropriateNumberType(metric, record.get(metric), 0D));
           } else {
-            sumMap
-                .get(column)
-                .get(value)
-                .put(metric,
-                    getAppropriateNumberType(metric, record.get(metric), sumMap.get(column).get(value).get(metric)));
+            sumMap.get(column).get(value).put(metric,
+                getAppropriateNumberType(metric, record.get(metric), sumMap.get(column).get(value).get(metric)));
           }
         }
         // here string key is columnName:columnValue:MetricName:GroupColumnName:groupKey:metricValue
@@ -291,8 +292,8 @@ public class AvroQueryGenerator {
           bld.append("limit 0");
           String queryString = bld.toString();
           if (!queryString.contains("null")) {
-            aggregationQueries.add(new TestSimpleAggreationQuery(queryString, new Double(cardinalityCountsMap.get(
-                column).get(entry))));
+            aggregationQueries.add(
+                new TestSimpleAggreationQuery(queryString, new Double(cardinalityCountsMap.get(column).get(entry))));
           }
         }
       }
@@ -314,8 +315,8 @@ public class AvroQueryGenerator {
           bld.append("limit 0");
           String queryString = bld.toString();
           if (!queryString.contains("null")) {
-            aggregationQueries.add(new TestSimpleAggreationQuery(bld.toString(), sumMap.get(column).get(value)
-                .get(metric)));
+            aggregationQueries
+                .add(new TestSimpleAggreationQuery(bld.toString(), sumMap.get(column).get(value).get(metric)));
           }
         }
       }
@@ -426,5 +427,4 @@ public class AvroQueryGenerator {
     }
     return ret;
   }
-
 }

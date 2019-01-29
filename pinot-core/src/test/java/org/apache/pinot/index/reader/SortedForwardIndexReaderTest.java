@@ -30,18 +30,19 @@ import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+
 @Test
 public class SortedForwardIndexReaderTest {
   private static Logger LOGGER = LoggerFactory.getLogger(SortedForwardIndexReaderTest.class);
-  public void testSimple() throws Exception {
+
+  public void testSimple()
+      throws Exception {
 
     int maxLength = 1000;
     int cardinality = 100000;
     File file = new File("test_sortef_fwd_index.dat");
     file.delete();
-    int[] columnSizes = new int[] {
-        4, 4
-    };
+    int[] columnSizes = new int[]{4, 4};
     FixedByteSingleValueMultiColWriter writer =
         new FixedByteSingleValueMultiColWriter(file, cardinality, columnSizes.length, columnSizes);
     Random random = new Random();

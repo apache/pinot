@@ -66,7 +66,8 @@ public class VarByteChunkSingleValueWriter extends BaseChunkSingleValueWriter {
    * @throws FileNotFoundException Throws {@link FileNotFoundException} if the specified file is not found.
    */
   public VarByteChunkSingleValueWriter(File file, ChunkCompressorFactory.CompressionType compressionType, int totalDocs,
-      int numDocsPerChunk, int lengthOfLongestEntry) throws FileNotFoundException {
+      int numDocsPerChunk, int lengthOfLongestEntry)
+      throws FileNotFoundException {
 
     super(file, compressionType, totalDocs, numDocsPerChunk,
         ((numDocsPerChunk * Integer.BYTES) + (lengthOfLongestEntry * numDocsPerChunk)), // chunkSize
@@ -99,7 +100,8 @@ public class VarByteChunkSingleValueWriter extends BaseChunkSingleValueWriter {
   }
 
   @Override
-  public void close() throws IOException {
+  public void close()
+      throws IOException {
 
     // Write the chunk if it is non-empty.
     if (_chunkBuffer.position() > 0) {

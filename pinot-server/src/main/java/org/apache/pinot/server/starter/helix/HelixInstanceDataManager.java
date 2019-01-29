@@ -72,7 +72,8 @@ public class HelixInstanceDataManager implements InstanceDataManager {
 
   @Override
   public synchronized void init(@Nonnull Configuration config, @Nonnull ZkHelixPropertyStore<ZNRecord> propertyStore,
-      @Nonnull ServerMetrics serverMetrics) throws ConfigurationException {
+      @Nonnull ServerMetrics serverMetrics)
+      throws ConfigurationException {
     LOGGER.info("Initializing Helix instance data manager");
 
     _instanceDataManagerConfig = new HelixInstanceDataManagerConfig(config);
@@ -118,7 +119,8 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   }
 
   @Override
-  public void addRealtimeSegment(@Nonnull String realtimeTableName, @Nonnull String segmentName) throws Exception {
+  public void addRealtimeSegment(@Nonnull String realtimeTableName, @Nonnull String segmentName)
+      throws Exception {
     LOGGER.info("Adding segment: {} to table: {}", segmentName, realtimeTableName);
     TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, realtimeTableName);
     Preconditions.checkNotNull(tableConfig);
@@ -132,9 +134,8 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     TableDataManagerConfig tableDataManagerConfig =
         TableDataManagerConfig.getDefaultHelixTableDataManagerConfig(_instanceDataManagerConfig, tableNameWithType);
     tableDataManagerConfig.overrideConfigs(tableConfig);
-    TableDataManager tableDataManager =
-        TableDataManagerProvider.getTableDataManager(tableDataManagerConfig, _instanceId, _propertyStore,
-            _serverMetrics);
+    TableDataManager tableDataManager = TableDataManagerProvider
+        .getTableDataManager(tableDataManagerConfig, _instanceId, _propertyStore, _serverMetrics);
     tableDataManager.start();
     LOGGER.info("Created table data manager for table: {}", tableNameWithType);
     return tableDataManager;
@@ -151,7 +152,8 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   }
 
   @Override
-  public void reloadSegment(@Nonnull String tableNameWithType, @Nonnull String segmentName) throws Exception {
+  public void reloadSegment(@Nonnull String tableNameWithType, @Nonnull String segmentName)
+      throws Exception {
     LOGGER.info("Reloading single segment: {} in table: {}", segmentName, tableNameWithType);
     SegmentMetadata segmentMetadata = getSegmentMetadata(tableNameWithType, segmentName);
     if (segmentMetadata == null) {
@@ -173,7 +175,8 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   }
 
   @Override
-  public void reloadAllSegments(@Nonnull String tableNameWithType) throws Exception {
+  public void reloadAllSegments(@Nonnull String tableNameWithType)
+      throws Exception {
     LOGGER.info("Reloading all segments in table: {}", tableNameWithType);
     TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
     Preconditions.checkNotNull(tableConfig);
@@ -192,7 +195,8 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   }
 
   private void reloadSegment(@Nonnull String tableNameWithType, @Nonnull SegmentMetadata segmentMetadata,
-      @Nonnull TableConfig tableConfig, @Nullable Schema schema) throws Exception {
+      @Nonnull TableConfig tableConfig, @Nullable Schema schema)
+      throws Exception {
     String segmentName = segmentMetadata.getName();
     LOGGER.info("Reloading segment: {} in table: {}", segmentName, tableNameWithType);
 
@@ -223,9 +227,8 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       FileUtils.copyDirectory(segmentBackupDir, indexDir);
 
       // Load from index directory
-      ImmutableSegment immutableSegment =
-          ImmutableSegmentLoader.load(indexDir, new IndexLoadingConfig(_instanceDataManagerConfig, tableConfig),
-              schema);
+      ImmutableSegment immutableSegment = ImmutableSegmentLoader
+          .load(indexDir, new IndexLoadingConfig(_instanceDataManagerConfig, tableConfig), schema);
 
       // Replace the old segment in memory
       _tableDataManagerMap.get(tableNameWithType).addSegment(immutableSegment);

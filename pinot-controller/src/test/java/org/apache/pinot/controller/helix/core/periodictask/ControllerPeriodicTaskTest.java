@@ -88,7 +88,7 @@ public class ControllerPeriodicTaskTest {
     _stopTaskCalled.set(false);
     _processCalled.set(false);
     _tablesProcessed.set(0);
-    _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED, TASK_NAME,0);
+    _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED, TASK_NAME, 0);
   }
 
   @Test
@@ -111,8 +111,8 @@ public class ControllerPeriodicTaskTest {
     assertEquals(_tablesProcessed.get(), 0);
     assertFalse(_stopTaskCalled.get());
     assertFalse(_task.shouldStopPeriodicTask());
-    assertEquals(_controllerMetrics.getValueOfGlobalGauge(ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED, TASK_NAME),
-        0);
+    assertEquals(
+        _controllerMetrics.getValueOfGlobalGauge(ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED, TASK_NAME), 0);
 
     // run task - leadership gained
     resetState();
@@ -120,7 +120,8 @@ public class ControllerPeriodicTaskTest {
     assertFalse(_initTaskCalled.get());
     assertTrue(_processCalled.get());
     assertEquals(_tablesProcessed.get(), _numTables);
-    assertEquals(_controllerMetrics.getValueOfGlobalGauge(ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED, TASK_NAME),
+    assertEquals(
+        _controllerMetrics.getValueOfGlobalGauge(ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED, TASK_NAME),
         _numTables);
     assertFalse(_stopTaskCalled.get());
     assertFalse(_task.shouldStopPeriodicTask());
@@ -131,8 +132,8 @@ public class ControllerPeriodicTaskTest {
     assertFalse(_initTaskCalled.get());
     assertFalse(_processCalled.get());
     assertEquals(_tablesProcessed.get(), 0);
-    assertEquals(_controllerMetrics.getValueOfGlobalGauge(ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED, TASK_NAME),
-        0);
+    assertEquals(
+        _controllerMetrics.getValueOfGlobalGauge(ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED, TASK_NAME), 0);
     assertTrue(_stopTaskCalled.get());
     assertTrue(_task.shouldStopPeriodicTask());
 
@@ -143,10 +144,10 @@ public class ControllerPeriodicTaskTest {
     assertFalse(_initTaskCalled.get());
     assertTrue(_processCalled.get());
     assertEquals(_tablesProcessed.get(), _numTables);
-    assertEquals(_controllerMetrics.getValueOfGlobalGauge(ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED, TASK_NAME),
+    assertEquals(
+        _controllerMetrics.getValueOfGlobalGauge(ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED, TASK_NAME),
         _numTables);
     assertFalse(_stopTaskCalled.get());
-
   }
 
   private class MockControllerPeriodicTask extends ControllerPeriodicTask {

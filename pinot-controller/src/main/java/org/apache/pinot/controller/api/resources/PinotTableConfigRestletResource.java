@@ -57,10 +57,7 @@ public class PinotTableConfigRestletResource {
   @Produces({"application/hocon", "text/x-java-properties", "text/plain"})
   @Path("/v2/tables/{tableName}")
   @ApiOperation("Displays the configuration of a table")
-  public Response readTableConfiguration(
-      @PathParam("tableName") String tableName,
-      @Context Request request
-  ) {
+  public Response readTableConfiguration(@PathParam("tableName") String tableName, @Context Request request) {
     TableConfig offlineTableConfig =
         _resourceManager.getTableConfig(tableName, CommonConstants.Helix.TableType.OFFLINE);
     TableConfig realtimeTableConfig =
@@ -68,24 +65,21 @@ public class PinotTableConfigRestletResource {
     Schema tableSchema = _resourceManager.getTableSchema(tableName);
 
     if (offlineTableConfig == null && realtimeTableConfig == null) {
-      return Response
-          .status(Response.Status.NOT_FOUND)
-          .build();
+      return Response.status(Response.Status.NOT_FOUND).build();
     }
 
     CombinedConfig combinedConfig = new CombinedConfig(offlineTableConfig, realtimeTableConfig, tableSchema);
     String serializedConfig;
 
-    List<Variant> variants = Variant
-        .mediaTypes(APPLICATION_HOCON, TEXT_JAVA_PROPERTIES, MediaType.TEXT_PLAIN_TYPE)
-        .build();
+    List<Variant> variants =
+        Variant.mediaTypes(APPLICATION_HOCON, TEXT_JAVA_PROPERTIES, MediaType.TEXT_PLAIN_TYPE).build();
 
     Variant variant = request.selectVariant(variants);
 
     if (variant == null) {
       return Response.notAcceptable(variants).build();
-    } else if (APPLICATION_HOCON.equals(variant.getMediaType()) ||
-        MediaType.TEXT_PLAIN_TYPE.equals(variant.getMediaType())) {
+    } else if (APPLICATION_HOCON.equals(variant.getMediaType()) || MediaType.TEXT_PLAIN_TYPE
+        .equals(variant.getMediaType())) {
       serializedConfig = Serializer.serializeToString(combinedConfig);
     } else if (TEXT_JAVA_PROPERTIES.equals(variant.getMediaType())) {
       serializedConfig = Serializer.serializeToPropertiesString(combinedConfig);
@@ -93,10 +87,7 @@ public class PinotTableConfigRestletResource {
       return Response.notAcceptable(variants).build();
     }
 
-    return Response
-        .ok(serializedConfig, variant)
-        .header("Content-Disposition", "inline")
-        .build();
+    return Response.ok(serializedConfig, variant).header("Content-Disposition", "inline").build();
   }
 
   @POST
@@ -109,20 +100,13 @@ public class PinotTableConfigRestletResource {
       config = Deserializer.deserializeFromString(CombinedConfig.class, tableConfiguration);
     } catch (Exception e) {
       LOGGER.warn("Caught exception while deserializing the table configuration", e);
-      return Response
-          .serverError()
-          .entity(e.getMessage())
-          .type(MediaType.TEXT_PLAIN_TYPE)
-          .build();
+      return Response.serverError().entity(e.getMessage()).type(MediaType.TEXT_PLAIN_TYPE).build();
     }
 
     if (config == null) {
       LOGGER.warn("Failed to deserialize the table configuration: {}", tableConfiguration);
-      return Response
-          .serverError()
-          .entity("Failed to deserialize the table configuration")
-          .type(MediaType.TEXT_PLAIN_TYPE)
-          .build();
+      return Response.serverError().entity("Failed to deserialize the table configuration")
+          .type(MediaType.TEXT_PLAIN_TYPE).build();
     }
 
     if (config.getSchema() != null) {
@@ -137,9 +121,7 @@ public class PinotTableConfigRestletResource {
       _resourceManager.addTable(config.getRealtimeTableConfig());
     }
 
-    return Response
-        .ok()
-        .build();
+    return Response.ok().build();
   }
 
   @PUT
@@ -152,20 +134,13 @@ public class PinotTableConfigRestletResource {
       config = Deserializer.deserializeFromString(CombinedConfig.class, tableConfiguration);
     } catch (Exception e) {
       LOGGER.warn("Caught exception while deserializing the table configuration", e);
-      return Response
-          .serverError()
-          .entity(e.getMessage())
-          .type(MediaType.TEXT_PLAIN_TYPE)
-          .build();
+      return Response.serverError().entity(e.getMessage()).type(MediaType.TEXT_PLAIN_TYPE).build();
     }
 
     if (config == null) {
       LOGGER.warn("Failed to deserialize the table configuration: {}", tableConfiguration);
-      return Response
-          .serverError()
-          .entity("Failed to deserialize the table configuration")
-          .type(MediaType.TEXT_PLAIN_TYPE)
-          .build();
+      return Response.serverError().entity("Failed to deserialize the table configuration")
+          .type(MediaType.TEXT_PLAIN_TYPE).build();
     }
 
     if (config.getSchema() != null) {
@@ -175,15 +150,14 @@ public class PinotTableConfigRestletResource {
     if (config.getOfflineTableConfig() != null) {
       if (_resourceManager.getAllTables().contains(config.getOfflineTableConfig().getTableName())) {
         try {
-          _resourceManager.setExistingTableConfig(config.getOfflineTableConfig(), config.getOfflineTableConfig().getTableName(),
-              CommonConstants.Helix.TableType.OFFLINE);
+          _resourceManager
+              .setExistingTableConfig(config.getOfflineTableConfig(), config.getOfflineTableConfig().getTableName(),
+                  CommonConstants.Helix.TableType.OFFLINE);
         } catch (IOException e) {
-          LOGGER.warn("Failed to update the offline table configuration for table {}", e, config.getOfflineTableConfig().getTableName());
-          return Response
-              .serverError()
-              .entity("Failed to update the offline table configuration")
-              .type(MediaType.TEXT_PLAIN_TYPE)
-              .build();
+          LOGGER.warn("Failed to update the offline table configuration for table {}", e,
+              config.getOfflineTableConfig().getTableName());
+          return Response.serverError().entity("Failed to update the offline table configuration")
+              .type(MediaType.TEXT_PLAIN_TYPE).build();
         }
       } else {
         _resourceManager.addTable(config.getOfflineTableConfig());
@@ -193,23 +167,20 @@ public class PinotTableConfigRestletResource {
     if (config.getRealtimeTableConfig() != null) {
       if (_resourceManager.getAllTables().contains(config.getRealtimeTableConfig().getTableName())) {
         try {
-          _resourceManager.setExistingTableConfig(config.getRealtimeTableConfig(), config.getRealtimeTableConfig().getTableName(),
-              CommonConstants.Helix.TableType.REALTIME);
+          _resourceManager
+              .setExistingTableConfig(config.getRealtimeTableConfig(), config.getRealtimeTableConfig().getTableName(),
+                  CommonConstants.Helix.TableType.REALTIME);
         } catch (IOException e) {
-          LOGGER.warn("Failed to update the realtime table configuration for table {}", e, config.getRealtimeTableConfig().getTableName());
-          return Response
-              .serverError()
-              .entity("Failed to update the realtime table configuration")
-              .type(MediaType.TEXT_PLAIN_TYPE)
-              .build();
+          LOGGER.warn("Failed to update the realtime table configuration for table {}", e,
+              config.getRealtimeTableConfig().getTableName());
+          return Response.serverError().entity("Failed to update the realtime table configuration")
+              .type(MediaType.TEXT_PLAIN_TYPE).build();
         }
       } else {
         _resourceManager.addTable(config.getRealtimeTableConfig());
       }
     }
 
-    return Response
-        .ok()
-        .build();
+    return Response.ok().build();
   }
 }

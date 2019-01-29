@@ -80,7 +80,8 @@ public class SegmentPreProcessorTest {
   private Schema _newColumnsSchema3;
 
   @BeforeClass
-  public void setUp() throws Exception {
+  public void setUp()
+      throws Exception {
     FileUtils.deleteQuietly(INDEX_DIR);
 
     // We specify two columns without inverted index ('column1', 'column13'), one non-existing column ('noSuchColumn')
@@ -110,7 +111,8 @@ public class SegmentPreProcessorTest {
     _newColumnsSchema3 = Schema.fromFile(new File(resourceUrl.getFile()));
   }
 
-  private void constructV1Segment() throws Exception {
+  private void constructV1Segment()
+      throws Exception {
     FileUtils.deleteQuietly(INDEX_DIR);
 
     // Create inverted index for 'column7' when constructing the segment.
@@ -124,13 +126,15 @@ public class SegmentPreProcessorTest {
     _indexDir = new File(INDEX_DIR, driver.getSegmentName());
   }
 
-  private void constructV3Segment() throws Exception {
+  private void constructV3Segment()
+      throws Exception {
     constructV1Segment();
     new SegmentV1V2ToV3FormatConverter().convert(_indexDir);
   }
 
   @Test
-  public void testV1CreateInvertedIndices() throws Exception {
+  public void testV1CreateInvertedIndices()
+      throws Exception {
     constructV1Segment();
 
     SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(_indexDir);
@@ -180,7 +184,8 @@ public class SegmentPreProcessorTest {
   }
 
   @Test
-  public void testV3CreateInvertedIndices() throws Exception {
+  public void testV3CreateInvertedIndices()
+      throws Exception {
     constructV3Segment();
 
     SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(_indexDir);
@@ -221,7 +226,8 @@ public class SegmentPreProcessorTest {
     Assert.assertEquals(singleFileIndex.length(), newFileSize);
   }
 
-  private void checkInvertedIndexCreation(boolean reCreate) throws Exception {
+  private void checkInvertedIndexCreation(boolean reCreate)
+      throws Exception {
     try (SegmentDirectory segmentDirectory = SegmentDirectory.createFromLocalFS(_indexDir, ReadMode.mmap);
         SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
       if (reCreate) {
@@ -251,7 +257,8 @@ public class SegmentPreProcessorTest {
   }
 
   @Test
-  public void testV1UpdateDefaultColumns() throws Exception {
+  public void testV1UpdateDefaultColumns()
+      throws Exception {
     constructV1Segment();
     checkUpdateDefaultColumns();
 
@@ -263,7 +270,8 @@ public class SegmentPreProcessorTest {
     }
   }
 
-  private void checkUpdateDefaultColumns() throws Exception {
+  private void checkUpdateDefaultColumns()
+      throws Exception {
     // Update default value.
     try (SegmentPreProcessor processor = new SegmentPreProcessor(_indexDir, _indexLoadingConfig, _newColumnsSchema1)) {
       processor.process();
@@ -358,7 +366,8 @@ public class SegmentPreProcessorTest {
   }
 
   @Test
-  public void testAddColumnMinMaxValue() throws Exception {
+  public void testAddColumnMinMaxValue()
+      throws Exception {
     constructV1Segment();
 
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
@@ -424,7 +433,8 @@ public class SegmentPreProcessorTest {
   }
 
   @AfterClass
-  public void tearDown() throws Exception {
+  public void tearDown()
+      throws Exception {
     FileUtils.deleteQuietly(INDEX_DIR);
   }
 }

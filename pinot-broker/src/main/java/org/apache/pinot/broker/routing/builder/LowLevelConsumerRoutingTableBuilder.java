@@ -88,8 +88,7 @@ public class LowLevelConsumerRoutingTableBuilder extends GeneratorBasedRoutingTa
 
     // 2. Ensure that for each partition, we have at most one Helix partition (Pinot segment) in consuming state
     Map<String, SegmentName> allowedSegmentInConsumingStateByPartition =
-        LowLevelRoutingTableBuilderUtil.getAllowedConsumingStateSegments(externalView,
-            sortedSegmentsByStreamPartition);
+        LowLevelRoutingTableBuilderUtil.getAllowedConsumingStateSegments(externalView, sortedSegmentsByStreamPartition);
 
     // 3. Sort all the segments to be used during assignment in ascending order of replicas
 
@@ -118,15 +117,13 @@ public class LowLevelConsumerRoutingTableBuilder extends GeneratorBasedRoutingTa
           }
 
           // Replicas in ONLINE state are always allowed
-          if (state.equalsIgnoreCase(
-              CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel.ONLINE)) {
+          if (state.equalsIgnoreCase(CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel.ONLINE)) {
             validServers.add(instance);
             continue;
           }
 
           // Replicas in CONSUMING state are only allowed on the last segment
-          if (state.equalsIgnoreCase(
-              CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel.CONSUMING)
+          if (state.equalsIgnoreCase(CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel.CONSUMING)
               && segmentName.equals(validConsumingSegment)) {
             validServers.add(instance);
           }

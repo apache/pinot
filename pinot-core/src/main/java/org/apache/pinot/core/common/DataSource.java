@@ -23,6 +23,7 @@ import org.apache.pinot.core.segment.index.readers.BloomFilterReader;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
 
+
 public abstract class DataSource extends BaseOperator {
 
   public abstract DataSourceMetadata getDataSourceMetadata();
@@ -30,6 +31,6 @@ public abstract class DataSource extends BaseOperator {
   public abstract InvertedIndexReader getInvertedIndex();
 
   public abstract Dictionary getDictionary();
-  
-  public abstract BloomFilterReader getBloomFilter();  
+
+  public abstract BloomFilterReader getBloomFilter();
 }

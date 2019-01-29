@@ -49,6 +49,7 @@ import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
 public class SegmentDeletionManager {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentDeletionManager.class);
@@ -62,7 +63,8 @@ public class SegmentDeletionManager {
   private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private final String DELETED_SEGMENTS = "Deleted_Segments";
 
-  public SegmentDeletionManager(String dataDir, HelixAdmin helixAdmin, String helixClusterName, ZkHelixPropertyStore<ZNRecord> propertyStore) {
+  public SegmentDeletionManager(String dataDir, HelixAdmin helixAdmin, String helixClusterName,
+      ZkHelixPropertyStore<ZNRecord> propertyStore) {
     _dataDir = dataDir;
     _helixAdmin = helixAdmin;
     _helixClusterName = helixClusterName;
@@ -96,7 +98,8 @@ public class SegmentDeletionManager {
     }, deletionDelaySeconds, TimeUnit.SECONDS);
   }
 
-  protected synchronized void deleteSegmentFromPropertyStoreAndLocal(String tableName, Collection<String> segmentIds, long deletionDelay) {
+  protected synchronized void deleteSegmentFromPropertyStoreAndLocal(String tableName, Collection<String> segmentIds,
+      long deletionDelay) {
     // Check if segment got removed from ExternalView and IdealStates
     if (_helixAdmin.getResourceExternalView(_helixClusterName, tableName) == null
         || _helixAdmin.getResourceIdealState(_helixClusterName, tableName) == null) {
@@ -177,8 +180,9 @@ public class SegmentDeletionManager {
       PinotFS pinotFS;
       URI dataDirURI = ControllerConf.getUriFromPath(_dataDir);
       fileToMoveURI = ControllerConf.constructSegmentLocation(_dataDir, rawTableName, segmentId);
-      URI deletedSegmentDestURI = ControllerConf.constructSegmentLocation(
-          StringUtil.join(File.separator, _dataDir, DELETED_SEGMENTS), rawTableName, segmentId);
+      URI deletedSegmentDestURI = ControllerConf
+          .constructSegmentLocation(StringUtil.join(File.separator, _dataDir, DELETED_SEGMENTS), rawTableName,
+              segmentId);
       pinotFS = PinotFSFactory.create(dataDirURI.getScheme());
 
       try {
@@ -188,7 +192,8 @@ public class SegmentDeletionManager {
           // Updates last modified.
           // Touch is needed here so that removeAgedDeletedSegments() works correctly.
           pinotFS.touch(deletedSegmentDestURI);
-          LOGGER.info("Moved segment {} from {} to {}", segmentId, fileToMoveURI.toString(), deletedSegmentDestURI.toString());
+          LOGGER.info("Moved segment {} from {} to {}", segmentId, fileToMoveURI.toString(),
+              deletedSegmentDestURI.toString());
         } else {
           if (!SegmentName.isHighLevelConsumerSegmentName(segmentId)) {
             LOGGER.warn("Not found local segment file for segment {}" + fileToMoveURI.toString());
@@ -238,7 +243,7 @@ public class SegmentDeletionManager {
               if (!pinotFS.delete(targetURI, true)) {
                 LOGGER.warn("Cannot remove file {} from deleted directory.", targetURI.toString());
               } else {
-                numFilesDeleted ++;
+                numFilesDeleted++;
               }
             }
           }

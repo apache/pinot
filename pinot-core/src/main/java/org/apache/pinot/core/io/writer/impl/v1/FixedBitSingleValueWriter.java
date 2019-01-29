@@ -29,9 +29,10 @@ import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 public class FixedBitSingleValueWriter implements SingleColumnSingleValueWriter {
   private FixedBitIntReaderWriter dataFileWriter;
 
-  public FixedBitSingleValueWriter(File file, int rows, int columnSizeInBits) throws Exception {
+  public FixedBitSingleValueWriter(File file, int rows, int columnSizeInBits)
+      throws Exception {
     // Convert to long in order to avoid int overflow
-    long length =  ((long) rows * columnSizeInBits + Byte.SIZE - 1) / Byte.SIZE;
+    long length = ((long) rows * columnSizeInBits + Byte.SIZE - 1) / Byte.SIZE;
     // Backward-compatible: index file is always big-endian
     PinotDataBuffer dataBuffer =
         PinotDataBuffer.mapFile(file, false, 0, length, ByteOrder.BIG_ENDIAN, getClass().getSimpleName());
@@ -39,14 +40,14 @@ public class FixedBitSingleValueWriter implements SingleColumnSingleValueWriter 
   }
 
   @Override
-  public void close() throws IOException {
+  public void close()
+      throws IOException {
     dataFileWriter.close();
   }
 
   @Override
   public void setChar(int row, char ch) {
-    throw new UnsupportedOperationException(
-        "Only int data type is supported in fixedbit format");
+    throw new UnsupportedOperationException("Only int data type is supported in fixedbit format");
   }
 
   @Override
@@ -56,40 +57,31 @@ public class FixedBitSingleValueWriter implements SingleColumnSingleValueWriter 
 
   @Override
   public void setShort(int row, short s) {
-    throw new UnsupportedOperationException(
-        "Only int data type is supported in fixedbit format");
+    throw new UnsupportedOperationException("Only int data type is supported in fixedbit format");
   }
 
   @Override
   public void setLong(int row, long l) {
-    throw new UnsupportedOperationException(
-        "Only int data type is supported in fixedbit format");
-
+    throw new UnsupportedOperationException("Only int data type is supported in fixedbit format");
   }
 
   @Override
   public void setFloat(int row, float f) {
-    throw new UnsupportedOperationException(
-        "Only int data type is supported in fixedbit format");
+    throw new UnsupportedOperationException("Only int data type is supported in fixedbit format");
   }
 
   @Override
   public void setDouble(int row, double d) {
-    throw new UnsupportedOperationException(
-        "Only int data type is supported in fixedbit format");
-
+    throw new UnsupportedOperationException("Only int data type is supported in fixedbit format");
   }
 
   @Override
   public void setString(int row, String string) {
-    throw new UnsupportedOperationException(
-        "Only int data type is supported in fixedbit format");
-
+    throw new UnsupportedOperationException("Only int data type is supported in fixedbit format");
   }
 
   @Override
   public void setBytes(int row, byte[] bytes) {
-    throw new UnsupportedOperationException(
-        "Only int data type is supported in fixedbit format");
+    throw new UnsupportedOperationException("Only int data type is supported in fixedbit format");
   }
 }

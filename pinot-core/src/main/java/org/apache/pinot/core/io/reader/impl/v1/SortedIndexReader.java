@@ -45,5 +45,6 @@ public interface SortedIndexReader<T extends ReaderContext> extends SingleColumn
   Pairs.IntPair getDocIds(int dictId);
 
   @Override
-  void close() throws IOException;
+  void close()
+      throws IOException;
 }

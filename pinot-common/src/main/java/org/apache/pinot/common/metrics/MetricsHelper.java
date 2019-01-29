@@ -57,7 +57,7 @@ public class MetricsHelper {
       String[] listenerClassNames = configuration.getStringArray("metricsRegistryRegistrationListeners");
 
       if (listenerClassNames.length < 1) {
-        listenerClassNames = new String[] { JmxReporterMetricsRegistryRegistrationListener.class.getName() };
+        listenerClassNames = new String[]{JmxReporterMetricsRegistryRegistrationListener.class.getName()};
       }
 
       // Build each listener using their default constructor and add them
@@ -71,7 +71,8 @@ public class MetricsHelper {
 
           addMetricsRegistryRegistrationListener(listener);
         } catch (Exception e) {
-          LOGGER.warn("Caught exception while initializing MetricsRegistryRegistrationListener " + listenerClassName, e);
+          LOGGER
+              .warn("Caught exception while initializing MetricsRegistryRegistrationListener " + listenerClassName, e);
         }
       }
     }

@@ -68,8 +68,8 @@ public class RangePredicate extends Predicate {
 
   @Override
   public String toString() {
-    return "Predicate: type: " + getType() + ", left : " + getLhs() + ", right : "
-        + Arrays.toString(getRhs().toArray(new String[0])) + "\n";
+    return "Predicate: type: " + getType() + ", left : " + getLhs() + ", right : " + Arrays
+        .toString(getRhs().toArray(new String[0])) + "\n";
   }
 
   public boolean includeLowerBoundary() {
@@ -87,5 +87,4 @@ public class RangePredicate extends Predicate {
   public String getUpperBoundary() {
     return upperBoundary;
   }
-
 }

@@ -24,15 +24,14 @@ import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.EnumUtils;
 import org.apache.pinot.common.utils.EqualityUtils;
 
+
 /**
  * Class to represent granularity from {@link DateTimeFieldSpec}
  */
 public class DateTimeGranularitySpec {
 
-  public static final String GRANULARITY_TOKENS_ERROR_STR =
-      "granularity must be of format size:timeunit";
-  public static final String GRANULARITY_PATTERN_ERROR_STR =
-      "granularity must be of format [0-9]+:<TimeUnit>";
+  public static final String GRANULARITY_TOKENS_ERROR_STR = "granularity must be of format size:timeunit";
+  public static final String GRANULARITY_PATTERN_ERROR_STR = "granularity must be of format [0-9]+:<TimeUnit>";
   public static final String NUMBER_REGEX = "[1-9][0-9]*";
 
   public static final String COLON_SEPARATOR = ":";
@@ -84,7 +83,6 @@ public class DateTimeGranularitySpec {
     return _timeUnit;
   }
 
-
   /**
    * <ul>
    * <li>Convert a granularity to millis.
@@ -102,7 +100,6 @@ public class DateTimeGranularitySpec {
     return TimeUnit.MILLISECONDS.convert(_size, _timeUnit);
   }
 
-
   /**
    * Check correctness of granularity of {@link DateTimeFieldSpec}
    * @param granularity
@@ -111,9 +108,9 @@ public class DateTimeGranularitySpec {
   public static boolean isValidGranularity(String granularity) {
     Preconditions.checkNotNull(granularity);
     String[] granularityTokens = granularity.split(COLON_SEPARATOR);
-    Preconditions.checkArgument(granularityTokens.length == MAX_GRANULARITY_TOKENS,
-        GRANULARITY_TOKENS_ERROR_STR);
-    Preconditions.checkArgument(granularityTokens[GRANULARITY_SIZE_POSITION].matches(NUMBER_REGEX), GRANULARITY_PATTERN_ERROR_STR);
+    Preconditions.checkArgument(granularityTokens.length == MAX_GRANULARITY_TOKENS, GRANULARITY_TOKENS_ERROR_STR);
+    Preconditions.checkArgument(granularityTokens[GRANULARITY_SIZE_POSITION].matches(NUMBER_REGEX),
+        GRANULARITY_PATTERN_ERROR_STR);
     Preconditions.checkArgument(EnumUtils.isValidEnum(TimeUnit.class, granularityTokens[GRANULARITY_UNIT_POSITION]),
         GRANULARITY_PATTERN_ERROR_STR);
 

@@ -81,5 +81,4 @@ public class NamedThreadFactory implements ThreadFactory {
     t.setPriority(Thread.NORM_PRIORITY);
     return t;
   }
-
 }

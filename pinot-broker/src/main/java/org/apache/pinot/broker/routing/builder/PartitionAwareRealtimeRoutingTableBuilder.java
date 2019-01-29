@@ -79,8 +79,7 @@ public class PartitionAwareRealtimeRoutingTableBuilder extends BasePartitionAwar
 
     // Ensure that for each partition, we have at most one Helix partition (Pinot segment) in consuming state
     Map<String, SegmentName> allowedSegmentInConsumingStateByPartition =
-        LowLevelRoutingTableBuilderUtil.getAllowedConsumingStateSegments(externalView,
-            sortedSegmentsByStreamPartition);
+        LowLevelRoutingTableBuilderUtil.getAllowedConsumingStateSegments(externalView, sortedSegmentsByStreamPartition);
 
     RoutingTableInstancePruner instancePruner = new RoutingTableInstancePruner(instanceConfigs);
 
@@ -88,8 +87,7 @@ public class PartitionAwareRealtimeRoutingTableBuilder extends BasePartitionAwar
     Map<String, Map<Integer, String>> segmentToReplicaToServerMap = new HashMap<>();
     for (String segmentName : segmentSet) {
       int partitionId = getPartitionId(segmentName);
-      SegmentName validConsumingSegment =
-          allowedSegmentInConsumingStateByPartition.get(Integer.toString(partitionId));
+      SegmentName validConsumingSegment = allowedSegmentInConsumingStateByPartition.get(Integer.toString(partitionId));
 
       Map<Integer, String> replicaToServerMap = new HashMap<>();
       int replicaId = 0;

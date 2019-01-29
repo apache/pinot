@@ -51,7 +51,8 @@ public class SegmentDumpTool {
   @Option(name = "-dumpStarTree")
   private boolean dumpStarTree;
 
-  public void doMain(String[] args) throws Exception {
+  public void doMain(String[] args)
+      throws Exception {
     CmdLineParser parser = new CmdLineParser(this);
     parser.parseArgument(args);
 
@@ -113,7 +114,8 @@ public class SegmentDumpTool {
     indexSegment.destroy();
   }
 
-  public static void main(String[] args) throws Exception {
+  public static void main(String[] args)
+      throws Exception {
     new SegmentDumpTool().doMain(args);
   }
 }

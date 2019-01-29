@@ -49,8 +49,7 @@ public class MutableDictionaryTest {
   private static final int EST_CARDINALITY = NUM_ENTRIES / 3;
   private static final int NUM_READERS = 3;
   private static final FieldSpec.DataType[] DATA_TYPES =
-      {FieldSpec.DataType.INT, FieldSpec.DataType.LONG, FieldSpec.DataType.FLOAT, FieldSpec.DataType.DOUBLE,
-          FieldSpec.DataType.STRING, FieldSpec.DataType.BYTES};
+      {FieldSpec.DataType.INT, FieldSpec.DataType.LONG, FieldSpec.DataType.FLOAT, FieldSpec.DataType.DOUBLE, FieldSpec.DataType.STRING, FieldSpec.DataType.BYTES};
   private static final long RANDOM_SEED = System.currentTimeMillis();
   private static final Random RANDOM = new Random(RANDOM_SEED);
 
@@ -145,7 +144,8 @@ public class MutableDictionaryTest {
   }
 
   @Test
-  public void testOffHeapMutableDictionary() throws Exception {
+  public void testOffHeapMutableDictionary()
+      throws Exception {
     int[] maxOverflowSizes = {0, 2000};
 
     try {
@@ -201,8 +201,8 @@ public class MutableDictionaryTest {
     Collections.sort(expectedSortedValues);
     Object sortedValues = dictionary.getSortedValues();
     List<Comparable> actualSortedValues =
-        (dataType.equals(FieldSpec.DataType.STRING) || dataType.equals(FieldSpec.DataType.BYTES)) ? Arrays.asList(
-            (Comparable[]) dictionary.getSortedValues()) : primitiveArrayToList(dataType, sortedValues);
+        (dataType.equals(FieldSpec.DataType.STRING) || dataType.equals(FieldSpec.DataType.BYTES)) ? Arrays
+            .asList((Comparable[]) dictionary.getSortedValues()) : primitiveArrayToList(dataType, sortedValues);
     Assert.assertEquals(actualSortedValues, expectedSortedValues);
 
     // Bytes do not support string comparison.
@@ -255,7 +255,8 @@ public class MutableDictionaryTest {
   }
 
   @AfterClass
-  public void tearDown() throws Exception {
+  public void tearDown()
+      throws Exception {
     _executorService.shutdown();
     _memoryManager.close();
   }
@@ -274,7 +275,8 @@ public class MutableDictionaryTest {
     }
 
     @Override
-    public Void call() throws Exception {
+    public Void call()
+        throws Exception {
       for (int i = 0; i < NUM_ENTRIES; i++) {
         int dictId;
         do {
@@ -303,7 +305,8 @@ public class MutableDictionaryTest {
     }
 
     @Override
-    public Void call() throws Exception {
+    public Void call()
+        throws Exception {
       for (int i = 0; i < NUM_ENTRIES; i++) {
         Object value = makeObject(i + 1, _dataType);
         _dictionary.index(value);

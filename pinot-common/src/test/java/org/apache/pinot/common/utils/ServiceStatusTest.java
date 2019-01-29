@@ -39,6 +39,7 @@ public class ServiceStatusTest {
     public ServiceStatus.Status getServiceStatus() {
       return ServiceStatus.Status.GOOD;
     }
+
     @Override
     public String getStatusDescription() {
       return ServiceStatus.STATUS_DESCRIPTION_NONE;
@@ -50,6 +51,7 @@ public class ServiceStatusTest {
     public ServiceStatus.Status getServiceStatus() {
       return ServiceStatus.Status.STARTING;
     }
+
     @Override
     public String getStatusDescription() {
       return ServiceStatus.STATUS_DESCRIPTION_NONE;
@@ -61,6 +63,7 @@ public class ServiceStatusTest {
     public ServiceStatus.Status getServiceStatus() {
       return ServiceStatus.Status.BAD;
     }
+
     @Override
     public String getStatusDescription() {
       return ServiceStatus.STATUS_DESCRIPTION_NONE;
@@ -73,37 +76,33 @@ public class ServiceStatusTest {
   @Test
   public void testMultipleServiceStatusCallback() {
     // Only good should return good
-    ServiceStatus.MultipleCallbackServiceStatusCallback onlyGood = new ServiceStatus.MultipleCallbackServiceStatusCallback(
-        ImmutableList.of(ALWAYS_GOOD)
-    );
+    ServiceStatus.MultipleCallbackServiceStatusCallback onlyGood =
+        new ServiceStatus.MultipleCallbackServiceStatusCallback(ImmutableList.of(ALWAYS_GOOD));
 
     assertEquals(onlyGood.getServiceStatus(), ServiceStatus.Status.GOOD);
 
     // Only bad should return bad
-    ServiceStatus.MultipleCallbackServiceStatusCallback onlyBad = new ServiceStatus.MultipleCallbackServiceStatusCallback(
-        ImmutableList.of(ALWAYS_BAD)
-    );
+    ServiceStatus.MultipleCallbackServiceStatusCallback onlyBad =
+        new ServiceStatus.MultipleCallbackServiceStatusCallback(ImmutableList.of(ALWAYS_BAD));
 
     assertEquals(onlyBad.getServiceStatus(), ServiceStatus.Status.BAD);
 
     // Only starting should return starting
-    ServiceStatus.MultipleCallbackServiceStatusCallback onlyStarting = new ServiceStatus.MultipleCallbackServiceStatusCallback(
-        ImmutableList.of(ALWAYS_STARTING)
-    );
+    ServiceStatus.MultipleCallbackServiceStatusCallback onlyStarting =
+        new ServiceStatus.MultipleCallbackServiceStatusCallback(ImmutableList.of(ALWAYS_STARTING));
 
     assertEquals(onlyStarting.getServiceStatus(), ServiceStatus.Status.STARTING);
 
     // Good + starting = starting
-    ServiceStatus.MultipleCallbackServiceStatusCallback goodAndStarting = new ServiceStatus.MultipleCallbackServiceStatusCallback(
-        ImmutableList.of(ALWAYS_GOOD, ALWAYS_STARTING)
-    );
+    ServiceStatus.MultipleCallbackServiceStatusCallback goodAndStarting =
+        new ServiceStatus.MultipleCallbackServiceStatusCallback(ImmutableList.of(ALWAYS_GOOD, ALWAYS_STARTING));
 
     assertEquals(goodAndStarting.getServiceStatus(), ServiceStatus.Status.STARTING);
 
     // Good + starting + bad = starting (check for left-to-right evaluation)
-    ServiceStatus.MultipleCallbackServiceStatusCallback goodStartingAndBad = new ServiceStatus.MultipleCallbackServiceStatusCallback(
-        ImmutableList.of(ALWAYS_GOOD, ALWAYS_STARTING, ALWAYS_BAD)
-    );
+    ServiceStatus.MultipleCallbackServiceStatusCallback goodStartingAndBad =
+        new ServiceStatus.MultipleCallbackServiceStatusCallback(
+            ImmutableList.of(ALWAYS_GOOD, ALWAYS_STARTING, ALWAYS_BAD));
 
     assertEquals(goodStartingAndBad.getServiceStatus(), ServiceStatus.Status.STARTING);
   }
@@ -189,8 +188,7 @@ public class ServiceStatusTest {
         Collections.singletonList(TABLE_NAME));
   }
 
-  private static class TestIdealStateAndExternalViewMatchServiceStatusCallback
-      extends ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback {
+  private static class TestIdealStateAndExternalViewMatchServiceStatusCallback extends ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback {
     private IdealState _idealState;
     private ExternalView _externalView;
 

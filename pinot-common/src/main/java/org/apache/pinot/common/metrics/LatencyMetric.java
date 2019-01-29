@@ -92,5 +92,4 @@ public class LatencyMetric<T extends Sampling & Summarizable> {
         + ", _percentile99=" + _percentile99 + ", _percentile999=" + _percentile999 + ", _histogram=" + _histogram
         + "]";
   }
-
 }

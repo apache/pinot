@@ -66,12 +66,12 @@ public class AggregationPlanNode implements PlanNode {
         }
         FilterQueryTree rootFilterNode = RequestUtils.generateFilterQueryTree(brokerRequest);
         for (StarTreeV2 starTreeV2 : starTrees) {
-          if (StarTreeUtils.isFitForStarTree(starTreeV2.getMetadata(), aggregationFunctionColumnPairs, null,
-              rootFilterNode)) {
+          if (StarTreeUtils
+              .isFitForStarTree(starTreeV2.getMetadata(), aggregationFunctionColumnPairs, null, rootFilterNode)) {
             _transformPlanNode = null;
             _starTreeTransformPlanNode =
-                new StarTreeTransformPlanNode(starTreeV2, aggregationFunctionColumnPairs, null,
-                    rootFilterNode, brokerRequest.getDebugOptions());
+                new StarTreeTransformPlanNode(starTreeV2, aggregationFunctionColumnPairs, null, rootFilterNode,
+                    brokerRequest.getDebugOptions());
             return;
           }
         }

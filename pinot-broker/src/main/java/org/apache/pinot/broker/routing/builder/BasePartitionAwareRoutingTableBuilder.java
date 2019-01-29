@@ -75,7 +75,8 @@ public abstract class BasePartitionAwareRoutingTableBuilder implements RoutingTa
   private String _tableName;
 
   @Override
-  public void init(Configuration configuration, TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore, BrokerMetrics brokerMetrics) {
+  public void init(Configuration configuration, TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore,
+      BrokerMetrics brokerMetrics) {
     _propertyStore = propertyStore;
 
     _tableName = tableConfig.getTableName();

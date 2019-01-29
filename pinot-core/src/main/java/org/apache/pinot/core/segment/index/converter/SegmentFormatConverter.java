@@ -20,12 +20,13 @@ package org.apache.pinot.core.segment.index.converter;
 
 import java.io.File;
 
+
 /**
  * Converts a segment from format to another.
  * This can be useful in upgrading our index formats etc automatically.
  */
 public interface SegmentFormatConverter {
 
-  void convert(File indexSegmentDir) throws Exception;
-
+  void convert(File indexSegmentDir)
+      throws Exception;
 }

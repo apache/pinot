@@ -111,9 +111,8 @@ public class QueryComparison {
     BufferedReader resultReader = null;
     ScanBasedQueryProcessor scanBasedQueryProcessor = null;
 
-    try (
-        BufferedReader queryReader = new BufferedReader(new InputStreamReader(new FileInputStream(_queryFile), "UTF8"))
-    ) {
+    try (BufferedReader queryReader = new BufferedReader(
+        new InputStreamReader(new FileInputStream(_queryFile), "UTF8"))) {
       if (_resultFile == null) {
         scanBasedQueryProcessor = new ScanBasedQueryProcessor(_segmentsDir.getAbsolutePath());
       } else {
@@ -164,7 +163,8 @@ public class QueryComparison {
               LOGGER.info("expected Response: {}", expectedJson);
             }
           } catch (Exception e) {
-            LOGGER.error("Comparison FAILED: Id: {} Exception caught while comparing query: '{}' actual response: {}, expected response: {}",
+            LOGGER.error(
+                "Comparison FAILED: Id: {} Exception caught while comparing query: '{}' actual response: {}, expected response: {}",
                 total, query, actualJson, expectedJson, e);
           }
         }
@@ -182,9 +182,8 @@ public class QueryComparison {
 
   private void runPerfMode()
       throws Exception {
-    try (
-        BufferedReader queryReader = new BufferedReader(new InputStreamReader(new FileInputStream(_queryFile), "UTF8"))
-    ) {
+    try (BufferedReader queryReader = new BufferedReader(
+        new InputStreamReader(new FileInputStream(_queryFile), "UTF8"))) {
       String query;
       while ((query = queryReader.readLine()) != null) {
         if (query.isEmpty() || query.startsWith("#")) {
@@ -211,9 +210,7 @@ public class QueryComparison {
   }
 
   public enum ComparisonStatus {
-    PASSED,
-    EMPTY,
-    FAILED
+    PASSED, EMPTY, FAILED
   }
 
   public static ComparisonStatus compareWithEmpty(JsonNode actualJson, JsonNode expectedJson) {
@@ -413,9 +410,8 @@ public class QueryComparison {
     JsonNode expectedSelection = expectedJson.get(SELECTION_RESULTS);
     Map<Integer, Integer> expectedToActualColMap = new HashMap<>(actualSelection.get(COLUMNS).size());
 
-    return compareLists(actualSelection.get(COLUMNS), expectedSelection.get(COLUMNS),
-        expectedToActualColMap) && compareSelectionRows(actualSelection.get(RESULTS),
-        expectedSelection.get(RESULTS), expectedToActualColMap);
+    return compareLists(actualSelection.get(COLUMNS), expectedSelection.get(COLUMNS), expectedToActualColMap)
+        && compareSelectionRows(actualSelection.get(RESULTS), expectedSelection.get(RESULTS), expectedToActualColMap);
   }
 
   private static boolean compareSelectionRows(JsonNode actualRows, JsonNode expectedRows,
@@ -423,7 +419,8 @@ public class QueryComparison {
     final int numActualRows = actualRows.size();
     final int numExpectedRows = expectedRows.size();
     if (numActualRows > numExpectedRows) {
-      LOGGER.error("In selection, number of actual rows: {} more than expected rows: {}", numActualRows, numExpectedRows);
+      LOGGER
+          .error("In selection, number of actual rows: {} more than expected rows: {}", numActualRows, numExpectedRows);
       return false;
     }
     Map<String, Integer> expectedRowMap = new HashMap<>(numExpectedRows);

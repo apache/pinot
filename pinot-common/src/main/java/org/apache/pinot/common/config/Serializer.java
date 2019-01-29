@@ -59,14 +59,13 @@ public class Serializer {
   public static <T> String serializeToPropertiesString(T object) {
     ConfigRenderOptions configRenderOptions =
         ConfigRenderOptions.defaults().setJson(false).setOriginComments(false).setFormatted(false);
-    return serialize(object)
-        .map(keyValueTuple -> keyValueTuple._1 + "=" +
-            ConfigValueFactory.fromAnyRef(keyValueTuple._2).render(configRenderOptions))
-        .sorted()
-        .mkString("\n");
+    return serialize(object).map(
+        keyValueTuple -> keyValueTuple._1 + "=" + ConfigValueFactory.fromAnyRef(keyValueTuple._2)
+            .render(configRenderOptions)).sorted().mkString("\n");
   }
 
-  private static <T> Map<String, ?> serialize(T object, Class<? extends T> clazz, String pathContext) throws Exception {
+  private static <T> Map<String, ?> serialize(T object, Class<? extends T> clazz, String pathContext)
+      throws Exception {
     if (object == null) {
       return HashMap.empty();
     }
@@ -155,8 +154,7 @@ public class Serializer {
     if (useChildKeyTransformers != null) {
       // Reverse the order of the child key transformers
       List<Class<? extends ChildKeyTransformer>> reversedChildKeyTransformers =
-          List.ofAll(Arrays.asList(useChildKeyTransformers.value()))
-          .reverse();
+          List.ofAll(Arrays.asList(useChildKeyTransformers.value())).reverse();
 
       for (Class<? extends ChildKeyTransformer> childKeyTransformerClass : reversedChildKeyTransformers) {
         LOGGER.debug("Using child key transformer {} on the root config {}", childKeyTransformerClass, values);
@@ -175,7 +173,7 @@ public class Serializer {
     List<Field> fields = List.of(clazz.getDeclaredFields());
 
     // Recursively add all parent fields
-    while(clazz.getSuperclass() != null) {
+    while (clazz.getSuperclass() != null) {
       clazz = clazz.getSuperclass();
       fields = fields.appendAll(Arrays.asList(clazz.getDeclaredFields()));
     }
@@ -183,7 +181,8 @@ public class Serializer {
     return fields;
   }
 
-  private static Map<String, Object> storeSimpleFieldIntoMap(Object object, Class<?> type, String keyName, Map<String, Object> values) {
+  private static Map<String, Object> storeSimpleFieldIntoMap(Object object, Class<?> type, String keyName,
+      Map<String, Object> values) {
     // No object to write
     if (object == null) {
       return values;

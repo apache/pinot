@@ -27,13 +27,10 @@ public class DataSizeTest {
   @Test
   public void testToBytes() {
 
-    Assert.assertEquals(DataSize.toBytes("128M"),
-        128 * 1024 * 1024L);
-    Assert.assertEquals(DataSize.toBytes("1024"),
-        1024L);
+    Assert.assertEquals(DataSize.toBytes("128M"), 128 * 1024 * 1024L);
+    Assert.assertEquals(DataSize.toBytes("1024"), 1024L);
 
-    Assert.assertEquals(DataSize.toBytes("1.5G"),
-        (long)(1.5 * 1024 * 1024 * 1024L));
+    Assert.assertEquals(DataSize.toBytes("1.5G"), (long) (1.5 * 1024 * 1024 * 1024L));
 
     Assert.assertEquals(DataSize.toBytes("123"), 123);
     Assert.assertEquals(DataSize.toBytes("123P"), -1);
@@ -43,7 +40,5 @@ public class DataSizeTest {
     Assert.assertEquals(DataSize.toBytes("123k"), 123 * 1024L);
 
     Assert.assertEquals(DataSize.toBytes("123t"), 123 * 1024L * 1024 * 1024 * 1024);
-
   }
-
 }

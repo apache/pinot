@@ -30,7 +30,8 @@ import org.testng.annotations.Test;
 public class SegmentMergeLineageTest {
 
   @Test
-  public void testSegmentMergeLineage() throws Exception {
+  public void testSegmentMergeLineage()
+      throws Exception {
     SegmentMergeLineage segmentMergeLineage = new SegmentMergeLineage("test_OFFLINE");
 
     // Start with 3 original segments.
@@ -56,24 +57,24 @@ public class SegmentMergeLineageTest {
     Assert.assertEquals(segmentMergeLineage.getSegmentsForGroup(groupId4), groupSegments4);
     Assert.assertEquals(segmentMergeLineage.getChildrenForGroup(groupId4),
         Arrays.asList(new String[]{groupId1, groupId2}));
-    Assert.assertEquals(segmentMergeLineage.getSegmentsForGroup(groupId4),
-        Arrays.asList(new String[]{"segment4"}));
+    Assert.assertEquals(segmentMergeLineage.getSegmentsForGroup(groupId4), Arrays.asList(new String[]{"segment4"}));
 
     // 2 more original segments gets uploaded.
     String groupId5 = "G5";
-    List<String> groupSegments5 = Arrays.asList(new String[] {"segment 5"});
+    List<String> groupSegments5 = Arrays.asList(new String[]{"segment 5"});
     segmentMergeLineage.addSegmentGroup(groupId5, groupSegments5, null);
     Assert.assertEquals(segmentMergeLineage.getSegmentsForGroup(groupId5), groupSegments5);
 
     String groupId6 = "G6";
-    List<String> groupSegments6 = Arrays.asList(new String[] {"segment 6"});
+    List<String> groupSegments6 = Arrays.asList(new String[]{"segment 6"});
     segmentMergeLineage.addSegmentGroup(groupId6, groupSegments6, null);
     Assert.assertEquals(segmentMergeLineage.getSegmentsForGroup(groupId6), groupSegments6);
 
     // Let's say a merge task merges segment 3,5,6 into 7,8.
     String groupId7 = "G7";
-    List<String> groupSegments7= Arrays.asList(new String[]{"segment7", "segment8"});
-    segmentMergeLineage.addSegmentGroup(groupId7, groupSegments7, Arrays.asList(new String[]{groupId3, groupId5, groupId6}));
+    List<String> groupSegments7 = Arrays.asList(new String[]{"segment7", "segment8"});
+    segmentMergeLineage
+        .addSegmentGroup(groupId7, groupSegments7, Arrays.asList(new String[]{groupId3, groupId5, groupId6}));
     Assert.assertEquals(segmentMergeLineage.getSegmentsForGroup(groupId7), groupSegments7);
     Assert.assertEquals(segmentMergeLineage.getChildrenForGroup(groupId7),
         Arrays.asList(new String[]{groupId3, groupId5, groupId6}));
@@ -101,7 +102,8 @@ public class SegmentMergeLineageTest {
   }
 
   @Test
-  public void testUpdateWithDuplicateGroupId() throws Exception {
+  public void testUpdateWithDuplicateGroupId()
+      throws Exception {
     SegmentMergeLineage segmentMergeLineage = new SegmentMergeLineage("test_OFFLINE");
     String groupId1 = "G1";
     List<String> groupSegments1 = Arrays.asList(new String[]{"segment1, segment2, segment3"});

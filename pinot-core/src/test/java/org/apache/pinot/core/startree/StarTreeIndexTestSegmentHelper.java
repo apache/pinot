@@ -49,7 +49,8 @@ public class StarTreeIndexTestSegmentHelper {
   private static final int NUM_METRICS = 2;
   private static final int METRIC_MAX_VALUE = 10000;
 
-  public static Schema buildSegment(String segmentDirName, String segmentName) throws Exception {
+  public static Schema buildSegment(String segmentDirName, String segmentName)
+      throws Exception {
     return buildSegment(segmentDirName, segmentName, null);
   }
 
@@ -58,7 +59,8 @@ public class StarTreeIndexTestSegmentHelper {
     return buildSegment(segmentDirName, segmentName, hllConfig);
   }
 
-  private static Schema buildSegment(String segmentDirName, String segmentName, HllConfig hllConfig) throws Exception {
+  private static Schema buildSegment(String segmentDirName, String segmentName, HllConfig hllConfig)
+      throws Exception {
     int numRows = (int) MathUtils.factorial(NUM_DIMENSIONS) * 100;
     Schema schema = new Schema();
 

@@ -43,7 +43,8 @@ public class QueryExecutorConfig {
   private QueryPlannerConfig _queryPlannerConfig;
   private final long _timeOutMs;
 
-  public QueryExecutorConfig(Configuration config) throws ConfigurationException {
+  public QueryExecutorConfig(Configuration config)
+      throws ConfigurationException {
     _queryExecutorConfig = config;
     checkRequiredKeys();
     _segmentPrunerConfig = new SegmentPrunerConfig(_queryExecutorConfig.subset(QUERY_PRUNER));
@@ -51,7 +52,8 @@ public class QueryExecutorConfig {
     _timeOutMs = _queryExecutorConfig.getLong(TIME_OUT, -1);
   }
 
-  private void checkRequiredKeys() throws ConfigurationException {
+  private void checkRequiredKeys()
+      throws ConfigurationException {
     for (String keyString : REQUIRED_KEYS) {
       if (!_queryExecutorConfig.containsKey(keyString)) {
         throw new ConfigurationException("Cannot find required key : " + keyString);

@@ -37,7 +37,8 @@ public class Duration {
     this.unitCount = unitCount;
   }
 
-  public Duration() {}
+  public Duration() {
+  }
 
   public TimeUnit getUnit() {
     return unit;

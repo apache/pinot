@@ -40,7 +40,8 @@ public class FixedByteSingleColumnMultiValueReaderWriterTest {
   }
 
   @AfterClass
-  public void tearDown() throws Exception {
+  public void tearDown()
+      throws Exception {
     _memoryManager.close();
   }
 
@@ -65,7 +66,8 @@ public class FixedByteSingleColumnMultiValueReaderWriterTest {
     }
   }
 
-  public void testIntArray(final long seed) throws IOException {
+  public void testIntArray(final long seed)
+      throws IOException {
     FixedByteSingleColumnMultiValueReaderWriter readerWriter;
     int rows = 1000;
     int columnSizeInBytes = Integer.BYTES;
@@ -92,7 +94,8 @@ public class FixedByteSingleColumnMultiValueReaderWriterTest {
     readerWriter.close();
   }
 
-  public void testIntArrayFixedSize(int multiValuesPerRow, long seed) throws IOException {
+  public void testIntArrayFixedSize(int multiValuesPerRow, long seed)
+      throws IOException {
     FixedByteSingleColumnMultiValueReaderWriter readerWriter;
     int rows = 1000;
     int columnSizeInBytes = Integer.BYTES;
@@ -120,7 +123,8 @@ public class FixedByteSingleColumnMultiValueReaderWriterTest {
     readerWriter.close();
   }
 
-  public void testWithZeroSize(long seed) throws IOException {
+  public void testWithZeroSize(long seed)
+      throws IOException {
     FixedByteSingleColumnMultiValueReaderWriter readerWriter;
     final int maxNumberOfMultiValuesPerRow = 5;
     int rows = 1000;
@@ -166,7 +170,8 @@ public class FixedByteSingleColumnMultiValueReaderWriterTest {
   }
 
   @Test
-  public void testLongArray() throws IOException {
+  public void testLongArray()
+      throws IOException {
     final long seed = generateSeed();
     Random r = new Random(seed);
     int rows = 1000;
@@ -197,7 +202,8 @@ public class FixedByteSingleColumnMultiValueReaderWriterTest {
   }
 
   @Test
-  public void testFloatArray() throws IOException {
+  public void testFloatArray()
+      throws IOException {
     final long seed = generateSeed();
     Random r = new Random(seed);
     int rows = 1000;
@@ -228,7 +234,8 @@ public class FixedByteSingleColumnMultiValueReaderWriterTest {
   }
 
   @Test
-  public void testDoubleArray() throws IOException {
+  public void testDoubleArray()
+      throws IOException {
     final long seed = generateSeed();
     Random r = new Random(seed);
     int rows = 1000;

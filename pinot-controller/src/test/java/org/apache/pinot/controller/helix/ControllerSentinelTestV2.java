@@ -34,13 +34,14 @@ public class ControllerSentinelTestV2 extends ControllerTest {
   private final String _helixClusterName = getHelixClusterName();
 
   @BeforeClass
-  public void setup() throws Exception {
+  public void setup()
+      throws Exception {
     startZk();
     startController();
-    ControllerRequestBuilderUtil.addFakeBrokerInstancesToAutoJoinHelixCluster(_helixClusterName,
-        ZkStarter.DEFAULT_ZK_STR, 20, true);
-    ControllerRequestBuilderUtil.addFakeDataInstancesToAutoJoinHelixCluster(_helixClusterName, ZkStarter.DEFAULT_ZK_STR,
-        20, true);
+    ControllerRequestBuilderUtil
+        .addFakeBrokerInstancesToAutoJoinHelixCluster(_helixClusterName, ZkStarter.DEFAULT_ZK_STR, 20, true);
+    ControllerRequestBuilderUtil
+        .addFakeDataInstancesToAutoJoinHelixCluster(_helixClusterName, ZkStarter.DEFAULT_ZK_STR, 20, true);
   }
 
   @AfterClass
@@ -50,48 +51,43 @@ public class ControllerSentinelTestV2 extends ControllerTest {
   }
 
   @Test
-  public void testOfflineTableLifeCycle() throws IOException {
+  public void testOfflineTableLifeCycle()
+      throws IOException {
     // Create offline table creation request
     String tableName = "testTable";
     String tableJSONConfigString =
-        new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(tableName)
-            .setNumReplicas(3)
-            .build()
-            .toJSONConfigString();
+        new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(tableName).setNumReplicas(3)
+            .build().toJSONConfigString();
     sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableJSONConfigString);
     Assert.assertEquals(
         _helixAdmin.getResourceIdealState(_helixClusterName, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)
-            .getPartitionSet()
-            .size(), 1);
+            .getPartitionSet().size(), 1);
     Assert.assertEquals(
         _helixAdmin.getResourceIdealState(_helixClusterName, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)
-            .getInstanceSet(tableName + "_OFFLINE")
-            .size(), 20);
+            .getInstanceSet(tableName + "_OFFLINE").size(), 20);
 
     // Adding segments
     for (int i = 0; i < 10; ++i) {
-      Assert.assertEquals(
-          _helixAdmin.getResourceIdealState(_helixClusterName, tableName + "_OFFLINE").getNumPartitions(), i);
+      Assert
+          .assertEquals(_helixAdmin.getResourceIdealState(_helixClusterName, tableName + "_OFFLINE").getNumPartitions(),
+              i);
       _helixResourceManager.addNewSegment(SegmentMetadataMockUtils.mockSegmentMetadata(tableName), "downloadUrl");
-      Assert.assertEquals(
-          _helixAdmin.getResourceIdealState(_helixClusterName, tableName + "_OFFLINE").getNumPartitions(), i + 1);
+      Assert
+          .assertEquals(_helixAdmin.getResourceIdealState(_helixClusterName, tableName + "_OFFLINE").getNumPartitions(),
+              i + 1);
     }
 
     // Delete table
     sendDeleteRequest(_controllerRequestURLBuilder.forTableDelete(tableName));
     Assert.assertEquals(
         _helixAdmin.getResourceIdealState(_helixClusterName, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)
-            .getPartitionSet()
-            .size(), 0);
+            .getPartitionSet().size(), 0);
 
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(_helixClusterName,
-        TagNameUtils.getBrokerTagForTenant(TagNameUtils.DEFAULT_TENANT_NAME))
-        .size(), 20);
+        TagNameUtils.getBrokerTagForTenant(TagNameUtils.DEFAULT_TENANT_NAME)).size(), 20);
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(_helixClusterName,
-        TagNameUtils.getRealtimeTagForTenant(TagNameUtils.DEFAULT_TENANT_NAME))
-        .size(), 20);
+        TagNameUtils.getRealtimeTagForTenant(TagNameUtils.DEFAULT_TENANT_NAME)).size(), 20);
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(_helixClusterName,
-        TagNameUtils.getOfflineTagForTenant(TagNameUtils.DEFAULT_TENANT_NAME))
-        .size(), 20);
+        TagNameUtils.getOfflineTagForTenant(TagNameUtils.DEFAULT_TENANT_NAME)).size(), 20);
   }
 }

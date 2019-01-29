@@ -56,10 +56,8 @@ public class DummyServer implements Runnable {
     EventLoopGroup workerGroup = new NioEventLoopGroup();
     try {
       ServerBootstrap serverBootstrap = new ServerBootstrap();
-      _channel = serverBootstrap.group(bossGroup, workerGroup)
-          .channel(NioServerSocketChannel.class)
-          .option(ChannelOption.SO_BACKLOG, 128)
-          .childOption(ChannelOption.SO_KEEPALIVE, true)
+      _channel = serverBootstrap.group(bossGroup, workerGroup).channel(NioServerSocketChannel.class)
+          .option(ChannelOption.SO_BACKLOG, 128).childOption(ChannelOption.SO_KEEPALIVE, true)
           .childHandler(new ChannelInitializer<SocketChannel>() {
             @Override
             protected void initChannel(SocketChannel ch) {
@@ -67,17 +65,15 @@ public class DummyServer implements Runnable {
                   .addLast(new LengthFieldBasedFrameDecoder(Integer.MAX_VALUE, 0, Integer.BYTES, 0, Integer.BYTES),
                       new LengthFieldPrepender(Integer.BYTES), new SimpleChannelInboundHandler<ByteBuf>() {
                         @Override
-                        protected void channelRead0(ChannelHandlerContext ctx, ByteBuf msg) throws Exception {
+                        protected void channelRead0(ChannelHandlerContext ctx, ByteBuf msg)
+                            throws Exception {
                           Thread.sleep(_responseDelayMs);
                           ctx.writeAndFlush(ctx.alloc().buffer(_responseBytes.length).writeBytes(_responseBytes),
                               ctx.voidPromise());
                         }
                       });
             }
-          })
-          .bind(_port)
-          .sync()
-          .channel();
+          }).bind(_port).sync().channel();
       _channel.closeFuture().sync();
     } catch (Exception e) {
       throw new RuntimeException(e);

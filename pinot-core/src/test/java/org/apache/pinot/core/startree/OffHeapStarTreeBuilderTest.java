@@ -109,7 +109,8 @@ public class OffHeapStarTreeBuilderTest {
    * @throws Exception
    */
   @Test
-  public void testSimple() throws Exception {
+  public void testSimple()
+      throws Exception {
     testSimpleCore(3, 2, 0);
   }
 
@@ -118,7 +119,8 @@ public class OffHeapStarTreeBuilderTest {
    * @throws Exception
    */
   @Test
-  public void testSkipMaterialization() throws Exception {
+  public void testSkipMaterialization()
+      throws Exception {
     testSimpleCore(6, 2, 2);
   }
 }

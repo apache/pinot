@@ -24,9 +24,9 @@ import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
 import org.apache.commons.configuration.Configuration;
+import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileUtil;
-import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RemoteIterator;
@@ -74,12 +74,14 @@ public class HadoopPinotFS extends PinotFS {
   }
 
   @Override
-  public boolean mkdir(URI uri) throws IOException {
+  public boolean mkdir(URI uri)
+      throws IOException {
     return _hadoopFS.mkdirs(new Path(uri));
   }
 
   @Override
-  public boolean delete(URI segmentUri, boolean forceDelete) throws IOException {
+  public boolean delete(URI segmentUri, boolean forceDelete)
+      throws IOException {
     // Returns false if we are moving a directory and that directory is not empty
     if (isDirectory(segmentUri) && listFiles(segmentUri, false).length > 0 && !forceDelete) {
       return false;
@@ -88,7 +90,8 @@ public class HadoopPinotFS extends PinotFS {
   }
 
   @Override
-  public boolean move(URI srcUri, URI dstUri, boolean overwrite) throws IOException {
+  public boolean move(URI srcUri, URI dstUri, boolean overwrite)
+      throws IOException {
     if (exists(dstUri) && !overwrite) {
       return false;
     }
@@ -100,7 +103,8 @@ public class HadoopPinotFS extends PinotFS {
    * need to create a new configuration and filesystem. Keeps files if copy/move is partial.
    */
   @Override
-  public boolean copy(URI srcUri, URI dstUri) throws IOException {
+  public boolean copy(URI srcUri, URI dstUri)
+      throws IOException {
     Path source = new Path(srcUri);
     Path target = new Path(dstUri);
     RemoteIterator<LocatedFileStatus> sourceFiles = _hadoopFS.listFiles(source, true);
@@ -117,17 +121,20 @@ public class HadoopPinotFS extends PinotFS {
   }
 
   @Override
-  public boolean exists(URI fileUri) throws IOException {
+  public boolean exists(URI fileUri)
+      throws IOException {
     return _hadoopFS.exists(new Path(fileUri));
   }
 
   @Override
-  public long length(URI fileUri) throws IOException {
+  public long length(URI fileUri)
+      throws IOException {
     return _hadoopFS.getLength(new Path(fileUri));
   }
 
   @Override
-  public String[] listFiles(URI fileUri, boolean recursive) throws IOException {
+  public String[] listFiles(URI fileUri, boolean recursive)
+      throws IOException {
     ArrayList<String> filePathStrings = new ArrayList<>();
     Path path = new Path(fileUri);
     if (_hadoopFS.exists(path)) {
@@ -145,7 +152,8 @@ public class HadoopPinotFS extends PinotFS {
   }
 
   @Override
-  public void copyToLocalFile(URI srcUri, File dstFile) throws Exception {
+  public void copyToLocalFile(URI srcUri, File dstFile)
+      throws Exception {
     LOGGER.debug("starting to fetch segment from hdfs");
     final String dstFilePath = dstFile.getAbsolutePath();
     try {
@@ -175,7 +183,8 @@ public class HadoopPinotFS extends PinotFS {
   }
 
   @Override
-  public void copyFromLocalFile(File srcFile, URI dstUri) throws Exception {
+  public void copyFromLocalFile(File srcFile, URI dstUri)
+      throws Exception {
     _hadoopFS.copyFromLocalFile(new Path(srcFile.toURI()), new Path(dstUri));
   }
 
@@ -197,7 +206,8 @@ public class HadoopPinotFS extends PinotFS {
   }
 
   @Override
-  public boolean touch(URI uri) throws IOException {
+  public boolean touch(URI uri)
+      throws IOException {
     Path path = new Path(uri);
     if (!exists(uri)) {
       FSDataOutputStream fos = _hadoopFS.create(path);
@@ -217,8 +227,7 @@ public class HadoopPinotFS extends PinotFS {
       if (UserGroupInformation.isSecurityEnabled()) {
         try {
           if (!UserGroupInformation.getCurrentUser().hasKerberosCredentials() || !UserGroupInformation.getCurrentUser()
-              .getUserName()
-              .equals(principal)) {
+              .getUserName().equals(principal)) {
             LOGGER.info("Trying to authenticate user [%s] with keytab [%s]..", principal, keytab);
             UserGroupInformation.loginUserFromKeytab(principal, keytab);
           }

@@ -69,14 +69,13 @@ public class KafkaStreamLevelConsumer implements StreamLevelConsumer {
     _messageDecoder = StreamDecoderProvider.create(streamConfig, schema);
 
     _tableAndStreamName = tableName + "-" + streamConfig.getTopicName();
-    INSTANCE_LOGGER = LoggerFactory.getLogger(
-        KafkaStreamLevelConsumer.class.getName() + "_" + tableName + "_" + streamConfig.getTopicName());
+    INSTANCE_LOGGER = LoggerFactory
+        .getLogger(KafkaStreamLevelConsumer.class.getName() + "_" + tableName + "_" + streamConfig.getTopicName());
   }
 
-
-
   @Override
-  public void start() throws Exception {
+  public void start()
+      throws Exception {
     consumerAndIterator = KafkaConsumerManager.acquireConsumerAndIteratorForConfig(_kafkaHighLevelStreamConfig);
     kafkaIterator = consumerAndIterator.getIterator();
     consumer = consumerAndIterator.getConsumer();
@@ -87,8 +86,8 @@ public class KafkaStreamLevelConsumer implements StreamLevelConsumer {
     if (kafkaIterator.hasNext()) {
       try {
         destination = _messageDecoder.decode(kafkaIterator.next().message(), destination);
-        tableAndStreamRowsConsumed =
-            _serverMetrics.addMeteredTableValue(_tableAndStreamName, ServerMeter.REALTIME_ROWS_CONSUMED, 1L,
+        tableAndStreamRowsConsumed = _serverMetrics
+            .addMeteredTableValue(_tableAndStreamName, ServerMeter.REALTIME_ROWS_CONSUMED, 1L,
                 tableAndStreamRowsConsumed);
         tableRowsConsumed =
             _serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_ROWS_CONSUMED, 1L, tableRowsConsumed);
@@ -102,8 +101,7 @@ public class KafkaStreamLevelConsumer implements StreamLevelConsumer {
             INSTANCE_LOGGER.info("Consumed {} events from kafka stream {}", currentCount, _streamConfig.getTopicName());
           } else {
             INSTANCE_LOGGER.info("Consumed {} events from kafka stream {} (rate:{}/s)", currentCount - lastCount,
-                _streamConfig.getTopicName(),
-                (float) (currentCount - lastCount) * 1000 / (now - lastLogTime));
+                _streamConfig.getTopicName(), (float) (currentCount - lastCount) * 1000 / (now - lastLogTime));
           }
           lastCount = currentCount;
           lastLogTime = now;
@@ -127,7 +125,8 @@ public class KafkaStreamLevelConsumer implements StreamLevelConsumer {
   }
 
   @Override
-  public void shutdown() throws Exception {
+  public void shutdown()
+      throws Exception {
     if (consumerAndIterator != null) {
       kafkaIterator = null;
       consumer = null;

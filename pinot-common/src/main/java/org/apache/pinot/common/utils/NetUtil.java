@@ -30,7 +30,8 @@ public class NetUtil {
   /**
    * Get the ip address of local host.
    */
-  public static String getHostAddress() throws SocketException, UnknownHostException {
+  public static String getHostAddress()
+      throws SocketException, UnknownHostException {
     DatagramSocket ds = new DatagramSocket();
     ds.connect(InetAddress.getByName(DUMMY_OUT_IP), 80);
     InetAddress localAddress = ds.getLocalAddress();

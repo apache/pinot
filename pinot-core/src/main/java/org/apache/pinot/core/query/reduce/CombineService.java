@@ -129,8 +129,9 @@ public class CombineService {
             // Merge two blocks.
             if (isSelectionOrderBy) {
               // Combine selection order-by.
-              SelectionOperatorUtils.mergeWithOrdering((PriorityQueue<Serializable[]>) mergedBlockResultSet,
-                  blockToMergeResultSet, selection.getOffset() + selectionSize);
+              SelectionOperatorUtils
+                  .mergeWithOrdering((PriorityQueue<Serializable[]>) mergedBlockResultSet, blockToMergeResultSet,
+                      selection.getOffset() + selectionSize);
             } else {
               // Combine selection only.
               SelectionOperatorUtils.mergeWithoutOrdering(mergedBlockResultSet, blockToMergeResultSet, selectionSize);

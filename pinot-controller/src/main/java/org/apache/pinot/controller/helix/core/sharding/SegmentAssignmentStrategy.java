@@ -36,7 +36,6 @@ public interface SegmentAssignmentStrategy {
   List<String> getAssignedInstances(HelixManager helixManager, HelixAdmin helixAdmin,
       ZkHelixPropertyStore<ZNRecord> propertyStore, String helixClusterName, SegmentMetadata segmentMetadata,
       int numReplicas, String tenantName);
-
 }
 
 

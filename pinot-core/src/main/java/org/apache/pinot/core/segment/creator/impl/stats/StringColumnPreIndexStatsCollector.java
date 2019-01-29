@@ -109,7 +109,6 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
     collect(entry, false /* isAggregated */);
   }
 
-
   @Override
   public String getMinValue() {
     if (sealed) {

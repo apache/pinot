@@ -55,7 +55,6 @@ public class SegmentStatusChecker extends ControllerPeriodicTask {
   private int _offlineTableCount;
   private int _disabledTableCount;
 
-
   /**
    * Constructs the segment status checker.
    * @param pinotHelixResourceManager The resource checker used to interact with Helix
@@ -148,15 +147,15 @@ public class SegmentStatusChecker extends ControllerPeriodicTask {
       } catch (NumberFormatException e) {
         // Ignore
       }
-      _metricsRegistry.setValueOfTableGauge(tableNameWithType, ControllerGauge.NUMBER_OF_REPLICAS,
-          nReplicasFromIdealState);
+      _metricsRegistry
+          .setValueOfTableGauge(tableNameWithType, ControllerGauge.NUMBER_OF_REPLICAS, nReplicasFromIdealState);
       _metricsRegistry.setValueOfTableGauge(tableNameWithType, ControllerGauge.PERCENT_OF_REPLICAS, 100);
       _metricsRegistry.setValueOfTableGauge(tableNameWithType, ControllerGauge.PERCENT_SEGMENTS_AVAILABLE, 100);
       return;
     }
 
-    _metricsRegistry.setValueOfTableGauge(tableNameWithType, ControllerGauge.IDEALSTATE_ZNODE_SIZE,
-        idealState.toString().length());
+    _metricsRegistry
+        .setValueOfTableGauge(tableNameWithType, ControllerGauge.IDEALSTATE_ZNODE_SIZE, idealState.toString().length());
     _metricsRegistry.setValueOfTableGauge(tableNameWithType, ControllerGauge.SEGMENT_COUNT,
         (long) (idealState.getPartitionSet().size()));
     ExternalView externalView = _pinotHelixResourceManager.getTableExternalView(tableNameWithType);
@@ -184,9 +183,8 @@ public class SegmentStatusChecker extends ControllerPeriodicTask {
         // No online segments in ideal state
         continue;
       }
-      nReplicasIdealMax =
-          (idealState.getInstanceStateMap(partitionName).size() > nReplicasIdealMax) ? idealState.getInstanceStateMap(
-              partitionName).size() : nReplicasIdealMax;
+      nReplicasIdealMax = (idealState.getInstanceStateMap(partitionName).size() > nReplicasIdealMax) ? idealState
+          .getInstanceStateMap(partitionName).size() : nReplicasIdealMax;
       if ((externalView == null) || (externalView.getStateMap(partitionName) == null)) {
         // No replicas for this segment
         TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);

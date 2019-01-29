@@ -29,7 +29,8 @@ public class HelixBrokerStarterUtilsTest {
   public void testZkParserUtil1() {
     String zkServers = "hostname1,hostname2";
     String zkAddressForBroker = HelixBrokerStarter.getZkAddressForBroker(zkServers, "helixClusterName");
-    String expectedZkAddressForBroker = "hostname1/helixClusterName/PROPERTYSTORE,hostname2/helixClusterName/PROPERTYSTORE";
+    String expectedZkAddressForBroker =
+        "hostname1/helixClusterName/PROPERTYSTORE,hostname2/helixClusterName/PROPERTYSTORE";
     Assert.assertEquals(zkAddressForBroker, expectedZkAddressForBroker);
   }
 
@@ -59,5 +60,4 @@ public class HelixBrokerStarterUtilsTest {
         "hostname1:2181/chroot1/chroot2/helixClusterName/PROPERTYSTORE,hostname2:2181/chroot1/chroot2/helixClusterName/PROPERTYSTORE";
     Assert.assertEquals(zkAddressForBroker, expectedZkAddressForBroker);
   }
-
 }

@@ -29,8 +29,8 @@ public class MultiplicationTransformFunctionTest extends BaseTransformFunctionTe
 
   @Test
   public void testMultiplicationTransformFunction() {
-    TransformExpressionTree expression = TransformExpressionTree.compileToExpressionTree(
-        String.format("mult(%s,%s,%s,%s,%s)", INT_SV_COLUMN, LONG_SV_COLUMN, FLOAT_SV_COLUMN, DOUBLE_SV_COLUMN,
+    TransformExpressionTree expression = TransformExpressionTree.compileToExpressionTree(String
+        .format("mult(%s,%s,%s,%s,%s)", INT_SV_COLUMN, LONG_SV_COLUMN, FLOAT_SV_COLUMN, DOUBLE_SV_COLUMN,
             STRING_SV_COLUMN));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof MultiplicationTransformFunction);
@@ -43,8 +43,8 @@ public class MultiplicationTransformFunctionTest extends BaseTransformFunctionTe
     }
     testTransformFunction(transformFunction, expectedValues);
 
-    expression = TransformExpressionTree.compileToExpressionTree(
-        String.format("mult(mult(12,%s),%s,mult(mult(%s,%s),0.34,%s),%s)", STRING_SV_COLUMN, DOUBLE_SV_COLUMN,
+    expression = TransformExpressionTree.compileToExpressionTree(String
+        .format("mult(mult(12,%s),%s,mult(mult(%s,%s),0.34,%s),%s)", STRING_SV_COLUMN, DOUBLE_SV_COLUMN,
             FLOAT_SV_COLUMN, LONG_SV_COLUMN, INT_SV_COLUMN, DOUBLE_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof MultiplicationTransformFunction);
@@ -63,9 +63,7 @@ public class MultiplicationTransformFunctionTest extends BaseTransformFunctionTe
 
   @DataProvider(name = "testIllegalArguments")
   public Object[][] testIllegalArguments() {
-    return new Object[][]{
-        new Object[]{String.format("mult(%s)", INT_SV_COLUMN)},
-        new Object[]{String.format("mult(%s, %s)", LONG_SV_COLUMN, INT_MV_COLUMN)}
-    };
+    return new Object[][]{new Object[]{String.format("mult(%s)", INT_SV_COLUMN)}, new Object[]{String.format(
+        "mult(%s, %s)", LONG_SV_COLUMN, INT_MV_COLUMN)}};
   }
 }

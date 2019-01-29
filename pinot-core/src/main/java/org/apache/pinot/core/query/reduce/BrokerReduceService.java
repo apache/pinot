@@ -174,10 +174,10 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
     String rawTableName = TableNameBuilder.extractRawTableName(tableName);
     if (brokerMetrics != null) {
       brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.DOCUMENTS_SCANNED, numDocsScanned);
-      brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.ENTRIES_SCANNED_IN_FILTER,
-          numEntriesScannedInFilter);
-      brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.ENTRIES_SCANNED_POST_FILTER,
-          numEntriesScannedPostFilter);
+      brokerMetrics
+          .addMeteredTableValue(rawTableName, BrokerMeter.ENTRIES_SCANNED_IN_FILTER, numEntriesScannedInFilter);
+      brokerMetrics
+          .addMeteredTableValue(rawTableName, BrokerMeter.ENTRIES_SCANNED_POST_FILTER, numEntriesScannedPostFilter);
     }
 
     // Parse the option from request whether to preserve the type
@@ -190,9 +190,8 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
 
       // This will only happen to selection query.
       if (cachedDataSchema != null) {
-        List<String> selectionColumns =
-            SelectionOperatorUtils.getSelectionColumns(brokerRequest.getSelections().getSelectionColumns(),
-                cachedDataSchema);
+        List<String> selectionColumns = SelectionOperatorUtils
+            .getSelectionColumns(brokerRequest.getSelections().getSelectionColumns(), cachedDataSchema);
         brokerResponseNative.setSelectionResults(new SelectionResults(selectionColumns, new ArrayList<>(0)));
       }
     } else {
@@ -214,8 +213,8 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
             if (brokerMetrics != null) {
               brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.RESPONSE_MERGE_EXCEPTIONS, 1L);
             }
-            brokerResponseNative.addToExceptions(
-                new QueryProcessingException(QueryException.MERGE_RESPONSE_ERROR_CODE, errorMessage));
+            brokerResponseNative
+                .addToExceptions(new QueryProcessingException(QueryException.MERGE_RESPONSE_ERROR_CODE, errorMessage));
           }
         }
         setSelectionResults(brokerResponseNative, brokerRequest.getSelections(), dataTableMap, masterDataSchema,
@@ -358,8 +357,8 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
     // Extract final results and set them into the broker response.
     List<AggregationResult> reducedAggregationResults = new ArrayList<>(numAggregationFunctions);
     for (int i = 0; i < numAggregationFunctions; i++) {
-      Serializable resultValue = AggregationFunctionUtils.getSerializableValue(
-          aggregationFunctions[i].extractFinalResult(intermediateResults[i]));
+      Serializable resultValue = AggregationFunctionUtils
+          .getSerializableValue(aggregationFunctions[i].extractFinalResult(intermediateResults[i]));
 
       // Format the value into string if required
       if (!preserveType) {
@@ -403,8 +402,8 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
             Object intermediateResultToMerge = entry.getValue();
             if (mergedIntermediateResultMap.containsKey(groupKey)) {
               Object mergedIntermediateResult = mergedIntermediateResultMap.get(groupKey);
-              mergedIntermediateResultMap.put(groupKey,
-                  aggregationFunctions[i].merge(mergedIntermediateResult, intermediateResultToMerge));
+              mergedIntermediateResultMap
+                  .put(groupKey, aggregationFunctions[i].merge(mergedIntermediateResult, intermediateResultToMerge));
             } else {
               mergedIntermediateResultMap.put(groupKey, intermediateResultToMerge);
             }
@@ -483,13 +482,12 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
       // Trim the final result maps to topN and set them into the broker response.
       AggregationGroupByTrimmingService aggregationGroupByTrimmingService =
           new AggregationGroupByTrimmingService(finalAggregationFunctions, (int) groupBy.getTopN());
-      List<GroupByResult>[] groupByResultLists =
-          aggregationGroupByTrimmingService.trimFinalResults(finalOutResultMaps);
+      List<GroupByResult>[] groupByResultLists = aggregationGroupByTrimmingService.trimFinalResults(finalOutResultMaps);
 
       // Format the value into string if required
       if (!preserveType) {
-        for (List<GroupByResult> groupByResultList: groupByResultLists) {
-          for (GroupByResult groupByResult: groupByResultList) {
+        for (List<GroupByResult> groupByResultList : groupByResultLists) {
+          for (GroupByResult groupByResult : groupByResultList) {
             groupByResult.setValue(AggregationFunctionUtils.formatValue(groupByResult.getValue()));
           }
         }

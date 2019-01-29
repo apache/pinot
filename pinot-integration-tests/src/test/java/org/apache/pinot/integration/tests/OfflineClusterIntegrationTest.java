@@ -83,7 +83,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   @BeforeClass
-  public void setUp() throws Exception {
+  public void setUp()
+      throws Exception {
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
 
     // Start the Pinot cluster
@@ -101,11 +102,11 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
                 Collections.singletonList(CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)));
       }
       if (instance.startsWith(CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE)) {
-        _serviceStatusCallbacks.add(new ServiceStatus.MultipleCallbackServiceStatusCallback(ImmutableList.of(
-            new ServiceStatus.IdealStateAndCurrentStateMatchServiceStatusCallback(_helixManager, _clusterName,
-                instance),
-            new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(_helixManager, _clusterName,
-                instance))));
+        _serviceStatusCallbacks.add(new ServiceStatus.MultipleCallbackServiceStatusCallback(ImmutableList
+            .of(new ServiceStatus.IdealStateAndCurrentStateMatchServiceStatusCallback(_helixManager, _clusterName,
+                    instance),
+                new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(_helixManager, _clusterName,
+                    instance))));
       }
     }
 
@@ -115,8 +116,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     ExecutorService executor = Executors.newCachedThreadPool();
 
     // Create segments from Avro data
-    ClusterIntegrationTestUtils.buildSegmentsFromAvro(avroFiles, 0, _segmentDir, _tarDir, getTableName(), false, null,
-        getRawIndexColumns(), null, executor);
+    ClusterIntegrationTestUtils
+        .buildSegmentsFromAvro(avroFiles, 0, _segmentDir, _tarDir, getTableName(), false, null, getRawIndexColumns(),
+            null, executor);
 
     // Load data into H2
     setUpH2Connection(avroFiles, executor);
@@ -149,7 +151,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   @Test
-  public void testInvertedIndexTriggering() throws Exception {
+  public void testInvertedIndexTriggering()
+      throws Exception {
     final long numTotalDocs = getCountStarResult();
 
     JsonNode queryResponse = postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY);
@@ -179,7 +182,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   @Test
-  public void testBloomFilterTriggering() throws Exception {
+  public void testBloomFilterTriggering()
+      throws Exception {
     final long numTotalDocs = getCountStarResult();
     JsonNode queryResponse = postQuery(TEST_UPDATED_BLOOM_FILTER_QUERY);
     assertEquals(queryResponse.get("numSegmentsProcessed").asLong(), NUM_SEGMENTS);
@@ -224,7 +228,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
    * </ul>
    */
   @Test
-  public void testDefaultColumns() throws Exception {
+  public void testDefaultColumns()
+      throws Exception {
     long numTotalDocs = getCountStarResult();
 
     reloadDefaultColumns(true);
@@ -240,7 +245,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(queryResponse.get("selectionResults").get("columns").size(), 79);
   }
 
-  private void reloadDefaultColumns(final boolean withExtraColumns) throws Exception {
+  private void reloadDefaultColumns(final boolean withExtraColumns)
+      throws Exception {
     final long numTotalDocs = getCountStarResult();
 
     if (withExtraColumns) {
@@ -281,14 +287,16 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     }, 600_000L, errorMessage);
   }
 
-  private void sendSchema(String resourceName) throws Exception {
+  private void sendSchema(String resourceName)
+      throws Exception {
     URL resource = OfflineClusterIntegrationTest.class.getClassLoader().getResource(resourceName);
     assertNotNull(resource);
     File schemaFile = new File(resource.getFile());
     addSchema(schemaFile, getTableName());
   }
 
-  private void testNewAddedColumns() throws Exception {
+  private void testNewAddedColumns()
+      throws Exception {
     long numTotalDocs = getCountStarResult();
     double numTotalDocsInDouble = (double) numTotalDocs;
 
@@ -393,12 +401,14 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
   @Test
   @Override
-  public void testBrokerResponseMetadata() throws Exception {
+  public void testBrokerResponseMetadata()
+      throws Exception {
     super.testBrokerResponseMetadata();
   }
 
   @Test
-  public void testUDF() throws Exception {
+  public void testUDF()
+      throws Exception {
     String pqlQuery = "SELECT COUNT(*) FROM mytable GROUP BY timeConvert(DaysSinceEpoch,'DAYS','SECONDS')";
     JsonNode response = postQuery(pqlQuery);
     JsonNode groupByResult = response.get("aggregationResults").get(0);
@@ -471,7 +481,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   @AfterClass
-  public void tearDown() throws Exception {
+  public void tearDown()
+      throws Exception {
     // Test instance decommission before tearing down
     testInstanceDecommission();
 
@@ -481,7 +492,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     FileUtils.deleteDirectory(_tempDir);
   }
 
-  private void testInstanceDecommission() throws Exception {
+  private void testInstanceDecommission()
+      throws Exception {
     // Fetch all instances
     JsonNode response = JsonUtils.stringToJsonNode(sendGetRequest(_controllerRequestURLBuilder.forInstanceList()));
     JsonNode instanceList = response.get("instances");

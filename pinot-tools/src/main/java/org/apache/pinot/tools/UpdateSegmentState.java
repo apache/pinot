@@ -33,6 +33,7 @@ import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
 public class UpdateSegmentState extends AbstractBaseCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(UpdateSegmentState.class);
   private static final String CmdName = "UpdateSegmentState";
@@ -56,7 +57,7 @@ public class UpdateSegmentState extends AbstractBaseCommand implements Command {
   @Option(name = "-fix", required = false, metaVar = "<boolean>", usage = "Update IDEALSTATE values (OFFLINE->ONLINE).")
   private boolean _fix = false;
 
-  @Option(name = "-help", required = false, help = true, aliases={"-h", "--h", "--help"}, usage = "Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
   private boolean _help = false;
 
   public UpdateSegmentState() {
@@ -120,7 +121,6 @@ public class UpdateSegmentState extends AbstractBaseCommand implements Command {
   private ZKHelixAdmin _helixAdmin;
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;
 
-
   private void init() {
     LOGGER.info("Trying to connect to " + _zkAddress + " cluster " + _clusterName);
     _helixAdmin = new ZKHelixAdmin(_zkAddress);
@@ -129,7 +129,8 @@ public class UpdateSegmentState extends AbstractBaseCommand implements Command {
     _propertyStore = new ZkHelixPropertyStore<>(_zkAddress, serializer, path);
   }
 
-  public List<String> getAllTenantTables() throws Exception {
+  public List<String> getAllTenantTables()
+      throws Exception {
     String tableConfigPath = "/CONFIGS/TABLE";
     List<ZNRecord> tableConfigs = _propertyStore.getChildren(tableConfigPath, null, 0);
     List<String> tables = new ArrayList<>(128);
@@ -142,7 +143,8 @@ public class UpdateSegmentState extends AbstractBaseCommand implements Command {
     return tables;
   }
 
-  public void fixTableIdealState(String tableName) throws Exception {
+  public void fixTableIdealState(String tableName)
+      throws Exception {
     IdealState idealState = _helixAdmin.getResourceIdealState(_clusterName, tableName);
     if (idealState == null) {
       LOGGER.info("No IDEALSTATE found for table " + tableName);
@@ -178,7 +180,8 @@ public class UpdateSegmentState extends AbstractBaseCommand implements Command {
   }
 
   @Override
-  public boolean execute() throws Exception {
+  public boolean execute()
+      throws Exception {
     if (_tableName == null && _tenantName == null) {
       LOGGER.error("One of -tableName or -tenantName must be specified.");
       return false;

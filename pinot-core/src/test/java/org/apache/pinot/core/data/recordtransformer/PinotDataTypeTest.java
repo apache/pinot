@@ -26,17 +26,11 @@ import static org.testng.Assert.fail;
 
 public class PinotDataTypeTest {
   private static final PinotDataType[] SOURCE_TYPES =
-      {PinotDataType.BYTE, PinotDataType.CHARACTER, PinotDataType.SHORT, PinotDataType.INTEGER, PinotDataType.LONG,
-          PinotDataType.FLOAT, PinotDataType.DOUBLE, PinotDataType.STRING, PinotDataType.BYTE_ARRAY,
-          PinotDataType.CHARACTER_ARRAY, PinotDataType.SHORT_ARRAY, PinotDataType.INTEGER_ARRAY,
-          PinotDataType.LONG_ARRAY, PinotDataType.FLOAT_ARRAY, PinotDataType.DOUBLE_ARRAY, PinotDataType.STRING_ARRAY};
+      {PinotDataType.BYTE, PinotDataType.CHARACTER, PinotDataType.SHORT, PinotDataType.INTEGER, PinotDataType.LONG, PinotDataType.FLOAT, PinotDataType.DOUBLE, PinotDataType.STRING, PinotDataType.BYTE_ARRAY, PinotDataType.CHARACTER_ARRAY, PinotDataType.SHORT_ARRAY, PinotDataType.INTEGER_ARRAY, PinotDataType.LONG_ARRAY, PinotDataType.FLOAT_ARRAY, PinotDataType.DOUBLE_ARRAY, PinotDataType.STRING_ARRAY};
   private static final Object[] SOURCE_OBJECTS =
-      {(byte) 123, (char) 123, (short) 123, 123, 123L, 123f, 123d, "123", new Object[]{(byte) 123},
-          new Object[]{(char) 123}, new Object[]{(short) 123}, new Object[]{123}, new Object[]{123L},
-          new Object[]{123f}, new Object[]{123d}, new Object[]{"123"}};
+      {(byte) 123, (char) 123, (short) 123, 123, 123L, 123f, 123d, "123", new Object[]{(byte) 123}, new Object[]{(char) 123}, new Object[]{(short) 123}, new Object[]{123}, new Object[]{123L}, new Object[]{123f}, new Object[]{123d}, new Object[]{"123"}};
   private static final PinotDataType[] DEST_TYPES =
-      {PinotDataType.INTEGER, PinotDataType.LONG, PinotDataType.FLOAT, PinotDataType.DOUBLE,
-          PinotDataType.INTEGER_ARRAY, PinotDataType.LONG_ARRAY, PinotDataType.FLOAT_ARRAY, PinotDataType.DOUBLE_ARRAY};
+      {PinotDataType.INTEGER, PinotDataType.LONG, PinotDataType.FLOAT, PinotDataType.DOUBLE, PinotDataType.INTEGER_ARRAY, PinotDataType.LONG_ARRAY, PinotDataType.FLOAT_ARRAY, PinotDataType.DOUBLE_ARRAY};
   private static final Object[] EXPECTED_DEST_VALUES =
       {123, 123L, 123f, 123d, new Object[]{123}, new Object[]{123L}, new Object[]{123f}, new Object[]{123d}};
 
@@ -83,10 +77,11 @@ public class PinotDataTypeTest {
 
   @Test
   public void testObjectArray() {
-    assertEquals(PinotDataType.STRING.convert(new AnObject[]{new AnObject("abc"), new AnObject("def")},
-        PinotDataType.OBJECT_ARRAY), "abc");
-    assertEquals(PinotDataType.STRING_ARRAY.convert(new AnObject[]{new AnObject("abc"), new AnObject("def")},
-        PinotDataType.OBJECT_ARRAY), new String[]{"abc", "def"});
+    assertEquals(PinotDataType.STRING
+        .convert(new AnObject[]{new AnObject("abc"), new AnObject("def")}, PinotDataType.OBJECT_ARRAY), "abc");
+    assertEquals(PinotDataType.STRING_ARRAY
+            .convert(new AnObject[]{new AnObject("abc"), new AnObject("def")}, PinotDataType.OBJECT_ARRAY),
+        new String[]{"abc", "def"});
   }
 
   @Test

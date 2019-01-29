@@ -67,13 +67,15 @@ public class InvertedIndexHandler {
     }
   }
 
-  public void createInvertedIndices() throws IOException {
+  public void createInvertedIndices()
+      throws IOException {
     for (ColumnMetadata columnMetadata : _invertedIndexColumns) {
       createInvertedIndexForColumn(columnMetadata);
     }
   }
 
-  private void createInvertedIndexForColumn(ColumnMetadata columnMetadata) throws IOException {
+  private void createInvertedIndexForColumn(ColumnMetadata columnMetadata)
+      throws IOException {
     String column = columnMetadata.getColumnName();
 
     File inProgress = new File(_indexDir, column + ".inv.inprogress");

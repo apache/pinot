@@ -24,10 +24,7 @@ public abstract class SegmentName {
   public static final int REALTIME_SUFFIX_LENGTH = REALTIME_SUFFIX.length();
 
   public enum RealtimeSegmentType {
-    UNSUPPORTED,
-    HLC_LONG,
-    HLC_SHORT,
-    LLC,
+    UNSUPPORTED, HLC_LONG, HLC_SHORT, LLC,
   }
 
   public static RealtimeSegmentType getSegmentType(String segmentName) {
@@ -82,7 +79,7 @@ public abstract class SegmentName {
       return false;
     }
 
-    String[] parts =  segmentName.split(SEPARATOR);
+    String[] parts = segmentName.split(SEPARATOR);
     if (parts.length != 3 && parts.length != 5) {
       return false;
     }
@@ -95,7 +92,7 @@ public abstract class SegmentName {
       return false;
     }
 
-    String[] parts =  segmentName.split(SEPARATOR);
+    String[] parts = segmentName.split(SEPARATOR);
     if (parts.length != 4) {
       return false;
     }

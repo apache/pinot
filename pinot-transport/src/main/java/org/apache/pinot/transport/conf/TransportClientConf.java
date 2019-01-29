@@ -26,9 +26,10 @@ import org.apache.pinot.transport.config.RoutingTableConfig;
 public class TransportClientConf {
 
   public static enum RoutingMode {
-    CONFIG,
-    HELIX
-  };
+    CONFIG, HELIX
+  }
+
+  ;
 
   public static final String ROUTING_MODE_KEY = "routingMode";
   public static final String CFG_BASED_ROUTING = "routing";

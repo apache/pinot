@@ -41,23 +41,8 @@ import org.testng.annotations.Test;
 public class SumStarTreeIndexTest extends BaseStarTreeIndexTest {
   private static final String DATA_DIR = System.getProperty("java.io.tmpdir") + File.separator + "SumStarTreeIndexTest";
   private static final String SEGMENT_NAME = "starTreeSegment";
-  private static final String[] HARD_CODED_QUERIES = new String[]{
-      "SELECT SUM(m1) FROM T",
-      "SELECT SUM(m1) FROM T WHERE d1 = 'd1-v1'",
-      "SELECT SUM(m1) FROM T WHERE d1 <> 'd1-v1' AND d1 >= 'd1-v2'",
-      "SELECT SUM(m1) FROM T WHERE d1 BETWEEN 'd1-v1' AND 'd1-v3' AND d1 <> 'd1-v2'",
-      "SELECT SUM(m1) FROM T WHERE d1 IN ('d1-v1', 'd1-v2')",
-      "SELECT SUM(m1) FROM T WHERE d1 IN ('d1-v1', 'd1-v2') AND d2 NOT IN ('d2-v1')",
-      "SELECT SUM(m1) FROM T GROUP BY d1",
-      "SELECT SUM(m1) FROM T GROUP BY d1, d2",
-      "SELECT SUM(m1) FROM T WHERE d1 = 'd1-v2' GROUP BY d1",
-      "SELECT SUM(m1) FROM T WHERE d1 BETWEEN 'd1-v1' AND 'd1-v3' GROUP BY d2",
-      "SELECT SUM(m1) FROM T WHERE d1 = 'd1-v2' GROUP BY d2, d3",
-      "SELECT SUM(m1) FROM T WHERE d1 <> 'd1-v1' GROUP BY d2",
-      "SELECT SUM(m1) FROM T WHERE d1 IN ('d1-v1', 'd1-v2') GROUP BY d2",
-      "SELECT SUM(m1) FROM T WHERE d1 IN ('d1-v1', 'd1-v2') AND d2 NOT IN ('d2-v1') GROUP BY d3",
-      "SELECT SUM(m1) FROM T WHERE d1 IN ('d1-v1', 'd1-v2') AND d2 NOT IN ('d2-v1') AND d2 > 'd2-v2' GROUP BY d3, d4"
-  };
+  private static final String[] HARD_CODED_QUERIES =
+      new String[]{"SELECT SUM(m1) FROM T", "SELECT SUM(m1) FROM T WHERE d1 = 'd1-v1'", "SELECT SUM(m1) FROM T WHERE d1 <> 'd1-v1' AND d1 >= 'd1-v2'", "SELECT SUM(m1) FROM T WHERE d1 BETWEEN 'd1-v1' AND 'd1-v3' AND d1 <> 'd1-v2'", "SELECT SUM(m1) FROM T WHERE d1 IN ('d1-v1', 'd1-v2')", "SELECT SUM(m1) FROM T WHERE d1 IN ('d1-v1', 'd1-v2') AND d2 NOT IN ('d2-v1')", "SELECT SUM(m1) FROM T GROUP BY d1", "SELECT SUM(m1) FROM T GROUP BY d1, d2", "SELECT SUM(m1) FROM T WHERE d1 = 'd1-v2' GROUP BY d1", "SELECT SUM(m1) FROM T WHERE d1 BETWEEN 'd1-v1' AND 'd1-v3' GROUP BY d2", "SELECT SUM(m1) FROM T WHERE d1 = 'd1-v2' GROUP BY d2, d3", "SELECT SUM(m1) FROM T WHERE d1 <> 'd1-v1' GROUP BY d2", "SELECT SUM(m1) FROM T WHERE d1 IN ('d1-v1', 'd1-v2') GROUP BY d2", "SELECT SUM(m1) FROM T WHERE d1 IN ('d1-v1', 'd1-v2') AND d2 NOT IN ('d2-v1') GROUP BY d3", "SELECT SUM(m1) FROM T WHERE d1 IN ('d1-v1', 'd1-v2') AND d2 NOT IN ('d2-v1') AND d2 > 'd2-v2' GROUP BY d3, d4"};
 
   @Override
   protected String[] getHardCodedQueries() {
@@ -103,12 +88,14 @@ public class SumStarTreeIndexTest extends BaseStarTreeIndexTest {
   }
 
   @BeforeClass
-  void setUp() throws Exception {
+  void setUp()
+      throws Exception {
     StarTreeIndexTestSegmentHelper.buildSegment(DATA_DIR, SEGMENT_NAME);
   }
 
   @Test
-  public void testQueries() throws Exception {
+  public void testQueries()
+      throws Exception {
     File indexDir = new File(DATA_DIR, SEGMENT_NAME);
 
     _segment = ImmutableSegmentLoader.load(indexDir, ReadMode.heap);

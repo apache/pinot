@@ -31,7 +31,8 @@ public class SingleValueSortedForwardIndexCreator implements SingleValueForwardI
   private final int[] _minDocIds;
   private final int[] _maxDocIds;
 
-  public SingleValueSortedForwardIndexCreator(File outputDir, String column, int cardinality) throws Exception {
+  public SingleValueSortedForwardIndexCreator(File outputDir, String column, int cardinality)
+      throws Exception {
     File indexFile = new File(outputDir, column + V1Constants.Indexes.SORTED_SV_FORWARD_INDEX_FILE_EXTENSION);
     _writer =
         new FixedByteSingleValueMultiColWriter(indexFile, cardinality, 2, new int[]{Integer.BYTES, Integer.BYTES});
@@ -52,7 +53,8 @@ public class SingleValueSortedForwardIndexCreator implements SingleValueForwardI
   }
 
   @Override
-  public void close() throws IOException {
+  public void close()
+      throws IOException {
     int cardinality = _maxDocIds.length;
     for (int i = 0; i < cardinality; i++) {
       _writer.setInt(i, 0, _minDocIds[i]);

@@ -24,6 +24,7 @@ import org.apache.pinot.core.query.utils.Pair;
 
 public class SumFunction extends AggregationFunc {
   private static final String _name = "sum";
+
   SumFunction(ResultTable rows, String column) {
     super(rows, column);
   }

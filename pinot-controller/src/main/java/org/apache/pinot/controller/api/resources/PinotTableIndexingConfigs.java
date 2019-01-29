@@ -36,6 +36,7 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
 @Api(tags = Constants.TABLE_TAG)
 @Path("/")
 public class PinotTableIndexingConfigs {
@@ -49,15 +50,10 @@ public class PinotTableIndexingConfigs {
   @Path("/tables/{tableName}/indexingConfigs")
   @ApiOperation(value = "Update table indexing configuration")
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Success"),
-      @ApiResponse(code = 404, message = "Table not found"),
-      @ApiResponse(code = 500, message = "Server error updating configuration")
-  })
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 404, message = "Table not found"), @ApiResponse(code = 500, message = "Server error updating configuration")})
   public SuccessResponse updateIndexingConfig(
       @ApiParam(value = "Table name (without type)", required = true) @PathParam("tableName") String tableName,
-      String body
-  ) {
+      String body) {
     try {
       TableConfig tableConfig = TableConfig.fromJsonString(body);
       pinotHelixResourceManager.updateIndexingConfigFor(tableConfig.getTableName(), tableConfig.getTableType(),

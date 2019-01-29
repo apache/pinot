@@ -52,10 +52,6 @@ public class ConsumerAndIterator {
 
   @Override
   public String toString() {
-    return "ConsumerAndIterator{" +
-        "_consumer=" + _consumer +
-        ", _iterator=" + _iterator +
-        ", _id=" + _id +
-        '}';
+    return "ConsumerAndIterator{" + "_consumer=" + _consumer + ", _iterator=" + _iterator + ", _id=" + _id + '}';
   }
 }

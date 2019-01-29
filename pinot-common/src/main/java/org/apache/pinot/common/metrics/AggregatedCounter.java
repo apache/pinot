@@ -48,9 +48,11 @@ public class AggregatedCounter implements Metric {
   private volatile long _count;
 
   @Override
-  public <T> void processWith(MetricProcessor<T> processor, MetricName name, T context) throws Exception {
-    for (Metric c : _counters)
+  public <T> void processWith(MetricProcessor<T> processor, MetricName name, T context)
+      throws Exception {
+    for (Metric c : _counters) {
       c.processWith(processor, name, context);
+    }
   }
 
   public AggregatedCounter() {

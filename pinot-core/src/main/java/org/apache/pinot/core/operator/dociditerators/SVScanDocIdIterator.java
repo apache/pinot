@@ -27,6 +27,7 @@ import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.roaringbitmap.IntIterator;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
+
 public class SVScanDocIdIterator implements ScanBasedDocIdIterator {
   private int _currentDocId = -1;
   private final BlockSingleValIterator _valueIterator;

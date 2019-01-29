@@ -104,7 +104,8 @@ public class FastHllQueriesTest extends BaseQueriesTest {
   }
 
   @Test
-  public void testFastHllWithoutPreGeneratedHllColumns() throws Exception {
+  public void testFastHllWithoutPreGeneratedHllColumns()
+      throws Exception {
     buildAndLoadSegment(false);
 
     // Test inner segment queries
@@ -144,14 +145,15 @@ public class FastHllQueriesTest extends BaseQueriesTest {
         new String[]{"17", "1197"});
     // Test inter segments query with group-by
     brokerResponse = getBrokerResponseForQuery(BASE_QUERY + GROUP_BY);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 18452L, 0L, 55356L, 120000L,
-        new String[]{"21", "1762"});
+    QueriesTestUtils
+        .testInterSegmentAggregationResult(brokerResponse, 18452L, 0L, 55356L, 120000L, new String[]{"21", "1762"});
 
     deleteSegment();
   }
 
   @Test
-  public void testFastHllWithPreGeneratedHllColumns() throws Exception {
+  public void testFastHllWithPreGeneratedHllColumns()
+      throws Exception {
     buildAndLoadSegment(true);
 
     // Test inner segment queries
@@ -184,21 +186,22 @@ public class FastHllQueriesTest extends BaseQueriesTest {
 
     // Test inter segments base query
     BrokerResponseNative brokerResponse = getBrokerResponseForQuery(BASE_QUERY);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 240000L, 120000L,
-        new String[]{"21", "1762"});
+    QueriesTestUtils
+        .testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 240000L, 120000L, new String[]{"21", "1762"});
     // Test inter segments query with filter
     brokerResponse = getBrokerResponseForQueryWithFilter(BASE_QUERY);
     QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 24516L, 336536L, 49032L, 120000L,
         new String[]{"17", "1197"});
     // Test inter segments query with group-by
     brokerResponse = getBrokerResponseForQuery(BASE_QUERY + GROUP_BY);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 360000L, 120000L,
-        new String[]{"21", "1762"});
+    QueriesTestUtils
+        .testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 360000L, 120000L, new String[]{"21", "1762"});
 
     deleteSegment();
   }
 
-  private void buildAndLoadSegment(boolean hasPreGeneratedHllColumns) throws Exception {
+  private void buildAndLoadSegment(boolean hasPreGeneratedHllColumns)
+      throws Exception {
     FileUtils.deleteQuietly(INDEX_DIR);
 
     // Get resource file path
@@ -212,18 +215,16 @@ public class FastHllQueriesTest extends BaseQueriesTest {
     String filePath = resource.getFile();
 
     // Build the segment schema
-    Schema.SchemaBuilder schemaBuilder = new Schema.SchemaBuilder().setSchemaName("testTable")
-        .addMetric("column1", FieldSpec.DataType.INT)
-        .addMetric("column3", FieldSpec.DataType.INT)
-        .addSingleValueDimension("column5", FieldSpec.DataType.STRING)
-        .addSingleValueDimension("column6", FieldSpec.DataType.INT)
-        .addSingleValueDimension("column7", FieldSpec.DataType.INT)
-        .addSingleValueDimension("column9", FieldSpec.DataType.INT)
-        .addSingleValueDimension("column11", FieldSpec.DataType.STRING)
-        .addSingleValueDimension("column12", FieldSpec.DataType.STRING)
-        .addMetric("column17", FieldSpec.DataType.INT)
-        .addMetric("column18", FieldSpec.DataType.INT)
-        .addTime("daysSinceEpoch", TimeUnit.DAYS, FieldSpec.DataType.INT);
+    Schema.SchemaBuilder schemaBuilder =
+        new Schema.SchemaBuilder().setSchemaName("testTable").addMetric("column1", FieldSpec.DataType.INT)
+            .addMetric("column3", FieldSpec.DataType.INT).addSingleValueDimension("column5", FieldSpec.DataType.STRING)
+            .addSingleValueDimension("column6", FieldSpec.DataType.INT)
+            .addSingleValueDimension("column7", FieldSpec.DataType.INT)
+            .addSingleValueDimension("column9", FieldSpec.DataType.INT)
+            .addSingleValueDimension("column11", FieldSpec.DataType.STRING)
+            .addSingleValueDimension("column12", FieldSpec.DataType.STRING)
+            .addMetric("column17", FieldSpec.DataType.INT).addMetric("column18", FieldSpec.DataType.INT)
+            .addTime("daysSinceEpoch", TimeUnit.DAYS, FieldSpec.DataType.INT);
     if (hasPreGeneratedHllColumns) {
       schemaBuilder.addSingleValueDimension("column17_HLL", FieldSpec.DataType.STRING)
           .addSingleValueDimension("column18_HLL", FieldSpec.DataType.STRING);
@@ -234,15 +235,15 @@ public class FastHllQueriesTest extends BaseQueriesTest {
     segmentGeneratorConfig.setInputFilePath(filePath);
     segmentGeneratorConfig.setTableName("testTable");
     segmentGeneratorConfig.setOutDir(INDEX_DIR.getAbsolutePath());
-    segmentGeneratorConfig.setInvertedIndexCreationColumns(
-        Arrays.asList("column6", "column7", "column11", "column17", "column18"));
+    segmentGeneratorConfig
+        .setInvertedIndexCreationColumns(Arrays.asList("column6", "column7", "column11", "column17", "column18"));
     if (hasPreGeneratedHllColumns) {
       segmentGeneratorConfig.setHllConfig(new HllConfig(HLL_LOG2M));
     } else {
       segmentGeneratorConfig.enableStarTreeIndex(null);
       // Intentionally use the non-default suffix
-      segmentGeneratorConfig.setHllConfig(
-          new HllConfig(HLL_LOG2M, new HashSet<>(Arrays.asList("column17", "column18")), "_HLL"));
+      segmentGeneratorConfig
+          .setHllConfig(new HllConfig(HLL_LOG2M, new HashSet<>(Arrays.asList("column17", "column18")), "_HLL"));
     }
 
     // Build the index segment
@@ -252,8 +253,8 @@ public class FastHllQueriesTest extends BaseQueriesTest {
 
     ImmutableSegment immutableSegment = ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), ReadMode.heap);
     _indexSegment = immutableSegment;
-    _segmentDataManagers =
-        Arrays.asList(new ImmutableSegmentDataManager(immutableSegment), new ImmutableSegmentDataManager(immutableSegment));
+    _segmentDataManagers = Arrays
+        .asList(new ImmutableSegmentDataManager(immutableSegment), new ImmutableSegmentDataManager(immutableSegment));
   }
 
   private void deleteSegment() {

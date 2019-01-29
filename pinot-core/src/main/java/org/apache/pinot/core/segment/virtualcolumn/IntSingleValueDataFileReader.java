@@ -46,7 +46,8 @@ public class IntSingleValueDataFileReader extends BaseSingleColumnSingleValueRea
   }
 
   @Override
-  public void close() throws IOException {
+  public void close()
+      throws IOException {
   }
 
   @Override

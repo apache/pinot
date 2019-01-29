@@ -20,6 +20,7 @@ package org.apache.pinot.core.query.selection.iterator;
 
 import java.io.Serializable;
 
+
 /**
  * Column iterator interface for selection query on a column.
  *
@@ -27,5 +28,4 @@ import java.io.Serializable;
 public interface SelectionColumnIterator {
 
   Serializable getValue(int docId);
-
 }

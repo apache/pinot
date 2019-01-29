@@ -44,7 +44,8 @@ public interface InstanceDataManager {
    * <p>Should be called only once and before calling any other method.
    */
   void init(@Nonnull Configuration config, @Nonnull ZkHelixPropertyStore<ZNRecord> propertyStore,
-      @Nonnull ServerMetrics serverMetrics) throws ConfigurationException;
+      @Nonnull ServerMetrics serverMetrics)
+      throws ConfigurationException;
 
   /**
    * Starts the data manager.
@@ -68,22 +69,26 @@ public interface InstanceDataManager {
    * Adds a segment into an REALTIME table.
    * <p>The segment might be committed or under consuming.
    */
-  void addRealtimeSegment(@Nonnull String realtimeTableName, @Nonnull String segmentName) throws Exception;
+  void addRealtimeSegment(@Nonnull String realtimeTableName, @Nonnull String segmentName)
+      throws Exception;
 
   /**
    * Removes a segment from a table.
    */
-  void removeSegment(@Nonnull String tableNameWithType, @Nonnull String segmentName) throws Exception;
+  void removeSegment(@Nonnull String tableNameWithType, @Nonnull String segmentName)
+      throws Exception;
 
   /**
    * Reloads a segment in a table.
    */
-  void reloadSegment(@Nonnull String tableNameWithType, @Nonnull String segmentName) throws Exception;
+  void reloadSegment(@Nonnull String tableNameWithType, @Nonnull String segmentName)
+      throws Exception;
 
   /**
    * Reloads all segment in a table.
    */
-  void reloadAllSegments(@Nonnull String tableNameWithType) throws Exception;
+  void reloadAllSegments(@Nonnull String tableNameWithType)
+      throws Exception;
 
   /**
    * Returns all tables served by the instance.

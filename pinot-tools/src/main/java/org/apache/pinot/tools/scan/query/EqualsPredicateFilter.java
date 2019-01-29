@@ -20,6 +20,7 @@ package org.apache.pinot.tools.scan.query;
 
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 
+
 public class EqualsPredicateFilter implements PredicateFilter {
   int _equalsDictId;
 

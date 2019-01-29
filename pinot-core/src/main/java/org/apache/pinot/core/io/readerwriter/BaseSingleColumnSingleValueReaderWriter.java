@@ -23,8 +23,7 @@ import org.apache.pinot.core.io.reader.SingleColumnSingleValueReader;
 import org.apache.pinot.core.io.writer.SingleColumnSingleValueWriter;
 
 
-public abstract class BaseSingleColumnSingleValueReaderWriter<T extends ReaderContext>
-    implements SingleColumnSingleValueReader<T>, SingleColumnSingleValueWriter {
+public abstract class BaseSingleColumnSingleValueReaderWriter<T extends ReaderContext> implements SingleColumnSingleValueReader<T>, SingleColumnSingleValueWriter {
 
   @Override
   public char getChar(int row) {

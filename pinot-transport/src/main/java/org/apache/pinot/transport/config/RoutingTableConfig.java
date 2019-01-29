@@ -78,5 +78,4 @@ public class RoutingTableConfig {
     return "BrokerRoutingConfig [_brokerRoutingConfig=" + _brokerRoutingConfig + ", _perTableRoutingCfg="
         + _tableRoutingCfg + "]";
   }
-
 }

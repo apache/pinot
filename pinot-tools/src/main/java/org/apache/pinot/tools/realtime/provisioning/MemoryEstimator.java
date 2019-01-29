@@ -118,15 +118,10 @@ public class MemoryEstimator {
     // create a config
     RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder =
         new RealtimeSegmentConfig.Builder().setSegmentName(_segmentMetadata.getName())
-            .setStreamName(_segmentMetadata.getTableName())
-            .setSchema(_segmentMetadata.getSchema())
-            .setCapacity(_segmentMetadata.getTotalDocs())
-            .setAvgNumMultiValues(_avgMultiValues)
-            .setNoDictionaryColumns(_noDictionaryColumns)
-            .setInvertedIndexColumns(_invertedIndexColumns)
-            .setRealtimeSegmentZKMetadata(segmentZKMetadata)
-            .setOffHeap(true)
-            .setMemoryManager(memoryManager)
+            .setStreamName(_segmentMetadata.getTableName()).setSchema(_segmentMetadata.getSchema())
+            .setCapacity(_segmentMetadata.getTotalDocs()).setAvgNumMultiValues(_avgMultiValues)
+            .setNoDictionaryColumns(_noDictionaryColumns).setInvertedIndexColumns(_invertedIndexColumns)
+            .setRealtimeSegmentZKMetadata(segmentZKMetadata).setOffHeap(true).setMemoryManager(memoryManager)
             .setStatsHistory(sampleStatsHistory);
 
     // create mutable segment impl
@@ -183,7 +178,8 @@ public class MemoryEstimator {
    * @throws IOException
    */
   public void estimateMemoryUsed(File statsFile, int[] numHosts, int[] numHours, int totalConsumingPartitions,
-      int retentionHours) throws IOException {
+      int retentionHours)
+      throws IOException {
     _totalMemoryPerHost = new String[numHours.length][numHosts.length];
     _optimalSegmentSize = new String[numHours.length][numHosts.length];
     _consumingMemoryPerHost = new String[numHours.length][numHosts.length];
@@ -220,16 +216,10 @@ public class MemoryEstimator {
 
       RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder =
           new RealtimeSegmentConfig.Builder().setSegmentName(_segmentMetadata.getName())
-              .setStreamName(_segmentMetadata.getTableName())
-              .setSchema(_segmentMetadata.getSchema())
-              .setCapacity(totalDocs)
-              .setAvgNumMultiValues(_avgMultiValues)
-              .setNoDictionaryColumns(_noDictionaryColumns)
-              .setInvertedIndexColumns(_invertedIndexColumns)
-              .setRealtimeSegmentZKMetadata(segmentZKMetadata)
-              .setOffHeap(true)
-              .setMemoryManager(memoryManager)
-              .setStatsHistory(statsHistory);
+              .setStreamName(_segmentMetadata.getTableName()).setSchema(_segmentMetadata.getSchema())
+              .setCapacity(totalDocs).setAvgNumMultiValues(_avgMultiValues).setNoDictionaryColumns(_noDictionaryColumns)
+              .setInvertedIndexColumns(_invertedIndexColumns).setRealtimeSegmentZKMetadata(segmentZKMetadata)
+              .setOffHeap(true).setMemoryManager(memoryManager).setStatsHistory(statsHistory);
 
       // create mutable segment impl
       MutableSegmentImpl mutableSegmentImpl = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build());
@@ -271,12 +261,9 @@ public class MemoryEstimator {
    */
   private int getAvgMultiValues() {
     int avgMultiValues = 0;
-    Set<String> multiValueColumns = _segmentMetadata.getSchema()
-        .getAllFieldSpecs()
-        .stream()
-        .filter(fieldSpec -> !fieldSpec.isSingleValueField())
-        .map(FieldSpec::getName)
-        .collect(Collectors.toSet());
+    Set<String> multiValueColumns =
+        _segmentMetadata.getSchema().getAllFieldSpecs().stream().filter(fieldSpec -> !fieldSpec.isSingleValueField())
+            .map(FieldSpec::getName).collect(Collectors.toSet());
 
     if (!multiValueColumns.isEmpty()) {
 

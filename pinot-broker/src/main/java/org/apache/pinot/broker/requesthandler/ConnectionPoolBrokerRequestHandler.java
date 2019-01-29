@@ -135,7 +135,8 @@ public class ConnectionPoolBrokerRequestHandler extends BaseBrokerRequestHandler
   protected BrokerResponse processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
       @Nullable BrokerRequest offlineBrokerRequest, @Nullable Map<String, List<String>> offlineRoutingTable,
       @Nullable BrokerRequest realtimeBrokerRequest, @Nullable Map<String, List<String>> realtimeRoutingTable,
-      long timeoutMs, ServerStats serverStats, RequestStatistics requestStatistics) throws Exception {
+      long timeoutMs, ServerStats serverStats, RequestStatistics requestStatistics)
+      throws Exception {
     ScatterGatherStats scatterGatherStats = new ScatterGatherStats();
     PhaseTimes phaseTimes = new PhaseTimes();
 
@@ -227,8 +228,8 @@ public class ConnectionPoolBrokerRequestHandler extends BaseBrokerRequestHandler
     if (numServersQueried > numServersResponded) {
       _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.BROKER_RESPONSES_WITH_PARTIAL_SERVERS_RESPONDED, 1);
     }
-    _brokerMetrics.addMeteredQueryValue(originalBrokerRequest, BrokerMeter.TOTAL_SERVER_RESPONSE_SIZE,
-        totalServerResponseSize);
+    _brokerMetrics
+        .addMeteredQueryValue(originalBrokerRequest, BrokerMeter.TOTAL_SERVER_RESPONSE_SIZE, totalServerResponseSize);
 
     return brokerResponse;
   }
@@ -240,7 +241,8 @@ public class ConnectionPoolBrokerRequestHandler extends BaseBrokerRequestHandler
    */
   private CompositeFuture<byte[]> scatterBrokerRequest(long requestId, BrokerRequest brokerRequest,
       Map<String, List<String>> routingTable, boolean isOfflineTable, long timeoutMs,
-      ScatterGatherStats scatterGatherStats, PhaseTimes phaseTimes) throws InterruptedException {
+      ScatterGatherStats scatterGatherStats, PhaseTimes phaseTimes)
+      throws InterruptedException {
     long scatterStartTimeNs = System.nanoTime();
     ScatterGatherRequest scatterRequest =
         new ScatterGatherRequestImpl(brokerRequest, routingTable, requestId, timeoutMs, _brokerId);

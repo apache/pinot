@@ -22,8 +22,7 @@ import org.apache.pinot.common.utils.CommonConstants;
 
 
 public enum ReadMode {
-  heap,
-  mmap;
+  heap, mmap;
 
   public static final ReadMode DEFAULT_MODE = ReadMode.valueOf(CommonConstants.Server.DEFAULT_READ_MODE);
 
@@ -31,8 +30,8 @@ public enum ReadMode {
     if (strVal.equalsIgnoreCase("heap")) {
       return heap;
     }
-    if (strVal.equalsIgnoreCase("mmap") || strVal.equalsIgnoreCase("memorymapped")
-        || strVal.equalsIgnoreCase("memorymap")) {
+    if (strVal.equalsIgnoreCase("mmap") || strVal.equalsIgnoreCase("memorymapped") || strVal
+        .equalsIgnoreCase("memorymap")) {
       return mmap;
     }
     throw new IllegalArgumentException("Unknown String Value: " + strVal);

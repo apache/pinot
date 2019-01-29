@@ -20,6 +20,7 @@ package org.apache.pinot.tools.scan.query;
 
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 
+
 public class NotPredicateFilter implements PredicateFilter {
   int _notEqualsDictId;
 
@@ -33,7 +34,7 @@ public class NotPredicateFilter implements PredicateFilter {
   }
 
   @Override
-  public boolean apply(int [] dictIds, int length) {
+  public boolean apply(int[] dictIds, int length) {
     // length <= dictIds.length
     for (int i = 0; i < length; ++i) {
       if (dictIds[i] == _notEqualsDictId) {

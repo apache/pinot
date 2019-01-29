@@ -47,11 +47,11 @@ public class MutableSegmentImplAggregateMetricsTest {
   public void setUp() {
     Schema schema = new Schema.SchemaBuilder().setSchemaName("testSchema")
         .addSingleValueDimension(DIMENSION_1, FieldSpec.DataType.INT)
-        .addSingleValueDimension(DIMENSION_2, FieldSpec.DataType.STRING)
-        .addMetric(METRIC, FieldSpec.DataType.LONG)
+        .addSingleValueDimension(DIMENSION_2, FieldSpec.DataType.STRING).addMetric(METRIC, FieldSpec.DataType.LONG)
         .build();
-    _mutableSegmentImpl = MutableSegmentImplTestUtils.createMutableSegmentImpl(schema,
-        new HashSet<>(Arrays.asList(DIMENSION_1, METRIC)), Collections.singleton(DIMENSION_1), true);
+    _mutableSegmentImpl = MutableSegmentImplTestUtils
+        .createMutableSegmentImpl(schema, new HashSet<>(Arrays.asList(DIMENSION_1, METRIC)),
+            Collections.singleton(DIMENSION_1), true);
   }
 
   @Test

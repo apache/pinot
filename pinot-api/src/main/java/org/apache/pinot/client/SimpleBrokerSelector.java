@@ -21,6 +21,7 @@ package org.apache.pinot.client;
 import java.util.List;
 import java.util.Random;
 
+
 /**
  * Picks a broker randomly from list of brokers provided. This assumes that all the provided brokers
  * are healthy. There is no health check done on the brokers
@@ -38,5 +39,4 @@ public class SimpleBrokerSelector implements BrokerSelector {
   public String selectBroker(String table) {
     return _brokerList.get(_random.nextInt(_brokerList.size()));
   }
-
 }

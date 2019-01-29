@@ -63,7 +63,8 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
   }
 
   @BeforeClass
-  public void setUp() throws Exception {
+  public void setUp()
+      throws Exception {
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
 
     // Start Zk, Kafka and Pinot
@@ -78,8 +79,9 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
     // Create segments from Avro data
     File schemaFile = getSchemaFile();
     _schema = Schema.fromFile(schemaFile);
-    ClusterIntegrationTestUtils.buildSegmentsFromAvro(offlineAvroFiles, 0, _segmentDir, _tarDir, getTableName(), false,
-        null, getRawIndexColumns(), _schema, executor);
+    ClusterIntegrationTestUtils
+        .buildSegmentsFromAvro(offlineAvroFiles, 0, _segmentDir, _tarDir, getTableName(), false, null,
+            getRawIndexColumns(), _schema, executor);
 
     // Push data into the Kafka topic
     pushAvroIntoKafka(realtimeAvroFiles, getKafkaTopic(), executor);
@@ -103,11 +105,12 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
     waitForAllDocsLoaded(600_000L);
   }
 
-  protected void startHybridCluster() throws Exception {
+  protected void startHybridCluster()
+      throws Exception {
     // Start Zk and Kafka
     startZk();
-    _kafkaStarter =
-        KafkaStarterUtils.startServer(KafkaStarterUtils.DEFAULT_KAFKA_PORT, KafkaStarterUtils.DEFAULT_BROKER_ID,
+    _kafkaStarter = KafkaStarterUtils
+        .startServer(KafkaStarterUtils.DEFAULT_KAFKA_PORT, KafkaStarterUtils.DEFAULT_BROKER_ID,
             KafkaStarterUtils.DEFAULT_ZK_STR, KafkaStarterUtils.getDefaultKafkaConfiguration());
 
     // Create Kafka topic
@@ -125,7 +128,8 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
     createServerTenant(TENANT_NAME, 1, 1);
   }
 
-  protected void setUpTable(File avroFile) throws Exception {
+  protected void setUpTable(File avroFile)
+      throws Exception {
     String schemaName = _schema.getSchemaName();
     addSchema(getSchemaFile(), schemaName);
 
@@ -143,7 +147,8 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
     completeTableConfiguration();
   }
 
-  protected List<File> getAllAvroFiles() throws Exception {
+  protected List<File> getAllAvroFiles()
+      throws Exception {
     // Unpack the Avro files
     int numSegments = unpackAvroData(_tempDir).size();
 
@@ -176,7 +181,8 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
   }
 
   @Test
-  public void testSegmentListApi() throws Exception {
+  public void testSegmentListApi()
+      throws Exception {
     {
       String jsonOutputStr = sendGetRequest(_controllerRequestURLBuilder.
           forSegmentListAPIWithTableType(getTableName(), CommonConstants.Helix.TableType.OFFLINE.toString()));
@@ -196,7 +202,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
       Assert.assertEquals(segments.size(), 3);
     }
     {
-      String jsonOutputStr = sendGetRequest(_controllerRequestURLBuilder. forSegmentListAPI(getTableName()));
+      String jsonOutputStr = sendGetRequest(_controllerRequestURLBuilder.forSegmentListAPI(getTableName()));
       JsonNode array = JsonUtils.stringToJsonNode(jsonOutputStr);
       // there should be 2 elements in the array now.
       int realtimeIndex = 0;
@@ -218,7 +224,8 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
   }
 
   @Test
-  public void testBrokerDebugOutput() throws Exception {
+  public void testBrokerDebugOutput()
+      throws Exception {
     String tableName = getTableName();
     Assert.assertNotNull(getDebugInfo("debug/timeBoundary/" + tableName));
     Assert.assertNotNull(getDebugInfo("debug/timeBoundary/" + TableNameBuilder.OFFLINE.tableNameWithType(tableName)));
@@ -230,31 +237,36 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
 
   @Test
   @Override
-  public void testQueriesFromQueryFile() throws Exception {
+  public void testQueriesFromQueryFile()
+      throws Exception {
     super.testQueriesFromQueryFile();
   }
 
   @Test
   @Override
-  public void testGeneratedQueriesWithMultiValues() throws Exception {
+  public void testGeneratedQueriesWithMultiValues()
+      throws Exception {
     super.testGeneratedQueriesWithMultiValues();
   }
 
   @Test
   @Override
-  public void testQueryExceptions() throws Exception {
+  public void testQueryExceptions()
+      throws Exception {
     super.testQueryExceptions();
   }
 
   @Test
   @Override
-  public void testInstanceShutdown() throws Exception {
+  public void testInstanceShutdown()
+      throws Exception {
     super.testInstanceShutdown();
   }
 
   @Test
   @Override
-  public void testBrokerResponseMetadata() throws Exception {
+  public void testBrokerResponseMetadata()
+      throws Exception {
     super.testBrokerResponseMetadata();
   }
 
@@ -265,7 +277,8 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
   }
 
   @AfterClass
-  public void tearDown() throws Exception {
+  public void tearDown()
+      throws Exception {
     // Try deleting the tables and check that they have no routing table
     final String tableName = getTableName();
     dropOfflineTable(tableName);
@@ -298,7 +311,8 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
    *
    * @throws Exception
    */
-  protected void cleanup() throws Exception {
+  protected void cleanup()
+      throws Exception {
     FileUtils.deleteDirectory(_tempDir);
   }
 

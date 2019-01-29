@@ -43,11 +43,12 @@ public class BalanceNumSegmentAssignmentStrategyIntegrationTest extends UploadRe
   private final int basePort = 1234;
 
   @BeforeClass
-  public void setUp() throws Exception {
+  public void setUp()
+      throws Exception {
     super.setUp();
 
     // Create eight dummy server instances
-    for(int i = 0; i < 8; ++i) {
+    for (int i = 0; i < 8; ++i) {
       ObjectNode serverInstance = JsonUtils.newObjectNode();
       serverInstance.put("host", hostName);
       serverInstance.put("port", Integer.toString(basePort + i));
@@ -58,9 +59,10 @@ public class BalanceNumSegmentAssignmentStrategyIntegrationTest extends UploadRe
   }
 
   @Test(dataProvider = "configProvider")
-  public void testSegmentAssignmentStrategy(String tableName, SegmentVersion version) throws Exception {
+  public void testSegmentAssignmentStrategy(String tableName, SegmentVersion version)
+      throws Exception {
     // Upload nine segments
-    for(int i = 0; i < 9; ++i) {
+    for (int i = 0; i < 9; ++i) {
       generateAndUploadRandomSegment(tableName + "_" + i, 10);
     }
 
@@ -91,17 +93,14 @@ public class BalanceNumSegmentAssignmentStrategyIntegrationTest extends UploadRe
 
   @DataProvider(name = "tableNameProvider")
   public Object[][] configProvider() {
-    Object[][] configs = {
-        { "disabledInstancesTable", SegmentVersion.v3}
-    };
+    Object[][] configs = {{"disabledInstancesTable", SegmentVersion.v3}};
     return configs;
   }
 
   @Test(dataProvider = "tableNameProvider")
   public void testNoAssignmentToDisabledInstances(String tableName, SegmentVersion version)
       throws Exception {
-    List<String> instances =
-        _helixAdmin.getInstancesInClusterWithTag(getHelixClusterName(), serverTenant);
+    List<String> instances = _helixAdmin.getInstancesInClusterWithTag(getHelixClusterName(), serverTenant);
     List<String> disabledInstances = new ArrayList<>();
     // disable 6 instances
     assertEquals(instances.size(), 9);
@@ -109,7 +108,7 @@ public class BalanceNumSegmentAssignmentStrategyIntegrationTest extends UploadRe
       _helixAdmin.enableInstance(getHelixClusterName(), instances.get(i), false);
     }
 
-   // Thread.sleep(100000);
+    // Thread.sleep(100000);
     for (int i = 0; i < 6; i++) {
       generateAndUploadRandomSegment(tableName + "_" + i, 10);
     }

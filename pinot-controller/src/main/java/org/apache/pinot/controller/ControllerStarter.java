@@ -98,7 +98,8 @@ public class ControllerStarter {
 
   public ControllerStarter(ControllerConf conf) {
     _config = conf;
-    _adminApp = new ControllerAdminApiApplication(_config.getQueryConsoleWebappPath(), _config.getQueryConsoleUseHttps());
+    _adminApp =
+        new ControllerAdminApiApplication(_config.getQueryConsoleWebappPath(), _config.getQueryConsoleUseHttps());
     // Do not use this before the invocation of {@link PinotHelixResourceManager::start()}, which happens in {@link ControllerStarter::start()}
     _helixResourceManager = new PinotHelixResourceManager(_config);
     _metricsRegistry = new MetricsRegistry();
@@ -131,8 +132,6 @@ public class ControllerStarter {
     return _taskManager;
   }
 
-
-
   public void start() {
     LOGGER.info("Starting Pinot controller");
 
@@ -157,8 +156,7 @@ public class ControllerStarter {
 
     LOGGER.info("Initializing SegmentFetcherFactory");
     try {
-      SegmentFetcherFactory.getInstance()
-          .init(segmentFetcherFactoryConfig);
+      SegmentFetcherFactory.getInstance().init(segmentFetcherFactoryConfig);
     } catch (Exception e) {
       throw new RuntimeException("Caught exception while initializing SegmentFetcherFactory", e);
     }
@@ -342,7 +340,6 @@ public class ControllerStarter {
       _helixResourceManager.stop();
 
       _executorService.shutdownNow();
-
     } catch (final Exception e) {
       LOGGER.error("Caught exception while shutting down", e);
     }

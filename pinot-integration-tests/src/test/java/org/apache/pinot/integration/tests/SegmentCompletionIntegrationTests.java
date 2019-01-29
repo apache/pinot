@@ -51,6 +51,7 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+
 public class SegmentCompletionIntegrationTests extends LLCRealtimeClusterIntegrationTest {
   private static final int NUM_KAFKA_PARTITIONS = 1;
 
@@ -64,7 +65,8 @@ public class SegmentCompletionIntegrationTests extends LLCRealtimeClusterIntegra
   }
 
   @BeforeClass
-  public void setUp() throws Exception {
+  public void setUp()
+      throws Exception {
     // Start the Pinot cluster
     startZk();
     startController();
@@ -83,22 +85,22 @@ public class SegmentCompletionIntegrationTests extends LLCRealtimeClusterIntegra
    *
    * @throws Exception
    */
-  private void startFakeServer() throws Exception {
+  private void startFakeServer()
+      throws Exception {
     _serverInstance = CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE + NetUtil.getHostAddress() + "_"
         + CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT;
 
     // Create server instance with the fake server state model
-    _serverHelixManager = HelixManagerFactory.getZKHelixManager(_clusterName, _serverInstance, InstanceType.PARTICIPANT,
-        ZkStarter.DEFAULT_ZK_STR);
+    _serverHelixManager = HelixManagerFactory
+        .getZKHelixManager(_clusterName, _serverInstance, InstanceType.PARTICIPANT, ZkStarter.DEFAULT_ZK_STR);
     _serverHelixManager.getStateMachineEngine()
         .registerStateModelFactory(SegmentOnlineOfflineStateModelFactory.getStateModelName(),
             new FakeServerSegmentStateModelFactory());
     _serverHelixManager.connect();
 
     // Add Helix tag to the server
-    _serverHelixManager.getClusterManagmentTool()
-        .addInstanceTag(_clusterName, _serverInstance,
-            TableNameBuilder.REALTIME.tableNameWithType(TagNameUtils.DEFAULT_TENANT_NAME));
+    _serverHelixManager.getClusterManagmentTool().addInstanceTag(_clusterName, _serverInstance,
+        TableNameBuilder.REALTIME.tableNameWithType(TagNameUtils.DEFAULT_TENANT_NAME));
 
     // Initialize controller leader locator
     ControllerLeaderLocator.create(_serverHelixManager);
@@ -110,7 +112,8 @@ public class SegmentCompletionIntegrationTests extends LLCRealtimeClusterIntegra
    * @throws Exception
    */
   @Test
-  public void testStopConsumingAndAutoFix() throws Exception {
+  public void testStopConsumingAndAutoFix()
+      throws Exception {
     final String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(getTableName());
 
     // Check if segment get into CONSUMING state
@@ -133,7 +136,8 @@ public class SegmentCompletionIntegrationTests extends LLCRealtimeClusterIntegra
     ServerSegmentCompletionProtocolHandler protocolHandler =
         new ServerSegmentCompletionProtocolHandler(new ServerMetrics(new MetricsRegistry()));
     SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
-    params.withOffset(45688L).withSegmentName(_currentSegment).withReason("RandomReason").withInstanceId(_serverInstance);
+    params.withOffset(45688L).withSegmentName(_currentSegment).withReason("RandomReason")
+        .withInstanceId(_serverInstance);
     SegmentCompletionProtocol.Response response = protocolHandler.segmentStoppedConsuming(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.PROCESSED);
 
@@ -183,37 +187,43 @@ public class SegmentCompletionIntegrationTests extends LLCRealtimeClusterIntegra
 
   @Test(enabled = false)
   @Override
-  public void testQueriesFromQueryFile() throws Exception {
+  public void testQueriesFromQueryFile()
+      throws Exception {
     // Skipped
   }
 
   @Test(enabled = false)
   @Override
-  public void testGeneratedQueriesWithMultiValues() throws Exception {
+  public void testGeneratedQueriesWithMultiValues()
+      throws Exception {
     // Skipped
   }
 
   @Test(enabled = false)
   @Override
-  public void testInstanceShutdown() throws Exception {
+  public void testInstanceShutdown()
+      throws Exception {
     // Skipped
   }
 
   @Test(enabled = false)
   @Override
-  public void testSegmentFlushSize() throws Exception {
+  public void testSegmentFlushSize()
+      throws Exception {
     // Skipped
   }
 
   @Test(enabled = false)
   @Override
-  public void testDictionaryBasedQueries() throws Exception {
+  public void testDictionaryBasedQueries()
+      throws Exception {
     // Skipped
   }
 
   @Test(enabled = false)
   @Override
-  public void testQueryExceptions() throws Exception {
+  public void testQueryExceptions()
+      throws Exception {
     // Skipped
   }
 
@@ -223,7 +233,8 @@ public class SegmentCompletionIntegrationTests extends LLCRealtimeClusterIntegra
   }
 
   @AfterClass
-  public void tearDown() throws Exception {
+  public void tearDown()
+      throws Exception {
     stopFakeServer();
     stopBroker();
     stopController();

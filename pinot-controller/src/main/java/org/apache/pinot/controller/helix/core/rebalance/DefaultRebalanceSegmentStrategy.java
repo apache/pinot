@@ -84,7 +84,8 @@ public class DefaultRebalanceSegmentStrategy implements RebalanceSegmentStrategy
    */
   @Override
   public PartitionAssignment rebalancePartitionAssignment(IdealState idealState, TableConfig tableConfig,
-      Configuration rebalanceUserConfig) throws InvalidConfigException {
+      Configuration rebalanceUserConfig)
+      throws InvalidConfigException {
     String tableNameWithType = tableConfig.getTableName();
     PartitionAssignment newPartitionAssignment = new PartitionAssignment(tableNameWithType);
 
@@ -103,8 +104,8 @@ public class DefaultRebalanceSegmentStrategy implements RebalanceSegmentStrategy
 
         StreamPartitionAssignmentGenerator streamPartitionAssignmentGenerator = getStreamPartitionAssignmentGenerator();
         int numPartitions = streamPartitionAssignmentGenerator.getNumPartitionsFromIdealState(idealState);
-        newPartitionAssignment = streamPartitionAssignmentGenerator.generateStreamPartitionAssignment(tableConfig, numPartitions);
-
+        newPartitionAssignment =
+            streamPartitionAssignmentGenerator.generateStreamPartitionAssignment(tableConfig, numPartitions);
       } else {
         LOGGER.info("includeConsuming = false. No need to rebalance partition assignment for {}",
             tableConfig.getTableType());
@@ -190,7 +191,8 @@ public class DefaultRebalanceSegmentStrategy implements RebalanceSegmentStrategy
         LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
         int partitionId = llcSegmentName.getPartitionId();
         LLCSegmentName latestSegmentForPartition = partitionIdToLatestSegment.get(partitionId);
-        if (latestSegmentForPartition == null || llcSegmentName.getSequenceNumber() > latestSegmentForPartition.getSequenceNumber()) {
+        if (latestSegmentForPartition == null || llcSegmentName.getSequenceNumber() > latestSegmentForPartition
+            .getSequenceNumber()) {
           partitionIdToLatestSegment.put(partitionId, llcSegmentName);
         }
       }
@@ -273,9 +275,8 @@ public class DefaultRebalanceSegmentStrategy implements RebalanceSegmentStrategy
         LOGGER.info("Current nodes for table {}: {}", tableNameWithType, currentHosts);
         LOGGER.info("New nodes for table {}: {}", tableNameWithType, servingInstances);
         LOGGER.info("Enabled nodes for table: {} {}", tableNameWithType, enabledServingInstances);
-        ZNRecord newZnRecord =
-            rebalanceStrategy.computePartitionAssignment(servingInstances, enabledServingInstances, mapFields,
-                new ClusterDataCache());
+        ZNRecord newZnRecord = rebalanceStrategy
+            .computePartitionAssignment(servingInstances, enabledServingInstances, mapFields, new ClusterDataCache());
         final Map<String, Map<String, String>> newMapping = newZnRecord.getMapFields();
         for (Map.Entry<String, Map<String, String>> entry : newMapping.entrySet()) {
           idealState.setInstanceStateMap(entry.getKey(), entry.getValue());
@@ -346,5 +347,4 @@ public class DefaultRebalanceSegmentStrategy implements RebalanceSegmentStrategy
   protected List<String> getEnabledInstancesWithTag(String tag) {
     return HelixHelper.getEnabledInstancesWithTag(_helixManager, tag);
   }
-
 }

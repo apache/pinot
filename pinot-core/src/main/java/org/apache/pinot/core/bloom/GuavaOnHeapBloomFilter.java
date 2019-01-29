@@ -38,9 +38,8 @@ public class GuavaOnHeapBloomFilter implements BloomFilter {
   }
 
   public GuavaOnHeapBloomFilter(int cardinality, double maxFalsePosProbability) {
-    _bloomFilter =
-        com.google.common.hash.BloomFilter.create(Funnels.stringFunnel(Charset.forName("UTF-8")), cardinality,
-            maxFalsePosProbability);
+    _bloomFilter = com.google.common.hash.BloomFilter
+        .create(Funnels.stringFunnel(Charset.forName("UTF-8")), cardinality, maxFalsePosProbability);
   }
 
   @Override
@@ -64,13 +63,14 @@ public class GuavaOnHeapBloomFilter implements BloomFilter {
   }
 
   @Override
-  public void writeTo(OutputStream out) throws IOException {
+  public void writeTo(OutputStream out)
+      throws IOException {
     _bloomFilter.writeTo(out);
   }
 
   @Override
-  public void readFrom(InputStream in) throws IOException {
-    _bloomFilter =
-        com.google.common.hash.BloomFilter.readFrom(in, Funnels.stringFunnel(Charset.forName("UTF-8")));
+  public void readFrom(InputStream in)
+      throws IOException {
+    _bloomFilter = com.google.common.hash.BloomFilter.readFrom(in, Funnels.stringFunnel(Charset.forName("UTF-8")));
   }
 }

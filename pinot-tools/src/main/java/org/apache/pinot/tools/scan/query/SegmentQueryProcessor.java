@@ -58,7 +58,8 @@ class SegmentQueryProcessor {
   private final String _segmentName;
   private final int _totalDocs;
 
-  SegmentQueryProcessor(File segmentDir) throws Exception {
+  SegmentQueryProcessor(File segmentDir)
+      throws Exception {
     _segmentDir = segmentDir;
 
     _immutableSegment = ImmutableSegmentLoader.load(_segmentDir, ReadMode.mmap);
@@ -86,7 +87,8 @@ class SegmentQueryProcessor {
     _immutableSegment.destroy();
   }
 
-  public ResultTable process(BrokerRequest brokerRequest) throws Exception {
+  public ResultTable process(BrokerRequest brokerRequest)
+      throws Exception {
     if (pruneSegment(brokerRequest)) {
       return null;
     }
@@ -100,7 +102,8 @@ class SegmentQueryProcessor {
       // Aggregation only
       if (!brokerRequest.isSetGroupBy()) {
         Aggregation aggregation =
-            new Aggregation(_immutableSegment, _metadata, filteredDocIds, brokerRequest.getAggregationsInfo(), null, 10);
+            new Aggregation(_immutableSegment, _metadata, filteredDocIds, brokerRequest.getAggregationsInfo(), null,
+                10);
         result = aggregation.run();
       } else { // Aggregation GroupBy
         GroupBy groupBy = brokerRequest.getGroupBy();

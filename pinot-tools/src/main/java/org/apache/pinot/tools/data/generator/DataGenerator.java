@@ -37,6 +37,7 @@ import org.apache.pinot.core.data.readers.FileFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
 /**
  * Sep 12, 2014
  */
@@ -53,7 +54,8 @@ public class DataGenerator {
     generators = new HashMap<String, Generator>();
   }
 
-  public void init(DataGeneratorSpec spec) throws IOException {
+  public void init(DataGeneratorSpec spec)
+      throws IOException {
     genSpec = spec;
     outDir = new File(genSpec.getOutputDir());
     if (outDir.exists() && !genSpec.isOverrideOutDir()) {
@@ -71,9 +73,7 @@ public class DataGenerator {
       DataType dataType = genSpec.getDataTypesMap().get(column);
 
       if (genSpec.getCardinalityMap().containsKey(column)) {
-        generators.put(column,
-            GeneratorFactory.getGeneratorFor(dataType, genSpec.getCardinalityMap().get(column)));
-
+        generators.put(column, GeneratorFactory.getGeneratorFor(dataType, genSpec.getCardinalityMap().get(column)));
       } else if (genSpec.getRangeMap().containsKey(column)) {
         IntRange range = genSpec.getRangeMap().get(column);
 
@@ -88,7 +88,8 @@ public class DataGenerator {
     }
   }
 
-  public void generate(long totalDocs, int numFiles) throws IOException {
+  public void generate(long totalDocs, int numFiles)
+      throws IOException {
     final int numPerFiles = (int) (totalDocs / numFiles);
     for (int i = 0; i < numFiles; i++) {
       try (AvroWriter writer = new AvroWriter(outDir, i, generators, fetchSchema())) {
@@ -126,8 +127,8 @@ public class DataGenerator {
         spec = new TimeFieldSpec(column, dataType, genSpec.getTimeUnitMap().get(column));
         break;
 
-        default:
-          throw new RuntimeException("Invalid Field type.");
+      default:
+        throw new RuntimeException("Invalid Field type.");
     }
 
     spec.setName(column);
@@ -137,8 +138,9 @@ public class DataGenerator {
     return spec;
   }
 
-  public static void main(String[] args) throws IOException {
-    final String[] columns = { "column1", "column2", "column3", "column4", "column5" };
+  public static void main(String[] args)
+      throws IOException {
+    final String[] columns = {"column1", "column2", "column3", "column4", "column5"};
     final Map<String, DataType> dataTypes = new HashMap<String, DataType>();
     final Map<String, FieldType> fieldTypes = new HashMap<String, FieldType>();
     final Map<String, TimeUnit> timeUnits = new HashMap<String, TimeUnit>();
@@ -151,8 +153,9 @@ public class DataGenerator {
       fieldTypes.put(col, FieldType.DIMENSION);
       cardinality.put(col, 1000);
     }
-    final DataGeneratorSpec spec = new DataGeneratorSpec(Arrays.asList(columns), cardinality,
-        range, dataTypes, fieldTypes, timeUnits, FileFormat.AVRO, "/tmp/out", true);
+    final DataGeneratorSpec spec =
+        new DataGeneratorSpec(Arrays.asList(columns), cardinality, range, dataTypes, fieldTypes, timeUnits,
+            FileFormat.AVRO, "/tmp/out", true);
 
     final DataGenerator gen = new DataGenerator();
     gen.init(spec);

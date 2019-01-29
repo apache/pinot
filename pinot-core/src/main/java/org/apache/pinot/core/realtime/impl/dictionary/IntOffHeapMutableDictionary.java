@@ -31,12 +31,12 @@ public class IntOffHeapMutableDictionary extends BaseOffHeapMutableDictionary {
 
   private final FixedByteSingleColumnSingleValueReaderWriter _dictIdToValue;
 
-  public IntOffHeapMutableDictionary(int estimatedCardinality, int maxOverflowSize, PinotDataBufferMemoryManager memoryManager,
-      String allocationContext) {
+  public IntOffHeapMutableDictionary(int estimatedCardinality, int maxOverflowSize,
+      PinotDataBufferMemoryManager memoryManager, String allocationContext) {
     super(estimatedCardinality, maxOverflowSize, memoryManager, allocationContext);
     final int initialEntryCount = nearestPowerOf2(estimatedCardinality);
-    _dictIdToValue = new FixedByteSingleColumnSingleValueReaderWriter(initialEntryCount, Integer.BYTES,
-        memoryManager, allocationContext);
+    _dictIdToValue = new FixedByteSingleColumnSingleValueReaderWriter(initialEntryCount, Integer.BYTES, memoryManager,
+        allocationContext);
   }
 
   public Object get(int dictionaryId) {
@@ -157,7 +157,8 @@ public class IntOffHeapMutableDictionary extends BaseOffHeapMutableDictionary {
   }
 
   @Override
-  public void doClose() throws IOException {
+  public void doClose()
+      throws IOException {
     _dictIdToValue.close();
   }
 

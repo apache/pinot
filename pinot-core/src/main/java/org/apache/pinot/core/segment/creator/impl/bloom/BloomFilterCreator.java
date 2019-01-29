@@ -47,14 +47,14 @@ public class BloomFilterCreator implements AutoCloseable {
 
   public BloomFilterCreator(File indexDir, String columnName, int cardinality) {
     _bloomFilterFile = new File(indexDir, columnName + V1Constants.Indexes.BLOOM_FILTER_FILE_EXTENSION);
-    double maxFalsePosProbability =
-        BloomFilterUtil.computeMaxFalsePositiveProbabilityForNumBits(cardinality, MB_IN_BITS,
-            DEFAULT_MAX_FALSE_POS_PROBABILITY);
+    double maxFalsePosProbability = BloomFilterUtil
+        .computeMaxFalsePositiveProbabilityForNumBits(cardinality, MB_IN_BITS, DEFAULT_MAX_FALSE_POS_PROBABILITY);
     _bloomFilter = SegmentBloomFilterFactory.createSegmentBloomFilter(cardinality, maxFalsePosProbability);
   }
 
   @Override
-  public void close() throws IOException {
+  public void close()
+      throws IOException {
     try (DataOutputStream outputStream = new DataOutputStream(new FileOutputStream(_bloomFilterFile))) {
       outputStream.writeInt(_bloomFilter.getBloomFilterType().getValue());
       outputStream.writeInt(_bloomFilter.getVersion());

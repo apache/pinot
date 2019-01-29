@@ -55,7 +55,8 @@ public class SegmentPurgerTest {
   private int _expectedNumRecordsModified;
 
   @BeforeClass
-  public void setUp() throws Exception {
+  public void setUp()
+      throws Exception {
     FileUtils.deleteDirectory(TEMP_DIR);
 
     Schema schema = new Schema();
@@ -90,7 +91,8 @@ public class SegmentPurgerTest {
   }
 
   @Test
-  public void testPurgeSegment() throws Exception {
+  public void testPurgeSegment()
+      throws Exception {
     // Purge records with d1 = 0
     SegmentPurger.RecordPurger recordPurger = new SegmentPurger.RecordPurger() {
       @Override
@@ -150,7 +152,8 @@ public class SegmentPurgerTest {
   }
 
   @AfterClass
-  public void tearDown() throws Exception {
+  public void tearDown()
+      throws Exception {
     FileUtils.deleteDirectory(TEMP_DIR);
   }
 }

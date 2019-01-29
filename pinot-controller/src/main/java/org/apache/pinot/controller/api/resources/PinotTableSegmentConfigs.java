@@ -38,11 +38,11 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
 @Api(tags = Constants.TABLE_TAG)
 @Path("/")
 public class PinotTableSegmentConfigs {
-  private static final Logger LOGGER = LoggerFactory.getLogger(
-      PinotTableSegmentConfigs.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(PinotTableSegmentConfigs.class);
 
   @Inject
   PinotHelixResourceManager pinotHelixResourceManager;
@@ -53,19 +53,15 @@ public class PinotTableSegmentConfigs {
   @PUT
   @Path("/tables/{tableName}/segmentConfigs")
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Update segments configuration",
-      notes = "Updates segmentsConfig section (validation and retention) of a table")
-  @ApiResponses(value = {@ApiResponse(code=200, message = "Success"),
-      @ApiResponse(code=404, message="Table not found"),
-      @ApiResponse(code=500, message = "Internal server error")})
-  public SuccessResponse put(
-      @ApiParam(value = "Table name", required = true) @PathParam("tableName") String tableName,
-      String requestBody
-  ) {
+  @ApiOperation(value = "Update segments configuration", notes = "Updates segmentsConfig section (validation and retention) of a table")
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 404, message = "Table not found"), @ApiResponse(code = 500, message = "Internal server error")})
+  public SuccessResponse put(@ApiParam(value = "Table name", required = true) @PathParam("tableName") String tableName,
+      String requestBody) {
     try {
       TableConfig tableConfig = TableConfig.fromJsonString(requestBody);
-      pinotHelixResourceManager.updateSegmentsValidationAndRetentionConfigFor(tableConfig.getTableName(),
-          tableConfig.getTableType(), tableConfig.getValidationConfig());
+      pinotHelixResourceManager
+          .updateSegmentsValidationAndRetentionConfigFor(tableConfig.getTableName(), tableConfig.getTableType(),
+              tableConfig.getValidationConfig());
       return new SuccessResponse("Update segmentsConfig for table: " + tableName);
     } catch (IOException e) {
       metrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_SCHEMA_UPDATE_ERROR, 1L);

@@ -125,8 +125,8 @@ public class RetentionManager extends ControllerPeriodicTask {
 
   private void manageRetentionForOfflineTable(String offlineTableName, RetentionStrategy retentionStrategy) {
     List<String> segmentsToDelete = new ArrayList<>();
-    for (OfflineSegmentZKMetadata offlineSegmentZKMetadata : _pinotHelixResourceManager.getOfflineSegmentMetadata(
-        offlineTableName)) {
+    for (OfflineSegmentZKMetadata offlineSegmentZKMetadata : _pinotHelixResourceManager
+        .getOfflineSegmentMetadata(offlineTableName)) {
       if (retentionStrategy.isPurgeable(offlineSegmentZKMetadata)) {
         segmentsToDelete.add(offlineSegmentZKMetadata.getSegmentName());
       }
@@ -141,8 +141,8 @@ public class RetentionManager extends ControllerPeriodicTask {
     List<String> segmentsToDelete = new ArrayList<>();
     IdealState idealState = _pinotHelixResourceManager.getHelixAdmin()
         .getResourceIdealState(_pinotHelixResourceManager.getHelixClusterName(), realtimeTableName);
-    for (RealtimeSegmentZKMetadata realtimeSegmentZKMetadata : _pinotHelixResourceManager.getRealtimeSegmentMetadata(
-        realtimeTableName)) {
+    for (RealtimeSegmentZKMetadata realtimeSegmentZKMetadata : _pinotHelixResourceManager
+        .getRealtimeSegmentMetadata(realtimeTableName)) {
       String segmentName = realtimeSegmentZKMetadata.getSegmentName();
       if (realtimeSegmentZKMetadata.getStatus() == Status.IN_PROGRESS) {
         // In progress segment, only check LLC segment
@@ -186,11 +186,10 @@ public class RetentionManager extends ControllerPeriodicTask {
     } else {
       // Delete segment if all of its replicas are OFFLINE
       Set<String> states = new HashSet<>(stateMap.values());
-      return states.size() == 1 && states.contains(
-          CommonConstants.Helix.StateModel.SegmentOnlineOfflineStateModel.OFFLINE);
+      return states.size() == 1 && states
+          .contains(CommonConstants.Helix.StateModel.SegmentOnlineOfflineStateModel.OFFLINE);
     }
   }
-
 
   @Override
   public void stopTask() {

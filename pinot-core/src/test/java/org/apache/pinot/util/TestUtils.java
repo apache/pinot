@@ -88,18 +88,18 @@ public class TestUtils {
     }
   }
 
-  public static void assertGroupByResultsApproximation(
-      List<GroupByResult> estimateValues, List<GroupByResult> actualValues, double precision) {
+  public static void assertGroupByResultsApproximation(List<GroupByResult> estimateValues,
+      List<GroupByResult> actualValues, double precision) {
     LOGGER.info("====== assertGroupByResultsApproximation ======");
     // estimation should not affect number of groups formed
     Assert.assertEquals(estimateValues.size(), actualValues.size());
 
     Map<List<String>, Double> mapEstimate = new HashMap<>();
     Map<List<String>, Double> mapActual = new HashMap<>();
-    for (GroupByResult gby: estimateValues) {
+    for (GroupByResult gby : estimateValues) {
       mapEstimate.put(gby.getGroup(), Double.parseDouble(gby.getValue().toString()));
     }
-    for (GroupByResult gby: actualValues) {
+    for (GroupByResult gby : actualValues) {
       mapActual.put(gby.getGroup(), Double.parseDouble(gby.getValue().toString()));
     }
 
@@ -107,7 +107,7 @@ public class TestUtils {
     LOGGER.info("actual: " + mapActual.keySet());
 
     int cnt = 0;
-    for (List<String> key: mapEstimate.keySet()) {
+    for (List<String> key : mapEstimate.keySet()) {
       // Not strictly enforced, since in quantile, top 100 groups from accurate maybe not be top 100 from estimate
       // Assert.assertEquals(mapActual.keySet().contains(key), true);
       if (mapActual.keySet().contains(key)) {
@@ -115,7 +115,7 @@ public class TestUtils {
         cnt += 1;
       }
     }
-    LOGGER.info("group overlap rate: " + (cnt+0.0)/mapEstimate.keySet().size());
+    LOGGER.info("group overlap rate: " + (cnt + 0.0) / mapEstimate.keySet().size());
   }
 
   /**

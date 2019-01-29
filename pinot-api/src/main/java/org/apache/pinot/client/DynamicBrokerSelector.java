@@ -39,8 +39,7 @@ import static org.apache.pinot.client.ExternalViewReader.REALTIME_SUFFIX;
  * Maintains a mapping between table name and list of brokers
  */
 public class DynamicBrokerSelector implements BrokerSelector, IZkDataListener {
-  AtomicReference<Map<String, List<String>>> tableToBrokerListMapRef =
-      new AtomicReference<Map<String, List<String>>>();
+  AtomicReference<Map<String, List<String>>> tableToBrokerListMapRef = new AtomicReference<Map<String, List<String>>>();
   AtomicReference<List<String>> allBrokerListRef = new AtomicReference<List<String>>();
   private final Random _random = new Random();
   private ExternalViewReader evReader;
@@ -64,8 +63,9 @@ public class DynamicBrokerSelector implements BrokerSelector, IZkDataListener {
     allBrokerListRef.set(new ArrayList<>(brokerSet));
   }
 
+  @Nullable
   @Override
-  public @Nullable String selectBroker(String table) {
+  public String selectBroker(String table) {
     if (table == null) {
       List<String> list = allBrokerListRef.get();
       if (list != null && !list.isEmpty()) {
@@ -83,12 +83,14 @@ public class DynamicBrokerSelector implements BrokerSelector, IZkDataListener {
   }
 
   @Override
-  public void handleDataChange(String dataPath, Object data) throws Exception {
+  public void handleDataChange(String dataPath, Object data)
+      throws Exception {
     refresh();
   }
 
   @Override
-  public void handleDataDeleted(String dataPath) throws Exception {
+  public void handleDataDeleted(String dataPath)
+      throws Exception {
     refresh();
   }
 }

@@ -44,7 +44,8 @@ public class AvroRecordReader implements RecordReader {
   private DataFileStream<GenericRecord> _avroReader;
   private GenericRecord _reusableAvroRecord = null;
 
-  public AvroRecordReader(File dataFile, Schema schema) throws IOException {
+  public AvroRecordReader(File dataFile, Schema schema)
+      throws IOException {
     _dataFile = dataFile;
     _schema = schema;
     _avroReader = AvroUtils.getAvroReader(dataFile);
@@ -89,19 +90,22 @@ public class AvroRecordReader implements RecordReader {
   }
 
   @Override
-  public GenericRow next() throws IOException {
+  public GenericRow next()
+      throws IOException {
     return next(new GenericRow());
   }
 
   @Override
-  public GenericRow next(GenericRow reuse) throws IOException {
+  public GenericRow next(GenericRow reuse)
+      throws IOException {
     _reusableAvroRecord = _avroReader.next(_reusableAvroRecord);
     AvroUtils.fillGenericRow(_reusableAvroRecord, reuse, _schema);
     return reuse;
   }
 
   @Override
-  public void rewind() throws IOException {
+  public void rewind()
+      throws IOException {
     _avroReader.close();
     _avroReader = AvroUtils.getAvroReader(_dataFile);
   }
@@ -112,7 +116,8 @@ public class AvroRecordReader implements RecordReader {
   }
 
   @Override
-  public void close() throws IOException {
+  public void close()
+      throws IOException {
     _avroReader.close();
   }
 }

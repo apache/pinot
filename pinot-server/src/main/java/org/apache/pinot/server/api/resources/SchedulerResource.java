@@ -44,6 +44,5 @@ public class SchedulerResource {
   public void setQueryScheduler(String schedulerName) {
     server.resetQueryScheduler(schedulerName);
   }
-
 }
 

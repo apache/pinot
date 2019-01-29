@@ -34,7 +34,8 @@ import org.testng.annotations.Test;
 public class TablesResourceTest extends BaseResourceTest {
 
   @Test
-  public void getTables() throws Exception {
+  public void getTables()
+      throws Exception {
     String tablesPath = "/tables";
 
     Response response = _webTarget.path(tablesPath).request().get(Response.class);
@@ -62,7 +63,8 @@ public class TablesResourceTest extends BaseResourceTest {
   }
 
   @Test
-  public void getSegments() throws Exception {
+  public void getSegments()
+      throws Exception {
     String segmentsPath = "/tables/" + TABLE_NAME + "/segments";
     IndexSegment defaultSegment = _indexSegments.get(0);
 
@@ -89,11 +91,13 @@ public class TablesResourceTest extends BaseResourceTest {
   }
 
   @Test
-  public void testSegmentMetadata() throws Exception {
+  public void testSegmentMetadata()
+      throws Exception {
     IndexSegment defaultSegment = _indexSegments.get(0);
     String segmentMetadataPath = "/tables/" + TABLE_NAME + "/segments/" + defaultSegment.getSegmentName() + "/metadata";
 
-    JsonNode jsonResponse = JsonUtils.stringToJsonNode(_webTarget.path(segmentMetadataPath).request().get(String.class));
+    JsonNode jsonResponse =
+        JsonUtils.stringToJsonNode(_webTarget.path(segmentMetadataPath).request().get(String.class));
     SegmentMetadataImpl segmentMetadata = (SegmentMetadataImpl) defaultSegment.getSegmentMetadata();
     Assert.assertEquals(jsonResponse.get("segmentName").asText(), segmentMetadata.getName());
     Assert.assertEquals(jsonResponse.get("crc").asText(), segmentMetadata.getCrc());
@@ -109,19 +113,16 @@ public class TablesResourceTest extends BaseResourceTest {
     Assert.assertTrue(jsonResponse.has("creationTimeReadable"));
     Assert.assertEquals(jsonResponse.get("columns").size(), 0);
 
-    jsonResponse = JsonUtils.stringToJsonNode(_webTarget.path(segmentMetadataPath)
-        .queryParam("columns", "column1")
-        .queryParam("columns", "column2")
-        .request()
-        .get(String.class));
+    jsonResponse = JsonUtils.stringToJsonNode(
+        _webTarget.path(segmentMetadataPath).queryParam("columns", "column1").queryParam("columns", "column2").request()
+            .get(String.class));
     Assert.assertEquals(jsonResponse.get("columns").size(), 2);
 
     jsonResponse = JsonUtils.stringToJsonNode(
         (_webTarget.path(segmentMetadataPath).queryParam("columns", "*").request().get(String.class)));
     Assert.assertEquals(jsonResponse.get("columns").size(), segmentMetadata.getAllColumns().size());
 
-    Response response = _webTarget.path("/tables/UNKNOWN_TABLE/segments/" + defaultSegment.getSegmentName())
-        .request()
+    Response response = _webTarget.path("/tables/UNKNOWN_TABLE/segments/" + defaultSegment.getSegmentName()).request()
         .get(Response.class);
     Assert.assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
 
@@ -130,7 +131,8 @@ public class TablesResourceTest extends BaseResourceTest {
   }
 
   @Test
-  public void testSegmentCrcMetadata() throws Exception {
+  public void testSegmentCrcMetadata()
+      throws Exception {
     String segmentsCrcPath = "/tables/" + TABLE_NAME + "/segments/crc";
 
     // Upload segments

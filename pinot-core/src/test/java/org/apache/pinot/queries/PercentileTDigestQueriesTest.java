@@ -108,7 +108,8 @@ public class PercentileTDigestQueriesTest extends BaseQueriesTest {
   }
 
   @BeforeClass
-  public void setUp() throws Exception {
+  public void setUp()
+      throws Exception {
     FileUtils.deleteQuietly(INDEX_DIR);
 
     buildSegment();
@@ -117,7 +118,8 @@ public class PercentileTDigestQueriesTest extends BaseQueriesTest {
         Arrays.asList(new ImmutableSegmentDataManager(_indexSegment), new ImmutableSegmentDataManager(_indexSegment));
   }
 
-  protected void buildSegment() throws Exception {
+  protected void buildSegment()
+      throws Exception {
     List<GenericRow> rows = new ArrayList<>(NUM_ROWS);
     for (int i = 0; i < NUM_ROWS; i++) {
       HashMap<String, Object> valueMap = new HashMap<>();
@@ -230,8 +232,9 @@ public class PercentileTDigestQueriesTest extends BaseQueriesTest {
   }
 
   protected String getAggregationQuery(int percentile) {
-    return String.format("SELECT PERCENTILE%d(%s), PERCENTILETDIGEST%d(%s), PERCENTILETDIGEST%d(%s) FROM %s",
-        percentile, DOUBLE_COLUMN, percentile, DOUBLE_COLUMN, percentile, TDIGEST_COLUMN, TABLE_NAME);
+    return String
+        .format("SELECT PERCENTILE%d(%s), PERCENTILETDIGEST%d(%s), PERCENTILETDIGEST%d(%s) FROM %s", percentile,
+            DOUBLE_COLUMN, percentile, DOUBLE_COLUMN, percentile, TDIGEST_COLUMN, TABLE_NAME);
   }
 
   private String getGroupByQuery(int percentile) {
@@ -246,8 +249,9 @@ public class PercentileTDigestQueriesTest extends BaseQueriesTest {
       } else {
         expected = doubleList.getDouble(doubleList.size() * percentile / 100);
       }
-      Assert.assertEquals(PercentileTDigestAggregationFunction.calculatePercentile(tDigest, percentile), expected,
-          DELTA, ERROR_MESSAGE);
+      Assert
+          .assertEquals(PercentileTDigestAggregationFunction.calculatePercentile(tDigest, percentile), expected, DELTA,
+              ERROR_MESSAGE);
     }
   }
 

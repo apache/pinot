@@ -31,13 +31,12 @@ public class ScanBasedMultiValueDocIdSet implements FilterBlockDocIdSet {
   private MVScanDocIdIterator blockValSetBlockDocIdIterator;
   private String datasourceName;
 
-  public ScanBasedMultiValueDocIdSet(String datasourceName, BlockValSet blockValSet,
-      BlockMetadata blockMetadata, PredicateEvaluator evaluator) {
+  public ScanBasedMultiValueDocIdSet(String datasourceName, BlockValSet blockValSet, BlockMetadata blockMetadata,
+      PredicateEvaluator evaluator) {
     this.datasourceName = datasourceName;
     this.blockValSet = blockValSet;
     this.blockMetadata = blockMetadata;
-    blockValSetBlockDocIdIterator =
-        new MVScanDocIdIterator(datasourceName, blockValSet, blockMetadata, evaluator);
+    blockValSetBlockDocIdIterator = new MVScanDocIdIterator(datasourceName, blockValSet, blockMetadata, evaluator);
   }
 
   @Override

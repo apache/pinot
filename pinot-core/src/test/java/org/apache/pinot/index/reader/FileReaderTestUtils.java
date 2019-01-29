@@ -26,8 +26,9 @@ import java.io.InputStreamReader;
 
 public class FileReaderTestUtils {
 
-  public static int getNumOpenFiles(File f) throws IOException {
-    Process plsof = new ProcessBuilder(new String[] { "lsof" }).start();
+  public static int getNumOpenFiles(File f)
+      throws IOException {
+    Process plsof = new ProcessBuilder(new String[]{"lsof"}).start();
     BufferedReader plsofReader = new BufferedReader(new InputStreamReader(plsof.getInputStream()));
     String line;
     int numOpenFiles = 0;

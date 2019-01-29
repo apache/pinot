@@ -75,8 +75,7 @@ public class CombinedConfigLoader {
 
     config = processProfileConditionals(config, profiles);
 
-    return HashSet.ofAll(config.entrySet())
-        .toMap(entry -> Tuple.of(entry.getKey(), entry.getValue().unwrapped()));
+    return HashSet.ofAll(config.entrySet()).toMap(entry -> Tuple.of(entry.getKey(), entry.getValue().unwrapped()));
   }
 
   private static Config processProfileConditionals(Config config, String... profiles) {
@@ -86,17 +85,14 @@ public class CombinedConfigLoader {
         HashSet.ofAll(config.entrySet()).toMap(entry -> Tuple.of(entry.getKey(), entry.getValue()));
 
     // Get all profile-specific keys
-    Set<String> profileKeys = configMap.keySet()
-        .filter(key -> key.contains(PROFILE_SEPARATOR))
-        .toSet();
+    Set<String> profileKeys = configMap.keySet().filter(key -> key.contains(PROFILE_SEPARATOR)).toSet();
 
     // Keep profile-specific keys for enabled profiles
-    Set<String> enabledProfileKeys = profileKeys
-        .filter(key -> {
-          int lastUnderscoreIndex = key.lastIndexOf(PROFILE_SEPARATOR);
-          String profile = key.substring(lastUnderscoreIndex + PROFILE_SEPARATOR.length(), key.length());
-          return enabledProfiles.contains(profile);
-        });
+    Set<String> enabledProfileKeys = profileKeys.filter(key -> {
+      int lastUnderscoreIndex = key.lastIndexOf(PROFILE_SEPARATOR);
+      String profile = key.substring(lastUnderscoreIndex + PROFILE_SEPARATOR.length(), key.length());
+      return enabledProfiles.contains(profile);
+    });
 
     // Merge all the enabled keys together
     io.vavr.collection.Map<String, ConfigValue> overrideConfigMap = HashMap.empty();
@@ -112,10 +108,10 @@ public class CombinedConfigLoader {
         ConfigValue previousOverrideValue = overrideConfigMap.get(destinationKey).get();
         ConfigValue newConfigValue = config.getValue(enabledProfileKey);
         if (!EqualityUtils.isEqual(previousOverrideValue.unwrapped(), newConfigValue.unwrapped())) {
-          throw new RuntimeException("Found conflicting value for key " + destinationKey +
-              " due to multiple enabled profiles for this configuration key. Previous override was " +
-              previousOverrideValue.unwrapped() + ", new override value is " + newConfigValue.unwrapped() +
-              ". Ensure that all enabled profiles for this profile override key have the same resulting value.");
+          throw new RuntimeException("Found conflicting value for key " + destinationKey
+              + " due to multiple enabled profiles for this configuration key. Previous override was "
+              + previousOverrideValue.unwrapped() + ", new override value is " + newConfigValue.unwrapped()
+              + ". Ensure that all enabled profiles for this profile override key have the same resulting value.");
         }
       }
     }
@@ -132,8 +128,8 @@ public class CombinedConfigLoader {
   }
 
   static io.vavr.collection.Map<String, ?> loadConfigFromString(String string) {
-    Config config = ConfigFactory.parseString(string,
-        ConfigParseOptions.defaults().prependIncluder(new ConfigIncluder() {
+    Config config =
+        ConfigFactory.parseString(string, ConfigParseOptions.defaults().prependIncluder(new ConfigIncluder() {
           private ConfigIncluder parent = null;
 
           public ConfigObject include(ConfigIncludeContext context, String what) {
@@ -148,8 +144,7 @@ public class CombinedConfigLoader {
 
     config = config.resolve();
 
-    return HashSet.ofAll(config.entrySet())
-        .toMap(entry -> Tuple.of(entry.getKey(), entry.getValue().unwrapped()));
+    return HashSet.ofAll(config.entrySet()).toMap(entry -> Tuple.of(entry.getKey(), entry.getValue().unwrapped()));
   }
 
   public static CombinedConfig loadCombinedConfig(io.vavr.collection.Map<String, ?> config) {

@@ -30,6 +30,7 @@ import javax.ws.rs.core.MediaType;
 import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.controller.ControllerConf;
 
+
 @Api(tags = Constants.HEALTH_TAG)
 @Path("/pinot-controller/admin")
 public class PinotControllerHealthCheck {
@@ -42,8 +43,7 @@ public class PinotControllerHealthCheck {
   @ApiOperation(value = "Check controller health")
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Good")})
   @Produces(MediaType.TEXT_PLAIN)
-  public String checkHealth(
-  ) {
+  public String checkHealth() {
     if (StringUtils.isNotBlank(controllerConf.generateVipUrl())) {
       return "GOOD";
     }

@@ -41,8 +41,8 @@ public class OffHeapStarTree implements StarTree {
 
   public OffHeapStarTree(PinotDataBuffer dataBuffer) {
     long offset = 0L;
-    Preconditions.checkState(MAGIC_MARKER == dataBuffer.getLong(offset),
-        "Invalid magic marker in star-tree data buffer");
+    Preconditions
+        .checkState(MAGIC_MARKER == dataBuffer.getLong(offset), "Invalid magic marker in star-tree data buffer");
     offset += Long.BYTES;
 
     Preconditions.checkState(VERSION == dataBuffer.getInt(offset), "Invalid version in star-tree data buffer");
@@ -120,16 +120,10 @@ public class OffHeapStarTree implements StarTree {
       childDimensionName = _dimensionNames.get(childDimensionId);
     }
 
-    String formattedOutput = MoreObjects.toStringHelper(node)
-        .add("level", level)
-        .add("dimensionName", dimensionName)
-        .add("dimensionValue", dimensionValueString)
-        .add("childDimensionName", childDimensionName)
-        .add("startDocId", node.getStartDocId())
-        .add("endDocId", node.getEndDocId())
-        .add("aggregatedDocId", node.getAggregatedDocId())
-        .add("numChildren", node.getNumChildren())
-        .toString();
+    String formattedOutput = MoreObjects.toStringHelper(node).add("level", level).add("dimensionName", dimensionName)
+        .add("dimensionValue", dimensionValueString).add("childDimensionName", childDimensionName)
+        .add("startDocId", node.getStartDocId()).add("endDocId", node.getEndDocId())
+        .add("aggregatedDocId", node.getAggregatedDocId()).add("numChildren", node.getNumChildren()).toString();
     stringBuilder.append(formattedOutput);
     System.out.println(stringBuilder.toString());
 

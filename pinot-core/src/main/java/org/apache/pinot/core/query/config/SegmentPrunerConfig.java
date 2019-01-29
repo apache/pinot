@@ -40,7 +40,8 @@ public class SegmentPrunerConfig {
   private List<String> _segmentPrunerClassNameList = new ArrayList<String>();
   private List<Configuration> _segmentPrunerConfigurationList = new ArrayList<Configuration>();
 
-  public SegmentPrunerConfig(Configuration segmentPrunerConfig) throws ConfigurationException {
+  public SegmentPrunerConfig(Configuration segmentPrunerConfig)
+      throws ConfigurationException {
     _segmentPrunerSetConfig = segmentPrunerConfig;
     checkRequiredKeys();
     String[] serviceClasses = _segmentPrunerSetConfig.getStringArray(SEGMENT_PRUNER_CLASS);
@@ -51,7 +52,8 @@ public class SegmentPrunerConfig {
     }
   }
 
-  private void checkRequiredKeys() throws ConfigurationException {
+  private void checkRequiredKeys()
+      throws ConfigurationException {
     for (String keyString : REQUIRED_KEYS) {
       if (!_segmentPrunerSetConfig.containsKey(keyString)) {
         throw new ConfigurationException("Cannot find required key : " + keyString);
@@ -70,5 +72,4 @@ public class SegmentPrunerConfig {
   public int numberOfSegmentPruner() {
     return _segmentPrunerConfigurationList.size();
   }
-
 }

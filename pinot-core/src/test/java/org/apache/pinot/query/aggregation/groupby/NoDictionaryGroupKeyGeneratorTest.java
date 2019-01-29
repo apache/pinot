@@ -69,8 +69,7 @@ public class NoDictionaryGroupKeyGeneratorTest {
   private static final String[] NO_DICT_COLUMN_NAMES =
       {"int_column", "long_column", "float_column", "double_column", "string_column"};
   private static final FieldSpec.DataType[] DATA_TYPES =
-      {FieldSpec.DataType.INT, FieldSpec.DataType.LONG, FieldSpec.DataType.FLOAT, FieldSpec.DataType.DOUBLE,
-          FieldSpec.DataType.STRING, FieldSpec.DataType.STRING};
+      {FieldSpec.DataType.INT, FieldSpec.DataType.LONG, FieldSpec.DataType.FLOAT, FieldSpec.DataType.DOUBLE, FieldSpec.DataType.STRING, FieldSpec.DataType.STRING};
   private static final int NUM_COLUMNS = COLUMN_NAMES.length;
   private static final int NUM_ROWS = 1000;
 
@@ -79,7 +78,8 @@ public class NoDictionaryGroupKeyGeneratorTest {
   private TransformBlock _transformBlock;
 
   @BeforeClass
-  public void setup() throws Exception {
+  public void setup()
+      throws Exception {
     FileUtils.deleteQuietly(new File(INDEX_DIR_PATH));
 
     _recordReader = buildSegment();
@@ -101,7 +101,8 @@ public class NoDictionaryGroupKeyGeneratorTest {
    * @throws Exception
    */
   @Test
-  public void testSingleColumnGroupKeyGenerator() throws Exception {
+  public void testSingleColumnGroupKeyGenerator()
+      throws Exception {
     for (String column : COLUMN_NAMES) {
       testGroupKeyGenerator(new String[]{column});
     }
@@ -112,7 +113,8 @@ public class NoDictionaryGroupKeyGeneratorTest {
    * @throws Exception
    */
   @Test
-  public void testMultiColumnGroupKeyGenerator() throws Exception {
+  public void testMultiColumnGroupKeyGenerator()
+      throws Exception {
     testGroupKeyGenerator(COLUMN_NAMES);
   }
 
@@ -120,13 +122,15 @@ public class NoDictionaryGroupKeyGeneratorTest {
    * Tests multi-column group key generator when at least one column as dictionary, and others don't.
    */
   @Test
-  public void testMultiColumnHybridGroupKeyGenerator() throws Exception {
+  public void testMultiColumnHybridGroupKeyGenerator()
+      throws Exception {
     for (String noDictColumn : NO_DICT_COLUMN_NAMES) {
       testGroupKeyGenerator(new String[]{noDictColumn, STRING_DICT_COLUMN});
     }
   }
 
-  private void testGroupKeyGenerator(String[] groupByColumns) throws Exception {
+  private void testGroupKeyGenerator(String[] groupByColumns)
+      throws Exception {
     int numGroupByColumns = groupByColumns.length;
     TransformExpressionTree[] groupByExpressions = new TransformExpressionTree[numGroupByColumns];
     for (int i = 0; i < numGroupByColumns; i++) {
@@ -164,7 +168,8 @@ public class NoDictionaryGroupKeyGeneratorTest {
    * @return Set of unique group keys.
    * @throws Exception
    */
-  private Set<String> getExpectedGroupKeys(RecordReader recordReader, String[] groupByColumns) throws Exception {
+  private Set<String> getExpectedGroupKeys(RecordReader recordReader, String[] groupByColumns)
+      throws Exception {
     Set<String> groupKeys = new HashSet<>();
     StringBuilder stringBuilder = new StringBuilder();
 
@@ -197,7 +202,8 @@ public class NoDictionaryGroupKeyGeneratorTest {
    *
    * @throws Exception
    */
-  private static RecordReader buildSegment() throws Exception {
+  private static RecordReader buildSegment()
+      throws Exception {
     Schema schema = new Schema();
 
     for (int i = 0; i < COLUMN_NAMES.length; i++) {

@@ -47,7 +47,8 @@ public abstract class SingleStringVirtualColumnProvider extends BaseVirtualColum
   @Override
   public Dictionary buildDictionary(VirtualColumnContext context) {
     DictionaryDelegatingValueReader valueReader = new DictionaryDelegatingValueReader();
-    SingleStringDictionary stringDictionary = new SingleStringDictionary(valueReader, context.getTotalDocCount(), context);
+    SingleStringDictionary stringDictionary =
+        new SingleStringDictionary(valueReader, context.getTotalDocCount(), context);
     valueReader.setDictionary(stringDictionary);
     return stringDictionary;
   }
@@ -56,12 +57,8 @@ public abstract class SingleStringVirtualColumnProvider extends BaseVirtualColum
   public ColumnMetadata buildMetadata(VirtualColumnContext context) {
     ColumnMetadata.Builder columnMetadataBuilder = super.getColumnMetadataBuilder(context);
 
-    columnMetadataBuilder.setCardinality(1)
-        .setHasDictionary(true)
-        .setHasInvertedIndex(true)
-        .setFieldType(FieldSpec.FieldType.DIMENSION)
-        .setDataType(FieldSpec.DataType.STRING)
-        .setSingleValue(true)
+    columnMetadataBuilder.setCardinality(1).setHasDictionary(true).setHasInvertedIndex(true)
+        .setFieldType(FieldSpec.FieldType.DIMENSION).setDataType(FieldSpec.DataType.STRING).setSingleValue(true)
         .setIsSorted(true);
 
     return columnMetadataBuilder.build();
@@ -99,7 +96,8 @@ public abstract class SingleStringVirtualColumnProvider extends BaseVirtualColum
     }
 
     @Override
-    public void close() throws IOException {
+    public void close()
+        throws IOException {
     }
 
     @Override
@@ -169,7 +167,8 @@ public abstract class SingleStringVirtualColumnProvider extends BaseVirtualColum
     }
 
     @Override
-    public void close() throws IOException {
+    public void close()
+        throws IOException {
     }
   }
 }

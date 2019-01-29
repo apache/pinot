@@ -341,9 +341,9 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, ConfigNodeLife
 
     FieldSpec that = (FieldSpec) o;
     return EqualityUtils.isEqual(_name, that._name) && EqualityUtils.isEqual(_dataType, that._dataType) && EqualityUtils
-        .isEqual(_isSingleValueField, that._isSingleValueField) && EqualityUtils.isEqual(
-        getStringValue(_defaultNullValue), getStringValue(that._defaultNullValue)) && EqualityUtils.isEqual(_maxLength,
-        that._maxLength);
+        .isEqual(_isSingleValueField, that._isSingleValueField) && EqualityUtils
+        .isEqual(getStringValue(_defaultNullValue), getStringValue(that._defaultNullValue)) && EqualityUtils
+        .isEqual(_maxLength, that._maxLength);
   }
 
   @Override
@@ -376,23 +376,17 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, ConfigNodeLife
    * segments, otherwise treated the same as <code>DIMENSION</code> field.
    */
   public enum FieldType {
-    DIMENSION,
-    METRIC,
-    TIME,
-    DATE_TIME
+    DIMENSION, METRIC, TIME, DATE_TIME
   }
 
   /**
    * The <code>DataType</code> enum is used to demonstrate the data type of a field.
    */
   public enum DataType {
-    INT,
-    LONG,
-    FLOAT,
-    DOUBLE,
-    BOOLEAN,  // Stored as STRING
-    STRING,
-    BYTES;
+    INT, LONG, FLOAT, DOUBLE, BOOLEAN,
+
+    // Stored as STRING
+    STRING, BYTES;
 
     /**
      * Returns the data type stored in Pinot.

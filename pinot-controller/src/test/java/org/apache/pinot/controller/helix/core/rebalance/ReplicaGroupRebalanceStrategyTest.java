@@ -56,34 +56,34 @@ public class ReplicaGroupRebalanceStrategyTest extends ControllerTest {
   private final TableConfig.Builder _offlineBuilder = new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE);
 
   @BeforeClass
-  public void setUp() throws Exception {
+  public void setUp()
+      throws Exception {
     try {
       startZk();
       ControllerConf config = getDefaultControllerConfiguration();
       config.setTableMinReplicas(MIN_NUM_REPLICAS);
       startController(config);
-      ControllerRequestBuilderUtil.addFakeBrokerInstancesToAutoJoinHelixCluster(getHelixClusterName(),
-          ZkStarter.DEFAULT_ZK_STR, NUM_BROKER_INSTANCES, true);
-      ControllerRequestBuilderUtil.addFakeDataInstancesToAutoJoinHelixCluster(getHelixClusterName(),
-          ZkStarter.DEFAULT_ZK_STR, NUM_SERVER_INSTANCES, true);
+      ControllerRequestBuilderUtil
+          .addFakeBrokerInstancesToAutoJoinHelixCluster(getHelixClusterName(), ZkStarter.DEFAULT_ZK_STR,
+              NUM_BROKER_INSTANCES, true);
+      ControllerRequestBuilderUtil
+          .addFakeDataInstancesToAutoJoinHelixCluster(getHelixClusterName(), ZkStarter.DEFAULT_ZK_STR,
+              NUM_SERVER_INSTANCES, true);
 
-      _offlineBuilder.setTableName("testOfflineTable")
-          .setTimeColumnName("timeColumn")
-          .setTimeType("DAYS")
-          .setRetentionTimeUnit("DAYS")
-          .setRetentionTimeValue("5");
+      _offlineBuilder.setTableName("testOfflineTable").setTimeColumnName("timeColumn").setTimeType("DAYS")
+          .setRetentionTimeUnit("DAYS").setRetentionTimeValue("5");
 
       setUpTable();
 
       // Join 4 more servers as untagged
       String[] instanceNames = {"Server_localhost_a", "Server_localhost_b", "Server_localhost_c", "Server_localhost_d"};
       for (String instanceName : instanceNames) {
-        ControllerRequestBuilderUtil.addFakeDataInstanceToAutoJoinHelixCluster(getHelixClusterName(),
-            ZkStarter.DEFAULT_ZK_STR, instanceName, true);
+        ControllerRequestBuilderUtil
+            .addFakeDataInstanceToAutoJoinHelixCluster(getHelixClusterName(), ZkStarter.DEFAULT_ZK_STR, instanceName,
+                true);
         _helixAdmin.removeInstanceTag(getHelixClusterName(), instanceName, OFFLINE_TENENT_NAME);
       }
-
-    } catch(Exception e) {
+    } catch (Exception e) {
       e.printStackTrace();
     }
   }
@@ -95,7 +95,8 @@ public class ReplicaGroupRebalanceStrategyTest extends ControllerTest {
   }
 
   @Test
-  public void testReplicaGroupRebalanceStrategy() throws Exception {
+  public void testReplicaGroupRebalanceStrategy()
+      throws Exception {
     Configuration rebalanceUserConfig = new PropertyListConfiguration();
     rebalanceUserConfig.setProperty(RebalanceUserConfigConstants.DRYRUN, false);
     rebalanceUserConfig.setProperty(RebalanceUserConfigConstants.DOWNTIME, true);
@@ -111,8 +112,8 @@ public class ReplicaGroupRebalanceStrategyTest extends ControllerTest {
     tableConfig.getValidationConfig().setSegmentAssignmentStrategy("ReplicaGroupSegmentAssignmentStrategy");
     tableConfig.getValidationConfig().setReplication("2");
 
-    _helixResourceManager.setExistingTableConfig(tableConfig, tableNameWithType,
-        CommonConstants.Helix.TableType.OFFLINE);
+    _helixResourceManager
+        .setExistingTableConfig(tableConfig, tableNameWithType, CommonConstants.Helix.TableType.OFFLINE);
 
     // Test rebalancing after migration from non-replica to replica group table
     _helixResourceManager.rebalanceTable(TABLE_NAME, CommonConstants.Helix.TableType.OFFLINE, rebalanceUserConfig);
@@ -244,17 +245,19 @@ public class ReplicaGroupRebalanceStrategyTest extends ControllerTest {
     Assert.assertTrue(validateNumSegments(INITIAL_NUM_SEGMENTS));
   }
 
-  private void addNewSegments() throws Exception {
+  private void addNewSegments()
+      throws Exception {
     for (int i = 0; i < 10; i++) {
       ReplicaGroupTestUtils.uploadSingleSegmentWithPartitionNumber(TABLE_NAME, NEW_SEGMENT_PREFIX + i, PARTITION_COLUMN,
           _helixResourceManager);
     }
   }
 
-  private void removeNewSegments() throws Exception {
+  private void removeNewSegments()
+      throws Exception {
     for (int i = 0; i < 10; i++) {
-      _helixResourceManager.deleteSegment(TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME),
-          NEW_SEGMENT_PREFIX + i);
+      _helixResourceManager
+          .deleteSegment(TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME), NEW_SEGMENT_PREFIX + i);
     }
   }
 
@@ -275,16 +278,17 @@ public class ReplicaGroupRebalanceStrategyTest extends ControllerTest {
     Map<String, Map<String, String>> segmentAssignment = idealState.getRecord().getMapFields();
     Map<Integer, Set<String>> segmentsPerPartition = new HashMap<>();
     segmentsPerPartition.put(0, segmentAssignment.keySet());
-    return ReplicaGroupTestUtils.validateReplicaGroupSegmentAssignment(tableConfig, replicaGroupMapping,
-        segmentAssignment, segmentsPerPartition);
+    return ReplicaGroupTestUtils
+        .validateReplicaGroupSegmentAssignment(tableConfig, replicaGroupMapping, segmentAssignment,
+            segmentsPerPartition);
   }
 
-  private void setUpTable() throws Exception {
+  private void setUpTable()
+      throws Exception {
     // Create table config
-    TableConfig tableConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setNumReplicas(2)
-        .setSegmentAssignmentStrategy("RandomAssignmentStrategy")
-        .build();
+    TableConfig tableConfig =
+        new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(TABLE_NAME).setNumReplicas(2)
+            .setSegmentAssignmentStrategy("RandomAssignmentStrategy").build();
 
     // Create the table and upload segments
     _helixResourceManager.addTable(tableConfig);
@@ -310,14 +314,14 @@ public class ReplicaGroupRebalanceStrategyTest extends ControllerTest {
         && idealState.getPartitionSet().size() == segmentNum;
   }
 
-  private void updateTableConfig(int targetNumInstancePerPartition, int targetNumReplicaGroup) throws IOException {
+  private void updateTableConfig(int targetNumInstancePerPartition, int targetNumReplicaGroup)
+      throws IOException {
     String tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME);
     TableConfig tableConfig = _helixResourceManager.getTableConfig(TABLE_NAME, CommonConstants.Helix.TableType.OFFLINE);
-    tableConfig.getValidationConfig()
-        .getReplicaGroupStrategyConfig()
+    tableConfig.getValidationConfig().getReplicaGroupStrategyConfig()
         .setNumInstancesPerPartition(targetNumInstancePerPartition);
     tableConfig.getValidationConfig().setReplication(Integer.toString(targetNumReplicaGroup));
-    _helixResourceManager.setExistingTableConfig(tableConfig, tableNameWithType,
-        CommonConstants.Helix.TableType.OFFLINE);
+    _helixResourceManager
+        .setExistingTableConfig(tableConfig, tableNameWithType, CommonConstants.Helix.TableType.OFFLINE);
   }
 }

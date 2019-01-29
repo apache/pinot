@@ -89,7 +89,6 @@ public class IntColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
     collect(entry, false /* isAggregated */);
   }
 
-
   @Override
   public Integer getMinValue() {
     if (sealed) {

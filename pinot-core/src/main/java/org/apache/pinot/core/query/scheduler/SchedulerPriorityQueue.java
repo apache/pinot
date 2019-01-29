@@ -36,19 +36,22 @@ public interface SchedulerPriorityQueue {
    */
   // TODO: throw OutOfCapacity or drop from the front of the queue ?
   // It may be more beneficial to drop oldest queries to move forward
-  void put(@Nonnull SchedulerQueryContext query) throws OutOfCapacityException;
+  void put(@Nonnull SchedulerQueryContext query)
+      throws OutOfCapacityException;
 
   /**
    * Blocking call to select the query with highest priority to schedule for execution next.
    * The returned query will be removed from internal queues.
    * @return query to schedule. Returns null only when interrupted
    */
-  @Nullable SchedulerQueryContext take();
+  @Nullable
+  SchedulerQueryContext take();
 
   /**
    * Get the list of all the pending queries in the queue
    * @return Non-null list of all the pending queries in the queue
    *         List is empty if there are no pending queries
    */
-  @Nonnull List<SchedulerQueryContext> drain();
+  @Nonnull
+  List<SchedulerQueryContext> drain();
 }

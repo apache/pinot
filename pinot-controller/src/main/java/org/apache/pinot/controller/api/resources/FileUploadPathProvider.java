@@ -49,7 +49,8 @@ public class FileUploadPathProvider {
   private final URI _tmpUntarredPathURI;
   private final String _vip;
 
-  public FileUploadPathProvider(ControllerConf controllerConf) throws InvalidControllerConfigException {
+  public FileUploadPathProvider(ControllerConf controllerConf)
+      throws InvalidControllerConfigException {
     String dataDir = controllerConf.getDataDir();
     StringUtils.stripEnd(dataDir, "/");
     try {
@@ -90,7 +91,8 @@ public class FileUploadPathProvider {
     }
   }
 
-  private static void mkdirIfNotExists(PinotFS pinotFS, URI uri) throws IOException {
+  private static void mkdirIfNotExists(PinotFS pinotFS, URI uri)
+      throws IOException {
     if (!pinotFS.exists(uri)) {
       if (!pinotFS.mkdir(uri)) {
         throw new IOException("Failed to create directory at URI: " + uri);

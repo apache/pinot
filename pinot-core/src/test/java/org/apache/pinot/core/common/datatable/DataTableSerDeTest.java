@@ -42,7 +42,8 @@ public class DataTableSerDeTest {
   private static final int NUM_ROWS = 100;
 
   @Test
-  public void testException() throws IOException {
+  public void testException()
+      throws IOException {
     Exception exception = new UnsupportedOperationException("Caught exception.");
     ProcessingException processingException =
         QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, exception);
@@ -60,7 +61,8 @@ public class DataTableSerDeTest {
   }
 
   @Test
-  public void testEmptyStrings() throws IOException {
+  public void testEmptyStrings()
+      throws IOException {
     String emptyString = StringUtils.EMPTY;
     String[] emptyStringArray = {StringUtils.EMPTY};
 
@@ -86,7 +88,8 @@ public class DataTableSerDeTest {
   }
 
   @Test
-  public void testAllDataTypes() throws IOException {
+  public void testAllDataTypes()
+      throws IOException {
     DataSchema.ColumnDataType[] columnDataTypes = DataSchema.ColumnDataType.values();
     int numColumns = columnDataTypes.length;
     String[] columnNames = new String[numColumns];
@@ -221,8 +224,8 @@ public class DataTableSerDeTest {
             Assert.assertTrue(Arrays.equals(newDataTable.getLongArray(rowId, colId), longArrays[rowId]), ERROR_MESSAGE);
             break;
           case FLOAT_ARRAY:
-            Assert.assertTrue(Arrays.equals(newDataTable.getFloatArray(rowId, colId), floatArrays[rowId]),
-                ERROR_MESSAGE);
+            Assert
+                .assertTrue(Arrays.equals(newDataTable.getFloatArray(rowId, colId), floatArrays[rowId]), ERROR_MESSAGE);
             break;
           case DOUBLE_ARRAY:
             Assert.assertTrue(Arrays.equals(newDataTable.getDoubleArray(rowId, colId), doubleArrays[rowId]),

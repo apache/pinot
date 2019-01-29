@@ -437,7 +437,8 @@ public class SelectionOperatorUtils {
    * @param dataSchema data schema.
    * @return column indices
    */
-  public static int[] getColumnIndicesWithoutOrdering(@Nonnull List<String> selectionColumns, @Nonnull DataSchema dataSchema) {
+  public static int[] getColumnIndicesWithoutOrdering(@Nonnull List<String> selectionColumns,
+      @Nonnull DataSchema dataSchema) {
     int numSelectionColumns = selectionColumns.size();
     int[] columnIndices = new int[numSelectionColumns];
     Map<String, Integer> dataSchemaIndices = new HashMap<>(numSelectionColumns);
@@ -457,7 +458,8 @@ public class SelectionOperatorUtils {
    * @param dataSchema data schema.
    * @return column indices
    */
-  public static int[] getColumnIndicesWithOrdering(@Nonnull List<String> selectionColumns, @Nonnull DataSchema dataSchema) {
+  public static int[] getColumnIndicesWithOrdering(@Nonnull List<String> selectionColumns,
+      @Nonnull DataSchema dataSchema) {
     int numSelectionColumns = selectionColumns.size();
     int[] columnIndices = new int[numSelectionColumns];
     int numColumnsInDataSchema = dataSchema.size();
@@ -592,13 +594,13 @@ public class SelectionOperatorUtils {
     switch (dataType) {
       // Single-value column.
       case INT:
-        return intFormat(((Number)value).intValue());
+        return intFormat(((Number) value).intValue());
       case LONG:
-        return longFormat(((Number)value).longValue());
+        return longFormat(((Number) value).longValue());
       case FLOAT:
-        return floatFormat(((Number)value).floatValue());
+        return floatFormat(((Number) value).floatValue());
       case DOUBLE:
-        return doubleFormat(((Number)value).doubleValue());
+        return doubleFormat(((Number) value).doubleValue());
 
       // Multi-value column.
       case INT_ARRAY:

@@ -60,7 +60,8 @@ public class BenchmarkDictionary {
   }
 
   @TearDown
-  public void tearDown() throws Exception {
+  public void tearDown()
+      throws Exception {
     _memoryManager.close();
   }
 
@@ -82,8 +83,8 @@ public class BenchmarkDictionary {
   @BenchmarkMode(Mode.SampleTime)
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
   public LongOffHeapMutableDictionary benchmarkOffHeapMidSizeWithOverflow() {
-    LongOffHeapMutableDictionary dictionary = new LongOffHeapMutableDictionary(CARDINALITY / 3, 1000,
-        _memoryManager, "longColumn");
+    LongOffHeapMutableDictionary dictionary =
+        new LongOffHeapMutableDictionary(CARDINALITY / 3, 1000, _memoryManager, "longColumn");
 
     for (Long colValue : _colValues) {
       dictionary.index(colValue);
@@ -97,8 +98,8 @@ public class BenchmarkDictionary {
   @BenchmarkMode(Mode.SampleTime)
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
   public LongOffHeapMutableDictionary benchmarkOffHeapMidSizeWithoutOverflow() {
-    LongOffHeapMutableDictionary dictionary = new LongOffHeapMutableDictionary(CARDINALITY / 3, 0,
-        _memoryManager, "longColumn");
+    LongOffHeapMutableDictionary dictionary =
+        new LongOffHeapMutableDictionary(CARDINALITY / 3, 0, _memoryManager, "longColumn");
 
     for (Long colValue : _colValues) {
       dictionary.index(colValue);
@@ -107,14 +108,13 @@ public class BenchmarkDictionary {
     return dictionary;
   }
 
-
   // Start with max size, with overflow
   @Benchmark
   @BenchmarkMode(Mode.SampleTime)
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
   public LongOffHeapMutableDictionary benchmarkOffHeapPreSizeWithOverflow() {
-    LongOffHeapMutableDictionary dictionary = new LongOffHeapMutableDictionary(CARDINALITY, 1000,
-        _memoryManager, "longColumn");
+    LongOffHeapMutableDictionary dictionary =
+        new LongOffHeapMutableDictionary(CARDINALITY, 1000, _memoryManager, "longColumn");
 
     for (Long colValue : _colValues) {
       dictionary.index(colValue);
@@ -128,8 +128,8 @@ public class BenchmarkDictionary {
   @BenchmarkMode(Mode.SampleTime)
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
   public LongOffHeapMutableDictionary benchmarkOffHeapPreSizeWithoutOverflow() {
-    LongOffHeapMutableDictionary dictionary = new LongOffHeapMutableDictionary(CARDINALITY, 0,
-        _memoryManager, "longColumn");
+    LongOffHeapMutableDictionary dictionary =
+        new LongOffHeapMutableDictionary(CARDINALITY, 0, _memoryManager, "longColumn");
 
     for (Long colValue : _colValues) {
       dictionary.index(colValue);
@@ -157,7 +157,8 @@ public class BenchmarkDictionary {
   @BenchmarkMode(Mode.SampleTime)
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
   public LongOffHeapMutableDictionary benchmarkOffHeapMinSizeWithOverflow() {
-    LongOffHeapMutableDictionary dictionary = new LongOffHeapMutableDictionary(10000, 1000, _memoryManager, "longColumn");
+    LongOffHeapMutableDictionary dictionary =
+        new LongOffHeapMutableDictionary(10000, 1000, _memoryManager, "longColumn");
 
     for (Long colValue : _colValues) {
       dictionary.index(colValue);
@@ -166,15 +167,11 @@ public class BenchmarkDictionary {
     return dictionary;
   }
 
-
-  public static void main(String[] args) throws Exception {
-    ChainedOptionsBuilder opt = new OptionsBuilder()
-        .include(BenchmarkDictionary.class.getSimpleName())
-        .warmupTime(TimeValue.seconds(60))
-        .warmupIterations(8)
-        .measurementTime(TimeValue.seconds(60))
-        .measurementIterations(8)
-        .forks(5);
+  public static void main(String[] args)
+      throws Exception {
+    ChainedOptionsBuilder opt =
+        new OptionsBuilder().include(BenchmarkDictionary.class.getSimpleName()).warmupTime(TimeValue.seconds(60))
+            .warmupIterations(8).measurementTime(TimeValue.seconds(60)).measurementIterations(8).forks(5);
 
     new Runner(opt.build()).run();
   }

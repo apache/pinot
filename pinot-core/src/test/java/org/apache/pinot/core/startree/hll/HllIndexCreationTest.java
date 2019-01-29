@@ -54,8 +54,8 @@ public class HllIndexCreationTest {
   private static final String hllDeriveColumnSuffix = HllConstants.DEFAULT_HLL_DERIVE_COLUMN_SUFFIX;
 
   // change this to change the columns that need to create hll index on
-  private static final Set<String> columnsToDeriveHllFields = new HashSet<>(
-      Arrays.asList("column1", "column2", "column3", "count", "weeksSinceEpochSunday", "daysSinceEpoch", "column17",
+  private static final Set<String> columnsToDeriveHllFields = new HashSet<>(Arrays
+      .asList("column1", "column2", "column3", "count", "weeksSinceEpochSunday", "daysSinceEpoch", "column17",
           "column18"));
   private static final String AVRO_DATA = "data/test_data-sv.avro";
   private static final String timeColumnName = "daysSinceEpoch";
@@ -68,7 +68,8 @@ public class HllIndexCreationTest {
   private HllConfig hllConfig;
 
   @BeforeClass
-  public void setUp() throws Exception {
+  public void setUp()
+      throws Exception {
     hllConfig = new HllConfig(hllLog2m, columnsToDeriveHllFields, hllDeriveColumnSuffix);
 
     v3LoadingConfig = new IndexLoadingConfig();
@@ -145,7 +146,8 @@ public class HllIndexCreationTest {
   }
 
   @Test
-  public void testConvert() throws Exception {
+  public void testConvert()
+      throws Exception {
     SegmentWithHllIndexCreateHelper helper = null;
     try {
       helper = new SegmentWithHllIndexCreateHelper("testConvert", getClass().getClassLoader().getResource(AVRO_DATA),

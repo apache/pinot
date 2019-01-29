@@ -94,7 +94,8 @@ public class SegmentMergeCommand extends AbstractBaseAdminCommand implements Com
   }
 
   @Override
-  public boolean execute() throws Exception {
+  public boolean execute()
+      throws Exception {
     LOGGER.info("Running segment merge command...");
 
     // Check merge type
@@ -186,12 +187,8 @@ public class SegmentMergeCommand extends AbstractBaseAdminCommand implements Com
       // TODO: add support for rollup
       String tableName = TableNameBuilder.extractRawTableName(tableConfig.getTableName());
       MergeRollupSegmentConverter mergeRollupSegmentConverter =
-          new MergeRollupSegmentConverter.Builder().setMergeType(_mergeType)
-              .setSegmentName(_outputSegmentName)
-              .setInputIndexDirs(inputIndexDirs)
-              .setWorkingDir(workingDir)
-              .setTableName(tableName)
-              .build();
+          new MergeRollupSegmentConverter.Builder().setMergeType(_mergeType).setSegmentName(_outputSegmentName)
+              .setInputIndexDirs(inputIndexDirs).setWorkingDir(workingDir).setTableName(tableName).build();
 
       List<File> outputSegments = mergeRollupSegmentConverter.convert();
       Preconditions.checkState(outputSegments.size() == 1);
@@ -238,7 +235,8 @@ public class SegmentMergeCommand extends AbstractBaseAdminCommand implements Com
   }
 
   private String getDefaultSegmentName(TableConfig tableConfig, Schema schema, List<File> inputIndexDirs,
-      long minStartTime, long maxEndTime) throws Exception {
+      long minStartTime, long maxEndTime)
+      throws Exception {
     String tableName = tableConfig.getTableName();
 
     // Fetch time related configurations from schema and table config.
@@ -266,7 +264,8 @@ public class SegmentMergeCommand extends AbstractBaseAdminCommand implements Com
     }
   }
 
-  private void addFilePath(List<String> inputPaths, String path) throws Exception {
+  private void addFilePath(List<String> inputPaths, String path)
+      throws Exception {
     File pathFile = new File(path);
 
     if (!pathFile.exists()) {

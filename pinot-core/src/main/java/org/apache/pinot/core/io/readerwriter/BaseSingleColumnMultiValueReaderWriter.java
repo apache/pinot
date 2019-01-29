@@ -23,8 +23,7 @@ import org.apache.pinot.core.io.reader.SingleColumnMultiValueReader;
 import org.apache.pinot.core.io.writer.SingleColumnMultiValueWriter;
 
 
-public abstract class BaseSingleColumnMultiValueReaderWriter<T extends ReaderContext>
-    implements SingleColumnMultiValueReader<T>, SingleColumnMultiValueWriter {
+public abstract class BaseSingleColumnMultiValueReaderWriter<T extends ReaderContext> implements SingleColumnMultiValueReader<T>, SingleColumnMultiValueWriter {
 
   @Override
   public int getCharArray(int row, char[] charArray) {

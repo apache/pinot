@@ -29,8 +29,8 @@ public class AdditionTransformFunctionTest extends BaseTransformFunctionTest {
 
   @Test
   public void testAdditionTransformFunction() {
-    TransformExpressionTree expression = TransformExpressionTree.compileToExpressionTree(
-        String.format("add(%s,%s,%s,%s,%s)", INT_SV_COLUMN, LONG_SV_COLUMN, FLOAT_SV_COLUMN, DOUBLE_SV_COLUMN,
+    TransformExpressionTree expression = TransformExpressionTree.compileToExpressionTree(String
+        .format("add(%s,%s,%s,%s,%s)", INT_SV_COLUMN, LONG_SV_COLUMN, FLOAT_SV_COLUMN, DOUBLE_SV_COLUMN,
             STRING_SV_COLUMN));
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof AdditionTransformFunction);
@@ -43,9 +43,9 @@ public class AdditionTransformFunctionTest extends BaseTransformFunctionTest {
     }
     testTransformFunction(transformFunction, expectedValues);
 
-    expression = TransformExpressionTree.compileToExpressionTree(
-        String.format("add(add(12,%s),%s,add(add(%s,%s),0.34,%s),%s)", STRING_SV_COLUMN, DOUBLE_SV_COLUMN,
-            FLOAT_SV_COLUMN, LONG_SV_COLUMN, INT_SV_COLUMN, DOUBLE_SV_COLUMN));
+    expression = TransformExpressionTree.compileToExpressionTree(String
+        .format("add(add(12,%s),%s,add(add(%s,%s),0.34,%s),%s)", STRING_SV_COLUMN, DOUBLE_SV_COLUMN, FLOAT_SV_COLUMN,
+            LONG_SV_COLUMN, INT_SV_COLUMN, DOUBLE_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof AdditionTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -63,9 +63,7 @@ public class AdditionTransformFunctionTest extends BaseTransformFunctionTest {
 
   @DataProvider(name = "testIllegalArguments")
   public Object[][] testIllegalArguments() {
-    return new Object[][]{
-        new Object[]{String.format("add(%s)", INT_SV_COLUMN)},
-        new Object[]{String.format("add(%s, %s)", LONG_SV_COLUMN, INT_MV_COLUMN)}
-    };
+    return new Object[][]{new Object[]{String.format("add(%s)", INT_SV_COLUMN)}, new Object[]{String.format(
+        "add(%s, %s)", LONG_SV_COLUMN, INT_MV_COLUMN)}};
   }
 }

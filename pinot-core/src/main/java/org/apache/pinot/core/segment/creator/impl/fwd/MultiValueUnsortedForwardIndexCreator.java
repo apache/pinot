@@ -31,7 +31,8 @@ public class MultiValueUnsortedForwardIndexCreator implements MultiValueForwardI
   private final SingleColumnMultiValueWriter _writer;
 
   public MultiValueUnsortedForwardIndexCreator(File outputDir, String column, int cardinality, int numDocs,
-      int totalNumValues) throws Exception {
+      int totalNumValues)
+      throws Exception {
     File indexFile = new File(outputDir, column + V1Constants.Indexes.UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION);
     _writer = new FixedBitMultiValueWriter(indexFile, numDocs, totalNumValues,
         PinotDataBitSet.getNumBitsPerValue(cardinality - 1));
@@ -43,7 +44,8 @@ public class MultiValueUnsortedForwardIndexCreator implements MultiValueForwardI
   }
 
   @Override
-  public void close() throws IOException {
+  public void close()
+      throws IOException {
     _writer.close();
   }
 }

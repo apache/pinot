@@ -119,8 +119,8 @@ public class TableSizeReader {
     public long reportedSizeInBytes = 0;
     // estimated size if servers are down
     public long estimatedSizeInBytes = 0;
-    public @Nullable TableSubTypeSizeDetails offlineSegments;
-    public @Nullable TableSubTypeSizeDetails realtimeSegments;
+    public TableSubTypeSizeDetails offlineSegments;
+    public TableSubTypeSizeDetails realtimeSegments;
 
     public TableSizeDetails(String tableName) {
       this.tableName = tableName;
@@ -221,20 +221,22 @@ public class TableSizeReader {
     if (subTypeSizeDetails.missingSegments > 0) {
       int numSegments = segmentToSizeDetailsMap.size();
       int missingPercent = subTypeSizeDetails.missingSegments * 100 / numSegments;
-      _controllerMetrics.setValueOfTableGauge(tableNameWithType,
-          ControllerGauge.TABLE_STORAGE_EST_MISSING_SEGMENT_PERCENT, missingPercent);
+      _controllerMetrics
+          .setValueOfTableGauge(tableNameWithType, ControllerGauge.TABLE_STORAGE_EST_MISSING_SEGMENT_PERCENT,
+              missingPercent);
       if (subTypeSizeDetails.missingSegments == numSegments) {
         LOGGER.warn("Failed to get size report for all {} segments: {} for table: {}", numSegments, missingSegments,
             tableNameWithType);
         subTypeSizeDetails.reportedSizeInBytes = -1;
         subTypeSizeDetails.estimatedSizeInBytes = -1;
       } else {
-        LOGGER.warn("Missing size report for {} out of {} segments: {} for table {}",
-            subTypeSizeDetails.missingSegments, numSegments, missingSegments, tableNameWithType);
+        LOGGER
+            .warn("Missing size report for {} out of {} segments: {} for table {}", subTypeSizeDetails.missingSegments,
+                numSegments, missingSegments, tableNameWithType);
       }
     } else {
-      _controllerMetrics.setValueOfTableGauge(tableNameWithType,
-          ControllerGauge.TABLE_STORAGE_EST_MISSING_SEGMENT_PERCENT, 0);
+      _controllerMetrics
+          .setValueOfTableGauge(tableNameWithType, ControllerGauge.TABLE_STORAGE_EST_MISSING_SEGMENT_PERCENT, 0);
     }
 
     return subTypeSizeDetails;

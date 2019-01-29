@@ -117,10 +117,8 @@ public class ServiceStatus {
     public String getStatusDescription() {
       StringBuilder statusDescription = new StringBuilder();
       for (ServiceStatusCallback statusCallback : _statusCallbacks) {
-        statusDescription.append(statusCallback.getClass().getSimpleName())
-            .append(":")
-            .append(statusCallback.getStatusDescription())
-            .append(";");
+        statusDescription.append(statusCallback.getClass().getSimpleName()).append(":")
+            .append(statusCallback.getStatusDescription()).append(";");
       }
       return statusDescription.toString();
     }
@@ -150,8 +148,8 @@ public class ServiceStatus {
       _resourcesToMonitor = new HashSet<>();
       for (String resourceName : _helixAdmin.getResourcesInCluster(_clusterName)) {
         // Only monitor table resources and broker resource
-        if (!TableNameBuilder.isTableResource(resourceName) && !resourceName.equals(
-            CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)) {
+        if (!TableNameBuilder.isTableResource(resourceName) && !resourceName
+            .equals(CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)) {
           continue;
         }
         // Only monitor enabled resources
@@ -206,8 +204,9 @@ public class ServiceStatus {
           continue;
         }
 
-        String descriptionSuffix = String.format("resource=%s, numResourcesLeft=%d, numTotalResources=%d", resourceName,
-            _resourcesToMonitor.size(), _numTotalResourcesToMonitor);
+        String descriptionSuffix = String
+            .format("resource=%s, numResourcesLeft=%d, numTotalResources=%d", resourceName, _resourcesToMonitor.size(),
+                _numTotalResourcesToMonitor);
         T helixState = getState(resourceName);
         if (helixState == null) {
           _statusDescription = "Helix state does not exist: " + descriptionSuffix;
@@ -233,8 +232,8 @@ public class ServiceStatus {
             if ("ERROR".equals(currentStateStatus)) {
               LOGGER.error(String.format("Resource: %s, partition: %s is in ERROR state", resourceName, partitionName));
             } else {
-              _statusDescription =
-                  String.format("partition=%s, idealStateStatus=%s, currentStateStatus=%s, %s", partitionName,
+              _statusDescription = String
+                  .format("partition=%s, idealStateStatus=%s, currentStateStatus=%s, %s", partitionName,
                       idealStateStatus, currentStateStatus, descriptionSuffix);
               return Status.STARTING;
             }
@@ -265,8 +264,7 @@ public class ServiceStatus {
    * external view and current state. This callback considers the ERROR state in the current view to be equivalent to
    * the ideal state value.
    */
-  public static class IdealStateAndCurrentStateMatchServiceStatusCallback
-      extends IdealStateMatchServiceStatusCallback<CurrentState> {
+  public static class IdealStateAndCurrentStateMatchServiceStatusCallback extends IdealStateMatchServiceStatusCallback<CurrentState> {
     public IdealStateAndCurrentStateMatchServiceStatusCallback(HelixManager helixManager, String clusterName,
         String instanceName) {
       super(helixManager, clusterName, instanceName);
@@ -296,8 +294,7 @@ public class ServiceStatus {
    * external view and ideal state. This callback considers the ERROR state in the external view to be equivalent to the
    * ideal state value.
    */
-  public static class IdealStateAndExternalViewMatchServiceStatusCallback
-      extends IdealStateMatchServiceStatusCallback<ExternalView> {
+  public static class IdealStateAndExternalViewMatchServiceStatusCallback extends IdealStateMatchServiceStatusCallback<ExternalView> {
     public IdealStateAndExternalViewMatchServiceStatusCallback(HelixManager helixManager, String clusterName,
         String instanceName) {
       super(helixManager, clusterName, instanceName);

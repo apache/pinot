@@ -103,9 +103,9 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
     return indexFile.exists();
   }
 
-
   @Override
-  public void close() throws IOException {
+  public void close()
+      throws IOException {
     for (PinotDataBuffer dataBuffer : indexBuffers.values()) {
       dataBuffer.close();
     }
@@ -122,7 +122,8 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
     return true;
   }
 
-  private PinotDataBuffer getReadBufferFor(IndexKey key) throws IOException {
+  private PinotDataBuffer getReadBufferFor(IndexKey key)
+      throws IOException {
     if (indexBuffers.containsKey(key)) {
       return indexBuffers.get(key);
     }
@@ -133,7 +134,8 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
     return buffer;
   }
 
-  private PinotDataBuffer getWriteBufferFor(IndexKey key, long sizeBytes) throws IOException {
+  private PinotDataBuffer getWriteBufferFor(IndexKey key, long sizeBytes)
+      throws IOException {
     if (indexBuffers.containsKey(key)) {
       return indexBuffers.get(key);
     }
@@ -166,7 +168,8 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
     return new File(segmentDirectory, filename);
   }
 
-  private PinotDataBuffer mapForWrites(File file, long sizeBytes, String context) throws IOException {
+  private PinotDataBuffer mapForWrites(File file, long sizeBytes, String context)
+      throws IOException {
     Preconditions.checkNotNull(file);
     Preconditions.checkArgument(sizeBytes >= 0 && sizeBytes < Integer.MAX_VALUE,
         "File size must be less than 2GB, file: " + file);
@@ -177,7 +180,8 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
     return PinotDataBuffer.mapFile(file, false, 0, sizeBytes, ByteOrder.BIG_ENDIAN, allocationContext);
   }
 
-  private PinotDataBuffer mapForReads(File file, String context) throws IOException {
+  private PinotDataBuffer mapForReads(File file, String context)
+      throws IOException {
     Preconditions.checkNotNull(file);
     Preconditions.checkNotNull(context);
     Preconditions.checkArgument(file.exists(), "File: " + file + " must exist");

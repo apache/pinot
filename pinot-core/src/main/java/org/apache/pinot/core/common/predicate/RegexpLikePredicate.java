@@ -26,6 +26,7 @@ import org.apache.pinot.core.common.Predicate;
 
 public class RegexpLikePredicate extends Predicate {
   String _regex;
+
   public RegexpLikePredicate(String lhs, List<String> rhs) {
     super(lhs, Type.REGEXP_LIKE, rhs);
     //we should have atleast one regex, we will ignore the remaining part instead of throwing exception
@@ -35,11 +36,11 @@ public class RegexpLikePredicate extends Predicate {
 
   @Override
   public String toString() {
-    return "Predicate: type: " + getType() + ", left : " + getLhs() + ", right : " + Arrays.toString(getRhs().toArray(new String[0])) + "\n";
+    return "Predicate: type: " + getType() + ", left : " + getLhs() + ", right : " + Arrays
+        .toString(getRhs().toArray(new String[0])) + "\n";
   }
 
-  public String getRegex(){
-   return _regex;
+  public String getRegex() {
+    return _regex;
   }
-
 }

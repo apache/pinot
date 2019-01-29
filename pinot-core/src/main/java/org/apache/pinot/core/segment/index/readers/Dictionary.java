@@ -64,5 +64,4 @@ public interface Dictionary extends Closeable {
   void readStringValues(int[] dictIds, int inStartPos, int length, String[] outValues, int outStartPos);
 
   void readBytesValues(int[] dictIds, int inStartPos, int length, byte[][] outValues, int outStartPos);
-
 }

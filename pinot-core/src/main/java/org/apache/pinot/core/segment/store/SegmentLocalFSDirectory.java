@@ -60,7 +60,7 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
     this(new File(directoryPath), metadata, readMode);
   }
 
-  SegmentLocalFSDirectory (File directory, ReadMode readMode)
+  SegmentLocalFSDirectory(File directory, ReadMode readMode)
       throws IOException, ConfigurationException {
     this(directory, loadSegmentMetadata(directory), readMode);
   }
@@ -130,13 +130,15 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
         return -1;
       }
     } else {
-      if (! SegmentDirectoryPaths.isV3Directory(segmentDirectory)) {
-        LOGGER.error("Segment directory: {} not found on disk and is not v3 format", segmentDirectory.getAbsolutePath());
+      if (!SegmentDirectoryPaths.isV3Directory(segmentDirectory)) {
+        LOGGER
+            .error("Segment directory: {} not found on disk and is not v3 format", segmentDirectory.getAbsolutePath());
         return -1;
       }
       File[] files = segmentDirectory.getParentFile().listFiles();
       if (files == null) {
-        LOGGER.warn("Empty list of files for path: {}, segmentDirectory: {}", segmentDirectory.getParentFile(), segmentDirectory);
+        LOGGER.warn("Empty list of files for path: {}, segmentDirectory: {}", segmentDirectory.getParentFile(),
+            segmentDirectory);
         return -1;
       }
 
@@ -208,7 +210,8 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
   }
 
   @Override
-  public void close() throws IOException {
+  public void close()
+      throws IOException {
     segmentLock.close();
     synchronized (this) {
       if (columnIndexDirectory != null) {
@@ -281,8 +284,9 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
     } else {
       // pos needs to be long because buffer.size() is 32 bit but
       // adding 4k can make it go over int size
-      for (long pos = 0; pos < buffer.size() && prefetchedPages.get() < prefetchSlowdownPageLimit; pos += PAGE_SIZE_BYTES) {
-        buffer.getByte((int)pos);
+      for (long pos = 0; pos < buffer.size() && prefetchedPages.get() < prefetchSlowdownPageLimit;
+          pos += PAGE_SIZE_BYTES) {
+        buffer.getByte((int) pos);
         prefetchedPages.incrementAndGet();
       }
     }
@@ -302,8 +306,7 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
     } catch (FileNotFoundException e) {
       // we should not reach here
       LOGGER.error("Star tree file for segment: {} is not found", segmentDirectory, e);
-      throw new IllegalStateException("Star tree file for segment: " + segmentDirectory +
-          " is not found", e);
+      throw new IllegalStateException("Star tree file for segment: " + segmentDirectory + " is not found", e);
     }
   }
 
@@ -421,8 +424,7 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
         case BLOOM_FILTER:
           return columnIndexDirectory.newBloomFilterBuffer(key.name, sizeBytes);
         default:
-          throw new RuntimeException("Unknown index type: " + indexType.name() +
-              " for directory: " + segmentDirectory);
+          throw new RuntimeException("Unknown index type: " + indexType.name() + " for directory: " + segmentDirectory);
       }
     }
 
@@ -434,7 +436,8 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
     }
 
     @Override
-    public void save() throws IOException {
+    public void save()
+        throws IOException {
     }
 
     void abort() {
@@ -447,7 +450,8 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
     }
 
     @Override
-    public void close() throws IOException {
+    public void close()
+        throws IOException {
       segmentLock.unlock();
       if (columnIndexDirectory != null) {
         columnIndexDirectory.close();

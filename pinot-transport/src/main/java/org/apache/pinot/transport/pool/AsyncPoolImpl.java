@@ -69,16 +69,14 @@ public class AsyncPoolImpl<T> implements AsyncPool<T> {
   private volatile ScheduledFuture<?> _objectTimeoutFuture;
 
   private enum State {
-    NOT_YET_STARTED,
-    RUNNING,
-    SHUTTING_DOWN,
-    STOPPED
+    NOT_YET_STARTED, RUNNING, SHUTTING_DOWN, STOPPED
   }
 
   public enum Strategy {
-    MRU,
-    LRU
-  };
+    MRU, LRU
+  }
+
+  ;
   private final Strategy _strategy;
 
   // All members below are protected by this lock
@@ -267,7 +265,7 @@ public class AsyncPoolImpl<T> implements AsyncPool<T> {
   public Collection<Callback<T>> cancelWaiters() {
     synchronized (_lock) {
       List<Callback<T>> cancelled = new ArrayList<Callback<T>>(_waiters.size());
-      for (Callback<T> item; (item = _waiters.poll()) != null;) {
+      for (Callback<T> item; (item = _waiters.poll()) != null; ) {
         cancelled.add(item);
       }
       return cancelled;
@@ -282,7 +280,7 @@ public class AsyncPoolImpl<T> implements AsyncPool<T> {
     boolean reject = false;
     final LinkedDequeue.Node<Callback<T>> node;
     final Callback<T> callbackWithTracking = new TimeTrackingCallback<T>(callback);
-    for (;;) {
+    for (; ; ) {
       TimedObject<T> obj = null;
       final State state;
       synchronized (_lock) {
@@ -609,7 +607,7 @@ public class AsyncPoolImpl<T> implements AsyncPool<T> {
     }
     if ((state == State.SHUTTING_DOWN) && (done == null)) {
       LOGGER.info("{}: {} waiters and {} objects outstanding before shutdown",
-          new Object[] { _poolName, waiters, poolSize - idle });
+          new Object[]{_poolName, waiters, poolSize - idle});
     }
     return done;
   }

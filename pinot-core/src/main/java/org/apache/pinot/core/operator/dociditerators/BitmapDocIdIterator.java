@@ -21,6 +21,7 @@ package org.apache.pinot.core.operator.dociditerators;
 import org.apache.pinot.core.common.Constants;
 import org.roaringbitmap.IntIterator;
 
+
 public final class BitmapDocIdIterator implements IndexBasedDocIdIterator {
   final private IntIterator iterator;
   private int endDocId = Integer.MAX_VALUE;
@@ -55,7 +56,7 @@ public final class BitmapDocIdIterator implements IndexBasedDocIdIterator {
     currentDocId = iterator.next();
 
     // Advance to startDocId if necessary
-    while(currentDocId < startDocId && iterator.hasNext()) {
+    while (currentDocId < startDocId && iterator.hasNext()) {
       currentDocId = iterator.next();
     }
 
@@ -70,15 +71,15 @@ public final class BitmapDocIdIterator implements IndexBasedDocIdIterator {
   @Override
   public int advance(int targetDocId) {
     if (targetDocId < currentDocId) {
-      throw new IllegalArgumentException("Trying to move backwards to docId " + targetDocId +
-          ", current position " + currentDocId);
+      throw new IllegalArgumentException(
+          "Trying to move backwards to docId " + targetDocId + ", current position " + currentDocId);
     }
 
     if (currentDocId == targetDocId) {
       return currentDocId;
     } else {
       int curr = next();
-      while(curr < targetDocId && curr != Constants.EOF) {
+      while (curr < targetDocId && curr != Constants.EOF) {
         curr = next();
       }
       return curr;
@@ -88,5 +89,4 @@ public final class BitmapDocIdIterator implements IndexBasedDocIdIterator {
   public String toString() {
     return BitmapDocIdIterator.class.getSimpleName();
   }
-
 }

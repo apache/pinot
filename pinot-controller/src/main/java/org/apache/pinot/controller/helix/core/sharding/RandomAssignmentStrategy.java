@@ -49,16 +49,15 @@ public class RandomAssignmentStrategy implements SegmentAssignmentStrategy {
     String serverTenantName = TagNameUtils.getOfflineTagForTenant(tenantName);
     final Random random = new Random(System.currentTimeMillis());
 
-    List<String> allInstanceList =
-        HelixHelper.getEnabledInstancesWithTag(helixManager, serverTenantName);
+    List<String> allInstanceList = HelixHelper.getEnabledInstancesWithTag(helixManager, serverTenantName);
     List<String> selectedInstanceList = new ArrayList<>();
     for (int i = 0; i < numReplicas; ++i) {
       final int idx = random.nextInt(allInstanceList.size());
       selectedInstanceList.add(allInstanceList.get(idx));
       allInstanceList.remove(idx);
     }
-    LOGGER.info("Segment assignment result for : " + segmentMetadata.getName() + ", in resource : "
-        + segmentMetadata.getTableName() + ", selected instances: " + Arrays.toString(selectedInstanceList.toArray()));
+    LOGGER.info("Segment assignment result for : " + segmentMetadata.getName() + ", in resource : " + segmentMetadata
+        .getTableName() + ", selected instances: " + Arrays.toString(selectedInstanceList.toArray()));
 
     return selectedInstanceList;
   }

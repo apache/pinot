@@ -24,6 +24,7 @@ import org.apache.pinot.core.common.Constants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
 public final class AndDocIdIterator implements BlockDocIdIterator {
 
   static final Logger LOGGER = LoggerFactory.getLogger(AndDocIdIterator.class);
@@ -56,8 +57,7 @@ public final class AndDocIdIterator implements BlockDocIdIterator {
       int scanBasedIndex = 0;
       for (int i = 0; i < blockDocIdIterators.length; i++) {
         if (blockDocIdIterators[i] instanceof ScanBasedDocIdIterator) {
-          this.scanBasedDocIdIterators[scanBasedIndex++] =
-              (ScanBasedDocIdIterator) blockDocIdIterators[i];
+          this.scanBasedDocIdIterators[scanBasedIndex++] = (ScanBasedDocIdIterator) blockDocIdIterators[i];
         } else {
           this.docIdIterators[nonScanBasedIndex++] = blockDocIdIterators[i];
         }
@@ -105,7 +105,7 @@ public final class AndDocIdIterator implements BlockDocIdIterator {
           i = -1;
         }
       }
-      if (hasScanBasedIterators  && i == docIdIterators.length - 1  ) {
+      if (hasScanBasedIterators && i == docIdIterators.length - 1) {
         // this means we found the docId common to all nonScanBased iterators, now we need to ensure
         // that its also found in scanBasedIterator, if not matched, we restart the intersection
         for (ScanBasedDocIdIterator iterator : scanBasedDocIdIterators) {

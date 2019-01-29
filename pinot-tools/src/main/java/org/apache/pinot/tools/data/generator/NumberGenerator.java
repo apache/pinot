@@ -126,5 +126,4 @@ public class NumberGenerator implements Generator {
       System.out.println(gen.next());
     }
   }
-
 }

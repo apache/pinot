@@ -21,6 +21,7 @@ package org.apache.pinot.client;
 import java.util.Arrays;
 import java.util.Properties;
 
+
 /**
  * Creates connections to Pinot, given various initialization methods.
  */
@@ -52,7 +53,8 @@ public class ConnectionFactory {
    * @return A connection that connects to the brokers specified in the properties
    */
   public static Connection fromProperties(Properties properties) {
-    return new Connection(Arrays.asList(properties.getProperty("brokerList").split(",")), _transportFactory.buildTransport());
+    return new Connection(Arrays.asList(properties.getProperty("brokerList").split(",")),
+        _transportFactory.buildTransport());
   }
 
   /**
@@ -63,5 +65,5 @@ public class ConnectionFactory {
    */
   public static Connection fromHostList(String... brokers) {
     return new Connection(Arrays.asList(brokers), _transportFactory.buildTransport());
-  }  
+  }
 }

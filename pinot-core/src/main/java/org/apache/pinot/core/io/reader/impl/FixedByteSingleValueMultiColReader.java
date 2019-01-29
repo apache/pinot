@@ -188,7 +188,8 @@ public class FixedByteSingleValueMultiColReader implements Closeable {
   }
 
   @Override
-  public void close() throws IOException {
+  public void close()
+      throws IOException {
     indexDataBuffer.close();
   }
 
@@ -209,6 +210,7 @@ public class FixedByteSingleValueMultiColReader implements Closeable {
       values[outStartPos++] = getLong(rows[iter], col);
     }
   }
+
   public void readFloatValues(int[] rows, int col, int startPos, int limit, float[] values, int outStartPos) {
     int endPos = startPos + limit;
     for (int iter = startPos; iter < endPos; iter++) {
@@ -222,11 +224,11 @@ public class FixedByteSingleValueMultiColReader implements Closeable {
       values[outStartPos++] = getDouble(rows[iter], col);
     }
   }
+
   public void readStringValues(int[] rows, int col, int startPos, int limit, String[] values, int outStartPos) {
     int endPos = startPos + limit;
     for (int iter = startPos; iter < endPos; iter++) {
       values[outStartPos++] = getString(rows[iter], col);
     }
   }
-
 }

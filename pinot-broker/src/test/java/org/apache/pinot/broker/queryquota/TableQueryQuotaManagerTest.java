@@ -54,7 +54,6 @@ public class TableQueryQuotaManagerTest {
   private static String REALTIME_TABLE_NAME = RAW_TABLE_NAME + "_REALTIME";
   private static final String BROKER_INSTANCE_ID = "broker_instance_1";
 
-
   @BeforeTest
   public void beforeTest() {
     _zookeeperInstance = ZkStarter.startLocalZkServer();
@@ -67,7 +66,8 @@ public class TableQueryQuotaManagerTest {
   }
 
   private HelixManager initHelixManager(String helixClusterName) {
-    return new FakeHelixManager(helixClusterName, BROKER_INSTANCE_ID, InstanceType.PARTICIPANT, ZkStarter.DEFAULT_ZK_STR);
+    return new FakeHelixManager(helixClusterName, BROKER_INSTANCE_ID, InstanceType.PARTICIPANT,
+        ZkStarter.DEFAULT_ZK_STR);
   }
 
   public class FakeHelixManager extends ZKHelixManager {
@@ -83,8 +83,9 @@ public class TableQueryQuotaManagerTest {
     }
 
     void setPropertyStore(String clusterName) {
-      _propertyStore = new ZkHelixPropertyStore<>(new ZkBaseDataAccessor<ZNRecord>(_zkclient),
-          "/" + clusterName + "/PROPERTYSTORE", null);
+      _propertyStore =
+          new ZkHelixPropertyStore<>(new ZkBaseDataAccessor<ZNRecord>(_zkclient), "/" + clusterName + "/PROPERTYSTORE",
+              null);
     }
 
     void closeZkClient() {
@@ -111,7 +112,8 @@ public class TableQueryQuotaManagerTest {
   }
 
   @Test
-  public void testOfflineTableNotnullQuota() throws Exception {
+  public void testOfflineTableNotnullQuota()
+      throws Exception {
     ExternalView brokerResource = generateBrokerResource(OFFLINE_TABLE_NAME);
     TableConfig tableConfig = generateDefaultTableConfig(OFFLINE_TABLE_NAME);
     setQps(tableConfig);
@@ -126,7 +128,8 @@ public class TableQueryQuotaManagerTest {
   }
 
   @Test
-  public void testOfflineTableWithNullQuotaAndNoRealtimeTableConfig() throws Exception {
+  public void testOfflineTableWithNullQuotaAndNoRealtimeTableConfig()
+      throws Exception {
     ExternalView brokerResource = generateBrokerResource(OFFLINE_TABLE_NAME);
     TableConfig tableConfig = generateDefaultTableConfig(OFFLINE_TABLE_NAME);
     _tableQueryQuotaManager.initTableQueryQuota(tableConfig, brokerResource);
@@ -134,19 +137,16 @@ public class TableQueryQuotaManagerTest {
   }
 
   @Test
-  public void testOfflineTableWithNullQuotaButWithRealtimeTableConfigNullQpsConfig() throws Exception {
+  public void testOfflineTableWithNullQuotaButWithRealtimeTableConfigNullQpsConfig()
+      throws Exception {
     QuotaConfig quotaConfig = new QuotaConfig();
     quotaConfig.setStorage("6G");
-    TableConfig realtimeTableConfig = new TableConfig.Builder(TableType.REALTIME)
-        .setTableName(RAW_TABLE_NAME)
-        .setQuotaConfig(quotaConfig)
-        .setRetentionTimeUnit("DAYS")
-        .setRetentionTimeValue("1")
-        .setSegmentPushType("APPEND")
-        .setBrokerTenant("testBroker")
-        .setServerTenant("testServer")
-        .build();
-    ZKMetadataProvider.setRealtimeTableConfig(_testPropertyStore, REALTIME_TABLE_NAME, TableConfig.toZnRecord(realtimeTableConfig));
+    TableConfig realtimeTableConfig =
+        new TableConfig.Builder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setQuotaConfig(quotaConfig)
+            .setRetentionTimeUnit("DAYS").setRetentionTimeValue("1").setSegmentPushType("APPEND")
+            .setBrokerTenant("testBroker").setServerTenant("testServer").build();
+    ZKMetadataProvider
+        .setRealtimeTableConfig(_testPropertyStore, REALTIME_TABLE_NAME, TableConfig.toZnRecord(realtimeTableConfig));
 
     ExternalView brokerResource = generateBrokerResource(OFFLINE_TABLE_NAME);
     TableConfig tableConfig = generateDefaultTableConfig(OFFLINE_TABLE_NAME);
@@ -159,20 +159,17 @@ public class TableQueryQuotaManagerTest {
   }
 
   @Test
-  public void testOfflineTableWithNullQuotaButWithRealtimeTableConfigNotNullQpsConfig() throws Exception {
+  public void testOfflineTableWithNullQuotaButWithRealtimeTableConfigNotNullQpsConfig()
+      throws Exception {
     QuotaConfig quotaConfig = new QuotaConfig();
     quotaConfig.setStorage("6G");
     quotaConfig.setMaxQueriesPerSecond("100.00");
-    TableConfig realtimeTableConfig = new TableConfig.Builder(TableType.REALTIME)
-        .setTableName(RAW_TABLE_NAME)
-        .setQuotaConfig(quotaConfig)
-        .setRetentionTimeUnit("DAYS")
-        .setRetentionTimeValue("1")
-        .setSegmentPushType("APPEND")
-        .setBrokerTenant("testBroker")
-        .setServerTenant("testServer")
-        .build();
-    ZKMetadataProvider.setRealtimeTableConfig(_testPropertyStore, REALTIME_TABLE_NAME, TableConfig.toZnRecord(realtimeTableConfig));
+    TableConfig realtimeTableConfig =
+        new TableConfig.Builder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setQuotaConfig(quotaConfig)
+            .setRetentionTimeUnit("DAYS").setRetentionTimeValue("1").setSegmentPushType("APPEND")
+            .setBrokerTenant("testBroker").setServerTenant("testServer").build();
+    ZKMetadataProvider
+        .setRealtimeTableConfig(_testPropertyStore, REALTIME_TABLE_NAME, TableConfig.toZnRecord(realtimeTableConfig));
 
     ExternalView brokerResource = generateBrokerResource(REALTIME_TABLE_NAME);
     TableConfig tableConfig = generateDefaultTableConfig(OFFLINE_TABLE_NAME);
@@ -185,7 +182,8 @@ public class TableQueryQuotaManagerTest {
   }
 
   @Test
-  public void testBothTableHaveQpsQuotaConfig() throws Exception {
+  public void testBothTableHaveQpsQuotaConfig()
+      throws Exception {
     ExternalView brokerResource = generateBrokerResource(OFFLINE_TABLE_NAME);
     brokerResource.setState(REALTIME_TABLE_NAME, BROKER_INSTANCE_ID, "ONLINE");
     brokerResource.setState(REALTIME_TABLE_NAME, "broker_instance_2", "OFFLINE");
@@ -193,31 +191,23 @@ public class TableQueryQuotaManagerTest {
     QuotaConfig quotaConfig = new QuotaConfig();
     quotaConfig.setStorage("6G");
     quotaConfig.setMaxQueriesPerSecond("100.00");
-    TableConfig realtimeTableConfig = new TableConfig.Builder(TableType.REALTIME)
-        .setTableName(RAW_TABLE_NAME)
-        .setQuotaConfig(quotaConfig)
-        .setRetentionTimeUnit("DAYS")
-        .setRetentionTimeValue("1")
-        .setSegmentPushType("APPEND")
-        .setBrokerTenant("testBroker")
-        .setServerTenant("testServer")
-        .build();
+    TableConfig realtimeTableConfig =
+        new TableConfig.Builder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setQuotaConfig(quotaConfig)
+            .setRetentionTimeUnit("DAYS").setRetentionTimeValue("1").setSegmentPushType("APPEND")
+            .setBrokerTenant("testBroker").setServerTenant("testServer").build();
 
     QuotaConfig quotaConfig2 = new QuotaConfig();
     quotaConfig2.setStorage("6G");
     quotaConfig2.setMaxQueriesPerSecond("100.00");
-    TableConfig offlineTableConfig = new TableConfig.Builder(TableType.OFFLINE)
-        .setTableName(RAW_TABLE_NAME)
-        .setQuotaConfig(quotaConfig)
-        .setRetentionTimeUnit("DAYS")
-        .setRetentionTimeValue("1")
-        .setSegmentPushType("APPEND")
-        .setBrokerTenant("testBroker")
-        .setServerTenant("testServer")
-        .build();
+    TableConfig offlineTableConfig =
+        new TableConfig.Builder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setQuotaConfig(quotaConfig)
+            .setRetentionTimeUnit("DAYS").setRetentionTimeValue("1").setSegmentPushType("APPEND")
+            .setBrokerTenant("testBroker").setServerTenant("testServer").build();
 
-    ZKMetadataProvider.setRealtimeTableConfig(_testPropertyStore, REALTIME_TABLE_NAME, TableConfig.toZnRecord(realtimeTableConfig));
-    ZKMetadataProvider.setOfflineTableConfig(_testPropertyStore, OFFLINE_TABLE_NAME, TableConfig.toZnRecord(offlineTableConfig));
+    ZKMetadataProvider
+        .setRealtimeTableConfig(_testPropertyStore, REALTIME_TABLE_NAME, TableConfig.toZnRecord(realtimeTableConfig));
+    ZKMetadataProvider
+        .setOfflineTableConfig(_testPropertyStore, OFFLINE_TABLE_NAME, TableConfig.toZnRecord(offlineTableConfig));
 
     // Since each table has 2 online brokers, per broker rate becomes 100.0 / 2 = 50.0
     _tableQueryQuotaManager.initTableQueryQuota(offlineTableConfig, brokerResource);
@@ -239,7 +229,8 @@ public class TableQueryQuotaManagerTest {
   }
 
   @Test
-  public void testRealtimeTableNotnullQuota() throws Exception {
+  public void testRealtimeTableNotnullQuota()
+      throws Exception {
     ExternalView brokerResource = generateBrokerResource(REALTIME_TABLE_NAME);
     TableConfig tableConfig = generateDefaultTableConfig(REALTIME_TABLE_NAME);
     setQps(tableConfig);
@@ -253,7 +244,8 @@ public class TableQueryQuotaManagerTest {
   }
 
   @Test
-  public void testRealtimeTableWithNullQuotaAndNoOfflineTableConfig() throws Exception {
+  public void testRealtimeTableWithNullQuotaAndNoOfflineTableConfig()
+      throws Exception {
     ExternalView brokerResource = generateBrokerResource(REALTIME_TABLE_NAME);
     TableConfig tableConfig = generateDefaultTableConfig(REALTIME_TABLE_NAME);
     _tableQueryQuotaManager.initTableQueryQuota(tableConfig, brokerResource);
@@ -261,19 +253,16 @@ public class TableQueryQuotaManagerTest {
   }
 
   @Test
-  public void testRealtimeTableWithNullQuotaButWithOfflineTableConfigNullQpsConfig() throws Exception {
+  public void testRealtimeTableWithNullQuotaButWithOfflineTableConfigNullQpsConfig()
+      throws Exception {
     QuotaConfig quotaConfig = new QuotaConfig();
     quotaConfig.setStorage("6G");
-    TableConfig offlineTableConfig = new TableConfig.Builder(TableType.OFFLINE)
-        .setTableName(RAW_TABLE_NAME)
-        .setQuotaConfig(quotaConfig)
-        .setRetentionTimeUnit("DAYS")
-        .setRetentionTimeValue("1")
-        .setSegmentPushType("APPEND")
-        .setBrokerTenant("testBroker")
-        .setServerTenant("testServer")
-        .build();
-    ZKMetadataProvider.setOfflineTableConfig(_testPropertyStore, OFFLINE_TABLE_NAME, TableConfig.toZnRecord(offlineTableConfig));
+    TableConfig offlineTableConfig =
+        new TableConfig.Builder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setQuotaConfig(quotaConfig)
+            .setRetentionTimeUnit("DAYS").setRetentionTimeValue("1").setSegmentPushType("APPEND")
+            .setBrokerTenant("testBroker").setServerTenant("testServer").build();
+    ZKMetadataProvider
+        .setOfflineTableConfig(_testPropertyStore, OFFLINE_TABLE_NAME, TableConfig.toZnRecord(offlineTableConfig));
 
     ExternalView brokerResource = generateBrokerResource(REALTIME_TABLE_NAME);
     TableConfig tableConfig = generateDefaultTableConfig(REALTIME_TABLE_NAME);
@@ -282,20 +271,17 @@ public class TableQueryQuotaManagerTest {
   }
 
   @Test
-  public void testRealtimeTableWithNullQuotaButWithOfflineTableConfigNotNullQpsConfig() throws Exception {
+  public void testRealtimeTableWithNullQuotaButWithOfflineTableConfigNotNullQpsConfig()
+      throws Exception {
     QuotaConfig quotaConfig = new QuotaConfig();
     quotaConfig.setStorage("6G");
     quotaConfig.setMaxQueriesPerSecond("100.00");
-    TableConfig offlineTableConfig = new TableConfig.Builder(TableType.OFFLINE)
-        .setTableName(RAW_TABLE_NAME)
-        .setQuotaConfig(quotaConfig)
-        .setRetentionTimeUnit("DAYS")
-        .setRetentionTimeValue("1")
-        .setSegmentPushType("APPEND")
-        .setBrokerTenant("testBroker")
-        .setServerTenant("testServer")
-        .build();
-    ZKMetadataProvider.setOfflineTableConfig(_testPropertyStore, OFFLINE_TABLE_NAME, TableConfig.toZnRecord(offlineTableConfig));
+    TableConfig offlineTableConfig =
+        new TableConfig.Builder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setQuotaConfig(quotaConfig)
+            .setRetentionTimeUnit("DAYS").setRetentionTimeValue("1").setSegmentPushType("APPEND")
+            .setBrokerTenant("testBroker").setServerTenant("testServer").build();
+    ZKMetadataProvider
+        .setOfflineTableConfig(_testPropertyStore, OFFLINE_TABLE_NAME, TableConfig.toZnRecord(offlineTableConfig));
 
     ExternalView brokerResource = generateBrokerResource(OFFLINE_TABLE_NAME);
     TableConfig tableConfig = generateDefaultTableConfig(REALTIME_TABLE_NAME);
@@ -304,7 +290,8 @@ public class TableQueryQuotaManagerTest {
   }
 
   @Test
-  public void testInvalidQpsQuota() throws Exception {
+  public void testInvalidQpsQuota()
+      throws Exception {
     ExternalView brokerResource = generateBrokerResource(OFFLINE_TABLE_NAME);
     TableConfig tableConfig = generateDefaultTableConfig(OFFLINE_TABLE_NAME);
     // Set invalid qps quota
@@ -316,7 +303,8 @@ public class TableQueryQuotaManagerTest {
   }
 
   @Test
-  public void testInvalidNegativeQpsQuota() throws Exception {
+  public void testInvalidNegativeQpsQuota()
+      throws Exception {
     ExternalView brokerResource = generateBrokerResource(OFFLINE_TABLE_NAME);
     TableConfig tableConfig = generateDefaultTableConfig(OFFLINE_TABLE_NAME);
     // Set invalid negative qps quota
@@ -328,7 +316,8 @@ public class TableQueryQuotaManagerTest {
   }
 
   @Test
-  public void testNoBrokerResource() throws Exception {
+  public void testNoBrokerResource()
+      throws Exception {
     TableConfig tableConfig = generateDefaultTableConfig(OFFLINE_TABLE_NAME);
     setQps(tableConfig);
     _tableQueryQuotaManager.initTableQueryQuota(tableConfig, null);
@@ -336,7 +325,8 @@ public class TableQueryQuotaManagerTest {
   }
 
   @Test
-  public void testNoBrokerServiceOnBrokerResource() throws Exception {
+  public void testNoBrokerServiceOnBrokerResource()
+      throws Exception {
     ExternalView brokerResource = new ExternalView(BROKER_RESOURCE_INSTANCE);
     TableConfig tableConfig = generateDefaultTableConfig(OFFLINE_TABLE_NAME);
     setQps(tableConfig);
@@ -345,7 +335,8 @@ public class TableQueryQuotaManagerTest {
   }
 
   @Test
-  public void testNoOnlineBrokerServiceOnBrokerResource() throws Exception {
+  public void testNoOnlineBrokerServiceOnBrokerResource()
+      throws Exception {
     ExternalView brokerResource = new ExternalView(BROKER_RESOURCE_INSTANCE);
     brokerResource.setState(OFFLINE_TABLE_NAME, "broker_instance_2", "OFFLINE");
     TableConfig tableConfig = generateDefaultTableConfig(OFFLINE_TABLE_NAME);
@@ -377,7 +368,8 @@ public class TableQueryQuotaManagerTest {
     return brokerResource;
   }
 
-  private void runQueries(int numOfTimesToRun, long millis) throws InterruptedException {
+  private void runQueries(int numOfTimesToRun, long millis)
+      throws InterruptedException {
     int count = 0;
     for (int i = 0; i < numOfTimesToRun; i++) {
       Assert.assertTrue(_tableQueryQuotaManager.acquire(RAW_TABLE_NAME));

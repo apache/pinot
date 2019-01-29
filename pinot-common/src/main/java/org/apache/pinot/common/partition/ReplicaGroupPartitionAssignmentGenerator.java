@@ -96,7 +96,8 @@ public class ReplicaGroupPartitionAssignmentGenerator {
     // which is equivalent to have the same partition number for all segments (i.e. 1 partition).
     int numColumnPartitions = 1;
     if (partitionColumn != null) {
-      numColumnPartitions = tableConfig.getIndexingConfig().getSegmentPartitionConfig().getNumPartitions(partitionColumn);
+      numColumnPartitions =
+          tableConfig.getIndexingConfig().getSegmentPartitionConfig().getNumPartitions(partitionColumn);
     }
     int numReplicas = tableConfig.getValidationConfig().getReplicationNumber();
     int numServers = servers.size();

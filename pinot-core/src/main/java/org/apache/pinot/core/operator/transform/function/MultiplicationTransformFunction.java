@@ -53,8 +53,7 @@ public class MultiplicationTransformFunction extends BaseTransformFunction {
         _literalProduct *= Double.parseDouble(((LiteralTransformFunction) argument).getLiteral());
       } else {
         if (!argument.getResultMetadata().isSingleValue()) {
-          throw new IllegalArgumentException(
-              "All the arguments of MULT transform function must be single-valued");
+          throw new IllegalArgumentException("All the arguments of MULT transform function must be single-valued");
         }
         _transformFunctions.add(argument);
       }

@@ -101,7 +101,8 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   private File starTreeTempDir;
 
   @Override
-  public void init(SegmentGeneratorConfig config) throws Exception {
+  public void init(SegmentGeneratorConfig config)
+      throws Exception {
     init(config, RecordReaderFactory.getRecordReader(config));
   }
 
@@ -184,7 +185,8 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     }
   }
 
-  private void populateDefaultDerivedColumnValues(GenericRow row) throws IOException {
+  private void populateDefaultDerivedColumnValues(GenericRow row)
+      throws IOException {
     //add default hll value in each row
     if (createHllIndex) {
       HllConfig hllConfig = config.getHllConfig();
@@ -198,7 +200,8 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   }
 
   @Override
-  public void build() throws Exception {
+  public void build()
+      throws Exception {
     if (createStarTree) {
       // TODO: add on-heap star-tree builder
       buildStarTree();
@@ -207,7 +210,8 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     }
   }
 
-  private void buildStarTree() throws Exception {
+  private void buildStarTree()
+      throws Exception {
     // Create stats collector
     StatsCollectorConfig statsCollectorConfig =
         new StatsCollectorConfig(dataSchema, config.getSegmentPartitionConfig());
@@ -232,8 +236,8 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     starTreeBuilderConfig.setDimensionsSplitOrder(starTreeIndexSpec.getDimensionsSplitOrder());
     starTreeBuilderConfig.setSkipStarNodeCreationDimensions(starTreeIndexSpec.getSkipStarNodeCreationForDimensions());
     starTreeBuilderConfig.setSkipMaterializationDimensions(starTreeIndexSpec.getSkipMaterializationForDimensions());
-    starTreeBuilderConfig.setSkipMaterializationCardinalityThreshold(
-        starTreeIndexSpec.getSkipMaterializationCardinalityThreshold());
+    starTreeBuilderConfig
+        .setSkipMaterializationCardinalityThreshold(starTreeIndexSpec.getSkipMaterializationCardinalityThreshold());
     starTreeBuilderConfig.setMaxNumLeafRecords(starTreeIndexSpec.getMaxLeafRecords());
     starTreeBuilderConfig.setExcludeSkipMaterializationDimensionsForStarTreeIndex(
         starTreeIndexSpec.isExcludeSkipMaterializationDimensionsForStarTreeIndex());
@@ -284,8 +288,8 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
         indexCreator.init(config, segmentIndexCreationInfo, indexCreationInfoMap, dataSchema, tempIndexDir);
 
         //iterate over the data again,
-        Iterator<GenericRow> allRowsIterator = starTreeBuilder.iterator(0,
-            starTreeBuilder.getTotalRawDocumentCount() + starTreeBuilder.getTotalAggregateDocumentCount());
+        Iterator<GenericRow> allRowsIterator = starTreeBuilder
+            .iterator(0, starTreeBuilder.getTotalRawDocumentCount() + starTreeBuilder.getTotalAggregateDocumentCount());
 
         while (allRowsIterator.hasNext()) {
           GenericRow genericRow = allRowsIterator.next();
@@ -313,7 +317,8 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     }
   }
 
-  private void buildRaw() throws Exception {
+  private void buildRaw()
+      throws Exception {
     // Count the number of documents and gather per-column statistics
     LOGGER.debug("Start building StatsCollector!");
     buildIndexCreationInfo();
@@ -351,7 +356,8 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     handlePostCreation();
   }
 
-  private void handlePostCreation() throws Exception {
+  private void handlePostCreation()
+      throws Exception {
     final String timeColumn = config.getTimeColumnName();
     segmentName = config.getSegmentNameGenerator().generateSegmentName(segmentStats.getColumnProfileFor(timeColumn));
 
@@ -406,7 +412,8 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     LOGGER.info("Driver, indexing time : {}", totalIndexTime);
   }
 
-  private void buildStarTreeV2IfNecessary(File indexDir) throws Exception {
+  private void buildStarTreeV2IfNecessary(File indexDir)
+      throws Exception {
     List<StarTreeV2BuilderConfig> starTreeV2BuilderConfigs = config.getStarTreeV2BuilderConfigs();
     if (starTreeV2BuilderConfigs != null && !starTreeV2BuilderConfigs.isEmpty()) {
       MultipleTreesBuilder.BuildMode buildMode =
@@ -429,7 +436,8 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   // Using converter is similar to option (2), plus it's battle-tested code. We will roll out with
   // this change to keep changes limited. Once we've migrated we can implement approach (1) with option to
   // copy for indexes for which we don't know sizes upfront.
-  private void convertFormatIfNeeded(File segmentDirectory) throws Exception {
+  private void convertFormatIfNeeded(File segmentDirectory)
+      throws Exception {
     SegmentVersion versionToGenerate = config.getSegmentVersion();
     if (versionToGenerate.equals(SegmentVersion.v1)) {
       // v1 by default
@@ -439,11 +447,13 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     converter.convert(segmentDirectory);
   }
 
-  public ColumnStatistics getColumnStatisticsCollector(final String columnName) throws Exception {
+  public ColumnStatistics getColumnStatisticsCollector(final String columnName)
+      throws Exception {
     return segmentStats.getColumnProfileFor(columnName);
   }
 
-  public static void persistCreationMeta(File indexDir, long crc, long creationTime) throws IOException {
+  public static void persistCreationMeta(File indexDir, long crc, long creationTime)
+      throws IOException {
     File segmentDir = SegmentDirectoryPaths.findSegmentDirectory(indexDir);
     File creationMetaFile = new File(segmentDir, V1Constants.SEGMENT_CREATION_META);
     try (DataOutputStream output = new DataOutputStream(new FileOutputStream(creationMetaFile))) {
@@ -455,7 +465,8 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   /**
    * Complete the stats gathering process and store the stats information in indexCreationInfoMap.
    */
-  void buildIndexCreationInfo() throws Exception {
+  void buildIndexCreationInfo()
+      throws Exception {
     for (FieldSpec spec : dataSchema.getAllFieldSpecs()) {
       String column = spec.getName();
 

@@ -80,20 +80,17 @@ public abstract class ResourceManager {
     LOGGER.info("Initializing with {} query runner threads and {} worker threads", numQueryRunnerThreads,
         numQueryWorkerThreads);
     // pqr -> pinot query runner (to give short names)
-    ThreadFactory queryRunnerFactory = new ThreadFactoryBuilder().setDaemon(false)
-        .setPriority(QUERY_RUNNER_THREAD_PRIORITY)
-        .setNameFormat("pqr-%d")
-        .build();
-    queryRunners = MoreExecutors.listeningDecorator(
-        Executors.newFixedThreadPool(numQueryRunnerThreads, queryRunnerFactory));
+    ThreadFactory queryRunnerFactory =
+        new ThreadFactoryBuilder().setDaemon(false).setPriority(QUERY_RUNNER_THREAD_PRIORITY).setNameFormat("pqr-%d")
+            .build();
+    queryRunners =
+        MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(numQueryRunnerThreads, queryRunnerFactory));
 
     // pqw -> pinot query workers
-    ThreadFactory queryWorkersFactory = new ThreadFactoryBuilder().setDaemon(false)
-        .setPriority(Thread.NORM_PRIORITY)
-        .setNameFormat("pqw-%d")
-        .build();
-    queryWorkers = MoreExecutors.listeningDecorator(
-        Executors.newFixedThreadPool(numQueryWorkerThreads, queryWorkersFactory));
+    ThreadFactory queryWorkersFactory =
+        new ThreadFactoryBuilder().setDaemon(false).setPriority(Thread.NORM_PRIORITY).setNameFormat("pqw-%d").build();
+    queryWorkers =
+        MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(numQueryWorkerThreads, queryWorkersFactory));
   }
 
   public void stop() {
@@ -140,7 +137,8 @@ public abstract class ResourceManager {
    * @param accountant Accountant for a scheduler group
    * @return
    */
-  public abstract QueryExecutorService getExecutorService(ServerQueryRequest query, SchedulerGroupAccountant accountant);
+  public abstract QueryExecutorService getExecutorService(ServerQueryRequest query,
+      SchedulerGroupAccountant accountant);
 
   /**
    * Hard limit on number of threads for a scheduler group.

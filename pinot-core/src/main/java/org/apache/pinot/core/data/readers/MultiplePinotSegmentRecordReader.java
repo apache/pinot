@@ -48,7 +48,8 @@ public class MultiplePinotSegmentRecordReader implements RecordReader {
    *
    * @param indexDirs a list of input segment directory paths
    */
-  public MultiplePinotSegmentRecordReader(@Nonnull List<File> indexDirs) throws Exception {
+  public MultiplePinotSegmentRecordReader(@Nonnull List<File> indexDirs)
+      throws Exception {
     this(indexDirs, null, null);
   }
 
@@ -63,7 +64,8 @@ public class MultiplePinotSegmentRecordReader implements RecordReader {
    * @param sortOrder a list of column names that represent the sorting order
    */
   public MultiplePinotSegmentRecordReader(@Nonnull List<File> indexDirs, @Nullable Schema schema,
-      @Nullable List<String> sortOrder) throws Exception {
+      @Nullable List<String> sortOrder)
+      throws Exception {
     // Initialize pinot segment record readers
     _pinotSegmentRecordReaders = new ArrayList<>(indexDirs.size());
     for (File file : indexDirs) {

@@ -264,8 +264,8 @@ public class TableQueryQuotaManager {
     LOGGER.info("Start processing qps quota change.");
     long startTime = System.currentTimeMillis();
 
-    ExternalView currentBrokerResource =
-        HelixHelper.getExternalViewForResource(_helixManager.getClusterManagmentTool(), _helixManager.getClusterName(),
+    ExternalView currentBrokerResource = HelixHelper
+        .getExternalViewForResource(_helixManager.getClusterManagmentTool(), _helixManager.getClusterName(),
             BROKER_RESOURCE_INSTANCE);
     if (currentBrokerResource == null) {
       LOGGER.warn("Finish processing qps quota change: external view for broker resource is null!");
@@ -286,8 +286,8 @@ public class TableQueryQuotaManager {
 
       // Get latest quota config for table.
       QuotaConfig quotaConfig = getQuotaConfigFromPropertyStore(rawTableName, tableType);
-      if (quotaConfig == null || quotaConfig.getMaxQueriesPerSecond() == null
-          || !quotaConfig.isMaxQueriesPerSecondValid()) {
+      if (quotaConfig == null || quotaConfig.getMaxQueriesPerSecond() == null || !quotaConfig
+          .isMaxQueriesPerSecondValid()) {
         LOGGER.info("No query quota config or the config is invalid for Table {}. Removing its rate limit.",
             tableNameWithType);
         removeRateLimiter(tableNameWithType);
@@ -323,7 +323,8 @@ public class TableQueryQuotaManager {
     }
     _lastKnownBrokerResourceVersion.set(currentVersionNumber);
     long endTime = System.currentTimeMillis();
-    LOGGER.info("Processed query quota change in {}ms, {} out of {} query quota configs rebuilt.",
-        (endTime - startTime), numRebuilt, _rateLimiterMap.size());
+    LOGGER
+        .info("Processed query quota change in {}ms, {} out of {} query quota configs rebuilt.", (endTime - startTime),
+            numRebuilt, _rateLimiterMap.size());
   }
 }

@@ -35,7 +35,8 @@ public class RealtimeSegmentSegmentCreationDataSource implements SegmentCreation
   private final RealtimeSegmentRecordReader _realtimeSegmentRecordReader;
   private final Schema _schema;
 
-  public RealtimeSegmentSegmentCreationDataSource(MutableSegmentImpl realtimeSegment, RealtimeSegmentRecordReader realtimeSegmentRecordReader, Schema schema) {
+  public RealtimeSegmentSegmentCreationDataSource(MutableSegmentImpl realtimeSegment,
+      RealtimeSegmentRecordReader realtimeSegmentRecordReader, Schema schema) {
     _realtimeSegment = realtimeSegment;
     _realtimeSegmentRecordReader = realtimeSegmentRecordReader;
     _schema = schema;

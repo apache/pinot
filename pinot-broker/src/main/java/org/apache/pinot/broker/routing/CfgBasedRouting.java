@@ -57,7 +57,8 @@ public class CfgBasedRouting implements RoutingTable {
   }
 
   @Override
-  public String dumpSnapshot(String tableName) throws Exception {
+  public String dumpSnapshot(String tableName)
+      throws Exception {
     return null;
   }
 }

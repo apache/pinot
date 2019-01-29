@@ -22,6 +22,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.EqualityUtils;
 
+
 /**
  * Class representing configurations related to segment assignment strategy.
  *
@@ -92,9 +93,9 @@ public class ReplicaGroupStrategyConfig {
 
     ReplicaGroupStrategyConfig that = (ReplicaGroupStrategyConfig) o;
 
-    return EqualityUtils.isEqual(_numInstancesPerPartition, that._numInstancesPerPartition) &&
-        EqualityUtils.isEqual(_mirrorAssignmentAcrossReplicaGroups, that._mirrorAssignmentAcrossReplicaGroups) &&
-        EqualityUtils.isEqual(_partitionColumn, that._partitionColumn);
+    return EqualityUtils.isEqual(_numInstancesPerPartition, that._numInstancesPerPartition) && EqualityUtils
+        .isEqual(_mirrorAssignmentAcrossReplicaGroups, that._mirrorAssignmentAcrossReplicaGroups) && EqualityUtils
+        .isEqual(_partitionColumn, that._partitionColumn);
   }
 
   @Override

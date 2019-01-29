@@ -77,9 +77,7 @@ public class ComparisonPredicateAstNode extends PredicateAstNode {
 
   @Override
   public String toString() {
-    return "ComparisonPredicateAstNode{" +
-        "_operand='" + _operand + '\'' +
-        '}';
+    return "ComparisonPredicateAstNode{" + "_operand='" + _operand + '\'' + '}';
   }
 
   /**
@@ -150,8 +148,7 @@ public class ComparisonPredicateAstNode extends PredicateAstNode {
       }
 
       if (_identifier != null) {
-        return new FilterQueryTree(_identifier, Collections.singletonList(comparison), FilterOperator.RANGE,
-            null);
+        return new FilterQueryTree(_identifier, Collections.singletonList(comparison), FilterOperator.RANGE, null);
       } else {
         throw new Pql2CompilationException("One column is needed for comparison.");
       }

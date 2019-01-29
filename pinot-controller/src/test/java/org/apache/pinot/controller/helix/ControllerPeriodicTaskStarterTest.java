@@ -93,5 +93,5 @@ public class ControllerPeriodicTaskStarterTest extends ControllerTest {
     List<PeriodicTask> getControllerPeriodicTasks() {
       return _controllerPeriodicTasks;
     }
-   }
+  }
 }

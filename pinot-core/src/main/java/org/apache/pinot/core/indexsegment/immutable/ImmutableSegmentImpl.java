@@ -164,8 +164,8 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
     for (FieldSpec fieldSpec : _segmentMetadata.getSchema().getAllFieldSpecs()) {
       String column = fieldSpec.getName();
       ColumnIndexContainer indexContainer = _indexContainerMap.get(column);
-      reuse.putField(column,
-          IndexSegmentUtils.getValue(docId, fieldSpec, indexContainer.getForwardIndex(), indexContainer.getDictionary(),
+      reuse.putField(column, IndexSegmentUtils
+          .getValue(docId, fieldSpec, indexContainer.getForwardIndex(), indexContainer.getDictionary(),
               _segmentMetadata.getColumnMetadataFor(column).getMaxNumberOfMultiValues()));
     }
     return reuse;

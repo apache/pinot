@@ -57,7 +57,8 @@ public class PinotSegmentRecordReaderTest {
   private static String TIME = "t";
 
   @BeforeClass
-  public void setup() throws Exception {
+  public void setup()
+      throws Exception {
     Schema schema = createPinotSchema();
     String segmentName = "pinotSegmentRecordReaderTest";
     _segmentOutputDir = Files.createTempDir().toString();
@@ -78,7 +79,8 @@ public class PinotSegmentRecordReaderTest {
   }
 
   @Test
-  public void testPinotSegmentRecordReader() throws Exception {
+  public void testPinotSegmentRecordReader()
+      throws Exception {
     List<GenericRow> outputRows = new ArrayList<>();
 
     try (PinotSegmentRecordReader pinotSegmentRecordReader = new PinotSegmentRecordReader(_segmentIndexDir)) {
@@ -101,12 +103,14 @@ public class PinotSegmentRecordReaderTest {
   }
 
   @Test
-  public void testPinotSegmentRecordReaderSortedColumn() throws Exception {
+  public void testPinotSegmentRecordReaderSortedColumn()
+      throws Exception {
     List<GenericRow> outputRows = new ArrayList<>();
     List<String> sortOrder = new ArrayList<>();
     sortOrder.add(D_SV_1);
 
-    try (PinotSegmentRecordReader pinotSegmentRecordReader = new PinotSegmentRecordReader(_segmentIndexDir, null, sortOrder)) {
+    try (PinotSegmentRecordReader pinotSegmentRecordReader = new PinotSegmentRecordReader(_segmentIndexDir, null,
+        sortOrder)) {
       while (pinotSegmentRecordReader.hasNext()) {
         GenericRow row = pinotSegmentRecordReader.next();
         outputRows.add(row);

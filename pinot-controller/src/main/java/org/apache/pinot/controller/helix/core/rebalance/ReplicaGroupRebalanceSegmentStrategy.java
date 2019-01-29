@@ -77,7 +77,8 @@ public class ReplicaGroupRebalanceSegmentStrategy implements RebalanceSegmentStr
    */
   @Override
   public PartitionAssignment rebalancePartitionAssignment(IdealState idealState, TableConfig tableConfig,
-      Configuration rebalanceUserConfig) throws InvalidConfigException {
+      Configuration rebalanceUserConfig)
+      throws InvalidConfigException {
     // Currently, only offline table is supported
     if (tableConfig.getTableType() == CommonConstants.Helix.TableType.REALTIME) {
       throw new InvalidConfigException("Realtime table is not supported by replica group rebalancer");
@@ -93,8 +94,8 @@ public class ReplicaGroupRebalanceSegmentStrategy implements RebalanceSegmentStr
     ReplicaGroupPartitionAssignment newPartitionAssignment =
         computeNewReplicaGroupMapping(tableConfig, partitionAssignmentGenerator);
 
-    boolean dryRun = rebalanceUserConfig.getBoolean(RebalanceUserConfigConstants.DRYRUN,
-        RebalanceUserConfigConstants.DEFAULT_DRY_RUN);
+    boolean dryRun = rebalanceUserConfig
+        .getBoolean(RebalanceUserConfigConstants.DRYRUN, RebalanceUserConfigConstants.DEFAULT_DRY_RUN);
     if (!dryRun) {
       LOGGER.info("Updating replica group partition assignment for table {}", tableNameWithType);
       partitionAssignmentGenerator.writeReplicaGroupPartitionAssignment(newPartitionAssignment);
@@ -115,7 +116,8 @@ public class ReplicaGroupRebalanceSegmentStrategy implements RebalanceSegmentStr
    */
   @Override
   public IdealState getRebalancedIdealState(IdealState idealState, TableConfig tableConfig,
-      Configuration rebalanceUserConfig, PartitionAssignment newPartitionAssignment) throws InvalidConfigException {
+      Configuration rebalanceUserConfig, PartitionAssignment newPartitionAssignment)
+      throws InvalidConfigException {
     // Currently, only offline table is supported
     if (tableConfig.getTableType() == CommonConstants.Helix.TableType.REALTIME) {
       throw new InvalidConfigException("Realtime table is not supported by replica group rebalancer");
@@ -132,7 +134,8 @@ public class ReplicaGroupRebalanceSegmentStrategy implements RebalanceSegmentStr
    * @return new replica group partition assignment
    */
   private ReplicaGroupPartitionAssignment computeNewReplicaGroupMapping(TableConfig tableConfig,
-      ReplicaGroupPartitionAssignmentGenerator partitionAssignmentGenerator) throws InvalidConfigException {
+      ReplicaGroupPartitionAssignmentGenerator partitionAssignmentGenerator)
+      throws InvalidConfigException {
     ReplicaGroupStrategyConfig replicaGroupConfig = tableConfig.getValidationConfig().getReplicaGroupStrategyConfig();
 
     // If no replica group config is available in table config, we cannot perform the rebalance algorithm
@@ -166,8 +169,7 @@ public class ReplicaGroupRebalanceSegmentStrategy implements RebalanceSegmentStr
     ReplicaGroupPartitionAssignment oldReplicaGroupPartitionAssignment =
         partitionAssignmentGenerator.getReplicaGroupPartitionAssignment(tableNameWithType);
     if (oldReplicaGroupPartitionAssignment == null) {
-      throw new InvalidConfigException(
-          "Replica group partition assignment does not exist for " + tableNameWithType);
+      throw new InvalidConfigException("Replica group partition assignment does not exist for " + tableNameWithType);
     }
 
     // Fetch the previous replica group configurations
@@ -259,7 +261,8 @@ public class ReplicaGroupRebalanceSegmentStrategy implements RebalanceSegmentStr
         if (!removeGroup) {
           LOGGER.info("Setting new replica group ( partitionId: " + partitionId + ", replicaGroupId: " + groupId
               + ", server list: " + StringUtils.join(",", newReplicaGroup));
-          newReplicaGroupPartitionAssignment.setInstancesToReplicaGroup(partitionId, currentNewReplicaGroupId++, newReplicaGroup);
+          newReplicaGroupPartitionAssignment
+              .setInstancesToReplicaGroup(partitionId, currentNewReplicaGroupId++, newReplicaGroup);
         }
       }
 

@@ -222,7 +222,8 @@ public class StarTreeDataTable implements Closeable {
   }
 
   @Override
-  public void close() throws IOException {
+  public void close()
+      throws IOException {
     _dataBuffer.close();
   }
 }

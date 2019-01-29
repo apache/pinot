@@ -33,5 +33,4 @@ public class CallableHttpGet {
     this.client = client;
     this.getMethod = getMethod;
   }
-
 }

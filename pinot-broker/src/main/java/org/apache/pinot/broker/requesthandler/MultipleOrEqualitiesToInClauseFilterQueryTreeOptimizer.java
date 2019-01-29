@@ -68,7 +68,7 @@ public class MultipleOrEqualitiesToInClauseFilterQueryTreeOptimizer extends Filt
           return rebuildFilterPredicate(columnToValues, nonEqualityOperators);
         }
       }
-    } else if (filterQueryTree.getChildren() != null){
+    } else if (filterQueryTree.getChildren() != null) {
       // Optimize the child nodes, if any
       applyOptimizationToChildNodes(filterQueryTree);
     }
@@ -102,7 +102,8 @@ public class MultipleOrEqualitiesToInClauseFilterQueryTreeOptimizer extends Filt
     boolean containsDuplicates = false;
 
     for (FilterQueryTree childQueryTree : filterQueryTree.getChildren()) {
-      if (childQueryTree.getOperator() == FilterOperator.EQUALITY || childQueryTree.getOperator() == FilterOperator.IN) {
+      if (childQueryTree.getOperator() == FilterOperator.EQUALITY
+          || childQueryTree.getOperator() == FilterOperator.IN) {
         List<String> childValues = valueDoubleTabListToElements(childQueryTree.getValue());
 
         if (!columnToValues.containsKey(childQueryTree.getColumn())) {
@@ -112,7 +113,7 @@ public class MultipleOrEqualitiesToInClauseFilterQueryTreeOptimizer extends Filt
             containsDuplicates = true;
           }
         } else {
-           Set<String> currentValues = columnToValues.get(childQueryTree.getColumn());
+          Set<String> currentValues = columnToValues.get(childQueryTree.getColumn());
           for (String childValue : childValues) {
             if (!containsDuplicates && currentValues.contains(childValue)) {
               containsDuplicates = true;
@@ -158,8 +159,8 @@ public class MultipleOrEqualitiesToInClauseFilterQueryTreeOptimizer extends Filt
   private FilterQueryTree buildFilterQueryTreeForColumnAndValues(Map.Entry<String, Set<String>> columnAndValues) {
     // If there's only one value, turn it into an equality, otherwise turn it into an IN clause
     if (columnAndValues.getValue().size() == 1) {
-      return new FilterQueryTree(columnAndValues.getKey(),
-          new ArrayList<>(columnAndValues.getValue()), FilterOperator.EQUALITY, null);
+      return new FilterQueryTree(columnAndValues.getKey(), new ArrayList<>(columnAndValues.getValue()),
+          FilterOperator.EQUALITY, null);
     } else {
       return new FilterQueryTree(columnAndValues.getKey(), new ArrayList<>(columnAndValues.getValue()),
           FilterOperator.IN, null);

@@ -42,13 +42,15 @@ public class DeleteAPIHybridClusterIntegrationTest extends HybridClusterIntegrat
   private long nOfflineRows;
 
   @BeforeClass
-  public void setUp() throws Exception {
+  public void setUp()
+      throws Exception {
     super.setUp();
     TABLE_NAME = super.getTableName();
     nOfflineRows = numRowsReturned(CommonConstants.Helix.TableType.OFFLINE);
   }
 
-  private long numRowsReturned(CommonConstants.Helix.TableType tableType) throws Exception {
+  private long numRowsReturned(CommonConstants.Helix.TableType tableType)
+      throws Exception {
     JsonNode response = postQuery("select count(*) from '" + TABLE_NAME + "_" + tableType + "'");
     if (response.get("numDocsScanned").asLong() == 0) {
       return 0;
@@ -60,7 +62,8 @@ public class DeleteAPIHybridClusterIntegrationTest extends HybridClusterIntegrat
   }
 
   // TODO: Find ways to refactor waitForNumRows and waitForSegmentsToBeInDeleteDirectory
-  private void waitForNumRows(long numRows, CommonConstants.Helix.TableType tableType) throws Exception {
+  private void waitForNumRows(long numRows, CommonConstants.Helix.TableType tableType)
+      throws Exception {
     long start = System.currentTimeMillis();
     long end = start + 60 * 1000;
     while (System.currentTimeMillis() < end) {
@@ -72,7 +75,8 @@ public class DeleteAPIHybridClusterIntegrationTest extends HybridClusterIntegrat
     Assert.fail("Operation took too long");
   }
 
-  private void waitForSegmentsToBeInDeleteDirectory() throws Exception {
+  private void waitForSegmentsToBeInDeleteDirectory()
+      throws Exception {
     long start = System.currentTimeMillis();
     long end = start + 60 * 1000;
     while (System.currentTimeMillis() < end) {
@@ -99,7 +103,8 @@ public class DeleteAPIHybridClusterIntegrationTest extends HybridClusterIntegrat
   }
 
   @Test
-  public void deleteRealtimeSegmentFromGetAPI() throws Exception {
+  public void deleteRealtimeSegmentFromGetAPI()
+      throws Exception {
     long currRealtimeRows = numRowsReturned(CommonConstants.Helix.TableType.REALTIME);
 
     String segmentList = sendGetRequest(_controllerRequestURLBuilder.
@@ -116,9 +121,8 @@ public class DeleteAPIHybridClusterIntegrationTest extends HybridClusterIntegrat
 
     waitForNumRows(currRealtimeRows - removedSegmentRows, CommonConstants.Helix.TableType.REALTIME);
 
-    String postDeleteSegmentList = sendGetRequest(
-        _controllerRequestURLBuilder.forSegmentListAPIWithTableType(TABLE_NAME,
-            CommonConstants.Helix.TableType.REALTIME.toString()));
+    String postDeleteSegmentList = sendGetRequest(_controllerRequestURLBuilder
+        .forSegmentListAPIWithTableType(TABLE_NAME, CommonConstants.Helix.TableType.REALTIME.toString()));
     JsonNode realtimeSegmentsListReturn =
         getSegmentsFromJsonSegmentAPI(postDeleteSegmentList, CommonConstants.Helix.TableType.REALTIME.toString());
     removeValue(realtimeSegmentsList, removedSegment);
@@ -126,11 +130,12 @@ public class DeleteAPIHybridClusterIntegrationTest extends HybridClusterIntegrat
   }
 
   @Test
-  public void deleteRealtimeSegmentFromDeleteAPI() throws Exception {
+  public void deleteRealtimeSegmentFromDeleteAPI()
+      throws Exception {
     long currRealtimeRows = numRowsReturned(CommonConstants.Helix.TableType.REALTIME);
 
-    String segmentList = sendGetRequest(_controllerRequestURLBuilder.forSegmentListAPIWithTableType(TABLE_NAME,
-        CommonConstants.Helix.TableType.REALTIME.toString()));
+    String segmentList = sendGetRequest(_controllerRequestURLBuilder
+        .forSegmentListAPIWithTableType(TABLE_NAME, CommonConstants.Helix.TableType.REALTIME.toString()));
     JsonNode realtimeSegmentsList =
         getSegmentsFromJsonSegmentAPI(segmentList, CommonConstants.Helix.TableType.REALTIME.toString());
 
@@ -143,9 +148,8 @@ public class DeleteAPIHybridClusterIntegrationTest extends HybridClusterIntegrat
 
     waitForNumRows(currRealtimeRows - removedSegmentRows, CommonConstants.Helix.TableType.REALTIME);
 
-    String postDeleteSegmentList = sendGetRequest(
-        _controllerRequestURLBuilder.forSegmentListAPIWithTableType(TABLE_NAME,
-            CommonConstants.Helix.TableType.REALTIME.toString()));
+    String postDeleteSegmentList = sendGetRequest(_controllerRequestURLBuilder
+        .forSegmentListAPIWithTableType(TABLE_NAME, CommonConstants.Helix.TableType.REALTIME.toString()));
     JsonNode realtimeSegmentsListReturn =
         getSegmentsFromJsonSegmentAPI(postDeleteSegmentList, CommonConstants.Helix.TableType.REALTIME.toString());
     removeValue(realtimeSegmentsList, removedSegment);
@@ -153,15 +157,18 @@ public class DeleteAPIHybridClusterIntegrationTest extends HybridClusterIntegrat
   }
 
   // @Test TODO: Add back when we use LLC only
-  public void deleteAllRealtimeSegmentsFromGetAPI() throws Exception {
+  public void deleteAllRealtimeSegmentsFromGetAPI()
+      throws Exception {
   }
 
   // @Test TODO: Add back when we use LLC only
-  public void deleteAllRealtimeSegmentsFromDeleteAPI() throws Exception {
+  public void deleteAllRealtimeSegmentsFromDeleteAPI()
+      throws Exception {
   }
 
   @Test
-  public void deleteFromDeleteAPI() throws Exception {
+  public void deleteFromDeleteAPI()
+      throws Exception {
     String segmentList = sendGetRequest(_controllerRequestURLBuilder.
         forSegmentListAPIWithTableType(TABLE_NAME, CommonConstants.Helix.TableType.OFFLINE.toString()));
     JsonNode offlineSegmentsList =
@@ -193,8 +200,9 @@ public class DeleteAPIHybridClusterIntegrationTest extends HybridClusterIntegrat
     String postDeleteSegmentListAll = sendGetRequest(_controllerRequestURLBuilder.
         forSegmentListAPIWithTableType(TABLE_NAME, CommonConstants.Helix.TableType.OFFLINE.toString()));
 
-    Assert.assertEquals(getSegmentsFromJsonSegmentAPI(postDeleteSegmentListAll,
-        CommonConstants.Helix.TableType.OFFLINE.toString()).size(), 0);
+    Assert.assertEquals(
+        getSegmentsFromJsonSegmentAPI(postDeleteSegmentListAll, CommonConstants.Helix.TableType.OFFLINE.toString())
+            .size(), 0);
 
     waitForSegmentsToBeInDeleteDirectory();
     repushOfflineSegments();
@@ -207,7 +215,8 @@ public class DeleteAPIHybridClusterIntegrationTest extends HybridClusterIntegrat
   }
 
   @Test
-  public void deleteFromGetAPI() throws Exception {
+  public void deleteFromGetAPI()
+      throws Exception {
     String segmentList = sendGetRequest(_controllerRequestURLBuilder.
         forSegmentListAPIWithTableType(TABLE_NAME, CommonConstants.Helix.TableType.OFFLINE.toString()));
 
@@ -240,14 +249,16 @@ public class DeleteAPIHybridClusterIntegrationTest extends HybridClusterIntegrat
     String postDeleteSegmentListAll = sendGetRequest(_controllerRequestURLBuilder.
         forSegmentListAPIWithTableType(TABLE_NAME, CommonConstants.Helix.TableType.OFFLINE.toString()));
 
-    Assert.assertEquals(getSegmentsFromJsonSegmentAPI(postDeleteSegmentListAll,
-        CommonConstants.Helix.TableType.OFFLINE.toString()).size(), 0);
+    Assert.assertEquals(
+        getSegmentsFromJsonSegmentAPI(postDeleteSegmentListAll, CommonConstants.Helix.TableType.OFFLINE.toString())
+            .size(), 0);
 
     waitForSegmentsToBeInDeleteDirectory();
     repushOfflineSegments();
   }
 
-  private long getNumRowsFromOfflineMetadata(String segmentName) throws Exception {
+  private long getNumRowsFromOfflineMetadata(String segmentName)
+      throws Exception {
     OfflineSegmentZKMetadata segmentZKMetadata =
         ZKMetadataProvider.getOfflineSegmentZKMetadata(_propertyStore, TABLE_NAME, segmentName);
     return segmentZKMetadata.getTotalRawDocs();
@@ -259,11 +270,13 @@ public class DeleteAPIHybridClusterIntegrationTest extends HybridClusterIntegrat
     return segmentZKMetadata.getTotalRawDocs();
   }
 
-  private JsonNode getSegmentsFromJsonSegmentAPI(String json, String type) throws Exception {
+  private JsonNode getSegmentsFromJsonSegmentAPI(String json, String type)
+      throws Exception {
     return JsonUtils.stringToJsonNode(json).get(0).get(type);
   }
 
-  private void repushOfflineSegments() throws Exception {
+  private void repushOfflineSegments()
+      throws Exception {
     uploadSegments(_tarDir);
     waitForNumRows(nOfflineRows, CommonConstants.Helix.TableType.OFFLINE);
   }

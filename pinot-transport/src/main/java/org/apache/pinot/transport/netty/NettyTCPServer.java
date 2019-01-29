@@ -40,7 +40,8 @@ import org.apache.pinot.transport.metrics.NettyServerMetrics;
  */
 public class NettyTCPServer extends NettyServer {
 
-  public NettyTCPServer(int port, RequestHandlerFactory handlerFactory, AggregatedMetricsRegistry registry, long defaultLargeQueryLatencyMs) {
+  public NettyTCPServer(int port, RequestHandlerFactory handlerFactory, AggregatedMetricsRegistry registry,
+      long defaultLargeQueryLatencyMs) {
     super(port, handlerFactory, registry, defaultLargeQueryLatencyMs);
   }
 
@@ -48,8 +49,8 @@ public class NettyTCPServer extends NettyServer {
     this(port, handlerFactory, registry, 100);
   }
 
-  public NettyTCPServer(int port, RequestHandlerFactory handlerFactory, AggregatedMetricsRegistry registry, long defaultLargeQueryLatencyMs,
-      int numThreadsForBossGroup, int numThreadsForWorkerGroup) {
+  public NettyTCPServer(int port, RequestHandlerFactory handlerFactory, AggregatedMetricsRegistry registry,
+      long defaultLargeQueryLatencyMs, int numThreadsForBossGroup, int numThreadsForWorkerGroup) {
     super(port, handlerFactory, registry, defaultLargeQueryLatencyMs, numThreadsForBossGroup, numThreadsForWorkerGroup);
   }
 
@@ -95,7 +96,8 @@ public class NettyTCPServer extends NettyServer {
     }
 
     @Override
-    protected void initChannel(SocketChannel ch) throws Exception {
+    protected void initChannel(SocketChannel ch)
+        throws Exception {
       LOGGER.info("Setting up Server channel, scheduler");
       ch.pipeline().addLast("decoder", new LengthFieldBasedFrameDecoder(Integer.MAX_VALUE, 0, 4, 0, 4));
       ch.pipeline().addLast("encoder", new LengthFieldPrepender(4));
@@ -109,7 +111,8 @@ public class NettyTCPServer extends NettyServer {
       }
 
       ch.pipeline().addLast("request_handler",
-          new NettyChannelInboundHandler(_handlerFactory.createNewRequestHandler(), serverMetric, _defaultLargeQueryLatencyMs));
+          new NettyChannelInboundHandler(_handlerFactory.createNewRequestHandler(), serverMetric,
+              _defaultLargeQueryLatencyMs));
     }
   }
 }

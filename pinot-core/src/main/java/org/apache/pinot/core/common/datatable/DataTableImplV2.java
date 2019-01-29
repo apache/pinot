@@ -101,7 +101,8 @@ public class DataTableImplV2 implements DataTable {
   /**
    * Construct data table from byte array. (broker side)
    */
-  public DataTableImplV2(@Nonnull ByteBuffer byteBuffer) throws IOException {
+  public DataTableImplV2(@Nonnull ByteBuffer byteBuffer)
+      throws IOException {
     // Read header.
     _numRows = byteBuffer.getInt();
     _numColumns = byteBuffer.getInt();
@@ -169,7 +170,8 @@ public class DataTableImplV2 implements DataTable {
     }
   }
 
-  private Map<String, Map<Integer, String>> deserializeDictionaryMap(byte[] bytes) throws IOException {
+  private Map<String, Map<Integer, String>> deserializeDictionaryMap(byte[] bytes)
+      throws IOException {
     try (ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(bytes);
         DataInputStream dataInputStream = new DataInputStream(byteArrayInputStream)) {
       int numDictionaries = dataInputStream.readInt();
@@ -191,7 +193,8 @@ public class DataTableImplV2 implements DataTable {
     }
   }
 
-  private Map<String, String> deserializeMetadata(byte[] bytes) throws IOException {
+  private Map<String, String> deserializeMetadata(byte[] bytes)
+      throws IOException {
     try (ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(bytes);
         DataInputStream dataInputStream = new DataInputStream(byteArrayInputStream)) {
       int numEntries = dataInputStream.readInt();
@@ -207,7 +210,8 @@ public class DataTableImplV2 implements DataTable {
     }
   }
 
-  private static String decodeString(DataInputStream dataInputStream) throws IOException {
+  private static String decodeString(DataInputStream dataInputStream)
+      throws IOException {
     int length = dataInputStream.readInt();
     if (length == 0) {
       return StringUtils.EMPTY;
@@ -226,7 +230,8 @@ public class DataTableImplV2 implements DataTable {
 
   @Nonnull
   @Override
-  public byte[] toBytes() throws IOException {
+  public byte[] toBytes()
+      throws IOException {
     ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
     DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
     dataOutputStream.writeInt(VERSION);
@@ -297,7 +302,8 @@ public class DataTableImplV2 implements DataTable {
     return byteArrayOutputStream.toByteArray();
   }
 
-  private byte[] serializeDictionaryMap() throws IOException {
+  private byte[] serializeDictionaryMap()
+      throws IOException {
     ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
     DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
 
@@ -321,7 +327,8 @@ public class DataTableImplV2 implements DataTable {
     return byteArrayOutputStream.toByteArray();
   }
 
-  private byte[] serializeMetadata() throws IOException {
+  private byte[] serializeMetadata()
+      throws IOException {
     ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
     DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
 

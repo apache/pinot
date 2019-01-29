@@ -50,7 +50,8 @@ public class ControllerRestApi {
     List<URI> tableConfigURIs = new ArrayList<>();
     try {
       for (PushLocation pushLocation : _pushLocations) {
-        tableConfigURIs.add(FileUploadDownloadClient.getRetrieveTableConfigURI(pushLocation.getHost(), pushLocation.getPort(), _tableName));
+        tableConfigURIs.add(FileUploadDownloadClient
+            .getRetrieveTableConfigURI(pushLocation.getHost(), pushLocation.getPort(), _tableName));
       }
     } catch (URISyntaxException e) {
       LOGGER.error("Could not construct table config URI for table {}", _tableName);
@@ -79,7 +80,8 @@ public class ControllerRestApi {
     List<URI> schemaURIs = new ArrayList<>();
     try {
       for (PushLocation pushLocation : _pushLocations) {
-        schemaURIs.add(FileUploadDownloadClient.getRetrieveSchemaHttpURI(pushLocation.getHost(), pushLocation.getPort(), _tableName));
+        schemaURIs.add(FileUploadDownloadClient
+            .getRetrieveSchemaHttpURI(pushLocation.getHost(), pushLocation.getPort(), _tableName));
       }
     } catch (URISyntaxException e) {
       LOGGER.error("Could not construct schema URI for table {}", _tableName);

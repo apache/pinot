@@ -72,7 +72,6 @@ public class PinotURIUploadIntegrationTest extends BaseClusterIntegrationTest {
   private String _tableName;
   private File _metadataDir = new File(_segmentDir, "tmpMeta");
 
-
   @Nonnull
   @Override
   protected String getTableName() {
@@ -80,7 +79,8 @@ public class PinotURIUploadIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   @BeforeClass
-  public void setUp() throws Exception {
+  public void setUp()
+      throws Exception {
     FileUtils.deleteQuietly(_metadataDir);
     FileUtils.deleteQuietly(new File(_metadataDir.getAbsolutePath() + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION));
     // Start an empty Pinot cluster
@@ -91,7 +91,8 @@ public class PinotURIUploadIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   @BeforeMethod
-  public void setupMethod(Object[] args) throws Exception {
+  public void setupMethod(Object[] args)
+      throws Exception {
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
     if (args == null || args.length == 0) {
       return;
@@ -109,10 +110,11 @@ public class PinotURIUploadIntegrationTest extends BaseClusterIntegrationTest {
     }
   }
 
-  protected void generateAndUploadRandomSegment(String segmentName, int rowCount) throws Exception {
+  protected void generateAndUploadRandomSegment(String segmentName, int rowCount)
+      throws Exception {
     ThreadLocalRandom random = ThreadLocalRandom.current();
-    Schema schema = new Schema.Parser().parse(
-        new File(TestUtils.getFileFromResourceUrl(getClass().getClassLoader().getResource("dummy.avsc"))));
+    Schema schema = new Schema.Parser()
+        .parse(new File(TestUtils.getFileFromResourceUrl(getClass().getClassLoader().getResource("dummy.avsc"))));
     GenericRecord record = new GenericData.Record(schema);
     GenericDatumWriter<GenericRecord> datumWriter = new GenericDatumWriter<GenericRecord>(schema);
     DataFileWriter<GenericRecord> fileWriter = new DataFileWriter<GenericRecord>(datumWriter);
@@ -131,8 +133,9 @@ public class PinotURIUploadIntegrationTest extends BaseClusterIntegrationTest {
     File segmentTarDir = new File(_tarDir, segmentName);
     TestUtils.ensureDirectoriesExistAndEmpty(segmentTarDir);
     ExecutorService executor = MoreExecutors.newDirectExecutorService();
-    ClusterIntegrationTestUtils.buildSegmentsFromAvro(Collections.singletonList(avroFile), segmentIndex,
-        new File(_segmentDir, segmentName), segmentTarDir, this._tableName, executor);
+    ClusterIntegrationTestUtils
+        .buildSegmentsFromAvro(Collections.singletonList(avroFile), segmentIndex, new File(_segmentDir, segmentName),
+            segmentTarDir, this._tableName, executor);
     executor.shutdown();
     executor.awaitTermination(1L, TimeUnit.MINUTES);
 
@@ -144,15 +147,13 @@ public class PinotURIUploadIntegrationTest extends BaseClusterIntegrationTest {
 
   @DataProvider(name = "configProvider")
   public Object[][] configProvider() {
-    Object[][] configs = {
-        { "mytable", SegmentVersion.v1},
-        { "yourtable", SegmentVersion.v3}
-    };
+    Object[][] configs = {{"mytable", SegmentVersion.v1}, {"yourtable", SegmentVersion.v3}};
     return configs;
   }
 
   @Test(dataProvider = "configProvider")
-  public void testRefresh(String tableName, SegmentVersion version) throws Exception {
+  public void testRefresh(String tableName, SegmentVersion version)
+      throws Exception {
     final String segment6 = "segmentToBeRefreshed_6";
     final int nRows1 = 69;
     generateAndUploadRandomSegment(segment6, nRows1);
@@ -160,7 +161,8 @@ public class PinotURIUploadIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   // Verify that the number of rows is either the initial value or the final value but not something else.
-  private void verifyNRows(int currentNrows, int finalNrows) throws Exception {
+  private void verifyNRows(int currentNrows, int finalNrows)
+      throws Exception {
     int attempt = 0;
     long sleepTime = 100;
     long nRows;
@@ -184,7 +186,6 @@ public class PinotURIUploadIntegrationTest extends BaseClusterIntegrationTest {
     Assert.fail("Failed to get from " + currentNrows + " to " + finalNrows);
   }
 
-
   @AfterClass
   public void tearDown() {
     stopServer();
@@ -201,7 +202,8 @@ public class PinotURIUploadIntegrationTest extends BaseClusterIntegrationTest {
    *
    * @param segmentDir Segment directory
    */
-  protected void uploadSegmentsDirectly(@Nonnull File segmentDir) throws Exception {
+  protected void uploadSegmentsDirectly(@Nonnull File segmentDir)
+      throws Exception {
     String[] segmentNames = segmentDir.list();
     Assert.assertNotNull(segmentNames);
 
@@ -217,12 +219,13 @@ public class PinotURIUploadIntegrationTest extends BaseClusterIntegrationTest {
 
         tasks.add(executor.submit(new Callable<Integer>() {
           @Override
-          public Integer call() throws Exception {
-            return fileUploadDownloadClient.sendSegmentUri(
-                FileUploadDownloadClient.getUploadSegmentHttpURI(LOCAL_HOST, _controllerPort), downloadUri, httpHeaders, null, 60*1000).getStatusCode();
+          public Integer call()
+              throws Exception {
+            return fileUploadDownloadClient
+                .sendSegmentUri(FileUploadDownloadClient.getUploadSegmentHttpURI(LOCAL_HOST, _controllerPort),
+                    downloadUri, httpHeaders, null, 60 * 1000).getStatusCode();
           }
         }));
-
       }
       for (Future<Integer> task : tasks) {
         Assert.assertEquals((int) task.get(), HttpStatus.SC_OK);
@@ -233,7 +236,8 @@ public class PinotURIUploadIntegrationTest extends BaseClusterIntegrationTest {
     }
   }
 
-  private List<String> getAllSegments(String tablename) throws IOException {
+  private List<String> getAllSegments(String tablename)
+      throws IOException {
     List<String> allSegments = new ArrayList<>();
     HttpHost controllerHttpHost = new HttpHost("localhost", 8998);
     HttpClient controllerClient = new DefaultHttpClient();

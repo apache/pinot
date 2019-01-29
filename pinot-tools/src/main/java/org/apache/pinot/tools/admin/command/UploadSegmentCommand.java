@@ -50,8 +50,7 @@ public class UploadSegmentCommand extends AbstractBaseAdminCommand implements Co
   @Option(name = "-segmentDir", required = true, metaVar = "<string>", usage = "Path to segment directory.")
   private String _segmentDir = null;
 
-  @Option(name = "-help", required = false, help = true, aliases = { "-h", "--h", "--help" },
-      usage = "Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
   private boolean _help = false;
 
   @Override
@@ -66,8 +65,8 @@ public class UploadSegmentCommand extends AbstractBaseAdminCommand implements Co
 
   @Override
   public String toString() {
-    return ("UploadSegment -controllerHost " + _controllerHost + " -controllerPort " + _controllerPort
-        + " -segmentDir " + _segmentDir);
+    return ("UploadSegment -controllerHost " + _controllerHost + " -controllerPort " + _controllerPort + " -segmentDir "
+        + _segmentDir);
   }
 
   @Override
@@ -96,7 +95,8 @@ public class UploadSegmentCommand extends AbstractBaseAdminCommand implements Co
   }
 
   @Override
-  public boolean execute() throws Exception {
+  public boolean execute()
+      throws Exception {
     if (_controllerHost == null) {
       _controllerHost = NetUtil.getHostAddress();
     }
@@ -121,8 +121,8 @@ public class UploadSegmentCommand extends AbstractBaseAdminCommand implements Co
           LOGGER.info("Compressing segment {}", file.getName());
 
           String srcDir = file.getAbsolutePath();
-          String tgzFileName = TarGzCompressionUtils.createTarGzOfDirectory(srcDir,
-              tempDir.getAbsolutePath() + File.separator + file.getName() + TAR_GZIP);
+          String tgzFileName = TarGzCompressionUtils
+              .createTarGzOfDirectory(srcDir, tempDir.getAbsolutePath() + File.separator + file.getName() + TAR_GZIP);
           tgzFile = new File(tgzFileName);
         }
 

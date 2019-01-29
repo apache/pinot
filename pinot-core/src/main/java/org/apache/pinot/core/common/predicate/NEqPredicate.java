@@ -31,11 +31,11 @@ public class NEqPredicate extends Predicate {
 
   @Override
   public String toString() {
-    return "Predicate: type: " + getType() + ", left : " + getLhs() + ", right : " + Arrays.toString(getRhs().toArray(new String[0])) + "\n";
+    return "Predicate: type: " + getType() + ", left : " + getLhs() + ", right : " + Arrays
+        .toString(getRhs().toArray(new String[0])) + "\n";
   }
 
   public String getNotEqualsValue() {
     return getRhs().get(0);
   }
-
 }

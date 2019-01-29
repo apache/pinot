@@ -74,9 +74,7 @@ public class AsyncResponseFuture<T> implements Callback<T>, ServerResponseFuture
    * Response Future State
    */
   public enum State {
-    PENDING,
-    CANCELLED,
-    DONE;
+    PENDING, CANCELLED, DONE;
 
     public boolean isCompleted() {
       return this != PENDING;
@@ -170,7 +168,8 @@ public class AsyncResponseFuture<T> implements Callback<T>, ServerResponseFuture
   }
 
   @Override
-  public Map<ServerInstance, T> get() throws InterruptedException, ExecutionException {
+  public Map<ServerInstance, T> get()
+      throws InterruptedException, ExecutionException {
     try {
       _futureLock.lock();
       while (!_state.isCompleted()) {
@@ -186,7 +185,8 @@ public class AsyncResponseFuture<T> implements Callback<T>, ServerResponseFuture
   }
 
   @Override
-  public T getOne() throws InterruptedException, ExecutionException {
+  public T getOne()
+      throws InterruptedException, ExecutionException {
     try {
       _futureLock.lock();
       while (!_state.isCompleted()) {
@@ -216,9 +216,10 @@ public class AsyncResponseFuture<T> implements Callback<T>, ServerResponseFuture
     try {
       _futureLock.lock();
       while (!_state.isCompleted()) {
-        boolean notElapsed = _finished.await(timeout,unit);
-        if (!notElapsed)
+        boolean notElapsed = _finished.await(timeout, unit);
+        if (!notElapsed) {
           throw new TimeoutException("Timedout waiting for async result for key " + _key);
+        }
       }
     } finally {
       _futureLock.unlock();
@@ -250,7 +251,8 @@ public class AsyncResponseFuture<T> implements Callback<T>, ServerResponseFuture
   }
 
   @Override
-  public Map<ServerInstance, T> get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException {
+  public Map<ServerInstance, T> get(long timeout, TimeUnit unit)
+      throws InterruptedException, ExecutionException, TimeoutException {
     try {
       _futureLock.lock();
       while (!_state.isCompleted()) {

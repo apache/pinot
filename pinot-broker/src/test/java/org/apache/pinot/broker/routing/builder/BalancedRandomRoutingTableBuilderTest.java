@@ -66,7 +66,8 @@ public class BalancedRandomRoutingTableBuilderTest {
   }
 
   @Test
-  public void testDynamicRouting() throws Exception {
+  public void testDynamicRouting()
+      throws Exception {
     String tableNameWithType = "testTable_OFFLINE";
     BalancedRandomRoutingTableBuilder routingTableBuilder = new BalancedRandomRoutingTableBuilder();
 

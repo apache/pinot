@@ -36,15 +36,16 @@ public class RealtimeSegmentConverterTest {
     Schema schema = new Schema();
     FieldSpec spec = new DimensionFieldSpec("col1", FieldSpec.DataType.STRING, true);
     schema.addField(spec);
-    TimeFieldSpec tfs = new TimeFieldSpec("col1", FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS,
-        "col2", FieldSpec.DataType.LONG, TimeUnit.DAYS);
+    TimeFieldSpec tfs =
+        new TimeFieldSpec("col1", FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "col2", FieldSpec.DataType.LONG,
+            TimeUnit.DAYS);
     schema.addField(tfs);
     VirtualColumnProviderFactory.addBuiltInVirtualColumnsToSchema(schema);
     Assert.assertEquals(schema.getColumnNames().size(), 5);
     Assert.assertEquals(schema.getTimeFieldSpec().getIncomingGranularitySpec().getTimeType(), TimeUnit.MILLISECONDS);
 
-    RealtimeSegmentConverter converter = new RealtimeSegmentConverter(null, "", schema,
-        "testTable", "col1", "segment1", "col1");
+    RealtimeSegmentConverter converter =
+        new RealtimeSegmentConverter(null, "", schema, "testTable", "col1", "segment1", "col1");
 
     Schema newSchema = converter.getUpdatedSchema(schema);
     Assert.assertEquals(newSchema.getColumnNames().size(), 2);

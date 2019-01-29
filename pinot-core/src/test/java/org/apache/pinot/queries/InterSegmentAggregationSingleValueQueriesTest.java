@@ -34,20 +34,20 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     String query = "SELECT COUNT(*) FROM testTable";
 
     BrokerResponseNative brokerResponse = getBrokerResponseForQuery(query);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 0L, 120000L,
-        new String[]{"120000"});
+    QueriesTestUtils
+        .testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 0L, 120000L, new String[]{"120000"});
 
     brokerResponse = getBrokerResponseForQueryWithFilter(query);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 24516L, 336536L, 0L, 120000L,
-        new String[]{"24516"});
+    QueriesTestUtils
+        .testInterSegmentAggregationResult(brokerResponse, 24516L, 336536L, 0L, 120000L, new String[]{"24516"});
 
     brokerResponse = getBrokerResponseForQuery(query + GROUP_BY);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 120000L, 120000L,
-        new String[]{"64420"});
+    QueriesTestUtils
+        .testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 120000L, 120000L, new String[]{"64420"});
 
     brokerResponse = getBrokerResponseForQueryWithFilter(query + GROUP_BY);
-    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 24516L, 336536L, 24516L, 120000L,
-        new String[]{"17080"});
+    QueriesTestUtils
+        .testInterSegmentAggregationResult(brokerResponse, 24516L, 336536L, 24516L, 120000L, new String[]{"17080"});
   }
 
   @Test

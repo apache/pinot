@@ -41,5 +41,4 @@ public abstract class StreamConsumerFactoryProvider {
     factory.init(streamConfig);
     return factory;
   }
-
 }

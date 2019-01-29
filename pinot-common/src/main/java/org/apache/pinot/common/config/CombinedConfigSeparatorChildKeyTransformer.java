@@ -47,7 +47,7 @@ public class CombinedConfigSeparatorChildKeyTransformer implements ChildKeyTrans
 
     // Move keys around so that they match with the combined config
     Map<String, Object> remappedConfig = config.flatMap((k, v) -> {
-      if(k.startsWith("table.schema.")) {
+      if (k.startsWith("table.schema.")) {
         // Remove realtime/offline suffixes
         if (k.endsWith(".realtime")) {
           k = k.substring(0, k.length() - ".realtime".length());
@@ -104,13 +104,13 @@ public class CombinedConfigSeparatorChildKeyTransformer implements ChildKeyTrans
 
     // Merge keys realtime/offline key pairs with the same value
     // table.foo.realtime + table.foo.offline -> table.foo?
-    Set<String> realtimeKeySet = remappedConfig.keySet()
-        .filter(key -> key.startsWith("table.") && key.endsWith(".realtime"))
-        .map(key -> key.substring(0, key.lastIndexOf(".realtime")));
+    Set<String> realtimeKeySet =
+        remappedConfig.keySet().filter(key -> key.startsWith("table.") && key.endsWith(".realtime"))
+            .map(key -> key.substring(0, key.lastIndexOf(".realtime")));
 
-    Set<String> offlineKeySet = remappedConfig.keySet()
-        .filter(key -> key.startsWith("table.") && key.endsWith(".offline"))
-        .map(key -> key.substring(0, key.lastIndexOf(".offline")));
+    Set<String> offlineKeySet =
+        remappedConfig.keySet().filter(key -> key.startsWith("table.") && key.endsWith(".offline"))
+            .map(key -> key.substring(0, key.lastIndexOf(".offline")));
 
     Set<String> commonOfflineAndRealtimeKeys = realtimeKeySet.intersect(offlineKeySet);
 
@@ -122,10 +122,8 @@ public class CombinedConfigSeparatorChildKeyTransformer implements ChildKeyTrans
       Object offlineValue = remappedConfig.getOrElse(offlineKey, null);
 
       if (EqualityUtils.isEqual(offlineValue, realtimeValue)) {
-        remappedConfig = remappedConfig
-            .remove(realtimeKey)
-            .remove(offlineKey)
-            .put(commonOfflineAndRealtimeKey, offlineValue);
+        remappedConfig =
+            remappedConfig.remove(realtimeKey).remove(offlineKey).put(commonOfflineAndRealtimeKey, offlineValue);
       }
     }
 

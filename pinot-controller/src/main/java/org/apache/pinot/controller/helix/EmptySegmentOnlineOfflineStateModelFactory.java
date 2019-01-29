@@ -32,7 +32,8 @@ public class EmptySegmentOnlineOfflineStateModelFactory extends StateModelFactor
 
   @Override
   public StateModel createNewStateModel(String partitionName) {
-    final EmptySegmentOnlineOfflineStateModel SegmentOnlineOfflineStateModel = new EmptySegmentOnlineOfflineStateModel();
+    final EmptySegmentOnlineOfflineStateModel SegmentOnlineOfflineStateModel =
+        new EmptySegmentOnlineOfflineStateModel();
     return SegmentOnlineOfflineStateModel;
   }
 
@@ -77,5 +78,4 @@ public class EmptySegmentOnlineOfflineStateModelFactory extends StateModelFactor
       LOGGER.info("EmptySegmentOnlineOfflineStateModel.onBecomeDroppedFromConsuming() : " + message);
     }
   }
-
 }

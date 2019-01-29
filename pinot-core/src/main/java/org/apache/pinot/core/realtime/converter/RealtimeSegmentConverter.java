@@ -82,7 +82,8 @@ public class RealtimeSegmentConverter {
         new ArrayList<>(), null/*StarTreeIndexSpec*/);
   }
 
-  public void build(@Nullable SegmentVersion segmentVersion, ServerMetrics serverMetrics) throws Exception {
+  public void build(@Nullable SegmentVersion segmentVersion, ServerMetrics serverMetrics)
+      throws Exception {
     // lets create a record reader
     RealtimeSegmentRecordReader reader;
     if (sortedColumn == null) {
@@ -145,8 +146,7 @@ public class RealtimeSegmentConverter {
    * and adds the new timespec to the schema.
    */
   @VisibleForTesting
-  public
-  Schema getUpdatedSchema(Schema original) {
+  public Schema getUpdatedSchema(Schema original) {
 
     TimeFieldSpec tfs = original.getTimeFieldSpec();
     // Use outgoing granularity for creating segment

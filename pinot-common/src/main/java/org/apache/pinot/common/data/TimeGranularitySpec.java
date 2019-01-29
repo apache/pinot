@@ -94,8 +94,8 @@ public class TimeGranularitySpec {
     Preconditions.checkNotNull(timeType);
     Preconditions.checkNotNull(name);
     Preconditions.checkNotNull(timeFormat);
-    Preconditions.checkArgument(timeFormat.equals(TimeFormat.EPOCH.toString()) || (timeFormat.startsWith(
-        TimeFormat.SIMPLE_DATE_FORMAT.toString())));
+    Preconditions.checkArgument(timeFormat.equals(TimeFormat.EPOCH.toString()) || (timeFormat
+        .startsWith(TimeFormat.SIMPLE_DATE_FORMAT.toString())));
 
     _dataType = dataType.getStoredType();
     _timeType = timeType;
@@ -119,8 +119,8 @@ public class TimeGranularitySpec {
     Preconditions.checkNotNull(timeType);
     Preconditions.checkNotNull(name);
     Preconditions.checkNotNull(timeFormat);
-    Preconditions.checkArgument(timeFormat.equals(TimeFormat.EPOCH.toString()) || (timeFormat.startsWith(
-        TimeFormat.SIMPLE_DATE_FORMAT.toString())));
+    Preconditions.checkArgument(timeFormat.equals(TimeFormat.EPOCH.toString()) || (timeFormat
+        .startsWith(TimeFormat.SIMPLE_DATE_FORMAT.toString())));
 
     _dataType = dataType.getStoredType();
     _timeType = timeType;

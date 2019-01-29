@@ -103,8 +103,8 @@ public class SegmentSizeBasedFlushThresholdUpdater implements FlushThresholdUpda
             _latestSegmentRowsToSizeRatio, newSegmentName, targetSegmentNumRows);
         newSegmentZKMetadata.setSizeThresholdToFlushSegment((int) targetSegmentNumRows);
       } else {
-        LOGGER.info("Committing segment zk metadata is not available, setting threshold for {} as {}",
-            newSegmentName, INITIAL_ROWS_THRESHOLD);
+        LOGGER.info("Committing segment zk metadata is not available, setting threshold for {} as {}", newSegmentName,
+            INITIAL_ROWS_THRESHOLD);
         newSegmentZKMetadata.setSizeThresholdToFlushSegment(INITIAL_ROWS_THRESHOLD);
       }
       return;
@@ -113,8 +113,7 @@ public class SegmentSizeBasedFlushThresholdUpdater implements FlushThresholdUpda
     long committingSegmentSizeBytes = committingSegmentDescriptor.getSegmentSizeBytes();
     if (committingSegmentSizeBytes <= 0) { // repair segment case
       final int targetNumRows = committingSegmentZKMetadata.getSizeThresholdToFlushSegment();
-      LOGGER.info(
-          "Committing segment size is not available, setting thresholds from previous segment for {} as {}",
+      LOGGER.info("Committing segment size is not available, setting thresholds from previous segment for {} as {}",
           newSegmentZKMetadata.getSegmentName(), targetNumRows);
       newSegmentZKMetadata.setSizeThresholdToFlushSegment(targetNumRows);
       return;
@@ -134,7 +133,8 @@ public class SegmentSizeBasedFlushThresholdUpdater implements FlushThresholdUpda
     // less same characteristics at any one point in time).
     // However, when we start a new table or change controller mastership, we can have any partition completing first.
     // It is best to learn the ratio as quickly as we can, so we allow any partition to supply the value.
-    if (new LLCSegmentName(committingSegmentZKMetadata.getSegmentName()).getPartitionId() == 0 || _latestSegmentRowsToSizeRatio == 0) {
+    if (new LLCSegmentName(committingSegmentZKMetadata.getSegmentName()).getPartitionId() == 0
+        || _latestSegmentRowsToSizeRatio == 0) {
       if (_latestSegmentRowsToSizeRatio > 0) {
         _latestSegmentRowsToSizeRatio =
             CURRENT_SEGMENT_RATIO_WEIGHT * currentRatio + PREVIOUS_SEGMENT_RATIO_WEIGHT * _latestSegmentRowsToSizeRatio;
@@ -170,7 +170,7 @@ public class SegmentSizeBasedFlushThresholdUpdater implements FlushThresholdUpda
     }
     targetSegmentNumRows = capNumRowsIfOverflow(targetSegmentNumRows);
     LOGGER.info("Committing segment size {}, current ratio {}, setting threshold for {} as {}",
-      committingSegmentSizeBytes, _latestSegmentRowsToSizeRatio, newSegmentName, targetSegmentNumRows);
+        committingSegmentSizeBytes, _latestSegmentRowsToSizeRatio, newSegmentName, targetSegmentNumRows);
 
     newSegmentZKMetadata.setSizeThresholdToFlushSegment((int) targetSegmentNumRows);
   }

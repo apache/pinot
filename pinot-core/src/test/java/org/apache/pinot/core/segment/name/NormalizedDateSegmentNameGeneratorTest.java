@@ -37,7 +37,8 @@ public class NormalizedDateSegmentNameGeneratorTest {
   private static final String REFRESH_PUSH_TYPE = "REFRESH";
 
   @Test
-  public void testAppend() throws Exception {
+  public void testAppend()
+      throws Exception {
     ColumnStatistics columnStatisticsClass = Mockito.mock(ColumnStatistics.class);
     when(columnStatisticsClass.getMaxValue()).thenReturn(3L);
     when(columnStatisticsClass.getMinValue()).thenReturn(1L);
@@ -49,7 +50,8 @@ public class NormalizedDateSegmentNameGeneratorTest {
   }
 
   @Test
-  public void testAppendWithPrefix() throws Exception {
+  public void testAppendWithPrefix()
+      throws Exception {
     ColumnStatistics columnStatisticsClass = Mockito.mock(ColumnStatistics.class);
     when(columnStatisticsClass.getMaxValue()).thenReturn(3L);
     when(columnStatisticsClass.getMinValue()).thenReturn(1L);
@@ -61,7 +63,8 @@ public class NormalizedDateSegmentNameGeneratorTest {
   }
 
   @Test
-  public void testRefresh() throws Exception {
+  public void testRefresh()
+      throws Exception {
     ColumnStatistics columnStatisticsClass = Mockito.mock(ColumnStatistics.class);
     when(columnStatisticsClass.getMaxValue()).thenReturn(3L);
     when(columnStatisticsClass.getMinValue()).thenReturn(1L);
@@ -72,7 +75,8 @@ public class NormalizedDateSegmentNameGeneratorTest {
   }
 
   @Test
-  public void testNoSequenceIdWithParameter() throws Exception {
+  public void testNoSequenceIdWithParameter()
+      throws Exception {
     ColumnStatistics columnStatisticsClass = Mockito.mock(ColumnStatistics.class);
     when(columnStatisticsClass.getMaxValue()).thenReturn(3L);
     when(columnStatisticsClass.getMinValue()).thenReturn(1L);
@@ -83,7 +87,8 @@ public class NormalizedDateSegmentNameGeneratorTest {
   }
 
   @Test
-  public void testRefreshWithPrefixNoSequenceId() throws Exception {
+  public void testRefreshWithPrefixNoSequenceId()
+      throws Exception {
     ColumnStatistics columnStatisticsClass = Mockito.mock(ColumnStatistics.class);
     when(columnStatisticsClass.getMaxValue()).thenReturn(3L);
     when(columnStatisticsClass.getMinValue()).thenReturn(1L);
@@ -94,7 +99,8 @@ public class NormalizedDateSegmentNameGeneratorTest {
   }
 
   @Test
-  public void testAppendWithPrefixNoSequenceId() throws Exception {
+  public void testAppendWithPrefixNoSequenceId()
+      throws Exception {
     ColumnStatistics columnStatisticsClass = Mockito.mock(ColumnStatistics.class);
     when(columnStatisticsClass.getMaxValue()).thenReturn(3L);
     when(columnStatisticsClass.getMinValue()).thenReturn(1L);
@@ -106,7 +112,8 @@ public class NormalizedDateSegmentNameGeneratorTest {
   }
 
   @Test
-  public void testMirrorShare() throws Exception {
+  public void testMirrorShare()
+      throws Exception {
     ColumnStatistics columnStatisticsClass = Mockito.mock(ColumnStatistics.class);
     when(columnStatisticsClass.getMaxValue()).thenReturn(3L);
     when(columnStatisticsClass.getMinValue()).thenReturn(1L);
@@ -118,7 +125,8 @@ public class NormalizedDateSegmentNameGeneratorTest {
   }
 
   @Test
-  public void testUntrimmedPrefix() throws Exception {
+  public void testUntrimmedPrefix()
+      throws Exception {
     ColumnStatistics columnStatisticsClass = Mockito.mock(ColumnStatistics.class);
     when(columnStatisticsClass.getMaxValue()).thenReturn(3L);
     when(columnStatisticsClass.getMinValue()).thenReturn(1L);
@@ -130,7 +138,8 @@ public class NormalizedDateSegmentNameGeneratorTest {
   }
 
   @Test
-  public void testSimpleDateFormat() throws Exception {
+  public void testSimpleDateFormat()
+      throws Exception {
     ColumnStatistics columnStatisticsClass = Mockito.mock(ColumnStatistics.class);
     when(columnStatisticsClass.getMaxValue()).thenReturn(19700104);
     when(columnStatisticsClass.getMinValue()).thenReturn(19700102);

@@ -32,7 +32,8 @@ public class BrokerTestUtils {
     return DefaultHelixBrokerConfig.getDefaultBrokerConf();
   }
 
-  public static HelixBrokerStarter startBroker(final String clusterName, final String zkStr, final Configuration configuration) {
+  public static HelixBrokerStarter startBroker(final String clusterName, final String zkStr,
+      final Configuration configuration) {
     try {
       return new HelixBrokerStarter(clusterName, zkStr, configuration);
     } catch (Exception e) {

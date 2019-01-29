@@ -47,8 +47,7 @@ public class VerifySegmentState extends AbstractBaseCommand implements Command {
   @Option(name = "-tablePrefix", required = false, metaVar = "<String>", usage = "Table name prefix. (Ex: myTable, my or myTable_OFFLINE)")
   String tablePrefix = "";
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
-      usage = "Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
   private boolean help = false;
 
   public boolean getHelp() {
@@ -100,8 +99,8 @@ public class VerifySegmentState extends AbstractBaseCommand implements Command {
           Map<String, String> segmentIdealState = idealEntry.getValue();
           // try to format consistently for tool based parsing
           if (!mapFieldsFromEV.containsKey(segmentName)) {
-            LOGGER.info("Segment: {} idealstate: {} is MISSING in external view: {}", segmentName, segmentIdealState,
-                "");
+            LOGGER
+                .info("Segment: {} idealstate: {} is MISSING in external view: {}", segmentName, segmentIdealState, "");
           }
           Map<String, String> segmentExternalView = mapFieldsFromEV.get(segmentName);
 

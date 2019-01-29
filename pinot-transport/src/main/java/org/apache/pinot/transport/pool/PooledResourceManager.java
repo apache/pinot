@@ -55,5 +55,4 @@ public interface PooledResourceManager<T> {
    * @return
    */
   public boolean validate(ServerInstance key, T resource);
-
 }

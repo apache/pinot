@@ -212,7 +212,8 @@ public class PinotTableRestletResource {
         tableExists = true;
 
         offline.put(FileUploadPathProvider.TABLE_NAME, offlineTableName);
-        offline.set(FileUploadPathProvider.STATE, JsonUtils.objectToJsonNode(toggleTableState(offlineTableName, stateStr)));
+        offline.set(FileUploadPathProvider.STATE,
+            JsonUtils.objectToJsonNode(toggleTableState(offlineTableName, stateStr)));
         ret.add(offline);
       }
 
@@ -223,7 +224,8 @@ public class PinotTableRestletResource {
         tableExists = true;
 
         realTime.put(FileUploadPathProvider.TABLE_NAME, realTimeTableName);
-        realTime.set(FileUploadPathProvider.STATE, JsonUtils.objectToJsonNode(toggleTableState(realTimeTableName, stateStr)));
+        realTime.set(FileUploadPathProvider.STATE,
+            JsonUtils.objectToJsonNode(toggleTableState(realTimeTableName, stateStr)));
         ret.add(realTime);
       }
       if (tableExists) {
@@ -266,7 +268,8 @@ public class PinotTableRestletResource {
   @ApiOperation(value = "Updates table config for a table", notes = "Updates table config for a table")
   public SuccessResponse updateTableConfig(
       @ApiParam(value = "Name of the table to update", required = true) @PathParam("tableName") String tableName,
-      String tableConfigStr) throws Exception {
+      String tableConfigStr)
+      throws Exception {
     TableConfig tableConfig;
     try {
       tableConfig = TableConfig.fromJsonString(tableConfigStr);
@@ -322,11 +325,11 @@ public class PinotTableRestletResource {
       ObjectNode tableConfigValidateStr = JsonUtils.newObjectNode();
       TableConfig tableConfig = TableConfig.fromJsonString(tableConfigStr);
       if (tableConfig.getTableType() == CommonConstants.Helix.TableType.OFFLINE) {
-        tableConfigValidateStr.set(CommonConstants.Helix.TableType.OFFLINE.name(),
-            TableConfig.toJSONConfig(tableConfig));
+        tableConfigValidateStr
+            .set(CommonConstants.Helix.TableType.OFFLINE.name(), TableConfig.toJSONConfig(tableConfig));
       } else {
-        tableConfigValidateStr.set(CommonConstants.Helix.TableType.REALTIME.name(),
-            TableConfig.toJSONConfig(tableConfig));
+        tableConfigValidateStr
+            .set(CommonConstants.Helix.TableType.REALTIME.name(), TableConfig.toJSONConfig(tableConfig));
       }
       return tableConfigValidateStr.toString();
     } catch (Exception e) {
@@ -436,16 +439,16 @@ public class PinotTableRestletResource {
     String newTimeColumnName = newSegmentConfig.getTimeColumnName();
     String existingTimeColumnName = SegmentConfigToCompare.getTimeColumnName();
     if (!existingTimeColumnName.equals(newTimeColumnName)) {
-      throw new PinotHelixResourceManager.InvalidTableConfigException(
-          String.format("Time column names are different! Existing time column name: %s. New time column name: %s",
+      throw new PinotHelixResourceManager.InvalidTableConfigException(String
+          .format("Time column names are different! Existing time column name: %s. New time column name: %s",
               existingTimeColumnName, newTimeColumnName));
     }
 
     String newTimeColumnType = newSegmentConfig.getTimeType();
     String existingTimeColumnType = SegmentConfigToCompare.getTimeType();
     if (!existingTimeColumnType.equalsIgnoreCase(newTimeColumnType)) {
-      throw new PinotHelixResourceManager.InvalidTableConfigException(
-          String.format("Time column types are different! Existing time column type: %s. New time column type: %s",
+      throw new PinotHelixResourceManager.InvalidTableConfigException(String
+          .format("Time column types are different! Existing time column type: %s. New time column type: %s",
               existingTimeColumnType, newTimeColumnType));
     }
 

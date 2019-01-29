@@ -50,7 +50,7 @@ public class HeaderAdder implements ContainerRequestFilter {
       // If we post a new instance, that is in JSON
       // But if we enable/disable the state of an instance, that is plain text.
       String[] pathParts = path.split("/");
-      if (pathParts[pathParts.length-1].equals("state")) {
+      if (pathParts[pathParts.length - 1].equals("state")) {
         return MediaType.TEXT_PLAIN;
       }
       return MediaType.APPLICATION_JSON;
@@ -59,7 +59,8 @@ public class HeaderAdder implements ContainerRequestFilter {
   }
 
   @Override
-  public void filter(ContainerRequestContext req) throws IOException {
+  public void filter(ContainerRequestContext req)
+      throws IOException {
     {
       // TODO HACK TO BE REMOVED ONCE CLIENTS HAVE UPGRADED TO NEW THIRD-EYE JAR
       // When a client sends an HTTP request without the leading slash (e.g. "GET tables HTTP/1.1")
@@ -83,8 +84,9 @@ public class HeaderAdder implements ContainerRequestFilter {
           // In the example described above, relativeUri will be "tables"
           if (!relativeUri.startsWith("/")) {
             URI newReqUri = new URI(baseUriWithoutSlash + "/" + relativeUri);
-            LOGGER.warn("Rewriting new Request URI {} (incomingBaseUri = {}, incomingReqUri = {})",
-                newReqUri.toString(), incomingBaseUri, incomingReqUri);
+            LOGGER
+                .warn("Rewriting new Request URI {} (incomingBaseUri = {}, incomingReqUri = {})", newReqUri.toString(),
+                    incomingBaseUri, incomingReqUri);
             req.setRequestUri(newReqUri);
           }
         }
@@ -95,8 +97,7 @@ public class HeaderAdder implements ContainerRequestFilter {
 
     // Add outgoing headers if this is a PUT or a POST
     String path = req.getUriInfo().getPath();
-    if ((req.getMethod().equalsIgnoreCase("PUT") ||
-        req.getMethod().equalsIgnoreCase("POST"))) {
+    if ((req.getMethod().equalsIgnoreCase("PUT") || req.getMethod().equalsIgnoreCase("POST"))) {
       String mediaType = modifiedContentType(path);
       if (mediaType != null) {
         req.getHeaders().remove(HttpHeaders.CONTENT_TYPE);

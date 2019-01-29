@@ -36,9 +36,9 @@ public class StringSelectionColumnIterator implements SelectionColumnIterator {
 
   public StringSelectionColumnIterator(Block block) {
     _dataType = block.getMetadata().getDataType();
-    Preconditions.checkArgument(
-        _dataType.equals(FieldSpec.DataType.STRING) || _dataType.equals(FieldSpec.DataType.BYTES),
-        "Illegal data type for StringSelectionColumnIterator: " + _dataType);
+    Preconditions
+        .checkArgument(_dataType.equals(FieldSpec.DataType.STRING) || _dataType.equals(FieldSpec.DataType.BYTES),
+            "Illegal data type for StringSelectionColumnIterator: " + _dataType);
     bvIter = (BlockSingleValIterator) block.getBlockValueSet().iterator();
   }
 

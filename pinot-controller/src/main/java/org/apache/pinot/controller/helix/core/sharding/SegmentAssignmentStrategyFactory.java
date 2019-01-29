@@ -43,5 +43,4 @@ public class SegmentAssignmentStrategyFactory {
         return new BalanceNumSegmentAssignmentStrategy();
     }
   }
-
 }

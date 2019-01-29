@@ -45,14 +45,14 @@ public class AvroDataPublisherTest {
   private final String AVRO_MULTI_DATA = "data/test_sample_data_multi_value.avro";
 
   @Test
-  public void TestReadAvro() throws Exception {
+  public void TestReadAvro()
+      throws Exception {
 
     final String filePath = TestUtils.getFileFromResourceUrl(getClass().getClassLoader().getResource(AVRO_DATA));
     final String jsonPath = TestUtils.getFileFromResourceUrl(getClass().getClassLoader().getResource(JSON_DATA));
 
-    Schema schema =
-        new Schema.SchemaBuilder().addSingleValueDimension("column3", DataType.STRING)
-            .addSingleValueDimension("column2", DataType.STRING).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("column3", DataType.STRING)
+        .addSingleValueDimension("column2", DataType.STRING).build();
 
     final SegmentGeneratorConfig config = new SegmentGeneratorConfig(schema);
     config.setFormat(FileFormat.AVRO);
@@ -82,7 +82,8 @@ public class AvroDataPublisherTest {
   }
 
   @Test
-  public void TestReadPartialAvro() throws Exception {
+  public void TestReadPartialAvro()
+      throws Exception {
     final String filePath = TestUtils.getFileFromResourceUrl(getClass().getClassLoader().getResource(AVRO_DATA));
     final String jsonPath = TestUtils.getFileFromResourceUrl(getClass().getClassLoader().getResource(JSON_DATA));
 
@@ -90,9 +91,8 @@ public class AvroDataPublisherTest {
     projectedColumns.add("column3");
     projectedColumns.add("column2");
 
-    Schema schema =
-        new Schema.SchemaBuilder().addSingleValueDimension("column3", DataType.STRING)
-            .addSingleValueDimension("column2", DataType.STRING).build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("column3", DataType.STRING)
+        .addSingleValueDimension("column2", DataType.STRING).build();
     final SegmentGeneratorConfig config = new SegmentGeneratorConfig(schema);
 
     config.setFormat(FileFormat.AVRO);
@@ -123,7 +123,8 @@ public class AvroDataPublisherTest {
   }
 
   @Test
-  public void TestReadMultiValueAvro() throws Exception {
+  public void TestReadMultiValueAvro()
+      throws Exception {
 
     final String filePath = TestUtils.getFileFromResourceUrl(getClass().getClassLoader().getResource(AVRO_MULTI_DATA));
 
@@ -158,7 +159,6 @@ public class AvroDataPublisherTest {
           }
           valueStringFromAvro += "]";
         }
-
       }
       cnt++;
     }

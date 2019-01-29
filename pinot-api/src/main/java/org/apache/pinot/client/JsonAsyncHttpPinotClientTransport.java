@@ -41,7 +41,8 @@ class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
   AsyncHttpClient _httpClient = new AsyncHttpClient();
 
   @Override
-  public BrokerResponse executeQuery(String brokerAddress, String query) throws PinotClientException {
+  public BrokerResponse executeQuery(String brokerAddress, String query)
+      throws PinotClientException {
     try {
       return executeQueryAsync(brokerAddress, query).get();
     } catch (Exception e) {
@@ -92,12 +93,14 @@ class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
     }
 
     @Override
-    public BrokerResponse get() throws ExecutionException {
+    public BrokerResponse get()
+        throws ExecutionException {
       return get(1000L, TimeUnit.DAYS);
     }
 
     @Override
-    public BrokerResponse get(long timeout, TimeUnit unit) throws ExecutionException {
+    public BrokerResponse get(long timeout, TimeUnit unit)
+        throws ExecutionException {
       try {
         LOGGER.debug("Sending query {} to {}", _query, _url);
 

@@ -52,13 +52,14 @@ public class QuerySchedulerFactory {
    * @param queryExecutor QueryExecutor to use
    * @return returns an instance of query scheduler
    */
-  public static @Nonnull  QueryScheduler create(@Nonnull Configuration schedulerConfig,
-      @Nonnull QueryExecutor queryExecutor, ServerMetrics serverMetrics, @Nonnull LongAccumulator latestQueryTime) {
+  public static @Nonnull
+  QueryScheduler create(@Nonnull Configuration schedulerConfig, @Nonnull QueryExecutor queryExecutor,
+      ServerMetrics serverMetrics, @Nonnull LongAccumulator latestQueryTime) {
     Preconditions.checkNotNull(schedulerConfig);
     Preconditions.checkNotNull(queryExecutor);
 
-    String schedulerName = schedulerConfig.getString(ALGORITHM_NAME_CONFIG_KEY,
-        DEFAULT_QUERY_SCHEDULER_ALGORITHM).toLowerCase();
+    String schedulerName =
+        schedulerConfig.getString(ALGORITHM_NAME_CONFIG_KEY, DEFAULT_QUERY_SCHEDULER_ALGORITHM).toLowerCase();
     if (schedulerName.equals(FCFS_ALGORITHM)) {
       LOGGER.info("Using FCFS query scheduler");
       return new FCFSQueryScheduler(schedulerConfig, queryExecutor, serverMetrics, latestQueryTime);
@@ -84,7 +85,8 @@ public class QuerySchedulerFactory {
     return new FCFSQueryScheduler(schedulerConfig, queryExecutor, serverMetrics, latestQueryTime);
   }
 
-  private static @Nullable QueryScheduler getQuerySchedulerByClassName(String className, Configuration schedulerConfig,
+  private static @Nullable
+  QueryScheduler getQuerySchedulerByClassName(String className, Configuration schedulerConfig,
       QueryExecutor queryExecutor) {
     try {
       Constructor<?> constructor =

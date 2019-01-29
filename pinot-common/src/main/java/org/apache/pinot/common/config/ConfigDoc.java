@@ -28,7 +28,10 @@ import java.lang.annotation.RetentionPolicy;
 @Retention(RetentionPolicy.RUNTIME)
 public @interface ConfigDoc {
   String value();
+
   String exampleValue() default "";
+
   boolean mandatory() default false;
+
   int order() default Integer.MAX_VALUE;
 }
