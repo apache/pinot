@@ -45,7 +45,8 @@ public class CommittingSegmentDescriptor {
     _segmentSizeBytes = segmentSizeBytes;
   }
 
-  public CommittingSegmentDescriptor(String segmentName, long nextOffset, long segmentSizeBytes, String segmentLocation) {
+  public CommittingSegmentDescriptor(String segmentName, long nextOffset, long segmentSizeBytes,
+      String segmentLocation) {
     this(segmentName, nextOffset, segmentSizeBytes);
     _segmentLocation = segmentLocation;
   }

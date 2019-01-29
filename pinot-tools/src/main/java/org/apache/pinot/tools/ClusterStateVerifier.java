@@ -53,7 +53,8 @@ public class ClusterStateVerifier extends PinotZKChanger {
     final ExecutorService executor = Executors.newSingleThreadExecutor();
     final Future<Boolean> future = executor.submit(new Callable<Boolean>() {
       @Override
-      public Boolean call() throws Exception {
+      public Boolean call()
+          throws Exception {
         return waitForClusterStable(tableNames, timeoutSec);
       }
     });
@@ -81,13 +82,13 @@ public class ClusterStateVerifier extends PinotZKChanger {
    * @return
    */
   private boolean waitForClusterStable(final List<String> tableNames, final long timeoutSec)
-      throws InterruptedException{
+      throws InterruptedException {
     final long startTimeMillis = System.currentTimeMillis();
     final long maxEndTimeMillis = startTimeMillis + TimeUnit.MILLISECONDS.convert(timeoutSec, TimeUnit.SECONDS);
 
     boolean stable = false;
     int iteration = 0;
-    long sleepTimeMillis = (maxEndTimeMillis - startTimeMillis)/10;
+    long sleepTimeMillis = (maxEndTimeMillis - startTimeMillis) / 10;
     if (sleepTimeMillis < MIN_SLEEP_BETWEEN_CHECKS_MILLIS) {
       sleepTimeMillis = MIN_SLEEP_BETWEEN_CHECKS_MILLIS;
     } else if (sleepTimeMillis > MAX_SLEEP_BETWEEN_CHECKS_MILLIS) {
@@ -96,8 +97,7 @@ public class ClusterStateVerifier extends PinotZKChanger {
 
     while (!stable) {
       iteration++;
-      LOGGER.info("Start scanning the stability of {} tables, iteration {}",
-          tableNames.size(), iteration);
+      LOGGER.info("Start scanning the stability of {} tables, iteration {}", tableNames.size(), iteration);
       int numUnstablePartitions = 0;
       for (String tableName : tableNames) {
         numUnstablePartitions = super.isStable(tableName);

@@ -75,7 +75,8 @@ public abstract class BaseMultiValueQueriesTest extends BaseQueriesTest {
   private List<SegmentDataManager> _segmentDataManagers;
 
   @BeforeTest
-  public void buildSegment() throws Exception {
+  public void buildSegment()
+      throws Exception {
     FileUtils.deleteQuietly(INDEX_DIR);
 
     // Get resource file path.
@@ -84,17 +85,13 @@ public abstract class BaseMultiValueQueriesTest extends BaseQueriesTest {
     String filePath = resource.getFile();
 
     // Build the segment schema.
-    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable")
-        .addMetric("column1", FieldSpec.DataType.INT)
-        .addMetric("column2", FieldSpec.DataType.INT)
-        .addSingleValueDimension("column3", FieldSpec.DataType.STRING)
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable").addMetric("column1", FieldSpec.DataType.INT)
+        .addMetric("column2", FieldSpec.DataType.INT).addSingleValueDimension("column3", FieldSpec.DataType.STRING)
         .addSingleValueDimension("column5", FieldSpec.DataType.STRING)
         .addMultiValueDimension("column6", FieldSpec.DataType.INT)
         .addMultiValueDimension("column7", FieldSpec.DataType.INT)
-        .addSingleValueDimension("column8", FieldSpec.DataType.INT)
-        .addMetric("column9", FieldSpec.DataType.INT)
-        .addMetric("column10", FieldSpec.DataType.INT)
-        .addTime("daysSinceEpoch", TimeUnit.DAYS, FieldSpec.DataType.INT)
+        .addSingleValueDimension("column8", FieldSpec.DataType.INT).addMetric("column9", FieldSpec.DataType.INT)
+        .addMetric("column10", FieldSpec.DataType.INT).addTime("daysSinceEpoch", TimeUnit.DAYS, FieldSpec.DataType.INT)
         .build();
 
     // Create the segment generator config.
@@ -111,11 +108,12 @@ public abstract class BaseMultiValueQueriesTest extends BaseQueriesTest {
   }
 
   @BeforeClass
-  public void loadSegment() throws Exception {
+  public void loadSegment()
+      throws Exception {
     ImmutableSegment immutableSegment = ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), ReadMode.heap);
     _indexSegment = immutableSegment;
-    _segmentDataManagers =
-        Arrays.asList(new ImmutableSegmentDataManager(immutableSegment), new ImmutableSegmentDataManager(immutableSegment));
+    _segmentDataManagers = Arrays
+        .asList(new ImmutableSegmentDataManager(immutableSegment), new ImmutableSegmentDataManager(immutableSegment));
   }
 
   @AfterClass

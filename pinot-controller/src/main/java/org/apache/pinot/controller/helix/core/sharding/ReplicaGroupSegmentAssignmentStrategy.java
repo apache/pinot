@@ -51,8 +51,9 @@ public class ReplicaGroupSegmentAssignmentStrategy implements SegmentAssignmentS
   private static final Random RANDOM = new Random();
 
   @Override
-  public List<String> getAssignedInstances(HelixManager helixManager, HelixAdmin helixAdmin, ZkHelixPropertyStore<ZNRecord> propertyStore,
-      String helixClusterName, SegmentMetadata segmentMetadata, int numReplicas, String tenantName) {
+  public List<String> getAssignedInstances(HelixManager helixManager, HelixAdmin helixAdmin,
+      ZkHelixPropertyStore<ZNRecord> propertyStore, String helixClusterName, SegmentMetadata segmentMetadata,
+      int numReplicas, String tenantName) {
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(segmentMetadata.getTableName());
 
     // Fetch the partition mapping table from the property store.
@@ -67,16 +68,13 @@ public class ReplicaGroupSegmentAssignmentStrategy implements SegmentAssignmentS
         tableConfig.getValidationConfig().getReplicaGroupStrategyConfig();
     boolean mirrorAssignmentAcrossReplicaGroups = replicaGroupStrategyConfig.getMirrorAssignmentAcrossReplicaGroups();
 
-    String partitionColumn = replicaGroupStrategyConfig.getPartitionColumn();
-
     int partitionNumber = 0;
+    String partitionColumn = replicaGroupStrategyConfig.getPartitionColumn();
     if (partitionColumn != null) {
-      // TODO: Need to address when we have multiple partition numbers.
+      // TODO: support multiple partitions
       partitionNumber =
-          ((SegmentMetadataImpl) segmentMetadata).getColumnMetadataFor(replicaGroupStrategyConfig.getPartitionColumn())
-              .getPartitionRanges()
-              .get(0)
-              .getMaximumInteger();
+          ((SegmentMetadataImpl) segmentMetadata).getColumnMetadataFor(partitionColumn).getPartitions().iterator()
+              .next();
     }
 
     // Perform the segment assignment.
@@ -100,8 +98,8 @@ public class ReplicaGroupSegmentAssignmentStrategy implements SegmentAssignmentS
       selectedInstanceList.add(instancesInReplicaGroup.get(index));
     }
 
-    LOGGER.info("Segment assignment result for : " + segmentMetadata.getName() + ", in resource : "
-        + segmentMetadata.getTableName() + ", selected instances: " + Arrays.toString(selectedInstanceList.toArray()));
+    LOGGER.info("Segment assignment result for : " + segmentMetadata.getName() + ", in resource : " + segmentMetadata
+        .getTableName() + ", selected instances: " + Arrays.toString(selectedInstanceList.toArray()));
 
     return selectedInstanceList;
   }

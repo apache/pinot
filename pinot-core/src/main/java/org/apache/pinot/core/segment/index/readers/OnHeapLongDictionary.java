@@ -71,8 +71,8 @@ public class OnHeapLongDictionary extends OnHeapDictionary {
       value = (Long) rawValue;
     } else {
       throw new IllegalArgumentException(
-          "Illegal data type for argument, actual: " + rawValue.getClass().getName() + " expected: "
-              + Long.class.getName());
+          "Illegal data type for argument, actual: " + rawValue.getClass().getName() + " expected: " + Long.class
+              .getName());
     }
     return value;
   }

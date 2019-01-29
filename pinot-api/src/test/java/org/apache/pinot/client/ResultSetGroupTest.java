@@ -55,14 +55,16 @@ public class ResultSetGroupTest {
   }
 
   @Test
-  public void testDeserializeAggregationResultSet() throws Exception {
+  public void testDeserializeAggregationResultSet()
+      throws Exception {
     // Deserialize aggregation result
     ResultSetGroup resultSetGroup = getResultSet("aggregation.json");
 
     // Check length and number of result groups
     Assert.assertEquals(resultSetGroup.getResultSetCount(), 1, "Result set count mismatch");
     ResultSet resultSet = resultSetGroup.getResultSet(0);
-    Assert.assertEquals(resultSet.getGroupKeyLength(), 0, "Expected 0 length group key for non-group by aggregation query");
+    Assert.assertEquals(resultSet.getGroupKeyLength(), 0,
+        "Expected 0 length group key for non-group by aggregation query");
     Assert.assertEquals(resultSet.getRowCount(), 1, "Result group length mismatch");
 
     // Check that values match and are in the same order
@@ -129,7 +131,7 @@ public class ResultSetGroupTest {
         InputStream stream = getClass().getResourceAsStream(_resource);
         int lastByte = stream.read();
         while (lastByte != -1) {
-          builder.append((char)lastByte);
+          builder.append((char) lastByte);
           lastByte = stream.read();
         }
         String jsonText = builder.toString();

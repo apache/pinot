@@ -112,7 +112,8 @@ public final class FixedByteValueReaderWriter implements Closeable, ValueReader 
   }
 
   @Override
-  public void close() throws IOException {
+  public void close()
+      throws IOException {
     _dataBuffer.close();
   }
 }

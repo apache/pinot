@@ -36,7 +36,8 @@ public class V1DefaultColumnHandler extends BaseDefaultColumnHandler {
    * {@inheritDoc}
    */
   @Override
-  protected void updateDefaultColumn(String column, DefaultColumnAction action) throws Exception {
+  protected void updateDefaultColumn(String column, DefaultColumnAction action)
+      throws Exception {
     LOGGER.info("Starting default column action: {} on column: {}", action, column);
 
     // For UPDATE and REMOVE action, delete existing dictionary and forward index, and remove column metadata

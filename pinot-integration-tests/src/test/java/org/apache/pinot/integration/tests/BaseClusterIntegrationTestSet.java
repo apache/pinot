@@ -104,7 +104,8 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
    *
    * @throws Exception
    */
-  public void testHardcodedQueries() throws Exception {
+  public void testHardcodedQueries()
+      throws Exception {
     // Here are some sample queries.
     String query;
     query = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch = 16312 AND Carrier = 'DL'";
@@ -139,19 +140,21 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
             + "FlightDate IN ('2014-12-09', '2014-10-05') GROUP BY ActualElapsedTime, OriginStateFips "
             + "HAVING SUM(ArrDelay) <> 6325.973 AND AVG(CAST(CRSDepTime AS DOUBLE)) <= 1569.8755 OR SUM(TaxiIn) = 1003.87274"));
   }
+
   /**
    * Test to ensure that broker response contains expected stats
    *
    * @throws Exception
    */
-  public void testBrokerResponseMetadata() throws Exception {
-    String[] pqlQueries = new String[] { //
+  public void testBrokerResponseMetadata()
+      throws Exception {
+    String[] pqlQueries = new String[]{ //
         "SELECT count(*) FROM mytable", // matching query
         "SELECT count(*) FROM mytable where non_existing_column='non_existing_value", // query that does not match any row
         "SELECT count(*) FROM mytable_foo" // query a non existing table
     };
-    String[] statNames = new String[] { "totalDocs", "numServersQueried", "numServersResponded", "numSegmentsQueried", "numSegmentsProcessed",
-        "numSegmentsMatched", "numDocsScanned", "totalDocs", "timeUsedMs", "numEntriesScannedInFilter", "numEntriesScannedPostFilter" };
+    String[] statNames =
+        new String[]{"totalDocs", "numServersQueried", "numServersResponded", "numSegmentsQueried", "numSegmentsProcessed", "numSegmentsMatched", "numDocsScanned", "totalDocs", "timeUsedMs", "numEntriesScannedInFilter", "numEntriesScannedPostFilter"};
 
     for (String query : pqlQueries) {
       JsonNode response = postQuery(query);
@@ -160,12 +163,14 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
       }
     }
   }
+
   public void testVirtualColumnQueries() {
     // Check that there are no virtual columns in the query results
     ResultSetGroup resultSetGroup = getPinotConnection().execute("select * from mytable");
     ResultSet resultSet = resultSetGroup.getResultSet(0);
     for (int i = 0; i < resultSet.getColumnCount(); i++) {
-      Assert.assertFalse(resultSet.getColumnName(i).startsWith("$"), "Virtual column " + resultSet.getColumnName(i) + " is present in the results!");
+      Assert.assertFalse(resultSet.getColumnName(i).startsWith("$"),
+          "Virtual column " + resultSet.getColumnName(i) + " is present in the results!");
     }
 
     // Check that the virtual columns work as expected (throws no exceptions)
@@ -181,7 +186,8 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
    *
    * @throws Exception
    */
-  public void testQueriesFromQueryFile() throws Exception {
+  public void testQueriesFromQueryFile()
+      throws Exception {
     URL resourceUrl = BaseClusterIntegrationTestSet.class.getClassLoader().getResource(getQueryFileName());
     Assert.assertNotNull(resourceUrl);
     File queryFile = new File(resourceUrl.getFile());
@@ -218,7 +224,8 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
    *
    * @throws Exception
    */
-  public void testGeneratedQueriesWithoutMultiValues() throws Exception {
+  public void testGeneratedQueriesWithoutMultiValues()
+      throws Exception {
     testGeneratedQueries(false);
   }
 
@@ -227,11 +234,13 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
    *
    * @throws Exception
    */
-  public void testGeneratedQueriesWithMultiValues() throws Exception {
+  public void testGeneratedQueriesWithMultiValues()
+      throws Exception {
     testGeneratedQueries(true);
   }
 
-  private void testGeneratedQueries(boolean withMultiValues) throws Exception {
+  private void testGeneratedQueries(boolean withMultiValues)
+      throws Exception {
     QueryGenerator queryGenerator = getQueryGenerator();
     queryGenerator.setSkipMultiValuePredicates(!withMultiValues);
     int numQueriesToGenerate = getNumQueriesToGenerate();
@@ -246,14 +255,16 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
    *
    * @throws Exception
    */
-  public void testQueryExceptions() throws Exception {
+  public void testQueryExceptions()
+      throws Exception {
     testQueryException("POTATO");
     testQueryException("SELECT COUNT(*) FROM potato");
     testQueryException("SELECT POTATO(ArrTime) FROM mytable");
     testQueryException("SELECT COUNT(*) FROM mytable where ArrTime = 'potato'");
   }
 
-  private void testQueryException(String query) throws Exception {
+  private void testQueryException(String query)
+      throws Exception {
     JsonNode jsonObject = postQuery(query);
     Assert.assertTrue(jsonObject.get("exceptions").size() > 0);
   }
@@ -263,7 +274,8 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
    *
    * @throws Exception
    */
-  public void testInstanceShutdown() throws Exception {
+  public void testInstanceShutdown()
+      throws Exception {
     List<String> instances = _helixAdmin.getInstancesInCluster(_clusterName);
     Assert.assertFalse(instances.isEmpty(), "List of instances should not be empty");
 
@@ -351,7 +363,8 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     }, 60_000L, errorMessage);
   }
 
-  private void checkForEmptyRoutingTable(final boolean shouldBeEmpty) throws Exception {
+  private void checkForEmptyRoutingTable(final boolean shouldBeEmpty)
+      throws Exception {
     String errorMessage;
     if (shouldBeEmpty) {
       errorMessage = "Routing table is not empty";
@@ -409,7 +422,8 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     if (isUsingNewConfigFormat()) {
       CombinedConfig combinedConfig = new CombinedConfig(_offlineTableConfig, _realtimeTableConfig, _schema);
       try {
-        sendPutRequest(_controllerRequestURLBuilder.forNewUpdateTableConfig(_offlineTableConfig.getTableName()), Serializer.serializeToString(combinedConfig));
+        sendPutRequest(_controllerRequestURLBuilder.forNewUpdateTableConfig(_offlineTableConfig.getTableName()),
+            Serializer.serializeToString(combinedConfig));
       } catch (IOException e) {
         throw new RuntimeException(e);
       }

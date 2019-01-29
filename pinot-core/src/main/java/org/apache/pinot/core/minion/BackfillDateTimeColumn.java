@@ -62,7 +62,8 @@ public class BackfillDateTimeColumn {
   private final DateTimeFieldSpec _destDateTimeFieldSpec;
 
   public BackfillDateTimeColumn(@Nonnull File originalIndexDir, @Nonnull File backfilledIndexDir,
-      @Nonnull TimeFieldSpec srcTimeSpec, @Nonnull DateTimeFieldSpec destDateTimeSpec) throws Exception {
+      @Nonnull TimeFieldSpec srcTimeSpec, @Nonnull DateTimeFieldSpec destDateTimeSpec)
+      throws Exception {
     _originalIndexDir = originalIndexDir;
     _backfilledIndexDir = backfilledIndexDir;
     Preconditions.checkArgument(!_originalIndexDir.getAbsolutePath().equals(_backfilledIndexDir.getAbsolutePath()),
@@ -71,7 +72,8 @@ public class BackfillDateTimeColumn {
     _destDateTimeFieldSpec = destDateTimeSpec;
   }
 
-  public boolean backfill() throws Exception {
+  public boolean backfill()
+      throws Exception {
     SegmentMetadataImpl originalSegmentMetadata = new SegmentMetadataImpl(_originalIndexDir);
     String segmentName = originalSegmentMetadata.getName();
     String tableName = originalSegmentMetadata.getTableName();
@@ -139,7 +141,8 @@ public class BackfillDateTimeColumn {
     }
 
     @Override
-    public GenericRow next() throws IOException {
+    public GenericRow next()
+        throws IOException {
       return next(new GenericRow());
     }
 
@@ -149,7 +152,8 @@ public class BackfillDateTimeColumn {
      * @see org.apache.pinot.core.data.readers.RecordReader#next(org.apache.pinot.core.data.GenericRow)
      */
     @Override
-    public GenericRow next(GenericRow reuse) throws IOException {
+    public GenericRow next(GenericRow reuse)
+        throws IOException {
       reuse = _baseRecordReader.next(reuse);
       Long timeColumnValue = (Long) reuse.getValue(_timeFieldSpec.getName());
       Object dateTimeColumnValue = convertTimeFieldToDateTimeFieldSpec(timeColumnValue);
@@ -178,7 +182,8 @@ public class BackfillDateTimeColumn {
     }
 
     @Override
-    public void rewind() throws IOException {
+    public void rewind()
+        throws IOException {
       _baseRecordReader.rewind();
     }
 
@@ -188,7 +193,8 @@ public class BackfillDateTimeColumn {
     }
 
     @Override
-    public void close() throws IOException {
+    public void close()
+        throws IOException {
       _baseRecordReader.close();
     }
   }

@@ -90,7 +90,7 @@ public abstract class PriorityScheduler extends QueryScheduler {
           try {
             runningQueriesSemaphore.acquire();
           } catch (InterruptedException e) {
-            if (! isRunning) {
+            if (!isRunning) {
               LOGGER.info("Shutting down scheduler");
             } else {
               LOGGER.error("Interrupt while acquiring semaphore. Exiting.", e);
@@ -103,8 +103,8 @@ public abstract class PriorityScheduler extends QueryScheduler {
               continue;
             }
             ServerQueryRequest queryRequest = request.getQueryRequest();
-            final QueryExecutorService executor = resourceManager.getExecutorService(queryRequest,
-                request.getSchedulerGroup());
+            final QueryExecutorService executor =
+                resourceManager.getExecutorService(queryRequest, request.getSchedulerGroup());
             final ListenableFutureTask<byte[]> queryFutureTask = createQueryFutureTask(queryRequest, executor);
             queryFutureTask.addListener(new Runnable() {
               @Override
@@ -122,8 +122,10 @@ public abstract class PriorityScheduler extends QueryScheduler {
             request.getSchedulerGroup().startQuery();
             queryRequest.getTimerContext().getPhaseTimer(ServerQueryPhase.SCHEDULER_WAIT).stopAndRecord();
             resourceManager.getQueryRunners().submit(queryFutureTask);
-          } catch (Throwable t){
-            LOGGER.error("Error in scheduler thread. This is indicative of a bug. Please report this. Server will continue with errors", t);
+          } catch (Throwable t) {
+            LOGGER.error(
+                "Error in scheduler thread. This is indicative of a bug. Please report this. Server will continue with errors",
+                t);
           }
         }
         if (isRunning) {
@@ -151,13 +153,13 @@ public abstract class PriorityScheduler extends QueryScheduler {
   synchronized private void failAllPendingQueries() {
     List<SchedulerQueryContext> pending = queryQueue.drain();
     for (SchedulerQueryContext queryContext : pending) {
-      queryContext.setResultFuture(immediateErrorResponse(queryContext.getQueryRequest(),
-          QueryException.SERVER_SCHEDULER_DOWN_ERROR));
+      queryContext.setResultFuture(
+          immediateErrorResponse(queryContext.getQueryRequest(), QueryException.SERVER_SCHEDULER_DOWN_ERROR));
     }
   }
 
   private void checkStopResourceManager() {
-    if (! isRunning && runningQueriesSemaphore.availablePermits() == numRunners) {
+    if (!isRunning && runningQueriesSemaphore.availablePermits() == numRunners) {
       resourceManager.stop();
     }
   }

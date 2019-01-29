@@ -63,39 +63,24 @@ public abstract class BaseDateTimeTransformer<I, O> implements DataTransformer<I
     final int sz = _outputGranularity.getSize();
     switch (_outputGranularity.getTimeUnit()) {
       case MILLISECONDS:
-        _dateTimeTruncate = (dateTime) -> _outputDateTimeFormatter.print(
-          dateTime.withMillisOfSecond(
-            (dateTime.getMillisOfSecond()/sz)*sz
-          )
-        );
+        _dateTimeTruncate = (dateTime) -> _outputDateTimeFormatter
+            .print(dateTime.withMillisOfSecond((dateTime.getMillisOfSecond() / sz) * sz));
         break;
       case SECONDS:
         _dateTimeTruncate = (dateTime) -> _outputDateTimeFormatter.print(
-          dateTime.withSecondOfMinute(
-            (dateTime.getSecondOfMinute()/sz)*sz
-          ).secondOfMinute().roundFloorCopy()
-        );
+            dateTime.withSecondOfMinute((dateTime.getSecondOfMinute() / sz) * sz).secondOfMinute().roundFloorCopy());
         break;
       case MINUTES:
-        _dateTimeTruncate = (dateTime) -> _outputDateTimeFormatter.print(
-          dateTime.withMinuteOfHour(
-            (dateTime.getMinuteOfHour()/sz)*sz
-          ).minuteOfHour().roundFloorCopy()
-        );
+        _dateTimeTruncate = (dateTime) -> _outputDateTimeFormatter
+            .print(dateTime.withMinuteOfHour((dateTime.getMinuteOfHour() / sz) * sz).minuteOfHour().roundFloorCopy());
         break;
       case HOURS:
-        _dateTimeTruncate = (dateTime) -> _outputDateTimeFormatter.print(
-          dateTime.withHourOfDay(
-            (dateTime.getHourOfDay()/sz)*sz
-          ).hourOfDay().roundFloorCopy()
-        );
+        _dateTimeTruncate = (dateTime) -> _outputDateTimeFormatter
+            .print(dateTime.withHourOfDay((dateTime.getHourOfDay() / sz) * sz).hourOfDay().roundFloorCopy());
         break;
       case DAYS:
-        _dateTimeTruncate = (dateTime) -> _outputDateTimeFormatter.print(
-          dateTime.withDayOfMonth(
-            (dateTime.getDayOfMonth()/sz)*sz
-          ).dayOfMonth().roundFloorCopy()
-        );
+        _dateTimeTruncate = (dateTime) -> _outputDateTimeFormatter
+            .print(dateTime.withDayOfMonth((dateTime.getDayOfMonth() / sz) * sz).dayOfMonth().roundFloorCopy());
         break;
       default:
         _dateTimeTruncate = _outputDateTimeFormatter::print;

@@ -54,10 +54,11 @@ public class CompositeFuture<V> extends AbstractCompositeListenableFuture<V> {
 
   public static enum GatherModeOnError {
     /* Future completes only when all underlying futures complete or any one underlying future fails */
-    SHORTCIRCUIT_AND,
-    /* Future completes only when all underlying futures completes successfully or fails. */
+    SHORTCIRCUIT_AND, /* Future completes only when all underlying futures completes successfully or fails. */
     AND,
-  };
+  }
+
+  ;
 
   private final Collection<ServerResponseFuture<V>> _futures;
 
@@ -95,8 +96,7 @@ public class CompositeFuture<V> extends AbstractCompositeListenableFuture<V> {
       throw new IllegalStateException(msg);
     }
 
-    if ( null !=  futureList )
-    {
+    if (null != futureList) {
       _futures.addAll(futureList);
       _latch = new CountDownLatch(futureList.size());
     } else {
@@ -125,14 +125,15 @@ public class CompositeFuture<V> extends AbstractCompositeListenableFuture<V> {
   @Override
   /**
    *
-   */
-  public Map<ServerInstance, V> get() throws InterruptedException, ExecutionException {
+   */ public Map<ServerInstance, V> get()
+      throws InterruptedException, ExecutionException {
     _latch.await();
     return _delayedResponseMap;
   }
 
   @Override
-  public V getOne() throws InterruptedException, ExecutionException {
+  public V getOne()
+      throws InterruptedException, ExecutionException {
     _latch.await();
     if (_delayedResponseMap.isEmpty()) {
       return null;
@@ -143,10 +144,11 @@ public class CompositeFuture<V> extends AbstractCompositeListenableFuture<V> {
   @Override
   public V getOne(long timeout, TimeUnit unit)
       throws InterruptedException, ExecutionException, TimeoutException {
-    boolean notElapsed = _latch.await(timeout,unit);
+    boolean notElapsed = _latch.await(timeout, unit);
 
-    if (!notElapsed)
+    if (!notElapsed) {
       throw new TimeoutException("Timedout waiting for async result for composite ");
+    }
 
     if (_delayedResponseMap.isEmpty()) {
       return null;
@@ -165,7 +167,7 @@ public class CompositeFuture<V> extends AbstractCompositeListenableFuture<V> {
     // the individual futures that have completed. Typically, we are interested in getting the individual completion
     // times, however.
     long maxDuration = -1;
-    for (Map.Entry<ServerInstance, Long> entry:_responseTimeMap.entrySet()) {
+    for (Map.Entry<ServerInstance, Long> entry : _responseTimeMap.entrySet()) {
       if (entry.getValue() > maxDuration) {
         maxDuration = entry.getValue();
       }
@@ -174,7 +176,8 @@ public class CompositeFuture<V> extends AbstractCompositeListenableFuture<V> {
   }
 
   @Override
-  public Map<ServerInstance, V> get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException {
+  public Map<ServerInstance, V> get(long timeout, TimeUnit unit)
+      throws InterruptedException, ExecutionException, TimeoutException {
     _latch.await(timeout, unit);
     return _delayedResponseMap;
   }
@@ -194,7 +197,8 @@ public class CompositeFuture<V> extends AbstractCompositeListenableFuture<V> {
   }
 
   @Override
-  protected boolean processFutureResult(ServerInstance server, Map<ServerInstance, V> response, Map<ServerInstance, Throwable> error, long durationMillis) {
+  protected boolean processFutureResult(ServerInstance server, Map<ServerInstance, V> response,
+      Map<ServerInstance, Throwable> error, long durationMillis) {
     // Get the response time and create another map that can be invoked to get the end time when responses were received for each server.
     boolean ret = false;
     if (null != response) {

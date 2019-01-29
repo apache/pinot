@@ -19,6 +19,7 @@
 package org.apache.pinot.controller.helix.core.relocation;
 
 import com.google.common.collect.Lists;
+import com.yammer.metrics.core.MetricsRegistry;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -31,6 +32,7 @@ import org.apache.helix.manager.zk.ZNRecordSerializer;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.builder.CustomModeISBuilder;
 import org.apache.pinot.common.config.RealtimeTagConfig;
+import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
@@ -68,7 +70,9 @@ public class RealtimeSegmentRelocatorTest {
     _mockHelixManager = mock(HelixManager.class);
     when(mockPinotHelixResourceManager.getHelixZkManager()).thenReturn(_mockHelixManager);
     ControllerConf controllerConfig = new ControllerConf();
-    _realtimeSegmentRelocator = new TestRealtimeSegmentRelocator(mockPinotHelixResourceManager, controllerConfig);
+    ControllerMetrics controllerMetrics = new ControllerMetrics(new MetricsRegistry());
+    _realtimeSegmentRelocator =
+        new TestRealtimeSegmentRelocator(mockPinotHelixResourceManager, controllerConfig, controllerMetrics);
 
     final int maxInstances = 20;
     serverNames = new String[maxInstances];
@@ -91,11 +95,9 @@ public class RealtimeSegmentRelocatorTest {
     List<String> consumingInstanceList = getConsumingInstanceList(3);
     List<String> completedInstanceList = getInstanceList(3);
     final CustomModeISBuilder customModeIdealStateBuilder = new CustomModeISBuilder(tableName);
-    customModeIdealStateBuilder.setStateModel(
-        PinotHelixSegmentOnlineOfflineStateModelGenerator.PINOT_SEGMENT_ONLINE_OFFLINE_STATE_MODEL)
-        .setNumPartitions(0)
-        .setNumReplica(nReplicas)
-        .setMaxPartitionsPerNode(1);
+    customModeIdealStateBuilder
+        .setStateModel(PinotHelixSegmentOnlineOfflineStateModelGenerator.PINOT_SEGMENT_ONLINE_OFFLINE_STATE_MODEL)
+        .setNumPartitions(0).setNumReplica(nReplicas).setMaxPartitionsPerNode(1);
     IdealState idealState = customModeIdealStateBuilder.build();
     idealState.setInstanceGroupTag(tableName);
 
@@ -121,8 +123,8 @@ public class RealtimeSegmentRelocatorTest {
     // empty ideal state
     _realtimeSegmentRelocator.setTagToInstance(serverTenantConsuming, consumingInstanceList);
     _realtimeSegmentRelocator.setTagToInstance(serverTenantCompleted, completedInstanceList);
-    IdealState prevIdealState = new IdealState(
-        (ZNRecord) znRecordSerializer.deserialize(znRecordSerializer.serialize(idealState.getRecord())));
+    IdealState prevIdealState =
+        new IdealState((ZNRecord) znRecordSerializer.deserialize(znRecordSerializer.serialize(idealState.getRecord())));
     _realtimeSegmentRelocator.relocateSegments(realtimeTagConfig, idealState);
     Assert.assertEquals(idealState, prevIdealState);
 
@@ -132,48 +134,50 @@ public class RealtimeSegmentRelocatorTest {
     instanceStateMap0.put(consumingInstanceList.get(1), "CONSUMING");
     instanceStateMap0.put(consumingInstanceList.get(2), "CONSUMING");
     idealState.setInstanceStateMap("segment0", instanceStateMap0);
-    prevIdealState = new IdealState(
-        (ZNRecord) znRecordSerializer.deserialize(znRecordSerializer.serialize(idealState.getRecord())));
+    prevIdealState =
+        new IdealState((ZNRecord) znRecordSerializer.deserialize(znRecordSerializer.serialize(idealState.getRecord())));
     _realtimeSegmentRelocator.relocateSegments(realtimeTagConfig, idealState);
     Assert.assertEquals(idealState, prevIdealState);
 
     // no move necessary, 1 replica ONLINE on consuming, others CONSUMING
     instanceStateMap0.put(consumingInstanceList.get(0), "ONLINE");
-    prevIdealState = new IdealState(
-        (ZNRecord) znRecordSerializer.deserialize(znRecordSerializer.serialize(idealState.getRecord())));
+    prevIdealState =
+        new IdealState((ZNRecord) znRecordSerializer.deserialize(znRecordSerializer.serialize(idealState.getRecord())));
     _realtimeSegmentRelocator.relocateSegments(realtimeTagConfig, idealState);
     Assert.assertEquals(idealState, prevIdealState);
 
     // no move necessary, 2 replicas ONLINE on consuming, 1 CONSUMING
     instanceStateMap0.put(consumingInstanceList.get(1), "ONLINE");
-    prevIdealState = new IdealState(
-        (ZNRecord) znRecordSerializer.deserialize(znRecordSerializer.serialize(idealState.getRecord())));
+    prevIdealState =
+        new IdealState((ZNRecord) znRecordSerializer.deserialize(znRecordSerializer.serialize(idealState.getRecord())));
     _realtimeSegmentRelocator.relocateSegments(realtimeTagConfig, idealState);
     Assert.assertEquals(idealState, prevIdealState);
 
     // all replicas ONLINE on consuming servers. relocate 1 replica from consuming to completed
     instanceStateMap0.put(consumingInstanceList.get(2), "ONLINE");
-    prevIdealState = new IdealState(
-        (ZNRecord) znRecordSerializer.deserialize(znRecordSerializer.serialize(idealState.getRecord())));
+    prevIdealState =
+        new IdealState((ZNRecord) znRecordSerializer.deserialize(znRecordSerializer.serialize(idealState.getRecord())));
     _realtimeSegmentRelocator.relocateSegments(realtimeTagConfig, idealState);
     Assert.assertNotSame(idealState, prevIdealState);
     segmentNameToExpectedNumCompletedInstances.put("segment0", 1);
-    verifySegmentAssignment(idealState, prevIdealState, completedInstanceList, nReplicas, segmentNameToExpectedNumCompletedInstances);
+    verifySegmentAssignment(idealState, prevIdealState, completedInstanceList, nReplicas,
+        segmentNameToExpectedNumCompletedInstances);
 
     // 2 replicas ONLINE on consuming servers, and 1 already relocated. relocate 1 replica from consuming to completed
-    prevIdealState = new IdealState(
-        (ZNRecord) znRecordSerializer.deserialize(znRecordSerializer.serialize(idealState.getRecord())));
+    prevIdealState =
+        new IdealState((ZNRecord) znRecordSerializer.deserialize(znRecordSerializer.serialize(idealState.getRecord())));
     _realtimeSegmentRelocator.relocateSegments(realtimeTagConfig, idealState);
     Assert.assertNotSame(idealState, prevIdealState);
     segmentNameToExpectedNumCompletedInstances.put("segment0", 2);
-    verifySegmentAssignment(idealState, prevIdealState, completedInstanceList, nReplicas, segmentNameToExpectedNumCompletedInstances);
+    verifySegmentAssignment(idealState, prevIdealState, completedInstanceList, nReplicas,
+        segmentNameToExpectedNumCompletedInstances);
 
     // 1 replica ONLINE on consuming, 2 already relocated. relocate the 3rd replica.
     // However, only 2 completed servers, which is less than num replicas
     completedInstanceList = getInstanceList(2);
     _realtimeSegmentRelocator.setTagToInstance(serverTenantCompleted, completedInstanceList);
-    prevIdealState = new IdealState(
-        (ZNRecord) znRecordSerializer.deserialize(znRecordSerializer.serialize(idealState.getRecord())));
+    prevIdealState =
+        new IdealState((ZNRecord) znRecordSerializer.deserialize(znRecordSerializer.serialize(idealState.getRecord())));
     exception = false;
     try {
       _realtimeSegmentRelocator.relocateSegments(realtimeTagConfig, idealState);
@@ -185,12 +189,13 @@ public class RealtimeSegmentRelocatorTest {
     // Revise list of completed servers to 3. Now we have enough completed servers for all replicas
     completedInstanceList = getInstanceList(3);
     _realtimeSegmentRelocator.setTagToInstance(serverTenantCompleted, completedInstanceList);
-    prevIdealState = new IdealState(
-        (ZNRecord) znRecordSerializer.deserialize(znRecordSerializer.serialize(idealState.getRecord())));
+    prevIdealState =
+        new IdealState((ZNRecord) znRecordSerializer.deserialize(znRecordSerializer.serialize(idealState.getRecord())));
     _realtimeSegmentRelocator.relocateSegments(realtimeTagConfig, idealState);
     Assert.assertNotSame(idealState, prevIdealState);
     segmentNameToExpectedNumCompletedInstances.put("segment0", 3);
-    verifySegmentAssignment(idealState, prevIdealState, completedInstanceList, nReplicas, segmentNameToExpectedNumCompletedInstances);
+    verifySegmentAssignment(idealState, prevIdealState, completedInstanceList, nReplicas,
+        segmentNameToExpectedNumCompletedInstances);
 
     // new segment, all CONSUMING, no move necessary
     Map<String, String> instanceStateMap1 = new HashMap<>(3);
@@ -198,8 +203,8 @@ public class RealtimeSegmentRelocatorTest {
     instanceStateMap1.put(consumingInstanceList.get(1), "CONSUMING");
     instanceStateMap1.put(consumingInstanceList.get(2), "CONSUMING");
     idealState.setInstanceStateMap("segment1", instanceStateMap1);
-    prevIdealState = new IdealState(
-        (ZNRecord) znRecordSerializer.deserialize(znRecordSerializer.serialize(idealState.getRecord())));
+    prevIdealState =
+        new IdealState((ZNRecord) znRecordSerializer.deserialize(znRecordSerializer.serialize(idealState.getRecord())));
     _realtimeSegmentRelocator.relocateSegments(realtimeTagConfig, idealState);
     Assert.assertEquals(idealState, prevIdealState);
 
@@ -212,13 +217,14 @@ public class RealtimeSegmentRelocatorTest {
     instanceStateMap2.put(consumingInstanceList.get(1), "ONLINE");
     instanceStateMap2.put(consumingInstanceList.get(2), "ONLINE");
     idealState.setInstanceStateMap("segment2", instanceStateMap2);
-    prevIdealState = new IdealState(
-        (ZNRecord) znRecordSerializer.deserialize(znRecordSerializer.serialize(idealState.getRecord())));
+    prevIdealState =
+        new IdealState((ZNRecord) znRecordSerializer.deserialize(znRecordSerializer.serialize(idealState.getRecord())));
     _realtimeSegmentRelocator.relocateSegments(realtimeTagConfig, idealState);
     Assert.assertNotSame(idealState, prevIdealState);
     segmentNameToExpectedNumCompletedInstances.put("segment1", 1);
     segmentNameToExpectedNumCompletedInstances.put("segment2", 1);
-    verifySegmentAssignment(idealState, prevIdealState, completedInstanceList, nReplicas, segmentNameToExpectedNumCompletedInstances);
+    verifySegmentAssignment(idealState, prevIdealState, completedInstanceList, nReplicas,
+        segmentNameToExpectedNumCompletedInstances);
 
     // a segment with instances that are not consuming tagged instances. Relocate them as well
     Map<String, String> instanceStateMap3 = new HashMap<>(3);
@@ -226,14 +232,15 @@ public class RealtimeSegmentRelocatorTest {
     instanceStateMap3.put("notAConsumingServer_1", "ONLINE");
     instanceStateMap3.put("notAConsumingServer_2", "ONLINE");
     idealState.setInstanceStateMap("segment3", instanceStateMap3);
-    prevIdealState = new IdealState(
-        (ZNRecord) znRecordSerializer.deserialize(znRecordSerializer.serialize(idealState.getRecord())));
+    prevIdealState =
+        new IdealState((ZNRecord) znRecordSerializer.deserialize(znRecordSerializer.serialize(idealState.getRecord())));
     _realtimeSegmentRelocator.relocateSegments(realtimeTagConfig, idealState);
     Assert.assertNotSame(idealState, prevIdealState);
     segmentNameToExpectedNumCompletedInstances.put("segment1", 2);
     segmentNameToExpectedNumCompletedInstances.put("segment2", 2);
     segmentNameToExpectedNumCompletedInstances.put("segment3", 1);
-    verifySegmentAssignment(idealState, prevIdealState, completedInstanceList, nReplicas, segmentNameToExpectedNumCompletedInstances);
+    verifySegmentAssignment(idealState, prevIdealState, completedInstanceList, nReplicas,
+        segmentNameToExpectedNumCompletedInstances);
   }
 
   private void verifySegmentAssignment(IdealState updatedIdealState, IdealState prevIdealState,
@@ -261,8 +268,9 @@ public class RealtimeSegmentRelocatorTest {
 
     private Map<String, List<String>> tagToInstances;
 
-    public TestRealtimeSegmentRelocator(PinotHelixResourceManager pinotHelixResourceManager, ControllerConf config) {
-      super(pinotHelixResourceManager, config);
+    public TestRealtimeSegmentRelocator(PinotHelixResourceManager pinotHelixResourceManager, ControllerConf config,
+        ControllerMetrics controllerMetrics) {
+      super(pinotHelixResourceManager, config, controllerMetrics);
       tagToInstances = new HashedMap();
     }
 

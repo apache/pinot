@@ -70,7 +70,6 @@ public class QueryResponse {
       columns.add(pair.getFirst());
     }
 
-
     for (ResultTable.Row row : resultTable) {
       List<String> columnValues = new ArrayList<>();
       for (Object value : row) {
@@ -95,7 +94,6 @@ public class QueryResponse {
     }
   }
 
-
   private void buildAggregationGroupByResult(ResultTable resultTable) {
     List<Pair> columnList = resultTable.getColumnList();
     List<String> groupByColumns = new ArrayList<>();
@@ -119,7 +117,7 @@ public class QueryResponse {
         if (columnList.get(colId).getSecond() != null) {
           break;
         }
-        if (value instanceof  Object []) {
+        if (value instanceof Object[]) {
           Object[] array = (Object[]) value;
           for (Object obj : array) {
             group.add(obj.toString());

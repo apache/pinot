@@ -53,12 +53,10 @@ public class BackfillDateTimeColumnCommand extends AbstractBaseAdminCommand impl
   @Option(name = "-tableName", required = true, metaVar = "<string>", usage = "Name of the table to backfill")
   private String _tableName;
 
-  @Option(name = "-segmentNames", required = false, metaVar = "<string>",
-      usage = "Comma separated names of the segments to backfill (if not specified, all segments will be backfilled)")
+  @Option(name = "-segmentNames", required = false, metaVar = "<string>", usage = "Comma separated names of the segments to backfill (if not specified, all segments will be backfilled)")
   private String _segmentNames;
 
-  @Option(name = "-segmentType", required = false, metaVar = "<OFFLINE/REALTIME>",
-      usage = "Type of segments to backfill (if not specified, all types will be backfilled)")
+  @Option(name = "-segmentType", required = false, metaVar = "<OFFLINE/REALTIME>", usage = "Type of segments to backfill (if not specified, all types will be backfilled)")
   private SegmentType _segmentType;
 
   @Option(name = "-srcTimeFieldSpec", required = true, metaVar = "<string>", usage = "File containing timeFieldSpec as json")
@@ -67,14 +65,11 @@ public class BackfillDateTimeColumnCommand extends AbstractBaseAdminCommand impl
   @Option(name = "-destDateTimeFieldSpec", required = true, metaVar = "<string>", usage = "File containing dateTimeFieldSpec as json")
   private String _destDateTimeFieldSpec;
 
-
   @Option(name = "-backupDir", required = true, metaVar = "<string>", usage = "Path to backup segments")
   private String _backupDir;
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
-      usage = "Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
   private boolean _help = false;
-
 
   public BackfillDateTimeColumnCommand setControllerHost(String controllerHost) {
     _controllerHost = controllerHost;
@@ -90,7 +85,6 @@ public class BackfillDateTimeColumnCommand extends AbstractBaseAdminCommand impl
     _tableName = tableName;
     return this;
   }
-
 
   public BackfillDateTimeColumnCommand setSegmentNames(String segmentNames) {
     _segmentNames = segmentNames;
@@ -117,7 +111,6 @@ public class BackfillDateTimeColumnCommand extends AbstractBaseAdminCommand impl
     return this;
   }
 
-
   @Override
   public String toString() {
     return ("BackfillSegmentColumn  -controllerHost " + _controllerHost + " -controllerPort " + _controllerPort
@@ -142,9 +135,9 @@ public class BackfillDateTimeColumnCommand extends AbstractBaseAdminCommand impl
   }
 
   @Override
-  public boolean execute() throws Exception {
+  public boolean execute()
+      throws Exception {
     LOGGER.info("Executing command: {}", toString());
-
 
     if (_controllerHost == null || _controllerPort == null) {
       throw new RuntimeException("Must specify controller host and port.");
@@ -165,8 +158,7 @@ public class BackfillDateTimeColumnCommand extends AbstractBaseAdminCommand impl
       throw new RuntimeException("Must specify tableName.");
     }
 
-    BackfillSegmentUtils backfillSegmentUtils =
-        new BackfillSegmentUtils(_controllerHost, _controllerPort);
+    BackfillSegmentUtils backfillSegmentUtils = new BackfillSegmentUtils(_controllerHost, _controllerPort);
 
     List<String> segmentNames = new ArrayList<>();
     List<String> allSegmentNames = backfillSegmentUtils.getAllSegments(_tableName, _segmentType);
@@ -195,7 +187,8 @@ public class BackfillDateTimeColumnCommand extends AbstractBaseAdminCommand impl
       // download segment
       File downloadSegmentDir = new File(downloadDir, segmentName);
       LOGGER.info("Downloading segment {} to {}", segmentName, downloadDir.getAbsolutePath());
-      boolean downloadStatus = backfillSegmentUtils.downloadSegment(_tableName, segmentName, downloadSegmentDir, tableBackupDir);
+      boolean downloadStatus =
+          backfillSegmentUtils.downloadSegment(_tableName, segmentName, downloadSegmentDir, tableBackupDir);
       LOGGER.info("Download status for segment {} is {}", segmentName, downloadStatus);
       if (!downloadStatus) {
         LOGGER.error("Failed to download segment {}. Skipping it.", segmentName);
@@ -205,9 +198,11 @@ public class BackfillDateTimeColumnCommand extends AbstractBaseAdminCommand impl
       // create new segment
       File segmentDir = new File(downloadSegmentDir, segmentName);
       File outputDir = new File(downloadSegmentDir, OUTPUT_FOLDER);
-      BackfillDateTimeColumn backfillDateTimeColumn = new BackfillDateTimeColumn(segmentDir, outputDir, timeFieldSpec, dateTimeFieldSpec);
+      BackfillDateTimeColumn backfillDateTimeColumn =
+          new BackfillDateTimeColumn(segmentDir, outputDir, timeFieldSpec, dateTimeFieldSpec);
       boolean backfillStatus = backfillDateTimeColumn.backfill();
-      LOGGER.info("Backfill status for segment {} in {} to {} is {}", segmentName, segmentDir, outputDir, backfillStatus);
+      LOGGER
+          .info("Backfill status for segment {} in {} to {} is {}", segmentName, segmentDir, outputDir, backfillStatus);
 
       // upload segment
       LOGGER.info("Uploading segment {} to host: {} port: {}", segmentName, _controllerHost, _controllerPort);
@@ -230,5 +225,4 @@ public class BackfillDateTimeColumnCommand extends AbstractBaseAdminCommand impl
     LOGGER.info("Original segment backup is at {}", tableBackupDir.getAbsolutePath());
     return true;
   }
-
 }

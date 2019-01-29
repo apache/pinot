@@ -79,7 +79,8 @@ public class PinotFSFactory {
     return pinotFS;
   }
 
-  public static void shutdown() throws IOException {
+  public static void shutdown()
+      throws IOException {
     for (PinotFS pinotFS : _fileSystemMap.values()) {
       pinotFS.close();
     }

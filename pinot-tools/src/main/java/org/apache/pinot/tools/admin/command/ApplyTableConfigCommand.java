@@ -56,23 +56,25 @@ public class ApplyTableConfigCommand extends AbstractBaseAdminCommand implements
   @Option(name = "-showComputedConfig", required = false, usage = "Only display the computed configuration, without attempting to upload it")
   private boolean _showComputedConfig = false;
 
-  @Option(name = "-help", required = false, help = true, aliases = { "-h", "--h", "--help" },
-      usage = "Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
   private boolean _help = false;
 
   @Override
-  public boolean execute() throws Exception {
+  public boolean execute()
+      throws Exception {
     // Split the profile list, if present
     String[] configurationProfiles;
 
     if (_profileList != null) {
-      configurationProfiles = Splitter.on(',').trimResults().omitEmptyStrings().splitToList(_profileList).toArray(new String[0]);
+      configurationProfiles =
+          Splitter.on(',').trimResults().omitEmptyStrings().splitToList(_profileList).toArray(new String[0]);
     } else {
       configurationProfiles = new String[0];
     }
 
     // Load the config
-    CombinedConfig combinedConfig = CombinedConfigLoader.loadCombinedConfig(new File(_tableConfigFile), configurationProfiles);
+    CombinedConfig combinedConfig =
+        CombinedConfigLoader.loadCombinedConfig(new File(_tableConfigFile), configurationProfiles);
     String tableName;
     if (combinedConfig.getOfflineTableConfig() != null) {
       tableName = combinedConfig.getOfflineTableConfig().getTableName();
@@ -105,7 +107,8 @@ public class ApplyTableConfigCommand extends AbstractBaseAdminCommand implements
     } else if (statusCode / 100 == 2) {
       tableExists = true;
     } else {
-      throw new RuntimeException("Unable to determine whether table " + tableName + " exists from HTTP status code " + statusCode);
+      throw new RuntimeException(
+          "Unable to determine whether table " + tableName + " exists from HTTP status code " + statusCode);
     }
 
     // Post or put the table configuration depending on whether the table exists
@@ -128,7 +131,9 @@ public class ApplyTableConfigCommand extends AbstractBaseAdminCommand implements
     } else {
       InputStream contentStream = response.getEntity().getContent();
       String content = IOUtils.toString(contentStream);
-      System.out.println("Failed to apply table configuration for table " + tableName + ", received HTTP status code " + statusCode + " " + content);
+      System.out.println(
+          "Failed to apply table configuration for table " + tableName + ", received HTTP status code " + statusCode
+              + " " + content);
       return false;
     }
   }

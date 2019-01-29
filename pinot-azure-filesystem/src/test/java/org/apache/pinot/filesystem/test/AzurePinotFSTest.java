@@ -44,8 +44,10 @@ public class AzurePinotFSTest {
   private File _testFile;
 
   @BeforeMethod
-  public void setup() throws IOException {
-    _adlLocation = new File(System.getProperty("java.io.tmpdir"), AzurePinotFSTest.class.getSimpleName()).getAbsolutePath();
+  public void setup()
+      throws IOException {
+    _adlLocation =
+        new File(System.getProperty("java.io.tmpdir"), AzurePinotFSTest.class.getSimpleName()).getAbsolutePath();
     FileUtils.deleteQuietly(new File(_adlLocation));
     Assert.assertTrue(new File(_adlLocation).mkdir(), "Could not make directory" + _adlLocation);
 
@@ -60,7 +62,8 @@ public class AzurePinotFSTest {
   }
 
   @Test
-  public void testFS() throws Exception {
+  public void testFS()
+      throws Exception {
     ADLStoreClient adlStoreClient = Mockito.mock(ADLStoreClient.class);
     Mockito.when(adlStoreClient.checkExists(_adlLocation)).thenReturn(true);
     Mockito.when(adlStoreClient.checkExists(_testFile.getPath())).thenReturn(true);
@@ -71,8 +74,8 @@ public class AzurePinotFSTest {
     Assert.assertTrue(azurePinotFS.exists(new URI(_adlLocation)));
 
     File file = new File(_adlLocation, "testfile2");
-    MockADLFileInputStream adlFileInputStream = new MockADLFileInputStream(
-        new ByteArrayInputStream(Files.readAllBytes(Paths.get(testFileURI))));
+    MockADLFileInputStream adlFileInputStream =
+        new MockADLFileInputStream(new ByteArrayInputStream(Files.readAllBytes(Paths.get(testFileURI))));
     Mockito.when(adlStoreClient.getReadStream(ArgumentMatchers.anyString())).thenReturn(adlFileInputStream);
     azurePinotFS.copyToLocalFile(testFileURI, file);
     Assert.assertTrue(file.exists());

@@ -93,7 +93,8 @@ public class ServerBuilder {
     return _serverMetrics;
   }
 
-  public InstanceDataManager buildInstanceDataManager() throws Exception {
+  public InstanceDataManager buildInstanceDataManager()
+      throws Exception {
     String className = _serverConf.getInstanceDataManagerClassName();
     LOGGER.info("Building instance data manager of class: {}", className);
     InstanceDataManager instanceDataManager = (InstanceDataManager) Class.forName(className).newInstance();
@@ -111,7 +112,8 @@ public class ServerBuilder {
   }
 
   public QueryScheduler buildQueryScheduler(QueryExecutor queryExecutor, LongAccumulator latestQueryTime) {
-    return QuerySchedulerFactory.create(_serverConf.getSchedulerConfig(), queryExecutor, _serverMetrics,latestQueryTime);
+    return QuerySchedulerFactory
+        .create(_serverConf.getSchedulerConfig(), queryExecutor, _serverMetrics, latestQueryTime);
   }
 
   public NettyServer buildNettyServer(NettyServer.RequestHandlerFactory requestHandlerFactory)

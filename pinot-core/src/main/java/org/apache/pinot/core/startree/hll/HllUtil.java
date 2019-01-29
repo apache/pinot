@@ -147,11 +147,11 @@ public class HllUtil {
     }
 
     public static char byteToChar(byte b) {
-      return (char)(((int)b) + BYTE_TO_CHAR_OFFSET);
+      return (char) (((int) b) + BYTE_TO_CHAR_OFFSET);
     }
 
     public static byte charToByte(char c) {
-      return (byte)(((int)c) - BYTE_TO_CHAR_OFFSET);
+      return (byte) (((int) c) - BYTE_TO_CHAR_OFFSET);
     }
   }
 }

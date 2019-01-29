@@ -20,6 +20,7 @@ package org.apache.pinot.core.data.function;
 
 import java.lang.reflect.Method;
 
+
 public class FunctionInfo {
 
   private final Method _method;
@@ -43,7 +44,7 @@ public class FunctionInfo {
    * Check if the Function is applicable to the argumentTypes.
    * We can only know the types at runtime, so we can validate if the return type is Object.
    * For e.g funcA( funcB('3.14'), columnA)
-   * We can only know return type of funcB and 3.14 (String.class) but 
+   * We can only know return type of funcB and 3.14 (String.class) but
    * we cannot know the type of columnA in advance without knowing the source schema
    * @param argumentTypes
    * @return
@@ -68,7 +69,7 @@ public class FunctionInfo {
 
   /**
    * Eventually we will need to convert the input datatypes before invoking the actual method. For now, there is no conversion
-   * 
+   *
    * @param args
    * @return
    */

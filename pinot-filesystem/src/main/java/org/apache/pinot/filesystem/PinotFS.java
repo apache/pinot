@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.net.URI;
 import org.apache.commons.configuration.Configuration;
 
+
 /**
  * The PinotFS is intended to be a thin wrapper on top of different filesystems. This interface is intended for internal
  * Pinot use only. This class will be implemented for each pluggable storage type.
@@ -38,7 +39,8 @@ public abstract class PinotFS implements Closeable {
   /**
    * Creates a new directory. If parent directories are not created, it will create them.
    */
-  public abstract boolean mkdir(URI uri) throws IOException;
+  public abstract boolean mkdir(URI uri)
+      throws IOException;
 
   /**
    * Deletes the file at the location provided. If the segmentUri is a directory, it will delete the entire directory.
@@ -49,7 +51,8 @@ public abstract class PinotFS implements Closeable {
    * @throws IOException IO failure
    * @throws Exception if segmentUri is not valid or present
    */
-  public abstract boolean delete(URI segmentUri, boolean forceDelete) throws IOException;
+  public abstract boolean delete(URI segmentUri, boolean forceDelete)
+      throws IOException;
 
   /**
    * Moves the file from the src to dst. Does not keep the original file. If the dst has parent directories
@@ -67,7 +70,8 @@ public abstract class PinotFS implements Closeable {
    * @throws IOException on failure
    * @throws Exception if srcUri is not present or valid
    */
-  public abstract boolean move(URI srcUri, URI dstUri, boolean overwrite) throws IOException;
+  public abstract boolean move(URI srcUri, URI dstUri, boolean overwrite)
+      throws IOException;
 
   /**
    * Same as move except the srcUri is not retained. For example, if x/y/z is copied to a/b/c, x/y/z will be retained
@@ -78,7 +82,8 @@ public abstract class PinotFS implements Closeable {
    * @throws IOException on IO Failure
    * @throws Exception if srcUri is not present or valid
    */
-  public abstract boolean copy(URI srcUri, URI dstUri) throws IOException;
+  public abstract boolean copy(URI srcUri, URI dstUri)
+      throws IOException;
 
   /**
    * Checks whether the file or directory at the provided location exists.
@@ -86,7 +91,8 @@ public abstract class PinotFS implements Closeable {
    * @return true if path exists
    * @throws IOException on IO Failure
    */
-  public abstract boolean exists(URI fileUri) throws IOException;
+  public abstract boolean exists(URI fileUri)
+      throws IOException;
 
   /**
    * Returns the length of the file at the provided location. Will throw exception if a directory
@@ -95,7 +101,8 @@ public abstract class PinotFS implements Closeable {
    * @throws IOException on IO Failure
    * @throws Exception if fileUri is not valid or present
    */
-  public abstract long length(URI fileUri) throws IOException;
+  public abstract long length(URI fileUri)
+      throws IOException;
 
   /**
    * Lists all the files at the location provided. Lists recursively.
@@ -107,7 +114,8 @@ public abstract class PinotFS implements Closeable {
    * @throws IOException see specific implementation
    * @throws Exception if fileUri is not valid or present
    */
-  public abstract String[] listFiles(URI fileUri, boolean recursive) throws IOException;
+  public abstract String[] listFiles(URI fileUri, boolean recursive)
+      throws IOException;
 
   /**
    * Copies a file from a remote filesystem to the local one. Keeps the original file.
@@ -115,7 +123,8 @@ public abstract class PinotFS implements Closeable {
    * @param dstFile location of destination on local filesystem
    * @throws Exception if srcUri is not valid or present
    */
-  public abstract void copyToLocalFile(URI srcUri, File dstFile) throws Exception;
+  public abstract void copyToLocalFile(URI srcUri, File dstFile)
+      throws Exception;
 
   /**
    * The src file is on the local disk. Add it to filesystem at the given dst name and the source is kept intact
@@ -125,7 +134,8 @@ public abstract class PinotFS implements Closeable {
    * @throws IOException for IO Error
    * @throws Exception if fileUri is not valid or present
    */
-  public abstract void copyFromLocalFile(File srcFile, URI dstUri) throws Exception;
+  public abstract void copyFromLocalFile(File srcFile, URI dstUri)
+      throws Exception;
 
   /**
    * Allows us the ability to determine whether the uri is a directory.
@@ -150,14 +160,16 @@ public abstract class PinotFS implements Closeable {
    * @param uri location of file or directory
    * @throws IOException if the parent directory doesn't exist.
    */
-  public abstract boolean touch(URI uri) throws IOException;
+  public abstract boolean touch(URI uri)
+      throws IOException;
 
   /**
    * For certain filesystems, we may need to close the filesystem and do relevant operations to prevent leaks.
    * By default, this method does nothing.
    * @throws IOException
    */
-  public void close() throws IOException {
+  public void close()
+      throws IOException {
 
   }
 }

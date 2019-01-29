@@ -52,5 +52,4 @@ public class Pair<T1 extends Serializable, T2 extends Serializable> implements S
   public String toString() {
     return "first=" + _first + ", second=" + _second;
   }
-
 }

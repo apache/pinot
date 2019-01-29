@@ -65,11 +65,11 @@ public class TimeTransformer implements RecordTransformer {
     if (!_isValidated) {
       // If incoming time value does not exist or the value is invalid after conversion, check the outgoing time value.
       // If the outgoing time value is valid, skip time conversion, otherwise, throw exception.
-      if (incomingTimeValue == null || !TimeUtils.timeValueInValidRange(
-          _incomingTimeConverter.toMillisSinceEpoch(incomingTimeValue))) {
+      if (incomingTimeValue == null || !TimeUtils
+          .timeValueInValidRange(_incomingTimeConverter.toMillisSinceEpoch(incomingTimeValue))) {
         Object outgoingTimeValue = record.getValue(_outgoingTimeColumn);
-        if (outgoingTimeValue == null || !TimeUtils.timeValueInValidRange(
-            _outgoingTimeConverter.toMillisSinceEpoch(outgoingTimeValue))) {
+        if (outgoingTimeValue == null || !TimeUtils
+            .timeValueInValidRange(_outgoingTimeConverter.toMillisSinceEpoch(outgoingTimeValue))) {
           throw new IllegalStateException(
               "No valid time value found in either incoming time column: " + _incomingTimeColumn
                   + " or outgoing time column: " + _outgoingTimeColumn);

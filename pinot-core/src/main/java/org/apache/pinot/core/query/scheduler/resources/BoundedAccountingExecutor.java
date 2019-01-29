@@ -45,8 +45,7 @@ public class BoundedAccountingExecutor extends QueryExecutorService {
   private Semaphore semaphore;
   private final SchedulerGroupAccountant accountant;
 
-  public BoundedAccountingExecutor(@Nonnull Executor s, int bounds,
-      @Nonnull SchedulerGroupAccountant accountant) {
+  public BoundedAccountingExecutor(@Nonnull Executor s, int bounds, @Nonnull SchedulerGroupAccountant accountant) {
     Preconditions.checkNotNull(s);
     Preconditions.checkNotNull(accountant);
     Preconditions.checkArgument(bounds > 0);
@@ -62,7 +61,7 @@ public class BoundedAccountingExecutor extends QueryExecutorService {
   }
 
   @Override
-  public void releaseWorkers()  {
+  public void releaseWorkers() {
     accountant.releasedReservedThreads(bounds);
   }
 

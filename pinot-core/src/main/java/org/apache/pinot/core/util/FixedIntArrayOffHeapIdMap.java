@@ -97,7 +97,8 @@ public class FixedIntArrayOffHeapIdMap extends BaseOffHeapMutableDictionary impl
   }
 
   @Override
-  public void doClose() throws IOException {
+  public void doClose()
+      throws IOException {
     _dictIdToValue.close();
   }
 

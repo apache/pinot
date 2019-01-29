@@ -125,12 +125,13 @@ public abstract class NettyServer implements Runnable {
 
   protected final long _defaultLargeQueryLatencyMs;
 
-  public NettyServer(int port, RequestHandlerFactory handlerFactory, AggregatedMetricsRegistry registry, long defaultLargeQueryLatencyMs) {
+  public NettyServer(int port, RequestHandlerFactory handlerFactory, AggregatedMetricsRegistry registry,
+      long defaultLargeQueryLatencyMs) {
     this(port, handlerFactory, registry, defaultLargeQueryLatencyMs, 1, 20);
   }
 
-  public NettyServer(int port, RequestHandlerFactory handlerFactory, AggregatedMetricsRegistry registry, long defaultLargeQueryLatencyMs,
-      int numThreadsForBossGroup, int numThreadsForWorkerGroup) {
+  public NettyServer(int port, RequestHandlerFactory handlerFactory, AggregatedMetricsRegistry registry,
+      long defaultLargeQueryLatencyMs, int numThreadsForBossGroup, int numThreadsForWorkerGroup) {
     _port = port;
     _handlerFactory = handlerFactory;
     _metricsRegistry = registry;
@@ -236,7 +237,8 @@ public abstract class NettyServer implements Runnable {
     private final RequestHandler _handler;
     private final NettyServerMetrics _metric;
 
-    public NettyChannelInboundHandler(RequestHandler handler, NettyServerMetrics metric, long defaultLargeQueryLatencyMs) {
+    public NettyChannelInboundHandler(RequestHandler handler, NettyServerMetrics metric,
+        long defaultLargeQueryLatencyMs) {
       _handler = handler;
       _metric = metric;
       _defaultLargeQueryLatencyMs = defaultLargeQueryLatencyMs;
@@ -276,9 +278,9 @@ public abstract class NettyServer implements Runnable {
                   requestProcessingLatency.getLatencyMs(), responseSendLatency.getLatencyMs());
               long totalQueryTime = System.currentTimeMillis() - requestStartTime;
               if (totalQueryTime > _defaultLargeQueryLatencyMs) {
-                LOGGER.info("Slow query: request handler processing time: {}, send response latency: {}, total time to handle request: {}",
-                    requestProcessingLatency.getLatencyMs(),
-                    responseSendLatency.getLatencyMs(), totalQueryTime);
+                LOGGER.info(
+                    "Slow query: request handler processing time: {}, send response latency: {}, total time to handle request: {}",
+                    requestProcessingLatency.getLatencyMs(), responseSendLatency.getLatencyMs(), totalQueryTime);
               }
             }
           });
@@ -286,6 +288,7 @@ public abstract class NettyServer implements Runnable {
           // TODO: check if we can release this right after _handler.processRequest returns
           request.release();
         }
+
         @Override
         public void onSuccess(@Nullable byte[] result) {
           if (result == null) {
@@ -300,7 +303,6 @@ public abstract class NettyServer implements Runnable {
           sendResponse(new byte[0]);
         }
       });
-
     }
 
     @Override
@@ -309,7 +311,6 @@ public abstract class NettyServer implements Runnable {
       _metric.addServingStats(0, 0, 0L, true, 0, 0);
       ctx.close();
     }
-
 
     @Override
     public String toString() {
@@ -320,5 +321,4 @@ public abstract class NettyServer implements Runnable {
   public boolean isShutdownComplete() {
     return _shutdownComplete.get();
   }
-
 }

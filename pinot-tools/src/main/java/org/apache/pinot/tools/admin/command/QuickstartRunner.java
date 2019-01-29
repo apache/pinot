@@ -84,10 +84,8 @@ public class QuickstartRunner {
       throws Exception {
     for (int i = 0; i < _numControllers; i++) {
       StartControllerCommand controllerStarter = new StartControllerCommand();
-      controllerStarter.setControllerPort(String.valueOf(DEFAULT_CONTROLLER_PORT + i))
-          .setZkAddress(ZK_ADDRESS)
-          .setClusterName(CLUSTER_NAME)
-          .setTenantIsolation(_enableTenantIsolation);
+      controllerStarter.setControllerPort(String.valueOf(DEFAULT_CONTROLLER_PORT + i)).setZkAddress(ZK_ADDRESS)
+          .setClusterName(CLUSTER_NAME).setTenantIsolation(_enableTenantIsolation);
       controllerStarter.execute();
       _controllerPorts.add(DEFAULT_CONTROLLER_PORT + i);
     }
@@ -107,10 +105,8 @@ public class QuickstartRunner {
       throws Exception {
     for (int i = 0; i < _numServers; i++) {
       StartServerCommand serverStarter = new StartServerCommand();
-      serverStarter.setPort(DEFAULT_SERVER_NETTY_PORT + i)
-          .setAdminPort(DEFAULT_SERVER_ADMIN_API_PORT + i)
-          .setZkAddress(ZK_ADDRESS)
-          .setClusterName(CLUSTER_NAME)
+      serverStarter.setPort(DEFAULT_SERVER_NETTY_PORT + i).setAdminPort(DEFAULT_SERVER_ADMIN_API_PORT + i)
+          .setZkAddress(ZK_ADDRESS).setClusterName(CLUSTER_NAME)
           .setDataDir(new File(_tempDir, "PinotServerData" + i).getAbsolutePath())
           .setSegmentDir(new File(_tempDir, "PinotServerSegment" + i).getAbsolutePath());
       serverStarter.execute();
@@ -146,33 +142,22 @@ public class QuickstartRunner {
 
   public void createServerTenantWith(int numOffline, int numRealtime, String tenantName)
       throws Exception {
-    new AddTenantCommand().setControllerUrl("http://localhost:" + _controllerPorts.get(0))
-        .setName(tenantName)
-        .setOffline(numOffline)
-        .setRealtime(numRealtime)
-        .setInstances(numOffline + numRealtime)
-        .setRole(TenantRole.SERVER)
-        .setExecute(true)
-        .execute();
+    new AddTenantCommand().setControllerUrl("http://localhost:" + _controllerPorts.get(0)).setName(tenantName)
+        .setOffline(numOffline).setRealtime(numRealtime).setInstances(numOffline + numRealtime)
+        .setRole(TenantRole.SERVER).setExecute(true).execute();
   }
 
   public void createBrokerTenantWith(int number, String tenantName)
       throws Exception {
-    new AddTenantCommand().setControllerUrl("http://localhost:" + _controllerPorts.get(0))
-        .setName(tenantName)
-        .setInstances(number)
-        .setRole(TenantRole.BROKER)
-        .setExecute(true)
-        .execute();
+    new AddTenantCommand().setControllerUrl("http://localhost:" + _controllerPorts.get(0)).setName(tenantName)
+        .setInstances(number).setRole(TenantRole.BROKER).setExecute(true).execute();
   }
 
   public void addSchema()
       throws Exception {
     for (QuickstartTableRequest request : _tableRequests) {
       new AddSchemaCommand().setControllerPort(String.valueOf(_controllerPorts.get(0)))
-          .setSchemaFilePath(request.getSchemaFile().getAbsolutePath())
-          .setExecute(true)
-          .execute();
+          .setSchemaFilePath(request.getSchemaFile().getAbsolutePath()).setExecute(true).execute();
     }
   }
 
@@ -180,9 +165,7 @@ public class QuickstartRunner {
       throws Exception {
     for (QuickstartTableRequest request : _tableRequests) {
       new AddTableCommand().setFilePath(request.getTableRequestFile().getAbsolutePath())
-          .setControllerPort(String.valueOf(_controllerPorts.get(0)))
-          .setExecute(true)
-          .execute();
+          .setControllerPort(String.valueOf(_controllerPorts.get(0))).setExecute(true).execute();
     }
   }
 
@@ -192,12 +175,10 @@ public class QuickstartRunner {
       if (request.getTableType() == TableType.OFFLINE) {
         File tempDir = new File(_tempDir, request.getTableName() + "_segment");
         new CreateSegmentCommand().setDataDir(request.getDataDir().getAbsolutePath())
-            .setFormat(request.getSegmentFileFormat())
-            .setSchemaFile(request.getSchemaFile().getAbsolutePath())
+            .setFormat(request.getSegmentFileFormat()).setSchemaFile(request.getSchemaFile().getAbsolutePath())
             .setTableName(request.getTableName())
             .setSegmentName(request.getTableName() + "_" + System.currentTimeMillis())
-            .setOutDir(tempDir.getAbsolutePath())
-            .execute();
+            .setOutDir(tempDir.getAbsolutePath()).execute();
         _segmentDirs.add(tempDir.getAbsolutePath());
       }
     }
@@ -206,8 +187,7 @@ public class QuickstartRunner {
   public void pushSegment()
       throws Exception {
     for (String segmentDir : _segmentDirs) {
-      new UploadSegmentCommand().setControllerPort(String.valueOf(_controllerPorts.get(0)))
-          .setSegmentDir(segmentDir)
+      new UploadSegmentCommand().setControllerPort(String.valueOf(_controllerPorts.get(0))).setSegmentDir(segmentDir)
           .execute();
     }
   }
@@ -215,6 +195,7 @@ public class QuickstartRunner {
   public JsonNode runQuery(String query)
       throws Exception {
     int brokerPort = _brokerPorts.get(RANDOM.nextInt(_brokerPorts.size()));
-    return JsonUtils.stringToJsonNode(new PostQueryCommand().setBrokerPort(String.valueOf(brokerPort)).setQuery(query).run());
+    return JsonUtils
+        .stringToJsonNode(new PostQueryCommand().setBrokerPort(String.valueOf(brokerPort)).setQuery(query).run());
   }
 }

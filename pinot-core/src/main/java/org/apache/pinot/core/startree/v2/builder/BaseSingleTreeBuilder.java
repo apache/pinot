@@ -128,8 +128,8 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
         _skipStarNodeCreationForDimensions.add(i);
       }
       _dimensionReaders[i] = new PinotSegmentColumnReader(segment, dimension);
-      Preconditions.checkState(_dimensionReaders[i].hasDictionary(),
-          "Dimension: " + dimension + " does not have dictionary");
+      Preconditions
+          .checkState(_dimensionReaders[i].hasDictionary(), "Dimension: " + dimension + " does not have dictionary");
     }
 
     Set<AggregationFunctionColumnPair> functionColumnPairs = builderConfig.getFunctionColumnPairs();
@@ -165,7 +165,8 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
    *
    * @param record Record to be appended
    */
-  abstract void appendRecord(Record record) throws IOException;
+  abstract void appendRecord(Record record)
+      throws IOException;
 
   /**
    * Returns the record of the given document Id in the star-tree.
@@ -173,7 +174,8 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
    * @param docId Document Id
    * @return Star-tree record
    */
-  abstract Record getStarTreeRecord(int docId) throws IOException;
+  abstract Record getStarTreeRecord(int docId)
+      throws IOException;
 
   /**
    * Returns the dimension value of the given document and dimension Id in the star-tree.
@@ -182,7 +184,8 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
    * @param dimensionId Dimension Id
    * @return Dimension value
    */
-  abstract int getDimensionValue(int docId, int dimensionId) throws IOException;
+  abstract int getDimensionValue(int docId, int dimensionId)
+      throws IOException;
 
   /**
    * Sorts and aggregates the records in the segment, and returns a record iterator for all the aggregated records.
@@ -191,7 +194,8 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
    * @param numDocs Number of documents in the segment
    * @return Iterator for the aggregated records
    */
-  abstract Iterator<Record> sortAndAggregateSegmentRecords(int numDocs) throws IOException;
+  abstract Iterator<Record> sortAndAggregateSegmentRecords(int numDocs)
+      throws IOException;
 
   /**
    * Generates aggregated records for star-node.
@@ -297,7 +301,8 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
   }
 
   @Override
-  public void build() throws Exception {
+  public void build()
+      throws Exception {
     long startTime = System.currentTimeMillis();
     LOGGER.info("Start building star-trees with config: {}", _builderConfig);
 
@@ -318,14 +323,15 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
     LOGGER.info("Finish creating aggregated documents, got {} aggregated records", _numDocs - numRecordsUnderStarNode);
 
     createForwardIndexes();
-    StarTreeBuilderUtils.serializeTree(new File(_outputDir, STAR_TREE_INDEX_FILE_NAME), _rootNode,
-        _dimensionsSplitOrder, _numNodes);
+    StarTreeBuilderUtils
+        .serializeTree(new File(_outputDir, STAR_TREE_INDEX_FILE_NAME), _rootNode, _dimensionsSplitOrder, _numNodes);
     writeMetadata();
 
     LOGGER.info("Finish building star-tree in {}ms", System.currentTimeMillis() - startTime);
   }
 
-  private void appendToStarTree(Record record) throws IOException {
+  private void appendToStarTree(Record record)
+      throws IOException {
     appendRecord(record);
     _numDocs++;
   }
@@ -335,7 +341,8 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
     return new TreeNode();
   }
 
-  private void constructStarTree(TreeNode node, int startDocId, int endDocId) throws IOException {
+  private void constructStarTree(TreeNode node, int startDocId, int endDocId)
+      throws IOException {
     int childDimensionId = node._dimensionId + 1;
     if (childDimensionId == _numDimensions) {
       return;
@@ -387,7 +394,8 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
     return nodes;
   }
 
-  private TreeNode constructStarNode(int startDocId, int endDocId, int dimensionId) throws IOException {
+  private TreeNode constructStarNode(int startDocId, int endDocId, int dimensionId)
+      throws IOException {
     TreeNode starNode = getNewNode();
     starNode._dimensionId = dimensionId;
     starNode._dimensionValue = StarTreeNode.ALL;
@@ -400,7 +408,8 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
     return starNode;
   }
 
-  private Record createAggregatedDocs(TreeNode node) throws IOException {
+  private Record createAggregatedDocs(TreeNode node)
+      throws IOException {
     if (node._children == null) {
       // For leaf node, aggregate all records under it
       Record record = null;
@@ -446,7 +455,8 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
     }
   }
 
-  private void createForwardIndexes() throws Exception {
+  private void createForwardIndexes()
+      throws Exception {
     SingleValueUnsortedForwardIndexCreator[] dimensionIndexCreators =
         new SingleValueUnsortedForwardIndexCreator[_numDimensions];
     for (int i = 0; i < _numDimensions; i++) {
@@ -498,11 +508,11 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
   }
 
   private void writeMetadata() {
-    _metadataProperties.addProperty(MetadataKey.TOTAL_DOCS, _numDocs);
-    _metadataProperties.addProperty(MetadataKey.DIMENSIONS_SPLIT_ORDER, _dimensionsSplitOrder);
-    _metadataProperties.addProperty(MetadataKey.FUNCTION_COLUMN_PAIRS, _metrics);
-    _metadataProperties.addProperty(MetadataKey.MAX_LEAF_RECORDS, _maxLeafRecords);
-    _metadataProperties.addProperty(MetadataKey.SKIP_STAR_NODE_CREATION_FOR_DIMENSIONS,
+    _metadataProperties.setProperty(MetadataKey.TOTAL_DOCS, _numDocs);
+    _metadataProperties.setProperty(MetadataKey.DIMENSIONS_SPLIT_ORDER, _dimensionsSplitOrder);
+    _metadataProperties.setProperty(MetadataKey.FUNCTION_COLUMN_PAIRS, _metrics);
+    _metadataProperties.setProperty(MetadataKey.MAX_LEAF_RECORDS, _maxLeafRecords);
+    _metadataProperties.setProperty(MetadataKey.SKIP_STAR_NODE_CREATION_FOR_DIMENSIONS,
         _builderConfig.getSkipStarNodeCreationForDimensions());
   }
 }

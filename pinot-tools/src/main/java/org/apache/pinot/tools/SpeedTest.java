@@ -25,6 +25,7 @@ import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel.MapMode;
 
+
 /**
  * Compares perf between Heap, Direct and Memory Mapped
  *
@@ -39,7 +40,8 @@ public class SpeedTest {
   static MappedByteBuffer mmappedByteBuffer;
   static int[] readIndices;
 
-  static void init() throws Exception {
+  static void init()
+      throws Exception {
     // write a temp file
     FileOutputStream fout = new FileOutputStream(FILE_NAME);
     DataOutputStream out = new DataOutputStream(fout);
@@ -107,7 +109,8 @@ public class SpeedTest {
     return sum;
   }
 
-  public static void main(String[] args) throws Exception {
+  public static void main(String[] args)
+      throws Exception {
     init();
 
     System.out.println(heap());
@@ -116,6 +119,5 @@ public class SpeedTest {
     System.out.println(directMemory());
     System.out.println(memoryMapped());
     System.out.println(memoryMapped());
-
   }
 }

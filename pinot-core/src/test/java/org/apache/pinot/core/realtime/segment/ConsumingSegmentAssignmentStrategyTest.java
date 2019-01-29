@@ -56,7 +56,8 @@ public class ConsumingSegmentAssignmentStrategyTest {
   }
 
   @BeforeMethod
-  public void setUp() throws Exception {
+  public void setUp()
+      throws Exception {
 
     consumingServerNames = new String[MAX_CONSUMING_INSTANCES];
     for (int i = 0; i < MAX_CONSUMING_INSTANCES; i++) {
@@ -149,7 +150,8 @@ public class ConsumingSegmentAssignmentStrategyTest {
    *
    */
   @Test
-  public void testSegmentLifecycle() throws Exception {
+  public void testSegmentLifecycle()
+      throws Exception {
     String tableName = "tableName_REALTIME";
     int numReplicas = 2;
     List<String> completedInstances = Lists.newArrayList("CompletedServer_0", "CompletedServer_1");
@@ -166,7 +168,8 @@ public class ConsumingSegmentAssignmentStrategyTest {
   }
 
   private void testSegmentCompletionScenario(String tableName, int numPartitions, int numReplicas,
-      List<String> consumingInstances, List<String> completedInstances) throws InvalidConfigException {
+      List<String> consumingInstances, List<String> completedInstances)
+      throws InvalidConfigException {
 
     IdealState idealState;
     TableConfig tableConfig = mock(TableConfig.class);
@@ -195,17 +198,16 @@ public class ConsumingSegmentAssignmentStrategyTest {
       LLCSegmentName segmentName = new LLCSegmentName(tableName, i, 1, System.currentTimeMillis());
       segmentNames.add(segmentName.getSegmentName());
     }
-    Map<String, List<String>> assignment = consumingSegmentAssignmentStrategy.assign(segmentNames, partitionAssignmentFromIdealState);
+    Map<String, List<String>> assignment =
+        consumingSegmentAssignmentStrategy.assign(segmentNames, partitionAssignmentFromIdealState);
 
     // verify
     verifyAssignmentIsFromLatest(partitionAssignmentGenerator, idealState, assignment);
 
     // 2) consuming segments moved to ONLINE, new set of consuming segments generated
 
-    idealState = idealStateBuilder.setSegmentState(0, 0, "ONLINE")
-        .setSegmentState(1, 0, "ONLINE")
-        .setSegmentState(2, 0, "ONLINE")
-        .addConsumingSegments(numPartitions, 1, numReplicas, consumingInstances)
+    idealState = idealStateBuilder.setSegmentState(0, 0, "ONLINE").setSegmentState(1, 0, "ONLINE")
+        .setSegmentState(2, 0, "ONLINE").addConsumingSegments(numPartitions, 1, numReplicas, consumingInstances)
         .build();
 
     partitionAssignmentFromIdealState =
@@ -223,10 +225,8 @@ public class ConsumingSegmentAssignmentStrategyTest {
 
     // 3) ONLINE segments moved to completed servers - latest consuming segments still on consuming
 
-    idealState = idealStateBuilder.moveToServers(0, 0, completedInstances)
-        .moveToServers(1, 0, completedInstances)
-        .moveToServers(2, 0, completedInstances)
-        .build();
+    idealState = idealStateBuilder.moveToServers(0, 0, completedInstances).moveToServers(1, 0, completedInstances)
+        .moveToServers(2, 0, completedInstances).build();
     partitionAssignmentFromIdealState =
         partitionAssignmentGenerator.getStreamPartitionAssignmentFromIdealState(tableConfig, idealState);
 
@@ -237,10 +237,8 @@ public class ConsumingSegmentAssignmentStrategyTest {
 
     // 4) latest consuming segments became OFFLINE
 
-    idealState = idealStateBuilder.setSegmentState(0, 1, "OFFLINE")
-        .setSegmentState(1, 1, "OFFLINE")
-        .setSegmentState(2, 1, "OFFLINE")
-        .build();
+    idealState = idealStateBuilder.setSegmentState(0, 1, "OFFLINE").setSegmentState(1, 1, "OFFLINE")
+        .setSegmentState(2, 1, "OFFLINE").build();
     partitionAssignmentFromIdealState =
         partitionAssignmentGenerator.getStreamPartitionAssignmentFromIdealState(tableConfig, idealState);
 

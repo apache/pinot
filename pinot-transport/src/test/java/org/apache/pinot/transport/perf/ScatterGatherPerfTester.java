@@ -36,14 +36,14 @@ import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.transport.config.PerTableRoutingConfig;
 import org.apache.pinot.transport.config.RoutingTableConfig;
 
+
 public class ScatterGatherPerfTester {
 
-  public enum ExecutionMode
-  {
-    RUN_CLIENT,
-    RUN_SERVER,
-    RUN_BOTH
-  };
+  public enum ExecutionMode {
+    RUN_CLIENT, RUN_SERVER, RUN_BOTH
+  }
+
+  ;
 
   private final int _numClients;
   private final int _numServers;
@@ -59,19 +59,9 @@ public class ScatterGatherPerfTester {
   private final int _numResponseReaderThreads;
   private final long _responseLatencyAtServer;
 
-  public ScatterGatherPerfTester(int numClients,
-                                 int numServers,
-                                 int requestSize,
-                                 int responseSize,
-                                 int numRequests,
-                                 int startPortNum,
-                                 boolean asyncRequestDispatch,
-                                 ExecutionMode mode,
-                                 List<String> remoteServerHosts,
-                                 int maxActiveConnectionsPerClientServerPair,
-                                 int numResponseReaderThreads,
-                                 long responseLatencyAtServer)
-  {
+  public ScatterGatherPerfTester(int numClients, int numServers, int requestSize, int responseSize, int numRequests,
+      int startPortNum, boolean asyncRequestDispatch, ExecutionMode mode, List<String> remoteServerHosts,
+      int maxActiveConnectionsPerClientServerPair, int numResponseReaderThreads, long responseLatencyAtServer) {
     _numClients = numClients;
     _numServers = numServers;
     _requestSize = requestSize;
@@ -87,17 +77,15 @@ public class ScatterGatherPerfTester {
     _responseLatencyAtServer = responseLatencyAtServer;
   }
 
-
-  public List<ScatterGatherPerfServer> runServer() throws Exception
-  {
+  public List<ScatterGatherPerfServer> runServer()
+      throws Exception {
     // Start the servers
     List<ScatterGatherPerfServer> servers = new ArrayList<ScatterGatherPerfServer>();
     int port = _startPortNum;
-    for (int i = 0; i < _numServers; i++)
-    {
+    for (int i = 0; i < _numServers; i++) {
       ScatterGatherPerfServer server = new ScatterGatherPerfServer(port++, _responseSize, _responseLatencyAtServer);
       servers.add(server);
-      System.out.println("Starting the server with port : " + (port -1));
+      System.out.println("Starting the server with port : " + (port - 1));
       server.run();
     }
 
@@ -106,19 +94,17 @@ public class ScatterGatherPerfTester {
     return servers;
   }
 
-  public void run() throws Exception
-  {
+  public void run()
+      throws Exception {
 
     List<ScatterGatherPerfServer> servers = null;
 
     // Run Servers when mode is RUN_SERVER or RUN_BOTH
-    if (_mode != ExecutionMode.RUN_CLIENT)
-    {
+    if (_mode != ExecutionMode.RUN_CLIENT) {
       servers = runServer();
     }
 
-    if (_mode != ExecutionMode.RUN_SERVER)
-    {
+    if (_mode != ExecutionMode.RUN_SERVER) {
       int port = _startPortNum;
       // Setup Routing config for clients
       RoutingTableConfig config = new RoutingTableConfig();
@@ -147,8 +133,9 @@ public class ScatterGatherPerfTester {
       } else {
         host = _remoteServerHosts.get(0);
       }
-      String serverName = CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE + host
-          + ServerInstance.NAME_PORT_DELIMITER_FOR_INSTANCE_NAME + port++;
+      String serverName =
+          CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE + host + ServerInstance.NAME_PORT_DELIMITER_FOR_INSTANCE_NAME
+              + port++;
       c.getDefaultServers().add(serverName);
       cfg.put(_resourceName, c);
 
@@ -160,7 +147,8 @@ public class ScatterGatherPerfTester {
       AggregatedHistogram<Histogram> latencyHistogram = new AggregatedHistogram<Histogram>();
       for (int i = 0; i < _numClients; i++) {
         ScatterGatherPerfClient c2 =
-            new ScatterGatherPerfClient(config, _requestSize, _resourceName, _asyncRequestDispatch, _numRequests, _maxActiveConnectionsPerClientServerPair, _numResponseReaderThreads);
+            new ScatterGatherPerfClient(config, _requestSize, _resourceName, _asyncRequestDispatch, _numRequests,
+                _maxActiveConnectionsPerClientServerPair, _numResponseReaderThreads);
         Thread t = new Thread(c2);
         clients.add(c2);
         latencyHistogram.add(c2.getLatencyHistogram());
@@ -170,14 +158,16 @@ public class ScatterGatherPerfTester {
       System.out.println("Starting the clients !!");
       long startTimeMs = 0;
       // Start Clients
-      for (Thread t2 : clientThreads)
+      for (Thread t2 : clientThreads) {
         t2.start();
+      }
 
       System.out.println("Waiting for clients to finish");
 
       // Wait for clients to finish
-      for (Thread t2 : clientThreads)
+      for (Thread t2 : clientThreads) {
         t2.join();
+      }
 
       Thread.sleep(3000);
 
@@ -198,17 +188,15 @@ public class ScatterGatherPerfTester {
       long totalTimeTakenMs = endResponseTime - beginRequestTime;
       System.out.println("Overall Total Num Requests :" + totalRequestsMeasured);
       System.out.println("Overall Total time :" + totalTimeTakenMs);
-      System.out.println("Overall Throughput (Requests/Second) :"
-          + ((totalRequestsMeasured * 1.0 * 1000) / totalTimeTakenMs));
+      System.out.println(
+          "Overall Throughput (Requests/Second) :" + ((totalRequestsMeasured * 1.0 * 1000) / totalTimeTakenMs));
       latencyHistogram.refresh();
       System.out.println("Latency :" + new LatencyMetric<AggregatedHistogram<Histogram>>(latencyHistogram));
     }
 
-    if ( _mode == ExecutionMode.RUN_BOTH)
-    {
+    if (_mode == ExecutionMode.RUN_BOTH) {
       // Shutdown Servers
-      for (ScatterGatherPerfServer s : servers)
-      {
+      for (ScatterGatherPerfServer s : servers) {
         s.shutdown();
       }
     }
@@ -230,22 +218,30 @@ public class ScatterGatherPerfTester {
   private static Options buildCommandLineOptions() {
     Options options = new Options();
     options.addOption(EXECUTION_MODE, true, "Execution Mode. One of " + EnumSet.allOf(ExecutionMode.class));
-    options.addOption(NUM_CLIENTS, true, "Number of Client instances. (Clients will not share connection-pool). Used only when execution mode is RUN_CLIENT or RUN_BOTH");
-    options.addOption(NUM_SERVERS, true, "Number of server instances. Used only when execution mode is RUN_SERVER or RUN_BOTH");
+    options.addOption(NUM_CLIENTS, true,
+        "Number of Client instances. (Clients will not share connection-pool). Used only when execution mode is RUN_CLIENT or RUN_BOTH");
+    options.addOption(NUM_SERVERS, true,
+        "Number of server instances. Used only when execution mode is RUN_SERVER or RUN_BOTH");
     options.addOption(REQUEST_SIZE, true, "Request Size. Used only when execution mode is RUN_SERVER or RUN_BOTH");
     options.addOption(RESPONSE_SIZE, true, "Response Size. Used only when execution mode is RUN_SERVER or RUN_BOTH");
-    options.addOption(NUM_REQUESTS, true, "Number of requests to be sent per Client instances. Used only when execution mode is RUN_CLIENT or RUN_BOTH");
-    options.addOption(SERVER_START_PORT, true, "Start port for server. If execution_mode == RUN_SERVER or RUN_BOTH, then, N (controlled by num_servers) servers will be started with port numbers monotonically incremented from this value. If execution_mode == RUN_CLIENT, then N servers are assumed to be running remotely and this client connects to them");
-    options.addOption(SYNC_REQUEST_DISPATCH, false, "Do we want to send requests synchronously (one by one requests and response per client). Set it to false to mimic production workflows");
-    options.addOption(SERVER_HOSTS, true, "Comma seperated list of remote hosts where the servers are assumed to be running with same ports (assigned from start_port_num)");
+    options.addOption(NUM_REQUESTS, true,
+        "Number of requests to be sent per Client instances. Used only when execution mode is RUN_CLIENT or RUN_BOTH");
+    options.addOption(SERVER_START_PORT, true,
+        "Start port for server. If execution_mode == RUN_SERVER or RUN_BOTH, then, N (controlled by num_servers) servers will be started with port numbers monotonically incremented from this value. If execution_mode == RUN_CLIENT, then N servers are assumed to be running remotely and this client connects to them");
+    options.addOption(SYNC_REQUEST_DISPATCH, false,
+        "Do we want to send requests synchronously (one by one requests and response per client). Set it to false to mimic production workflows");
+    options.addOption(SERVER_HOSTS, true,
+        "Comma seperated list of remote hosts where the servers are assumed to be running with same ports (assigned from start_port_num)");
     options.addOption(CONN_POOL_SIZE_PER_PEER, true, "Number of max active connections to be allowed");
-    options.addOption(NUM_RESPONSE_READERS, true, "Number of reponse reader threads per Client instances. Used only when execution mode is RUN_CLIENT or RUN_BOTH");
-    options.addOption(RESPONSE_LATENCY, true, "Induced Latency in server per request. Used only when execution mode is RUN_SERVER or RUN_BOTH");
+    options.addOption(NUM_RESPONSE_READERS, true,
+        "Number of reponse reader threads per Client instances. Used only when execution mode is RUN_CLIENT or RUN_BOTH");
+    options.addOption(RESPONSE_LATENCY, true,
+        "Induced Latency in server per request. Used only when execution mode is RUN_SERVER or RUN_BOTH");
     return options;
   }
 
-  public static void main(String[] args) throws Exception
-  {
+  public static void main(String[] args)
+      throws Exception {
     CommandLineParser cliParser = new GnuParser();
 
     Options cliOptions = buildCommandLineOptions();
@@ -255,11 +251,11 @@ public class ScatterGatherPerfTester {
     if (!cmd.hasOption(EXECUTION_MODE)) {
       System.out.println("Missing required argument (" + EXECUTION_MODE + ")");
       HelpFormatter formatter = new HelpFormatter();
-      formatter.printHelp( "", cliOptions );
+      formatter.printHelp("", cliOptions);
       System.exit(-1);
     }
 
-    ExecutionMode  mode = ExecutionMode.valueOf(cmd.getOptionValue(EXECUTION_MODE));
+    ExecutionMode mode = ExecutionMode.valueOf(cmd.getOptionValue(EXECUTION_MODE));
 
     int numClients = 1;
     int numServers = 1;
@@ -273,12 +269,11 @@ public class ScatterGatherPerfTester {
     int numResponseReaders = 3;
     long serverInducedLatency = 10;
 
-    if ( mode == ExecutionMode.RUN_CLIENT)
-    {
+    if (mode == ExecutionMode.RUN_CLIENT) {
       if (!cmd.hasOption(SERVER_HOSTS)) {
         System.out.println("Missing required argument (" + SERVER_HOSTS + ")");
         HelpFormatter formatter = new HelpFormatter();
-        formatter.printHelp( "", cliOptions );
+        formatter.printHelp("", cliOptions);
         System.exit(-1);
       }
     }
@@ -320,18 +315,17 @@ public class ScatterGatherPerfTester {
     }
 
     ScatterGatherPerfTester tester = new ScatterGatherPerfTester(numClients, // num Client Threads
-                                                                 numServers, // Num Servers
-                                                                 requestSize, // Request Size
-                                                                 responseSize, // Response Size
-                                                                 numRequests, //  Num Requests
-                                                                 startPortNum, // Server start port
-                                                                 isAsyncRequest, // Async Request sending
-                                                                 ExecutionMode.RUN_CLIENT, // Execution mode
-                                                                 servers, // Server Hosts. All servers need to run on the same port
-                                                                 numActiveConnectionsPerPeer, // Number of Active Client connections per Client-Server pair
-                                                                 numResponseReaders, // Number of Response Reader threads in client
-                                                                 serverInducedLatency); // 10 ms latency at server
+        numServers, // Num Servers
+        requestSize, // Request Size
+        responseSize, // Response Size
+        numRequests, //  Num Requests
+        startPortNum, // Server start port
+        isAsyncRequest, // Async Request sending
+        ExecutionMode.RUN_CLIENT, // Execution mode
+        servers, // Server Hosts. All servers need to run on the same port
+        numActiveConnectionsPerPeer, // Number of Active Client connections per Client-Server pair
+        numResponseReaders, // Number of Response Reader threads in client
+        serverInducedLatency); // 10 ms latency at server
     tester.run();
   }
-
 }

@@ -165,7 +165,8 @@ public abstract class ControllerTest {
     return schema;
   }
 
-  protected void addDummySchema(String tableName) throws IOException {
+  protected void addDummySchema(String tableName)
+      throws IOException {
     addSchema(createDummySchema(tableName).getJSONSchema());
   }
 
@@ -173,21 +174,25 @@ public abstract class ControllerTest {
    * Add a schema to the controller.
    * @param schemaJson the json string representing the schema
    */
-  protected void addSchema(String schemaJson) throws IOException {
+  protected void addSchema(String schemaJson)
+      throws IOException {
     String url = _controllerRequestURLBuilder.forSchemaCreate();
     PostMethod postMethod = sendMultipartPostRequest(url, schemaJson);
     Assert.assertEquals(postMethod.getStatusCode(), 200);
   }
 
-  public static String sendGetRequest(String urlString) throws IOException {
+  public static String sendGetRequest(String urlString)
+      throws IOException {
     return constructResponse(new URL(urlString).openStream());
   }
 
-  public static String sendGetRequestRaw(String urlString) throws IOException {
+  public static String sendGetRequestRaw(String urlString)
+      throws IOException {
     return IOUtils.toString(new URL(urlString).openStream());
   }
 
-  public static String sendPostRequest(String urlString, String payload) throws IOException {
+  public static String sendPostRequest(String urlString, String payload)
+      throws IOException {
     HttpURLConnection httpConnection = (HttpURLConnection) new URL(urlString).openConnection();
     httpConnection.setRequestMethod("POST");
 
@@ -203,7 +208,8 @@ public abstract class ControllerTest {
     return constructResponse(httpConnection.getInputStream());
   }
 
-  public static String sendPutRequest(String urlString, String payload) throws IOException {
+  public static String sendPutRequest(String urlString, String payload)
+      throws IOException {
     HttpURLConnection httpConnection = (HttpURLConnection) new URL(urlString).openConnection();
     httpConnection.setDoOutput(true);
     httpConnection.setRequestMethod("PUT");
@@ -217,7 +223,8 @@ public abstract class ControllerTest {
     return constructResponse(httpConnection.getInputStream());
   }
 
-  public static String sendDeleteRequest(String urlString) throws IOException {
+  public static String sendDeleteRequest(String urlString)
+      throws IOException {
     HttpURLConnection httpConnection = (HttpURLConnection) new URL(urlString).openConnection();
     httpConnection.setRequestMethod("DELETE");
     httpConnection.connect();
@@ -225,7 +232,8 @@ public abstract class ControllerTest {
     return constructResponse(httpConnection.getInputStream());
   }
 
-  private static String constructResponse(InputStream inputStream) throws IOException {
+  private static String constructResponse(InputStream inputStream)
+      throws IOException {
     try (BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, "UTF-8"))) {
       StringBuilder responseBuilder = new StringBuilder();
       String line;
@@ -236,7 +244,8 @@ public abstract class ControllerTest {
     }
   }
 
-  public static PostMethod sendMultipartPostRequest(String url, String body) throws IOException {
+  public static PostMethod sendMultipartPostRequest(String url, String body)
+      throws IOException {
     HttpClient httpClient = new HttpClient();
     PostMethod postMethod = new PostMethod(url);
     // our handlers ignore key...so we can put anything here
@@ -246,7 +255,8 @@ public abstract class ControllerTest {
     return postMethod;
   }
 
-  public static PutMethod sendMultipartPutRequest(String url, String body) throws IOException {
+  public static PutMethod sendMultipartPutRequest(String url, String body)
+      throws IOException {
     HttpClient httpClient = new HttpClient();
     PutMethod putMethod = new PutMethod(url);
     // our handlers ignore key...so we can put anything here

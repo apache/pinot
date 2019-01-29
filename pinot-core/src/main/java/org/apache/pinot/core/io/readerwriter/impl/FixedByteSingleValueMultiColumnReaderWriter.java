@@ -159,7 +159,8 @@ public class FixedByteSingleValueMultiColumnReaderWriter extends BaseSingleValue
   }
 
   @Override
-  public void close() throws IOException {
+  public void close()
+      throws IOException {
     _capacityInRows = 0;
     _writers.clear();
     _readers.clear();

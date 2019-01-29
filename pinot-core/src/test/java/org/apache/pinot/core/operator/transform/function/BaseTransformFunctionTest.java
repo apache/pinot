@@ -78,7 +78,8 @@ public abstract class BaseTransformFunctionTest {
   protected ProjectionBlock _projectionBlock;
 
   @BeforeClass
-  public void setUp() throws Exception {
+  public void setUp()
+      throws Exception {
     FileUtils.deleteQuietly(new File(INDEX_DIR_PATH));
 
     long currentTimeMs = System.currentTimeMillis();

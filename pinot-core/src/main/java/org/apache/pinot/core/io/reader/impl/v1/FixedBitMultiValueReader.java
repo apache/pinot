@@ -140,7 +140,8 @@ public final class FixedBitMultiValueReader extends BaseSingleColumnMultiValueRe
   }
 
   @Override
-  public void close() throws IOException {
+  public void close()
+      throws IOException {
     _chunkOffsetReader.close();
     _bitmapReader.close();
     _rawDataReader.close();

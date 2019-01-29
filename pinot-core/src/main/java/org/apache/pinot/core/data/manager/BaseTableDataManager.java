@@ -126,13 +126,15 @@ public abstract class BaseTableDataManager implements TableDataManager {
   }
 
   @Override
-  public void addSegment(@Nonnull File indexDir, @Nonnull IndexLoadingConfig indexLoadingConfig) throws Exception {
+  public void addSegment(@Nonnull File indexDir, @Nonnull IndexLoadingConfig indexLoadingConfig)
+      throws Exception {
     throw new UnsupportedOperationException();
   }
 
   @Override
   public void addSegment(@Nonnull String segmentName, @Nonnull TableConfig tableConfig,
-      @Nonnull IndexLoadingConfig indexLoadingConfig) throws Exception {
+      @Nonnull IndexLoadingConfig indexLoadingConfig)
+      throws Exception {
     throw new UnsupportedOperationException();
   }
 

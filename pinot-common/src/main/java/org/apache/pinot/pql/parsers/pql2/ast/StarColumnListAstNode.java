@@ -34,6 +34,6 @@ public class StarColumnListAstNode extends BaseAstNode {
     List<String> modifiableList = new ArrayList<>(1);
     modifiableList.add("*");
     selection.setSelectionColumns(modifiableList);
-        brokerRequest.setSelections(selection);
+    brokerRequest.setSelections(selection);
   }
 }

@@ -97,14 +97,16 @@ public class GenericRow implements RowEvent {
     }
   }
 
-  public static GenericRow fromBytes(byte[] buffer) throws IOException {
+  public static GenericRow fromBytes(byte[] buffer)
+      throws IOException {
     Map<String, Object> fieldMap = JsonUtils.bytesToObject(buffer, Map.class);
     GenericRow genericRow = new GenericRow();
     genericRow.init(fieldMap);
     return genericRow;
   }
 
-  public byte[] toBytes() throws IOException {
+  public byte[] toBytes()
+      throws IOException {
     return JsonUtils.objectToBytes(_fieldMap);
   }
 

@@ -31,45 +31,40 @@ import org.slf4j.LoggerFactory;
 public class ChangeTableState extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(ChangeTableState.class);
 
-  @Option (name = "-controllerHost", required = false, metaVar = "<String>", usage = "host name for controller")
+  @Option(name = "-controllerHost", required = false, metaVar = "<String>", usage = "host name for controller")
   private String _controllerHost;
 
-  @Option (name = "-controllerPort", required = false, metaVar = "<int>", usage = "Port number for controller.")
+  @Option(name = "-controllerPort", required = false, metaVar = "<int>", usage = "Port number for controller.")
   private String _controllerPort = DEFAULT_CONTROLLER_PORT;
 
-  @Option (name = "-tableName", required = true, metaVar = "<String>", usage = "Table name to disable")
+  @Option(name = "-tableName", required = true, metaVar = "<String>", usage = "Table name to disable")
   private String _tableName;
 
-  @Option (name = "-state", required = true, metaVar = "<String>", usage = "Change Table State(enable|disable|drop)")
+  @Option(name = "-state", required = true, metaVar = "<String>", usage = "Change Table State(enable|disable|drop)")
   private String _state;
 
-  @Option (name = "-help", required = false, help = true, aliases = { "-h", "--h", "--help" },
-      usage = "Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
   private boolean _help = false;
 
   @Override
-  public boolean execute() throws Exception {
+  public boolean execute()
+      throws Exception {
     if (_controllerHost == null) {
       _controllerHost = NetUtil.getHostAddress();
     }
 
     String stateValue = _state.toLowerCase();
-    if (!stateValue.equals("enable")
-        && !stateValue.equals("disable")
-        && !stateValue.equals("drop")) {
-      throw new IllegalArgumentException("Invalid value for state: " + _state
-          + "\n Value must be one of enable|disable|drop");
+    if (!stateValue.equals("enable") && !stateValue.equals("disable") && !stateValue.equals("drop")) {
+      throw new IllegalArgumentException(
+          "Invalid value for state: " + _state + "\n Value must be one of enable|disable|drop");
     }
     HttpClient httpClient = new HttpClient();
-    HttpURL url = new HttpURL(_controllerHost,
-        Integer.parseInt(_controllerPort),
-        URI_TABLES_PATH + _tableName);
+    HttpURL url = new HttpURL(_controllerHost, Integer.parseInt(_controllerPort), URI_TABLES_PATH + _tableName);
     url.setQuery("state", stateValue);
     GetMethod httpGet = new GetMethod(url.getEscapedURI());
     int status = httpClient.executeMethod(httpGet);
     if (status != 200) {
-      throw new RuntimeException(
-          "Failed to change table state, error: " + httpGet.getResponseBodyAsString());
+      throw new RuntimeException("Failed to change table state, error: " + httpGet.getResponseBodyAsString());
     }
     return true;
   }
@@ -90,15 +85,12 @@ public class ChangeTableState extends AbstractBaseAdminCommand implements Comman
 
   @Override
   public String toString() {
-    return ("ChangeTableState -controllerHost " + _controllerHost
-        + " -controllerPort " + _controllerPort
-        + " -tableName" + _tableName
-        + " -state" + _state);
+    return ("ChangeTableState -controllerHost " + _controllerHost + " -controllerPort " + _controllerPort
+        + " -tableName" + _tableName + " -state" + _state);
   }
 
   @Override
   public void cleanup() {
 
   }
-
 }

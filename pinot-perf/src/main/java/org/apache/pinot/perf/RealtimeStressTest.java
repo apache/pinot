@@ -55,7 +55,8 @@ public class RealtimeStressTest extends RealtimeClusterIntegrationTest {
     }
   }
 
-  private void runBenchmark() throws Exception {
+  private void runBenchmark()
+      throws Exception {
     // Start ZK and Kafka
     startZk();
     KafkaServerStartable kafkaStarter = KafkaStarterUtils
@@ -66,8 +67,8 @@ public class RealtimeStressTest extends RealtimeClusterIntegrationTest {
     KafkaStarterUtils.createTopic(getKafkaTopic(), KafkaStarterUtils.DEFAULT_ZK_STR, 10);
 
     // Unpack data (needed to get the Avro schema)
-    TarGzCompressionUtils.unTar(
-        new File(TestUtils.getFileFromResourceUrl(RealtimeClusterIntegrationTest.class.getClassLoader()
+    TarGzCompressionUtils.unTar(new File(TestUtils.getFileFromResourceUrl(
+        RealtimeClusterIntegrationTest.class.getClassLoader()
             .getResource("On_Time_On_Time_Performance_2014_100k_subset_nonulls.tar.gz"))), _tmpDir);
 
     _tmpDir.mkdirs();
@@ -76,9 +77,8 @@ public class RealtimeStressTest extends RealtimeClusterIntegrationTest {
       avroFiles.add(new File(_tmpDir.getPath() + "/On_Time_On_Time_Performance_2014_" + segmentNumber + ".avro"));
     }
 
-    File schemaFile =
-        new File(OfflineClusterIntegrationTest.class.getClassLoader()
-            .getResource("On_Time_On_Time_Performance_2014_100k_subset_nonulls.schema").getFile());
+    File schemaFile = new File(OfflineClusterIntegrationTest.class.getClassLoader()
+        .getResource("On_Time_On_Time_Performance_2014_100k_subset_nonulls.schema").getFile());
 
     // Start the Pinot cluster
     startController();
@@ -92,8 +92,9 @@ public class RealtimeStressTest extends RealtimeClusterIntegrationTest {
     Uninterruptibles.sleepUninterruptibly(5, TimeUnit.SECONDS);
 
     // Generate ROW_COUNT rows and write them into Kafka
-    ClusterIntegrationTestUtils.pushRandomAvroIntoKafka(avroFiles.get(0), KafkaStarterUtils.DEFAULT_KAFKA_BROKER,
-        getKafkaTopic(), ROW_COUNT, getMaxNumKafkaMessagesPerBatch(), getKafkaMessageHeader(), getPartitionColumn());
+    ClusterIntegrationTestUtils
+        .pushRandomAvroIntoKafka(avroFiles.get(0), KafkaStarterUtils.DEFAULT_KAFKA_BROKER, getKafkaTopic(), ROW_COUNT,
+            getMaxNumKafkaMessagesPerBatch(), getKafkaMessageHeader(), getPartitionColumn());
     rowsWritten += ROW_COUNT;
 
     // Run forever until something breaks or the timeout completes
@@ -113,8 +114,9 @@ public class RealtimeStressTest extends RealtimeClusterIntegrationTest {
 
       // Write more rows if needed
       if (rowsWritten - pinotRecordCount < MIN_ROW_COUNT) {
-        ClusterIntegrationTestUtils.pushRandomAvroIntoKafka(avroFiles.get(0), KafkaStarterUtils.DEFAULT_KAFKA_BROKER,
-            getKafkaTopic(), ROW_COUNT, getMaxNumKafkaMessagesPerBatch(), getKafkaMessageHeader(), getPartitionColumn());
+        ClusterIntegrationTestUtils
+            .pushRandomAvroIntoKafka(avroFiles.get(0), KafkaStarterUtils.DEFAULT_KAFKA_BROKER, getKafkaTopic(),
+                ROW_COUNT, getMaxNumKafkaMessagesPerBatch(), getKafkaMessageHeader(), getPartitionColumn());
         rowsWritten += ROW_COUNT;
       }
 

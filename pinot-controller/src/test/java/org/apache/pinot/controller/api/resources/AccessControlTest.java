@@ -41,7 +41,7 @@ public class AccessControlTest extends ControllerTest {
   }
 
   @Test
-  public void testAccessDenied() throws Exception {
+  public void testAccessDenied() {
     try {
       sendGetRequest(_controllerRequestURLBuilder.forSegmentDownload("testTable", "testSegment"));
     } catch (IOException e) {

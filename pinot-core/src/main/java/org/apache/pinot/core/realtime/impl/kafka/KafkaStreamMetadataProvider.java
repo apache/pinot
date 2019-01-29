@@ -224,7 +224,8 @@ public class KafkaStreamMetadataProvider extends KafkaConnectionHandler implemen
   }
 
   @Override
-  public void close() throws IOException {
+  public void close()
+      throws IOException {
     super.close();
   }
 }

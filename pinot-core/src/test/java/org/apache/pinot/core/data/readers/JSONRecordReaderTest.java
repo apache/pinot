@@ -33,7 +33,8 @@ public class JSONRecordReaderTest extends RecordReaderTest {
   private static final File DATA_FILE = new File(TEMP_DIR, "data.json");
 
   @BeforeClass
-  public void setUp() throws Exception {
+  public void setUp()
+      throws Exception {
     FileUtils.forceMkdir(TEMP_DIR);
 
     try (FileWriter fileWriter = new FileWriter(DATA_FILE)) {
@@ -51,7 +52,8 @@ public class JSONRecordReaderTest extends RecordReaderTest {
   }
 
   @Test
-  public void testJSONRecordReader() throws Exception {
+  public void testJSONRecordReader()
+      throws Exception {
     try (JSONRecordReader recordReader = new JSONRecordReader(DATA_FILE, SCHEMA)) {
       checkValue(recordReader);
       recordReader.rewind();
@@ -60,7 +62,8 @@ public class JSONRecordReaderTest extends RecordReaderTest {
   }
 
   @AfterClass
-  public void tearDown() throws Exception {
+  public void tearDown()
+      throws Exception {
     FileUtils.forceDelete(TEMP_DIR);
   }
 }

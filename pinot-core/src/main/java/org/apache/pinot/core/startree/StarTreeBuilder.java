@@ -35,27 +35,32 @@ public interface StarTreeBuilder extends Closeable {
   /**
    * Initialize the builder, called before append().
    */
-  void init(StarTreeBuilderConfig config) throws IOException;
+  void init(StarTreeBuilderConfig config)
+      throws IOException;
 
   /**
    * Append a document to the star tree.
    */
-  void append(GenericRow row) throws IOException;
+  void append(GenericRow row)
+      throws IOException;
 
   /**
    * Build the StarTree, called after all documents get appended.
    */
-  void build() throws IOException;
+  void build()
+      throws IOException;
 
   /**
    * Iterator to iterate over the records from startDocId to endDocId (exclusive).
    */
-  Iterator<GenericRow> iterator(int startDocId, int endDocId) throws IOException;
+  Iterator<GenericRow> iterator(int startDocId, int endDocId)
+      throws IOException;
 
   /**
    * Serialize the star tree into a file.
    */
-  void serializeTree(File starTreeFile, Map<String, ColumnIndexCreationInfo> indexCreationInfoMap) throws IOException;
+  void serializeTree(File starTreeFile, Map<String, ColumnIndexCreationInfo> indexCreationInfoMap)
+      throws IOException;
 
   /**
    * Returns the total number of non-aggregate dimension combinations.

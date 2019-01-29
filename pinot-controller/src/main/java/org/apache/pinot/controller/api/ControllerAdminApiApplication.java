@@ -94,15 +94,12 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     // So, we setup specific handlers for static resource directory. index.html is served directly
     // by a jersey handler
 
-    httpServer.getServerConfiguration().addHttpHandler(
-        new CLStaticHttpHandler(classLoader,"/static/query/"), "/query");
-    httpServer.getServerConfiguration().addHttpHandler(
-        new CLStaticHttpHandler(classLoader, "/static/css/"), "/css");
-    httpServer.getServerConfiguration().addHttpHandler(
-        new CLStaticHttpHandler(classLoader, "/static/js/"), "/js");
+    httpServer.getServerConfiguration()
+        .addHttpHandler(new CLStaticHttpHandler(classLoader, "/static/query/"), "/query/");
+    httpServer.getServerConfiguration().addHttpHandler(new CLStaticHttpHandler(classLoader, "/static/css/"), "/css/");
+    httpServer.getServerConfiguration().addHttpHandler(new CLStaticHttpHandler(classLoader, "/static/js/"), "/js/");
     // without this explicit request to /index.html will not work
-    httpServer.getServerConfiguration().addHttpHandler(
-        new CLStaticHttpHandler(classLoader, "/static/"), "/index.html");
+    httpServer.getServerConfiguration().addHttpHandler(new CLStaticHttpHandler(classLoader, "/static/"), "/index.html");
 
     started = true;
     LOGGER.info("Start jersey admin API on port: {}", httpPort);
@@ -117,7 +114,7 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     BeanConfig beanConfig = new BeanConfig();
     beanConfig.setTitle("Pinot Controller API");
     beanConfig.setDescription("APIs for accessing Pinot Controller information");
-    beanConfig.setContact("https://github.com/linkedin/pinot");
+    beanConfig.setContact("https://github.com/apache/incubator-pinot");
     beanConfig.setVersion("1.0");
     if (_useHttps) {
       beanConfig.setSchemes(new String[]{"https"});
@@ -128,20 +125,18 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     beanConfig.setResourcePackage(RESOURCE_PACKAGE);
     beanConfig.setScan(true);
 
-    CLStaticHttpHandler apiStaticHttpHandler = new CLStaticHttpHandler(ControllerAdminApiApplication.class.getClassLoader(),
-        "/api/");
+    ClassLoader loader = this.getClass().getClassLoader();
+    CLStaticHttpHandler apiStaticHttpHandler = new CLStaticHttpHandler(loader, "/api/");
     // map both /api and /help to swagger docs. /api because it looks nice. /help for backward compatibility
-    httpServer.getServerConfiguration().addHttpHandler(apiStaticHttpHandler, "/api");
-    httpServer.getServerConfiguration().addHttpHandler(apiStaticHttpHandler, "/help");
+    httpServer.getServerConfiguration().addHttpHandler(apiStaticHttpHandler, "/api/");
+    httpServer.getServerConfiguration().addHttpHandler(apiStaticHttpHandler, "/help/");
 
-    URL swaggerDistLocation = ControllerAdminApiApplication.class.getClassLoader()
-        .getResource("META-INF/resources/webjars/swagger-ui/2.2.2/");
-    CLStaticHttpHandler swaggerDist = new CLStaticHttpHandler(
-        new URLClassLoader(new URL[] {swaggerDistLocation}));
+    URL swaggerDistLocation = loader.getResource("META-INF/resources/webjars/swagger-ui/2.2.2/");
+    CLStaticHttpHandler swaggerDist = new CLStaticHttpHandler(new URLClassLoader(new URL[]{swaggerDistLocation}));
     httpServer.getServerConfiguration().addHttpHandler(swaggerDist, "/swaggerui-dist/");
   }
 
-   public void stop(){
+  public void stop() {
     if (!started) {
       return;
     }

@@ -60,7 +60,6 @@ public class SegmentValidator {
     _executor = executor;
     _connectionManager = connectionManager;
     _controllerMetrics = controllerMetrics;
-
   }
 
   public void validateSegment(SegmentMetadata segmentMetadata, File tempSegmentDir) {
@@ -81,11 +80,13 @@ public class SegmentValidator {
     } catch (InvalidConfigException e) {
       // Admin port is missing, return response with 500 status code.
       throw new ControllerApplicationException(LOGGER,
-          "Quota check failed for segment: " + segmentName + " of table: " + offlineTableName + ", reason: " + e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR);
+          "Quota check failed for segment: " + segmentName + " of table: " + offlineTableName + ", reason: " + e
+              .getMessage(), Response.Status.INTERNAL_SERVER_ERROR);
     }
     if (!quotaResponse.isSegmentWithinQuota) {
       throw new ControllerApplicationException(LOGGER,
-          "Quota check failed for segment: " + segmentName + " of table: " + offlineTableName + ", reason: " + quotaResponse.reason, Response.Status.FORBIDDEN);
+          "Quota check failed for segment: " + segmentName + " of table: " + offlineTableName + ", reason: "
+              + quotaResponse.reason, Response.Status.FORBIDDEN);
     }
 
     // Check time range
@@ -104,13 +105,15 @@ public class SegmentValidator {
    * @param offlineTableConfig offline table configuration. This should not be null.
    */
   private StorageQuotaChecker.QuotaCheckerResponse checkStorageQuota(@Nonnull File segmentFile,
-      @Nonnull SegmentMetadata metadata, @Nonnull TableConfig offlineTableConfig) throws InvalidConfigException {
+      @Nonnull SegmentMetadata metadata, @Nonnull TableConfig offlineTableConfig)
+      throws InvalidConfigException {
     if (!_controllerConf.getEnableStorageQuotaCheck()) {
       return StorageQuotaChecker.success("Quota check is disabled");
     }
-    TableSizeReader tableSizeReader = new TableSizeReader(_executor, _connectionManager,
-        _controllerMetrics, _pinotHelixResourceManager);
-    StorageQuotaChecker quotaChecker = new StorageQuotaChecker(offlineTableConfig, tableSizeReader, _controllerMetrics, _pinotHelixResourceManager);
+    TableSizeReader tableSizeReader =
+        new TableSizeReader(_executor, _connectionManager, _controllerMetrics, _pinotHelixResourceManager);
+    StorageQuotaChecker quotaChecker =
+        new StorageQuotaChecker(offlineTableConfig, tableSizeReader, _controllerMetrics, _pinotHelixResourceManager);
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(metadata.getTableName());
     return quotaChecker.isSegmentStorageWithinQuota(segmentFile, offlineTableName, metadata.getName(),
         _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);

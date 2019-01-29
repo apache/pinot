@@ -20,6 +20,7 @@ package org.apache.pinot.common.utils;
 
 import java.util.Comparator;
 
+
 public class Pairs {
 
   public static IntPair intPair(int a, int b) {
@@ -111,16 +112,14 @@ public class Pairs {
     }
   }
 
-  public static class AscendingNumber2ObjectPairComparator
-      implements Comparator<Number2ObjectPair> {
+  public static class AscendingNumber2ObjectPairComparator implements Comparator<Number2ObjectPair> {
     @Override
     public int compare(Number2ObjectPair o1, Number2ObjectPair o2) {
       return new Double(o1.a.doubleValue()).compareTo(new Double(o2.a.doubleValue()));
     }
   }
 
-  public static class DescendingNumber2ObjectPairComparator
-      implements Comparator<Number2ObjectPair> {
+  public static class DescendingNumber2ObjectPairComparator implements Comparator<Number2ObjectPair> {
     @Override
     public int compare(Number2ObjectPair o1, Number2ObjectPair o2) {
       return new Double(o2.a.doubleValue()).compareTo(new Double(o1.a.doubleValue()));
@@ -194,7 +193,7 @@ public class Pairs {
       double v2 = o2.getDoubleValue();
 
       if (v1 < v2) {
-        return  (_descending) ? 1 : -1;
+        return (_descending) ? 1 : -1;
       } else if (v1 > v2) {
         return (_descending) ? -1 : 1;
       } else {
@@ -279,5 +278,4 @@ public class Pairs {
       }
     }
   }
-
 }

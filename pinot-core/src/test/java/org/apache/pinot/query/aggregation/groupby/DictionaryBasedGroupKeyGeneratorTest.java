@@ -79,7 +79,8 @@ public class DictionaryBasedGroupKeyGeneratorTest {
   private TransformBlock _transformBlock;
 
   @BeforeClass
-  private void setup() throws Exception {
+  private void setup()
+      throws Exception {
     FileUtils.deleteQuietly(new File(INDEX_DIR_PATH));
 
     List<GenericRow> rows = new ArrayList<>(NUM_ROWS);
@@ -133,8 +134,8 @@ public class DictionaryBasedGroupKeyGeneratorTest {
     int docId1 = _random.nextInt(50);
     int docId2 = docId1 + 1 + _random.nextInt(50);
     // NOTE: put all columns into group-by so that transform operator has expressions for all columns
-    String query =
-        String.format("SELECT COUNT(*) FROM table WHERE %s IN (%d, %d) GROUP BY %s, %s", FILTER_COLUMN, docId1, docId2,
+    String query = String
+        .format("SELECT COUNT(*) FROM table WHERE %s IN (%d, %d) GROUP BY %s, %s", FILTER_COLUMN, docId1, docId2,
             StringUtils.join(SV_COLUMNS, ", "), StringUtils.join(MV_COLUMNS, ", "));
     TransformPlanNode transformPlanNode =
         new TransformPlanNode(indexSegment, new Pql2Compiler().compileToBrokerRequest(query));

@@ -62,8 +62,8 @@ public class RoutingTableInstancePruner {
       return true;
     }
 
-    if (Boolean.parseBoolean(
-        instanceConfig.getRecord().getSimpleField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS))) {
+    if (Boolean
+        .parseBoolean(instanceConfig.getRecord().getSimpleField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS))) {
       LOGGER.info("Instance '{}' is shutting down", instanceName);
       return true;
     }

@@ -64,9 +64,7 @@ public class HttpsSegmentFetcher extends HttpSegmentFetcher {
 
   @Override
   public Set<String> getProtectedConfigKeys() {
-    return ClientSSLContextGenerator.getProtectedConfigKeys()
-        .stream()
-        .map(s -> CommonConstants.PREFIX_OF_SSL_SUBSET + "." + s)
-        .collect(Collectors.toSet());
+    return ClientSSLContextGenerator.getProtectedConfigKeys().stream()
+        .map(s -> CommonConstants.PREFIX_OF_SSL_SUBSET + "." + s).collect(Collectors.toSet());
   }
 }

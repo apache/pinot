@@ -76,7 +76,6 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
 
     deleteStaleConversionDirectories(v2SegmentDirectory);
 
-
     File v3TempDirectory = v3ConversionTempDirectory(v2SegmentDirectory);
     setDirectoryPermissions(v3TempDirectory);
 
@@ -108,11 +107,12 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
   @VisibleForTesting
   public File v3ConversionTempDirectory(File v2SegmentDirectory)
       throws IOException {
-    File v3TempDirectory = Files.createTempDirectory(v2SegmentDirectory.toPath(),
-        v2SegmentDirectory.getName() + V3_TEMP_DIR_SUFFIX).toFile();
+    File v3TempDirectory =
+        Files.createTempDirectory(v2SegmentDirectory.toPath(), v2SegmentDirectory.getName() + V3_TEMP_DIR_SUFFIX)
+            .toFile();
     return v3TempDirectory;
-
   }
+
   private void setDirectoryPermissions(File v3Directory)
       throws IOException {
     EnumSet<PosixFilePermission> permissions = EnumSet
@@ -127,7 +127,7 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
       throws Exception {
     SegmentMetadataImpl v3Metadata = new SegmentMetadataImpl(v3Directory);
     try (SegmentDirectory v2Segment = SegmentDirectory.createFromLocalFS(v2Directory, v2Metadata, ReadMode.mmap);
-        SegmentDirectory v3Segment = SegmentDirectory.createFromLocalFS(v3Directory, v3Metadata, ReadMode.mmap) ) {
+        SegmentDirectory v3Segment = SegmentDirectory.createFromLocalFS(v3Directory, v3Metadata, ReadMode.mmap)) {
 
       // for each dictionary and each fwdIndex, copy that to newDirectory buffer
       Set<String> allColumns = v2Metadata.getAllColumns();
@@ -154,7 +154,8 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
     copyStarTreeV2(v2Directory, v3Directory);
   }
 
-  private void copyStarTreeV2(File src, File dest) throws IOException {
+  private void copyStarTreeV2(File src, File dest)
+      throws IOException {
     File indexFile = new File(src, StarTreeV2Constants.INDEX_FILE_NAME);
     if (indexFile.exists()) {
       FileUtils.copyFile(indexFile, new File(dest, StarTreeV2Constants.INDEX_FILE_NAME));
@@ -165,7 +166,7 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
 
   private void copyStarTree(SegmentDirectory.Reader v2DataReader, SegmentDirectory.Writer v3DataWriter)
       throws IOException {
-    if (! v2DataReader.hasStarTree()) {
+    if (!v2DataReader.hasStarTree()) {
       return;
     }
 
@@ -175,23 +176,17 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
     IOUtils.copy(v2StarTreeStream, v3StarTreeStream);
   }
 
-  private void copyDictionary(SegmentDirectory.Reader reader,
-      SegmentDirectory.Writer writer,
-      String column)
+  private void copyDictionary(SegmentDirectory.Reader reader, SegmentDirectory.Writer writer, String column)
       throws IOException {
     readCopyBuffers(reader, writer, column, ColumnIndexType.DICTIONARY);
   }
 
-  private void copyForwardIndex(SegmentDirectory.Reader reader,
-      SegmentDirectory.Writer writer,
-      String column)
+  private void copyForwardIndex(SegmentDirectory.Reader reader, SegmentDirectory.Writer writer, String column)
       throws IOException {
     readCopyBuffers(reader, writer, column, ColumnIndexType.FORWARD_INDEX);
   }
 
-  private void copyExistingInvertedIndex(SegmentDirectory.Reader reader,
-      SegmentDirectory.Writer writer,
-      String column)
+  private void copyExistingInvertedIndex(SegmentDirectory.Reader reader, SegmentDirectory.Writer writer, String column)
       throws IOException {
     if (reader.hasIndexFor(column, ColumnIndexType.INVERTED_INDEX)) {
       readCopyBuffers(reader, writer, column, ColumnIndexType.INVERTED_INDEX);
@@ -199,7 +194,8 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
   }
 
   private void readCopyBuffers(SegmentDirectory.Reader reader, SegmentDirectory.Writer writer, String column,
-      ColumnIndexType indexType) throws IOException {
+      ColumnIndexType indexType)
+      throws IOException {
     PinotDataBuffer oldBuffer = reader.getIndexFor(column, indexType);
     PinotDataBuffer newDictBuffer = writer.newIndexFor(column, indexType, oldBuffer.size());
     oldBuffer.copyTo(0, newDictBuffer, 0, oldBuffer.size());
@@ -216,7 +212,8 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
     properties.save(v3MetadataFile);
   }
 
-  private void copyCreationMetadataIfExists(File currentDir, File v3Dir) throws IOException {
+  private void copyCreationMetadataIfExists(File currentDir, File v3Dir)
+      throws IOException {
     File v2CreationFile = new File(currentDir, V1Constants.SEGMENT_CREATION_META);
     if (v2CreationFile.exists()) {
       File v3CreationFile = new File(v3Dir, V1Constants.SEGMENT_CREATION_META);
@@ -252,14 +249,14 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
     SegmentFormatConverter converter = new SegmentV1V2ToV3FormatConverter();
 
     for (File file : files) {
-      if (! file.isDirectory()) {
+      if (!file.isDirectory()) {
         System.out.println("Path: " + file + " is not a directory. Skipping...");
         continue;
       }
       long startTimeNano = System.nanoTime();
       converter.convert(file);
       long endTimeNano = System.nanoTime();
-      long latency =  (endTimeNano - startTimeNano) / (1000 * 1000);
+      long latency = (endTimeNano - startTimeNano) / (1000 * 1000);
       System.out.println("Converting segment: " + file + " took " + latency + " milliseconds");
     }
   }

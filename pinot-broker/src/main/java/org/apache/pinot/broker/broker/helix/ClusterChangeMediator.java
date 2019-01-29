@@ -48,8 +48,7 @@ public class ClusterChangeMediator implements LiveInstanceChangeListener, Extern
   private final TableQueryQuotaManager _tableQueryQuotaManager;
 
   private enum UpdateType {
-    EXTERNAL_VIEW,
-    INSTANCE_CONFIG
+    EXTERNAL_VIEW, INSTANCE_CONFIG
   }
 
   private final LinkedBlockingQueue<Pair<UpdateType, Long>> _clusterChangeQueue = new LinkedBlockingQueue<>(1000);
@@ -57,8 +56,7 @@ public class ClusterChangeMediator implements LiveInstanceChangeListener, Extern
   private Thread _deferredClusterUpdater = null;
 
   public ClusterChangeMediator(HelixExternalViewBasedRouting helixExternalViewBasedRouting,
-      TableQueryQuotaManager tableQueryQuotaManager,
-      final BrokerMetrics brokerMetrics) {
+      TableQueryQuotaManager tableQueryQuotaManager, final BrokerMetrics brokerMetrics) {
     _helixExternalViewBasedRouting = helixExternalViewBasedRouting;
     _tableQueryQuotaManager = tableQueryQuotaManager;
 
@@ -132,7 +130,8 @@ public class ClusterChangeMediator implements LiveInstanceChangeListener, Extern
         LOGGER.warn("Was interrupted while trying to add external view change to queue", e);
       }
     } else {
-      LOGGER.warn("Deferred cluster updater thread is null or stopped, not deferring external view routing table rebuild");
+      LOGGER.warn(
+          "Deferred cluster updater thread is null or stopped, not deferring external view routing table rebuild");
       _helixExternalViewBasedRouting.processExternalViewChange();
       _tableQueryQuotaManager.processQueryQuotaChange();
     }
@@ -148,7 +147,8 @@ public class ClusterChangeMediator implements LiveInstanceChangeListener, Extern
         LOGGER.warn("Was interrupted while trying to add external view change to queue", e);
       }
     } else {
-      LOGGER.warn("Deferred cluster updater thread is null or stopped, not deferring instance config change notification");
+      LOGGER.warn(
+          "Deferred cluster updater thread is null or stopped, not deferring instance config change notification");
       _helixExternalViewBasedRouting.processInstanceConfigChange();
     }
   }

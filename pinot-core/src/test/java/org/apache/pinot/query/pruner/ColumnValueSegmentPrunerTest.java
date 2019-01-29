@@ -42,17 +42,12 @@ public class ColumnValueSegmentPrunerTest {
   private static final Map<String, BloomFilterReader> BLOOM_FILTER_MAP = new HashMap<>();
 
   static {
-    COLUMN_METADATA_MAP.put("time", new ColumnMetadata.Builder().setColumnName("time")
-        .setFieldType(FieldSpec.FieldType.TIME)
-        .setDataType(FieldSpec.DataType.INT)
-        .setTimeUnit(TimeUnit.DAYS)
-        .setMinValue(10)
-        .setMaxValue(20)
-        .build());
-    COLUMN_METADATA_MAP.put("foo", new ColumnMetadata.Builder().setColumnName("foo")
-        .setFieldType(FieldSpec.FieldType.DIMENSION)
-        .setDataType(FieldSpec.DataType.STRING)
-        .build());
+    COLUMN_METADATA_MAP.put("time",
+        new ColumnMetadata.Builder().setColumnName("time").setFieldType(FieldSpec.FieldType.TIME)
+            .setDataType(FieldSpec.DataType.INT).setTimeUnit(TimeUnit.DAYS).setMinValue(10).setMaxValue(20).build());
+    COLUMN_METADATA_MAP.put("foo",
+        new ColumnMetadata.Builder().setColumnName("foo").setFieldType(FieldSpec.FieldType.DIMENSION)
+            .setDataType(FieldSpec.DataType.STRING).build());
   }
 
   @Test

@@ -36,6 +36,7 @@ import org.glassfish.jersey.server.ResourceConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
 public class AdminApiApplication extends ResourceConfig {
   private static final Logger LOGGER = LoggerFactory.getLogger(AdminApiApplication.class);
 
@@ -44,6 +45,7 @@ public class AdminApiApplication extends ResourceConfig {
   private boolean started = false;
   private HttpServer httpServer;
   public static final String RESOURCE_PACKAGE = "org.apache.pinot.server.api.resources";
+
   public AdminApiApplication(ServerInstance instance) {
     this.serverInstance = instance;
     packages(RESOURCE_PACKAGE);
@@ -66,11 +68,10 @@ public class AdminApiApplication extends ResourceConfig {
         containerResponseContext.getHeaders().add("Access-Control-Allow-Origin", "*");
       }
     });
-
   }
 
   public boolean start(int httpPort) {
-    if (httpPort <= 0 ) {
+    if (httpPort <= 0) {
       LOGGER.warn("Invalid admin API port: {}. Not starting admin service", httpPort);
       return false;
     }
@@ -90,26 +91,26 @@ public class AdminApiApplication extends ResourceConfig {
     BeanConfig beanConfig = new BeanConfig();
     beanConfig.setTitle("Pinot Server API");
     beanConfig.setDescription("APIs for accessing Pinot server information");
-    beanConfig.setContact("https://github.com/linkedin/pinot");
+    beanConfig.setContact("https://github.com/apache/incubator-pinot");
     beanConfig.setVersion("1.0");
     beanConfig.setSchemes(new String[]{"http"});
     beanConfig.setBasePath(baseUri.getPath());
     beanConfig.setResourcePackage(RESOURCE_PACKAGE);
     beanConfig.setScan(true);
 
-    CLStaticHttpHandler staticHttpHandler = new CLStaticHttpHandler(AdminApiApplication.class.getClassLoader(), "/api/");
+    CLStaticHttpHandler staticHttpHandler =
+        new CLStaticHttpHandler(AdminApiApplication.class.getClassLoader(), "/api/");
     // map both /api and /help to swagger docs. /api because it looks nice. /help for backward compatibility
-    httpServer.getServerConfiguration().addHttpHandler(staticHttpHandler, "/api");
-    httpServer.getServerConfiguration().addHttpHandler(staticHttpHandler, "/help");
+    httpServer.getServerConfiguration().addHttpHandler(staticHttpHandler, "/api/");
+    httpServer.getServerConfiguration().addHttpHandler(staticHttpHandler, "/help/");
 
-    URL swaggerDistLocation = AdminApiApplication.class.getClassLoader()
-        .getResource("META-INF/resources/webjars/swagger-ui/2.2.2/");
-    CLStaticHttpHandler swaggerDist = new CLStaticHttpHandler(
-        new URLClassLoader(new URL[] {swaggerDistLocation}));
+    URL swaggerDistLocation =
+        AdminApiApplication.class.getClassLoader().getResource("META-INF/resources/webjars/swagger-ui/2.2.2/");
+    CLStaticHttpHandler swaggerDist = new CLStaticHttpHandler(new URLClassLoader(new URL[]{swaggerDistLocation}));
     httpServer.getServerConfiguration().addHttpHandler(swaggerDist, "/swaggerui-dist/");
   }
 
-  public void stop(){
+  public void stop() {
     if (!started) {
       return;
     }

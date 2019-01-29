@@ -130,8 +130,8 @@ public abstract class QueryScheduler {
     try {
       dataTable = queryExecutor.processQuery(queryRequest, executorService);
     } catch (Exception e) {
-      LOGGER.error("Encountered exception while processing requestId {} from broker {}",
-          queryRequest.getRequestId(), queryRequest.getBrokerId(), e);
+      LOGGER.error("Encountered exception while processing requestId {} from broker {}", queryRequest.getRequestId(),
+          queryRequest.getBrokerId(), e);
       // For not handled exceptions
       serverMetrics.addMeteredGlobalValue(ServerMeter.UNCAUGHT_EXCEPTIONS, 1);
       dataTable = new DataTableImplV2();
@@ -149,12 +149,12 @@ public abstract class QueryScheduler {
         Long.parseLong(dataTableMetadata.getOrDefault(DataTable.NUM_DOCS_SCANNED_METADATA_KEY, INVALID_NUM_SCANNED));
     long numEntriesScannedInFilter = Long.parseLong(
         dataTableMetadata.getOrDefault(DataTable.NUM_ENTRIES_SCANNED_IN_FILTER_METADATA_KEY, INVALID_NUM_SCANNED));
-    long numEntriesScannedPostFilter = Long.parseLong(
-        dataTableMetadata.getOrDefault(DataTable.NUM_SEGMENTS_QUERIED, INVALID_NUM_SCANNED));
-    long numSegmentsProcessed = Long.parseLong(
-        dataTableMetadata.getOrDefault(DataTable.NUM_SEGMENTS_PROCESSED, INVALID_SEGMENTS_COUNT));
-    long numSegmentsMatched = Long.parseLong(
-        dataTableMetadata.getOrDefault(DataTable.NUM_SEGMENTS_MATCHED, INVALID_SEGMENTS_COUNT));
+    long numEntriesScannedPostFilter =
+        Long.parseLong(dataTableMetadata.getOrDefault(DataTable.NUM_SEGMENTS_QUERIED, INVALID_NUM_SCANNED));
+    long numSegmentsProcessed =
+        Long.parseLong(dataTableMetadata.getOrDefault(DataTable.NUM_SEGMENTS_PROCESSED, INVALID_SEGMENTS_COUNT));
+    long numSegmentsMatched =
+        Long.parseLong(dataTableMetadata.getOrDefault(DataTable.NUM_SEGMENTS_MATCHED, INVALID_SEGMENTS_COUNT));
 
     if (numDocsScanned > 0) {
       serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_DOCS_SCANNED, numDocsScanned);

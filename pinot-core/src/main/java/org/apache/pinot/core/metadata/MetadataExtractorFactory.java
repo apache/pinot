@@ -27,22 +27,22 @@ import org.slf4j.LoggerFactory;
  * a given file during segment upload.
  */
 public class MetadataExtractorFactory {
-    public static final Logger LOGGER = LoggerFactory.getLogger(MetadataExtractorFactory.class);
+  public static final Logger LOGGER = LoggerFactory.getLogger(MetadataExtractorFactory.class);
 
-    // Prevent factory from being instantiated
-    private MetadataExtractorFactory() {
+  // Prevent factory from being instantiated
+  private MetadataExtractorFactory() {
 
+  }
+
+  public static MetadataExtractor create(String metadataClassName) {
+    String metadataExtractorClassName = metadataClassName;
+    try {
+      LOGGER.info("Instantiating MetadataExtractor class {}", metadataExtractorClassName);
+      MetadataExtractor metadataExtractor = (MetadataExtractor) Class.forName(metadataExtractorClassName).newInstance();
+      return metadataExtractor;
+    } catch (Exception e) {
+      LOGGER.warn("No metadata extractor class passed in, using default");
+      return new DefaultMetadataExtractor();
     }
-
-    public static MetadataExtractor create(String metadataClassName) {
-      String metadataExtractorClassName = metadataClassName;
-      try {
-        LOGGER.info("Instantiating MetadataExtractor class {}", metadataExtractorClassName);
-        MetadataExtractor metadataExtractor =  (MetadataExtractor) Class.forName(metadataExtractorClassName).newInstance();
-        return metadataExtractor;
-      } catch (Exception e) {
-        LOGGER.warn("No metadata extractor class passed in, using default");
-        return new DefaultMetadataExtractor();
-      }
-    }
+  }
 }

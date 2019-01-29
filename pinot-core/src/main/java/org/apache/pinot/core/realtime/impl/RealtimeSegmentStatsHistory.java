@@ -93,7 +93,8 @@ public class RealtimeSegmentStatsHistory implements Serializable {
   public static class SegmentStats implements Serializable {
     private static final long serialVersionUID = 1L;
     private int _numRowsConsumed;   // Number of rows consumed
-    private int _numRowsIndexed = DEFAULT_ROWS_TO_INDEX; // numRowsIndexed can be <= numRowsConsumed when aggregateMetrics is true.
+    private int _numRowsIndexed = DEFAULT_ROWS_TO_INDEX;
+    // numRowsIndexed can be <= numRowsConsumed when aggregateMetrics is true.
     private int _numSeconds;        // Number of seconds taken to consume them
     private long _memUsedBytes;          // Memory used for consumption (bytes)
     private Map<String, ColumnStats> _colNameToStats = new HashMap();
@@ -134,22 +135,19 @@ public class RealtimeSegmentStatsHistory implements Serializable {
       _colNameToStats.put(columnName, columnStats);
     }
 
-    public @Nullable ColumnStats getColumnStats(String columnName) {
+    @Nullable
+    public ColumnStats getColumnStats(String columnName) {
       return _colNameToStats.get(columnName);
     }
 
     @Override
     public String toString() {
       StringBuilder sb = new StringBuilder();
-      sb.append("nRows=" + getNumRowsConsumed())
-          .append(",nMinutes=" + getNumSeconds())
+      sb.append("nRows=" + getNumRowsConsumed()).append(",nMinutes=" + getNumSeconds())
           .append(",memUsed=" + getMemUsedBytes());
 
       for (Map.Entry<String, ColumnStats> entry : _colNameToStats.entrySet()) {
-        sb.append(",")
-            .append(entry.getKey())
-            .append(":")
-            .append(entry.getValue().toString());
+        sb.append(",").append(entry.getKey()).append(":").append(entry.getValue().toString());
       }
       return sb.toString();
     }
@@ -289,7 +287,7 @@ public class RealtimeSegmentStatsHistory implements Serializable {
       }
     }
     if (numValidValues > 0) {
-      int avgEstimatedCardinality = totalCardinality /numValidValues;
+      int avgEstimatedCardinality = totalCardinality / numValidValues;
       if (avgEstimatedCardinality > 0) {
         return avgEstimatedCardinality;
       }
@@ -354,8 +352,7 @@ public class RealtimeSegmentStatsHistory implements Serializable {
 
   private void save() {
     try (OutputStream os = new FileOutputStream(new File(_historyFilePath));
-        ObjectOutputStream obos = new ObjectOutputStream(os)
-    ) {
+        ObjectOutputStream obos = new ObjectOutputStream(os)) {
       obos.writeObject(this);
       obos.flush();
       os.flush();
@@ -364,7 +361,8 @@ public class RealtimeSegmentStatsHistory implements Serializable {
     }
   }
 
-  public static synchronized RealtimeSegmentStatsHistory deserialzeFrom(File inFile) throws IOException, ClassNotFoundException {
+  public static synchronized RealtimeSegmentStatsHistory deserialzeFrom(File inFile)
+      throws IOException, ClassNotFoundException {
     if (inFile.exists()) {
       try (FileInputStream is = new FileInputStream(inFile); ObjectInputStream obis = new ObjectInputStream(is)) {
         RealtimeSegmentStatsHistory history = (RealtimeSegmentStatsHistory) (obis.readObject());
@@ -383,13 +381,13 @@ public class RealtimeSegmentStatsHistory implements Serializable {
     return getCursor();
   }
 
-  public static void main(String[] args) throws Exception {
+  public static void main(String[] args)
+      throws Exception {
     RealtimeSegmentStatsHistory history = RealtimeSegmentStatsHistory.deserialzeFrom(new File("/tmp/stats.ser"));
     System.out.println(history.toString());
-    for (int i = 0; i <history.getNumntriesToScan(); i++) {
+    for (int i = 0; i < history.getNumntriesToScan(); i++) {
       SegmentStats segmentStats = history.getSegmentStatsAt(i);
       System.out.println(segmentStats.toString());
-
     }
   }
 }

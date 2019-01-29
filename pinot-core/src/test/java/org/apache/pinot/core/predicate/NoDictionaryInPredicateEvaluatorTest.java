@@ -70,8 +70,7 @@ public class NoDictionaryInPredicateEvaluatorTest {
       valueSet.add(value);
     }
 
-    InPredicate inPredicate =
-        new InPredicate(COLUMN_NAME, stringValues);
+    InPredicate inPredicate = new InPredicate(COLUMN_NAME, stringValues);
     PredicateEvaluator inPredicateEvaluator =
         InPredicateEvaluatorFactory.newRawValueBasedEvaluator(inPredicate, FieldSpec.DataType.INT);
 
@@ -109,8 +108,7 @@ public class NoDictionaryInPredicateEvaluatorTest {
       valueSet.add(value);
     }
 
-    InPredicate inPredicate =
-        new InPredicate(COLUMN_NAME, stringValues);
+    InPredicate inPredicate = new InPredicate(COLUMN_NAME, stringValues);
     PredicateEvaluator inPredicateEvaluator =
         InPredicateEvaluatorFactory.newRawValueBasedEvaluator(inPredicate, FieldSpec.DataType.LONG);
 
@@ -149,8 +147,7 @@ public class NoDictionaryInPredicateEvaluatorTest {
       valueSet.add(value);
     }
 
-    InPredicate inPredicate =
-        new InPredicate(COLUMN_NAME, stringValues);
+    InPredicate inPredicate = new InPredicate(COLUMN_NAME, stringValues);
     PredicateEvaluator inPredicateEvaluator =
         InPredicateEvaluatorFactory.newRawValueBasedEvaluator(inPredicate, FieldSpec.DataType.FLOAT);
 
@@ -189,8 +186,7 @@ public class NoDictionaryInPredicateEvaluatorTest {
       valueSet.add(value);
     }
 
-    InPredicate inPredicate =
-        new InPredicate(COLUMN_NAME, stringValues);
+    InPredicate inPredicate = new InPredicate(COLUMN_NAME, stringValues);
     PredicateEvaluator inPredicateEvaluator =
         InPredicateEvaluatorFactory.newRawValueBasedEvaluator(inPredicate, FieldSpec.DataType.DOUBLE);
 
@@ -229,8 +225,7 @@ public class NoDictionaryInPredicateEvaluatorTest {
       valueSet.add(value);
     }
 
-    InPredicate inPredicate =
-        new InPredicate(COLUMN_NAME, stringValues);
+    InPredicate inPredicate = new InPredicate(COLUMN_NAME, stringValues);
     PredicateEvaluator inPredicateEvaluator =
         InPredicateEvaluatorFactory.newRawValueBasedEvaluator(inPredicate, FieldSpec.DataType.STRING);
 

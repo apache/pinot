@@ -33,6 +33,7 @@ import static org.mockito.Matchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+
 public class ControllerLeaderLocatorTest {
 
   /**
@@ -40,7 +41,7 @@ public class ControllerLeaderLocatorTest {
    * We set the value for lastCacheInvalidateMillis as we do not want to rely on operations being executed within or after the time thresholds in the tests
    */
   @Test
-  public void testInvalidateCachedControllerLeader()  {
+  public void testInvalidateCachedControllerLeader() {
     HelixManager helixManager = mock(HelixManager.class);
     HelixDataAccessor helixDataAccessor = mock(HelixDataAccessor.class);
     BaseDataAccessor<ZNRecord> baseDataAccessor = mock(BaseDataAccessor.class);

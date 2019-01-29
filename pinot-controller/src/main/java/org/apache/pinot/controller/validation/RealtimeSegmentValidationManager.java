@@ -26,6 +26,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.metrics.ValidationMetrics;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.HLCSegmentName;
@@ -53,9 +54,10 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask {
   private boolean _updateRealtimeDocumentCount;
 
   public RealtimeSegmentValidationManager(ControllerConf config, PinotHelixResourceManager pinotHelixResourceManager,
-      PinotLLCRealtimeSegmentManager llcRealtimeSegmentManager, ValidationMetrics validationMetrics) {
+      PinotLLCRealtimeSegmentManager llcRealtimeSegmentManager, ValidationMetrics validationMetrics,
+      ControllerMetrics controllerMetrics) {
     super("RealtimeSegmentValidationManager", config.getRealtimeSegmentValidationFrequencyInSeconds(),
-        pinotHelixResourceManager);
+        config.getPeriodicTaskInitialDelayInSeconds(), pinotHelixResourceManager, controllerMetrics);
     _llcRealtimeSegmentManager = llcRealtimeSegmentManager;
     _validationMetrics = validationMetrics;
 
@@ -78,28 +80,24 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask {
 
   @Override
   protected void processTable(String tableNameWithType) {
-    try {
-      CommonConstants.Helix.TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
-      if (tableType == CommonConstants.Helix.TableType.REALTIME) {
+    CommonConstants.Helix.TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
+    if (tableType == CommonConstants.Helix.TableType.REALTIME) {
 
-        TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
-        if (tableConfig == null) {
-          LOGGER.warn("Failed to find table config for table: {}, skipping validation", tableNameWithType);
-          return;
-        }
-
-        if (_updateRealtimeDocumentCount) {
-          updateRealtimeDocumentCount(tableConfig);
-        }
-
-        Map<String, String> streamConfigMap = tableConfig.getIndexingConfig().getStreamConfigs();
-        StreamConfig streamConfig = new StreamConfig(streamConfigMap);
-        if (streamConfig.hasLowLevelConsumerType()) {
-          _llcRealtimeSegmentManager.ensureAllPartitionsConsuming(tableConfig);
-        }
+      TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
+      if (tableConfig == null) {
+        LOGGER.warn("Failed to find table config for table: {}, skipping validation", tableNameWithType);
+        return;
       }
-    } catch (Exception e) {
-      LOGGER.warn("Caught exception while validating realtime table: {}", tableNameWithType, e);
+
+      if (_updateRealtimeDocumentCount) {
+        updateRealtimeDocumentCount(tableConfig);
+      }
+
+      Map<String, String> streamConfigMap = tableConfig.getIndexingConfig().getStreamConfigs();
+      StreamConfig streamConfig = new StreamConfig(streamConfigMap);
+      if (streamConfig.hasLowLevelConsumerType()) {
+        _llcRealtimeSegmentManager.ensureAllPartitionsConsuming(tableConfig);
+      }
     }
   }
 
@@ -151,7 +149,11 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask {
 
   @Override
   protected void postprocess() {
+  }
 
+  @Override
+  protected void exceptionHandler(String tableNameWithType, Exception e) {
+    LOGGER.error("Caught exception while validating realtime table: {}", tableNameWithType, e);
   }
 
   @Override

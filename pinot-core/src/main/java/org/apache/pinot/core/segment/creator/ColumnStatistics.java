@@ -18,8 +18,7 @@
  */
 package org.apache.pinot.core.segment.creator;
 
-import java.util.List;
-import org.apache.commons.lang.math.IntRange;
+import java.util.Set;
 import org.apache.pinot.core.data.partition.PartitionFunction;
 
 
@@ -27,69 +26,64 @@ import org.apache.pinot.core.data.partition.PartitionFunction;
  * An interface to read the column statistics from statistics collectors.
  */
 public interface ColumnStatistics {
-    /**
-     * @return Minimum value of the column
-     */
-    Object getMinValue();
+  /**
+   * @return Minimum value of the column
+   */
+  Object getMinValue();
 
-    /**
-     * @return Maximum value of the column
-     */
-    Object getMaxValue();
+  /**
+   * @return Maximum value of the column
+   */
+  Object getMaxValue();
 
-    /**
-     *
-     * @return An array of elements that has the unique values for this column, sorted order.
-     */
-    Object getUniqueValuesSet();
+  /**
+   *
+   * @return An array of elements that has the unique values for this column, sorted order.
+   */
+  Object getUniqueValuesSet();
 
-    /**
-     *
-     * @return The number of unique values of this column.
-     */
-    int getCardinality();
+  /**
+   *
+   * @return The number of unique values of this column.
+   */
+  int getCardinality();
 
-    /**
-     *
-     * @return For variable length objects, returns the length of the shortest value. For others, returns -1.
-     */
-    int getLengthOfShortestElement();
+  /**
+   *
+   * @return For variable length objects, returns the length of the shortest value. For others, returns -1.
+   */
+  int getLengthOfShortestElement();
 
-    /**
-     *
-     * @return For variable length objects, returns the length of the longest value. For others, returns -1.
-     */
-    int getLengthOfLargestElement();
+  /**
+   *
+   * @return For variable length objects, returns the length of the longest value. For others, returns -1.
+   */
+  int getLengthOfLargestElement();
 
-    /**
-     * Whether or not the data in this column is in ascending order.
-     * @return true if the data is in ascending order.
-     */
-    boolean isSorted();
+  /**
+   * Whether or not the data in this column is in ascending order.
+   * @return true if the data is in ascending order.
+   */
+  boolean isSorted();
 
-    /**
-     * @return total number of entries
-     */
-    int getTotalNumberOfEntries();
+  /**
+   * @return total number of entries
+   */
+  int getTotalNumberOfEntries();
 
-    /**
-     * @return For multi-valued columns, returns the max number of values in a single occurrence of the column, otherwise 0.
-     */
-    int getMaxNumberOfMultiValues();
+  /**
+   * @return For multi-valued columns, returns the max number of values in a single occurrence of the column, otherwise 0.
+   */
+  int getMaxNumberOfMultiValues();
 
-    /**
-     * @return Returns if any of the values have nulls in the segments.
-     */
-    boolean hasNull();
+  /**
+   * @return Returns if any of the values have nulls in the segments.
+   */
+  boolean hasNull();
 
-    PartitionFunction getPartitionFunction();
+  PartitionFunction getPartitionFunction();
 
-    int getNumPartitions();
+  int getNumPartitions();
 
-    List<IntRange> getPartitionRanges();
-
-    /**
-     * Returns the width of the partition range for this column, used when doing per-column partitioning.
-     */
-    int getPartitionRangeWidth();
+  Set<Integer> getPartitions();
 }

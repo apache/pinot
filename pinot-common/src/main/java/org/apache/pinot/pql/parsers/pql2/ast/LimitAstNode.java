@@ -45,9 +45,6 @@ public class LimitAstNode extends BaseAstNode {
 
   @Override
   public String toString() {
-    return "LimitAstNode{" +
-        "_count=" + _count +
-        ", _offset=" + _offset +
-        '}';
+    return "LimitAstNode{" + "_count=" + _count + ", _offset=" + _offset + '}';
   }
 }

@@ -25,6 +25,7 @@ public enum ColumnIndexType {
   BLOOM_FILTER("bloom_filter");
 
   private final String indexName;
+
   ColumnIndexType(String name) {
     indexName = name;
   }

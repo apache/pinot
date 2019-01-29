@@ -37,7 +37,8 @@ public interface SegmentFetcher {
    * @param tempFile location segment will be stored locally
    * @throws Exception
    */
-  void fetchSegmentToLocal(String uri, File tempFile) throws Exception;
+  void fetchSegmentToLocal(String uri, File tempFile)
+      throws Exception;
 
   /**
    * Returns a list of config keys whose value should not be logged.

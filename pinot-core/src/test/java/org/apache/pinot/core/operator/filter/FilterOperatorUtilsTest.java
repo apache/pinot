@@ -49,19 +49,16 @@ public class FilterOperatorUtilsTest {
         FilterOperatorUtils.getAndFilterOperator(Collections.singletonList(REGULAR_FILTER_OPERATOR), NUM_DOCS, null);
     assertTrue(filterOperator instanceof TestFilterOperator);
 
-    filterOperator =
-        FilterOperatorUtils.getAndFilterOperator(Arrays.asList(EMPTY_FILTER_OPERATOR, MATCH_ALL_FILTER_OPERATOR),
-            NUM_DOCS, null);
+    filterOperator = FilterOperatorUtils
+        .getAndFilterOperator(Arrays.asList(EMPTY_FILTER_OPERATOR, MATCH_ALL_FILTER_OPERATOR), NUM_DOCS, null);
     assertTrue(filterOperator instanceof EmptyFilterOperator);
 
-    filterOperator =
-        FilterOperatorUtils.getAndFilterOperator(Arrays.asList(EMPTY_FILTER_OPERATOR, REGULAR_FILTER_OPERATOR),
-            NUM_DOCS, null);
+    filterOperator = FilterOperatorUtils
+        .getAndFilterOperator(Arrays.asList(EMPTY_FILTER_OPERATOR, REGULAR_FILTER_OPERATOR), NUM_DOCS, null);
     assertTrue(filterOperator instanceof EmptyFilterOperator);
 
-    filterOperator =
-        FilterOperatorUtils.getAndFilterOperator(Arrays.asList(MATCH_ALL_FILTER_OPERATOR, REGULAR_FILTER_OPERATOR),
-            NUM_DOCS, null);
+    filterOperator = FilterOperatorUtils
+        .getAndFilterOperator(Arrays.asList(MATCH_ALL_FILTER_OPERATOR, REGULAR_FILTER_OPERATOR), NUM_DOCS, null);
     assertTrue(filterOperator instanceof TestFilterOperator);
   }
 
@@ -83,19 +80,16 @@ public class FilterOperatorUtilsTest {
         FilterOperatorUtils.getOrFilterOperator(Collections.singletonList(REGULAR_FILTER_OPERATOR), NUM_DOCS, null);
     assertTrue(filterOperator instanceof TestFilterOperator);
 
-    filterOperator =
-        FilterOperatorUtils.getOrFilterOperator(Arrays.asList(EMPTY_FILTER_OPERATOR, MATCH_ALL_FILTER_OPERATOR),
-            NUM_DOCS, null);
+    filterOperator = FilterOperatorUtils
+        .getOrFilterOperator(Arrays.asList(EMPTY_FILTER_OPERATOR, MATCH_ALL_FILTER_OPERATOR), NUM_DOCS, null);
     assertTrue(filterOperator instanceof MatchAllFilterOperator);
 
-    filterOperator =
-        FilterOperatorUtils.getOrFilterOperator(Arrays.asList(EMPTY_FILTER_OPERATOR, REGULAR_FILTER_OPERATOR), NUM_DOCS,
-            null);
+    filterOperator = FilterOperatorUtils
+        .getOrFilterOperator(Arrays.asList(EMPTY_FILTER_OPERATOR, REGULAR_FILTER_OPERATOR), NUM_DOCS, null);
     assertTrue(filterOperator instanceof TestFilterOperator);
 
-    filterOperator =
-        FilterOperatorUtils.getOrFilterOperator(Arrays.asList(MATCH_ALL_FILTER_OPERATOR, REGULAR_FILTER_OPERATOR),
-            NUM_DOCS, null);
+    filterOperator = FilterOperatorUtils
+        .getOrFilterOperator(Arrays.asList(MATCH_ALL_FILTER_OPERATOR, REGULAR_FILTER_OPERATOR), NUM_DOCS, null);
     assertTrue(filterOperator instanceof MatchAllFilterOperator);
   }
 }

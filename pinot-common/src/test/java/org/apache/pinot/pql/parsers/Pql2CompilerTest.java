@@ -117,8 +117,8 @@ public class Pql2CompilerTest {
     } catch (Pql2CompilationException e) {
       // Expected
       Assert.assertTrue(e.getMessage().startsWith("1:30: "),
-          "Compilation exception should contain line and character for error message. Error message is "
-              + e.getMessage());
+          "Compilation exception should contain line and character for error message. Error message is " + e
+              .getMessage());
       return;
     }
 
@@ -135,8 +135,8 @@ public class Pql2CompilerTest {
 
   @Test
   public void testCompilationWithHaving() {
-    BrokerRequest brokerRequest = COMPILER.compileToBrokerRequest(
-        "select avg(age) as avg_age from person group by address_city having avg(age)=20");
+    BrokerRequest brokerRequest = COMPILER
+        .compileToBrokerRequest("select avg(age) as avg_age from person group by address_city having avg(age)=20");
     Assert.assertEquals(brokerRequest.getHavingFilterQuery().getOperator(), FilterOperator.EQUALITY);
     Assert.assertEquals(brokerRequest.getHavingFilterQuery().getAggregationInfo().getAggregationType(), "avg");
     Assert.assertEquals(brokerRequest.getHavingFilterQuery().getAggregationInfo().getAggregationParams().get("column"),
@@ -171,8 +171,8 @@ public class Pql2CompilerTest {
     Assert.assertEquals(brokerRequest.getQueryOptionsSize(), 0);
     Assert.assertNull(brokerRequest.getQueryOptions());
 
-    brokerRequest = COMPILER.compileToBrokerRequest(
-        "select * from vegetables where name != 'Brussels sprouts' OPTION (delicious=yes)");
+    brokerRequest = COMPILER
+        .compileToBrokerRequest("select * from vegetables where name != 'Brussels sprouts' OPTION (delicious=yes)");
     Assert.assertEquals(brokerRequest.getQueryOptionsSize(), 1);
     Assert.assertTrue(brokerRequest.getQueryOptions().containsKey("delicious"));
     Assert.assertEquals(brokerRequest.getQueryOptions().get("delicious"), "yes");

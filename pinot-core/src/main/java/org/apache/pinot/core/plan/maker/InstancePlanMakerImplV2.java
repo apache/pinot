@@ -199,8 +199,8 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
       IndexSegment indexSegment) {
     AggregationFunctionType functionType =
         AggregationFunctionType.getAggregationFunctionType(aggregationInfo.getAggregationType());
-    if (functionType.isOfType(AggregationFunctionType.MIN, AggregationFunctionType.MAX,
-        AggregationFunctionType.MINMAXRANGE)) {
+    if (functionType
+        .isOfType(AggregationFunctionType.MIN, AggregationFunctionType.MAX, AggregationFunctionType.MINMAXRANGE)) {
       String expression = AggregationFunctionUtils.getColumn(aggregationInfo);
       if (TransformExpressionTree.compileToExpressionTree(expression).isColumn()) {
         Dictionary dictionary = indexSegment.getDataSource(expression).getDictionary();

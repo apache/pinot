@@ -72,7 +72,8 @@ public class RealtimeSingleValueIteratorTest {
   }
 
   @Test
-  public void testIntReader() throws Exception {
+  public void testIntReader()
+      throws Exception {
     try {
       SingleValueIterator iterator = new SingleValueIterator(_intReader, NUM_ROWS);
       // Test all values
@@ -93,7 +94,8 @@ public class RealtimeSingleValueIteratorTest {
   }
 
   @Test
-  public void testLongReader() throws Exception {
+  public void testLongReader()
+      throws Exception {
     try {
       SingleValueIterator iterator = new SingleValueIterator(_longReader, NUM_ROWS);
       // Test all values
@@ -114,7 +116,8 @@ public class RealtimeSingleValueIteratorTest {
   }
 
   @Test
-  public void testFloatReader() throws Exception {
+  public void testFloatReader()
+      throws Exception {
     try {
       SingleValueIterator iterator = new SingleValueIterator(_floatReader, NUM_ROWS);
       // Test all values
@@ -135,7 +138,8 @@ public class RealtimeSingleValueIteratorTest {
   }
 
   @Test
-  public void testDoubleReader() throws Exception {
+  public void testDoubleReader()
+      throws Exception {
     try {
       SingleValueIterator iterator = new SingleValueIterator(_doubleReader, NUM_ROWS);
       // Test all values
@@ -156,7 +160,8 @@ public class RealtimeSingleValueIteratorTest {
   }
 
   @AfterTest
-  public void tearDown() throws IOException {
+  public void tearDown()
+      throws IOException {
     _memoryManager.close();
   }
 }

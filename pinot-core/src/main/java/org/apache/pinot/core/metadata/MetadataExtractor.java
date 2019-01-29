@@ -34,5 +34,6 @@ public interface MetadataExtractor {
    * @return
    * @throws Exception
    */
-  SegmentMetadata extractMetadata(File tarFile, File workingDir) throws Exception;
+  SegmentMetadata extractMetadata(File tarFile, File workingDir)
+      throws Exception;
 }

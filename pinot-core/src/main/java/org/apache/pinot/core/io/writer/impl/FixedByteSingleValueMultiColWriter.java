@@ -30,7 +30,8 @@ public class FixedByteSingleValueMultiColWriter {
   private PinotDataBuffer indexDataBuffer;
   private int rowSizeInBytes;
 
-  public FixedByteSingleValueMultiColWriter(File file, int rows, int cols, int[] columnSizes) throws IOException {
+  public FixedByteSingleValueMultiColWriter(File file, int rows, int cols, int[] columnSizes)
+      throws IOException {
     this.columnOffsets = new int[cols];
     rowSizeInBytes = 0;
     for (int i = 0; i < columnSizes.length; i++) {
@@ -98,7 +99,8 @@ public class FixedByteSingleValueMultiColWriter {
     indexDataBuffer.readFrom(offset, bytes);
   }
 
-  public void close() throws IOException {
+  public void close()
+      throws IOException {
     this.indexDataBuffer.close();
     this.indexDataBuffer = null;
   }

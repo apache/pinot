@@ -60,7 +60,6 @@ public interface GroupByResultHolder {
    */
   <T> T getResult(int groupKey);
 
-
   /**
    * Increase internal storage if needed to store the required number
    * of unique group keys.

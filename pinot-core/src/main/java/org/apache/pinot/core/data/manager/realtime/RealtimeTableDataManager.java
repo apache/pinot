@@ -95,8 +95,9 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     try {
       _statsHistory = RealtimeSegmentStatsHistory.deserialzeFrom(statsFile);
     } catch (IOException | ClassNotFoundException e) {
-      _logger.error("Error reading history object for table {} from {}", _tableNameWithType,
-          statsFile.getAbsolutePath(), e);
+      _logger
+          .error("Error reading history object for table {} from {}", _tableNameWithType, statsFile.getAbsolutePath(),
+              e);
       File savedFile = new File(_tableDataDir, STATS_FILE_NAME + "." + UUID.randomUUID());
       try {
         FileUtils.moveFile(statsFile, savedFile);
@@ -201,7 +202,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
    */
   @Override
   public void addSegment(@Nonnull String segmentName, @Nonnull TableConfig tableConfig,
-      @Nonnull IndexLoadingConfig indexLoadingConfig) throws Exception {
+      @Nonnull IndexLoadingConfig indexLoadingConfig)
+      throws Exception {
     RealtimeSegmentZKMetadata realtimeSegmentZKMetadata =
         ZKMetadataProvider.getRealtimeSegmentZKMetadata(_propertyStore, _tableNameWithType, segmentName);
     Preconditions.checkNotNull(realtimeSegmentZKMetadata);

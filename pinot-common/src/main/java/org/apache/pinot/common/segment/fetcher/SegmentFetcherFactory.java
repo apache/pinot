@@ -63,12 +63,13 @@ public class SegmentFetcherFactory {
    * @param segmentFetcherClassConfig Segment fetcher factory config
    *
    */
-  public void init(Configuration segmentFetcherClassConfig) throws ClassNotFoundException, IllegalAccessException, InstantiationException {
+  public void init(Configuration segmentFetcherClassConfig)
+      throws ClassNotFoundException, IllegalAccessException, InstantiationException {
     @SuppressWarnings("unchecked")
     List<String> protocols = segmentFetcherClassConfig.getList(PROTOCOLS_KEY, DEFAULT_PROTOCOLS);
     for (String protocol : protocols) {
-      String fetcherClass =
-          segmentFetcherClassConfig.getString(protocol + FETCHER_CLASS_KEY_SUFFIX, DEFAULT_FETCHER_CLASS_MAP.get(protocol));
+      String fetcherClass = segmentFetcherClassConfig
+          .getString(protocol + FETCHER_CLASS_KEY_SUFFIX, DEFAULT_FETCHER_CLASS_MAP.get(protocol));
       Preconditions.checkNotNull(fetcherClass, "No fetcher class defined for protocol: " + protocol);
       LOGGER.info("Creating a new segment fetcher for protocol: {} with class: {}", protocol, fetcherClass);
       SegmentFetcher segmentFetcher = (SegmentFetcher) Class.forName(fetcherClass).newInstance();
@@ -84,7 +85,8 @@ public class SegmentFetcherFactory {
     return _segmentFetcherMap.containsKey(protocol);
   }
 
-  public SegmentFetcher getSegmentFetcherBasedOnURI(String uri) throws URISyntaxException {
+  public SegmentFetcher getSegmentFetcherBasedOnURI(String uri)
+      throws URISyntaxException {
     String protocol = new URI(uri).getScheme();
     return _segmentFetcherMap.get(protocol);
   }

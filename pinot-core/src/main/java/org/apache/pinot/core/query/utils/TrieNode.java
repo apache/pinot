@@ -60,5 +60,4 @@ public class TrieNode {
   public void setIsLeaf(boolean isLeaf) {
     this._isLeaf = isLeaf;
   }
-
 }

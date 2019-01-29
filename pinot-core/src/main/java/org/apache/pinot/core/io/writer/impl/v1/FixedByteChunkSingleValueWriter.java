@@ -67,7 +67,8 @@ public class FixedByteChunkSingleValueWriter extends BaseChunkSingleValueWriter 
    * @throws FileNotFoundException Throws {@link FileNotFoundException} if the specified file is not found.
    */
   public FixedByteChunkSingleValueWriter(File file, ChunkCompressorFactory.CompressionType compressionType,
-      int totalDocs, int numDocsPerChunk, int sizeOfEntry) throws FileNotFoundException {
+      int totalDocs, int numDocsPerChunk, int sizeOfEntry)
+      throws FileNotFoundException {
 
     super(file, compressionType, totalDocs, numDocsPerChunk, (sizeOfEntry * numDocsPerChunk), sizeOfEntry,
         CURRENT_VERSION);

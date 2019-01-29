@@ -98,7 +98,8 @@ abstract class BaseStarTreeV2Test<R, A> {
   private StarTreeV2 _starTreeV2;
 
   @BeforeClass
-  public void setUp() throws Exception {
+  public void setUp()
+      throws Exception {
     _valueAggregator = getValueAggregator();
     _aggregatedValueType = _valueAggregator.getAggregatedValueType();
 
@@ -135,8 +136,7 @@ abstract class BaseStarTreeV2Test<R, A> {
         new StarTreeV2BuilderConfig.Builder().setDimensionsSplitOrder(Arrays.asList(DIMENSION_D1, DIMENSION_D2))
             .setFunctionColumnPairs(
                 Collections.singleton(new AggregationFunctionColumnPair(_valueAggregator.getAggregationType(), METRIC)))
-            .setMaxLeafRecords(MAX_LEAF_RECORDS)
-            .build();
+            .setMaxLeafRecords(MAX_LEAF_RECORDS).build();
     File indexDir = new File(TEMP_DIR, SEGMENT_NAME);
 
     // Randomly build star-tree using on-heap or off-heap mode
@@ -169,7 +169,8 @@ abstract class BaseStarTreeV2Test<R, A> {
   }
 
   @AfterClass
-  public void tearDown() throws IOException {
+  public void tearDown()
+      throws IOException {
     _indexSegment.destroy();
     FileUtils.deleteDirectory(TEMP_DIR);
   }
@@ -210,10 +211,8 @@ abstract class BaseStarTreeV2Test<R, A> {
     List<BlockSingleValIterator> starTreeAggregationColumnValueIterators = new ArrayList<>(numAggregations);
     for (AggregationFunctionColumnPair aggregationFunctionColumnPair : functionColumnPairs) {
       starTreeAggregationColumnValueIterators.add(
-          (BlockSingleValIterator) _starTreeV2.getDataSource(aggregationFunctionColumnPair.toColumnName())
-              .nextBlock()
-              .getBlockValueSet()
-              .iterator());
+          (BlockSingleValIterator) _starTreeV2.getDataSource(aggregationFunctionColumnPair.toColumnName()).nextBlock()
+              .getBlockValueSet().iterator());
     }
     List<BlockSingleValIterator> starTreeGroupByColumnValueIterators = new ArrayList<>(numGroupByColumns);
     for (String groupByColumn : groupByColumns) {
@@ -234,17 +233,16 @@ abstract class BaseStarTreeV2Test<R, A> {
         nonStarTreeAggregationColumnDictionaries.add(null);
       } else {
         DataSource dataSource = _indexSegment.getDataSource(aggregationFunctionColumnPair.getColumn());
-        nonStarTreeAggregationColumnValueIterators.add(
-            (BlockSingleValIterator) dataSource.nextBlock().getBlockValueSet().iterator());
+        nonStarTreeAggregationColumnValueIterators
+            .add((BlockSingleValIterator) dataSource.nextBlock().getBlockValueSet().iterator());
         nonStarTreeAggregationColumnDictionaries.add(dataSource.getDictionary());
       }
     }
     List<BlockSingleValIterator> nonStarTreeGroupByColumnValueIterators = new ArrayList<>(numGroupByColumns);
     for (String groupByColumn : groupByColumns) {
-      nonStarTreeGroupByColumnValueIterators.add((BlockSingleValIterator) _indexSegment.getDataSource(groupByColumn)
-          .nextBlock()
-          .getBlockValueSet()
-          .iterator());
+      nonStarTreeGroupByColumnValueIterators.add(
+          (BlockSingleValIterator) _indexSegment.getDataSource(groupByColumn).nextBlock().getBlockValueSet()
+              .iterator());
     }
     Map<List<Integer>, List<Object>> nonStarTreeResult =
         computeNonStarTreeResult(nonStarTreeFilterPlanNode, nonStarTreeAggregationColumnValueIterators,

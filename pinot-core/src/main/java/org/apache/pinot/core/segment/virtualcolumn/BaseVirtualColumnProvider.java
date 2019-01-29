@@ -29,10 +29,9 @@ public abstract class BaseVirtualColumnProvider implements VirtualColumnProvider
 
   protected ColumnMetadata.Builder getColumnMetadataBuilder(VirtualColumnContext context) {
 
-    ColumnMetadata.Builder builder = new ColumnMetadata.Builder()
-        .setVirtual(true)
-        .setColumnName(context.getColumnName())
-        .setTotalDocs(context.getTotalDocCount());
+    ColumnMetadata.Builder builder =
+        new ColumnMetadata.Builder().setVirtual(true).setColumnName(context.getColumnName())
+            .setTotalDocs(context.getTotalDocCount());
 
     return builder;
   }

@@ -39,8 +39,7 @@ public class StartControllerCommand extends AbstractBaseAdminCommand implements 
   @Option(name = "-controllerHost", required = false, metaVar = "<String>", usage = "host name for controller.")
   private String _controllerHost;
 
-  @Option(name = "-controllerPort", required = false, metaVar = "<int>",
-      usage = "Port number to start the controller at.")
+  @Option(name = "-controllerPort", required = false, metaVar = "<int>", usage = "Port number to start the controller at.")
   private String _controllerPort = DEFAULT_CONTROLLER_PORT;
 
   @Option(name = "-dataDir", required = false, metaVar = "<string>", usage = "Path to directory containging data.")
@@ -52,13 +51,10 @@ public class StartControllerCommand extends AbstractBaseAdminCommand implements 
   @Option(name = "-clusterName", required = false, metaVar = "<String>", usage = "Pinot cluster name.")
   private String _clusterName = DEFAULT_CLUSTER_NAME;
 
-  @Option(name = "-configFileName", required = false, metaVar = "<FilePathName>",
-      usage = "Controller Starter config file",
-      forbids = { "-controllerHost", "-controllerPort", "-dataDir", "-zkAddress", "-clusterName" })
+  @Option(name = "-configFileName", required = false, metaVar = "<FilePathName>", usage = "Controller Starter config file", forbids = {"-controllerHost", "-controllerPort", "-dataDir", "-zkAddress", "-clusterName"})
   private String _configFileName;
 
-  @Option(name = "-help", required = false, help = true, aliases = { "-h", "--h", "--help" },
-      usage = "Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
   private boolean _help = false;
 
   // This can be set via the set method, or via config file input.
@@ -125,7 +121,8 @@ public class StartControllerCommand extends AbstractBaseAdminCommand implements 
   }
 
   @Override
-  public boolean execute() throws Exception {
+  public boolean execute()
+      throws Exception {
     try {
       if (_controllerHost == null) {
         _controllerHost = NetUtil.getHostAddress();
@@ -171,7 +168,8 @@ public class StartControllerCommand extends AbstractBaseAdminCommand implements 
   }
 
   @Override
-  ControllerConf readConfigFromFile(String configFileName) throws ConfigurationException {
+  ControllerConf readConfigFromFile(String configFileName)
+      throws ConfigurationException {
     ControllerConf conf = null;
 
     if (configFileName == null) {

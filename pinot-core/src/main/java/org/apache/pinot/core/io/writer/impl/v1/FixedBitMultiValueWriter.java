@@ -30,6 +30,7 @@ import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
 /**
  * Storage Layout
  * ==============
@@ -82,7 +83,8 @@ public class FixedBitMultiValueWriter implements SingleColumnMultiValueWriter {
     bitsetSize = (totalNumValues + 7) / 8;
     rawDataSize = ((long) totalNumValues * columnSizeInBits + 7) / 8;
     totalSize = chunkOffsetHeaderSize + bitsetSize + rawDataSize;
-    Preconditions.checkState(totalSize > 0 && totalSize < Integer.MAX_VALUE, "Total size can not exceed 2GB for file: ", file.toString());
+    Preconditions.checkState(totalSize > 0 && totalSize < Integer.MAX_VALUE, "Total size can not exceed 2GB for file: ",
+        file.toString());
     // Backward-compatible: index file is always big-endian
     indexDataBuffer =
         PinotDataBuffer.mapFile(file, false, 0, totalSize, ByteOrder.BIG_ENDIAN, getClass().getSimpleName());
@@ -122,7 +124,8 @@ public class FixedBitMultiValueWriter implements SingleColumnMultiValueWriter {
   }
 
   @Override
-  public void close() throws IOException {
+  public void close()
+      throws IOException {
     customBitSet.close();
     chunkOffsetsWriter.close();
     rawDataWriter.close();
@@ -178,7 +181,6 @@ public class FixedBitMultiValueWriter implements SingleColumnMultiValueWriter {
   @Override
   public void setDoubleArray(int row, double[] doubleArray) {
     throw new UnsupportedOperationException("Only int data type is supported in fixedbit format");
-
   }
 
   @Override
@@ -190,5 +192,4 @@ public class FixedBitMultiValueWriter implements SingleColumnMultiValueWriter {
   public void setBytesArray(int row, byte[][] bytesArray) {
     throw new UnsupportedOperationException("Only int data type is supported in fixedbit format");
   }
-
 }

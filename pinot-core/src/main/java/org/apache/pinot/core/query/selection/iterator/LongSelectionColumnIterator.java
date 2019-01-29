@@ -22,6 +22,7 @@ import java.io.Serializable;
 import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.BlockSingleValIterator;
 
+
 /**
  * Iterator on long no dictionary column selection query.
  *

@@ -204,7 +204,8 @@ public class FixedByteSingleColumnSingleValueReaderWriter extends BaseSingleColu
     }
 
     @Override
-    public void close() throws IOException {
+    public void close()
+        throws IOException {
       _writer.close();
     }
 
@@ -238,7 +239,8 @@ public class FixedByteSingleColumnSingleValueReaderWriter extends BaseSingleColu
     }
 
     @Override
-    public void close() throws IOException {
+    public void close()
+        throws IOException {
       _reader.close();
     }
 

@@ -49,9 +49,8 @@ public class FixedIntArrayIdMapTest {
     _random = new Random(System.nanoTime());
     _memoryManager = new DirectMemoryManager(FixedIntArrayIdMapTest.class.getName());
 
-    _idMap =
-        new FixedIntArrayOffHeapIdMap(INITIAL_CARDINALITY, ON_HEAP_CACHE_SIZE, NUM_COLUMNS, _memoryManager,
-            FixedIntArrayIdMapTest.class.getName());
+    _idMap = new FixedIntArrayOffHeapIdMap(INITIAL_CARDINALITY, ON_HEAP_CACHE_SIZE, NUM_COLUMNS, _memoryManager,
+        FixedIntArrayIdMapTest.class.getName());
   }
 
   @AfterClass

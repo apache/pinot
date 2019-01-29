@@ -48,7 +48,8 @@ public class PinotResourceManagerTest {
   private HelixAdmin _helixAdmin;
 
   @BeforeClass
-  public void setUp() throws Exception {
+  public void setUp()
+      throws Exception {
     _zookeeperInstance = ZkStarter.startLocalZkServer();
     _zkClient = new ZkClient(ZkStarter.DEFAULT_ZK_STR);
 
@@ -59,15 +60,15 @@ public class PinotResourceManagerTest {
     _pinotHelixResourceManager.start();
     _helixAdmin = _pinotHelixResourceManager.getHelixAdmin();
 
-    ControllerRequestBuilderUtil.addFakeDataInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME,
-        ZkStarter.DEFAULT_ZK_STR, 1, true);
-    ControllerRequestBuilderUtil.addFakeBrokerInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME,
-        ZkStarter.DEFAULT_ZK_STR, 1, true);
+    ControllerRequestBuilderUtil
+        .addFakeDataInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZkStarter.DEFAULT_ZK_STR, 1, true);
+    ControllerRequestBuilderUtil
+        .addFakeBrokerInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZkStarter.DEFAULT_ZK_STR, 1, true);
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "DefaultTenant_BROKER").size(), 1);
-    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "DefaultTenant_OFFLINE").size(),
-        1);
-    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "DefaultTenant_REALTIME").size(),
-        1);
+    Assert
+        .assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "DefaultTenant_OFFLINE").size(), 1);
+    Assert
+        .assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "DefaultTenant_REALTIME").size(), 1);
 
     // Adding table
     TableConfig tableConfig =
@@ -105,7 +106,8 @@ public class PinotResourceManagerTest {
    */
 
   @Test
-  public void testBasicAndConcurrentAddingAndDeletingSegments() throws Exception {
+  public void testBasicAndConcurrentAddingAndDeletingSegments()
+      throws Exception {
     final String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME);
 
     // Basic add/delete case
@@ -129,8 +131,8 @@ public class PinotResourceManagerTest {
         @Override
         public void run() {
           for (int i = 0; i < 10; i++) {
-            _pinotHelixResourceManager.addNewSegment(SegmentMetadataMockUtils.mockSegmentMetadata(TABLE_NAME),
-                "downloadUrl");
+            _pinotHelixResourceManager
+                .addNewSegment(SegmentMetadataMockUtils.mockSegmentMetadata(TABLE_NAME), "downloadUrl");
           }
         }
       });

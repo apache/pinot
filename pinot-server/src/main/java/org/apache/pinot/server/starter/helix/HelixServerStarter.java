@@ -107,16 +107,16 @@ public class HelixServerStarter {
     } else {
       String host =
           _helixServerConfig.getString(CommonConstants.Helix.KEY_OF_SERVER_NETTY_HOST, NetUtil.getHostAddress());
-      int port = _helixServerConfig.getInt(CommonConstants.Helix.KEY_OF_SERVER_NETTY_PORT,
-          CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT);
+      int port = _helixServerConfig
+          .getInt(CommonConstants.Helix.KEY_OF_SERVER_NETTY_PORT, CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT);
       _instanceId = CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE + host + "_" + port;
       _helixServerConfig.addProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_ID, _instanceId);
     }
 
     _maxQueryTimeMs = _helixServerConfig.getLong(CommonConstants.Server.CONFIG_OF_QUERY_EXECUTOR_TIMEOUT,
         CommonConstants.Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
-    _maxShutdownWaitTimeMs =
-        _helixServerConfig.getLong(CommonConstants.Server.CONFIG_OF_INSTANCE_MAX_SHUTDOWN_WAIT_TIME,
+    _maxShutdownWaitTimeMs = _helixServerConfig
+        .getLong(CommonConstants.Server.CONFIG_OF_INSTANCE_MAX_SHUTDOWN_WAIT_TIME,
             CommonConstants.Server.DEFAULT_MAX_SHUTDOWN_WAIT_TIME_MS);
     long checkIntervalTimeMs = _helixServerConfig.getLong(CommonConstants.Server.CONFIG_OF_INSTANCE_CHECK_INTERVAL_TIME,
         CommonConstants.Server.DEFAULT_CHECK_INTERVAL_TIME_MS);
@@ -144,8 +144,8 @@ public class HelixServerStarter {
     Utils.logVersions();
     ServerConf serverInstanceConfig = DefaultHelixStarterServerConfig.getDefaultHelixServerConfig(_helixServerConfig);
     // Need to do this before we start receiving state transitions.
-    ServerSegmentCompletionProtocolHandler.init(
-        _helixServerConfig.subset(CommonConstants.Server.PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER));
+    ServerSegmentCompletionProtocolHandler
+        .init(_helixServerConfig.subset(CommonConstants.Server.PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER));
     _serverInstance = new ServerInstance();
     _serverInstance.init(serverInstanceConfig, propertyStore);
     _serverInstance.start();
@@ -156,12 +156,12 @@ public class HelixServerStarter {
     StateModelFactory<?> stateModelFactory =
         new SegmentOnlineOfflineStateModelFactory(_instanceId, _serverInstance.getInstanceDataManager(),
             fetcherAndLoader, propertyStore);
-    stateMachineEngine.registerStateModelFactory(SegmentOnlineOfflineStateModelFactory.getStateModelName(),
-        stateModelFactory);
+    stateMachineEngine
+        .registerStateModelFactory(SegmentOnlineOfflineStateModelFactory.getStateModelName(), stateModelFactory);
 
     // Start restlet server for admin API endpoint
-    int adminApiPort = _helixServerConfig.getInt(CommonConstants.Server.CONFIG_OF_ADMIN_API_PORT,
-        CommonConstants.Server.DEFAULT_ADMIN_API_PORT);
+    int adminApiPort = _helixServerConfig
+        .getInt(CommonConstants.Server.CONFIG_OF_ADMIN_API_PORT, CommonConstants.Server.DEFAULT_ADMIN_API_PORT);
     _adminApiApplication = new AdminApiApplication(_serverInstance);
     _adminApiApplication.start(adminApiPort);
     setAdminApiPort(adminApiPort);
@@ -174,15 +174,15 @@ public class HelixServerStarter {
         .registerMessageHandlerFactory(Message.MessageType.USER_DEFINE_MSG.toString(), messageHandlerFactory);
 
     serverMetrics.addCallbackGauge("helix.connected", () -> _helixManager.isConnected() ? 1L : 0L);
-    _helixManager.addPreConnectCallback(
-        () -> serverMetrics.addMeteredGlobalValue(ServerMeter.HELIX_ZOOKEEPER_RECONNECTS, 1L));
+    _helixManager
+        .addPreConnectCallback(() -> serverMetrics.addMeteredGlobalValue(ServerMeter.HELIX_ZOOKEEPER_RECONNECTS, 1L));
 
     // Register the service status handler
-    ServiceStatus.setServiceStatusCallback(new ServiceStatus.MultipleCallbackServiceStatusCallback(ImmutableList.of(
-        new ServiceStatus.IdealStateAndCurrentStateMatchServiceStatusCallback(_helixManager, _helixClusterName,
-            _instanceId),
-        new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(_helixManager, _helixClusterName,
-            _instanceId))));
+    ServiceStatus.setServiceStatusCallback(new ServiceStatus.MultipleCallbackServiceStatusCallback(ImmutableList
+        .of(new ServiceStatus.IdealStateAndCurrentStateMatchServiceStatusCallback(_helixManager, _helixClusterName,
+                _instanceId),
+            new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(_helixManager, _helixClusterName,
+                _instanceId))));
 
     ControllerLeaderLocator.create(_helixManager);
 
@@ -199,22 +199,27 @@ public class HelixServerStarter {
   }
 
   private void waitForAllSegmentsLoaded() {
-    if (_helixServerConfig.getBoolean(CommonConstants.Server.CONFIG_OF_STARTER_ENABLE_SEGMENTS_LOADING_CHECK, CommonConstants.Server.DEFAULT_STARTER_ENABLE_SEGMENTS_LOADING_CHECK)) {
+    if (_helixServerConfig.getBoolean(CommonConstants.Server.CONFIG_OF_STARTER_ENABLE_SEGMENTS_LOADING_CHECK,
+        CommonConstants.Server.DEFAULT_STARTER_ENABLE_SEGMENTS_LOADING_CHECK)) {
       long startTime = System.currentTimeMillis();
-      int serverStarterTimeout = _helixServerConfig.getInt(CommonConstants.Server.CONFIG_OF_STARTER_TIMEOUT_IN_SECONDS, CommonConstants.Server.DEFAULT_STARTER_TIMEOUT_IN_SECONDS);
+      int serverStarterTimeout = _helixServerConfig.getInt(CommonConstants.Server.CONFIG_OF_STARTER_TIMEOUT_IN_SECONDS,
+          CommonConstants.Server.DEFAULT_STARTER_TIMEOUT_IN_SECONDS);
       long endTime = startTime + TimeUnit.SECONDS.toMillis(serverStarterTimeout);
       boolean allSegmentsLoaded = false;
       while (System.currentTimeMillis() < endTime) {
-        long timeToSleep = Math.min(TimeUnit.MILLISECONDS.toSeconds(endTime - System.currentTimeMillis()), 10 /* Sleep 10 seconds as default*/);
+        long timeToSleep = Math.min(TimeUnit.MILLISECONDS.toSeconds(endTime - System.currentTimeMillis()),
+            10 /* Sleep 10 seconds as default*/);
         if (ServiceStatus.getServiceStatus() == Status.GOOD) {
-          LOGGER.info("All the segments are fully loaded into Pinot server, time taken: {} seconds", TimeUnit.MILLISECONDS.toSeconds(System.currentTimeMillis() - startTime));
+          LOGGER.info("All the segments are fully loaded into Pinot server, time taken: {} seconds",
+              TimeUnit.MILLISECONDS.toSeconds(System.currentTimeMillis() - startTime));
           allSegmentsLoaded = true;
           break;
         }
         try {
           int numSegmentsLoaded = getNumSegmentLoaded();
           int numSegmentsToLoad = getNumSegmentsToLoad();
-          LOGGER.warn("Waiting for all segments to be loaded, current progress: [ {} / {} ], sleep {} seconds...", numSegmentsLoaded, numSegmentsToLoad, timeToSleep);
+          LOGGER.warn("Waiting for all segments to be loaded, current progress: [ {} / {} ], sleep {} seconds...",
+              numSegmentsLoaded, numSegmentsToLoad, timeToSleep);
           Thread.sleep(TimeUnit.SECONDS.toMillis(timeToSleep));
         } catch (InterruptedException e) {
           Thread.currentThread().interrupt();
@@ -238,7 +243,7 @@ public class HelixServerStarter {
 
     List<String> tableNames = _helixAdmin.getResourcesInCluster(_helixClusterName);
     int numSegmentsLoaded = 0;
-    for (String tableName: tableNames) {
+    for (String tableName : tableNames) {
       numSegmentsLoaded += instanceDataManager.getAllSegmentsMetadata(tableName).size();
     }
     return numSegmentsLoaded;
@@ -254,7 +259,7 @@ public class HelixServerStarter {
     Builder keyBuilder = helixDataAccessor.keyBuilder();
     int numSegmentsToLoad = 0;
     List<String> tableNames = _helixAdmin.getResourcesInCluster(_helixClusterName);
-    for (String tableName: tableNames) {
+    for (String tableName : tableNames) {
       LiveInstance liveInstance = helixDataAccessor.getProperty(keyBuilder.liveInstance(_instanceId));
       String sessionId = liveInstance.getSessionId();
       PropertyKey currentStateKey = keyBuilder.currentState(_instanceId, sessionId, tableName);
@@ -276,13 +281,15 @@ public class HelixServerStarter {
     LiveInstance liveInstance = helixDataAccessor.getProperty(keyBuilder.liveInstance(_instanceId));
     String sessionId = liveInstance.getSessionId();
     List<String> tableNames = _helixAdmin.getResourcesInCluster(_helixClusterName);
-    for (String tableName: tableNames) {
+    for (String tableName : tableNames) {
       PropertyKey currentStateKey = keyBuilder.currentState(_instanceId, sessionId, tableName);
       CurrentState currentState = helixDataAccessor.getProperty(currentStateKey);
       int numSegmentsLoaded = instanceDataManager.getAllSegmentsMetadata(tableName).size();
       if (currentState != null && currentState.isValid()) {
         int numSegmentsToLoad = currentState.getPartitionStateMap().size();
-        LOGGER.info("Segments are not fully loaded during server bootstrap, current progress: table: {}, segments loading progress [ {} / {} ]", tableName, numSegmentsLoaded, numSegmentsToLoad);
+        LOGGER.info(
+            "Segments are not fully loaded during server bootstrap, current progress: table: {}, segments loading progress [ {} / {} ]",
+            tableName, numSegmentsLoaded, numSegmentsToLoad);
       }
     }
   }
@@ -480,7 +487,8 @@ public class HelixServerStarter {
   /**
    * This method is for reference purpose only.
    */
-  public static HelixServerStarter startDefault() throws Exception {
+  public static HelixServerStarter startDefault()
+      throws Exception {
     Configuration configuration = new PropertiesConfiguration();
     int port = 8003;
     configuration.addProperty(CommonConstants.Helix.KEY_OF_SERVER_NETTY_PORT, port);
@@ -489,7 +497,8 @@ public class HelixServerStarter {
     return new HelixServerStarter("quickstart", "localhost:2191", configuration);
   }
 
-  public static void main(String[] args) throws Exception {
+  public static void main(String[] args)
+      throws Exception {
     /*
     // Another way to start a server via IDE
     if (args.length < 1) {

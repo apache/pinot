@@ -45,7 +45,6 @@ public class SegmentStatusChecker extends ControllerPeriodicTask {
   public static final String ONLINE = "ONLINE";
   public static final String ERROR = "ERROR";
   public static final String CONSUMING = "CONSUMING";
-  private final ControllerMetrics _metricsRegistry;
   private final int _waitForPushTimeSeconds;
 
   // log messages about disabled tables atmost once a day
@@ -56,18 +55,17 @@ public class SegmentStatusChecker extends ControllerPeriodicTask {
   private int _offlineTableCount;
   private int _disabledTableCount;
 
-
   /**
    * Constructs the segment status checker.
    * @param pinotHelixResourceManager The resource checker used to interact with Helix
    * @param config The controller configuration object
    */
   public SegmentStatusChecker(PinotHelixResourceManager pinotHelixResourceManager, ControllerConf config,
-      ControllerMetrics metricsRegistry) {
-    super("SegmentStatusChecker", config.getStatusCheckerFrequencyInSeconds(), pinotHelixResourceManager);
+      ControllerMetrics controllerMetrics) {
+    super("SegmentStatusChecker", config.getStatusCheckerFrequencyInSeconds(),
+        config.getStatusCheckerInitialDelayInSeconds(), pinotHelixResourceManager, controllerMetrics);
 
     _waitForPushTimeSeconds = config.getStatusCheckerWaitForPushTimeInSeconds();
-    _metricsRegistry = metricsRegistry;
   }
 
   @Override
@@ -98,6 +96,13 @@ public class SegmentStatusChecker extends ControllerPeriodicTask {
   }
 
   @Override
+  protected void exceptionHandler(String tableNameWithType, Exception e) {
+    LOGGER.error("Caught exception while updating segment status for table {}", tableNameWithType, e);
+    // Remove the metric for this table
+    resetTableMetrics(tableNameWithType);
+  }
+
+  @Override
   protected void postprocess() {
     _metricsRegistry.setValueOfGlobalGauge(ControllerGauge.REALTIME_TABLE_COUNT, _realTimeTableCount);
     _metricsRegistry.setValueOfGlobalGauge(ControllerGauge.OFFLINE_TABLE_COUNT, _offlineTableCount);
@@ -112,132 +117,131 @@ public class SegmentStatusChecker extends ControllerPeriodicTask {
    */
   private void updateSegmentMetrics(String tableNameWithType) {
 
-    try {
-      if (TableNameBuilder.getTableTypeFromTableName(tableNameWithType) == TableType.OFFLINE) {
-        _offlineTableCount++;
-      } else {
-        _realTimeTableCount++;
-      }
-      IdealState idealState = _pinotHelixResourceManager.getTableIdealState(tableNameWithType);
-      if ((idealState == null) || (idealState.getPartitionSet().isEmpty())) {
-        int nReplicasFromIdealState = 1;
-        try {
-          if (idealState != null) {
-            nReplicasFromIdealState = Integer.valueOf(idealState.getReplicas());
-          }
-        } catch (NumberFormatException e) {
-          // Ignore
-        }
-        _metricsRegistry.setValueOfTableGauge(tableNameWithType, ControllerGauge.NUMBER_OF_REPLICAS, nReplicasFromIdealState);
-        _metricsRegistry.setValueOfTableGauge(tableNameWithType, ControllerGauge.PERCENT_OF_REPLICAS, 100);
-        _metricsRegistry.setValueOfTableGauge(tableNameWithType, ControllerGauge.PERCENT_SEGMENTS_AVAILABLE, 100);
-        return;
-      }
+    if (TableNameBuilder.getTableTypeFromTableName(tableNameWithType) == TableType.OFFLINE) {
+      _offlineTableCount++;
+    } else {
+      _realTimeTableCount++;
+    }
 
-      if (!idealState.isEnabled()) {
-        if (_logDisabledTables) {
-          LOGGER.warn("Table {} is disabled. Skipping segment status checks", tableNameWithType);
-        }
-        resetTableMetrics(tableNameWithType);
-        _disabledTableCount++;
-        return;
-      }
+    IdealState idealState = _pinotHelixResourceManager.getTableIdealState(tableNameWithType);
 
-      _metricsRegistry.setValueOfTableGauge(tableNameWithType, ControllerGauge.IDEALSTATE_ZNODE_SIZE,
-          idealState.toString().length());
-      _metricsRegistry.setValueOfTableGauge(tableNameWithType, ControllerGauge.SEGMENT_COUNT,
-          (long) (idealState.getPartitionSet().size()));
-      ExternalView externalView = _pinotHelixResourceManager.getTableExternalView(tableNameWithType);
-
-      int nReplicasIdealMax = 0; // Keeps track of maximum number of replicas in ideal state
-      int nReplicasExternal = -1; // Keeps track of minimum number of replicas in external view
-      int nErrors = 0; // Keeps track of number of segments in error state
-      int nOffline = 0; // Keeps track of number segments with no online replicas
-      int nSegments = 0; // Counts number of segments
-      for (String partitionName : idealState.getPartitionSet()) {
-        int nReplicas = 0;
-        int nIdeal = 0;
-        nSegments++;
-        // Skip segments not online in ideal state
-        for (Map.Entry<String, String> serverAndState : idealState.getInstanceStateMap(partitionName).entrySet()) {
-          if (serverAndState == null) {
-            break;
-          }
-          if (serverAndState.getValue().equals(ONLINE)) {
-            nIdeal++;
-            break;
-          }
-        }
-        if (nIdeal == 0) {
-          // No online segments in ideal state
-          continue;
-        }
-        nReplicasIdealMax =
-            (idealState.getInstanceStateMap(partitionName).size() > nReplicasIdealMax) ? idealState.getInstanceStateMap(
-                partitionName).size() : nReplicasIdealMax;
-        if ((externalView == null) || (externalView.getStateMap(partitionName) == null)) {
-          // No replicas for this segment
-          TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
-          if ((tableType != null) && (tableType.equals(TableType.OFFLINE))) {
-            OfflineSegmentZKMetadata segmentZKMetadata =
-                _pinotHelixResourceManager.getOfflineSegmentZKMetadata(tableNameWithType, partitionName);
-
-            if (segmentZKMetadata != null
-                && segmentZKMetadata.getPushTime() > System.currentTimeMillis() - _waitForPushTimeSeconds * 1000) {
-              // push not yet finished, skip
-              continue;
-            }
-          }
-          nOffline++;
-          if (nOffline < MaxOfflineSegmentsToLog) {
-            LOGGER.warn("Segment {} of table {} has no replicas", partitionName, tableNameWithType);
-          }
-          nReplicasExternal = 0;
-          continue;
-        }
-        for (Map.Entry<String, String> serverAndState : externalView.getStateMap(partitionName).entrySet()) {
-          // Count number of online replicas. Ignore if state is CONSUMING.
-          // It is possible for a segment to be ONLINE in idealstate, and CONSUMING in EV for a short period of time.
-          // So, ignore this combination. If a segment exists in this combination for a long time, we will get
-          // low level-partition-not-consuming alert anyway.
-          if (serverAndState.getValue().equals(ONLINE) || serverAndState.getValue().equals(CONSUMING)) {
-            nReplicas++;
-          }
-          if (serverAndState.getValue().equals(ERROR)) {
-            nErrors++;
-          }
-        }
-        if (nReplicas == 0) {
-          if (nOffline < MaxOfflineSegmentsToLog) {
-            LOGGER.warn("Segment {} of table {} has no online replicas", partitionName, tableNameWithType);
-          }
-          nOffline++;
-        }
-        nReplicasExternal =
-            ((nReplicasExternal > nReplicas) || (nReplicasExternal == -1)) ? nReplicas : nReplicasExternal;
-      }
-      if (nReplicasExternal == -1) {
-        nReplicasExternal = (nReplicasIdealMax == 0) ? 1 : 0;
-      }
-      // Synchronization provided by Controller Gauge to make sure that only one thread updates the gauge
-      _metricsRegistry.setValueOfTableGauge(tableNameWithType, ControllerGauge.NUMBER_OF_REPLICAS, nReplicasExternal);
-      _metricsRegistry.setValueOfTableGauge(tableNameWithType, ControllerGauge.PERCENT_OF_REPLICAS,
-          (nReplicasIdealMax > 0) ? (nReplicasExternal * 100 / nReplicasIdealMax) : 100);
-      _metricsRegistry.setValueOfTableGauge(tableNameWithType, ControllerGauge.SEGMENTS_IN_ERROR_STATE, nErrors);
-      _metricsRegistry.setValueOfTableGauge(tableNameWithType, ControllerGauge.PERCENT_SEGMENTS_AVAILABLE,
-          (nSegments > 0) ? (100 - (nOffline * 100 / nSegments)) : 100);
-      if (nOffline > 0) {
-        LOGGER.warn("Table {} has {} segments with no online replicas", tableNameWithType, nOffline);
-      }
-      if (nReplicasExternal < nReplicasIdealMax) {
-        LOGGER.warn("Table {} has {} replicas, below replication threshold :{}", tableNameWithType, nReplicasExternal,
-            nReplicasIdealMax);
-      }
-    } catch (Exception e) {
-      LOGGER.error("Caught exception while updating segment status for table {}", tableNameWithType, e);
-
-      // Remove the metric for this table
+    if (idealState == null) {
+      LOGGER.warn("Table {} has null ideal state. Skipping segment status checks", tableNameWithType);
       resetTableMetrics(tableNameWithType);
+      return;
+    }
+
+    if (!idealState.isEnabled()) {
+      if (_logDisabledTables) {
+        LOGGER.warn("Table {} is disabled. Skipping segment status checks", tableNameWithType);
+      }
+      resetTableMetrics(tableNameWithType);
+      _disabledTableCount++;
+      return;
+    }
+
+    if (idealState.getPartitionSet().isEmpty()) {
+      int nReplicasFromIdealState = 1;
+      try {
+        nReplicasFromIdealState = Integer.valueOf(idealState.getReplicas());
+      } catch (NumberFormatException e) {
+        // Ignore
+      }
+      _metricsRegistry
+          .setValueOfTableGauge(tableNameWithType, ControllerGauge.NUMBER_OF_REPLICAS, nReplicasFromIdealState);
+      _metricsRegistry.setValueOfTableGauge(tableNameWithType, ControllerGauge.PERCENT_OF_REPLICAS, 100);
+      _metricsRegistry.setValueOfTableGauge(tableNameWithType, ControllerGauge.PERCENT_SEGMENTS_AVAILABLE, 100);
+      return;
+    }
+
+    _metricsRegistry
+        .setValueOfTableGauge(tableNameWithType, ControllerGauge.IDEALSTATE_ZNODE_SIZE, idealState.toString().length());
+    _metricsRegistry.setValueOfTableGauge(tableNameWithType, ControllerGauge.SEGMENT_COUNT,
+        (long) (idealState.getPartitionSet().size()));
+    ExternalView externalView = _pinotHelixResourceManager.getTableExternalView(tableNameWithType);
+
+    int nReplicasIdealMax = 0; // Keeps track of maximum number of replicas in ideal state
+    int nReplicasExternal = -1; // Keeps track of minimum number of replicas in external view
+    int nErrors = 0; // Keeps track of number of segments in error state
+    int nOffline = 0; // Keeps track of number segments with no online replicas
+    int nSegments = 0; // Counts number of segments
+    for (String partitionName : idealState.getPartitionSet()) {
+      int nReplicas = 0;
+      int nIdeal = 0;
+      nSegments++;
+      // Skip segments not online in ideal state
+      for (Map.Entry<String, String> serverAndState : idealState.getInstanceStateMap(partitionName).entrySet()) {
+        if (serverAndState == null) {
+          break;
+        }
+        if (serverAndState.getValue().equals(ONLINE)) {
+          nIdeal++;
+          break;
+        }
+      }
+      if (nIdeal == 0) {
+        // No online segments in ideal state
+        continue;
+      }
+      nReplicasIdealMax = (idealState.getInstanceStateMap(partitionName).size() > nReplicasIdealMax) ? idealState
+          .getInstanceStateMap(partitionName).size() : nReplicasIdealMax;
+      if ((externalView == null) || (externalView.getStateMap(partitionName) == null)) {
+        // No replicas for this segment
+        TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
+        if ((tableType != null) && (tableType.equals(TableType.OFFLINE))) {
+          OfflineSegmentZKMetadata segmentZKMetadata =
+              _pinotHelixResourceManager.getOfflineSegmentZKMetadata(tableNameWithType, partitionName);
+
+          if (segmentZKMetadata != null
+              && segmentZKMetadata.getPushTime() > System.currentTimeMillis() - _waitForPushTimeSeconds * 1000) {
+            // push not yet finished, skip
+            continue;
+          }
+        }
+        nOffline++;
+        if (nOffline < MaxOfflineSegmentsToLog) {
+          LOGGER.warn("Segment {} of table {} has no replicas", partitionName, tableNameWithType);
+        }
+        nReplicasExternal = 0;
+        continue;
+      }
+      for (Map.Entry<String, String> serverAndState : externalView.getStateMap(partitionName).entrySet()) {
+        // Count number of online replicas. Ignore if state is CONSUMING.
+        // It is possible for a segment to be ONLINE in idealstate, and CONSUMING in EV for a short period of time.
+        // So, ignore this combination. If a segment exists in this combination for a long time, we will get
+        // low level-partition-not-consuming alert anyway.
+        if (serverAndState.getValue().equals(ONLINE) || serverAndState.getValue().equals(CONSUMING)) {
+          nReplicas++;
+        }
+        if (serverAndState.getValue().equals(ERROR)) {
+          nErrors++;
+        }
+      }
+      if (nReplicas == 0) {
+        if (nOffline < MaxOfflineSegmentsToLog) {
+          LOGGER.warn("Segment {} of table {} has no online replicas", partitionName, tableNameWithType);
+        }
+        nOffline++;
+      }
+      nReplicasExternal =
+          ((nReplicasExternal > nReplicas) || (nReplicasExternal == -1)) ? nReplicas : nReplicasExternal;
+    }
+    if (nReplicasExternal == -1) {
+      nReplicasExternal = (nReplicasIdealMax == 0) ? 1 : 0;
+    }
+    // Synchronization provided by Controller Gauge to make sure that only one thread updates the gauge
+    _metricsRegistry.setValueOfTableGauge(tableNameWithType, ControllerGauge.NUMBER_OF_REPLICAS, nReplicasExternal);
+    _metricsRegistry.setValueOfTableGauge(tableNameWithType, ControllerGauge.PERCENT_OF_REPLICAS,
+        (nReplicasIdealMax > 0) ? (nReplicasExternal * 100 / nReplicasIdealMax) : 100);
+    _metricsRegistry.setValueOfTableGauge(tableNameWithType, ControllerGauge.SEGMENTS_IN_ERROR_STATE, nErrors);
+    _metricsRegistry.setValueOfTableGauge(tableNameWithType, ControllerGauge.PERCENT_SEGMENTS_AVAILABLE,
+        (nSegments > 0) ? (100 - (nOffline * 100 / nSegments)) : 100);
+    if (nOffline > 0) {
+      LOGGER.warn("Table {} has {} segments with no online replicas", tableNameWithType, nOffline);
+    }
+    if (nReplicasExternal < nReplicasIdealMax) {
+      LOGGER.warn("Table {} has {} replicas, below replication threshold :{}", tableNameWithType, nReplicasExternal,
+          nReplicasIdealMax);
     }
   }
 

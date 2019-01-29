@@ -49,28 +49,30 @@ public class TableViewsTest extends ControllerTest {
   private static final int NUM_SERVER_INSTANCES = 4;
 
   @BeforeClass
-  public void setUp() throws Exception {
+  public void setUp()
+      throws Exception {
     startZk();
     startController();
 
-    ControllerRequestBuilderUtil.addFakeBrokerInstancesToAutoJoinHelixCluster(getHelixClusterName(),
-        ZkStarter.DEFAULT_ZK_STR, NUM_BROKER_INSTANCES, true);
-    ControllerRequestBuilderUtil.addFakeDataInstancesToAutoJoinHelixCluster(getHelixClusterName(),
-        ZkStarter.DEFAULT_ZK_STR, NUM_SERVER_INSTANCES, true);
+    ControllerRequestBuilderUtil
+        .addFakeBrokerInstancesToAutoJoinHelixCluster(getHelixClusterName(), ZkStarter.DEFAULT_ZK_STR,
+            NUM_BROKER_INSTANCES, true);
+    ControllerRequestBuilderUtil
+        .addFakeDataInstancesToAutoJoinHelixCluster(getHelixClusterName(), ZkStarter.DEFAULT_ZK_STR,
+            NUM_SERVER_INSTANCES, true);
 
     // Create the offline table and add one segment
     TableConfig tableConfig =
         new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(OFFLINE_TABLE_NAME)
-            .setNumReplicas(2)
-            .build();
+            .setNumReplicas(2).build();
     _helixResourceManager.addTable(tableConfig);
-    _helixResourceManager.addNewSegment(
-        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, OFFLINE_SEGMENT_NAME), "downloadUrl");
+    _helixResourceManager
+        .addNewSegment(SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, OFFLINE_SEGMENT_NAME),
+            "downloadUrl");
 
     // Create the hybrid table
     tableConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(HYBRID_TABLE_NAME)
-        .setNumReplicas(2)
-        .build();
+        .setNumReplicas(2).build();
     _helixResourceManager.addTable(tableConfig);
 
     // add schema for realtime table
@@ -81,20 +83,20 @@ public class TableViewsTest extends ControllerTest {
     String consumerFactoryClass = KafkaConsumerFactory.class.getName();
     String decoderClass = KafkaAvroMessageDecoder.class.getName();
     streamConfigs.put(StreamConfigProperties.STREAM_TYPE, streamType);
-    streamConfigs.put(
-        StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_TOPIC_NAME), topic);
-    streamConfigs.put(
-        StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
-        StreamConfig.ConsumerType.HIGHLEVEL.toString());
-    streamConfigs.put(StreamConfigProperties.constructStreamProperty(streamType,
-        StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS), consumerFactoryClass);
-    streamConfigs.put(
-        StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_DECODER_CLASS),
-        decoderClass);
+    streamConfigs
+        .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_TOPIC_NAME),
+            topic);
+    streamConfigs
+        .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
+            StreamConfig.ConsumerType.HIGHLEVEL.toString());
+    streamConfigs.put(StreamConfigProperties
+            .constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS),
+        consumerFactoryClass);
+    streamConfigs
+        .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_DECODER_CLASS),
+            decoderClass);
     tableConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.REALTIME).setTableName(HYBRID_TABLE_NAME)
-        .setNumReplicas(2)
-        .setStreamConfigs(streamConfigs)
-        .build();
+        .setNumReplicas(2).setStreamConfigs(streamConfigs).build();
     _helixResourceManager.addTable(tableConfig);
 
     // Wait for external view get updated
@@ -123,21 +125,24 @@ public class TableViewsTest extends ControllerTest {
   }
 
   @Test(dataProvider = "viewProvider")
-  public void testTableNotFound(String view) throws Exception {
+  public void testTableNotFound(String view)
+      throws Exception {
     String url = _controllerRequestURLBuilder.forTableView("unknownTable", view, null);
     HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
     Assert.assertEquals(connection.getResponseCode(), 404);
   }
 
   @Test(dataProvider = "viewProvider")
-  public void testBadRequest(String view) throws Exception {
+  public void testBadRequest(String view)
+      throws Exception {
     String url = _controllerRequestURLBuilder.forTableView(OFFLINE_TABLE_NAME, view, "no_such_type");
     HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
     Assert.assertEquals(connection.getResponseCode(), 400);
   }
 
   @Test(dataProvider = "viewProvider")
-  public void testOfflineTableState(String view) throws Exception {
+  public void testOfflineTableState(String view)
+      throws Exception {
     TableViews.TableView tableView = getTableView(OFFLINE_TABLE_NAME, view, null);
     Assert.assertNotNull(tableView.offline);
     Assert.assertEquals(tableView.offline.size(), 1);
@@ -153,7 +158,8 @@ public class TableViewsTest extends ControllerTest {
   }
 
   @Test(dataProvider = "viewProvider")
-  public void testHybridTableState(String state) throws Exception {
+  public void testHybridTableState(String state)
+      throws Exception {
     TableViews.TableView tableView = getTableView(HYBRID_TABLE_NAME, state, "realtime");
     Assert.assertNull(tableView.offline);
     Assert.assertNotNull(tableView.realtime);
@@ -181,10 +187,11 @@ public class TableViewsTest extends ControllerTest {
     Assert.assertEquals(tableView.realtime.size(), NUM_SERVER_INSTANCES);
   }
 
-  private TableViews.TableView getTableView(String tableName, String view, String tableType) throws Exception {
-    return JsonUtils.stringToObject(
-        sendGetRequest(_controllerRequestURLBuilder.forTableView(tableName, view, tableType)),
-        TableViews.TableView.class);
+  private TableViews.TableView getTableView(String tableName, String view, String tableType)
+      throws Exception {
+    return JsonUtils
+        .stringToObject(sendGetRequest(_controllerRequestURLBuilder.forTableView(tableName, view, tableType)),
+            TableViews.TableView.class);
   }
 
   @AfterClass

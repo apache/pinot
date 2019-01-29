@@ -51,7 +51,8 @@ public class ColumnMinMaxValueGenerator {
     _columnMinMaxValueGeneratorMode = columnMinMaxValueGeneratorMode;
   }
 
-  public void addColumnMinMaxValue() throws Exception {
+  public void addColumnMinMaxValue()
+      throws Exception {
     Preconditions.checkState(_columnMinMaxValueGeneratorMode != ColumnMinMaxValueGeneratorMode.NONE);
 
     Schema schema = _segmentMetadata.getSchema();
@@ -82,7 +83,8 @@ public class ColumnMinMaxValueGenerator {
     saveMetadata();
   }
 
-  private void addColumnMinMaxValueForColumn(String columnName) throws Exception {
+  private void addColumnMinMaxValueForColumn(String columnName)
+      throws Exception {
     // Skip column without dictionary or with min/max value already set
     ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(columnName);
     if ((!columnMetadata.hasDictionary()) || (columnMetadata.getMinValue() != null)) {
@@ -95,26 +97,30 @@ public class ColumnMinMaxValueGenerator {
     switch (dataType) {
       case INT:
         try (IntDictionary intDictionary = new IntDictionary(dictionaryBuffer, length)) {
-          SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(_segmentProperties, columnName,
-              intDictionary.getStringValue(0), intDictionary.getStringValue(length - 1));
+          SegmentColumnarIndexCreator
+              .addColumnMinMaxValueInfo(_segmentProperties, columnName, intDictionary.getStringValue(0),
+                  intDictionary.getStringValue(length - 1));
         }
         break;
       case LONG:
         try (LongDictionary longDictionary = new LongDictionary(dictionaryBuffer, length)) {
-          SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(_segmentProperties, columnName,
-              longDictionary.getStringValue(0), longDictionary.getStringValue(length - 1));
+          SegmentColumnarIndexCreator
+              .addColumnMinMaxValueInfo(_segmentProperties, columnName, longDictionary.getStringValue(0),
+                  longDictionary.getStringValue(length - 1));
         }
         break;
       case FLOAT:
         try (FloatDictionary floatDictionary = new FloatDictionary(dictionaryBuffer, length)) {
-          SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(_segmentProperties, columnName,
-              floatDictionary.getStringValue(0), floatDictionary.getStringValue(length - 1));
+          SegmentColumnarIndexCreator
+              .addColumnMinMaxValueInfo(_segmentProperties, columnName, floatDictionary.getStringValue(0),
+                  floatDictionary.getStringValue(length - 1));
         }
         break;
       case DOUBLE:
         try (DoubleDictionary doubleDictionary = new DoubleDictionary(dictionaryBuffer, length)) {
-          SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(_segmentProperties, columnName,
-              doubleDictionary.getStringValue(0), doubleDictionary.getStringValue(length - 1));
+          SegmentColumnarIndexCreator
+              .addColumnMinMaxValueInfo(_segmentProperties, columnName, doubleDictionary.getStringValue(0),
+                  doubleDictionary.getStringValue(length - 1));
         }
         break;
       case STRING:
@@ -131,7 +137,8 @@ public class ColumnMinMaxValueGenerator {
     _minMaxValueAdded = true;
   }
 
-  private void saveMetadata() throws Exception {
+  private void saveMetadata()
+      throws Exception {
     if (_minMaxValueAdded) {
       _segmentProperties.save();
     }

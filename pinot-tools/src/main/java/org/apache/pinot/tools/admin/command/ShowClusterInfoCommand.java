@@ -46,6 +46,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
 
+
 public class ShowClusterInfoCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(ShowClusterInfoCommand.class.getName());
 
@@ -61,12 +62,12 @@ public class ShowClusterInfoCommand extends AbstractBaseAdminCommand implements 
   @Option(name = "-tags", required = false, metaVar = "<String>", usage = "Commaa separated tag names.")
   private String _tags = "";
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
-      usage = "Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
   private boolean _help = false;
 
   @Override
-  public boolean execute() throws Exception {
+  public boolean execute()
+      throws Exception {
     Set<String> includeTableSet = new HashSet<>();
     String[] includeTables = _tables.split(",");
     for (String includeTable : includeTables) {
@@ -195,14 +196,13 @@ public class ShowClusterInfoCommand extends AbstractBaseAdminCommand implements 
 
   @Override
   public String toString() {
-    return ("ShowClusterInfo -clusterName " + _clusterName + " -zkAddress " + _zkAddress
-        + " -tables " + _tables + " -tags " + _tags);
+    return ("ShowClusterInfo -clusterName " + _clusterName + " -zkAddress " + _zkAddress + " -tables " + _tables
+        + " -tags " + _tags);
   }
 
   class SegmentInfo {
     public String name;
     public Map<String, String> segmentStateMap = new HashMap<String, String>();
-
   }
 
   class TableInfo {
@@ -225,13 +225,11 @@ public class ShowClusterInfoCommand extends AbstractBaseAdminCommand implements 
     public String name;
     public List<String> tags;
     public String state;
-
   }
 
   class ControllerInfo {
 
     public String leaderName;
-
   }
 
   class ClusterInfo {

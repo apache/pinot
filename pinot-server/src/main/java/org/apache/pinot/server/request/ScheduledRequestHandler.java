@@ -70,8 +70,7 @@ public class ScheduledRequestHandler implements NettyServer.RequestHandler {
     }
 
     ServerQueryRequest queryRequest = new ServerQueryRequest(instanceRequest, serverMetrics, queryArrivalTimeMs);
-    queryRequest.getTimerContext()
-        .startNewPhaseTimer(ServerQueryPhase.REQUEST_DESERIALIZATION, queryArrivalTimeMs)
+    queryRequest.getTimerContext().startNewPhaseTimer(ServerQueryPhase.REQUEST_DESERIALIZATION, queryArrivalTimeMs)
         .stopAndRecord();
 
     LOGGER.debug("Processing requestId:{},request={}", instanceRequest.getRequestId(), instanceRequest);

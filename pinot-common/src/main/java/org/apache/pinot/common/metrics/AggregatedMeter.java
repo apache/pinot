@@ -100,12 +100,14 @@ public class AggregatedMeter<T extends Metered & Stoppable> implements Metered, 
 
   @Override
   public void stop() {
-    for (T m : _meters)
+    for (T m : _meters) {
       m.stop();
+    }
   }
 
   @Override
-  public <T2> void processWith(MetricProcessor<T2> processor, MetricName name, T2 context) throws Exception {
+  public <T2> void processWith(MetricProcessor<T2> processor, MetricName name, T2 context)
+      throws Exception {
     for (T m : _meters) {
       m.processWith(processor, name, context);
     }
@@ -147,15 +149,17 @@ public class AggregatedMeter<T extends Metered & Stoppable> implements Metered, 
 
   @Override
   public TimeUnit rateUnit() {
-    if (_meters.isEmpty())
+    if (_meters.isEmpty()) {
       return null;
+    }
     return _meters.get(0).rateUnit();
   }
 
   @Override
   public String eventType() {
-    if (_meters.isEmpty())
+    if (_meters.isEmpty()) {
       return null;
+    }
     return _meters.get(0).eventType();
   }
 

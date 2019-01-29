@@ -98,16 +98,16 @@ public class RealtimeTableDataManagerTest {
     streamConfigs.put("streamType", "kafka");
     streamConfigs.put("stream.kafka.consumer.type", "highLevel");
     streamConfigs.put("stream.kafka.topic.name", "kafkaTopic");
-    streamConfigs.put("stream.kafka.decoder.class.name",
-        "org.apache.pinot.core.realtime.impl.kafka.KafkaAvroMessageDecoder");
+    streamConfigs
+        .put("stream.kafka.decoder.class.name", "org.apache.pinot.core.realtime.impl.kafka.KafkaAvroMessageDecoder");
     streamConfigs.put("stream.kafka.hlc.zk.connect.string", "localhost:1111/zkConnect");
     streamConfigs.put("stream.kafka.decoder.prop.schema.registry.rest.url", "http://localhost:2222/schemaRegistry");
     tableConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.REALTIME).setTableName("mirror")
-        .setStreamConfigs(streamConfigs)
-        .build();
+        .setStreamConfigs(streamConfigs).build();
   }
 
-  private static TableDataManagerConfig getTableDataManagerConfig() throws ConfigurationException {
+  private static TableDataManagerConfig getTableDataManagerConfig()
+      throws ConfigurationException {
     String tableName = "testTable_R";
     Configuration defaultConfig = new PropertiesConfiguration();
     defaultConfig.addProperty(TABLE_DATA_MANAGER_NAME, tableName);
@@ -133,12 +133,13 @@ public class RealtimeTableDataManagerTest {
     return dataManagerConfig;
   }
 
-  public void testSetup() throws Exception {
+  public void testSetup()
+      throws Exception {
     InstanceDataManagerConfig dataManagerConfig = makeInstanceDataManagerConfig();
     final HLRealtimeSegmentDataManager manager =
         new HLRealtimeSegmentDataManager(realtimeSegmentZKMetadata, tableConfig, instanceZKMetadata, null,
-            tableDataManagerConfig.getDataDir(), new IndexLoadingConfig(dataManagerConfig, tableConfig), getTestSchema(),
-            new ServerMetrics(new MetricsRegistry()));
+            tableDataManagerConfig.getDataDir(), new IndexLoadingConfig(dataManagerConfig, tableConfig),
+            getTestSchema(), new ServerMetrics(new MetricsRegistry()));
 
     final long start = System.currentTimeMillis();
     TimerService.timer.scheduleAtFixedRate(new TimerTask() {
@@ -258,8 +259,8 @@ public class RealtimeTableDataManagerTest {
           e.printStackTrace();
         }
         long stop = System.currentTimeMillis();
-        LOGGER.info("time to scan MV col viewerCompanies : " + (stop - start) + " sum : " + sum + " average len : "
-            + (sumOfLengths / counter));
+        LOGGER.info("time to scan MV col viewerCompanies : " + (stop - start) + " sum : " + sum + " average len : " + (
+            sumOfLengths / counter));
       }
     }, 20000, 1000 * 5);
 
@@ -296,7 +297,8 @@ public class RealtimeTableDataManagerTest {
     return realtimeSegmentMetadata;
   }
 
-  private static Schema getTestSchema() throws FileNotFoundException, IOException {
+  private static Schema getTestSchema()
+      throws FileNotFoundException, IOException {
     filePath = MutableSegmentImplTest.class.getClassLoader().getResource(AVRO_DATA).getFile();
     fieldTypeMap = new HashMap<String, FieldSpec.FieldType>();
     fieldTypeMap.put("viewerId", FieldType.DIMENSION);

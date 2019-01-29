@@ -42,7 +42,8 @@ public class DruidResponseTime {
   private static final byte[] BYTE_BUFFER = new byte[4096];
   private static final char[] CHAR_BUFFER = new char[4096];
 
-  public static void main(String[] args) throws Exception {
+  public static void main(String[] args)
+      throws Exception {
     if (args.length != 4 && args.length != 5) {
       System.err.println(
           "4 or 5 arguments required: QUERY_DIR, RESOURCE_URL, WARM_UP_ROUNDS, TEST_ROUNDS, RESULT_DIR (optional).");
@@ -116,10 +117,8 @@ public class DruidResponseTime {
         if (resultDir != null) {
           File resultFile = new File(resultDir, queryFile.getName() + ".result");
           CloseableHttpResponse httpResponse = httpClient.execute(httpPost);
-          try (
-              BufferedInputStream bufferedInputStream = new BufferedInputStream(httpResponse.getEntity().getContent());
-              BufferedWriter bufferedWriter = new BufferedWriter(new FileWriter(resultFile))
-          ) {
+          try (BufferedInputStream bufferedInputStream = new BufferedInputStream(httpResponse.getEntity().getContent());
+              BufferedWriter bufferedWriter = new BufferedWriter(new FileWriter(resultFile))) {
             int length;
             while ((length = bufferedInputStream.read(BYTE_BUFFER)) > 0) {
               bufferedWriter.write(new String(BYTE_BUFFER, 0, length));

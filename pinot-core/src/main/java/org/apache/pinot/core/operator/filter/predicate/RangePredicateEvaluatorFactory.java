@@ -76,8 +76,7 @@ public class RangePredicateEvaluatorFactory {
     }
   }
 
-  private static final class OfflineDictionaryBasedRangePredicateEvaluator
-      extends BaseDictionaryBasedPredicateEvaluator {
+  private static final class OfflineDictionaryBasedRangePredicateEvaluator extends BaseDictionaryBasedPredicateEvaluator {
     final int _startDictId;
     // Exclusive
     final int _endDictId;
@@ -158,8 +157,7 @@ public class RangePredicateEvaluatorFactory {
     }
   }
 
-  private static final class RealtimeDictionaryBasedRangePredicateEvaluator
-      extends BaseDictionaryBasedPredicateEvaluator {
+  private static final class RealtimeDictionaryBasedRangePredicateEvaluator extends BaseDictionaryBasedPredicateEvaluator {
     final IntSet _matchingDictIdSet;
     final int _numMatchingDictIds;
     int[] _matchingDictIds;

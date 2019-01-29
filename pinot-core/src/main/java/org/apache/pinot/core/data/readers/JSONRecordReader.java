@@ -42,14 +42,16 @@ public class JSONRecordReader implements RecordReader {
   private JsonParser _parser;
   private Iterator<Map> _iterator;
 
-  public JSONRecordReader(File dataFile, Schema schema) throws IOException {
+  public JSONRecordReader(File dataFile, Schema schema)
+      throws IOException {
     _dataFile = dataFile;
     _schema = schema;
 
     init();
   }
 
-  private void init() throws IOException {
+  private void init()
+      throws IOException {
     _parser = _factory.createParser(RecordReaderUtils.getFileReader(_dataFile));
     try {
       _iterator = JsonUtils.DEFAULT_MAPPER.readValues(_parser, Map.class);
@@ -92,7 +94,8 @@ public class JSONRecordReader implements RecordReader {
   }
 
   @Override
-  public void rewind() throws IOException {
+  public void rewind()
+      throws IOException {
     _parser.close();
     init();
   }
@@ -103,7 +106,8 @@ public class JSONRecordReader implements RecordReader {
   }
 
   @Override
-  public void close() throws IOException {
+  public void close()
+      throws IOException {
     _parser.close();
   }
 }

@@ -22,6 +22,7 @@ import java.util.concurrent.Callable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
 /**
  * Fetches the partition count of a stream using the {@link StreamMetadataProvider}
  */
@@ -55,7 +56,8 @@ public class PartitionCountFetcher implements Callable<Boolean> {
    * @throws Exception
    */
   @Override
-  public Boolean call() throws Exception {
+  public Boolean call()
+      throws Exception {
 
     String clientId = PartitionCountFetcher.class.getSimpleName() + "-" + _topicName;
     try (

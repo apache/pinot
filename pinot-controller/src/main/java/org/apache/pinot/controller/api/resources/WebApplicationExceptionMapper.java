@@ -30,6 +30,7 @@ import org.apache.pinot.common.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
 @Provider
 public class WebApplicationExceptionMapper implements ExceptionMapper<Throwable> {
   private static final Logger LOGGER = LoggerFactory.getLogger(WebApplicationExceptionMapper.class);
@@ -37,10 +38,10 @@ public class WebApplicationExceptionMapper implements ExceptionMapper<Throwable>
   @Override
   public Response toResponse(Throwable t) {
     int status = 500;
-    if (! (t instanceof WebApplicationException)) {
+    if (!(t instanceof WebApplicationException)) {
       LOGGER.error("Server error: ", t);
     } else {
-      status = ((WebApplicationException)t ).getResponse().getStatus();
+      status = ((WebApplicationException) t).getResponse().getStatus();
     }
 
     ErrorInfo einfo = new ErrorInfo(status, t.getMessage());
@@ -58,6 +59,7 @@ public class WebApplicationExceptionMapper implements ExceptionMapper<Throwable>
       this.code = code;
       this.error = message;
     }
+
     public int code;
     public String error;
   }

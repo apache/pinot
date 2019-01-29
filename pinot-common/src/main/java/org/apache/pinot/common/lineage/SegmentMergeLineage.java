@@ -304,7 +304,8 @@ public class SegmentMergeLineage {
    * @param childrenGroups a list of children group ids
    * @return group level
    */
-  private Integer getGroupLevel(List<String> childrenGroups) throws InvalidConfigException {
+  private Integer getGroupLevel(List<String> childrenGroups)
+      throws InvalidConfigException {
     // If no children exists, the group belongs to the base level.
     if (childrenGroups == null || childrenGroups.isEmpty()) {
       return DEFAULT_GROUP_LEVEL;
@@ -336,9 +337,9 @@ public class SegmentMergeLineage {
 
     SegmentMergeLineage that = (SegmentMergeLineage) o;
 
-    return EqualityUtils.isEqual(_tableNameWithType, that._tableNameWithType) && EqualityUtils.isEqual(
-        _parentGroupToChildrenGroupsMap, that._parentGroupToChildrenGroupsMap) && EqualityUtils.isEqual(
-        _levelToGroupToSegmentsMap, that._levelToGroupToSegmentsMap);
+    return EqualityUtils.isEqual(_tableNameWithType, that._tableNameWithType) && EqualityUtils
+        .isEqual(_parentGroupToChildrenGroupsMap, that._parentGroupToChildrenGroupsMap) && EqualityUtils
+        .isEqual(_levelToGroupToSegmentsMap, that._levelToGroupToSegmentsMap);
   }
 
   @Override

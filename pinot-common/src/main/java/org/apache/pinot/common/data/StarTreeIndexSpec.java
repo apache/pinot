@@ -114,7 +114,8 @@ public class StarTreeIndexSpec {
     return ToStringBuilder.reflectionToString(this, ToStringStyle.SHORT_PREFIX_STYLE);
   }
 
-  public String toJsonString() throws JsonProcessingException {
+  public String toJsonString()
+      throws JsonProcessingException {
     return JsonUtils.objectToString(this);
   }
 
@@ -125,11 +126,13 @@ public class StarTreeIndexSpec {
    * @return StarTreeIndexSpec object de-serialized from the file.
    * @throws IOException
    */
-  public static StarTreeIndexSpec fromFile(File starTreeIndexSpecFile) throws IOException {
+  public static StarTreeIndexSpec fromFile(File starTreeIndexSpecFile)
+      throws IOException {
     return JsonUtils.fileToObject(starTreeIndexSpecFile, StarTreeIndexSpec.class);
   }
 
-  public static StarTreeIndexSpec fromJsonString(String jsonString) throws IOException {
+  public static StarTreeIndexSpec fromJsonString(String jsonString)
+      throws IOException {
     return JsonUtils.stringToObject(jsonString, StarTreeIndexSpec.class);
   }
 
@@ -137,10 +140,10 @@ public class StarTreeIndexSpec {
     StarTreeIndexSpec starTreeIndexSpec = new StarTreeIndexSpec();
     starTreeIndexSpec.setMaxLeafRecords(starTreeMetadata.getMaxLeafRecords());
     starTreeIndexSpec.setDimensionsSplitOrder(starTreeMetadata.getDimensionsSplitOrder());
-    starTreeIndexSpec.setSkipStarNodeCreationForDimensions(
-        Sets.newHashSet(starTreeMetadata.getSkipStarNodeCreationForDimensions()));
-    starTreeIndexSpec.setSkipMaterializationForDimensions(
-        Sets.newHashSet(starTreeMetadata.getSkipMaterializationForDimensions()));
+    starTreeIndexSpec
+        .setSkipStarNodeCreationForDimensions(Sets.newHashSet(starTreeMetadata.getSkipStarNodeCreationForDimensions()));
+    starTreeIndexSpec
+        .setSkipMaterializationForDimensions(Sets.newHashSet(starTreeMetadata.getSkipMaterializationForDimensions()));
     starTreeIndexSpec.setSkipMaterializationCardinalityThreshold(starTreeMetadata.getSkipMaterializationCardinality());
     return starTreeIndexSpec;
   }
@@ -157,12 +160,13 @@ public class StarTreeIndexSpec {
 
     StarTreeIndexSpec that = (StarTreeIndexSpec) o;
 
-    return EqualityUtils.isEqual(_maxLeafRecords, that._maxLeafRecords) &&
-        EqualityUtils.isEqual( _skipMaterializationCardinalityThreshold, that._skipMaterializationCardinalityThreshold) &&
-        EqualityUtils.isEqual(_excludeSkipMaterializationDimensionsForStarTreeIndex, that._excludeSkipMaterializationDimensionsForStarTreeIndex) &&
-        EqualityUtils.isEqual(_dimensionsSplitOrder, that._dimensionsSplitOrder) &&
-        EqualityUtils.isEqual(_skipStarNodeCreationForDimensions, that._skipStarNodeCreationForDimensions) &&
-        EqualityUtils.isEqual(_skipMaterializationForDimensions, that._skipMaterializationForDimensions);
+    return EqualityUtils.isEqual(_maxLeafRecords, that._maxLeafRecords) && EqualityUtils
+        .isEqual(_skipMaterializationCardinalityThreshold, that._skipMaterializationCardinalityThreshold)
+        && EqualityUtils.isEqual(_excludeSkipMaterializationDimensionsForStarTreeIndex,
+        that._excludeSkipMaterializationDimensionsForStarTreeIndex) && EqualityUtils
+        .isEqual(_dimensionsSplitOrder, that._dimensionsSplitOrder) && EqualityUtils
+        .isEqual(_skipStarNodeCreationForDimensions, that._skipStarNodeCreationForDimensions) && EqualityUtils
+        .isEqual(_skipMaterializationForDimensions, that._skipMaterializationForDimensions);
   }
 
   @Override

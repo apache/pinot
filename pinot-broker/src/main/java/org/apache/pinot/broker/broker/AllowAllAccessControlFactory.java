@@ -26,6 +26,7 @@ import org.apache.pinot.common.request.BrokerRequest;
 
 public class AllowAllAccessControlFactory extends AccessControlFactory {
   private final AccessControl _accessControl;
+
   public AllowAllAccessControlFactory() {
     _accessControl = new AllowAllAccessControl();
   }

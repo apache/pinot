@@ -49,7 +49,8 @@ public class SegmentUriPushJob extends Configured {
     _port = Integer.parseInt(properties.getProperty(JobConfigConstants.PUSH_TO_PORT));
   }
 
-  public void run() throws Exception {
+  public void run()
+      throws Exception {
     Configuration conf = new Configuration();
     FileSystem fs = FileSystem.get(conf);
     Path path = new Path(_segmentPath);
@@ -63,7 +64,8 @@ public class SegmentUriPushJob extends Configured {
     }
   }
 
-  public void pushDir(FileSystem fs, Path path) throws Exception {
+  public void pushDir(FileSystem fs, Path path)
+      throws Exception {
     LOGGER.info("******** Now uploading segments tar from dir: {}", path);
     FileStatus[] fileStatusArr = fs.listStatus(new Path(path.toString() + "/"));
     for (FileStatus fileStatus : fileStatusArr) {
@@ -75,7 +77,8 @@ public class SegmentUriPushJob extends Configured {
     }
   }
 
-  public void pushOneTarFile(FileSystem fs, Path path) throws Exception {
+  public void pushOneTarFile(FileSystem fs, Path path)
+      throws Exception {
     String fileName = path.getName();
     if (!fileName.endsWith(JobConfigConstants.TARGZ)) {
       return;
@@ -83,12 +86,12 @@ public class SegmentUriPushJob extends Configured {
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
       for (String host : _hosts) {
         String uri = String.format("%s%s%s", _pushUriPrefix, path.toUri().getRawPath(), _pushUriSuffix);
-        LOGGER.info("******** Uploading file: {} to Host: {} and Port: {} with download uri: {} *******", fileName,
-            host, _port, uri);
+        LOGGER
+            .info("******** Uploading file: {} to Host: {} and Port: {} with download uri: {} *******", fileName, host,
+                _port, uri);
         try {
-          SimpleHttpResponse response =
-              fileUploadDownloadClient.sendSegmentUri(FileUploadDownloadClient.getUploadSegmentHttpURI(host, _port),
-                  uri);
+          SimpleHttpResponse response = fileUploadDownloadClient
+              .sendSegmentUri(FileUploadDownloadClient.getUploadSegmentHttpURI(host, _port), uri);
           LOGGER.info("Response {}: {}", response.getStatusCode(), response.getResponse());
         } catch (Exception e) {
           LOGGER.error("******** Error Uploading file: {} to Host: {} and Port: {}  *******", fileName, host, _port);

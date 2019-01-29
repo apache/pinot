@@ -28,8 +28,7 @@ import org.apache.pinot.core.io.writer.SingleValueMultiColumnWriter;
  * Abstract class for reader and writer interfaces for Single-value Multiple-Columns case.
  * @param <T>
  */
-public abstract class BaseSingleValueMultiColumnReaderWriter<T extends ReaderContext>
-    implements SingleValueMultiColumnReader<T>, SingleValueMultiColumnWriter {
+public abstract class BaseSingleValueMultiColumnReaderWriter<T extends ReaderContext> implements SingleValueMultiColumnReader<T>, SingleValueMultiColumnWriter {
   @Override
   public char getChar(int row, int column) {
     throw new UnsupportedOperationException();

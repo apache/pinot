@@ -67,7 +67,7 @@ public class GenerateDataCommand extends AbstractBaseAdminCommand implements Com
   @Option(name = "-overwrite", required = false, usage = "Overwrite, if directory exists")
   boolean _overwrite;
 
-  @Option(name="-help", required=false, help=true, aliases={"-h", "--h", "--help"}, usage="Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
   private boolean _help = false;
 
   @Override
@@ -85,9 +85,8 @@ public class GenerateDataCommand extends AbstractBaseAdminCommand implements Com
 
   @Override
   public String toString() {
-    return ("GenerateData -numRecords " + _numRecords + " -numFiles " + " " + _numFiles +
-        " -schemaFile " + _schemaFile + " -outDir " + _outDir +
-        " -schemaAnnotationFile " + _schemaAnnFile);
+    return ("GenerateData -numRecords " + _numRecords + " -numFiles " + " " + _numFiles + " -schemaFile " + _schemaFile
+        + " -outDir " + _outDir + " -schemaAnnotationFile " + _schemaAnnFile);
   }
 
   @Override
@@ -106,7 +105,8 @@ public class GenerateDataCommand extends AbstractBaseAdminCommand implements Com
   }
 
   @Override
-  public boolean execute() throws Exception {
+  public boolean execute()
+      throws Exception {
     LOGGER.info("Executing command: " + toString());
 
     if ((_numRecords < 0) || (_numFiles < 0)) {
@@ -124,8 +124,8 @@ public class GenerateDataCommand extends AbstractBaseAdminCommand implements Com
     final HashMap<String, IntRange> range = new HashMap<String, IntRange>();
 
     buildCardinalityRangeMaps(_schemaAnnFile, cardinality, range);
-    final DataGeneratorSpec spec = buildDataGeneratorSpec(schema, columns, dataTypes, fieldTypes,
-        timeUnits, cardinality, range);
+    final DataGeneratorSpec spec =
+        buildDataGeneratorSpec(schema, columns, dataTypes, fieldTypes, timeUnits, cardinality, range);
 
     final DataGenerator gen = new DataGenerator();
     gen.init(spec);
@@ -135,7 +135,8 @@ public class GenerateDataCommand extends AbstractBaseAdminCommand implements Com
   }
 
   private void buildCardinalityRangeMaps(String file, HashMap<String, Integer> cardinality,
-      HashMap<String, IntRange> range) throws IOException {
+      HashMap<String, IntRange> range)
+      throws IOException {
     if (file == null) {
       return; // Nothing to do here.
     }
@@ -154,9 +155,8 @@ public class GenerateDataCommand extends AbstractBaseAdminCommand implements Com
   }
 
   private DataGeneratorSpec buildDataGeneratorSpec(Schema schema, List<String> columns,
-      HashMap<String, DataType> dataTypes, HashMap<String, FieldType> fieldTypes,
-      HashMap<String, TimeUnit> timeUnits, HashMap<String, Integer> cardinality,
-      HashMap<String, IntRange> range) {
+      HashMap<String, DataType> dataTypes, HashMap<String, FieldType> fieldTypes, HashMap<String, TimeUnit> timeUnits,
+      HashMap<String, Integer> cardinality, HashMap<String, IntRange> range) {
     for (final FieldSpec fs : schema.getAllFieldSpecs()) {
       String col = fs.getName();
 
@@ -190,11 +190,12 @@ public class GenerateDataCommand extends AbstractBaseAdminCommand implements Com
       }
     }
 
-    return new DataGeneratorSpec(columns, cardinality, range, dataTypes, fieldTypes,
-        timeUnits, FileFormat.AVRO, _outDir, _overwrite);
+    return new DataGeneratorSpec(columns, cardinality, range, dataTypes, fieldTypes, timeUnits, FileFormat.AVRO,
+        _outDir, _overwrite);
   }
 
-  public static void main(String[] args) throws IOException {
+  public static void main(String[] args)
+      throws IOException {
     SchemaBuilder schemaBuilder = new SchemaBuilder();
 
     schemaBuilder.addSingleValueDimension("name", DataType.STRING);

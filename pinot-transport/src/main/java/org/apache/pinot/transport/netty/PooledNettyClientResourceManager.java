@@ -80,8 +80,9 @@ public class PooledNettyClientResourceManager implements PooledResourceManager<P
 
   @Override
   public boolean validate(ServerInstance key, PooledClientConnection resource) {
-    if ( null != resource)
+    if (null != resource) {
       return resource.validate();
+    }
     return false;
   }
 
@@ -125,8 +126,8 @@ public class PooledNettyClientResourceManager implements PooledResourceManager<P
        * We got error. Time to discard this connection.
        */
       if (!_destroyed) {
-        LOGGER.info("Destroying connection (onError) {} due to error connId {}", _server, getConnId(),
-            arg0.getMessage());
+        LOGGER
+            .info("Destroying connection (onError) {} due to error connId {}", _server, getConnId(), arg0.getMessage());
         _pool.destroyObject(getServer(), this);
         _destroyed = true;
       }

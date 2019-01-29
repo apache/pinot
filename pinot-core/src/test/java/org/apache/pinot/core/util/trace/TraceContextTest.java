@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.util.trace;
 
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Queue;
@@ -38,7 +37,8 @@ public class TraceContextTest {
   private static final Random RANDOM = new Random();
 
   @Test
-  public void testSingleRequest() throws Exception {
+  public void testSingleRequest()
+      throws Exception {
     ExecutorService executorService = Executors.newCachedThreadPool();
     testSingleRequest(executorService, 0);
     executorService.shutdown();
@@ -46,7 +46,8 @@ public class TraceContextTest {
   }
 
   @Test
-  public void testMultipleRequests() throws Exception {
+  public void testMultipleRequests()
+      throws Exception {
     final ExecutorService executorService = Executors.newCachedThreadPool();
     Future[] futures = new Future[NUM_REQUESTS];
     for (int i = 0; i < NUM_REQUESTS; i++) {
@@ -69,7 +70,8 @@ public class TraceContextTest {
     Assert.assertTrue(TraceContext.REQUEST_TO_TRACES_MAP.isEmpty());
   }
 
-  private void testSingleRequest(ExecutorService executorService, final long requestId) throws Exception {
+  private void testSingleRequest(ExecutorService executorService, final long requestId)
+      throws Exception {
     Set<String> expectedTraces = new HashSet<>(NUM_CHILDREN_PER_REQUEST + 1);
     TraceContext.register(requestId);
     String key = Integer.toString(RANDOM.nextInt());
@@ -117,8 +119,6 @@ public class TraceContextTest {
   }
 
   private static String getTraceString(String key, Object value) {
-    ObjectNode jsonTrace = JsonUtils.newObjectNode();
-    jsonTrace.set(key, JsonUtils.objectToJsonNode(value));
-    return jsonTrace.toString();
+    return JsonUtils.newObjectNode().set(key, JsonUtils.objectToJsonNode(value)).toString();
   }
 }

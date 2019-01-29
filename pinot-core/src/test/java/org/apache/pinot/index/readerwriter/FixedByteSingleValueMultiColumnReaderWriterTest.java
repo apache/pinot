@@ -56,7 +56,8 @@ public class FixedByteSingleValueMultiColumnReaderWriterTest {
   }
 
   @AfterClass
-  public void tearDown() throws IOException {
+  public void tearDown()
+      throws IOException {
     _readerWriter.close();
     _memoryManager.close();
   }

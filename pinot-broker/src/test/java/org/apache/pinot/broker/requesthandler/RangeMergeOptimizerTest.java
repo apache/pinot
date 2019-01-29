@@ -178,7 +178,9 @@ public class RangeMergeOptimizerTest {
     compareTrees(actualTree, expectedTree);
 
     // Query with same lower and upper range
-    actualTree = buildFilterQueryTree("select * from table where (time >= 10 and time <= 20) and (time between 10 and 20)", true);
+    actualTree =
+        buildFilterQueryTree("select * from table where (time >= 10 and time <= 20) and (time between 10 and 20)",
+            true);
     expectedTree = buildFilterQueryTree("select * from table where time between 10 and 20", false);
     compareTrees(actualTree, expectedTree);
 

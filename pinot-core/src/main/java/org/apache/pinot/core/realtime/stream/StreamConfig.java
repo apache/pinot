@@ -92,7 +92,8 @@ public class StreamConfig {
     String consumerTypes = streamConfigMap.get(consumerTypesKey);
     Preconditions.checkNotNull(consumerTypes, "Must specify at least one consumer type " + consumerTypesKey);
     for (String consumerType : consumerTypes.split(",")) {
-      if (consumerType.equals(SIMPLE_CONSUMER_TYPE_STRING)) { //For backward compatibility of stream configs which referred to lowlevel as simple
+      if (consumerType.equals(
+          SIMPLE_CONSUMER_TYPE_STRING)) { //For backward compatibility of stream configs which referred to lowlevel as simple
         consumerType = ConsumerType.LOWLEVEL.toString();
       }
       _consumerTypes.add(ConsumerType.valueOf(consumerType.toUpperCase()));
@@ -106,8 +107,9 @@ public class StreamConfig {
       // For backward compatibility, default consumer factory is for Kafka.
       _consumerFactoryClassName = DEFAULT_CONSUMER_FACTORY_CLASS_NAME_STRING;
     }
-    LOGGER.info("Stream type: {}, name: {}, consumer types: {}, consumer factory: {}", _type, _topicName,
-        _consumerTypes, _consumerFactoryClassName);
+    LOGGER
+        .info("Stream type: {}, name: {}, consumer types: {}, consumer factory: {}", _type, _topicName, _consumerTypes,
+            _consumerFactoryClassName);
 
     String offsetCriteriaKey =
         StreamConfigProperties.constructStreamProperty(_type, StreamConfigProperties.STREAM_CONSUMER_OFFSET_CRITERIA);
@@ -127,8 +129,8 @@ public class StreamConfig {
         StreamConfigProperties.constructStreamProperty(_type, StreamConfigProperties.DECODER_PROPS_PREFIX);
     for (String key : streamConfigMap.keySet()) {
       if (key.startsWith(streamDecoderPropPrefix)) {
-        _decoderProperties.put(StreamConfigProperties.getPropertySuffix(key, streamDecoderPropPrefix),
-            streamConfigMap.get(key));
+        _decoderProperties
+            .put(StreamConfigProperties.getPropertySuffix(key, streamDecoderPropPrefix), streamConfigMap.get(key));
       }
     }
 
@@ -184,8 +186,8 @@ public class StreamConfig {
           flushThresholdTime = Long.parseLong(flushThresholdTimeValue);
         } catch (Exception e1) {
           LOGGER.warn("Caught exception when converting flush threshold period to millis {}:{}, defaulting to {}",
-              StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_TIME, flushThresholdTimeValue, DEFAULT_FLUSH_THRESHOLD_TIME,
-              e);
+              StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_TIME, flushThresholdTimeValue,
+              DEFAULT_FLUSH_THRESHOLD_TIME, e);
         }
       }
     }
@@ -204,7 +206,6 @@ public class StreamConfig {
 
     String groupIdKey = StreamConfigProperties.constructStreamProperty(_type, StreamConfigProperties.GROUP_ID);
     _groupId = streamConfigMap.get(groupIdKey);
-
 
     _streamConfigMap.putAll(streamConfigMap);
   }
@@ -296,8 +297,8 @@ public class StreamConfig {
         + _offsetCriteria + '\'' + ", _connectionTimeoutMillis=" + _connectionTimeoutMillis + ", _fetchTimeoutMillis="
         + _fetchTimeoutMillis + ", _flushThresholdRows=" + _flushThresholdRows + ", _flushThresholdTimeMillis="
         + _flushThresholdTimeMillis + ", _flushSegmentDesiredSizeBytes=" + _flushSegmentDesiredSizeBytes
-        + ", _decoderClass='" + _decoderClass + '\'' + ", _decoderProperties=" + _decoderProperties
-        + ", _groupId='" + _groupId + '}';
+        + ", _decoderClass='" + _decoderClass + '\'' + ", _decoderProperties=" + _decoderProperties + ", _groupId='"
+        + _groupId + '}';
   }
 
   @Override
@@ -312,16 +313,17 @@ public class StreamConfig {
 
     StreamConfig that = (StreamConfig) o;
 
-    return EqualityUtils.isEqual(_connectionTimeoutMillis, that._connectionTimeoutMillis) && EqualityUtils.isEqual(
-        _fetchTimeoutMillis, that._fetchTimeoutMillis) && EqualityUtils.isEqual(_flushThresholdRows,
-        that._flushThresholdRows) && EqualityUtils.isEqual(_flushThresholdTimeMillis, that._flushThresholdTimeMillis)
-        && EqualityUtils.isEqual(_flushSegmentDesiredSizeBytes, that._flushSegmentDesiredSizeBytes)
-        && EqualityUtils.isEqual(_type, that._type) && EqualityUtils.isEqual(_topicName, that._topicName)
-        && EqualityUtils.isEqual(_consumerTypes, that._consumerTypes) && EqualityUtils.isEqual(
-        _consumerFactoryClassName, that._consumerFactoryClassName) && EqualityUtils.isEqual(_offsetCriteria,
-        that._offsetCriteria) && EqualityUtils.isEqual(_decoderClass, that._decoderClass) && EqualityUtils.isEqual(
-        _decoderProperties, that._decoderProperties) && EqualityUtils.isEqual(_groupId, that._groupId)
-        && EqualityUtils.isEqual(_streamConfigMap, that._streamConfigMap);
+    return EqualityUtils.isEqual(_connectionTimeoutMillis, that._connectionTimeoutMillis) && EqualityUtils
+        .isEqual(_fetchTimeoutMillis, that._fetchTimeoutMillis) && EqualityUtils
+        .isEqual(_flushThresholdRows, that._flushThresholdRows) && EqualityUtils
+        .isEqual(_flushThresholdTimeMillis, that._flushThresholdTimeMillis) && EqualityUtils
+        .isEqual(_flushSegmentDesiredSizeBytes, that._flushSegmentDesiredSizeBytes) && EqualityUtils
+        .isEqual(_type, that._type) && EqualityUtils.isEqual(_topicName, that._topicName) && EqualityUtils
+        .isEqual(_consumerTypes, that._consumerTypes) && EqualityUtils
+        .isEqual(_consumerFactoryClassName, that._consumerFactoryClassName) && EqualityUtils
+        .isEqual(_offsetCriteria, that._offsetCriteria) && EqualityUtils.isEqual(_decoderClass, that._decoderClass)
+        && EqualityUtils.isEqual(_decoderProperties, that._decoderProperties) && EqualityUtils
+        .isEqual(_groupId, that._groupId) && EqualityUtils.isEqual(_streamConfigMap, that._streamConfigMap);
   }
 
   @Override

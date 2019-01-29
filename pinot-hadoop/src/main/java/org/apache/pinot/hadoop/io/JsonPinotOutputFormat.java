@@ -75,7 +75,8 @@ public class JsonPinotOutputFormat<K, V extends Serializable> extends PinotOutpu
     }
 
     @Override
-    public T deserialize(PinotRecord record) throws IOException {
+    public T deserialize(PinotRecord record)
+        throws IOException {
       ObjectNode jsonRecord = JsonUtils.newObjectNode();
       for (String column : _schema.getColumnNames()) {
         jsonRecord.set(column, JsonUtils.objectToJsonNode(record.getValue(column)));

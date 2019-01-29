@@ -80,9 +80,9 @@ public class SelectionOperatorServiceTest {
     List<String> selectionColumns =
         SelectionOperatorUtils.getSelectionColumns(Collections.singletonList("*"), _dataSchema);
     // Alphabetical.
-    List<String> expectedSelectionColumns =
-        Arrays.asList("double", "double_array", "float", "float_array", "int", "int_array", "long", "long_array",
-            "string", "string_array");
+    List<String> expectedSelectionColumns = Arrays
+        .asList("double", "double_array", "float", "float_array", "int", "int_array", "long", "long_array", "string",
+            "string_array");
     Assert.assertEquals(selectionColumns, expectedSelectionColumns);
   }
 
@@ -121,7 +121,8 @@ public class SelectionOperatorServiceTest {
   }
 
   @Test
-  public void testCompatibleRowsDataTableTransformation() throws Exception {
+  public void testCompatibleRowsDataTableTransformation()
+      throws Exception {
     Collection<Serializable[]> rows = new ArrayList<>(2);
     rows.add(_row1.clone());
     rows.add(_compatibleRow1.clone());
@@ -143,9 +144,8 @@ public class SelectionOperatorServiceTest {
     List<Serializable[]> rows = new ArrayList<>(2);
     rows.add(_row1.clone());
     rows.add(_compatibleRow1.clone());
-    SelectionResults selectionResults =
-        SelectionOperatorUtils.renderSelectionResultsWithoutOrdering(rows, _upgradedDataSchema,
-            Arrays.asList(_columnNames));
+    SelectionResults selectionResults = SelectionOperatorUtils
+        .renderSelectionResultsWithoutOrdering(rows, _upgradedDataSchema, Arrays.asList(_columnNames));
 
     List<Serializable[]> resultRows = selectionResults.getRows();
 
@@ -191,8 +191,7 @@ public class SelectionOperatorServiceTest {
 
     int[] columnIndices =
         SelectionOperatorUtils.getColumnIndicesWithOrdering(selectionResults.getColumns(), _dataSchema);
-    resultRows =
-        SelectionOperatorUtils.formatRowsWithOrdering(resultRows, columnIndices, _upgradedDataSchema);
+    resultRows = SelectionOperatorUtils.formatRowsWithOrdering(resultRows, columnIndices, _upgradedDataSchema);
 
     Serializable[] expectedFormattedRow1 =
         {"1", "2.0", "3.0", "4.0", "5", new String[]{"6"}, new String[]{"7.0"}, new String[]{"8.0"}, new String[]{"9.0"}, new String[]{"10"}};

@@ -43,32 +43,30 @@ public class ControllerInstanceToggleTest extends ControllerTest {
   private final String _helixClusterName = getHelixClusterName();
 
   @BeforeClass
-  public void setup() throws Exception {
+  public void setup()
+      throws Exception {
     startZk();
     startController();
-    ControllerRequestBuilderUtil.addFakeBrokerInstancesToAutoJoinHelixCluster(_helixClusterName,
-        ZkStarter.DEFAULT_ZK_STR, NUM_INSTANCES, true);
-    ControllerRequestBuilderUtil.addFakeDataInstancesToAutoJoinHelixCluster(_helixClusterName, ZkStarter.DEFAULT_ZK_STR,
-        NUM_INSTANCES, true);
+    ControllerRequestBuilderUtil
+        .addFakeBrokerInstancesToAutoJoinHelixCluster(_helixClusterName, ZkStarter.DEFAULT_ZK_STR, NUM_INSTANCES, true);
+    ControllerRequestBuilderUtil
+        .addFakeDataInstancesToAutoJoinHelixCluster(_helixClusterName, ZkStarter.DEFAULT_ZK_STR, NUM_INSTANCES, true);
   }
 
   @Test
-  public void testInstanceToggle() throws Exception {
+  public void testInstanceToggle()
+      throws Exception {
     // Create an offline table
     String tableJSONConfigString =
         new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
-            .setNumReplicas(NUM_INSTANCES)
-            .build()
-            .toJSONConfigString();
+            .setNumReplicas(NUM_INSTANCES).build().toJSONConfigString();
     sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableJSONConfigString);
     Assert.assertEquals(
         _helixAdmin.getResourceIdealState(_helixClusterName, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)
-            .getPartitionSet()
-            .size(), 1);
+            .getPartitionSet().size(), 1);
     Assert.assertEquals(
         _helixAdmin.getResourceIdealState(_helixClusterName, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)
-            .getInstanceSet(OFFLINE_TABLE_NAME)
-            .size(), NUM_INSTANCES);
+            .getInstanceSet(OFFLINE_TABLE_NAME).size(), NUM_INSTANCES);
 
     // Add segments
     for (int i = 0; i < NUM_INSTANCES; i++) {
@@ -106,8 +104,7 @@ public class ControllerInstanceToggleTest extends ControllerTest {
     sendDeleteRequest(_controllerRequestURLBuilder.forTableDelete(RAW_TABLE_NAME));
     Assert.assertEquals(
         _helixAdmin.getResourceIdealState(_helixClusterName, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)
-            .getPartitionSet()
-            .size(), 0);
+            .getPartitionSet().size(), 0);
   }
 
   private void checkNumOnlineInstancesFromExternalView(String resourceName, int expectedNumOnlineInstances)

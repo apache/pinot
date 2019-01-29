@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.helix.core.retention;
 
+import com.yammer.metrics.core.MetricsRegistry;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -29,6 +30,7 @@ import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.segment.SegmentMetadata;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.LLCSegmentName;
@@ -86,9 +88,10 @@ public class RetentionManagerTest {
     when(pinotHelixResourceManager.getOfflineSegmentMetadata(OFFLINE_TABLE_NAME)).thenReturn(metadataList);
 
     ControllerConf conf = new ControllerConf();
+    ControllerMetrics controllerMetrics = new ControllerMetrics(new MetricsRegistry());
     conf.setRetentionControllerFrequencyInSeconds(0);
     conf.setDeletedSegmentsRetentionInDays(0);
-    RetentionManager retentionManager = new RetentionManager(pinotHelixResourceManager, conf);
+    RetentionManager retentionManager = new RetentionManager(pinotHelixResourceManager, conf, controllerMetrics);
     retentionManager.init();
     retentionManager.run();
 
@@ -102,7 +105,8 @@ public class RetentionManagerTest {
   }
 
   @Test
-  public void testRetentionWithMinutes() throws Exception {
+  public void testRetentionWithMinutes()
+      throws Exception {
     final long theDayAfterTomorrowSinceEpoch = System.currentTimeMillis() / 1000 / 60 / 60 / 24 + 2;
     final long minutesSinceEpochTimeStamp = theDayAfterTomorrowSinceEpoch * 24 * 60;
     final long pastMinutesSinceEpoch = 22383360L;
@@ -110,7 +114,8 @@ public class RetentionManagerTest {
   }
 
   @Test
-  public void testRetentionWithSeconds() throws Exception {
+  public void testRetentionWithSeconds()
+      throws Exception {
     final long theDayAfterTomorrowSinceEpoch = System.currentTimeMillis() / 1000 / 60 / 60 / 24 + 2;
     final long secondsSinceEpochTimeStamp = theDayAfterTomorrowSinceEpoch * 24 * 60 * 60;
     final long pastSecondsSinceEpoch = 1343001600L;
@@ -118,7 +123,8 @@ public class RetentionManagerTest {
   }
 
   @Test
-  public void testRetentionWithMillis() throws Exception {
+  public void testRetentionWithMillis()
+      throws Exception {
     final long theDayAfterTomorrowSinceEpoch = System.currentTimeMillis() / 1000 / 60 / 60 / 24 + 2;
     final long millisSinceEpochTimeStamp = theDayAfterTomorrowSinceEpoch * 24 * 60 * 60 * 1000;
     final long pastMillisSinceEpoch = 1343001600000L;
@@ -126,7 +132,8 @@ public class RetentionManagerTest {
   }
 
   @Test
-  public void testRetentionWithHours() throws Exception {
+  public void testRetentionWithHours()
+      throws Exception {
     final long theDayAfterTomorrowSinceEpoch = System.currentTimeMillis() / 1000 / 60 / 60 / 24 + 2;
     final long hoursSinceEpochTimeStamp = theDayAfterTomorrowSinceEpoch * 24;
     final long pastHoursSinceEpoch = 373056L;
@@ -134,27 +141,22 @@ public class RetentionManagerTest {
   }
 
   @Test
-  public void testRetentionWithDays() throws Exception {
+  public void testRetentionWithDays()
+      throws Exception {
     final long daysSinceEpochTimeStamp = System.currentTimeMillis() / 1000 / 60 / 60 / 24 + 2;
     final long pastDaysSinceEpoch = 15544L;
     testDifferentTimeUnits(pastDaysSinceEpoch, TimeUnit.DAYS, daysSinceEpochTimeStamp);
   }
 
-  private TableConfig createOfflineTableConfig() throws Exception {
+  private TableConfig createOfflineTableConfig()
+      throws Exception {
     return new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(TEST_TABLE_NAME)
-        .setRetentionTimeUnit("DAYS")
-        .setRetentionTimeValue("365")
-        .setNumReplicas(2)
-        .build();
+        .setRetentionTimeUnit("DAYS").setRetentionTimeValue("365").setNumReplicas(2).build();
   }
 
   private TableConfig createRealtimeTableConfig1(int replicaCount) {
-    return new TableConfig.Builder(CommonConstants.Helix.TableType.REALTIME).setTableName(TEST_TABLE_NAME)
-        .setLLC(true)
-        .setRetentionTimeUnit("DAYS")
-        .setRetentionTimeValue("5")
-        .setNumReplicas(replicaCount)
-        .build();
+    return new TableConfig.Builder(CommonConstants.Helix.TableType.REALTIME).setTableName(TEST_TABLE_NAME).setLLC(true)
+        .setRetentionTimeUnit("DAYS").setRetentionTimeValue("5").setNumReplicas(replicaCount).build();
   }
 
   private void setupPinotHelixResourceManager(TableConfig tableConfig, final List<String> removedSegments,
@@ -167,7 +169,8 @@ public class RetentionManagerTest {
     // run of the retention manager
     doAnswer(new Answer() {
       @Override
-      public Void answer(InvocationOnMock invocationOnMock) throws Throwable {
+      public Void answer(InvocationOnMock invocationOnMock)
+          throws Throwable {
         return null;
       }
     }).when(deletionManager).removeAgedDeletedSegments(anyInt());
@@ -177,7 +180,8 @@ public class RetentionManagerTest {
     // are exactly the same as the ones we expect to be deleted.
     doAnswer(new Answer() {
       @Override
-      public Object answer(InvocationOnMock invocationOnMock) throws Throwable {
+      public Object answer(InvocationOnMock invocationOnMock)
+          throws Throwable {
         Object[] args = invocationOnMock.getArguments();
         String tableNameArg = (String) args[0];
         Assert.assertEquals(tableNameArg, tableNameWithType);
@@ -193,7 +197,8 @@ public class RetentionManagerTest {
 
   // This test makes sure that we clean up the segments marked OFFLINE in realtime for more than 7 days
   @Test
-  public void testRealtimeLLCCleanup() throws Exception {
+  public void testRealtimeLLCCleanup()
+      throws Exception {
     final int initialNumSegments = 8;
     final long now = System.currentTimeMillis();
 
@@ -206,9 +211,10 @@ public class RetentionManagerTest {
     setupPinotHelixResourceManager(tableConfig, removedSegments, pinotHelixResourceManager);
 
     ControllerConf conf = new ControllerConf();
+    ControllerMetrics controllerMetrics = new ControllerMetrics(new MetricsRegistry());
     conf.setRetentionControllerFrequencyInSeconds(0);
     conf.setDeletedSegmentsRetentionInDays(0);
-    RetentionManager retentionManager = new RetentionManager(pinotHelixResourceManager, conf);
+    RetentionManager retentionManager = new RetentionManager(pinotHelixResourceManager, conf, controllerMetrics);
     retentionManager.init();
     retentionManager.run();
 
@@ -307,10 +313,9 @@ public class RetentionManagerTest {
     when(segmentMetadata.getStartTime()).thenReturn(startTime);
     when(segmentMetadata.getEndTime()).thenReturn(endTime);
     when(segmentMetadata.getTimeUnit()).thenReturn(timeUnit);
-    when(segmentMetadata.getTimeInterval()).thenReturn(
-        new Interval(timeUnit.toMillis(startTime), timeUnit.toMillis(endTime)));
+    when(segmentMetadata.getTimeInterval())
+        .thenReturn(new Interval(timeUnit.toMillis(startTime), timeUnit.toMillis(endTime)));
     when(segmentMetadata.getTimeGranularity()).thenReturn(new Duration(timeUnit.toMillis(1)));
     return segmentMetadata;
   }
-
 }

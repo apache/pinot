@@ -65,7 +65,8 @@ public class ImmutableDictionaryReaderTest {
   private int _numBytesPerStringValue;
 
   @BeforeClass
-  public void setUp() throws Exception {
+  public void setUp()
+      throws Exception {
     FileUtils.deleteQuietly(TEMP_DIR);
 
     IntOpenHashSet intSet = new IntOpenHashSet();
@@ -146,7 +147,8 @@ public class ImmutableDictionaryReaderTest {
   }
 
   @Test
-  public void testIntDictionary() throws Exception {
+  public void testIntDictionary()
+      throws Exception {
     try (IntDictionary intDictionary = new IntDictionary(
         PinotDataBuffer.mapReadOnlyBigEndianFile(new File(TEMP_DIR, INT_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)),
         NUM_VALUES)) {
@@ -167,9 +169,11 @@ public class ImmutableDictionaryReaderTest {
   }
 
   @Test
-  public void testLongDictionary() throws Exception {
-    try (LongDictionary longDictionary = new LongDictionary(PinotDataBuffer.mapReadOnlyBigEndianFile(
-        new File(TEMP_DIR, LONG_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)), NUM_VALUES)) {
+  public void testLongDictionary()
+      throws Exception {
+    try (LongDictionary longDictionary = new LongDictionary(PinotDataBuffer
+        .mapReadOnlyBigEndianFile(new File(TEMP_DIR, LONG_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)),
+        NUM_VALUES)) {
       for (int i = 0; i < NUM_VALUES; i++) {
         assertEquals(longDictionary.get(i).longValue(), _longValues[i]);
         assertEquals(longDictionary.getIntValue(i), (int) _longValues[i]);
@@ -187,9 +191,11 @@ public class ImmutableDictionaryReaderTest {
   }
 
   @Test
-  public void testFloatDictionary() throws Exception {
-    try (FloatDictionary floatDictionary = new FloatDictionary(PinotDataBuffer.mapReadOnlyBigEndianFile(
-        new File(TEMP_DIR, FLOAT_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)), NUM_VALUES)) {
+  public void testFloatDictionary()
+      throws Exception {
+    try (FloatDictionary floatDictionary = new FloatDictionary(PinotDataBuffer
+        .mapReadOnlyBigEndianFile(new File(TEMP_DIR, FLOAT_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)),
+        NUM_VALUES)) {
       for (int i = 0; i < NUM_VALUES; i++) {
         assertEquals(floatDictionary.get(i), _floatValues[i], 0.0f);
         assertEquals(floatDictionary.getIntValue(i), (int) _floatValues[i]);
@@ -207,9 +213,11 @@ public class ImmutableDictionaryReaderTest {
   }
 
   @Test
-  public void testDoubleDictionary() throws Exception {
-    try (DoubleDictionary doubleDictionary = new DoubleDictionary(PinotDataBuffer.mapReadOnlyBigEndianFile(
-        new File(TEMP_DIR, DOUBLE_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)), NUM_VALUES)) {
+  public void testDoubleDictionary()
+      throws Exception {
+    try (DoubleDictionary doubleDictionary = new DoubleDictionary(PinotDataBuffer
+        .mapReadOnlyBigEndianFile(new File(TEMP_DIR, DOUBLE_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)),
+        NUM_VALUES)) {
       for (int i = 0; i < NUM_VALUES; i++) {
         assertEquals(doubleDictionary.get(i), _doubleValues[i], 0.0);
         assertEquals(doubleDictionary.getIntValue(i), (int) _doubleValues[i]);
@@ -227,19 +235,20 @@ public class ImmutableDictionaryReaderTest {
   }
 
   @Test
-  public void testStringDictionary() throws Exception {
-    try (StringDictionary stringDictionary = new StringDictionary(PinotDataBuffer.mapReadOnlyBigEndianFile(
-        new File(TEMP_DIR, STRING_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)), NUM_VALUES, _numBytesPerStringValue,
-        (byte) 0)) {
+  public void testStringDictionary()
+      throws Exception {
+    try (StringDictionary stringDictionary = new StringDictionary(PinotDataBuffer
+        .mapReadOnlyBigEndianFile(new File(TEMP_DIR, STRING_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)), NUM_VALUES,
+        _numBytesPerStringValue, (byte) 0)) {
       testStringDictionary(stringDictionary);
     }
   }
 
   @Test
-  public void testOnHeapStringDictionary() throws Exception {
-    try (OnHeapStringDictionary onHeapStringDictionary = new OnHeapStringDictionary(
-        PinotDataBuffer.mapReadOnlyBigEndianFile(
-            new File(TEMP_DIR, STRING_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)), NUM_VALUES,
+  public void testOnHeapStringDictionary()
+      throws Exception {
+    try (OnHeapStringDictionary onHeapStringDictionary = new OnHeapStringDictionary(PinotDataBuffer
+        .mapReadOnlyBigEndianFile(new File(TEMP_DIR, STRING_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)), NUM_VALUES,
         _numBytesPerStringValue, (byte) 0)) {
       testStringDictionary(onHeapStringDictionary);
     }
@@ -259,9 +268,11 @@ public class ImmutableDictionaryReaderTest {
   }
 
   @Test
-  public void testBytesDictionary() throws Exception {
-    try (BytesDictionary bytesDictionary = new BytesDictionary(PinotDataBuffer.mapReadOnlyBigEndianFile(
-        new File(TEMP_DIR, BYTES_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)), NUM_VALUES, BYTES_LENGTH)) {
+  public void testBytesDictionary()
+      throws Exception {
+    try (BytesDictionary bytesDictionary = new BytesDictionary(PinotDataBuffer
+        .mapReadOnlyBigEndianFile(new File(TEMP_DIR, BYTES_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)), NUM_VALUES,
+        BYTES_LENGTH)) {
       for (int i = 0; i < NUM_VALUES; i++) {
         assertEquals(new ByteArray(bytesDictionary.get(i)), _bytesValues[i]);
         assertEquals(new ByteArray(bytesDictionary.getBytesValue(i)), _bytesValues[i]);

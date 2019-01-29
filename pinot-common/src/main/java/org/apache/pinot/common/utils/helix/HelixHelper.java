@@ -280,8 +280,8 @@ public class HelixHelper {
 
     // Removing partitions from ideal state
     LOGGER.info("Trying to remove resource {} from idealstate", resourceTag);
-    HelixHelper.updateIdealState(helixManager, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE, updater,
-        DEFAULT_RETRY_POLICY);
+    HelixHelper
+        .updateIdealState(helixManager, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE, updater, DEFAULT_RETRY_POLICY);
   }
 
   /**
@@ -468,10 +468,10 @@ public class HelixHelper {
    */
   public static Set<String> getServerInstancesForTenant(List<InstanceConfig> instanceConfigs, String tenant) {
     Set<String> serverInstances = new HashSet<>();
-    serverInstances.addAll(
-        HelixHelper.getInstancesWithTag(instanceConfigs, TagNameUtils.getOfflineTagForTenant(tenant)));
-    serverInstances.addAll(
-        HelixHelper.getInstancesWithTag(instanceConfigs, TagNameUtils.getRealtimeTagForTenant(tenant)));
+    serverInstances
+        .addAll(HelixHelper.getInstancesWithTag(instanceConfigs, TagNameUtils.getOfflineTagForTenant(tenant)));
+    serverInstances
+        .addAll(HelixHelper.getInstancesWithTag(instanceConfigs, TagNameUtils.getRealtimeTagForTenant(tenant)));
     return serverInstances;
   }
 

@@ -20,7 +20,6 @@ package org.apache.pinot.core.util.trace;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
 import java.util.List;
@@ -62,9 +61,7 @@ public final class TraceContext {
       }
 
       JsonNode toJson() {
-        ObjectNode jsonLog = JsonUtils.newObjectNode();
-        jsonLog.set(_key, JsonUtils.objectToJsonNode(_value));
-        return jsonLog;
+        return JsonUtils.newObjectNode().set(_key, JsonUtils.objectToJsonNode(_value));
       }
     }
 
@@ -93,9 +90,7 @@ public final class TraceContext {
       for (LogEntry log : _logs) {
         jsonLogs.add(log.toJson());
       }
-      ObjectNode jsonTrace = JsonUtils.newObjectNode();
-      jsonTrace.set(_traceId, jsonLogs);
-      return jsonTrace;
+      return JsonUtils.newObjectNode().set(_traceId, jsonLogs);
     }
   }
 

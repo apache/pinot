@@ -46,7 +46,8 @@ public class MeetupRsvpStream {
   private boolean keepPublishing = true;
   private ClientManager client;
 
-  public MeetupRsvpStream(File schemaFile) throws IOException, URISyntaxException {
+  public MeetupRsvpStream(File schemaFile)
+      throws IOException, URISyntaxException {
     schema = Schema.fromFile(schemaFile);
 
     Properties properties = new Properties();

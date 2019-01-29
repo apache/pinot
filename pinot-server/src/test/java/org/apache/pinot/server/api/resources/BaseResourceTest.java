@@ -66,7 +66,8 @@ public abstract class BaseResourceTest {
 
   @SuppressWarnings("SuspiciousMethodCalls")
   @BeforeClass
-  public void setUp() throws Exception {
+  public void setUp()
+      throws Exception {
     FileUtils.deleteQuietly(INDEX_DIR);
     Assert.assertTrue(INDEX_DIR.mkdirs());
     URL resourceUrl = getClass().getClassLoader().getResource(AVRO_DATA_PATH);
@@ -75,8 +76,8 @@ public abstract class BaseResourceTest {
 
     // Mock the instance data manager
     InstanceDataManager instanceDataManager = mock(InstanceDataManager.class);
-    when(instanceDataManager.getTableDataManager(anyString())).thenAnswer(
-        invocation -> _tableDataManagerMap.get(invocation.getArguments()[0]));
+    when(instanceDataManager.getTableDataManager(anyString()))
+        .thenAnswer(invocation -> _tableDataManagerMap.get(invocation.getArguments()[0]));
     when(instanceDataManager.getAllTables()).thenReturn(_tableDataManagerMap.keySet());
 
     // Mock the server instance
@@ -101,7 +102,8 @@ public abstract class BaseResourceTest {
     FileUtils.deleteQuietly(INDEX_DIR);
   }
 
-  protected List<ImmutableSegment> setUpSegments(int numSegments) throws Exception {
+  protected List<ImmutableSegment> setUpSegments(int numSegments)
+      throws Exception {
     List<ImmutableSegment> immutableSegments = new ArrayList<>();
     for (int i = 0; i < numSegments; i++) {
       immutableSegments.add(setUpSegment(Integer.toString(_indexSegments.size())));
@@ -109,7 +111,8 @@ public abstract class BaseResourceTest {
     return immutableSegments;
   }
 
-  protected ImmutableSegment setUpSegment(String segmentNamePostfix) throws Exception {
+  protected ImmutableSegment setUpSegment(String segmentNamePostfix)
+      throws Exception {
     SegmentGeneratorConfig config =
         SegmentTestUtils.getSegmentGeneratorConfigWithoutTimeColumn(_avroFile, INDEX_DIR, TABLE_NAME);
     config.setSegmentNamePostfix(segmentNamePostfix);
@@ -129,9 +132,9 @@ public abstract class BaseResourceTest {
     when(tableDataManagerConfig.getTableDataManagerType()).thenReturn("OFFLINE");
     when(tableDataManagerConfig.getTableName()).thenReturn(tableName);
     when(tableDataManagerConfig.getDataDir()).thenReturn(FileUtils.getTempDirectoryPath());
-    TableDataManager tableDataManager =
-        TableDataManagerProvider.getTableDataManager(tableDataManagerConfig, "testInstance",
-            mock(ZkHelixPropertyStore.class), mock(ServerMetrics.class));
+    TableDataManager tableDataManager = TableDataManagerProvider
+        .getTableDataManager(tableDataManagerConfig, "testInstance", mock(ZkHelixPropertyStore.class),
+            mock(ServerMetrics.class));
     tableDataManager.start();
     _tableDataManagerMap.put(tableName, tableDataManager);
   }

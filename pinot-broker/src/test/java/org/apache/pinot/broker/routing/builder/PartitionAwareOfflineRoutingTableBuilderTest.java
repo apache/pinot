@@ -26,7 +26,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
-import org.apache.commons.lang.math.IntRange;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.broker.routing.RoutingTableLookupRequest;
@@ -61,7 +60,8 @@ public class PartitionAwareOfflineRoutingTableBuilderTest {
   private int NUM_SEGMENTS;
 
   @Test
-  public void testBrokerSideServerAndSegmentPruning() throws Exception {
+  public void testBrokerSideServerAndSegmentPruning()
+      throws Exception {
     int numIterations = 50;
 
     for (int iter = 0; iter < numIterations; iter++) {
@@ -91,9 +91,9 @@ public class PartitionAwareOfflineRoutingTableBuilderTest {
         partitionSegmentCount.put(partition, partitionSegmentCount.get(partition) + 1);
 
         SegmentZKMetadata metadata = buildOfflineSegmentZKMetadata(segmentName, partition);
-        fakePropertyStore.setContents(
-            ZKMetadataProvider.constructPropertyStorePathForSegment(OFFLINE_TABLE_NAME, segmentName),
-            metadata.toZNRecord());
+        fakePropertyStore
+            .setContents(ZKMetadataProvider.constructPropertyStorePathForSegment(OFFLINE_TABLE_NAME, segmentName),
+                metadata.toZNRecord());
       }
 
       // Update replica group mapping zk metadata
@@ -135,8 +135,7 @@ public class PartitionAwareOfflineRoutingTableBuilderTest {
       // Check the broker side server and segment pruning.
       for (int queryPartition = 0; queryPartition < 100; queryPartition++) {
         String filterQuery = "select count(*) from myTable where " + PARTITION_COLUMN + " = " + queryPartition;
-        routingTable =
-            routingTableBuilder.getRoutingTable(buildRoutingTableLookupRequest(filterQuery), null);
+        routingTable = routingTableBuilder.getRoutingTable(buildRoutingTableLookupRequest(filterQuery), null);
 
         // Check that the number of servers picked are always equal or less than the number of servers
         // in a single replica group.
@@ -156,7 +155,8 @@ public class PartitionAwareOfflineRoutingTableBuilderTest {
   }
 
   @Test
-  public void testRoutingTableAfterRebalance() throws Exception {
+  public void testRoutingTableAfterRebalance()
+      throws Exception {
     NUM_REPLICA = 1;
     NUM_PARTITION = 1;
     NUM_SERVERS = 1;
@@ -176,9 +176,9 @@ public class PartitionAwareOfflineRoutingTableBuilderTest {
       String segmentName = "segment" + i;
       int partition = i % NUM_PARTITION;
       SegmentZKMetadata metadata = buildOfflineSegmentZKMetadata(segmentName, partition);
-      fakePropertyStore.setContents(
-          ZKMetadataProvider.constructPropertyStorePathForSegment(OFFLINE_TABLE_NAME, segmentName),
-          metadata.toZNRecord());
+      fakePropertyStore
+          .setContents(ZKMetadataProvider.constructPropertyStorePathForSegment(OFFLINE_TABLE_NAME, segmentName),
+              metadata.toZNRecord());
     }
 
     // Update replica group mapping zk metadata
@@ -248,7 +248,8 @@ public class PartitionAwareOfflineRoutingTableBuilderTest {
   }
 
   private RoutingTableBuilder buildPartitionAwareOfflineRoutingTableBuilder(FakePropertyStore propertyStore,
-      TableConfig tableConfig, ExternalView externalView, List<InstanceConfig> instanceConfigs) throws Exception {
+      TableConfig tableConfig, ExternalView externalView, List<InstanceConfig> instanceConfigs)
+      throws Exception {
     PartitionAwareOfflineRoutingTableBuilder routingTableBuilder = new PartitionAwareOfflineRoutingTableBuilder();
     routingTableBuilder.init(null, tableConfig, propertyStore, null);
     routingTableBuilder.computeOnExternalViewChange(OFFLINE_TABLE_NAME, externalView, instanceConfigs);
@@ -288,7 +289,8 @@ public class PartitionAwareOfflineRoutingTableBuilderTest {
     return new RoutingTableLookupRequest(COMPILER.compileToBrokerRequest(query));
   }
 
-  private TableConfig buildOfflineTableConfig() throws Exception {
+  private TableConfig buildOfflineTableConfig()
+      throws Exception {
     // Create the replica group aware assignment strategy config
     ReplicaGroupStrategyConfig replicaGroupStrategyConfig = new ReplicaGroupStrategyConfig();
     replicaGroupStrategyConfig.setNumInstancesPerPartition(NUM_PARTITION);
@@ -301,9 +303,7 @@ public class PartitionAwareOfflineRoutingTableBuilderTest {
     // Create table config
     TableConfig tableConfig =
         new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(OFFLINE_TABLE_NAME)
-            .setNumReplicas(NUM_REPLICA)
-            .setSegmentAssignmentStrategy("ReplicaGroupSegmentAssignmentStrategy")
-            .build();
+            .setNumReplicas(NUM_REPLICA).setSegmentAssignmentStrategy("ReplicaGroupSegmentAssignmentStrategy").build();
 
     tableConfig.getValidationConfig().setReplicaGroupStrategyConfig(replicaGroupStrategyConfig);
     tableConfig.setRoutingConfig(routingConfig);
@@ -313,8 +313,8 @@ public class PartitionAwareOfflineRoutingTableBuilderTest {
   private SegmentZKMetadata buildOfflineSegmentZKMetadata(String segmentName, int partition) {
     OfflineSegmentZKMetadata metadata = new OfflineSegmentZKMetadata();
     Map<String, ColumnPartitionMetadata> columnPartitionMap = new HashMap<>();
-    columnPartitionMap.put(PARTITION_COLUMN, new ColumnPartitionMetadata(PARTITION_FUNCTION_NAME, NUM_PARTITION,
-        Collections.singletonList(new IntRange(partition))));
+    columnPartitionMap.put(PARTITION_COLUMN,
+        new ColumnPartitionMetadata(PARTITION_FUNCTION_NAME, NUM_PARTITION, Collections.singleton(partition)));
     SegmentPartitionMetadata segmentPartitionMetadata = new SegmentPartitionMetadata(columnPartitionMap);
 
     metadata.setSegmentName(segmentName);

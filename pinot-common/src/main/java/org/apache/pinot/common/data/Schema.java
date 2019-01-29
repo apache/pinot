@@ -86,17 +86,20 @@ public final class Schema {
   private transient final List<String> _dateTimeNames = new ArrayList<>();
 
   @Nonnull
-  public static Schema fromFile(@Nonnull File schemaFile) throws IOException {
+  public static Schema fromFile(@Nonnull File schemaFile)
+      throws IOException {
     return JsonUtils.fileToObject(schemaFile, Schema.class);
   }
 
   @Nonnull
-  public static Schema fromString(@Nonnull String schemaString) throws IOException {
+  public static Schema fromString(@Nonnull String schemaString)
+      throws IOException {
     return JsonUtils.stringToObject(schemaString, Schema.class);
   }
 
   @Nonnull
-  public static Schema fromInputSteam(@Nonnull InputStream schemaInputStream) throws IOException {
+  public static Schema fromInputSteam(@Nonnull InputStream schemaInputStream)
+      throws IOException {
     return JsonUtils.inputStreamToObject(schemaInputStream, Schema.class);
   }
 
@@ -188,8 +191,8 @@ public final class Schema {
     Preconditions.checkNotNull(fieldSpec);
     String columnName = fieldSpec.getName();
     Preconditions.checkNotNull(columnName);
-    Preconditions.checkState(!_fieldSpecMap.containsKey(columnName),
-        "Field spec already exists for column: " + columnName);
+    Preconditions
+        .checkState(!_fieldSpecMap.containsKey(columnName), "Field spec already exists for column: " + columnName);
 
     FieldType fieldType = fieldSpec.getFieldType();
     switch (fieldType) {
@@ -276,7 +279,7 @@ public final class Schema {
     cols.addAll(_fieldSpecMap.keySet());
     for (String col : _fieldSpecMap.keySet()) {
       // exclude virtual columns
-      if(isVirtualColumn(col)) {
+      if (isVirtualColumn(col)) {
         cols.remove(col);
       }
     }
@@ -635,11 +638,11 @@ public final class Schema {
 
     Schema that = (Schema) o;
 
-    return EqualityUtils.isEqual(_schemaName, that._schemaName) &&
-        EqualityUtils.isEqualIgnoreOrder(_dimensionFieldSpecs, that._dimensionFieldSpecs) &&
-        EqualityUtils.isEqualIgnoreOrder(_metricFieldSpecs, that._metricFieldSpecs) &&
-        EqualityUtils.isEqual(_timeFieldSpec, that._timeFieldSpec) &&
-        EqualityUtils.isEqualIgnoreOrder(_dateTimeFieldSpecs, that._dateTimeFieldSpecs);
+    return EqualityUtils.isEqual(_schemaName, that._schemaName) && EqualityUtils
+        .isEqualIgnoreOrder(_dimensionFieldSpecs, that._dimensionFieldSpecs) && EqualityUtils
+        .isEqualIgnoreOrder(_metricFieldSpecs, that._metricFieldSpecs) && EqualityUtils
+        .isEqual(_timeFieldSpec, that._timeFieldSpec) && EqualityUtils
+        .isEqualIgnoreOrder(_dateTimeFieldSpecs, that._dateTimeFieldSpecs);
   }
 
   @Override
@@ -653,8 +656,7 @@ public final class Schema {
   }
 
   public boolean isVirtualColumn(String columnName) {
-    return columnName.startsWith("$") ||
-        (getFieldSpecFor(columnName).getVirtualColumnProvider() != null &&
-            !getFieldSpecFor(columnName).getVirtualColumnProvider().isEmpty());
+    return columnName.startsWith("$") || (getFieldSpecFor(columnName).getVirtualColumnProvider() != null
+        && !getFieldSpecFor(columnName).getVirtualColumnProvider().isEmpty());
   }
 }

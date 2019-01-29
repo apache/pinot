@@ -86,9 +86,7 @@ public class StarTreeV2BuilderConfig {
   public String toString() {
     return new ToStringBuilder(this, ToStringStyle.SHORT_PREFIX_STYLE).append("splitOrder", _dimensionsSplitOrder)
         .append("skipStarNodeCreation", _skipStarNodeCreationForDimensions)
-        .append("functionColumnPairs", _functionColumnPairs)
-        .append("maxLeafRecords", _maxLeafRecords)
-        .toString();
+        .append("functionColumnPairs", _functionColumnPairs).append("maxLeafRecords", _maxLeafRecords).toString();
   }
 
   public static class Builder {

@@ -39,12 +39,14 @@ public class FixedByteSingleColumnSingleValueReaderWriterTest {
   }
 
   @AfterClass
-  public void tearDown() throws Exception {
+  public void tearDown()
+      throws Exception {
     _memoryManager.close();
   }
 
   @Test
-  public void testInt() throws IOException {
+  public void testInt()
+      throws IOException {
     Random r = new Random();
     final long seed = r.nextLong();
     r = new Random(seed);
@@ -59,7 +61,8 @@ public class FixedByteSingleColumnSingleValueReaderWriterTest {
     }
   }
 
-  private void testInt(final Random random, final int rows, final int div) throws IOException {
+  private void testInt(final Random random, final int rows, final int div)
+      throws IOException {
     FixedByteSingleColumnSingleValueReaderWriter readerWriter;
     final int columnSizesInBytes = Integer.BYTES;
     readerWriter =
@@ -118,7 +121,8 @@ public class FixedByteSingleColumnSingleValueReaderWriterTest {
   }
 
   @Test
-  public void testLong() throws IOException {
+  public void testLong()
+      throws IOException {
     int rows = 10;
     Random r = new Random();
     final long seed = r.nextLong();
@@ -128,7 +132,8 @@ public class FixedByteSingleColumnSingleValueReaderWriterTest {
     }
   }
 
-  private void testLong(final Random random, final int rows, final int div) throws IOException {
+  private void testLong(final Random random, final int rows, final int div)
+      throws IOException {
     FixedByteSingleColumnSingleValueReaderWriter readerWriter;
     readerWriter = new FixedByteSingleColumnSingleValueReaderWriter(rows / div, Long.BYTES, _memoryManager, "Long");
     long[] data = new long[rows];

@@ -18,9 +18,8 @@
  */
 package org.apache.pinot.core.realtime.converter.stats;
 
-import java.util.Arrays;
-import java.util.List;
-import org.apache.commons.lang.math.IntRange;
+import java.util.HashSet;
+import java.util.Set;
 import org.apache.pinot.common.config.ColumnPartitionConfig;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.core.common.Block;
@@ -45,8 +44,7 @@ public class RealtimeColumnStatistics implements ColumnStatistics {
   private final Block _block;
   private PartitionFunction _partitionFunction;
   private int _numPartitions;
-  private int _partitionRangeStart = Integer.MAX_VALUE;
-  private int _partitionRangeEnd = Integer.MIN_VALUE;
+  private Set<Integer> _partitions;
 
   public RealtimeColumnStatistics(ColumnDataSource dataSource, int[] sortedDocIdIterationOrder,
       ColumnPartitionConfig columnPartitionConfig) {
@@ -60,7 +58,12 @@ public class RealtimeColumnStatistics implements ColumnStatistics {
       _partitionFunction =
           (functionName != null) ? PartitionFunctionFactory.getPartitionFunction(functionName, _numPartitions) : null;
       if (_partitionFunction != null) {
-        updatePartition();
+        // Iterate over the dictionary to check the partitioning
+        _partitions = new HashSet<>();
+        int length = _dictionaryReader.length();
+        for (int i = 0; i < length; i++) {
+          _partitions.add(_partitionFunction.getPartition(_dictionaryReader.get(i)));
+        }
       }
     }
   }
@@ -203,36 +206,7 @@ public class RealtimeColumnStatistics implements ColumnStatistics {
   }
 
   @Override
-  public List<IntRange> getPartitionRanges() {
-    if (_partitionRangeStart <= _partitionRangeEnd) {
-      return Arrays.asList(new IntRange(_partitionRangeStart, _partitionRangeEnd));
-    } else {
-      return null;
-    }
-  }
-
-  /**
-   * Update partition ranges based on column values.
-   *
-   */
-  void updatePartition() {
-    // Iterate over the dictionary to check the partitioning
-    final int length = _dictionaryReader.length();
-    for (int i = 0; i < length; i++) {
-      int partition = _partitionFunction.getPartition(_dictionaryReader.get(i));
-
-      if (partition < _partitionRangeStart) {
-        _partitionRangeStart = partition;
-      }
-
-      if (partition > _partitionRangeEnd) {
-        _partitionRangeEnd = partition;
-      }
-    }
-  }
-
-  @Override
-  public int getPartitionRangeWidth() {
-    return _partitionRangeEnd - _partitionRangeStart + 1;
+  public Set<Integer> getPartitions() {
+    return _partitions;
   }
 }

@@ -68,7 +68,7 @@ public class BrokerAdminApiApplication extends ResourceConfig {
     BeanConfig beanConfig = new BeanConfig();
     beanConfig.setTitle("Pinot Broker API");
     beanConfig.setDescription("APIs for accessing Pinot broker information");
-    beanConfig.setContact("https://github.com/linkedin/pinot");
+    beanConfig.setContact("https://github.com/apache/incubator-pinot");
     beanConfig.setVersion("1.0");
     beanConfig.setSchemes(new String[]{"http"});
     beanConfig.setBasePath(_baseUri.getPath());
@@ -77,7 +77,7 @@ public class BrokerAdminApiApplication extends ResourceConfig {
 
     HttpHandler httpHandler = new CLStaticHttpHandler(BrokerAdminApiApplication.class.getClassLoader(), "/api/");
     // map both /api and /help to swagger docs. /api because it looks nice. /help for backward compatibility
-    _httpServer.getServerConfiguration().addHttpHandler(httpHandler, "/api", "/help");
+    _httpServer.getServerConfiguration().addHttpHandler(httpHandler, "/api/", "/help/");
 
     URL swaggerDistLocation =
         BrokerAdminApiApplication.class.getClassLoader().getResource("META-INF/resources/webjars/swagger-ui/2.2.2/");

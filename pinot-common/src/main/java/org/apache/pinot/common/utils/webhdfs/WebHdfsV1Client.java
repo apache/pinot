@@ -38,7 +38,8 @@ public class WebHdfsV1Client {
   private static final int DEFAULT_PERMISSION = 755;
 
   //Web hdfs upload path template has 6 parameters: protocol/host/port/hdfs_path/overwrite/permission
-  private static final String WEB_HDFS_UPLOAD_PATH_TEMPLATE = "%s://%s:%s/webhdfs/v1%s?op=CREATE&overwrite=%s&permission=%s";
+  private static final String WEB_HDFS_UPLOAD_PATH_TEMPLATE =
+      "%s://%s:%s/webhdfs/v1%s?op=CREATE&overwrite=%s&permission=%s";
   //Web hdfs download path template has 4 parameters: protocol/host/port/hdfs_path
   private static final String WEB_HDFS_DOWNLOAD_PATH_TEMPLATE = "%s://%s:%s/webhdfs/v1%s?op=OPEN";
 
@@ -68,20 +69,21 @@ public class WebHdfsV1Client {
   public synchronized boolean uploadSegment(String webHdfsPath, String localFilePath) {
     // Step 1: Submit a HTTP PUT request without automatically following
     // redirects and without sending the file data.
-    String firstPutReqString = String.format(WEB_HDFS_UPLOAD_PATH_TEMPLATE, _protocol, _host, _port, webHdfsPath, _overwrite, _permission);
+    String firstPutReqString =
+        String.format(WEB_HDFS_UPLOAD_PATH_TEMPLATE, _protocol, _host, _port, webHdfsPath, _overwrite, _permission);
     HttpMethod firstPutReq = new PutMethod(firstPutReqString);
     try {
       LOGGER.info("Trying to send request: {}.", firstPutReqString);
       int firstResponseCode = _httpClient.executeMethod(firstPutReq);
       if (firstResponseCode != 307) {
-        LOGGER.error(String.format(
-            "Failed to execute the first PUT request to upload segment to webhdfs: %s. "
-                + "Expected response code 307, but get %s. Response body: %s",
-            firstPutReqString, firstResponseCode, firstPutReq.getResponseBodyAsString()));
+        LOGGER.error(String.format("Failed to execute the first PUT request to upload segment to webhdfs: %s. "
+                + "Expected response code 307, but get %s. Response body: %s", firstPutReqString, firstResponseCode,
+            firstPutReq.getResponseBodyAsString()));
         return false;
       }
     } catch (Exception e) {
-      LOGGER.error(String.format("Failed to execute the first request to upload segment to webhdfs: %s.", firstPutReqString), e);
+      LOGGER.error(
+          String.format("Failed to execute the first request to upload segment to webhdfs: %s.", firstPutReqString), e);
       return false;
     } finally {
       firstPutReq.releaseConnection();
@@ -98,14 +100,15 @@ public class WebHdfsV1Client {
       LOGGER.info("Trying to send request: {}.", redirectedReqString);
       int redirectedResponseCode = _httpClient.executeMethod(redirectedReq);
       if (redirectedResponseCode != 201) {
-        LOGGER.error(String.format(
-            "Failed to execute the redirected PUT request to upload segment to webhdfs: %s. "
-                + "Expected response code 201, but get %s. Response: %s",
-            redirectedReqString, redirectedResponseCode, redirectedReq.getResponseBodyAsString()));
+        LOGGER.error(String.format("Failed to execute the redirected PUT request to upload segment to webhdfs: %s. "
+                + "Expected response code 201, but get %s. Response: %s", redirectedReqString, redirectedResponseCode,
+            redirectedReq.getResponseBodyAsString()));
       }
       return true;
     } catch (IOException e) {
-      LOGGER.error(String.format("Failed to execute the redirected request to upload segment to webhdfs: %s.", redirectedReqString), e);
+      LOGGER.error(String
+              .format("Failed to execute the redirected request to upload segment to webhdfs: %s.", redirectedReqString),
+          e);
       return false;
     } finally {
       redirectedReq.releaseConnection();

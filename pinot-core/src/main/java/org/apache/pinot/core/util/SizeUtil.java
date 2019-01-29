@@ -27,8 +27,7 @@ public class SizeUtil {
   public static int computeBytesRequired(int numValues, int numBits, int entriesPerBatch) {
     int bitsRequiredPerBatch = entriesPerBatch * numBits;
     //Align to batch boundary to avoid if checks while reading
-    int totalBitsRounded = (int) (Math.ceil((numValues * numBits * 1.0) / bitsRequiredPerBatch)
-        * bitsRequiredPerBatch);
+    int totalBitsRounded = (int) (Math.ceil((numValues * numBits * 1.0) / bitsRequiredPerBatch) * bitsRequiredPerBatch);
     return totalBitsRounded / 8;
   }
 }

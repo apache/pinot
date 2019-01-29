@@ -49,5 +49,6 @@ public interface RoutingTable {
    * @param tableName Table name or null for all tables.
    * @throws Exception
    */
-  String dumpSnapshot(String tableName) throws Exception;
+  String dumpSnapshot(String tableName)
+      throws Exception;
 }

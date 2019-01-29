@@ -110,9 +110,9 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
         if (!(acquiredSegment instanceof LLRealtimeSegmentDataManager)) {
           // We found a LLC segment that is not consuming right now, must be that we already swapped it with a
           // segment that has been built. Nothing to do for this state transition.
-          _logger.info(
-              "Segment {} not an instance of LLRealtimeSegmentDataManager. Reporting success for the transition",
-              acquiredSegment.getSegmentName());
+          _logger
+              .info("Segment {} not an instance of LLRealtimeSegmentDataManager. Reporting success for the transition",
+                  acquiredSegment.getSegmentName());
           return;
         }
         LLRealtimeSegmentDataManager segmentDataManager = (LLRealtimeSegmentDataManager) acquiredSegment;

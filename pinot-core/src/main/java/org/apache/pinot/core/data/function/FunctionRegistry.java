@@ -26,6 +26,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+
 public class FunctionRegistry {
 
   static Map<String, List<FunctionInfo>> _functionInfoMap = new HashMap<>();
@@ -35,7 +36,7 @@ public class FunctionRegistry {
     FunctionInfo bestMatch = null;
     if (list != null && list.size() > 0) {
       for (FunctionInfo functionInfo : list) {
-        if(functionInfo.isApplicable(argumentTypes)){
+        if (functionInfo.isApplicable(argumentTypes)) {
           bestMatch = functionInfo;
           break;
         }

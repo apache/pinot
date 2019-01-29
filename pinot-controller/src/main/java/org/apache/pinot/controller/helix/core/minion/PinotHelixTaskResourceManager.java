@@ -89,8 +89,8 @@ public class PinotHelixTaskResourceManager {
 
       // Set full parallelism
       // Don't allow overlap job assignment so that we can control number of concurrent tasks per instance
-      JobQueue jobQueue = new JobQueue.Builder(helixJobQueueName).setWorkflowConfig(
-          new WorkflowConfig.Builder().setParallelJobs(Integer.MAX_VALUE).build()).build();
+      JobQueue jobQueue = new JobQueue.Builder(helixJobQueueName)
+          .setWorkflowConfig(new WorkflowConfig.Builder().setParallelJobs(Integer.MAX_VALUE).build()).build();
       _taskDriver.createQueue(jobQueue);
     }
 
@@ -116,7 +116,8 @@ public class PinotHelixTaskResourceManager {
    *
    * @param taskType Task type
    */
-  public synchronized void stopTaskQueue(@Nonnull String taskType) throws InterruptedException {
+  public synchronized void stopTaskQueue(@Nonnull String taskType)
+      throws InterruptedException {
     String helixJobQueueName = getHelixJobQueueName(taskType);
     LOGGER.info("Stopping task queue: {} for task type: {}", helixJobQueueName, taskType);
     _taskDriver.stop(helixJobQueueName);
@@ -194,9 +195,9 @@ public class PinotHelixTaskResourceManager {
 
     String taskType = pinotTaskConfigs.get(0).getTaskType();
     String parentTaskName = TASK_PREFIX + taskType + TASK_NAME_SEPARATOR + System.currentTimeMillis();
-    LOGGER.info(
-        "Submitting parent task: {} of type: {} with {} child task configs: {} to Minion instances with tag: {}",
-        parentTaskName, taskType, numChildTasks, pinotTaskConfigs, minionInstanceTag);
+    LOGGER
+        .info("Submitting parent task: {} of type: {} with {} child task configs: {} to Minion instances with tag: {}",
+            parentTaskName, taskType, numChildTasks, pinotTaskConfigs, minionInstanceTag);
     List<TaskConfig> helixTaskConfigs = new ArrayList<>(numChildTasks);
     for (int i = 0; i < numChildTasks; i++) {
       PinotTaskConfig pinotTaskConfig = pinotTaskConfigs.get(i);
@@ -207,12 +208,10 @@ public class PinotHelixTaskResourceManager {
     // Run each task only once no matter whether it succeeds or not, and never fail the job
     // The reason for this is that: we put multiple independent tasks into one job to get them run in parallel, so we
     // don't want one task failure affects other tasks. Also, if one task failed, next time we will re-schedule it
-    JobConfig.Builder jobBuilder = new JobConfig.Builder().addTaskConfigs(helixTaskConfigs)
-        .setInstanceGroupTag(minionInstanceTag)
-        .setNumConcurrentTasksPerInstance(numConcurrentTasksPerInstance)
-        .setIgnoreDependentJobFailure(true)
-        .setMaxAttemptsPerTask(1)
-        .setFailureThreshold(Integer.MAX_VALUE);
+    JobConfig.Builder jobBuilder =
+        new JobConfig.Builder().addTaskConfigs(helixTaskConfigs).setInstanceGroupTag(minionInstanceTag)
+            .setNumConcurrentTasksPerInstance(numConcurrentTasksPerInstance).setIgnoreDependentJobFailure(true)
+            .setMaxAttemptsPerTask(1).setFailureThreshold(Integer.MAX_VALUE);
     _taskDriver.enqueueJob(getHelixJobQueueName(taskType), parentTaskName, jobBuilder);
 
     // Wait until task state is available

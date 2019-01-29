@@ -40,8 +40,8 @@ public class SortedInvertedIndexBasedFilterOperator extends BaseFilterOperator {
   // Inclusive
   private final int _endDocId;
 
-  SortedInvertedIndexBasedFilterOperator(PredicateEvaluator predicateEvaluator, DataSource dataSource,
-      int startDocId, int endDocId) {
+  SortedInvertedIndexBasedFilterOperator(PredicateEvaluator predicateEvaluator, DataSource dataSource, int startDocId,
+      int endDocId) {
     // NOTE:
     // Predicate that is always evaluated as true or false should not be passed into the
     // SortedInvertedIndexBasedFilterOperator for performance concern.

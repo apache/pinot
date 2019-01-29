@@ -69,7 +69,8 @@ public class AvroSchemaToPinotSchema extends AbstractBaseAdminCommand implements
   private boolean _help = false;
 
   @Override
-  public boolean execute() throws Exception {
+  public boolean execute()
+      throws Exception {
     if (_dimensions == null && _metrics == null && _timeColumnName == null) {
       LOGGER.error(
           "Error: Missing required argument, please specify at least one of -dimensions, -metrics, -timeColumnName");

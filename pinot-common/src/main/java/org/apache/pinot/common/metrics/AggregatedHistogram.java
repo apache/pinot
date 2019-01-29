@@ -189,12 +189,12 @@ public class AggregatedHistogram<T extends Sampling> implements Sampling, Summar
   }
 
   @Override
-  public <T2> void processWith(MetricProcessor<T2> processor, MetricName name, T2 context) throws Exception {
+  public <T2> void processWith(MetricProcessor<T2> processor, MetricName name, T2 context)
+      throws Exception {
     for (T h : _histograms) {
       if (h instanceof Metric) {
         ((Metric) h).processWith(processor, name, context);
       }
     }
   }
-
 }

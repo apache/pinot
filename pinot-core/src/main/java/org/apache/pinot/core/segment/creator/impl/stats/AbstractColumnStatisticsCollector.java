@@ -18,10 +18,9 @@
  */
 package org.apache.pinot.core.segment.creator.impl.stats;
 
-import java.util.Arrays;
-import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
 import org.apache.avro.reflect.Nullable;
-import org.apache.commons.lang.math.IntRange;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.FieldSpec.DataType;
 import org.apache.pinot.core.data.partition.PartitionFunction;
@@ -40,7 +39,6 @@ import org.apache.pinot.core.segment.creator.impl.V1Constants;
  * compute max
  * see if column isSorted
  */
-
 public abstract class AbstractColumnStatisticsCollector implements ColumnStatistics {
   protected static final int INITIAL_HASH_SET_SIZE = 1000;
   private Object previousValue = null;
@@ -50,11 +48,9 @@ public abstract class AbstractColumnStatisticsCollector implements ColumnStatist
 
   protected int totalNumberOfEntries = 0;
   protected int maxNumberOfMultiValues = 0;
-  private int numInputNullValues = 0;  // Number of rows in which this column was null in the input.
   private PartitionFunction partitionFunction;
   private final int numPartitions;
-  private int partitionRangeStart = Integer.MAX_VALUE;
-  private int partitionRangeEnd = Integer.MIN_VALUE;
+  private final Set<Integer> _partitions;
 
   void updateTotalNumberOfEntries(Object[] entries) {
     totalNumberOfEntries += entries.length;
@@ -69,6 +65,11 @@ public abstract class AbstractColumnStatisticsCollector implements ColumnStatist
     fieldSpec = statsCollectorConfig.getFieldSpecForColumn(column);
     partitionFunction = statsCollectorConfig.getPartitionFunction(column);
     numPartitions = statsCollectorConfig.getNumPartitions(column);
+    if (partitionFunction != null) {
+      _partitions = new HashSet<>();
+    } else {
+      _partitions = null;
+    }
     addressNull(previousValue, fieldSpec.getDataType());
     previousValue = null;
   }
@@ -167,17 +168,13 @@ public abstract class AbstractColumnStatisticsCollector implements ColumnStatist
   }
 
   /**
-   * Returns the partition range within which the column values exist.
+   * Returns the partitions within which the column values exist.
    *
    * @return List of ranges for the column values.
    */
   @Nullable
-  public List<IntRange> getPartitionRanges() {
-    if (partitionRangeStart <= partitionRangeEnd) {
-      return Arrays.asList(new IntRange(partitionRangeStart, partitionRangeEnd));
-    } else {
-      return null;
-    }
+  public Set<Integer> getPartitions() {
+    return _partitions;
   }
 
   /**
@@ -187,19 +184,7 @@ public abstract class AbstractColumnStatisticsCollector implements ColumnStatist
    */
   protected void updatePartition(Object value) {
     if (partitionFunction != null) {
-      int partition = partitionFunction.getPartition(value);
-
-      if (partition < partitionRangeStart) {
-        partitionRangeStart = partition;
-      }
-      if (partition > partitionRangeEnd) {
-        partitionRangeEnd = partition;
-      }
+      _partitions.add(partitionFunction.getPartition(value));
     }
-  }
-
-  @Override
-  public int getPartitionRangeWidth() {
-    return partitionRangeEnd - partitionRangeStart + 1;
   }
 }

@@ -106,8 +106,7 @@ public abstract class SegmentDirectory implements Closeable {
   // NOTE: this needs to be metadata impl to read all columns.
   // In future, we will have this class load metadata rather than
   // passing it in.
-  public static SegmentDirectory createFromLocalFS(File directory,
-      SegmentMetadataImpl metadata, ReadMode readMode) {
+  public static SegmentDirectory createFromLocalFS(File directory, SegmentMetadataImpl metadata, ReadMode readMode) {
     return new SegmentLocalFSDirectory(directory, metadata, readMode);
   }
 
@@ -115,10 +114,12 @@ public abstract class SegmentDirectory implements Closeable {
       throws IOException, ConfigurationException {
     return new SegmentLocalFSDirectory(directory, readMode);
   }
+
   public static SegmentMetadataImpl loadSegmentMetadata(File directory)
       throws IOException, ConfigurationException {
     return SegmentLocalFSDirectory.loadSegmentMetadata(directory);
   }
+
   /**
    * Get the path/URL for the directory
    * @return
@@ -231,7 +232,8 @@ public abstract class SegmentDirectory implements Closeable {
       close();
     }
 
-    public abstract void save() throws IOException;
+    public abstract void save()
+        throws IOException;
 
     abstract void abort();
 
@@ -263,5 +265,4 @@ public abstract class SegmentDirectory implements Closeable {
 
   protected SegmentDirectory() {
   }
-
 }

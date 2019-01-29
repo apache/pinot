@@ -59,7 +59,6 @@ public class FilePerIndexDirectoryTest {
     }
     segmentDir.mkdirs();
     segmentMetadata = ColumnIndexDirectoryTestHelper.writeMetadata(SegmentVersion.v1);
-
   }
 
   @AfterMethod
@@ -79,7 +78,7 @@ public class FilePerIndexDirectoryTest {
       throws Exception {
     Assert.assertEquals(0, segmentDir.list().length, segmentDir.list().toString());
     try (FilePerIndexDirectory fpiDir = new FilePerIndexDirectory(segmentDir, segmentMetadata, ReadMode.heap);
-        PinotDataBuffer buffer = fpiDir.newDictionaryBuffer("col1", 1024) ) {
+        PinotDataBuffer buffer = fpiDir.newDictionaryBuffer("col1", 1024)) {
       Assert.assertEquals(1, segmentDir.list().length, segmentDir.list().toString());
 
       buffer.putLong(0, 0xbadfadL);
@@ -115,7 +114,7 @@ public class FilePerIndexDirectoryTest {
       throws Exception {
     // first verify it all works for one mode
     testMultipleRW(ReadMode.heap, 6, 100 * ONE_MB);
-    try(ColumnIndexDirectory columnDirectory = new FilePerIndexDirectory(segmentDir, segmentMetadata, ReadMode.mmap)) {
+    try (ColumnIndexDirectory columnDirectory = new FilePerIndexDirectory(segmentDir, segmentMetadata, ReadMode.mmap)) {
       ColumnIndexDirectoryTestHelper.verifyMultipleReads(columnDirectory, "foo", 6);
     }
   }
@@ -126,7 +125,7 @@ public class FilePerIndexDirectoryTest {
       ColumnIndexDirectoryTestHelper.performMultipleWrites(columnDirectory, "foo", size, numIter);
     }
     // now read and validate data
-    try(FilePerIndexDirectory columnDirectory = new FilePerIndexDirectory(segmentDir, segmentMetadata, readMode) ){
+    try (FilePerIndexDirectory columnDirectory = new FilePerIndexDirectory(segmentDir, segmentMetadata, readMode)) {
       ColumnIndexDirectoryTestHelper.verifyMultipleReads(columnDirectory, "foo", numIter);
     }
   }
@@ -137,17 +136,15 @@ public class FilePerIndexDirectoryTest {
     try (FilePerIndexDirectory columnDirectory = new FilePerIndexDirectory(segmentDir, segmentMetadata, ReadMode.mmap);
         PinotDataBuffer buffer = columnDirectory.newDictionaryBuffer("column1", 1024)) {
     }
-    try (FilePerIndexDirectory columnDirectory =
-          new FilePerIndexDirectory(segmentDir, segmentMetadata, ReadMode.mmap);
+    try (FilePerIndexDirectory columnDirectory = new FilePerIndexDirectory(segmentDir, segmentMetadata, ReadMode.mmap);
         PinotDataBuffer repeatBuffer = columnDirectory.newDictionaryBuffer("column1", 1024)) {
     }
   }
 
-  @Test (expectedExceptions = IllegalArgumentException.class)
+  @Test(expectedExceptions = IllegalArgumentException.class)
   public void testMissingIndex()
       throws IOException {
-    try (FilePerIndexDirectory fpiDirectory =
-        new FilePerIndexDirectory(segmentDir, segmentMetadata, ReadMode.mmap);
+    try (FilePerIndexDirectory fpiDirectory = new FilePerIndexDirectory(segmentDir, segmentMetadata, ReadMode.mmap);
         PinotDataBuffer buffer = fpiDirectory.getDictionaryBufferFor("noSuchColumn")) {
 
     }
@@ -156,8 +153,7 @@ public class FilePerIndexDirectoryTest {
   @Test
   public void testHasIndex()
       throws IOException {
-    try (FilePerIndexDirectory fpiDirectory =
-        new FilePerIndexDirectory(segmentDir, segmentMetadata, ReadMode.mmap)) {
+    try (FilePerIndexDirectory fpiDirectory = new FilePerIndexDirectory(segmentDir, segmentMetadata, ReadMode.mmap)) {
       PinotDataBuffer buffer = fpiDirectory.newDictionaryBuffer("foo", 1024);
       buffer.putInt(0, 100);
       Assert.assertTrue(fpiDirectory.hasIndexFor("foo", ColumnIndexType.DICTIONARY));
@@ -168,8 +164,10 @@ public class FilePerIndexDirectoryTest {
   public void testRemoveIndex()
       throws IOException {
     try (FilePerIndexDirectory fpi = new FilePerIndexDirectory(segmentDir, segmentMetadata, ReadMode.mmap)) {
-      try (PinotDataBuffer buffer = fpi.newForwardIndexBuffer("col1", 1024)) {}
-      try (PinotDataBuffer buffer = fpi.newDictionaryBuffer("col2", 100)) {}
+      try (PinotDataBuffer buffer = fpi.newForwardIndexBuffer("col1", 1024)) {
+      }
+      try (PinotDataBuffer buffer = fpi.newDictionaryBuffer("col2", 100)) {
+      }
       Assert.assertTrue(fpi.getFileFor("col1", ColumnIndexType.FORWARD_INDEX).exists());
       Assert.assertTrue(fpi.getFileFor("col2", ColumnIndexType.DICTIONARY).exists());
       Assert.assertTrue(fpi.isIndexRemovalSupported());
@@ -177,6 +175,4 @@ public class FilePerIndexDirectoryTest {
       Assert.assertFalse(fpi.getFileFor("col1", ColumnIndexType.FORWARD_INDEX).exists());
     }
   }
-
-
 }

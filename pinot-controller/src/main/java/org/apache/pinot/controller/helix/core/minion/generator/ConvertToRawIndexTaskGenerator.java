@@ -93,8 +93,8 @@ public class ConvertToRawIndexTaskGenerator implements PinotTaskGenerator {
 
       // Generate tasks
       int tableNumTasks = 0;
-      for (OfflineSegmentZKMetadata offlineSegmentZKMetadata : _clusterInfoProvider.getOfflineSegmentsMetadata(
-          offlineTableName)) {
+      for (OfflineSegmentZKMetadata offlineSegmentZKMetadata : _clusterInfoProvider
+          .getOfflineSegmentsMetadata(offlineTableName)) {
         // Generate up to tableMaxNumTasks tasks each time for each table
         if (tableNumTasks == tableMaxNumTasks) {
           break;

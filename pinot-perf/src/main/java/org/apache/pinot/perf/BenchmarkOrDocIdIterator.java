@@ -153,14 +153,11 @@ public class BenchmarkOrDocIdIterator {
     }
   }
 
-  public static void main(String[] args) throws Exception {
-    Options opt = new OptionsBuilder().include(BenchmarkOrDocIdIterator.class.getSimpleName())
-        .warmupTime(TimeValue.seconds(5))
-        .warmupIterations(2)
-        .measurementTime(TimeValue.seconds(5))
-        .measurementIterations(3)
-        .forks(1)
-        .build();
+  public static void main(String[] args)
+      throws Exception {
+    Options opt =
+        new OptionsBuilder().include(BenchmarkOrDocIdIterator.class.getSimpleName()).warmupTime(TimeValue.seconds(5))
+            .warmupIterations(2).measurementTime(TimeValue.seconds(5)).measurementIterations(3).forks(1).build();
 
     new Runner(opt).run();
   }

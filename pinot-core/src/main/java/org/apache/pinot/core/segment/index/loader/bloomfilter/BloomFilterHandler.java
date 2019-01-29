@@ -70,7 +70,8 @@ public class BloomFilterHandler {
     }
   }
 
-  public void createBloomFilters() throws Exception {
+  public void createBloomFilters()
+      throws Exception {
     for (ColumnMetadata columnMetadata : _bloomFilterColumns) {
       if (columnMetadata.hasDictionary()) {
         createBloomFilterForColumn(columnMetadata);
@@ -78,7 +79,8 @@ public class BloomFilterHandler {
     }
   }
 
-  private void createBloomFilterForColumn(ColumnMetadata columnMetadata) throws Exception {
+  private void createBloomFilterForColumn(ColumnMetadata columnMetadata)
+      throws Exception {
     String columnName = columnMetadata.getColumnName();
 
     File bloomFilterFileInProgress = new File(_indexDir, columnName + ".bloom.inprogress");
@@ -102,8 +104,7 @@ public class BloomFilterHandler {
 
     // Create new bloom filter for the column.
     LOGGER.info("Creating new bloom filter for segment: {}, column: {}", _segmentName, columnName);
-    try (BloomFilterCreator creator = new BloomFilterCreator(_indexDir, columnName,
-        columnMetadata.getCardinality())) {
+    try (BloomFilterCreator creator = new BloomFilterCreator(_indexDir, columnName, columnMetadata.getCardinality())) {
       if (columnMetadata.hasDictionary()) {
         // Read dictionary
         try (ImmutableDictionaryReader dictionaryReader = getDictionaryReader(columnMetadata, _segmentWriter)) {
@@ -128,7 +129,8 @@ public class BloomFilterHandler {
   }
 
   private ImmutableDictionaryReader getDictionaryReader(ColumnMetadata columnMetadata,
-      SegmentDirectory.Writer segmentWriter) throws IOException {
+      SegmentDirectory.Writer segmentWriter)
+      throws IOException {
     PinotDataBuffer dictionaryBuffer =
         segmentWriter.getIndexFor(columnMetadata.getColumnName(), ColumnIndexType.DICTIONARY);
     int cardinality = columnMetadata.getCardinality();

@@ -52,9 +52,8 @@ public class DataGeneratorSpec {
         FileFormat.AVRO, "/tmp/dataGen", true);
   }
 
-  public DataGeneratorSpec(List<String> columns, Map<String, Integer> cardinalityMap,
-      Map<String, IntRange> rangeMap, Map<String, DataType> dataTypesMap,
-      Map<String, FieldType> fieldTypesMap, Map<String, TimeUnit> timeUnitMap,
+  public DataGeneratorSpec(List<String> columns, Map<String, Integer> cardinalityMap, Map<String, IntRange> rangeMap,
+      Map<String, DataType> dataTypesMap, Map<String, FieldType> fieldTypesMap, Map<String, TimeUnit> timeUnitMap,
       FileFormat format, String outputDir, boolean override) {
     this.columns = columns;
     this.cardinalityMap = cardinalityMap;

@@ -60,7 +60,8 @@ public abstract class BaseChunkSingleValueWriter implements SingleColumnSingleVa
    * @throws FileNotFoundException
    */
   protected BaseChunkSingleValueWriter(File file, ChunkCompressorFactory.CompressionType compressionType, int totalDocs,
-      int numDocsPerChunk, int chunkSize, int sizeOfEntry, int version) throws FileNotFoundException {
+      int numDocsPerChunk, int chunkSize, int sizeOfEntry, int version)
+      throws FileNotFoundException {
     _chunkSize = chunkSize;
     _chunkCompressor = ChunkCompressorFactory.getCompressor(compressionType);
 
@@ -111,7 +112,8 @@ public abstract class BaseChunkSingleValueWriter implements SingleColumnSingleVa
   }
 
   @Override
-  public void close() throws IOException {
+  public void close()
+      throws IOException {
 
     // Write the chunk if it is non-empty.
     if (_chunkBuffer.position() > 0) {

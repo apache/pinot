@@ -33,8 +33,7 @@ public class TaskConfigMapChildKeyHandler implements ChildKeyHandler<Map<String,
     Map<String, Map<String, String>> returnValue = new java.util.HashMap<>();
 
     // Deserialize task keys for tasks that have no config
-    childKeys
-        .filter((key, value) -> key.indexOf('.') == -1)
+    childKeys.filter((key, value) -> key.indexOf('.') == -1)
         .forEach((key, value) -> returnValue.put(key, new java.util.HashMap<>()));
 
     if (returnValue.isEmpty()) {
@@ -47,14 +46,13 @@ public class TaskConfigMapChildKeyHandler implements ChildKeyHandler<Map<String,
   @Override
   public io.vavr.collection.Map<String, ?> unhandleChildKeys(Map<String, Map<String, String>> value,
       String pathPrefix) {
-    HashMap<String, String> retVal = HashMap.ofAll(value)
-        .flatMap((taskKey, configs) -> {
-          if (!configs.isEmpty()) {
-            return HashMap.ofAll(configs).map((configKey, configValue) -> Tuple.of(taskKey + "." + configKey, configValue));
-          } else {
-            return HashMap.of(taskKey, "");
-          }
-        });
+    HashMap<String, String> retVal = HashMap.ofAll(value).flatMap((taskKey, configs) -> {
+      if (!configs.isEmpty()) {
+        return HashMap.ofAll(configs).map((configKey, configValue) -> Tuple.of(taskKey + "." + configKey, configValue));
+      } else {
+        return HashMap.of(taskKey, "");
+      }
+    });
 
     return retVal;
   }

@@ -21,5 +21,4 @@ package org.apache.pinot.core.common;
 public interface BlockDocIdValueSet {
 
   public BlockDocIdValueIterator iterator();
-
 }

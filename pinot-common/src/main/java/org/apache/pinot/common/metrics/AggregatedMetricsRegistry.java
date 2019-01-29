@@ -87,7 +87,8 @@ public class AggregatedMetricsRegistry extends MetricsRegistry {
    * @param metricName the name of the metric
    * @return a new {@link AggregatedLongGauge}
    */
-  public <T extends Number, V extends Gauge<T>> AggregatedLongGauge<T, V> newAggregatedLongGauge(MetricName metricName) {
+  public <T extends Number, V extends Gauge<T>> AggregatedLongGauge<T, V> newAggregatedLongGauge(
+      MetricName metricName) {
     return getOrAdd(metricName, new AggregatedLongGauge<T, V>());
   }
 }

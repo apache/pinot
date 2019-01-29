@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
 
+
 /**
  * Class to represent a replica group partition assignment
  *
@@ -120,5 +121,4 @@ public class ReplicaGroupPartitionAssignment extends PartitionAssignment {
   private String createMappingKey(int partition, int replicaGroup) {
     return partition + SEPARATOR + replicaGroup;
   }
-
 }

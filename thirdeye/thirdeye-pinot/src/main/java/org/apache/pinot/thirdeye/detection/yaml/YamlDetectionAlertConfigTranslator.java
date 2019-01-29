@@ -175,7 +175,8 @@ public class YamlDetectionAlertConfigTranslator {
     // TODO: Remove all references to onlyFetchLegacyAnomalies after migration
     alertConfigDTO.setOnlyFetchLegacyAnomalies(MapUtils.getBooleanValue(yamlAlertConfig, PROP_ONLY_FETCH_LEGACY_ANOMALIES, false));
 
-    alertConfigDTO.setSubjectType((AlertConfigBean.SubjectType) MapUtils.getObject(yamlAlertConfig, PROP_EMAIL_SUBJECT_TYPE, AlertConfigBean.SubjectType.METRICS));
+    alertConfigDTO.setSubjectType(AlertConfigBean.SubjectType.valueOf(
+        (String) MapUtils.getObject(yamlAlertConfig, PROP_EMAIL_SUBJECT_TYPE, AlertConfigBean.SubjectType.METRICS.name())));
 
     Map<String, String> refLinks = MapUtils.getMap(yamlAlertConfig, PROP_REFERENCE_LINKS);
     if (refLinks == null) {

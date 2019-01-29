@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+
 public class Utils {
 
   public static List<List<Object>> cartesianProduct(List<List<Object>> lists) {

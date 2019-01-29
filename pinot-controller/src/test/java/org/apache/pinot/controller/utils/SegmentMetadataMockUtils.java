@@ -18,10 +18,9 @@
  */
 package org.apache.pinot.controller.utils;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.Collections;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import org.apache.commons.lang.math.IntRange;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import org.apache.pinot.common.segment.SegmentMetadata;
 import org.apache.pinot.core.segment.index.ColumnMetadata;
@@ -31,6 +30,7 @@ import org.mockito.Mockito;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+
 
 public class SegmentMetadataMockUtils {
   private SegmentMetadataMockUtils() {
@@ -74,9 +74,8 @@ public class SegmentMetadataMockUtils {
   public static SegmentMetadata mockSegmentMetadataWithPartitionInfo(String tableName, String segmentName,
       String columnName, int partitionNumber) {
     ColumnMetadata columnMetadata = mock(ColumnMetadata.class);
-    List<IntRange> partitionRanges = new ArrayList<>();
-    partitionRanges.add(new IntRange(partitionNumber));
-    when(columnMetadata.getPartitionRanges()).thenReturn(partitionRanges);
+    Set<Integer> partitions = Collections.singleton(partitionNumber);
+    when(columnMetadata.getPartitions()).thenReturn(partitions);
 
     SegmentMetadataImpl segmentMetadata = mock(SegmentMetadataImpl.class);
     if (columnName != null) {

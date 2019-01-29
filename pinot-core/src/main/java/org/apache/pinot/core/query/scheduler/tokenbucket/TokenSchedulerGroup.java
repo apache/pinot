@@ -64,7 +64,6 @@ public class TokenSchedulerGroup extends AbstractSchedulerGroup {
   // get a fresh start and continue to hog high resources impacting sparse users
   private static final double ALPHA = 0.80;
 
-
   TokenSchedulerGroup(String schedGroupName, int numTokensPerMs, int tokenLifetimeMs) {
     super(schedGroupName);
     Preconditions.checkArgument(numTokensPerMs > 0);
@@ -134,16 +133,13 @@ public class TokenSchedulerGroup extends AbstractSchedulerGroup {
     if (leftTokens < rightTokens) {
       return -1;
     }
-    return FCFSSchedulerGroup.compare(this, (SchedulerGroup)rhs);
+    return FCFSSchedulerGroup.compare(this, (SchedulerGroup) rhs);
   }
 
   public String toString() {
-    return String.format(" {%s:[%d,%d,%d,%d,%d]},", name(),
-        getAvailableTokens(),
-        numPending(),
-        numRunning(),
-        getThreadsInUse(),
-        totalReservedThreads());
+    return String
+        .format(" {%s:[%d,%d,%d,%d,%d]},", name(), getAvailableTokens(), numPending(), numRunning(), getThreadsInUse(),
+            totalReservedThreads());
   }
 
   // callers must synchronize access to this method
@@ -181,7 +177,7 @@ public class TokenSchedulerGroup extends AbstractSchedulerGroup {
     return System.currentTimeMillis();
   }
 
-  private class TokenLockManager implements AutoCloseable{
+  private class TokenLockManager implements AutoCloseable {
     private final Lock lock;
 
     TokenLockManager(Lock lock) {

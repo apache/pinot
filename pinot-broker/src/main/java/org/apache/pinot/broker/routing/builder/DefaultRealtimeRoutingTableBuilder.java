@@ -44,7 +44,8 @@ public class DefaultRealtimeRoutingTableBuilder implements RoutingTableBuilder {
   private boolean _hasLLC;
 
   @Override
-  public void init(Configuration configuration, TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore, BrokerMetrics brokerMetrics) {
+  public void init(Configuration configuration, TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore,
+      BrokerMetrics brokerMetrics) {
     _realtimeHLCRoutingTableBuilder = new HighLevelConsumerBasedRoutingTableBuilder();
     _realtimeLLCRoutingTableBuilder = new LowLevelConsumerRoutingTableBuilder();
     _realtimeHLCRoutingTableBuilder.init(configuration, tableConfig, propertyStore, brokerMetrics);

@@ -52,7 +52,6 @@ public interface IdMap<Key> {
    */
   int getId(Key key);
 
-
   /**
    * Returns the key associated with the specified id.
    *
@@ -63,7 +62,6 @@ public interface IdMap<Key> {
    * @return Key for the id.
    */
   Key getKey(int id);
-
 
   /**
    * Returns the current size of the map, zero if the map is empty.

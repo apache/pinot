@@ -74,10 +74,9 @@ public class KafkaPartitionLevelConsumer extends KafkaConnectionHandler implemen
       throw new java.util.concurrent.TimeoutException();
     }
 
-    FetchResponse fetchResponse = _simpleConsumer.fetch(new FetchRequestBuilder().minBytes(100000)
-        .maxWait(timeoutMillis)
-        .addFetch(_topic, _partition, startOffset, 500000)
-        .build());
+    FetchResponse fetchResponse = _simpleConsumer.fetch(
+        new FetchRequestBuilder().minBytes(100000).maxWait(timeoutMillis)
+            .addFetch(_topic, _partition, startOffset, 500000).build());
 
     if (!fetchResponse.hasError()) {
       final Iterable<MessageAndOffset> messageAndOffsetIterable =
@@ -112,7 +111,8 @@ public class KafkaPartitionLevelConsumer extends KafkaConnectionHandler implemen
   @Override
   /**
    * Closes this consumer.
-   */ public void close() throws IOException {
+   */ public void close()
+      throws IOException {
     super.close();
   }
 }

@@ -46,14 +46,17 @@ public class VarByteChunkSingleValueReaderWriteTest {
   private static final String TEST_FILE = System.getProperty("java.io.tmpdir") + File.separator + "varByteSVRTest";
 
   @Test
-  public void testWithCompression() throws Exception {
+  public void testWithCompression()
+      throws Exception {
     test(ChunkCompressorFactory.CompressionType.SNAPPY);
   }
 
   @Test
-  public void testWithoutCompression() throws Exception {
+  public void testWithoutCompression()
+      throws Exception {
     test(ChunkCompressorFactory.CompressionType.PASS_THROUGH);
   }
+
   /**
    * This test writes {@link #NUM_ENTRIES} using {@link VarByteChunkSingleValueWriter}. It then reads
    * the strings & bytes using {@link VarByteChunkSingleValueReader}, and asserts that what was written is the same as
@@ -111,7 +114,7 @@ public class VarByteChunkSingleValueReaderWriteTest {
   @Test
   public void testBackwardCompatibility()
       throws IOException {
-    String[] expected = new String[] {"abcde", "fgh", "ijklmn", "12345"};
+    String[] expected = new String[]{"abcde", "fgh", "ijklmn", "12345"};
 
     // Get v1 from resources folder
     ClassLoader classLoader = getClass().getClassLoader();

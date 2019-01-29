@@ -22,6 +22,7 @@ import java.util.List;
 import org.apache.pinot.common.utils.Pairs.IntPair;
 import org.apache.pinot.core.common.Constants;
 
+
 public final class SortedDocIdIterator implements IndexBasedDocIdIterator {
   /**
    *
@@ -55,8 +56,7 @@ public final class SortedDocIdIterator implements IndexBasedDocIdIterator {
         // targetDocId in the gap between two valid pairs.
         currentDocId = pairs.get(pairPointer).getLeft();
         break;
-      } else if (targetDocId >= pairs.get(pairPointer).getLeft()
-          && targetDocId <= pairs.get(pairPointer).getRight()) {
+      } else if (targetDocId >= pairs.get(pairPointer).getLeft() && targetDocId <= pairs.get(pairPointer).getRight()) {
         // targetDocId in the future valid pair.
         currentDocId = targetDocId;
         break;

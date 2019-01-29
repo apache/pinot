@@ -22,6 +22,7 @@ import java.util.HashSet;
 import java.util.List;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 
+
 public class NotInPredicateFilter implements PredicateFilter {
   private static final String SEPARATOR = "\t\t";
   HashSet<Integer> _notInSet = new HashSet<>();

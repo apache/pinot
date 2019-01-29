@@ -28,7 +28,7 @@ public class ExecutionStatistics {
   private long _numTotalRawDocs;
   private long _numSegmentsProcessed;
   private long _numSegmentsMatched;
-  
+
   public ExecutionStatistics() {
   }
 
@@ -82,12 +82,9 @@ public class ExecutionStatistics {
 
   @Override
   public String toString() {
-    return "Execution Statistics:"
-        + "\n  numDocsScanned: " + _numDocsScanned
-        + "\n  numEntriesScannedInFilter: " + _numEntriesScannedInFilter
-        + "\n  numEntriesScannedPostFilter: " + _numEntriesScannedPostFilter
-        + "\n  numTotalRawDocs: " + _numTotalRawDocs
-        + "\n  numSegmentsProcessed: " + _numSegmentsProcessed
+    return "Execution Statistics:" + "\n  numDocsScanned: " + _numDocsScanned + "\n  numEntriesScannedInFilter: "
+        + _numEntriesScannedInFilter + "\n  numEntriesScannedPostFilter: " + _numEntriesScannedPostFilter
+        + "\n  numTotalRawDocs: " + _numTotalRawDocs + "\n  numSegmentsProcessed: " + _numSegmentsProcessed
         + "\n  numSegmentsMatched: " + _numSegmentsMatched;
   }
 }

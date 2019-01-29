@@ -1,23 +1,21 @@
 <h1 class="te-title">Create Alert
-  {{#if isDevEnv}}
-    {{#x-toggle
-      value=isForm
-      classNames="te-toggle te-toggle--form te-toggle--left report-toggle pull-right"
-      theme="ios"
-      id="label-toggle"
-      showLabels=true
-      name="activeToggle"
-      onToggle=(action (mut isForm))
-      as |toggle|}}
-        {{#toggle.label value=isForm}}
-          <span class="te-label te-label--flush">YAML</span>
-        {{/toggle.label}}
-        {{toggle.switch theme='ios' onLabel='diff on' offLabel='diff off'}}
-        {{#toggle.label value=isForm}}
-          <span class="te-label te-label--flush">Form</span>
-        {{/toggle.label}}
-    {{/x-toggle}}
-  {{/if}}
+  {{#x-toggle
+    value=isForm
+    classNames="te-toggle te-toggle--form te-toggle--left report-toggle pull-right"
+    theme="ios"
+    id="label-toggle"
+    showLabels=true
+    name="activeToggle"
+    onToggle=(action (mut isForm))
+    as |toggle|}}
+      {{#toggle.label value=isForm}}
+        <span class="te-label te-label--flush">YAML</span>
+      {{/toggle.label}}
+      {{toggle.switch theme='ios' onLabel='diff on' offLabel='diff off'}}
+      {{#toggle.label value=isForm}}
+        <span class="te-label te-label--flush">Form</span>
+      {{/toggle.label}}
+  {{/x-toggle}}
 </h1>
 <main class="alert-create card-container card-container--padded te-form">
   {{#if isForm}}

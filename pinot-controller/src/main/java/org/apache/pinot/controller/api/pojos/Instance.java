@@ -47,15 +47,13 @@ public class Instance {
       throw new RuntimeException("Unknown instance type for: " + instanceName);
     }
 
-    Instance instance = new Instance(ic.getHostName(),
-        ic.getPort(),
-        type, org.apache.commons.lang.StringUtils.join(ic.getTags(), ','));
+    Instance instance =
+        new Instance(ic.getHostName(), ic.getPort(), type, org.apache.commons.lang.StringUtils.join(ic.getTags(), ','));
     return instance;
   }
 
   @JsonCreator
-  public Instance(
-      @JsonProperty(value = "host", required = true) String host,
+  public Instance(@JsonProperty(value = "host", required = true) String host,
       @JsonProperty(value = "port", required = true) String port,
       @JsonProperty(value = "type", required = true) String type,
       @JsonProperty(value = "tag", required = false) String tag) {

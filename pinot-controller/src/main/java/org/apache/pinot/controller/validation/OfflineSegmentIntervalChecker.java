@@ -26,6 +26,7 @@ import org.apache.pinot.common.config.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
+import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.metrics.ValidationMetrics;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.time.TimeUtils;
@@ -48,9 +49,9 @@ public class OfflineSegmentIntervalChecker extends ControllerPeriodicTask {
   private final ValidationMetrics _validationMetrics;
 
   public OfflineSegmentIntervalChecker(ControllerConf config, PinotHelixResourceManager pinotHelixResourceManager,
-      ValidationMetrics validationMetrics) {
+      ValidationMetrics validationMetrics, ControllerMetrics controllerMetrics) {
     super("OfflineSegmentIntervalChecker", config.getOfflineSegmentIntervalCheckerFrequencyInSeconds(),
-        pinotHelixResourceManager);
+        config.getPeriodicTaskInitialDelayInSeconds(), pinotHelixResourceManager, controllerMetrics);
     _validationMetrics = validationMetrics;
   }
 
@@ -60,21 +61,15 @@ public class OfflineSegmentIntervalChecker extends ControllerPeriodicTask {
 
   @Override
   protected void processTable(String tableNameWithType) {
-    try {
+    CommonConstants.Helix.TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
+    if (tableType == CommonConstants.Helix.TableType.OFFLINE) {
 
-      CommonConstants.Helix.TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
-      if (tableType == CommonConstants.Helix.TableType.OFFLINE) {
-
-        TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
-        if (tableConfig == null) {
-          LOGGER.warn("Failed to find table config for table: {}, skipping validation", tableNameWithType);
-          return;
-        }
-
-        validateOfflineSegmentPush(tableConfig);
+      TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
+      if (tableConfig == null) {
+        LOGGER.warn("Failed to find table config for table: {}, skipping validation", tableNameWithType);
+        return;
       }
-    } catch (Exception e) {
-      LOGGER.warn("Caught exception while checking offline segment intervals for table: {}", tableNameWithType, e);
+      validateOfflineSegmentPush(tableConfig);
     }
   }
 
@@ -93,8 +88,8 @@ public class OfflineSegmentIntervalChecker extends ControllerPeriodicTask {
       List<String> segmentsWithInvalidInterval = new ArrayList<>();
       for (OfflineSegmentZKMetadata offlineSegmentZKMetadata : offlineSegmentZKMetadataList) {
         Interval timeInterval = offlineSegmentZKMetadata.getTimeInterval();
-        if (timeInterval != null && TimeUtils.timeValueInValidRange(timeInterval.getStartMillis())
-            && TimeUtils.timeValueInValidRange(timeInterval.getEndMillis())) {
+        if (timeInterval != null && TimeUtils.timeValueInValidRange(timeInterval.getStartMillis()) && TimeUtils
+            .timeValueInValidRange(timeInterval.getEndMillis())) {
           segmentIntervals.add(timeInterval);
         } else {
           segmentsWithInvalidInterval.add(offlineSegmentZKMetadata.getSegmentName());
@@ -212,7 +207,11 @@ public class OfflineSegmentIntervalChecker extends ControllerPeriodicTask {
 
   @Override
   protected void postprocess() {
+  }
 
+  @Override
+  protected void exceptionHandler(String tableNameWithType, Exception e) {
+    LOGGER.warn("Caught exception while checking offline segment intervals for table: {}", tableNameWithType, e);
   }
 
   @Override

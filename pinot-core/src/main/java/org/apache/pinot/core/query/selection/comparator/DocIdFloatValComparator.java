@@ -21,6 +21,7 @@ package org.apache.pinot.core.query.selection.comparator;
 import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.BlockSingleValIterator;
 
+
 public class DocIdFloatValComparator implements IDocIdValComparator {
 
   int orderToggleMultiplier = 1;
@@ -40,5 +41,4 @@ public class DocIdFloatValComparator implements IDocIdValComparator {
     float val2 = blockValSetIterator.nextFloatVal();
     return Float.compare(val1, val2) * orderToggleMultiplier;
   }
-
 }

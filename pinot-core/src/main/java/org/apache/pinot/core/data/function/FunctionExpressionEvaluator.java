@@ -46,11 +46,13 @@ public class FunctionExpressionEvaluator {
   // Root of the execution tree
   private final ExecutableNode _rootNode;
 
-  public FunctionExpressionEvaluator(String expression) throws Exception {
+  public FunctionExpressionEvaluator(String expression)
+      throws Exception {
     _rootNode = planExecution(TransformExpressionTree.compileToExpressionTree(expression));
   }
 
-  private ExecutableNode planExecution(TransformExpressionTree expressionTree) throws Exception {
+  private ExecutableNode planExecution(TransformExpressionTree expressionTree)
+      throws Exception {
     String transformName = expressionTree.getValue();
     List<TransformExpressionTree> children = expressionTree.getChildren();
     Class<?>[] argumentTypes = new Class<?>[children.size()];
@@ -95,7 +97,8 @@ public class FunctionExpressionEvaluator {
     ExecutableNode[] _argumentProviders;
     Object[] _argInputs;
 
-    public FunctionExecutionNode(FunctionInfo functionInfo, ExecutableNode[] argumentProviders) throws Exception {
+    public FunctionExecutionNode(FunctionInfo functionInfo, ExecutableNode[] argumentProviders)
+        throws Exception {
       Preconditions.checkNotNull(functionInfo);
       Preconditions.checkNotNull(argumentProviders);
       _functionInvoker = new FunctionInvoker(functionInfo);

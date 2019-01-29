@@ -61,7 +61,8 @@ public class SegmentConverterTest {
   private final long _referenceTimestamp = System.currentTimeMillis();
 
   @BeforeClass
-  public void setUp() throws Exception {
+  public void setUp()
+      throws Exception {
     FileUtils.deleteDirectory(WORKING_DIR);
     _segmentIndexDirList = new ArrayList<>(NUM_SEGMENTS);
 
@@ -100,15 +101,12 @@ public class SegmentConverterTest {
   }
 
   @Test
-  public void testSegmentConcatenate() throws Exception {
-    SegmentConverter segmentConverter = new SegmentConverter.Builder()
-        .setTableName(TABLE_NAME)
-        .setSegmentName("segmentConcatenate")
-        .setInputIndexDirs(_segmentIndexDirList)
-        .setWorkingDir(WORKING_DIR)
-        .setRecordTransformer((row) -> row)
-        .setTotalNumPartition(1)
-        .build();
+  public void testSegmentConcatenate()
+      throws Exception {
+    SegmentConverter segmentConverter =
+        new SegmentConverter.Builder().setTableName(TABLE_NAME).setSegmentName("segmentConcatenate")
+            .setInputIndexDirs(_segmentIndexDirList).setWorkingDir(WORKING_DIR).setRecordTransformer((row) -> row)
+            .setTotalNumPartition(1).build();
 
     List<File> result = segmentConverter.convertSegment();
 
@@ -139,25 +137,21 @@ public class SegmentConverterTest {
   }
 
   @Test
-  public void testSegmentRollupWithTimeConversion() throws Exception {
+  public void testSegmentRollupWithTimeConversion()
+      throws Exception {
     final BaseDateTimeTransformer dateTimeTransformer =
         DateTimeTransformerFactory.getDateTimeTransformer("1:MILLISECONDS:EPOCH", "1:DAYS:EPOCH", "1:DAYS");
 
-    SegmentConverter segmentConverter = new SegmentConverter.Builder()
-        .setTableName(TABLE_NAME)
-        .setSegmentName("segmentRollupWithTimeConversion")
-        .setInputIndexDirs(_segmentIndexDirList)
-        .setWorkingDir(WORKING_DIR)
-        .setRecordTransformer((row) -> {
+    SegmentConverter segmentConverter =
+        new SegmentConverter.Builder().setTableName(TABLE_NAME).setSegmentName("segmentRollupWithTimeConversion")
+            .setInputIndexDirs(_segmentIndexDirList).setWorkingDir(WORKING_DIR).setRecordTransformer((row) -> {
           long[] input = new long[1];
           long[] output = new long[1];
           input[0] = (Long) row.getValue(T);
           dateTimeTransformer.transform(input, output, 1);
           row.putField(T, output[0]);
           return row;
-        })
-        .setGroupByColumns(Arrays.asList(new String[]{D1, D2, T}))
-        .setRecordAggregator((rows) -> {
+        }).setGroupByColumns(Arrays.asList(new String[]{D1, D2, T})).setRecordAggregator((rows) -> {
           GenericRow result = rows.get(0);
           for (int i = 1; i < rows.size(); i++) {
             GenericRow current = rows.get(i);
@@ -166,9 +160,7 @@ public class SegmentConverterTest {
             result.putField(M1, aggregatedValue);
           }
           return result;
-        })
-        .setTotalNumPartition(1)
-        .build();
+        }).setTotalNumPartition(1).build();
 
     List<File> result = segmentConverter.convertSegment();
 
@@ -185,7 +177,7 @@ public class SegmentConverterTest {
 
     // Check the value
     int expectedValue = 0;
-    for (GenericRow row: outputRows) {
+    for (GenericRow row : outputRows) {
       Assert.assertEquals(row.getValue(D1), expectedValue);
       Assert.assertEquals(row.getValue(D2), Integer.toString(expectedValue));
       Assert.assertEquals(row.getValue(M1), expectedValue * NUM_SEGMENTS * REPEAT_ROWS);
@@ -194,15 +186,12 @@ public class SegmentConverterTest {
   }
 
   @Test
-  public void testMultipleOutput() throws Exception {
-    SegmentConverter segmentConverter = new SegmentConverter.Builder()
-        .setTableName(TABLE_NAME)
-        .setSegmentName("segmentConcatenate")
-        .setInputIndexDirs(_segmentIndexDirList)
-        .setWorkingDir(WORKING_DIR)
-        .setRecordTransformer((row) -> row)
-        .setTotalNumPartition(3)
-        .build();
+  public void testMultipleOutput()
+      throws Exception {
+    SegmentConverter segmentConverter =
+        new SegmentConverter.Builder().setTableName(TABLE_NAME).setSegmentName("segmentConcatenate")
+            .setInputIndexDirs(_segmentIndexDirList).setWorkingDir(WORKING_DIR).setRecordTransformer((row) -> row)
+            .setTotalNumPartition(3).build();
 
     List<File> result = segmentConverter.convertSegment();
 
@@ -223,7 +212,8 @@ public class SegmentConverterTest {
   }
 
   @AfterClass
-  public void tearDown() throws Exception {
+  public void tearDown()
+      throws Exception {
     FileUtils.deleteDirectory(WORKING_DIR);
   }
 }

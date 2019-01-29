@@ -98,7 +98,8 @@ public class ControllerStarter {
 
   public ControllerStarter(ControllerConf conf) {
     _config = conf;
-    _adminApp = new ControllerAdminApiApplication(_config.getQueryConsoleWebappPath(), _config.getQueryConsoleUseHttps());
+    _adminApp =
+        new ControllerAdminApiApplication(_config.getQueryConsoleWebappPath(), _config.getQueryConsoleUseHttps());
     // Do not use this before the invocation of {@link PinotHelixResourceManager::start()}, which happens in {@link ControllerStarter::start()}
     _helixResourceManager = new PinotHelixResourceManager(_config);
     _metricsRegistry = new MetricsRegistry();
@@ -131,8 +132,6 @@ public class ControllerStarter {
     return _taskManager;
   }
 
-
-
   public void start() {
     LOGGER.info("Starting Pinot controller");
 
@@ -157,8 +156,7 @@ public class ControllerStarter {
 
     LOGGER.info("Initializing SegmentFetcherFactory");
     try {
-      SegmentFetcherFactory.getInstance()
-          .init(segmentFetcherFactoryConfig);
+      SegmentFetcherFactory.getInstance().init(segmentFetcherFactoryConfig);
     } catch (Exception e) {
       throw new RuntimeException("Caught exception while initializing SegmentFetcherFactory", e);
     }
@@ -300,21 +298,21 @@ public class ControllerStarter {
     List<PeriodicTask> periodicTasks = new ArrayList<>();
     _taskManager = new PinotTaskManager(_helixTaskResourceManager, _helixResourceManager, _config, _controllerMetrics);
     periodicTasks.add(_taskManager);
-    _retentionManager = new RetentionManager(_helixResourceManager, _config);
+    _retentionManager = new RetentionManager(_helixResourceManager, _config, _controllerMetrics);
     periodicTasks.add(_retentionManager);
     _offlineSegmentIntervalChecker =
-        new OfflineSegmentIntervalChecker(_config, _helixResourceManager, new ValidationMetrics(_metricsRegistry));
+        new OfflineSegmentIntervalChecker(_config, _helixResourceManager, new ValidationMetrics(_metricsRegistry),
+            _controllerMetrics);
     periodicTasks.add(_offlineSegmentIntervalChecker);
-    _realtimeSegmentValidationManager =
-        new RealtimeSegmentValidationManager(_config, _helixResourceManager, PinotLLCRealtimeSegmentManager.getInstance(),
-            new ValidationMetrics(_metricsRegistry));
+    _realtimeSegmentValidationManager = new RealtimeSegmentValidationManager(_config, _helixResourceManager,
+        PinotLLCRealtimeSegmentManager.getInstance(), new ValidationMetrics(_metricsRegistry), _controllerMetrics);
     periodicTasks.add(_realtimeSegmentValidationManager);
     _brokerResourceValidationManager =
-        new BrokerResourceValidationManager(_config, _helixResourceManager);
+        new BrokerResourceValidationManager(_config, _helixResourceManager, _controllerMetrics);
     periodicTasks.add(_brokerResourceValidationManager);
     _segmentStatusChecker = new SegmentStatusChecker(_helixResourceManager, _config, _controllerMetrics);
     periodicTasks.add(_segmentStatusChecker);
-    _realtimeSegmentRelocator = new RealtimeSegmentRelocator(_helixResourceManager, _config);
+    _realtimeSegmentRelocator = new RealtimeSegmentRelocator(_helixResourceManager, _config, _controllerMetrics);
     periodicTasks.add(_realtimeSegmentRelocator);
 
     return periodicTasks;
@@ -342,7 +340,6 @@ public class ControllerStarter {
       _helixResourceManager.stop();
 
       _executorService.shutdownNow();
-
     } catch (final Exception e) {
       LOGGER.error("Caught exception while shutting down", e);
     }
@@ -350,6 +347,11 @@ public class ControllerStarter {
 
   public MetricsRegistry getMetricsRegistry() {
     return _metricsRegistry;
+  }
+
+  @VisibleForTesting
+  public ControllerMetrics getControllerMetrics() {
+    return _controllerMetrics;
   }
 
   public static ControllerStarter startDefault() {

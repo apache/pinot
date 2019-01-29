@@ -123,19 +123,17 @@ public class LLCRealtimeSegmentZKMetadata extends RealtimeSegmentZKMetadata {
     }
 
     LLCRealtimeSegmentZKMetadata metadata = (LLCRealtimeSegmentZKMetadata) segmentMetadata;
-    return super.equals(metadata) &&
-        isEqual(_startOffset, metadata._startOffset) &&
-        isEqual(_endOffset, metadata._endOffset) &&
-        isEqual(_downloadUrl, metadata._downloadUrl) &&
-        isEqual(_numReplicas, metadata._numReplicas);
+    return super.equals(metadata) && isEqual(_startOffset, metadata._startOffset) && isEqual(_endOffset,
+        metadata._endOffset) && isEqual(_downloadUrl, metadata._downloadUrl) && isEqual(_numReplicas,
+        metadata._numReplicas);
   }
 
   @Override
   public int hashCode() {
     int result = super.hashCode();
-    result =  hashCodeOf(result, _startOffset);
-    result =  hashCodeOf(result, _endOffset);
-    result =  hashCodeOf(result, _numReplicas);
+    result = hashCodeOf(result, _startOffset);
+    result = hashCodeOf(result, _endOffset);
+    result = hashCodeOf(result, _numReplicas);
     result = hashCodeOf(result, _downloadUrl);
     return result;
   }

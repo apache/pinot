@@ -45,9 +45,9 @@ public class NormalizedDateSegmentNameGenerator implements SegmentNameGenerator 
   private final String _segmentExcludeSequenceId;
   private final String _schemaTimeFormat;
 
-  public NormalizedDateSegmentNameGenerator(
-      String tableName, int sequenceId, String timeColumnType, String tablePushFrequency, String tablePushType,
-      String segmentNamePrefix, String segmentExcludeSequenceId, String schemaTimeFormat) {
+  public NormalizedDateSegmentNameGenerator(String tableName, int sequenceId, String timeColumnType,
+      String tablePushFrequency, String tablePushType, String segmentNamePrefix, String segmentExcludeSequenceId,
+      String schemaTimeFormat) {
     _tableName = tableName;
     _sequenceId = sequenceId;
     _timeColumnType = timeColumnType;
@@ -59,7 +59,8 @@ public class NormalizedDateSegmentNameGenerator implements SegmentNameGenerator 
   }
 
   @Override
-  public String generateSegmentName(ColumnStatistics statsCollector) throws Exception {
+  public String generateSegmentName(ColumnStatistics statsCollector)
+      throws Exception {
     long minTimeValue = Long.parseLong(statsCollector.getMinValue().toString());
     long maxTimeValue = Long.parseLong(statsCollector.getMaxValue().toString());
     String segmentName = generateSegmentName(minTimeValue, maxTimeValue);
@@ -96,8 +97,8 @@ public class NormalizedDateSegmentNameGenerator implements SegmentNameGenerator 
     if (_tablePushType.equalsIgnoreCase("APPEND")) {
       minTimeValueNormalized = getNormalizedDate(minTimeValue);
       maxTimeValueNormalized = getNormalizedDate(maxTimeValue);
-      LOGGER.info("Table push type is append. Min time value = " + minTimeValueNormalized
-          + " and max time value = " + maxTimeValueNormalized + " table name: " + _tableName);
+      LOGGER.info("Table push type is append. Min time value = " + minTimeValueNormalized + " and max time value = "
+          + maxTimeValueNormalized + " table name: " + _tableName);
     } else {
       LOGGER.info("Table push type is refresh for table: " + _tableName);
     }

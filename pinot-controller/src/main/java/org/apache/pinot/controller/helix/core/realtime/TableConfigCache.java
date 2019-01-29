@@ -42,19 +42,20 @@ public class TableConfigCache {
   private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
 
   public TableConfigCache(ZkHelixPropertyStore<ZNRecord> propertyStore) {
-    _tableConfigCache = CacheBuilder.newBuilder()
-        .maximumSize(DEFAULT_CACHE_SIZE)
+    _tableConfigCache = CacheBuilder.newBuilder().maximumSize(DEFAULT_CACHE_SIZE)
         .expireAfterWrite(DEFAULT_CACHE_TIMEOUT_IN_MINUTE, TimeUnit.MINUTES)
         .build(new CacheLoader<String, TableConfig>() {
           @Override
-          public TableConfig load(String tableNameWithType) throws Exception {
+          public TableConfig load(String tableNameWithType)
+              throws Exception {
             return ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
           }
         });
     _propertyStore = propertyStore;
   }
 
-  public TableConfig getTableConfig(String tableNameWithType) throws ExecutionException {
+  public TableConfig getTableConfig(String tableNameWithType)
+      throws ExecutionException {
     return _tableConfigCache.get(tableNameWithType);
   }
 }

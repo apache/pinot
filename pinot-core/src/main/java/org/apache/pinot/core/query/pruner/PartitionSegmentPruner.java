@@ -22,7 +22,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.configuration.Configuration;
-import org.apache.commons.lang.math.IntRange;
 import org.apache.pinot.common.request.FilterOperator;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
 import org.apache.pinot.core.data.partition.PartitionFunction;
@@ -95,25 +94,19 @@ public class PartitionSegmentPruner extends AbstractSegmentPruner {
 
     // Leaf node
     String column = filterQueryTree.getColumn();
-    ColumnMetadata metadata = columnMetadataMap.get(column);
-    if (metadata == null) {
+    ColumnMetadata columnMetadata = columnMetadataMap.get(column);
+    // NOTE: should have already been pruned in DataSchemaSegmentPruner
+    if (columnMetadata == null) {
+      return true;
+    }
+
+    PartitionFunction partitionFunction = columnMetadata.getPartitionFunction();
+    if (partitionFunction != null) {
+      Comparable value = getValue(filterQueryTree.getValue().get(0), columnMetadata.getDataType());
+      int partition = partitionFunction.getPartition(value);
+      return !columnMetadata.getPartitions().contains(partition);
+    } else {
       return false;
     }
-
-    List<IntRange> partitionRanges = metadata.getPartitionRanges();
-    if (partitionRanges == null || partitionRanges.isEmpty()) {
-      return false;
-    }
-
-    Comparable value = getValue(filterQueryTree.getValue().get(0), metadata.getDataType());
-    PartitionFunction partitionFunction = metadata.getPartitionFunction();
-    int partition = partitionFunction.getPartition(value);
-
-    for (IntRange partitionRange : partitionRanges) {
-      if (partitionRange.containsInteger(partition)) {
-        return false;
-      }
-    }
-    return true;
   }
 }

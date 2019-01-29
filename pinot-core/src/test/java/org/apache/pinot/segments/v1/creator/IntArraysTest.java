@@ -55,7 +55,8 @@ public class IntArraysTest {
   }
 
   @BeforeClass
-  public static void before() throws Exception {
+  public static void before()
+      throws Exception {
     final String filePath =
         TestUtils.getFileFromResourceUrl(DictionariesTest.class.getClassLoader().getResource(AVRO_DATA));
     if (INDEX_DIR.exists()) {
@@ -65,9 +66,9 @@ public class IntArraysTest {
 //    System.out.println(INDEX_DIR.getAbsolutePath());
     final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
 
-    final SegmentGeneratorConfig config =
-        SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR,
-            "weeksSinceEpochSunday", TimeUnit.DAYS, "test");
+    final SegmentGeneratorConfig config = SegmentTestUtils
+        .getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, "weeksSinceEpochSunday",
+            TimeUnit.DAYS, "test");
     config.setTimeColumnName("weeksSinceEpochSunday");
     driver.init(config);
     driver.build();
@@ -83,7 +84,8 @@ public class IntArraysTest {
   }
 
   @Test
-  public void test1() throws Exception {
+  public void test1()
+      throws Exception {
     ImmutableSegment heapSegment = ImmutableSegmentLoader.load(INDEX_DIR.listFiles()[0], ReadMode.heap);
     ImmutableSegment mmapSegment = ImmutableSegmentLoader.load(INDEX_DIR.listFiles()[0], ReadMode.mmap);
     Map<String, ColumnMetadata> metadataMap =

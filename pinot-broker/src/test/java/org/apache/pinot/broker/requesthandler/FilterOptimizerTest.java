@@ -32,7 +32,8 @@ public class FilterOptimizerTest {
 
   // Testing positive cases of flattening the query tree.
   @Test
-  public void testPositive() throws Exception {
+  public void testPositive()
+      throws Exception {
 
     Pql2Compiler pql2Compiler = new Pql2Compiler();
     BrokerRequest req;
@@ -45,7 +46,7 @@ public class FilterOptimizerTest {
     tree = RequestUtils.generateFilterQueryTree(_optimizer.optimize(req, timeColumn));
     Assert.assertEquals(tree.getChildren().size(), 3);
     Assert.assertEquals(tree.getOperator(), FilterOperator.AND);
-    for (FilterQueryTree node: tree.getChildren()) {
+    for (FilterQueryTree node : tree.getChildren()) {
       Assert.assertNull(node.getChildren());
       Assert.assertEquals(node.getOperator(), FilterOperator.EQUALITY);
     }
@@ -54,7 +55,7 @@ public class FilterOptimizerTest {
     tree = RequestUtils.generateFilterQueryTree(_optimizer.optimize(req, timeColumn));
     Assert.assertEquals(tree.getChildren().size(), 4);
     Assert.assertEquals(tree.getOperator(), FilterOperator.AND);
-    for (FilterQueryTree node: tree.getChildren()) {
+    for (FilterQueryTree node : tree.getChildren()) {
       Assert.assertNull(node.getChildren());
       Assert.assertEquals(node.getOperator(), FilterOperator.EQUALITY);
     }
@@ -63,7 +64,7 @@ public class FilterOptimizerTest {
     tree = RequestUtils.generateFilterQueryTree(_optimizer.optimize(req, timeColumn));
     Assert.assertEquals(tree.getChildren().size(), 3);
     Assert.assertEquals(tree.getOperator(), FilterOperator.OR);
-    for (FilterQueryTree node: tree.getChildren()) {
+    for (FilterQueryTree node : tree.getChildren()) {
       Assert.assertNull(node.getChildren());
       Assert.assertEquals(node.getOperator(), FilterOperator.EQUALITY);
     }
@@ -72,7 +73,7 @@ public class FilterOptimizerTest {
     tree = RequestUtils.generateFilterQueryTree(_optimizer.optimize(req, timeColumn));
     Assert.assertEquals(tree.getChildren().size(), 4);
     Assert.assertEquals(tree.getOperator(), FilterOperator.OR);
-    for (FilterQueryTree node: tree.getChildren()) {
+    for (FilterQueryTree node : tree.getChildren()) {
       Assert.assertNull(node.getChildren());
       Assert.assertEquals(node.getOperator(), FilterOperator.EQUALITY);
     }
@@ -82,7 +83,7 @@ public class FilterOptimizerTest {
     tree = RequestUtils.generateFilterQueryTree(_optimizer.optimize(req, timeColumn));
     Assert.assertEquals(tree.getChildren().size(), 5);
     Assert.assertEquals(tree.getOperator(), FilterOperator.OR);
-    for (FilterQueryTree node: tree.getChildren()) {
+    for (FilterQueryTree node : tree.getChildren()) {
       Assert.assertNull(node.getChildren());
       Assert.assertEquals(node.getOperator(), FilterOperator.EQUALITY);
     }
@@ -94,7 +95,7 @@ public class FilterOptimizerTest {
     Assert.assertEquals(tree.getOperator(), FilterOperator.OR);
     numLeaves = 0;
     numOps = 0;
-    for (FilterQueryTree node: tree.getChildren()) {
+    for (FilterQueryTree node : tree.getChildren()) {
       if (node.getOperator().equals(FilterOperator.EQUALITY)) {
         Assert.assertNull(node.getChildren());
         numLeaves++;
@@ -111,11 +112,11 @@ public class FilterOptimizerTest {
     String whereClause = constructWhereClause(FilterOperator.OR, maxNodesAtTopLevel + 50);
     req = pql2Compiler.compileToBrokerRequest("SELECT * FROM T WHERE " + whereClause);
     tree = RequestUtils.generateFilterQueryTree(_optimizer.optimize(req, timeColumn));
-    Assert.assertEquals(tree.getChildren().size(), maxNodesAtTopLevel+1);
+    Assert.assertEquals(tree.getChildren().size(), maxNodesAtTopLevel + 1);
     Assert.assertEquals(tree.getOperator(), FilterOperator.OR);
     numLeaves = 0;
     numOps = 0;
-    for (FilterQueryTree node: tree.getChildren()) {
+    for (FilterQueryTree node : tree.getChildren()) {
       if (node.getOperator().equals(FilterOperator.EQUALITY)) {
         Assert.assertNull(node.getChildren());
         numLeaves++;
@@ -130,7 +131,8 @@ public class FilterOptimizerTest {
 
   // Tests cases where we should not do any flattening.
   @Test
-  public void testNegative() throws Exception {
+  public void testNegative()
+      throws Exception {
     Pql2Compiler pql2Compiler = new Pql2Compiler();
     BrokerRequest req;
     FilterQueryTree tree;
@@ -143,7 +145,7 @@ public class FilterOptimizerTest {
     Assert.assertEquals(tree.getOperator(), FilterOperator.AND);
     numOps = 0;
     numLeaves = 0;
-    for (FilterQueryTree node: tree.getChildren()) {
+    for (FilterQueryTree node : tree.getChildren()) {
       if (node.getOperator().equals(FilterOperator.OR)) {
         Assert.assertEquals(2, node.getChildren().size());
         numOps++;
@@ -159,7 +161,7 @@ public class FilterOptimizerTest {
     if (depth == 1) {
       return "(A = " + depth + ")";
     } else {
-      return "(A" + depth + " = " + depth + " " + operator + " " + constructWhereClause(operator, depth-1) + ")";
+      return "(A" + depth + " = " + depth + " " + operator + " " + constructWhereClause(operator, depth - 1) + ")";
     }
   }
 }

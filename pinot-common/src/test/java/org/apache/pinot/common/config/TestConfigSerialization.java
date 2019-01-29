@@ -30,7 +30,8 @@ import org.testng.annotations.Test;
  */
 public class TestConfigSerialization {
   @Test
-  public void testConfigRoundtrip() throws Exception {
+  public void testConfigRoundtrip()
+      throws Exception {
     // Load the config and check it
     CombinedConfig combinedConfig = CombinedConfigLoader
         .loadCombinedConfig(new File(getClass().getClassLoader().getResource("test-table-config.conf").getFile()));

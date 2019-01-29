@@ -34,7 +34,8 @@ public interface StreamMessageDecoder<T> {
    * @param props
    * @throws Exception
    */
-  void init(Map<String, String> props, Schema indexingSchema, String topicName) throws Exception;
+  void init(Map<String, String> props, Schema indexingSchema, String topicName)
+      throws Exception;
 
   /**
    * Decodes the payload received into a generic row

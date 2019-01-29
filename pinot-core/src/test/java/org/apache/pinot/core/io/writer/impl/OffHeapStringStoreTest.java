@@ -36,12 +36,14 @@ public class OffHeapStringStoreTest {
   }
 
   @AfterClass
-  public void tearDown() throws Exception {
+  public void tearDown()
+      throws Exception {
     _memoryManager.close();
   }
 
   @Test
-  public void maxValueTest() throws Exception {
+  public void maxValueTest()
+      throws Exception {
     OffHeapStringStore store = new OffHeapStringStore(_memoryManager, "stringColumn");
     final int arrSize = OffHeapStringStore.getStartSize() - 4;
     String dataIn = generateRandomString(arrSize);
@@ -52,7 +54,8 @@ public class OffHeapStringStoreTest {
   }
 
   @Test
-  public void overflowTest() throws Exception {
+  public void overflowTest()
+      throws Exception {
     OffHeapStringStore store = new OffHeapStringStore(_memoryManager, "stringColumn");
     final int maxSize = OffHeapStringStore.getStartSize() - 4;
 

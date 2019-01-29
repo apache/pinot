@@ -80,8 +80,7 @@ public class BenchmarkFixedIntArrayOffHeapIdMap {
     PinotDataBufferMemoryManager memoryManager = new DirectMemoryManager("perfTest");
 
     IdMap<FixedIntArray> idMap =
-        new FixedIntArrayOffHeapIdMap(CARDINALITY / 10, 1000, NUM_COLUMNS, memoryManager,
-            "perfTestWithCache");
+        new FixedIntArrayOffHeapIdMap(CARDINALITY / 10, 1000, NUM_COLUMNS, memoryManager, "perfTestWithCache");
 
     for (FixedIntArray value : _values) {
       idMap.put(value);
@@ -99,8 +98,7 @@ public class BenchmarkFixedIntArrayOffHeapIdMap {
     PinotDataBufferMemoryManager memoryManager = new DirectMemoryManager("perfTest");
 
     IdMap<FixedIntArray> idMap =
-        new FixedIntArrayOffHeapIdMap(CARDINALITY / 10, 0, NUM_COLUMNS, memoryManager,
-            "perfTestWithCache");
+        new FixedIntArrayOffHeapIdMap(CARDINALITY / 10, 0, NUM_COLUMNS, memoryManager, "perfTestWithCache");
 
     for (FixedIntArray value : _values) {
       idMap.put(value);
@@ -148,11 +146,8 @@ public class BenchmarkFixedIntArrayOffHeapIdMap {
   public static void main(String[] args)
       throws Exception {
     ChainedOptionsBuilder opt = new OptionsBuilder().include(BenchmarkFixedIntArrayOffHeapIdMap.class.getSimpleName())
-        .warmupTime(TimeValue.seconds(10))
-        .warmupIterations(2)
-        .measurementTime(TimeValue.seconds(30))
-        .measurementIterations(5)
-        .forks(1);
+        .warmupTime(TimeValue.seconds(10)).warmupIterations(2).measurementTime(TimeValue.seconds(30))
+        .measurementIterations(5).forks(1);
 
     new Runner(opt.build()).run();
   }

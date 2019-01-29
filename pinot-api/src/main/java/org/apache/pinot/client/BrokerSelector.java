@@ -24,6 +24,5 @@ public interface BrokerSelector {
    * @param table
    * @return
    */
-  String selectBroker(String table); 
-  
+  String selectBroker(String table);
 }

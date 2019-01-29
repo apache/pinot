@@ -20,5 +20,4 @@ package org.apache.pinot.core.io.reader;
 
 public interface ReaderContext {
 
-
 }

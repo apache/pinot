@@ -61,7 +61,8 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
    * @throws Exception
    */
   protected abstract SegmentConversionResult convert(@Nonnull PinotTaskConfig pinotTaskConfig,
-      @Nonnull File originalIndexDir, @Nonnull File workingDir) throws Exception;
+      @Nonnull File originalIndexDir, @Nonnull File workingDir)
+      throws Exception;
 
   /**
    * Returns the segment ZK metadata custom map modifier.
@@ -71,7 +72,8 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
   protected abstract SegmentZKMetadataCustomMapModifier getSegmentZKMetadataCustomMapModifier();
 
   @Override
-  public SegmentConversionResult executeTask(@Nonnull PinotTaskConfig pinotTaskConfig) throws Exception {
+  public SegmentConversionResult executeTask(@Nonnull PinotTaskConfig pinotTaskConfig)
+      throws Exception {
     String taskType = pinotTaskConfig.getTaskType();
     Map<String, String> configs = pinotTaskConfig.getConfigs();
     String tableNameWithType = configs.get(MinionConstants.TABLE_NAME_KEY);
@@ -89,8 +91,7 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
       // Download the tarred segment file
       File tarredSegmentFile = new File(tempDataDir, "tarredSegmentFile");
       LOGGER.info("Downloading segment from {} to {}", downloadURL, tarredSegmentFile.getAbsolutePath());
-      SegmentFetcherFactory.getInstance()
-          .getSegmentFetcherBasedOnURI(downloadURL)
+      SegmentFetcherFactory.getInstance().getSegmentFetcherBasedOnURI(downloadURL)
           .fetchSegmentToLocal(downloadURL, tarredSegmentFile);
 
       // Un-tar the segment file
@@ -111,8 +112,8 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
       // Tar the converted segment
       File convertedTarredSegmentDir = new File(tempDataDir, "convertedTarredSegmentDir");
       Preconditions.checkState(convertedTarredSegmentDir.mkdir());
-      File convertedTarredSegmentFile = new File(
-          TarGzCompressionUtils.createTarGzOfDirectory(convertedIndexDir.getPath(),
+      File convertedTarredSegmentFile = new File(TarGzCompressionUtils
+          .createTarGzOfDirectory(convertedIndexDir.getPath(),
               new File(convertedTarredSegmentDir, convertedSegmentName).getPath()));
 
       // Check whether the task get cancelled before uploading the segment
@@ -141,8 +142,9 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
           new BasicNameValuePair(FileUploadDownloadClient.QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION, "true"));
 
       // Upload the tarred segment
-      SegmentConversionUtils.uploadSegment(configs, httpHeaders, parameters, tableNameWithType, convertedSegmentName,
-          uploadURL, convertedTarredSegmentFile);
+      SegmentConversionUtils
+          .uploadSegment(configs, httpHeaders, parameters, tableNameWithType, convertedSegmentName, uploadURL,
+              convertedTarredSegmentFile);
 
       LOGGER.info("Done executing {} on table: {}, input segment: {}, output segment: {}", taskType, tableNameWithType,
           segmentName, convertedSegmentName);

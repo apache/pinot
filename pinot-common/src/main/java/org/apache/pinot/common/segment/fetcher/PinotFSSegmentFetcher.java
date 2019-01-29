@@ -36,7 +36,8 @@ public class PinotFSSegmentFetcher implements SegmentFetcher {
   }
 
   @Override
-  public void fetchSegmentToLocal(String uriString, File tempFile) throws Exception {
+  public void fetchSegmentToLocal(String uriString, File tempFile)
+      throws Exception {
     URI uri = new URI(uriString);
 
     // TODO: move _pinotFS creation to init, however, it needs the right config passed in into init.

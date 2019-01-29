@@ -52,7 +52,8 @@ public class PercentileTDigestMVQueriesTest extends PercentileTDigestQueriesTest
   private static final int MAX_NUM_MULTI_VALUES = 10;
 
   @Override
-  protected void buildSegment() throws Exception {
+  protected void buildSegment()
+      throws Exception {
     List<GenericRow> rows = new ArrayList<>(NUM_ROWS);
     for (int i = 0; i < NUM_ROWS; i++) {
       HashMap<String, Object> valueMap = new HashMap<>();
@@ -98,7 +99,8 @@ public class PercentileTDigestMVQueriesTest extends PercentileTDigestQueriesTest
 
   @Override
   protected String getAggregationQuery(int percentile) {
-    return String.format("SELECT PERCENTILE%dMV(%s), PERCENTILETDIGEST%dMV(%s), PERCENTILETDIGEST%d(%s) FROM %s",
-        percentile, DOUBLE_COLUMN, percentile, DOUBLE_COLUMN, percentile, TDIGEST_COLUMN, TABLE_NAME);
+    return String
+        .format("SELECT PERCENTILE%dMV(%s), PERCENTILETDIGEST%dMV(%s), PERCENTILETDIGEST%d(%s) FROM %s", percentile,
+            DOUBLE_COLUMN, percentile, DOUBLE_COLUMN, percentile, TDIGEST_COLUMN, TABLE_NAME);
   }
 }

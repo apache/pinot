@@ -72,7 +72,8 @@ public class DictionaryDelegatingValueReader implements ValueReader {
   }
 
   @Override
-  public void close() throws IOException {
+  public void close()
+      throws IOException {
     _dictionary.close();
   }
 }

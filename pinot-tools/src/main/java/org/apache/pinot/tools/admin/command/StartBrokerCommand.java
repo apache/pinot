@@ -40,7 +40,8 @@ public class StartBrokerCommand extends AbstractBaseAdminCommand implements Comm
   private String _brokerHost;
 
   @Option(name = "-brokerPort", required = false, metaVar = "<int>", usage = "Broker port number to use for query.")
-  private int _brokerPort = CommonConstants.Helix.DEFAULT_BROKER_QUERY_PORT;;
+  private int _brokerPort = CommonConstants.Helix.DEFAULT_BROKER_QUERY_PORT;
+  ;
 
   @Option(name = "-zkAddress", required = false, metaVar = "<http>", usage = "HTTP address of Zookeeper.")
   private String _zkAddress = DEFAULT_ZK_ADDRESS;
@@ -48,12 +49,10 @@ public class StartBrokerCommand extends AbstractBaseAdminCommand implements Comm
   @Option(name = "-clusterName", required = false, metaVar = "<String>", usage = "Pinot cluster name.")
   private String _clusterName = "PinotCluster";
 
-  @Option(name = "-configFileName", required = false, metaVar = "<Config File Name>",
-      usage = "Broker Starter Config file.", forbids = { "-brokerHost", "-brokerPort" })
+  @Option(name = "-configFileName", required = false, metaVar = "<Config File Name>", usage = "Broker Starter Config file.", forbids = {"-brokerHost", "-brokerPort"})
   private String _configFileName;
 
-  @Option(name = "-help", required = false, help = true, aliases = { "-h", "--h", "--help" },
-      usage = "Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
   private boolean _help = false;
 
   public boolean getHelp() {
@@ -105,7 +104,8 @@ public class StartBrokerCommand extends AbstractBaseAdminCommand implements Comm
   }
 
   @Override
-  public boolean execute() throws Exception {
+  public boolean execute()
+      throws Exception {
     try {
       Configuration configuration = readConfigFromFile(_configFileName);
       if (configuration == null) {

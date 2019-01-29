@@ -11,6 +11,9 @@ import {
   set,
   setProperties
 } from '@ember/object';
+import { appendFilters } from 'thirdeye-frontend/utils/rca-utils';
+import { humanizeFloat, humanizeChange, checkStatus } from 'thirdeye-frontend/utils/utils';
+import floatToPercent from 'thirdeye-frontend/utils/float-to-percent';
 
 const queryParamsConfig = {
   refreshModel: true
@@ -70,7 +73,7 @@ export default Route.extend(AuthenticatedRouteMixin, {
 
     return new RSVP.Promise(async (resolve, reject) => {
       try {
-        const anomalyMapping = appName ? await get(this, '_getAnomalyMapping').perform(model) : [];//DEMO:
+        const anomalyMapping = appName ? await get(this, '_getAnomalyMapping').perform(model) : []; //DEMO:
         const shareMetaData = shareId ? await get(this, 'shareDashboardApiService').queryShareMetaById(shareId) : [];
         const shareTemplateConfig = appName ? await get(this, 'shareTemplateConfigApiService').queryShareTemplateConfigByAppName(appName) : {};
         const defaultParams = {
@@ -123,6 +126,71 @@ export default Route.extend(AuthenticatedRouteMixin, {
       anomalyMapping[metricName].items[functionName].items.push(get(this, 'anomaliesApiService').getHumanizedEntity(anomaly, humanizedObject));
     });
 
+    anomalyMapping = yield get(this, '_fetchOffsets').perform(anomalyMapping);
+    return anomalyMapping;
+  }).drop(),
+
+  _fetchOffsets: task (function * (anomalyMapping) {
+    if (!anomalyMapping) { return; }
+
+    let map = {};
+    let index = 1;
+    // Iterate through each anomaly
+    yield Object.keys(anomalyMapping).some(function(metric) {
+      Object.keys(anomalyMapping[metric].items).some(function(alert) {
+        anomalyMapping[metric].items[alert].items.forEach(async (item) => {
+
+          const anomaly = item.anomaly;
+          const metricName = get(anomaly, 'metricName');
+          const metricId = get(anomaly, 'metricId');
+          const functionName = get(anomaly, 'functionName');
+          const functionId = get(anomaly, 'functionId');
+
+          const dimensions = get(anomaly, 'dimensions');
+          const start = get(anomaly, 'start');
+          const end = get(anomaly, 'end');
+
+          if (!map[metricName]) {
+            map[metricName] = { 'metricId': metricId, items: {}, count: index };
+            index++;
+          }
+
+          if(!map[metricName].items[functionName]) {
+            map[metricName].items[functionName] = { 'functionId': functionId, items: [] };
+          }
+
+          const filteredDimensions = Object.keys(dimensions).map(key => [key, '=', dimensions[key]]);
+          //build new urn
+          const metricUrn = appendFilters(`thirdeye:metric:${metricId}`, filteredDimensions);
+          //Get all in the following order - current,wo2w,median4w
+          const offsets = await fetch(`/rootcause/metric/aggregate/batch?urn=${metricUrn}&start=${start}&end=${end}&offsets=wo1w,wo2w,median4w&timezone=America/Los_Angeles`).then(checkStatus).then(res => res);
+
+          const current = get(anomaly, 'current');
+          const wow = humanizeFloat(offsets[0]);
+          const wo2w = humanizeFloat(offsets[1]);
+          const median4w = humanizeFloat(offsets[2]);
+          const wowChange = floatToPercent(Number((current - offsets[0]) / offsets[0]));
+          const wo2wChange = floatToPercent(Number((current - offsets[1]) / offsets[1]));
+          const median4wChange = floatToPercent(Number((current - offsets[2]) / offsets[2]));
+          const wowHumanizeChange = humanizeChange(Number((current - offsets[0]) / offsets[0]));
+          const wo2wHumanizeChange = humanizeChange(Number((current - offsets[1]) / offsets[1]));
+          const median4wHumanizeChange = humanizeChange(Number((current - offsets[2]) / offsets[2]));
+
+          set(anomaly, 'offsets',  offsets ? {
+            'wow': { value: wow, change: wowChange, humanizedChangeDisplay: wowHumanizeChange },
+            'wo2w': { value: wo2w, change: wo2wChange, humanizedChangeDisplay: wo2wHumanizeChange },
+            'median4w': { value: median4w, change: median4wChange, humanizedChangeDisplay: median4wHumanizeChange }
+          } : {
+            'wow': '-',
+            'wo2w': '-',
+            'median4w': '-'
+          });
+
+          map[metricName].items[functionName].items.push(item);
+        });
+      });
+    });
+    // return updated anomalyMapping
     return anomalyMapping;
   }).drop(),
 
