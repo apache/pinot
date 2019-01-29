@@ -71,6 +71,7 @@ import org.apache.pinot.common.config.TagOverrideConfig;
 import org.apache.pinot.common.config.Tenant;
 import org.apache.pinot.common.config.TenantConfig;
 import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.common.exception.InstanceNotFoundException;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.messages.SegmentRefreshMessage;
@@ -284,8 +285,13 @@ public class PinotHelixResourceManager {
    * @return Helix instance config
    */
   @Nonnull
-  public InstanceConfig getHelixInstanceConfig(@Nonnull String instanceId) {
+  public InstanceConfig getHelixInstanceConfig(@Nonnull String instanceId) throws InstanceNotFoundException {
     ZNRecord znRecord = _cacheInstanceConfigsDataAccessor.get("/" + instanceId, null, AccessOption.PERSISTENT);
+    if (znRecord == null) {
+      String errorMsg = String.format("Instance %s not found", instanceId);
+      LOGGER.warn(errorMsg);
+      throw new InstanceNotFoundException(errorMsg);
+    }
     return new InstanceConfig(znRecord);
   }
 
@@ -2157,9 +2163,8 @@ public class PinotHelixResourceManager {
    * @return True if instance exists in the Helix cluster, False otherwise.
    */
   public boolean instanceExists(String instanceName) {
-    HelixDataAccessor helixDataAccessor = _helixZkManager.getHelixDataAccessor();
-    InstanceConfig config = helixDataAccessor.getProperty(_keyBuilder.instanceConfig(instanceName));
-    return (config != null);
+    ZNRecord znRecord = _cacheInstanceConfigsDataAccessor.get("/" + instanceName, null, AccessOption.PERSISTENT);
+    return (znRecord != null);
   }
 
   public boolean isSingleTenantCluster() {
@@ -2204,8 +2209,7 @@ public class PinotHelixResourceManager {
    * server instances. With BiMap, both mappings are easily available
    */
   @Nonnull
-  public BiMap<String, String> getDataInstanceAdminEndpoints(@Nonnull Set<String> instances)
-      throws InvalidConfigException {
+  public BiMap<String, String> getDataInstanceAdminEndpoints(@Nonnull Set<String> instances) throws Exception {
     Preconditions.checkNotNull(instances);
     BiMap<String, String> endpointToInstance = HashBiMap.create(instances.size());
     for (String instance : instances) {
@@ -2239,13 +2243,14 @@ public class PinotHelixResourceManager {
     final long externalViewOnlineToOfflineTimeoutMillis = 100L;
     final boolean isSingleTenantCluster = false;
     final boolean isUpdateStateModel = false;
+    final boolean enableBatchMessageMode = false;
     MetricsRegistry metricsRegistry = new MetricsRegistry();
     final boolean dryRun = true;
     final String tableName = "testTable";
     final TableType tableType = TableType.OFFLINE;
     PinotHelixResourceManager helixResourceManager =
         new PinotHelixResourceManager(zkURL, helixClusterName, controllerInstanceId, localDiskDir,
-            externalViewOnlineToOfflineTimeoutMillis, isSingleTenantCluster, isUpdateStateModel);
+            externalViewOnlineToOfflineTimeoutMillis, isSingleTenantCluster, isUpdateStateModel, enableBatchMessageMode);
     helixResourceManager.start();
     ZNRecord record = helixResourceManager.rebalanceTable(tableName, dryRun, tableType);
     ObjectMapper mapper = new ObjectMapper();

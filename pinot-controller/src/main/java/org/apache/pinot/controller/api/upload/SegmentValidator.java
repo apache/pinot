@@ -62,7 +62,7 @@ public class SegmentValidator {
     _controllerMetrics = controllerMetrics;
   }
 
-  public void validateSegment(SegmentMetadata segmentMetadata, File tempSegmentDir) {
+  public void validateSegment(SegmentMetadata segmentMetadata, File tempSegmentDir) throws Exception {
     String rawTableName = segmentMetadata.getTableName();
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
     String segmentName = segmentMetadata.getName();
@@ -105,8 +105,7 @@ public class SegmentValidator {
    * @param offlineTableConfig offline table configuration. This should not be null.
    */
   private StorageQuotaChecker.QuotaCheckerResponse checkStorageQuota(@Nonnull File segmentFile,
-      @Nonnull SegmentMetadata metadata, @Nonnull TableConfig offlineTableConfig)
-      throws InvalidConfigException {
+      @Nonnull SegmentMetadata metadata, @Nonnull TableConfig offlineTableConfig) throws Exception {
     if (!_controllerConf.getEnableStorageQuotaCheck()) {
       return StorageQuotaChecker.success("Quota check is disabled");
     }

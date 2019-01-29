@@ -224,21 +224,21 @@ public class TableSizeReaderTest {
   }
 
   @Test
-  public void testNoSuchTable()
-      throws InvalidConfigException {
-    TableSizeReader reader = new TableSizeReader(executor, connectionManager, _controllerMetrics, helix);
+  public void testNoSuchTable() throws Exception {
+    TableSizeReader reader = new TableSizeReader(executor, connectionManager,
+        _controllerMetrics, helix);
     Assert.assertNull(reader.getTableSizeDetails("mytable", 5000));
   }
 
-  private TableSizeReader.TableSizeDetails testRunner(final String[] servers, String table)
-      throws InvalidConfigException {
-    when(helix.getServerToSegmentsMap(anyString())).thenAnswer(new Answer<Object>() {
-      @Override
-      public Object answer(InvocationOnMock invocationOnMock)
-          throws Throwable {
-        return subsetOfServerSegments(servers);
-      }
-    });
+  private TableSizeReader.TableSizeDetails testRunner(final String[] servers, String table) throws Exception {
+    when(helix.getServerToSegmentsMap(anyString()))
+        .thenAnswer(new Answer<Object>() {
+          @Override
+          public Object answer(InvocationOnMock invocationOnMock)
+              throws Throwable {
+            return subsetOfServerSegments(servers);
+          }
+        });
 
     when(helix.getDataInstanceAdminEndpoints(ArgumentMatchers.<String>anySet())).thenAnswer(new Answer<Object>() {
       @Override
@@ -312,9 +312,8 @@ public class TableSizeReaderTest {
   }
 
   @Test
-  public void testGetTableSubTypeSizeAllSuccess()
-      throws InvalidConfigException {
-    final String[] servers = {"server0", "server1"};
+  public void testGetTableSubTypeSizeAllSuccess() throws Exception {
+    final String[] servers = { "server0", "server1"};
     String table = "offline";
     TableSizeReader.TableSizeDetails tableSizeDetails = testRunner(servers, table);
     TableSizeReader.TableSubTypeSizeDetails offlineSizes = tableSizeDetails.offlineSegments;
@@ -331,9 +330,8 @@ public class TableSizeReaderTest {
   }
 
   @Test
-  public void testGetTableSubTypeSizeAllErrors()
-      throws InvalidConfigException {
-    final String[] servers = {"server2", "server5"};
+  public void testGetTableSubTypeSizeAllErrors() throws Exception {
+    final String[] servers = { "server2", "server5"};
     String table = "offline";
     TableSizeReader.TableSizeDetails tableSizeDetails = testRunner(servers, table);
     TableSizeReader.TableSubTypeSizeDetails offlineSizes = tableSizeDetails.offlineSegments;
@@ -348,9 +346,8 @@ public class TableSizeReaderTest {
   }
 
   @Test
-  public void testGetTableSubTypeSizesWithErrors()
-      throws InvalidConfigException {
-    final String[] servers = {"server0", "server1", "server2", "server5"};
+  public void testGetTableSubTypeSizesWithErrors() throws Exception {
+    final String[] servers = { "server0", "server1", "server2", "server5"};
     String table = "offline";
     TableSizeReader.TableSizeDetails tableSizeDetails = testRunner(servers, "offline");
     TableSizeReader.TableSubTypeSizeDetails offlineSizes = tableSizeDetails.offlineSegments;
@@ -365,9 +362,8 @@ public class TableSizeReaderTest {
   }
 
   @Test
-  public void getTableSizeDetailsRealtimeOnly()
-      throws InvalidConfigException {
-    final String[] servers = {"server3", "server4"};
+  public void getTableSizeDetailsRealtimeOnly() throws Exception {
+    final String[] servers = { "server3", "server4"};
     TableSizeReader.TableSizeDetails tableSizeDetails = testRunner(servers, "realtime");
     Assert.assertNull(tableSizeDetails.offlineSegments);
     TableSizeReader.TableSubTypeSizeDetails realtimeSegments = tableSizeDetails.realtimeSegments;

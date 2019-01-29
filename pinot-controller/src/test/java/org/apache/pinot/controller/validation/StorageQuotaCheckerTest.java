@@ -21,13 +21,11 @@ package org.apache.pinot.controller.validation;
 import com.yammer.metrics.core.MetricsRegistry;
 import java.io.File;
 import java.io.FileOutputStream;
-import java.io.IOException;
 import java.util.Arrays;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.config.QuotaConfig;
 import org.apache.pinot.common.config.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -71,10 +69,8 @@ public class StorageQuotaCheckerTest {
   }
 
   @Test
-  public void testNoQuota()
-      throws InvalidConfigException {
-    StorageQuotaChecker checker =
-        new MockStorageQuotaChecker(_tableConfig, _tableSizeReader, _controllerMetrics, _pinotHelixResourceManager);
+  public void testNoQuota() throws Exception {
+    StorageQuotaChecker checker = new MockStorageQuotaChecker(_tableConfig, _tableSizeReader, _controllerMetrics, _pinotHelixResourceManager);
     when(_tableConfig.getQuotaConfig()).thenReturn(null);
     StorageQuotaChecker.QuotaCheckerResponse res =
         checker.isSegmentStorageWithinQuota(TEST_DIR, "myTable", "segment", 1000);
@@ -82,8 +78,7 @@ public class StorageQuotaCheckerTest {
   }
 
   @Test
-  public void testNoStorageQuotaConfig()
-      throws InvalidConfigException {
+  public void testNoStorageQuotaConfig() throws Exception {
     StorageQuotaChecker checker =
         new MockStorageQuotaChecker(_tableConfig, _tableSizeReader, _controllerMetrics, _pinotHelixResourceManager);
     when(_tableConfig.getQuotaConfig()).thenReturn(_quotaConfig);
@@ -93,10 +88,9 @@ public class StorageQuotaCheckerTest {
     Assert.assertTrue(res.isSegmentWithinQuota);
   }
 
-  public void setupTableSegmentSize(final long tableSize, final long segmentSize, final int missing)
-      throws InvalidConfigException {
-    when(_tableSizeReader.getTableSubtypeSize("testTable", 1000))
-        .thenAnswer(new Answer<TableSizeReader.TableSubTypeSizeDetails>() {
+  public void setupTableSegmentSize(final long tableSize, final long segmentSize, final int missing) throws Exception {
+    when(_tableSizeReader.getTableSubtypeSize("testTable", 1000)).thenAnswer(
+        new Answer<TableSizeReader.TableSubTypeSizeDetails>() {
           @Override
           public TableSizeReader.TableSubTypeSizeDetails answer(InvocationOnMock invocationOnMock)
               throws Throwable {
@@ -112,8 +106,7 @@ public class StorageQuotaCheckerTest {
   }
 
   @Test
-  public void testWithinQuota()
-      throws IOException, InvalidConfigException {
+  public void testWithinQuota() throws Exception {
     File tempFile = new File(TEST_DIR, "small_file");
     tempFile.createNewFile();
     byte[] data = new byte[1024];

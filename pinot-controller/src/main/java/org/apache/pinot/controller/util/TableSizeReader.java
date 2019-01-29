@@ -72,7 +72,7 @@ public class TableSizeReader {
    */
   @Nullable
   public TableSizeDetails getTableSizeDetails(@Nonnull String tableName, @Nonnegative int timeoutMsec)
-      throws InvalidConfigException {
+      throws Exception {
     Preconditions.checkNotNull(tableName, "Table name should not be null");
     Preconditions.checkArgument(timeoutMsec > 0, "Timeout value must be greater than 0");
 
@@ -146,8 +146,7 @@ public class TableSizeReader {
     public Map<String, SegmentSizeInfo> serverInfo = new HashMap<>();
   }
 
-  public TableSubTypeSizeDetails getTableSubtypeSize(String tableNameWithType, int timeoutMs)
-      throws InvalidConfigException {
+  public TableSubTypeSizeDetails getTableSubtypeSize(String tableNameWithType, int timeoutMs) throws Exception {
     Map<String, List<String>> serverToSegmentsMap = _helixResourceManager.getServerToSegmentsMap(tableNameWithType);
     ServerTableSizeReader serverTableSizeReader = new ServerTableSizeReader(_executor, _connectionManager);
     BiMap<String, String> endpoints = _helixResourceManager.getDataInstanceAdminEndpoints(serverToSegmentsMap.keySet());
