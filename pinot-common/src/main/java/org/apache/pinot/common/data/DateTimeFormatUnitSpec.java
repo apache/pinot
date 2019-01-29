@@ -31,42 +31,57 @@ public class DateTimeFormatUnitSpec {
    * Time unit enum with range from MILLISECONDS to YEARS
    */
   public enum DateTimeTransformUnit {
+
     MILLISECONDS {
       @Override
       public long fromMillis(long millisSinceEpoch) {
         return millisSinceEpoch;
       }
-    }, SECONDS {
+    },
+
+    SECONDS {
       @Override
       public long fromMillis(long millisSinceEpoch) {
         return TimeUnit.MILLISECONDS.toSeconds(millisSinceEpoch);
       }
-    }, MINUTES {
+    },
+
+    MINUTES {
       @Override
       public long fromMillis(long millisSinceEpoch) {
         return TimeUnit.MILLISECONDS.toMinutes(millisSinceEpoch);
       }
-    }, HOURS {
+    },
+
+    HOURS {
       @Override
       public long fromMillis(long millisSinceEpoch) {
         return TimeUnit.MILLISECONDS.toHours(millisSinceEpoch);
       }
-    }, DAYS {
+    },
+
+    DAYS {
       @Override
       public long fromMillis(long millisSinceEpoch) {
         return TimeUnit.MILLISECONDS.toDays(millisSinceEpoch);
       }
-    }, WEEKS {
+    },
+
+    WEEKS {
       @Override
       public long fromMillis(long millisSinceEpoch) {
         return DurationFieldType.weeks().getField(ISOChronology.getInstanceUTC()).getDifference(millisSinceEpoch, 0L);
       }
-    }, MONTHS {
+    },
+
+    MONTHS {
       @Override
       public long fromMillis(long millisSinceEpoch) {
         return DurationFieldType.months().getField(ISOChronology.getInstanceUTC()).getDifference(millisSinceEpoch, 0L);
       }
-    }, YEARS {
+    },
+
+    YEARS {
       @Override
       public long fromMillis(long millisSinceEpoch) {
         return DurationFieldType.years().getField(ISOChronology.getInstanceUTC()).getDifference(millisSinceEpoch, 0L);
@@ -80,6 +95,7 @@ public class DateTimeFormatUnitSpec {
      * @return Time since epoch of desired time unit
      */
     public abstract long fromMillis(long millisSinceEpoch);
+
   }
 
   private TimeUnit _timeUnit = null;
@@ -124,8 +140,8 @@ public class DateTimeFormatUnitSpec {
 
     DateTimeFormatUnitSpec that = (DateTimeFormatUnitSpec) o;
 
-    return EqualityUtils.isEqual(_timeUnit, that._timeUnit) && EqualityUtils.isEqual(_dateTimeTransformUnit,
-        that._dateTimeTransformUnit);
+    return EqualityUtils.isEqual(_timeUnit, that._timeUnit) && EqualityUtils
+        .isEqual(_dateTimeTransformUnit, that._dateTimeTransformUnit);
   }
 
   @Override

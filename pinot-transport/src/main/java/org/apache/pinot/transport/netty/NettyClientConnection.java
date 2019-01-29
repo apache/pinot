@@ -43,12 +43,7 @@ public abstract class NettyClientConnection {
    * Client Connection State
    */
   public enum State {
-    INIT,
-    CONNECTED,
-    REQUEST_WRITTEN,
-    REQUEST_SENT,
-    ERROR,
-    GOT_RESPONSE;
+    INIT, CONNECTED, REQUEST_WRITTEN, REQUEST_SENT, ERROR, GOT_RESPONSE;
 
     public boolean isValidTransition(State nextState) {
       switch (nextState) {
@@ -67,7 +62,7 @@ public abstract class NettyClientConnection {
       }
       return false;
     }
-  };
+  }
 
   protected final ServerInstance _server;
 
@@ -96,7 +91,6 @@ public abstract class NettyClientConnection {
     return _connId;
   }
 
-
   /**
    * Connect to the server. Returns false if unable to connect to the server.
    */
@@ -105,7 +99,8 @@ public abstract class NettyClientConnection {
   /**
    * Close the client connection
    */
-  public abstract void close() throws InterruptedException;
+  public abstract void close()
+      throws InterruptedException;
 
   /**
    * API to send a request asynchronously.

@@ -27,11 +27,8 @@ public class IdentifierAstNode extends BaseAstNode {
 
   public IdentifierAstNode(String expression) {
     _expression = expression;
-    if (
-      expression.charAt(0) == '`'
-      && expression.charAt(expression.length()-1) == '`'
-    ) {
-      _name = expression.substring(1, expression.length()-1);
+    if (expression.charAt(0) == '`' && expression.charAt(expression.length() - 1) == '`') {
+      _name = expression.substring(1, expression.length() - 1);
     } else {
       _name = expression;
     }
@@ -47,8 +44,6 @@ public class IdentifierAstNode extends BaseAstNode {
 
   @Override
   public String toString() {
-    return "IdentifierAstNode{" +
-        "_name='" + _name + '\'' +
-        '}';
+    return "IdentifierAstNode{" + "_name='" + _name + '\'' + '}';
   }
 }

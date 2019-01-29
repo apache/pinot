@@ -132,6 +132,5 @@ public interface AsyncPool<T> extends PoolStatsProvider<Histogram> {
     void shutdown();
 
     PoolStats.LifecycleStats<Histogram> getStats();
-
   }
 }

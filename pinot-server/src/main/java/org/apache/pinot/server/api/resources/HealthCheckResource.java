@@ -31,6 +31,7 @@ import javax.ws.rs.core.Response;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.ServiceStatus.Status;
 
+
 /**
  * REST API to do health check through ServiceStatus.
  */
@@ -42,13 +43,13 @@ public class HealthCheckResource {
   @Path("/health")
   @Produces(MediaType.TEXT_PLAIN)
   @ApiOperation(value = "Checking server health")
-  @ApiResponses(value = { @ApiResponse(code = 200, message = "Server is healthy"), @ApiResponse(code = 503, message = "Server is not healthy")
-  })
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Server is healthy"), @ApiResponse(code = 503, message = "Server is not healthy")})
   public String checkHealth() {
     Status status = ServiceStatus.getServiceStatus();
     if (status == Status.GOOD) {
       return "OK";
     }
-    throw new WebApplicationException(String.format("Pinot server status is %s", status), Response.Status.SERVICE_UNAVAILABLE);
+    throw new WebApplicationException(String.format("Pinot server status is %s", status),
+        Response.Status.SERVICE_UNAVAILABLE);
   }
 }

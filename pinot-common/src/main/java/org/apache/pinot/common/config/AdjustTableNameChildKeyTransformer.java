@@ -32,23 +32,19 @@ public class AdjustTableNameChildKeyTransformer implements ChildKeyTransformer {
   @Override
   public Map<String, ?> apply(Map<String, ?> childKeys, String pathPrefix) {
     // Adjust the name to add the table suffix to table.name.realtime/table.name.offline
-    List<String> tableTypes = childKeys
-        .get("table.types")
-        .map(tableTypesListOrString -> {
-          if (tableTypesListOrString instanceof String) {
-            return List.of((String) tableTypesListOrString);
-          } else if (tableTypesListOrString instanceof Collection) {
-            return List.ofAll((Collection<String>) tableTypesListOrString);
-          } else {
-            return List.empty();
-          }
-        })
-        .getOrElse(List.empty())
-        .map(Object::toString);
+    List<String> tableTypes = childKeys.get("table.types").map(tableTypesListOrString -> {
+      if (tableTypesListOrString instanceof String) {
+        return List.of((String) tableTypesListOrString);
+      } else if (tableTypesListOrString instanceof Collection) {
+        return List.ofAll((Collection<String>) tableTypesListOrString);
+      } else {
+        return List.empty();
+      }
+    }).getOrElse(List.empty()).map(Object::toString);
 
     String tableName = childKeys.get("table.name").map(Object::toString).getOrElse(
-            () -> childKeys.get("table.name.realtime").map(Object::toString).getOrElse(
-                () -> childKeys.get("table.name.offline").map(Object::toString).getOrNull()));
+        () -> childKeys.get("table.name.realtime").map(Object::toString)
+            .getOrElse(() -> childKeys.get("table.name.offline").map(Object::toString).getOrNull()));
 
     Map<String, Object> remappedConfig = (Map<String, Object>) childKeys;
 
@@ -68,8 +64,7 @@ public class AdjustTableNameChildKeyTransformer implements ChildKeyTransformer {
   public Map<String, ?> unapply(Map<String, ?> childKeys, String pathPrefix) {
     String tableNameWithSuffix = childKeys.filterKeys(key -> key.startsWith("table.name")).head()._2.toString();
 
-    return ((Map<String, Object>) childKeys)
-        .filterKeys(key -> !key.startsWith("table.name"))
+    return ((Map<String, Object>) childKeys).filterKeys(key -> !key.startsWith("table.name"))
         .put("table.name", TableNameBuilder.extractRawTableName(tableNameWithSuffix));
   }
 }

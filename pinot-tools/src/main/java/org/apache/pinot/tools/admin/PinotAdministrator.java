@@ -69,42 +69,11 @@ public class PinotAdministrator {
 
   // @formatter:off
   @Argument(handler = SubCommandHandler.class, metaVar = "<subCommand>")
-  @SubCommands({
-      @SubCommand(name = "GenerateData", impl = GenerateDataCommand.class),
-      @SubCommand(name = "CreateSegment", impl = CreateSegmentCommand.class),
-      @SubCommand(name = "StartZookeeper", impl = StartZookeeperCommand.class),
-      @SubCommand(name = "StartKafka", impl = StartKafkaCommand.class),
-      @SubCommand(name = "StreamAvroIntoKafka", impl = StreamAvroIntoKafkaCommand.class),
-      @SubCommand(name = "StartController", impl = StartControllerCommand.class),
-      @SubCommand(name = "StartBroker", impl = StartBrokerCommand.class),
-      @SubCommand(name = "StartServer", impl = StartServerCommand.class),
-      @SubCommand(name = "AddTable", impl = AddTableCommand.class),
-      @SubCommand(name = "ChangeTableState", impl = ChangeTableState.class),
-      @SubCommand(name = "AddTenant", impl = AddTenantCommand.class),
-      @SubCommand(name = "AddSchema", impl = AddSchemaCommand.class),
-      @SubCommand(name = "UploadSegment", impl = UploadSegmentCommand.class),
-      @SubCommand(name = "PostQuery", impl = PostQueryCommand.class),
-      @SubCommand(name = "StopProcess", impl = StopProcessCommand.class),
-      @SubCommand(name = "DeleteCluster", impl = DeleteClusterCommand.class),
-      @SubCommand(name = "ShowClusterInfo", impl = ShowClusterInfoCommand.class),
-      @SubCommand(name = "AvroSchemaToPinotSchema", impl = AvroSchemaToPinotSchema.class),
-      @SubCommand(name = "RebalanceTable", impl = RebalanceTableCommand.class),
-      @SubCommand(name = "ChangeNumReplicas", impl = ChangeNumReplicasCommand.class),
-      @SubCommand(name = "ValidateConfig", impl = ValidateConfigCommand.class),
-      @SubCommand(name = "VerifySegmentState", impl = VerifySegmentState.class),
-      @SubCommand(name = "ConvertPinotSegment", impl = PinotSegmentConvertCommand.class),
-      @SubCommand(name = "MoveReplicaGroup", impl = MoveReplicaGroup.class),
-      @SubCommand(name = "BackfillSegmentColumn", impl = BackfillDateTimeColumnCommand.class),
-      @SubCommand(name = "VerifyClusterState", impl = VerifyClusterStateCommand.class),
-      @SubCommand(name = "ApplyTableConfig", impl = ApplyTableConfigCommand.class),
-      @SubCommand(name = "RealtimeProvisioningHelper", impl = RealtimeProvisioningHelperCommand.class),
-      @SubCommand(name = "MergeSegments", impl = SegmentMergeCommand.class)
-  })
+  @SubCommands({@SubCommand(name = "GenerateData", impl = GenerateDataCommand.class), @SubCommand(name = "CreateSegment", impl = CreateSegmentCommand.class), @SubCommand(name = "StartZookeeper", impl = StartZookeeperCommand.class), @SubCommand(name = "StartKafka", impl = StartKafkaCommand.class), @SubCommand(name = "StreamAvroIntoKafka", impl = StreamAvroIntoKafkaCommand.class), @SubCommand(name = "StartController", impl = StartControllerCommand.class), @SubCommand(name = "StartBroker", impl = StartBrokerCommand.class), @SubCommand(name = "StartServer", impl = StartServerCommand.class), @SubCommand(name = "AddTable", impl = AddTableCommand.class), @SubCommand(name = "ChangeTableState", impl = ChangeTableState.class), @SubCommand(name = "AddTenant", impl = AddTenantCommand.class), @SubCommand(name = "AddSchema", impl = AddSchemaCommand.class), @SubCommand(name = "UploadSegment", impl = UploadSegmentCommand.class), @SubCommand(name = "PostQuery", impl = PostQueryCommand.class), @SubCommand(name = "StopProcess", impl = StopProcessCommand.class), @SubCommand(name = "DeleteCluster", impl = DeleteClusterCommand.class), @SubCommand(name = "ShowClusterInfo", impl = ShowClusterInfoCommand.class), @SubCommand(name = "AvroSchemaToPinotSchema", impl = AvroSchemaToPinotSchema.class), @SubCommand(name = "RebalanceTable", impl = RebalanceTableCommand.class), @SubCommand(name = "ChangeNumReplicas", impl = ChangeNumReplicasCommand.class), @SubCommand(name = "ValidateConfig", impl = ValidateConfigCommand.class), @SubCommand(name = "VerifySegmentState", impl = VerifySegmentState.class), @SubCommand(name = "ConvertPinotSegment", impl = PinotSegmentConvertCommand.class), @SubCommand(name = "MoveReplicaGroup", impl = MoveReplicaGroup.class), @SubCommand(name = "BackfillSegmentColumn", impl = BackfillDateTimeColumnCommand.class), @SubCommand(name = "VerifyClusterState", impl = VerifyClusterStateCommand.class), @SubCommand(name = "ApplyTableConfig", impl = ApplyTableConfigCommand.class), @SubCommand(name = "RealtimeProvisioningHelper", impl = RealtimeProvisioningHelperCommand.class), @SubCommand(name = "MergeSegments", impl = SegmentMergeCommand.class)})
   Command _subCommand;
   // @formatter:on
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
-      usage = "Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
   boolean _help = false;
   boolean _status = false;
 
@@ -112,7 +81,8 @@ public class PinotAdministrator {
     return _status;
   }
 
-  public void execute(String[] args) throws Exception {
+  public void execute(String[] args)
+      throws Exception {
     try {
       CmdLineParser parser = new CmdLineParser(this);
       parser.parseArgument(args);
@@ -125,7 +95,6 @@ public class PinotAdministrator {
       } else {
         _status = _subCommand.execute();
       }
-
     } catch (CmdLineException e) {
       LOGGER.error("Error: {}", e.getMessage());
     } catch (Exception e) {
@@ -133,7 +102,8 @@ public class PinotAdministrator {
     }
   }
 
-  public static void main(String[] args) throws Exception {
+  public static void main(String[] args)
+      throws Exception {
     PinotAdministrator pinotAdministrator = new PinotAdministrator();
     pinotAdministrator.execute(args);
   }

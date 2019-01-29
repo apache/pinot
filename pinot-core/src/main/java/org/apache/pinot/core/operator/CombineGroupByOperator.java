@@ -143,8 +143,8 @@ public class CombineGroupByOperator extends BaseOperator<IntermediateResultsBloc
                     }
                   } else {
                     for (int i = 0; i < numAggregationFunctions; i++) {
-                      value[i] = aggregationFunctions[i].merge(value[i],
-                          aggregationGroupByResult.getResultForKey(groupKey, i));
+                      value[i] = aggregationFunctions[i]
+                          .merge(value[i], aggregationGroupByResult.getResultForKey(groupKey, i));
                     }
                   }
                   return value;

@@ -40,8 +40,7 @@ public class ChangeNumReplicasCommand extends AbstractBaseAdminCommand implement
   @Option(name = "-exec", required = false, metaVar = "<boolean>", usage = "Execute command (Run the replica changer)")
   private boolean _exec;
 
-  @Option(name = "-help", required = false, help = true, aliases = { "-h", "--h", "--help" },
-      usage = "Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
   private boolean _help = false;
 
   public boolean getHelp() {
@@ -54,7 +53,8 @@ public class ChangeNumReplicasCommand extends AbstractBaseAdminCommand implement
   }
 
   @Override
-  public boolean execute() throws Exception {
+  public boolean execute()
+      throws Exception {
     boolean _dryRun = !_exec;
     PinotNumReplicaChanger replicaChanger = new PinotNumReplicaChanger(_zkAddress, _clusterName, _dryRun);
     replicaChanger.changeNumReplicas(_tableName);

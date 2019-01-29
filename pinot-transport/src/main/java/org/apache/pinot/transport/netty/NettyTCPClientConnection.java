@@ -61,7 +61,7 @@ import org.apache.pinot.transport.metrics.NettyClientMetrics;
  * |                    ...............                       |
  * ------------------------------------------------------------
  */
-public class NettyTCPClientConnection extends NettyClientConnection  {
+public class NettyTCPClientConnection extends NettyClientConnection {
   /**
    * Channel Inbound Handler for receiving response asynchronously
    */
@@ -94,7 +94,7 @@ public class NettyTCPClientConnection extends NettyClientConnection  {
 
   public NettyTCPClientConnection(ServerInstance server, EventLoopGroup eventGroup, Timer timer,
       NettyClientMetrics metric) {
-    super(server, eventGroup, timer,_connIdGen.incrementAndGet() );
+    super(server, eventGroup, timer, _connIdGen.incrementAndGet());
     _handler = new NettyClientConnectionHandler();
     _outstandingFuture = new AtomicReference<ResponseFuture>();
     _clientMetric = metric;
@@ -120,7 +120,8 @@ public class NettyTCPClientConnection extends NettyClientConnection  {
    */
   private void checkTransition(State nextState) {
     if (!_connState.isValidTransition(nextState)) {
-      throw new IllegalStateException("Wrong transition :" + _connState + " -> " + nextState + ", connId:" + getConnId());
+      throw new IllegalStateException(
+          "Wrong transition :" + _connState + " -> " + nextState + ", connId:" + getConnId());
     }
   }
 
@@ -133,7 +134,7 @@ public class NettyTCPClientConnection extends NettyClientConnection  {
       checkTransition(State.CONNECTED);
       //Connect synchronously. At the end of this line, _channel should have been set
       TimerContext t = MetricsHelper.startTimer();
-      ChannelFuture f =  _bootstrap.connect(_server.getHostname(), _server.getPort()).sync();
+      ChannelFuture f = _bootstrap.connect(_server.getHostname(), _server.getPort()).sync();
       /**
        * Waiting for future alone does not guarantee that _channel is set. _channel is set
        * only when the channelActive() async callback runs. So we should also wait for it.
@@ -146,7 +147,8 @@ public class NettyTCPClientConnection extends NettyClientConnection  {
       _clientMetric.addConnectStats(t.getLatencyMs());
       return true;
     } catch (Exception ie) {
-      if (ie instanceof ConnectException && ie.getMessage() != null && ie.getMessage().startsWith("Connection refused")) {
+      if (ie instanceof ConnectException && ie.getMessage() != null && ie.getMessage()
+          .startsWith("Connection refused")) {
         // Most common case when a server is down. Don't print the entire stack and fill the logs.
         LOGGER.info("Could not connect to server {}:{} connId:{}", _server, ie.getMessage(), getConnId());
       } else {
@@ -163,7 +165,8 @@ public class NettyTCPClientConnection extends NettyClientConnection  {
   private void setChannel(Channel channel) {
     _channel = channel;
     _channelSet.countDown();
-    LOGGER.info("Setting channel for connection id ({}) to server {}. Is channel null? {}",_connId, _server, (null == _channel));
+    LOGGER.info("Setting channel for connection id ({}) to server {}. Is channel null? {}", _connId, _server,
+        (null == _channel));
   }
 
   @Override
@@ -175,7 +178,8 @@ public class NettyTCPClientConnection extends NettyClientConnection  {
     _lastSendRequestLatency = MetricsHelper.startTimer();
     _lastResponseLatency = MetricsHelper.startTimer();
 
-    _outstandingFuture.set(new ResponseFuture(_server, "Server response future for reqId " + requestId + " to server " + _server + " connId " + getConnId()));
+    _outstandingFuture.set(new ResponseFuture(_server,
+        "Server response future for reqId " + requestId + " to server " + _server + " connId " + getConnId()));
     _lastRequestTimeoutMS = timeoutMS;
     _lastRequestId = requestId;
     _lastError = null;
@@ -199,27 +203,26 @@ public class NettyTCPClientConnection extends NettyClientConnection  {
        * We do this by tracking the connection state. If we detect that response/error is already obtained,
        * we then do the process of checking back the connection to the pool or destroying (if error)
        */
-      synchronized(_handler)
-      {
+      synchronized (_handler) {
         _lastSendRequestLatency.stop();
 
-        if ( _connState == State.REQUEST_WRITTEN)
-        {
+        if (_connState == State.REQUEST_WRITTEN) {
           _connState = State.REQUEST_SENT;
         } else {
-          LOGGER.info("Response/Error already arrived !! Checking-in/destroying the connection to server {}, connId {}", _server, getConnId());
-          if ( _connState == State.GOT_RESPONSE)
-          {
+          LOGGER.info("Response/Error already arrived !! Checking-in/destroying the connection to server {}, connId {}",
+              _server, getConnId());
+          if (_connState == State.GOT_RESPONSE) {
             if (null != _requestCallback) {
               _requestCallback.onSuccess(null);
             }
-          } else if ( _connState == State.ERROR){
+          } else if (_connState == State.ERROR) {
             if (null != _requestCallback) {
               _requestCallback.onError(_lastError);
             }
           } else {
-            throw new IllegalStateException("Invalid connection State (" + _connState
-                                             + ") when sending request to  server " + _server + ", connId " + getConnId());
+            throw new IllegalStateException(
+                "Invalid connection State (" + _connState + ") when sending request to  server " + _server + ", connId "
+                    + getConnId());
           }
         }
       }
@@ -260,7 +263,8 @@ public class NettyTCPClientConnection extends NettyClientConnection  {
    */
   public class NettyClientConnectionHandler extends ChannelInboundHandlerAdapter {
     @Override
-    public void channelInactive(ChannelHandlerContext ctx) throws Exception {
+    public void channelInactive(ChannelHandlerContext ctx)
+        throws Exception {
       // called when:
       // 1. idle server restart
       // 2. Also when an idle connection is closed by broker. In that case, self-close is set to true.
@@ -271,7 +275,8 @@ public class NettyTCPClientConnection extends NettyClientConnection  {
     }
 
     @Override
-    public void channelActive(ChannelHandlerContext ctx) throws Exception {
+    public void channelActive(ChannelHandlerContext ctx)
+        throws Exception {
       LOGGER.info("Client Channel to server ({}) (id = {}) is active.", _server, _connId);
       setChannel(ctx.channel());
       super.channelActive(ctx);
@@ -329,27 +334,24 @@ public class NettyTCPClientConnection extends NettyClientConnection  {
       releaseResources();
     }
 
-    private synchronized void closeOnError(ChannelHandlerContext ctx, Throwable cause)
-    {
-      if ( _connState != State.ERROR)
-      {
+    private synchronized void closeOnError(ChannelHandlerContext ctx, Throwable cause) {
+      if (_connState != State.ERROR) {
         //Cancel outstanding timer
         cancelLastRequestTimeout();
 
-        if ( null != _lastResponseLatency)
+        if (null != _lastResponseLatency) {
           _lastResponseLatency.stop();
+        }
 
         //LOG.error("Got exception when processing the channel. Closing the channel", cause);
         checkTransition(State.ERROR);
 
-        if ( null != _outstandingFuture.get())
-        {
+        if (null != _outstandingFuture.get()) {
           _outstandingFuture.get().onError(cause);
         }
         _clientMetric.addRequestResponseStats(_lastRequsetSizeInBytes, 1, _lastResponseSizeInBytes, true,
-                (null == _lastSendRequestLatency) ? 0 : _lastSendRequestLatency.getLatencyMs(),
-                (null == _lastSendRequestLatency ) ? 0 :_lastResponseLatency.getLatencyMs());
-
+            (null == _lastSendRequestLatency) ? 0 : _lastSendRequestLatency.getLatencyMs(),
+            (null == _lastSendRequestLatency) ? 0 : _lastResponseLatency.getLatencyMs());
 
         /**
          * IMPORTANT:
@@ -369,7 +371,6 @@ public class NettyTCPClientConnection extends NettyClientConnection  {
         _connState = State.ERROR;
 
         ctx.close();
-
       }
     }
   }
@@ -390,7 +391,8 @@ public class NettyTCPClientConnection extends NettyClientConnection  {
     }
 
     @Override
-    protected void initChannel(SocketChannel ch) throws Exception {
+    protected void initChannel(SocketChannel ch)
+        throws Exception {
       ChannelPipeline pipeline = ch.pipeline();
       /**
        * We will use a length prepended payload to defragment TCP fragments.
@@ -404,13 +406,15 @@ public class NettyTCPClientConnection extends NettyClientConnection  {
   }
 
   @Override
-  public void close() throws InterruptedException {
+  public void close()
+      throws InterruptedException {
     LOGGER.info("Closing client channel to {} connId {}", _server, getConnId());
     if (null != _channel) {
       _channel.close().sync();
       setSelfClose(true);
     }
   }
+
   /**
    * Timer task responsible for closing the connection on timeout
    *
@@ -418,10 +422,10 @@ public class NettyTCPClientConnection extends NettyClientConnection  {
   public class ReadTimeoutHandler implements TimerTask {
 
     @Override
-    public void run(Timeout timeout) throws Exception {
-      String message =
-          "Request (" + _lastRequestId + ") to server " + _server + " connId " + getConnId()
-              + " timed-out waiting for response. Closing the channel !!";
+    public void run(Timeout timeout)
+        throws Exception {
+      String message = "Request (" + _lastRequestId + ") to server " + _server + " connId " + getConnId()
+          + " timed-out waiting for response. Closing the channel !!";
       LOGGER.warn(message);
       Exception e = new Exception(message);
       _outstandingFuture.get().onError(e);

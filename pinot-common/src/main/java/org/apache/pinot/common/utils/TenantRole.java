@@ -19,6 +19,5 @@
 package org.apache.pinot.common.utils;
 
 public enum TenantRole {
-  SERVER,
-  BROKER
+  SERVER, BROKER
 }

@@ -30,8 +30,7 @@ public class SimpleMapChildKeyHandler implements ChildKeyHandler<java.util.Map<S
   public java.util.Map<String, String> handleChildKeys(Map<String, ?> childKeys, String pathPrefix) {
     java.util.Map<String, String> returnedMap = new HashMap<>();
 
-    childKeys
-        .forEach((key, value) -> returnedMap.put(key, value.toString()));
+    childKeys.forEach((key, value) -> returnedMap.put(key, value.toString()));
 
     if (returnedMap.isEmpty()) {
       return null;

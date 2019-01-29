@@ -34,6 +34,7 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
 @Api(tags = Constants.TABLE_TAG)
 @Path("/")
 public class PinotTableMetadataConfigs {
@@ -47,15 +48,12 @@ public class PinotTableMetadataConfigs {
   @Path("/tables/{tableName}/metadataConfigs")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Update table metadata", notes = "Updates table configuration")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"),
-  @ApiResponse(code = 500, message = "Internal server error"),
-  @ApiResponse(code = 404, message = "Table not found")})
-  public SuccessResponse updateTableMetadata(@PathParam("tableName")String tableName, String requestBody
-  ) {
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error"), @ApiResponse(code = 404, message = "Table not found")})
+  public SuccessResponse updateTableMetadata(@PathParam("tableName") String tableName, String requestBody) {
     try {
       TableConfig tableConfig = TableConfig.fromJsonString(requestBody);
       pinotHelixResourceManager.updateMetadataConfigFor(tableConfig.getTableName(), tableConfig.getTableType(),
-        tableConfig.getCustomConfig());
+          tableConfig.getCustomConfig());
       return new SuccessResponse("Successfully updated " + tableName + " configuration");
     } catch (Exception e) {
       String errStr = "Error while updating table configuration, table: " + tableName;

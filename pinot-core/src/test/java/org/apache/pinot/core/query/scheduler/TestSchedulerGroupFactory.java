@@ -28,6 +28,7 @@ import static org.testng.Assert.assertNull;
 class TestSchedulerGroupFactory implements SchedulerGroupFactory {
   AtomicInteger numCalls = new AtomicInteger(0);
   ConcurrentHashMap<String, TestSchedulerGroup> groupMap = new ConcurrentHashMap<>();
+
   @Override
   public SchedulerGroup create(Configuration config, String groupName) {
     numCalls.incrementAndGet();

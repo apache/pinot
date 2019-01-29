@@ -37,7 +37,6 @@ public class Constants {
   public static final String TASK_TAG = "Task";
   public static final String TABLE_NAME = "tableName";
 
-
   public static CommonConstants.Helix.TableType validateTableType(String tableTypeStr) {
     if (tableTypeStr == null || tableTypeStr.isEmpty()) {
       return null;
@@ -46,7 +45,8 @@ public class Constants {
       return CommonConstants.Helix.TableType.valueOf(tableTypeStr.toUpperCase());
     } catch (IllegalArgumentException e) {
       LOGGER.info("Illegal table type '{}'", tableTypeStr);
-      throw new WebApplicationException("Illegal table type '" + tableTypeStr + "'", PinotSegmentRestletResource.BAD_REQUEST);
+      throw new WebApplicationException("Illegal table type '" + tableTypeStr + "'",
+          PinotSegmentRestletResource.BAD_REQUEST);
     }
   }
 

@@ -68,7 +68,8 @@ public class CrcUtils {
     }
   }
 
-  public long computeCrc() throws IOException {
+  public long computeCrc()
+      throws IOException {
     byte[] buffer = new byte[BUFFER_SIZE];
     Checksum checksum = new Adler32();
 
@@ -84,7 +85,8 @@ public class CrcUtils {
     return checksum.getValue();
   }
 
-  public String computeMD5() throws NoSuchAlgorithmException, IOException {
+  public String computeMD5()
+      throws NoSuchAlgorithmException, IOException {
     byte[] buffer = new byte[BUFFER_SIZE];
     MessageDigest digest = MessageDigest.getInstance("md5");
 

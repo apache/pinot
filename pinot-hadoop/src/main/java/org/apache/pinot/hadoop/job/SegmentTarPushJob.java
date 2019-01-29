@@ -46,7 +46,8 @@ public class SegmentTarPushJob extends Configured {
     _port = Integer.parseInt(properties.getProperty(JobConfigConstants.PUSH_TO_PORT));
   }
 
-  public void run() throws Exception {
+  public void run()
+      throws Exception {
     Configuration conf = new Configuration();
     FileSystem fs = FileSystem.get(conf);
     Path path = new Path(_segmentPath);
@@ -60,7 +61,8 @@ public class SegmentTarPushJob extends Configured {
     }
   }
 
-  public void pushDir(FileSystem fs, Path path) throws Exception {
+  public void pushDir(FileSystem fs, Path path)
+      throws Exception {
     LOGGER.info("******** Now uploading segments tar from dir: {}", path);
     FileStatus[] fileStatusArr = fs.listStatus(new Path(path.toString() + "/"));
     for (FileStatus fileStatus : fileStatusArr) {
@@ -72,7 +74,8 @@ public class SegmentTarPushJob extends Configured {
     }
   }
 
-  public void pushOneTarFile(FileSystem fs, Path path) throws Exception {
+  public void pushOneTarFile(FileSystem fs, Path path)
+      throws Exception {
     String fileName = path.getName();
     if (!fileName.endsWith(".tar.gz")) {
       return;
@@ -82,9 +85,8 @@ public class SegmentTarPushJob extends Configured {
         try (InputStream inputStream = fs.open(path)) {
           fileName = fileName.split(JobConfigConstants.TARGZ)[0];
           LOGGER.info("******** Uploading file: {} to Host: {} and Port: {} *******", fileName, host, _port);
-          SimpleHttpResponse response =
-              fileUploadDownloadClient.uploadSegment(FileUploadDownloadClient.getUploadSegmentHttpURI(host, _port),
-                  fileName, inputStream);
+          SimpleHttpResponse response = fileUploadDownloadClient
+              .uploadSegment(FileUploadDownloadClient.getUploadSegmentHttpURI(host, _port), fileName, inputStream);
           LOGGER.info("Response {}: {}", response.getStatusCode(), response.getResponse());
         } catch (Exception e) {
           LOGGER.error("******** Error Uploading file: {} to Host: {} and Port: {}  *******", fileName, host, _port);

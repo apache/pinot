@@ -117,8 +117,8 @@ public class MutableSegmentImpl implements MutableSegment {
     _segmentPartitionConfig = config.getSegmentPartitionConfig();
     _numKeyColumns = _schema.getDimensionNames().size() + 1;
 
-    _logger = LoggerFactory.getLogger(
-        MutableSegmentImpl.class.getName() + "_" + _segmentName + "_" + config.getStreamName());
+    _logger =
+        LoggerFactory.getLogger(MutableSegmentImpl.class.getName() + "_" + _segmentName + "_" + config.getStreamName());
 
     Set<String> noDictionaryColumns = config.getNoDictionaryColumns();
 
@@ -147,8 +147,8 @@ public class MutableSegmentImpl implements MutableSegment {
           dictionaryColumnSize = dataType.size();
         }
         String allocationContext = buildAllocationContext(_segmentName, column, V1Constants.Dict.FILE_EXTENSION);
-        MutableDictionary dictionary =
-            MutableDictionaryFactory.getMutableDictionary(dataType, _offHeap, _memoryManager, dictionaryColumnSize,
+        MutableDictionary dictionary = MutableDictionaryFactory
+            .getMutableDictionary(dataType, _offHeap, _memoryManager, dictionaryColumnSize,
                 Math.min(_statsHistory.getEstimatedCardinality(column), _capacity), allocationContext);
         _dictionaryMap.put(column, dictionary);
 
@@ -213,8 +213,8 @@ public class MutableSegmentImpl implements MutableSegment {
       // Update number of document indexed at last to make the latest record queryable
       return _numDocsIndexed++ < _capacity;
     } else {
-      Preconditions.checkState(_aggregateMetrics,
-          "Invalid document-id during indexing: " + docId + " expected: " + numDocs);
+      Preconditions
+          .checkState(_aggregateMetrics, "Invalid document-id during indexing: " + docId + " expected: " + numDocs);
       // Update metrics for existing document.
       return aggregateMetrics(row, docId);
     }
@@ -390,19 +390,22 @@ public class MutableSegmentImpl implements MutableSegment {
   @Override
   public ColumnDataSource getDataSource(String columnName) {
     if (!_schema.isVirtualColumn(columnName)) {
-      return new ColumnDataSource(_schema.getFieldSpecFor(columnName), _numDocsIndexed, _maxNumValuesMap.get(columnName),
-          _indexReaderWriterMap.get(columnName), _invertedIndexMap.get(columnName), _dictionaryMap.get(columnName),
-          _bloomFilterMap.get(columnName));
+      return new ColumnDataSource(_schema.getFieldSpecFor(columnName), _numDocsIndexed,
+          _maxNumValuesMap.get(columnName), _indexReaderWriterMap.get(columnName), _invertedIndexMap.get(columnName),
+          _dictionaryMap.get(columnName), _bloomFilterMap.get(columnName));
     } else {
       return getVirtualDataSource(columnName);
     }
   }
 
   private ColumnDataSource getVirtualDataSource(String column) {
-    VirtualColumnContext virtualColumnContext = new VirtualColumnContext(NetUtil.getHostnameOrAddress(), _segmentMetadata.getTableName(), getSegmentName(),
-        column, _numDocsIndexed + 1);
-    VirtualColumnProvider provider = VirtualColumnProviderFactory.buildProvider(_schema.getFieldSpecFor(column).getVirtualColumnProvider());
-    return new ColumnDataSource(provider.buildColumnIndexContainer(virtualColumnContext), provider.buildMetadata(virtualColumnContext));
+    VirtualColumnContext virtualColumnContext =
+        new VirtualColumnContext(NetUtil.getHostnameOrAddress(), _segmentMetadata.getTableName(), getSegmentName(),
+            column, _numDocsIndexed + 1);
+    VirtualColumnProvider provider =
+        VirtualColumnProviderFactory.buildProvider(_schema.getFieldSpecFor(column).getVirtualColumnProvider());
+    return new ColumnDataSource(provider.buildColumnIndexContainer(virtualColumnContext),
+        provider.buildMetadata(virtualColumnContext));
   }
 
   @Override
@@ -414,8 +417,8 @@ public class MutableSegmentImpl implements MutableSegment {
   public GenericRow getRecord(int docId, GenericRow reuse) {
     for (FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
       String column = fieldSpec.getName();
-      reuse.putField(column,
-          IndexSegmentUtils.getValue(docId, fieldSpec, _indexReaderWriterMap.get(column), _dictionaryMap.get(column),
+      reuse.putField(column, IndexSegmentUtils
+          .getValue(docId, fieldSpec, _indexReaderWriterMap.get(column), _dictionaryMap.get(column),
               _maxNumValuesMap.getOrDefault(column, 0)));
     }
     return reuse;
@@ -430,8 +433,9 @@ public class MutableSegmentImpl implements MutableSegment {
       if (_numDocsIndexed > 0) {
         int numSeconds = (int) ((System.currentTimeMillis() - _startTimeMillis) / 1000);
         long totalMemBytes = _memoryManager.getTotalAllocatedBytes();
-        _logger.info("Segment used {} bytes of memory for {} rows consumed in {} seconds", totalMemBytes,
-            _numDocsIndexed, numSeconds);
+        _logger
+            .info("Segment used {} bytes of memory for {} rows consumed in {} seconds", totalMemBytes, _numDocsIndexed,
+                numSeconds);
 
         RealtimeSegmentStatsHistory.SegmentStats segmentStats = new RealtimeSegmentStatsHistory.SegmentStats();
         for (Map.Entry<String, MutableDictionary> entry : _dictionaryMap.entrySet()) {
@@ -563,8 +567,9 @@ public class MutableSegmentImpl implements MutableSegment {
 
     long start = System.currentTimeMillis();
     Arrays.sort(values);
-    _logger.info("Spent {}ms sorting double column: {} with cardinality: {}", System.currentTimeMillis() - start,
-        column, numValues);
+    _logger
+        .info("Spent {}ms sorting double column: {} with cardinality: {}", System.currentTimeMillis() - start, column,
+            numValues);
 
     for (int i = 0; i < numValues; i++) {
       intIterators[i] = invertedIndex.getDocIds(dictionary.indexOf(values[i])).getIntIterator();
@@ -585,8 +590,9 @@ public class MutableSegmentImpl implements MutableSegment {
 
     long start = System.currentTimeMillis();
     Arrays.sort(values);
-    _logger.info("Spent {}ms sorting string column: {} with cardinality: {}", System.currentTimeMillis() - start,
-        column, numValues);
+    _logger
+        .info("Spent {}ms sorting string column: {} with cardinality: {}", System.currentTimeMillis() - start, column,
+            numValues);
 
     for (int i = 0; i < numValues; i++) {
       intIterators[i] = invertedIndex.getDocIds(dictionary.indexOf(values[i])).getIntIterator();
@@ -701,8 +707,8 @@ public class MutableSegmentImpl implements MutableSegment {
     // All metric columns should have no-dictionary index.
     for (String metric : schema.getMetricNames()) {
       if (!noDictionaryColumns.contains(metric)) {
-        _logger.warn("Metrics aggregation cannot be turned ON in presence of dictionary encoded metrics, eg: {}",
-            metric);
+        _logger
+            .warn("Metrics aggregation cannot be turned ON in presence of dictionary encoded metrics, eg: {}", metric);
         _aggregateMetrics = false;
         break;
       }
@@ -711,8 +717,8 @@ public class MutableSegmentImpl implements MutableSegment {
     // All dimension columns should be dictionary encoded.
     for (String dimension : schema.getDimensionNames()) {
       if (noDictionaryColumns.contains(dimension)) {
-        _logger.warn("Metrics aggregation cannot be turned ON in presence of no-dictionary dimensions, eg: {}",
-            dimension);
+        _logger
+            .warn("Metrics aggregation cannot be turned ON in presence of no-dictionary dimensions, eg: {}", dimension);
         _aggregateMetrics = false;
         break;
       }
@@ -721,8 +727,8 @@ public class MutableSegmentImpl implements MutableSegment {
     // Time column should be dictionary encoded.
     String timeColumn = schema.getTimeColumnName();
     if (noDictionaryColumns.contains(timeColumn)) {
-      _logger.warn("Metrics aggregation cannot be turned ON in presence of no-dictionary time column, eg: {}",
-          timeColumn);
+      _logger
+          .warn("Metrics aggregation cannot be turned ON in presence of no-dictionary time column, eg: {}", timeColumn);
       _aggregateMetrics = false;
     }
 

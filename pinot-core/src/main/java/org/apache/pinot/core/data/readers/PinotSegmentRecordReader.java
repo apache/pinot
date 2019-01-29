@@ -54,7 +54,8 @@ public class PinotSegmentRecordReader implements RecordReader {
    * Read records using the segment schema
    * @param indexDir input path for the segment index
    */
-  public PinotSegmentRecordReader(@Nonnull File indexDir) throws Exception {
+  public PinotSegmentRecordReader(@Nonnull File indexDir)
+      throws Exception {
     this(indexDir, null, null);
   }
 
@@ -148,7 +149,6 @@ public class PinotSegmentRecordReader implements RecordReader {
     }
     return reuse;
   }
-
 
   @Override
   public void rewind() {

@@ -40,6 +40,8 @@ import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.integration.tests.BaseClusterIntegrationTestSet;
 import org.apache.pinot.integration.tests.ClusterIntegrationTestUtils;
 import org.apache.pinot.util.TestUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -52,13 +54,18 @@ import org.testng.annotations.Test;
  */
 public class SegmentStatusCheckerIntegrationTest extends BaseClusterIntegrationTestSet {
 
+  private static final Logger LOGGER = LoggerFactory.getLogger(SegmentStatusCheckerIntegrationTest.class);
+
   private String emptyTable = "table1_OFFLINE";
   private String disabledOfflineTable = "table2_OFFLINE";
   private String basicOfflineTable = "table3_OFFLINE";
   private String errorOfflineTable = "table4_OFFLINE";
   private String realtimeTableErrorState = "table5_REALTIME";
+  private String _currentTableName;
+  private static final int NUM_TABLES = 5;
 
   private static final int SEGMENT_STATUS_CHECKER_INITIAL_DELAY_SECONDS = 60;
+  private static final int SEGMENT_STATUS_CHECKER_FREQ_SECONDS = 5;
 
   @BeforeClass
   public void setUp() throws Exception {
@@ -67,14 +74,13 @@ public class SegmentStatusCheckerIntegrationTest extends BaseClusterIntegrationT
     startZk();
 
     // Set initial delay of 60 seconds for the segment status checker, to allow time for tables setup.
-    // By default, it will pick a random delay between 120s and 300s
+    // Run at 5 seconds freq in order to keep it running, in case first run happens before table setup
     ControllerConf controllerConf = getDefaultControllerConfiguration();
     controllerConf.setStatusCheckerInitialDelayInSeconds(SEGMENT_STATUS_CHECKER_INITIAL_DELAY_SECONDS);
+    controllerConf.setStatusCheckerFrequencyInSeconds(SEGMENT_STATUS_CHECKER_FREQ_SECONDS);
 
     startController(controllerConf);
-
     startBroker();
-
     startServers(3);
 
     // empty table
@@ -107,9 +113,6 @@ public class SegmentStatusCheckerIntegrationTest extends BaseClusterIntegrationT
 
     // realtime table with segments in error state
     setupRealtimeTable(realtimeTableErrorState);
-
-    // we need to wait for SegmentStatusChecker to finish at least 1 run
-    Thread.sleep(TimeUnit.MILLISECONDS.convert(SEGMENT_STATUS_CHECKER_INITIAL_DELAY_SECONDS + 10, TimeUnit.SECONDS));
   }
 
   private void setupOfflineTable(String table) throws Exception {
@@ -119,6 +122,8 @@ public class SegmentStatusCheckerIntegrationTest extends BaseClusterIntegrationT
   }
 
   private void setupOfflineTableAndSegments(String table) throws Exception {
+    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
+    setTableName(table);
     _realtimeTableConfig = null;
     addOfflineTable(table);
     completeTableConfiguration();
@@ -129,6 +134,8 @@ public class SegmentStatusCheckerIntegrationTest extends BaseClusterIntegrationT
     executor.shutdown();
     executor.awaitTermination(10, TimeUnit.MINUTES);
     uploadSegments(_tarDir);
+
+    waitForAllDocsLoaded(600_000L);
   }
 
   private void setupRealtimeTable(String table) throws Exception {
@@ -151,6 +158,14 @@ public class SegmentStatusCheckerIntegrationTest extends BaseClusterIntegrationT
     completeTableConfiguration();
   }
 
+  @Override
+  public String getTableName() {
+    return _currentTableName;
+  }
+
+  private void setTableName(String tableName) {
+    _currentTableName = tableName;
+  }
   /**
    * After 1 run of SegmentStatusChecker the controllerMetrics will be set for each table
    * Validate that we are seeing the expected numbers
@@ -158,6 +173,20 @@ public class SegmentStatusCheckerIntegrationTest extends BaseClusterIntegrationT
   @Test
   public void testSegmentStatusChecker() {
     ControllerMetrics controllerMetrics = _controllerStarter.getControllerMetrics();
+
+    long millisToWait = TimeUnit.MILLISECONDS.convert(2, TimeUnit.MINUTES);
+    while (controllerMetrics.getValueOfGlobalGauge(ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED,
+        "SegmentStatusChecker") < NUM_TABLES && millisToWait > 0) {
+      try {
+        Thread.sleep(1000);
+        millisToWait -= 1000;
+      } catch (InterruptedException e) {
+        LOGGER.info("Interrupted while waiting for SegmentStatusChecker");
+      }
+    }
+
+    Assert.assertEquals(controllerMetrics.getValueOfGlobalGauge(ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED,
+        "SegmentStatusChecker"), NUM_TABLES);
 
     // empty table - table1_OFFLINE
     // num replicas set from ideal state

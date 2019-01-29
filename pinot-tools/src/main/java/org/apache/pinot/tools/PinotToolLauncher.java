@@ -37,20 +37,15 @@ public class PinotToolLauncher {
 
   // @formatter:off
   @Argument(handler = SubCommandHandler.class, metaVar = "<subCommand>")
-  @SubCommands({
-      @SubCommand(name = "UpdateSegmentState", impl = UpdateSegmentState.class),
-      @SubCommand(name = "AutoAddInvertedIndex", impl = AutoAddInvertedIndexTool.class),
-      @SubCommand(name = "ValidateTableRetention", impl = ValidateTableRetention.class),
-      @SubCommand(name = "PerfBenchmarkRunner", impl = PerfBenchmarkRunner.class),
-      @SubCommand(name = "QueryRunner", impl = QueryRunner.class)
-  })
+  @SubCommands({@SubCommand(name = "UpdateSegmentState", impl = UpdateSegmentState.class), @SubCommand(name = "AutoAddInvertedIndex", impl = AutoAddInvertedIndexTool.class), @SubCommand(name = "ValidateTableRetention", impl = ValidateTableRetention.class), @SubCommand(name = "PerfBenchmarkRunner", impl = PerfBenchmarkRunner.class), @SubCommand(name = "QueryRunner", impl = QueryRunner.class)})
   Command _subCommand;
   // @formatter:on
 
-  @Option(name = "-help", required = false, help = true, aliases={"-h", "--h", "--help"}, usage="Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
   boolean _help = false;
 
-  public void execute(String[] args) throws Exception {
+  public void execute(String[] args)
+      throws Exception {
     try {
       CmdLineParser parser = new CmdLineParser(this);
       parser.parseArgument(args);
@@ -62,7 +57,6 @@ public class PinotToolLauncher {
       } else {
         _subCommand.execute();
       }
-
     } catch (CmdLineException e) {
       LOGGER.error("Error: {}", e.getMessage());
     } catch (Exception e) {
@@ -70,7 +64,8 @@ public class PinotToolLauncher {
     }
   }
 
-  public static void main(String[] args) throws Exception {
+  public static void main(String[] args)
+      throws Exception {
     new PinotToolLauncher().execute(args);
   }
 

@@ -55,7 +55,8 @@ public class AirlineDataStream {
   ExecutorService service;
   int counter = 0;
 
-  public AirlineDataStream(Schema pinotSchema, File avroFile) throws FileNotFoundException, IOException {
+  public AirlineDataStream(Schema pinotSchema, File avroFile)
+      throws FileNotFoundException, IOException {
     this.pinotSchema = pinotSchema;
     this.avroFile = avroFile;
     createStream();
@@ -79,7 +80,8 @@ public class AirlineDataStream {
     service.shutdown();
   }
 
-  private void createStream() throws FileNotFoundException, IOException {
+  private void createStream()
+      throws FileNotFoundException, IOException {
     if (keepIndexing) {
       avroDataStream =
           new DataFileStream<GenericRecord>(new FileInputStream(avroFile), new GenericDatumReader<GenericRecord>());
@@ -88,7 +90,8 @@ public class AirlineDataStream {
     avroDataStream = null;
   }
 
-  private void publish(JsonNode message) throws IOException {
+  private void publish(JsonNode message)
+      throws IOException {
     if (!keepIndexing) {
       avroDataStream.close();
       avroDataStream = null;
@@ -151,6 +154,5 @@ public class AirlineDataStream {
         }
       }
     });
-
   }
 }

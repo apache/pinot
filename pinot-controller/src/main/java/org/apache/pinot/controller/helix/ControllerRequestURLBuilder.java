@@ -206,46 +206,57 @@ public class ControllerRequestURLBuilder {
     System.out.println(ControllerRequestURLBuilder.baseUrl("localhost:8089").forInstanceCreate());
   }
 
-  public String forSegmentDownload(String tableName, String segmentName) throws IOException {
-    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "segments", tableName,
-        URLEncoder.encode(segmentName, "UTF-8"));
+  public String forSegmentDownload(String tableName, String segmentName)
+      throws IOException {
+    return StringUtil
+        .join("/", StringUtils.chomp(_baseUrl, "/"), "segments", tableName, URLEncoder.encode(segmentName, "UTF-8"));
   }
 
   public String forSegmentDelete(String resourceName, String segmentName) {
     return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "datafiles", resourceName, segmentName);
   }
 
-  public String forSegmentDeleteAPI(String tableName, String segmentName, String tableType) throws Exception {
-    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "segments", tableName, URLEncoder.encode(segmentName, "UTF-8") + "?type=" + tableType);
+  public String forSegmentDeleteAPI(String tableName, String segmentName, String tableType)
+      throws Exception {
+    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "segments", tableName,
+        URLEncoder.encode(segmentName, "UTF-8") + "?type=" + tableType);
   }
 
-  public String forSegmentDeleteAllAPI(String tableName, String tableType) throws Exception {
+  public String forSegmentDeleteAllAPI(String tableName, String tableType)
+      throws Exception {
     return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "segments", tableName + "?type=" + tableType);
   }
 
-  public String forListAllSegments(String tableName) throws Exception {
+  public String forListAllSegments(String tableName)
+      throws Exception {
     return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "tables", tableName, "segments");
   }
 
-  public String forListAllCrcInformationForTable(String tableName) throws Exception {
+  public String forListAllCrcInformationForTable(String tableName)
+      throws Exception {
     return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "tables", tableName, "segments", "crc");
   }
 
-  public String forDeleteTableWithType(String tableName, String tableType) throws Exception {
+  public String forDeleteTableWithType(String tableName, String tableType)
+      throws Exception {
     return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "tables", tableName + "?type=" + tableType);
   }
 
-  public String forDeleteSegmentWithGetAPI(String tableName, String segmentName, String tableType) throws Exception {
-    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "tables", tableName, "segments", URLEncoder.encode(segmentName, "UTF-8") + "?state=drop&" + "type=" + tableType);
+  public String forDeleteSegmentWithGetAPI(String tableName, String segmentName, String tableType)
+      throws Exception {
+    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "tables", tableName, "segments",
+        URLEncoder.encode(segmentName, "UTF-8") + "?state=drop&" + "type=" + tableType);
   }
 
   public String forDeleteAllSegmentsWithTypeWithGetAPI(String tableName, String tableType) {
-    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "tables", tableName, "segments" + "?state=drop&" + "type=" + tableType);
+    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "tables", tableName,
+        "segments" + "?state=drop&" + "type=" + tableType);
   }
 
   public String forSegmentListAPIWithTableType(String tableName, String tableType) {
     return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "segments", tableName + "?type=" + tableType);
   }
+
   public String forSegmentListAPI(String tableName) {
     return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "segments", tableName);
   }

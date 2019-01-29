@@ -35,8 +35,8 @@ public class HllSizeUtils {
   }
 
   public static int getHllFieldSizeFromLog2m(int log2m) {
-    Preconditions.checkArgument(LOG2M_TO_SIZE_IN_BYTES.containsKey(log2m),
-        "Log2m: " + log2m + " is not in valid range.");
+    Preconditions
+        .checkArgument(LOG2M_TO_SIZE_IN_BYTES.containsKey(log2m), "Log2m: " + log2m + " is not in valid range.");
     return LOG2M_TO_SIZE_IN_BYTES.get(log2m);
   }
 

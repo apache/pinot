@@ -63,10 +63,10 @@ public class DateTimeFormatSpec {
       _size = Integer.valueOf(formatTokens[FORMAT_SIZE_POSITION]);
       _unitSpec = new DateTimeFormatUnitSpec(formatTokens[FORMAT_UNIT_POSITION]);
       if (formatTokens.length == MAX_FORMAT_TOKENS) {
-         _patternSpec = new DateTimeFormatPatternSpec(formatTokens[FORMAT_TIMEFORMAT_POSITION],
+        _patternSpec = new DateTimeFormatPatternSpec(formatTokens[FORMAT_TIMEFORMAT_POSITION],
             formatTokens[FORMAT_PATTERN_POSITION]);
       } else {
-         _patternSpec = new DateTimeFormatPatternSpec(formatTokens[FORMAT_TIMEFORMAT_POSITION], null);
+        _patternSpec = new DateTimeFormatPatternSpec(formatTokens[FORMAT_TIMEFORMAT_POSITION], null);
       }
     }
   }
@@ -95,8 +95,7 @@ public class DateTimeFormatSpec {
    * @param sdfPattern and tz
    * @return
    */
-  public DateTimeFormatSpec(int columnSize, String columnUnit, String columnTimeFormat,
-      String sdfPattern) {
+  public DateTimeFormatSpec(int columnSize, String columnUnit, String columnTimeFormat, String sdfPattern) {
     _format = Joiner.on(COLON_SEPARATOR).join(columnSize, columnUnit, columnTimeFormat, sdfPattern);
     isValidFormat(_format);
 
@@ -214,9 +213,9 @@ public class DateTimeFormatSpec {
       Preconditions.checkArgument(formatTokens[FORMAT_TIMEFORMAT_POSITION].equals(TimeFormat.EPOCH.toString()),
           TIME_FORMAT_ERROR_STR);
     } else {
-      Preconditions.checkArgument(
-          formatTokens[FORMAT_TIMEFORMAT_POSITION].equals(TimeFormat.SIMPLE_DATE_FORMAT.toString()),
-          TIME_FORMAT_ERROR_STR);
+      Preconditions
+          .checkArgument(formatTokens[FORMAT_TIMEFORMAT_POSITION].equals(TimeFormat.SIMPLE_DATE_FORMAT.toString()),
+              TIME_FORMAT_ERROR_STR);
     }
     return true;
   }
@@ -233,10 +232,8 @@ public class DateTimeFormatSpec {
 
     DateTimeFormatSpec that = (DateTimeFormatSpec) o;
 
-    return EqualityUtils.isEqual(_size, that._size) &&
-        EqualityUtils.isEqual(_format, that._format) &&
-        EqualityUtils.isEqual(_unitSpec, that._unitSpec) &&
-        EqualityUtils.isEqual(_patternSpec, that._patternSpec);
+    return EqualityUtils.isEqual(_size, that._size) && EqualityUtils.isEqual(_format, that._format) && EqualityUtils
+        .isEqual(_unitSpec, that._unitSpec) && EqualityUtils.isEqual(_patternSpec, that._patternSpec);
   }
 
   @Override

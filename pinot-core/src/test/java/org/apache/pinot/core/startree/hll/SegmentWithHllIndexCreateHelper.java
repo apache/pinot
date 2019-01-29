@@ -41,6 +41,7 @@ import org.apache.pinot.util.TestUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
 public class SegmentWithHllIndexCreateHelper {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentWithHllIndexCreateHelper.class);
   private static final String hllDeriveColumnSuffix = HllConstants.DEFAULT_HLL_DERIVE_COLUMN_SUFFIX;
@@ -53,13 +54,15 @@ public class SegmentWithHllIndexCreateHelper {
   private String segmentName = "starTreeSegment";
   private Schema schema;
 
-  public SegmentWithHllIndexCreateHelper(String tableName, URL avroUrl, String timeColumnName,
-      TimeUnit timeUnit, String segmentName) throws IOException {
+  public SegmentWithHllIndexCreateHelper(String tableName, URL avroUrl, String timeColumnName, TimeUnit timeUnit,
+      String segmentName)
+      throws IOException {
     this(tableName, TestUtils.getFileFromResourceUrl(avroUrl), timeColumnName, timeUnit, segmentName);
   }
 
   public SegmentWithHllIndexCreateHelper(String tableName, String avroDataPath, String timeColumnName,
-      TimeUnit timeUnit, String segmentName) throws IOException {
+      TimeUnit timeUnit, String segmentName)
+      throws IOException {
     INDEX_DIR = Files.createTempDirectory(SegmentWithHllIndexCreateHelper.class.getName() + "_" + tableName).toFile();
     LOGGER.info("INDEX_DIR: {}", INDEX_DIR.getAbsolutePath());
     inputAvro = new File(avroDataPath);
@@ -83,7 +86,7 @@ public class SegmentWithHllIndexCreateHelper {
     LOGGER.info("schemaName: {}", schema.getSchemaName());
     LOGGER.info("Dimension columnNames: ");
     int i = 0;
-    for (DimensionFieldSpec spec: schema.getDimensionFieldSpecs()) {
+    for (DimensionFieldSpec spec : schema.getDimensionFieldSpecs()) {
       String columnInfo = i + " " + spec.getName();
       if (!spec.isSingleValueField()) {
         LOGGER.info(columnInfo + " Multi-Value.");
@@ -94,7 +97,7 @@ public class SegmentWithHllIndexCreateHelper {
     }
     LOGGER.info("Metric columnNames: ");
     i = 0;
-    for (MetricFieldSpec spec: schema.getMetricFieldSpecs()) {
+    for (MetricFieldSpec spec : schema.getMetricFieldSpecs()) {
       String columnInfo = i + " " + spec.getName();
       if (!spec.isSingleValueField()) {
         LOGGER.info(columnInfo + " Multi-Value.");
@@ -115,9 +118,10 @@ public class SegmentWithHllIndexCreateHelper {
     printSchema(segmentGenConfig.getSchema());
   }
 
-  public SegmentIndexCreationDriver build(boolean enableStarTree, HllConfig hllConfig) throws Exception {
-    final SegmentGeneratorConfig segmentGenConfig = new SegmentGeneratorConfig(
-        SegmentTestUtils.extractSchemaFromAvroWithoutTime(inputAvro));
+  public SegmentIndexCreationDriver build(boolean enableStarTree, HllConfig hllConfig)
+      throws Exception {
+    final SegmentGeneratorConfig segmentGenConfig =
+        new SegmentGeneratorConfig(SegmentTestUtils.extractSchemaFromAvroWithoutTime(inputAvro));
 
     // set other fields in segmentGenConfig
     segmentGenConfig.setInputFilePath(inputAvro.getAbsolutePath());
@@ -176,5 +180,4 @@ public class SegmentWithHllIndexCreateHelper {
   public File getIndexDir() {
     return INDEX_DIR;
   }
-
 }

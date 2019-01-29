@@ -53,9 +53,8 @@ public class PinotZKChanger {
   public PinotZKChanger(String zkAddress, String clusterName) {
     this.clusterName = clusterName;
     helixAdmin = new ZKHelixAdmin(zkAddress);
-    helixManager =
-        HelixManagerFactory
-            .getZKHelixManager(clusterName, "PinotNumReplicaChanger", InstanceType.ADMINISTRATOR, zkAddress);
+    helixManager = HelixManagerFactory
+        .getZKHelixManager(clusterName, "PinotNumReplicaChanger", InstanceType.ADMINISTRATOR, zkAddress);
     try {
       helixManager.connect();
     } catch (Exception e) {
@@ -87,8 +86,9 @@ public class PinotZKChanger {
       for (String server : mapIS.keySet()) {
         String state = mapIS.get(server);
         if (mapEV == null || mapEV.get(server) == null || !mapEV.get(server).equals(state)) {
-          LOGGER.info("Mismatch: segment " + segment + " server:" + server + " expected state:" + state +
-             " actual state:" + ((mapEV == null || mapEV.get(server) == null) ? "null" : mapEV.get(server)));
+          LOGGER.info(
+              "Mismatch: segment " + segment + " server:" + server + " expected state:" + state + " actual state:" + (
+                  (mapEV == null || mapEV.get(server) == null) ? "null" : mapEV.get(server)));
           numDiff = numDiff + 1;
         }
       }
@@ -111,13 +111,15 @@ public class PinotZKChanger {
         break;
       } else {
         LOGGER.info(
-            "Waiting for externalView to match idealstate for table:" + resourceName + " Num segments difference:" + diff);
+            "Waiting for externalView to match idealstate for table:" + resourceName + " Num segments difference:"
+                + diff);
         Thread.sleep(30000);
       }
     } while (diff > 0);
   }
 
-  protected void printSegmentAssignment(Map<String, Map<String, String>> mapping) throws Exception {
+  protected void printSegmentAssignment(Map<String, Map<String, String>> mapping)
+      throws Exception {
     LOGGER.info(JsonUtils.objectToPrettyString(mapping));
     Map<String, List<String>> serverToSegmentMapping = new TreeMap<>();
     for (String segment : mapping.keySet()) {

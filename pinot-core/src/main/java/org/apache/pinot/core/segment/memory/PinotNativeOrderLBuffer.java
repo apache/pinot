@@ -36,13 +36,15 @@ public class PinotNativeOrderLBuffer extends BasePinotLBuffer {
     return new PinotNativeOrderLBuffer(buffer, true, false);
   }
 
-  static PinotNativeOrderLBuffer loadFile(File file, long offset, long size) throws IOException {
+  static PinotNativeOrderLBuffer loadFile(File file, long offset, long size)
+      throws IOException {
     PinotNativeOrderLBuffer buffer = allocateDirect(size);
     buffer.readFrom(0, file, offset, size);
     return buffer;
   }
 
-  static PinotNativeOrderLBuffer mapFile(File file, boolean readOnly, long offset, long size) throws IOException {
+  static PinotNativeOrderLBuffer mapFile(File file, boolean readOnly, long offset, long size)
+      throws IOException {
     if (readOnly) {
       return new PinotNativeOrderLBuffer(new MMapBuffer(file, offset, size, MMapMode.READ_ONLY), true, false);
     } else {

@@ -62,7 +62,6 @@ public class MultiGetRequestTest {
     startServer(portStart, createHandler(SUCCESS_CODE, SUCCESS_MSG, 0));
     startServer(portStart + 1, createHandler(ERROR_CODE, ERROR_MSG, 0));
     startServer(portStart + 2, createHandler(SUCCESS_CODE, TIMEOUT_MSG, TIMEOUT_MS));
-
   }
 
   @AfterTest
@@ -72,8 +71,7 @@ public class MultiGetRequestTest {
     }
   }
 
-  private HttpHandler createHandler(final int status, final String msg,
-      final int sleepTimeMs) {
+  private HttpHandler createHandler(final int status, final String msg, final int sleepTimeMs) {
     return new HttpHandler() {
       @Override
       public void handle(HttpExchange httpExchange)
@@ -107,17 +105,15 @@ public class MultiGetRequestTest {
     return server;
   }
 
-
   @Test
   public void testMultiGet() {
-    MultiGetRequest mget = new MultiGetRequest(Executors.newCachedThreadPool(),
-        new MultiThreadedHttpConnectionManager());
+    MultiGetRequest mget =
+        new MultiGetRequest(Executors.newCachedThreadPool(), new MultiThreadedHttpConnectionManager());
     List<String> urls = Arrays.asList("http://localhost:" + String.valueOf(portStart) + URI_PATH,
         "http://localhost:" + String.valueOf(portStart + 1) + URI_PATH,
         "http://localhost:" + String.valueOf(portStart + 2) + URI_PATH,
         // 2nd request to the same server
-        "http://localhost:" + String.valueOf(portStart) + URI_PATH
-        );
+        "http://localhost:" + String.valueOf(portStart) + URI_PATH);
     // timeout value needs to be less than 5000ms set above for
     // third server
     final int requestTimeoutMs = 1000;
@@ -128,7 +124,7 @@ public class MultiGetRequestTest {
     for (int i = 0; i < urls.size(); i++) {
       GetMethod getMethod = null;
       try {
-         getMethod = completionService.take().get();
+        getMethod = completionService.take().get();
         if (getMethod.getStatusCode() >= 300) {
           ++errors;
           Assert.assertEquals(getMethod.getResponseBodyAsString(), ERROR_MSG);
@@ -136,7 +132,6 @@ public class MultiGetRequestTest {
           ++success;
           Assert.assertEquals(getMethod.getResponseBodyAsString(), SUCCESS_MSG);
         }
-
       } catch (InterruptedException e) {
         LOGGER.error("Interrupted", e);
         ++errors;

@@ -62,7 +62,8 @@ public class LoaderTest {
   private IndexLoadingConfig _v3IndexLoadingConfig;
 
   @BeforeClass
-  public void setUp() throws Exception {
+  public void setUp()
+      throws Exception {
     FileUtils.deleteQuietly(INDEX_DIR);
 
     URL resourceUrl = getClass().getClassLoader().getResource(AVRO_DATA);
@@ -78,7 +79,8 @@ public class LoaderTest {
     _v3IndexLoadingConfig.setSegmentVersion(SegmentVersion.v3);
   }
 
-  private Schema constructV1Segment() throws Exception {
+  private Schema constructV1Segment()
+      throws Exception {
     FileUtils.deleteQuietly(INDEX_DIR);
 
     SegmentGeneratorConfig segmentGeneratorConfig =
@@ -93,7 +95,8 @@ public class LoaderTest {
   }
 
   @Test
-  public void testLoad() throws Exception {
+  public void testLoad()
+      throws Exception {
     constructV1Segment();
     Assert.assertEquals(new SegmentMetadataImpl(_indexDir).getSegmentVersion(), SegmentVersion.v1);
     Assert.assertFalse(SegmentDirectoryPaths.segmentDirectoryFor(_indexDir, SegmentVersion.v3).exists());
@@ -106,7 +109,8 @@ public class LoaderTest {
    * that scenario.
    */
   @Test
-  public void testLoadWithStaleConversionDir() throws Exception {
+  public void testLoadWithStaleConversionDir()
+      throws Exception {
     constructV1Segment();
 
     File v3TempDir = new SegmentV1V2ToV3FormatConverter().v3ConversionTempDirectory(_indexDir);
@@ -115,7 +119,8 @@ public class LoaderTest {
     Assert.assertFalse(v3TempDir.exists());
   }
 
-  private void testConversion() throws Exception {
+  private void testConversion()
+      throws Exception {
     // Do not set segment version, should not convert the segment
     IndexSegment indexSegment = ImmutableSegmentLoader.load(_indexDir, ReadMode.mmap);
     Assert.assertEquals(indexSegment.getSegmentMetadata().getVersion(), SegmentVersion.v1.toString());
@@ -136,7 +141,8 @@ public class LoaderTest {
   }
 
   @Test
-  public void testPadding() throws Exception {
+  public void testPadding()
+      throws Exception {
     // Old Format
     URL resourceUrl = LoaderTest.class.getClassLoader().getResource(PADDING_OLD);
     Assert.assertNotNull(resourceUrl);
@@ -148,8 +154,9 @@ public class LoaderTest {
     SegmentDirectory segmentDir = SegmentDirectory.createFromLocalFS(segmentDirectory, segmentMetadata, ReadMode.heap);
     SegmentDirectory.Reader reader = segmentDir.createReader();
     PinotDataBuffer dictionaryBuffer = reader.getIndexFor("name", ColumnIndexType.DICTIONARY);
-    StringDictionary dict = new StringDictionary(dictionaryBuffer, columnMetadata.getCardinality(),
-        columnMetadata.getColumnMaxLength(), (byte) columnMetadata.getPaddingCharacter());
+    StringDictionary dict =
+        new StringDictionary(dictionaryBuffer, columnMetadata.getCardinality(), columnMetadata.getColumnMaxLength(),
+            (byte) columnMetadata.getPaddingCharacter());
     Assert.assertEquals(dict.getStringValue(0), "lynda 2.0");
     Assert.assertEquals(dict.getStringValue(1), "lynda");
     Assert.assertEquals(dict.get(0), "lynda 2.0");
@@ -168,8 +175,8 @@ public class LoaderTest {
     segmentDir = SegmentDirectory.createFromLocalFS(segmentDirectory, segmentMetadata, ReadMode.heap);
     reader = segmentDir.createReader();
     dictionaryBuffer = reader.getIndexFor("name", ColumnIndexType.DICTIONARY);
-    dict = new StringDictionary(dictionaryBuffer, columnMetadata.getCardinality(),
-        columnMetadata.getColumnMaxLength(), (byte) columnMetadata.getPaddingCharacter());
+    dict = new StringDictionary(dictionaryBuffer, columnMetadata.getCardinality(), columnMetadata.getColumnMaxLength(),
+        (byte) columnMetadata.getPaddingCharacter());
     Assert.assertEquals(dict.getStringValue(0), "lynda 2.0");
     Assert.assertEquals(dict.getStringValue(1), "lynda");
     Assert.assertEquals(dict.get(0), "lynda 2.0");
@@ -188,8 +195,8 @@ public class LoaderTest {
     segmentDir = SegmentDirectory.createFromLocalFS(segmentDirectory, segmentMetadata, ReadMode.heap);
     reader = segmentDir.createReader();
     dictionaryBuffer = reader.getIndexFor("name", ColumnIndexType.DICTIONARY);
-    dict = new StringDictionary(dictionaryBuffer, columnMetadata.getCardinality(),
-        columnMetadata.getColumnMaxLength(), (byte) columnMetadata.getPaddingCharacter());
+    dict = new StringDictionary(dictionaryBuffer, columnMetadata.getCardinality(), columnMetadata.getColumnMaxLength(),
+        (byte) columnMetadata.getPaddingCharacter());
     Assert.assertEquals(dict.getStringValue(0), "lynda");
     Assert.assertEquals(dict.getStringValue(1), "lynda 2.0");
     Assert.assertEquals(dict.get(0), "lynda");
@@ -202,7 +209,8 @@ public class LoaderTest {
    * Tests loading default string column with empty ("") default null value.
    */
   @Test
-  public void testDefaultEmptyValueStringColumn() throws Exception {
+  public void testDefaultEmptyValueStringColumn()
+      throws Exception {
     Schema schema = constructV1Segment();
     schema.addField(new DimensionFieldSpec("SVString", FieldSpec.DataType.STRING, true, ""));
     schema.addField(new DimensionFieldSpec("MVString", FieldSpec.DataType.STRING, false, ""));

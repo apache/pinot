@@ -22,6 +22,7 @@ import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.common.Constants;
 import org.roaringbitmap.IntIterator;
 
+
 public class RangelessBitmapDocIdIterator implements BlockDocIdIterator {
 
   private IntIterator iterator;
@@ -52,8 +53,8 @@ public class RangelessBitmapDocIdIterator implements BlockDocIdIterator {
   @Override
   public int advance(int targetDocId) {
     if (targetDocId < currentDocId) {
-      throw new IllegalArgumentException("Trying to move backwards to docId " + targetDocId +
-          ", current position " + currentDocId);
+      throw new IllegalArgumentException(
+          "Trying to move backwards to docId " + targetDocId + ", current position " + currentDocId);
     }
 
     if (currentDocId == targetDocId) {
@@ -61,12 +62,11 @@ public class RangelessBitmapDocIdIterator implements BlockDocIdIterator {
     } else {
       int curr = next();
 
-      while(curr < targetDocId && curr != Constants.EOF) {
+      while (curr < targetDocId && curr != Constants.EOF) {
         curr = next();
       }
 
       return curr;
     }
   }
-
 }

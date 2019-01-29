@@ -82,9 +82,9 @@ public class TestStarTreeMetadata {
       FileUtils.deleteQuietly(segmentDir);
     }
 
-    final SegmentGeneratorConfig config =
-        SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), segmentDir, "time_day",
-            TimeUnit.DAYS, TABLE_NAME);
+    final SegmentGeneratorConfig config = SegmentTestUtils
+        .getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), segmentDir, "time_day", TimeUnit.DAYS,
+            TABLE_NAME);
 
     config.setTableName(TABLE_NAME);
     config.setSegmentName(SEGMENT_NAME);
@@ -100,7 +100,6 @@ public class TestStarTreeMetadata {
     final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
     driver.init(config);
     driver.build();
-
   }
 
   /**

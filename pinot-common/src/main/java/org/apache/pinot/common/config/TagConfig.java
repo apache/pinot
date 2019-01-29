@@ -39,6 +39,5 @@ public class TagConfig {
   public String getServerTenantName() {
     return _serverTenant;
   }
-
 }
 

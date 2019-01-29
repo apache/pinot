@@ -23,6 +23,7 @@ import java.util.List;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+
 /**
  * Tests for the connection factory
  */
@@ -58,6 +59,7 @@ public class ConnectionFactoryTest {
   }
 
   // For testing DynamicBrokerSelector
+
   /**
    * ConnectionFactoryTest <ZK_URL> <tableName> <query>
    * @param args
@@ -73,5 +75,4 @@ public class ConnectionFactoryTest {
     ResultSetGroup resultSetGroup = connection.execute(tableName, args[2]);
     System.out.println(resultSetGroup);
   }
-
 }

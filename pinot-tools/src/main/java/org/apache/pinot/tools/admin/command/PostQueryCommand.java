@@ -40,8 +40,7 @@ public class PostQueryCommand extends AbstractBaseAdminCommand implements Comman
   @Option(name = "-query", required = true, metaVar = "<string>", usage = "Query string to perform.")
   private String _query;
 
-  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h",
-      "--help"}, usage = "Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
   private boolean _help = false;
 
   @Override
@@ -84,7 +83,8 @@ public class PostQueryCommand extends AbstractBaseAdminCommand implements Comman
     return this;
   }
 
-  public String run() throws Exception {
+  public String run()
+      throws Exception {
     if (_brokerHost == null) {
       _brokerHost = NetUtil.getHostAddress();
     }
@@ -95,7 +95,8 @@ public class PostQueryCommand extends AbstractBaseAdminCommand implements Comman
   }
 
   @Override
-  public boolean execute() throws Exception {
+  public boolean execute()
+      throws Exception {
     String result = run();
     LOGGER.info("Result: " + result);
     return true;

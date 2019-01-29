@@ -21,6 +21,7 @@ package org.apache.pinot.common.restlet.resources;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
 
+
 public class TableSegments {
   List<String> segments;
 

@@ -165,8 +165,8 @@ public final class MetricFieldSpec extends FieldSpec {
     }
 
     MetricFieldSpec that = (MetricFieldSpec) o;
-    return EqualityUtils.isEqual(_fieldSize, that._fieldSize) && EqualityUtils.isEqual(_derivedMetricType,
-        that._derivedMetricType);
+    return EqualityUtils.isEqual(_fieldSize, that._fieldSize) && EqualityUtils
+        .isEqual(_derivedMetricType, that._derivedMetricType);
   }
 
   @Override

@@ -63,7 +63,8 @@ public class UploadRefreshDeleteIntegrationTest extends BaseClusterIntegrationTe
   }
 
   @BeforeClass
-  public void setUp() throws Exception {
+  public void setUp()
+      throws Exception {
     // Start an empty Pinot cluster
     startZk();
     startController();
@@ -72,7 +73,8 @@ public class UploadRefreshDeleteIntegrationTest extends BaseClusterIntegrationTe
   }
 
   @BeforeMethod
-  public void setupMethod(Object[] args) throws Exception {
+  public void setupMethod(Object[] args)
+      throws Exception {
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
     if (args == null || args.length == 0) {
       return;
@@ -90,10 +92,11 @@ public class UploadRefreshDeleteIntegrationTest extends BaseClusterIntegrationTe
     }
   }
 
-  protected void generateAndUploadRandomSegment(String segmentName, int rowCount) throws Exception {
+  protected void generateAndUploadRandomSegment(String segmentName, int rowCount)
+      throws Exception {
     ThreadLocalRandom random = ThreadLocalRandom.current();
-    Schema schema = new Schema.Parser().parse(
-        new File(TestUtils.getFileFromResourceUrl(getClass().getClassLoader().getResource("dummy.avsc"))));
+    Schema schema = new Schema.Parser()
+        .parse(new File(TestUtils.getFileFromResourceUrl(getClass().getClassLoader().getResource("dummy.avsc"))));
     GenericRecord record = new GenericData.Record(schema);
     GenericDatumWriter<GenericRecord> datumWriter = new GenericDatumWriter<GenericRecord>(schema);
     DataFileWriter<GenericRecord> fileWriter = new DataFileWriter<GenericRecord>(datumWriter);
@@ -112,8 +115,9 @@ public class UploadRefreshDeleteIntegrationTest extends BaseClusterIntegrationTe
     File segmentTarDir = new File(_tarDir, segmentName);
     TestUtils.ensureDirectoriesExistAndEmpty(segmentTarDir);
     ExecutorService executor = MoreExecutors.newDirectExecutorService();
-    ClusterIntegrationTestUtils.buildSegmentsFromAvro(Collections.singletonList(avroFile), segmentIndex,
-        new File(_segmentDir, segmentName), segmentTarDir, this._tableName, executor);
+    ClusterIntegrationTestUtils
+        .buildSegmentsFromAvro(Collections.singletonList(avroFile), segmentIndex, new File(_segmentDir, segmentName),
+            segmentTarDir, this._tableName, executor);
     executor.shutdown();
     executor.awaitTermination(1L, TimeUnit.MINUTES);
 
@@ -125,15 +129,13 @@ public class UploadRefreshDeleteIntegrationTest extends BaseClusterIntegrationTe
 
   @DataProvider(name = "configProvider")
   public Object[][] configProvider() {
-    Object[][] configs = {
-        { "mytable", SegmentVersion.v1},
-        { "yourtable", SegmentVersion.v3}
-    };
+    Object[][] configs = {{"mytable", SegmentVersion.v1}, {"yourtable", SegmentVersion.v3}};
     return configs;
   }
 
   @Test(dataProvider = "configProvider")
-  public void testRefresh(String tableName, SegmentVersion version) throws Exception {
+  public void testRefresh(String tableName, SegmentVersion version)
+      throws Exception {
     final int nAtttempts = 5;
     final String segment6 = "segmentToBeRefreshed_6";
     final int nRows1 = 69;
@@ -147,11 +149,12 @@ public class UploadRefreshDeleteIntegrationTest extends BaseClusterIntegrationTe
     final String segment9 = "newSegment_9";
     final int nRows3 = 102;
     generateAndUploadRandomSegment(segment9, nRows3);
-    verifyNRows(nRows2, nRows2+nRows3);
+    verifyNRows(nRows2, nRows2 + nRows3);
   }
 
   // Verify that the number of rows is either the initial value or the final value but not something else.
-  private void verifyNRows(int currentNrows, int finalNrows) throws Exception {
+  private void verifyNRows(int currentNrows, int finalNrows)
+      throws Exception {
     int attempt = 0;
     long sleepTime = 100;
     long nRows;
@@ -176,7 +179,8 @@ public class UploadRefreshDeleteIntegrationTest extends BaseClusterIntegrationTe
   }
 
   @Test(enabled = false, dataProvider = "configProvider")
-  public void testUploadRefreshDelete(String tableName, SegmentVersion version) throws Exception {
+  public void testUploadRefreshDelete(String tableName, SegmentVersion version)
+      throws Exception {
     final int THREAD_COUNT = 1;
     final int SEGMENT_COUNT = 5;
 
@@ -276,7 +280,8 @@ public class UploadRefreshDeleteIntegrationTest extends BaseClusterIntegrationTe
       }
 
       // Compare row counts
-      Assert.assertEquals(pinotRowCount, expectedRowCount, "Expected and actual row counts don't match after waiting one minute");
+      Assert.assertEquals(pinotRowCount, expectedRowCount,
+          "Expected and actual row counts don't match after waiting one minute");
     }
   }
 

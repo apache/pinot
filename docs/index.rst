@@ -22,6 +22,7 @@ Reference
 .. toctree::
    :maxdepth: 1
 
+
    reference
    in_production
 
@@ -32,9 +33,9 @@ Customizing Pinot
 .. toctree::
    :maxdepth: 1
 
+
    pluggable_streams
    segment_fetcher
-   star-tree/star-tree
    pluggable_storage
 
 ################
@@ -43,6 +44,7 @@ Design Documents
 
 .. toctree::
    :maxdepth: 1
+
 
    llc
    partition_aware_routing
@@ -55,6 +57,7 @@ Design Proposals
 
 .. toctree::
    :maxdepth: 1
+
 
    multitenancy
 

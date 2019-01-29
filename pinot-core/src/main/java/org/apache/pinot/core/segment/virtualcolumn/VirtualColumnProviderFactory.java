@@ -43,11 +43,13 @@ public class VirtualColumnProviderFactory {
     }
 
     if (!schema.hasColumn("$hostName")) {
-      schema.addField(new DimensionFieldSpec("$hostName", FieldSpec.DataType.STRING, true, HostNameVirtualColumnProvider.class));
+      schema.addField(
+          new DimensionFieldSpec("$hostName", FieldSpec.DataType.STRING, true, HostNameVirtualColumnProvider.class));
     }
 
     if (!schema.hasColumn("$segmentName")) {
-      schema.addField(new DimensionFieldSpec("$segmentName", FieldSpec.DataType.STRING, true, SegmentNameVirtualColumnProvider.class));
+      schema.addField(new DimensionFieldSpec("$segmentName", FieldSpec.DataType.STRING, true,
+          SegmentNameVirtualColumnProvider.class));
     }
   }
 }

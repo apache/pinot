@@ -67,8 +67,9 @@ public class NettyServerMetrics implements TransportServerMetrics {
     _requestsReceived.inc(numRequests);
     _bytesReceived.inc(requestSize);
     _bytesSent.inc(responseSize);
-    if (error)
+    if (error) {
       _errors.inc();
+    }
     _sendResponseMsHistogram.update(sendResponseLatencyMs);
     _processingLatencyMsHistogram.update(processingLatencyMs);
   }

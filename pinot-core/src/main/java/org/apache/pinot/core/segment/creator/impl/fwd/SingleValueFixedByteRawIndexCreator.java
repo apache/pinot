@@ -50,7 +50,8 @@ public class SingleValueFixedByteRawIndexCreator extends BaseSingleValueRawIndex
    * @throws IOException
    */
   public SingleValueFixedByteRawIndexCreator(File baseIndexDir, ChunkCompressorFactory.CompressionType compressionType,
-      String column, int totalDocs, int sizeOfEntry) throws IOException {
+      String column, int totalDocs, int sizeOfEntry)
+      throws IOException {
     File file = new File(baseIndexDir, column + V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
     _indexWriter =
         new FixedByteChunkSingleValueWriter(file, compressionType, totalDocs, NUM_DOCS_PER_CHUNK, sizeOfEntry);

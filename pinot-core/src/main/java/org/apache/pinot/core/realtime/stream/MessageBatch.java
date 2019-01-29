@@ -24,37 +24,37 @@ package org.apache.pinot.core.realtime.stream;
  * @param <T>
  */
 public interface MessageBatch<T> {
-    /**
-     *
-     * @return number of messages returned from the stream
-     */
-    int getMessageCount();
+  /**
+   *
+   * @return number of messages returned from the stream
+   */
+  int getMessageCount();
 
-    /**
-     * Returns the message at a particular index inside a set of messages returned from the stream.
-     * @param index
-     * @return
-     */
-    T getMessageAtIndex(int index);
+  /**
+   * Returns the message at a particular index inside a set of messages returned from the stream.
+   * @param index
+   * @return
+   */
+  T getMessageAtIndex(int index);
 
-    /**
-     * Returns the offset of the message at a particular index inside a set of messages returned from the stream.
-     * @param index
-     * @return
-     */
-    int getMessageOffsetAtIndex(int index);
+  /**
+   * Returns the offset of the message at a particular index inside a set of messages returned from the stream.
+   * @param index
+   * @return
+   */
+  int getMessageOffsetAtIndex(int index);
 
-    /**
-     * Returns the length of the message at a particular index inside a set of messages returned from the stream.
-     * @param index
-     * @return
-     */
-    int getMessageLengthAtIndex(int index);
+  /**
+   * Returns the length of the message at a particular index inside a set of messages returned from the stream.
+   * @param index
+   * @return
+   */
+  int getMessageLengthAtIndex(int index);
 
-    /**
-     * Returns the offset of the next message.
-     * @param index
-     * @return
-     */
-    long getNextStreamMessageOffsetAtIndex(int index);
+  /**
+   * Returns the offset of the next message.
+   * @param index
+   * @return
+   */
+  long getNextStreamMessageOffsetAtIndex(int index);
 }

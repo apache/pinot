@@ -86,14 +86,19 @@ public class SegmentNameBuilderTest {
     assertEquals(shortNameSegment.getSegmentType(), SegmentName.RealtimeSegmentType.HLC_SHORT);
 
     assertEquals(SegmentName.getSegmentType(llcSegment.getSegmentName()), SegmentName.RealtimeSegmentType.LLC);
-    assertEquals(SegmentName.getSegmentType(longNameSegment.getSegmentName()), SegmentName.RealtimeSegmentType.HLC_LONG);
-    assertEquals(SegmentName.getSegmentType(shortNameSegment.getSegmentName()), SegmentName.RealtimeSegmentType.HLC_SHORT);
+    assertEquals(SegmentName.getSegmentType(longNameSegment.getSegmentName()),
+        SegmentName.RealtimeSegmentType.HLC_LONG);
+    assertEquals(SegmentName.getSegmentType(shortNameSegment.getSegmentName()),
+        SegmentName.RealtimeSegmentType.HLC_SHORT);
 
     // Invalid segment names
-    assertEquals(SegmentName.getSegmentType(shortNameSegment.getSegmentName() + "__"), SegmentName.RealtimeSegmentType.UNSUPPORTED);
-    assertEquals(SegmentName.getSegmentType("__" + shortNameSegment.getSegmentName()), SegmentName.RealtimeSegmentType.UNSUPPORTED);
+    assertEquals(SegmentName.getSegmentType(shortNameSegment.getSegmentName() + "__"),
+        SegmentName.RealtimeSegmentType.UNSUPPORTED);
+    assertEquals(SegmentName.getSegmentType("__" + shortNameSegment.getSegmentName()),
+        SegmentName.RealtimeSegmentType.UNSUPPORTED);
     assertEquals(SegmentName.getSegmentType("__abc__"), SegmentName.RealtimeSegmentType.UNSUPPORTED);
-    assertEquals(SegmentName.getSegmentType("a__abc__1__3__4__54__g__gg___h"), SegmentName.RealtimeSegmentType.UNSUPPORTED);
+    assertEquals(SegmentName.getSegmentType("a__abc__1__3__4__54__g__gg___h"),
+        SegmentName.RealtimeSegmentType.UNSUPPORTED);
   }
 
   @Test
@@ -143,23 +148,23 @@ public class SegmentNameBuilderTest {
 
     Assert.assertEquals(segName1, segName2);
 
-    LLCSegmentName segName3 = new LLCSegmentName(tableName, partitionId+1, sequenceNumber-1, msSinceEpoch);
+    LLCSegmentName segName3 = new LLCSegmentName(tableName, partitionId + 1, sequenceNumber - 1, msSinceEpoch);
     Assert.assertTrue(segName1.compareTo(segName3) < 0);
-    LLCSegmentName segName4 = new LLCSegmentName(tableName, partitionId+1, sequenceNumber+1, msSinceEpoch);
+    LLCSegmentName segName4 = new LLCSegmentName(tableName, partitionId + 1, sequenceNumber + 1, msSinceEpoch);
     Assert.assertTrue(segName1.compareTo(segName4) < 0);
-    LLCSegmentName segName5 = new LLCSegmentName(tableName, partitionId-1, sequenceNumber+1, msSinceEpoch);
+    LLCSegmentName segName5 = new LLCSegmentName(tableName, partitionId - 1, sequenceNumber + 1, msSinceEpoch);
     Assert.assertTrue(segName1.compareTo(segName5) > 0);
-    LLCSegmentName segName6 = new LLCSegmentName(tableName, partitionId, sequenceNumber+1, msSinceEpoch);
+    LLCSegmentName segName6 = new LLCSegmentName(tableName, partitionId, sequenceNumber + 1, msSinceEpoch);
     Assert.assertTrue(segName1.compareTo(segName6) < 0);
 
-    LLCSegmentName segName7 = new LLCSegmentName(tableName+"NotGood", partitionId, sequenceNumber+1, msSinceEpoch);
+    LLCSegmentName segName7 = new LLCSegmentName(tableName + "NotGood", partitionId, sequenceNumber + 1, msSinceEpoch);
     try {
       segName1.compareTo(segName7);
       Assert.fail("Not failing when comparing " + segName1.getSegmentName() + " and " + segName7.getSegmentName());
     } catch (Exception e) {
       // expected
     }
-    LLCSegmentName[] testSorted = new LLCSegmentName[] {segName3, segName1, segName4, segName5, segName6};
+    LLCSegmentName[] testSorted = new LLCSegmentName[]{segName3, segName1, segName4, segName5, segName6};
     Arrays.sort(testSorted);
     Assert.assertTrue(testSorted[0] == segName5);
     Assert.assertTrue(testSorted[1] == segName1);

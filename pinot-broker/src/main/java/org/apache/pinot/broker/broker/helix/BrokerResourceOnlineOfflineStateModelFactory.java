@@ -92,13 +92,11 @@ public class BrokerResourceOnlineOfflineStateModelFactory extends StateModelFact
         List<InstanceConfig> instanceConfigList = helixDataAccessor.getChildValues(keyBuilder.instanceConfigs());
         TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableName);
 
-        _helixExternalViewBasedRouting.markDataResourceOnline(
-            tableConfig,
+        _helixExternalViewBasedRouting.markDataResourceOnline(tableConfig,
             HelixHelper.getExternalViewForResource(_helixAdmin, _helixManager.getClusterName(), tableName),
             instanceConfigList);
-        _tableQueryQuotaManager.initTableQueryQuota(
-            tableConfig,
-            HelixHelper.getExternalViewForResource(_helixAdmin, _helixManager.getClusterName(), BROKER_RESOURCE_INSTANCE));
+        _tableQueryQuotaManager.initTableQueryQuota(tableConfig, HelixHelper
+            .getExternalViewForResource(_helixAdmin, _helixManager.getClusterName(), BROKER_RESOURCE_INSTANCE));
       } catch (Exception e) {
         LOGGER.error("Caught exception during OFFLINE -> ONLINE transition", e);
         Utils.rethrowException(e);

@@ -67,5 +67,4 @@ public class EmptyBrokerOnlineOfflineStateModelFactory extends StateModelFactory
       LOGGER.debug("EmptyBrokerOnlineOfflineStateModel.onBecomeDroppedFromOnline() : {}", message);
     }
   }
-
 }

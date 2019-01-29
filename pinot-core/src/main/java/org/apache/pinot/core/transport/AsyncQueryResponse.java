@@ -55,7 +55,8 @@ public class AsyncQueryResponse {
   /**
    * Waits until the query is done and returns a map from the server to the response.
    */
-  public Map<Server, ServerResponse> getResponse() throws InterruptedException {
+  public Map<Server, ServerResponse> getResponse()
+      throws InterruptedException {
     try {
       _countDownLatch.await(_maxEndTimeMs - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
       return _responseMap;

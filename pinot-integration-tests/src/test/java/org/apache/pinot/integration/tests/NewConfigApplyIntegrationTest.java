@@ -52,21 +52,20 @@ public class NewConfigApplyIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   @Test(enabled = false)
-  public void testTableOperations() throws Exception {
+  public void testTableOperations()
+      throws Exception {
     // Unpack the table configs if necessary
-    List<String> configs = Lists.newArrayList("mytable.conf", "mytable-updated.conf", "profiles/test1.conf", "profiles/test2.conf");
-    List<File> configFiles = configs
-        .stream()
-        .map(path -> getClass().getClassLoader().getResource(path))
-        .map(TestUtils::getFileFromResourceUrl)
-        .map(File::new)
-        .collect(Collectors.toList());
+    List<String> configs =
+        Lists.newArrayList("mytable.conf", "mytable-updated.conf", "profiles/test1.conf", "profiles/test2.conf");
+    List<File> configFiles = configs.stream().map(path -> getClass().getClassLoader().getResource(path))
+        .map(TestUtils::getFileFromResourceUrl).map(File::new).collect(Collectors.toList());
 
     // Apply expects the profiles to be relative to cwd, so copy them
     FileUtils.copyDirectoryToDirectory(configFiles.get(2).getParentFile(), new File("."));
 
     // Create a new table using the command line tools without a profile
-    runAdminCommand("ApplyTableConfig", "-controllerUrl", "http://localhost:8998/", "-tableConfigFile", configFiles.get(0).getAbsolutePath());
+    runAdminCommand("ApplyTableConfig", "-controllerUrl", "http://localhost:8998/", "-tableConfigFile",
+        configFiles.get(0).getAbsolutePath());
 
     // Check that the table exists
     String tableConfiguration = sendGetRequestRaw("http://localhost:8998/v2/tables/mytable");
@@ -75,7 +74,8 @@ public class NewConfigApplyIntegrationTest extends BaseClusterIntegrationTest {
     assertEquals(tableConfigurationObject.getOfflineTableConfig().getValidationConfig().getReplicationNumber(), 3);
 
     // Update the table using a configuration profile
-    runAdminCommand("ApplyTableConfig", "-controllerUrl", "http://localhost:8998/", "-tableConfigFile", configFiles.get(1).getAbsolutePath(), "-profile", "test2");
+    runAdminCommand("ApplyTableConfig", "-controllerUrl", "http://localhost:8998/", "-tableConfigFile",
+        configFiles.get(1).getAbsolutePath(), "-profile", "test2");
 
     // Check that the table is updated
     tableConfiguration = sendGetRequestRaw("http://localhost:8998/v2/tables/mytable");
@@ -85,7 +85,8 @@ public class NewConfigApplyIntegrationTest extends BaseClusterIntegrationTest {
     assertEquals(tableConfigurationObject.getOfflineTableConfig().getIndexingConfig().getLoadMode(), "MMAP");
 
     // Update the table using a configuration profile
-    runAdminCommand("ApplyTableConfig", "-controllerUrl", "http://localhost:8998/", "-tableConfigFile", configFiles.get(0).getAbsolutePath(), "-profile", "test1");
+    runAdminCommand("ApplyTableConfig", "-controllerUrl", "http://localhost:8998/", "-tableConfigFile",
+        configFiles.get(0).getAbsolutePath(), "-profile", "test1");
 
     // Check that the table is updated
     tableConfiguration = sendGetRequestRaw("http://localhost:8998/v2/tables/mytable");
@@ -95,20 +96,19 @@ public class NewConfigApplyIntegrationTest extends BaseClusterIntegrationTest {
     assertEquals(tableConfigurationObject.getOfflineTableConfig().getIndexingConfig().getLoadMode(), "HEAP");
   }
 
-  private void runAdminCommand(String... args) throws Exception {
-    ArrayList<String> commandLine = Lists.newArrayList(
-        "java", "-cp", "pinot-tools/target/pinot-tool-launcher-jar-with-dependencies.jar",
-        "org.apache.pinot.tools.admin.PinotAdministrator"
-    );
+  private void runAdminCommand(String... args)
+      throws Exception {
+    ArrayList<String> commandLine = Lists
+        .newArrayList("java", "-cp", "pinot-tools/target/pinot-tool-launcher-jar-with-dependencies.jar",
+            "org.apache.pinot.tools.admin.PinotAdministrator");
 
     commandLine.addAll(Lists.newArrayList(args));
 
     LOGGER.info("Running command " + Joiner.on(" ").join(commandLine));
 
-    Process process = new ProcessBuilder(commandLine.toArray(new String[0]))
-        .redirectOutput(ProcessBuilder.Redirect.INHERIT)
-        .redirectError(ProcessBuilder.Redirect.INHERIT)
-        .start();
+    Process process =
+        new ProcessBuilder(commandLine.toArray(new String[0])).redirectOutput(ProcessBuilder.Redirect.INHERIT)
+            .redirectError(ProcessBuilder.Redirect.INHERIT).start();
     int returnCode = process.waitFor();
     assertEquals(returnCode, 0);
   }

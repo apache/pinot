@@ -180,7 +180,8 @@ public class FixedByteSingleColumnMultiValueReaderWriter extends BaseSingleColum
   }
 
   @Override
-  public void close() throws IOException {
+  public void close()
+      throws IOException {
     for (PinotDataBuffer dataBuffer : _dataBuffers) {
       dataBuffer.close();
     }

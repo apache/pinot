@@ -157,8 +157,8 @@ public abstract class ClusterTest extends ControllerTest {
     try {
       for (int i = 0; i < numServers; i++) {
         configuration.setProperty(Server.CONFIG_OF_INSTANCE_DATA_DIR, Server.DEFAULT_INSTANCE_DATA_DIR + "-" + i);
-        configuration.setProperty(Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR,
-            Server.DEFAULT_INSTANCE_SEGMENT_TAR_DIR + "-" + i);
+        configuration
+            .setProperty(Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR, Server.DEFAULT_INSTANCE_SEGMENT_TAR_DIR + "-" + i);
         configuration.setProperty(Server.CONFIG_OF_ADMIN_API_PORT, baseAdminApiPort - i);
         configuration.setProperty(Server.CONFIG_OF_NETTY_PORT, baseNettyPort + i);
         // Set check interval time to 5 seconds for cluster tests.
@@ -236,7 +236,8 @@ public abstract class ClusterTest extends ControllerTest {
     FileUtils.deleteQuietly(new File(Minion.DEFAULT_INSTANCE_BASE_DIR));
   }
 
-  protected void addSchema(File schemaFile, String schemaName) throws Exception {
+  protected void addSchema(File schemaFile, String schemaName)
+      throws Exception {
     if (!isUsingNewConfigFormat()) {
       try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
         fileUploadDownloadClient
@@ -253,7 +254,8 @@ public abstract class ClusterTest extends ControllerTest {
    *
    * @param segmentDir Segment directory
    */
-  protected void uploadSegments(@Nonnull File segmentDir) throws Exception {
+  protected void uploadSegments(@Nonnull File segmentDir)
+      throws Exception {
     String[] segmentNames = segmentDir.list();
     Assert.assertNotNull(segmentNames);
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
@@ -267,7 +269,8 @@ public abstract class ClusterTest extends ControllerTest {
         final File segmentFile = new File(segmentDir, segmentName);
         tasks.add(executor.submit(new Callable<Integer>() {
           @Override
-          public Integer call() throws Exception {
+          public Integer call()
+              throws Exception {
             return fileUploadDownloadClient.uploadSegment(uploadSegmentHttpURI, segmentName, segmentFile)
                 .getStatusCode();
           }
@@ -280,17 +283,20 @@ public abstract class ClusterTest extends ControllerTest {
     }
   }
 
-  protected void addOfflineTable(String tableName) throws Exception {
+  protected void addOfflineTable(String tableName)
+      throws Exception {
     addOfflineTable(tableName, SegmentVersion.v1);
   }
 
-  protected void addOfflineTable(String tableName, SegmentVersion segmentVersion) throws Exception {
+  protected void addOfflineTable(String tableName, SegmentVersion segmentVersion)
+      throws Exception {
     addOfflineTable(tableName, null, null, null, null, null, segmentVersion, null, null, null);
   }
 
   protected void addOfflineTable(String tableName, String timeColumnName, String timeType, String brokerTenant,
       String serverTenant, String loadMode, SegmentVersion segmentVersion, List<String> invertedIndexColumns,
-      List<String> bloomFilterColumns, TableTaskConfig taskConfig) throws Exception {
+      List<String> bloomFilterColumns, TableTaskConfig taskConfig)
+      throws Exception {
     TableConfig tableConfig =
         getOfflineTableConfig(tableName, timeColumnName, timeType, brokerTenant, serverTenant, loadMode, segmentVersion,
             invertedIndexColumns, bloomFilterColumns, taskConfig);
@@ -304,7 +310,8 @@ public abstract class ClusterTest extends ControllerTest {
 
   protected void updateOfflineTable(String tableName, String timeColumnName, String timeType, String brokerTenant,
       String serverTenant, String loadMode, SegmentVersion segmentVersion, List<String> invertedIndexColumns,
-      List<String> bloomFilterColumns, TableTaskConfig taskConfig) throws Exception {
+      List<String> bloomFilterColumns, TableTaskConfig taskConfig)
+      throws Exception {
     TableConfig tableConfig =
         getOfflineTableConfig(tableName, timeColumnName, timeType, brokerTenant, serverTenant, loadMode, segmentVersion,
             invertedIndexColumns, bloomFilterColumns, taskConfig);
@@ -318,22 +325,17 @@ public abstract class ClusterTest extends ControllerTest {
 
   private static TableConfig getOfflineTableConfig(String tableName, String timeColumnName, String timeType,
       String brokerTenant, String serverTenant, String loadMode, SegmentVersion segmentVersion,
-      List<String> invertedIndexColumns, List<String> bloomFilterColumns, TableTaskConfig taskConfig) throws Exception {
-    return new TableConfig.Builder(Helix.TableType.OFFLINE).setTableName(tableName)
-        .setTimeColumnName(timeColumnName)
-        .setTimeType(timeType)
-        .setNumReplicas(3)
-        .setBrokerTenant(brokerTenant)
-        .setServerTenant(serverTenant)
-        .setLoadMode(loadMode)
-        .setSegmentVersion(segmentVersion.toString())
-        .setInvertedIndexColumns(invertedIndexColumns)
-        .setBloomFilterColumns(bloomFilterColumns)
-        .setTaskConfig(taskConfig)
-        .build();
+      List<String> invertedIndexColumns, List<String> bloomFilterColumns, TableTaskConfig taskConfig)
+      throws Exception {
+    return new TableConfig.Builder(Helix.TableType.OFFLINE).setTableName(tableName).setTimeColumnName(timeColumnName)
+        .setTimeType(timeType).setNumReplicas(3).setBrokerTenant(brokerTenant).setServerTenant(serverTenant)
+        .setLoadMode(loadMode).setSegmentVersion(segmentVersion.toString())
+        .setInvertedIndexColumns(invertedIndexColumns).setBloomFilterColumns(bloomFilterColumns)
+        .setTaskConfig(taskConfig).build();
   }
 
-  protected void dropOfflineTable(String tableName) throws Exception {
+  protected void dropOfflineTable(String tableName)
+      throws Exception {
     sendDeleteRequest(
         _controllerRequestURLBuilder.forTableDelete(TableNameBuilder.OFFLINE.tableNameWithType(tableName)));
   }
@@ -351,7 +353,8 @@ public abstract class ClusterTest extends ControllerTest {
     private DatumReader<GenericData.Record> _reader;
 
     @Override
-    public void init(Map<String, String> props, Schema indexingSchema, String topicName) throws Exception {
+    public void init(Map<String, String> props, Schema indexingSchema, String topicName)
+        throws Exception {
       // Load Avro schema
       DataFileStream<GenericRecord> reader = AvroUtils.getAvroReader(avroFile);
       _avroSchema = reader.getSchema();
@@ -382,53 +385,46 @@ public abstract class ClusterTest extends ControllerTest {
       String kafkaTopic, int realtimeSegmentFlushRows, File avroFile, String timeColumnName, String timeType,
       String schemaName, String brokerTenant, String serverTenant, String loadMode, String sortedColumn,
       List<String> invertedIndexColumns, List<String> bloomFilterColumns, List<String> noDictionaryColumns,
-      TableTaskConfig taskConfig, String streamConsumerFactoryName) throws Exception {
+      TableTaskConfig taskConfig, String streamConsumerFactoryName)
+      throws Exception {
     Map<String, String> streamConfigs = new HashMap<>();
     String streamType = "kafka";
     streamConfigs.put(StreamConfigProperties.STREAM_TYPE, streamType);
     if (useLlc) {
       // LLC
-      streamConfigs.put(
-          StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
-          StreamConfig.ConsumerType.LOWLEVEL.toString());
-      streamConfigs.put(KafkaStreamConfigProperties.constructStreamProperty(
-          KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_BROKER_LIST), kafkaBrokerList);
+      streamConfigs
+          .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
+              StreamConfig.ConsumerType.LOWLEVEL.toString());
+      streamConfigs.put(KafkaStreamConfigProperties
+          .constructStreamProperty(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_BROKER_LIST), kafkaBrokerList);
     } else {
       // HLC
-      streamConfigs.put(
-          StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
-          StreamConfig.ConsumerType.HIGHLEVEL.toString());
-      streamConfigs.put(KafkaStreamConfigProperties.constructStreamProperty(
-          KafkaStreamConfigProperties.HighLevelConsumer.KAFKA_HLC_ZK_CONNECTION_STRING), kafkaZkUrl);
+      streamConfigs
+          .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
+              StreamConfig.ConsumerType.HIGHLEVEL.toString());
+      streamConfigs.put(KafkaStreamConfigProperties
+              .constructStreamProperty(KafkaStreamConfigProperties.HighLevelConsumer.KAFKA_HLC_ZK_CONNECTION_STRING),
+          kafkaZkUrl);
     }
-    streamConfigs.put(StreamConfigProperties.constructStreamProperty(streamType,
-        StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS), streamConsumerFactoryName);
-    streamConfigs.put(
-        StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_TOPIC_NAME),
-        kafkaTopic);
+    streamConfigs.put(StreamConfigProperties
+            .constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS),
+        streamConsumerFactoryName);
+    streamConfigs
+        .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_TOPIC_NAME),
+            kafkaTopic);
     AvroFileSchemaKafkaAvroMessageDecoder.avroFile = avroFile;
-    streamConfigs.put(
-        StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_DECODER_CLASS),
-        AvroFileSchemaKafkaAvroMessageDecoder.class.getName());
+    streamConfigs
+        .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_DECODER_CLASS),
+            AvroFileSchemaKafkaAvroMessageDecoder.class.getName());
     streamConfigs.put(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS, Integer.toString(realtimeSegmentFlushRows));
-    streamConfigs.put(StreamConfigProperties.constructStreamProperty(streamType,
-        StreamConfigProperties.STREAM_CONSUMER_OFFSET_CRITERIA), "smallest");
+    streamConfigs.put(StreamConfigProperties
+        .constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_OFFSET_CRITERIA), "smallest");
 
-    TableConfig tableConfig = new TableConfig.Builder(Helix.TableType.REALTIME).setTableName(tableName)
-        .setLLC(useLlc)
-        .setTimeColumnName(timeColumnName)
-        .setTimeType(timeType)
-        .setSchemaName(schemaName)
-        .setBrokerTenant(brokerTenant)
-        .setServerTenant(serverTenant)
-        .setLoadMode(loadMode)
-        .setSortedColumn(sortedColumn)
-        .setInvertedIndexColumns(invertedIndexColumns)
-        .setBloomFilterColumns(bloomFilterColumns)
-        .setNoDictionaryColumns(noDictionaryColumns)
-        .setStreamConfigs(streamConfigs)
-        .setTaskConfig(taskConfig)
-        .build();
+    TableConfig tableConfig = new TableConfig.Builder(Helix.TableType.REALTIME).setTableName(tableName).setLLC(useLlc)
+        .setTimeColumnName(timeColumnName).setTimeType(timeType).setSchemaName(schemaName).setBrokerTenant(brokerTenant)
+        .setServerTenant(serverTenant).setLoadMode(loadMode).setSortedColumn(sortedColumn)
+        .setInvertedIndexColumns(invertedIndexColumns).setBloomFilterColumns(bloomFilterColumns)
+        .setNoDictionaryColumns(noDictionaryColumns).setStreamConfigs(streamConfigs).setTaskConfig(taskConfig).build();
 
     // save the realtime table config
     _realtimeTableConfig = tableConfig;
@@ -438,16 +434,20 @@ public abstract class ClusterTest extends ControllerTest {
     }
   }
 
-  protected void updateRealtimeTableConfig(String tablename, List<String> invertedIndexCols, List<String> bloomFilterCols) throws Exception {
+  protected void updateRealtimeTableConfig(String tablename, List<String> invertedIndexCols,
+      List<String> bloomFilterCols)
+      throws Exception {
 
-    IndexingConfig config  = _realtimeTableConfig.getIndexingConfig();
+    IndexingConfig config = _realtimeTableConfig.getIndexingConfig();
     config.setInvertedIndexColumns(invertedIndexCols);
     config.setBloomFilterColumns(bloomFilterCols);
 
-    sendPutRequest(_controllerRequestURLBuilder.forUpdateTableConfig(tablename), _realtimeTableConfig.toJSONConfigString());
+    sendPutRequest(_controllerRequestURLBuilder.forUpdateTableConfig(tablename),
+        _realtimeTableConfig.toJSONConfigString());
   }
 
-  protected void dropRealtimeTable(String tableName) throws Exception {
+  protected void dropRealtimeTable(String tableName)
+      throws Exception {
     sendDeleteRequest(
         _controllerRequestURLBuilder.forTableDelete(TableNameBuilder.REALTIME.tableNameWithType(tableName)));
   }
@@ -456,7 +456,8 @@ public abstract class ClusterTest extends ControllerTest {
       String kafkaTopic, int realtimeSegmentFlushSize, File avroFile, String timeColumnName, String timeType,
       String schemaName, String brokerTenant, String serverTenant, String loadMode, String sortedColumn,
       List<String> invertedIndexColumns, List<String> bloomFilterColumns, List<String> noDictionaryColumns,
-      TableTaskConfig taskConfig, String streamConsumerFactoryName) throws Exception {
+      TableTaskConfig taskConfig, String streamConsumerFactoryName)
+      throws Exception {
     addOfflineTable(tableName, timeColumnName, timeType, brokerTenant, serverTenant, loadMode, SegmentVersion.v1,
         invertedIndexColumns, bloomFilterColumns, taskConfig);
     addRealtimeTable(tableName, useLlc, kafkaBrokerList, kafkaZkUrl, kafkaTopic, realtimeSegmentFlushSize, avroFile,
@@ -464,31 +465,37 @@ public abstract class ClusterTest extends ControllerTest {
         bloomFilterColumns, noDictionaryColumns, taskConfig, streamConsumerFactoryName);
   }
 
-  protected void createBrokerTenant(String tenantName, int brokerCount) throws Exception {
+  protected void createBrokerTenant(String tenantName, int brokerCount)
+      throws Exception {
     String request = ControllerRequestBuilderUtil.buildBrokerTenantCreateRequestJSON(tenantName, brokerCount);
     sendPostRequest(_controllerRequestURLBuilder.forBrokerTenantCreate(), request);
   }
 
   protected void createServerTenant(String tenantName, int offlineServerCount, int realtimeServerCount)
       throws Exception {
-    String request = ControllerRequestBuilderUtil.buildServerTenantCreateRequestJSON(tenantName,
-        offlineServerCount + realtimeServerCount, offlineServerCount, realtimeServerCount);
+    String request = ControllerRequestBuilderUtil
+        .buildServerTenantCreateRequestJSON(tenantName, offlineServerCount + realtimeServerCount, offlineServerCount,
+            realtimeServerCount);
     sendPostRequest(_controllerRequestURLBuilder.forServerTenantCreate(), request);
   }
 
-  protected JsonNode getDebugInfo(final String uri) throws Exception {
+  protected JsonNode getDebugInfo(final String uri)
+      throws Exception {
     return JsonUtils.stringToJsonNode(sendGetRequest(_brokerBaseApiUrl + "/" + uri));
   }
 
-  protected JsonNode postQuery(String query) throws Exception {
+  protected JsonNode postQuery(String query)
+      throws Exception {
     return postQuery(query, _brokerBaseApiUrl);
   }
 
-  public static JsonNode postQuery(String query, String brokerBaseApiUrl) throws Exception {
+  public static JsonNode postQuery(String query, String brokerBaseApiUrl)
+      throws Exception {
     return postQuery(query, brokerBaseApiUrl, false);
   }
 
-  public static JsonNode postQuery(String query, String brokerBaseApiUrl, boolean enableTrace) throws Exception {
+  public static JsonNode postQuery(String query, String brokerBaseApiUrl, boolean enableTrace)
+      throws Exception {
     ObjectNode payload = JsonUtils.newObjectNode();
     payload.put("pql", query);
     payload.put("trace", enableTrace);

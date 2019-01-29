@@ -41,6 +41,7 @@ public class DataSize {
   private static final DecimalFormat DECIMAL_FORMAT = new DecimalFormat("0.##");
 
   static final Map<String, Long> MULTIPLIER;
+
   static {
     MULTIPLIER = new HashMap<>(4);
     MULTIPLIER.put("T", 1024L * 1024 * 1024 * 1024L);
@@ -48,7 +49,6 @@ public class DataSize {
     MULTIPLIER.put("M", 1024 * 1024L);
     MULTIPLIER.put("K", 1024L);
     MULTIPLIER.put("B", 1L);
-
   }
 
   /**
@@ -62,7 +62,7 @@ public class DataSize {
     }
 
     Matcher matcher = STORAGE_VAL_PATTERN.matcher(val);
-    if (! matcher.matches()) {
+    if (!matcher.matches()) {
       return -1;
     }
     String number = matcher.group(1);
@@ -78,11 +78,11 @@ public class DataSize {
   public static String fromBytes(long bytes) {
     if (bytes < MULTIPLIER.get("K")) {
       return String.valueOf(bytes) + "B";
-    } else if (bytes < MULTIPLIER.get("M")){
+    } else if (bytes < MULTIPLIER.get("M")) {
       return DECIMAL_FORMAT.format(((double) bytes) / MULTIPLIER.get("K")) + "KB";
     } else if (bytes < MULTIPLIER.get("G")) {
       return DECIMAL_FORMAT.format(((double) bytes) / MULTIPLIER.get("M")) + "MB";
-    } else if (bytes < MULTIPLIER.get("T")){
+    } else if (bytes < MULTIPLIER.get("T")) {
       return DECIMAL_FORMAT.format(((double) bytes) / MULTIPLIER.get("G")) + "GB";
     } else {
       return DECIMAL_FORMAT.format(((double) bytes) / MULTIPLIER.get("T")) + "TB";

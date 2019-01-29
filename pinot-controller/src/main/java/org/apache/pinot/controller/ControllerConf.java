@@ -49,7 +49,8 @@ public class ControllerConf extends PropertiesConfiguration {
   // Potentially same as data dir if local
   private static final String LOCAL_TEMP_DIR = "controller.local.temp.dir";
   private static final String ZK_STR = "controller.zk.str";
-  private static final String UPDATE_SEGMENT_STATE_MODEL = "controller.update_segment_state_model"; // boolean: Update the statemodel on boot?
+  // boolean: Update the statemodel on boot?
+  private static final String UPDATE_SEGMENT_STATE_MODEL = "controller.update_segment_state_model";
   private static final String HELIX_CLUSTER_NAME = "controller.helix.cluster.name";
   private static final String CLUSTER_TENANT_ISOLATION_ENABLE = "cluster.tenant.isolation.enable";
   private static final String CONSOLE_WEBAPP_ROOT_PATH = "controller.query.console";
@@ -59,7 +60,8 @@ public class ControllerConf extends PropertiesConfiguration {
   public static class ControllerPeriodicTasksConf {
     // frequency configs
     private static final String RETENTION_MANAGER_FREQUENCY_IN_SECONDS = "controller.retention.frequencyInSeconds";
-    @Deprecated // The ValidationManager has been split up into 3 separate tasks, each having their own frequency config settings
+    @Deprecated
+    // The ValidationManager has been split up into 3 separate tasks, each having their own frequency config settings
     private static final String DEPRECATED_VALIDATION_MANAGER_FREQUENCY_IN_SECONDS =
         "controller.validation.frequencyInSeconds";
     private static final String OFFLINE_SEGMENT_INTERVAL_CHECKER_FREQUENCY_IN_SECONDS =
@@ -80,12 +82,14 @@ public class ControllerConf extends PropertiesConfiguration {
         "controller.segment.level.validation.intervalInSeconds";
 
     // Initial delays
-    private static final String STATUS_CHECKER_INITIAL_DELAY_IN_SECONDS = "controller.statusChecker.initialDelayInSeconds";
+    private static final String STATUS_CHECKER_INITIAL_DELAY_IN_SECONDS =
+        "controller.statusChecker.initialDelayInSeconds";
 
     public static final int MIN_INITIAL_DELAY_IN_SECONDS = 120;
     public static final int MAX_INITIAL_DELAY_IN_SECONDS = 300;
 
     private static final Random RANDOM = new Random();
+
     private static long getRandomInitialDelayInSeconds() {
       return MIN_INITIAL_DELAY_IN_SECONDS + RANDOM.nextInt(MAX_INITIAL_DELAY_IN_SECONDS - MIN_INITIAL_DELAY_IN_SECONDS);
     }
@@ -113,7 +117,8 @@ public class ControllerConf extends PropertiesConfiguration {
   // Amount of the time the segment can take from the beginning of upload to the end of upload. Used when parallel push
   // protection is enabled. If the upload does not finish within the timeout, next upload can override the previous one.
   private static final String SEGMENT_UPLOAD_TIMEOUT_IN_MILLIS = "controller.segment.upload.timeoutInMillis";
-  private static final String REALTIME_SEGMENT_METADATA_COMMIT_NUMLOCKS = "controller.realtime.segment.metadata.commit.numLocks";
+  private static final String REALTIME_SEGMENT_METADATA_COMMIT_NUMLOCKS =
+      "controller.realtime.segment.metadata.commit.numLocks";
   private static final String ENABLE_STORAGE_QUOTA_CHECK = "controller.enable.storage.quota.check";
 
   private static final String ENABLE_BATCH_MESSAGE_MODE = "controller.enable.batch.message.mode";
@@ -121,7 +126,6 @@ public class ControllerConf extends PropertiesConfiguration {
   // Defines the kind of storage and the underlying PinotFS implementation
   private static final String PINOT_FS_FACTORY_CLASS_PREFIX = "controller.storage.factory.class";
   private static final String PINOT_FS_FACTORY_CLASS_LOCAL = "controller.storage.factory.class.file";
-
 
   private static final long DEFAULT_EXTERNAL_VIEW_ONLINE_TO_OFFLINE_TIMEOUT_MILLIS = 120_000L; // 2 minutes
   private static final int DEFAULT_SERVER_ADMIN_REQUEST_TIMEOUT_SECONDS = 30;
@@ -138,7 +142,8 @@ public class ControllerConf extends PropertiesConfiguration {
 
   private static final String DEFAULT_PINOT_FS_FACTORY_CLASS_LOCAL = LocalPinotFS.class.getName();
 
-  public ControllerConf(File file) throws ConfigurationException {
+  public ControllerConf(File file)
+      throws ConfigurationException {
     super(file);
   }
 
@@ -167,8 +172,9 @@ public class ControllerConf extends PropertiesConfiguration {
     try {
       return new URI(StringUtil.join(File.separator, baseDataDir, tableName, URLEncoder.encode(segmentName, "UTF-8")));
     } catch (UnsupportedEncodingException | URISyntaxException e) {
-      LOGGER.error("Could not construct segment location with baseDataDir {}, tableName {}, segmentName {}",
-          baseDataDir, tableName, segmentName);
+      LOGGER
+          .error("Could not construct segment location with baseDataDir {}, tableName {}, segmentName {}", baseDataDir,
+              tableName, segmentName);
       throw new RuntimeException(e);
     }
   }
@@ -317,8 +323,9 @@ public class ControllerConf extends PropertiesConfiguration {
     } else if (zkAddressObj instanceof String) {
       return (String) zkAddressObj;
     } else {
-      throw new RuntimeException("Unexpected data type for zkAddress PropertiesConfiguration, expecting String but got "
-          + zkAddressObj.getClass().getName());
+      throw new RuntimeException(
+          "Unexpected data type for zkAddress PropertiesConfiguration, expecting String but got " + zkAddressObj
+              .getClass().getName());
     }
   }
 
@@ -398,8 +405,8 @@ public class ControllerConf extends PropertiesConfiguration {
    */
   public int getRealtimeSegmentValidationFrequencyInSeconds() {
     if (containsKey(ControllerPeriodicTasksConf.REALTIME_SEGMENT_VALIDATION_FREQUENCY_IN_SECONDS)) {
-      return Integer.parseInt(
-          (String) getProperty(ControllerPeriodicTasksConf.REALTIME_SEGMENT_VALIDATION_FREQUENCY_IN_SECONDS));
+      return Integer
+          .parseInt((String) getProperty(ControllerPeriodicTasksConf.REALTIME_SEGMENT_VALIDATION_FREQUENCY_IN_SECONDS));
     }
     return getInt(ControllerPeriodicTasksConf.DEPRECATED_VALIDATION_MANAGER_FREQUENCY_IN_SECONDS,
         ControllerPeriodicTasksConf.DEFAULT_REALTIME_SEGMENT_VALIDATION_FREQUENCY_IN_SECONDS);
@@ -419,8 +426,8 @@ public class ControllerConf extends PropertiesConfiguration {
    */
   public int getBrokerResourceValidationFrequencyInSeconds() {
     if (containsKey(ControllerPeriodicTasksConf.BROKER_RESOURCE_VALIDATION_FREQUENCY_IN_SECONDS)) {
-      return Integer.parseInt(
-          (String) getProperty(ControllerPeriodicTasksConf.BROKER_RESOURCE_VALIDATION_FREQUENCY_IN_SECONDS));
+      return Integer
+          .parseInt((String) getProperty(ControllerPeriodicTasksConf.BROKER_RESOURCE_VALIDATION_FREQUENCY_IN_SECONDS));
     }
     return getInt(ControllerPeriodicTasksConf.DEPRECATED_VALIDATION_MANAGER_FREQUENCY_IN_SECONDS,
         ControllerPeriodicTasksConf.DEFAULT_BROKER_RESOURCE_VALIDATION_FREQUENCY_IN_SECONDS);
@@ -456,8 +463,8 @@ public class ControllerConf extends PropertiesConfiguration {
 
   public int getStatusCheckerWaitForPushTimeInSeconds() {
     if (containsKey(ControllerPeriodicTasksConf.STATUS_CHECKER_WAIT_FOR_PUSH_TIME_IN_SECONDS)) {
-      return Integer.parseInt(
-          (String) getProperty(ControllerPeriodicTasksConf.STATUS_CHECKER_WAIT_FOR_PUSH_TIME_IN_SECONDS));
+      return Integer
+          .parseInt((String) getProperty(ControllerPeriodicTasksConf.STATUS_CHECKER_WAIT_FOR_PUSH_TIME_IN_SECONDS));
     }
     return ControllerPeriodicTasksConf.DEFAULT_STATUS_CONTROLLER_WAIT_FOR_PUSH_TIME_IN_SECONDS;
   }

@@ -34,5 +34,6 @@ public interface RetryPolicy {
    * @throws AttemptsExceededException
    * @throws RetriableOperationException
    */
-  void attempt(Callable<Boolean> operation) throws AttemptsExceededException, RetriableOperationException;
+  void attempt(Callable<Boolean> operation)
+      throws AttemptsExceededException, RetriableOperationException;
 }

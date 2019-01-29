@@ -80,8 +80,8 @@ public class HdfsSegmentFetcher implements SegmentFetcher {
       UserGroupInformation.setConfiguration(hadoopConf);
       if (UserGroupInformation.isSecurityEnabled()) {
         try {
-          if (!UserGroupInformation.getCurrentUser().hasKerberosCredentials()
-              || !UserGroupInformation.getCurrentUser().getUserName().equals(principal)) {
+          if (!UserGroupInformation.getCurrentUser().hasKerberosCredentials() || !UserGroupInformation.getCurrentUser()
+              .getUserName().equals(principal)) {
             LOGGER.info("Trying to authenticate user [%s] with keytab [%s]..", principal, keytab);
             UserGroupInformation.loginUserFromKeytab(principal, keytab);
           }
@@ -94,7 +94,8 @@ public class HdfsSegmentFetcher implements SegmentFetcher {
   }
 
   @Override
-  public void fetchSegmentToLocal(final String uri, final File tempFile) throws Exception {
+  public void fetchSegmentToLocal(final String uri, final File tempFile)
+      throws Exception {
     LOGGER.debug("starting to fetch segment from hdfs");
     final String dstFilePath = tempFile.getAbsolutePath();
     try {
@@ -109,8 +110,9 @@ public class HdfsSegmentFetcher implements SegmentFetcher {
           }
           long startMs = System.currentTimeMillis();
           _hadoopFS.copyToLocalFile(remoteFile, localFile);
-          LOGGER.debug("copied {} from hdfs to {} in local for size {}, take {} ms", uri, dstFilePath,
-              tempFile.length(), System.currentTimeMillis() - startMs);
+          LOGGER
+              .debug("copied {} from hdfs to {} in local for size {}, take {} ms", uri, dstFilePath, tempFile.length(),
+                  System.currentTimeMillis() - startMs);
           return true;
         } catch (IOException e) {
           LOGGER.warn("failed to fetch segment {} from hdfs, might retry", uri, e);

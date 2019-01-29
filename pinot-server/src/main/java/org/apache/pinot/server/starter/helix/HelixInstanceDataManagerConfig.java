@@ -90,21 +90,22 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   //
   private static final String MAX_PARALLEL_REFRESH_THREADS = "max.parallel.refresh.threads";
 
-  private final static String[] REQUIRED_KEYS = { INSTANCE_ID, INSTANCE_DATA_DIR, READ_MODE };
+  private final static String[] REQUIRED_KEYS = {INSTANCE_ID, INSTANCE_DATA_DIR, READ_MODE};
   private Configuration _instanceDataManagerConfiguration = null;
 
-  public HelixInstanceDataManagerConfig(Configuration serverConfig) throws ConfigurationException {
+  public HelixInstanceDataManagerConfig(Configuration serverConfig)
+      throws ConfigurationException {
     _instanceDataManagerConfiguration = serverConfig;
     Iterator keysIterator = serverConfig.getKeys();
     while (keysIterator.hasNext()) {
       String key = (String) keysIterator.next();
-      LOGGER.info("InstanceDataManagerConfig, key: {} , value: {}",  key,
-          serverConfig.getProperty(key));
+      LOGGER.info("InstanceDataManagerConfig, key: {} , value: {}", key, serverConfig.getProperty(key));
     }
     checkRequiredKeys();
   }
 
-  private void checkRequiredKeys() throws ConfigurationException {
+  private void checkRequiredKeys()
+      throws ConfigurationException {
     for (String keyString : REQUIRED_KEYS) {
       if (!_instanceDataManagerConfiguration.containsKey(keyString)) {
         throw new ConfigurationException("Cannot find required key : " + keyString);

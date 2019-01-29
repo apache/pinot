@@ -26,6 +26,7 @@ import org.apache.helix.manager.zk.ZkBaseDataAccessor;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.zookeeper.data.Stat;
 
+
 public class FakePropertyStore extends ZkHelixPropertyStore<ZNRecord> {
   private Map<String, ZNRecord> _contents = new HashMap<>();
   private IZkDataListener _listener = null;
@@ -64,7 +65,8 @@ public class FakePropertyStore extends ZkHelixPropertyStore<ZNRecord> {
     }
   }
 
-  public void setContents(String path, ZNRecord contents) throws Exception {
+  public void setContents(String path, ZNRecord contents)
+      throws Exception {
     _contents.put(path, contents);
     if (_listener != null) {
       _listener.handleDataChange(path, contents);

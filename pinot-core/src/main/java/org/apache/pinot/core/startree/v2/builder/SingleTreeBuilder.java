@@ -29,5 +29,6 @@ public interface SingleTreeBuilder extends Closeable {
   /**
    * Builds the star-tree.
    */
-  void build() throws Exception;
+  void build()
+      throws Exception;
 }

@@ -24,6 +24,7 @@ import org.apache.pinot.core.query.utils.Pair;
 
 public class CountFunction extends AggregationFunc {
   private static final String _name = "count";
+
   CountFunction(ResultTable rows, String column) {
     super(rows, column);
   }

@@ -27,6 +27,7 @@ import org.joda.time.Duration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
 /**
  * A simple code to invoke a method in any class using reflection.
  * Eventually this will support annotations on the method but for now its a simple wrapper on any java method
@@ -44,7 +45,8 @@ public class FunctionInvoker {
   private long lastExceptionTime = 0;
   private FunctionInfo _functionInfo;
 
-  public FunctionInvoker(FunctionInfo functionInfo) throws Exception {
+  public FunctionInvoker(FunctionInfo functionInfo)
+      throws Exception {
     _functionInfo = functionInfo;
     _method = functionInfo.getMethod();
     Class<?> clazz = functionInfo.getClazz();
@@ -74,15 +76,16 @@ public class FunctionInvoker {
       }
       //some udf's might be configured incorrectly and we dont want to pollute the log
       //keep track of the last time an exception was logged and reset the counter if the last exception is more than the EXCEPTION_LIMIT_DURATION
-      if(Duration.millis(System.currentTimeMillis() - lastExceptionTime).getStandardMinutes() > EXCEPTION_LIMIT_DURATION) {
+      if (Duration.millis(System.currentTimeMillis() - lastExceptionTime).getStandardMinutes()
+          > EXCEPTION_LIMIT_DURATION) {
         exceptionCount = 0;
       }
-      if(exceptionCount < EXCEPTION_LIMIT_RATE) {
+      if (exceptionCount < EXCEPTION_LIMIT_RATE) {
         exceptionCount = exceptionCount + 1;
-        LOGGER.error("Exception invoking method:{} with args:{}, exception message: {}", _method.getName(), Arrays.toString(args), cause.getMessage());
+        LOGGER.error("Exception invoking method:{} with args:{}, exception message: {}", _method.getName(),
+            Arrays.toString(args), cause.getMessage());
       }
       return null;
     }
   }
-
 }

@@ -853,8 +853,8 @@ public class QuantileDigest {
       builder.append("\tsubgraph level_" + entry.getKey() + " {\n").append("\t\trank = same;\n");
 
       for (Node node : entry.getValue()) {
-        builder.append(
-            String.format("\t\t%s [label=\"[%s..%s]@%s\\n%s\", shape=rect, style=filled,color=%s];\n", idFor(node),
+        builder.append(String
+            .format("\t\t%s [label=\"[%s..%s]@%s\\n%s\", shape=rect, style=filled,color=%s];\n", idFor(node),
                 node.getLowerBound(), node.getUpperBound(), node.level, node.weightedCount,
                 node.weightedCount > 0 ? "salmon2" : "white"));
       }
@@ -1025,8 +1025,8 @@ public class QuantileDigest {
       }
       final Node other = (Node) obj;
       return Objects.equal(this.weightedCount, other.weightedCount) && Objects.equal(this.level, other.level) && Objects
-          .equal(this.bits, other.bits) && Objects.equal(this.left, other.left) && Objects.equal(this.right,
-          other.right);
+          .equal(this.bits, other.bits) && Objects.equal(this.left, other.left) && Objects
+          .equal(this.right, other.right);
     }
   }
 

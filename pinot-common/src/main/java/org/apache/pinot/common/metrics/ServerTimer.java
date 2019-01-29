@@ -22,9 +22,9 @@ import org.apache.pinot.common.Utils;
 
 
 /**
-* Enumeration containing all the timers exposed by the Pinot server.
-*
-*/
+ * Enumeration containing all the timers exposed by the Pinot server.
+ *
+ */
 public enum ServerTimer implements AbstractMetrics.Timer {
   CURRENT_MSG_EVENT_TIMESTAMP_LAG("currentMsgEventTimestampLag", false);
 

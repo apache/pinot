@@ -39,5 +39,6 @@ public interface ValueReader {
 
   byte[] getBytes(int index, int numBytesPerValue, byte[] buffer);
 
-  void close() throws IOException;
+  void close()
+      throws IOException;
 }

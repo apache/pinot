@@ -28,6 +28,7 @@ public class DefaultSegmentNameGenerator implements SegmentNameGenerator {
   private final String _tableName;
   private final String _segmentNamePostfix;
   private final int _sequenceId;
+
   /**
    * To be used when segment name is pre-decided externally
    * @param segmentName
@@ -46,7 +47,8 @@ public class DefaultSegmentNameGenerator implements SegmentNameGenerator {
    * @param tableName
    * @param segmentNamePostfix
    */
-  public DefaultSegmentNameGenerator(String timeColumnName, String tableName, String segmentNamePostfix, int sequenceId) {
+  public DefaultSegmentNameGenerator(String timeColumnName, String tableName, String segmentNamePostfix,
+      int sequenceId) {
     _timeColumnName = timeColumnName;
     _tableName = tableName;
     _segmentNamePostfix = segmentNamePostfix;
@@ -80,7 +82,8 @@ public class DefaultSegmentNameGenerator implements SegmentNameGenerator {
    * @throws Exception
    */
   @Override
-  public String generateSegmentName(ColumnStatistics statsCollector) throws Exception {
+  public String generateSegmentName(ColumnStatistics statsCollector)
+      throws Exception {
     if (_segmentName != null) {
       return _segmentName;
     }
@@ -106,11 +109,13 @@ public class DefaultSegmentNameGenerator implements SegmentNameGenerator {
     return segmentName;
   }
 
-  protected static String buildBasic(String tableName, Object minTimeValue, Object maxTimeValue, int sequenceId, String postfix) {
+  protected static String buildBasic(String tableName, Object minTimeValue, Object maxTimeValue, int sequenceId,
+      String postfix) {
     if (sequenceId == -1) {
       return StringUtil.join("_", tableName, minTimeValue.toString(), maxTimeValue.toString(), postfix);
     } else {
-      return StringUtil.join("_", tableName, minTimeValue.toString(), maxTimeValue.toString(), postfix, Integer.toString(sequenceId));
+      return StringUtil.join("_", tableName, minTimeValue.toString(), maxTimeValue.toString(), postfix,
+          Integer.toString(sequenceId));
     }
   }
 
@@ -118,7 +123,8 @@ public class DefaultSegmentNameGenerator implements SegmentNameGenerator {
     if (sequenceId == -1) {
       return StringUtil.join("_", tableName, minTimeValue.toString(), maxTimeValue.toString());
     } else {
-      return StringUtil.join("_", tableName, minTimeValue.toString(), maxTimeValue.toString(), Integer.toString(sequenceId));
+      return StringUtil
+          .join("_", tableName, minTimeValue.toString(), maxTimeValue.toString(), Integer.toString(sequenceId));
     }
   }
 

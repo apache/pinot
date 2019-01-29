@@ -56,7 +56,6 @@ abstract class ColumnIndexDirectory implements Closeable {
     Preconditions.checkArgument(segmentDirectory.isDirectory(),
         "SegmentDirectory: " + segmentDirectory.toString() + " is not a directory");
 
-
     this.segmentDirectory = segmentDirectory;
     this.metadata = metadata;
     this.readMode = readMode;
@@ -68,7 +67,7 @@ abstract class ColumnIndexDirectory implements Closeable {
    * @param context additional context string
    * @return formatted string for memory tracking
    */
-  protected String allocationContext(File f, String context)  {
+  protected String allocationContext(File f, String context) {
     return this.getClass().getSimpleName() + "." + f.toString() + "." + context;
   }
 
@@ -80,6 +79,7 @@ abstract class ColumnIndexDirectory implements Closeable {
    */
   public abstract PinotDataBuffer getDictionaryBufferFor(String column)
       throws IOException;
+
   /**
    * Get forward index data buffer for a column
    * @param column column name
@@ -88,6 +88,7 @@ abstract class ColumnIndexDirectory implements Closeable {
    */
   public abstract PinotDataBuffer getForwardIndexBufferFor(String column)
       throws IOException;
+
   /**
    * Get inverted index data buffer for a column
    * @param column column name
@@ -96,6 +97,7 @@ abstract class ColumnIndexDirectory implements Closeable {
    */
   public abstract PinotDataBuffer getInvertedIndexBufferFor(String column)
       throws IOException;
+
   /**
    * Get inverted bloom filter buffer for a column
    * @param column column name
@@ -104,6 +106,7 @@ abstract class ColumnIndexDirectory implements Closeable {
    */
   public abstract PinotDataBuffer getBloomFilterBufferFor(String column)
       throws IOException;
+
   /**
    * Allocate a new data buffer of specified sizeBytes in the columnar index directory
    * @param column column name
@@ -113,6 +116,7 @@ abstract class ColumnIndexDirectory implements Closeable {
    */
   public abstract PinotDataBuffer newDictionaryBuffer(String column, long sizeBytes)
       throws IOException;
+
   /**
    * Allocate a new data buffer of specified sizeBytes in the columnar index directory
    * @param column column name
@@ -122,6 +126,7 @@ abstract class ColumnIndexDirectory implements Closeable {
    */
   public abstract PinotDataBuffer newForwardIndexBuffer(String column, long sizeBytes)
       throws IOException;
+
   /**
    * Allocate a new data buffer of specified sizeBytes in the columnar index directory
    * @param column column name
@@ -131,6 +136,7 @@ abstract class ColumnIndexDirectory implements Closeable {
    */
   public abstract PinotDataBuffer newInvertedIndexBuffer(String column, long sizeBytes)
       throws IOException;
+
   /**
    * Allocate a new data buffer of specified sizeBytes in the columnar index directory
    * @param column column name
@@ -166,5 +172,4 @@ abstract class ColumnIndexDirectory implements Closeable {
     // this is not version dependent for now
     return new File(segmentDirectory, V1Constants.STAR_TREE_INDEX_FILE);
   }
-
 }

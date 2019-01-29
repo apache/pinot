@@ -53,11 +53,11 @@ public class StarTreeIndexContainer implements Closeable {
       // Star-tree V2 exists, load it
       File indexFile = new File(segmentDirectory, StarTreeV2Constants.INDEX_FILE_NAME);
       if (readMode == ReadMode.heap) {
-        _dataBuffer = PinotDataBuffer.loadFile(indexFile, 0, indexFile.length(), ByteOrder.LITTLE_ENDIAN,
-            "Star-tree V2 data buffer");
+        _dataBuffer = PinotDataBuffer
+            .loadFile(indexFile, 0, indexFile.length(), ByteOrder.LITTLE_ENDIAN, "Star-tree V2 data buffer");
       } else {
-        _dataBuffer = PinotDataBuffer.mapFile(indexFile, true, 0, indexFile.length(), ByteOrder.LITTLE_ENDIAN,
-            "Star-tree V2 data buffer");
+        _dataBuffer = PinotDataBuffer
+            .mapFile(indexFile, true, 0, indexFile.length(), ByteOrder.LITTLE_ENDIAN, "Star-tree V2 data buffer");
       }
       File indexMapFile = new File(segmentDirectory, StarTreeV2Constants.INDEX_MAP_FILE_NAME);
       List<Map<IndexKey, IndexValue>> indexMapList =
@@ -67,11 +67,11 @@ public class StarTreeIndexContainer implements Closeable {
       // Backward-compatible: star-tree V2 does not exist, convert star-tree V1 to star-tree V2
       File indexFile = new File(segmentDirectory, V1Constants.STAR_TREE_INDEX_FILE);
       if (readMode == ReadMode.heap) {
-        _dataBuffer = PinotDataBuffer.loadFile(indexFile, 0, indexFile.length(), ByteOrder.LITTLE_ENDIAN,
-            "Star-tree V1 data buffer");
+        _dataBuffer = PinotDataBuffer
+            .loadFile(indexFile, 0, indexFile.length(), ByteOrder.LITTLE_ENDIAN, "Star-tree V1 data buffer");
       } else {
-        _dataBuffer = PinotDataBuffer.mapFile(indexFile, true, 0, indexFile.length(), ByteOrder.LITTLE_ENDIAN,
-            "Star-tree V1 data buffer");
+        _dataBuffer = PinotDataBuffer
+            .mapFile(indexFile, true, 0, indexFile.length(), ByteOrder.LITTLE_ENDIAN, "Star-tree V1 data buffer");
       }
       _starTrees = StarTreeLoaderUtils.convertFromStarTreeV1(_dataBuffer, segmentMetadata, indexContainerMap);
     }
@@ -82,7 +82,8 @@ public class StarTreeIndexContainer implements Closeable {
   }
 
   @Override
-  public void close() throws IOException {
+  public void close()
+      throws IOException {
     _dataBuffer.close();
   }
 }

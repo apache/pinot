@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.io.writer;
 
-
 public interface SingleColumnMultiValueWriter extends DataFileWriter {
   /**
    * Read the multiple values for a column at a specific row.

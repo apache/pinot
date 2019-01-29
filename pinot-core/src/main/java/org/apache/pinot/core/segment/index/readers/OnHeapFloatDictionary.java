@@ -71,8 +71,8 @@ public class OnHeapFloatDictionary extends OnHeapDictionary {
       value = (float) rawValue;
     } else {
       throw new IllegalArgumentException(
-          "Illegal data type for argument, actual: " + rawValue.getClass().getName() + " expected: "
-              + Float.class.getName());
+          "Illegal data type for argument, actual: " + rawValue.getClass().getName() + " expected: " + Float.class
+              .getName());
     }
     return value;
   }

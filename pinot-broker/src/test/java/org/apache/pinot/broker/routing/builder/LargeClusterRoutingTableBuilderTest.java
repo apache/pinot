@@ -84,7 +84,8 @@ public class LargeClusterRoutingTableBuilderTest {
 
     final InstanceConfig shuttingDownInstance = instanceConfigs.get(1);
     final String shuttingDownInstanceName = shuttingDownInstance.getInstanceName();
-    shuttingDownInstance.getRecord().setSimpleField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, Boolean.toString(true));
+    shuttingDownInstance.getRecord()
+        .setSimpleField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, Boolean.toString(true));
 
     validateAssertionForOneRoutingTable(new RoutingTableValidator() {
       @Override
@@ -183,9 +184,10 @@ public class LargeClusterRoutingTableBuilderTest {
         done = true;
       } else {
         if (iterationCount++ >= maxNumIterations) {
-          Assert.fail("At least one server has more than 150% of the load of the least loaded server, minNumberOfSegmentsAssignedPerServer = "
-                + minNumberOfSegmentsAssignedPerServer + " maxNumberOfSegmentsAssignedPerServer = "
-                + maxNumberOfSegmentsAssignedPerServer);
+          Assert.fail(
+              "At least one server has more than 150% of the load of the least loaded server, minNumberOfSegmentsAssignedPerServer = "
+                  + minNumberOfSegmentsAssignedPerServer + " maxNumberOfSegmentsAssignedPerServer = "
+                  + maxNumberOfSegmentsAssignedPerServer);
         }
       }
     }
@@ -216,8 +218,7 @@ public class LargeClusterRoutingTableBuilderTest {
     return externalView;
   }
 
-  private void validateAssertionOverMultipleRoutingTables(RoutingTableValidator routingTableValidator,
-      String message) {
+  private void validateAssertionOverMultipleRoutingTables(RoutingTableValidator routingTableValidator, String message) {
     if (EXHAUSTIVE) {
       for (int instanceCount = 1; instanceCount < 100; instanceCount += 1) {
         for (int replicationFactor = 1; replicationFactor < 10; replicationFactor++) {

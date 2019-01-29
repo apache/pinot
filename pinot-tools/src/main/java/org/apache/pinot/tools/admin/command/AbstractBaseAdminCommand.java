@@ -56,13 +56,15 @@ public class AbstractBaseAdminCommand extends AbstractBaseCommand {
     return Integer.parseInt(processName.split("@")[0]);
   }
 
-  protected void savePID(String fileName) throws IOException {
+  protected void savePID(String fileName)
+      throws IOException {
     FileWriter pidFile = new FileWriter(fileName);
     pidFile.write(getPID());
     pidFile.close();
   }
 
-  public static String sendPostRequest(String urlString, String payload) throws IOException {
+  public static String sendPostRequest(String urlString, String payload)
+      throws IOException {
     final URL url = new URL(urlString);
     final URLConnection conn = url.openConnection();
 
@@ -83,7 +85,8 @@ public class AbstractBaseAdminCommand extends AbstractBaseCommand {
     return sb.toString();
   }
 
-  PropertiesConfiguration readConfigFromFile(String configFileName) throws ConfigurationException {
+  PropertiesConfiguration readConfigFromFile(String configFileName)
+      throws ConfigurationException {
     if (configFileName != null) {
       File configFile = new File(configFileName);
 

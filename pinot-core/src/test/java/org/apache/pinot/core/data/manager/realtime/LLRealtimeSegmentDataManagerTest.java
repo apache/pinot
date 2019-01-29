@@ -62,7 +62,8 @@ public class LLRealtimeSegmentDataManagerTest {
   private static final int _partitionId = 13;
   private static final int _sequenceId = 945;
   private static final long _segTimeMs = 98347869999L;
-  private static final LLCSegmentName _segmentName = new LLCSegmentName(_tableName, _partitionId, _sequenceId, _segTimeMs);
+  private static final LLCSegmentName _segmentName =
+      new LLCSegmentName(_tableName, _partitionId, _sequenceId, _segTimeMs);
   private static final String _segmentNameStr = _segmentName.getSegmentName();
   private static final long _startOffset = 19885L;
   private static final String _topicName = "someTopic";
@@ -71,46 +72,39 @@ public class LLRealtimeSegmentDataManagerTest {
 
   private static long _timeNow = System.currentTimeMillis();
 
-  private final String _tableConfigJson = "{\n" + "  \"metadata\": {}, \n" + "  \"segmentsConfig\": {\n"
-      + "    \"replicasPerPartition\": \"3\", \n" + "    \"replication\": \"3\", \n"
-      + "    \"replicationNumber\": 3, \n" + "    \"retentionTimeUnit\": \"DAYS\", \n"
-      + "    \"retentionTimeValue\": \"3\", \n" + "    \"schemaName\": \"UnknownSchema\", \n"
-      + "    \"segmentAssignmentStrategy\": \"BalanceNumSegmentAssignmentStrategy\", \n"
-      + "    \"segmentPushFrequency\": \"daily\", \n" + "    \"segmentPushType\": \"APPEND\", \n"
-      + "    \"timeColumnName\": \"minutesSinceEpoch\", \n" + "    \"timeType\": \"MINUTES\"\n" + "  }, \n"
-      + "  \"tableIndexConfig\": {\n" + "    \"invertedIndexColumns\": ["
-      + "    ], \n" + "    \"lazyLoad\": \"false\", \n" + "    \"loadMode\": \"HEAP\", \n"
-      + "    \"segmentFormatVersion\": null, \n" + "    \"sortedColumn\": [], \n"
-      + "    \"streamConfigs\": {\n" + "      \"" + StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS+ "\": \"" + String.valueOf(maxRowsInSegment) + "\", \n"
-      + "      \"" + StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_TIME + "\": \"" + maxTimeForSegmentCloseMs + "\", \n"
-      + "      \"stream.kafka.broker.list\": \"broker:7777\", \n"
-      + "      \"stream.kafka.consumer.prop.auto.offset.reset\": \"smallest\", \n"
-      + "      \"stream.kafka.consumer.type\": \"simple\", \n"
-      + "      \"stream.kafka.consumer.factory.class.name\": \"org.apache.pinot.core.realtime.impl.kafka.KafkaConsumerFactory\", \n"
-      + "      \"stream.kafka.decoder.class.name\": \"" + FakeStreamMessageDecoder.class.getName() + "\", \n"
-      + "      \"stream.kafka.decoder.prop.schema.registry.rest.url\": \"http://schema-registry-host.corp.ceo:1766/schemas\", \n"
-      + "      \"stream.kafka.decoder.prop.schema.registry.schema.name\": \"UnknownSchema\", \n"
-      + "      \"stream.kafka.hlc.zk.connect.string\": \"zoo:2181/kafka-queuing\", \n"
-      + "      \"stream.kafka.topic.name\": \"" + _topicName + "\", \n"
-      + "      \"stream.kafka.zk.broker.url\": \"kafka-broker:2181/kafka-queuing\", \n"
-      + "      \"streamType\": \"kafka\"\n" + "    }\n" + "  }, \n" + "  \"tableName\": \"Coffee_REALTIME\", \n"
-      + "  \"tableType\": \"realtime\", \n" + "  \"tenants\": {\n" + "    \"broker\": \"shared\", \n"
-      + "    \"server\": \"server-1\"\n" + "  }\n" + "}";
+  private final String _tableConfigJson =
+      "{\n" + "  \"metadata\": {}, \n" + "  \"segmentsConfig\": {\n" + "    \"replicasPerPartition\": \"3\", \n"
+          + "    \"replication\": \"3\", \n" + "    \"replicationNumber\": 3, \n"
+          + "    \"retentionTimeUnit\": \"DAYS\", \n" + "    \"retentionTimeValue\": \"3\", \n"
+          + "    \"schemaName\": \"UnknownSchema\", \n"
+          + "    \"segmentAssignmentStrategy\": \"BalanceNumSegmentAssignmentStrategy\", \n"
+          + "    \"segmentPushFrequency\": \"daily\", \n" + "    \"segmentPushType\": \"APPEND\", \n"
+          + "    \"timeColumnName\": \"minutesSinceEpoch\", \n" + "    \"timeType\": \"MINUTES\"\n" + "  }, \n"
+          + "  \"tableIndexConfig\": {\n" + "    \"invertedIndexColumns\": [" + "    ], \n"
+          + "    \"lazyLoad\": \"false\", \n" + "    \"loadMode\": \"HEAP\", \n"
+          + "    \"segmentFormatVersion\": null, \n" + "    \"sortedColumn\": [], \n" + "    \"streamConfigs\": {\n"
+          + "      \"" + StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS + "\": \"" + String
+          .valueOf(maxRowsInSegment) + "\", \n" + "      \"" + StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_TIME
+          + "\": \"" + maxTimeForSegmentCloseMs + "\", \n" + "      \"stream.kafka.broker.list\": \"broker:7777\", \n"
+          + "      \"stream.kafka.consumer.prop.auto.offset.reset\": \"smallest\", \n"
+          + "      \"stream.kafka.consumer.type\": \"simple\", \n"
+          + "      \"stream.kafka.consumer.factory.class.name\": \"org.apache.pinot.core.realtime.impl.kafka.KafkaConsumerFactory\", \n"
+          + "      \"stream.kafka.decoder.class.name\": \"" + FakeStreamMessageDecoder.class.getName() + "\", \n"
+          + "      \"stream.kafka.decoder.prop.schema.registry.rest.url\": \"http://schema-registry-host.corp.ceo:1766/schemas\", \n"
+          + "      \"stream.kafka.decoder.prop.schema.registry.schema.name\": \"UnknownSchema\", \n"
+          + "      \"stream.kafka.hlc.zk.connect.string\": \"zoo:2181/kafka-queuing\", \n"
+          + "      \"stream.kafka.topic.name\": \"" + _topicName + "\", \n"
+          + "      \"stream.kafka.zk.broker.url\": \"kafka-broker:2181/kafka-queuing\", \n"
+          + "      \"streamType\": \"kafka\"\n" + "    }\n" + "  }, \n" + "  \"tableName\": \"Coffee_REALTIME\", \n"
+          + "  \"tableType\": \"realtime\", \n" + "  \"tenants\": {\n" + "    \"broker\": \"shared\", \n"
+          + "    \"server\": \"server-1\"\n" + "  }\n" + "}";
 
   private String makeSchema() {
-    return "{"
-        + "  \"schemaName\":\"SchemaTest\","
-        + "  \"metricFieldSpecs\":["
-        + "    {\"name\":\"m\",\"dataType\":\"" + "LONG" + "\"}"
-        + "  ],"
-        + "  \"dimensionFieldSpecs\":["
-        + "    {\"name\":\"d\",\"dataType\":\"" + "STRING" + "\",\"singleValueField\":" + "true" + "}"
-        + "  ],"
-        + "  \"timeFieldSpec\":{"
+    return "{" + "  \"schemaName\":\"SchemaTest\"," + "  \"metricFieldSpecs\":[" + "    {\"name\":\"m\",\"dataType\":\""
+        + "LONG" + "\"}" + "  ]," + "  \"dimensionFieldSpecs\":[" + "    {\"name\":\"d\",\"dataType\":\"" + "STRING"
+        + "\",\"singleValueField\":" + "true" + "}" + "  ]," + "  \"timeFieldSpec\":{"
         + "    \"incomingGranularitySpec\":{\"dataType\":\"LONG\",\"timeType\":\"MILLISECONDS\",\"name\":\"time\"},"
-        + "    \"defaultNullValue\":12345"
-        + "  }"
-        + "}";
+        + "    \"defaultNullValue\":12345" + "  }" + "}";
   }
 
   private TableConfig createTableConfig()
@@ -142,7 +136,8 @@ public class LLRealtimeSegmentDataManagerTest {
   public static class FakeStreamMessageDecoder implements StreamMessageDecoder<byte[]> {
 
     @Override
-    public void init(Map<String, String> props, Schema indexingSchema, String topicName) throws Exception {
+    public void init(Map<String, String> props, Schema indexingSchema, String topicName)
+        throws Exception {
 
     }
 
@@ -157,7 +152,8 @@ public class LLRealtimeSegmentDataManagerTest {
     }
   }
 
-  private FakeLLRealtimeSegmentDataManager createFakeSegmentManager() throws Exception {
+  private FakeLLRealtimeSegmentDataManager createFakeSegmentManager()
+      throws Exception {
     LLCRealtimeSegmentZKMetadata segmentZKMetadata = createZkMetadata();
     TableConfig tableConfig = createTableConfig();
     InstanceZKMetadata instanceZKMetadata = new InstanceZKMetadata();
@@ -165,8 +161,9 @@ public class LLRealtimeSegmentDataManagerTest {
     String resourceDir = _segmentDir;
     Schema schema = Schema.fromString(makeSchema());
     ServerMetrics serverMetrics = new ServerMetrics(new MetricsRegistry());
-    FakeLLRealtimeSegmentDataManager segmentDataManager = new FakeLLRealtimeSegmentDataManager(segmentZKMetadata,
-        tableConfig, instanceZKMetadata, tableDataManager, resourceDir, schema, serverMetrics);
+    FakeLLRealtimeSegmentDataManager segmentDataManager =
+        new FakeLLRealtimeSegmentDataManager(segmentZKMetadata, tableConfig, instanceZKMetadata, tableDataManager,
+            resourceDir, schema, serverMetrics);
     return segmentDataManager;
   }
 
@@ -183,15 +180,16 @@ public class LLRealtimeSegmentDataManagerTest {
   // Test that we are in HOLDING state as long as the controller responds HOLD to our segmentConsumed() message.
   // we should not consume when holding.
   @Test
-  public void testHolding() throws Exception {
+  public void testHolding()
+      throws Exception {
     FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
     LLRealtimeSegmentDataManager.PartitionConsumer consumer = segmentDataManager.createPartitionConsumer();
     final long endOffset = _startOffset + 500;
     // We should consume initially...
     segmentDataManager._consumeOffsets.add(endOffset);
     final SegmentCompletionProtocol.Response response = new SegmentCompletionProtocol.Response(
-        new SegmentCompletionProtocol.Response.Params().withStatus(
-            SegmentCompletionProtocol.ControllerResponseStatus.HOLD).withOffset(endOffset));
+        new SegmentCompletionProtocol.Response.Params()
+            .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.HOLD).withOffset(endOffset));
     // And then never consume as long as we get a hold response, 100 times.
     for (int i = 0; i < 100; i++) {
       segmentDataManager._responses.add(response);
@@ -210,18 +208,19 @@ public class LLRealtimeSegmentDataManagerTest {
 
   // Test that we go to commit when the controller responds commit after 2 holds.
   @Test
-  public void testCommitAfterHold() throws Exception {
+  public void testCommitAfterHold()
+      throws Exception {
     FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
     LLRealtimeSegmentDataManager.PartitionConsumer consumer = segmentDataManager.createPartitionConsumer();
     final long endOffset = _startOffset + 500;
     // We should consume initially...
     segmentDataManager._consumeOffsets.add(endOffset);
     final SegmentCompletionProtocol.Response holdResponse = new SegmentCompletionProtocol.Response(
-        new SegmentCompletionProtocol.Response.Params().withOffset(endOffset).withStatus(
-            SegmentCompletionProtocol.ControllerResponseStatus.HOLD));
+        new SegmentCompletionProtocol.Response.Params().withOffset(endOffset)
+            .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.HOLD));
     final SegmentCompletionProtocol.Response commitResponse = new SegmentCompletionProtocol.Response(
-        new SegmentCompletionProtocol.Response.Params().withOffset(endOffset).withStatus(
-            SegmentCompletionProtocol.ControllerResponseStatus.COMMIT));
+        new SegmentCompletionProtocol.Response.Params().withOffset(endOffset)
+            .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT));
     // And then never consume as long as we get a hold response, 100 times.
     segmentDataManager._responses.add(holdResponse);
     segmentDataManager._responses.add(commitResponse);
@@ -234,19 +233,21 @@ public class LLRealtimeSegmentDataManagerTest {
     Assert.assertFalse(segmentDataManager._buildAndReplaceCalled);
     Assert.assertFalse(segmentDataManager._downloadAndReplaceCalled);
     Assert.assertTrue(segmentDataManager._commitSegmentCalled);
-    Assert.assertEquals(segmentDataManager._state.get(segmentDataManager), LLRealtimeSegmentDataManager.State.COMMITTED);
+    Assert
+        .assertEquals(segmentDataManager._state.get(segmentDataManager), LLRealtimeSegmentDataManager.State.COMMITTED);
   }
 
   @Test
-  public void testSegmentBuildException() throws Exception {
+  public void testSegmentBuildException()
+      throws Exception {
     FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
     LLRealtimeSegmentDataManager.PartitionConsumer consumer = segmentDataManager.createPartitionConsumer();
     final long endOffset = _startOffset + 500;
     // We should consume initially...
     segmentDataManager._consumeOffsets.add(endOffset);
     final SegmentCompletionProtocol.Response commitResponse = new SegmentCompletionProtocol.Response(
-        new SegmentCompletionProtocol.Response.Params().withOffset(endOffset).withStatus(
-            SegmentCompletionProtocol.ControllerResponseStatus.COMMIT));
+        new SegmentCompletionProtocol.Response.Params().withOffset(endOffset)
+            .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT));
     segmentDataManager._responses.add(commitResponse);
     segmentDataManager._failSegmentBuild = true;
 
@@ -255,10 +256,10 @@ public class LLRealtimeSegmentDataManagerTest {
     Assert.assertEquals(segmentDataManager._state.get(segmentDataManager), LLRealtimeSegmentDataManager.State.ERROR);
   }
 
-
   // Test hold, catchup. hold, commit
   @Test
-  public void testCommitAfterCatchup() throws Exception {
+  public void testCommitAfterCatchup()
+      throws Exception {
     FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
     LLRealtimeSegmentDataManager.PartitionConsumer consumer = segmentDataManager.createPartitionConsumer();
     final long firstOffset = _startOffset + 500;
@@ -267,19 +268,18 @@ public class LLRealtimeSegmentDataManagerTest {
     segmentDataManager._consumeOffsets.add(firstOffset);
     segmentDataManager._consumeOffsets.add(catchupOffset); // Offset after catchup
     final SegmentCompletionProtocol.Response holdResponse1 = new SegmentCompletionProtocol.Response(
-        new SegmentCompletionProtocol.Response.Params().withStatus(
-            SegmentCompletionProtocol.ControllerResponseStatus.HOLD).
+        new SegmentCompletionProtocol.Response.Params()
+            .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.HOLD).
             withOffset(firstOffset));
     final SegmentCompletionProtocol.Response catchupResponse = new SegmentCompletionProtocol.Response(
-        new SegmentCompletionProtocol.Response.Params().withStatus(
-            SegmentCompletionProtocol.ControllerResponseStatus.CATCH_UP).withOffset(
-            catchupOffset));
+        new SegmentCompletionProtocol.Response.Params()
+            .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.CATCH_UP).withOffset(catchupOffset));
     final SegmentCompletionProtocol.Response holdResponse2 = new SegmentCompletionProtocol.Response(
-        new SegmentCompletionProtocol.Response.Params().withOffset(catchupOffset).withStatus(
-            SegmentCompletionProtocol.ControllerResponseStatus.HOLD));
+        new SegmentCompletionProtocol.Response.Params().withOffset(catchupOffset)
+            .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.HOLD));
     final SegmentCompletionProtocol.Response commitResponse = new SegmentCompletionProtocol.Response(
-        new SegmentCompletionProtocol.Response.Params().withOffset(catchupOffset).withStatus(
-            SegmentCompletionProtocol.ControllerResponseStatus.COMMIT));
+        new SegmentCompletionProtocol.Response.Params().withOffset(catchupOffset)
+            .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT));
     // And then never consume as long as we get a hold response, 100 times.
     segmentDataManager._responses.add(holdResponse1);
     segmentDataManager._responses.add(catchupResponse);
@@ -294,18 +294,20 @@ public class LLRealtimeSegmentDataManagerTest {
     Assert.assertFalse(segmentDataManager._buildAndReplaceCalled);
     Assert.assertFalse(segmentDataManager._downloadAndReplaceCalled);
     Assert.assertTrue(segmentDataManager._commitSegmentCalled);
-    Assert.assertEquals(segmentDataManager._state.get(segmentDataManager), LLRealtimeSegmentDataManager.State.COMMITTED);
+    Assert
+        .assertEquals(segmentDataManager._state.get(segmentDataManager), LLRealtimeSegmentDataManager.State.COMMITTED);
   }
 
   @Test
-  public void testDiscarded() throws Exception {
+  public void testDiscarded()
+      throws Exception {
     FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
     LLRealtimeSegmentDataManager.PartitionConsumer consumer = segmentDataManager.createPartitionConsumer();
     final long endOffset = _startOffset + 500;
     segmentDataManager._consumeOffsets.add(endOffset);
     final SegmentCompletionProtocol.Response discardResponse = new SegmentCompletionProtocol.Response(
-        new SegmentCompletionProtocol.Response.Params().withOffset(endOffset).withStatus(
-            SegmentCompletionProtocol.ControllerResponseStatus.DISCARD));
+        new SegmentCompletionProtocol.Response.Params().withOffset(endOffset)
+            .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.DISCARD));
     segmentDataManager._responses.add(discardResponse);
 
     consumer.run();
@@ -316,11 +318,13 @@ public class LLRealtimeSegmentDataManagerTest {
     Assert.assertFalse(segmentDataManager._buildAndReplaceCalled);
     Assert.assertFalse(segmentDataManager._downloadAndReplaceCalled);
     Assert.assertFalse(segmentDataManager._commitSegmentCalled);
-    Assert.assertEquals(segmentDataManager._state.get(segmentDataManager), LLRealtimeSegmentDataManager.State.DISCARDED);
+    Assert
+        .assertEquals(segmentDataManager._state.get(segmentDataManager), LLRealtimeSegmentDataManager.State.DISCARDED);
   }
 
   @Test
-  public void testRetained() throws Exception {
+  public void testRetained()
+      throws Exception {
     FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
     LLRealtimeSegmentDataManager.PartitionConsumer consumer = segmentDataManager.createPartitionConsumer();
     final long endOffset = _startOffset + 500;
@@ -342,15 +346,16 @@ public class LLRealtimeSegmentDataManagerTest {
   }
 
   @Test
-  public void testNotLeader() throws Exception {
+  public void testNotLeader()
+      throws Exception {
     FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
     LLRealtimeSegmentDataManager.PartitionConsumer consumer = segmentDataManager.createPartitionConsumer();
     final long endOffset = _startOffset + 500;
     // We should consume initially...
     segmentDataManager._consumeOffsets.add(endOffset);
     final SegmentCompletionProtocol.Response response = new SegmentCompletionProtocol.Response(
-        new SegmentCompletionProtocol.Response.Params().withOffset(endOffset).withStatus(
-            SegmentCompletionProtocol.ControllerResponseStatus.NOT_LEADER));
+        new SegmentCompletionProtocol.Response.Params().withOffset(endOffset)
+            .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.NOT_LEADER));
     // And then never consume as long as we get a Not leader response, 100 times.
     for (int i = 0; i < 100; i++) {
       segmentDataManager._responses.add(response);
@@ -368,7 +373,8 @@ public class LLRealtimeSegmentDataManagerTest {
   }
 
   @Test
-  public void testConsumingException() throws Exception {
+  public void testConsumingException()
+      throws Exception {
     FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
     LLRealtimeSegmentDataManager.PartitionConsumer consumer = segmentDataManager.createPartitionConsumer();
 
@@ -383,7 +389,8 @@ public class LLRealtimeSegmentDataManagerTest {
   // If the state is is COMMITTED or RETAINED, nothing to do
   // If discarded or error state, then downloadAndReplace the segment
   @Test
-  public void testOnlineTransitionAfterStop() throws Exception {
+  public void testOnlineTransitionAfterStop()
+      throws Exception {
     LLCRealtimeSegmentZKMetadata metadata = new LLCRealtimeSegmentZKMetadata();
     final long finalOffset = _startOffset + 600;
     metadata.setEndOffset(finalOffset);
@@ -470,7 +477,8 @@ public class LLRealtimeSegmentDataManagerTest {
   }
 
   @Test
-  public void testEndCriteriaChecking() throws Exception {
+  public void testEndCriteriaChecking()
+      throws Exception {
     // test reaching max row limit
     {
       FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
@@ -502,7 +510,7 @@ public class LLRealtimeSegmentDataManagerTest {
       segmentDataManager._state.set(segmentDataManager, LLRealtimeSegmentDataManager.State.CATCHING_UP);
       final long finalOffset = _startOffset + 100;
       segmentDataManager.setFinalOffset(finalOffset);
-      segmentDataManager.setCurrentOffset(finalOffset-1);
+      segmentDataManager.setCurrentOffset(finalOffset - 1);
       Assert.assertFalse(segmentDataManager.invokeEndCriteriaReached());
       segmentDataManager.setCurrentOffset(finalOffset);
       Assert.assertTrue(segmentDataManager.invokeEndCriteriaReached());
@@ -514,7 +522,7 @@ public class LLRealtimeSegmentDataManagerTest {
       segmentDataManager._state.set(segmentDataManager, LLRealtimeSegmentDataManager.State.CATCHING_UP);
       final long finalOffset = _startOffset + 100;
       segmentDataManager.setFinalOffset(finalOffset);
-      segmentDataManager.setCurrentOffset(finalOffset-1);
+      segmentDataManager.setCurrentOffset(finalOffset - 1);
       Assert.assertFalse(segmentDataManager.invokeEndCriteriaReached());
       segmentDataManager.setCurrentOffset(finalOffset);
       Assert.assertTrue(segmentDataManager.invokeEndCriteriaReached());
@@ -542,7 +550,7 @@ public class LLRealtimeSegmentDataManagerTest {
       final long finalOffset = _startOffset + 100;
       segmentDataManager.setFinalOffset(finalOffset);
       segmentDataManager.setCurrentOffset(finalOffset - 1);
-      _timeNow = endTime-1;
+      _timeNow = endTime - 1;
       Assert.assertFalse(segmentDataManager.invokeEndCriteriaReached());
       _timeNow = endTime;
       Assert.assertTrue(segmentDataManager.invokeEndCriteriaReached());
@@ -550,7 +558,8 @@ public class LLRealtimeSegmentDataManagerTest {
   }
 
   // Replace the realtime segment with a mock that returns numDocs for raw doc count.
-  private void replaceRealtimeSegment(FakeLLRealtimeSegmentDataManager segmentDataManager, int numDocs) throws Exception {
+  private void replaceRealtimeSegment(FakeLLRealtimeSegmentDataManager segmentDataManager, int numDocs)
+      throws Exception {
     MutableSegmentImpl mockSegmentImpl = mock(MutableSegmentImpl.class);
     when(mockSegmentImpl.getNumDocsIndexed()).thenReturn(numDocs);
     Field segmentImpl = LLRealtimeSegmentDataManager.class.getDeclaredField("_realtimeSegment");
@@ -560,7 +569,8 @@ public class LLRealtimeSegmentDataManagerTest {
 
   // If commit fails, make sure that we do not re-build the segment when we try to commit again.
   @Test
-  public void testReuseOfBuiltSegment() throws Exception {
+  public void testReuseOfBuiltSegment()
+      throws Exception {
     FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
 
     SegmentCompletionProtocol.Response.Params params = new SegmentCompletionProtocol.Response.Params();
@@ -594,7 +604,8 @@ public class LLRealtimeSegmentDataManagerTest {
   // If commit fails, and we still have the file, make sure that we remove the file when we go
   // online.
   @Test
-  public void testFileRemovedDuringOnlineTransition() throws Exception {
+  public void testFileRemovedDuringOnlineTransition()
+      throws Exception {
     FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
 
     SegmentCompletionProtocol.Response.Params params = new SegmentCompletionProtocol.Response.Params();
@@ -704,7 +715,8 @@ public class LLRealtimeSegmentDataManagerTest {
     }
 
     @Override
-    protected boolean consumeLoop() throws Exception {
+    protected boolean consumeLoop()
+        throws Exception {
       if (_throwExceptionFromConsume) {
         throw new PermanentConsumerException(Errors.OFFSET_OUT_OF_RANGE.exception());
       }
@@ -756,7 +768,7 @@ public class LLRealtimeSegmentDataManagerTest {
       if (!forCommit) {
         return new SegmentBuildDescriptor(null, getCurrentOffset(), _segmentDir, 0, 0, -1);
       }
-      final String segTarFileName =  _segmentDir + "/" + "segmentFile";
+      final String segTarFileName = _segmentDir + "/" + "segmentFile";
       File segmentTgzFile = new File(segTarFileName);
       try {
         segmentTgzFile.createNewFile();
@@ -794,7 +806,7 @@ public class LLRealtimeSegmentDataManagerTest {
       setInt(numRows, "_numRowsConsumed");
     }
 
-    public  void setNumRowsIndexed(int numRows) {
+    public void setNumRowsIndexed(int numRows) {
       setInt(numRows, "_numRowsIndexed");
     }
 
@@ -807,7 +819,7 @@ public class LLRealtimeSegmentDataManagerTest {
       try {
         endCriteriaReached = LLRealtimeSegmentDataManager.class.getDeclaredMethod("endCriteriaReached");
         endCriteriaReached.setAccessible(true);
-        Boolean result = (Boolean)endCriteriaReached.invoke(this);
+        Boolean result = (Boolean) endCriteriaReached.invoke(this);
         return result;
       } catch (NoSuchMethodException e) {
         Assert.fail();
@@ -818,6 +830,7 @@ public class LLRealtimeSegmentDataManagerTest {
       }
       throw new RuntimeException("Cannot get here");
     }
+
     public void setSegmentMaxRowCount(int numRows) {
       setInt(numRows, "_segmentMaxRowCount");
     }

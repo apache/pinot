@@ -64,7 +64,8 @@ public abstract class BaseOnHeapMutableDictionary extends MutableDictionary {
     return _entriesIndexed == 0;
   }
 
-  public void close() throws IOException {
+  public void close()
+      throws IOException {
   }
 
   /**

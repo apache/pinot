@@ -54,7 +54,8 @@ public interface BrokerResponse {
   /**
    * Convert the broker response to JSON String.
    */
-  String toJsonString() throws Exception;
+  String toJsonString()
+      throws Exception;
 
   /**
    * Returns the number of servers queried.

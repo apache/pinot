@@ -40,7 +40,7 @@ public class ColumnIndexDirectoryTestHelper {
 
   static PinotDataBuffer newIndexBuffer(ColumnIndexDirectory columnDirectory, String column, int size, int index)
       throws IOException {
-    String columnName = column + "." +  Integer.toString(index);
+    String columnName = column + "." + Integer.toString(index);
     // skip star tree. It's managed differently
     ColumnIndexType indexType = indexTypes[index % indexTypes.length];
     PinotDataBuffer buf = null;
@@ -63,7 +63,7 @@ public class ColumnIndexDirectoryTestHelper {
 
   static PinotDataBuffer getIndexBuffer(ColumnIndexDirectory columnDirectory, String column, int index)
       throws IOException {
-    String columnName = column + "." +  Integer.toString(index);
+    String columnName = column + "." + Integer.toString(index);
     // skip star tree
     ColumnIndexType indexType = indexTypes[index % indexTypes.length];
     PinotDataBuffer buf = null;
@@ -80,11 +80,9 @@ public class ColumnIndexDirectoryTestHelper {
       case BLOOM_FILTER:
         buf = columnDirectory.getBloomFilterBufferFor(columnName);
         break;
-
     }
     return buf;
   }
-
 
   static void verifyMultipleReads(ColumnIndexDirectory columnDirectory, String column, int numIter)
       throws Exception {
@@ -103,7 +101,7 @@ public class ColumnIndexDirectoryTestHelper {
     // size is the size of large buffer...split it into parts
     int bufsize = (int) (size / numIter);
     for (int i = 0; i < numIter; i++) {
-      try(PinotDataBuffer buf = ColumnIndexDirectoryTestHelper.newIndexBuffer(columnDirectory, column, bufsize, i)) {
+      try (PinotDataBuffer buf = ColumnIndexDirectoryTestHelper.newIndexBuffer(columnDirectory, column, bufsize, i)) {
         int numValues = bufsize / 4;
         for (int j = 0; j < numValues; j++) {
           buf.putInt(j * 4, j);
@@ -116,33 +114,29 @@ public class ColumnIndexDirectoryTestHelper {
     SegmentMetadataImpl meta = mock(SegmentMetadataImpl.class);
     when(meta.getVersion()).thenReturn(version.toString());
     when(meta.getSegmentVersion()).thenReturn(version);
-    when(meta.getDictionaryFileName(anyString()))
-        .thenAnswer(new Answer<String>() {
-          @Override
-          public String answer(InvocationOnMock invocationOnMock)
-              throws Throwable {
-            return invocationOnMock.getArguments()[0] + ".dict";
-          }
-        });
-    when(meta.getForwardIndexFileName(anyString()))
-        .thenAnswer(new Answer<String>() {
-          @Override
-          public String answer(InvocationOnMock invocationOnMock)
-              throws Throwable {
-            return invocationOnMock.getArguments()[0] + ".fwd";
-          }
-        });
+    when(meta.getDictionaryFileName(anyString())).thenAnswer(new Answer<String>() {
+      @Override
+      public String answer(InvocationOnMock invocationOnMock)
+          throws Throwable {
+        return invocationOnMock.getArguments()[0] + ".dict";
+      }
+    });
+    when(meta.getForwardIndexFileName(anyString())).thenAnswer(new Answer<String>() {
+      @Override
+      public String answer(InvocationOnMock invocationOnMock)
+          throws Throwable {
+        return invocationOnMock.getArguments()[0] + ".fwd";
+      }
+    });
 
-    when(meta.getBitmapInvertedIndexFileName(anyString()))
-        .thenAnswer(new Answer<String>() {
-          @Override
-          public String answer(InvocationOnMock invocationOnMock)
-              throws Throwable {
-            return invocationOnMock.getArguments()[0] + ".ii";
-          }
-        });
-    when(meta.getBloomFilterFileName(anyString()))
-    .thenAnswer(new Answer<String>() {
+    when(meta.getBitmapInvertedIndexFileName(anyString())).thenAnswer(new Answer<String>() {
+      @Override
+      public String answer(InvocationOnMock invocationOnMock)
+          throws Throwable {
+        return invocationOnMock.getArguments()[0] + ".ii";
+      }
+    });
+    when(meta.getBloomFilterFileName(anyString())).thenAnswer(new Answer<String>() {
       @Override
       public String answer(InvocationOnMock invocationOnMock)
           throws Throwable {

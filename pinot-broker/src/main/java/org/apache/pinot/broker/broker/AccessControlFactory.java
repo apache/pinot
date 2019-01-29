@@ -28,9 +28,9 @@ public abstract class AccessControlFactory {
   public static final Logger LOGGER = LoggerFactory.getLogger(AccessControlFactory.class);
   public static final String ACCESS_CONTROL_CLASS_CONFIG = "class";
 
-  public abstract  void init(Configuration confguration);
+  public abstract void init(Configuration confguration);
 
-  public abstract  AccessControl create();
+  public abstract AccessControl create();
 
   public static AccessControlFactory loadFactory(Configuration configuration) {
     AccessControlFactory accessControlFactory;
@@ -40,7 +40,7 @@ public abstract class AccessControlFactory {
     }
     try {
       LOGGER.info("Instantiating Access control factory class {}", accessControlFactoryClassName);
-      accessControlFactory =  (AccessControlFactory) Class.forName(accessControlFactoryClassName).newInstance();
+      accessControlFactory = (AccessControlFactory) Class.forName(accessControlFactoryClassName).newInstance();
       LOGGER.info("Initializing Access control factory class {}", accessControlFactoryClassName);
       accessControlFactory.init(configuration);
       return accessControlFactory;

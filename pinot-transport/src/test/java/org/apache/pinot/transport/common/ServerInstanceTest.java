@@ -27,7 +27,8 @@ import org.testng.annotations.Test;
 public class ServerInstanceTest {
 
   @Test
-  public void testServerInstance() throws Exception {
+  public void testServerInstance()
+      throws Exception {
     // Same local hostname and port
     {
       ServerInstance instance1 = new ServerInstance("localhost", 8080);

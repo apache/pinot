@@ -145,10 +145,12 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
           // No, this is a brand new ideal state, so we will add one new segment to every partition and replica
           List<String> instancesInResource = new ArrayList<>();
           try {
-            instancesInResource.addAll(_pinotHelixResourceManager.getServerInstancesForTable(realtimeTableName, TableType.REALTIME));
+            instancesInResource
+                .addAll(_pinotHelixResourceManager.getServerInstancesForTable(realtimeTableName, TableType.REALTIME));
           } catch (Exception e) {
             LOGGER.error("Caught exception while fetching instances for resource {}", realtimeTableName, e);
-            _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_REALTIME_TABLE_SEGMENT_ASSIGNMENT_ERROR, 1L);
+            _controllerMetrics
+                .addMeteredGlobalValue(ControllerMeter.CONTROLLER_REALTIME_TABLE_SEGMENT_ASSIGNMENT_ERROR, 1L);
           }
 
           // Assign a new segment to all server instances
@@ -158,7 +160,8 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
             if (instanceZKMetadata == null) {
               LOGGER.warn("Instance {} has no associated instance metadata in ZK, ignoring for segment assignment.",
                   instanceId);
-              _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_REALTIME_TABLE_SEGMENT_ASSIGNMENT_ERROR, 1L);
+              _controllerMetrics
+                  .addMeteredGlobalValue(ControllerMeter.CONTROLLER_REALTIME_TABLE_SEGMENT_ASSIGNMENT_ERROR, 1L);
               continue;
             }
 
@@ -169,20 +172,23 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
                   new HLCSegmentName(groupId, partitionId, String.valueOf(System.currentTimeMillis())).getSegmentName(),
                   instanceId));
             } else {
-              LOGGER.warn("Instance {} has invalid groupId ({}) and/or partitionId ({}) for resource {}, ignoring for segment assignment.",
+              LOGGER.warn(
+                  "Instance {} has invalid groupId ({}) and/or partitionId ({}) for resource {}, ignoring for segment assignment.",
                   instanceId, groupId, partitionId, realtimeTableName);
-              _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_REALTIME_TABLE_SEGMENT_ASSIGNMENT_ERROR, 1L);
+              _controllerMetrics
+                  .addMeteredGlobalValue(ControllerMeter.CONTROLLER_REALTIME_TABLE_SEGMENT_ASSIGNMENT_ERROR, 1L);
             }
           }
         } else {
           // Add all server instances to the list of instances for which to assign a realtime segment
           Set<String> instancesToAssignRealtimeSegment = new HashSet<String>();
           try {
-            instancesToAssignRealtimeSegment.addAll(
-                _pinotHelixResourceManager.getServerInstancesForTable(realtimeTableName, TableType.REALTIME));
+            instancesToAssignRealtimeSegment
+                .addAll(_pinotHelixResourceManager.getServerInstancesForTable(realtimeTableName, TableType.REALTIME));
           } catch (Exception e) {
             LOGGER.error("Caught exception while fetching instances for resource {}", realtimeTableName, e);
-            _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_REALTIME_TABLE_SEGMENT_ASSIGNMENT_ERROR, 1L);
+            _controllerMetrics
+                .addMeteredGlobalValue(ControllerMeter.CONTROLLER_REALTIME_TABLE_SEGMENT_ASSIGNMENT_ERROR, 1L);
           }
 
           // Remove server instances that are currently processing a segment
@@ -215,7 +221,8 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
         }
       } catch (Exception e) {
         LOGGER.warn("Caught exception while processing resource {}, skipping.", realtimeTableName, e);
-        _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_REALTIME_TABLE_SEGMENT_ASSIGNMENT_ERROR, 1L);
+        _controllerMetrics
+            .addMeteredGlobalValue(ControllerMeter.CONTROLLER_REALTIME_TABLE_SEGMENT_ASSIGNMENT_ERROR, 1L);
       }
     }
 
@@ -245,16 +252,20 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
               realtimeSegmentMetadataToAdd);
 
           // Update the ideal state to add the new realtime segment
-          HelixHelper.updateIdealState(_pinotHelixResourceManager.getHelixZkManager(), resourceName, new Function<IdealState, IdealState>() {
-            @Override
-            public IdealState apply(IdealState idealState) {
-              return PinotTableIdealStateBuilder.addNewRealtimeSegmentToIdealState(segmentId, idealState, instanceName);
-            }
-          }, RetryPolicies.exponentialBackoffRetryPolicy(5, 500L, 2.0f));
+          HelixHelper.updateIdealState(_pinotHelixResourceManager.getHelixZkManager(), resourceName,
+              new Function<IdealState, IdealState>() {
+                @Override
+                public IdealState apply(IdealState idealState) {
+                  return PinotTableIdealStateBuilder
+                      .addNewRealtimeSegmentToIdealState(segmentId, idealState, instanceName);
+                }
+              }, RetryPolicies.exponentialBackoffRetryPolicy(5, 500L, 2.0f));
         }
       } catch (Exception e) {
-        LOGGER.warn("Caught exception while processing segment {} for instance {}, skipping.", segmentId, instanceName, e);
-        _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_REALTIME_TABLE_SEGMENT_ASSIGNMENT_ERROR, 1L);
+        LOGGER.warn("Caught exception while processing segment {} for instance {}, skipping.", segmentId, instanceName,
+            e);
+        _controllerMetrics
+            .addMeteredGlobalValue(ControllerMeter.CONTROLLER_REALTIME_TABLE_SEGMENT_ASSIGNMENT_ERROR, 1L);
       }
     }
   }
@@ -287,9 +298,8 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
       refreshWatchers(path);
 
       if (isLeader()) {
-        if (path.matches(REALTIME_SEGMENT_PROPERTY_STORE_PATH_PATTERN) ||
-            path.matches(REALTIME_TABLE_CONFIG_PROPERTY_STORE_PATH_PATTERN) ||
-            path.equals(CONTROLLER_LEADER_CHANGE)) {
+        if (path.matches(REALTIME_SEGMENT_PROPERTY_STORE_PATH_PATTERN) || path
+            .matches(REALTIME_TABLE_CONFIG_PROPERTY_STORE_PATH_PATTERN) || path.equals(CONTROLLER_LEADER_CHANGE)) {
           assignRealtimeSegmentsToServerInstancesIfNecessary();
         }
       } else {
@@ -341,8 +351,8 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
                   continue;
                 }
                 String segmentPath = realtimeSegmentsPathForTable + "/" + segmentName;
-                RealtimeSegmentZKMetadata realtimeSegmentZKMetadata =
-                    ZKMetadataProvider.getRealtimeSegmentZKMetadata(_pinotHelixResourceManager.getPropertyStore(),
+                RealtimeSegmentZKMetadata realtimeSegmentZKMetadata = ZKMetadataProvider
+                    .getRealtimeSegmentZKMetadata(_pinotHelixResourceManager.getPropertyStore(),
                         tableConfig.getTableName(), segmentName);
                 if (realtimeSegmentZKMetadata == null) {
                   // The segment got deleted by retention manager

@@ -39,13 +39,13 @@ import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
 /**
  * Contains APIs which are used for backfilling the pinot segments with dateTimeFieldSpec
  */
 public class BackfillSegmentUtils {
 
   private static Logger LOGGER = LoggerFactory.getLogger(BackfillSegmentUtils.class);
-
 
   private static final String SEGMENTS_ENDPOINT = "%s/segments/%s";
   private static final String DOWNLOAD_SEGMENT_ENDPOINT = "%s/segments/%s/%s";
@@ -58,9 +58,8 @@ public class BackfillSegmentUtils {
   public BackfillSegmentUtils(String controllerHost, String controllerPort) {
     _controllerHost = controllerHost;
     _controllerPort = controllerPort;
-   _controllerHttpHost = new HttpHost(controllerHost, Integer.valueOf(controllerPort));
+    _controllerHttpHost = new HttpHost(controllerHost, Integer.valueOf(controllerPort));
   }
-
 
   /**
    * Fetches the list of all segment names for a table
@@ -68,7 +67,8 @@ public class BackfillSegmentUtils {
    * @return
    * @throws IOException
    */
-  public List<String> getAllSegments(String tableName, SegmentType segmentType) throws IOException {
+  public List<String> getAllSegments(String tableName, SegmentType segmentType)
+      throws IOException {
 
     List<String> allSegments = new ArrayList<>();
     String urlString = String.format(SEGMENTS_ENDPOINT, _controllerHttpHost.toURI(), tableName);
@@ -102,7 +102,6 @@ public class BackfillSegmentUtils {
     return allSegments;
   }
 
-
   /**
    * Downloads a segment from a table to a directory locally, and backs it up to given backup path
    * @param tableName
@@ -111,7 +110,7 @@ public class BackfillSegmentUtils {
    * @param tableBackupDir - backup segments path
    * @return
    */
-  public boolean downloadSegment(String tableName, String segmentName, File downloadSegmentDir, File tableBackupDir)  {
+  public boolean downloadSegment(String tableName, String segmentName, File downloadSegmentDir, File tableBackupDir) {
     boolean downloadSuccess = true;
     if (downloadSegmentDir.exists()) {
       try {

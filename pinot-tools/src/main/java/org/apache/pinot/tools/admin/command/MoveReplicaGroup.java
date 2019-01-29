@@ -64,16 +64,13 @@ import org.slf4j.LoggerFactory;
 public class MoveReplicaGroup extends AbstractBaseAdminCommand implements Command {
   private static Logger LOGGER = LoggerFactory.getLogger(MoveReplicaGroup.class);
 
-  @Option(name = "-srcHosts", aliases = {"-s", "--src"}, required = true, metaVar = "<filePath or csv hostnames>",
-      usage = "File with names of source hosts or csv list of hostnames")
+  @Option(name = "-srcHosts", aliases = {"-s", "--src"}, required = true, metaVar = "<filePath or csv hostnames>", usage = "File with names of source hosts or csv list of hostnames")
   private String srcHosts;
 
-  @Option(name = "-destHostsFile", aliases = {"-d", "--dest"}, required = false, metaVar = "<File Path>",
-      usage = "File with destination servers list")
+  @Option(name = "-destHostsFile", aliases = {"-d", "--dest"}, required = false, metaVar = "<File Path>", usage = "File with destination servers list")
   private String destHostsFile = "";
 
-  @Option(name = "-tableName", aliases = {"-t", "-table"}, required = true, metaVar = "<string>",
-      usage = "Table name. Supports only OFFLINE table (type is optional)")
+  @Option(name = "-tableName", aliases = {"-t", "-table"}, required = true, metaVar = "<string>", usage = "Table name. Supports only OFFLINE table (type is optional)")
   private String tableName;
 
   @Option(name = "-maxSegmentsToMove", aliases = {"-m", "--max"}, required = false, metaVar = "<int>", usage = "MaxSegmentsToMove")
@@ -88,9 +85,8 @@ public class MoveReplicaGroup extends AbstractBaseAdminCommand implements Comman
   @Option(name = "-exec", required = false, metaVar = "<boolean>", usage = "Execute replica group move. dryRun(default) if not specified")
   private boolean exec = false;
 
-  @Option(name = "-help", required = false, aliases = { "-h", "--h", "--help"}, metaVar = "<boolean>", usage = "Prints help")
+  @Option(name = "-help", required = false, aliases = {"-h", "--h", "--help"}, metaVar = "<boolean>", usage = "Prints help")
   private boolean help = false;
-
 
   private ZKHelixAdmin helix;
   private PinotZKChanger zkChanger;
@@ -110,9 +106,9 @@ public class MoveReplicaGroup extends AbstractBaseAdminCommand implements Comman
   }
 
   public String toString() {
-    String retString = "MoveReplicaGroup -srcHosts " + srcHosts + " -tableName " +
-        tableName + " -zkHost " + zkHost + " -zkPath " + zkPath +
-        (exec ? " -exec" : "");
+    String retString =
+        "MoveReplicaGroup -srcHosts " + srcHosts + " -tableName " + tableName + " -zkHost " + zkHost + " -zkPath "
+            + zkPath + (exec ? " -exec" : "");
     return retString;
   }
 
@@ -121,13 +117,14 @@ public class MoveReplicaGroup extends AbstractBaseAdminCommand implements Comman
 
   }
 
-  public boolean execute() throws IOException, InterruptedException {
+  public boolean execute()
+      throws IOException, InterruptedException {
     validateParams();
 
     zkChanger = new PinotZKChanger(zkHost, zkPath);
     this.helix = zkChanger.getHelixAdmin();
 
-    if (! isExistingTable(tableName)) {
+    if (!isExistingTable(tableName)) {
       LOGGER.error("Table {} does not exist", tableName);
     }
 
@@ -141,8 +138,8 @@ public class MoveReplicaGroup extends AbstractBaseAdminCommand implements Comman
     LOGGER.info("Destination servers: {}", destinationServers);
     verifyServerLists(srcHostsList, destinationServers);
 
-    Map<String, Map<String, String>> idealStateMap = helix.getResourceIdealState(zkPath, tableName)
-        .getRecord().getMapFields();
+    Map<String, Map<String, String>> idealStateMap =
+        helix.getResourceIdealState(zkPath, tableName).getRecord().getMapFields();
 
     System.out.println("Existing idealstate:");
     printIdealState(idealStateMap);
@@ -155,7 +152,7 @@ public class MoveReplicaGroup extends AbstractBaseAdminCommand implements Comman
     System.out.println("Proposed idealstate:");
     printIdealState(proposedIdealState);
     printDestinationServerCounts(destinationServerQueue);
-    if (! exec) {
+    if (!exec) {
       LOGGER.info("Run with -exec to apply this IdealState");
       System.exit(0);
     }
@@ -168,14 +165,14 @@ public class MoveReplicaGroup extends AbstractBaseAdminCommand implements Comman
   private List<String> readSourceHosts()
       throws IOException {
     if (this.srcHosts.isEmpty()) {
-     LOGGER.error("Source hosts(-s) are required");
+      LOGGER.error("Source hosts(-s) are required");
       System.exit(1);
     }
 
     File srcFile = new File(this.srcHosts);
     List<String> srcHostsList = null;
     if (srcFile.exists()) {
-       srcHostsList = readHostsFromFile(this.srcHosts);
+      srcHostsList = readHostsFromFile(this.srcHosts);
       if (srcHostsList.isEmpty()) {
         LOGGER.error("Empty list of servers. Nothing to do");
         // this is not process error but most likely usage error
@@ -247,16 +244,17 @@ public class MoveReplicaGroup extends AbstractBaseAdminCommand implements Comman
     return newIdealState;
   }
 
-  private String getDestinationServer(PriorityQueue<ServerInstance> destinationServers, Map<String, String> existingSegmentMapping) {
+  private String getDestinationServer(PriorityQueue<ServerInstance> destinationServers,
+      Map<String, String> existingSegmentMapping) {
     Preconditions.checkNotNull(destinationServers);
-    Preconditions.checkArgument(! destinationServers.isEmpty());
+    Preconditions.checkArgument(!destinationServers.isEmpty());
 
     List<ServerInstance> removedServers = new ArrayList<>();
     String selectedServer = null;
     while (!destinationServers.isEmpty()) {
       ServerInstance si = destinationServers.poll();
       removedServers.add(si);
-      if (! existingSegmentMapping.containsKey(si.server)) {
+      if (!existingSegmentMapping.containsKey(si.server)) {
         selectedServer = si.server;
         ++si.segments;
         break;
@@ -299,14 +297,13 @@ public class MoveReplicaGroup extends AbstractBaseAdminCommand implements Comman
   private boolean hasDisabledInstances(String logTag, List<String> instances) {
     boolean hasDisabled = false;
     for (String instance : instances) {
-      if (! helix.getInstanceConfig(zkPath, instance).getInstanceEnabled()) {
+      if (!helix.getInstanceConfig(zkPath, instance).getInstanceEnabled()) {
         LOGGER.error("{} instance: {} is disabled", logTag, instance);
         hasDisabled = true;
       }
     }
     return hasDisabled;
   }
-
 
   private PriorityQueue<ServerInstance> getDestinationServerQueue(Map<String, Map<String, String>> idealStateMap,
       List<String> destServers) {
@@ -327,8 +324,8 @@ public class MoveReplicaGroup extends AbstractBaseAdminCommand implements Comman
       }
     }
 
-    PriorityQueue<ServerInstance> destServerQueue = new PriorityQueue<>(destServers.size(),
-        new Comparator<ServerInstance>() {
+    PriorityQueue<ServerInstance> destServerQueue =
+        new PriorityQueue<>(destServers.size(), new Comparator<ServerInstance>() {
           @Override
           public int compare(ServerInstance o1, ServerInstance o2) {
             return o1.segments < o2.segments ? -1 : 1;
@@ -345,11 +342,12 @@ public class MoveReplicaGroup extends AbstractBaseAdminCommand implements Comman
       this.segment = segment;
       this.replicaCount = replicas;
     }
+
     String segment;
     int replicaCount;
   }
 
-  class ServerInstance{
+  class ServerInstance {
     ServerInstance(String server, int segments) {
       this.server = server;
       this.segments = segments;
@@ -363,12 +361,12 @@ public class MoveReplicaGroup extends AbstractBaseAdminCommand implements Comman
   // on srcHosts. This can happen if previous run of the program limited the number of segments to move
   private PriorityQueue<SourceSegments> getSegmentsToMoveQueue(Map<String, Map<String, String>> idealStateMap,
       List<String> srcHosts) {
-    PriorityQueue<SourceSegments> sourceSegments = new PriorityQueue<>(idealStateMap.keySet().size(),
-        new Comparator<SourceSegments>() {
+    PriorityQueue<SourceSegments> sourceSegments =
+        new PriorityQueue<>(idealStateMap.keySet().size(), new Comparator<SourceSegments>() {
           @Override
           public int compare(SourceSegments s1, SourceSegments s2) {
             // arbitrary decision for equals case
-            return (s1.replicaCount > s2.replicaCount ? -1: 1);
+            return (s1.replicaCount > s2.replicaCount ? -1 : 1);
           }
         });
     for (Map.Entry<String, Map<String, String>> segmentEntry : idealStateMap.entrySet()) {
@@ -395,8 +393,8 @@ public class MoveReplicaGroup extends AbstractBaseAdminCommand implements Comman
       System.exit(1);
     }
 
-    tableName = tableName.endsWith(CommonConstants.Helix.TableType.OFFLINE.toString()) ?
-        tableName : tableName + "_OFFLINE";
+    tableName =
+        tableName.endsWith(CommonConstants.Helix.TableType.OFFLINE.toString()) ? tableName : tableName + "_OFFLINE";
     if (zkHost.isEmpty() || zkPath.isEmpty()) {
       LOGGER.error("zkHost or zkPath should not be empty");
       System.exit(1);
@@ -414,11 +412,13 @@ public class MoveReplicaGroup extends AbstractBaseAdminCommand implements Comman
     LOGGER.info("Using zkHost: {}, zkPath: {}", zkHost, zkPath);
   }
 
-  private String getServerTenantName(String tableName) throws IOException {
+  private String getServerTenantName(String tableName)
+      throws IOException {
     return getTableConfig(tableName).getTenantConfig().getServer();
   }
 
-  private TableConfig getTableConfig(String tableName) throws IOException {
+  private TableConfig getTableConfig(String tableName)
+      throws IOException {
     ZNRecordSerializer serializer = new ZNRecordSerializer();
     String path = PropertyPathConfig.getPath(PropertyType.PROPERTYSTORE, zkPath);
     ZkHelixPropertyStore<ZNRecord> propertyStore = new ZkHelixPropertyStore<>(zkHost, serializer, path);
@@ -432,7 +432,8 @@ public class MoveReplicaGroup extends AbstractBaseAdminCommand implements Comman
     return helix.getResourcesInCluster(zkPath).contains(tableName);
   }
 
-  private List<String> readDestinationServers() throws IOException {
+  private List<String> readDestinationServers()
+      throws IOException {
     if (destHostsFile.isEmpty()) {
       String serverTenant = getServerTenantName(tableName) + "_OFFLINE";
       LOGGER.debug("Using server tenant: {}", serverTenant);
@@ -459,6 +460,7 @@ public class MoveReplicaGroup extends AbstractBaseAdminCommand implements Comman
     }
     return srcHosts;
   }
+
   public static void main(String[] args)
       throws Exception {
     MoveReplicaGroup mrg = new MoveReplicaGroup();

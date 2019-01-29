@@ -43,15 +43,13 @@ public class AddTableCommand extends AbstractBaseAdminCommand implements Command
   @Option(name = "-controllerHost", required = false, metaVar = "<String>", usage = "host name for controller.")
   private String _controllerHost;
 
-  @Option(name = "-controllerPort", required = false, metaVar = "<int>",
-      usage = "Port number to start the controller at.")
+  @Option(name = "-controllerPort", required = false, metaVar = "<int>", usage = "Port number to start the controller at.")
   private String _controllerPort = DEFAULT_CONTROLLER_PORT;
 
   @Option(name = "-exec", required = false, metaVar = "<boolean>", usage = "Execute the command.")
   private boolean _exec;
 
-  @Option(name = "-help", required = false, help = true, aliases = { "-h", "--h", "--help" },
-      usage = "Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
   private boolean _help = false;
 
   private String _controllerAddress;
@@ -73,8 +71,8 @@ public class AddTableCommand extends AbstractBaseAdminCommand implements Command
 
   @Override
   public String toString() {
-    String retString = ("AddTable -filePath " + _filePath + " -controllerHost " + _controllerHost +
-        " -controllerPort " + _controllerPort);
+    String retString = ("AddTable -filePath " + _filePath + " -controllerHost " + _controllerHost + " -controllerPort "
+        + _controllerPort);
 
     return ((_exec) ? (retString + " -exec") : retString);
   }
@@ -99,7 +97,8 @@ public class AddTableCommand extends AbstractBaseAdminCommand implements Command
     return this;
   }
 
-  public boolean execute(JsonNode node) throws IOException {
+  public boolean execute(JsonNode node)
+      throws IOException {
     if (_controllerHost == null) {
       _controllerHost = NetUtil.getHostAddress();
     }
@@ -112,16 +111,16 @@ public class AddTableCommand extends AbstractBaseAdminCommand implements Command
     }
 
     LOGGER.info("Executing command: " + toString());
-    String res =
-        AbstractBaseAdminCommand
-            .sendPostRequest(ControllerRequestURLBuilder.baseUrl(_controllerAddress).forTableCreate(), node.toString());
+    String res = AbstractBaseAdminCommand
+        .sendPostRequest(ControllerRequestURLBuilder.baseUrl(_controllerAddress).forTableCreate(), node.toString());
 
     LOGGER.info(res);
     return true;
   }
 
   @Override
-  public boolean execute() throws Exception {
+  public boolean execute()
+      throws Exception {
     return execute(JsonUtils.fileToJsonNode(new File(_filePath)));
   }
 }

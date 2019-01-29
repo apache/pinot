@@ -72,7 +72,8 @@ public abstract class ImmutableDictionaryReader extends BaseDictionary {
   }
 
   @Override
-  public void close() throws IOException {
+  public void close()
+      throws IOException {
     _valueReader.close();
   }
 

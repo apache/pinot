@@ -29,8 +29,7 @@ public class PerfBenchmarkDriverConf {
   String clusterName = "PinotPerfTestCluster";
   /*
    * zookeeper configuration
-   */
-  String zkHost = "localhost";
+   */ String zkHost = "localhost";
   int zkPort = 2191;
   boolean startZookeeper = true;
 
@@ -335,5 +334,4 @@ public class PerfBenchmarkDriverConf {
     String dump = yaml.dump(new PerfBenchmarkDriverConf());
     System.out.println(dump);
   }
-
 }

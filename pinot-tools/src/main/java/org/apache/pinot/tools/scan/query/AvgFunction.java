@@ -36,8 +36,8 @@ public class AvgFunction extends AggregationFunc {
 
     for (ResultTable.Row row : _rows) {
       Object value = row.get(_column, _name);
-      if (value instanceof double []) {
-        double [] valArray = (double []) value;
+      if (value instanceof double[]) {
+        double[] valArray = (double[]) value;
         sum += valArray[0];
         numEntries += valArray[1];
       } else {

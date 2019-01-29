@@ -104,8 +104,9 @@ public class ScatterGatherPerfClient implements Runnable {
 
   private final int _maxActiveConnections;
 
-  private final Histogram _latencyHistogram = MetricsHelper.newHistogram(null, new MetricName(
-      ScatterGatherPerfClient.class, "latency"), false);;
+  private final Histogram _latencyHistogram =
+      MetricsHelper.newHistogram(null, new MetricName(ScatterGatherPerfClient.class, "latency"), false);
+  ;
 
   private AtomicLong _idGen = new AtomicLong(0);
 
@@ -152,8 +153,8 @@ public class ScatterGatherPerfClient implements Runnable {
     NettyClientMetrics clientMetrics = new NettyClientMetrics(registry, "client_");
     PooledNettyClientResourceManager rm = new PooledNettyClientResourceManager(_eventLoopGroup, _timer, clientMetrics);
     _pool =
-        new KeyedPoolImpl<PooledNettyClientResourceManager.PooledClientConnection>(1, _maxActiveConnections, 300000, 10, rm,
-            _timedExecutor, MoreExecutors.sameThreadExecutor(), registry);
+        new KeyedPoolImpl<PooledNettyClientResourceManager.PooledClientConnection>(1, _maxActiveConnections, 300000, 10,
+            rm, _timedExecutor, MoreExecutors.sameThreadExecutor(), registry);
     rm.setPool(_pool);
     _scatterGather = new ScatterGatherImpl(_pool, _service);
     for (AsyncReader r : _readerThreads) {
@@ -230,7 +231,6 @@ public class ScatterGatherPerfClient implements Runnable {
 
     shutdown();
     System.out.println("Client done !!");
-
   }
 
   /**
@@ -295,7 +295,8 @@ public class ScatterGatherPerfClient implements Runnable {
    * @throws ExecutionException
    */
   private String sendRequestAndGetResponse(SimpleScatterGatherRequest request,
-      final ScatterGatherStats scatterGatherStats) throws InterruptedException, ExecutionException {
+      final ScatterGatherStats scatterGatherStats)
+      throws InterruptedException, ExecutionException {
     BrokerMetrics brokerMetrics = new BrokerMetrics(new MetricsRegistry());
     CompositeFuture<byte[]> future = _scatterGather.scatterGather(request, scatterGatherStats, brokerMetrics);
     byte[] bytes = future.getOne();
@@ -431,15 +432,16 @@ public class ScatterGatherPerfClient implements Runnable {
     return options;
   }
 
-  public static void main(String[] args) throws Exception {
+  public static void main(String[] args)
+      throws Exception {
     //Process Command Line to get config and port
     CommandLineParser cliParser = new GnuParser();
     Options cliOptions = buildCommandLineOptions();
 
     CommandLine cmd = cliParser.parse(cliOptions, args, true);
 
-    if ((!cmd.hasOption(BROKER_CONFIG_OPT_NAME)) || (!cmd.hasOption(REQUEST_SIZE_OPT_NAME))
-        || (!cmd.hasOption(TABLE_NAME_OPT_NAME)) || (!cmd.hasOption(TABLE_NAME_OPT_NAME))) {
+    if ((!cmd.hasOption(BROKER_CONFIG_OPT_NAME)) || (!cmd.hasOption(REQUEST_SIZE_OPT_NAME)) || (!cmd
+        .hasOption(TABLE_NAME_OPT_NAME)) || (!cmd.hasOption(TABLE_NAME_OPT_NAME))) {
       System.err.println("Missing required arguments !!");
       System.err.println(cliOptions);
       throw new RuntimeException("Missing required arguments !!");
@@ -477,5 +479,4 @@ public class ScatterGatherPerfClient implements Runnable {
   public long getEndLastResponseTime() {
     return _endLastResponseTime;
   }
-
 }

@@ -33,28 +33,27 @@ import org.apache.pinot.common.data.FieldSpec;
  *    <li>We will throw exception if the conversion throws exception (e.g. "foo" -> INT)</li>
  *  </ul>
  */
-public enum PinotDataType {
-  BOOLEAN {
-    @Override
-    public Integer toInteger(Object value) {
-      throw new UnsupportedOperationException("Cannot convert value: " + value + " from: BOOLEAN to: INTEGER");
-    }
+public enum PinotDataType {BOOLEAN {
+  @Override
+  public Integer toInteger(Object value) {
+    throw new UnsupportedOperationException("Cannot convert value: " + value + " from: BOOLEAN to: INTEGER");
+  }
 
-    @Override
-    public Long toLong(Object value) {
-      throw new UnsupportedOperationException("Cannot convert value: " + value + " from: BOOLEAN to: LONG");
-    }
+  @Override
+  public Long toLong(Object value) {
+    throw new UnsupportedOperationException("Cannot convert value: " + value + " from: BOOLEAN to: LONG");
+  }
 
-    @Override
-    public Float toFloat(Object value) {
-      throw new UnsupportedOperationException("Cannot convert value: " + value + " from: BOOLEAN to: FLOAT");
-    }
+  @Override
+  public Float toFloat(Object value) {
+    throw new UnsupportedOperationException("Cannot convert value: " + value + " from: BOOLEAN to: FLOAT");
+  }
 
-    @Override
-    public Double toDouble(Object value) {
-      throw new UnsupportedOperationException("Cannot convert value: " + value + " from: BOOLEAN to: DOUBLE");
-    }
-  },
+  @Override
+  public Double toDouble(Object value) {
+    throw new UnsupportedOperationException("Cannot convert value: " + value + " from: BOOLEAN to: DOUBLE");
+  }
+},
 
   BYTE {
     @Override
@@ -486,5 +485,4 @@ public enum PinotDataType {
         throw new UnsupportedOperationException(
             "Unsupported data type: " + dataType + " in field: " + fieldSpec.getName());
     }
-  }
-}
+  }}

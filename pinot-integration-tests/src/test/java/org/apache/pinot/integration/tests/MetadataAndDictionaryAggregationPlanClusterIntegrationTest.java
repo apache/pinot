@@ -85,7 +85,8 @@ public class MetadataAndDictionaryAggregationPlanClusterIntegrationTest extends 
   }
 
   @BeforeClass
-  public void setUp() throws Exception {
+  public void setUp()
+      throws Exception {
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir);
 
     // Start the Pinot cluster
@@ -117,7 +118,8 @@ public class MetadataAndDictionaryAggregationPlanClusterIntegrationTest extends 
     waitForAllDocsLoaded(600_000L);
   }
 
-  private void loadDataIntoH2(List<File> avroFiles) throws Exception {
+  private void loadDataIntoH2(List<File> avroFiles)
+      throws Exception {
     ExecutorService executor = Executors.newCachedThreadPool();
     setUpH2Connection(avroFiles, executor);
     executor.shutdown();
@@ -125,12 +127,14 @@ public class MetadataAndDictionaryAggregationPlanClusterIntegrationTest extends 
   }
 
   private void createAndUploadSegments(List<File> avroFiles, String tableName, boolean createStarTreeIndex,
-      List<String> rawIndexColumns, Schema pinotSchema) throws Exception {
+      List<String> rawIndexColumns, Schema pinotSchema)
+      throws Exception {
     TestUtils.ensureDirectoriesExistAndEmpty(_segmentDir, _tarDir);
 
     ExecutorService executor = Executors.newCachedThreadPool();
-    ClusterIntegrationTestUtils.buildSegmentsFromAvro(avroFiles, 0, _segmentDir, _tarDir, tableName,
-        createStarTreeIndex, null, rawIndexColumns, pinotSchema, executor);
+    ClusterIntegrationTestUtils
+        .buildSegmentsFromAvro(avroFiles, 0, _segmentDir, _tarDir, tableName, createStarTreeIndex, null,
+            rawIndexColumns, pinotSchema, executor);
     executor.shutdown();
     executor.awaitTermination(10, TimeUnit.MINUTES);
 
@@ -138,7 +142,8 @@ public class MetadataAndDictionaryAggregationPlanClusterIntegrationTest extends 
   }
 
   @Test
-  public void testDictionaryBasedQueries() throws Exception {
+  public void testDictionaryBasedQueries()
+      throws Exception {
 
     String pqlQuery;
     String pqlStarTreeQuery;
@@ -417,7 +422,8 @@ public class MetadataAndDictionaryAggregationPlanClusterIntegrationTest extends 
   }
 
   @Test
-  public void testMetadataBasedQueries() throws Exception {
+  public void testMetadataBasedQueries()
+      throws Exception {
 
     String pqlQuery;
     String pqlStarTreeQuery;
@@ -481,7 +487,8 @@ public class MetadataAndDictionaryAggregationPlanClusterIntegrationTest extends 
   }
 
   @AfterClass
-  public void tearDown() throws Exception {
+  public void tearDown()
+      throws Exception {
     dropOfflineTable(DEFAULT_TABLE_NAME);
     dropOfflineTable(STAR_TREE_TABLE_NAME);
 

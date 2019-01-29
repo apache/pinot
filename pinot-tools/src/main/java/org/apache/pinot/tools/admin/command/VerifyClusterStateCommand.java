@@ -40,8 +40,7 @@ public class VerifyClusterStateCommand extends AbstractBaseAdminCommand implemen
   @Option(name = "-timeoutSec", required = false, metaVar = "<long>", usage = "Maximum timeout in second.")
   private long _timeoutSec = 300L;
 
-  @Option(name = "-help", required = false, help = true, aliases = { "-h", "--h", "--help" },
-      usage = "Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
   private boolean _help = false;
 
   @Override
@@ -50,7 +49,8 @@ public class VerifyClusterStateCommand extends AbstractBaseAdminCommand implemen
   }
 
   @Override
-  public boolean execute() throws Exception {
+  public boolean execute()
+      throws Exception {
     if (_timeoutSec <= 0) {
       String message = "Error: timeoutMs must be greater than 0";
       LOGGER.error(message);

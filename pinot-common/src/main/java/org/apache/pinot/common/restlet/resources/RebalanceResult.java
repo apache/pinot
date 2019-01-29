@@ -23,6 +23,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.Map;
 import org.apache.pinot.common.partition.PartitionAssignment;
 
+
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class RebalanceResult {
   private Map<String, Map<String, String>> idealStateMapping;

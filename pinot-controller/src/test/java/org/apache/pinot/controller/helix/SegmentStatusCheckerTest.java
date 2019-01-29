@@ -39,7 +39,8 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 
 public class SegmentStatusCheckerTest {
@@ -50,7 +51,8 @@ public class SegmentStatusCheckerTest {
   private ControllerConf config;
 
   @Test
-  public void offlineBasicTest() throws Exception {
+  public void offlineBasicTest()
+      throws Exception {
     final String tableName = "myTable_OFFLINE";
     List<String> allTableNames = new ArrayList<String>();
     allTableNames.add(tableName);
@@ -66,10 +68,10 @@ public class SegmentStatusCheckerTest {
     idealState.setRebalanceMode(IdealState.RebalanceMode.CUSTOMIZED);
 
     ExternalView externalView = new ExternalView(tableName);
-    externalView.setState("myTable_0","pinot1","ONLINE");
-    externalView.setState("myTable_0","pinot2","ONLINE");
-    externalView.setState("myTable_1","pinot1","ERROR");
-    externalView.setState("myTable_1","pinot2","ONLINE");
+    externalView.setState("myTable_0", "pinot1", "ONLINE");
+    externalView.setState("myTable_0", "pinot2", "ONLINE");
+    externalView.setState("myTable_1", "pinot1", "ERROR");
+    externalView.setState("myTable_1", "pinot2", "ONLINE");
 
     {
       helixResourceManager = mock(PinotHelixResourceManager.class);
@@ -87,18 +89,21 @@ public class SegmentStatusCheckerTest {
     segmentStatusChecker = new SegmentStatusChecker(helixResourceManager, config, controllerMetrics);
     segmentStatusChecker.init();
     segmentStatusChecker.run();
-    Assert.assertEquals(controllerMetrics.getValueOfTableGauge(externalView.getId(),
-        ControllerGauge.SEGMENTS_IN_ERROR_STATE), 1);
-    Assert.assertEquals(controllerMetrics.getValueOfTableGauge(externalView.getId(),
-        ControllerGauge.NUMBER_OF_REPLICAS), 1);
-    Assert.assertEquals(controllerMetrics.getValueOfTableGauge(externalView.getId(),
-        ControllerGauge.PERCENT_OF_REPLICAS), 33);
-    Assert.assertEquals(controllerMetrics.getValueOfTableGauge(externalView.getId(),
-        ControllerGauge.PERCENT_SEGMENTS_AVAILABLE), 100);
+    Assert.assertEquals(
+        controllerMetrics.getValueOfTableGauge(externalView.getId(), ControllerGauge.SEGMENTS_IN_ERROR_STATE), 1);
+    Assert
+        .assertEquals(controllerMetrics.getValueOfTableGauge(externalView.getId(), ControllerGauge.NUMBER_OF_REPLICAS),
+            1);
+    Assert
+        .assertEquals(controllerMetrics.getValueOfTableGauge(externalView.getId(), ControllerGauge.PERCENT_OF_REPLICAS),
+            33);
+    Assert.assertEquals(
+        controllerMetrics.getValueOfTableGauge(externalView.getId(), ControllerGauge.PERCENT_SEGMENTS_AVAILABLE), 100);
   }
 
   @Test
-  public void realtimeBasicTest() throws Exception {
+  public void realtimeBasicTest()
+      throws Exception {
     final String tableName = "myTable_REALTIME";
     final String rawTableName = TableNameBuilder.extractRawTableName(tableName);
     List<String> allTableNames = new ArrayList<String>();
@@ -120,15 +125,15 @@ public class SegmentStatusCheckerTest {
     idealState.setRebalanceMode(IdealState.RebalanceMode.CUSTOMIZED);
 
     ExternalView externalView = new ExternalView(tableName);
-    externalView.setState(seg1.getSegmentName(),"pinot1","ONLINE");
-    externalView.setState(seg1.getSegmentName(), "pinot2","ONLINE");
-    externalView.setState(seg1.getSegmentName(),"pinot3","ONLINE");
-    externalView.setState(seg2.getSegmentName(),"pinot1","CONSUMING");
-    externalView.setState(seg2.getSegmentName(),"pinot2","ONLINE");
-    externalView.setState(seg2.getSegmentName(),"pinot3","CONSUMING");
-    externalView.setState(seg3.getSegmentName(),"pinot1","CONSUMING");
-    externalView.setState(seg3.getSegmentName(),"pinot2","CONSUMING");
-    externalView.setState(seg3.getSegmentName(),"pinot3","OFFLINE");
+    externalView.setState(seg1.getSegmentName(), "pinot1", "ONLINE");
+    externalView.setState(seg1.getSegmentName(), "pinot2", "ONLINE");
+    externalView.setState(seg1.getSegmentName(), "pinot3", "ONLINE");
+    externalView.setState(seg2.getSegmentName(), "pinot1", "CONSUMING");
+    externalView.setState(seg2.getSegmentName(), "pinot2", "ONLINE");
+    externalView.setState(seg2.getSegmentName(), "pinot3", "CONSUMING");
+    externalView.setState(seg3.getSegmentName(), "pinot1", "CONSUMING");
+    externalView.setState(seg3.getSegmentName(), "pinot2", "CONSUMING");
+    externalView.setState(seg3.getSegmentName(), "pinot3", "OFFLINE");
 
     {
       helixResourceManager = mock(PinotHelixResourceManager.class);
@@ -146,18 +151,21 @@ public class SegmentStatusCheckerTest {
     segmentStatusChecker = new SegmentStatusChecker(helixResourceManager, config, controllerMetrics);
     segmentStatusChecker.init();
     segmentStatusChecker.run();
-    Assert.assertEquals(controllerMetrics.getValueOfTableGauge(externalView.getId(),
-        ControllerGauge.SEGMENTS_IN_ERROR_STATE), 0);
-    Assert.assertEquals(controllerMetrics.getValueOfTableGauge(externalView.getId(),
-        ControllerGauge.NUMBER_OF_REPLICAS), 3);
-    Assert.assertEquals(controllerMetrics.getValueOfTableGauge(externalView.getId(),
-        ControllerGauge.PERCENT_OF_REPLICAS), 100);
-    Assert.assertEquals(controllerMetrics.getValueOfTableGauge(externalView.getId(),
-        ControllerGauge.PERCENT_SEGMENTS_AVAILABLE), 100);
+    Assert.assertEquals(
+        controllerMetrics.getValueOfTableGauge(externalView.getId(), ControllerGauge.SEGMENTS_IN_ERROR_STATE), 0);
+    Assert
+        .assertEquals(controllerMetrics.getValueOfTableGauge(externalView.getId(), ControllerGauge.NUMBER_OF_REPLICAS),
+            3);
+    Assert
+        .assertEquals(controllerMetrics.getValueOfTableGauge(externalView.getId(), ControllerGauge.PERCENT_OF_REPLICAS),
+            100);
+    Assert.assertEquals(
+        controllerMetrics.getValueOfTableGauge(externalView.getId(), ControllerGauge.PERCENT_SEGMENTS_AVAILABLE), 100);
   }
 
   @Test
-  public void missingEVPartitionTest() throws Exception {
+  public void missingEVPartitionTest()
+      throws Exception {
     final String tableName = "myTable_OFFLINE";
     List<String> allTableNames = new ArrayList<String>();
     allTableNames.add(tableName);
@@ -174,13 +182,13 @@ public class SegmentStatusCheckerTest {
     idealState.setRebalanceMode(IdealState.RebalanceMode.CUSTOMIZED);
 
     ExternalView externalView = new ExternalView(tableName);
-    externalView.setState("myTable_0","pinot1","ONLINE");
-    externalView.setState("myTable_0","pinot2","ONLINE");
-    externalView.setState("myTable_1","pinot1","ERROR");
-    externalView.setState("myTable_1","pinot2","ONLINE");
+    externalView.setState("myTable_0", "pinot1", "ONLINE");
+    externalView.setState("myTable_0", "pinot2", "ONLINE");
+    externalView.setState("myTable_1", "pinot1", "ERROR");
+    externalView.setState("myTable_1", "pinot2", "ONLINE");
 
-    ZNRecord znrecord =  new ZNRecord("myTable_0");
-    znrecord.setSimpleField(CommonConstants.Segment.SEGMENT_NAME,"myTable_0");
+    ZNRecord znrecord = new ZNRecord("myTable_0");
+    znrecord.setSimpleField(CommonConstants.Segment.SEGMENT_NAME, "myTable_0");
     znrecord.setSimpleField(CommonConstants.Segment.TABLE_NAME, "myTable_OFFLINE");
     znrecord.setSimpleField(CommonConstants.Segment.INDEX_VERSION, "v1");
     znrecord.setEnumField(CommonConstants.Segment.SEGMENT_TYPE, CommonConstants.Segment.SegmentType.OFFLINE);
@@ -192,12 +200,13 @@ public class SegmentStatusCheckerTest {
     znrecord.setLongField(CommonConstants.Segment.CREATION_TIME, 3000);
     znrecord.setSimpleField(CommonConstants.Segment.Offline.DOWNLOAD_URL, "http://localhost:8000/myTable_0");
     znrecord.setLongField(CommonConstants.Segment.Offline.PUSH_TIME, System.currentTimeMillis());
-    znrecord.setLongField(CommonConstants.Segment.Offline.REFRESH_TIME,System.currentTimeMillis());
+    znrecord.setLongField(CommonConstants.Segment.Offline.REFRESH_TIME, System.currentTimeMillis());
 
     ZkHelixPropertyStore<ZNRecord> propertyStore;
     {
       propertyStore = (ZkHelixPropertyStore<ZNRecord>) mock(ZkHelixPropertyStore.class);
-      when(propertyStore.get("/SEGMENTS/myTable_OFFLINE/myTable_3",null, AccessOption.PERSISTENT)).thenReturn(znrecord);
+      when(propertyStore.get("/SEGMENTS/myTable_OFFLINE/myTable_3", null, AccessOption.PERSISTENT))
+          .thenReturn(znrecord);
     }
 
     {
@@ -205,8 +214,8 @@ public class SegmentStatusCheckerTest {
       when(helixResourceManager.getAllTables()).thenReturn(allTableNames);
       when(helixResourceManager.getTableIdealState(tableName)).thenReturn(idealState);
       when(helixResourceManager.getTableExternalView(tableName)).thenReturn(externalView);
-      when(helixResourceManager.getOfflineSegmentZKMetadata(tableName, "myTable_3")).thenReturn(
-          new OfflineSegmentZKMetadata(znrecord));
+      when(helixResourceManager.getOfflineSegmentZKMetadata(tableName, "myTable_3"))
+          .thenReturn(new OfflineSegmentZKMetadata(znrecord));
     }
     {
       config = mock(ControllerConf.class);
@@ -218,16 +227,18 @@ public class SegmentStatusCheckerTest {
     segmentStatusChecker = new SegmentStatusChecker(helixResourceManager, config, controllerMetrics);
     segmentStatusChecker.init();
     segmentStatusChecker.run();
-    Assert.assertEquals(controllerMetrics.getValueOfTableGauge(externalView.getId(),
-        ControllerGauge.SEGMENTS_IN_ERROR_STATE), 1);
-    Assert.assertEquals(controllerMetrics.getValueOfTableGauge(externalView.getId(),
-        ControllerGauge.NUMBER_OF_REPLICAS), 0);
-    Assert.assertEquals(controllerMetrics.getValueOfTableGauge(externalView.getId(),
-        ControllerGauge.PERCENT_SEGMENTS_AVAILABLE), 75);
+    Assert.assertEquals(
+        controllerMetrics.getValueOfTableGauge(externalView.getId(), ControllerGauge.SEGMENTS_IN_ERROR_STATE), 1);
+    Assert
+        .assertEquals(controllerMetrics.getValueOfTableGauge(externalView.getId(), ControllerGauge.NUMBER_OF_REPLICAS),
+            0);
+    Assert.assertEquals(
+        controllerMetrics.getValueOfTableGauge(externalView.getId(), ControllerGauge.PERCENT_SEGMENTS_AVAILABLE), 75);
   }
 
   @Test
-  public void missingEVTest() throws Exception {
+  public void missingEVTest()
+      throws Exception {
     final String tableName = "myTable_REALTIME";
     List<String> allTableNames = new ArrayList<String>();
     allTableNames.add(tableName);
@@ -258,14 +269,13 @@ public class SegmentStatusCheckerTest {
     segmentStatusChecker = new SegmentStatusChecker(helixResourceManager, config, controllerMetrics);
     segmentStatusChecker.init();
     segmentStatusChecker.run();
-    Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName,
-        ControllerGauge.SEGMENTS_IN_ERROR_STATE), 0);
-    Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName,
-        ControllerGauge.NUMBER_OF_REPLICAS), 0);
+    Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName, ControllerGauge.SEGMENTS_IN_ERROR_STATE), 0);
+    Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName, ControllerGauge.NUMBER_OF_REPLICAS), 0);
   }
 
   @Test
-  public void missingIdealTest() throws Exception {
+  public void missingIdealTest()
+      throws Exception {
     final String tableName = "myTable_REALTIME";
     List<String> allTableNames = new ArrayList<>();
     allTableNames.add(tableName);
@@ -286,16 +296,17 @@ public class SegmentStatusCheckerTest {
     segmentStatusChecker = new SegmentStatusChecker(helixResourceManager, config, controllerMetrics);
     segmentStatusChecker.init();
     segmentStatusChecker.run();
-    Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName,
-        ControllerGauge.SEGMENTS_IN_ERROR_STATE), Long.MIN_VALUE);
-    Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName,
-        ControllerGauge.NUMBER_OF_REPLICAS), Long.MIN_VALUE);
-    Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName,
-        ControllerGauge.PERCENT_OF_REPLICAS), Long.MIN_VALUE);
+    Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName, ControllerGauge.SEGMENTS_IN_ERROR_STATE),
+        Long.MIN_VALUE);
+    Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName, ControllerGauge.NUMBER_OF_REPLICAS),
+        Long.MIN_VALUE);
+    Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName, ControllerGauge.PERCENT_OF_REPLICAS),
+        Long.MIN_VALUE);
   }
 
   @Test
-  public void missingEVPartitionPushTest() throws Exception {
+  public void missingEVPartitionPushTest()
+      throws Exception {
     final String tableName = "myTable_OFFLINE";
     List<String> allTableNames = new ArrayList<String>();
     allTableNames.add(tableName);
@@ -307,11 +318,11 @@ public class SegmentStatusCheckerTest {
     idealState.setRebalanceMode(IdealState.RebalanceMode.CUSTOMIZED);
 
     ExternalView externalView = new ExternalView(tableName);
-    externalView.setState("myTable_1","pinot1","ONLINE");
-    externalView.setState("myTable_1","pinot2","ONLINE");
+    externalView.setState("myTable_1", "pinot1", "ONLINE");
+    externalView.setState("myTable_1", "pinot2", "ONLINE");
 
-    ZNRecord znrecord =  new ZNRecord("myTable_0");
-    znrecord.setSimpleField(CommonConstants.Segment.SEGMENT_NAME,"myTable_0");
+    ZNRecord znrecord = new ZNRecord("myTable_0");
+    znrecord.setSimpleField(CommonConstants.Segment.SEGMENT_NAME, "myTable_0");
     znrecord.setSimpleField(CommonConstants.Segment.TABLE_NAME, "myTable_OFFLINE");
     znrecord.setSimpleField(CommonConstants.Segment.INDEX_VERSION, "v1");
     znrecord.setEnumField(CommonConstants.Segment.SEGMENT_TYPE, CommonConstants.Segment.SegmentType.OFFLINE);
@@ -323,15 +334,15 @@ public class SegmentStatusCheckerTest {
     znrecord.setLongField(CommonConstants.Segment.CREATION_TIME, 3000);
     znrecord.setSimpleField(CommonConstants.Segment.Offline.DOWNLOAD_URL, "http://localhost:8000/myTable_0");
     znrecord.setLongField(CommonConstants.Segment.Offline.PUSH_TIME, System.currentTimeMillis());
-    znrecord.setLongField(CommonConstants.Segment.Offline.REFRESH_TIME,System.currentTimeMillis());
+    znrecord.setLongField(CommonConstants.Segment.Offline.REFRESH_TIME, System.currentTimeMillis());
 
     {
       helixResourceManager = mock(PinotHelixResourceManager.class);
       when(helixResourceManager.getAllTables()).thenReturn(allTableNames);
       when(helixResourceManager.getTableIdealState(tableName)).thenReturn(idealState);
       when(helixResourceManager.getTableExternalView(tableName)).thenReturn(externalView);
-      when(helixResourceManager.getOfflineSegmentZKMetadata(tableName, "myTable_0")).thenReturn(
-          new OfflineSegmentZKMetadata(znrecord));
+      when(helixResourceManager.getOfflineSegmentZKMetadata(tableName, "myTable_0"))
+          .thenReturn(new OfflineSegmentZKMetadata(znrecord));
     }
     {
       config = mock(ControllerConf.class);
@@ -343,18 +354,21 @@ public class SegmentStatusCheckerTest {
     segmentStatusChecker = new SegmentStatusChecker(helixResourceManager, config, controllerMetrics);
     segmentStatusChecker.init();
     segmentStatusChecker.run();
-    Assert.assertEquals(controllerMetrics.getValueOfTableGauge(externalView.getId(),
-        ControllerGauge.SEGMENTS_IN_ERROR_STATE), 0);
-    Assert.assertEquals(controllerMetrics.getValueOfTableGauge(externalView.getId(),
-        ControllerGauge.NUMBER_OF_REPLICAS), 2);
-    Assert.assertEquals(controllerMetrics.getValueOfTableGauge(externalView.getId(),
-        ControllerGauge.PERCENT_OF_REPLICAS), 100);
-    Assert.assertEquals(controllerMetrics.getValueOfTableGauge(externalView.getId(),
-        ControllerGauge.PERCENT_SEGMENTS_AVAILABLE), 100);
+    Assert.assertEquals(
+        controllerMetrics.getValueOfTableGauge(externalView.getId(), ControllerGauge.SEGMENTS_IN_ERROR_STATE), 0);
+    Assert
+        .assertEquals(controllerMetrics.getValueOfTableGauge(externalView.getId(), ControllerGauge.NUMBER_OF_REPLICAS),
+            2);
+    Assert
+        .assertEquals(controllerMetrics.getValueOfTableGauge(externalView.getId(), ControllerGauge.PERCENT_OF_REPLICAS),
+            100);
+    Assert.assertEquals(
+        controllerMetrics.getValueOfTableGauge(externalView.getId(), ControllerGauge.PERCENT_SEGMENTS_AVAILABLE), 100);
   }
 
   @Test
-  public void noReplicas() throws Exception {
+  public void noReplicas()
+      throws Exception {
     final String tableName = "myTable_REALTIME";
     List<String> allTableNames = new ArrayList<String>();
     allTableNames.add(tableName);
@@ -381,18 +395,16 @@ public class SegmentStatusCheckerTest {
     segmentStatusChecker = new SegmentStatusChecker(helixResourceManager, config, controllerMetrics);
     segmentStatusChecker.init();
     segmentStatusChecker.run();
-    Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName,
-        ControllerGauge.SEGMENTS_IN_ERROR_STATE), 0);
-    Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName,
-        ControllerGauge.NUMBER_OF_REPLICAS), 1);
-    Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName,
-        ControllerGauge.PERCENT_OF_REPLICAS), 100);
-    Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName,
-        ControllerGauge.PERCENT_SEGMENTS_AVAILABLE), 100);
+    Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName, ControllerGauge.SEGMENTS_IN_ERROR_STATE), 0);
+    Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName, ControllerGauge.NUMBER_OF_REPLICAS), 1);
+    Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName, ControllerGauge.PERCENT_OF_REPLICAS), 100);
+    Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName, ControllerGauge.PERCENT_SEGMENTS_AVAILABLE),
+        100);
   }
 
   @Test
-  public void disabledTableTest() throws Exception {
+  public void disabledTableTest()
+      throws Exception {
 
     final String tableName = "myTable_OFFLINE";
     List<String> allTableNames = new ArrayList<String>();
@@ -421,18 +433,16 @@ public class SegmentStatusCheckerTest {
     controllerMetrics = new ControllerMetrics(metricsRegistry);
     segmentStatusChecker = new SegmentStatusChecker(helixResourceManager, config, controllerMetrics);
     // verify state before test
-    Assert.assertEquals(controllerMetrics.getValueOfGlobalGauge(
-        ControllerGauge.DISABLED_TABLE_COUNT), 0);
+    Assert.assertEquals(controllerMetrics.getValueOfGlobalGauge(ControllerGauge.DISABLED_TABLE_COUNT), 0);
     // update metrics
     segmentStatusChecker.init();
     segmentStatusChecker.run();
-    Assert.assertEquals(controllerMetrics.getValueOfGlobalGauge(
-        ControllerGauge.DISABLED_TABLE_COUNT), 1);
+    Assert.assertEquals(controllerMetrics.getValueOfGlobalGauge(ControllerGauge.DISABLED_TABLE_COUNT), 1);
   }
 
-
   @Test
-  public void disabledEmptyTableTest() throws Exception {
+  public void disabledEmptyTableTest()
+      throws Exception {
 
     final String tableName = "myTable_OFFLINE";
     List<String> allTableNames = Lists.newArrayList(tableName);
@@ -457,23 +467,23 @@ public class SegmentStatusCheckerTest {
     controllerMetrics = new ControllerMetrics(metricsRegistry);
     segmentStatusChecker = new SegmentStatusChecker(helixResourceManager, config, controllerMetrics);
     // verify state before test
-    Assert.assertEquals(controllerMetrics.getValueOfGlobalGauge(
-        ControllerGauge.DISABLED_TABLE_COUNT), 0);
+    Assert.assertEquals(controllerMetrics.getValueOfGlobalGauge(ControllerGauge.DISABLED_TABLE_COUNT), 0);
     // update metrics
     segmentStatusChecker.init();
     segmentStatusChecker.run();
-    Assert.assertEquals(controllerMetrics.getValueOfGlobalGauge(
-        ControllerGauge.DISABLED_TABLE_COUNT), 1);
+    Assert.assertEquals(controllerMetrics.getValueOfGlobalGauge(ControllerGauge.DISABLED_TABLE_COUNT), 1);
   }
 
   @Test
-  public void noSegments() throws Exception {
+  public void noSegments()
+      throws Exception {
     noSegmentsInternal(0);
     noSegmentsInternal(5);
     noSegmentsInternal(-1);
   }
 
-  public void noSegmentsInternal(final int nReplicas) throws Exception {
+  public void noSegmentsInternal(final int nReplicas)
+      throws Exception {
     final String tableName = "myTable_REALTIME";
     String nReplicasStr = Integer.toString(nReplicas);
     int nReplicasExpectedValue = nReplicas;
@@ -503,13 +513,12 @@ public class SegmentStatusCheckerTest {
     segmentStatusChecker = new SegmentStatusChecker(helixResourceManager, config, controllerMetrics);
     segmentStatusChecker.init();
     segmentStatusChecker.run();
-    Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName,
-        ControllerGauge.SEGMENTS_IN_ERROR_STATE), Long.MIN_VALUE);
-    Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName,
-        ControllerGauge.NUMBER_OF_REPLICAS), nReplicasExpectedValue);
-    Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName,
-        ControllerGauge.PERCENT_OF_REPLICAS), 100);
-    Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName,
-        ControllerGauge.PERCENT_SEGMENTS_AVAILABLE), 100);
+    Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName, ControllerGauge.SEGMENTS_IN_ERROR_STATE),
+        Long.MIN_VALUE);
+    Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName, ControllerGauge.NUMBER_OF_REPLICAS),
+        nReplicasExpectedValue);
+    Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName, ControllerGauge.PERCENT_OF_REPLICAS), 100);
+    Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName, ControllerGauge.PERCENT_SEGMENTS_AVAILABLE),
+        100);
   }
 }

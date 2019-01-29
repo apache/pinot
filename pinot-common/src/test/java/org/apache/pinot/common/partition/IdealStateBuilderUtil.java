@@ -76,7 +76,8 @@ public class IdealStateBuilderUtil {
     return this;
   }
 
-  public IdealStateBuilderUtil addConsumingSegments(int numPartitions, int seqNum, int numReplicas, List<String> instances) {
+  public IdealStateBuilderUtil addConsumingSegments(int numPartitions, int seqNum, int numReplicas,
+      List<String> instances) {
     int serverId = 0;
     for (int p = 0; p < numPartitions; p++) {
       LLCSegmentName llcSegmentName = new LLCSegmentName(_rawTableName, p, seqNum, System.currentTimeMillis());
@@ -135,7 +136,7 @@ public class IdealStateBuilderUtil {
           Map<String, String> newInstanceStateMap = new HashMap<>(instanceStateMap.size());
           int serverId = 0;
           for (Map.Entry<String, String> entry : instanceStateMap.entrySet()) {
-            newInstanceStateMap.put(instances.get(serverId ++), entry.getValue());
+            newInstanceStateMap.put(instances.get(serverId++), entry.getValue());
           }
           _idealState.setInstanceStateMap(llcSegmentName.getSegmentName(), newInstanceStateMap);
           break;
@@ -169,5 +170,4 @@ public class IdealStateBuilderUtil {
     _idealState.getRecord().getMapFields().clear();
     return this;
   }
-
 }

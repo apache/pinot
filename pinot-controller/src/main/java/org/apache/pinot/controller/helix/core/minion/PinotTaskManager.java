@@ -50,7 +50,6 @@ public class PinotTaskManager extends ControllerPeriodicTask {
   private final PinotHelixTaskResourceManager _helixTaskResourceManager;
   private final ClusterInfoProvider _clusterInfoProvider;
   private final TaskGeneratorRegistry _taskGeneratorRegistry;
-  private final ControllerMetrics _controllerMetrics;
 
   private Map<String, List<TableConfig>> _enabledTableConfigMap;
   private Set<String> _taskTypes;
@@ -61,11 +60,10 @@ public class PinotTaskManager extends ControllerPeriodicTask {
       @Nonnull PinotHelixResourceManager helixResourceManager, @Nonnull ControllerConf controllerConf,
       @Nonnull ControllerMetrics controllerMetrics) {
     super("PinotTaskManager", controllerConf.getTaskManagerFrequencyInSeconds(),
-        controllerConf.getPeriodicTaskInitialDelayInSeconds(), helixResourceManager);
+        controllerConf.getPeriodicTaskInitialDelayInSeconds(), helixResourceManager, controllerMetrics);
     _helixTaskResourceManager = helixTaskResourceManager;
     _clusterInfoProvider = new ClusterInfoProvider(helixResourceManager, helixTaskResourceManager, controllerConf);
     _taskGeneratorRegistry = new TaskGeneratorRegistry(_clusterInfoProvider);
-    _controllerMetrics = controllerMetrics;
   }
 
   @Override
@@ -104,7 +102,7 @@ public class PinotTaskManager extends ControllerPeriodicTask {
 
   @Override
   protected void preprocess() {
-    _controllerMetrics.addMeteredGlobalValue(ControllerMeter.NUMBER_TIMES_SCHEDULE_TASKS_CALLED, 1L);
+    _metricsRegistry.addMeteredGlobalValue(ControllerMeter.NUMBER_TIMES_SCHEDULE_TASKS_CALLED, 1L);
 
     _taskTypes = _taskGeneratorRegistry.getAllTaskTypes();
     _numTaskTypes = _taskTypes.size();
@@ -134,6 +132,11 @@ public class PinotTaskManager extends ControllerPeriodicTask {
   }
 
   @Override
+  protected void exceptionHandler(String tableNameWithType, Exception e) {
+    LOGGER.error("Exception in PinotTaskManager for table {}", tableNameWithType, e);
+  }
+
+  @Override
   protected void postprocess() {
     // Generate each type of tasks
     _tasksScheduled = new HashMap<>(_numTaskTypes);
@@ -143,11 +146,11 @@ public class PinotTaskManager extends ControllerPeriodicTask {
       List<PinotTaskConfig> pinotTaskConfigs = pinotTaskGenerator.generateTasks(_enabledTableConfigMap.get(taskType));
       int numTasks = pinotTaskConfigs.size();
       if (numTasks > 0) {
-        LOGGER.info("Submitting {} tasks for task type: {} with task configs: {}", numTasks, taskType,
-            pinotTaskConfigs);
-        _tasksScheduled.put(taskType, _helixTaskResourceManager.submitTask(pinotTaskConfigs,
-            pinotTaskGenerator.getNumConcurrentTasksPerInstance()));
-        _controllerMetrics.addMeteredTableValue(taskType, ControllerMeter.NUMBER_TASKS_SUBMITTED, numTasks);
+        LOGGER
+            .info("Submitting {} tasks for task type: {} with task configs: {}", numTasks, taskType, pinotTaskConfigs);
+        _tasksScheduled.put(taskType, _helixTaskResourceManager
+            .submitTask(pinotTaskConfigs, pinotTaskGenerator.getNumConcurrentTasksPerInstance()));
+        _metricsRegistry.addMeteredTableValue(taskType, ControllerMeter.NUMBER_TASKS_SUBMITTED, numTasks);
       }
     }
   }

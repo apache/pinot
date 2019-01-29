@@ -41,32 +41,38 @@ public final class MockADLFileInputStream extends ADLFileInputStream {
   }
 
   @Override
-  public int read() throws IOException {
+  public int read()
+      throws IOException {
     return _in.read();
   }
 
   @Override
-  public int read(byte[] b) throws IOException {
+  public int read(byte[] b)
+      throws IOException {
     return _in.read(b);
   }
 
   @Override
-  public int read(byte[] b, int off, int len) throws IOException {
+  public int read(byte[] b, int off, int len)
+      throws IOException {
     return _in.read(b, off, len);
   }
 
   @Override
-  public long skip(long n) throws IOException {
+  public long skip(long n)
+      throws IOException {
     return _in.skip(n);
   }
 
   @Override
-  public int available() throws IOException {
+  public int available()
+      throws IOException {
     return _in.available();
   }
 
   @Override
-  public void close() throws IOException {
+  public void close()
+      throws IOException {
     _in.close();
   }
 
@@ -76,7 +82,8 @@ public final class MockADLFileInputStream extends ADLFileInputStream {
   }
 
   @Override
-  public synchronized void reset() throws IOException {
+  public synchronized void reset()
+      throws IOException {
     _in.reset();
   }
 

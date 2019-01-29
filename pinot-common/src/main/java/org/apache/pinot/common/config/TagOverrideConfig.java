@@ -85,8 +85,8 @@ public class TagOverrideConfig {
 
     TagOverrideConfig that = (TagOverrideConfig) o;
 
-    return EqualityUtils.isEqual(realtimeConsuming, that.realtimeConsuming) && EqualityUtils.isEqual(realtimeCompleted,
-        that.realtimeCompleted);
+    return EqualityUtils.isEqual(realtimeConsuming, that.realtimeConsuming) && EqualityUtils
+        .isEqual(realtimeCompleted, that.realtimeCompleted);
   }
 
   @Override

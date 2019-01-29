@@ -59,13 +59,8 @@ public class PinotBrokerDebug {
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/routingTable/{tableName}")
   @ApiOperation(value = "Debugging routing table")
-  @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Routing table information of a table"),
-      @ApiResponse(code = 500, message = "Internal server error")
-  })
-  public String debugRoutingTable(
-      @ApiParam(value = "Name of the table") @PathParam("tableName") String tableName
-  ) {
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Routing table information of a table"), @ApiResponse(code = 500, message = "Internal server error")})
+  public String debugRoutingTable(@ApiParam(value = "Name of the table") @PathParam("tableName") String tableName) {
     try {
       return _routingTable.dumpSnapshot(tableName);
     } catch (Exception e) {
@@ -79,13 +74,9 @@ public class PinotBrokerDebug {
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/timeBoundary/{tableName}")
   @ApiOperation(value = "Debugging time boundary service")
-  @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Time boundary information of a table"),
-      @ApiResponse(code = 500, message = "Internal server error")
-  })
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Time boundary information of a table"), @ApiResponse(code = 500, message = "Internal server error")})
   public String debugTimeBoundaryService(
-      @ApiParam(value = "Name of the table") @PathParam("tableName") String tableName
-  ) {
+      @ApiParam(value = "Name of the table") @PathParam("tableName") String tableName) {
     try {
       String response = "{}";
       if (!tableName.isEmpty()) {

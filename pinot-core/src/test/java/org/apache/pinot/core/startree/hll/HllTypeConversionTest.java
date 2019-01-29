@@ -42,8 +42,8 @@ public class HllTypeConversionTest {
     int min = Byte.MIN_VALUE;
 
     for (long i = min; i <= max; i++) { // use long type to prevent overflow
-      Assert.assertEquals(HllUtil.SerializationConverter.charToByte(
-          new String(new char[]{HllUtil.SerializationConverter.byteToChar((byte) i)}).toCharArray()[0]), i);
+      Assert.assertEquals(HllUtil.SerializationConverter
+          .charToByte(new String(new char[]{HllUtil.SerializationConverter.byteToChar((byte) i)}).toCharArray()[0]), i);
     }
   }
 

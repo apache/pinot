@@ -60,8 +60,8 @@ public class DataTableHandler extends SimpleChannelInboundHandler<ByteBuf> {
     try {
       long deserializationStartTimeMs = System.currentTimeMillis();
       DataTable dataTable = DataTableFactory.getDataTable(msg.nioBuffer());
-      _queryRouter.receiveDataTable(_server, dataTable, responseSize,
-          System.currentTimeMillis() - deserializationStartTimeMs);
+      _queryRouter
+          .receiveDataTable(_server, dataTable, responseSize, System.currentTimeMillis() - deserializationStartTimeMs);
     } catch (Exception e) {
       LOGGER.error("Caught exception while deserializing data table of size: {} from server: {}", responseSize, _server,
           e);

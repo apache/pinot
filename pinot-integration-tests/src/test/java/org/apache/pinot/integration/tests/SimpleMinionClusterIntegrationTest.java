@@ -74,7 +74,8 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
   private PinotTaskManager _taskManager;
 
   @BeforeClass
-  public void setUp() throws Exception {
+  public void setUp()
+      throws Exception {
     startZk();
     startController();
     startBroker();
@@ -103,7 +104,8 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
   }
 
   @Test
-  public void testStopAndResumeTaskQueue() throws Exception {
+  public void testStopAndResumeTaskQueue()
+      throws Exception {
     // Hold the task
     HOLD.set(true);
 
@@ -178,7 +180,8 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
   }
 
   @AfterClass
-  public void tearDown() throws Exception {
+  public void tearDown()
+      throws Exception {
     dropOfflineTable(TABLE_NAME_1);
     dropOfflineTable(TABLE_NAME_2);
     dropOfflineTable(TABLE_NAME_3);

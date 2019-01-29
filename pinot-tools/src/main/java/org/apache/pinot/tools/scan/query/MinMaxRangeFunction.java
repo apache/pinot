@@ -21,6 +21,7 @@ package org.apache.pinot.tools.scan.query;
 import java.util.ArrayList;
 import org.apache.pinot.core.query.utils.Pair;
 
+
 public class MinMaxRangeFunction extends AggregationFunc {
   private static final String _name = "minmaxrange";
 

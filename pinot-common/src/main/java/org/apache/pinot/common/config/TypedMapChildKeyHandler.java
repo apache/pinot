@@ -37,24 +37,21 @@ public class TypedMapChildKeyHandler<T> implements ChildKeyHandler<java.util.Map
   public java.util.Map<String, T> handleChildKeys(Map<String, ?> childKeys, String pathPrefix) {
     java.util.Map<String, T> returnedMap = new HashMap<>();
 
-    childKeys
-        .groupBy(tuple2 -> tuple2._1.split("\\.", 2)[0])
-        .map((key, values) -> {
-          // Drop the prefix
-          Map<String, ?> valuesWithoutPrefix = values
-              .map((configKey, configValue) -> Tuple.of(configKey.substring(key.length() + 1), configValue));
+    childKeys.groupBy(tuple2 -> tuple2._1.split("\\.", 2)[0]).map((key, values) -> {
+      // Drop the prefix
+      Map<String, ?> valuesWithoutPrefix =
+          values.map((configKey, configValue) -> Tuple.of(configKey.substring(key.length() + 1), configValue));
 
-          T value;
-          try {
-            value = Deserializer.deserialize(_type, valuesWithoutPrefix, "");
-          } catch (Exception e) {
-            value = null;
-            e.printStackTrace();
-          }
+      T value;
+      try {
+        value = Deserializer.deserialize(_type, valuesWithoutPrefix, "");
+      } catch (Exception e) {
+        value = null;
+        e.printStackTrace();
+      }
 
-          return Tuple.of(key, value);
-        })
-        .forEach(returnedMap::put);
+      return Tuple.of(key, value);
+    }).forEach(returnedMap::put);
 
     if (returnedMap.isEmpty()) {
       return null;
@@ -69,8 +66,8 @@ public class TypedMapChildKeyHandler<T> implements ChildKeyHandler<java.util.Map
       return null;
     }
 
-    final io.vavr.collection.HashMap<String, ?> serialized = io.vavr.collection.HashMap.ofAll(value)
-        .flatMap((columnName, columnPartitionConfig) -> Serializer.serialize(columnPartitionConfig)
+    final io.vavr.collection.HashMap<String, ?> serialized = io.vavr.collection.HashMap.ofAll(value).flatMap(
+        (columnName, columnPartitionConfig) -> Serializer.serialize(columnPartitionConfig)
             .map((key, obj) -> Tuple.of(columnName + "." + key, obj)));
     return serialized;
   }

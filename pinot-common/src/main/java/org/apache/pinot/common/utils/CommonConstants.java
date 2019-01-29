@@ -81,8 +81,7 @@ public class CommonConstants {
     }
 
     public enum TableType {
-      OFFLINE,
-      REALTIME;
+      OFFLINE, REALTIME;
 
       public ServerType getServerType() {
         if (this == OFFLINE) {
@@ -101,7 +100,8 @@ public class CommonConstants {
     public static final String HELIX_MANAGER_FLAPPING_TIME_WINDOW_KEY = "helixmanager.flappingTimeWindow";
     public static final String HELIX_MANAGER_MAX_DISCONNECT_THRESHOLD_KEY = "helixmanager.maxDisconnectThreshold";
     public static final String CONFIG_OF_HELIX_FLAPPING_TIMEWINDOW_MS = "pinot.server.flapping.timeWindowMs";
-    public static final String CONFIG_OF_HELIX_MAX_DISCONNECT_THRESHOLD = "pinot.server.flapping.maxDisconnectThreshold";
+    public static final String CONFIG_OF_HELIX_MAX_DISCONNECT_THRESHOLD =
+        "pinot.server.flapping.maxDisconnectThreshold";
     public static final String DEFAULT_HELIX_FLAPPING_TIMEWINDOW_MS = "1";
     public static final String DEFAULT_HELIX_FLAPPING_MAX_DISCONNECT_THRESHOLD = "100";
   }
@@ -119,8 +119,9 @@ public class CommonConstants {
     // The sleep interval time of the thread used by the Brokers to refresh TimeboundaryInfo upon segment refreshing
     // events.
     public static final String CONFIG_OF_BROKER_REFRESH_TIMEBOUNDARY_INFO_SLEEP_INTERVAL =
-            "pinot.broker.refresh.timeBoundaryInfo.sleepInterval";
+        "pinot.broker.refresh.timeBoundaryInfo.sleepInterval";
     public static final long DEFAULT_BROKER_REFRESH_TIMEBOUNDARY_INFO_SLEEP_INTERVAL_MS = 10000L;
+
     public static class Request {
       public static final String PQL = "pql";
       public static final String TRACE = "trace";
@@ -145,7 +146,8 @@ public class CommonConstants {
     public static final String CONFIG_OF_REQUEST_HANDLER_FACTORY_CLASS = "pinot.server.requestHandlerFactory.class";
     public static final String CONFIG_OF_NETTY_PORT = "pinot.server.netty.port";
     public static final String CONFIG_OF_ADMIN_API_PORT = "pinot.server.adminapi.port";
-    public static final String CONFIG_OF_STARTER_ENABLE_SEGMENTS_LOADING_CHECK = "pinot.server.starter.enableSegmentsLoadingCheck";
+    public static final String CONFIG_OF_STARTER_ENABLE_SEGMENTS_LOADING_CHECK =
+        "pinot.server.starter.enableSegmentsLoadingCheck";
     public static final String CONFIG_OF_STARTER_TIMEOUT_IN_SECONDS = "pinot.server.starter.timeoutInSeconds";
 
     public static final String CONFIG_OF_SEGMENT_FORMAT_VERSION = "pinot.server.instance.segment.format.version";
@@ -153,11 +155,14 @@ public class CommonConstants {
     public static final String CONFIG_OF_ENABLE_SHUTDOWN_DELAY = "pinot.server.instance.enable.shutdown.delay";
     public static final String CONFIG_OF_ENABLE_SPLIT_COMMIT = "pinot.server.instance.enable.split.commit";
     public static final String CONFIG_OF_REALTIME_OFFHEAP_ALLOCATION = "pinot.server.instance.realtime.alloc.offheap";
-    public static final String CONFIG_OF_REALTIME_OFFHEAP_DIRECT_ALLOCATION = "pinot.server.instance.realtime.alloc.offheap.direct";
+    public static final String CONFIG_OF_REALTIME_OFFHEAP_DIRECT_ALLOCATION =
+        "pinot.server.instance.realtime.alloc.offheap.direct";
     public static final String PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY = "pinot.server.storage.factory";
     public static final String PREFIX_OF_CONFIG_OF_PINOT_CRYPTER = "pinot.server.crypter";
-    public static final String CONFIG_OF_INSTANCE_MAX_SHUTDOWN_WAIT_TIME = "pinot.server.instance.starter.maxShutdownWaitTime";
-    public static final String CONFIG_OF_INSTANCE_CHECK_INTERVAL_TIME = "pinot.server.instance.starter.checkIntervalTime";
+    public static final String CONFIG_OF_INSTANCE_MAX_SHUTDOWN_WAIT_TIME =
+        "pinot.server.instance.starter.maxShutdownWaitTime";
+    public static final String CONFIG_OF_INSTANCE_CHECK_INTERVAL_TIME =
+        "pinot.server.instance.starter.checkIntervalTime";
 
     public static final int DEFAULT_ADMIN_API_PORT = 8097;
     public static final boolean DEFAULT_STARTER_ENABLE_SEGMENTS_LOADING_CHECK = false;
@@ -225,9 +230,9 @@ public class CommonConstants {
   public static class Segment {
     public static class Realtime {
       public enum Status {
-        IN_PROGRESS,
-        DONE
+        IN_PROGRESS, DONE
       }
+
       public static final String STATUS = "segment.realtime.status";
     }
 
@@ -266,8 +271,7 @@ public class CommonConstants {
     public static final String LOCAL_SEGMENT_SCHEME = "file";
 
     public enum SegmentType {
-      OFFLINE,
-      REALTIME
+      OFFLINE, REALTIME
     }
   }
 

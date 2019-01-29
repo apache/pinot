@@ -37,7 +37,8 @@ public class PurgeTaskExecutor extends BaseSingleSegmentConversionExecutor {
 
   @Override
   protected SegmentConversionResult convert(@Nonnull PinotTaskConfig pinotTaskConfig, @Nonnull File originalIndexDir,
-      @Nonnull File workingDir) throws Exception {
+      @Nonnull File workingDir)
+      throws Exception {
     Map<String, String> configs = pinotTaskConfig.getConfigs();
     String tableNameWithType = configs.get(MinionConstants.TABLE_NAME_KEY);
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
@@ -55,20 +56,18 @@ public class PurgeTaskExecutor extends BaseSingleSegmentConversionExecutor {
       purgedSegmentFile = originalIndexDir;
     }
 
-    return new SegmentConversionResult.Builder().setFile(purgedSegmentFile)
-        .setTableNameWithType(tableNameWithType)
+    return new SegmentConversionResult.Builder().setFile(purgedSegmentFile).setTableNameWithType(tableNameWithType)
         .setSegmentName(configs.get(MinionConstants.SEGMENT_NAME_KEY))
         .setCustomProperty(RECORD_PURGER_KEY, segmentPurger.getRecordPurger())
         .setCustomProperty(RECORD_MODIFIER_KEY, segmentPurger.getRecordModifier())
         .setCustomProperty(NUM_RECORDS_PURGED_KEY, segmentPurger.getNumRecordsPurged())
-        .setCustomProperty(NUM_RECORDS_MODIFIED_KEY, segmentPurger.getNumRecordsModified())
-        .build();
+        .setCustomProperty(NUM_RECORDS_MODIFIED_KEY, segmentPurger.getNumRecordsModified()).build();
   }
 
   @Override
   protected SegmentZKMetadataCustomMapModifier getSegmentZKMetadataCustomMapModifier() {
-    return new SegmentZKMetadataCustomMapModifier(SegmentZKMetadataCustomMapModifier.ModifyMode.REPLACE,
-        Collections.singletonMap(MinionConstants.PurgeTask.TASK_TYPE + MinionConstants.TASK_TIME_SUFFIX,
+    return new SegmentZKMetadataCustomMapModifier(SegmentZKMetadataCustomMapModifier.ModifyMode.REPLACE, Collections
+        .singletonMap(MinionConstants.PurgeTask.TASK_TYPE + MinionConstants.TASK_TIME_SUFFIX,
             String.valueOf(System.currentTimeMillis())));
   }
 }

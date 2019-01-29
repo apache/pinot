@@ -60,10 +60,12 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
    * @throws Exception
    */
   protected abstract List<SegmentConversionResult> convert(@Nonnull PinotTaskConfig pinotTaskConfig,
-      @Nonnull List<File> originalIndexDir, @Nonnull File workingDir) throws Exception;
+      @Nonnull List<File> originalIndexDir, @Nonnull File workingDir)
+      throws Exception;
 
   @Override
-  public List<SegmentConversionResult> executeTask(@Nonnull PinotTaskConfig pinotTaskConfig) throws Exception {
+  public List<SegmentConversionResult> executeTask(@Nonnull PinotTaskConfig pinotTaskConfig)
+      throws Exception {
     String taskType = pinotTaskConfig.getTaskType();
     Map<String, String> configs = pinotTaskConfig.getConfigs();
     String tableNameWithType = configs.get(MinionConstants.TABLE_NAME_KEY);
@@ -84,8 +86,7 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
         // Download the segment file
         File tarredSegmentFile = new File(tempDataDir, "tarredSegmentFile_" + i);
         LOGGER.info("Downloading segment from {} to {}", downloadURLs[i], tarredSegmentFile.getAbsolutePath());
-        SegmentFetcherFactory.getInstance()
-            .getSegmentFetcherBasedOnURI(downloadURLs[i])
+        SegmentFetcherFactory.getInstance().getSegmentFetcherBasedOnURI(downloadURLs[i])
             .fetchSegmentToLocal(downloadURLs[i], tarredSegmentFile);
 
         // Un-tar the segment file
@@ -112,8 +113,8 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
         // Tar the converted segment
         SegmentConversionResult segmentConversionResult = segmentConversionResults.get(i);
         File convertedIndexDir = segmentConversionResult.getFile();
-        File convertedTarredSegmentFile = new File(
-            TarGzCompressionUtils.createTarGzOfDirectory(convertedIndexDir.getPath(),
+        File convertedTarredSegmentFile = new File(TarGzCompressionUtils
+            .createTarGzOfDirectory(convertedIndexDir.getPath(),
                 new File(convertedTarredSegmentDir, segmentConversionResult.getSegmentName()).getPath()));
         tarredSegmentFiles.add(convertedTarredSegmentFile);
       }
@@ -138,11 +139,11 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
             convertedTarredSegmentFile);
       }
 
-      String outputSegmentNames = segmentConversionResults.stream()
-          .map(SegmentConversionResult::getSegmentName)
+      String outputSegmentNames = segmentConversionResults.stream().map(SegmentConversionResult::getSegmentName)
           .collect(Collectors.joining(","));
-      LOGGER.info("Done executing {} on table: {}, input segments: {}, output segments: {}", taskType,
-          tableNameWithType, inputSegmentNames, outputSegmentNames);
+      LOGGER
+          .info("Done executing {} on table: {}, input segments: {}, output segments: {}", taskType, tableNameWithType,
+              inputSegmentNames, outputSegmentNames);
 
       return segmentConversionResults;
     } finally {

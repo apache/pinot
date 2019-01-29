@@ -22,24 +22,26 @@ import java.io.IOException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.pinot.common.data.Schema;
 
+
 public interface PinotRecordSerialization<T> {
 
-    /**
-     * init method, called during the {@link PinotRecordWriter()} object creation
-     */
-    void init(Configuration conf, Schema schema);
+  /**
+   * init method, called during the {@link PinotRecordWriter()} object creation
+   */
+  void init(Configuration conf, Schema schema);
 
-    /**
-     * Serialize object to {@link PinotRecord}, called during the {@link
-     * PinotRecordWriter#write(Object, Object)}
-     */
-    PinotRecord serialize(T t) throws IOException;
+  /**
+   * Serialize object to {@link PinotRecord}, called during the {@link
+   * PinotRecordWriter#write(Object, Object)}
+   */
+  PinotRecord serialize(T t)
+      throws IOException;
 
-    /**
-     * Deserialize {@link PinotRecord} to Object.
-     */
-    T deserialize(PinotRecord record) throws IOException;
+  /**
+   * Deserialize {@link PinotRecord} to Object.
+   */
+  T deserialize(PinotRecord record)
+      throws IOException;
 
-    void close();
-
+  void close();
 }

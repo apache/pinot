@@ -46,7 +46,8 @@ public class Utils {
   }
 
   @SuppressWarnings("unchecked")
-  private static <T extends Throwable> void rethrowExceptionInner(Throwable exception) throws T {
+  private static <T extends Throwable> void rethrowExceptionInner(Throwable exception)
+      throws T {
     throw (T) exception;
   }
 

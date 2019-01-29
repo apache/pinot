@@ -64,7 +64,8 @@ public interface ServerResponseFuture<V> extends ListenableFuture<Map<ServerInst
    * response. Useful when we know the only one response is expected.
    * @return
    */
-  public V getOne() throws InterruptedException, ExecutionException;
+  public V getOne()
+      throws InterruptedException, ExecutionException;
 
   /**
    * Waits if necessary for at most the given time for the computation

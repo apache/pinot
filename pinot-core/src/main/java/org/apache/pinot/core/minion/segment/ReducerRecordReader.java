@@ -28,6 +28,7 @@ import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
 import org.apache.pinot.core.data.readers.RecordReader;
 import org.apache.pinot.core.data.readers.RecordReaderUtils;
 
+
 /**
  * Record reader for reducer stage of the segment conversion
  */
@@ -59,7 +60,7 @@ public class ReducerRecordReader implements RecordReader {
       return true;
     }
 
-    while(_recordReader.hasNext()) {
+    while (_recordReader.hasNext()) {
       GenericRow currentRow = _recordReader.next();
 
       // Grouping rows by the given group-by columns

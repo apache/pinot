@@ -47,7 +47,7 @@ public class SortedDocIdSetTest {
   public void testPairWithSameStartAndEnd() {
     List<IntPair> pairs = new ArrayList<IntPair>();
     pairs.add(Pairs.intPair(1, 1));
-    SortedDocIdSet sortedDocIdSet = new SortedDocIdSet("Datasource-testCol",pairs);
+    SortedDocIdSet sortedDocIdSet = new SortedDocIdSet("Datasource-testCol", pairs);
     BlockDocIdIterator iterator = sortedDocIdSet.iterator();
     List<Integer> result = new ArrayList<Integer>();
     int docId;
@@ -77,7 +77,7 @@ public class SortedDocIdSetTest {
     pairs.add(Pairs.intPair(90, 99));
     pairs.add(Pairs.intPair(100, 109));
 
-    SortedDocIdSet sortedDocIdSet = new SortedDocIdSet("Datasource-testCol",pairs);
+    SortedDocIdSet sortedDocIdSet = new SortedDocIdSet("Datasource-testCol", pairs);
     BlockDocIdIterator iterator = sortedDocIdSet.iterator();
     List<Integer> result = new ArrayList<Integer>();
     int docId;
@@ -105,7 +105,6 @@ public class SortedDocIdSetTest {
     rangeString =
         "[(0,325), (326,658), (659,946), (947,1308), (1309,1658), (1659,1922), (1923,2276), (2277,2601), (2602,2888), (2889,3192), (3193,3499), (3500,3810), (3811,4058), (4059,4335), (4336,4636), (4637,4940), (4941,5226), (5227,5549), (5550,5864), (5865,6094), (6095,6390), (6391,6689), (6690,6957), (6958,7246), (7247,7532), (7533,7919), (7920,8183), (8184,8485), (8486,8819), (8820,9135)]";
     testCustomRange(rangeString);
-
   }
 
   private void testCustomRange(String rangeString) {

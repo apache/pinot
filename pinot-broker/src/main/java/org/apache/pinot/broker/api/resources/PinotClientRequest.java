@@ -63,10 +63,7 @@ public class PinotClientRequest {
   @Produces(MediaType.APPLICATION_JSON)
   @Path("query")
   @ApiOperation(value = "Querying pinot")
-  @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Query response"),
-      @ApiResponse(code = 500, message = "Internal Server Error")
-  })
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Query response"), @ApiResponse(code = 500, message = "Internal Server Error")})
   public String processQueryGet(
       // Query param "bql" is for backward compatibility
       @ApiParam(value = "Query", required = true) @QueryParam("bql") String query,
@@ -94,10 +91,7 @@ public class PinotClientRequest {
   @Produces(MediaType.APPLICATION_JSON)
   @Path("query")
   @ApiOperation(value = "Querying pinot")
-  @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Query response"),
-      @ApiResponse(code = 500, message = "Internal Server Error")
-  })
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Query response"), @ApiResponse(code = 500, message = "Internal Server Error")})
   public String processQueryPost(String query) {
     try {
       JsonNode requestJson = JsonUtils.stringToJsonNode(query);

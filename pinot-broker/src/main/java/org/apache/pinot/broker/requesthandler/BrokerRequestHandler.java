@@ -34,5 +34,6 @@ public interface BrokerRequestHandler {
   void shutDown();
 
   BrokerResponse handleRequest(JsonNode request, @Nullable RequesterIdentity requesterIdentity,
-      RequestStatistics requestStatistics) throws Exception;
+      RequestStatistics requestStatistics)
+      throws Exception;
 }

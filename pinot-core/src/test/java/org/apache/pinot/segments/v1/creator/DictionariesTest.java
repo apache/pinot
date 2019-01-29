@@ -80,16 +80,17 @@ public class DictionariesTest {
   }
 
   @BeforeClass
-  public static void before() throws Exception {
+  public static void before()
+      throws Exception {
     final String filePath =
         TestUtils.getFileFromResourceUrl(DictionariesTest.class.getClassLoader().getResource(AVRO_DATA));
     if (INDEX_DIR.exists()) {
       FileUtils.deleteQuietly(INDEX_DIR);
     }
 
-    final SegmentGeneratorConfig config =
-        SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, "time_day",
-            TimeUnit.DAYS, "test");
+    final SegmentGeneratorConfig config = SegmentTestUtils
+        .getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, "time_day", TimeUnit.DAYS,
+            "test");
 
     final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
     driver.init(config);
@@ -142,7 +143,8 @@ public class DictionariesTest {
   }
 
   @Test
-  public void test1() throws Exception {
+  public void test1()
+      throws Exception {
     ImmutableSegment heapSegment = ImmutableSegmentLoader.load(segmentDirectory, ReadMode.heap);
     ImmutableSegment mmapSegment = ImmutableSegmentLoader.load(segmentDirectory, ReadMode.mmap);
 
@@ -151,8 +153,7 @@ public class DictionariesTest {
       Dictionary heapDictionary = heapSegment.getDictionary(column);
       Dictionary mmapDictionary = mmapSegment.getDictionary(column);
 
-      switch (((SegmentMetadataImpl) mmapSegment.getSegmentMetadata()).getColumnMetadataMap()
-          .get(column)
+      switch (((SegmentMetadataImpl) mmapSegment.getSegmentMetadata()).getColumnMetadataMap().get(column)
           .getDataType()) {
         case BOOLEAN:
         case STRING:
@@ -185,7 +186,8 @@ public class DictionariesTest {
   }
 
   @Test
-  public void test2() throws Exception {
+  public void test2()
+      throws Exception {
     ImmutableSegment heapSegment = ImmutableSegmentLoader.load(segmentDirectory, ReadMode.heap);
     ImmutableSegment mmapSegment = ImmutableSegmentLoader.load(segmentDirectory, ReadMode.mmap);
 
@@ -376,7 +378,8 @@ public class DictionariesTest {
    * @throws Exception
    */
   @Test
-  public void testUTF8Characters() throws Exception {
+  public void testUTF8Characters()
+      throws Exception {
     File indexDir = new File("/tmp/dict.test");
     indexDir.deleteOnExit();
     FieldSpec fieldSpec = new DimensionFieldSpec("test", DataType.STRING, true);
@@ -391,8 +394,8 @@ public class DictionariesTest {
     try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(inputStrings, fieldSpec, indexDir)) {
       dictionaryCreator.build();
       for (String inputString : inputStrings) {
-        Assert.assertTrue(dictionaryCreator.indexOfSV(inputString) >= 0,
-            "Value not found in dictionary " + inputString);
+        Assert
+            .assertTrue(dictionaryCreator.indexOfSV(inputString) >= 0, "Value not found in dictionary " + inputString);
       }
     }
 
@@ -403,7 +406,8 @@ public class DictionariesTest {
    * Tests SegmentDictionaryCreator for case when there is only one string and it is empty.
    */
   @Test
-  public void testSingleEmptyString() throws Exception {
+  public void testSingleEmptyString()
+      throws Exception {
     File indexDir = new File("/tmp/dict.test");
     indexDir.deleteOnExit();
     FieldSpec fieldSpec = new DimensionFieldSpec("test", DataType.STRING, true);

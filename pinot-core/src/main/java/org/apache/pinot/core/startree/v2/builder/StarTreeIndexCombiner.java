@@ -44,7 +44,8 @@ import static org.apache.pinot.core.startree.v2.store.StarTreeIndexMapUtils.STAR
 public class StarTreeIndexCombiner implements Closeable {
   private final FileChannel _fileChannel;
 
-  public StarTreeIndexCombiner(File indexFile) throws IOException {
+  public StarTreeIndexCombiner(File indexFile)
+      throws IOException {
     Preconditions.checkState(!indexFile.exists(), "Star-tree index file already exists");
     _fileChannel = new RandomAccessFile(indexFile, "rw").getChannel();
   }
@@ -77,7 +78,8 @@ public class StarTreeIndexCombiner implements Closeable {
     return indexMap;
   }
 
-  private IndexValue writeFile(File srcFile) throws IOException {
+  private IndexValue writeFile(File srcFile)
+      throws IOException {
     try (FileChannel src = new RandomAccessFile(srcFile, "r").getChannel()) {
       long offset = _fileChannel.position();
       long size = src.size();
@@ -87,7 +89,8 @@ public class StarTreeIndexCombiner implements Closeable {
   }
 
   @Override
-  public void close() throws IOException {
+  public void close()
+      throws IOException {
     _fileChannel.close();
   }
 }

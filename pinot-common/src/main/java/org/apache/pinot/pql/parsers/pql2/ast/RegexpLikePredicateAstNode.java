@@ -28,6 +28,7 @@ import org.apache.pinot.common.utils.request.FilterQueryTree;
 import org.apache.pinot.common.utils.request.HavingQueryTree;
 import org.apache.pinot.pql.parsers.Pql2CompilationException;
 
+
 public class RegexpLikePredicateAstNode extends PredicateAstNode {
   private static final String SEPERATOR = "\t\t";
   private String _identifier;
@@ -43,8 +44,7 @@ public class RegexpLikePredicateAstNode extends PredicateAstNode {
       }
     } else if (childNode instanceof FunctionCallAstNode) {
       throw new Pql2CompilationException("REGEXP_LIKE operator can not be called for a function.");
-    }
-    else {
+    } else {
       super.addChild(childNode);
     }
   }
@@ -64,7 +64,7 @@ public class RegexpLikePredicateAstNode extends PredicateAstNode {
         values.add(expr);
       }
     }
-    if(values.size() > 1) {
+    if (values.size() > 1) {
       throw new Pql2CompilationException("Matching more than one regex is NOT supported currently");
     }
 

@@ -38,7 +38,8 @@ public class StringOffHeapMutableDictionary extends BaseOffHeapMutableDictionary
   }
 
   @Override
-  public void doClose() throws IOException {
+  public void doClose()
+      throws IOException {
     _byteStore.close();
   }
 
@@ -56,14 +57,14 @@ public class StringOffHeapMutableDictionary extends BaseOffHeapMutableDictionary
   public void index(@Nonnull Object rawValue) {
     if (rawValue instanceof String) {
       // Single value
-      byte[] serializedValue =  StringUtil.encodeUtf8((String) rawValue);
+      byte[] serializedValue = StringUtil.encodeUtf8((String) rawValue);
       indexValue(rawValue, serializedValue);
       updateMinMax((String) rawValue);
     } else {
       // Multi value
       Object[] values = (Object[]) rawValue;
       for (Object value : values) {
-        byte[] serializedValue =  StringUtil.encodeUtf8((String) value);
+        byte[] serializedValue = StringUtil.encodeUtf8((String) value);
         indexValue(value, serializedValue);
         updateMinMax((String) value);
       }

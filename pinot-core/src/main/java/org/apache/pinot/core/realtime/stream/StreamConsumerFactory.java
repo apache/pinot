@@ -71,5 +71,4 @@ public abstract class StreamConsumerFactory {
    * @return
    */
   public abstract StreamMetadataProvider createStreamMetadataProvider(String clientId);
-
 }

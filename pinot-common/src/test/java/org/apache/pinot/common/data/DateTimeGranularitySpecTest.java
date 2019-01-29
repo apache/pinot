@@ -25,6 +25,7 @@ import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+
 public class DateTimeGranularitySpecTest {
 
   // Test construct granularity from components
@@ -44,21 +45,11 @@ public class DateTimeGranularitySpecTest {
 
     List<Object[]> entries = new ArrayList<>();
 
-    entries.add(new Object[] {
-        1, TimeUnit.HOURS, new DateTimeGranularitySpec("1:HOURS")
-    });
-    entries.add(new Object[] {
-        5, TimeUnit.MINUTES, new DateTimeGranularitySpec("5:MINUTES")
-    });
-    entries.add(new Object[] {
-        0, TimeUnit.HOURS, null
-    });
-    entries.add(new Object[] {
-        -1, TimeUnit.HOURS, null
-    });
-    entries.add(new Object[] {
-        1, null, null
-    });
+    entries.add(new Object[]{1, TimeUnit.HOURS, new DateTimeGranularitySpec("1:HOURS")});
+    entries.add(new Object[]{5, TimeUnit.MINUTES, new DateTimeGranularitySpec("5:MINUTES")});
+    entries.add(new Object[]{0, TimeUnit.HOURS, null});
+    entries.add(new Object[]{-1, TimeUnit.HOURS, null});
+    entries.add(new Object[]{1, null, null});
 
     return entries.toArray(new Object[entries.size()][]);
   }
@@ -82,26 +73,13 @@ public class DateTimeGranularitySpecTest {
 
     List<Object[]> entries = new ArrayList<>();
 
-    entries.add(new Object[] {
-        "1:HOURS", 3600000L
-    });
-    entries.add(new Object[] {
-        "1:MILLISECONDS", 1L
-    });
-    entries.add(new Object[] {
-        "15:MINUTES", 900000L
-    });
-    entries.add(new Object[] {
-        "0:HOURS", null
-    });
-    entries.add(new Object[] {
-        null, null
-    });
-    entries.add(new Object[] {
-        "1:DUMMY", null
-    });
+    entries.add(new Object[]{"1:HOURS", 3600000L});
+    entries.add(new Object[]{"1:MILLISECONDS", 1L});
+    entries.add(new Object[]{"15:MINUTES", 900000L});
+    entries.add(new Object[]{"0:HOURS", null});
+    entries.add(new Object[]{null, null});
+    entries.add(new Object[]{"1:DUMMY", null});
 
     return entries.toArray(new Object[entries.size()][]);
   }
-
 }

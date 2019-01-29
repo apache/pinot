@@ -40,13 +40,14 @@ public class PinotSegmentRestletResourceTest extends ControllerTest {
   private final static String TABLE_NAME = "testTable";
 
   @BeforeClass
-  public void setUp() throws Exception {
+  public void setUp()
+      throws Exception {
     startZk();
     startController();
 
     ControllerRequestBuilderUtil.addFakeDataInstancesToAutoJoinHelixCluster(getHelixClusterName(), ZK_SERVER, 1, true);
-    ControllerRequestBuilderUtil.addFakeBrokerInstancesToAutoJoinHelixCluster(getHelixClusterName(), ZK_SERVER, 1,
-        true);
+    ControllerRequestBuilderUtil
+        .addFakeBrokerInstancesToAutoJoinHelixCluster(getHelixClusterName(), ZK_SERVER, 1, true);
 
     while (_helixAdmin.getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_OFFLINE").size() == 0) {
       Thread.sleep(100);
@@ -59,17 +60,19 @@ public class PinotSegmentRestletResourceTest extends ControllerTest {
   }
 
   @AfterClass
-  public void tearDown() throws Exception {
+  public void tearDown()
+      throws Exception {
     stopController();
     stopZk();
   }
 
   @Test
-  public void testSegmentCrcApi() throws Exception {
+  public void testSegmentCrcApi()
+      throws Exception {
     // Adding table
-    TableConfig tableConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setNumReplicas(1)
-        .build();
+    TableConfig tableConfig =
+        new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(TABLE_NAME).setNumReplicas(1)
+            .build();
     _helixResourceManager.addTable(tableConfig);
 
     // Wait for the table addition
@@ -109,7 +112,8 @@ public class PinotSegmentRestletResourceTest extends ControllerTest {
     checkCrcRequest(segmentMetadataTable, 9);
   }
 
-  private void checkCrcRequest(Map<String, SegmentMetadata> metadataTable, int expectedSize) throws Exception {
+  private void checkCrcRequest(Map<String, SegmentMetadata> metadataTable, int expectedSize)
+      throws Exception {
     String crcMapStr = sendGetRequest(_controllerRequestURLBuilder.forListAllCrcInformationForTable(TABLE_NAME));
     Map<String, String> crcMap = JsonUtils.stringToObject(crcMapStr, Map.class);
     for (String segmentName : crcMap.keySet()) {

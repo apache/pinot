@@ -230,8 +230,8 @@ public final class TimeFieldSpec extends FieldSpec {
     }
 
     TimeFieldSpec that = (TimeFieldSpec) o;
-    return EqualityUtils.isEqual(_incomingGranularitySpec, that._incomingGranularitySpec) && EqualityUtils.isEqual(
-        getOutgoingGranularitySpec(), that.getOutgoingGranularitySpec());
+    return EqualityUtils.isEqual(_incomingGranularitySpec, that._incomingGranularitySpec) && EqualityUtils
+        .isEqual(getOutgoingGranularitySpec(), that.getOutgoingGranularitySpec());
   }
 
   @Override

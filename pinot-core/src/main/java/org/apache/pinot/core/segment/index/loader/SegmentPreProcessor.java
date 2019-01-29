@@ -52,7 +52,8 @@ public class SegmentPreProcessor implements AutoCloseable {
   private SegmentMetadataImpl _segmentMetadata;
 
   public SegmentPreProcessor(@Nonnull File indexDir, @Nonnull IndexLoadingConfig indexLoadingConfig,
-      @Nullable Schema schema) throws Exception {
+      @Nullable Schema schema)
+      throws Exception {
     _indexDir = indexDir;
     _indexLoadingConfig = indexLoadingConfig;
     _schema = schema;
@@ -63,7 +64,8 @@ public class SegmentPreProcessor implements AutoCloseable {
     _segmentDirectory = SegmentDirectory.createFromLocalFS(indexDir, _segmentMetadata, ReadMode.mmap);
   }
 
-  public void process() throws Exception {
+  public void process()
+      throws Exception {
     if (_segmentMetadata.getTotalDocs() == 0) {
       return;
     }
@@ -116,7 +118,8 @@ public class SegmentPreProcessor implements AutoCloseable {
   }
 
   @Override
-  public void close() throws Exception {
+  public void close()
+      throws Exception {
     _segmentDirectory.close();
   }
 }

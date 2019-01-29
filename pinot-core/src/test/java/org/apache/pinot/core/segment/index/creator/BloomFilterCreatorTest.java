@@ -39,8 +39,8 @@ public class BloomFilterCreatorTest {
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "BloomFilterCreatorTest");
   private static int MB_IN_BYTES = 1024 * 1024;
 
-
-  public void setUp() throws Exception {
+  public void setUp()
+      throws Exception {
     if (TEMP_DIR.exists()) {
       FileUtils.deleteQuietly(TEMP_DIR);
     }
@@ -59,8 +59,8 @@ public class BloomFilterCreatorTest {
     Assert.assertEquals(BloomFilterUtil.computeNumberOfHashFunctions(10000000, 47925292), 3);
 
     double threshold = 0.001;
-    Assert.assertTrue(
-        compareDouble(BloomFilterUtil.computeMaxFalsePosProbability(1000000, 5, 7298441), 0.03, threshold));
+    Assert
+        .assertTrue(compareDouble(BloomFilterUtil.computeMaxFalsePosProbability(1000000, 5, 7298441), 0.03, threshold));
     Assert.assertTrue(
         compareDouble(BloomFilterUtil.computeMaxFalsePosProbability(10000000, 5, 72984409), 0.03, threshold));
     Assert.assertTrue(
@@ -75,7 +75,8 @@ public class BloomFilterCreatorTest {
   }
 
   @Test
-  public void testBloomFilterCreator() throws Exception {
+  public void testBloomFilterCreator()
+      throws Exception {
     // Create bloom filter directory
     File bloomFilterDir = new File(TEMP_DIR, "bloomFilterDir");
     bloomFilterDir.mkdirs();
@@ -83,8 +84,7 @@ public class BloomFilterCreatorTest {
     // Create a bloom filter and serialize it to a file
     int cardinality = 10000;
     String columnName = "testColumn";
-    BloomFilterCreator
-        bloomFilterCreator = new BloomFilterCreator(bloomFilterDir, columnName, cardinality);
+    BloomFilterCreator bloomFilterCreator = new BloomFilterCreator(bloomFilterDir, columnName, cardinality);
     for (int i = 0; i < 5; i++) {
       bloomFilterCreator.add(Integer.toString(i));
     }
@@ -112,16 +112,16 @@ public class BloomFilterCreatorTest {
   }
 
   @Test
-  public void testBloomFilterSize() throws Exception {
-    int cardinalityArray[] = new int[] { 10, 100, 1000, 100000, 100000 , 1000000, 5000000, 10000000};
+  public void testBloomFilterSize()
+      throws Exception {
+    int cardinalityArray[] = new int[]{10, 100, 1000, 100000, 100000, 1000000, 5000000, 10000000};
     for (int cardinality : cardinalityArray) {
       FileUtils.deleteQuietly(TEMP_DIR);
       File indexDir = new File(TEMP_DIR, "testBloomFilterSize");
       Preconditions.checkState(indexDir.mkdirs());
 
       String columnName = "testSize";
-      BloomFilterCreator
-          bloomFilterCreator = new BloomFilterCreator(indexDir, columnName, cardinality);
+      BloomFilterCreator bloomFilterCreator = new BloomFilterCreator(indexDir, columnName, cardinality);
       bloomFilterCreator.close();
 
       File bloomFilterFile = new File(indexDir, columnName + V1Constants.Indexes.BLOOM_FILTER_FILE_EXTENSION);
@@ -137,7 +137,8 @@ public class BloomFilterCreatorTest {
   }
 
   @AfterClass
-  public void tearDown() throws Exception {
+  public void tearDown()
+      throws Exception {
     FileUtils.deleteDirectory(TEMP_DIR);
   }
 }

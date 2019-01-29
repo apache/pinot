@@ -50,11 +50,7 @@ public class BrokerServerBuilder {
   public static final String SINGLE_CONNECTION_REQUEST_HANDLER_TYPE = "singleConnection";
 
   public enum State {
-    INIT,
-    STARTING,
-    RUNNING,
-    SHUTTING_DOWN,
-    SHUTDOWN
+    INIT, STARTING, RUNNING, SHUTTING_DOWN, SHUTDOWN
   }
 
   // Running State Of broker
@@ -112,8 +108,8 @@ public class BrokerServerBuilder {
     _state.set(State.STARTING);
 
     _brokerRequestHandler.start();
-    _brokerAdminApplication.start(_config.getInt(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT,
-        CommonConstants.Helix.DEFAULT_BROKER_QUERY_PORT));
+    _brokerAdminApplication.start(_config
+        .getInt(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT, CommonConstants.Helix.DEFAULT_BROKER_QUERY_PORT));
 
     _state.set(State.RUNNING);
     LOGGER.info("Pinot Broker started");

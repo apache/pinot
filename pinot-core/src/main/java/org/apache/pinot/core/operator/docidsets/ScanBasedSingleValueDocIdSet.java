@@ -32,7 +32,8 @@ public class ScanBasedSingleValueDocIdSet implements FilterBlockDocIdSet {
   int startDocId;
   int endDocId;
 
-  public ScanBasedSingleValueDocIdSet(String datasourceName, BlockValSet blockValSet, BlockMetadata blockMetadata, PredicateEvaluator evaluator) {
+  public ScanBasedSingleValueDocIdSet(String datasourceName, BlockValSet blockValSet, BlockMetadata blockMetadata,
+      PredicateEvaluator evaluator) {
     this.datasourceName = datasourceName;
     this.blockValSet = blockValSet;
     blockValSetBlockDocIdIterator = new SVScanDocIdIterator(datasourceName, blockValSet, blockMetadata, evaluator);
@@ -56,7 +57,7 @@ public class ScanBasedSingleValueDocIdSet implements FilterBlockDocIdSet {
    */
   @Override
   public void setStartDocId(int startDocId) {
-    this.startDocId= startDocId;
+    this.startDocId = startDocId;
     blockValSetBlockDocIdIterator.setStartDocId(startDocId);
   }
 
@@ -84,5 +85,4 @@ public class ScanBasedSingleValueDocIdSet implements FilterBlockDocIdSet {
   public <T> T getRaw() {
     throw new UnsupportedOperationException("getRaw not supported for ScanBasedDocIdSet");
   }
-
 }

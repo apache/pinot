@@ -105,7 +105,7 @@ public class SegmentDeletionManagerTest {
       }
     });
 
-        when(store.exists(anyString(), anyInt())).thenReturn(true);
+    when(store.exists(anyString(), anyInt())).thenReturn(true);
     return store;
   }
 
@@ -134,13 +134,15 @@ public class SegmentDeletionManagerTest {
   }
 
   @Test
-  public void testBulkDeleteWithFailures() throws Exception {
+  public void testBulkDeleteWithFailures()
+      throws Exception {
     testBulkDeleteWithFailures(true);
     testBulkDeleteWithFailures(false);
   }
 
-  public void testBulkDeleteWithFailures(boolean useSet) throws Exception {
-    HelixAdmin helixAdmin =  makeHelixAdmin();
+  public void testBulkDeleteWithFailures(boolean useSet)
+      throws Exception {
+    HelixAdmin helixAdmin = makeHelixAdmin();
     ZkHelixPropertyStore<ZNRecord> propertyStore = makePropertyStore();
     FakeDeletionManager deletionManager = new FakeDeletionManager(helixAdmin, propertyStore);
     Collection<String> segments;
@@ -184,7 +186,7 @@ public class SegmentDeletionManagerTest {
   }
 
   private void testAllFailed(List<String> segments) {
-    HelixAdmin helixAdmin =  makeHelixAdmin();
+    HelixAdmin helixAdmin = makeHelixAdmin();
     ZkHelixPropertyStore<ZNRecord> propertyStore = makePropertyStore();
     FakeDeletionManager deletionManager = new FakeDeletionManager(helixAdmin, propertyStore);
     deletionManager.deleteSegmentsFromPropertyStoreAndLocal(tableName, segments);
@@ -195,7 +197,8 @@ public class SegmentDeletionManagerTest {
   }
 
   @Test
-  public void testRemoveDeletedSegments() throws Exception {
+  public void testRemoveDeletedSegments()
+      throws Exception {
     PropertiesConfiguration pinotFSConfig = new PropertiesConfiguration();
     pinotFSConfig.addProperty(CommonConstants.Controller.PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY + ".class",
         LocalPinotFS.class.getName());
@@ -238,7 +241,7 @@ public class SegmentDeletionManagerTest {
       createTestFileWithAge(dummyDir1.getAbsolutePath() + File.separator + "file" + i, i);
     }
     for (int i = 2; i < 5; i++) {
-      createTestFileWithAge(dummyDir2.getAbsolutePath() + File.separator +"file" + i, i);
+      createTestFileWithAge(dummyDir2.getAbsolutePath() + File.separator + "file" + i, i);
     }
 
     // Check that dummy directories and files are successfully created.
@@ -258,7 +261,8 @@ public class SegmentDeletionManagerTest {
     Assert.assertEquals(dummyDir2.exists(), false);
   }
 
-  public void createTestFileWithAge(String path, int age) throws Exception {
+  public void createTestFileWithAge(String path, int age)
+      throws Exception {
     File testFile = new File(path);
     testFile.createNewFile();
     testFile.setLastModified(DateTime.now().minusDays(age).getMillis());
@@ -285,6 +289,7 @@ public class SegmentDeletionManagerTest {
     protected void removeSegmentFromStore(String tableName, String segmentId) {
       segmentsRemovedFromStore.add(segmentId);
     }
+
     @Override
     protected void deleteSegmentsWithDelay(final String tableName, final Collection<String> segmentIds,
         final long deletionDelaySeconds) {

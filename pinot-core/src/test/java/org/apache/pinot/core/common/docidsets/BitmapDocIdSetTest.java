@@ -38,7 +38,8 @@ import org.testng.annotations.Test;
 public class BitmapDocIdSetTest {
 
   @Test
-  public void testSimple() throws IOException {
+  public void testSimple()
+      throws IOException {
     int numBitMaps = 5;
     final int numDocs = 1000;
     List<ImmutableRoaringBitmap> list = new ArrayList<>();

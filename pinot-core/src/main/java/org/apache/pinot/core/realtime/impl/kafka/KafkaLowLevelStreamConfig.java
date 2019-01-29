@@ -44,12 +44,12 @@ public class KafkaLowLevelStreamConfig {
 
     _kafkaTopicName = streamConfig.getTopicName();
 
-    String llcBrokerListKey =
-        KafkaStreamConfigProperties.constructStreamProperty(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_BROKER_LIST);
-    String llcBufferKey =
-        KafkaStreamConfigProperties.constructStreamProperty(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_BUFFER_SIZE);
-    String llcTimeoutKey =
-        KafkaStreamConfigProperties.constructStreamProperty(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_SOCKET_TIMEOUT);
+    String llcBrokerListKey = KafkaStreamConfigProperties
+        .constructStreamProperty(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_BROKER_LIST);
+    String llcBufferKey = KafkaStreamConfigProperties
+        .constructStreamProperty(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_BUFFER_SIZE);
+    String llcTimeoutKey = KafkaStreamConfigProperties
+        .constructStreamProperty(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_SOCKET_TIMEOUT);
     _bootstrapHosts = streamConfigMap.get(llcBrokerListKey);
     _kafkaBufferSize = getIntConfigWithDefault(streamConfigMap, llcBufferKey,
         KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_BUFFER_SIZE_DEFAULT);
@@ -89,13 +89,10 @@ public class KafkaLowLevelStreamConfig {
 
   @Override
   public String toString() {
-    return "KafkaLowLevelStreamConfig{" + "_kafkaTopicName='" + _kafkaTopicName + '\''
-        + ", _bootstrapHosts='" + _bootstrapHosts + '\''
-        + ", _kafkaBufferSize='" + _kafkaBufferSize + '\''
-        + ", _kafkaSocketTimeout='" + _kafkaSocketTimeout + '\''
-        + '}';
+    return "KafkaLowLevelStreamConfig{" + "_kafkaTopicName='" + _kafkaTopicName + '\'' + ", _bootstrapHosts='"
+        + _bootstrapHosts + '\'' + ", _kafkaBufferSize='" + _kafkaBufferSize + '\'' + ", _kafkaSocketTimeout='"
+        + _kafkaSocketTimeout + '\'' + '}';
   }
-
 
   @Override
   public boolean equals(Object o) {
@@ -109,10 +106,10 @@ public class KafkaLowLevelStreamConfig {
 
     KafkaLowLevelStreamConfig that = (KafkaLowLevelStreamConfig) o;
 
-    return EqualityUtils.isEqual(_kafkaTopicName, that._kafkaTopicName)
-        && EqualityUtils.isEqual(_bootstrapHosts, that._bootstrapHosts)
-        && EqualityUtils.isEqual(_kafkaBufferSize, that._kafkaBufferSize)
-        && EqualityUtils.isEqual(_kafkaSocketTimeout, that._kafkaSocketTimeout);
+    return EqualityUtils.isEqual(_kafkaTopicName, that._kafkaTopicName) && EqualityUtils
+        .isEqual(_bootstrapHosts, that._bootstrapHosts) && EqualityUtils
+        .isEqual(_kafkaBufferSize, that._kafkaBufferSize) && EqualityUtils
+        .isEqual(_kafkaSocketTimeout, that._kafkaSocketTimeout);
   }
 
   @Override

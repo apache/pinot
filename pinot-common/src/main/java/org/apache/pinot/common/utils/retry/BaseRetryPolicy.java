@@ -42,7 +42,8 @@ public abstract class BaseRetryPolicy implements RetryPolicy {
   protected abstract long getDelayMs(int currentAttempt);
 
   @Override
-  public void attempt(Callable<Boolean> operation) throws AttemptsExceededException, RetriableOperationException {
+  public void attempt(Callable<Boolean> operation)
+      throws AttemptsExceededException, RetriableOperationException {
     int attempt = 0;
     while (attempt < _maxNumAttempts) {
       try {

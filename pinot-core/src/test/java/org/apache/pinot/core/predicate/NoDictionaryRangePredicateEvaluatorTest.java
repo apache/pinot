@@ -214,13 +214,15 @@ public class NoDictionaryRangePredicateEvaluatorTest {
     PredicateEvaluator predicateEvaluator = buildRangePredicate("[-10\t\t10]", FieldSpec.DataType.STRING);
     for (int i = -20; i < 20; i++) {
       String value = Integer.toString(i);
-      Assert.assertEquals(predicateEvaluator.applySV(value), (value.compareTo("-10") >= 0 && value.compareTo("10") <= 0));
+      Assert
+          .assertEquals(predicateEvaluator.applySV(value), (value.compareTo("-10") >= 0 && value.compareTo("10") <= 0));
     }
 
     predicateEvaluator = buildRangePredicate("(-10\t\t10]", FieldSpec.DataType.STRING);
     for (int i = -20; i < 20; i++) {
       String value = Integer.toString(i);
-      Assert.assertEquals(predicateEvaluator.applySV(value), (value.compareTo("-10") > 0 && value.compareTo("10") <= 0));
+      Assert
+          .assertEquals(predicateEvaluator.applySV(value), (value.compareTo("-10") > 0 && value.compareTo("10") <= 0));
     }
 
     predicateEvaluator = buildRangePredicate("(-10\t\t10)", FieldSpec.DataType.STRING);

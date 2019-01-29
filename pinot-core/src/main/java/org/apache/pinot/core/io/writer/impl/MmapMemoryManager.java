@@ -157,12 +157,13 @@ public class MmapMemoryManager extends RealtimeIndexOffHeapMemoryManager {
   }
 
   @Override
-  protected void doClose() throws IOException {
+  protected void doClose()
+      throws IOException {
     for (PinotDataBuffer buffer : _memMappedBuffers) {
       LOGGER.info("Closing buffer {}", buffer);
       buffer.close();
     }
-    for (String path: _paths) {
+    for (String path : _paths) {
       try {
         File file = new File(path);
         if (file.delete()) {

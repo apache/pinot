@@ -30,11 +30,7 @@ import static org.apache.pinot.common.utils.EqualityUtils.isNullOrNotSameClass;
  * Combined configuration object, which contains an offline table configuration, a realtime table configuration, and a
  * schema for the table.
  */
-@UseChildKeyTransformers({
-    AdjustTableNameChildKeyTransformer.class,
-    RemapTableTypesChildKeyTransformer.class,
-    CombinedConfigSeparatorChildKeyTransformer.class
-})
+@UseChildKeyTransformers({AdjustTableNameChildKeyTransformer.class, RemapTableTypesChildKeyTransformer.class, CombinedConfigSeparatorChildKeyTransformer.class})
 public class CombinedConfig {
   @ConfigKey("offline")
   private TableConfig _offline;
@@ -80,7 +76,8 @@ public class CombinedConfig {
     _schema = schema;
   }
 
-  public CombinedConfig() {}
+  public CombinedConfig() {
+  }
 
   @Override
   public boolean equals(Object o) {
@@ -94,10 +91,7 @@ public class CombinedConfig {
 
     CombinedConfig that = (CombinedConfig) o;
 
-    return
-        isEqual(_offline, that._offline) &&
-        isEqual(_realtime, that._realtime) &&
-        isEqual(_schema, that._schema);
+    return isEqual(_offline, that._offline) && isEqual(_realtime, that._realtime) && isEqual(_schema, that._schema);
   }
 
   @Override

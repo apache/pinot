@@ -50,7 +50,8 @@ public class QueryRouterTest {
   }
 
   @Test
-  public void testValidResponse() throws Exception {
+  public void testValidResponse()
+      throws Exception {
     long requestId = 123;
     DataTable dataTable = new DataTableImplV2();
     dataTable.getMetadata().put(DataTable.REQUEST_ID_METADATA_KEY, Long.toString(requestId));
@@ -85,9 +86,8 @@ public class QueryRouterTest {
     Assert.assertEquals(serverResponse.getResponseSize(), responseBytes.length);
 
     // Hybrid
-    asyncQueryResponse =
-        _queryRouter.submitQuery(requestId, "testTable", BROKER_REQUEST, ROUTING_TABLE, BROKER_REQUEST, ROUTING_TABLE,
-            1_000L);
+    asyncQueryResponse = _queryRouter
+        .submitQuery(requestId, "testTable", BROKER_REQUEST, ROUTING_TABLE, BROKER_REQUEST, ROUTING_TABLE, 1_000L);
     response = asyncQueryResponse.getResponse();
     Assert.assertEquals(response.size(), 2);
     Assert.assertTrue(response.containsKey(OFFLINE_SERVER));
@@ -105,7 +105,8 @@ public class QueryRouterTest {
   }
 
   @Test
-  public void testInvalidResponse() throws Exception {
+  public void testInvalidResponse()
+      throws Exception {
     long requestId = 123;
 
     // Start the server
@@ -136,7 +137,8 @@ public class QueryRouterTest {
   }
 
   @Test
-  public void testNonMatchingRequestId() throws Exception {
+  public void testNonMatchingRequestId()
+      throws Exception {
     long requestId = 123;
     DataTable dataTable = new DataTableImplV2();
     dataTable.getMetadata().put(DataTable.REQUEST_ID_METADATA_KEY, Long.toString(requestId));
@@ -170,7 +172,8 @@ public class QueryRouterTest {
   }
 
   @Test
-  public void testServerDown() throws Exception {
+  public void testServerDown()
+      throws Exception {
     long requestId = 123;
     DataTable dataTable = new DataTableImplV2();
     dataTable.getMetadata().put(DataTable.REQUEST_ID_METADATA_KEY, Long.toString(requestId));

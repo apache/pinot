@@ -25,5 +25,6 @@ package org.apache.pinot.tools.data.generator;
 public interface Generator {
 
   public void init();
+
   public Object next();
 }

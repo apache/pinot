@@ -55,23 +55,23 @@ public class PinotTableRestletResourceTest extends ControllerTest {
   private String _createTableUrl;
 
   @BeforeClass
-  public void setUp() throws Exception {
+  public void setUp()
+      throws Exception {
     startZk();
     ControllerConf config = getDefaultControllerConfiguration();
     config.setTableMinReplicas(MIN_NUM_REPLICAS);
     startController(config);
     _createTableUrl = _controllerRequestURLBuilder.forTableCreate();
 
-    ControllerRequestBuilderUtil.addFakeBrokerInstancesToAutoJoinHelixCluster(getHelixClusterName(),
-        ZkStarter.DEFAULT_ZK_STR, NUM_BROKER_INSTANCES, true);
-    ControllerRequestBuilderUtil.addFakeDataInstancesToAutoJoinHelixCluster(getHelixClusterName(),
-        ZkStarter.DEFAULT_ZK_STR, NUM_SERVER_INSTANCES, true);
+    ControllerRequestBuilderUtil
+        .addFakeBrokerInstancesToAutoJoinHelixCluster(getHelixClusterName(), ZkStarter.DEFAULT_ZK_STR,
+            NUM_BROKER_INSTANCES, true);
+    ControllerRequestBuilderUtil
+        .addFakeDataInstancesToAutoJoinHelixCluster(getHelixClusterName(), ZkStarter.DEFAULT_ZK_STR,
+            NUM_SERVER_INSTANCES, true);
 
-    _offlineBuilder.setTableName("testOfflineTable")
-        .setTimeColumnName("timeColumn")
-        .setTimeType("DAYS")
-        .setRetentionTimeUnit("DAYS")
-        .setRetentionTimeValue("5");
+    _offlineBuilder.setTableName("testOfflineTable").setTimeColumnName("timeColumn").setTimeType("DAYS")
+        .setRetentionTimeUnit("DAYS").setRetentionTimeValue("5");
 
     // add schema for realtime table
     addDummySchema(REALTIME_TABLE_NAME);
@@ -79,28 +79,31 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     Map<String, String> streamConfigs = new HashMap<>();
     String streamType = "kafka";
     streamConfigs.put(StreamConfigProperties.STREAM_TYPE, streamType);
-    streamConfigs.put(
-        StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
-        StreamConfig.ConsumerType.HIGHLEVEL.toString());
-    streamConfigs.put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_TOPIC_NAME), "fakeTopic");
-    streamConfigs.put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_DECODER_CLASS), "fakeClass");
-    streamConfigs.put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS), "fakeClass");
-    streamConfigs.put(KafkaStreamConfigProperties.constructStreamProperty(
-        KafkaStreamConfigProperties.HighLevelConsumer.KAFKA_HLC_ZK_CONNECTION_STRING), "fakeUrl");
+    streamConfigs
+        .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
+            StreamConfig.ConsumerType.HIGHLEVEL.toString());
+    streamConfigs
+        .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_TOPIC_NAME),
+            "fakeTopic");
+    streamConfigs
+        .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_DECODER_CLASS),
+            "fakeClass");
+    streamConfigs.put(StreamConfigProperties
+        .constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS), "fakeClass");
+    streamConfigs.put(KafkaStreamConfigProperties
+            .constructStreamProperty(KafkaStreamConfigProperties.HighLevelConsumer.KAFKA_HLC_ZK_CONNECTION_STRING),
+        "fakeUrl");
     streamConfigs.put(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS, Integer.toString(1234));
-    streamConfigs.put(
-        StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_OFFSET_CRITERIA), "smallest");
-    _realtimeBuilder.setTableName(REALTIME_TABLE_NAME)
-        .setTimeColumnName("timeColumn")
-        .setTimeType("DAYS")
-        .setRetentionTimeUnit("DAYS")
-        .setRetentionTimeValue("5")
-        .setSchemaName(REALTIME_TABLE_NAME)
+    streamConfigs.put(StreamConfigProperties
+        .constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_OFFSET_CRITERIA), "smallest");
+    _realtimeBuilder.setTableName(REALTIME_TABLE_NAME).setTimeColumnName("timeColumn").setTimeType("DAYS")
+        .setRetentionTimeUnit("DAYS").setRetentionTimeValue("5").setSchemaName(REALTIME_TABLE_NAME)
         .setStreamConfigs(streamConfigs);
   }
 
   @Test
-  public void testCreateTable() throws Exception {
+  public void testCreateTable()
+      throws Exception {
     // Create an OFFLINE table with an invalid name which should fail
     // NOTE: Set bad table name inside table config builder is not allowed, so have to explicitly set in table config
     TableConfig offlineTableConfig = _offlineBuilder.build();
@@ -183,12 +186,14 @@ public class PinotTableRestletResourceTest extends ControllerTest {
   }
 
   @Test
-  public void testTableMinReplication() throws Exception {
+  public void testTableMinReplication()
+      throws Exception {
     testTableMinReplicationInternal("minReplicationOne", 1);
     testTableMinReplicationInternal("minReplicationTwo", NUM_SERVER_INSTANCES);
   }
 
-  private void testTableMinReplicationInternal(String tableName, int tableReplication) throws Exception {
+  private void testTableMinReplicationInternal(String tableName, int tableReplication)
+      throws Exception {
     String tableJSONConfigString =
         _offlineBuilder.setTableName(tableName).setNumReplicas(tableReplication).build().toJSONConfigString();
     sendPostRequest(_createTableUrl, tableJSONConfigString);
@@ -209,13 +214,15 @@ public class PinotTableRestletResourceTest extends ControllerTest {
 //    Assert.assertEquals(replicasPerPartition, Math.max(tableReplication, TABLE_MIN_REPLICATION));
   }
 
-  private TableConfig getTableConfig(String tableName, String tableType) throws Exception {
+  private TableConfig getTableConfig(String tableName, String tableType)
+      throws Exception {
     String tableConfigString = sendGetRequest(_controllerRequestURLBuilder.forTableGet(tableName));
     return TableConfig.fromJSONConfig(JsonUtils.stringToJsonNode(tableConfigString).get(tableType));
   }
 
   @Test
-  public void testUpdateTableConfig() throws Exception {
+  public void testUpdateTableConfig()
+      throws Exception {
     String tableName = "updateTC";
     String tableJSONConfigString =
         _offlineBuilder.setTableName(tableName).setNumReplicas(2).build().toJSONConfigString();
@@ -275,14 +282,16 @@ public class PinotTableRestletResourceTest extends ControllerTest {
   }
 
   @Test(expectedExceptions = FileNotFoundException.class)
-  public void rebalanceNonExistentOfflineTable() throws IOException {
+  public void rebalanceNonExistentOfflineTable()
+      throws IOException {
     String tableName = "nonExistentTable";
     // should result in file not found exception
     sendPostRequest(_controllerRequestURLBuilder.forTableRebalance(tableName, "offline"), null);
   }
 
   @Test(expectedExceptions = FileNotFoundException.class)
-  public void rebalanceNonExistentRealtimeTable() throws IOException {
+  public void rebalanceNonExistentRealtimeTable()
+      throws IOException {
     String tableName = "nonExistentTable";
     // should result in file not found exception
     sendPostRequest(_controllerRequestURLBuilder.forTableRebalance(tableName, "realtime"), null);

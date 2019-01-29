@@ -179,11 +179,9 @@ public class SegmentGeneratorConfig {
 
       if (noDictionaryColumnMap != null) {
         Map<String, ChunkCompressorFactory.CompressionType> serializedNoDictionaryColumnMap =
-            noDictionaryColumnMap.entrySet()
-                .stream()
-                .collect(Collectors.toMap(Map.Entry::getKey,
-                    e -> (ChunkCompressorFactory.CompressionType) ChunkCompressorFactory.CompressionType.valueOf(
-                        e.getValue())));
+            noDictionaryColumnMap.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey,
+                e -> (ChunkCompressorFactory.CompressionType) ChunkCompressorFactory.CompressionType
+                    .valueOf(e.getValue())));
         this.setRawIndexCompressionType(serializedNoDictionaryColumnMap);
       }
     }
@@ -583,7 +581,8 @@ public class SegmentGeneratorConfig {
    * @throws IOException
    */
   @Deprecated
-  public void loadConfigFiles() throws IOException {
+  public void loadConfigFiles()
+      throws IOException {
     Schema schema;
     if (_schemaFile != null) {
       schema = Schema.fromFile(new File(_schemaFile));

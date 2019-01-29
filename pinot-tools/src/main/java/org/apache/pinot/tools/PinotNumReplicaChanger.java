@@ -95,14 +95,16 @@ public class PinotNumReplicaChanger extends PinotZKChanger {
           instanceStateMap.remove(keys.iterator().next());
         }
       } else if (instanceStateMap.size() < newNumReplicas) {
-        throw new RuntimeException("Segment " + segmentId + " has " + instanceStateMap.size() +
-            " replicas but want changed to " + newNumReplicas);
+        throw new RuntimeException(
+            "Segment " + segmentId + " has " + instanceStateMap.size() + " replicas but want changed to "
+                + newNumReplicas);
       }
     }
     return idealState;
   }
 
-  public static void main(String[] args) throws Exception {
+  public static void main(String[] args)
+      throws Exception {
     final boolean dryRun = true;
     if (args.length != 3) {
       usage();
@@ -118,6 +120,5 @@ public class PinotNumReplicaChanger extends PinotZKChanger {
     if (dryRun) {
       System.out.println("That was a dryrun");
     }
-
   }
 }

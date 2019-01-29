@@ -38,26 +38,24 @@ public class NamedListChildKeyHandler<T> implements ChildKeyHandler<java.util.Li
 
   @Override
   public java.util.List<T> handleChildKeys(Map<String, ?> childKeys, String pathPrefix) {
-    Seq<T> valueList = childKeys
-        .groupBy(tuple2 -> tuple2._1.split("\\.", 2)[0])
-        .flatMap(tuple2 -> {
-          String key = tuple2._1;
-          Map<String, ?> values = tuple2._2;
+    Seq<T> valueList = childKeys.groupBy(tuple2 -> tuple2._1.split("\\.", 2)[0]).flatMap(tuple2 -> {
+      String key = tuple2._1;
+      Map<String, ?> values = tuple2._2;
 
-          // Drop the prefix
-          Map<String, Object> valuesWithoutPrefix = values
-              .map((configKey, configValue) -> Tuple.of(configKey.substring(key.length() + 1), configValue));
-          valuesWithoutPrefix = valuesWithoutPrefix.put("name", key);
+      // Drop the prefix
+      Map<String, Object> valuesWithoutPrefix =
+          values.map((configKey, configValue) -> Tuple.of(configKey.substring(key.length() + 1), configValue));
+      valuesWithoutPrefix = valuesWithoutPrefix.put("name", key);
 
-          T value;
-          try {
-            value = Deserializer.deserialize(_type, valuesWithoutPrefix, "");
-            return Option.some(value);
-          } catch (Exception e) {
-            e.printStackTrace();
-            return Option.none();
-          }
-        });
+      T value;
+      try {
+        value = Deserializer.deserialize(_type, valuesWithoutPrefix, "");
+        return Option.some(value);
+      } catch (Exception e) {
+        e.printStackTrace();
+        return Option.none();
+      }
+    });
 
     return valueList.asJava();
   }
@@ -68,14 +66,10 @@ public class NamedListChildKeyHandler<T> implements ChildKeyHandler<java.util.Li
       return null;
     }
 
-    return List.ofAll(values)
-        .flatMap(value -> {
-          Map<String, ?> serializedValue = Serializer.serialize(value);
-          final String name = (String) serializedValue.getOrElse("name", null);
-          return serializedValue
-              .remove("name")
-              .mapKeys(key -> name + "." + key);
-        })
-        .toMap(Function.identity());
+    return List.ofAll(values).flatMap(value -> {
+      Map<String, ?> serializedValue = Serializer.serialize(value);
+      final String name = (String) serializedValue.getOrElse("name", null);
+      return serializedValue.remove("name").mapKeys(key -> name + "." + key);
+    }).toMap(Function.identity());
   }
 }

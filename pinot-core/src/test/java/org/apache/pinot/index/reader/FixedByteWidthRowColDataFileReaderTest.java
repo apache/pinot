@@ -33,7 +33,8 @@ import org.testng.annotations.Test;
 public class FixedByteWidthRowColDataFileReaderTest {
 
   @Test
-  void testSingleCol() throws Exception {
+  void testSingleCol()
+      throws Exception {
     String fileName = "test_single_col.dat";
     File f = new File(fileName);
 
@@ -64,7 +65,8 @@ public class FixedByteWidthRowColDataFileReaderTest {
   }
 
   @Test
-  void testMultiCol() throws Exception {
+  void testMultiCol()
+      throws Exception {
     String fileName = "test_single_col.dat";
     File f = new File(fileName);
     f.delete();

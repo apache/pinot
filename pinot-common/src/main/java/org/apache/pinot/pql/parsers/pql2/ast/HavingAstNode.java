@@ -31,5 +31,4 @@ public class HavingAstNode extends BaseAstNode {
     PredicateAstNode predicateAstNode = (PredicateAstNode) getChildren().get(0);
     RequestUtils.generateFilterFromTree(predicateAstNode.buildHavingQueryTree(), brokerRequest);
   }
-
 }

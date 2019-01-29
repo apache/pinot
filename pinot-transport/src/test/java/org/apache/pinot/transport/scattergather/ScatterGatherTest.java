@@ -64,7 +64,8 @@ public class ScatterGatherTest {
   }
 
   @Test
-  public void testNormal() throws Exception {
+  public void testNormal()
+      throws Exception {
     NettyServer[] nettyServers = new NettyServer[NUM_SERVERS];
     String[] serverNames = new String[NUM_SERVERS];
     ServerInstance[] serverInstances = new ServerInstance[NUM_SERVERS];
@@ -119,7 +120,8 @@ public class ScatterGatherTest {
   }
 
   @Test
-  public void testTimeout() throws Exception {
+  public void testTimeout()
+      throws Exception {
     NettyServer[] nettyServers = new NettyServer[NUM_SERVERS];
     String[] serverNames = new String[NUM_SERVERS];
     ServerInstance[] serverInstances = new ServerInstance[NUM_SERVERS];
@@ -181,7 +183,8 @@ public class ScatterGatherTest {
   }
 
   @Test
-  public void testError() throws Exception {
+  public void testError()
+      throws Exception {
     NettyServer[] nettyServers = new NettyServer[NUM_SERVERS];
     String[] serverNames = new String[NUM_SERVERS];
     ServerInstance[] serverInstances = new ServerInstance[NUM_SERVERS];

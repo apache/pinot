@@ -82,9 +82,11 @@ public class CombinePlanNode implements PlanNode {
       // Calculate the time out timestamp
       long endTime = System.currentTimeMillis() + TIME_OUT_IN_MILLISECONDS_FOR_PARALLEL_RUN;
 
-      int threads = Math.min(numPlanNodes/MIN_TASKS_PER_THREAD + ((numPlanNodes % MIN_TASKS_PER_THREAD == 0) ? 0 : 1), // ceil without using double arithmetic
+      int threads = Math.min(numPlanNodes / MIN_TASKS_PER_THREAD + ((numPlanNodes % MIN_TASKS_PER_THREAD == 0) ? 0 : 1),
+          // ceil without using double arithmetic
           MAX_PLAN_THREADS);
-      int opsPerThread = Math.max(numPlanNodes/threads + ((numPlanNodes % threads == 0) ? 0 : 1), // ceil without using double arithmetic
+      int opsPerThread = Math.max(numPlanNodes / threads + ((numPlanNodes % threads == 0) ? 0 : 1),
+          // ceil without using double arithmetic
           MIN_TASKS_PER_THREAD);
       // Submit all jobs
       Future[] futures = new Future[threads];
@@ -92,11 +94,12 @@ public class CombinePlanNode implements PlanNode {
         final int index = i;
         futures[i] = _executorService.submit(new TraceCallable<List<Operator>>() {
           @Override
-          public List<Operator> callJob() throws Exception {
+          public List<Operator> callJob()
+              throws Exception {
             List<Operator> operators = new ArrayList<>();
             int start = index * opsPerThread;
             int limit = Math.min(opsPerThread, numPlanNodes - start);
-            for(int count = start; count < start + limit; count++) {
+            for (int count = start; count < start + limit; count++) {
               operators.add(_planNodes.get(count).run());
             }
             return operators;

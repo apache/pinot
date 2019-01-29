@@ -56,7 +56,8 @@ public class ServerChannels {
     _brokerMetrics = brokerMetrics;
   }
 
-  public void sendRequest(Server server, InstanceRequest instanceRequest) throws Exception {
+  public void sendRequest(Server server, InstanceRequest instanceRequest)
+      throws Exception {
     _serverToChannelMap.computeIfAbsent(server, ServerChannel::new).sendRequest(instanceRequest);
   }
 
@@ -74,10 +75,8 @@ public class ServerChannels {
 
     ServerChannel(Server server) {
       _server = server;
-      _bootstrap = new Bootstrap().remoteAddress(server.getHostName(), server.getPort())
-          .group(_eventLoopGroup)
-          .channel(NioSocketChannel.class)
-          .option(ChannelOption.SO_KEEPALIVE, true)
+      _bootstrap = new Bootstrap().remoteAddress(server.getHostName(), server.getPort()).group(_eventLoopGroup)
+          .channel(NioSocketChannel.class).option(ChannelOption.SO_KEEPALIVE, true)
           .handler(new ChannelInitializer<SocketChannel>() {
             @Override
             protected void initChannel(SocketChannel ch) {
@@ -91,7 +90,8 @@ public class ServerChannels {
           });
     }
 
-    synchronized void sendRequest(InstanceRequest instanceRequest) throws Exception {
+    synchronized void sendRequest(InstanceRequest instanceRequest)
+        throws Exception {
       if (_channel == null || !_channel.isActive()) {
         long startTime = System.currentTimeMillis();
         _channel = _bootstrap.connect().sync().channel();
@@ -99,8 +99,8 @@ public class ServerChannels {
             System.currentTimeMillis() - startTime);
       }
       byte[] requestBytes = _serializer.serialize(instanceRequest);
-      _channel.writeAndFlush(_channel.alloc().buffer(requestBytes.length).writeBytes(requestBytes),
-          _channel.voidPromise());
+      _channel
+          .writeAndFlush(_channel.alloc().buffer(requestBytes.length).writeBytes(requestBytes), _channel.voidPromise());
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.NETTY_CONNECTION_REQUESTS_SENT, 1L);
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.NETTY_CONNECTION_BYTES_SENT, requestBytes.length);
     }

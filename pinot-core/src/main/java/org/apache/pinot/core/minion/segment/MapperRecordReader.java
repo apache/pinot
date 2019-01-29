@@ -44,7 +44,8 @@ public class MapperRecordReader implements RecordReader {
   private boolean _nextRowReturned = true;
 
   public MapperRecordReader(List<File> indexDirs, RecordTransformer recordTransformer,
-      RecordPartitioner recordPartitioner, int totalNumPartition, int currentPartition) throws Exception {
+      RecordPartitioner recordPartitioner, int totalNumPartition, int currentPartition)
+      throws Exception {
     _recordReader = new MultiplePinotSegmentRecordReader(indexDirs);
     _recordPartitioner = recordPartitioner;
     _recordTransformer = recordTransformer;
@@ -62,7 +63,7 @@ public class MapperRecordReader implements RecordReader {
       return true;
     }
 
-    while(_recordReader.hasNext()) {
+    while (_recordReader.hasNext()) {
       _nextRow = _recordReader.next(_nextRow);
       // Filter out the records that do not belong to the current partition
       if (_recordPartitioner.getPartitionFromRecord(_nextRow, _totalNumPartition) == _currentPartition) {
@@ -110,7 +111,8 @@ public class MapperRecordReader implements RecordReader {
   }
 
   @Override
-  public void close() throws IOException {
+  public void close()
+      throws IOException {
     _recordReader.close();
   }
 }

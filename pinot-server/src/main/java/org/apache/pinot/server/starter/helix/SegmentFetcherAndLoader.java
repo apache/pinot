@@ -57,7 +57,8 @@ public class SegmentFetcherAndLoader {
   private final Configuration _crypterConfig;
 
   public SegmentFetcherAndLoader(@Nonnull Configuration config, @Nonnull InstanceDataManager instanceDataManager,
-      @Nonnull ZkHelixPropertyStore<ZNRecord> propertyStore) throws Exception {
+      @Nonnull ZkHelixPropertyStore<ZNRecord> propertyStore)
+      throws Exception {
     _instanceDataManager = instanceDataManager;
     _propertyStore = propertyStore;
 
@@ -124,8 +125,9 @@ public class SegmentFetcherAndLoader {
             FileUtils.deleteQuietly(indexDir);
             localSegmentMetadata = null;
           } catch (Exception e) {
-            LOGGER.error("Failed to load {} of table {} from local, will try to reload it from controller!",
-                segmentName, tableNameWithType, e);
+            LOGGER
+                .error("Failed to load {} of table {} from local, will try to reload it from controller!", segmentName,
+                    tableNameWithType, e);
             FileUtils.deleteQuietly(indexDir);
             localSegmentMetadata = null;
           }
@@ -188,7 +190,8 @@ public class SegmentFetcherAndLoader {
   }
 
   @Nonnull
-  private String downloadSegmentToLocal(@Nonnull String uri, PinotCrypter crypter, @Nonnull String tableName, @Nonnull String segmentName)
+  private String downloadSegmentToLocal(@Nonnull String uri, PinotCrypter crypter, @Nonnull String tableName,
+      @Nonnull String segmentName)
       throws Exception {
     File tempDir = new File(new File(_instanceDataManager.getSegmentFileDirectory(), tableName),
         "tmp_" + segmentName + "_" + System.nanoTime());
@@ -206,8 +209,9 @@ public class SegmentFetcherAndLoader {
         tempTarFile = tempDownloadFile;
       }
 
-      LOGGER.info("Downloaded tarred segment: {} for table: {} from: {} to: {}, file length: {}", segmentName,
-          tableName, uri, tempTarFile, tempTarFile.length());
+      LOGGER
+          .info("Downloaded tarred segment: {} for table: {} from: {} to: {}, file length: {}", segmentName, tableName,
+              uri, tempTarFile, tempTarFile.length());
 
       // If an exception is thrown when untarring, it means the tar file is broken OR not found after the retry.
       // Thus, there's no need to retry again.

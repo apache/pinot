@@ -66,7 +66,6 @@ public class GeneratorFactory {
 
       default:
         throw new RuntimeException("Invalid datatype");
-
     }
     return generator;
   }

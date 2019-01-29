@@ -32,20 +32,20 @@ public class ConvertToRawIndexTaskExecutor extends BaseSingleSegmentConversionEx
 
   @Override
   protected SegmentConversionResult convert(@Nonnull PinotTaskConfig pinotTaskConfig, @Nonnull File originalIndexDir,
-      @Nonnull File workingDir) throws Exception {
+      @Nonnull File workingDir)
+      throws Exception {
     Map<String, String> configs = pinotTaskConfig.getConfigs();
     new RawIndexConverter(originalIndexDir, workingDir,
         configs.get(MinionConstants.ConvertToRawIndexTask.COLUMNS_TO_CONVERT_KEY)).convert();
     return new SegmentConversionResult.Builder().setFile(workingDir)
         .setTableNameWithType(configs.get(MinionConstants.TABLE_NAME_KEY))
-        .setSegmentName(configs.get(MinionConstants.SEGMENT_NAME_KEY))
-        .build();
+        .setSegmentName(configs.get(MinionConstants.SEGMENT_NAME_KEY)).build();
   }
 
   @Override
   protected SegmentZKMetadataCustomMapModifier getSegmentZKMetadataCustomMapModifier() {
-    return new SegmentZKMetadataCustomMapModifier(SegmentZKMetadataCustomMapModifier.ModifyMode.UPDATE,
-        Collections.singletonMap(MinionConstants.ConvertToRawIndexTask.TASK_TYPE + MinionConstants.TASK_TIME_SUFFIX,
+    return new SegmentZKMetadataCustomMapModifier(SegmentZKMetadataCustomMapModifier.ModifyMode.UPDATE, Collections
+        .singletonMap(MinionConstants.ConvertToRawIndexTask.TASK_TYPE + MinionConstants.TASK_TIME_SUFFIX,
             String.valueOf(System.currentTimeMillis())));
   }
 }

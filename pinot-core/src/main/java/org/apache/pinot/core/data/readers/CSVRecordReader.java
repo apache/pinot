@@ -42,7 +42,8 @@ public class CSVRecordReader implements RecordReader {
   private CSVParser _parser;
   private Iterator<CSVRecord> _iterator;
 
-  public CSVRecordReader(File dataFile, Schema schema, CSVRecordReaderConfig config) throws IOException {
+  public CSVRecordReader(File dataFile, Schema schema, CSVRecordReaderConfig config)
+      throws IOException {
     _dataFile = dataFile;
     _schema = schema;
 
@@ -88,7 +89,8 @@ public class CSVRecordReader implements RecordReader {
     init();
   }
 
-  private void init() throws IOException {
+  private void init()
+      throws IOException {
     _parser = _format.parse(RecordReaderUtils.getFileReader(_dataFile));
     _iterator = _parser.iterator();
   }
@@ -126,7 +128,8 @@ public class CSVRecordReader implements RecordReader {
   }
 
   @Override
-  public void rewind() throws IOException {
+  public void rewind()
+      throws IOException {
     _parser.close();
     init();
   }
@@ -137,7 +140,8 @@ public class CSVRecordReader implements RecordReader {
   }
 
   @Override
-  public void close() throws IOException {
+  public void close()
+      throws IOException {
     _parser.close();
   }
 }

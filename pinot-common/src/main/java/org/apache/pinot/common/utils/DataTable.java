@@ -44,7 +44,8 @@ public interface DataTable {
   void addException(@Nonnull ProcessingException processingException);
 
   @Nonnull
-  byte[] toBytes() throws IOException;
+  byte[] toBytes()
+      throws IOException;
 
   @Nonnull
   Map<String, String> getMetadata();

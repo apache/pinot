@@ -81,7 +81,8 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   @BeforeClass
-  public void setUp() throws Exception {
+  public void setUp()
+      throws Exception {
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir);
 
     // Start the Pinot cluster
@@ -105,7 +106,8 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
     waitForAllDocsLoaded(600_000L);
   }
 
-  protected void setUpSegmentsAndQueryGenerator() throws Exception {
+  protected void setUpSegmentsAndQueryGenerator()
+      throws Exception {
     // Unpack the Avro files
     List<File> avroFiles = unpackAvroData(_tempDir);
 
@@ -127,8 +129,9 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
     TestUtils.ensureDirectoriesExistAndEmpty(_segmentDir, _tarDir);
 
     ExecutorService executor = Executors.newCachedThreadPool();
-    ClusterIntegrationTestUtils.buildSegmentsFromAvro(avroFiles, 0, _segmentDir, _tarDir, tableName,
-        createStarTreeIndex, null, null, _schema, executor);
+    ClusterIntegrationTestUtils
+        .buildSegmentsFromAvro(avroFiles, 0, _segmentDir, _tarDir, tableName, createStarTreeIndex, null, null, _schema,
+            executor);
     executor.shutdown();
     executor.awaitTermination(10, TimeUnit.MINUTES);
 
@@ -136,7 +139,8 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   @Test
-  public void testQueriesFromQueryFile() throws Exception {
+  public void testQueriesFromQueryFile()
+      throws Exception {
     URL resourceUrl = BaseClusterIntegrationTestSet.class.getClassLoader().getResource(QUERY_FILE_NAME);
     Assert.assertNotNull(resourceUrl);
     File queryFile = new File(resourceUrl.getFile());
@@ -150,7 +154,8 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   @Test
-  public void testGeneratedQueries() throws Exception {
+  public void testGeneratedQueries()
+      throws Exception {
     for (int i = 0; i < NUM_QUERIES_TO_GENERATE; i++) {
       testStarQuery(generateQuery());
     }
@@ -161,7 +166,8 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   @Test
-  public void testPredicateOnMetrics() throws Exception {
+  public void testPredicateOnMetrics()
+      throws Exception {
     String starQuery;
 
     // Query containing predicate on one metric only
@@ -180,7 +186,8 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
     testStarQuery(starQuery);
   }
 
-  private void testStarQuery(String starQuery) throws Exception {
+  private void testStarQuery(String starQuery)
+      throws Exception {
     String referenceQuery = starQuery.replace(STAR_TREE_TABLE_NAME, DEFAULT_TABLE_NAME) + " TOP 10000";
     JsonNode starResponse = postQuery(starQuery);
     JsonNode referenceResponse = postQuery(referenceQuery);
@@ -199,7 +206,8 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   @AfterClass
-  public void tearDown() throws Exception {
+  public void tearDown()
+      throws Exception {
     dropOfflineTable(DEFAULT_TABLE_NAME);
     dropOfflineTable(STAR_TREE_TABLE_NAME);
 

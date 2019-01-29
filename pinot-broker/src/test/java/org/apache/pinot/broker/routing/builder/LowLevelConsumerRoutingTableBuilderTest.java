@@ -77,8 +77,8 @@ public class LowLevelConsumerRoutingTableBuilderTest {
         int segmentCount = random.nextInt(32); // 0 to 31 segments in partition
         segmentNames[partitionId] = new String[segmentCount];
         for (int sequenceNumber = 0; sequenceNumber < segmentCount; sequenceNumber++) {
-          segmentNames[partitionId][sequenceNumber] = new LLCSegmentName("table", partitionId, sequenceNumber,
-              System.currentTimeMillis()).getSegmentName();
+          segmentNames[partitionId][sequenceNumber] =
+              new LLCSegmentName("table", partitionId, sequenceNumber, System.currentTimeMillis()).getSegmentName();
         }
         totalSegmentCount += segmentCount;
       }
@@ -130,8 +130,7 @@ public class LowLevelConsumerRoutingTableBuilderTest {
 
       // Create routing tables
       long startTime = System.nanoTime();
-      routingTableBuilder.computeOnExternalViewChange(
-          "table_REALTIME", externalView, instanceConfigs);
+      routingTableBuilder.computeOnExternalViewChange("table_REALTIME", externalView, instanceConfigs);
 
       List<Map<String, List<String>>> routingTables = routingTableBuilder.getRoutingTables();
 
@@ -168,7 +167,7 @@ public class LowLevelConsumerRoutingTableBuilderTest {
     routingTableBuilder.init(new BaseConfiguration(), tableConfig, null, null);
 
     List<SegmentName> segmentNames = new ArrayList<>();
-    for(int i = 0; i < SEGMENT_COUNT; ++i) {
+    for (int i = 0; i < SEGMENT_COUNT; ++i) {
       segmentNames.add(new LLCSegmentName("table", 0, i, System.currentTimeMillis()));
     }
 
@@ -214,7 +213,7 @@ public class LowLevelConsumerRoutingTableBuilderTest {
     routingTableBuilder.init(new BaseConfiguration(), tableConfig, null, null);
 
     List<SegmentName> segmentNames = new ArrayList<>();
-    for(int i = 0; i < SEGMENT_COUNT; ++i) {
+    for (int i = 0; i < SEGMENT_COUNT; ++i) {
       segmentNames.add(new LLCSegmentName("table", 0, i, System.currentTimeMillis()));
     }
 

@@ -50,8 +50,10 @@ public class RoutingTableBuilderFactory {
     DefaultOffline,
     DefaultRealtime,
     BalancedRandom,
-    KafkaLowLevel, // This should ideally be LowLevel and HighLevel. But we cannot rename these, else all tables which reference these in the configs will break
-    KafkaHighLevel,// We will keep these prefixed with "Kafka", but they are intended to work for any stream
+    // This should ideally be LowLevel and HighLevel. But we cannot rename these, else all tables which reference these
+    // in the configs will break. We will keep these prefixed with "Kafka", but they are intended to work for any stream
+    KafkaLowLevel,
+    KafkaHighLevel,
     PartitionAwareOffline,
     PartitionAwareRealtime
   }
@@ -117,8 +119,9 @@ public class RoutingTableBuilderFactory {
         boolean hasReplicaGroupStrategyConfig = (validationConfig != null);
 
         // Check that the table push type is not 'refresh'.
-        boolean isNotRefreshPush = (validationConfig.getSegmentPushType() != null) &&
-            !validationConfig.getSegmentPushType().equalsIgnoreCase("REFRESH");
+        boolean isNotRefreshPush =
+            (validationConfig.getSegmentPushType() != null) && !validationConfig.getSegmentPushType()
+                .equalsIgnoreCase("REFRESH");
 
         if (isSegmentAssignmentStrategyCorrect && hasReplicaGroupStrategyConfig && isNotRefreshPush) {
           builder = new PartitionAwareOfflineRoutingTableBuilder();

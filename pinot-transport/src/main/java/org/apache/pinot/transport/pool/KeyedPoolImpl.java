@@ -51,10 +51,7 @@ public class KeyedPoolImpl<T> implements KeyedPool<T> {
    * State of the pool
    */
   private enum State {
-    INIT,
-    RUNNING,
-    SHUTTING_DOWN,
-    SHUTDOWN
+    INIT, RUNNING, SHUTTING_DOWN, SHUTDOWN
   }
 
   // State of this connection pool
@@ -140,7 +137,8 @@ public class KeyedPoolImpl<T> implements KeyedPool<T> {
       }
     }
 
-    AsyncResponseFuture<T> future = new AsyncResponseFuture<T>(key, "ConnPool checkout future for key " + key + "(" + context + ")");
+    AsyncResponseFuture<T> future =
+        new AsyncResponseFuture<T>(key, "ConnPool checkout future for key " + key + "(" + context + ")");
     Cancellable cancellable = pool.get(future);
     future.setCancellable(cancellable);
     return future;
@@ -178,7 +176,7 @@ public class KeyedPoolImpl<T> implements KeyedPool<T> {
 
       _state = State.SHUTTING_DOWN;
 
-      List<ServerResponseFuture< NoneType>> futureList = new ArrayList<ServerResponseFuture<NoneType>>();
+      List<ServerResponseFuture<NoneType>> futureList = new ArrayList<ServerResponseFuture<NoneType>>();
       for (Entry<ServerInstance, AsyncPool<T>> poolEntry : _keyedPool.entrySet()) {
         AsyncResponseFuture<NoneType> shutdownFuture = new AsyncResponseFuture<NoneType>(poolEntry.getKey(),
             "ConnPool shutdown future for pool entry " + poolEntry.getKey());

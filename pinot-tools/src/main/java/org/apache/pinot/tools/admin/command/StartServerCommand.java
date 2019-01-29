@@ -43,15 +43,13 @@ public class StartServerCommand extends AbstractBaseAdminCommand implements Comm
   @Option(name = "-serverPort", required = false, metaVar = "<int>", usage = "Port number to start the server at.")
   private int _serverPort = CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT;
 
-  @Option(name = "-serverAdminPort", required = false, metaVar = "<int>",
-      usage = "Port number to serve the server admin API at.")
+  @Option(name = "-serverAdminPort", required = false, metaVar = "<int>", usage = "Port number to serve the server admin API at.")
   private int _serverAdminPort = CommonConstants.Server.DEFAULT_ADMIN_API_PORT;
 
   @Option(name = "-dataDir", required = false, metaVar = "<string>", usage = "Path to directory containing data.")
   private String _dataDir = TMP_DIR + "pinotServerData";
 
-  @Option(name = "-segmentDir", required = false, metaVar = "<string>",
-      usage = "Path to directory containing segments.")
+  @Option(name = "-segmentDir", required = false, metaVar = "<string>", usage = "Path to directory containing segments.")
   private String _segmentDir = TMP_DIR + "pinotSegments";
 
   @Option(name = "-zkAddress", required = false, metaVar = "<http>", usage = "Http address of Zookeeper.")
@@ -60,12 +58,10 @@ public class StartServerCommand extends AbstractBaseAdminCommand implements Comm
   @Option(name = "-clusterName", required = false, metaVar = "<String>", usage = "Pinot cluster name.")
   private String _clusterName = "PinotCluster";
 
-  @Option(name = "-configFileName", required = false, metaVar = "<Config File Name>",
-      usage = "Broker Starter Config file.", forbids = { "-serverHost", "-serverPort", "-dataDir", "-segmentDir", })
+  @Option(name = "-configFileName", required = false, metaVar = "<Config File Name>", usage = "Broker Starter Config file.", forbids = {"-serverHost", "-serverPort", "-dataDir", "-segmentDir",})
   private String _configFileName;
 
-  @Option(name = "-help", required = false, help = true, aliases = { "-h", "--h", "--help" },
-      usage = "Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
   private boolean _help = false;
 
   @Override
@@ -137,7 +133,8 @@ public class StartServerCommand extends AbstractBaseAdminCommand implements Comm
   }
 
   @Override
-  public boolean execute() throws Exception {
+  public boolean execute()
+      throws Exception {
     try {
       if (_serverHost == null) {
         _serverHost = NetUtil.getHostAddress();

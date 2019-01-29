@@ -97,7 +97,8 @@ public class AddSchemaCommand extends AbstractBaseAdminCommand implements Comman
   }
 
   @Override
-  public boolean execute() throws Exception {
+  public boolean execute()
+      throws Exception {
     if (_controllerHost == null) {
       _controllerHost = NetUtil.getHostAddress();
     }

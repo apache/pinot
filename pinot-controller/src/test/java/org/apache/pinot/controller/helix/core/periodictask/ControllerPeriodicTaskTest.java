@@ -18,11 +18,14 @@
  */
 package org.apache.pinot.controller.helix.core.periodictask;
 
+import com.yammer.metrics.core.MetricsRegistry;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
+import org.apache.pinot.common.metrics.ControllerGauge;
+import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.testng.annotations.BeforeTest;
@@ -40,14 +43,16 @@ public class ControllerPeriodicTaskTest {
   private final ControllerConf _controllerConf = new ControllerConf();
 
   private final PinotHelixResourceManager _resourceManager = mock(PinotHelixResourceManager.class);
+  private final ControllerMetrics _controllerMetrics = new ControllerMetrics(new MetricsRegistry());
   private final AtomicBoolean _stopTaskCalled = new AtomicBoolean();
   private final AtomicBoolean _initTaskCalled = new AtomicBoolean();
   private final AtomicBoolean _processCalled = new AtomicBoolean();
-  private final AtomicInteger _numTablesProcessed = new AtomicInteger();
+  private final AtomicInteger _tablesProcessed = new AtomicInteger();
   private final int _numTables = 3;
+  private static final String TASK_NAME = "TestTask";
 
-  private final MockControllerPeriodicTask _task = new MockControllerPeriodicTask("TestTask", RUN_FREQUENCY_IN_SECONDS,
-      _controllerConf.getPeriodicTaskInitialDelayInSeconds(), _resourceManager) {
+  private final MockControllerPeriodicTask _task = new MockControllerPeriodicTask(TASK_NAME, RUN_FREQUENCY_IN_SECONDS,
+      _controllerConf.getPeriodicTaskInitialDelayInSeconds(), _resourceManager, _controllerMetrics) {
 
     @Override
     protected void initTask() {
@@ -67,7 +72,7 @@ public class ControllerPeriodicTaskTest {
 
     @Override
     public void processTable(String tableNameWithType) {
-      _numTablesProcessed.getAndIncrement();
+      _tablesProcessed.getAndIncrement();
     }
   };
 
@@ -82,7 +87,8 @@ public class ControllerPeriodicTaskTest {
     _initTaskCalled.set(false);
     _stopTaskCalled.set(false);
     _processCalled.set(false);
-    _numTablesProcessed.set(0);
+    _tablesProcessed.set(0);
+    _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED, TASK_NAME, 0);
   }
 
   @Test
@@ -102,16 +108,21 @@ public class ControllerPeriodicTaskTest {
     _task.init();
     assertTrue(_initTaskCalled.get());
     assertFalse(_processCalled.get());
-    assertEquals(_numTablesProcessed.get(), 0);
+    assertEquals(_tablesProcessed.get(), 0);
     assertFalse(_stopTaskCalled.get());
     assertFalse(_task.shouldStopPeriodicTask());
+    assertEquals(
+        _controllerMetrics.getValueOfGlobalGauge(ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED, TASK_NAME), 0);
 
     // run task - leadership gained
     resetState();
     _task.run();
     assertFalse(_initTaskCalled.get());
     assertTrue(_processCalled.get());
-    assertEquals(_numTablesProcessed.get(), _numTables);
+    assertEquals(_tablesProcessed.get(), _numTables);
+    assertEquals(
+        _controllerMetrics.getValueOfGlobalGauge(ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED, TASK_NAME),
+        _numTables);
     assertFalse(_stopTaskCalled.get());
     assertFalse(_task.shouldStopPeriodicTask());
 
@@ -120,7 +131,9 @@ public class ControllerPeriodicTaskTest {
     _task.stop();
     assertFalse(_initTaskCalled.get());
     assertFalse(_processCalled.get());
-    assertEquals(_numTablesProcessed.get(), 0);
+    assertEquals(_tablesProcessed.get(), 0);
+    assertEquals(
+        _controllerMetrics.getValueOfGlobalGauge(ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED, TASK_NAME), 0);
     assertTrue(_stopTaskCalled.get());
     assertTrue(_task.shouldStopPeriodicTask());
 
@@ -130,16 +143,18 @@ public class ControllerPeriodicTaskTest {
     assertFalse(_task.shouldStopPeriodicTask());
     assertFalse(_initTaskCalled.get());
     assertTrue(_processCalled.get());
-    assertEquals(_numTablesProcessed.get(), _numTables);
+    assertEquals(_tablesProcessed.get(), _numTables);
+    assertEquals(
+        _controllerMetrics.getValueOfGlobalGauge(ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED, TASK_NAME),
+        _numTables);
     assertFalse(_stopTaskCalled.get());
-
   }
 
   private class MockControllerPeriodicTask extends ControllerPeriodicTask {
 
     public MockControllerPeriodicTask(String taskName, long runFrequencyInSeconds, long initialDelayInSeconds,
-        PinotHelixResourceManager pinotHelixResourceManager) {
-      super(taskName, runFrequencyInSeconds, initialDelayInSeconds, pinotHelixResourceManager);
+        PinotHelixResourceManager pinotHelixResourceManager, ControllerMetrics controllerMetrics) {
+      super(taskName, runFrequencyInSeconds, initialDelayInSeconds, pinotHelixResourceManager, controllerMetrics);
     }
 
     @Override
@@ -149,7 +164,6 @@ public class ControllerPeriodicTaskTest {
 
     @Override
     protected void preprocess() {
-
     }
 
     @Override
@@ -159,9 +173,12 @@ public class ControllerPeriodicTaskTest {
 
     @Override
     public void postprocess() {
-
     }
 
+    @Override
+    public void exceptionHandler(String tableNameWithType, Exception e) {
+
+    }
 
     @Override
     public void stopTask() {

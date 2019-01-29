@@ -60,7 +60,8 @@ public final class OnHeapBitmapInvertedIndexCreator implements InvertedIndexCrea
   }
 
   @Override
-  public void seal() throws IOException {
+  public void seal()
+      throws IOException {
     try (DataOutputStream out = new DataOutputStream(
         new BufferedOutputStream(new FileOutputStream(_invertedIndexFile)))) {
       // Write bitmap offsets

@@ -29,8 +29,7 @@ public class ChunkCompressorFactory {
   }
 
   public enum CompressionType {
-    PASS_THROUGH(0),
-    SNAPPY(1);
+    PASS_THROUGH(0), SNAPPY(1);
 
     private final int _value;
 

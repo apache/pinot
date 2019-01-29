@@ -40,8 +40,8 @@ public class SelectingFutureTest {
   /**
    * 3 futures. Happy path. we got response from the first future
    * @throws Exception
-   */
-  public void testMultiFutureComposite1() throws Exception {
+   */ public void testMultiFutureComposite1()
+      throws Exception {
     List<ServerInstance> keys = new ArrayList<>();
     int numFutures = 3;
     List<ServerResponseFuture<String>> futureList = new ArrayList<>();
@@ -93,8 +93,8 @@ public class SelectingFutureTest {
   /**
    * 3 futures. we got errors from all the futures
    * @throws Exception
-   */
-  public void testMultiFutureComposite2() throws Exception {
+   */ public void testMultiFutureComposite2()
+      throws Exception {
     List<ServerInstance> keys = new ArrayList<>();
     int numFutures = 3;
     List<ServerResponseFuture<String>> futureList = new ArrayList<>();
@@ -149,8 +149,8 @@ public class SelectingFutureTest {
    * 3 futures. we got errors from first future, response from second future and error from the 3rd future.
    * The composite future should have second future and no error.
    * @throws Exception
-   */
-  public void testMultiFutureComposite3() throws Exception {
+   */ public void testMultiFutureComposite3()
+      throws Exception {
     List<ServerInstance> keys = new ArrayList<>();
     int numFutures = 3;
     List<ServerResponseFuture<String>> futureList = new ArrayList<>();
@@ -225,11 +225,13 @@ public class SelectingFutureTest {
       _future = f;
     }
 
-    public void waitForAboutToGet() throws InterruptedException {
+    public void waitForAboutToGet()
+        throws InterruptedException {
       _latch.await();
     }
 
-    public void waitForDone() throws InterruptedException {
+    public void waitForDone()
+        throws InterruptedException {
       _endLatch.await();
     }
 

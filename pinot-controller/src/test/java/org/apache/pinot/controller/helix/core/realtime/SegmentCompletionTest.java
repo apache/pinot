@@ -57,11 +57,13 @@ public class SegmentCompletionTest {
   private final long s3Offset = 30L;
 
   @BeforeMethod
-  public void testCaseSetup() throws Exception {
+  public void testCaseSetup()
+      throws Exception {
     testCaseSetup(true, true);
   }
 
-  public void testCaseSetup(boolean isLeader, boolean isConnected) throws Exception {
+  public void testCaseSetup(boolean isLeader, boolean isConnected)
+      throws Exception {
     segmentManager = new MockPinotLLCRealtimeSegmentManager();
     final int partitionId = 23;
     final int seqId = 12;
@@ -79,26 +81,28 @@ public class SegmentCompletionTest {
 
     Field fsmMapField = SegmentCompletionManager.class.getDeclaredField("_fsmMap");
     fsmMapField.setAccessible(true);
-    fsmMap = (Map<String, Object>)fsmMapField.get(segmentCompletionMgr);
+    fsmMap = (Map<String, Object>) fsmMapField.get(segmentCompletionMgr);
 
     Field ctMapField = SegmentCompletionManager.class.getDeclaredField("_commitTimeMap");
     ctMapField.setAccessible(true);
-    commitTimeMap = (Map<String, Long>)ctMapField.get(segmentCompletionMgr);
+    commitTimeMap = (Map<String, Long>) ctMapField.get(segmentCompletionMgr);
   }
 
   // Simulate a new controller taking over with an empty completion manager object,
   // but segment metadata is fine in zk
-  private void replaceSegmentCompletionManager() throws Exception {
+  private void replaceSegmentCompletionManager()
+      throws Exception {
     long oldSecs = segmentCompletionMgr._secconds;
     segmentCompletionMgr = new MockSegmentCompletionManager(segmentManager, true, true);
     segmentCompletionMgr._secconds = oldSecs;
     Field fsmMapField = SegmentCompletionManager.class.getDeclaredField("_fsmMap");
     fsmMapField.setAccessible(true);
-    fsmMap = (Map<String, Object>)fsmMapField.get(segmentCompletionMgr);
+    fsmMap = (Map<String, Object>) fsmMapField.get(segmentCompletionMgr);
   }
 
   @Test
-  public void testStoppedConsumeDuringCompletion() throws Exception {
+  public void testStoppedConsumeDuringCompletion()
+      throws Exception {
     SegmentCompletionProtocol.Response response;
     Request.Params params;
     final String reason = "IAmLazy";
@@ -115,7 +119,8 @@ public class SegmentCompletionTest {
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.HOLD);
     // s3 sends offset of 30, gets catchup to 40
     segmentCompletionMgr._secconds += 1;
-    params = new Request.Params().withInstanceId(s3).withOffset(s3Offset).withSegmentName(segmentNameStr).withReason(reason);
+    params =
+        new Request.Params().withInstanceId(s3).withOffset(s3Offset).withSegmentName(segmentNameStr).withReason(reason);
     response = segmentCompletionMgr.segmentStoppedConsuming(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.PROCESSED);
     Assert.assertEquals(new LLCSegmentName(segmentNameStr), segmentManager._stoppedSegmentName);
@@ -163,14 +168,15 @@ public class SegmentCompletionTest {
   }
 
   @Test
-  public void testStoppedConsumeBeforeHold() throws Exception {
+  public void testStoppedConsumeBeforeHold()
+      throws Exception {
     SegmentCompletionProtocol.Response response;
     Request.Params params;
     final String reason = "IAmLazy";
     // s1 stops consuming at t = 5;
     segmentCompletionMgr._secconds = 5;
-    params = new Request.Params().withInstanceId(s1).withOffset(s1Offset).withSegmentName(segmentNameStr).withReason(
-        reason);
+    params =
+        new Request.Params().withInstanceId(s1).withOffset(s1Offset).withSegmentName(segmentNameStr).withReason(reason);
     response = segmentCompletionMgr.segmentStoppedConsuming(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.PROCESSED);
     Assert.assertEquals(new LLCSegmentName(segmentNameStr), segmentManager._stoppedSegmentName);
@@ -232,12 +238,14 @@ public class SegmentCompletionTest {
 
   // s2 sends stoppedConsuming message, but then may have gotten restarted, so eventually we complete the segment.
   @Test
-  public void testHappyPathAfterStoppedConsuming() throws Exception {
+  public void testHappyPathAfterStoppedConsuming()
+      throws Exception {
     SegmentCompletionProtocol.Response response;
     Request.Params params;
     segmentCompletionMgr._secconds = 5;
 
-    params = new Request.Params().withInstanceId(s2).withOffset(s2Offset).withSegmentName(segmentNameStr).withReason("some reason");
+    params = new Request.Params().withInstanceId(s2).withOffset(s2Offset).withSegmentName(segmentNameStr)
+        .withReason("some reason");
     response = segmentCompletionMgr.segmentStoppedConsuming(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.PROCESSED);
     Assert.assertEquals(new LLCSegmentName(segmentNameStr), segmentManager._stoppedSegmentName);
@@ -249,18 +257,21 @@ public class SegmentCompletionTest {
   }
 
   @Test
-  public void testHappyPath() throws Exception {
+  public void testHappyPath()
+      throws Exception {
     testHappyPath(5L);
   }
 
   // Tests happy path with split commit protocol
   @Test
-  public void testHappyPathSplitCommit() throws Exception {
+  public void testHappyPathSplitCommit()
+      throws Exception {
     testHappyPathSplitCommit(5L);
   }
 
   @Test
-  public void testExceptionInConsumedMessage() throws Exception {
+  public void testExceptionInConsumedMessage()
+      throws Exception {
     segmentManager._segmentMetadata = null;
 
     SegmentCompletionProtocol.Response response;
@@ -273,7 +284,8 @@ public class SegmentCompletionTest {
 
   // When commit segment file fails, makes sure the fsm aborts and that a segment can successfully commit afterwards.
   @Test
-  public void testCommitSegmentFileFail() throws  Exception {
+  public void testCommitSegmentFileFail()
+      throws Exception {
     SegmentCompletionProtocol.Response response;
     Request.Params params;
     // s1 sends offset of 20, gets HOLD at t = 5s;
@@ -316,7 +328,8 @@ public class SegmentCompletionTest {
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_CONTINUE);
     // s2's file does not successfully commit
     segmentCompletionMgr._secconds += 5;
-    params = new Request.Params().withInstanceId(s2).withOffset(s2Offset).withSegmentName(segmentNameStr).withSegmentLocation("doNotCommitMe");
+    params = new Request.Params().withInstanceId(s2).withOffset(s2Offset).withSegmentName(segmentNameStr)
+        .withSegmentLocation("doNotCommitMe");
     response = segmentCompletionMgr.segmentCommitEnd(params, true, true);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.FAILED);
 
@@ -348,14 +361,16 @@ public class SegmentCompletionTest {
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_CONTINUE);
     // s2's file successfully commits
     segmentCompletionMgr._secconds += 5;
-    params = new Request.Params().withInstanceId(s3).withOffset(s2Offset).withSegmentName(segmentNameStr).withSegmentLocation("location");
+    params = new Request.Params().withInstanceId(s3).withOffset(s2Offset).withSegmentName(segmentNameStr)
+        .withSegmentLocation("location");
     response = segmentCompletionMgr.segmentCommitEnd(params, true, true);
     Assert.assertEquals(response.getStatus(), ControllerResponseStatus.COMMIT_SUCCESS);
     // And the FSM should be removed.
     Assert.assertFalse(fsmMap.containsKey(segmentNameStr));
   }
 
-  public void testHappyPathSplitCommit(long startTime) throws  Exception {
+  public void testHappyPathSplitCommit(long startTime)
+      throws Exception {
     SegmentCompletionProtocol.Response response;
     Request.Params params;
     // s1 sends offset of 20, gets HOLD at t = 5s;
@@ -398,7 +413,8 @@ public class SegmentCompletionTest {
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_CONTINUE);
 
     segmentCompletionMgr._secconds += 5;
-    params = new Request.Params().withInstanceId(s2).withOffset(s2Offset).withSegmentName(segmentNameStr).withSegmentLocation("location");
+    params = new Request.Params().withInstanceId(s2).withOffset(s2Offset).withSegmentName(segmentNameStr)
+        .withSegmentLocation("location");
     response = segmentCompletionMgr.segmentCommitEnd(params, true, true);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS);
 
@@ -417,7 +433,8 @@ public class SegmentCompletionTest {
 
   // Tests that we abort when the server instance comes back with a different offset than it is told to commit with
   @Test
-  public void testCommitDifferentOffsetSplitCommit() throws Exception {
+  public void testCommitDifferentOffsetSplitCommit()
+      throws Exception {
     SegmentCompletionProtocol.Response response;
     Request.Params params;
     // s1 sends offset of 20, gets HOLD at t = 5s;
@@ -445,7 +462,8 @@ public class SegmentCompletionTest {
 
     // s3 comes back to try to commit with a different offset
     segmentCompletionMgr._secconds += 5;
-    params = new Request.Params().withInstanceId(s3).withOffset(s3Offset).withSegmentName(segmentNameStr).withSegmentLocation("location");
+    params = new Request.Params().withInstanceId(s3).withOffset(s3Offset).withSegmentName(segmentNameStr)
+        .withSegmentLocation("location");
     response = segmentCompletionMgr.segmentCommitEnd(params, true, true);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.FAILED);
 
@@ -462,7 +480,8 @@ public class SegmentCompletionTest {
     Assert.assertTrue(fsmMap.containsKey(segmentNameStr));
   }
 
-  public void testHappyPath(long startTime) throws  Exception {
+  public void testHappyPath(long startTime)
+      throws Exception {
     SegmentCompletionProtocol.Response response;
     Request.Params params;
     // s1 sends offset of 20, gets HOLD at t = 5s;
@@ -521,21 +540,22 @@ public class SegmentCompletionTest {
   }
 
   @Test
-  public void testControllerNotConnected() throws Exception {
+  public void testControllerNotConnected()
+      throws Exception {
     testCaseSetup(true, false); // Leader but not connected
     SegmentCompletionProtocol.Response response;
     Request.Params params;
     // s1 sends offset of 20, gets HOLD at t = 5s;
     segmentCompletionMgr._secconds = 5L;
     params = new Request.Params().withInstanceId(s1).withOffset(s1Offset).withSegmentName(segmentNameStr)
-    .withReason("rowLimit");
+        .withReason("rowLimit");
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), ControllerResponseStatus.NOT_LEADER);
-
   }
 
   @Test
-  public void testWinnerOnTimeLimit() throws Exception {
+  public void testWinnerOnTimeLimit()
+      throws Exception {
     SegmentCompletionProtocol.Response response;
     Request.Params params;
     segmentCompletionMgr._secconds = 10L;
@@ -546,7 +566,8 @@ public class SegmentCompletionTest {
   }
 
   @Test
-  public void testWinnerOnRowLimit() throws Exception {
+  public void testWinnerOnRowLimit()
+      throws Exception {
     SegmentCompletionProtocol.Response response;
     Request.Params params;
     segmentCompletionMgr._secconds = 10L;
@@ -590,16 +611,19 @@ public class SegmentCompletionTest {
 
   // Tests that when server is delayed(Stalls for a hour), when server comes back, we commit successfully.
   @Test
-  public void testDelayedServerSplitCommit() throws Exception {
+  public void testDelayedServerSplitCommit()
+      throws Exception {
     testDelayedServer(true);
   }
 
   @Test
-  public void testDelayedServer() throws Exception {
+  public void testDelayedServer()
+      throws Exception {
     testDelayedServer(false);
   }
 
-  public void testDelayedServer(boolean isSplitCommit) throws Exception {
+  public void testDelayedServer(boolean isSplitCommit)
+      throws Exception {
     SegmentCompletionProtocol.Response response;
     Request.Params params;
     // s1 sends offset of 20, gets HOLD at t = 5s;
@@ -619,7 +643,7 @@ public class SegmentCompletionTest {
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.HOLD);
     // s2 is asked to commit.
-    segmentCompletionMgr._secconds += SegmentCompletionProtocol.MAX_HOLD_TIME_MS/1000;
+    segmentCompletionMgr._secconds += SegmentCompletionProtocol.MAX_HOLD_TIME_MS / 1000;
     params = new Request.Params().withInstanceId(s2).withOffset(s2Offset).withSegmentName(segmentNameStr);
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT);
@@ -635,7 +659,8 @@ public class SegmentCompletionTest {
     response = segmentCompletionMgr.segmentCommitStart(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_CONTINUE);
     segmentCompletionMgr._secconds += 5;
-    params = new Request.Params().withInstanceId(s2).withOffset(s2Offset).withSegmentName(segmentNameStr).withSegmentLocation("location");
+    params = new Request.Params().withInstanceId(s2).withOffset(s2Offset).withSegmentName(segmentNameStr)
+        .withSegmentLocation("location");
     response = segmentCompletionMgr.segmentCommitEnd(params, true, isSplitCommit);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS);
     // Now the FSM should have disappeared from the map
@@ -652,7 +677,8 @@ public class SegmentCompletionTest {
 
   // We test the case where all servers go silent after controller asks one of them commit
   @Test
-  public void testDeadServers() throws Exception {
+  public void testDeadServers()
+      throws Exception {
     SegmentCompletionProtocol.Response response;
     Request.Params params;
     // s1 sends offset of 20, gets HOLD at t = 5s;
@@ -699,7 +725,8 @@ public class SegmentCompletionTest {
 
   // We test the case when the committer is asked to commit, but they never come back.
   @Test
-  public void testCommitterFailure() throws Exception {
+  public void testCommitterFailure()
+      throws Exception {
     SegmentCompletionProtocol.Response response;
     Request.Params params;
     // s1 sends offset of 20, gets HOLD at t = 5s;
@@ -726,7 +753,7 @@ public class SegmentCompletionTest {
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT);
 
     // Time passes, s2 never comes back.
-    segmentCompletionMgr._secconds += SegmentCompletionProtocol.MAX_HOLD_TIME_MS/1000;
+    segmentCompletionMgr._secconds += SegmentCompletionProtocol.MAX_HOLD_TIME_MS / 1000;
 
     // But since s1 and s3 are in HOLDING state, they should come back again. s1 is asked to catchup
     params = new Request.Params().withInstanceId(s1).withOffset(s1Offset).withSegmentName(segmentNameStr);
@@ -734,7 +761,8 @@ public class SegmentCompletionTest {
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.CATCH_UP);
 
     // Max time to commit passes
-    segmentCompletionMgr._secconds += SegmentCompletionProtocol.getMaxSegmentCommitTimeMs() * SegmentCompletionProtocol.MAX_HOLD_TIME_MS/1000;
+    segmentCompletionMgr._secconds +=
+        SegmentCompletionProtocol.getMaxSegmentCommitTimeMs() * SegmentCompletionProtocol.MAX_HOLD_TIME_MS / 1000;
 
     // s1 comes back with the updated offset, since it was asked to catch up.
     // The FSM will be aborted, and destroyed ...
@@ -767,7 +795,8 @@ public class SegmentCompletionTest {
   }
 
   @Test
-  public void testHappyPathSlowCommit() throws Exception {
+  public void testHappyPathSlowCommit()
+      throws Exception {
     SegmentCompletionProtocol.Response response;
     Request.Params params;
     // s1 sends offset of 20, gets HOLD at t = 1509242466s;
@@ -804,15 +833,16 @@ public class SegmentCompletionTest {
 
     // Fast forward to one second before commit time, and send a lease renewal request for 20s
     segmentCompletionMgr._secconds = startTime + commitTimeSec - 1;
-    params = new Request.Params().withInstanceId(s2).withOffset(s2Offset).withSegmentName(segmentNameStr).withExtraTimeSec(20);
+    params = new Request.Params().withInstanceId(s2).withOffset(s2Offset).withSegmentName(segmentNameStr)
+        .withExtraTimeSec(20);
     response = segmentCompletionMgr.extendBuildTime(params);
     Assert.assertEquals(response.getStatus(), ControllerResponseStatus.PROCESSED);
     Assert.assertTrue((fsmMap.containsKey(segmentNameStr)));
 
     // Another lease extension in 19s.
     segmentCompletionMgr._secconds += 19;
-    params = new Request.Params().withInstanceId(s2).withOffset(s2Offset).withSegmentName(segmentNameStr).withExtraTimeSec(
-        20);
+    params = new Request.Params().withInstanceId(s2).withOffset(s2Offset).withSegmentName(segmentNameStr)
+        .withExtraTimeSec(20);
     response = segmentCompletionMgr.extendBuildTime(params);
     Assert.assertEquals(response.getStatus(), ControllerResponseStatus.PROCESSED);
     Assert.assertTrue((fsmMap.containsKey(segmentNameStr)));
@@ -832,8 +862,8 @@ public class SegmentCompletionTest {
   }
 
   @Test
-  public void testFailedSlowCommit() throws Exception
-  {
+  public void testFailedSlowCommit()
+      throws Exception {
     SegmentCompletionProtocol.Response response;
     Request.Params params;
     final String tableName = new LLCSegmentName(segmentNameStr).getTableName();
@@ -869,8 +899,8 @@ public class SegmentCompletionTest {
 
     // Fast forward to one second before commit time, and send a lease renewal request for 20s
     segmentCompletionMgr._secconds = startTime + commitTimeSec - 1;
-    params = new Request.Params().withInstanceId(s2).withOffset(s2Offset).withSegmentName(segmentNameStr).withExtraTimeSec(
-        20);
+    params = new Request.Params().withInstanceId(s2).withOffset(s2Offset).withSegmentName(segmentNameStr)
+        .withExtraTimeSec(20);
     response = segmentCompletionMgr.extendBuildTime(params);
     Assert.assertEquals(response.getStatus(), ControllerResponseStatus.PROCESSED);
     Assert.assertTrue((fsmMap.containsKey(segmentNameStr)));
@@ -886,7 +916,8 @@ public class SegmentCompletionTest {
   }
 
   @Test
-  public void testLeaseTooLong() throws Exception {
+  public void testLeaseTooLong()
+      throws Exception {
     SegmentCompletionProtocol.Response response;
     Request.Params params;
     // s1 sends offset of 20, gets HOLD at t = 5s;
@@ -921,17 +952,18 @@ public class SegmentCompletionTest {
 
     // Fast forward to one second before commit time, and send a lease renewal request for 20s
     segmentCompletionMgr._secconds = startTime + commitTimeSec - 1;
-    params = new Request.Params().withInstanceId(s2).withOffset(s2Offset).withSegmentName(segmentNameStr).withExtraTimeSec(
-        20);
+    params = new Request.Params().withInstanceId(s2).withOffset(s2Offset).withSegmentName(segmentNameStr)
+        .withExtraTimeSec(20);
     response = segmentCompletionMgr.extendBuildTime(params);
     Assert.assertEquals(response.getStatus(), ControllerResponseStatus.PROCESSED);
     Assert.assertTrue((fsmMap.containsKey(segmentNameStr)));
 
     final int leaseTimeSec = 20;
     // Lease will not be granted if the time taken so far plus lease time exceeds the max allowabale.
-    while (segmentCompletionMgr._secconds + leaseTimeSec <= startTime + SegmentCompletionManager.getMaxCommitTimeForAllSegmentsSeconds()) {
-      params = new Request.Params().withInstanceId(s2).withOffset(s2Offset).withSegmentName(segmentNameStr).withExtraTimeSec(
-          leaseTimeSec);
+    while (segmentCompletionMgr._secconds + leaseTimeSec <= startTime + SegmentCompletionManager
+        .getMaxCommitTimeForAllSegmentsSeconds()) {
+      params = new Request.Params().withInstanceId(s2).withOffset(s2Offset).withSegmentName(segmentNameStr)
+          .withExtraTimeSec(leaseTimeSec);
       response = segmentCompletionMgr.extendBuildTime(params);
       Assert.assertEquals(response.getStatus(), ControllerResponseStatus.PROCESSED);
       Assert.assertTrue((fsmMap.containsKey(segmentNameStr)));
@@ -940,15 +972,15 @@ public class SegmentCompletionTest {
 
     // Now the lease request should fail.
     params = new Request.Params().withInstanceId(s2).withOffset(s2Offset).withSegmentName(segmentNameStr)
-        .withExtraTimeSec(
-        leaseTimeSec);
+        .withExtraTimeSec(leaseTimeSec);
     response = segmentCompletionMgr.extendBuildTime(params);
     Assert.assertEquals(response.getStatus(), ControllerResponseStatus.FAILED);
     Assert.assertFalse((fsmMap.containsKey(segmentNameStr)));
   }
 
   @Test
-  public void testControllerFailureDuringCommit() throws Exception {
+  public void testControllerFailureDuringCommit()
+      throws Exception {
     SegmentCompletionProtocol.Response response;
     Request.Params params;
     // s1 sends offset of 20, gets HOLD at t = 5s;
@@ -1007,7 +1039,8 @@ public class SegmentCompletionTest {
   // Tests that when controller fails, after controller failure, commit doesn't continue. Then because all server instances
   // are in holding state, we will ask one to commit.
   @Test
-  public void testControllerFailureDuringSplitCommit() throws Exception {
+  public void testControllerFailureDuringSplitCommit()
+      throws Exception {
     SegmentCompletionProtocol.Response response;
     Request.Params params;
     // s1 sends offset of 20, gets HOLD at t = 5s;
@@ -1058,13 +1091,15 @@ public class SegmentCompletionTest {
     Assert.assertTrue(response.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.HOLD));
 
     // So s2 goes back into HOLDING state. s1 and s3 are already holding, so now it will get COMMIT back.
-    params = new Request.Params().withInstanceId(s2).withOffset(s2Offset).withSegmentName(segmentNameStr).withSegmentLocation("location");
+    params = new Request.Params().withInstanceId(s2).withOffset(s2Offset).withSegmentName(segmentNameStr)
+        .withSegmentLocation("location");
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT);
   }
 
   @Test
-  public void testNotLeader() throws Exception {
+  public void testNotLeader()
+      throws Exception {
     testCaseSetup(false, true);
     SegmentCompletionProtocol.Response response;
     SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
@@ -1098,16 +1133,18 @@ public class SegmentCompletionTest {
     }
 
     @Override
-    public LLCRealtimeSegmentZKMetadata getRealtimeSegmentZKMetadata(String realtimeTableName, String segmentName, Stat stat) {
+    public LLCRealtimeSegmentZKMetadata getRealtimeSegmentZKMetadata(String realtimeTableName, String segmentName,
+        Stat stat) {
       return _segmentMetadata;
     }
 
     @Override
-         public boolean commitSegmentMetadata(String rawTableName, CommittingSegmentDescriptor committingSegmentDescriptor) {
+    public boolean commitSegmentMetadata(String rawTableName, CommittingSegmentDescriptor committingSegmentDescriptor) {
       _segmentMetadata.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
       _segmentMetadata.setEndOffset(committingSegmentDescriptor.getNextOffset());
-      _segmentMetadata.setDownloadUrl(
-          ControllerConf.constructDownloadUrl(rawTableName, committingSegmentDescriptor.getSegmentName(), CONTROLLER_CONF.generateVipUrl()));
+      _segmentMetadata.setDownloadUrl(ControllerConf
+          .constructDownloadUrl(rawTableName, committingSegmentDescriptor.getSegmentName(),
+              CONTROLLER_CONF.generateVipUrl()));
       _segmentMetadata.setEndTime(_segmentCompletionMgr.getCurrentTimeMs());
       return true;
     }
@@ -1136,11 +1173,14 @@ public class SegmentCompletionTest {
   public static class MockSegmentCompletionManager extends SegmentCompletionManager {
     public long _secconds;
     private boolean _isLeader;
+
     protected MockSegmentCompletionManager(PinotLLCRealtimeSegmentManager segmentManager, boolean isLeader,
         boolean isConnected) {
-      super(createMockHelixManager(isLeader, isConnected), segmentManager, new ControllerMetrics(new MetricsRegistry()));
+      super(createMockHelixManager(isLeader, isConnected), segmentManager,
+          new ControllerMetrics(new MetricsRegistry()));
       _isLeader = isLeader;
     }
+
     @Override
     protected long getCurrentTimeMs() {
       return _secconds * 1000L;

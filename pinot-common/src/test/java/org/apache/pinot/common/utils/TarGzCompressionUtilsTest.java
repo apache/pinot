@@ -67,7 +67,6 @@ public class TarGzCompressionUtilsTest {
     }
   }
 
-
   @Test
   public void testBasic()
       throws IOException, InterruptedException, ArchiveException {
@@ -127,11 +126,11 @@ public class TarGzCompressionUtilsTest {
     File[] segmentFiles = segments[0].listFiles();
     Assert.assertNotNull(segmentFiles);
     Assert.assertEquals(segmentFiles.length, 0);
-
   }
 
   @Test
-  public void testBadFilePath() throws Exception {
+  public void testBadFilePath()
+      throws Exception {
     File metaFile = new File(segmentDir, "metadata.properties");
     metaFile.createNewFile();
 
@@ -151,16 +150,14 @@ public class TarGzCompressionUtilsTest {
   }
 
   private void createInvalidTarFile(File nonDirFile, File tarGzPath) {
-    try (
-        FileOutputStream fOut = new FileOutputStream(new File(tarGzPath.getPath()));
+    try (FileOutputStream fOut = new FileOutputStream(new File(tarGzPath.getPath()));
         BufferedOutputStream bOut = new BufferedOutputStream(fOut);
         GzipCompressorOutputStream gzOut = new GzipCompressorOutputStream(bOut);
-        TarArchiveOutputStream tOut = new TarArchiveOutputStream(gzOut)
-    ) {
+        TarArchiveOutputStream tOut = new TarArchiveOutputStream(gzOut)) {
       tOut.setLongFileMode(TarArchiveOutputStream.LONGFILE_GNU);
 
       // Mock the file that doesn't use the correct file name.
-      String badEntryName =  "../foo/bar";
+      String badEntryName = "../foo/bar";
       TarArchiveEntry tarEntry = new TarArchiveEntry(nonDirFile, badEntryName);
       tOut.putArchiveEntry(tarEntry);
       IOUtils.copy(new FileInputStream(nonDirFile), tOut);

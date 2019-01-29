@@ -72,7 +72,8 @@ public class SegmentCreationJob extends Configured {
   private String[] _hosts;
   private int _port;
 
-  public SegmentCreationJob(String jobName, Properties properties) throws Exception {
+  public SegmentCreationJob(String jobName, Properties properties)
+      throws Exception {
     super(new Configuration());
     getConf().set("mapreduce.job.user.classpath.first", "true");
     _jobName = jobName;
@@ -129,7 +130,8 @@ public class SegmentCreationJob extends Configured {
 
   }
 
-  public void run() throws Exception {
+  public void run()
+      throws Exception {
     LOGGER.info("Starting {}", getClass().getSimpleName());
 
     FileSystem fs = FileSystem.get(getConf());
@@ -235,12 +237,14 @@ public class SegmentCreationJob extends Configured {
     fs.delete(new Path(_stagingDir), true);
   }
 
-  private void setDirPermission(Path directory, FsPermission permission, FileSystem fs) throws IOException {
+  private void setDirPermission(Path directory, FsPermission permission, FileSystem fs)
+      throws IOException {
     fs.setPermission(directory, permission);
     LOGGER.info("Setting permissions '{}' for directory: '{}'", permission, directory);
   }
 
-  protected void setAdditionalJobProperties(Job job) throws Exception {
+  protected void setAdditionalJobProperties(Job job)
+      throws Exception {
     // Check host and port information before set table config dependent properties
     if (_hosts == null || _port == 0) {
       LOGGER.warn("Unable to set TableConfig-dependent properties. Please set host {} ({}) and port {} ({})",
@@ -297,7 +301,8 @@ public class SegmentCreationJob extends Configured {
     job.getConfiguration().set(JobConfigConstants.SCHEMA, schema);
   }
 
-  protected void moveToOutputDirectory(FileSystem fs) throws Exception {
+  protected void moveToOutputDirectory(FileSystem fs)
+      throws Exception {
     LOGGER.info("Moving Segment Tar files from {} to: {}", _stagingDir + "/output/segmentTar", _outputDir);
     FileStatus[] segmentArr = fs.listStatus(new Path(_stagingDir + "/output/segmentTar"));
     for (FileStatus segment : segmentArr) {
@@ -310,7 +315,8 @@ public class SegmentCreationJob extends Configured {
     return job;
   }
 
-  private void addDepsJarToDistributedCache(Path path, Job job) throws IOException {
+  private void addDepsJarToDistributedCache(Path path, Job job)
+      throws IOException {
     LOGGER.info("Trying to add all the deps jar files from directory: {}", path);
     FileSystem fs = FileSystem.get(getConf());
     FileStatus[] fileStatusArr = fs.listStatus(path);
@@ -327,7 +333,8 @@ public class SegmentCreationJob extends Configured {
     }
   }
 
-  private ArrayList<FileStatus> getDataFilesFromPath(FileSystem fs, Path inBaseDir) throws IOException {
+  private ArrayList<FileStatus> getDataFilesFromPath(FileSystem fs, Path inBaseDir)
+      throws IOException {
     ArrayList<FileStatus> dataFileStatusList = new ArrayList<FileStatus>();
     FileStatus[] fileStatusArr = fs.listStatus(inBaseDir);
     for (FileStatus fileStatus : fileStatusArr) {

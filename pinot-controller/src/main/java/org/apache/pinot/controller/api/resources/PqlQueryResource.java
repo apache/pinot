@@ -86,9 +86,7 @@ public class PqlQueryResource {
 
   @GET
   @Path("pql")
-  public String get(
-      @QueryParam("pql") String pqlQuery,
-      @QueryParam("trace") String traceEnabled,
+  public String get(@QueryParam("pql") String pqlQuery, @QueryParam("trace") String traceEnabled,
       @Context HttpHeaders httpHeaders) {
     try {
       LOGGER.debug("Trace: {}, Running query: {}", traceEnabled, pqlQuery);
@@ -132,8 +130,9 @@ public class PqlQueryResource {
     String instanceId = instanceIds.get(RANDOM.nextInt(instanceIds.size()));
     InstanceConfig instanceConfig = _pinotHelixResourceManager.getHelixInstanceConfig(instanceId);
     String hostNameWithPrefix = instanceConfig.getHostName();
-    String url = "http://" + hostNameWithPrefix.substring(hostNameWithPrefix.indexOf("_") + 1) + ":"
-        + instanceConfig.getPort() + "/query";
+    String url =
+        "http://" + hostNameWithPrefix.substring(hostNameWithPrefix.indexOf("_") + 1) + ":" + instanceConfig.getPort()
+            + "/query";
     return sendPQLRaw(url, pqlQuery, traceEnabled);
   }
 
@@ -201,7 +200,8 @@ public class PqlQueryResource {
     }
   }
 
-  byte[] drain(InputStream inputStream) throws IOException {
+  byte[] drain(InputStream inputStream)
+      throws IOException {
     try {
       final byte[] buf = new byte[1024];
       int len;

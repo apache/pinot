@@ -47,8 +47,8 @@ public class CompoundTransformer implements RecordTransformer {
    * </ul>
    */
   public static CompoundTransformer getDefaultTransformer(Schema schema) {
-    return new CompoundTransformer(
-        Arrays.asList(new TimeTransformer(schema), new ExpressionTransformer(schema), new DataTypeTransformer(schema),
+    return new CompoundTransformer(Arrays
+        .asList(new TimeTransformer(schema), new ExpressionTransformer(schema), new DataTypeTransformer(schema),
             new SanitationTransformer(schema)));
   }
 

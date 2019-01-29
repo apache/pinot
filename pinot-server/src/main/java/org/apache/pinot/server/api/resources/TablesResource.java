@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.server.api.resources;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
@@ -65,10 +64,7 @@ public class TablesResource {
   @Produces(MediaType.APPLICATION_JSON)
   //swagger annotations
   @ApiOperation(value = "List tables", notes = "List all the tables on this server")
-  @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Success", response = TablesList.class),
-      @ApiResponse(code = 500, message = "Server initialization error", response = ErrorInfo.class)
-  })
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success", response = TablesList.class), @ApiResponse(code = 500, message = "Server initialization error", response = ErrorInfo.class)})
   public String listTables() {
     InstanceDataManager instanceDataManager = checkGetInstanceDataManager();
     List<String> tables = new ArrayList<>(instanceDataManager.getAllTables());
@@ -100,10 +96,7 @@ public class TablesResource {
   @Path("/tables/{tableName}/segments")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "List table segments", notes = "List segments of table hosted on this server")
-  @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Success", response = TableSegments.class),
-      @ApiResponse(code = 500, message = "Server initialization error", response = ErrorInfo.class)
-  })
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success", response = TableSegments.class), @ApiResponse(code = 500, message = "Server initialization error", response = ErrorInfo.class)})
   public String listTableSegments(
       @ApiParam(value = "Table name including type", required = true, example = "myTable_OFFLINE") @PathParam("tableName") String tableName) {
     TableDataManager tableDataManager = checkGetTableDataManager(tableName);
@@ -125,11 +118,7 @@ public class TablesResource {
   @Path("/tables/{tableName}/segments/{segmentName}/metadata")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Provide segment metadata", notes = "Provide segments metadata for the segment on server")
-  @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Success"),
-      @ApiResponse(code = 500, message = "Internal server error", response = ErrorInfo.class),
-      @ApiResponse(code = 404, message = "Table or segment not found", response = ErrorInfo.class)
-  })
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error", response = ErrorInfo.class), @ApiResponse(code = 404, message = "Table or segment not found", response = ErrorInfo.class)})
   public String getSegmentMetadata(
       @ApiParam(value = "Table name including type", required = true, example = "myTable_OFFLINE") @PathParam("tableName") String tableName,
       @ApiParam(value = "Segment name", required = true) @PathParam("segmentName") String segmentName,
@@ -164,11 +153,7 @@ public class TablesResource {
   @Path("/tables/{tableName}/segments/crc")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Provide segment crc information", notes = "Provide crc information for the segments on server")
-  @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Success"),
-      @ApiResponse(code = 500, message = "Internal server error", response = ErrorInfo.class),
-      @ApiResponse(code = 404, message = "Table or segment not found", response = ErrorInfo.class)
-  })
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error", response = ErrorInfo.class), @ApiResponse(code = 404, message = "Table or segment not found", response = ErrorInfo.class)})
   public String getCrcMetadataForTable(
       @ApiParam(value = "Table name including type", required = true, example = "myTable_OFFLINE") @PathParam("tableName") String tableName) {
     TableDataManager tableDataManager = checkGetTableDataManager(tableName);

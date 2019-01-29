@@ -54,7 +54,8 @@ public class SegmentZKMetadataCustomMapModifier {
     }
   }
 
-  public SegmentZKMetadataCustomMapModifier(@Nonnull String jsonString) throws IOException {
+  public SegmentZKMetadataCustomMapModifier(@Nonnull String jsonString)
+      throws IOException {
     JsonNode jsonNode = JsonUtils.stringToJsonNode(jsonString);
     _modifyMode = ModifyMode.valueOf(jsonNode.get(MAP_MODIFY_MODE_KEY).asText());
     JsonNode jsonMap = jsonNode.get(MAP_KEY);

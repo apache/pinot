@@ -54,7 +54,8 @@ public class BenchmarkRealtimeConsumptionSpeed extends RealtimeClusterIntegratio
     System.exit(0);
   }
 
-  private void runBenchmark() throws Exception {
+  private void runBenchmark()
+      throws Exception {
     // Start ZK and Kafka
     startZk();
     KafkaServerStartable kafkaStarter = KafkaStarterUtils
@@ -65,8 +66,8 @@ public class BenchmarkRealtimeConsumptionSpeed extends RealtimeClusterIntegratio
     KafkaStarterUtils.createTopic(getKafkaTopic(), KafkaStarterUtils.DEFAULT_ZK_STR, 10);
 
     // Unpack data (needed to get the Avro schema)
-    TarGzCompressionUtils.unTar(
-        new File(TestUtils.getFileFromResourceUrl(RealtimeClusterIntegrationTest.class.getClassLoader()
+    TarGzCompressionUtils.unTar(new File(TestUtils.getFileFromResourceUrl(
+        RealtimeClusterIntegrationTest.class.getClassLoader()
             .getResource("On_Time_On_Time_Performance_2014_100k_subset_nonulls.tar.gz"))), _tmpDir);
 
     _tmpDir.mkdirs();
@@ -91,8 +92,9 @@ public class BenchmarkRealtimeConsumptionSpeed extends RealtimeClusterIntegratio
       @Override
       public void run() {
         try {
-          ClusterIntegrationTestUtils.pushRandomAvroIntoKafka(avroFiles.get(0), KafkaStarterUtils.DEFAULT_KAFKA_BROKER,
-              getKafkaTopic(), ROW_COUNT, getMaxNumKafkaMessagesPerBatch(), getKafkaMessageHeader(), getPartitionColumn());
+          ClusterIntegrationTestUtils
+              .pushRandomAvroIntoKafka(avroFiles.get(0), KafkaStarterUtils.DEFAULT_KAFKA_BROKER, getKafkaTopic(),
+                  ROW_COUNT, getMaxNumKafkaMessagesPerBatch(), getKafkaMessageHeader(), getPartitionColumn());
         } catch (Exception e) {
           // Ignored
         }

@@ -32,7 +32,8 @@ import org.testng.annotations.Test;
 public class AvroRecordToPinotRowGeneratorTest {
 
   @Test
-  public void testIncomingTimeColumn() throws Exception {
+  public void testIncomingTimeColumn()
+      throws Exception {
     List<Schema.Field> avroFields =
         Collections.singletonList(new Schema.Field("incomingTime", Schema.create(Schema.Type.LONG), null, null));
     Schema avroSchema = Schema.createRecord(avroFields);
@@ -42,8 +43,7 @@ public class AvroRecordToPinotRowGeneratorTest {
     org.apache.pinot.common.data.Schema pinotSchema =
         new org.apache.pinot.common.data.Schema.SchemaBuilder().setSchemaName("testSchema")
             .addTime("incomingTime", TimeUnit.MILLISECONDS, FieldSpec.DataType.LONG, "outgoingTime", TimeUnit.DAYS,
-                FieldSpec.DataType.INT)
-            .build();
+                FieldSpec.DataType.INT).build();
 
     AvroRecordToPinotRowGenerator avroRecordToPinotRowGenerator = new AvroRecordToPinotRowGenerator(pinotSchema);
     GenericRow genericRow = new GenericRow();

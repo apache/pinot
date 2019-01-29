@@ -37,14 +37,12 @@ public class RecordTransformerTest {
       .addSingleValueDimension("svFloat", FieldSpec.DataType.FLOAT)
       .addSingleValueDimension("svDouble", FieldSpec.DataType.DOUBLE)
       .addSingleValueDimension("svBytes", FieldSpec.DataType.BYTES)
-      .addMultiValueDimension("mvInt", FieldSpec.DataType.INT)
-      .addMultiValueDimension("mvLong", FieldSpec.DataType.LONG)
+      .addMultiValueDimension("mvInt", FieldSpec.DataType.INT).addMultiValueDimension("mvLong", FieldSpec.DataType.LONG)
       .addMultiValueDimension("mvFloat", FieldSpec.DataType.FLOAT)
       .addMultiValueDimension("mvDouble", FieldSpec.DataType.DOUBLE)
       // For sanitation
       .addSingleValueDimension("svStringWithNullCharacters", FieldSpec.DataType.STRING)
-      .addSingleValueDimension("svStringWithLengthLimit", FieldSpec.DataType.STRING)
-      .build();
+      .addSingleValueDimension("svStringWithLengthLimit", FieldSpec.DataType.STRING).build();
 
   static {
     SCHEMA.getFieldSpecFor("svStringWithLengthLimit").setMaxLength(2);

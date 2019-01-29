@@ -225,8 +225,8 @@ public class PerfBenchmarkDriver {
     }
     Configuration serverConfiguration = new PropertiesConfiguration();
     serverConfiguration.addProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_DATA_DIR, _serverInstanceDataDir);
-    serverConfiguration.addProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR,
-        _serverInstanceSegmentTarDir);
+    serverConfiguration
+        .addProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR, _serverInstanceSegmentTarDir);
     if (_segmentFormatVersion != null) {
       serverConfiguration.setProperty(CommonConstants.Server.CONFIG_OF_SEGMENT_FORMAT_VERSION, _segmentFormatVersion);
     }
@@ -245,10 +245,9 @@ public class PerfBenchmarkDriver {
     _helixResourceManager.createBrokerTenant(brokerTenant);
 
     // Create server tenant.
-    Tenant serverTenant = new TenantBuilder(_serverTenantName).setRole(TenantRole.SERVER)
-        .setTotalInstances(1)
-        .setOfflineInstances(1)
-        .build();
+    Tenant serverTenant =
+        new TenantBuilder(_serverTenantName).setRole(TenantRole.SERVER).setTotalInstances(1).setOfflineInstances(1)
+            .build();
     _helixResourceManager.createServerTenant(serverTenant);
   }
 
@@ -270,19 +269,15 @@ public class PerfBenchmarkDriver {
   public void configureTable(String tableName, List<String> invertedIndexColumns, List<String> bloomFilterColumns)
       throws Exception {
     TableConfig tableConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(tableName)
-        .setSegmentAssignmentStrategy(_segmentAssignmentStrategy)
-        .setNumReplicas(_numReplicas)
-        .setBrokerTenant(_brokerTenantName)
-        .setServerTenant(_serverTenantName)
-        .setLoadMode(_loadMode)
-        .setSegmentVersion(_segmentFormatVersion)
-        .setInvertedIndexColumns(invertedIndexColumns)
-        .setBloomFilterColumns(bloomFilterColumns)
-        .build();
+        .setSegmentAssignmentStrategy(_segmentAssignmentStrategy).setNumReplicas(_numReplicas)
+        .setBrokerTenant(_brokerTenantName).setServerTenant(_serverTenantName).setLoadMode(_loadMode)
+        .setSegmentVersion(_segmentFormatVersion).setInvertedIndexColumns(invertedIndexColumns)
+        .setBloomFilterColumns(bloomFilterColumns).build();
     _helixResourceManager.addTable(tableConfig);
   }
 
-  private void uploadIndexSegments() throws Exception {
+  private void uploadIndexSegments()
+      throws Exception {
     if (!_conf.isUploadIndexes()) {
       LOGGER.info("Skipping upload index segments step.");
       return;
@@ -305,7 +300,8 @@ public class PerfBenchmarkDriver {
    * @param segmentMetadata segment metadata.
    */
   public void addSegment(SegmentMetadata segmentMetadata) {
-    _helixResourceManager.addNewSegment(segmentMetadata, "http://" + _controllerAddress + "/" + segmentMetadata.getName());
+    _helixResourceManager
+        .addNewSegment(segmentMetadata, "http://" + _controllerAddress + "/" + segmentMetadata.getName());
   }
 
   public static void waitForExternalViewUpdate(String zkAddress, final String clusterName, long timeoutInMilliseconds) {
@@ -315,16 +311,15 @@ public class PerfBenchmarkDriver {
     Set<String> tableAndBrokerResources = new HashSet<>();
     for (String resourceName : allResourcesInCluster) {
       // Only check table resources and broker resource
-      if (TableNameBuilder.isTableResource(resourceName) || resourceName.equals(
-          CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)) {
+      if (TableNameBuilder.isTableResource(resourceName) || resourceName
+          .equals(CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)) {
         tableAndBrokerResources.add(resourceName);
       }
     }
 
-    StrictMatchExternalViewVerifier verifier = new StrictMatchExternalViewVerifier.Builder(clusterName)
-        .setZkAddr(zkAddress)
-        .setResources(tableAndBrokerResources)
-        .build();
+    StrictMatchExternalViewVerifier verifier =
+        new StrictMatchExternalViewVerifier.Builder(clusterName).setZkAddr(zkAddress)
+            .setResources(tableAndBrokerResources).build();
 
     boolean success = verifier.verify(timeoutInMilliseconds);
     if (success) {

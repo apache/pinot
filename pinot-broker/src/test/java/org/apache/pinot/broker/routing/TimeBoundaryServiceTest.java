@@ -66,7 +66,8 @@ public class TimeBoundaryServiceTest {
   }
 
   @Test
-  public void testExternalViewBasedTimeBoundaryService() throws Exception {
+  public void testExternalViewBasedTimeBoundaryService()
+      throws Exception {
     addingTableToPropertyStore("testResource0");
     addingTableToPropertyStore("testResource1");
     HelixExternalViewBasedTimeBoundaryService tbs = new HelixExternalViewBasedTimeBoundaryService(_propertyStore);
@@ -120,12 +121,11 @@ public class TimeBoundaryServiceTest {
     }
   }
 
-  private void addingTableToPropertyStore(String tableName) throws Exception {
+  private void addingTableToPropertyStore(String tableName)
+      throws Exception {
     TableConfig tableConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(tableName)
-        .setTimeColumnName("timestamp")
-        .setTimeType("DAYS")
-        .build();
-    ZKMetadataProvider.setOfflineTableConfig(_propertyStore, tableConfig.getTableName(),
-        TableConfig.toZnRecord(tableConfig));
+        .setTimeColumnName("timestamp").setTimeType("DAYS").build();
+    ZKMetadataProvider
+        .setOfflineTableConfig(_propertyStore, tableConfig.getTableName(), TableConfig.toZnRecord(tableConfig));
   }
 }

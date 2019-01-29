@@ -22,9 +22,9 @@ import org.apache.pinot.common.Utils;
 
 
 /**
-* Enumeration containing all the timers exposed by the Pinot controller.
-*
-*/
+ * Enumeration containing all the timers exposed by the Pinot controller.
+ *
+ */
 public enum ControllerTimer implements AbstractMetrics.Timer {
   ;
 

@@ -21,9 +21,9 @@ package org.apache.pinot.core.minion.rollup;
 import java.util.HashMap;
 import java.util.Map;
 
+
 public enum MergeType {
-  CONCATENATE,
-  ROLLUP;
+  CONCATENATE, ROLLUP;
 
   private static final Map<String, MergeType> VALUE_MAP = new HashMap<>();
 

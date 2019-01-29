@@ -25,6 +25,7 @@ import java.util.List;
 import org.apache.pinot.common.utils.Pairs;
 import org.apache.pinot.common.utils.Pairs.IntPair;
 
+
 /**
  * Utility to perform intersection of sorted ranges
  */

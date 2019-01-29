@@ -49,7 +49,8 @@ public class SegmentGenerationWithTimeColumnTest {
   private static final String STRING_COL_NAME = "someString";
   private static final String TIME_COL_NAME = "date";
   private static final String TIME_COL_FORMAT = "yyyyMMdd";
-  private static final String SEGMENT_DIR_NAME = System.getProperty("java.io.tmpdir") + File.separator + "segmentGenTest";
+  private static final String SEGMENT_DIR_NAME =
+      System.getProperty("java.io.tmpdir") + File.separator + "segmentGenTest";
   private static final String SEGMENT_NAME = "testSegment";
   private static final int NUM_ROWS = 10000;
 
@@ -67,7 +68,8 @@ public class SegmentGenerationWithTimeColumnTest {
   }
 
   @Test
-  public void testSimpleDateSegmentGeneration() throws Exception {
+  public void testSimpleDateSegmentGeneration()
+      throws Exception {
     Schema schema = createSchema(true);
     File segmentDir = buildSegment(schema, true);
     SegmentMetadataImpl metadata = SegmentDirectory.loadSegmentMetadata(segmentDir);
@@ -76,7 +78,8 @@ public class SegmentGenerationWithTimeColumnTest {
   }
 
   @Test
-  public void testEpochDateSegmentGeneration() throws Exception {
+  public void testEpochDateSegmentGeneration()
+      throws Exception {
     Schema schema = createSchema(false);
     File segmentDir = buildSegment(schema, false);
     SegmentMetadataImpl metadata = SegmentDirectory.loadSegmentMetadata(segmentDir);

@@ -86,7 +86,6 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
   private RoutingTableBuilderFactory _routingTableBuilderFactory;
   private SegmentSelectorProvider _segmentSelectorProvider;
 
-
   public HelixExternalViewBasedRouting(ZkHelixPropertyStore<ZNRecord> propertyStore, HelixManager helixManager,
       Configuration configuration) {
     _configuration = configuration;
@@ -119,8 +118,8 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
 
     RoutingTableBuilder routingTableBuilder =
         _routingTableBuilderFactory.createRoutingTableBuilder(tableConfig, _brokerMetrics);
-    LOGGER.info("Initialized routingTableBuilder: {} for table {}", routingTableBuilder.getClass().getName(),
-        tableName);
+    LOGGER
+        .info("Initialized routingTableBuilder: {} for table {}", routingTableBuilder.getClass().getName(), tableName);
     _routingTableBuilderMap.put(tableName, routingTableBuilder);
 
     // Initialize segment selector
@@ -346,7 +345,7 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
   }
 
   public void updateTimeBoundary(String tableName) {
-    updateTimeBoundary(tableName,fetchExternalView(tableName));
+    updateTimeBoundary(tableName, fetchExternalView(tableName));
   }
 
   protected void updateTimeBoundary(String tableName, ExternalView externalView) {
@@ -359,8 +358,8 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
   }
 
   protected ExternalView fetchExternalView(String table) {
-    return HelixHelper.getExternalViewForResource(_helixManager.getClusterManagmentTool(),
-        _helixManager.getClusterName(), table);
+    return HelixHelper
+        .getExternalViewForResource(_helixManager.getClusterManagmentTool(), _helixManager.getClusterName(), table);
   }
 
   private void updateInstanceConfigsMapFromExternalView(Map<String, InstanceConfig> relevantInstanceConfigs,
@@ -574,7 +573,8 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
   }
 
   @Override
-  public String dumpSnapshot(String tableName) throws Exception {
+  public String dumpSnapshot(String tableName)
+      throws Exception {
     ObjectNode ret = JsonUtils.newObjectNode();
     ArrayNode routingTableSnapshot = JsonUtils.newArrayNode();
 

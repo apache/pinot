@@ -92,7 +92,8 @@ public class HybridClusterIntegrationTestCommandLineRunner {
     System.exit(1);
   }
 
-  public static void main(String[] args) throws Exception {
+  public static void main(String[] args)
+      throws Exception {
     int numArgs = args.length;
     if (!((numArgs == 5) || (numArgs == 6 && args[0].equals("--llc")))) {
       printUsage();
@@ -240,12 +241,14 @@ public class HybridClusterIntegrationTestCommandLineRunner {
     }
 
     @Override
-    protected long getCurrentCountStarResult() throws Exception {
+    protected long getCurrentCountStarResult()
+        throws Exception {
       return postQuery("SELECT COUNT(*) FROM " + getTableName()).get("aggregationResults").get(0).get("value").asLong();
     }
 
     @BeforeClass
-    public void setUp() throws Exception {
+    public void setUp()
+        throws Exception {
       if (!_enabled) {
         return;
       }
@@ -276,8 +279,9 @@ public class HybridClusterIntegrationTestCommandLineRunner {
       // Create segments from Avro data
       ExecutorService executor = Executors.newCachedThreadPool();
       Schema schema = Schema.fromFile(_schemaFile);
-      ClusterIntegrationTestUtils.buildSegmentsFromAvro(_offlineAvroFiles, 0, _segmentDir, _tarDir, _tableName, false,
-          null, getRawIndexColumns(), schema, executor);
+      ClusterIntegrationTestUtils
+          .buildSegmentsFromAvro(_offlineAvroFiles, 0, _segmentDir, _tarDir, _tableName, false, null,
+              getRawIndexColumns(), schema, executor);
       executor.shutdown();
       executor.awaitTermination(10, TimeUnit.MINUTES);
 
@@ -298,7 +302,8 @@ public class HybridClusterIntegrationTestCommandLineRunner {
     }
 
     @Test
-    public void testQueriesFromQueryFile() throws Exception {
+    public void testQueriesFromQueryFile()
+        throws Exception {
       if (!_enabled) {
         return;
       }
@@ -310,8 +315,9 @@ public class HybridClusterIntegrationTestCommandLineRunner {
       try (BufferedReader responseFileReader = new BufferedReader(new FileReader(_responseFile))) {
         for (File realtimeAvroFile : _realtimeAvroFiles) {
           // Push one avro file into the Kafka topic
-          ClusterIntegrationTestUtils.pushAvroIntoKafka(Collections.singletonList(realtimeAvroFile), KAFKA_BROKER,
-              getKafkaTopic(), getMaxNumKafkaMessagesPerBatch(), getKafkaMessageHeader(), getPartitionColumn());
+          ClusterIntegrationTestUtils
+              .pushAvroIntoKafka(Collections.singletonList(realtimeAvroFile), KAFKA_BROKER, getKafkaTopic(),
+                  getMaxNumKafkaMessagesPerBatch(), getKafkaMessageHeader(), getPartitionColumn());
 
           try (BufferedReader queryFileReader = new BufferedReader(new FileReader(_queryFile))) {
             // Set the expected COUNT(*) result and wait for all documents loaded
@@ -337,9 +343,8 @@ public class HybridClusterIntegrationTestCommandLineRunner {
                         == QueryComparison.ComparisonStatus.FAILED) {
                       numFailedQueries.getAndIncrement();
                       System.out.println(
-                          "Query comparison failed for query: " + currentQuery
-                              + "\nActual: " + actualResponse.toString()
-                              + "\nExpected: " + expectedResponse.toString());
+                          "Query comparison failed for query: " + currentQuery + "\nActual: " + actualResponse
+                              .toString() + "\nExpected: " + expectedResponse.toString());
                     }
                   } catch (Exception e) {
                     numFailedQueries.getAndIncrement();
@@ -359,7 +364,8 @@ public class HybridClusterIntegrationTestCommandLineRunner {
     }
 
     @AfterClass
-    public void tearDown() throws Exception {
+    public void tearDown()
+        throws Exception {
       if (!_enabled) {
         return;
       }

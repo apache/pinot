@@ -24,6 +24,7 @@ import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
 public class DeleteClusterCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(DeleteClusterCommand.class);
 
@@ -33,8 +34,7 @@ public class DeleteClusterCommand extends AbstractBaseAdminCommand implements Co
   @Option(name = "-zkAddress", required = false, metaVar = "<http>", usage = "Http address of Zookeeper.")
   private String _zkAddress = DEFAULT_ZK_ADDRESS;
 
-  @Option(name = "-help", required = false, help = true, aliases = { "-h", "--h", "--help" },
-      usage = "Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
   private boolean _help = false;
 
   @Override
@@ -73,7 +73,8 @@ public class DeleteClusterCommand extends AbstractBaseAdminCommand implements Co
   }
 
   @Override
-  public boolean execute() throws Exception {
+  public boolean execute()
+      throws Exception {
     LOGGER.info("Connecting to Zookeeper at address: {}", _zkAddress);
     ZkClient zkClient = new ZkClient(_zkAddress, 5000);
     String helixClusterName = "/" + _clusterName;

@@ -34,8 +34,7 @@ public class DataMerger {
   }
 
   private enum MergeGranularity {
-    MONTH,
-    YEAR
+    MONTH, YEAR
   }
 
   public static void main(String[] args)

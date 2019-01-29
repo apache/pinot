@@ -54,13 +54,15 @@ public class BitmapInvertedIndexCreatorTest {
   private static final Random RANDOM = new Random();
 
   @BeforeMethod
-  public void setUp() throws IOException {
+  public void setUp()
+      throws IOException {
     FileUtils.forceMkdir(ON_HEAP_INDEX_DIR);
     FileUtils.forceMkdir(OFF_HEAP_INDEX_DIR);
   }
 
   @Test
-  public void testSingleValue() throws IOException {
+  public void testSingleValue()
+      throws IOException {
     int[] dictIds = new int[NUM_DOCS];
     @SuppressWarnings("unchecked")
     Set<Integer>[] postingLists = new Set[CARDINALITY];
@@ -99,7 +101,8 @@ public class BitmapInvertedIndexCreatorTest {
   }
 
   @Test
-  public void testMultiValue() throws IOException {
+  public void testMultiValue()
+      throws IOException {
     int[][] dictIds = new int[NUM_DOCS][];
     int numValues = 0;
     @SuppressWarnings("unchecked")
@@ -143,7 +146,8 @@ public class BitmapInvertedIndexCreatorTest {
     Assert.assertTrue(FileUtils.contentEquals(ON_HEAP_INVERTED_INDEX, OFF_HEAP_INVERTED_INDEX));
   }
 
-  private void validate(File invertedIndex, Set<Integer>[] postingLists) throws IOException {
+  private void validate(File invertedIndex, Set<Integer>[] postingLists)
+      throws IOException {
     try (BitmapInvertedIndexReader reader = new BitmapInvertedIndexReader(
         PinotDataBuffer.mapReadOnlyBigEndianFile(invertedIndex), CARDINALITY)) {
       for (int dictId = 0; dictId < CARDINALITY; dictId++) {
@@ -159,7 +163,8 @@ public class BitmapInvertedIndexCreatorTest {
   }
 
   @AfterMethod
-  public void tearDown() throws IOException {
+  public void tearDown()
+      throws IOException {
     FileUtils.deleteDirectory(ON_HEAP_INDEX_DIR);
     FileUtils.deleteDirectory(OFF_HEAP_INDEX_DIR);
   }

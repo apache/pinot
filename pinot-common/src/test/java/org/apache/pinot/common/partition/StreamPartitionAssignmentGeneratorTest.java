@@ -53,7 +53,8 @@ public class StreamPartitionAssignmentGeneratorTest {
   }
 
   @BeforeMethod
-  public void setUp() throws Exception {
+  public void setUp()
+      throws Exception {
     _mockHelixManager = mock(HelixManager.class);
 
     final int maxInstances = 20;

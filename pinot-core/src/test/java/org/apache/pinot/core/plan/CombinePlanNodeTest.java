@@ -60,8 +60,8 @@ public class CombinePlanNodeTest {
           }
         });
       }
-      CombinePlanNode combinePlanNode =
-          new CombinePlanNode(planNodes, new BrokerRequest(), _executorService, 1000, InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT);
+      CombinePlanNode combinePlanNode = new CombinePlanNode(planNodes, new BrokerRequest(), _executorService, 1000,
+          InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT);
       combinePlanNode.run();
       Assert.assertEquals(numPlans, count.get());
     }

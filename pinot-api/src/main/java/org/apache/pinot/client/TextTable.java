@@ -21,6 +21,7 @@ package org.apache.pinot.client;
 import java.util.LinkedList;
 import java.util.List;
 
+
 /**
  * Utility class to format tabular data. Useful to display on console for debugging
  */
@@ -119,5 +120,4 @@ public class TextTable {
     }
     return String.valueOf(buf);
   }
-
 }

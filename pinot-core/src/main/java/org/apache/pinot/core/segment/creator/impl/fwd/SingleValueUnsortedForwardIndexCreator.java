@@ -42,7 +42,8 @@ public class SingleValueUnsortedForwardIndexCreator implements SingleValueForwar
   }
 
   @Override
-  public void close() throws IOException {
+  public void close()
+      throws IOException {
     _writer.close();
   }
 }

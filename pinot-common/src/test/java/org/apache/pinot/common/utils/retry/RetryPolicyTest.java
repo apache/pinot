@@ -60,7 +60,8 @@ public class RetryPolicyTest {
   }
 
   @Test
-  public void testBaseRetryPolicy() throws Exception {
+  public void testBaseRetryPolicy()
+      throws Exception {
     RetryPolicy retryPolicy = RetryPolicies.noDelayRetryPolicy(MAX_NUM_ATTEMPTS);
     for (int i = 0; i < NUM_ROUNDS; i++) {
       retryPolicy.attempt(() -> true);

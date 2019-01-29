@@ -45,8 +45,8 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
   private final InstanceDataManager _instanceDataManager;
   private final ServerMetrics _metrics;
 
-  public SegmentMessageHandlerFactory(SegmentFetcherAndLoader fetcherAndLoader,
-      InstanceDataManager instanceDataManager, ServerMetrics metrics) {
+  public SegmentMessageHandlerFactory(SegmentFetcherAndLoader fetcherAndLoader, InstanceDataManager instanceDataManager,
+      ServerMetrics metrics) {
     _fetcherAndLoader = fetcherAndLoader;
     _instanceDataManager = instanceDataManager;
     _metrics = metrics;
@@ -58,7 +58,8 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
     }
   }
 
-  private void acquireSema(String context, Logger logger) throws InterruptedException {
+  private void acquireSema(String context, Logger logger)
+      throws InterruptedException {
     if (_refreshThreadSemaphore != null) {
       long startTime = System.currentTimeMillis();
       logger.info("Waiting for lock to refresh : {}, queue-length: {}", context,
@@ -118,7 +119,8 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
     }
 
     @Override
-    public HelixTaskResult handleMessage() throws InterruptedException {
+    public HelixTaskResult handleMessage()
+        throws InterruptedException {
       HelixTaskResult result = new HelixTaskResult();
       _logger.info("Handling message: {}", _message);
       try {
@@ -157,7 +159,8 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
     }
 
     @Override
-    public HelixTaskResult handleMessage() throws InterruptedException {
+    public HelixTaskResult handleMessage()
+        throws InterruptedException {
       HelixTaskResult helixTaskResult = new HelixTaskResult();
       _logger.info("Handling message: {}", _message);
       try {

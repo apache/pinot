@@ -136,8 +136,7 @@ public class KafkaStarterUtils {
   public static void createTopic(String kafkaTopic, String zkStr, int partitionCount) {
     invokeTopicCommand(
         new String[]{"--create", "--zookeeper", zkStr, "--replication-factor", "1", "--partitions", Integer.toString(
-            partitionCount), "--topic",
-            kafkaTopic});
+            partitionCount), "--topic", kafkaTopic});
   }
 
   private static void invokeTopicCommand(String[] args) {

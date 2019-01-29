@@ -109,14 +109,10 @@ public class BenchmarkStringDictionary {
 
   public static void main(String[] args)
       throws Exception {
-    ChainedOptionsBuilder opt = new OptionsBuilder().include(BenchmarkStringDictionary.class.getSimpleName())
-        .addProfiler(GCProfiler.class)
-        .addProfiler(HotspotMemoryProfiler.class)
-        .warmupTime(TimeValue.seconds(60))
-        .warmupIterations(8)
-        .measurementTime(TimeValue.seconds(60))
-        .measurementIterations(8)
-        .forks(5);
+    ChainedOptionsBuilder opt =
+        new OptionsBuilder().include(BenchmarkStringDictionary.class.getSimpleName()).addProfiler(GCProfiler.class)
+            .addProfiler(HotspotMemoryProfiler.class).warmupTime(TimeValue.seconds(60)).warmupIterations(8)
+            .measurementTime(TimeValue.seconds(60)).measurementIterations(8).forks(5);
 
     new Runner(opt.build()).run();
   }

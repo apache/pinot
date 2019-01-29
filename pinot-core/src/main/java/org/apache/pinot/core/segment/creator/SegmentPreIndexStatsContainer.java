@@ -22,7 +22,8 @@ package org.apache.pinot.core.segment.creator;
  * Container for per-column stats for a segment
  */
 public interface SegmentPreIndexStatsContainer {
-  ColumnStatistics getColumnProfileFor(String column) throws Exception;
+  ColumnStatistics getColumnProfileFor(String column)
+      throws Exception;
 
   int getRawDocCount();
 

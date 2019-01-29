@@ -43,8 +43,8 @@ public class ReplicaGroupTestUtils {
     for (int i = 0; i < numSegments; ++i) {
       int partition = i % numPartition;
       String segmentName = SEGMENT_PREFIX + i;
-      SegmentMetadata segmentMetadata =
-          SegmentMetadataMockUtils.mockSegmentMetadataWithPartitionInfo(tableName, segmentName, partitionColumn, partition);
+      SegmentMetadata segmentMetadata = SegmentMetadataMockUtils
+          .mockSegmentMetadataWithPartitionInfo(tableName, segmentName, partitionColumn, partition);
       resourceManager.addNewSegment(segmentMetadata, "downloadUrl");
       if (!segmentsPerPartition.containsKey(partition)) {
         segmentsPerPartition.put(partition, new HashSet<String>());
@@ -77,13 +77,13 @@ public class ReplicaGroupTestUtils {
 
     // Create the server to segments mapping
     Map<String, List<String>> serverToSegments = new HashMap<>();
-    for (String server: replicaGroupMapping.getAllInstances()) {
+    for (String server : replicaGroupMapping.getAllInstances()) {
       serverToSegments.put(server, new ArrayList<String>());
     }
 
-    for (Map.Entry<String, Map<String, String>> entry: segmentAssignment.entrySet()) {
+    for (Map.Entry<String, Map<String, String>> entry : segmentAssignment.entrySet()) {
       String segment = entry.getKey();
-      for (String server: entry.getValue().keySet()) {
+      for (String server : entry.getValue().keySet()) {
         if (!serverToSegments.containsKey(server)) {
           serverToSegments.put(server, new ArrayList<String>());
         }
@@ -100,8 +100,8 @@ public class ReplicaGroupTestUtils {
       for (int replicaId = 0; replicaId < numReplicaGroups; replicaId++) {
         List<String> replicaGroup = replicaGroupMapping.getInstancesfromReplicaGroup(partitionId, replicaId);
         Set<String> replicaGroupSegments = new HashSet<>();
-        for (String server: replicaGroup) {
-          for (String segment: serverToSegments.get(server)) {
+        for (String server : replicaGroup) {
+          for (String segment : serverToSegments.get(server)) {
             if (segmentsPerPartition.get(partitionId).contains(segment)) {
               if (!replicaGroupSegments.contains(segment)) {
                 replicaGroupSegments.add(segment);

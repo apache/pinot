@@ -20,6 +20,8 @@ package org.apache.pinot.controller.helix.core.periodictask;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.util.List;
+import org.apache.pinot.common.metrics.ControllerGauge;
+import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.periodictask.BasePeriodicTask;
 import org.slf4j.Logger;
@@ -33,18 +35,19 @@ import org.slf4j.LoggerFactory;
 public abstract class ControllerPeriodicTask extends BasePeriodicTask {
   private static final Logger LOGGER = LoggerFactory.getLogger(ControllerPeriodicTask.class);
 
-
   private static final long MAX_CONTROLLER_PERIODIC_TASK_STOP_TIME_MILLIS = 30_000L;
 
   protected final PinotHelixResourceManager _pinotHelixResourceManager;
+  protected final ControllerMetrics _metricsRegistry;
 
   private volatile boolean _stopPeriodicTask;
   private volatile boolean _periodicTaskInProgress;
 
   public ControllerPeriodicTask(String taskName, long runFrequencyInSeconds, long initialDelayInSeconds,
-      PinotHelixResourceManager pinotHelixResourceManager) {
+      PinotHelixResourceManager pinotHelixResourceManager, ControllerMetrics controllerMetrics) {
     super(taskName, runFrequencyInSeconds, initialDelayInSeconds);
     _pinotHelixResourceManager = pinotHelixResourceManager;
+    _metricsRegistry = controllerMetrics;
   }
 
   /**
@@ -118,16 +121,27 @@ public abstract class ControllerPeriodicTask extends BasePeriodicTask {
    */
   protected void process(List<String> tableNamesWithType) {
     if (!shouldStopPeriodicTask()) {
+
+      int numTablesProcessed = 0;
       preprocess();
+
       for (String tableNameWithType : tableNamesWithType) {
         if (shouldStopPeriodicTask()) {
           LOGGER.info("Skip processing table {} and all the remaining tables for task {}.", tableNameWithType,
               getTaskName());
           break;
         }
-        processTable(tableNameWithType);
+        try {
+          processTable(tableNameWithType);
+          numTablesProcessed++;
+        } catch (Exception e) {
+          exceptionHandler(tableNameWithType, e);
+        }
       }
+
       postprocess();
+      _metricsRegistry
+          .setValueOfGlobalGauge(ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED, getTaskName(), numTablesProcessed);
     } else {
       LOGGER.info("Skip processing all tables for task {}", getTaskName());
     }
@@ -148,6 +162,8 @@ public abstract class ControllerPeriodicTask extends BasePeriodicTask {
    * This method runs after processing all tables
    */
   protected abstract void postprocess();
+
+  protected abstract void exceptionHandler(String tableNameWithType, Exception e);
 
   @VisibleForTesting
   protected boolean shouldStopPeriodicTask() {

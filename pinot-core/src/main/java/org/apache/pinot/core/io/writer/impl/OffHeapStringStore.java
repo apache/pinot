@@ -141,7 +141,8 @@ public class OffHeapStringStore implements Closeable {
     }
 
     @Override
-    public void close() throws IOException {
+    public void close()
+        throws IOException {
       _pinotDataBuffer.close();
     }
 
@@ -210,7 +211,8 @@ public class OffHeapStringStore implements Closeable {
   }
 
   @Override
-  public void close() throws IOException {
+  public void close()
+      throws IOException {
     _numElements = 0;
     for (Buffer buffer : _buffers) {
       buffer.close();

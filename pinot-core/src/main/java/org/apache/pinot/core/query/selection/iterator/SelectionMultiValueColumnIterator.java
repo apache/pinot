@@ -23,6 +23,7 @@ import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.BlockMultiValIterator;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 
+
 /**
  * Iterator on multi-value column selection query.
  *

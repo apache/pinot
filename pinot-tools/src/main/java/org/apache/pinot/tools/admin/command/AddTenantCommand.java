@@ -34,8 +34,7 @@ public class AddTenantCommand extends AbstractBaseAdminCommand implements Comman
   @Option(name = "-controllerHost", required = false, metaVar = "<String>", usage = "host name for controller.")
   private String _controllerHost;
 
-  @Option(name = "-controllerPort", required = false, metaVar = "<int>",
-      usage = "Port number to start the controller at.")
+  @Option(name = "-controllerPort", required = false, metaVar = "<int>", usage = "Port number to start the controller at.")
   private String _controllerPort = DEFAULT_CONTROLLER_PORT;
 
   @Option(name = "-name", required = true, metaVar = "<string>", usage = "Name of the tenant to be created")
@@ -56,8 +55,7 @@ public class AddTenantCommand extends AbstractBaseAdminCommand implements Comman
   @Option(name = "-exec", required = false, metaVar = "<boolean>", usage = "Execute the command.")
   private boolean _exec;
 
-  @Option(name = "-help", required = false, help = true, aliases = { "-h", "--h", "--help" },
-      usage = "Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
   private boolean _help = false;
 
   private String _controllerAddress;
@@ -97,9 +95,9 @@ public class AddTenantCommand extends AbstractBaseAdminCommand implements Comman
     return this;
   }
 
-
   @Override
-  public boolean execute() throws Exception {
+  public boolean execute()
+      throws Exception {
     if (_controllerAddress == null) {
       if (_controllerHost == null) {
         _controllerHost = NetUtil.getHostAddress();
@@ -114,13 +112,11 @@ public class AddTenantCommand extends AbstractBaseAdminCommand implements Comman
     }
 
     LOGGER.info("Executing command: " + toString());
-    Tenant t =
-        new Tenant.TenantBuilder(_name).setRole(_role).setTotalInstances(_instanceCount)
-            .setOfflineInstances(_offlineInstanceCount).setRealtimeInstances(_realtimeInstanceCount).build();
+    Tenant t = new Tenant.TenantBuilder(_name).setRole(_role).setTotalInstances(_instanceCount)
+        .setOfflineInstances(_offlineInstanceCount).setRealtimeInstances(_realtimeInstanceCount).build();
 
-    String res =
-        AbstractBaseAdminCommand
-            .sendPostRequest(ControllerRequestURLBuilder.baseUrl(_controllerAddress).forTenantCreate(), t.toString());
+    String res = AbstractBaseAdminCommand
+        .sendPostRequest(ControllerRequestURLBuilder.baseUrl(_controllerAddress).forTenantCreate(), t.toString());
 
     LOGGER.info(res);
     System.out.print(res);
@@ -139,10 +135,10 @@ public class AddTenantCommand extends AbstractBaseAdminCommand implements Comman
 
   @Override
   public String toString() {
-    String retString = ("AddTenant -controllerHost " + _controllerHost + " -controllerPort "
-        + _controllerPort + " -name " + _name + " -role " + _role
-        + " -instanceCount " + _instanceCount + " -offlineInstanceCount " + _offlineInstanceCount
-        + " -realTimeInstanceCount " + _realtimeInstanceCount);
+    String retString =
+        ("AddTenant -controllerHost " + _controllerHost + " -controllerPort " + _controllerPort + " -name " + _name
+            + " -role " + _role + " -instanceCount " + _instanceCount + " -offlineInstanceCount "
+            + _offlineInstanceCount + " -realTimeInstanceCount " + _realtimeInstanceCount);
 
     return ((_exec) ? (retString + " -exec") : retString);
   }

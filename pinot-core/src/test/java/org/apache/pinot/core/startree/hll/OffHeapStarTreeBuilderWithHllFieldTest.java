@@ -56,7 +56,8 @@ public class OffHeapStarTreeBuilderWithHllFieldTest {
   private final int log2m = 8; //HllUtil.Constants.DEFAULT_LOG2M;
 
   private void testSimpleCore(int numDimensions, int numMetrics, int numSkipMaterializationDimensions,
-      int[] memberIdColumnValues, long preciseCardinality) throws Exception {
+      int[] memberIdColumnValues, long preciseCardinality)
+      throws Exception {
     Schema schema = new Schema();
     List<String> dimensionsSplitOrder = new ArrayList<>();
     Set<String> skipMaterializationDimensions = new HashSet<>();
@@ -222,25 +223,29 @@ public class OffHeapStarTreeBuilderWithHllFieldTest {
   }
 
   @Test
-  public void testSmallDuplicates() throws Exception {
+  public void testSmallDuplicates()
+      throws Exception {
     RandomNumberArray rand = new RandomNumberArray(500, 1);
     testSimpleCore(3, 3, 0, rand.toIntArray(), rand.getPreciseCardinality());
   }
 
   @Test
-  public void testMediumDuplicates() throws Exception {
+  public void testMediumDuplicates()
+      throws Exception {
     RandomNumberArray rand = new RandomNumberArray(500, 5);
     testSimpleCore(3, 3, 0, rand.toIntArray(), rand.getPreciseCardinality());
   }
 
   @Test
-  public void testLargeDuplicates() throws Exception {
+  public void testLargeDuplicates()
+      throws Exception {
     RandomNumberArray rand = new RandomNumberArray(500, 50);
     testSimpleCore(3, 3, 0, rand.toIntArray(), rand.getPreciseCardinality());
   }
 
   @Test
-  public void testSkipMaterialization() throws Exception {
+  public void testSkipMaterialization()
+      throws Exception {
     RandomNumberArray rand = new RandomNumberArray(250, 3);
     testSimpleCore(6, 4, 2, rand.toIntArray(), rand.getPreciseCardinality());
   }
