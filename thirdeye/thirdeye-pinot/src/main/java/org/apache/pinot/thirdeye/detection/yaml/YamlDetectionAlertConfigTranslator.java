@@ -199,7 +199,7 @@ public class YamlDetectionAlertConfigTranslator {
       detectionConfigIds.addAll(detectionNames.stream().map(detectionName ->  this.detectionConfigDAO.findByPredicate(
           Predicate.EQ("name", detectionName)).get(0).getId()).collect(Collectors.toList()));
     } catch (Exception e){
-      throw new IllegalArgumentException("cannot find detection pipeline, please check the subscribed detections.");
+      throw new IllegalArgumentException("Cannot find detection pipeline, please check the subscribed detections.");
     }
 
     alertConfigDTO.setProperties(buildAlerterProperties(yamlAlertConfig, detectionConfigIds));
