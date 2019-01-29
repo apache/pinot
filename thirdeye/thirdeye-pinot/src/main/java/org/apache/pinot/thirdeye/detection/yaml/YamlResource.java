@@ -22,6 +22,7 @@ package org.apache.pinot.thirdeye.detection.yaml;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
+import javax.ws.rs.DefaultValue;
 import org.apache.pinot.thirdeye.api.Constants;
 import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionAlertConfigManager;
@@ -40,11 +41,13 @@ import org.apache.pinot.thirdeye.datasource.loader.DefaultTimeSeriesLoader;
 import org.apache.pinot.thirdeye.datasource.loader.TimeSeriesLoader;
 import org.apache.pinot.thirdeye.detection.DataProvider;
 import org.apache.pinot.thirdeye.detection.DefaultDataProvider;
+import org.apache.pinot.thirdeye.detection.DetectionPipeline;
 import org.apache.pinot.thirdeye.detection.DetectionPipelineLoader;
 import com.wordnik.swagger.annotations.Api;
 import com.wordnik.swagger.annotations.ApiImplicitParam;
 import com.wordnik.swagger.annotations.ApiImplicitParams;
 import com.wordnik.swagger.annotations.ApiOperation;
+import org.apache.pinot.thirdeye.detection.DetectionPipelineResult;
 import org.apache.pinot.thirdeye.detection.validators.DetectionAlertConfigValidator;
 import com.wordnik.swagger.annotations.ApiParam;
 import java.lang.reflect.InvocationTargetException;
@@ -464,6 +467,41 @@ public class YamlResource {
 
     return updatedAlertConfig;
   }
+
+  @POST
+  @Path("/preview")
+  @Produces(MediaType.APPLICATION_JSON)
+  @Consumes(MediaType.TEXT_PLAIN)
+  @ApiOperation("Preview the anomaly detection result of a YAML configuration")
+  public Response yamlPreview(
+      @QueryParam("start") long start,
+      @QueryParam("end") long end,
+      @QueryParam("tuningStart") long tuningStart,
+      @QueryParam("tuningEnd") long tuningEnd,
+      @ApiParam("jsonPayload") String payload) throws Exception {
+    if (StringUtils.isBlank(payload)){
+      return Response.status(Response.Status.BAD_REQUEST).entity(ImmutableMap.of("message", "empty payload")).build();
+    }
+    Map<String, Object> yamlConfig;
+    try {
+      yamlConfig = (Map<String, Object>) this.yaml.load(payload);
+    } catch (Exception e){
+      return Response.status(Response.Status.BAD_REQUEST).entity(ImmutableMap.of("message", "detection yaml parsing error, " + e.getMessage())).build();
+    }
+
+    Map<String, String> responseMessage = new HashMap<>();
+    DetectionConfigDTO detectionConfig =
+        buildDetectionConfigFromYaml(tuningStart, tuningEnd, yamlConfig, null, responseMessage);
+    if (detectionConfig == null) {
+      return Response.status(Response.Status.BAD_REQUEST).entity(responseMessage).build();
+    }
+    detectionConfig.setId(-1L);
+    DetectionPipeline pipeline = this.loader.from(this.provider, detectionConfig, start, end);
+    DetectionPipelineResult result = pipeline.run();
+
+    return Response.ok(result).build();
+  }
+
 
   /**
    List all yaml configurations as JSON. enhanced with detection config id, isActive and createBy information.
