@@ -71,7 +71,6 @@ import org.apache.pinot.common.config.TagOverrideConfig;
 import org.apache.pinot.common.config.Tenant;
 import org.apache.pinot.common.config.TenantConfig;
 import org.apache.pinot.common.data.Schema;
-import org.apache.pinot.common.exception.InstanceNotFoundException;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.messages.SegmentRefreshMessage;
@@ -284,15 +283,9 @@ public class PinotHelixResourceManager {
    * @param instanceId Instance Id
    * @return Helix instance config
    */
-  @Nonnull
-  public InstanceConfig getHelixInstanceConfig(@Nonnull String instanceId) throws InstanceNotFoundException {
+  public InstanceConfig getHelixInstanceConfig(@Nonnull String instanceId) {
     ZNRecord znRecord = _cacheInstanceConfigsDataAccessor.get("/" + instanceId, null, AccessOption.PERSISTENT);
-    if (znRecord == null) {
-      String errorMsg = String.format("Instance %s not found", instanceId);
-      LOGGER.warn(errorMsg);
-      throw new InstanceNotFoundException(errorMsg);
-    }
-    return new InstanceConfig(znRecord);
+    return znRecord != null ? new InstanceConfig(znRecord) : null;
   }
 
   /**
@@ -2209,11 +2202,16 @@ public class PinotHelixResourceManager {
    * server instances. With BiMap, both mappings are easily available
    */
   @Nonnull
-  public BiMap<String, String> getDataInstanceAdminEndpoints(@Nonnull Set<String> instances) throws Exception {
+  public BiMap<String, String> getDataInstanceAdminEndpoints(@Nonnull Set<String> instances)
+      throws InvalidConfigException {
     Preconditions.checkNotNull(instances);
     BiMap<String, String> endpointToInstance = HashBiMap.create(instances.size());
     for (String instance : instances) {
       InstanceConfig helixInstanceConfig = getHelixInstanceConfig(instance);
+      if (helixInstanceConfig == null) {
+        LOGGER.warn("Instance {} not found", instance);
+        continue;
+      }
       ZNRecord record = helixInstanceConfig.getRecord();
       String[] hostnameSplit = helixInstanceConfig.getHostName().split("_");
       Preconditions.checkState(hostnameSplit.length >= 2);

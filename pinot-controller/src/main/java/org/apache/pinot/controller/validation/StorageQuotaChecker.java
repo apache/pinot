@@ -85,7 +85,8 @@ public class StorageQuotaChecker {
    *
    */
   public QuotaCheckerResponse isSegmentStorageWithinQuota(@Nonnull File segmentFile, @Nonnull String tableNameWithType,
-      @Nonnull String segmentName, @Nonnegative int timeoutMsec) throws Exception {
+      @Nonnull String segmentName, @Nonnegative int timeoutMsec)
+      throws InvalidConfigException {
     Preconditions.checkNotNull(segmentFile);
     Preconditions.checkNotNull(tableNameWithType);
     Preconditions.checkNotNull(segmentName);

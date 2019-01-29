@@ -43,7 +43,6 @@ import javax.ws.rs.core.HttpHeaders;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.config.TableNameBuilder;
-import org.apache.pinot.common.exception.InstanceNotFoundException;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.utils.JsonUtils;
@@ -129,10 +128,8 @@ public class PqlQueryResource {
 
     // Send query to a random broker.
     String instanceId = instanceIds.get(RANDOM.nextInt(instanceIds.size()));
-    InstanceConfig instanceConfig;
-    try {
-      instanceConfig = _pinotHelixResourceManager.getHelixInstanceConfig(instanceId);
-    } catch (InstanceNotFoundException e) {
+    InstanceConfig instanceConfig = _pinotHelixResourceManager.getHelixInstanceConfig(instanceId);
+    if (instanceConfig == null) {
       LOGGER.error("Instance {} not found", instanceId);
       return QueryException.INTERNAL_ERROR.toString();
     }

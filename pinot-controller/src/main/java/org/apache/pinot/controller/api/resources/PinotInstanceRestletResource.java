@@ -37,7 +37,6 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.helix.model.InstanceConfig;
-import org.apache.pinot.common.exception.InstanceNotFoundException;
 import org.apache.pinot.common.utils.JsonUtils;
 import org.apache.pinot.controller.api.pojos.Instance;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -88,10 +87,8 @@ public class PinotInstanceRestletResource {
   public String getInstance(
       @ApiParam(value = "Instance name", required = true, example = "Server_a.b.com_20000 | Broker_my.broker.com_30000")
       @PathParam("instanceName") String instanceName) {
-    InstanceConfig instanceConfig;
-    try {
-      instanceConfig = pinotHelixResourceManager.getHelixInstanceConfig(instanceName);
-    } catch (InstanceNotFoundException e) {
+    InstanceConfig instanceConfig = pinotHelixResourceManager.getHelixInstanceConfig(instanceName);
+    if (instanceConfig == null) {
       throw new ControllerApplicationException(LOGGER, "Instance " + instanceName + " not found",
           Response.Status.NOT_FOUND);
     }
