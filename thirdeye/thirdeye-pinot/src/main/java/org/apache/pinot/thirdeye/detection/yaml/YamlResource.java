@@ -490,7 +490,6 @@ public class YamlResource {
     }
 
     Map<String, String> responseMessage = new HashMap<>();
-    // retrieve id if detection config already exists
     DetectionConfigDTO detectionConfig =
         buildDetectionConfigFromYaml(tuningStart, tuningEnd, yamlConfig, null, responseMessage);
     if (detectionConfig == null) {
