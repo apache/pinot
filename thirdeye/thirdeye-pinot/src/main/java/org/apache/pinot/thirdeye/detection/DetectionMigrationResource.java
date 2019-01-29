@@ -19,10 +19,10 @@
 
 package org.apache.pinot.thirdeye.detection;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -37,10 +37,8 @@ import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
-import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.apache.commons.lang.exception.ExceptionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.thirdeye.anomaly.detection.AnomalyDetectionInputContextBuilder;
 import org.apache.pinot.thirdeye.datalayer.bao.AlertConfigManager;
@@ -57,12 +55,9 @@ import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.datalayer.util.Predicate;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
-import org.apache.pinot.thirdeye.detection.annotation.registry.DetectionRegistry;
-import org.apache.pinot.thirdeye.detection.yaml.CompositePipelineConfigTranslator;
 import org.apache.pinot.thirdeye.detection.yaml.YamlDetectionAlertConfigTranslator;
 import org.apache.pinot.thirdeye.detection.yaml.YamlResource;
 import org.joda.time.Period;
-import org.junit.Assert;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.DumperOptions;
@@ -243,6 +238,8 @@ public class DetectionMigrationResource {
 
   private String getTimezone(AnomalyFunctionDTO functionDTO) {
     DatasetConfigDTO datasetConfigDTO = this.datasetConfigDAO.findByDataset(functionDTO.getCollection());
+    Preconditions.checkNotNull(datasetConfigDTO,
+        String.format("Dataset %s cannot be found for anomaly %d", functionDTO.getCollection(), functionDTO.getId()));
     return datasetConfigDTO.getTimezone();
   }
 
@@ -306,7 +303,7 @@ public class DetectionMigrationResource {
   private long migrateLegacyAnomalyFunction(AnomalyFunctionDTO anomalyFunctionDTO) {
     DetectionConfigDTO detectionConfig;
     try {
-      LOGGER.info(String.format("[MIG] Migrating anomaly function %d_%s", anomalyFunctionDTO.getId(),
+      LOGGER.info(String.format("[MIG] Migrating anomaly function %d %s", anomalyFunctionDTO.getId(),
           anomalyFunctionDTO.getFunctionName()));
 
       // Check if this anomaly function is already migrated
@@ -324,7 +321,7 @@ public class DetectionMigrationResource {
       detectionConfig = new YamlResource().translateToDetectionConfig(detectionYAMLMap, responseMessage);
 
       if (detectionConfig == null) {
-        throw new RuntimeException("Couldn't translate yaml to detection config. Message = " + responseMessage.get("message"));
+        throw new RuntimeException("Couldn't translate yaml to detection config due to " + responseMessage.get("message"));
       }
 
       // Save the migrated anomaly function
@@ -354,11 +351,11 @@ public class DetectionMigrationResource {
             + detectionConfig.getId());
       }
     } catch (Exception e) {
-      throw new RuntimeException(String.format("Error migrating anomaly function %d with name %s. Message = %s",
-          anomalyFunctionDTO.getId(), anomalyFunctionDTO.getFunctionName(), e.getMessage()), e);
+      throw new RuntimeException(String.format("Error migrating anomaly function %d due to %s",
+          anomalyFunctionDTO.getId(), e.getMessage()), e);
     }
 
-    LOGGER.info(String.format("[MIG] Successfully migrated anomaly function %d_%s", anomalyFunctionDTO.getId(),
+    LOGGER.info(String.format("[MIG] Successfully migrated anomaly function %d %s", anomalyFunctionDTO.getId(),
         anomalyFunctionDTO.getFunctionName()));
     return detectionConfig.getId();
   }
@@ -376,9 +373,9 @@ public class DetectionMigrationResource {
     yamlConfigs.put(PROP_TYPE, "DEFAULT_ALERTER_PIPELINE");
 
     Map<String, Object> recipients = new LinkedHashMap<>();
-    recipients.put("to", new ArrayList<>(alertConfigDTO.getReceiverAddresses().getTo()));
-    recipients.put("cc", new ArrayList<>(alertConfigDTO.getReceiverAddresses().getCc()));
-    recipients.put("bcc", new ArrayList<>(alertConfigDTO.getReceiverAddresses().getBcc()));
+    recipients.put("to", ConfigUtils.getList(alertConfigDTO.getReceiverAddresses().getTo()));
+    recipients.put("cc", ConfigUtils.getList(alertConfigDTO.getReceiverAddresses().getCc()));
+    recipients.put("bcc", ConfigUtils.getList(alertConfigDTO.getReceiverAddresses().getBcc()));
     yamlConfigs.put(PROP_RECIPIENTS, recipients);
 
     List<Map<String, Object>> schemes = new ArrayList<>();
@@ -429,13 +426,16 @@ public class DetectionMigrationResource {
   }
 
   @POST
+  @Produces(MediaType.APPLICATION_JSON)
+  @Consumes(MediaType.APPLICATION_JSON)
   @Path("/application/{name}")
   public Response migrateApplication(@PathParam("name") String application) throws Exception {
     List<AlertConfigDTO> alertConfigDTOList = alertConfigDAO.findByPredicate(Predicate.EQ("application", application));
     Map<String, String> responseMessage = new HashMap<>();
 
     for (AlertConfigDTO alertConfigDTO : alertConfigDTOList) {
-      LOGGER.info(String.format("[MIG] Migrating alert %d_%s", alertConfigDTO.getId(), alertConfigDTO.getName()));
+      String alertName = alertConfigDTO.getName();
+      LOGGER.info(String.format("[MIG] Migrating alert %d %s", alertConfigDTO.getId(), alertName));
       try {
         // Skip if the alert is already migrated
         if (alertConfigDTO.getName().contains(MIGRATED_TAG)) {
@@ -456,22 +456,23 @@ public class DetectionMigrationResource {
         DetectionAlertConfigDTO alertConfig = new YamlDetectionAlertConfigTranslator(detectionConfigDAO).translate(detectionAlertYaml);
         detectionAlertConfigDAO.save(alertConfig);
         if (alertConfig.getId() == null) {
-          throw new RuntimeException("Error while saving the migrated alert config for " + alertConfigDTO.getName());
+          throw new RuntimeException("Error while saving the migrated alert config for " + alertName);
         }
 
         // Update migration status and disable the old alert
-        alertConfigDTO.setName(alertConfigDTO.getName() + MIGRATED_TAG + "_" + alertConfig.getId());
+        alertConfigDTO.setName(alertName + MIGRATED_TAG + "_" + alertConfig.getId());
         alertConfigDTO.setActive(false);
         int affectedRows = alertConfigDAO.update(alertConfigDTO);
         if (affectedRows == 0) {
           throw new RuntimeException("Alert migrated successfully but failed to disable and update the migration status"
               + " of the old alert. Recommend doing it manually." + " Migrated alert id " + alertConfig.getId());
         }
-        LOGGER.info(String.format("[MIG] Successfully migrated alert %d_%s", alertConfigDTO.getId(), alertConfigDTO.getName()));
+        LOGGER.info(String.format("[MIG] Successfully migrated alert %d %s", alertConfigDTO.getId(), alertName));
       } catch (Exception e) {
-        LOGGER.error("[MIG] Failed to migrate alert ID {} name {}.", alertConfigDTO.getId(), alertConfigDTO.getName(), e);
-        responseMessage.put("message", String.format("Failed to migrate alert ID %d name %s. Exception %s",
-            alertConfigDTO.getId(), alertConfigDTO.getName(), ExceptionUtils.getStackTrace(e)));
+        LOGGER.error("[MIG] Failed to migrate alert ID {} name {}.", alertConfigDTO.getId(), alertName, e);
+        responseMessage.put("Status of alert " + alertConfigDTO.getId(),
+            String.format("Failed to migrate alert ID %d with name %s due to %s", alertConfigDTO.getId(), alertName,
+                e.getMessage()));
         // Skip migrating this alert and move on to the next
       }
     }
