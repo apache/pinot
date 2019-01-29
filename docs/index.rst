@@ -36,6 +36,7 @@ Customizing Pinot
 
    pluggable_streams
    segment_fetcher
+   pluggable_storage
 
 ################
 Design Documents
