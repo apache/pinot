@@ -1326,31 +1326,52 @@ public class PinotHelixResourceManager {
 
   public void deleteOfflineTable(String tableName) {
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
+    LOGGER.info("Start deleting table: {}", offlineTableName);
+    long startTime = System.currentTimeMillis();
 
     // Remove the table from brokerResource
     HelixHelper.removeResourceFromBrokerIdealState(_helixZkManager, offlineTableName);
+    long removeFromBrokerResourceFinishTime = System.currentTimeMillis();
+    LOGGER.info("Finish removing resource from broker resource in {}ms",
+        (removeFromBrokerResourceFinishTime - startTime));
 
     // Drop the table
     if (_helixAdmin.getResourcesInCluster(_helixClusterName).contains(offlineTableName)) {
       _helixAdmin.dropResource(_helixClusterName, offlineTableName);
     }
+    long dropTableFinishTime = System.currentTimeMillis();
+    LOGGER.info("Finish dropping table in {}ms", (dropTableFinishTime - removeFromBrokerResourceFinishTime));
 
     // Remove all segments for the table
     _segmentDeletionManager.removeSegmentsFromStore(offlineTableName, getSegmentsFor(offlineTableName));
     ZKMetadataProvider.removeResourceSegmentsFromPropertyStore(_propertyStore, offlineTableName);
+    long removeSegmentFinishTime = System.currentTimeMillis();
+    LOGGER.info("Finish removing segments in {}ms", (removeSegmentFinishTime - dropTableFinishTime));
 
     // Remove table config
     ZKMetadataProvider.removeResourceConfigFromPropertyStore(_propertyStore, offlineTableName);
+    long removeTableConfigFinishTime = System.currentTimeMillis();
+    LOGGER.info("Finish removing table config in {}ms", (removeTableConfigFinishTime - removeSegmentFinishTime));
 
     // Remove replica group partition assignment
     ZKMetadataProvider.removeInstancePartitionAssignmentFromPropertyStore(_propertyStore, offlineTableName);
+    long removeReplicaGroupPartitionAssignment = System.currentTimeMillis();
+    LOGGER.info("Finish removing replica group partition assignment in {}ms",
+        (removeReplicaGroupPartitionAssignment - removeTableConfigFinishTime));
+    LOGGER.info("Finish deleting table {} in {}ms", offlineTableName,
+        (removeReplicaGroupPartitionAssignment - startTime));
   }
 
   public void deleteRealtimeTable(String tableName) {
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
+    LOGGER.info("Start deleting table: {}", realtimeTableName);
+    long startTime = System.currentTimeMillis();
 
     // Remove the table from brokerResource
     HelixHelper.removeResourceFromBrokerIdealState(_helixZkManager, realtimeTableName);
+    long removeFromBrokerResourceFinishTime = System.currentTimeMillis();
+    LOGGER.info("Finish removing resource from broker resource in {}ms",
+        (removeFromBrokerResourceFinishTime - startTime));
 
     // Cache the state and drop the table
     Set<String> instancesForTable = null;
@@ -1358,13 +1379,19 @@ public class PinotHelixResourceManager {
       instancesForTable = getAllInstancesForTable(realtimeTableName);
       _helixAdmin.dropResource(_helixClusterName, realtimeTableName);
     }
+    long dropTableFinishTime = System.currentTimeMillis();
+    LOGGER.info("Finish dropping table in {}ms", (dropTableFinishTime - removeFromBrokerResourceFinishTime));
 
     // Remove all segments for the table
     _segmentDeletionManager.removeSegmentsFromStore(realtimeTableName, getSegmentsFor(realtimeTableName));
     ZKMetadataProvider.removeResourceSegmentsFromPropertyStore(_propertyStore, realtimeTableName);
+    long removeSegmentFinishTime = System.currentTimeMillis();
+    LOGGER.info("Finish removing segments in {}ms", (removeSegmentFinishTime - dropTableFinishTime));
 
     // Remove table config
     ZKMetadataProvider.removeResourceConfigFromPropertyStore(_propertyStore, realtimeTableName);
+    long removeTableConfigFinishTime = System.currentTimeMillis();
+    LOGGER.info("Finish removing table config in {}ms", (removeTableConfigFinishTime - removeSegmentFinishTime));
 
     // Remove groupId/PartitionId mapping for HLC table
     if (instancesForTable != null) {
@@ -1376,6 +1403,11 @@ public class PinotHelixResourceManager {
         }
       }
     }
+    long removeReplicaGroupPartitionAssignment = System.currentTimeMillis();
+    LOGGER.info("Finish removing replica group partition assignment in {}ms",
+        (removeReplicaGroupPartitionAssignment - removeTableConfigFinishTime));
+    LOGGER.info("Finish deleting table {} in {}ms", realtimeTableName,
+        (removeReplicaGroupPartitionAssignment - startTime));
   }
 
   /**
