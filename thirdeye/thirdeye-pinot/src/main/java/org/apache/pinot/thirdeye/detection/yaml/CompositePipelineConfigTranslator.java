@@ -414,7 +414,7 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
 
   private Map<String, Object> getTunedSpecs(String componentName, String componentClassName, Map<String, Object> params)
       throws Exception {
-    long configId = this.existingConfig == null ? -1 : this.existingConfig.getId();
+    long configId = this.existingConfig == null ? 0 : this.existingConfig.getId();
     InputDataFetcher dataFetcher = new DefaultInputDataFetcher(this.dataProvider, configId);
     Tunable tunable = getTunable(componentClassName, params, dataFetcher);
 
