@@ -117,8 +117,8 @@ public class DetectionRegistry {
    * @return component class name
    */
   public String lookup(String type) {
-    Preconditions.checkArgument(REGISTRY_MAP.containsKey(type.toUpperCase()), type + " not found in registry");
-    return MapUtils.getString(REGISTRY_MAP.get(type.toUpperCase()), KEY_CLASS_NAME);
+    Preconditions.checkArgument(REGISTRY_MAP.containsKey(type), type + " not found in registry");
+    return MapUtils.getString(REGISTRY_MAP.get(type), KEY_CLASS_NAME);
   }
 
   /**
