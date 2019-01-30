@@ -1324,53 +1324,61 @@ public class PinotHelixResourceManager {
         }, RetryPolicies.exponentialBackoffRetryPolicy(5, 500L, 2.0f));
   }
 
-  public void deleteOfflineTable(String tableName) {
-    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
-    LOGGER.info("Start deleting table: {}", offlineTableName);
+  public void deleteOfflineTable(String rawTableName) {
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
+    LOGGER.info("Deleting table {}: Start", offlineTableName);
     long startTime = System.currentTimeMillis();
 
     // Remove the table from brokerResource
     HelixHelper.removeResourceFromBrokerIdealState(_helixZkManager, offlineTableName);
     long removeFromBrokerResourceFinishTime = System.currentTimeMillis();
-    LOGGER.info("Finish removing resource from broker resource in {}ms",
+    LOGGER.info("Deleting table {}: Removed from broker resource in {}ms", offlineTableName,
         (removeFromBrokerResourceFinishTime - startTime));
 
     // Drop the table
     if (_helixAdmin.getResourcesInCluster(_helixClusterName).contains(offlineTableName)) {
       _helixAdmin.dropResource(_helixClusterName, offlineTableName);
     }
-    long dropTableFinishTime = System.currentTimeMillis();
-    LOGGER.info("Finish dropping table in {}ms", (dropTableFinishTime - removeFromBrokerResourceFinishTime));
+    long removeTableResourceFinishTime = System.currentTimeMillis();
+    LOGGER.info("Deleting table {}: Removed helix table resource in {}ms", offlineTableName,
+        (removeTableResourceFinishTime - removeFromBrokerResourceFinishTime));
 
-    // Remove all segments for the table
+    // Remove all stored segments for the table
     _segmentDeletionManager.removeSegmentsFromStore(offlineTableName, getSegmentsFor(offlineTableName));
+    long removeStoredSegmentsFinishTime = System.currentTimeMillis();
+    LOGGER.info("Deleting table {}: Removed stored segments in {}ms", offlineTableName,
+    (removeStoredSegmentsFinishTime - removeTableResourceFinishTime));
+
+    // Remove segment metadata
     ZKMetadataProvider.removeResourceSegmentsFromPropertyStore(_propertyStore, offlineTableName);
-    long removeSegmentFinishTime = System.currentTimeMillis();
-    LOGGER.info("Finish removing segments in {}ms", (removeSegmentFinishTime - dropTableFinishTime));
+    long removeSegmentMetadataFinishTime = System.currentTimeMillis();
+    LOGGER.info("Deleting table {}: Removed segment metadata in {}ms", offlineTableName,
+        (removeSegmentMetadataFinishTime - removeStoredSegmentsFinishTime));
 
     // Remove table config
     ZKMetadataProvider.removeResourceConfigFromPropertyStore(_propertyStore, offlineTableName);
     long removeTableConfigFinishTime = System.currentTimeMillis();
-    LOGGER.info("Finish removing table config in {}ms", (removeTableConfigFinishTime - removeSegmentFinishTime));
+    LOGGER.info("Deleting table {}: Removed table config in {}ms", offlineTableName,
+        (removeTableConfigFinishTime - removeSegmentMetadataFinishTime));
 
     // Remove replica group partition assignment
     ZKMetadataProvider.removeInstancePartitionAssignmentFromPropertyStore(_propertyStore, offlineTableName);
     long removeReplicaGroupPartitionAssignment = System.currentTimeMillis();
-    LOGGER.info("Finish removing replica group partition assignment in {}ms",
+    LOGGER.info("Deleting table {}: Removed replica group partition assignment in {}ms", offlineTableName,
         (removeReplicaGroupPartitionAssignment - removeTableConfigFinishTime));
-    LOGGER.info("Finish deleting table {} in {}ms", offlineTableName,
+    LOGGER.info("Deleting table {}: Finish in {}ms", offlineTableName,
         (removeReplicaGroupPartitionAssignment - startTime));
   }
 
-  public void deleteRealtimeTable(String tableName) {
-    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
-    LOGGER.info("Start deleting table: {}", realtimeTableName);
+  public void deleteRealtimeTable(String rawTableName) {
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(rawTableName);
+    LOGGER.info("Deleting table {}: Start", realtimeTableName);
     long startTime = System.currentTimeMillis();
 
     // Remove the table from brokerResource
     HelixHelper.removeResourceFromBrokerIdealState(_helixZkManager, realtimeTableName);
     long removeFromBrokerResourceFinishTime = System.currentTimeMillis();
-    LOGGER.info("Finish removing resource from broker resource in {}ms",
+    LOGGER.info("Deleting table {}: Removed from broker resource in {}ms", realtimeTableName,
         (removeFromBrokerResourceFinishTime - startTime));
 
     // Cache the state and drop the table
@@ -1379,19 +1387,27 @@ public class PinotHelixResourceManager {
       instancesForTable = getAllInstancesForTable(realtimeTableName);
       _helixAdmin.dropResource(_helixClusterName, realtimeTableName);
     }
-    long dropTableFinishTime = System.currentTimeMillis();
-    LOGGER.info("Finish dropping table in {}ms", (dropTableFinishTime - removeFromBrokerResourceFinishTime));
+    long removeTableResourceFinishTime = System.currentTimeMillis();
+    LOGGER.info("Deleting table {}: Removed helix table resource in {}ms", realtimeTableName,
+        (removeTableResourceFinishTime - removeFromBrokerResourceFinishTime));
 
-    // Remove all segments for the table
+    // Remove all stored segments for the table
     _segmentDeletionManager.removeSegmentsFromStore(realtimeTableName, getSegmentsFor(realtimeTableName));
+    long removeStoredSegmentsFinishTime = System.currentTimeMillis();
+    LOGGER.info("Deleting table {}: Removed stored segments in {}ms", realtimeTableName,
+        (removeStoredSegmentsFinishTime - removeTableResourceFinishTime));
+
+    // Remove segment metadata
     ZKMetadataProvider.removeResourceSegmentsFromPropertyStore(_propertyStore, realtimeTableName);
-    long removeSegmentFinishTime = System.currentTimeMillis();
-    LOGGER.info("Finish removing segments in {}ms", (removeSegmentFinishTime - dropTableFinishTime));
+    long removeSegmentMetadataFinishTime = System.currentTimeMillis();
+    LOGGER.info("Deleting table {}: Removed segment metadata in {}ms", realtimeTableName,
+        (removeSegmentMetadataFinishTime - removeStoredSegmentsFinishTime));
 
     // Remove table config
     ZKMetadataProvider.removeResourceConfigFromPropertyStore(_propertyStore, realtimeTableName);
     long removeTableConfigFinishTime = System.currentTimeMillis();
-    LOGGER.info("Finish removing table config in {}ms", (removeTableConfigFinishTime - removeSegmentFinishTime));
+    LOGGER.info("Deleting table {}: Removed table config in {}ms", realtimeTableName,
+        (removeTableConfigFinishTime - removeSegmentMetadataFinishTime));
 
     // Remove groupId/PartitionId mapping for HLC table
     if (instancesForTable != null) {
@@ -1404,9 +1420,9 @@ public class PinotHelixResourceManager {
       }
     }
     long removeReplicaGroupPartitionAssignment = System.currentTimeMillis();
-    LOGGER.info("Finish removing replica group partition assignment in {}ms",
+    LOGGER.info("Deleting table {}: Removed replica group partition assignment in {}ms", realtimeTableName,
         (removeReplicaGroupPartitionAssignment - removeTableConfigFinishTime));
-    LOGGER.info("Finish deleting table {} in {}ms", realtimeTableName,
+    LOGGER.info("Deleting table {}: Finish in {}ms", realtimeTableName,
         (removeReplicaGroupPartitionAssignment - startTime));
   }
 
