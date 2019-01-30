@@ -24,6 +24,9 @@ import org.apache.pinot.thirdeye.dataframe.DoubleSeries;
 import org.apache.pinot.thirdeye.dataframe.LongSeries;
 import org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils;
 
+import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
+
+
 /**
  * Time series. wrapper object of data frame. Used by baselineProvider to return the predicted time series
  */
@@ -39,7 +42,7 @@ public class TimeSeries {
    * @param timestamps
    */
   public void addTimeStamps(LongSeries timestamps) {
-    this.df.addSeries(DataFrameUtils.COL_TIME, timestamps);
+    this.df.addSeries(COL_TIME, timestamps).setIndex(COL_TIME);
   }
 
   /**
@@ -52,7 +55,7 @@ public class TimeSeries {
 
   public static TimeSeries fromDataFrame(DataFrame df) {
     TimeSeries ts = new TimeSeries();
-    ts.df.addSeries(DataFrameUtils.COL_TIME, df.get(DataFrameUtils.COL_TIME));
+    ts.df.addSeries(COL_TIME, df.get(COL_TIME)).setIndex(COL_TIME);
     ts.df.addSeries(DataFrameUtils.COL_VALUE, df.get(DataFrameUtils.COL_VALUE));
     return ts;
   }

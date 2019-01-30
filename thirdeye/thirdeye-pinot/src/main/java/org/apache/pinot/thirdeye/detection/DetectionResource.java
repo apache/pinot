@@ -67,6 +67,7 @@ import org.apache.pinot.thirdeye.datasource.loader.TimeSeriesLoader;
 import org.apache.pinot.thirdeye.detection.finetune.GridSearchTuningAlgorithm;
 import org.apache.pinot.thirdeye.detection.finetune.TuningAlgorithm;
 import org.apache.pinot.thirdeye.detection.spi.model.AnomalySlice;
+import org.apache.pinot.thirdeye.detection.spi.model.TimeSeries;
 import org.joda.time.DateTime;
 import org.joda.time.Interval;
 import org.quartz.CronExpression;
@@ -473,6 +474,22 @@ public class DetectionResource {
     this.anomalyDAO.save(anomaly);
 
     return Response.ok(anomaly.getId()).build();
+  }
+
+  @GET
+  @ApiOperation("get the predicted baseline for an anomaly within a time range")
+  @Path(value = "/predicted-baseline/{anomalyId}")
+  public Response getPredictedBaseline(
+    @PathParam("anomalyId") @ApiParam("anomalyId") long anomalyId,
+      @QueryParam("start") long start,
+      @QueryParam("end") long end
+  ) throws Exception {
+    MergedAnomalyResultDTO anomaly = anomalyDAO.findById(anomalyId);
+    if (anomaly == null) {
+      throw new IllegalArgumentException(String.format("Could not resolve anomaly id %d", anomalyId));
+    }
+    TimeSeries ts = DetectionUtils.getBaselineTimeseries(anomaly, configDAO.findById(anomaly.getId()), start, end, loader, provider);
+    return Response.ok(ts.getDataFrame()).build();
   }
 
 }

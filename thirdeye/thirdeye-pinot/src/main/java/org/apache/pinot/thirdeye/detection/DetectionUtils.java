@@ -25,13 +25,19 @@ import org.apache.pinot.thirdeye.dataframe.BooleanSeries;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
 import org.apache.pinot.thirdeye.dataframe.LongSeries;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
+import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
+import org.apache.pinot.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.EventDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.pojo.MetricConfigBean;
 import org.apache.pinot.thirdeye.detection.DataProvider;
+import org.apache.pinot.thirdeye.detection.components.RuleBaselineProvider;
+import org.apache.pinot.thirdeye.detection.spec.RuleBaselineProviderSpec;
 import org.apache.pinot.thirdeye.detection.spi.components.BaseComponent;
+import org.apache.pinot.thirdeye.detection.spi.components.BaselineProvider;
 import org.apache.pinot.thirdeye.detection.spi.model.AnomalySlice;
 import org.apache.pinot.thirdeye.detection.spi.model.EventSlice;
 import org.apache.pinot.thirdeye.detection.spi.model.InputData;
@@ -45,6 +51,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
+import org.apache.pinot.thirdeye.detection.spi.model.TimeSeries;
+import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.Period;
@@ -53,6 +61,8 @@ import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
 
 
 public class DetectionUtils {
+  private static final String PROP_BASELINE_PROVIDER_COMPONENT_NAME = "baselineProviderComponentName";
+
   // TODO anomaly should support multimap
   public static DimensionMap toFilterMap(Multimap<String, String> filters) {
     DimensionMap map = new DimensionMap();
@@ -174,5 +184,37 @@ public class DetectionUtils {
       return -1L;
     }
     return Collections.min(nestedLastTimeStamps);
+  }
+
+  /**
+   * Get the predicted baseline for a anomaly in a time range. Will return wo1w if baseline provider not available.
+   * @param anomaly the anomaly
+   * @param config the detection config
+   * @param start start time
+   * @param end end time
+   * @param loader detection pipeline loader
+   * @param provider data provider
+   * @return baseline time series
+   * @throws Exception
+   */
+  public static TimeSeries getBaselineTimeseries(MergedAnomalyResultDTO anomaly, DetectionConfigDTO config,
+      long start, long end, DetectionPipelineLoader loader, DataProvider provider) throws Exception {
+    String baselineProviderComponentName = anomaly.getProperties().get(PROP_BASELINE_PROVIDER_COMPONENT_NAME);
+    BaselineProvider baselineProvider = new RuleBaselineProvider();
+    MetricEntity me = MetricEntity.fromURN(anomaly.getMetricUrn());
+
+    if (baselineProviderComponentName != null && config != null &&
+        config.getComponentSpecs().containsKey(baselineProviderComponentName)) {
+      // load pipeline and init components
+      loader.from(provider, config, start, end);
+      baselineProvider = (BaselineProvider) config.getComponents().get(baselineProviderComponentName);
+    } else {
+      // use wow instead
+      RuleBaselineProviderSpec spec = new RuleBaselineProviderSpec();
+      spec.setOffset("wo1w");
+      InputDataFetcher dataFetcher = new DefaultInputDataFetcher(provider, config.getId());
+      baselineProvider.init(spec, dataFetcher);
+    }
+    return baselineProvider.computePredictedTimeSeries(MetricSlice.from(me.getId(), start, end, me.getFilters()));
   }
 }

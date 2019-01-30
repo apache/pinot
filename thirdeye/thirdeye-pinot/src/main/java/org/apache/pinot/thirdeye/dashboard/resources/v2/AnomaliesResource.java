@@ -39,6 +39,7 @@ import org.apache.pinot.thirdeye.api.TimeSpec;
 import org.apache.pinot.thirdeye.constant.AnomalyFeedbackType;
 import org.apache.pinot.thirdeye.constant.AnomalyResultSource;
 import org.apache.pinot.thirdeye.dashboard.Utils;
+import org.apache.pinot.thirdeye.datalayer.bao.EventManager;
 import org.apache.pinot.thirdeye.datasource.loader.AggregationLoader;
 import org.apache.pinot.thirdeye.datasource.loader.DefaultAggregationLoader;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.pojo.AnomaliesWrapper;
@@ -70,23 +71,22 @@ import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
 import org.apache.pinot.thirdeye.datasource.cache.QueryCache;
 import org.apache.pinot.thirdeye.datasource.loader.DefaultTimeSeriesLoader;
 import org.apache.pinot.thirdeye.datasource.loader.TimeSeriesLoader;
+import org.apache.pinot.thirdeye.detection.DataProvider;
+import org.apache.pinot.thirdeye.detection.DefaultDataProvider;
+import org.apache.pinot.thirdeye.detection.DetectionPipelineLoader;
+import org.apache.pinot.thirdeye.detection.DetectionUtils;
 import org.apache.pinot.thirdeye.detector.email.filter.AlertFilterFactory;
 import org.apache.pinot.thirdeye.detector.function.AnomalyFunctionFactory;
 import org.apache.pinot.thirdeye.detector.function.BaseAnomalyFunction;
 import org.apache.pinot.thirdeye.detector.metric.transfer.MetricTransfer;
 import org.apache.pinot.thirdeye.detector.metric.transfer.ScalingFactor;
-import org.apache.pinot.thirdeye.rootcause.timeseries.Baseline;
-import org.apache.pinot.thirdeye.rootcause.timeseries.BaselineAggregate;
-import org.apache.pinot.thirdeye.rootcause.timeseries.BaselineAggregateType;
 import org.apache.pinot.thirdeye.util.AnomalyOffset;
 import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -153,12 +153,17 @@ public class AnomaliesResource {
   private final AnomalyFunctionManager anomalyFunctionDAO;
   private final DatasetConfigManager datasetConfigDAO;
   private final DetectionConfigManager detectionDAO;
+  private final EventManager eventDAO;
+  private final MergedAnomalyResultManager anomalyDAO;
+
   private final ExecutorService threadPool;
   private final AlertFilterFactory alertFilterFactory;
   private final AnomalyFunctionFactory anomalyFunctionFactory;
 
   private final TimeSeriesLoader timeSeriesLoader;
   private final AggregationLoader aggregationLoader;
+  private final DetectionPipelineLoader loader;
+  private final DataProvider provider;
 
   public AnomaliesResource(AnomalyFunctionFactory anomalyFunctionFactory, AlertFilterFactory alertFilterFactory) {
     this.metricConfigDAO = DAO_REGISTRY.getMetricConfigDAO();
@@ -170,12 +175,17 @@ public class AnomaliesResource {
     this.threadPool = Executors.newFixedThreadPool(NUM_EXECS);
     this.alertFilterFactory = alertFilterFactory;
     this.anomalyFunctionFactory = anomalyFunctionFactory;
+    this.eventDAO = DAORegistry.getInstance().getEventDAO();
+    this.anomalyDAO = DAORegistry.getInstance().getMergedAnomalyResultDAO();
 
     QueryCache queryCache = ThirdEyeCacheRegistry.getInstance().getQueryCache();
     LoadingCache<String, Long> maxTimeCache = ThirdEyeCacheRegistry.getInstance().getDatasetMaxDataTimeCache();
 
     this.timeSeriesLoader = new DefaultTimeSeriesLoader(this.metricConfigDAO, this.datasetConfigDAO, queryCache);
     this.aggregationLoader = new DefaultAggregationLoader(this.metricConfigDAO, this.datasetConfigDAO, queryCache, maxTimeCache);
+    this.loader = new DetectionPipelineLoader();
+
+    this.provider = new DefaultDataProvider(this.metricConfigDAO, this.datasetConfigDAO, this.eventDAO, this.anomalyDAO, this.timeSeriesLoader, this.aggregationLoader, this.loader);
   }
 
   @GET
@@ -899,16 +909,12 @@ public class AnomaliesResource {
     String dataset = datasetConfig.getDataset();
     String metricName = mergedAnomaly.getMetric();
 
-    if (mergedAnomaly.getFunctionId() == null) {
-      if (mergedAnomaly.getDetectionConfigId() == null) {
-        return null;
-      }
+    if (mergedAnomaly.getDetectionConfigId() != null) {
 
       DetectionConfigDTO detectionConfig = this.detectionDAO.findById(mergedAnomaly.getDetectionConfigId());
       if (detectionConfig == null) {
         return null;
       }
-
       return constructAnomalyDetails(mergedAnomaly, detectionConfig);
     }
 
@@ -1113,18 +1119,10 @@ public class AnomaliesResource {
 
     // TODO parallel load
     // TODO type from agg function
-    Baseline baseline = BaselineAggregate.fromWeekOverWeek(BaselineAggregateType.MEDIAN, 1, 1, dataTimeZone);
-
     MetricSlice sliceAnomalyCurrent = MetricSlice.from(metric.getId(), anomaly.getStartTime(), anomaly.getEndTime(), filters);
 
-    Collection<MetricSlice> slicesAnomalyBaseline = baseline.scatter(sliceAnomalyCurrent);
-    Map<MetricSlice, DataFrame> anomalyBaselineMap = new HashMap<>();
-    for (MetricSlice slice : slicesAnomalyBaseline) {
-      anomalyBaselineMap.put(slice, fixTimestamp(this.aggregationLoader.loadAggregate(slice, Collections.<String>emptyList(), -1), slice.getStart()));
-    }
-
-    details.setCurrent(makeStringValue(this.aggregationLoader.loadAggregate(sliceAnomalyCurrent, Collections.<String>emptyList(), -1)));
-    details.setBaseline(makeStringValue(baseline.gather(sliceAnomalyCurrent, anomalyBaselineMap)));
+    details.setCurrent(makeStringValue(new DataFrame().addSeries(COL_VALUE, anomaly.getAvgCurrentVal())));
+    details.setBaseline(makeStringValue(new DataFrame().addSeries(COL_VALUE, anomaly.getAvgBaselineVal())));
 
     AnomalyOffset offsets = BaseAnomalyFunction.getDefaultOffsets(dataset);
 
@@ -1132,15 +1130,8 @@ public class AnomaliesResource {
         .withStart(new DateTime(sliceAnomalyCurrent.getStart(), dataTimeZone).minus(offsets.getPreOffsetPeriod()).getMillis())
         .withEnd(new DateTime(sliceAnomalyCurrent.getEnd(), dataTimeZone).plus(offsets.getPostOffsetPeriod()).getMillis());
 
-    Collection<MetricSlice> slicesViewBaseline = baseline.scatter(sliceViewCurrent);
-    Map<MetricSlice, DataFrame> viewBaselineMap = new HashMap<>();
-    for (MetricSlice slice : slicesViewBaseline) {
-      viewBaselineMap.put(slice, this.timeSeriesLoader.load(slice));
-    }
-
     DataFrame dfCurrent = this.timeSeriesLoader.load(sliceViewCurrent);
-    DataFrame dfBaseline = baseline.gather(sliceViewCurrent, viewBaselineMap);
-
+    DataFrame dfBaseline = DetectionUtils.getBaselineTimeseries(anomaly, config, sliceViewCurrent.getStart(), sliceViewCurrent.getEnd(), this.loader, this.provider).getDataFrame();
     DataFrame dfAligned = dfCurrent.renameSeries(COL_VALUE, COL_CURRENT).joinOuter(
         dfBaseline.renameSeries(COL_VALUE, COL_BASELINE));
 
