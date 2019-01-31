@@ -71,9 +71,17 @@ export default Component.extend({
     if (_.isEmpty(metricUrn)) { return []; }
 
     const pageKeys = toFilters(metricUrn).filter(t => t[0] === 'page_key').map(t => t[2]);
-    if (_.isEmpty(pageKeys)) { return ['none']; }
 
     return pageKeys;
+  }),
+
+  /**
+   * Tracks presence of page keys
+   * @type {boolean}
+   */
+  hasPageKeys: computed('pageKeys', function () {
+    const { pageKeys } = getProperties(this, 'pageKeys');
+    return !_.isEmpty(pageKeys);
   }),
 
   /**
@@ -108,7 +116,12 @@ export default Component.extend({
    */
   _parse(value) {
     const f = parseFloat(value);
-    if (!Number.isNaN(f)) { return (f / 1000.0).toFixed(3); }
+    if (!Number.isNaN(f)) {
+      if (f >= 100) {
+        return Math.round(f);
+      }
+      return (f / 1000.0).toFixed(3);
+    }
     return value;
   },
 

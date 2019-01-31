@@ -13,6 +13,11 @@ export default [
     title: 'API',
     className: 'metrics-table__column metrics-table__column--text'
   }, {
+    propertyName: 'currCount',
+    title: 'Traffic',
+    disableFiltering: true,
+    className: 'metrics-table__column metrics-table__column--small'
+  }, {
     propertyName: 'diffAverage',
     title: 'Change in Avg. Latency',
     disableFiltering: true,
