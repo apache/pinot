@@ -578,7 +578,7 @@ public class RunAdhocDatabaseQueriesTool {
 
   public static void main(String[] args) throws Exception {
 
-    File persistenceFile = new File("/home/akrai/persistence.yml");
+    File persistenceFile = new File(args[0]);
     if (!persistenceFile.exists()) {
       System.err.println("Missing file:" + persistenceFile);
       System.exit(1);
