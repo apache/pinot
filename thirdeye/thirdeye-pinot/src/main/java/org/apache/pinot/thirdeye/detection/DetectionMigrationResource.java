@@ -547,8 +547,44 @@ public class DetectionMigrationResource {
   }
 
   @POST
+  @Produces(MediaType.APPLICATION_JSON)
+  @Consumes(MediaType.APPLICATION_JSON)
   @Path("/anomaly-function/{id}")
   public Response migrateAnomalyFunction(@PathParam("id") long anomalyFunctionId) throws Exception {
     return Response.ok(migrateLegacyAnomalyFunction(anomalyFunctionId)).build();
+  }
+
+  @POST
+  @Produces(MediaType.APPLICATION_JSON)
+  @Consumes(MediaType.APPLICATION_JSON)
+  @Path("/unsubscribed-anomaly-functions")
+  public Response migrateAnomalyFunction() throws Exception {
+    List<AnomalyFunctionDTO> anomalyFunctionDTOs = anomalyFunctionDAO.findAll();
+    Map<String, String> responseMessage = new HashMap<>();
+
+    for (AnomalyFunctionDTO func : anomalyFunctionDTOs) {
+      if (func.getFunctionName().contains(MIGRATED_TAG)) {
+        LOGGER.info("[MIG] Function already migrated. Name " + func.getFunctionName());
+        continue;
+      }
+
+      try {
+        validateFunction(func);
+      } catch (ValidationException e) {
+        LOGGER.info("[MIG] Function failed validation. Name " + func.getFunctionName() + " Error : " + e.getMessage());
+        continue;
+      }
+
+      try {
+        migrateLegacyAnomalyFunction(func);
+      } catch (Exception e) {
+        // Skip migrating this function and move on to the next
+        responseMessage.put("Status of function " + func.getId(),
+            String.format("Failed to migrate function ID %d with name %s due to %s", func.getId(),
+                func.getFunctionName(), e.getMessage()));
+      }
+    }
+
+    return Response.ok(responseMessage).build();
   }
 }
