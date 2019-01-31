@@ -25,6 +25,7 @@ const ROOTCAUSE_TAB_DIMENSIONS = 'dimensions';
 const ROOTCAUSE_TAB_METRICS = 'metrics';
 const ROOTCAUSE_TAB_EVENTS = 'events';
 const ROOTCAUSE_TAB_TREND = 'trend';
+const ROOTCAUSE_TAB_CALLGRAPH = 'callgraph';
 
 const ROOTCAUSE_SETUP_MODE_CONTEXT = "context";
 const ROOTCAUSE_SETUP_MODE_SELECTED = "selected";
@@ -39,6 +40,7 @@ const ROOTCAUSE_SERVICE_TIMESERIES = 'timeseries';
 const ROOTCAUSE_SERVICE_AGGREGATES = 'aggregates';
 const ROOTCAUSE_SERVICE_BREAKDOWNS = 'breakdowns';
 const ROOTCAUSE_SERVICE_ANOMALY_FUNCTIONS = 'anomalyFunctions';
+const ROOTCAUSE_SERVICE_CALLGRAPH = 'callgraph';
 const ROOTCAUSE_SERVICE_ALL = 'all';
 
 const ROOTCAUSE_SESSION_TIMER_INTERVAL = 300000;
@@ -97,6 +99,8 @@ export default Controller.extend({
   sessionService: service('services/rootcause-session-datasource'),
 
   anomalyFunctionService: service('services/rootcause-anomalyfunction-cache'),
+
+  callgraphService: service('services/rootcause-callgraph-cache'),
 
   //
   // user details
@@ -297,6 +301,9 @@ export default Controller.extend({
    *
    * anomalyfunctions: anomaly function baselines for display in chart
    *                   (typically displayed in timeseries chart)
+   *
+   * callgraph:        service call graph edges as ranked by the backend
+   *                   (typically displayed in call graph table)
    */
   _contextObserver: observer(
     'context',
@@ -305,8 +312,8 @@ export default Controller.extend({
     'sizeMetricUrns',
     'activeTab',
     function () {
-      const { context, selectedUrns, sizeMetricUrns, entitiesService, timeseriesService, aggregatesService, breakdownsService, scoresService, anomalyFunctionService, activeTab, setupMode } =
-        getProperties(this, 'context', 'selectedUrns', 'sizeMetricUrns', 'entitiesService', 'timeseriesService', 'aggregatesService', 'breakdownsService', 'scoresService', 'anomalyFunctionService', 'activeTab', 'setupMode');
+      const { context, selectedUrns, sizeMetricUrns, entitiesService, timeseriesService, aggregatesService, breakdownsService, scoresService, anomalyFunctionService, callgraphService, activeTab, setupMode } =
+        getProperties(this, 'context', 'selectedUrns', 'sizeMetricUrns', 'entitiesService', 'timeseriesService', 'aggregatesService', 'breakdownsService', 'scoresService', 'anomalyFunctionService', 'callgraphService', 'activeTab', 'setupMode');
       if (!context || !selectedUrns) {
         return;
       }
@@ -388,6 +395,13 @@ export default Controller.extend({
       const anomalyOffsetUrns = [...anomalyMetricUrns]
         .map(urn => [].concat(anomalyOffsets.map(offset => toOffsetUrn(urn, offset))))
         .reduce((agg, l) => agg.concat(l), []);
+
+      //
+      // call graph
+      //
+      if (activeTab === ROOTCAUSE_SERVICE_CALLGRAPH) {
+        callgraphService.request(context, [...context.urns]);
+      }
 
       aggregatesService.request(context, new Set([...offsetUrns, ...anomalyOffsetUrns]));
 
@@ -483,6 +497,12 @@ export default Controller.extend({
    * @type {object}
    */
   scores: reads('scoresService.scores'),
+
+  /**
+   * Subscribed callgraph edges cache
+   * @type {object}
+   */
+  edges: reads('callgraphService.edges'),
 
   /**
    * Primary metric urn for rootcause search
@@ -610,6 +630,8 @@ export default Controller.extend({
   isLoadingAnomalyFunctions: gt('anomalyFunctionService.pending.size', 0),
 
   isLoadingMetricData: or('isLoadingAggregates', 'isLoadingScores'),
+
+  isLoadingCallgraph: gt('callgraphService.pending.size', 0),
 
   loadingFrameworks: reads('entitiesService.pending'),
 
@@ -1161,8 +1183,8 @@ export default Controller.extend({
      * Clears error logs of data services and/or route
      */
     clearErrors(type) {
-      const { entitiesService, timeseriesService, aggregatesService, breakdownsService, anomalyFunctionService } =
-        getProperties(this, 'entitiesService', 'timeseriesService', 'aggregatesService', 'breakdownsService', 'anomalyFunctionService');
+      const { entitiesService, timeseriesService, aggregatesService, breakdownsService, anomalyFunctionService, callgraphService } =
+        getProperties(this, 'entitiesService', 'timeseriesService', 'aggregatesService', 'breakdownsService', 'anomalyFunctionService', 'callgraphService');
 
       switch(type) {
         case ROOTCAUSE_SERVICE_ENTITIES:
@@ -1185,6 +1207,10 @@ export default Controller.extend({
           anomalyFunctionService.clearErrors();
           break;
 
+        case ROOTCAUSE_SERVICE_CALLGRAPH:
+          callgraphService.clearErrors();
+          break;
+
         case ROOTCAUSE_SERVICE_ROUTE:
           setProperties(this, { routeErrors: new Set() });
           break;
@@ -1195,6 +1221,7 @@ export default Controller.extend({
           aggregatesService.clearErrors();
           breakdownsService.clearErrors();
           anomalyFunctionService.clearErrors();
+          callgraphService.clearErrors();
           break;
 
       }
