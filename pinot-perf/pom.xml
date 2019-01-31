@@ -93,6 +93,7 @@
     <dependency>
       <groupId>org.openjdk.jmh</groupId>
       <artifactId>jmh-core</artifactId>
+      <version>1.15</version>
       <exclusions>
         <exclusion>
           <groupId>net.sf.jopt-simple</groupId>
@@ -101,13 +102,14 @@
       </exclusions>
     </dependency>
     <dependency>
-      <groupId>net.sf.jopt-simple</groupId>
-      <artifactId>jopt-simple</artifactId>
-    </dependency>
-    <dependency>
       <groupId>org.openjdk.jmh</groupId>
       <artifactId>jmh-generator-annprocess</artifactId>
+      <version>1.15</version>
       <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>net.sf.jopt-simple</groupId>
+      <artifactId>jopt-simple</artifactId>
     </dependency>
   </dependencies>
   <build>
@@ -118,12 +120,60 @@
         <configuration>
           <programs>
             <program>
-              <mainClass>org.apache.pinot.perf.PerfBenchmarkTest</mainClass>
-              <name>pinot-perfBenchmarkTest</name>
+              <mainClass>org.apache.pinot.perf.BenchmarkDictionary</mainClass>
+              <name>pinot-BenchmarkDictionary</name>
             </program>
             <program>
-              <mainClass>org.apache.pinot.perf.PerfBenchmarkRunner</mainClass>
-              <name>pinot-perfBenchmarkRunner</name>
+              <mainClass>org.apache.pinot.perf.BenchmarkDictionaryCreation</mainClass>
+              <name>pinot-BenchmarkDictionaryCreation</name>
+            </program>
+            <program>
+              <mainClass>org.apache.pinot.perf.BenchmarkFixedIntArrayOffHeapIdMap</mainClass>
+              <name>pinot-BenchmarkFixedIntArrayOffHeapIdMap</name>
+            </program>
+            <program>
+              <mainClass>org.apache.pinot.perf.BenchmarkOffHeapDictionaryMemory</mainClass>
+              <name>pinot-BenchmarkOffHeapDictionaryMemory</name>
+            </program>
+            <program>
+              <mainClass>org.apache.pinot.perf.BenchmarkOfflineIndexReader</mainClass>
+              <name>pinot-BenchmarkOfflineIndexReader</name>
+            </program>
+            <program>
+              <mainClass>org.apache.pinot.perf.BenchmarkOrDocIdIterator</mainClass>
+              <name>pinot-BenchmarkOrDocIdIterator</name>
+            </program>
+            <program>
+              <mainClass>org.apache.pinot.perf.BenchmarkQueryEngine</mainClass>
+              <name>pinot-BenchmarkQueryEngine</name>
+            </program>
+            <program>
+              <mainClass>org.apache.pinot.perf.BenchmarkRealtimeConsumptionSpeed</mainClass>
+              <name>pinot-BenchmarkRealtimeConsumptionSpeed</name>
+            </program>
+            <program>
+              <mainClass>org.apache.pinot.perf.BenchmarkStringDictionary</mainClass>
+              <name>pinot-BenchmarkStringDictionary</name>
+            </program>
+            <program>
+              <mainClass>org.apache.pinot.perf.DictionaryDumper</mainClass>
+              <name>pinot-DictionaryDumper</name>
+            </program>
+            <program>
+              <mainClass>org.apache.pinot.perf.ForwardIndexWriterBenchmark</mainClass>
+              <name>pinot-ForwardIndexWriterBenchmark</name>
+            </program>
+            <program>
+              <mainClass>org.apache.pinot.perf.RawIndexBenchmark</mainClass>
+              <name>pinot-RawIndexBenchmark</name>
+            </program>
+            <program>
+              <mainClass>org.apache.pinot.perf.RealtimeStressTest</mainClass>
+              <name>pinot-RealtimeStressTest</name>
+            </program>
+            <program>
+              <mainClass>org.apache.pinot.perf.StringDictionaryPerfTest</mainClass>
+              <name>pinot-StringDictionaryPerfTest</name>
             </program>
           </programs>
           <repositoryLayout>flat</repositoryLayout>

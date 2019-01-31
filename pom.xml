@@ -114,7 +114,7 @@
     <jackson.version>2.9.8</jackson.version>
     <async-http-client.version>1.9.21</async-http-client.version>
     <jersey.version>2.28</jersey.version>
-    <swagger.version>1.5.10</swagger.version>
+    <swagger.version>1.5.16</swagger.version>
     <hadoop.version>2.7.0</hadoop.version>
     <antlr.version>4.6</antlr.version>
     <!-- commons-configuration, hadoop-common, hadoop-client use commons-lang -->
@@ -284,7 +284,7 @@
       <dependency>
         <groupId>org.testng</groupId>
         <artifactId>testng</artifactId>
-        <version>6.0.1</version>
+        <version>6.11</version>
       </dependency>
       <dependency>
         <groupId>me.lemire.integercompression</groupId>
@@ -304,7 +304,7 @@
       <dependency>
         <groupId>com.google.guava</groupId>
         <artifactId>guava</artifactId>
-        <version>19.0</version>
+        <version>20.0</version>
       </dependency>
       <dependency>
         <groupId>com.microsoft.azure</groupId>
@@ -709,16 +709,6 @@
         <groupId>com.github.jnr</groupId>
         <artifactId>jnr-posix</artifactId>
         <version>3.0.12</version>
-      </dependency>
-      <dependency>
-        <groupId>org.openjdk.jmh</groupId>
-        <artifactId>jmh-generator-annprocess</artifactId>
-        <version>1.8</version>
-      </dependency>
-      <dependency>
-        <groupId>org.openjdk.jmh</groupId>
-        <artifactId>jmh-core</artifactId>
-        <version>1.15</version>
       </dependency>
       <dependency>
         <groupId>args4j</groupId>

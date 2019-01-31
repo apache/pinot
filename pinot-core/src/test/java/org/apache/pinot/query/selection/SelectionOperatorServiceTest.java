@@ -135,8 +135,9 @@ public class SelectionOperatorServiceTest {
         {0L, 1.0, 2.0, 3.0, "4", new long[]{5L}, new double[]{6.0}, new double[]{7.0}, new double[]{8.0}, new String[]{"9"}};
     Serializable[] expectedCompatibleRow1 =
         {1L, 2.0, 3.0, 4.0, "5", new long[]{6L}, new double[]{7.0}, new double[]{8.0}, new double[]{9.0}, new String[]{"10"}};
-    Assert.assertEquals(SelectionOperatorUtils.extractRowFromDataTable(dataTable, 0), expectedRow1);
-    Assert.assertEquals(SelectionOperatorUtils.extractRowFromDataTable(dataTable, 1), expectedCompatibleRow1);
+    Assert.assertTrue(Arrays.deepEquals(SelectionOperatorUtils.extractRowFromDataTable(dataTable, 0), expectedRow1));
+    Assert.assertTrue(
+        Arrays.deepEquals(SelectionOperatorUtils.extractRowFromDataTable(dataTable, 1), expectedCompatibleRow1));
   }
 
   @Test
@@ -153,8 +154,9 @@ public class SelectionOperatorServiceTest {
         {0, 1L, 2.0F, 3.0, "4", new int[]{5}, new long[]{6L}, new float[]{7.0F}, new double[]{8.0}, new String[]{"9"}};
     Serializable[] expectedRow2 =
         {1L, 2.0F, 3.0, 4, "5", new long[]{6L}, new float[]{7.0F}, new double[]{8.0}, new int[]{9}, new String[]{"10"}};
-    Assert.assertEquals(resultRows.get(0), expectedRow1);
-    Assert.assertEquals(resultRows.get(1), expectedRow2);
+
+    Assert.assertTrue(Arrays.deepEquals(resultRows.get(0), expectedRow1));
+    Assert.assertTrue(Arrays.deepEquals(resultRows.get(1), expectedRow2));
 
     int[] columnIndices =
         SelectionOperatorUtils.getColumnIndicesWithoutOrdering(selectionResults.getColumns(), _dataSchema);
@@ -166,8 +168,8 @@ public class SelectionOperatorServiceTest {
         {"0", "1.0", "2.0", "3.0", "4", new String[]{"5"}, new String[]{"6.0"}, new String[]{"7.0"}, new String[]{"8.0"}, new String[]{"9"}};
     Serializable[] expectedFormattedRow2 =
         {"1", "2.0", "3.0", "4.0", "5", new String[]{"6"}, new String[]{"7.0"}, new String[]{"8.0"}, new String[]{"9.0"}, new String[]{"10"}};
-    Assert.assertEquals(resultRows.get(0), expectedFormattedRow1);
-    Assert.assertEquals(resultRows.get(1), expectedFormattedRow2);
+    Assert.assertTrue(Arrays.deepEquals(resultRows.get(0), expectedFormattedRow1));
+    Assert.assertTrue(Arrays.deepEquals(resultRows.get(1), expectedFormattedRow2));
   }
 
   @Test
@@ -186,8 +188,8 @@ public class SelectionOperatorServiceTest {
         {1L, 2.0F, 3.0, 4, "5", new long[]{6L}, new float[]{7.0F}, new double[]{8.0}, new int[]{9}, new String[]{"10"}};
     Serializable[] expectedRow2 =
         {0, 1L, 2.0F, 3.0, "4", new int[]{5}, new long[]{6L}, new float[]{7.0F}, new double[]{8.0}, new String[]{"9"}};
-    Assert.assertEquals(resultRows.get(0), expectedRow1);
-    Assert.assertEquals(resultRows.get(1), expectedRow2);
+    Assert.assertTrue(Arrays.deepEquals(resultRows.get(0), expectedRow1));
+    Assert.assertTrue(Arrays.deepEquals(resultRows.get(1), expectedRow2));
 
     int[] columnIndices =
         SelectionOperatorUtils.getColumnIndicesWithOrdering(selectionResults.getColumns(), _dataSchema);
@@ -197,7 +199,7 @@ public class SelectionOperatorServiceTest {
         {"1", "2.0", "3.0", "4.0", "5", new String[]{"6"}, new String[]{"7.0"}, new String[]{"8.0"}, new String[]{"9.0"}, new String[]{"10"}};
     Serializable[] expectedFormattedRow2 =
         {"0", "1.0", "2.0", "3.0", "4", new String[]{"5"}, new String[]{"6.0"}, new String[]{"7.0"}, new String[]{"8.0"}, new String[]{"9"}};
-    Assert.assertEquals(resultRows.get(0), expectedFormattedRow1);
-    Assert.assertEquals(resultRows.get(1), expectedFormattedRow2);
+    Assert.assertTrue(Arrays.deepEquals(resultRows.get(0), expectedFormattedRow1));
+    Assert.assertTrue(Arrays.deepEquals(resultRows.get(1), expectedFormattedRow2));
   }
 }
