@@ -74,7 +74,7 @@ public abstract class YamlDetectionConfigTranslator {
   /**
    * Fill in common fields of detection config. Properties of the pipeline is filled by the subclass.
    */
-  DetectionConfigDTO generateDetectionConfig() {
+  public DetectionConfigDTO generateDetectionConfig() {
     validateYAML(yamlConfig);
 
     DetectionConfigDTO config = new DetectionConfigDTO();

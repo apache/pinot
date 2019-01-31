@@ -62,6 +62,8 @@ public class CSVThirdEyeDataSource implements ThirdEyeDataSource {
    */
   public static final String COL_TIMESTAMP = "timestamp";
 
+  public static final String DATA_SOURCE_NAME = CSVThirdEyeDataSource.class.getSimpleName();
+
   /**
    * The Data sets.
    */
