@@ -17,54 +17,64 @@
 
 package com.linkedin.pinot.tools.pacelab.benchmark;
 
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class QueryTaskDaemon extends QueryTask {
 
-    protected  AtomicBoolean[] thread_status;
-    protected int thread_id;
+	private static final Logger LOGGER = LoggerFactory.getLogger(QueryTaskDaemon.class);
+	protected AtomicInteger[] threadQueryType;
+	protected int threadId = -1;
 
-    public void setThread_status(AtomicBoolean[] thread_status) {
-        this.thread_status = thread_status;
-    }
+	public void setThreadQueryType(AtomicInteger[] threadQueryType) {
+		this.threadQueryType = threadQueryType;
+	}
 
-    @Override
-    public void run() {
+	@Override
+	public void run() {
+		if(threadId ==-1) {
+			super.run();
+			return;
+		}
 
-//        float[] likelihood = getLikelihoodArrayFromProps();
-        while(!Thread.interrupted())
-        {
-            try {
-            if(thread_status[thread_id].get()) {
-                long timeBeforeSendingQuery = System.currentTimeMillis();
-                //TODO: call queries based
-//                float randomLikelihood = rand.nextFloat();
-//                for (int i = 0; i < likelihood.length; i++)
-//                {
-//                    if (randomLikelihood <= likelihood[i])
-//                    {
-//                        generateAndRunQuery(i);
-//                        break;
-//                    }
-//                }
-                //TODO: Currently Hardcoded , will modify later on.
-                generateAndRunQuery(rand.nextInt(5));
-                long timeAfterSendingQuery = System.currentTimeMillis();
-                long timeDistance = timeAfterSendingQuery - timeBeforeSendingQuery;
-                if (timeDistance < 1000) {
-                    Thread.sleep(1000 - timeDistance);
-                }
-            }
-            else
-                Thread.sleep(1000);
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
+		long timeBeforeSendingQuery;
+		long timeAfterSendingQuery;
+		long timeDistance;
+		long runStartMillisTime = System.currentTimeMillis();
+		long currentTimeMillisTime =  System.currentTimeMillis();
+		long secondsPassed = (currentTimeMillisTime-runStartMillisTime)/1000;
+		int queryType;
+		while(secondsPassed < _testDuration && !Thread.interrupted())
+		{
+			try {
+				queryType = threadQueryType[threadId].get();
+				if( queryType != Constant.STOP) {
+					timeBeforeSendingQuery = System.currentTimeMillis();
+					generateAndRunQuery(rand.nextInt(Constant.QUERY_COUNT),queryType);
+					timeAfterSendingQuery = System.currentTimeMillis();
+					timeDistance = timeAfterSendingQuery - timeBeforeSendingQuery;
+					if (timeDistance < 1000) {
+						Thread.sleep(1000 - timeDistance);
+					}
+				}
+				else
+					Thread.sleep(100);
 
-        }
-    }
+				currentTimeMillisTime =  System.currentTimeMillis();
+				secondsPassed = (currentTimeMillisTime-runStartMillisTime)/1000;
+			} catch (Exception e) {
+				LOGGER.error("Exception in thread");
+			}
 
-    public void setThread_id(int thread_id) {
-        this.thread_id = thread_id;
-    }
+		}
+	}
+	public void generateAndRunQuery(int queryId, int queryType) throws Exception {
+
+	}
+
+	public void setThreadId(int threadId) {
+		this.threadId = threadId;
+	}
 }

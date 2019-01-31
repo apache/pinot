@@ -23,26 +23,18 @@ import java.util.List;
 import java.util.Properties;
 import java.util.Random;
 
-public class CompanySearchQueryTask extends QueryTask{
+public class CompanySearchQueryTask extends QueryTaskDaemon{
     List<GenericRow> _companyTable;
-    ZipfRandom _zipfRandom;
-    final static int HourSecond = 3600;
+
     Random _companyIndexGenerator;
 
-    public CompanySearchQueryTask(Properties config, String[] queries, String dataDir, int testDuration) {
+    public CompanySearchQueryTask(Properties config, String[] queries, String dataDir, int testDuration, Criteria pCriteria) {
         setConfig(config);
         setQueries(queries);
         setDataDir(dataDir);
         setTestDuration(testDuration);
         EventTableGenerator eventTableGenerator = new EventTableGenerator(_dataDir);
-
-        long minSearchStartTime= Long.parseLong(config.getProperty("MinSearchStartTime"));
-        long maxSearchStartTime = Long.parseLong(config.getProperty("MaxSearchStartTime"));
-
-        double zipfS = Double.parseDouble(config.getProperty("ZipfSParameter"));
-
-        int hourCount = (int) Math.ceil((maxSearchStartTime-minSearchStartTime)/(HourSecond));
-        _zipfRandom = new ZipfRandom(zipfS,hourCount);
+        criteria = pCriteria;
 
         _companyIndexGenerator = new Random(System.currentTimeMillis());
 
@@ -62,17 +54,22 @@ public class CompanySearchQueryTask extends QueryTask{
 
 
     public void generateAndRunQuery(int queryId) throws Exception {
+        generateAndRunQuery(queryId,0);
+    }
+
+    public void generateAndRunQuery(int queryId, int queryType) throws Exception {
         EventTableGenerator eventTableGenerator = new EventTableGenerator(_dataDir);
         Properties config = getConfig();
         String[] queries = getQueries();
 
-        long minSearchStartTime= Long.parseLong(config.getProperty("MinSearchStartTime"));
-        long maxSearchStartTime = Long.parseLong(config.getProperty("MaxSearchStartTime"));
-
         /*
+//        long minSearchStartTime= Long.parseLong(config.getProperty("MinSearchStartTime"));
+//        long maxSearchStartTime = Long.parseLong(config.getProperty("MaxSearchStartTime"));
+
+
         double zipfS = Double.parseDouble(config.getProperty("ZipfSParameter"));
         LongRange timeRange = CommonTools.getZipfRandomTimeRange(minApplyStartTime,maxApplyStartTime,zipfS);
-        */
+
 
         int firstHour = _zipfRandom.nextInt();
         //int secondHour = _zipfRandom.nextInt();
@@ -82,29 +79,43 @@ public class CompanySearchQueryTask extends QueryTask{
         long queriedStartTime = Math.max(minSearchStartTime,queriedEndTime - firstHour*HourSecond);
 
         LongRange timeRange =  new LongRange(queriedStartTime,queriedEndTime);
-
+        */
 
         int selectLimit = CommonTools.getSelectLimt(config);
-        int groupByLimit = Integer.parseInt(config.getProperty("GroupByLimit"));
+        int groupByLimit = Integer.parseInt(config.getProperty(Constant.GROUP_BY_LIMIT));
 
         GenericRow randomCompany = eventTableGenerator.getRandomGenericRow(_companyTable, _companyIndexGenerator);
 
-        String query = "";
+        String query;
+        String clause = criteria.getClause(Constant.SEARCH_TIME, queryType);
+
         switch (queryId) {
             case 0:
-                query = String.format(queries[queryId], timeRange.getMinimumLong(), timeRange.getMaximumLong());
+                if(!clause.equals("")){
+                    clause = " WHERE "+clause;
+                }
+                query = String.format(queries[queryId], clause);
                 runQuery(query);
                 break;
             case 1:
-                query = String.format(queries[queryId], timeRange.getMinimumLong(), timeRange.getMaximumLong(), randomCompany.getValue("ID"));
+                if(!clause.equals("")){
+                    clause = " AND " +clause;
+                }
+                query = String.format(queries[queryId], randomCompany.getValue("ID"), clause);
                 runQuery(query);
                 break;
             case 2:
-                query = String.format(queries[queryId], timeRange.getMinimumLong(), timeRange.getMaximumLong(), groupByLimit);
+                if(!clause.equals("")){
+                    clause = " WHERE "+clause;
+                }
+                query = String.format(queries[queryId], clause, groupByLimit);
                 runQuery(query);
                 break;
             case 3:
-                query = String.format(queries[queryId], timeRange.getMinimumLong(), timeRange.getMaximumLong(), groupByLimit);
+                if(!clause.equals("")){
+                    clause = " WHERE "+clause;
+                }
+                query = String.format(queries[queryId], clause, groupByLimit);
                 runQuery(query);
                 break;
         }

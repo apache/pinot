@@ -26,14 +26,14 @@ public class CompanySearchQueryExecutor extends QueryExecutor{
     private static String[] getQueries() {
         String[] queries = {
                 "SELECT COUNT(*) FROM CompanySearchAppearance" +
-                        " WHERE SearchTime > %d AND SearchTime < %d",
+                        "%s",
                 "SELECT COUNT(*) FROM CompanySearchAppearance" +
-                        " WHERE SearchTime > %d AND SearchTime < %d AND ViewedProfileId = '%s'",
+                        " WHERE ViewedProfileId = '%s'" + "%s",
                 "SELECT CompanyDomain,COUNT(*), AVG(TimeSpent) FROM CompanySearchAppearance" +
-                        " WHERE SearchTime > %d AND SearchTime < %d" +
+                        "%s" +
                         " GROUP BY CompanyDomain TOP %d",
                 "SELECT CompanyDomain, Location, CompanySize,COUNT(*),AVG(TimeSpent) FROM CompanySearchAppearance" +
-                        " WHERE SearchTime > %d AND SearchTime < %d"+
+                        "%s" +
                         " GROUP BY CompanyDomain, Location, CompanySize TOP %d"
         };
         return queries;
@@ -50,6 +50,6 @@ public class CompanySearchQueryExecutor extends QueryExecutor{
     }
 
     public CompanySearchQueryTask getTask(Properties config) {
-        return new CompanySearchQueryTask(config, QUERIES, _dataDir, _testDuration);
+        return new CompanySearchQueryTask(config, QUERIES, _dataDir, _testDuration, getCriteria(Constant.MAX_SEARCH_START_TIME,Constant.MIN_SEARCH_START_TIME));
     }
 }

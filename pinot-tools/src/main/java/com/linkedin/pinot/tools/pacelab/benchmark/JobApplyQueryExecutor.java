@@ -25,17 +25,22 @@ public class JobApplyQueryExecutor extends QueryExecutor {
     private static String[] getQueries() {
         String[] queries = {
                 "SELECT COUNT(*) FROM JobApply" +
-                        " WHERE ApplyStartTime > %d AND ApplyStartTime < %d",
+                        "%s",
+
                 "SELECT JobID, JobPosition, JobCompany, ApplyStartTime FROM JobApply" +
-                        " WHERE ApplyStartTime > %d AND ApplyStartTime < %d AND ApplicantProfileId = '%s' LIMIT %d",
+                        " WHERE ApplicantProfileId = '%s'" + "%s" +
+                        " LIMIT %d",
+
                 "SELECT JobID, COUNT(*) FROM JobApply" +
-                         " WHERE ApplyStartTime > %d AND ApplyStartTime < %d AND JobCompany = '%s'" +
+                         " WHERE JobCompany = '%s'" + "%s" +
                          " GROUP BY JobID ORDER BY COUNT(*) desc TOP %d",
+
                 "SELECT JobCompany, COUNT(*), AVG(TimeSpent), AVG(JobSalary) FROM JobApply" +
-                        " WHERE ApplyStartTime > %d AND ApplyStartTime < %d" +
+                        "%s" +
                         " GROUP BY JobCompany TOP %d",
+
                 "SELECT JobCompany, JobID, ApplicantPosition, DidApplyIsFinalized, COUNT(*),AVG(JobSalary) FROM JobApply" +
-                        " WHERE ApplyStartTime > %d AND ApplyStartTime < %d"+
+                        "%s" +
                         " GROUP BY JobCompany, JobID, ApplicantPosition, DidApplyIsFinalized TOP %d"
         };
         return queries;
@@ -52,6 +57,6 @@ public class JobApplyQueryExecutor extends QueryExecutor {
     }
 
     public JobApplyQueryTask getTask(Properties config) {
-        return new JobApplyQueryTask(config, QUERIES, _dataDir, _testDuration);
+        return new JobApplyQueryTask(config, QUERIES, _dataDir, _testDuration, getCriteria(Constant.MAX_APPLY_START_TIME,Constant.MIN_APPLY_START_TIME));
     }
 }
