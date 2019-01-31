@@ -24,24 +24,6 @@ import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Multimap;
-import org.apache.pinot.thirdeye.api.TimeGranularity;
-import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
-import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
-import org.apache.pinot.thirdeye.detection.ConfigUtils;
-import org.apache.pinot.thirdeye.detection.DataProvider;
-import org.apache.pinot.thirdeye.detection.DefaultInputDataFetcher;
-import org.apache.pinot.thirdeye.detection.InputDataFetcher;
-import org.apache.pinot.thirdeye.detection.algorithm.DimensionWrapper;
-import org.apache.pinot.thirdeye.detection.annotation.registry.DetectionRegistry;
-import org.apache.pinot.thirdeye.detection.annotation.Yaml;
-import org.apache.pinot.thirdeye.detection.spec.AbstractSpec;
-import org.apache.pinot.thirdeye.detection.spi.components.Tunable;
-import org.apache.pinot.thirdeye.detection.wrapper.AnomalyDetectorWrapper;
-import org.apache.pinot.thirdeye.detection.wrapper.AnomalyFilterWrapper;
-import org.apache.pinot.thirdeye.detection.wrapper.BaselineFillingMergeWrapper;
-import org.apache.pinot.thirdeye.detection.wrapper.ChildKeepingMergeWrapper;
-import org.apache.pinot.thirdeye.detection.DetectionUtils;
-import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -52,6 +34,25 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.collections.MapUtils;
+import org.apache.pinot.thirdeye.api.TimeGranularity;
+import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
+import org.apache.pinot.thirdeye.detection.ConfigUtils;
+import org.apache.pinot.thirdeye.detection.DataProvider;
+import org.apache.pinot.thirdeye.detection.DefaultInputDataFetcher;
+import org.apache.pinot.thirdeye.detection.DetectionUtils;
+import org.apache.pinot.thirdeye.detection.InputDataFetcher;
+import org.apache.pinot.thirdeye.detection.algorithm.DimensionWrapper;
+import org.apache.pinot.thirdeye.detection.annotation.Yaml;
+import org.apache.pinot.thirdeye.detection.annotation.registry.DetectionRegistry;
+import org.apache.pinot.thirdeye.detection.spec.AbstractSpec;
+import org.apache.pinot.thirdeye.detection.spi.components.Tunable;
+import org.apache.pinot.thirdeye.detection.wrapper.AnomalyDetectorWrapper;
+import org.apache.pinot.thirdeye.detection.wrapper.AnomalyFilterWrapper;
+import org.apache.pinot.thirdeye.detection.wrapper.BaselineFillingMergeWrapper;
+import org.apache.pinot.thirdeye.detection.wrapper.ChildKeepingMergeWrapper;
+import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
+import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.Interval;
 
@@ -158,10 +159,23 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
   private static final String PROP_MERGER = "merger";
   private static final String PROP_TIMEZONE = "timezone";
   private static final String PROP_NAME = "name";
+  private static final String DEFAULT_TIMEZONE = "America/Los_Angeles";
   private static final String DEFAULT_BASELINE_PROVIDER_YAML_TYPE = "RULE_BASELINE";
 
   private static final DetectionRegistry DETECTION_REGISTRY = DetectionRegistry.getInstance();
-  private static final Map<String, String> DETECTOR_TO_BASELINE = ImmutableMap.of("ALGORITHM", "ALGORITHM_BASELINE");
+  static {
+    // do not tune for alerts migrated from legacy anomaly function.
+    DetectionRegistry.registerComponent("com.linkedin.thirdeye.detection.components.AdLibAlertFilter",
+        "MIGRATED_ALGORITHM_FILTER");
+    DetectionRegistry.registerComponent("com.linkedin.thirdeye.detection.components.AdLibAnomalyDetector",
+        "MIGRATED_ALGORITHM");
+    DetectionRegistry.registerComponent("com.linkedin.thirdeye.detection.components.AdLibBaselineProvider",
+        "MIGRATED_ALGORITHM_BASELINE");
+  }
+  private static final Set<String> TUNING_OFF_COMPONENTS =
+      ImmutableSet.of("MIGRATED_ALGORITHM_FILTER", "MIGRATED_ALGORITHM", "MIGRATED_ALGORITHM_BASELINE");
+  private static final Map<String, String> DETECTOR_TO_BASELINE =
+      ImmutableMap.of("ALGORITHM", "ALGORITHM_BASELINE", "MIGRATED_ALGORITHM", "MIGRATED_ALGORITHM_BASELINE");
   private static final Set<String> MOVING_WINDOW_DETECTOR_TYPES = ImmutableSet.of("ALGORITHM");
 
   private final Map<String, Object> components = new HashMap<>();
@@ -386,7 +400,7 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
       params = MapUtils.getMap(yamlConfig, PROP_PARAMS);
     }
 
-    if (DETECTION_REGISTRY.isTunable(componentClassName)) {
+    if (!TUNING_OFF_COMPONENTS.contains(type) && DETECTION_REGISTRY.isTunable(componentClassName)) {
       try {
         componentSpecs.putAll(getTunedSpecs(componentName, componentClassName, params));
       } catch (Exception e) {
@@ -400,10 +414,15 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
 
   private Map<String, Object> getTunedSpecs(String componentName, String componentClassName, Map<String, Object> params)
       throws Exception {
-    long configId = this.existingConfig == null ? -1 : this.existingConfig.getId();
+    long configId = this.existingConfig == null ? 0 : this.existingConfig.getId();
     InputDataFetcher dataFetcher = new DefaultInputDataFetcher(this.dataProvider, configId);
     Tunable tunable = getTunable(componentClassName, params, dataFetcher);
-    Interval window = new Interval(this.startTime, this.endTime, DateTimeZone.forID(this.datasetConfig.getTimezone()));
+
+    // round to daily boundary
+    DateTimeZone timezone = DateTimeZone.forID(this.datasetConfig.getTimezone() == null ? DEFAULT_TIMEZONE : this.datasetConfig.getTimezone());
+    DateTime start = new DateTime(this.startTime, timezone).withTimeAtStartOfDay();
+    DateTime end =  new DateTime(this.endTime, timezone).withTimeAtStartOfDay();
+    Interval window = new Interval(start, end);
     Map<String, Object> existingComponentSpec =
         this.existingComponentSpecs.containsKey(componentName) ? MapUtils.getMap(this.existingComponentSpecs,
             componentName) : Collections.emptyMap();

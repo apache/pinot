@@ -144,7 +144,7 @@ public class DetectionMigrationResource {
     } else{
       // algorithm detector
       ruleYaml.put("detection", Collections.singletonList(
-          ImmutableMap.of("name", "detection_rule1", "type", "ALGORITHM", "params", getAlgorithmDetectorParams(anomalyFunctionDTO),
+          ImmutableMap.of("name", "detection_rule1", "type", "MIGRATED_ALGORITHM", "params", getAlgorithmDetectorParams(anomalyFunctionDTO),
               PROP_WINDOW_SIZE, anomalyFunctionDTO.getWindowSize(),
               PROP_WINDOW_UNIT, anomalyFunctionDTO.getWindowUnit().toString())));
     }
@@ -156,7 +156,7 @@ public class DetectionMigrationResource {
       Map<String, Object> filterYaml = new LinkedHashMap<>();
       if (!alertFilter.containsKey("thresholdField")) {
         // algorithm alert filter
-        filterYaml = ImmutableMap.of("name", "filter_rule1", "type", "ALGORITHM_FILTER", "params", getAlertFilterParams(anomalyFunctionDTO));
+        filterYaml = ImmutableMap.of("name", "filter_rule1", "type", "MIGRATED_ALGORITHM_FILTER", "params", getAlertFilterParams(anomalyFunctionDTO));
       } else {
         // threshold filter migrate to rule filters
         // site wide impact filter migrate to rule based swi filter
