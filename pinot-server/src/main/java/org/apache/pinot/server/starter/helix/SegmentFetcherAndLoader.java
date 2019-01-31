@@ -202,8 +202,6 @@ public class SegmentFetcherAndLoader {
     try {
       SegmentFetcherFactory.getInstance().getSegmentFetcherBasedOnURI(uri).fetchSegmentToLocal(uri, tempDownloadFile);
       if (crypter != null) {
-        // TODO: We should not need to initialize crypter each time, instead Factory should have an initialized version ready.
-        crypter.init(_crypterConfig);
         crypter.decrypt(tempDownloadFile, tempTarFile);
       } else {
         tempTarFile = tempDownloadFile;
