@@ -125,7 +125,7 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
     this.dataset = this.provider.fetchDatasets(Collections.singletonList(metricConfigDTO.getDataset()))
         .get(metricConfigDTO.getDataset());
     // date time zone for moving windows. use dataset time zone as default
-    this.dateTimeZone = DateTimeZone.forID(MapUtils.getString(config.getProperties(), PROP_TIMEZONE, "America/Los_Angeles"));
+    this.dateTimeZone = DateTimeZone.forID(MapUtils.getString(config.getProperties(), PROP_TIMEZONE, this.dataset.getTimezone()));
   }
 
   @Override
