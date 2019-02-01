@@ -39,7 +39,7 @@
   </div>
 
   <div class="col-xs-12">
-    {{#bs-accordion onChange=(action "showPreview") as |acc|}}
+    {{#bs-accordion onChange=(action (mut toggleCollapsed)) as |acc|}}
       {{#acc.item value=preview as |aitem|}}
         {{#aitem.title}}
           <section class="dashboard-container__title">Preview alert
@@ -47,7 +47,33 @@
           </section>
         {{/aitem.title}}
         {{#aitem.body}}
-          <p>Preview Alert Component Goes Here</p>
+          {{#unless errorAnomalies}}
+            {{#if showPreview}}
+              {{#if isLoading}}
+                {{ember-spinner}}
+              {{/if}}
+              {{timeseries-chart
+                series=series
+                colorMapping=colorMapping
+                axis=axis
+                zoom=zoom
+                legend=legend
+              }}
+              {{else}}
+                <p>Please define anomaly detection in YAML to enable preview.</p>
+            {{/if}}
+          {{/unless}}
+          <p>{{errorAnomalies}}</p>
+          <div class="pull-right">
+            {{bs-button
+              defaultText=(if showPreview "Refresh Preview" "Get Preview")
+              disabled=disablePreviewButton
+              type="outline-primary"
+              buttonType="refresh"
+              onClick=(action "getPreview")
+              class="te-button te-button--cancel"
+            }}
+          </div>
         {{/aitem.body}}
       {{/acc.item}}
     {{/bs-accordion}}

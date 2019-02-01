@@ -23,7 +23,9 @@
 
 import Component from '@ember/component';
 import { computed, set, get, getProperties } from '@ember/object';
-import { checkStatus } from 'thirdeye-frontend/utils/utils';
+import { later } from '@ember/runloop';
+import { checkStatus, humanizeFloat } from 'thirdeye-frontend/utils/utils';
+import { colorMapping, toColor, makeTime } from 'thirdeye-frontend/utils/rca-utils';
 import { yamlAlertProps, yamlAlertSettings, yamIt } from 'thirdeye-frontend/utils/constants';
 import yamljs from 'yamljs';
 import RSVP from "rsvp";
@@ -34,6 +36,11 @@ import {
 } from 'thirdeye-frontend/utils/api/self-serve';
 import { inject as service } from '@ember/service';
 import { task } from 'ember-concurrency';
+import moment from 'moment';
+import _ from 'lodash';
+import d3 from 'd3';
+
+const PREVIEW_DATE_FORMAT = 'MMM DD, hh:mm a';
 
 export default Component.extend({
   classNames: ['yaml-editor'],
@@ -58,7 +65,30 @@ export default Component.extend({
   YAMLField: '',
   currentYamlAlertOriginal: '',
   currentYamlSettingsOriginal: '',
-  toggleCollapsed: false,
+  toggleCollapsed: true,
+  timeseries: null,
+  isLoading: false,
+  analysisRange: [moment().subtract(1, 'month').startOf('hour').valueOf(), moment().startOf('hour').valueOf()],
+  displayRange: [moment().subtract(2, 'month').startOf('hour').valueOf(), moment().startOf('hour').valueOf()],
+  colorMapping: colorMapping,
+  zoom: {
+    enabled: true,
+    rescale: true
+  },
+
+  legend: {
+    show: true,
+    position: 'right'
+  },
+  errorTimeseries: null,
+  metricUrn: null,
+  errorBaseline: null,
+  compareMode: 'wo1w',
+  baseline: null,
+  errorAnomalies: null,
+  showPreview: false,
+  componentId: 'timeseries-chart',
+
 
 
   init() {
@@ -69,6 +99,120 @@ export default Component.extend({
       set(this, 'currentYamlSettingsOriginal', get(this, 'detectionSettingsYaml') || get(this, 'yamlAlertSettings'));
     }
   },
+
+  disablePreviewButton: computed(
+    'alertYaml',
+    'isLoading',
+    function() {
+      return (get(this, 'alertYaml') === null || get(this, 'isLoading') === true);
+    }
+  ),
+
+  axis: computed(
+    'displayRange',
+    function () {
+      const displayRange = getProperties(this, 'displayRange');
+
+      return {
+        y: {
+          show: true,
+          tick: {
+            format: function(d){return humanizeFloat(d);}
+          }
+        },
+        y2: {
+          show: false,
+          min: 0,
+          max: 1
+        },
+        x: {
+          type: 'timeseries',
+          show: true,
+          min: displayRange[0],
+          max: displayRange[1],
+          tick: {
+            fit: false,
+            format: (d) => {
+              const t = makeTime(d);
+              if (t.valueOf() === t.clone().startOf('day').valueOf()) {
+                return t.format('MMM D (ddd)');
+              }
+              return t.format('h:mm a');
+            }
+          }
+        }
+      };
+    }
+  ),
+
+  series: computed(
+    'anomalies',
+    'timeseries',
+    'baseline',
+    'analysisRange',
+    'displayRange',
+    function () {
+      const metricUrn = get(this, 'metricUrn');
+      const anomalies = get(this, 'anomalies');
+      const timeseries = get(this, 'timeseries');
+      const baseline = get(this, 'baseline');
+      const analysisRange = get(this, 'analysisRange');
+      const displayRange = get(this, 'displayRange');
+
+      const series = {};
+
+      if (!_.isEmpty(anomalies)) {
+
+        anomalies
+          .filter(anomaly => anomaly.metricUrn === metricUrn)
+          .forEach(anomaly => {
+            const key = this._formatAnomaly(anomaly);
+            series[key] = {
+              timestamps: [anomaly.startTime, anomaly.endTime],
+              values: [1, 1],
+              type: 'line',
+              color: 'teal',
+              axis: 'y2'
+            };
+            series[key + '-region'] = Object.assign({}, series[key], {
+              type: 'region',
+              color: 'orange'
+            });
+          });
+      }
+
+      if (timeseries && !_.isEmpty(timeseries.value)) {
+        series['current'] = {
+          timestamps: timeseries.timestamp,
+          values: timeseries.value,
+          type: 'line',
+          color: toColor(metricUrn)
+        };
+      }
+
+      if (baseline && !_.isEmpty(baseline.value)) {
+        series['baseline'] = {
+          timestamps: baseline.timestamp,
+          values: baseline.value,
+          type: 'line',
+          color: 'light-' + toColor(metricUrn)
+        };
+      }
+
+      // detection range
+      if (timeseries && !_.isEmpty(timeseries.value)) {
+        series['pre-detection-region'] = {
+          timestamps: [displayRange[0], analysisRange[0]],
+          values: [1, 1],
+          type: 'region',
+          color: 'grey'
+        };
+      }
+
+      return series;
+    }
+  ),
+
   /**
    * sets Yaml value displayed to contents of alertYaml or yamlAlertProps
    * @method currentYamlAlert
@@ -136,6 +280,116 @@ export default Component.extend({
       notifications.error('Failed to retrieve subscription groups.', 'Error');
     }
   }).drop(),
+
+  didRender(){
+    this._super(...arguments);
+
+    later(() => {
+      this._buildSliderButton();
+    });
+  },
+
+  // Helper function that builds the subchart region buttons
+  _buildSliderButton() {
+    const componentId = this.get('componentId');
+    const resizeButtons = d3.select(`.${componentId}`).selectAll('.resize');
+
+    resizeButtons.append('circle')
+      .attr('cx', 0)
+      .attr('cy', 30)
+      .attr('r', 10)
+      .attr('fill', '#0091CA');
+    resizeButtons.append('line')
+      .attr('class', 'anomaly-graph__slider-line')
+      .attr("x1", 0)
+      .attr("y1", 27)
+      .attr("x2", 0)
+      .attr("y2", 33);
+
+    resizeButtons.append('line')
+      .attr('class', 'anomaly-graph__slider-line')
+      .attr("x1", -5)
+      .attr("y1", 27)
+      .attr("x2", -5)
+      .attr("y2", 33);
+
+    resizeButtons.append('line')
+      .attr('class', 'anomaly-graph__slider-line')
+      .attr("x1", 5)
+      .attr("y1", 27)
+      .attr("x2", 5)
+      .attr("y2", 33);
+  },
+
+  _formatAnomaly(anomaly) {
+    return `${moment(anomaly.startTime).format(PREVIEW_DATE_FORMAT)}
+    to ${moment(anomaly.endTime).format(PREVIEW_DATE_FORMAT)}`;
+  },
+
+  _filterAnomalies(rows) {
+    return rows.filter(row => (row.startTime && row.endTime && !row.child));
+  },
+
+  _fetchTimeseries() {
+    const metricUrn = get(this, 'metricUrn');
+    const range = get(this, 'displayRange');
+    const granularity = '15_MINUTES';
+    const timezone = moment.tz.guess();
+
+    set(this, 'errorTimeseries', null);
+
+    const urlCurrent = `/rootcause/metric/timeseries?urn=${metricUrn}&start=${range[0]}&end=${range[1]}&offset=current&granularity=${granularity}&timezone=${timezone}`;
+    fetch(urlCurrent)
+      .then(checkStatus)
+      .then(res => {
+        set(this, 'timeseries', res);
+        set(this, 'isLoading', false);
+      });
+    // .then(res => set(this, 'output', 'got timeseries'))
+    // .catch(err => set(this, 'errorTimeseries', err));
+
+    set(this, 'errorBaseline', null);
+
+    const offset = get(this, 'compareMode');
+    const urlBaseline = `/rootcause/metric/timeseries?urn=${metricUrn}&start=${range[0]}&end=${range[1]}&offset=${offset}&granularity=${granularity}&timezone=${timezone}`;
+    fetch(urlBaseline)
+      .then(checkStatus)
+      .then(res => set(this, 'baseline', res));
+    // .then(res => set(this, 'output', 'got baseline'))
+    // .catch(err => set(this, 'errorBaseline', err));
+  },
+
+  _fetchAnomalies() {
+    const analysisRange = get(this, 'analysisRange');
+    const url = `/yaml/preview?start=${analysisRange[0]}&end=${analysisRange[1]}&tuningStart=0&tuningEnd=0`;
+
+    set(this, 'errorAnomalies', null);
+
+    const content = get(this, 'alertYaml');
+    const postProps = {
+      method: 'post',
+      body: content,
+      headers: { 'content-type': 'text/plain' }
+    };
+
+    fetch(url, postProps)
+      .then(checkStatus)
+      .then(res => {
+        set(this, 'anomalies', this._filterAnomalies(res.anomalies));
+        set(this, 'metricUrn', Object.keys(res.diagnostics['0'])[0]);
+      })
+      .then(() => {
+        this._fetchTimeseries();
+      })
+    // .then(res => set(this, 'output', 'got anomalies'))
+      .catch(err => {
+        err.response.json()
+          .then(res => {
+            set(this, 'errorAnomalies', res.message);
+            set(this, 'isLoading', false);
+          });
+      });
+  },
 
   /**
    * Calls api's for specific metric's autocomplete
@@ -233,10 +487,12 @@ export default Component.extend({
 
   actions: {
     /**
-    * triggered by preview dropdown
+    * triggered by preview button
     */
-    showPreview() {
-      this.toggleProperty('toggleCollapsed');
+    getPreview() {
+      set(this, 'isLoading', true);
+      set(this, 'showPreview', true);
+      this._fetchAnomalies();
     },
 
     /**
