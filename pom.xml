@@ -24,7 +24,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>org.apache.pinot</groupId>
   <artifactId>pinot</artifactId>
-  <version>0.016</version>
+  <version>0.1.0-SNAPSHOT</version>
   <packaging>pom</packaging>
   <name>Pinot</name>
   <description>A realtime distributed OLAP datastore</description>
@@ -89,7 +89,8 @@
     <developerConnection>scm:git:git://apache/incubator-pinot.git</developerConnection>
   </scm>
 
-  <inceptionYear>2014</inceptionYear>
+  <!-- Apache project inception year for generating correct NOTICE file for jar bundle. -->
+  <inceptionYear>2018</inceptionYear>
 
   <properties>
     <pinot.root>${basedir}</pinot.root>
@@ -433,7 +434,6 @@
         <artifactId>async-http-client</artifactId>
         <version>${async-http-client.version}</version>
       </dependency>
-
       <dependency>
         <groupId>org.yaml</groupId>
         <artifactId>snakeyaml</artifactId>
@@ -814,13 +814,15 @@
           <artifactId>maven-assembly-plugin</artifactId>
           <version>2.5.5</version>
         </plugin>
-
+        <plugin>
+          <artifactId>maven-resources-plugin</artifactId>
+          <version>2.6</version>
+        </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-dependency-plugin</artifactId>
-          <version>2.3</version>
+          <version>2.8</version>
         </plugin>
-
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-javadoc-plugin</artifactId>
@@ -910,6 +912,13 @@
           <artifactId>license-maven-plugin</artifactId>
           <version>2.8</version>
         </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-release-plugin</artifactId>
+          <configuration>
+            <autoVersionSubmodules>true</autoVersionSubmodules>
+          </configuration>
+        </plugin>
       </plugins>
     </pluginManagement>
     <plugins>
@@ -934,12 +943,12 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
-        <!--
-      Configuration for unit/integration tests section 2 of 3 (plugins) STARTS HERE.
-      This is the core piece for being able to manage unit tests and
-      integration (='system') tests within Maven by using surefire.
-      See also: properties section and profiles section.
-     -->
+      <!--
+        Configuration for unit/integration tests section 2 of 3 (plugins) STARTS HERE.
+        This is the core piece for being able to manage unit tests and
+        integration (='system') tests within Maven by using surefire.
+        See also: properties section and profiles section.
+      -->
         <configuration>
           <testFailureIgnore>false</testFailureIgnore>
           <!-- Excludes integration tests when unit tests are run. -->
@@ -1048,8 +1057,9 @@
             <!-- Top level files -->
             <exclude>.codecov*</exclude>
             <exclude>HEADER</exclude>
-            <exclude>LICENSE</exclude>
-            <exclude>NOTICE</exclude>
+            <exclude>LICENSE*</exclude>
+            <exclude>NOTICE*</exclude>
+            <exclude>DISCLAIMER</exclude>
 
             <!-- js, css files that are exact copies of the third-party works. In this case, the original header has to
             be kept. Please refer to 'Treatment of Third-party works' in https://www.apache.org/legal/src-headers.html
@@ -1115,6 +1125,28 @@
             </filter>
           </filters>
         </configuration>
+      </plugin>
+      <!-- Include apache LICENSE, NOTICE, and DISCLAIMER files for jar resource bundle -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-remote-resources-plugin</artifactId>
+        <version>1.6.0</version>
+        <executions>
+          <execution>
+            <goals>
+              <goal>process</goal>
+            </goals>
+            <configuration>
+              <properties>
+                <projectName>Apache Pinot (incubating)</projectName>
+              </properties>
+              <resourceBundles>
+                <resourceBundle>org.apache:apache-jar-resource-bundle:1.4</resourceBundle>
+                <resourceBundle>org.apache:apache-incubator-disclaimer-resource-bundle:1.1</resourceBundle>
+              </resourceBundles>
+            </configuration>
+          </execution>
+        </executions>
       </plugin>
     </plugins>
   </build>

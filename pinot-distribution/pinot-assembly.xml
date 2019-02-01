@@ -24,7 +24,7 @@
   xsi:schemaLocation="http://maven.apache.org/plugins/maven-assembly-plugin/assembly/1.1.2 http://maven.apache.org/xsd/assembly-1.1.2.xsd">
   <id>bin</id>
   <formats>
-    <format>zip</format>
+    <format>tar.gz</format>
     <format>dir</format>
   </formats>
   <includeBaseDirectory>false</includeBaseDirectory>
@@ -48,13 +48,28 @@
       </includes>
     </dependencySet>
   </dependencySets>
+
+  <files>
+    <!-- Rename LICENSE-binary, NOTICE-binary to LICENSE, NOTICE and include them to a distribution tarbell -->
+    <file>
+      <source>${pinot.root}/LICENSE-binary</source>
+      <destName>LICENSE</destName>
+    </file>
+    <file>
+      <source>${pinot.root}/NOTICE-binary</source>
+      <destName>NOTICE</destName>
+    </file>
+    <!-- Include DISCLAIMER -->
+    <file>
+      <source>${pinot.root}/DISCLAIMER</source>
+    </file>
+  </files>
   <fileSets>
+    <!-- Rename liscenses-binary directory to licenses and include it to a distribution tarbell -->
     <fileSet>
-      <directory>${pinot.root}</directory>
-      <includes>
-        <include>LICENSE</include>
-      </includes>
-      <outputDirectory></outputDirectory>
+      <useDefaultExcludes>false</useDefaultExcludes>
+      <directory>${pinot.root}/licenses-binary</directory>
+      <outputDirectory>licenses</outputDirectory>
     </fileSet>
     <fileSet>
       <useDefaultExcludes>false</useDefaultExcludes>
