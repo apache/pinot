@@ -114,7 +114,7 @@ public class DetectionMigrationResource {
     this.yaml = new Yaml(options);
   }
 
-  private Map<String, Object> translateAnomalyFunctionToYaml(AnomalyFunctionDTO anomalyFunctionDTO) throws Exception {
+  private Map<String, Object> translateAnomalyFunctionToYaml(AnomalyFunctionDTO anomalyFunctionDTO) {
     Map<String, Object> yamlConfigs = new LinkedHashMap<>();
     yamlConfigs.put("detectionName", anomalyFunctionDTO.getFunctionName());
     yamlConfigs.put("metric", anomalyFunctionDTO.getMetric());
@@ -190,7 +190,7 @@ public class DetectionMigrationResource {
     return yamlConfigs;
   }
 
-  private Map<String, Object> getDimensionExplorationParams(AnomalyFunctionDTO functionDTO) throws IOException {
+  private Map<String, Object> getDimensionExplorationParams(AnomalyFunctionDTO functionDTO) {
     Map<String, Object> dimensionExploreYaml = new LinkedHashMap<>();
     dimensionExploreYaml.put("dimensions", Collections.singletonList(functionDTO.getExploreDimensions()));
     if (functionDTO.getDataFilter() != null && !functionDTO.getDataFilter().isEmpty() && functionDTO.getDataFilter().get("type").equals("average_threshold")) {
@@ -248,7 +248,7 @@ public class DetectionMigrationResource {
     return new Period(TimeUnit.MILLISECONDS.convert(functionDTO.getBucketSize(), functionDTO.getBucketUnit())).toString();
   }
 
-  private Map<String, Object> getPercentageChangeRuleDetectorParams(AnomalyFunctionDTO functionDTO) throws IOException {
+  private Map<String, Object> getPercentageChangeRuleDetectorParams(AnomalyFunctionDTO functionDTO) {
     Map<String, Object> detectorYaml = new LinkedHashMap<>();
     Properties properties = AnomalyFunctionDTO.toProperties(functionDTO.getProperties());
     double threshold = Double.valueOf(properties.getProperty("changeThreshold"));
@@ -263,7 +263,7 @@ public class DetectionMigrationResource {
     return detectorYaml;
   }
 
-  private Map<String, Object> getMinMaxThresholdRuleDetectorParams(AnomalyFunctionDTO functionDTO) throws IOException {
+  private Map<String, Object> getMinMaxThresholdRuleDetectorParams(AnomalyFunctionDTO functionDTO) {
     Map<String, Object> detectorYaml = new LinkedHashMap<>();
     Properties properties = AnomalyFunctionDTO.toProperties(functionDTO.getProperties());
     if (properties.containsKey("min")){
@@ -275,7 +275,7 @@ public class DetectionMigrationResource {
     return detectorYaml;
   }
 
-  private Map<String, Object> getAlgorithmDetectorParams(AnomalyFunctionDTO functionDTO) throws Exception {
+  private Map<String, Object> getAlgorithmDetectorParams(AnomalyFunctionDTO functionDTO) {
     Map<String, Object> detectorYaml = new LinkedHashMap<>();
     Map<String, Object> params = new LinkedHashMap<>();
     detectorYaml.put("configuration", params);
@@ -495,7 +495,7 @@ public class DetectionMigrationResource {
   @Produces(MediaType.TEXT_PLAIN)
   @Consumes(MediaType.APPLICATION_JSON)
   @Path("/legacy-anomaly-function-to-yaml/{id}")
-  public Response getYamlFromLegacyAnomalyFunction(@PathParam("id") long anomalyFunctionID) throws Exception {
+  public Response getYamlFromLegacyAnomalyFunction(@PathParam("id") long anomalyFunctionID) {
     AnomalyFunctionDTO anomalyFunctionDTO = this.anomalyFunctionDAO.findById(anomalyFunctionID);
     if (anomalyFunctionDTO == null) {
       return Response.status(Response.Status.BAD_REQUEST)
@@ -509,7 +509,7 @@ public class DetectionMigrationResource {
   @Produces(MediaType.TEXT_PLAIN)
   @Consumes(MediaType.APPLICATION_JSON)
   @Path("/legacy-alert-to-yaml/{id}")
-  public Response getYamlFromLegacyAlert(@PathParam("id") long alertId) throws Exception {
+  public Response getYamlFromLegacyAlert(@PathParam("id") long alertId) {
     AlertConfigDTO alertConfigDTO = this.alertConfigDAO.findById(alertId);
     if (alertConfigDTO == null) {
       return Response.status(Response.Status.BAD_REQUEST)
@@ -523,7 +523,7 @@ public class DetectionMigrationResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.APPLICATION_JSON)
   @Path("/application/{name}")
-  public Response migrateApplication(@PathParam("name") String application) throws Exception {
+  public Response migrateApplication(@PathParam("name") String application) {
     List<AlertConfigDTO> alertConfigDTOList = alertConfigDAO.findByPredicate(Predicate.EQ("application", application));
     Map<String, String> responseMessage = new HashMap<>();
 

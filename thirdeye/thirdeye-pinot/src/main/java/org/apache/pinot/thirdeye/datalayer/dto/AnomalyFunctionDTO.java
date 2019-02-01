@@ -72,13 +72,7 @@ public class AnomalyFunctionDTO extends AnomalyFunctionBean {
    * @return a Properties object corresponds to the properties String of this anomaly function.
    */
   public Properties toProperties() {
-    Properties props = null;
-    try {
-      props = toProperties(getProperties());
-    } catch (IOException e) {
-      LOGGER.warn("Failed to parse property string ({}) for anomaly function: {}", getProperties(), getId());
-    }
-    return props;
+    return toProperties(getProperties());
   }
 
   /**
@@ -86,7 +80,7 @@ public class AnomalyFunctionDTO extends AnomalyFunctionBean {
    *
    * @return a Properties object corresponds to the properties String of this anomaly function.
    */
-  public static Properties toProperties(String properties) throws IOException {
+  public static Properties toProperties(String properties) {
     if (properties == null || properties.isEmpty()) {
       return new Properties();
     }
