@@ -202,8 +202,8 @@ public class SegmentAssignmentStrategyTest {
   @Test
   public void testReplicaGroupPartitionAssignment()
       throws Exception {
-    String tableNameWithType =
-        TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME_REPLICA_GROUP_PARTITION_ASSIGNMENT);
+    String rawTableName = TABLE_NAME_REPLICA_GROUP_PARTITION_ASSIGNMENT;
+    String tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
 
     // Adding a table without replica group
     TableConfig tableConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE)
@@ -236,7 +236,7 @@ public class SegmentAssignmentStrategyTest {
     Assert.assertTrue(partitionAssignment != null);
 
     // After table deletion, check that the replica group partition assignment is deleted
-    _pinotHelixResourceManager.deleteOfflineTable(tableNameWithType);
+    _pinotHelixResourceManager.deleteOfflineTable(rawTableName);
     partitionAssignment = _partitionAssignmentGenerator.getReplicaGroupPartitionAssignment(tableNameWithType);
     Assert.assertTrue(partitionAssignment == null);
 
@@ -246,7 +246,7 @@ public class SegmentAssignmentStrategyTest {
     Assert.assertTrue(partitionAssignment != null);
 
     // Check that the replica group partition assignment is deleted
-    _pinotHelixResourceManager.deleteOfflineTable(tableNameWithType);
+    _pinotHelixResourceManager.deleteOfflineTable(rawTableName);
     partitionAssignment = _partitionAssignmentGenerator.getReplicaGroupPartitionAssignment(tableNameWithType);
     Assert.assertTrue(partitionAssignment == null);
   }

@@ -1324,47 +1324,65 @@ public class PinotHelixResourceManager {
         }, RetryPolicies.exponentialBackoffRetryPolicy(5, 500L, 2.0f));
   }
 
-  public void deleteOfflineTable(String tableName) {
-    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
+  public void deleteOfflineTable(String rawTableName) {
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
+    LOGGER.info("Deleting table {}: Start", offlineTableName);
 
     // Remove the table from brokerResource
     HelixHelper.removeResourceFromBrokerIdealState(_helixZkManager, offlineTableName);
+    LOGGER.info("Deleting table {}: Removed from broker resource", offlineTableName);
 
     // Drop the table
     if (_helixAdmin.getResourcesInCluster(_helixClusterName).contains(offlineTableName)) {
       _helixAdmin.dropResource(_helixClusterName, offlineTableName);
+      LOGGER.info("Deleting table {}: Removed helix table resource", offlineTableName);
     }
 
-    // Remove all segments for the table
+    // Remove all stored segments for the table
     _segmentDeletionManager.removeSegmentsFromStore(offlineTableName, getSegmentsFor(offlineTableName));
+    LOGGER.info("Deleting table {}: Removed stored segments", offlineTableName);
+
+    // Remove segment metadata
     ZKMetadataProvider.removeResourceSegmentsFromPropertyStore(_propertyStore, offlineTableName);
+    LOGGER.info("Deleting table {}: Removed segment metadata", offlineTableName);
 
     // Remove table config
     ZKMetadataProvider.removeResourceConfigFromPropertyStore(_propertyStore, offlineTableName);
+    LOGGER.info("Deleting table {}: Removed table config", offlineTableName);
 
     // Remove replica group partition assignment
     ZKMetadataProvider.removeInstancePartitionAssignmentFromPropertyStore(_propertyStore, offlineTableName);
+    LOGGER.info("Deleting table {}: Removed replica group partition assignment", offlineTableName);
+    LOGGER.info("Deleting table {}: Finish", offlineTableName);
   }
 
-  public void deleteRealtimeTable(String tableName) {
-    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
+  public void deleteRealtimeTable(String rawTableName) {
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(rawTableName);
+    LOGGER.info("Deleting table {}: Start", realtimeTableName);
 
     // Remove the table from brokerResource
     HelixHelper.removeResourceFromBrokerIdealState(_helixZkManager, realtimeTableName);
+    LOGGER.info("Deleting table {}: Removed from broker resource", realtimeTableName);
 
     // Cache the state and drop the table
     Set<String> instancesForTable = null;
     if (_helixAdmin.getResourcesInCluster(_helixClusterName).contains(realtimeTableName)) {
       instancesForTable = getAllInstancesForTable(realtimeTableName);
       _helixAdmin.dropResource(_helixClusterName, realtimeTableName);
+      LOGGER.info("Deleting table {}: Removed helix table resource", realtimeTableName);
     }
 
-    // Remove all segments for the table
+    // Remove all stored segments for the table
     _segmentDeletionManager.removeSegmentsFromStore(realtimeTableName, getSegmentsFor(realtimeTableName));
+    LOGGER.info("Deleting table {}: Removed stored segments", realtimeTableName);
+
+    // Remove segment metadata
     ZKMetadataProvider.removeResourceSegmentsFromPropertyStore(_propertyStore, realtimeTableName);
+    LOGGER.info("Deleting table {}: Removed segment metadata", realtimeTableName);
 
     // Remove table config
     ZKMetadataProvider.removeResourceConfigFromPropertyStore(_propertyStore, realtimeTableName);
+    LOGGER.info("Deleting table {}: Removed table config", realtimeTableName);
 
     // Remove groupId/PartitionId mapping for HLC table
     if (instancesForTable != null) {
@@ -1376,6 +1394,8 @@ public class PinotHelixResourceManager {
         }
       }
     }
+    LOGGER.info("Deleting table {}: Removed replica group partition assignment", realtimeTableName);
+    LOGGER.info("Deleting table {}: Finish", realtimeTableName);
   }
 
   /**
