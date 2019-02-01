@@ -19,9 +19,12 @@ package org.apache.pinot.thirdeye.tools;
 import org.apache.pinot.thirdeye.anomaly.task.TaskConstants;
 import org.apache.pinot.thirdeye.datalayer.bao.AlertConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.AnomalyFunctionManager;
+import org.apache.pinot.thirdeye.datalayer.bao.ApplicationManager;
 import org.apache.pinot.thirdeye.datalayer.bao.ClassificationConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.DataCompletenessConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
+import org.apache.pinot.thirdeye.datalayer.bao.DetectionAlertConfigManager;
+import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionStatusManager;
 import org.apache.pinot.thirdeye.datalayer.bao.JobManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MergedAnomalyResultManager;
@@ -31,10 +34,14 @@ import org.apache.pinot.thirdeye.datalayer.bao.RawAnomalyResultManager;
 import org.apache.pinot.thirdeye.datalayer.bao.TaskManager;
 import org.apache.pinot.thirdeye.datalayer.bao.jdbc.AlertConfigManagerImpl;
 import org.apache.pinot.thirdeye.datalayer.bao.jdbc.AnomalyFunctionManagerImpl;
+import org.apache.pinot.thirdeye.datalayer.bao.jdbc.ApplicationManagerImpl;
 import org.apache.pinot.thirdeye.datalayer.bao.jdbc.ClassificationConfigManagerImpl;
 import org.apache.pinot.thirdeye.datalayer.bao.jdbc.DataCompletenessConfigManagerImpl;
 import org.apache.pinot.thirdeye.datalayer.bao.jdbc.DatasetConfigManagerImpl;
+import org.apache.pinot.thirdeye.datalayer.bao.jdbc.DetectionAlertConfigManagerImpl;
+import org.apache.pinot.thirdeye.datalayer.bao.jdbc.DetectionConfigManagerImpl;
 import org.apache.pinot.thirdeye.datalayer.bao.jdbc.DetectionStatusManagerImpl;
+import org.apache.pinot.thirdeye.datalayer.bao.jdbc.EventManagerImpl;
 import org.apache.pinot.thirdeye.datalayer.bao.jdbc.JobManagerImpl;
 import org.apache.pinot.thirdeye.datalayer.bao.jdbc.MergedAnomalyResultManagerImpl;
 import org.apache.pinot.thirdeye.datalayer.bao.jdbc.MetricConfigManagerImpl;
@@ -44,9 +51,12 @@ import org.apache.pinot.thirdeye.datalayer.bao.jdbc.TaskManagerImpl;
 import org.apache.pinot.thirdeye.datalayer.dto.AlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.ApplicationDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.ClassificationConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DataCompletenessConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionStatusDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.JobDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
@@ -56,16 +66,19 @@ import org.apache.pinot.thirdeye.datalayer.pojo.AlertConfigBean;
 import org.apache.pinot.thirdeye.datalayer.util.DaoProviderUtil;
 
 import org.apache.pinot.thirdeye.datalayer.util.Predicate;
+
 import java.io.File;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
 import java.util.Set;
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterRecipients;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -76,6 +89,9 @@ public class RunAdhocDatabaseQueriesTool {
 
   private static final Logger LOG = LoggerFactory.getLogger(RunAdhocDatabaseQueriesTool.class);
 
+  private DetectionConfigManager detectionConfigDAO;
+  private DetectionAlertConfigManager detectionAlertConfigDAO;
+  private EventManagerImpl eventDAO;
   private AnomalyFunctionManager anomalyFunctionDAO;
   private RawAnomalyResultManager rawResultDAO;
   private MergedAnomalyResultManager mergedResultDAO;
@@ -88,6 +104,7 @@ public class RunAdhocDatabaseQueriesTool {
   private DetectionStatusManager detectionStatusDAO;
   private AlertConfigManager alertConfigDAO;
   private ClassificationConfigManager classificationConfigDAO;
+  private ApplicationManager applicationDAO;
 
   public RunAdhocDatabaseQueriesTool(File persistenceFile)
       throws Exception {
@@ -96,6 +113,9 @@ public class RunAdhocDatabaseQueriesTool {
 
   public void init(File persistenceFile) throws Exception {
     DaoProviderUtil.init(persistenceFile);
+    detectionConfigDAO = DaoProviderUtil.getInstance(DetectionConfigManagerImpl.class);
+    detectionAlertConfigDAO = DaoProviderUtil.getInstance(DetectionAlertConfigManagerImpl.class);
+    eventDAO = DaoProviderUtil.getInstance(EventManagerImpl.class);
     anomalyFunctionDAO = DaoProviderUtil.getInstance(AnomalyFunctionManagerImpl.class);
     rawResultDAO = DaoProviderUtil.getInstance(RawAnomalyResultManagerImpl.class);
     mergedResultDAO = DaoProviderUtil.getInstance(MergedAnomalyResultManagerImpl.class);
@@ -108,6 +128,7 @@ public class RunAdhocDatabaseQueriesTool {
     detectionStatusDAO = DaoProviderUtil.getInstance(DetectionStatusManagerImpl.class);
     alertConfigDAO = DaoProviderUtil.getInstance(AlertConfigManagerImpl.class);
     classificationConfigDAO = DaoProviderUtil.getInstance(ClassificationConfigManagerImpl.class);
+    applicationDAO = DaoProviderUtil.getInstance(ApplicationManagerImpl.class);
   }
 
   private void toggleAnomalyFunction(Long id) {
@@ -433,6 +454,128 @@ public class RunAdhocDatabaseQueriesTool {
     }
   }
 
+  /**
+   * Generates a report of the status and owner of all the un-subscribed anomaly functions
+   */
+  private void unsubscribedDetections(){
+    List<ApplicationDTO> apps = applicationDAO.findAll();
+
+    List<AnomalyFunctionDTO> allAnomalyFuncs = anomalyFunctionDAO.findAll();
+    LOG.info("Total number of funcs: " + allAnomalyFuncs.size());
+
+    Set<Long> allAnomalyFuncsIds = new HashSet<>();
+    Set<Long> subscribedFuncsIds = new HashSet<>();
+    for (AnomalyFunctionDTO anom : allAnomalyFuncs) {
+      allAnomalyFuncsIds.add(anom.getId());
+    }
+
+    List<AnomalyFunctionDTO> subscribedFuncs = new ArrayList<>();
+    for (ApplicationDTO app : apps) {
+      List<AlertConfigDTO> alertConfigDTOS = alertConfigDAO.findByPredicate(Predicate.EQ("application", app.getApplication()));
+      if (alertConfigDTOS != null) {
+        for (AlertConfigDTO alertDTO : alertConfigDTOS) {
+          if (alertDTO.getEmailConfig() != null) {
+            if (alertDTO.getEmailConfig().getFunctionIds() != null) {
+              for (long id : alertDTO.getEmailConfig().getFunctionIds()) {
+                AnomalyFunctionDTO func = anomalyFunctionDAO.findById(id);
+                if (func != null) {
+                  subscribedFuncs.add(func);
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    for (AnomalyFunctionDTO anom : subscribedFuncs) {
+      subscribedFuncsIds.add(anom.getId());
+    }
+
+    allAnomalyFuncsIds.removeAll(subscribedFuncsIds);
+
+    for (long id : allAnomalyFuncsIds) {
+      AnomalyFunctionDTO func = anomalyFunctionDAO.findById(id);
+      System.out.println(String.format("%s\t%s\t%s\t%s\t%s", func.getId(), func.getFunctionName(), func.getIsActive(), func.getCreatedBy(), func.getUpdatedBy()));
+
+    }
+  }
+
+  /**
+   * Generates a report of the status, owner and recipients of all the subscription groups by application
+   */
+  private void notificationOwners(){
+    List<ApplicationDTO> apps = applicationDAO.findAll();
+    for (ApplicationDTO app : apps) {
+      List<AlertConfigDTO> alertConfigDTOS = alertConfigDAO.findByPredicate(Predicate.EQ("application", app.getApplication()));
+      for (AlertConfigDTO alertDTO : alertConfigDTOS) {
+        String recipients = fetchRecipients(alertDTO.getReceiverAddresses());
+        System.out.println(String.format("%s\t%s\t%s\t%s\t%s", app.getApplication(), alertDTO.getName(), alertDTO.isActive(), alertDTO.getCreatedBy(), recipients));
+      }
+    }
+  }
+
+  /**
+   * Generates a report of the status, owner and recipients of all the subscribed anomaly functions by application
+   */
+  private void detectionOwners(){
+    List<ApplicationDTO> apps = applicationDAO.findAll();
+
+    for (ApplicationDTO app : apps) {
+      List<AlertConfigDTO> alertConfigDTOS = alertConfigDAO.findByPredicate(Predicate.EQ("application", app.getApplication()));
+      if (alertConfigDTOS != null) {
+        for (AlertConfigDTO alertDTO : alertConfigDTOS) {
+          if (alertDTO.getEmailConfig() != null) {
+            if (alertDTO.getEmailConfig().getFunctionIds() != null) {
+              for (long id : alertDTO.getEmailConfig().getFunctionIds()) {
+                AnomalyFunctionDTO func = anomalyFunctionDAO.findById(id);
+                if (func != null) {
+                  String recipients = fetchRecipients(alertDTO.getReceiverAddresses());
+                  System.out.println(String.format("%s\t%s\t%s\t%s\t%s\t%s", app.getApplication(), func.getId(), func.getFunctionName(),
+                      func.getIsActive(), func.getCreatedBy(), String.join(",", recipients)));
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  private String fetchRecipients(DetectionAlertFilterRecipients receivers) {
+    String recipients = String.join(", ", receivers.getTo()).trim();
+    while (recipients.startsWith(",")) {
+      recipients = recipients.substring(1, recipients.length());
+    }
+    while (recipients.endsWith(",")) {
+      recipients = recipients.substring(0, recipients.length() - 1);
+    }
+    return recipients;
+  }
+
+  private void cleanup(){
+    List<DetectionConfigDTO> detectionConfigDTOS = detectionConfigDAO.findAll();
+
+    for (DetectionConfigDTO detFunction : detectionConfigDTOS) {
+      // Delete all the anomalies generated by the functions
+      List<AnomalyFunctionDTO> anomalies = anomalyFunctionDAO.findByPredicate(Predicate.EQ("baseId", detFunction.getId()));
+      for (AnomalyFunctionDTO anomaly : anomalies) {
+        anomalyFunctionDAO.delete(anomaly);
+      }
+      // Delete all the functions
+      detectionConfigDAO.delete(detFunction);
+    }
+
+    List<DetectionAlertConfigDTO> detectionAlertConfigDTOS = detectionAlertConfigDAO.findAll();
+    for (DetectionAlertConfigDTO alert : detectionAlertConfigDTOS) {
+      if (alert.getId() == 89049435 || alert.getId() == 89235978) {
+        continue;
+      }
+
+      detectionAlertConfigDAO.delete(alert);
+    }
+  }
+
   public static void main(String[] args) throws Exception {
 
     File persistenceFile = new File(args[0]);
@@ -441,7 +584,8 @@ public class RunAdhocDatabaseQueriesTool {
       System.exit(1);
     }
     RunAdhocDatabaseQueriesTool dq = new RunAdhocDatabaseQueriesTool(persistenceFile);
-
+    dq.unsubscribedDetections();
+    LOG.info("DONE");
   }
 
 }
