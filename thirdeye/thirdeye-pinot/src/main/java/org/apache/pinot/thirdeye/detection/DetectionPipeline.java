@@ -61,8 +61,7 @@ public abstract class DetectionPipeline {
   protected final long startTime;
   protected final long endTime;
 
-  protected DetectionPipeline(DataProvider provider, DetectionConfigDTO config, long startTime, long endTime)
-  {
+  protected DetectionPipeline(DataProvider provider, DetectionConfigDTO config, long startTime, long endTime) {
     this.provider = provider;
     this.config = config;
     this.startTime = startTime;
@@ -70,8 +69,7 @@ public abstract class DetectionPipeline {
     try {
       this.initComponents();
     } catch (Exception e) {
-      LOG.error("Initialize components failed", e);
-      throw new IllegalArgumentException("Initialize components failed. Please check rule parameters. " + e.getMessage());
+      throw new IllegalArgumentException("Initialize components failed. Please check rule parameters.", e);
     }
   }
 

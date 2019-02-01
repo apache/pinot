@@ -303,63 +303,57 @@ public class DetectionMigrationResource {
 
   private long migrateLegacyAnomalyFunction(AnomalyFunctionDTO anomalyFunctionDTO) {
     DetectionConfigDTO detectionConfig;
-    try {
-      LOGGER.info(String.format("[MIG] Migrating anomaly function %d %s", anomalyFunctionDTO.getId(),
-          anomalyFunctionDTO.getFunctionName()));
 
-      // Check if this anomaly function is already migrated
-      if (anomalyFunctionDTO.getFunctionName().contains(MIGRATED_TAG)) {
-        LOGGER.info(String.format("[MIG] Anomaly function %d is already migrated.", anomalyFunctionDTO.getId()));
+    LOGGER.info(String.format("[MIG] Migrating anomaly function %d %s", anomalyFunctionDTO.getId(),
+        anomalyFunctionDTO.getFunctionName()));
 
-        // Fetch the migrated config id and return
-        String funcName = anomalyFunctionDTO.getFunctionName();
-        return Long.parseLong(funcName.substring(funcName.lastIndexOf("_") + 1, funcName.length()));
+    // Check if this anomaly function is already migrated
+    if (anomalyFunctionDTO.getFunctionName().contains(MIGRATED_TAG)) {
+      LOGGER.info(String.format("[MIG] Anomaly function %d is already migrated.", anomalyFunctionDTO.getId()));
+
+      // Fetch the migrated config id and return
+      String funcName = anomalyFunctionDTO.getFunctionName();
+      return Long.parseLong(funcName.substring(funcName.lastIndexOf("_") + 1, funcName.length()));
+    }
+
+    // Migrate anomaly function config to the detection config by converting to YAML and then to Detection Config
+    Map<String, String> responseMessage = new HashMap<>();
+    Map<String, Object> detectionYAMLMap = translateAnomalyFunctionToYaml(anomalyFunctionDTO);
+    detectionConfig = new YamlResource().translateToDetectionConfig(detectionYAMLMap, responseMessage);
+
+    if (detectionConfig == null) {
+      throw new RuntimeException("Couldn't translate yaml to detection config due to " + responseMessage.get("message"));
+    }
+
+    // Save the migrated anomaly function
+    DAORegistry.getInstance().getDetectionConfigManager().save(detectionConfig);
+    if (detectionConfig.getId() == null) {
+      throw new RuntimeException("Error saving the new detection config.");
+    }
+
+    // Point all the associated anomalies to the migrated anomaly function.
+    List<MergedAnomalyResultDTO> mergedAnomalyResultDTOS = mergedAnomalyResultDAO.findByPredicate(Predicate.EQ("functionId", anomalyFunctionDTO.getId()));
+    for (MergedAnomalyResultDTO anomaly : mergedAnomalyResultDTOS) {
+      // Drop the baseline and current values from the anomalies.
+      if (anomaly.getProperties() != null) {
+        anomaly.getProperties().remove("anomalyTimelinesView");
       }
-
-      // Migrate anomaly function config to the detection config by converting to YAML and then to Detection Config
-      Map<String, String> responseMessage = new HashMap<>();
-      Map<String, Object> detectionYAMLMap = translateAnomalyFunctionToYaml(anomalyFunctionDTO);
-      detectionConfig = new YamlResource().translateToDetectionConfig(detectionYAMLMap, responseMessage);
-
-      if (detectionConfig == null) {
-        throw new RuntimeException("Couldn't translate yaml to detection config due to " + responseMessage.get("message"));
-      }
-
-      // Save the migrated anomaly function
-      DAORegistry.getInstance().getDetectionConfigManager().save(detectionConfig);
-      if (detectionConfig.getId() == null) {
-        throw new RuntimeException("Error saving the new detection config.");
-      }
-
-      // Point all the associated anomalies to the migrated anomaly function.
-      List<MergedAnomalyResultDTO> mergedAnomalyResultDTOS = mergedAnomalyResultDAO.findByPredicate(Predicate.EQ("functionId", anomalyFunctionDTO.getId()));
-      for (MergedAnomalyResultDTO anomaly : mergedAnomalyResultDTOS) {
-        // Drop the baseline and current values from the anomalies.
-        if (anomaly.getProperties() != null) {
-          anomaly.getProperties().remove("anomalyTimelinesView");
-        }
-        anomaly.setDetectionConfigId(detectionConfig.getId());
-        int affectedRows = mergedAnomalyResultDAO.update(anomaly);
-        if (affectedRows == 0) {
-          throw new RuntimeException("Failed to update the anomaly " + anomaly.getId() + " with the new detection id"
-              + " for anomaly function " + detectionConfig.getId());
-        }
-      }
-
-      // Mark the old anomaly function as migrated
-      anomalyFunctionDTO.setActive(false);
-      anomalyFunctionDTO.setFunctionName(anomalyFunctionDTO.getFunctionName() + MIGRATED_TAG + "_" + detectionConfig.getId());
-      int affectedRows = this.anomalyFunctionDAO.update(anomalyFunctionDTO);
+      anomaly.setDetectionConfigId(detectionConfig.getId());
+      int affectedRows = mergedAnomalyResultDAO.update(anomaly);
       if (affectedRows == 0) {
-        throw new RuntimeException("Anomaly function migrated successfully but failed to disable and update the"
-            + " migration status of the old anomaly function. Recommend doing it manually. Migrated detection id "
-            + detectionConfig.getId());
+        throw new RuntimeException("Failed to update the anomaly " + anomaly.getId() + " with the new detection id"
+            + " for anomaly function " + detectionConfig.getId());
       }
-    } catch (Exception e) {
-      LOGGER.error("[MIG] Failed to migrate anomaly function id {} name {}.", anomalyFunctionDTO.getId(),
-          anomalyFunctionDTO.getFunctionName(), e);
-      throw new RuntimeException(String.format("Error migrating anomaly function %d due to %s",
-          anomalyFunctionDTO.getId(), e.getMessage()), e);
+    }
+
+    // Mark the old anomaly function as migrated
+    anomalyFunctionDTO.setActive(false);
+    anomalyFunctionDTO.setFunctionName(anomalyFunctionDTO.getFunctionName() + MIGRATED_TAG + "_" + detectionConfig.getId());
+    int affectedRows = this.anomalyFunctionDAO.update(anomalyFunctionDTO);
+    if (affectedRows == 0) {
+      throw new RuntimeException("Anomaly function migrated successfully but failed to disable and update the"
+          + " migration status of the old anomaly function. Recommend doing it manually. Migrated detection id "
+          + detectionConfig.getId());
     }
 
     LOGGER.info(String.format("[MIG] Successfully migrated anomaly function %d %s", anomalyFunctionDTO.getId(),
@@ -368,64 +362,68 @@ public class DetectionMigrationResource {
   }
 
   private void migrateLegacyNotification(AlertConfigDTO alertConfigDTO) {
+    int anomalyFailureCount = 0;
+    int anomalyWarningCount = 0;
     String alertName = alertConfigDTO.getName();
 
-    try {
-      LOGGER.info(String.format("[MIG] Migrating alert %d %s", alertConfigDTO.getId(), alertName));
+    LOGGER.info(String.format("[MIG] Migrating alert %d %s", alertConfigDTO.getId(), alertName));
 
-      // Skip if the alert is already migrated
-      if (alertConfigDTO.getName().contains(MIGRATED_TAG)) {
-        LOGGER.info(String.format("[MIG] Alert %d is already migrated. Skipping!", alertConfigDTO.getId()));
-        return;
-      }
-
-      // Migrate all the subscribed anomaly functions. Note that this will update the state of old anomaly functions.
-      List<Long> detectionIds = ConfigUtils.getLongs(alertConfigDTO.getEmailConfig().getFunctionIds());
-      List<Long> filteredIds = new ArrayList<>();
-      for (long detectionId : detectionIds) {
-        try {
-          migrateLegacyAnomalyFunction(detectionId);
-          filteredIds.add(detectionId);
-        } catch (ValidationException e) {
-          // Ignore those anomaly functions which are pointing to invalid entities
-          LOGGER.warn("[MIG] Error while migrating anomaly function. Error " + e.getMessage());
-        }
-      }
-      alertConfigDTO.getEmailConfig().setFunctionIds(filteredIds);
-
-      // Translate the old alert and capture the state.
-      Map<String, Object> detectionAlertYaml = translateAlertToYaml(alertConfigDTO);
-
-      // Migrate the alert/notification group
-      DetectionAlertConfigDTO alertConfig = new YamlDetectionAlertConfigTranslator(detectionConfigDAO).translate(detectionAlertYaml);
-      List<DetectionAlertConfigDTO> alertDTOs = detectionAlertConfigDAO.findByPredicate(Predicate.EQ("name", alertConfig.getName()));
-      if (!alertDTOs.isEmpty()) {
-        LOGGER.warn("[MIG] Looks like this alert was already migrated. old id = " + alertConfig.getId() + " new id = "
-            + alertDTOs.get(0).getId());
-      } else {
-        detectionAlertConfigDAO.save(alertConfig);
-        if (alertConfig.getId() == null) {
-          throw new RuntimeException("Error while saving the migrated alert config for " + alertName);
-        }
-      }
-
-      // Update migration status and disable the old alert
-      alertConfigDTO.setName(alertName + MIGRATED_TAG + "_" + alertConfig.getId());
-      alertConfigDTO.setActive(false);
-      int affectedRows = alertConfigDAO.update(alertConfigDTO);
-      if (affectedRows == 0) {
-        throw new RuntimeException(
-            "Alert migrated successfully but failed to disable and update the migration status" + " of the old alert."
-                + " Migrated alert id " + alertConfig.getId());
-      }
-
-    } catch (Exception e) {
-      LOGGER.error("[MIG] Failed to migrate alert ID {} name {}.", alertConfigDTO.getId(), alertConfigDTO.getName(), e);
-      throw new RuntimeException(String.format("Error migrating alert ID %d due to %s",
-          alertConfigDTO.getId(), e.getMessage()), e);
+    // Skip if the alert is already migrated
+    if (alertConfigDTO.getName().contains(MIGRATED_TAG)) {
+      LOGGER.info(String.format("[MIG] Alert %d is already migrated. Skipping!", alertConfigDTO.getId()));
+      return;
     }
 
-    LOGGER.info(String.format("[MIG] Successfully migrated alert %d %s", alertConfigDTO.getId(), alertName));
+    // Migrate all the subscribed anomaly functions. Note that this will update the state of old anomaly functions.
+    List<Long> detectionIds = ConfigUtils.getLongs(alertConfigDTO.getEmailConfig().getFunctionIds());
+    List<Long> filteredIds = new ArrayList<>();
+    for (long detectionId : detectionIds) {
+      try {
+        migrateLegacyAnomalyFunction(detectionId);
+        filteredIds.add(detectionId);
+      } catch (ValidationException e) {
+        anomalyWarningCount++;
+        // Ignore those anomaly functions which are pointing to invalid entities
+        LOGGER.warn("[MIG] Validation error while migrating anomaly function {}. Error ", detectionId, e.getMessage());
+      } catch (Exception e) {
+        anomalyFailureCount++;
+        LOGGER.error("[MIG] Error while migrating anomaly function {}. Error ", detectionId, e);
+      }
+    }
+    alertConfigDTO.getEmailConfig().setFunctionIds(filteredIds);
+
+    // Translate the old alert and capture the state.
+    Map<String, Object> detectionAlertYaml = translateAlertToYaml(alertConfigDTO);
+
+    // Migrate the alert/notification group
+    DetectionAlertConfigDTO alertConfig = new YamlDetectionAlertConfigTranslator(detectionConfigDAO).translate(detectionAlertYaml);
+    List<DetectionAlertConfigDTO> alertDTOs = detectionAlertConfigDAO.findByPredicate(Predicate.EQ("name", alertConfig.getName()));
+    if (!alertDTOs.isEmpty()) {
+      LOGGER.warn("[MIG] Looks like this alert was already migrated. old id = " + alertConfig.getId() + " new id = "
+          + alertDTOs.get(0).getId());
+    } else {
+      detectionAlertConfigDAO.save(alertConfig);
+      if (alertConfig.getId() == null) {
+        throw new RuntimeException("Error while saving the migrated alert config for " + alertName);
+      }
+    }
+
+    // Update migration status and disable the old alert
+    alertConfigDTO.setName(alertName + MIGRATED_TAG + "_" + alertConfig.getId());
+    alertConfigDTO.setActive(false);
+    int affectedRows = alertConfigDAO.update(alertConfigDTO);
+    if (affectedRows == 0) {
+      throw new RuntimeException(
+          "Alert migrated successfully but failed to disable and update the migration status" + " of the old alert."
+              + " Migrated alert id " + alertConfig.getId());
+    }
+
+    if (anomalyFailureCount == 0 || anomalyWarningCount == 0) {
+      LOGGER.info(String.format("[MIG] Successfully migrated alert %d %s", alertConfigDTO.getId(), alertName));
+    } else {
+      throw new RuntimeException("Failures/Warnings found. anomalyFailureCount " + anomalyFailureCount + " and"
+          + " anomalyWarningCount " + anomalyWarningCount);
+    }
   }
 
   private void validateFunction(AnomalyFunctionDTO functionDTO) throws ValidationException {
@@ -532,6 +530,7 @@ public class DetectionMigrationResource {
         migrateLegacyNotification(alertConfigDTO);
       } catch (Exception e) {
         // Skip migrating this alert and move on to the next
+        LOGGER.error("[MIG] Failed to migrate alert ID {} name {}. Exception {}", alertConfigDTO.getId(), alertConfigDTO.getName(), e);
         responseMessage.put("Status of alert " + alertConfigDTO.getId(),
             String.format("Failed to migrate alert ID %d with name %s due to %s", alertConfigDTO.getId(),
                 alertConfigDTO.getName(), e.getMessage()));
