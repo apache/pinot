@@ -19,6 +19,7 @@
 
 package org.apache.pinot.thirdeye.detection.validators;
 
+import javax.xml.bind.ValidationException;
 import org.apache.pinot.thirdeye.datalayer.bao.AlertConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.ApplicationManager;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
@@ -44,21 +45,17 @@ public abstract class ConfigValidator {
    * the yaml exists and is parsable
    */
   @SuppressWarnings("unchecked")
-  public boolean validateYAMLConfig(String yamlConfig, Map<String, String> responseMessage) {
+  public boolean validateYAMLConfig(String yamlConfig) throws ValidationException {
     // Check if YAML is empty or not
     if (StringUtils.isEmpty(yamlConfig)) {
-      responseMessage.put("message", "The config file cannot be blank.");
-      responseMessage.put("more-info", "Payload in the request is empty");
-      return false;
+      throw new ValidationException("The Yaml Payload in the request is empty.");
     }
 
     // Check if the YAML is parsable
     try {
       Map<String, Object> yamlConfigMap = (Map<String, Object>) YAML.load(yamlConfig);
     } catch (Exception e) {
-      responseMessage.put("message", "There was an error parsing the yaml file. Check for syntax issues.");
-      responseMessage.put("more-info", "Error parsing YAML" + e);
-      return false;
+      throw new ValidationException("Error parsing the Yaml input. Check for syntax issues.");
     }
 
     return true;
