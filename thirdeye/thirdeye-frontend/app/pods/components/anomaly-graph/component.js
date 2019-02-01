@@ -26,7 +26,8 @@ const COLOR_MAPPING = {
 export default Component.extend({
   init() {
     this._super(...arguments);
-
+    const subChartStart = this.get('subChartStart');
+    const subChartEnd = this.get('subChartEnd');
     this.setProperties({
       _subchartStart: Number(this.get('subchartStart')),
       _subchartEnd: Number(this.get('subchartEnd'))
@@ -63,94 +64,6 @@ export default Component.extend({
       .attr("y1", 27)
       .attr("x2", 5)
       .attr("y2", 33);
-  },
-
-  buildAnomalyRegionSlider(start, end) {
-    const {
-      componentId,
-      regionStart,
-      regionEnd,
-      _subchartStart: subchartStart,
-      _subchartEnd: subchartEnd
-    } = this.getProperties(
-      'componentId',
-      'regionStart',
-      'regionEnd',
-      '_subchartStart',
-      '_subchartEnd');
-
-    start = start || subchartStart;
-    end = end || subchartEnd;
-
-    d3.select(`#${componentId} .anomaly-graph__region-slider`).remove();
-    if (componentId !== 'main-graph') {return;}
-
-    const focus = d3.select(`#${componentId}.c3-chart-component .c3-chart`);
-    const { height, width } = d3.select(`#${componentId} .c3-chart .c3-event-rects`).node().getBoundingClientRect();
-    const dates = this.get('primaryMetric.timeBucketsCurrent');
-    const min = start ? moment(start).valueOf() : d3.min(dates);
-    const max = end ? moment(end).valueOf() : d3.max(dates);
-
-    const x = d3.time.scale()
-      .domain([min, max])
-      .range([0, width]);
-
-    const brush = d3.svg.brush()
-      .on("brushend", brushed.bind(this))
-      .x(x)
-      .extent([+regionStart, +regionEnd]);
-
-    function brushed() {
-      const e = brush.extent();
-      const [ start, end ] = e;
-
-      const regionStart = moment(start).valueOf();
-      const regionEnd = moment(end).valueOf();
-      const subchartStart = this.get('_subchartStart');
-      const subchartEnd = this.get('_subchartEnd');
-
-      this.setProperties({
-        regionStart,
-        regionEnd,
-        subchartStart,
-        subchartEnd
-      });
-    }
-
-    focus.append('g')
-      .attr('class', 'anomaly-graph__region-slider x brush')
-      .call(brush)
-      .selectAll('rect')
-      .attr('y', 0)
-      .attr('height', height);
-
-    const resizeButton = focus.selectAll('.resize');
-    const sliderHeight = height/2;
-    resizeButton.append('circle')
-      .attr('cx', 0)
-      .attr('cy', sliderHeight)
-      .attr('r', 10)
-      .attr('fill', '#E55800');
-    resizeButton.append('line')
-      .attr('class', 'anomaly-graph__slider-line')
-      .attr("x1", 0)
-      .attr("y1", sliderHeight - 3)
-      .attr("x2", 0)
-      .attr("y2", sliderHeight + 3);
-
-    resizeButton.append('line')
-      .attr('class', 'anomaly-graph__slider-line')
-      .attr("x1", -5)
-      .attr("y1", sliderHeight - 3)
-      .attr("x2", -5)
-      .attr("y2", sliderHeight + 3);
-
-    resizeButton.append('line')
-      .attr('class', 'anomaly-graph__slider-line')
-      .attr("x1", 5)
-      .attr("y1", sliderHeight - 3)
-      .attr("x2", 5)
-      .attr("y2", sliderHeight + 3);
   },
 
   // Builds the Current/Expected legend for the graph
@@ -213,8 +126,6 @@ export default Component.extend({
 
     later(() => {
       this.buildSliderButton();
-      // hiding this feature until fully fleshed out
-      // this.buildAnomalyRegionSlider();
       this.buildCustomLegend().then(() => {
         this.notifyPhantomJS();
       });
@@ -529,8 +440,6 @@ export default Component.extend({
 
       onSubchartBrush && onSubchartBrush(dates);
     }
-    // hiding this feature until fully fleshed out
-    // this.buildAnomalyRegionSlider(start, end);
 
   },
 

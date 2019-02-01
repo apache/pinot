@@ -31,6 +31,178 @@
           {{!-- Alert anomaly stats cards --}}
           {{stats-cards stats=stats}}
         </div>
+        {{#unless errorAnomalies}}
+          {{#if showPreview}}
+            {{#if isLoading}}
+              {{ember-spinner}}
+            {{/if}}
+            {{timeseries-chart
+              series=series
+              colorMapping=colorMapping
+              axis=axis
+              zoom=zoom
+              legend=legend
+            }}
+            {{#if anomalies}}
+              {{!-- Baseline type selector --}}
+              {{range-pill-selectors
+                title="Baseline"
+                timeRangeOptions=baselineOptions
+                selectAction=(action "onBaselineOptionClick")
+              }}
+              {{!-- Alert anomaly table --}}
+              <div class="te-block-container">
+                <table class="te-anomaly-table">
+                  {{#if anomalies}}
+                    <thead>
+                      <tr class="te-anomaly-table__row te-anomaly-table__head">
+                        <th class="te-anomaly-table__cell-head te-anomaly-table__cell-head--left">
+                          <a class="te-anomaly-table__cell-link" {{action "toggleSortDirection" "number"}}>#
+                            <i class="te-anomaly-table__icon glyphicon {{if sortColumnNumberUp "glyphicon-menu-down" "glyphicon-menu-up"}}"></i>
+                          </a>
+                        </th>
+                        <th class="te-anomaly-table__cell-head te-anomaly-table__cell-head--left">
+                          <a class="te-anomaly-table__cell-link" {{action "toggleSortDirection" "start"}}>
+                            Start/Duration (PDT)
+                            <i class="te-anomaly-table__icon glyphicon {{if sortColumnStartUp "glyphicon-menu-up" "glyphicon-menu-down"}}"></i>
+                          </a>
+                        </th>
+                        {{#if alertHasDimensions}}
+                          <th class="te-anomaly-table__cell-head te-anomaly-table__cell-head--fixed">Dimensions</th>
+                        {{/if}}
+                        <th class="te-anomaly-table__cell-head">
+                          <a class="te-anomaly-table__cell-link" {{action "toggleSortDirection" "score"}}>
+                            Severity Score
+                            <i class="te-anomaly-table__icon glyphicon {{if sortColumnScoreUp "glyphicon-menu-up" "glyphicon-menu-down"}}"></i>
+                          </a>
+                        </th>
+                        <th class="te-anomaly-table__cell-head">
+                          <a class="te-anomaly-table__cell-link" {{action "toggleSortDirection" "change"}}>
+                            Average Current / Average Predicted
+                            <i class="te-anomaly-table__icon glyphicon {{if sortColumnChangeUp "glyphicon-menu-up" "glyphicon-menu-down"}}"></i>
+                          </a>
+                        </th>
+                        {{#if notPreview}}
+                          <th class="te-anomaly-table__cell-head">
+                            <a class="te-anomaly-table__cell-link" {{action "toggleSortDirection" "resolution"}}>
+                              Resolution
+                              <i class="te-anomaly-table__icon glyphicon {{if sortColumnResolutionUp "glyphicon-menu-up" "glyphicon-menu-down"}}"></i>
+                            </a>
+                          </th>
+                          <th class="te-anomaly-table__cell-head"></th>
+                        {{/if}}
+                      </tr>
+                    </thead>
+                  {{/if}}
+                  <tbody>
+                    {{#each tableAnomalies as |anomaly|}}
+                      <tr class="te-anomaly-table__row">
+                         <td class="te-anomaly-table__cell te-anomaly-table__cell--index">{{anomaly.index}}</td>
+                         <td class="te-anomaly-table__cell">
+                          <ul class="te-anomaly-table__list te-anomaly-table__list--left">
+                            <li class="te-anomaly-table__list-item te-anomaly-table__list-item--stronger">
+                              {{#if notPreview}}
+                                <a target="_blank" class="te-anomaly-table__link" href="/app/#/rootcause?anomalyId={{anomaly.anomalyId}}">
+                                  {{anomaly.startDateStr}}
+                                </a>
+                              {{else}}
+                                {{anomaly.startDateStr}}
+                              {{/if}}
+                            </li>
+                            <li class="te-anomaly-table__list-item te-anomaly-table__list-item--lighter">{{anomaly.durationStr}}</li>
+                          </ul>
+                         </td>
+                         {{#if alertHasDimensions}}
+                           <td class="te-anomaly-table__cell">
+                            <ul class="te-anomaly-table__list">
+                             {{#each anomaly.dimensionList as |dimension|}}
+                                <li class="te-anomaly-table__list-item te-anomaly-table__list-item--smaller" title="{{dimension.dimensionVal}}">
+                                  {{dimension.dimensionKey}}: <span class="stronger">{{dimension.dimensionVal}}</span>
+                                </li>
+                             {{else}}
+                                -
+                             {{/each}}
+                            </ul>
+                           </td>
+                         {{/if}}
+                         <td class="te-anomaly-table__cell">{{anomaly.severityScore}}</td>
+                         <td class="te-anomaly-table__cell">
+                          <ul class="te-anomaly-table__list">
+                            <li>{{anomaly.shownCurrent}} / {{anomaly.shownBaseline}}</li>
+                            <li class="te-anomaly-table__value-label te-anomaly-table__value-label--{{calculate-direction anomaly.shownChangeRate}}">
+                              {{#if (not anomaly.isNullChangeRate)}}
+                                ({{anomaly.shownChangeRate}}%)
+                              {{else}}
+                                (N/A)
+                              {{/if}}
+                            </li>
+                          </ul>
+                         </td>
+                         {{#if notPreview}}
+                           <td class="te-anomaly-table__cell">
+                              {{#if renderStatusIcon}}
+                                {{#if anomaly.showResponseSaved}}
+                                  <i class="te-anomaly-table__icon--status glyphicon glyphicon-ok-circle"></i>
+                                {{/if}}
+                                {{#if anomaly.showResponseFailed}}
+                                  <i class="te-anomaly-table__icon--status te-anomaly-table__icon--error glyphicon glyphicon-remove-circle"></i>
+                                {{/if}}
+                              {{/if}}
+
+                              {{#if anomaly.isUserReported}}
+                                <div class="te-anomaly-table__text te-anomaly-table__text--explore">User Reported</div>
+                                <div class="te-anomaly-table__comment">
+                                  <i class="glyphicon glyphicon-th-list"></i>
+                                  {{#tooltip-on-element class="te-anomaly-table__tooltip"}}
+                                    {{anomaly.anomalyFeedbackComments}}
+                                  {{/tooltip-on-element}}
+                                </div>
+                              {{else}}
+                                {{#power-select
+                                  triggerId=anomaly.anomalyId
+                                  triggerClass="te-anomaly-table__select"
+                                  options=responseOptions
+                                  searchEnabled=false
+                                  selected=(get labelMap anomaly.anomalyFeedback)
+                                  onchange=(action "onChangeAnomalyResponse" anomaly)
+                                  as |response|
+                                }}
+                                  {{response}}
+                                {{/power-select}}
+                              {{/if}}
+                           </td>
+                           <td class="te-anomaly-table__cell te-anomaly-table__cell--feedback">
+                              <div class="te-anomaly-table__link-wrapper">
+                                {{#link-to 'rootcause' (query-params anomalyId=anomaly.anomalyId) target="_blank" class="te-anomaly-table__link"}}
+                                  Investigate
+                                {{/link-to}}
+                              </div>
+                           </td>
+                         {{/if}}
+                      </tr>
+                    {{/each}}
+                  </tbody>
+                </table>
+              </div>
+
+            {{/if}}
+            {{else}}
+              {{#if disablePreviewButton}}
+                <p>Please define anomaly detection in YAML to enable preview.</p>
+              {{/if}}
+          {{/if}}
+        {{/unless}}
+        <p>{{errorAnomalies}}</p>
+        <div class="pull-right">
+          {{bs-button
+            defaultText=(if showPreview "Refresh Preview" "Get Preview")
+            disabled=disablePreviewButton
+            type="outline-primary"
+            buttonType="refresh"
+            onClick=(action "getPreview")
+            class="te-button te-button--cancel"
+          }}
+        </div>
         {{#if repRunStatus}}
           <p class="te-self-serve__block-subtext te-self-serve__block-subtext--normal">Replay in progress. Please check back later...</p>
         {{/if}}

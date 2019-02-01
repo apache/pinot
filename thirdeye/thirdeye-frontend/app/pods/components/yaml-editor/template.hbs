@@ -38,7 +38,7 @@
     }}
   </div>
   <div class="col-xs-12">
-    {{#bs-accordion onChange=(action 'getPreview') as |acc|}}
+    {{#bs-accordion onChange=(action (mut toggleCollapsed)) as |acc|}}
       {{#acc.item value=preview as |aitem|}}
         {{#aitem.title}}
           <section class="dashboard-container__title">Preview alert {{#unless disableYamlSave}} / Alert configuration has changed.{{/unless}}
