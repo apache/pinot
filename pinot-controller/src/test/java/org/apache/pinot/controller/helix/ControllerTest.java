@@ -167,17 +167,16 @@ public abstract class ControllerTest {
 
   protected void addDummySchema(String tableName)
       throws IOException {
-    addSchema(createDummySchema(tableName).getJSONSchema());
+    addSchema(createDummySchema(tableName));
   }
 
   /**
    * Add a schema to the controller.
-   * @param schemaJson the json string representing the schema
    */
-  protected void addSchema(String schemaJson)
+  protected void addSchema(Schema schema)
       throws IOException {
     String url = _controllerRequestURLBuilder.forSchemaCreate();
-    PostMethod postMethod = sendMultipartPostRequest(url, schemaJson);
+    PostMethod postMethod = sendMultipartPostRequest(url, schema.toSingleLineJsonString());
     Assert.assertEquals(postMethod.getStatusCode(), 200);
   }
 

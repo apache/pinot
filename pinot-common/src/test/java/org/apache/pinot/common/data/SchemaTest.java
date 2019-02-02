@@ -266,7 +266,11 @@ public class SchemaTest {
     Assert.assertNotNull(resourceUrl);
     Schema schema = Schema.fromFile(new File(resourceUrl.getFile()));
 
-    Schema schemaToCompare = Schema.fromString(schema.getJSONSchema());
+    Schema schemaToCompare = Schema.fromString(schema.toPrettyJsonString());
+    Assert.assertEquals(schemaToCompare, schema);
+    Assert.assertEquals(schemaToCompare.hashCode(), schema.hashCode());
+
+    schemaToCompare = Schema.fromString(schema.toSingleLineJsonString());
     Assert.assertEquals(schemaToCompare, schema);
     Assert.assertEquals(schemaToCompare.hashCode(), schema.hashCode());
 
@@ -275,10 +279,10 @@ public class SchemaTest {
     Assert.assertEquals(schemaToCompare.hashCode(), schema.hashCode());
 
     // When setting new fields, schema string should be updated
-    String JSONSchema = schemaToCompare.getJSONSchema();
+    String jsonSchema = schemaToCompare.toSingleLineJsonString();
     schemaToCompare.setSchemaName("newSchema");
-    String JSONSchemaToCompare = schemaToCompare.getJSONSchema();
-    Assert.assertFalse(JSONSchema.equals(JSONSchemaToCompare));
+    String jsonSchemaToCompare = schemaToCompare.toSingleLineJsonString();
+    Assert.assertNotEquals(jsonSchemaToCompare, jsonSchema);
   }
 
   @Test
@@ -292,7 +296,7 @@ public class SchemaTest {
             TimeFormat.SIMPLE_DATE_FORMAT + ":yyyyMMdd", "Date");
     Schema schema = new Schema.SchemaBuilder().setSchemaName("testSchema")
         .addTime(incomingTimeGranularitySpec, outgoingTimeGranularitySpec).build();
-    String jsonSchema = schema.getJSONSchema();
+    String jsonSchema = schema.toSingleLineJsonString();
     Schema schemaFromJson = Schema.fromString(jsonSchema);
     Assert.assertEquals(schemaFromJson, schema);
     Assert.assertEquals(schemaFromJson.hashCode(), schema.hashCode());
@@ -311,7 +315,7 @@ public class SchemaTest {
     expectedSchema.addField(new MetricFieldSpec("nonEmptyDefault", FieldSpec.DataType.BYTES, expectedNonEmptyDefault));
 
     // Ensure that schema can be serialized and de-serialized (ie byte[] converted to String and back).
-    String jsonSchema = expectedSchema.getJSONSchema();
+    String jsonSchema = expectedSchema.toSingleLineJsonString();
     Schema actualSchema = Schema.fromString(jsonSchema);
 
     Assert.assertEquals(actualSchema.getFieldSpecFor("noDefault").getDefaultNullValue(), expectedEmptyDefault);

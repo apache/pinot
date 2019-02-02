@@ -53,7 +53,7 @@ public class PinotTableSchema {
       @ApiParam(value = "Table name (without type)", required = true) @PathParam("tableName") String tableName) {
     Schema schema = pinotHelixResourceManager.getTableSchema(tableName);
     if (schema != null) {
-      return schema.getJSONSchema();
+      return schema.toPrettyJsonString();
     }
     throw new ControllerApplicationException(LOGGER, "Schema not found for table: " + tableName,
         Response.Status.NOT_FOUND);

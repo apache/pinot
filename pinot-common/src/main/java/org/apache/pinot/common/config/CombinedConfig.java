@@ -18,8 +18,10 @@
  */
 package org.apache.pinot.common.config;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.utils.EqualityUtils;
+import org.apache.pinot.common.utils.JsonUtils;
 
 import static org.apache.pinot.common.utils.EqualityUtils.hashCodeOf;
 import static org.apache.pinot.common.utils.EqualityUtils.isEqual;
@@ -43,7 +45,11 @@ public class CombinedConfig {
 
   @Override
   public String toString() {
-    return "CombinedConfig{" + "_offline=" + _offline + ", _realtime=" + _realtime + ", _schema=" + _schema + '}';
+    try {
+      return JsonUtils.objectToPrettyString(this);
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   public TableConfig getOfflineTableConfig() {

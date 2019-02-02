@@ -116,7 +116,7 @@ public class PinotOutputFormat<K, V> extends FileOutputFormat<K, V> {
   }
 
   public static void setSchema(Job job, Schema schema) {
-    job.getConfiguration().set(PinotOutputFormat.SCHEMA, schema.getJSONSchema());
+    job.getConfiguration().set(PinotOutputFormat.SCHEMA, schema.toSingleLineJsonString());
   }
 
   public static String getSchema(JobContext context) {

@@ -361,40 +361,57 @@ public final class Schema {
     return (_timeFieldSpec != null) ? _timeFieldSpec.getOutgoingGranularitySpec().getTimeType() : null;
   }
 
-  @JsonIgnore
-  @Nonnull
-  public String getJSONSchema() {
-    ObjectNode jsonSchema = JsonUtils.newObjectNode();
-    jsonSchema.put("schemaName", _schemaName);
+  /**
+   * Returns a json representation of the schema.
+   */
+  public ObjectNode toJsonObject() {
+    ObjectNode jsonObject = JsonUtils.newObjectNode();
+    jsonObject.put("schemaName", _schemaName);
     if (!_dimensionFieldSpecs.isEmpty()) {
       ArrayNode jsonArray = JsonUtils.newArrayNode();
       for (DimensionFieldSpec dimensionFieldSpec : _dimensionFieldSpecs) {
         jsonArray.add(dimensionFieldSpec.toJsonObject());
       }
-      jsonSchema.set("dimensionFieldSpecs", jsonArray);
+      jsonObject.set("dimensionFieldSpecs", jsonArray);
     }
     if (!_metricFieldSpecs.isEmpty()) {
       ArrayNode jsonArray = JsonUtils.newArrayNode();
       for (MetricFieldSpec metricFieldSpec : _metricFieldSpecs) {
         jsonArray.add(metricFieldSpec.toJsonObject());
       }
-      jsonSchema.set("metricFieldSpecs", jsonArray);
+      jsonObject.set("metricFieldSpecs", jsonArray);
     }
     if (_timeFieldSpec != null) {
-      jsonSchema.set("timeFieldSpec", _timeFieldSpec.toJsonObject());
+      jsonObject.set("timeFieldSpec", _timeFieldSpec.toJsonObject());
     }
     if (!_dateTimeFieldSpecs.isEmpty()) {
       ArrayNode jsonArray = JsonUtils.newArrayNode();
       for (DateTimeFieldSpec dateTimeFieldSpec : _dateTimeFieldSpecs) {
         jsonArray.add(dateTimeFieldSpec.toJsonObject());
       }
-      jsonSchema.set("dateTimeFieldSpecs", jsonArray);
+      jsonObject.set("dateTimeFieldSpecs", jsonArray);
     }
+    return jsonObject;
+  }
+
+  /**
+   * Returns a pretty json string representation of the schema.
+   */
+  @Nonnull
+  public String toPrettyJsonString() {
     try {
-      return JsonUtils.objectToPrettyString(jsonSchema);
+      return JsonUtils.objectToPrettyString(toJsonObject());
     } catch (JsonProcessingException e) {
       throw new RuntimeException(e);
     }
+  }
+
+  /**
+   * Returns a single-line json string representation of the schema.
+   */
+  @Nonnull
+  public String toSingleLineJsonString() {
+    return toJsonObject().toString();
   }
 
   /**
@@ -622,7 +639,7 @@ public final class Schema {
 
   @Override
   public String toString() {
-    return getJSONSchema();
+    return toPrettyJsonString();
   }
 
   @SuppressWarnings("EqualsWhichDoesntCheckParameterClass")

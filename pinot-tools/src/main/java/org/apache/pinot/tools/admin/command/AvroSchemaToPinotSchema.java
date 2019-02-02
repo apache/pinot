@@ -97,7 +97,7 @@ public class AvroSchemaToPinotSchema extends AbstractBaseAdminCommand implements
     LOGGER.info("Store Pinot schema to file: {}", outputFile.getAbsolutePath());
 
     try (FileWriter writer = new FileWriter(outputFile)) {
-      writer.write(schema.toString());
+      writer.write(schema.toPrettyJsonString());
     }
 
     return true;
