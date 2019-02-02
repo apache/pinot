@@ -43,7 +43,7 @@ public class PinotSchemaRestletResourceTest extends ControllerTest {
   public void testBadContentType() {
     Schema schema = createDummySchema("testSchema");
     try {
-      sendPostRequest(_controllerRequestURLBuilder.forSchemaCreate(), schema.getJSONSchema());
+      sendPostRequest(_controllerRequestURLBuilder.forSchemaCreate(), schema.toSingleLineJsonString());
     } catch (IOException e) {
       // TODO The Jersey API returns 400, so we need to check return code here not a string.
 //      Assert.assertTrue(e.getMessage().startsWith("Server returned HTTP response code: 415"), e.getMessage());
@@ -59,40 +59,41 @@ public class PinotSchemaRestletResourceTest extends ControllerTest {
     String schemaName = "testSchema";
     Schema schema = createDummySchema(schemaName);
     String url = _controllerRequestURLBuilder.forSchemaCreate();
-    PostMethod postMethod = sendMultipartPostRequest(url, schema.toString());
+    PostMethod postMethod = sendMultipartPostRequest(url, schema.toSingleLineJsonString());
     Assert.assertEquals(postMethod.getStatusCode(), 200);
 
     schema.addField(new DimensionFieldSpec("NewColumn", FieldSpec.DataType.STRING, true));
-    postMethod = sendMultipartPostRequest(url, schema.toString());
+    postMethod = sendMultipartPostRequest(url, schema.toSingleLineJsonString());
     Assert.assertEquals(postMethod.getStatusCode(), 200);
 
     String schemaStr = sendGetRequest(_controllerRequestURLBuilder.forSchemaGet(schemaName));
     Schema readSchema = Schema.fromString(schemaStr);
-    Schema inputSchema = Schema.fromString(schema.toString());
+    Schema inputSchema = Schema.fromString(schema.toSingleLineJsonString());
     Assert.assertEquals(readSchema, inputSchema);
     Assert.assertTrue(readSchema.getFieldSpecMap().containsKey("NewColumn"));
 
     final String yetAnotherColumn = "YetAnotherColumn";
     Assert.assertFalse(readSchema.getFieldSpecMap().containsKey(yetAnotherColumn));
     schema.addField(new DimensionFieldSpec(yetAnotherColumn, FieldSpec.DataType.STRING, true));
-    PutMethod putMethod =
-        sendMultipartPutRequest(_controllerRequestURLBuilder.forSchemaUpdate(schemaName), schema.toString());
+    PutMethod putMethod = sendMultipartPutRequest(_controllerRequestURLBuilder.forSchemaUpdate(schemaName),
+        schema.toSingleLineJsonString());
     Assert.assertEquals(putMethod.getStatusCode(), 200);
     // verify some more...
     schemaStr = sendGetRequest(_controllerRequestURLBuilder.forSchemaGet(schemaName));
     readSchema = Schema.fromString(schemaStr);
-    inputSchema = Schema.fromString(schema.toString());
+    inputSchema = Schema.fromString(schema.toSingleLineJsonString());
     Assert.assertEquals(readSchema, inputSchema);
     Assert.assertTrue(readSchema.getFieldSpecMap().containsKey(yetAnotherColumn));
 
     // error cases
     putMethod = sendMultipartPutRequest(_controllerRequestURLBuilder.forSchemaUpdate(schemaName),
-        schema.toString().substring(1));
+        schema.toSingleLineJsonString().substring(1));
     // invalid json
     Assert.assertEquals(putMethod.getStatusCode(), 400);
 
     schema.setSchemaName("differentSchemaName");
-    putMethod = sendMultipartPutRequest(_controllerRequestURLBuilder.forSchemaUpdate(schemaName), schema.toString());
+    putMethod = sendMultipartPutRequest(_controllerRequestURLBuilder.forSchemaUpdate(schemaName),
+        schema.toSingleLineJsonString());
     Assert.assertEquals(putMethod.getStatusCode(), 400);
   }
 

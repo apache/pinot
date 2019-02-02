@@ -64,7 +64,7 @@ public class SchemaUtils {
    */
   public static ZNRecord toZNRecord(@Nonnull Schema schema) {
     ZNRecord record = new ZNRecord(schema.getSchemaName());
-    record.setSimpleField("schemaJSON", schema.getJSONSchema());
+    record.setSimpleField("schemaJSON", schema.toSingleLineJsonString());
     return record;
   }
 
@@ -118,7 +118,7 @@ public class SchemaUtils {
       URL url = new URL("http", host, port, "/schemas");
       PostMethod httpPost = new PostMethod(url.toString());
       try {
-        Part[] parts = {new StringPart(schema.getSchemaName(), schema.toString())};
+        Part[] parts = {new StringPart(schema.getSchemaName(), schema.toSingleLineJsonString())};
         MultipartRequestEntity requestEntity = new MultipartRequestEntity(parts, new HttpMethodParams());
         httpPost.setRequestEntity(requestEntity);
         int responseCode = HTTP_CLIENT.executeMethod(httpPost);

@@ -95,9 +95,7 @@ public class PinotSchemaRestletResource {
     if (schema == null) {
       throw new ControllerApplicationException(LOGGER, "Schema not found", Response.Status.NOT_FOUND);
     }
-    // We need to return schema.getJSONSchema(). Returning schema ends up with many extra fields, "jsonSchema" being one of them,
-    // Others like fieldSpecMap, etc., serialzing the entire Schema object.
-    return schema.getJSONSchema();
+    return schema.toPrettyJsonString();
   }
 
   @DELETE
@@ -144,7 +142,7 @@ public class PinotSchemaRestletResource {
       throw new ControllerApplicationException(LOGGER, "Invalid schema. Check controller logs",
           Response.Status.BAD_REQUEST);
     }
-    return schema.getJSONSchema();
+    return schema.toPrettyJsonString();
   }
 
   /**

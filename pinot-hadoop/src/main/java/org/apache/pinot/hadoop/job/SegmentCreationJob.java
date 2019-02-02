@@ -210,7 +210,7 @@ public class SegmentCreationJob extends Configured {
 
     job.getConfiguration().setInt(JobContext.NUM_MAPS, inputDataFiles.size());
     if (_dataSchema != null) {
-      job.getConfiguration().set(JobConfigConstants.SCHEMA, _dataSchema.toString());
+      job.getConfiguration().set(JobConfigConstants.SCHEMA, _dataSchema.toSingleLineJsonString());
     }
     setOutputPath(job.getConfiguration());
 
