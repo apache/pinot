@@ -119,8 +119,11 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
         .of(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE, PosixFilePermission.OWNER_EXECUTE,
             PosixFilePermission.GROUP_READ, PosixFilePermission.GROUP_WRITE, PosixFilePermission.GROUP_EXECUTE,
             PosixFilePermission.OTHERS_READ, PosixFilePermission.OTHERS_EXECUTE);
-
-    Files.setPosixFilePermissions(v3Directory.toPath(), permissions);
+    try {
+      Files.setPosixFilePermissions(v3Directory.toPath(), permissions);
+    } catch(UnsupportedOperationException ex) {
+      LOGGER.error("unsupported non-posix filesystem permissions setting");
+    }
   }
 
   private void copyIndexData(File v2Directory, SegmentMetadataImpl v2Metadata, File v3Directory)

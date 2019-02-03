@@ -20,6 +20,7 @@ package org.apache.pinot.segments.v1.creator;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.net.URI;
 import java.net.URL;
 import java.util.HashSet;
 import java.util.Set;
@@ -67,7 +68,8 @@ public class BitmapInvertedIndexTest {
     FileUtils.deleteQuietly(INDEX_DIR);
     URL resourceUrl = getClass().getClassLoader().getResource(AVRO_FILE_PATH);
     Assert.assertNotNull(resourceUrl);
-    _avroFile = new File(resourceUrl.getFile());
+    URI resourceUri = new URI(resourceUrl.toString());
+    _avroFile = new File(resourceUri);
 
     SegmentGeneratorConfig segmentGeneratorConfig =
         SegmentTestUtils.getSegmentGeneratorConfigWithoutTimeColumn(_avroFile, INDEX_DIR, "myTable");
