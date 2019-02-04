@@ -34,6 +34,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
@@ -47,6 +48,8 @@ import org.apache.commons.collections.MapUtils;
 import org.apache.pinot.thirdeye.api.Constants;
 import org.apache.pinot.thirdeye.constant.AnomalyFeedbackType;
 import org.apache.pinot.thirdeye.constant.AnomalyResultSource;
+import org.apache.pinot.thirdeye.dashboard.resources.v2.ResourceUtils;
+import org.apache.pinot.thirdeye.dashboard.resources.v2.rootcause.AnomalyEventFormatter;
 import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionAlertConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
@@ -162,7 +165,12 @@ public class DetectionResource {
             Predicate.EQ("detectionConfigId", detectionConfigId),
             Predicate.LT("startTime", endTime),
             Predicate.GT("endTime", startTime)));
-    return Response.ok(anomalies).build();
+    List result = anomalies.stream().map(anomaly -> {
+      Map<String, Object> anomalyResult = OBJECT_MAPPER.convertValue(anomaly, Map.class);
+      anomalyResult.put(AnomalyEventFormatter.ATTR_STATUS_CLASSIFICATION, ResourceUtils.getStatusClassification(anomaly).toString());
+      return anomalyResult;
+    }).collect(Collectors.toList());
+    return Response.ok(result).build();
   }
 
   @POST
