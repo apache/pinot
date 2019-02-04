@@ -28,6 +28,7 @@ import org.apache.pinot.thirdeye.anomaly.task.TaskConstants.TaskType;
 import org.apache.pinot.thirdeye.completeness.checker.DataCompletenessTaskRunner;
 import org.apache.pinot.thirdeye.detection.DetectionPipelineTaskRunner;
 import org.apache.pinot.thirdeye.detection.alert.DetectionAlertTaskRunner;
+import org.apache.pinot.thirdeye.detection.onboard.YamlOnboardingTaskRunner;
 
 
 /**
@@ -43,6 +44,9 @@ public class TaskRunnerFactory {
         break;
       case DETECTION_ALERT:
         taskRunner = new DetectionAlertTaskRunner();
+        break;
+      case YAML_DETECTION_ONBOARD:
+        taskRunner = new YamlOnboardingTaskRunner();
         break;
       case ANOMALY_DETECTION:
         taskRunner = new DetectionTaskRunner();
