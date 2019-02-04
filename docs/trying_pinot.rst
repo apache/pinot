@@ -24,8 +24,8 @@ One can also run the Pinot demonstration by checking out the code on GitHub, com
 Pinot requires JDK 8 or later and Apache Maven 3.
 
 #. Check out the code from GitHub (https://github.com/apache/incubator-pinot)
-#. With Maven installed, run ``mvn install package -DskipTests`` in the directory in which you checked out Pinot.
-#. Make the generated scripts executable ``cd pinot-distribution/target/pinot-0.016-pkg; chmod +x bin/*.sh``
+#. With Maven installed, run ``mvn install package -DskipTests -Pbin-dist`` in the directory in which you checked out Pinot.
+#. Make the generated scripts executable ``cd pinot-distribution/target/apache-pinot-incubating-<version>-SNAPSHOT-bin; chmod +x bin/*.sh``
 
 Trying out Offline quickstart demo
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -64,7 +64,7 @@ The full reference for the PQL query language is present in the :ref:`pql` secti
 Trying out Realtime quickstart demo
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Pinot can ingest data from streaming sources such as Kafka. 
+Pinot can ingest data from streaming sources such as Kafka.
 
 To run the demo with docker
   ``docker run -it -p 9000:9000 linkedin/pinot-quickstart-realtime``

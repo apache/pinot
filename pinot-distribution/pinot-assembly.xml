@@ -65,7 +65,7 @@
     </file>
   </files>
   <fileSets>
-    <!-- Rename liscenses-binary directory to licenses and include it to a distribution tarbell -->
+    <!-- Rename licenses-binary directory to licenses and include it to a distribution tarbell -->
     <fileSet>
       <useDefaultExcludes>false</useDefaultExcludes>
       <directory>${pinot.root}/licenses-binary</directory>
