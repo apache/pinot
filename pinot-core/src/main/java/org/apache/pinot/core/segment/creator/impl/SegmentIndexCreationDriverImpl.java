@@ -119,7 +119,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     this.config = config;
     this.createStarTree = config.isEnableStarTreeIndex();
     recordReader = dataSource.getRecordReader();
-    Preconditions.checkState(recordReader.hasNext(), "No record in data source");
+    Preconditions.checkState(recordReader.hasNext(), "No records found: You must have at least one record in each of your input files");
     dataSchema = recordReader.getSchema();
 
     if (config.getHllConfig() != null) {
