@@ -420,10 +420,11 @@
       {{/if}}
     </fieldset>
   {{else}}
-    {{yaml-editor
+    {{#yaml-editor
       isEditMode=false
       showSettings=true
     }}
+    {{/yaml-editor}}
   {{/if}}
   {{outlet}}
 </main>
