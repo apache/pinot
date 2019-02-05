@@ -63,7 +63,6 @@ export default Component.extend({
 
   init() {
     this._super(...arguments);
-
     if(get(this, 'isEditMode')) {
       set(this, 'currentYamlAlertOriginal', get(this, 'alertYaml') || get(this, 'yamlAlertProps'));
       set(this, 'currentYamlSettingsOriginal', get(this, 'detectionSettingsYaml') || get(this, 'yamlAlertSettings'));
@@ -118,8 +117,8 @@ export default Component.extend({
   ),
 
   _fetchSubscriptionGroups: task(function* () {
-    // /detection/subscription-groups
-    const url2 = `/detection/subscription-groups`;//dropdown of subscription groups
+    //dropdown of subscription groups
+    const url2 = `/detection/subscription-groups`;
     const postProps2 = {
       method: 'get',
       headers: { 'content-type': 'application/json' }
@@ -129,8 +128,6 @@ export default Component.extend({
     try {
       const response = yield fetch(url2, postProps2);
       const json = yield response.json();
-      //filter subscription groups with yaml
-      //set(this, 'subscriptionGroupNames', json.filterBy('yaml'));
       return json.filterBy('yaml');
     } catch (error) {
       notifications.error('Failed to retrieve subscription groups.', 'Error');
@@ -232,13 +229,10 @@ export default Component.extend({
   },
 
   actions: {
-    /**
-    * triggered by preview dropdown
-    */
-    showPreview() {
+    getPreview(){
+      set(this, 'alertYaml', get(this, 'currentYamlAlert')),
       this.toggleProperty('toggleCollapsed');
     },
-
     /**
      * resets given yaml field to default value for creation mode and server value for edit mode
      */

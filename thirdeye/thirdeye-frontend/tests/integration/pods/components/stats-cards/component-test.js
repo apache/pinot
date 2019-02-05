@@ -36,20 +36,6 @@ module('Integration | Component | stats cards', function(hooks) {
       stats[2][0],
       'title of 3rd card is correct');
 
-    // Testing descriptions of all cards
-    assert.equal(
-      $description.get(0).innerText.trim(),
-      stats[0][1],
-      'description of 1st card is correct');
-    assert.equal(
-      $description.get(1).innerText.trim(),
-      stats[1][1],
-      'description of 2nd card is correct');
-    assert.equal(
-      $description.get(2).innerText.trim(),
-      stats[2][1],
-      'description of 3rd card is correct');
-
     // Testing values of all cards
     assert.equal(
       $number.get(0).innerText.trim(),
