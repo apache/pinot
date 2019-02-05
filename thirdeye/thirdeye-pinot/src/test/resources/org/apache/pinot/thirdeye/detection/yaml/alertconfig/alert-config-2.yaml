@@ -12,7 +12,6 @@ dimensionRecipients:
   - "ios-thirdeye@thirdeye.com"
 dimension: app_name
 
-
 fromAddress: thirdeye-dev@linkedin.com
 
 recipients:
