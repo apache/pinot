@@ -56,7 +56,6 @@ export default Component.extend({
   yamlAlertSettings: yamlAlertSettings,
   showAnomalyModal: false,
   showNotificationModal: false,
-  YAMLField: '',
   currentYamlAlertOriginal: '',
   currentYamlSettingsOriginal: '',
   toggleCollapsed: true,
@@ -267,9 +266,12 @@ export default Component.extend({
     /**
      * Brings up appropriate modal, based on which yaml field is clicked
      */
-    triggerDocModal(field) {
-      set(this, `show${field}Modal`, true);
-      set(this, 'YAMLField', field);
+    triggerDoc(field) {
+      if (field === 'Anomaly') {
+        window.open('https://iwww.corp.linkedin.com/wiki/cf/display/ENGS/ThirdEye+Alert+Configuration+Reference#ThirdEyeAlertConfigurationReference-2.WriteAnomaly-Function/DetectionConfiguration');
+      } else {
+        window.open('https://iwww.corp.linkedin.com/wiki/cf/display/ENGS/ThirdEye+Alert+Configuration+Reference#ThirdEyeAlertConfigurationReference-3.WriteSubscription-Group/NotificationConfiguration');
+      }
     },
 
     /**
