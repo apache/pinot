@@ -14,7 +14,7 @@
  */
 
 import Component from '@ember/component';
-import { computed, observer, setProperties, set, get, getProperties } from '@ember/object';
+import { computed, observer, set, get, getProperties } from '@ember/object';
 import { later } from '@ember/runloop';
 import { checkStatus, humanizeFloat } from 'thirdeye-frontend/utils/utils';
 import { colorMapping, toColor, makeTime } from 'thirdeye-frontend/utils/rca-utils';
@@ -37,7 +37,6 @@ export default Component.extend({
   anomaliesApiService: service('services/api/anomalies'),
   notifications: service('toast'),
   anomalyMapping: {},
-  toggleCollapsed: true,
   timeseries: null,
   isLoading: false,
   analysisRange: [moment().subtract(1, 'month').startOf('hour').valueOf(), moment().startOf('hour').valueOf()],
@@ -81,20 +80,21 @@ export default Component.extend({
   selectedSortMode: '',
   selectedBaseline: 'wo1w',
 
-  alertYamlChanged: observer('alertYaml', 'analysisRange', 'disableYamlSave', async function() {
-    set(this, 'isPendingData', true);
-    // deal with the change
-    const alertYaml = get(this, 'alertYaml');
-    if(alertYaml) {
-      try {
-        const anomalyMapping = await this.get('_getAnomalyMapping').perform(alertYaml);
-        set(this, 'isPendingData', false);
-        set(this, 'anomalyMapping', anomalyMapping);
-      } catch (error) {
-        throw new Error(`Unable to retrieve anomaly data. ${error}`);
-      }
-    }
-  }),
+  // alertYamlChanged: observer('alertYaml', 'analysisRange', 'disableYamlSave', async function() {
+  //   set(this, 'isPendingData', true);
+  //   // deal with the change
+  //   const alertYaml = get(this, 'alertYaml');
+  //   if(alertYaml) {
+  //     try {
+  //       const anomalyMapping = await this.get('_getAnomalyMapping').perform(alertYaml);
+  //       set(this, 'isPendingData', false);
+  //       set(this, 'anomalyMapping', anomalyMapping);
+  //       debugger;
+  //     } catch (error) {
+  //       throw new Error(`Unable to retrieve anomaly data. ${error}`);
+  //     }
+  //   }
+  // }),
 
   disablePreviewButton: computed(
     'alertYaml',
@@ -157,22 +157,22 @@ export default Component.extend({
 
       if (!_.isEmpty(anomalies)) {
 
-        anomalies
-          .filter(anomaly => anomaly.metricUrn === metricUrn)
-          .forEach(anomaly => {
-            const key = this._formatAnomaly(anomaly);
-            series[key] = {
-              timestamps: [anomaly.startTime, anomaly.endTime],
-              values: [1, 1],
-              type: 'line',
-              color: 'teal',
-              axis: 'y2'
-            };
-            series[key + '-region'] = Object.assign({}, series[key], {
-              type: 'region',
-              color: 'orange'
+          anomalies
+            .filter(anomaly => anomaly.metricUrn === metricUrn)
+            .forEach(anomaly => {
+              const key = this._formatAnomaly(anomaly);
+              series[key] = {
+                timestamps: [anomaly.startTime, anomaly.endTime],
+                values: [1, 1],
+                type: 'line',
+                color: 'teal',
+                axis: 'y2'
+              };
+              series[key + '-region'] = Object.assign({}, series[key], {
+                type: 'region',
+                color: 'orange'
+              });
             });
-          });
       }
 
       if (timeseries && !_.isEmpty(timeseries.value)) {
@@ -218,6 +218,7 @@ export default Component.extend({
       const anomalies = get(this, 'anomalies');
       let tableData = [];
       let i = 1;
+
       anomalies.forEach(a => {
         let tableRow = {
           index: i,
@@ -300,7 +301,7 @@ export default Component.extend({
    * @type {Object[]} - array of objects, each of which represents each date pill
    */
   pill: computed(
-    'analysisRange', 'startDate', 'endDate' ,'duration',
+    'analysisRange', 'startDate', 'endDate', 'duration',
     function() {
       const analysisRange = get(this, 'analysisRange');
       const startDate = Number(analysisRange[0]) || Number(get(this, 'startDate'));
@@ -335,9 +336,10 @@ export default Component.extend({
     const notifications = get(this, 'notifications');
 
     //detection alert fetch
-    const start = analysisRange[0] || '1548489600000';
-    const end = analysisRange[1] || '1548748800000';
-    const alertUrl = `yaml/preview?start=${start}&end=${end}&tuningStart=0&tuningEnd=0`;
+    const start = analysisRange[0];
+    const end = analysisRange[1];
+    const alertUrl = `/yaml/preview?start=${start}&end=${end}&tuningStart=0&tuningEnd=0`;
+    let anomalies;
     try {
       const alert_result = yield fetch(alertUrl, postProps);
       const alert_status  = get(alert_result, 'status');
@@ -346,7 +348,9 @@ export default Component.extend({
       if (alert_status !== 200 && applicationAnomalies.message) {
         notifications.error(applicationAnomalies.message, 'Preview alert failed');
       } else {
-        const anomalies = applicationAnomalies.anomalies;
+        anomalies = applicationAnomalies.anomalies;
+        set(this, 'metricUrn', Object.keys(applicationAnomalies.diagnostics['0'])[0]);
+
         if (anomalies && anomalies.length > 0) {
           const humanizedObject = {
             queryDuration: '1m',
@@ -371,7 +375,10 @@ export default Component.extend({
       notifications.error('Preview alert failed', error);
     }
 
-    return anomalyMapping;
+    return {
+      anomalyMapping,
+      anomalies
+    };
   }).drop(),
 
   didRender(){
@@ -452,38 +459,23 @@ export default Component.extend({
   },
 
   _fetchAnomalies() {
-    const analysisRange = get(this, 'analysisRange');
-    const url = `/yaml/preview?start=${analysisRange[0]}&end=${analysisRange[1]}&tuningStart=0&tuningEnd=0`;
-
     set(this, 'errorAnomalies', null);
 
-    const content = get(this, 'alertYaml');
-    const postProps = {
-      method: 'post',
-      body: content,
-      headers: { 'content-type': 'text/plain' }
-    };
-
-    fetch(url, postProps)
-      .then(checkStatus)
-      .then(res => {
+    try {
+      const content = get(this, 'alertYaml');
+      this.get('_getAnomalyMapping').perform(content)
+      .then(results => {
         this.setProperties({
-          anomalies: this._filterAnomalies(res.anomalies),
-          metricUrn: Object.keys(res.diagnostics['0'])[0]
+          anomalyMapping: results.anomalyMapping,
+          anomalies: results.anomalies,
+          isLoading: false
         });
-      })
-      .then(() => {
         this._fetchTimeseries();
-      })
-      .catch(err => {
-        err.response.json()
-          .then(res => {
-            this.setProperties({
-              errorAnomalies: res.message,
-              isLoading: false
-            });
-          });
       });
+    } catch (error) {
+      set(this, 'isLoading', false);
+      throw new Error(`Unable to retrieve anomaly data. ${error}`);
+    }
   },
 
   actions: {
@@ -503,7 +495,7 @@ export default Component.extend({
       const endDate = moment(end).valueOf();
       //Update the time range option selected
       set(this, 'analysisRange', [startDate, endDate]);
-      set(this, 'duration', duration)
+      set(this, 'duration', duration);
     },
 
     /**

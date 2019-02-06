@@ -41,7 +41,7 @@
     {{#bs-accordion onChange=(action (mut toggleCollapsed)) as |acc|}}
       {{#acc.item value=preview as |aitem|}}
         {{#aitem.title}}
-          <section class="dashboard-container__title">Preview alert {{#unless disableYamlSave}} / Alert configuration has changed.{{/unless}}
+          <section class="dashboard-container__title">Preview alert
             <span class="pull-right"><i class="glyphicon glyphicon-menu-{{if toggleCollapsed "down" "up"}}"></i></span>
           </section>
         {{/aitem.title}}

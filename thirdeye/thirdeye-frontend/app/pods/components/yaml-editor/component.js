@@ -59,6 +59,7 @@ export default Component.extend({
   YAMLField: '',
   currentYamlAlertOriginal: '',
   currentYamlSettingsOriginal: '',
+  toggleCollapsed: true,
 
 
 
