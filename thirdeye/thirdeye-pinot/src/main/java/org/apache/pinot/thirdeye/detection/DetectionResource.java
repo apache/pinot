@@ -20,6 +20,7 @@
 package org.apache.pinot.thirdeye.detection;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.collect.Multimaps;
 import com.wordnik.swagger.annotations.Api;
 import com.wordnik.swagger.annotations.ApiOperation;
 import com.wordnik.swagger.annotations.ApiParam;
@@ -60,6 +61,7 @@ import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.util.Predicate;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
@@ -71,6 +73,7 @@ import org.apache.pinot.thirdeye.detection.finetune.GridSearchTuningAlgorithm;
 import org.apache.pinot.thirdeye.detection.finetune.TuningAlgorithm;
 import org.apache.pinot.thirdeye.detection.spi.model.AnomalySlice;
 import org.apache.pinot.thirdeye.detection.spi.model.TimeSeries;
+import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
 import org.joda.time.DateTime;
 import org.joda.time.Interval;
 import org.quartz.CronExpression;
@@ -496,7 +499,11 @@ public class DetectionResource {
     if (anomaly == null) {
       throw new IllegalArgumentException(String.format("Could not resolve anomaly id %d", anomalyId));
     }
-    TimeSeries ts = DetectionUtils.getBaselineTimeseries(anomaly, configDAO.findById(anomaly.getId()), start, end, loader, provider);
+    MetricConfigDTO metric = this.metricDAO.findByMetricAndDataset(anomaly.getMetric(), anomaly.getCollection());
+    if (metric == null) {
+      throw new IllegalArgumentException(String.format("Could not resolve metric '%s' in dataset '%s' for anomaly id %d", anomaly.getMetric(), anomaly.getCollection(), anomaly.getId()));
+    }
+    TimeSeries ts = DetectionUtils.getBaselineTimeseries(anomaly, Multimaps.forMap(anomaly.getDimensions()), metric.getId(), configDAO.findById(anomaly.getId()), start, end, loader, provider);
     return Response.ok(ts.getDataFrame()).build();
   }
 

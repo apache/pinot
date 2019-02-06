@@ -19,7 +19,10 @@
 
 package org.apache.pinot.thirdeye.detection;
 
+import com.google.common.collect.HashMultimap;
+import com.google.common.collect.ListMultimap;
 import com.google.common.collect.Multimap;
+import com.google.common.collect.Multimaps;
 import org.apache.pinot.thirdeye.api.DimensionMap;
 import org.apache.pinot.thirdeye.dataframe.BooleanSeries;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
@@ -197,11 +200,10 @@ public class DetectionUtils {
    * @return baseline time series
    * @throws Exception
    */
-  public static TimeSeries getBaselineTimeseries(MergedAnomalyResultDTO anomaly, DetectionConfigDTO config,
+  public static TimeSeries getBaselineTimeseries(MergedAnomalyResultDTO anomaly, Multimap<String, String> filters, Long metricId, DetectionConfigDTO config,
       long start, long end, DetectionPipelineLoader loader, DataProvider provider) throws Exception {
     String baselineProviderComponentName = anomaly.getProperties().get(PROP_BASELINE_PROVIDER_COMPONENT_NAME);
     BaselineProvider baselineProvider = new RuleBaselineProvider();
-    MetricEntity me = MetricEntity.fromURN(anomaly.getMetricUrn());
 
     if (baselineProviderComponentName != null && config != null &&
         config.getComponentSpecs().containsKey(baselineProviderComponentName)) {
@@ -215,6 +217,6 @@ public class DetectionUtils {
       InputDataFetcher dataFetcher = new DefaultInputDataFetcher(provider, config.getId());
       baselineProvider.init(spec, dataFetcher);
     }
-    return baselineProvider.computePredictedTimeSeries(MetricSlice.from(me.getId(), start, end, me.getFilters()));
+    return baselineProvider.computePredictedTimeSeries(MetricSlice.from(metricId, start, end, filters));
   }
 }

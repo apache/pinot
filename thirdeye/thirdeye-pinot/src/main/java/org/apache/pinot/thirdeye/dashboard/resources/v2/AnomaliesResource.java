@@ -1131,7 +1131,7 @@ public class AnomaliesResource {
         .withEnd(new DateTime(sliceAnomalyCurrent.getEnd(), dataTimeZone).plus(offsets.getPostOffsetPeriod()).getMillis());
 
     DataFrame dfCurrent = this.timeSeriesLoader.load(sliceViewCurrent);
-    DataFrame dfBaseline = DetectionUtils.getBaselineTimeseries(anomaly, config, sliceViewCurrent.getStart(), sliceViewCurrent.getEnd(), this.loader, this.provider).getDataFrame();
+    DataFrame dfBaseline = DetectionUtils.getBaselineTimeseries(anomaly, filters, metric.getId(), config, sliceViewCurrent.getStart(), sliceViewCurrent.getEnd(), this.loader, this.provider).getDataFrame();
     DataFrame dfAligned = dfCurrent.renameSeries(COL_VALUE, COL_CURRENT).joinOuter(
         dfBaseline.renameSeries(COL_VALUE, COL_BASELINE));
 
