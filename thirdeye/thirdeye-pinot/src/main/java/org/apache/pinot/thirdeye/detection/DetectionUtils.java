@@ -20,39 +20,25 @@
 package org.apache.pinot.thirdeye.detection;
 
 import com.google.common.collect.Multimap;
+import java.lang.reflect.ParameterizedType;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import org.apache.pinot.thirdeye.api.DimensionMap;
 import org.apache.pinot.thirdeye.dataframe.BooleanSeries;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
 import org.apache.pinot.thirdeye.dataframe.LongSeries;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
-import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
-import org.apache.pinot.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
-import org.apache.pinot.thirdeye.datalayer.dto.EventDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
-import org.apache.pinot.thirdeye.datalayer.pojo.MetricConfigBean;
-import org.apache.pinot.thirdeye.detection.DataProvider;
 import org.apache.pinot.thirdeye.detection.components.RuleBaselineProvider;
 import org.apache.pinot.thirdeye.detection.spec.RuleBaselineProviderSpec;
 import org.apache.pinot.thirdeye.detection.spi.components.BaseComponent;
 import org.apache.pinot.thirdeye.detection.spi.components.BaselineProvider;
-import org.apache.pinot.thirdeye.detection.spi.model.AnomalySlice;
-import org.apache.pinot.thirdeye.detection.spi.model.EventSlice;
-import org.apache.pinot.thirdeye.detection.spi.model.InputData;
-import org.apache.pinot.thirdeye.detection.spi.model.InputDataSpec;
-import java.lang.reflect.ParameterizedType;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.function.Consumer;
-import java.util.stream.Collectors;
 import org.apache.pinot.thirdeye.detection.spi.model.TimeSeries;
-import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.Period;
@@ -197,11 +183,10 @@ public class DetectionUtils {
    * @return baseline time series
    * @throws Exception
    */
-  public static TimeSeries getBaselineTimeseries(MergedAnomalyResultDTO anomaly, DetectionConfigDTO config,
+  public static TimeSeries getBaselineTimeseries(MergedAnomalyResultDTO anomaly, Multimap<String, String> filters, Long metricId, DetectionConfigDTO config,
       long start, long end, DetectionPipelineLoader loader, DataProvider provider) throws Exception {
     String baselineProviderComponentName = anomaly.getProperties().get(PROP_BASELINE_PROVIDER_COMPONENT_NAME);
     BaselineProvider baselineProvider = new RuleBaselineProvider();
-    MetricEntity me = MetricEntity.fromURN(anomaly.getMetricUrn());
 
     if (baselineProviderComponentName != null && config != null &&
         config.getComponentSpecs().containsKey(baselineProviderComponentName)) {
@@ -215,6 +200,6 @@ public class DetectionUtils {
       InputDataFetcher dataFetcher = new DefaultInputDataFetcher(provider, config.getId());
       baselineProvider.init(spec, dataFetcher);
     }
-    return baselineProvider.computePredictedTimeSeries(MetricSlice.from(me.getId(), start, end, me.getFilters()));
+    return baselineProvider.computePredictedTimeSeries(MetricSlice.from(metricId, start, end, filters));
   }
 }
