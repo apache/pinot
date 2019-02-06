@@ -191,6 +191,7 @@ public class DetectionResource {
     DetectionConfigDTO config = new DetectionConfigDTO();
     config.setId(Long.MAX_VALUE);
     config.setName("preview");
+    config.setDescription("previewing the detection");
     config.setProperties(MapUtils.getMap(properties, "properties"));
     config.setComponentSpecs(MapUtils.getMap(properties, "componentSpecs"));
 

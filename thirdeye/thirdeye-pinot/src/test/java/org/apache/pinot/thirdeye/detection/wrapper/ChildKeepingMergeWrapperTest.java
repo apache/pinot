@@ -50,6 +50,7 @@ public class ChildKeepingMergeWrapperTest {
 
   private static final Long PROP_ID_VALUE = 1000L;
   private static final String PROP_NAME_VALUE = "myName";
+  private static final String PROP_DESC_VALUE = "myDescription";
 
   private static final String PROP_CLASS_NAME = "className";
   private static final String PROP_METRIC_URN = "metricUrn";
@@ -82,6 +83,7 @@ public class ChildKeepingMergeWrapperTest {
     this.config = new DetectionConfigDTO();
     this.config.setId(PROP_ID_VALUE);
     this.config.setName(PROP_NAME_VALUE);
+    this.config.setDescription(PROP_DESC_VALUE);
     this.config.setProperties(this.properties);
 
     this.outputs = new ArrayList<>();

@@ -33,6 +33,7 @@ public class YamlResourceTest {
     DetectionConfigManager detectionDAO = this.daoRegistry.getDetectionConfigManager();
     DetectionConfigDTO config = new DetectionConfigDTO();
     config.setName("test_detection_1");
+    config.setDescription("my_test_detection_1");
     detectionDAO.save(config);
 
     DetectionAlertRegistry.getInstance().registerAlertScheme("EMAIL", "EmailClass");

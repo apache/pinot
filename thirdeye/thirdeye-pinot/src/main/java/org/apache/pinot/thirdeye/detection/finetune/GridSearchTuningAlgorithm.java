@@ -143,6 +143,7 @@ public class GridSearchTuningAlgorithm implements TuningAlgorithm {
     DetectionConfigDTO config = new DetectionConfigDTO();
     config.setId(Long.MAX_VALUE);
     config.setName("preview");
+    config.setDescription("previewing the detection");
     config.setProperties(properties);
 
     return config;

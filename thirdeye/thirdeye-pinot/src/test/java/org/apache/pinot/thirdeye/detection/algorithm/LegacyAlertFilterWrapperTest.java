@@ -47,6 +47,7 @@ public class LegacyAlertFilterWrapperTest {
   private static final String PROP_ANOMALY_FUNCTION_CLASS_NAME_VALUE = "org.apache.pinot.thirdeye.anomalydetection.function.MinMaxThresholdFunction";
   private static final Long PROP_ID_VALUE = 1000L;
   private static final String PROP_NAME_VALUE = "myName";
+  private static final String PROP_DESC_VALUE = "myDescription";
   private static final long START_TIME_VALUE = 1000L;
   private static final long END_TIME_VALUE = 2000L;
 
@@ -84,6 +85,7 @@ public class LegacyAlertFilterWrapperTest {
     this.config = new DetectionConfigDTO();
     this.config.setId(PROP_ID_VALUE);
     this.config.setName(PROP_NAME_VALUE);
+    this.config.setDescription(PROP_DESC_VALUE);
     this.config.setProperties(this.properties);
 
     List<MergedAnomalyResultDTO> anomalies = new ArrayList<>();

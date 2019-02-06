@@ -51,6 +51,7 @@ public class AnomalyEventFormatter extends RootCauseEventEntityFormatter {
   public static final String ATTR_METRIC = "metric";
   public static final String ATTR_METRIC_ID = "metricId";
   public static final String ATTR_FUNCTION = "function";
+  public static final String ATTR_DESCRIPTION = "description";
   public static final String ATTR_FUNCTION_ID = "functionId";
   public static final String ATTR_CURRENT = "current";
   public static final String ATTR_BASELINE = "baseline";
@@ -102,6 +103,7 @@ public class AnomalyEventFormatter extends RootCauseEventEntityFormatter {
 
     DatasetConfigDTO dataset = this.datasetDAO.findByDataset(metric.getDataset());
     String functionName = "unknown";
+    String functionDescription = "";
 
     if (anomaly.getDetectionConfigId() != null){
       DetectionConfigDTO detectionConfigDTO = detectionDAO.findById(anomaly.getDetectionConfigId());
@@ -109,16 +111,19 @@ public class AnomalyEventFormatter extends RootCauseEventEntityFormatter {
         throw new IllegalArgumentException(String.format("could not resolve detection config id %d", anomaly.getDetectionConfigId()));
       }
       functionName = detectionConfigDTO.getName();
+      functionDescription = detectionConfigDTO.getDescription();
     }
 
     if (anomaly.getFunctionId() != null){
       AnomalyFunctionDTO function = anomaly.getFunction();
       functionName = function.getFunctionName();
+      functionDescription = "<Please edit and provide a description for this alert>";
       attributes.put(ATTR_FUNCTION_ID, String.valueOf(function.getId()));
       attributes.put(ATTR_AGGREGATE_MULTIPLIER, String.valueOf(getAggregateMultiplier(anomaly, dataset, metric)));
     }
 
     attributes.put(ATTR_FUNCTION, functionName);
+    attributes.put(ATTR_DESCRIPTION, functionDescription);
 
     String comment = "";
     AnomalyFeedbackType status = AnomalyFeedbackType.NO_FEEDBACK;

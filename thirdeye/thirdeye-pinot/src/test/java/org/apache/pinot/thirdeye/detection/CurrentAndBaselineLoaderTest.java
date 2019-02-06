@@ -50,6 +50,7 @@ import org.testng.annotations.Test;
 public class CurrentAndBaselineLoaderTest {
   private static final String COLLECTION_VALUE = "test_dataset";
   private static final String DETECTION_NAME_VALUE = "test detection";
+  private static final String DETECTION_DESC_VALUE = "this is a test detection";
   private static final String METRIC_VALUE = "test_metric";
 
   private DAOTestBase testDAOProvider;
@@ -94,6 +95,7 @@ public class CurrentAndBaselineLoaderTest {
 
     DetectionConfigDTO detectionConfig = new DetectionConfigDTO();
     detectionConfig.setName(DETECTION_NAME_VALUE);
+    detectionConfig.setDescription(DETECTION_NAME_VALUE);
     this.detectionConfigId = this.detectionDAO.save(detectionConfig);
 
     MergedAnomalyResultDTO anomalyResultDTO = new MergedAnomalyResultDTO();

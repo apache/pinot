@@ -59,6 +59,7 @@ public class LegacyDimensionWrapperTest {
   // values
   private static final Long PROP_ID_VALUE = 1000L;
   private static final String PROP_NAME_VALUE = "myName";
+  private static final String PROP_DESC_VALUE = "myDescription";
   private static final String PROP_CLASS_NAME_VALUE = "MyClassName";
   private static final Collection<String> PROP_NESTED_METRIC_URN_VALUES = Collections.singleton("thirdeye:metric:2");
   private static final String PROP_NESTED_METRIC_URN_KEY_VALUE = "myMetricUrn";
@@ -112,6 +113,7 @@ public class LegacyDimensionWrapperTest {
     this.config = new DetectionConfigDTO();
     this.config.setId(PROP_ID_VALUE);
     this.config.setName(PROP_NAME_VALUE);
+    this.config.setDescription(PROP_DESC_VALUE);
     this.config.setProperties(this.properties);
 
     this.dimensionWrapper = new LegacyDimensionWrapper(this.provider, this.config, 10, 15);
@@ -138,6 +140,7 @@ public class LegacyDimensionWrapperTest {
     DetectionConfigDTO config = new DetectionConfigDTO();
     config.setId(this.config.getId());
     config.setName(this.config.getName());
+    config.setDescription(this.config.getDescription());
     config.setProperties(properties);
 
     return config;

@@ -89,7 +89,7 @@ public class YamlDetectionAlertConfigTranslatorTest {
     Assert.assertEquals(timeWindow.get("windowEndTime"), 1543215600000L);
 
     Assert.assertNotNull(alertConfig.getProperties());
-    Assert.assertEquals(ConfigUtils.getLongs(alertConfig.getProperties().get(PROP_DETECTION_CONFIG_IDS)).size(), 1);
+    Assert.assertEquals(ConfigUtils.getLongs(alertConfig.getVectorClocks().keySet()).size(), 1);
 
     Map<String, Object> recipient = (Map<String, Object>) alertConfig.getProperties().get(PROP_RECIPIENTS);
     Assert.assertEquals(recipient.size(), 2);
@@ -105,6 +105,7 @@ public class YamlDetectionAlertConfigTranslatorTest {
     detectionConfigManager = daoRegistry.getDetectionConfigManager();
     DetectionConfigDTO detectionConfigDTO = new DetectionConfigDTO();
     detectionConfigDTO.setName("test_pipeline_1");
+    detectionConfigDTO.setDescription("my_test_pipeline_1");
     detectionConfigManager.save(detectionConfigDTO);
 
     DetectionAlertRegistry.getInstance().registerAlertFilter("DEFAULT_ALERTER_PIPELINE", "RECIPIENTClass");

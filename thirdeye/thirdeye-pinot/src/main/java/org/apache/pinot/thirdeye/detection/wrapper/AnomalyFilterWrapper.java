@@ -84,6 +84,7 @@ public class AnomalyFilterWrapper extends DetectionPipeline {
       }
       nestedConfig.setId(this.config.getId());
       nestedConfig.setName(this.config.getName());
+      nestedConfig.setDescription(this.config.getDescription());
       nestedConfig.setProperties(nestedProp);
       nestedConfig.setComponents(this.config.getComponents());
       DetectionPipeline pipeline = this.provider.loadPipeline(nestedConfig, this.startTime, this.endTime);

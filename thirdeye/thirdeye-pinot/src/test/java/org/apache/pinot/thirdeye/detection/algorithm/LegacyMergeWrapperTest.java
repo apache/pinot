@@ -45,6 +45,7 @@ import static org.apache.pinot.thirdeye.detection.DetectionTestUtils.*;
 public class LegacyMergeWrapperTest {
   private static final Long PROP_ID_VALUE = 1000L;
   private static final String PROP_NAME_VALUE = "myName";
+  private static final String PROP_DESC_VALUE = "myDescription";
   private static final String PROP_SPECS = "specs";
 
   private static final String PROP_CLASS_NAME = "className";
@@ -93,6 +94,7 @@ public class LegacyMergeWrapperTest {
     this.config = new DetectionConfigDTO();
     this.config.setId(PROP_ID_VALUE);
     this.config.setName(PROP_NAME_VALUE);
+    this.config.setDescription(PROP_DESC_VALUE);
     this.config.setProperties(this.properties);
 
     List<MergedAnomalyResultDTO> existing = new ArrayList<>();
@@ -124,6 +126,7 @@ public class LegacyMergeWrapperTest {
     DetectionPipelineResult result = mergeWrapper.run();
     Assert.assertEquals(this.runs.size(), 1);
     Assert.assertEquals(this.runs.get(0).getConfig().getName(), PROP_NAME_VALUE);
+    Assert.assertEquals(this.runs.get(0).getConfig().getDescription(), PROP_DESC_VALUE);
     Assert.assertEquals(MapUtils.getMap(this.runs.get(0).getConfig().getProperties(), "specs"), specs);
     Assert.assertEquals(MapUtils.getString(this.runs.get(0).getConfig().getProperties(), PROP_ANOMALY_FUNCTION_CLASS_NAME),
         PROP_ANOMALY_FUNCTION_CLASS_NAME_VALUE);
