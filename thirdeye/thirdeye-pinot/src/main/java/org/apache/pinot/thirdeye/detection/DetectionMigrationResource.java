@@ -418,7 +418,7 @@ public class DetectionMigrationResource {
               + " Migrated alert id " + alertConfig.getId());
     }
 
-    if (anomalyFailureCount == 0 || anomalyWarningCount == 0) {
+    if (anomalyFailureCount == 0 && anomalyWarningCount == 0) {
       LOGGER.info(String.format("[MIG] Successfully migrated alert %d %s", alertConfigDTO.getId(), alertName));
     } else {
       throw new RuntimeException("Failures/Warnings found. anomalyFailureCount " + anomalyFailureCount + " and"
