@@ -20,6 +20,7 @@ package org.apache.pinot.queries;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import java.io.File;
+import java.net.URI;
 import java.net.URL;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -212,7 +213,7 @@ public class FastHllQueriesTest extends BaseQueriesTest {
       resource = getClass().getClassLoader().getResource(AVRO_DATA_WITHOUT_PRE_GENERATED_HLL_COLUMNS);
     }
     Assert.assertNotNull(resource);
-    String filePath = resource.getFile();
+    URI resourceUri = new URI(resource.toString());
 
     // Build the segment schema
     Schema.SchemaBuilder schemaBuilder =
@@ -232,7 +233,7 @@ public class FastHllQueriesTest extends BaseQueriesTest {
 
     // Create the segment generator config
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(schemaBuilder.build());
-    segmentGeneratorConfig.setInputFilePath(filePath);
+    segmentGeneratorConfig.setInputFilePath(resourceUri.getPath());
     segmentGeneratorConfig.setTableName("testTable");
     segmentGeneratorConfig.setOutDir(INDEX_DIR.getAbsolutePath());
     segmentGeneratorConfig

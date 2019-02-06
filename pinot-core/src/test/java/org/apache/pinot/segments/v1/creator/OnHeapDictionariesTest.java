@@ -91,6 +91,8 @@ public class OnHeapDictionariesTest {
   @AfterClass
   public void tearDown()
       throws IOException {
+    _offHeapSegment.destroy();
+    _onHeapSegment.destroy();
     FileUtils.deleteDirectory(new File(SEGMENT_DIR_NAME));
   }
 

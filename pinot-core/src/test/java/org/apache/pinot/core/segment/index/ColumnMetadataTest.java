@@ -159,6 +159,7 @@ public class ColumnMetadataTest {
 
     // Make sure we got the creator name as well.
     String creatorName = metadata.getCreatorName();
+    segment.destroy();
     Assert.assertEquals(creatorName, CREATOR_VERSION);
   }
 
@@ -178,6 +179,7 @@ public class ColumnMetadataTest {
 
     // Make sure we get null for creator name.
     String creatorName = metadata.getCreatorName();
+    segment.destroy();
     Assert.assertEquals(creatorName, null);
   }
 
@@ -197,6 +199,7 @@ public class ColumnMetadataTest {
 
     // Make sure we get null for creator name.
     char paddingCharacter = metadata.getPaddingCharacter();
+    segment.destroy();
     Assert.assertEquals(paddingCharacter, '\0');
   }
 
@@ -220,6 +223,7 @@ public class ColumnMetadataTest {
       StarTreeMetadata starTreeMetadata = metadata.getStarTreeMetadata();
       Assert.assertNotNull(starTreeMetadata);
       ColumnMetadata column = metadata.getColumnMetadataFor("column7_hllSuffix");
+      segment.destroy();
       Assert.assertEquals(column.getDerivedMetricType(), MetricFieldSpec.DerivedMetricType.HLL);
       Assert.assertEquals(column.getOriginColumnName(), "column7");
     } finally {

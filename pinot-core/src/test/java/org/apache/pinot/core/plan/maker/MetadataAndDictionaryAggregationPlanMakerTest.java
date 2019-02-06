@@ -19,6 +19,7 @@
 package org.apache.pinot.core.plan.maker;
 
 import java.io.File;
+import java.net.URI;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -75,7 +76,7 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
     // Get resource file path.
     URL resource = getClass().getClassLoader().getResource(AVRO_DATA);
     Assert.assertNotNull(resource);
-    String filePath = resource.getFile();
+    URI resourceUri = new URI(resource.toString());
 
     // Build the segment schema.
     Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable").addMetric("column1", FieldSpec.DataType.INT)
@@ -90,7 +91,7 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
 
     // Create the segment generator config.
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(schema);
-    segmentGeneratorConfig.setInputFilePath(filePath);
+    segmentGeneratorConfig.setInputFilePath(resourceUri.getPath());
     segmentGeneratorConfig.setTableName("testTable");
     segmentGeneratorConfig.setSegmentName(SEGMENT_NAME);
     segmentGeneratorConfig.setOutDir(INDEX_DIR.getAbsolutePath());
@@ -116,7 +117,7 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
 
     // Create the segment generator config.
     segmentGeneratorConfig = new SegmentGeneratorConfig(schema);
-    segmentGeneratorConfig.setInputFilePath(filePath);
+    segmentGeneratorConfig.setInputFilePath(resourceUri.getPath());
     segmentGeneratorConfig.setTableName("testTableStarTree");
     segmentGeneratorConfig.setSegmentName(SEGMENT_NAME_STARTREE);
     segmentGeneratorConfig.setOutDir(INDEX_DIR_STARTREE.getAbsolutePath());

@@ -19,6 +19,7 @@
 package org.apache.pinot.queries;
 
 import java.io.File;
+import java.net.URI;
 import java.net.URL;
 import java.util.Arrays;
 import java.util.List;
@@ -83,7 +84,7 @@ public abstract class BaseSingleValueQueriesTest extends BaseQueriesTest {
     // Get resource file path.
     URL resource = getClass().getClassLoader().getResource(AVRO_DATA);
     Assert.assertNotNull(resource);
-    String filePath = resource.getFile();
+    URI resourceUri = new URI(resource.toString());
 
     // Build the segment schema.
     Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable").addMetric("column1", FieldSpec.DataType.INT)
@@ -98,7 +99,7 @@ public abstract class BaseSingleValueQueriesTest extends BaseQueriesTest {
 
     // Create the segment generator config.
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(schema);
-    segmentGeneratorConfig.setInputFilePath(filePath);
+    segmentGeneratorConfig.setInputFilePath(resourceUri.getPath());
     segmentGeneratorConfig.setTableName("testTable");
     segmentGeneratorConfig.setOutDir(INDEX_DIR.getAbsolutePath());
     segmentGeneratorConfig

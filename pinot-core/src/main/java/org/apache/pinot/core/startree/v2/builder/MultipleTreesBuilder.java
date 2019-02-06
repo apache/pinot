@@ -133,4 +133,8 @@ public class MultipleTreesBuilder {
       return new OffHeapSingleTreeBuilder(builderConfig, outputDir, segment, metadataProperties);
     }
   }
+
+  public void close() {
+	  _segment.destroy();
+  }
 }

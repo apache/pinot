@@ -85,7 +85,10 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
 
     File newLocation = SegmentDirectoryPaths.segmentDirectoryFor(v2SegmentDirectory, SegmentVersion.v3);
     LOGGER.info("v3 segment location for segment: {} is {}", v2Metadata.getName(), newLocation);
-    v3TempDirectory.renameTo(newLocation);
+
+    if (!v3TempDirectory.renameTo(newLocation)) {
+      LOGGER.error("cannot rename {} to {}", v3TempDirectory.getName(), newLocation.getName());
+    }
     deleteV2Files(v2SegmentDirectory);
   }
 
@@ -177,6 +180,9 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
     OutputStream v3StarTreeStream = v3DataWriter.starTreeOutputStream();
 
     IOUtils.copy(v2StarTreeStream, v3StarTreeStream);
+
+    v2StarTreeStream.close();
+    v3StarTreeStream.close();
   }
 
   private void copyDictionary(SegmentDirectory.Reader reader, SegmentDirectory.Writer writer, String column)

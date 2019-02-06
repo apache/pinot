@@ -101,6 +101,7 @@ public class OffHeapStarTreeBuilderTest {
       }
     }
 
+    builder.close();
     FileUtils.deleteDirectory(TEMP_DIR);
   }
 

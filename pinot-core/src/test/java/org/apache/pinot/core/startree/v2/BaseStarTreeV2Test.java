@@ -141,7 +141,9 @@ abstract class BaseStarTreeV2Test<R, A> {
 
     // Randomly build star-tree using on-heap or off-heap mode
     BuildMode buildMode = RANDOM.nextBoolean() ? BuildMode.ON_HEAP : BuildMode.OFF_HEAP;
-    new MultipleTreesBuilder(Collections.singletonList(starTreeV2BuilderConfig), indexDir, buildMode).build();
+    MultipleTreesBuilder builder = new MultipleTreesBuilder(Collections.singletonList(starTreeV2BuilderConfig), indexDir, buildMode);
+    builder.build();
+    builder.close();
 
     _indexSegment = ImmutableSegmentLoader.load(indexDir, ReadMode.mmap);
     _starTreeV2 = _indexSegment.getStarTrees().get(0);

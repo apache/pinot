@@ -150,6 +150,7 @@ public class OffHeapStarTreeBuilderWithHllFieldTest {
     assertApproximation(HllUtil.convertStringToHll((String) lastRow.getValue(hllMetricName)).cardinality(),
         preciseCardinality, 0.1);
 
+    builder.close();
     FileUtils.deleteDirectory(TEMP_DIR);
   }
 
