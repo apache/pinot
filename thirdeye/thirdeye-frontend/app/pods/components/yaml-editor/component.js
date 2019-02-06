@@ -35,6 +35,7 @@ import {
 import { inject as service } from '@ember/service';
 import { task } from 'ember-concurrency';
 
+
 export default Component.extend({
   classNames: ['yaml-editor'],
   notifications: service('toast'),
@@ -58,7 +59,8 @@ export default Component.extend({
   YAMLField: '',
   currentYamlAlertOriginal: '',
   currentYamlSettingsOriginal: '',
-  toggleCollapsed: false,
+  toggleCollapsed: true,
+
 
 
   init() {
@@ -68,6 +70,7 @@ export default Component.extend({
       set(this, 'currentYamlSettingsOriginal', get(this, 'detectionSettingsYaml') || get(this, 'yamlAlertSettings'));
     }
   },
+
   /**
    * sets Yaml value displayed to contents of alertYaml or yamlAlertProps
    * @method currentYamlAlert
@@ -239,10 +242,6 @@ export default Component.extend({
   },
 
   actions: {
-    getPreview(){
-      set(this, 'alertYaml', get(this, 'currentYamlAlert')),
-      this.toggleProperty('toggleCollapsed');
-    },
     /**
      * resets given yaml field to default value for creation mode and server value for edit mode
      */
