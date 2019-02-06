@@ -214,13 +214,13 @@
       <artifactId>jackson-jaxrs-json-provider</artifactId>
     </dependency>
     <dependency>
-        <groupId>org.webjars</groupId>
-        <artifactId>swagger-ui</artifactId>
+      <groupId>org.webjars</groupId>
+      <artifactId>swagger-ui</artifactId>
       <exclusions>
-      <exclusion>
-        <groupId>com.fasterxml.jackson.jaxrs</groupId>
-        <artifactId>jackson-jaxrs-json-provider</artifactId>
-      </exclusion>
+        <exclusion>
+          <groupId>com.fasterxml.jackson.jaxrs</groupId>
+          <artifactId>jackson-jaxrs-json-provider</artifactId>
+        </exclusion>
       </exclusions>
     </dependency>
     <!-- test -->
