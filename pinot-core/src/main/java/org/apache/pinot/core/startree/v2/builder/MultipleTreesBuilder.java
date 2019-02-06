@@ -135,6 +135,6 @@ public class MultipleTreesBuilder {
   }
 
   public void close() {
-	  _segment.destroy();
+    _segment.destroy();
   }
 }
