@@ -32,6 +32,7 @@ import java.util.Map;
 import java.util.TreeMap;
 
 import org.apache.commons.collections.MapUtils;
+import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -242,7 +243,14 @@ public class SearchFilters {
         functionName = mergedAnomalyResultDTO.getFunction().getFunctionName();
       }
       if (mergedAnomalyResultDTO.getDetectionConfigId() != null) {
-        functionName = String.format("DetectionConfig %d", mergedAnomalyResultDTO.getDetectionConfigId());
+        try {
+          functionName = DAORegistry.getInstance()
+              .getDetectionConfigManager()
+              .findById(mergedAnomalyResultDTO.getDetectionConfigId())
+              .getName();
+        } catch (Exception e) {
+          functionName = String.format("DetectionConfig %d", mergedAnomalyResultDTO.getDetectionConfigId());
+        }
       }
       update(functionFilterMap, functionName, mergedAnomalyResultDTO.getId());
 
