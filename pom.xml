@@ -943,12 +943,12 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
-      <!--
-        Configuration for unit/integration tests section 2 of 3 (plugins) STARTS HERE.
-        This is the core piece for being able to manage unit tests and
-        integration (='system') tests within Maven by using surefire.
-        See also: properties section and profiles section.
-      -->
+        <!--
+          Configuration for unit/integration tests section 2 of 3 (plugins) STARTS HERE.
+          This is the core piece for being able to manage unit tests and
+          integration (='system') tests within Maven by using surefire.
+          See also: properties section and profiles section.
+        -->
         <configuration>
           <testFailureIgnore>false</testFailureIgnore>
           <!-- Excludes integration tests when unit tests are run. -->
