@@ -175,6 +175,10 @@ public class DetectionMigrationResourceTest {
     AnomalyFunctionDTO actual = OBJECT_MAPPER.readValue(this.getClass().getResourceAsStream("legacy-anomaly-function-1.json"), AnomalyFunctionDTO.class);
     long oldID = anomalyFunctionDAO.save(actual);
 
+    AnomalyFunctionDTO legacyAnomalyFunction = anomalyFunctionDAO.findById(oldID);
+    legacyAnomalyFunction.setCreatedBy("test_user");
+    anomalyFunctionDAO.update(legacyAnomalyFunction);
+
     MergedAnomalyResultDTO mergedAnomalyResultDTO = new MergedAnomalyResultDTO();
     mergedAnomalyResultDTO.setFunction(actual);
     anomalyDAO.save(mergedAnomalyResultDTO);
@@ -182,8 +186,9 @@ public class DetectionMigrationResourceTest {
     Response responseId = migrationResource.migrateAnomalyFunction(oldID);
     long newID = (long) responseId.getEntity();
 
-    AnomalyFunctionDTO legacyAnomalyFunction = anomalyFunctionDAO.findById(oldID);
     DetectionConfigDTO migratedAnomalyFunction = detectionConfigDAO.findById(newID);
+
+    legacyAnomalyFunction = anomalyFunctionDAO.findById(oldID);
 
     // Verify if the migration status is updated correctly and the old detection is disabled.
     Assert.assertEquals(legacyAnomalyFunction.getFunctionName(), "test_function_thirdeye_migrated_" + newID);

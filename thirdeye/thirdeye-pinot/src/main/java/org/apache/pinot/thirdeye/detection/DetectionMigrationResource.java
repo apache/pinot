@@ -327,9 +327,16 @@ public class DetectionMigrationResource {
     }
 
     // Save the migrated anomaly function
-    DAORegistry.getInstance().getDetectionConfigManager().save(detectionConfig);
+    detectionConfigDAO.save(detectionConfig);
     if (detectionConfig.getId() == null) {
       throw new RuntimeException("Error saving the new detection config.");
+    }
+
+    // Hack to retain Anomaly function owner
+    detectionConfig.setCreatedBy(anomalyFunctionDTO.getCreatedBy());
+    detectionConfigDAO.update(detectionConfig);
+    if (detectionConfig.getId() == null) {
+      throw new RuntimeException("Error saving the new detection config after updating the owner.");
     }
 
     // Point all the associated anomalies to the migrated anomaly function.
@@ -406,6 +413,13 @@ public class DetectionMigrationResource {
       detectionAlertConfigDAO.save(alertConfig);
       if (alertConfig.getId() == null) {
         throw new RuntimeException("Error while saving the migrated alert config for " + alertName);
+      }
+
+      // Hack to retain subscription group owner
+      alertConfig.setCreatedBy(alertConfigDTO.getCreatedBy());
+      detectionAlertConfigDAO.update(alertConfig);
+      if (alertConfig.getId() == null) {
+        throw new RuntimeException("Error saving the migrated alert config after updating the owner.");
       }
     }
 
