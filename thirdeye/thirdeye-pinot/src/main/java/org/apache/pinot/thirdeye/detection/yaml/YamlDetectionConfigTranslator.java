@@ -109,5 +109,6 @@ public abstract class YamlDetectionConfigTranslator {
    */
   protected void validateYAML(Map<String, Object> yamlConfig) {
     Preconditions.checkArgument(yamlConfig.containsKey(PROP_NAME), "Property missing " + PROP_NAME);
+    Preconditions.checkArgument(yamlConfig.containsKey(PROP_DESC_NAME), "Property missing " + PROP_DESC_NAME);
   }
 }

@@ -60,7 +60,6 @@ public class SendAlertTest {
   private static final String DASHBOARD_HOST_VALUE = "dashboard";
   private static final String COLLECTION_VALUE = "test_dataset";
   private static final String DETECTION_NAME_VALUE = "test detection";
-  private static final String DETECTION_DESC_VALUE = "my test detection";
   private static final String METRIC_VALUE = "test_metric";
 
   private DAOTestBase testDAOProvider;
@@ -108,7 +107,6 @@ public class SendAlertTest {
 
     DetectionConfigDTO detectionConfig = new DetectionConfigDTO();
     detectionConfig.setName(DETECTION_NAME_VALUE);
-    detectionConfig.setDescription(DETECTION_DESC_VALUE);
     this.detectionConfigId = this.detectionDAO.save(detectionConfig);
 
     this.alertConfigDTO = new DetectionAlertConfigDTO();

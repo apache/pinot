@@ -19,7 +19,6 @@
 
 package org.apache.pinot.thirdeye.detection.validators;
 
-import java.util.Set;
 import javax.xml.bind.ValidationException;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import java.util.List;
@@ -70,7 +69,7 @@ public class DetectionAlertConfigValidator extends ConfigValidator {
           + " subscribed detections, and type.");
     }
     // detectionConfigIds cannot be empty
-    Set<Long> detectionIds = alertConfig.getVectorClocks().keySet();
+    List<Long> detectionIds = (List<Long>) alertConfig.getProperties().get(PROP_DETECTION_CONFIG_IDS);
     if (detectionIds == null || detectionIds.isEmpty()) {
       throw new ValidationException("A notification group should subscribe to at least one alert. If you wish to"
           + " unsubscribe, set active to false.");
