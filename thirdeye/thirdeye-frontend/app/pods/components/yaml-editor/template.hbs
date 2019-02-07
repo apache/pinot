@@ -21,8 +21,8 @@
       {{bs-button
         defaultText="View Documentation"
         type="outline-primary"
-        buttonType="modal"
-        onClick=(action "triggerDocModal" "Anomaly")
+        buttonType="link"
+        onClick=(action "triggerDoc" "Anomaly")
         class="te-button te-button--cancel"
       }}
     </div>
@@ -93,8 +93,8 @@
         {{bs-button
           defaultText="View Documentation"
           type="outline-primary"
-          buttonType="modal"
-          onClick=(action "triggerDocModal" "Notification")
+          buttonType="link"
+          onClick=(action "triggerDoc" "Notification")
           class="te-button te-button--cancel"
         }}
       </div>
@@ -140,9 +140,3 @@
     }}
   {{/if}}
 </fieldset>
-
-{{modals/yaml-documentation
-  showAnomalyModal=showAnomalyModal
-  showNotificationModal=showNotificationModal
-  YAMLField=YAMLField
-}}
