@@ -74,6 +74,7 @@ public class DetectionPipelineTaskRunnerTest {
     DetectionConfigDTO detector = new DetectionConfigDTO();
     detector.setProperties(this.properties);
     detector.setName("myName");
+    detector.setDescription("myDescription");
     detector.setCron("myCron");
     this.detectorId = this.detectionDAO.save(detector);
 
@@ -106,6 +107,7 @@ public class DetectionPipelineTaskRunnerTest {
     Assert.assertEquals(this.runs.get(0).getStartTime(), 1250);
     Assert.assertEquals(this.runs.get(0).getEndTime(), 1500);
     Assert.assertEquals(this.runs.get(0).getConfig().getName(), "myName");
+    Assert.assertEquals(this.runs.get(0).getConfig().getDescription(), "myDescription");
     Assert.assertEquals(this.runs.get(0).getConfig().getProperties().get("className"), "myClassName");
     Assert.assertEquals(this.runs.get(0).getConfig().getCron(), "myCron");
   }

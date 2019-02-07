@@ -76,6 +76,7 @@ public class AnomalyFilterStageWrapper extends DetectionPipeline {
       Preconditions.checkArgument(properties.containsKey(PROP_CLASS_NAME), "Nested missing " + PROP_CLASS_NAME);
       nestedConfig.setId(this.config.getId());
       nestedConfig.setName(this.config.getName());
+      nestedConfig.setDescription(this.config.getDescription());
       nestedConfig.setProperties(properties);
       if (this.metricUrn != null){
         properties.put(PROP_METRIC_URN, this.metricUrn);

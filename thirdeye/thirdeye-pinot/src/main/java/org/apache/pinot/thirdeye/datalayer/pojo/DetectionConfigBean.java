@@ -35,6 +35,7 @@ import java.util.Objects;
 public class DetectionConfigBean extends AbstractBean {
   String cron;
   String name;
+  String description;
   long lastTimestamp;
   Map<String, Object> properties;
   boolean active;
@@ -63,6 +64,14 @@ public class DetectionConfigBean extends AbstractBean {
 
   public void setName(String name) {
     this.name = name;
+  }
+
+  public String getDescription() {
+    return description;
+  }
+
+  public void setDescription(String description) {
+    this.description = description;
   }
 
   public String getCron() {

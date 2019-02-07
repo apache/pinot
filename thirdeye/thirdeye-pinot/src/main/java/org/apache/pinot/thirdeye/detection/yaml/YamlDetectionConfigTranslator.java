@@ -38,6 +38,7 @@ import org.yaml.snakeyaml.Yaml;
 public abstract class YamlDetectionConfigTranslator {
   protected static final Logger LOG = LoggerFactory.getLogger(YamlDetectionConfigTranslator.class);
   private static final String PROP_NAME = "detectionName";
+  private static final String PROP_DESC_NAME = "description";
   private static final String PROP_ACTIVE = "active";
 
   protected Map<String, Object> yamlConfig;
@@ -79,6 +80,7 @@ public abstract class YamlDetectionConfigTranslator {
 
     DetectionConfigDTO config = new DetectionConfigDTO();
     config.setName(MapUtils.getString(yamlConfig, PROP_NAME));
+    config.setDescription(MapUtils.getString(yamlConfig, PROP_DESC_NAME));
     config.setLastTimestamp(System.currentTimeMillis());
     config.setActive(true);
     YamlTranslationResult translationResult = translateYaml();
@@ -107,5 +109,6 @@ public abstract class YamlDetectionConfigTranslator {
    */
   protected void validateYAML(Map<String, Object> yamlConfig) {
     Preconditions.checkArgument(yamlConfig.containsKey(PROP_NAME), "Property missing " + PROP_NAME);
+    Preconditions.checkArgument(yamlConfig.containsKey(PROP_DESC_NAME), "Property missing " + PROP_DESC_NAME);
   }
 }

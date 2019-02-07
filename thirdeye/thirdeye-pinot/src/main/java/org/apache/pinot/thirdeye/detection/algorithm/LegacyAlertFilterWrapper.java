@@ -109,6 +109,7 @@ public class LegacyAlertFilterWrapper extends DetectionPipeline {
       }
       nestedConfig.setId(this.config.getId());
       nestedConfig.setName(this.config.getName());
+      nestedConfig.setDescription(this.config.getDescription());
       nestedConfig.setProperties(properties);
 
       DetectionPipeline pipeline = this.provider.loadPipeline(nestedConfig, this.startTime - this.alertFilterLookBack, this.endTime);
