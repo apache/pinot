@@ -464,7 +464,7 @@ public class YamlResource {
     if (detectionConfig == null) {
       return Response.status(Response.Status.BAD_REQUEST).entity(responseMessage).build();
     }
-    detectionConfig.setId(-1L);
+    detectionConfig.setId(Long.MAX_VALUE);
     DetectionPipeline pipeline = this.loader.from(this.provider, detectionConfig, start, end);
     DetectionPipelineResult result = pipeline.run();
 
