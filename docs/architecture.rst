@@ -120,7 +120,7 @@ Realtime segments are immutable once they are completed. While realtime segments
 in the sense that new rows can be added to them. Rows cannot be deleted from segments.
 
 
-See :doc:`realtime design <llc>` for details.
+See `Consuming and Indexing rows in Realtime <https://cwiki.apache.org/confluence/display/PINOT/Consuming+and+Indexing+rows+in+Realtime>`_ for details.
 
 
 Pinot Segments

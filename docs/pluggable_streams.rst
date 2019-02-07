@@ -20,7 +20,8 @@ You may encounter some limitations either in Pinot or in the stream system while
 Please feel free to get in touch with us when you start writing a stream plug-in, and we can help you out.
 We are open to receiving PRs in order to improve these abstractions if they do not work for a certain stream implementation.
 
-Refer to sections :ref:`hlc-section` and :ref:`llc-section` for details on how Pinot consumes streaming data.
+Refer to `Consuming and Indexing rows in Realtime <https://cwiki.apache.org/confluence/display/PINOT/Consuming+and+Indexing+rows+in+Realtime>`_
+for details on how Pinot consumes streaming data.
 
 Requirements to support Stream Level (High Level) consumers
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
