@@ -334,34 +334,49 @@ Common Development and Distribution License (CDDL) 1.1
 (see license/LICENSE-cddl-1.1.txt)
 
 javax.ws.rs:javax.ws.rs-api - http://jax-rs-spec.java.net
-org.glassfish.grizzly:grizzly-framework - https://javaee.github.io/grizzly
-org.glassfish.grizzly:grizzly-http
-org.glassfish.grizzly:grizzly-http-server
-org.glassfish.hk2:hk2-api - https://javaee.github.io/hk2
-org.glassfish.hk2:hk2-locator
-org.glassfish.hk2:hk2-utils
-org.glassfish.hk2:osgi-resource-locator
-org.glassfish.hk2.external:aopalliance-repackaged
-org.glassfish.hk2.external:javax.inject - https://jersey.github.io
-org.glassfish.jersey.bundles.repackaged:jersey-guava
-org.glassfish.jersey.containers:jersey-container-grizzly2-http
-org.glassfish.jersey.containers:jersey-container-servlet-core
-org.glassfish.jersey.core:jersey-client
-org.glassfish.jersey.core:jersey-common
-org.glassfish.jersey.core:jersey-server
-org.glassfish.jersey.ext:jersey-entity-filtering
-org.glassfish.jersey.media:jersey-media-jaxb
-org.glassfish.jersey.media:jersey-media-json-jackson
-org.glassfish.jersey.media:jersey-media-multipart
+org.glassfish.jersey.containers:jersey-container-servlet-core - https://jersey.github.io
 org.glassfish.tyrus.bundles:tyrus-standalone-client - https://github.com/tyrus-project/tyrus
-org.jvnet.mimepull:mimepull - http://mimepull.java.net
 
 
 Common Public License (CPL) 1.0
--------------------------
+-------------------------------
+(see license/LICENSE-cpl-1.0.txt)
+
 junit:junit - http://junit.sourceforge.net/junit3.8.1
 
 
 Eclipse Public License (EPL) 1.0
 --------------------------------
+(see license/LICENSE-epl-1.0.txt)
+
 org.aspectj:aspectjrt - https://www.eclipse.org/aspectj
+
+
+Eclipse Public LIcense (EPL) 2.0
+-------------------------------
+(see license/LICENSE-epl-2.0.txt)
+
+jakarta.annotation:jakarta.annotation-api - https://projects.eclipse.org/projects/ee4j
+jakarta.ws.rs:jakarta.ws.rs-api
+org.glassfish.grizzly:grizzly-framework - https://projects.eclipse.org/projects/ee4j.grizzly
+org.glassfish.grizzly:grizzly-http
+org.glassfish.grizzly:grizzly-http-server
+org.glassfish.hk2:hk2-api - https://projects.eclipse.org/projects/ee4j
+org.glassfish.hk2:hk2-locator
+org.glassfish.hk2:hk2-utils
+org.glassfish.hk2.external:aopalliance-repackaged
+org.glassfish.hk2.external:jakarta.inject
+org.glassfish.jersey.containers:jersey-container-grizzly2-http - https://projects.eclipse.org/projects/ee4j.jersey
+org.glassfish.jersey.core:jersey-client
+org.glassfish.jersey.core:jersey-common
+org.glassfish.jersey.core:jersey-server
+org.glassfish.jersey.ext:jersey-entity-filtering
+org.glassfish.jersey.inject:jersey-hk2
+org.glassfish.jersey.media:jersey-media-jaxb
+org.glassfish.jersey.media:jersey-media-json-jackson
+org.glassfish.jersey.media:jersey-media-multipart
+
+
+Eclipse Distribution License (EDL) 1.0
+--------------------------------------
+org.jvnet.mimepull:mimepull - https://github.com/eclipse-ee4j/metro-mimepull
