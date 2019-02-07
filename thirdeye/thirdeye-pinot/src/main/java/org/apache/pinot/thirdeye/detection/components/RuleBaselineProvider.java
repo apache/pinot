@@ -48,17 +48,17 @@ public class RuleBaselineProvider implements BaselineProvider<RuleBaselineProvid
     return TimeSeries.fromDataFrame(this.baseline.gather(slice, data.getTimeseries()));
   }
 
-  @Override
-  public Double computePredictedAggregates(MetricSlice slice, Series.DoubleFunction aggregateFunction) {
-    InputData data = this.dataFetcher.fetchData(new InputDataSpec().withAggregateSlices(this.baseline.scatter(slice)));
-    double value;
-    try {
-      value = data.getAggregates().get(this.baseline.scatter(slice).get(0)).getDouble(COL_VALUE, 0);
-    } catch (Exception e) {
-      value = Double.NaN;
-    }
-    return value;
-  }
+//  @Override
+//  public Double computePredictedAggregates(MetricSlice slice, Series.DoubleFunction aggregateFunction) {
+//    InputData data = this.dataFetcher.fetchData(new InputDataSpec().withAggregateSlices(this.baseline.scatter(slice)));
+//    double value;
+//    try {
+//      value = data.getAggregates().get(this.baseline.scatter(slice).get(0)).getDouble(COL_VALUE, 0);
+//    } catch (Exception e) {
+//      value = Double.NaN;
+//    }
+//    return value;
+//  }
 
 
   @Override

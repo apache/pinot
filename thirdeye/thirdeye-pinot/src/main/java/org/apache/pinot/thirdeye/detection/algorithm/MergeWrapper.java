@@ -23,6 +23,7 @@ import com.google.common.base.Preconditions;
 import org.apache.pinot.thirdeye.common.dimension.DimensionMap;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.detection.DefaultDataProvider;
 import org.apache.pinot.thirdeye.detection.DetectionUtils;
 import org.apache.pinot.thirdeye.detection.spi.model.AnomalySlice;
 import org.apache.pinot.thirdeye.detection.ConfigUtils;
@@ -40,6 +41,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import org.apache.commons.collections.MapUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -51,6 +54,7 @@ public class MergeWrapper extends DetectionPipeline {
   private static final String PROP_CLASS_NAME = "className";
   private static final String PROP_MERGE_KEY = "mergeKey";
   private static final String PROP_DETECTOR_COMPONENT_NAME = "detectorComponentName";
+  private static final Logger LOG = LoggerFactory.getLogger(DefaultDataProvider.class);
 
   protected static final Comparator<MergedAnomalyResultDTO> COMPARATOR = new Comparator<MergedAnomalyResultDTO>() {
     @Override
@@ -113,8 +117,9 @@ public class MergeWrapper extends DetectionPipeline {
       nestedConfig.setDescription(this.config.getDescription());
       nestedConfig.setProperties(properties);
       nestedConfig.setComponents(this.config.getComponents());
-
+      long ts = System.currentTimeMillis();
       DetectionPipeline pipeline = this.provider.loadPipeline(nestedConfig, this.startTime, this.endTime);
+      LOG.info("Mergewrapper, run nested cost {}", System.currentTimeMillis() -ts);
 
       DetectionPipelineResult intermediate = pipeline.run();
       lastTimeStamps.add(intermediate.getLastTimestamp());

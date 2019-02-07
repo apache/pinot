@@ -133,13 +133,19 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
 
   @Override
   public DetectionPipelineResult run() throws Exception {
+    // pre-cache time series if using moving window detection
+    MetricSlice cacheSlice1 = MetricSlice.from(this.metricEntity.getId(), startTime - TimeUnit.DAYS.toMillis(90), endTime, this.metricEntity.getFilters());
+    this.provider.cacheTimeseries(Collections.singleton(cacheSlice1));
+
     List<Interval> monitoringWindows = this.getMonitoringWindows();
     List<MergedAnomalyResultDTO> anomalies = new ArrayList<>();
     for (Interval window : monitoringWindows) {
       List<MergedAnomalyResultDTO> anomaliesForOneWindow = new ArrayList<>();
       try {
-        LOG.info("[New Pipeline] running detection for config {} metricUrn {}. start time {}, end time{}", config.getId(), metricUrn, window.getStart(), window.getEnd());
+        LOG.info("[New Pipeline] running detection for config {} metricUrn {}. start time {}, end time {}", config.getId(), metricUrn, window.getStart(), window.getEnd());
+        long ts = System.currentTimeMillis();
         anomaliesForOneWindow = anomalyDetector.runDetection(window, this.metricUrn);
+        LOG.info("[New Pipeline] run anomaly detection for window {} - {} used {} milliseconds", window.getStart(), window.getEnd(), System.currentTimeMillis() - ts);
       } catch (Exception e) {
         LOG.warn("[DetectionConfigID{}] detecting anomalies for window {} to {} failed.", this.config.getId(), window.getStart(), window.getEnd(), e);
       }
@@ -197,9 +203,7 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
         for (Interval window : monitoringWindows){
           LOG.info("running detections in windows {}", window);
         }
-//         pre-cache time series if using moving window detection
-        MetricEntity me = MetricEntity.fromURN(this.metricUrn);
-        MetricSlice cacheSlice = MetricSlice.from(me.getId(), startTime - TimeUnit.DAYS.toMillis(90), endTime, me.getFilters(), toTimeGranularity(this.bucketPeriod));
+        MetricSlice cacheSlice = MetricSlice.from(this.metricEntity.getId(), startTime - TimeUnit.DAYS.toMillis(90), endTime, this.metricEntity.getFilters(), toTimeGranularity(this.bucketPeriod));
         this.provider.cacheTimeseries(Collections.singleton(cacheSlice));
         return monitoringWindows;
       } catch (Exception e) {

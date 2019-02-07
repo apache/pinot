@@ -309,7 +309,7 @@ public class DataProviderTest {
   @Test
   public void testTimeseriesCache(){
     MetricSlice slice = MetricSlice.from(this.metricIds.get(0), 604800000L, 1814400000L);
-    this.provider.cacheTimeseries(Collect);
+    this.provider.cacheTimeseries(Collections.singleton(slice));
 
     DataFrame df = this.provider.fetchTimeseries(Collections.singleton(slice)).get(slice);
 

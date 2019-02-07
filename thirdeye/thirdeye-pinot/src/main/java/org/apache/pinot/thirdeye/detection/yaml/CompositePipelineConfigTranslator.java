@@ -164,7 +164,6 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
   private static final String PROP_BUCKET_PERIOD = "bucketPeriod";
 
   private static final DetectionRegistry DETECTION_REGISTRY = DetectionRegistry.getInstance();
-<<<<<<< HEAD
   static {
     // do not tune for alerts migrated from legacy anomaly function.
     DetectionRegistry.registerComponent("com.linkedin.thirdeye.detection.components.AdLibAlertFilter",
@@ -179,10 +178,6 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
   private static final Map<String, String> DETECTOR_TO_BASELINE =
       ImmutableMap.of("ALGORITHM", "ALGORITHM_BASELINE", "MIGRATED_ALGORITHM", "MIGRATED_ALGORITHM_BASELINE");
   private static final Set<String> MOVING_WINDOW_DETECTOR_TYPES = ImmutableSet.of("ALGORITHM");
-=======
-  private static final Map<String, String> DETECTOR_TO_BASELINE = ImmutableMap.of("ALGORITHM", "ALGORITHM_BASELINE");
-  private static final Set<String> MOVING_WINDOW_DETECTOR_TYPES = ImmutableSet.of("ALGORITHM", "LEGACY_ALGORITHM");
->>>>>>> cache test
 
   private final Map<String, Object> components = new HashMap<>();
   private MetricConfigDTO metricConfig;
