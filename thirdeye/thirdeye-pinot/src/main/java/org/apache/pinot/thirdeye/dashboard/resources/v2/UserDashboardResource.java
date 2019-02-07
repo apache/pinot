@@ -181,6 +181,13 @@ public class UserDashboardResource {
       }
     }
 
+    // TODO: deprecate after migration
+    // Support for partially migrated alerts.
+    List<DetectionAlertConfigDTO> notifications = detectionAlertDAO.findByPredicate(Predicate.EQ("application", application));
+    for (DetectionAlertConfigDTO notification : notifications) {
+      applicationFunctionIds.addAll(notification.getVectorClocks().keySet());
+    }
+
     // group (indirect)
     Set<Long> groupFunctionIds = new HashSet<>();
     if (StringUtils.isNotBlank(group)) {
