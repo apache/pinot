@@ -53,6 +53,11 @@ import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
 
 
+/**
+ * The task runner to run yaml onboarding task after a new detection is set up
+ * It will replay the detection pipeline and the re-tune the pipeline.
+ * Because for some pipeline component, tuning is depend on replay result
+ */
 public class YamlOnboardingTaskRunner implements TaskRunner {
   private static final Logger LOG = LoggerFactory.getLogger(YamlOnboardingTaskRunner.class);
   private final DetectionConfigManager detectionDAO;
@@ -111,12 +116,8 @@ public class YamlOnboardingTaskRunner implements TaskRunner {
     for (MergedAnomalyResultDTO anomaly : result.getAnomalies()) {
       anomaly.setAnomalyResultSource(AnomalyResultSource.ANOMALY_REPLAY);
       this.anomalyDAO.save(anomaly);
-    }
-
-    for (MergedAnomalyResultDTO mergedAnomalyResultDTO : result.getAnomalies()) {
-      this.anomalyDAO.save(mergedAnomalyResultDTO);
-      if (mergedAnomalyResultDTO.getId() == null) {
-        LOG.warn("Could not store anomaly:\n{}", mergedAnomalyResultDTO);
+      if (anomaly.getId() == null) {
+        LOG.warn("Could not store anomaly:\n{}", anomaly);
       }
     }
 

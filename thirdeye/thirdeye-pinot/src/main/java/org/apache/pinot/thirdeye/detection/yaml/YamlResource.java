@@ -155,7 +155,7 @@ public class YamlResource {
   /*
    * Create a yaml onboarding task. It runs 1 month replay and re-tune the pipeline.
    */
-  private void createYamlOnboardingTask(long configId, long tuningWindowStart, long tuningWindowEnd){
+  private void createYamlOnboardingTask(long configId, long tuningWindowStart, long tuningWindowEnd) throws Exception {
     YamlOnboardingTaskInfo info = new YamlOnboardingTaskInfo();
     info.setConfigId(configId);
     if (tuningWindowStart == 0L && tuningWindowEnd == 0L) {
@@ -168,12 +168,7 @@ public class YamlResource {
     info.setEnd(System.currentTimeMillis());
     info.setStart(info.getEnd() - ONBOARDING_REPLAY_LOOKBACK);
 
-    String taskInfoJson = null;
-    try {
-      taskInfoJson = OBJECT_MAPPER.writeValueAsString(info);
-    } catch (JsonProcessingException e) {
-      LOG.error("Exception when converting yaml detection onboarding {} to jsonString", info, e);
-    }
+    String taskInfoJson = OBJECT_MAPPER.writeValueAsString(info);
     String jobName = String.format("%s_%d", TaskConstants.TaskType.YAML_DETECTION_ONBOARD, configId);
 
     TaskDTO taskDTO = new TaskDTO();
