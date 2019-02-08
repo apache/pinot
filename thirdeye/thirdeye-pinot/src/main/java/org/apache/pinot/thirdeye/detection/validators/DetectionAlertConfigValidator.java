@@ -26,7 +26,6 @@ import java.util.Map;
 import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.thirdeye.datalayer.util.Predicate;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
-import org.junit.Assert;
 
 import static org.apache.pinot.thirdeye.detection.yaml.YamlDetectionAlertConfigTranslator.*;
 
