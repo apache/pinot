@@ -82,7 +82,6 @@ public abstract class YamlDetectionConfigTranslator {
     config.setName(MapUtils.getString(yamlConfig, PROP_NAME));
     config.setDescription(MapUtils.getString(yamlConfig, PROP_DESC_NAME));
     config.setLastTimestamp(System.currentTimeMillis());
-    config.setActive(true);
     YamlTranslationResult translationResult = translateYaml();
     Preconditions.checkArgument(!translationResult.getProperties().isEmpty(), "Empty detection property");
     config.setProperties(translationResult.getProperties());

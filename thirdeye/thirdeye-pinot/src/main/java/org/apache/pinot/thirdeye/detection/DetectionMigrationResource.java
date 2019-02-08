@@ -119,6 +119,7 @@ public class DetectionMigrationResource {
     yamlConfigs.put("detectionName", anomalyFunctionDTO.getFunctionName());
     yamlConfigs.put("description", "<Please edit and provide a description for this alert>");
     yamlConfigs.put("metric", anomalyFunctionDTO.getMetric());
+    yamlConfigs.put("active", anomalyFunctionDTO.getIsActive());
     yamlConfigs.put("dataset", anomalyFunctionDTO.getCollection());
     yamlConfigs.put("pipelineType", "Composite");
     if (StringUtils.isNotBlank(anomalyFunctionDTO.getExploreDimensions())) {
@@ -586,6 +587,7 @@ public class DetectionMigrationResource {
         validateFunction(func);
       } catch (ValidationException e) {
         LOGGER.info("[MIG] Function failed validation. Name " + func.getFunctionName() + " Error : " + e.getMessage());
+        responseMessage.put("Failed to migrate " + func.getId(),  String.format("Validation Error : %s", e.getMessage()));
         continue;
       }
 
@@ -593,9 +595,7 @@ public class DetectionMigrationResource {
         migrateLegacyAnomalyFunction(func);
       } catch (Exception e) {
         // Skip migrating this function and move on to the next
-        responseMessage.put("Status of function " + func.getId(),
-            String.format("Failed to migrate function ID %d with name %s due to %s", func.getId(),
-                func.getFunctionName(), e.getMessage()));
+        responseMessage.put("Failed to migrate " + func.getId(), String.format("Error : %s", e.getMessage()));
       }
     }
 

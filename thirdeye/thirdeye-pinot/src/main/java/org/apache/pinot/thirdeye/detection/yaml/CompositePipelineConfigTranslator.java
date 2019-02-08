@@ -213,7 +213,7 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
       List<Map<String, Object>> filterYamls = ConfigUtils.getList(ruleYaml.get(PROP_FILTER));
       List<Map<String, Object>> detectionYamls = ConfigUtils.getList(ruleYaml.get(PROP_DETECTION));
       List<Map<String, Object>> detectionProperties = buildListOfMergeWrapperProperties(detectionYamls);
-      if (filterYamls == null || filterYamls.isEmpty()) {
+      if (filterYamls.isEmpty()) {
         nestedPipelines.addAll(detectionProperties);
       } else {
         List<Map<String, Object>> filterNestedProperties = detectionProperties;
