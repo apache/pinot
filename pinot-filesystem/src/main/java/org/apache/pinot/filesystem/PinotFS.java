@@ -56,13 +56,13 @@ public abstract class PinotFS implements Closeable {
 
   /**
    * Moves the file from the src to dst. Does not keep the original file. If the dst has parent directories
-   * that haven't been created, this method will create all the necessary parent directories. If dst already exists,
-   * it will overwrite. Will work either for moving a directory or a file. Currently assumes that both the srcUri
-   * and the dstUri are of the same type (both files or both directories). If srcUri is a file, it will move the file to
-   * dstUri's location. If srcUri is a directory, it will move the directory to dstUri. Does not support moving a file under a
-   * directory.
-   *
-   * For example, if a/b/c is moved to x/y/z, in the case of overwrite, a/b/c will be renamed to x/y/z.
+   * that haven't been created, this method will create all the necessary parent directories.
+   * If both src and dst are files, dst will be overwritten.
+   * If src is a file and dst is a directory, src file will get copied under dst directory.
+   * If both src and dst are directories, src folder will get copied under dst directory.
+   * If src is a directory and dst is a file, operation will fail.
+   * For example, if a file a/b/c is moved to x/y/z, in the case of overwrite, a/b/c will be renamed to x/y/z;
+   * if a file x is copied to x/y, all the original files under x/y will be kept.
    * @param srcUri URI of the original file
    * @param dstUri URI of the final file location
    * @param overwrite true if we want to overwrite the dstURI, false otherwise
@@ -74,8 +74,8 @@ public abstract class PinotFS implements Closeable {
       throws IOException;
 
   /**
-   * Same as move except the srcUri is retained. For example, if x/y/z is copied to a/b/c, x/y/z will be retained
-   * and x/y/z will also be present as a/b/c; if x is copied to x/y, all the original files under x/y will be kept.
+   * Same as move except the srcUri is retained. For example, if a file x/y/z is copied to a/b/c, x/y/z will be retained
+   * and x/y/z will also be present as a/b/c; if a file x is copied to x/y, all the original files under x/y will be kept.
    * @param srcUri URI of the original file
    * @param dstUri URI of the final file location
    * @return true if copy is successful
@@ -95,7 +95,7 @@ public abstract class PinotFS implements Closeable {
       throws IOException;
 
   /**
-   * Returns the length of the file at the provided location. Will throw exception if a directory
+   * Returns the length of the file at the provided location. Will throw exception if a directory.
    * @param fileUri location of file
    * @return the number of bytes
    * @throws IOException on IO Failure
