@@ -55,7 +55,7 @@ public abstract class ConfigValidator {
     try {
       Map<String, Object> yamlConfigMap = (Map<String, Object>) YAML.load(yamlConfig);
     } catch (Exception e) {
-      throw new ValidationException("Error parsing the Yaml input. Check for syntax issues.");
+      throw new ValidationException("Error parsing the Yaml payload. Check for syntax issues.");
     }
 
     return true;

@@ -161,7 +161,6 @@ public class YamlDetectionAlertConfigTranslator {
   /**
    * Generates the {@link DetectionAlertConfigDTO} from the YAML Alert Map
    */
-  @SuppressWarnings("unchecked")
   public DetectionAlertConfigDTO translate(Map<String,Object> yamlAlertConfig) {
     DetectionAlertConfigDTO alertConfigDTO = new DetectionAlertConfigDTO();
 

@@ -19,6 +19,7 @@
 
 package org.apache.pinot.thirdeye.detection;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -319,12 +320,12 @@ public class DetectionMigrationResource {
     }
 
     // Migrate anomaly function config to the detection config by converting to YAML and then to Detection Config
-    Map<String, String> responseMessage = new HashMap<>();
-    Map<String, Object> detectionYAMLMap = translateAnomalyFunctionToYaml(anomalyFunctionDTO);
-    detectionConfig = new YamlResource().translateToDetectionConfig(detectionYAMLMap, responseMessage);
-
-    if (detectionConfig == null) {
-      throw new RuntimeException("Couldn't translate yaml to detection config due to " + responseMessage.get("message"));
+    try {
+      Map<String, Object> detectionYAMLMap = translateAnomalyFunctionToYaml(anomalyFunctionDTO);
+      detectionConfig = new YamlResource().translateToDetectionConfig(detectionYAMLMap);
+      Preconditions.checkNotNull(detectionConfig);
+    } catch (Exception e) {
+      throw new RuntimeException("Error translating anomaly function config to the detection config" + e.getMessage());
     }
 
     // Save the migrated anomaly function
