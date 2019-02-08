@@ -54,7 +54,6 @@ public class MergeWrapper extends DetectionPipeline {
   private static final String PROP_CLASS_NAME = "className";
   private static final String PROP_MERGE_KEY = "mergeKey";
   private static final String PROP_DETECTOR_COMPONENT_NAME = "detectorComponentName";
-  private static final Logger LOG = LoggerFactory.getLogger(DefaultDataProvider.class);
 
   protected static final Comparator<MergedAnomalyResultDTO> COMPARATOR = new Comparator<MergedAnomalyResultDTO>() {
     @Override
@@ -117,9 +116,7 @@ public class MergeWrapper extends DetectionPipeline {
       nestedConfig.setDescription(this.config.getDescription());
       nestedConfig.setProperties(properties);
       nestedConfig.setComponents(this.config.getComponents());
-      long ts = System.currentTimeMillis();
       DetectionPipeline pipeline = this.provider.loadPipeline(nestedConfig, this.startTime, this.endTime);
-      LOG.info("Mergewrapper, run nested cost {}", System.currentTimeMillis() -ts);
 
       DetectionPipelineResult intermediate = pipeline.run();
       lastTimeStamps.add(intermediate.getLastTimestamp());

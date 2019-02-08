@@ -130,8 +130,6 @@ public class DefaultDataProvider implements DataProvider {
 
   @Override
   public void cacheTimeseries(Collection<MetricSlice> slices) {
-    // caches
-    LOG.info("Cache {} time series slice", slices.size());
     Collection<MetricSlice> slicesToFetch = slices.stream().filter(slice -> !this.timeseriesCache.containsKey(slice)).collect(Collectors.toList());
     this.timeseriesCache.putAll(this.fetchTimeseries(slicesToFetch));
   }
