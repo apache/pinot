@@ -21,12 +21,11 @@ package org.apache.pinot.thirdeye.dataframe.util;
 
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
-import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang.builder.ToStringBuilder;
 import org.apache.commons.lang.builder.ToStringStyle;
-import org.apache.pinot.thirdeye.datasource.comparison.Row;
+import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 
 
 /**

@@ -72,6 +72,7 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
   private static final String PROP_DETECTOR_COMPONENT_NAME = "detectorComponentName";
   private static final String PROP_TIMEZONE = "timezone";
   private static final String PROP_BUCKET_PERIOD = "bucketPeriod";
+  private static final long DEFAULT_CACHING_PERIOD_LOOKBACK = TimeUnit.DAYS.toMillis(30);
 
   private static final Logger LOG = LoggerFactory.getLogger(
       AnomalyDetectorWrapper.class);
@@ -134,10 +135,10 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
   @Override
   public DetectionPipelineResult run() throws Exception {
     // pre-cache time series with default granularity. this is used in multiple places:
-    // 1. calculate the last time stamp for the time series.
+    // 1. get the last time stamp for the time series.
     // 2. to calculate current values and  baseline values for the anomalies detected
     // 3. anomaly detection current and baseline time series value
-    MetricSlice cacheSlice = MetricSlice.from(this.metricEntity.getId(), startTime - TimeUnit.DAYS.toMillis(90), endTime, this.metricEntity.getFilters());
+    MetricSlice cacheSlice = MetricSlice.from(this.metricEntity.getId(), startTime - DEFAULT_CACHING_PERIOD_LOOKBACK, endTime, this.metricEntity.getFilters());
     this.provider.cacheTimeseries(Collections.singleton(cacheSlice));
 
     List<Interval> monitoringWindows = this.getMonitoringWindows();
@@ -207,7 +208,7 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
           LOG.info("running detections in windows {}", window);
         }
         // pre cache the time series for the whole detection time period instead of fetching for each window
-        MetricSlice cacheSlice = MetricSlice.from(this.metricEntity.getId(), startTime - TimeUnit.DAYS.toMillis(90), endTime, this.metricEntity.getFilters(), toTimeGranularity(this.bucketPeriod));
+        MetricSlice cacheSlice = MetricSlice.from(this.metricEntity.getId(), startTime - DEFAULT_CACHING_PERIOD_LOOKBACK, endTime, this.metricEntity.getFilters(), toTimeGranularity(this.bucketPeriod));
         this.provider.cacheTimeseries(Collections.singleton(cacheSlice));
         return monitoringWindows;
       } catch (Exception e) {
