@@ -44,11 +44,13 @@ public class ControllerConf extends PropertiesConfiguration {
   private static final String CONTROLLER_VIP_PROTOCOL = "controller.vip.protocol";
   private static final String CONTROLLER_HOST = "controller.host";
   private static final String CONTROLLER_PORT = "controller.port";
+  private static final String USE_HTTP_AND_SSL = "controller.ssl.enable.both";
   private static final String USE_SSL = "controller.ssl.enabled";
   private static final String KEYSTORE_FILE = "controller.ssl.keystore.file";
   private static final String KEYSTORE_PASSWORD = "controller.ssl.keystore.pass";
   private static final String TRUSTSTORE_FILE = "controller.ssl.truststore.file";
   private static final String TRUSTSTORE_PASSWORD = "controller.ssl.truststore.pass";
+  private static final String BROKER_SSL_LOADBALANCER_ADDRESS = "broker.ssl.loadbalancer";
   private static final String DATA_DIR = "controller.data.dir";
   // Potentially same as data dir if local
   private static final String LOCAL_TEMP_DIR = "controller.local.temp.dir";
@@ -212,7 +214,11 @@ public class ControllerConf extends PropertiesConfiguration {
   public boolean getQueryConsoleUseHttps() {
     return containsKey(CONSOLE_WEBAPP_USE_HTTPS) && getBoolean(CONSOLE_WEBAPP_USE_HTTPS);
   }
-  
+
+  public boolean getUseHTTPAndSSL() {
+    return containsKey(USE_HTTP_AND_SSL) && getBoolean(USE_HTTP_AND_SSL);
+  }
+
   public void setUseSSL(boolean useSSL) {
 	setProperty(USE_SSL, useSSL);
   }
@@ -224,7 +230,15 @@ public class ControllerConf extends PropertiesConfiguration {
   public void setKeyStoreFile(String keyStoreFile) {
 	setProperty(KEYSTORE_FILE, keyStoreFile);
   }
-  
+
+  public String getBrokerSslLoadbalancerAddress() {
+    if(!containsKey(BROKER_SSL_LOADBALANCER_ADDRESS)){
+      return null;
+    } else {
+      return getString(BROKER_SSL_LOADBALANCER_ADDRESS);
+    }
+  }
+
   public String getKeyStoreFile() {
 	return getString(KEYSTORE_FILE, null);
   }

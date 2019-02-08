@@ -130,6 +130,7 @@ public class PinotHelixResourceManager {
   private final boolean _isSingleTenantCluster;
   private final boolean _isUpdateStateModel;
   private final boolean _enableBatchMessageMode;
+  private final String _overloadBrokerWithLB;
 
   private HelixManager _helixZkManager;
   private HelixAdmin _helixAdmin;
@@ -143,6 +144,7 @@ public class PinotHelixResourceManager {
   public PinotHelixResourceManager(@Nonnull String zkURL, @Nonnull String helixClusterName,
       @Nonnull String controllerInstanceId, String dataDir, long externalViewOnlineToOfflineTimeoutMillis,
       boolean isSingleTenantCluster, boolean isUpdateStateModel, boolean enableBatchMessageMode) {
+      boolean isSingleTenantCluster, boolean isUpdateStateModel, boolean enableBatchMessageMode, String overloadBrokerWithLB) {
     _helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(zkURL);
     _helixClusterName = helixClusterName;
     _instanceId = controllerInstanceId;
@@ -151,19 +153,21 @@ public class PinotHelixResourceManager {
     _isSingleTenantCluster = isSingleTenantCluster;
     _isUpdateStateModel = isUpdateStateModel;
     _enableBatchMessageMode = enableBatchMessageMode;
+    _overloadBrokerWithLB = overloadBrokerWithLB;
   }
 
   public PinotHelixResourceManager(@Nonnull String zkURL, @Nonnull String helixClusterName,
       @Nonnull String controllerInstanceId, @Nonnull String dataDir) {
     this(zkURL, helixClusterName, controllerInstanceId, dataDir, DEFAULT_EXTERNAL_VIEW_UPDATE_TIMEOUT_MILLIS,
         false, false, true);
+        false, false, true, null);
   }
 
   public PinotHelixResourceManager(@Nonnull ControllerConf controllerConf) {
     this(controllerConf.getZkStr(), controllerConf.getHelixClusterName(),
         controllerConf.getControllerHost() + "_" + controllerConf.getControllerPort(), controllerConf.getDataDir(),
         controllerConf.getExternalViewOnlineToOfflineTimeout(), controllerConf.tenantIsolationEnabled(),
-        controllerConf.isUpdateSegmentStateModel(), controllerConf.getEnableBatchMessageMode());
+        controllerConf.isUpdateSegmentStateModel(), controllerConf.getEnableBatchMessageMode(), controllerConf.getBrokerSslLoadbalancerAddress());
   }
 
   /**
@@ -298,6 +302,16 @@ public class PinotHelixResourceManager {
   @Nullable
   public InstanceZKMetadata getInstanceZKMetadata(@Nonnull String instanceId) {
     return ZKMetadataProvider.getInstanceZKMetadata(_propertyStore, instanceId);
+  }
+
+  /**
+   * Get the Broker Load Balancer address if it exists
+   * @param
+   * @return String of load balancer address, null if none defined
+   */
+  @Nullable
+  public String getBrokerLoadBalancerAddress() {
+    return _overloadBrokerWithLB;
   }
 
   /**

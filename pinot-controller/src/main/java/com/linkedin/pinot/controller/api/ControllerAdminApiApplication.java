@@ -24,6 +24,7 @@ import java.net.URL;
 import java.net.URLClassLoader;
 import org.glassfish.grizzly.http.server.CLStaticHttpHandler;
 import org.glassfish.grizzly.http.server.HttpServer;
+import org.glassfish.grizzly.http.server.NetworkListener;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.grizzly2.httpserver.GrizzlyHttpServerFactory;
 import org.glassfish.jersey.jackson.JacksonFeature;
@@ -93,6 +94,7 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     register(binder);
   }
 
+  // if both http and https protocols are enabled, will bind the https listener to default port 443
   public boolean start(int httpPort) {
     // ideally greater than reserved port but then port 80 is also valid
     Preconditions.checkArgument(httpPort > 0);

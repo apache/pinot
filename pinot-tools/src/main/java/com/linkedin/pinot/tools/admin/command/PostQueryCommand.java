@@ -99,7 +99,8 @@ public class PostQueryCommand extends AbstractBaseAdminCommand implements Comman
     final JSONObject json = new JSONObject();
     json.put("pql", _query);
 
-    String brokerUrl = "http://" + _brokerHost + ":" + _brokerPort;
+    //String brokerUrl = "http://" + _brokerHost + ":" + _brokerPort;
+    String brokerUrl = _brokerHost+":"+_brokerPort;
     final URLConnection conn = new URL(brokerUrl + "/query").openConnection();
     conn.setDoOutput(true);
 
