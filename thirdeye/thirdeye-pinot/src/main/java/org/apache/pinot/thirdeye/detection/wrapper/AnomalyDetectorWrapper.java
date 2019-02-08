@@ -133,9 +133,12 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
 
   @Override
   public DetectionPipelineResult run() throws Exception {
-    // pre-cache time series if using moving window detection
-    MetricSlice cacheSlice1 = MetricSlice.from(this.metricEntity.getId(), startTime - TimeUnit.DAYS.toMillis(90), endTime, this.metricEntity.getFilters());
-    this.provider.cacheTimeseries(Collections.singleton(cacheSlice1));
+    // pre-cache time series with default granularity. this is used in multiple places:
+    // 1. calculate the last time stamp for the time series.
+    // 2. to calculate current values and  baseline values for the anomalies detected
+    // 3. anomaly detection current and baseline time series value
+    MetricSlice cacheSlice = MetricSlice.from(this.metricEntity.getId(), startTime - TimeUnit.DAYS.toMillis(90), endTime, this.metricEntity.getFilters());
+    this.provider.cacheTimeseries(Collections.singleton(cacheSlice));
 
     List<Interval> monitoringWindows = this.getMonitoringWindows();
     List<MergedAnomalyResultDTO> anomalies = new ArrayList<>();
@@ -203,6 +206,7 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
         for (Interval window : monitoringWindows){
           LOG.info("running detections in windows {}", window);
         }
+        // pre cache the time series for the whole detection time period instead of fetching for each window
         MetricSlice cacheSlice = MetricSlice.from(this.metricEntity.getId(), startTime - TimeUnit.DAYS.toMillis(90), endTime, this.metricEntity.getFilters(), toTimeGranularity(this.bucketPeriod));
         this.provider.cacheTimeseries(Collections.singleton(cacheSlice));
         return monitoringWindows;
