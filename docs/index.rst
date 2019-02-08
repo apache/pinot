@@ -38,26 +38,3 @@ Customizing Pinot
    segment_fetcher
    pluggable_storage
 
-################
-Design Documents
-################
-
-.. toctree::
-   :maxdepth: 1
-
-
-   llc
-   partition_aware_routing
-   expressions_udf
-   schema_timespec
-
-################
-Design Proposals
-################
-
-.. toctree::
-   :maxdepth: 1
-
-
-   multitenancy
-
