@@ -48,6 +48,7 @@ public class TransformFunctionFactory {
           put(DateTimeConversionTransformFunction.FUNCTION_NAME.toLowerCase(),
               DateTimeConversionTransformFunction.class);
           put(ValueInTransformFunction.FUNCTION_NAME.toLowerCase(), ValueInTransformFunction.class);
+          put(RemainderTransformFunction.FUNCTION_NAME.toLowerCase(), RemainderTransformFunction.class);
         }
       };
 
