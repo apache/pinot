@@ -80,6 +80,7 @@ public class YamlResource {
   private static ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   public static final String PROP_DETECTION_NAME = "detectionName";
+  public static final String PROP_SUBS_GROUP_NAME = "subscriptionGroupName";
 
   private final DetectionConfigManager detectionConfigDAO;
   private final DetectionAlertConfigManager detectionAlertConfigDAO;
@@ -217,7 +218,26 @@ public class YamlResource {
 
     // Notification
     String notificationYaml = yamls.get("notification");
-    Response response = createDetectionAlertConfigApi(notificationYaml);
+
+    Map<String, Object> notificationYamlConfig;
+    try {
+      notificationYamlConfig = (Map<String, Object>) this.yaml.load(notificationYaml);
+    } catch (Exception e){
+      return Response.status(Response.Status.BAD_REQUEST)
+          .entity(ImmutableMap.of("message", "notification yaml parsing error, " + e.getMessage())).build();
+    }
+
+    // Check if existing or new subscription group
+    String groupName = MapUtils.getString(notificationYamlConfig, PROP_SUBS_GROUP_NAME);
+    List<DetectionAlertConfigDTO> alertConfigDTOS = detectionAlertConfigDAO
+        .findByPredicate(Predicate.EQ("name", groupName));
+    Response response;
+    if (!alertConfigDTOS.isEmpty()) {
+      response = updateDetectionAlertConfigApi(notificationYaml, alertConfigDTOS.get(0).getId());
+    } else {
+      response = createDetectionAlertConfigApi(notificationYaml);
+    }
+
     if (response.getStatusInfo() != Response.Status.OK) {
       // revert detection DTO
       this.detectionConfigDAO.deleteById(detectionConfigId);
@@ -327,7 +347,14 @@ public class YamlResource {
     DetectionAlertConfigDTO alertConfig = this.alertConfigTranslator.translate(newAlertConfigMap);
     alertConfig.setYaml(yamlAlertConfig);
 
-    // Validate the config before saving it
+    // Check for duplicates
+    List<DetectionAlertConfigDTO> alertConfigDTOS = detectionAlertConfigDAO
+        .findByPredicate(Predicate.EQ("name", alertConfig.getName()));
+    if (!alertConfigDTOS.isEmpty()) {
+      throw new ValidationException("Subscription group name is already taken. Please use a different name.");
+    }
+
+    // Validate the config
     notificationValidator.validateConfig(alertConfig);
 
     return alertConfig;

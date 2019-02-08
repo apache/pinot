@@ -87,13 +87,6 @@ public class DetectionAlertConfigValidator extends ConfigValidator {
           + " to ask_thirdeye if you wish to setup a new application.");
     }
 
-    // Check for duplicates
-    List<DetectionAlertConfigDTO> alertConfigDTOS = DAORegistry.getInstance().getDetectionAlertConfigManager()
-        .findByPredicate(Predicate.EQ("name", alertConfig.getName()));
-    if (!alertConfigDTOS.isEmpty()) {
-      throw new ValidationException("Subscription group name is already taken. Please use a different name.");
-    }
-
     // TODO add more checks like cron validity, email validity, alert type check, scheme type check etc.
   }
 
