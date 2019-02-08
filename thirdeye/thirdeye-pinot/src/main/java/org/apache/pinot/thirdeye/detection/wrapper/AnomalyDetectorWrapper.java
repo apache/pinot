@@ -72,7 +72,7 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
   private static final String PROP_DETECTOR_COMPONENT_NAME = "detectorComponentName";
   private static final String PROP_TIMEZONE = "timezone";
   private static final String PROP_BUCKET_PERIOD = "bucketPeriod";
-  private static final long DEFAULT_CACHING_PERIOD_LOOKBACK = TimeUnit.DAYS.toMillis(30);
+  private static final long DEFAULT_CACHING_PERIOD_LOOKBACK = TimeUnit.DAYS.toMillis(60);
 
   private static final Logger LOG = LoggerFactory.getLogger(
       AnomalyDetectorWrapper.class);
