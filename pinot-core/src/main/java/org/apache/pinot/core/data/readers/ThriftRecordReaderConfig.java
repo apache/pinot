@@ -31,7 +31,7 @@ public class ThriftRecordReaderConfig implements RecordReaderConfig {
   }
 
   public void setThriftClass(String thriftClass) {
-    this._thriftClass = thriftClass;
+    _thriftClass = thriftClass;
   }
 
   @Override

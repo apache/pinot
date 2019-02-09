@@ -21,7 +21,6 @@ package org.apache.pinot.hadoop;
 import java.io.FileInputStream;
 import java.util.Arrays;
 import java.util.Properties;
-import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.hadoop.job.SegmentCreationJob;
 import org.apache.pinot.hadoop.job.SegmentTarPushJob;
 import org.apache.pinot.hadoop.job.SegmentUriPushJob;
@@ -36,13 +35,6 @@ public class PinotHadoopJobLauncher {
   private static final String USAGE = "usage: [job_type] [job.properties]";
   private static final String SUPPORT_JOB_TYPES =
       "\tsupport job types: " + Arrays.toString(PinotHadoopJobType.values());
-  private static final String SEGMENT_CREATION_JOB_NAME = PinotHadoopJobType.SegmentCreation.toString();
-  private static final String SEGMENT_PUSH_TAR_JOB_NAME = PinotHadoopJobType.SegmentTarPush.toString();
-  private static final String SEGMENT_PUSH_URI_JOB_NAME = PinotHadoopJobType.SegmentUriPush.toString();
-  private static final String SEGMENT_CREATION_AND_TAR_PUSH_JOB_NAME =
-      PinotHadoopJobType.SegmentCreationAndTarPush.toString();
-  private static final String SEGMENT_CREATION_AND_URI_PUSH_JOB_NAME =
-      PinotHadoopJobType.SegmentCreationAndUriPush.toString();
 
   private static void usage() {
     System.err.println(USAGE);
@@ -53,25 +45,21 @@ public class PinotHadoopJobLauncher {
       throws Exception {
     switch (jobType) {
       case SegmentCreation:
-        new SegmentCreationJob(SEGMENT_CREATION_JOB_NAME, jobConf).run();
+        new SegmentCreationJob(jobConf).run();
         break;
       case SegmentTarPush:
-        new SegmentTarPushJob(SEGMENT_PUSH_TAR_JOB_NAME, jobConf).run();
+        new SegmentTarPushJob(jobConf).run();
         break;
       case SegmentUriPush:
-        new SegmentUriPushJob(SEGMENT_PUSH_URI_JOB_NAME, jobConf).run();
+        new SegmentUriPushJob(jobConf).run();
         break;
       case SegmentCreationAndTarPush:
-        new SegmentCreationJob(StringUtil.join(":", SEGMENT_CREATION_JOB_NAME, SEGMENT_CREATION_AND_TAR_PUSH_JOB_NAME),
-            jobConf).run();
-        new SegmentTarPushJob(StringUtil.join(":", SEGMENT_PUSH_TAR_JOB_NAME, SEGMENT_CREATION_AND_TAR_PUSH_JOB_NAME),
-            jobConf).run();
+        new SegmentCreationJob(jobConf).run();
+        new SegmentTarPushJob(jobConf).run();
         break;
       case SegmentCreationAndUriPush:
-        new SegmentCreationJob(StringUtil.join(":", SEGMENT_CREATION_JOB_NAME, SEGMENT_CREATION_AND_URI_PUSH_JOB_NAME),
-            jobConf).run();
-        new SegmentUriPushJob(StringUtil.join(":", SEGMENT_PUSH_TAR_JOB_NAME, SEGMENT_CREATION_AND_URI_PUSH_JOB_NAME),
-            jobConf).run();
+        new SegmentCreationJob(jobConf).run();
+        new SegmentUriPushJob(jobConf).run();
         break;
       default:
         throw new RuntimeException("Not a valid jobType - " + jobType);

@@ -18,13 +18,25 @@
  */
 package org.apache.pinot.hadoop.utils;
 
+import java.util.ArrayList;
+import java.util.List;
+
+
 public class PushLocation {
   private final String _host;
   private final int _port;
 
-  private PushLocation(PushLocationBuilder pushLocationBuilder) {
-    _host = pushLocationBuilder._host;
-    _port = pushLocationBuilder._port;
+  public PushLocation(String host, int port) {
+    _host = host;
+    _port = port;
+  }
+
+  public static List<PushLocation> getPushLocations(String[] hosts, int port) {
+    List<PushLocation> pushLocations = new ArrayList<>(hosts.length);
+    for (String host : hosts) {
+      pushLocations.add(new PushLocation(host, port));
+    }
+    return pushLocations;
   }
 
   public String getHost() {
@@ -33,28 +45,6 @@ public class PushLocation {
 
   public int getPort() {
     return _port;
-  }
-
-  public static class PushLocationBuilder {
-    private String _host;
-    private int _port;
-
-    public PushLocationBuilder() {
-    }
-
-    public PushLocationBuilder setHost(String host) {
-      _host = host;
-      return this;
-    }
-
-    public PushLocationBuilder setPort(int port) {
-      _port = port;
-      return this;
-    }
-
-    public PushLocation build() {
-      return new PushLocation(this);
-    }
   }
 
   @Override

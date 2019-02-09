@@ -18,82 +18,41 @@
  */
 package org.apache.pinot.hadoop.job;
 
-import java.io.InputStream;
+import com.google.common.base.Preconditions;
+import java.util.List;
 import java.util.Properties;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.conf.Configured;
-import org.apache.hadoop.fs.FileStatus;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.pinot.common.utils.FileUploadDownloadClient;
-import org.apache.pinot.common.utils.SimpleHttpResponse;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.pinot.hadoop.utils.PushLocation;
 
 
-public class SegmentTarPushJob extends Configured {
+public class SegmentTarPushJob extends BaseSegmentJob {
+  private final Path _segmentPattern;
+  private final List<PushLocation> _pushLocations;
 
-  private String _segmentPath;
-  private String[] _hosts;
-  private int _port;
+  public SegmentTarPushJob(Properties properties) {
+    super(properties);
+    _segmentPattern = Preconditions.checkNotNull(getPathFromProperty(JobConfigConstants.PATH_TO_OUTPUT));
+    String[] hosts = StringUtils.split(properties.getProperty(JobConfigConstants.PUSH_TO_HOSTS), ',');
+    int port = Integer.parseInt(properties.getProperty(JobConfigConstants.PUSH_TO_PORT));
+    _pushLocations = PushLocation.getPushLocations(hosts, port);
+  }
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(SegmentTarPushJob.class);
-
-  public SegmentTarPushJob(String name, Properties properties) {
-    super(new Configuration());
-    _segmentPath = properties.getProperty(JobConfigConstants.PATH_TO_OUTPUT) + "/";
-    _hosts = properties.getProperty(JobConfigConstants.PUSH_TO_HOSTS).split(",");
-    _port = Integer.parseInt(properties.getProperty(JobConfigConstants.PUSH_TO_PORT));
+  @Override
+  protected boolean isDataFile(String fileName) {
+    return fileName.endsWith(JobConfigConstants.TAR_GZ_FILE_EXT);
   }
 
   public void run()
       throws Exception {
-    Configuration conf = new Configuration();
-    FileSystem fs = FileSystem.get(conf);
-    Path path = new Path(_segmentPath);
-    FileStatus[] fileStatusArr = fs.globStatus(path);
-    for (FileStatus fileStatus : fileStatusArr) {
-      if (fileStatus.isDirectory()) {
-        pushDir(fs, fileStatus.getPath());
-      } else {
-        pushOneTarFile(fs, fileStatus.getPath());
-      }
+    FileSystem fileSystem = FileSystem.get(_conf);
+    try (ControllerRestApi controllerRestApi = getControllerRestApi()) {
+      controllerRestApi.pushSegments(fileSystem, getDataFilePaths(_segmentPattern));
     }
   }
 
-  public void pushDir(FileSystem fs, Path path)
-      throws Exception {
-    LOGGER.info("******** Now uploading segments tar from dir: {}", path);
-    FileStatus[] fileStatusArr = fs.listStatus(new Path(path.toString() + "/"));
-    for (FileStatus fileStatus : fileStatusArr) {
-      if (fileStatus.isDirectory()) {
-        pushDir(fs, fileStatus.getPath());
-      } else {
-        pushOneTarFile(fs, fileStatus.getPath());
-      }
-    }
-  }
-
-  public void pushOneTarFile(FileSystem fs, Path path)
-      throws Exception {
-    String fileName = path.getName();
-    if (!fileName.endsWith(".tar.gz")) {
-      return;
-    }
-    try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
-      for (String host : _hosts) {
-        try (InputStream inputStream = fs.open(path)) {
-          fileName = fileName.split(JobConfigConstants.TARGZ)[0];
-          LOGGER.info("******** Uploading file: {} to Host: {} and Port: {} *******", fileName, host, _port);
-          SimpleHttpResponse response = fileUploadDownloadClient
-              .uploadSegment(FileUploadDownloadClient.getUploadSegmentHttpURI(host, _port), fileName, inputStream);
-          LOGGER.info("Response {}: {}", response.getStatusCode(), response.getResponse());
-        } catch (Exception e) {
-          LOGGER.error("******** Error Uploading file: {} to Host: {} and Port: {}  *******", fileName, host, _port);
-          LOGGER.error("Caught exception during upload", e);
-          throw e;
-        }
-      }
-    }
+  protected ControllerRestApi getControllerRestApi() {
+    return new DefaultControllerRestApi(_pushLocations, null);
   }
 }

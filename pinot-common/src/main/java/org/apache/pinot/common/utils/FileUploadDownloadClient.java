@@ -97,7 +97,6 @@ public class FileUploadDownloadClient implements Closeable {
   private static final String SEGMENT_METADATA_PATH = "/segmentmetadata";
   private static final String TABLES_PATH = "/tables";
   private static final String TYPE_DELIMITER = "?type=";
-  private static final String SLASH = "/";
 
   private final CloseableHttpClient _httpClient;
 
@@ -122,16 +121,14 @@ public class FileUploadDownloadClient implements Closeable {
     return new URI(scheme, null, host, port, path, null, null);
   }
 
-  public static URI getRetrieveTableConfigURI(String host, int port, String tableName)
+  public static URI getRetrieveTableConfigHttpURI(String host, int port, String rawTableName)
       throws URISyntaxException {
-    String path = TABLES_PATH + SLASH + tableName;
-    return getURI(HTTP, host, port, path);
+    return getURI(HTTP, host, port, TABLES_PATH + "/" + rawTableName);
   }
 
-  public static URI getRetrieveSchemaHttpURI(String host, int port, String tableName)
+  public static URI getRetrieveSchemaHttpURI(String host, int port, String schemaName)
       throws URISyntaxException {
-    String path = SCHEMA_PATH + SLASH + tableName;
-    return getURI(HTTP, host, port, path);
+    return getURI(HTTP, host, port, SCHEMA_PATH + "/" + schemaName);
   }
 
   public static URI getUploadSchemaHttpURI(String host, int port)
@@ -336,26 +333,7 @@ public class FileUploadDownloadClient implements Closeable {
     return errorMessage;
   }
 
-  /**
-   * Get request to retrieve table config
-   * @param uri URI
-   * @return Response
-   * @throws IOException
-   * @throws HttpErrorStatusException
-   */
-  public SimpleHttpResponse getTableConfig(URI uri)
-      throws IOException, HttpErrorStatusException {
-    return sendRequest(constructGetRequest(uri));
-  }
-
-  /**
-   * Get request to retrieve schema
-   * @param uri URI
-   * @return Response
-   * @throws IOException
-   * @throws HttpErrorStatusException
-   */
-  public SimpleHttpResponse getSchema(URI uri)
+  public SimpleHttpResponse sendGetRequest(URI uri)
       throws IOException, HttpErrorStatusException {
     return sendRequest(constructGetRequest(uri));
   }

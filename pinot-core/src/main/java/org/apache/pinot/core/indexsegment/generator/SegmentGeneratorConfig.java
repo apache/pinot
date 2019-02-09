@@ -162,7 +162,7 @@ public class SegmentGeneratorConfig {
    * @param tableConfig
    * @param schema
    */
-  public SegmentGeneratorConfig(TableConfig tableConfig, Schema schema) {
+  public SegmentGeneratorConfig(@Nullable TableConfig tableConfig, Schema schema) {
     Preconditions.checkNotNull(schema);
     _schema = schema;
 

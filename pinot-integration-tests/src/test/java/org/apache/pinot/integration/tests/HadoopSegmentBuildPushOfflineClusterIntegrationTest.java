@@ -155,13 +155,13 @@ public class HadoopSegmentBuildPushOfflineClusterIntegrationTest extends BaseClu
     properties.setProperty(JobConfigConstants.PUSH_TO_PORT, getDefaultControllerConfiguration().getControllerPort());
 
     // Run segment creation job
-    SegmentCreationJob creationJob = new SegmentCreationJob("TestSegmentCreation", properties);
+    SegmentCreationJob creationJob = new SegmentCreationJob(properties);
     Configuration config = _mrCluster.getConfig();
     creationJob.setConf(config);
     creationJob.run();
 
     // Run segment push job
-    SegmentTarPushJob pushJob = new SegmentTarPushJob("TestSegmentPush", properties);
+    SegmentTarPushJob pushJob = new SegmentTarPushJob(properties);
     pushJob.setConf(_mrCluster.getConfig());
     pushJob.run();
   }
