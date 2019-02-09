@@ -241,6 +241,10 @@ export default Component.extend({
   },
 
   actions: {
+    changeAccordion() {
+      set(this, 'toggleCollapsed', !get(this, 'toggleCollapsed'));
+    },
+
     /**
      * resets given yaml field to default value for creation mode and server value for edit mode
      */

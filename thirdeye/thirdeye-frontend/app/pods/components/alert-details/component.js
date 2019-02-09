@@ -40,7 +40,6 @@ export default Component.extend({
   timeseries: null,
   isLoading: false,
   analysisRange: [moment().subtract(1, 'month').startOf('hour').valueOf(), moment().startOf('hour').valueOf()],
-  displayRange: [moment().subtract(2, 'month').startOf('hour').valueOf(), moment().startOf('hour').valueOf()],
   isPendingData: false,
   colorMapping: colorMapping,
   zoom: {
@@ -73,12 +72,14 @@ export default Component.extend({
     { name: 'none', isActive: false}
   ],
   sortColumnStartUp: false,
-  sortColumnScoreUp: false,
   sortColumnChangeUp: false,
   sortColumnNumberUp: true,
   sortColumnResolutionUp: false,
   selectedSortMode: '',
   selectedBaseline: 'wo1w',
+  pageSize: 10,
+  currentPage: 1,
+
 
   // alertYamlChanged: observer('alertYaml', 'analysisRange', 'disableYamlSave', async function() {
   //   set(this, 'isPendingData', true);
@@ -96,6 +97,87 @@ export default Component.extend({
   //   }
   // }),
 
+  /**
+   * Table pagination: number of pages to display
+   * @type {Number}
+   */
+  paginationSize: computed(
+    'pagesNum',
+    'pageSize',
+    function() {
+      const { pagesNum, pageSize } = this.getProperties('pagesNum', 'pageSize');
+      return Math.min(pagesNum, pageSize/2);
+    }
+  ),
+
+  /**
+   * Table pagination: total Number of pages to display
+   * @type {Number}
+   */
+  pagesNum: computed(
+    'tableAnomalies',
+    'pageSize',
+    function() {
+      const { tableAnomalies, pageSize } = this.getProperties('tableAnomalies', 'pageSize');
+      const anomalyCount = tableAnomalies.length || 0;
+      return Math.ceil(anomalyCount/pageSize);
+    }
+  ),
+
+  /**
+   * Table pagination: creates the page Array for view
+   * @type {Array}
+   */
+  viewPages: computed(
+    'pages',
+    'currentPage',
+    'paginationSize',
+    'pagesNum',
+    function() {
+      const {
+        currentPage,
+        pagesNum: max,
+        paginationSize: size
+      } = this.getProperties('currentPage', 'pagesNum', 'paginationSize');
+      const step = Math.floor(size / 2);
+
+      if (max === 1) { return; }
+
+      const startingNumber = ((max - currentPage) < step)
+        ? Math.max(max - size + 1, 1)
+        : Math.max(currentPage - step, 1);
+
+      return [...new Array(size)].map((page, index) => startingNumber + index);
+    }
+  ),
+
+  /**
+   * Table pagination: pre-filtered and sorted anomalies with pagination
+   * @type {Array}
+   */
+  paginatedFilteredAnomalies: computed(
+    'tableAnomalies',
+    'pageSize',
+    'currentPage',
+    'selectedSortMode',
+    function() {
+      let anomalies = this.get('tableAnomalies');
+      const { pageSize, currentPage, selectedSortMode } = getProperties(this, 'pageSize', 'currentPage', 'selectedSortMode');
+
+      if (selectedSortMode) {
+        let [ sortKey, sortDir ] = selectedSortMode.split(':');
+
+        if (sortDir === 'up') {
+          anomalies = anomalies.sortBy(sortKey);
+        } else {
+          anomalies = anomalies.sortBy(sortKey).reverse();
+        }
+      }
+
+      return anomalies.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+    }
+  ),
+
   disablePreviewButton: computed(
     'alertYaml',
     'isLoading',
@@ -105,9 +187,9 @@ export default Component.extend({
   ),
 
   axis: computed(
-    'displayRange',
+    'analysisRange',
     function () {
-      const displayRange = getProperties(this, 'displayRange');
+      const analysisRange = getProperties(this, 'analysisRange');
 
       return {
         y: {
@@ -124,8 +206,8 @@ export default Component.extend({
         x: {
           type: 'timeseries',
           show: true,
-          min: displayRange[0],
-          max: displayRange[1],
+          min: analysisRange[0],
+          max: analysisRange[1],
           tick: {
             fit: false,
             format: (d) => {
@@ -146,12 +228,11 @@ export default Component.extend({
     'timeseries',
     'baseline',
     'analysisRange',
-    'displayRange',
     function () {
       const {
-        metricUrn, anomalies, timeseries, baseline, analysisRange, displayRange
+        metricUrn, anomalies, timeseries, baseline, analysisRange
       } = getProperties(this, 'metricUrn', 'anomalies', 'timeseries',
-        'baseline', 'analysisRange', 'displayRange');
+        'baseline', 'analysisRange');
 
       const series = {};
 
@@ -193,16 +274,6 @@ export default Component.extend({
         };
       }
 
-      // detection range
-      if (timeseries && !_.isEmpty(timeseries.value)) {
-        series['pre-detection-region'] = {
-          timestamps: [displayRange[0], analysisRange[0]],
-          values: [1, 1],
-          type: 'region',
-          color: 'grey'
-        };
-      }
-
       return series;
     }
   ),
@@ -221,11 +292,12 @@ export default Component.extend({
 
       anomalies.forEach(a => {
         let tableRow = {
-          index: i,
+          number: i,
+          start: a,
           startDateStr: this._formatAnomaly(a),
-          severityScore: a.score,
           shownCurrent: humanizeFloat(a.avgCurrentVal),
           shownBaseline: humanizeFloat(a.avgBaselineVal),
+          change: ((a.avgCurrentVal/a.avgBaselineVal - 1.0) * 100.0),
           shownChangeRate: humanizeFloat(((a.avgCurrentVal/a.avgBaselineVal - 1.0) * 100.0))
         };
         tableData.push(tableRow);
@@ -432,15 +504,15 @@ export default Component.extend({
   _fetchTimeseries() {
     const {
       metricUrn,
-      displayRange,
+      analysisRange,
       selectedBaseline
-    } = this.getProperties('metricUrn', 'displayRange', 'selectedBaseline');
+    } = this.getProperties('metricUrn', 'analysisRange', 'selectedBaseline');
     const granularity = '15_MINUTES';
     const timezone = moment.tz.guess();
 
     set(this, 'errorTimeseries', null);
 
-    const urlCurrent = `/rootcause/metric/timeseries?urn=${metricUrn}&start=${displayRange[0]}&end=${displayRange[1]}&offset=current&granularity=${granularity}&timezone=${timezone}`;
+    const urlCurrent = `/rootcause/metric/timeseries?urn=${metricUrn}&start=${analysisRange[0]}&end=${analysisRange[1]}&offset=current&granularity=${granularity}&timezone=${timezone}`;
     fetch(urlCurrent)
       .then(checkStatus)
       .then(res => {
@@ -452,7 +524,7 @@ export default Component.extend({
 
     set(this, 'errorBaseline', null);
 
-    const urlBaseline = `/rootcause/metric/timeseries?urn=${metricUrn}&start=${displayRange[0]}&end=${displayRange[1]}&offset=${selectedBaseline}&granularity=${granularity}&timezone=${timezone}`;
+    const urlBaseline = `/rootcause/metric/timeseries?urn=${metricUrn}&start=${analysisRange[0]}&end=${analysisRange[1]}&offset=${selectedBaseline}&granularity=${granularity}&timezone=${timezone}`;
     fetch(urlBaseline)
       .then(checkStatus)
       .then(res => set(this, 'baseline', res));
@@ -479,6 +551,33 @@ export default Component.extend({
   },
 
   actions: {
+    /**
+      * Action handler for page clicks
+      * @param {Number|String} page
+      */
+     onPaginationClick(page) {
+       let newPage = page;
+       let currentPage = this.get('currentPage');
+
+       switch (page) {
+         case 'previous':
+           if (currentPage > 1) {
+             newPage = --currentPage;
+           } else {
+             newPage = currentPage;
+           }
+           break;
+         case 'next':
+         if (currentPage < this.get('pagesNum')) {
+           newPage = ++currentPage;
+         } else {
+           newPage = currentPage;
+         }
+           break;
+       }
+       this.set('currentPage', newPage);
+     },
+
     /**
      * Sets the new custom date range for anomaly coverage
      * @method onRangeSelection
