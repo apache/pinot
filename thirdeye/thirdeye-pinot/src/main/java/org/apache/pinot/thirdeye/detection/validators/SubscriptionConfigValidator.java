@@ -26,23 +26,23 @@ import java.util.Map;
 import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.thirdeye.datalayer.util.Predicate;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
+import org.apache.pinot.thirdeye.detection.ConfigUtils;
 
 import static org.apache.pinot.thirdeye.detection.yaml.YamlDetectionAlertConfigTranslator.*;
 
 
-public class DetectionAlertConfigValidator extends ConfigValidator {
+public class SubscriptionConfigValidator extends ConfigValidator {
 
-  private static final DetectionAlertConfigValidator INSTANCE = new DetectionAlertConfigValidator();
+  private static final SubscriptionConfigValidator INSTANCE = new SubscriptionConfigValidator();
   private static final String PROP_CLASS_NAME = "className";
 
-  public static DetectionAlertConfigValidator getInstance() {
+  public static SubscriptionConfigValidator getInstance() {
     return INSTANCE;
   }
 
   /**
    * Perform validation on the alert config like verifying if all the required fields are set
    */
-  @SuppressWarnings("unchecked")
   public void validateConfig(DetectionAlertConfigDTO alertConfig) throws ValidationException {
     // Check for all the required fields in the alert
     if (StringUtils.isEmpty(alertConfig.getName())) {
@@ -68,14 +68,14 @@ public class DetectionAlertConfigValidator extends ConfigValidator {
           + " subscribed detections, and type.");
     }
     // detectionConfigIds cannot be empty
-    List<Long> detectionIds = (List<Long>) alertConfig.getProperties().get(PROP_DETECTION_CONFIG_IDS);
+    List<Long> detectionIds = ConfigUtils.getLongs(alertConfig.getProperties().get(PROP_DETECTION_CONFIG_IDS));
     if (detectionIds == null || detectionIds.isEmpty()) {
       throw new ValidationException("A notification group should subscribe to at least one alert. If you wish to"
           + " unsubscribe, set active to false.");
     }
     // At least one recipient must be specified
-    Map<String, Object> recipients = (Map<String, Object>) alertConfig.getProperties().get(PROP_RECIPIENTS);
-    if (recipients == null || recipients.isEmpty() || ((List<String>) recipients.get("to")).isEmpty()) {
+    Map<String, Object> recipients = ConfigUtils.getMap(alertConfig.getProperties().get(PROP_RECIPIENTS));
+    if (recipients.isEmpty() || ConfigUtils.getList(recipients.get("to")).isEmpty()) {
       throw new ValidationException("Please specify at least one recipient in the notification group. If you wish to"
           + " unsubscribe, set active to false.");
     }
@@ -93,7 +93,6 @@ public class DetectionAlertConfigValidator extends ConfigValidator {
    * Perform validation on the updated alert config. Check for fields which shouldn't be
    * updated by the user.
    */
-  @SuppressWarnings("unchecked")
   public void validateUpdatedConfig(DetectionAlertConfigDTO updatedAlertConfig, DetectionAlertConfigDTO oldAlertConfig)
       throws ValidationException {
     validateConfig(updatedAlertConfig);

@@ -1,0 +1,111 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
+package org.apache.pinot.thirdeye.detection.validators;
+
+import javax.xml.bind.ValidationException;
+import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
+import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
+import org.apache.pinot.thirdeye.datasource.DAORegistry;
+import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
+import org.apache.pinot.thirdeye.datasource.loader.AggregationLoader;
+import org.apache.pinot.thirdeye.datasource.loader.DefaultAggregationLoader;
+import org.apache.pinot.thirdeye.datasource.loader.DefaultTimeSeriesLoader;
+import org.apache.pinot.thirdeye.datasource.loader.TimeSeriesLoader;
+import org.apache.pinot.thirdeye.detection.DataProvider;
+import org.apache.pinot.thirdeye.detection.DefaultDataProvider;
+import org.apache.pinot.thirdeye.detection.DetectionPipelineLoader;
+import org.apache.pinot.thirdeye.detection.yaml.YamlDetectionAlertConfigTranslator;
+import org.apache.pinot.thirdeye.detection.yaml.YamlDetectionTranslatorLoader;
+import org.yaml.snakeyaml.Yaml;
+
+
+public class DetectionConfigValidator extends ConfigValidator {
+
+  private static DetectionConfigValidator INSTANCE;
+
+  private final DataProvider provider;
+  private final DetectionPipelineLoader loader;
+
+  public static DetectionConfigValidator getInstance() {
+    if (INSTANCE == null) {
+      INSTANCE = new DetectionConfigValidator();
+    }
+    return INSTANCE;
+  }
+
+  DetectionConfigValidator() {
+    MetricConfigManager metricDAO = DAORegistry.getInstance().getMetricConfigDAO();
+    DatasetConfigManager datasetDAO = DAORegistry.getInstance().getDatasetConfigDAO();
+
+    TimeSeriesLoader timeseriesLoader =
+        new DefaultTimeSeriesLoader(metricDAO, datasetDAO, ThirdEyeCacheRegistry.getInstance().getQueryCache());
+
+    AggregationLoader aggregationLoader =
+        new DefaultAggregationLoader(metricDAO, datasetDAO, ThirdEyeCacheRegistry.getInstance().getQueryCache(),
+            ThirdEyeCacheRegistry.getInstance().getDatasetMaxDataTimeCache());
+
+    this.loader = new DetectionPipelineLoader();
+
+    this.provider = new DefaultDataProvider(metricDAO, datasetDAO,
+        DAORegistry.getInstance().getEventDAO(),
+        DAORegistry.getInstance().getMergedAnomalyResultDAO(),
+        timeseriesLoader, aggregationLoader, loader);
+  }
+
+  /**
+   * Validate the pipeline by loading and initializing components
+   */
+  private void semanticValidation(DetectionConfigDTO detectionConfig) throws ValidationException {
+    try {
+      // backup and swap out id
+      Long id = detectionConfig.getId();
+      detectionConfig.setId(-1L);
+
+      // try to load the detection pipeline and init all the components
+      this.loader.from(provider, detectionConfig, 0, 0);
+
+      // set id back
+      detectionConfig.setId(id);
+    } catch (Exception e) {
+      throw new ValidationException("Semantic error while initializing the detection pipeline.");
+    }
+  }
+
+  /**
+   * Perform validation on the detection config like verifying if all the required fields are set
+   */
+  public void validateConfig(DetectionConfigDTO detectionConfig) throws ValidationException {
+    semanticValidation(detectionConfig);
+
+    // TODO: Add more static validations here
+  }
+
+  /**
+   * Perform validation on the updated detection config. Check for fields which shouldn't be
+   * updated by the user.
+   */
+  public void validateUpdatedConfig(DetectionConfigDTO updatedConfig, DetectionConfigDTO oldConfig)
+      throws ValidationException {
+    validateConfig(updatedConfig);
+
+    // TODO: Add more checks here
+  }
+}
