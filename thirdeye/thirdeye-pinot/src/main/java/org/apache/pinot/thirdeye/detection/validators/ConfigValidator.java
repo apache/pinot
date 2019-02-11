@@ -20,45 +20,26 @@
 package org.apache.pinot.thirdeye.detection.validators;
 
 import javax.xml.bind.ValidationException;
-import org.apache.pinot.thirdeye.datalayer.bao.AlertConfigManager;
-import org.apache.pinot.thirdeye.datalayer.bao.ApplicationManager;
-import org.apache.pinot.thirdeye.datasource.DAORegistry;
-import java.util.Map;
-import org.apache.commons.lang.StringUtils;
-import org.yaml.snakeyaml.Yaml;
+import org.apache.pinot.thirdeye.datalayer.dto.AbstractDTO;
 
 
-public abstract class ConfigValidator {
-
-  protected static final Yaml YAML = new Yaml();
-
-  final AlertConfigManager alertDAO;
-  final ApplicationManager applicationDAO;
-
-  ConfigValidator() {
-    this.alertDAO = DAORegistry.getInstance().getAlertConfigDAO();
-    this.applicationDAO = DAORegistry.getInstance().getApplicationDAO();
-  }
+/**
+ * Validate a config used in detection and alerter
+ * @param <T> the type of the config
+ */
+interface ConfigValidator<T extends AbstractDTO> {
+  /**
+   * Validate the configuration. Thrown a validation exception if validation failed.
+   * @param config the config
+   * @throws ValidationException the validation exception with error message
+   */
+  void validateConfig(T config) throws ValidationException;
 
   /**
-   * Perform basic validations on a yaml file like verifying if
-   * the yaml exists and is parsable
+   * Validate the configuration. Thrown a validation exception if validation failed.
+   * @param updatedConfig the new config
+   * @param oldConfig the old config
+   * @throws ValidationException the validation exception with error message
    */
-  @SuppressWarnings("unchecked")
-  public boolean validateYAMLConfig(String yamlConfig) throws ValidationException {
-    // Check if YAML is empty or not
-    if (StringUtils.isEmpty(yamlConfig)) {
-      throw new ValidationException("The Yaml Payload in the request is empty.");
-    }
-
-    // Check if the YAML is parsable
-    try {
-      Map<String, Object> yamlConfigMap = (Map<String, Object>) YAML.load(yamlConfig);
-    } catch (Exception e) {
-      throw new ValidationException("Error parsing the Yaml payload. Check for syntax issues.");
-    }
-
-    return true;
-  }
-
+  void validateUpdatedConfig(T updatedConfig, T oldConfig) throws ValidationException;
 }
