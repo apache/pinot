@@ -23,7 +23,7 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
-import org.apache.pinot.thirdeye.api.MetricType;
+import org.apache.pinot.thirdeye.common.metric.MetricType;
 
 /**
  * Helper class to convert to and from Number data type. - supports arithmetic

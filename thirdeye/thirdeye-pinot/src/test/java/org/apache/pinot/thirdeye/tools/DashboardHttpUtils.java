@@ -17,7 +17,6 @@
 package org.apache.pinot.thirdeye.tools;
 
 import org.apache.pinot.thirdeye.anomaly.utils.AbstractResourceHttpUtils;
-import org.apache.pinot.thirdeye.api.TimeGranularity;
 import java.net.URLEncoder;
 import java.util.concurrent.TimeUnit;
 import org.apache.http.HttpHost;

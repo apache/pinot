@@ -16,7 +16,7 @@
 
 package org.apache.pinot.thirdeye.datalayer.bao;
 
-import org.apache.pinot.thirdeye.api.DimensionMap;
+import org.apache.pinot.thirdeye.common.dimension.DimensionMap;
 import org.apache.pinot.thirdeye.datalayer.DaoTestUtils;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.testng.Assert;

@@ -32,7 +32,7 @@ import java.util.concurrent.TimeUnit;
 import org.joda.time.DateTime;
 
 import com.google.common.collect.Range;
-import org.apache.pinot.thirdeye.api.TimeGranularity;
+import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.dashboard.Utils;
 import org.apache.pinot.thirdeye.datasource.MetricExpression;
 import org.apache.pinot.thirdeye.datasource.MetricFunction;

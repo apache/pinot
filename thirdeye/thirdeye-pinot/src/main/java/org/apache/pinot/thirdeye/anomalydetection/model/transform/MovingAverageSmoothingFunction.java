@@ -21,7 +21,7 @@ package org.apache.pinot.thirdeye.anomalydetection.model.transform;
 
 import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyDetectionContext;
 import org.apache.pinot.thirdeye.anomalydetection.context.TimeSeries;
-import org.apache.pinot.thirdeye.api.DimensionMap;
+import org.apache.pinot.thirdeye.common.dimension.DimensionMap;
 import org.joda.time.Interval;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

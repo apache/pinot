@@ -28,8 +28,8 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import com.google.common.collect.Range;
-import org.apache.pinot.thirdeye.api.TimeGranularity;
-import org.apache.pinot.thirdeye.datasource.TimeRangeUtils;
+import org.apache.pinot.thirdeye.common.time.TimeGranularity;
+
 
 public class TestTimeRangeUtils {
 

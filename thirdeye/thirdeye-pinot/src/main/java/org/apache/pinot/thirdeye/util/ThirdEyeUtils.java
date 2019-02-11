@@ -23,7 +23,7 @@ package org.apache.pinot.thirdeye.util;
 
 import com.google.common.collect.HashMultimap;
 import org.apache.pinot.common.data.TimeGranularitySpec.TimeFormat;
-import org.apache.pinot.thirdeye.api.DimensionMap;
+import org.apache.pinot.thirdeye.common.dimension.DimensionMap;
 
 import org.apache.pinot.thirdeye.dashboard.ThirdEyeDashboardConfiguration;
 import org.apache.pinot.thirdeye.datalayer.util.DaoProviderUtil;
@@ -56,8 +56,8 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
-import org.apache.pinot.thirdeye.api.TimeGranularity;
-import org.apache.pinot.thirdeye.api.TimeSpec;
+import org.apache.pinot.thirdeye.common.time.TimeGranularity;
+import org.apache.pinot.thirdeye.common.time.TimeSpec;
 import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;

@@ -14,8 +14,9 @@
  * limitations under the License.
  */
 
-package org.apache.pinot.thirdeye.api;
+package org.apache.pinot.thirdeye.common.dimension;
 
+import org.apache.pinot.thirdeye.common.dimension.DimensionMap;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 

@@ -23,7 +23,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.pinot.thirdeye.api.TimeSpec;
+import org.apache.pinot.thirdeye.common.time.TimeSpec;
 
 public abstract class BaseThirdEyeResponse implements ThirdEyeResponse {
   protected final List<MetricFunction> metricFunctions;

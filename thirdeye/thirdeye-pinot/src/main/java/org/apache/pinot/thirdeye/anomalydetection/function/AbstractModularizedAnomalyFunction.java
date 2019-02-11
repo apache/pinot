@@ -35,8 +35,8 @@ import org.apache.pinot.thirdeye.anomalydetection.model.prediction.ExpectedTimeS
 import org.apache.pinot.thirdeye.anomalydetection.model.prediction.NoopPredictionModel;
 import org.apache.pinot.thirdeye.anomalydetection.model.prediction.PredictionModel;
 import org.apache.pinot.thirdeye.anomalydetection.model.transform.TransformationFunction;
-import org.apache.pinot.thirdeye.api.DimensionMap;
-import org.apache.pinot.thirdeye.api.MetricTimeSeries;
+import org.apache.pinot.thirdeye.common.dimension.DimensionMap;
+import org.apache.pinot.thirdeye.common.metric.MetricTimeSeries;
 import org.apache.pinot.thirdeye.dashboard.views.TimeBucket;
 import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;

@@ -17,7 +17,7 @@
 package org.apache.pinot.thirdeye.detection.wrapper;
 
 import com.google.common.collect.ImmutableMap;
-import org.apache.pinot.thirdeye.api.TimeSpec;
+import org.apache.pinot.thirdeye.common.time.TimeSpec;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;

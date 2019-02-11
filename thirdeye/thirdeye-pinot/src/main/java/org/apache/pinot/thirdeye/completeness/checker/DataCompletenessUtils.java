@@ -21,7 +21,7 @@ package org.apache.pinot.thirdeye.completeness.checker;
 
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ListMultimap;
-import org.apache.pinot.thirdeye.api.TimeSpec;
+import org.apache.pinot.thirdeye.common.time.TimeSpec;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
 import org.apache.pinot.thirdeye.datasource.pinot.PinotQuery;
 import org.apache.pinot.thirdeye.datasource.pinot.PinotThirdEyeDataSource;

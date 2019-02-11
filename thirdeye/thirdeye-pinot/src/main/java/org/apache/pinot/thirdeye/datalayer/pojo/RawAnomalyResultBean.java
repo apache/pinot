@@ -19,7 +19,7 @@
 
 package org.apache.pinot.thirdeye.datalayer.pojo;
 
-import org.apache.pinot.thirdeye.api.DimensionMap;
+import org.apache.pinot.thirdeye.common.dimension.DimensionMap;
 import org.apache.pinot.thirdeye.constant.AnomalyResultSource;
 import java.util.Objects;
 import org.apache.commons.lang.ObjectUtils;

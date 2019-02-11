@@ -23,7 +23,7 @@ import com.google.common.collect.Multimap;
 import org.apache.pinot.thirdeye.alert.commons.AnomalyNotifiedStatus;
 import org.apache.pinot.thirdeye.alert.commons.AnomalySource;
 import org.apache.pinot.thirdeye.datalayer.dto.AlertSnapshotDTO;
-import org.apache.pinot.thirdeye.api.TimeGranularity;
+import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.datalayer.util.Predicate;
 import java.util.ArrayList;

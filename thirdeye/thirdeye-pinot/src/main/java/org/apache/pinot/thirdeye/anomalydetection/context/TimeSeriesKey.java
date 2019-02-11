@@ -19,7 +19,7 @@
 
 package org.apache.pinot.thirdeye.anomalydetection.context;
 
-import org.apache.pinot.thirdeye.api.DimensionMap;
+import org.apache.pinot.thirdeye.common.dimension.DimensionMap;
 import java.util.Objects;
 import org.apache.commons.lang.ObjectUtils;
 

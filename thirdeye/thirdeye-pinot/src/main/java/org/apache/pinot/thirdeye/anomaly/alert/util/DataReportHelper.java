@@ -20,7 +20,7 @@
 package org.apache.pinot.thirdeye.anomaly.alert.util;
 
 import org.apache.pinot.thirdeye.anomaly.alert.template.pojo.MetricDimensionReport;
-import org.apache.pinot.thirdeye.api.DimensionMap;
+import org.apache.pinot.thirdeye.common.dimension.DimensionMap;
 import org.apache.pinot.thirdeye.dashboard.views.contributor.ContributorViewResponse;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import freemarker.template.TemplateMethodModelEx;

@@ -35,7 +35,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.common.collect.Range;
-import org.apache.pinot.thirdeye.api.TimeGranularity;
+import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.datasource.MetricFunction;
 import org.apache.pinot.thirdeye.datasource.ResponseParserUtils;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeResponse;

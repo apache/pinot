@@ -19,7 +19,7 @@
 
 package org.apache.pinot.thirdeye.datasource.csv;
 
-import org.apache.pinot.thirdeye.api.TimeSpec;
+import org.apache.pinot.thirdeye.common.time.TimeSpec;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
 import org.apache.pinot.thirdeye.datasource.BaseThirdEyeResponse;
 import org.apache.pinot.thirdeye.datasource.MetricFunction;

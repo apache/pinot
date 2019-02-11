@@ -19,7 +19,7 @@
 
 package org.apache.pinot.thirdeye.datalayer.dto;
 
-import org.apache.pinot.thirdeye.api.TimeGranularity;
+import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.datalayer.pojo.DatasetConfigBean;
 import java.util.concurrent.TimeUnit;
 

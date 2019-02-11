@@ -22,7 +22,7 @@ package org.apache.pinot.thirdeye.dashboard.resources.v2;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ListMultimap;
 import org.apache.pinot.thirdeye.api.Constants;
-import org.apache.pinot.thirdeye.api.TimeGranularity;
+import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
 import org.apache.pinot.thirdeye.dataframe.LongSeries;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;

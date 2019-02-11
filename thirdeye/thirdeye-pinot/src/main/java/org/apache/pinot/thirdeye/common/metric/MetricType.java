@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.pinot.thirdeye.api;
+package org.apache.pinot.thirdeye.common.metric;
 
 /**
  * Represents the various data types supported for a metric<br/>

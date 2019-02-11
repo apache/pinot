@@ -19,12 +19,9 @@
 
 package org.apache.pinot.thirdeye.util;
 
-import org.apache.pinot.thirdeye.api.DimensionMap;
-import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import java.util.ArrayList;
+import org.apache.pinot.thirdeye.common.dimension.DimensionMap;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Stack;

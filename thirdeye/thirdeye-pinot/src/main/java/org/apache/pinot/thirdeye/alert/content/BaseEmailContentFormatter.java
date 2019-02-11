@@ -20,7 +20,6 @@
 package org.apache.pinot.thirdeye.alert.content;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.google.common.base.Joiner;
 import com.google.common.base.Strings;
 import com.google.common.base.Throwables;
 import com.google.common.collect.Multimap;
@@ -33,11 +32,10 @@ import org.apache.pinot.thirdeye.anomaly.detection.AnomalyDetectionInputContextB
 import org.apache.pinot.thirdeye.anomaly.events.EventFilter;
 import org.apache.pinot.thirdeye.anomaly.events.EventType;
 import org.apache.pinot.thirdeye.anomaly.events.HolidayEventProvider;
-import org.apache.pinot.thirdeye.anomaly.utils.EmailUtils;
 import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyFeedback;
 import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyResult;
-import org.apache.pinot.thirdeye.api.DimensionMap;
-import org.apache.pinot.thirdeye.api.MetricTimeSeries;
+import org.apache.pinot.thirdeye.common.dimension.DimensionMap;
+import org.apache.pinot.thirdeye.common.metric.MetricTimeSeries;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.AnomaliesResource;
 import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
 import org.apache.pinot.thirdeye.datalayer.dto.AlertConfigDTO;
@@ -68,8 +66,6 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;

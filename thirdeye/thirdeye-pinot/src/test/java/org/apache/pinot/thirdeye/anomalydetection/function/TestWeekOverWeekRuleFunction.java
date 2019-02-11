@@ -24,7 +24,7 @@ import org.apache.pinot.thirdeye.anomalydetection.context.TimeSeriesKey;
 import org.apache.pinot.thirdeye.anomalydetection.model.detection.SimpleThresholdDetectionModel;
 import org.apache.pinot.thirdeye.anomalydetection.model.transform.MovingAverageSmoothingFunction;
 import org.apache.pinot.thirdeye.anomalydetection.model.transform.TotalCountThresholdRemovalFunction;
-import org.apache.pinot.thirdeye.api.DimensionMap;
+import org.apache.pinot.thirdeye.common.dimension.DimensionMap;
 import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import java.util.ArrayList;

@@ -54,7 +54,7 @@ import org.jfree.data.xy.XYDataset;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.apache.pinot.thirdeye.api.TimeGranularity;
+import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.datasource.comparison.Row;
 import org.apache.pinot.thirdeye.datasource.comparison.TimeOnTimeComparisonResponse;
 import org.apache.pinot.thirdeye.datasource.comparison.Row.Metric;

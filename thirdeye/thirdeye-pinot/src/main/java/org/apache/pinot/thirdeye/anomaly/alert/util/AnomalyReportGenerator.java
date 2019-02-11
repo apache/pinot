@@ -31,7 +31,7 @@ import org.apache.pinot.thirdeye.anomaly.alert.v2.AlertTaskRunnerV2;
 import org.apache.pinot.thirdeye.anomaly.classification.ClassificationTaskRunner;
 import org.apache.pinot.thirdeye.anomaly.events.EventType;
 import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyFeedback;
-import org.apache.pinot.thirdeye.api.DimensionMap;
+import org.apache.pinot.thirdeye.common.dimension.DimensionMap;
 import org.apache.pinot.thirdeye.datalayer.bao.EventManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;

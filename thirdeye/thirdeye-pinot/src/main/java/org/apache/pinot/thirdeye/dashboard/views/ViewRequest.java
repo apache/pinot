@@ -21,7 +21,7 @@ package org.apache.pinot.thirdeye.dashboard.views;
 
 
 import com.google.common.collect.Multimap;
-import org.apache.pinot.thirdeye.api.TimeGranularity;
+import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 
 public interface ViewRequest {
 

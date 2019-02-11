@@ -20,7 +20,7 @@
 package org.apache.pinot.thirdeye.datalayer.pojo;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import org.apache.pinot.thirdeye.api.MetricType;
+import org.apache.pinot.thirdeye.common.metric.MetricType;
 import org.apache.pinot.thirdeye.constant.MetricAggFunction;
 
 import java.util.Map;

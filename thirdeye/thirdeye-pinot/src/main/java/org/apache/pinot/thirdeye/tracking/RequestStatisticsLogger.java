@@ -20,7 +20,7 @@
 package org.apache.pinot.thirdeye.tracking;
 
 import org.apache.pinot.thirdeye.anomaly.utils.ThirdeyeMetricsUtil;
-import org.apache.pinot.thirdeye.api.TimeGranularity;
+import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import org.slf4j.Logger;

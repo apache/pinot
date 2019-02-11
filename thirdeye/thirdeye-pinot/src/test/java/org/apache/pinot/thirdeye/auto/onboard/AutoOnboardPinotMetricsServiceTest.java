@@ -23,7 +23,7 @@ import org.apache.pinot.common.data.MetricFieldSpec;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.data.TimeFieldSpec;
 import org.apache.pinot.common.data.TimeGranularitySpec;
-import org.apache.pinot.thirdeye.api.MetricType;
+import org.apache.pinot.thirdeye.common.metric.MetricType;
 import org.apache.pinot.thirdeye.datalayer.bao.DAOTestBase;
 import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;

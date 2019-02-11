@@ -17,7 +17,7 @@
 package org.apache.pinot.thirdeye.auto.onboard;
 
 import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
-import org.apache.pinot.thirdeye.api.TimeGranularity;
+import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import java.net.URL;
 import java.util.concurrent.TimeUnit;
 import org.testng.annotations.Test;

@@ -26,7 +26,7 @@ import java.util.concurrent.TimeUnit;
 import org.joda.time.DateTime;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.apache.pinot.thirdeye.api.TimeGranularity;
+import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.dashboard.views.heatmap.HeatMapViewHandler;
 import org.apache.pinot.thirdeye.dashboard.views.heatmap.HeatMapViewRequest;
 import org.apache.pinot.thirdeye.dashboard.views.heatmap.HeatMapViewResponse;

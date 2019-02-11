@@ -26,16 +26,13 @@ import java.util.concurrent.TimeUnit;
 import org.joda.time.DateTime;
 
 import com.google.common.collect.Lists;
-import org.apache.pinot.thirdeye.api.TimeGranularity;
+import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.constant.MetricAggFunction;
 import org.apache.pinot.thirdeye.dashboard.Utils;
 import org.apache.pinot.thirdeye.datasource.MetricExpression;
 import org.apache.pinot.thirdeye.datasource.MetricFunction;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeDataSource;
 import org.apache.pinot.thirdeye.datasource.cache.QueryCache;
-import org.apache.pinot.thirdeye.datasource.comparison.TimeOnTimeComparisonHandler;
-import org.apache.pinot.thirdeye.datasource.comparison.TimeOnTimeComparisonRequest;
-import org.apache.pinot.thirdeye.datasource.comparison.TimeOnTimeComparisonResponse;
 import org.apache.pinot.thirdeye.datasource.comparison.Row.Metric;
 import org.apache.pinot.thirdeye.datasource.pinot.PinotThirdEyeDataSource;
 

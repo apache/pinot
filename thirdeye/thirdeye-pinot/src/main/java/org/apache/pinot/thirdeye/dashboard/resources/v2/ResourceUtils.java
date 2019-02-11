@@ -21,7 +21,7 @@ package org.apache.pinot.thirdeye.dashboard.resources.v2;
 
 import com.google.common.collect.SetMultimap;
 import com.google.common.collect.TreeMultimap;
-import org.apache.pinot.thirdeye.api.TimeGranularity;
+import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.constant.AnomalyResultSource;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.pojo.AnomalyClassificationType;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;

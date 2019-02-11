@@ -32,7 +32,7 @@ import com.google.api.services.calendar.model.Event;
 import com.google.common.collect.ImmutableMap;
 import com.ibm.icu.util.TimeZone;
 import org.apache.pinot.thirdeye.anomaly.HolidayEventsLoaderConfiguration;
-import org.apache.pinot.thirdeye.api.TimeGranularity;
+import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.datalayer.bao.EventManager;
 import org.apache.pinot.thirdeye.datalayer.dto.EventDTO;
 import java.io.FileInputStream;

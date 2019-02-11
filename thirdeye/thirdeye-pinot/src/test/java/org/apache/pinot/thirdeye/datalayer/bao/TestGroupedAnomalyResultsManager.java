@@ -16,7 +16,7 @@
 
 package org.apache.pinot.thirdeye.datalayer.bao;
 
-import org.apache.pinot.thirdeye.api.DimensionMap;
+import org.apache.pinot.thirdeye.common.dimension.DimensionMap;
 import org.apache.pinot.thirdeye.datalayer.dto.GroupedAnomalyResultsDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
