@@ -142,7 +142,7 @@ public class DetectionResource {
     List<DetectionAlertConfigDTO> detectionAlertConfigDTOs = this.detectionAlertConfigDAO.findAll();
     Set<DetectionAlertConfigDTO> subscriptionGroupAlertDTOs = new HashSet<>();
     for (DetectionAlertConfigDTO alertConfigDTO : detectionAlertConfigDTOs){
-      if (alertConfigDTO.getVectorClocks().containsKey(id)){
+      if (alertConfigDTO.getVectorClocks().containsKey(id) || ConfigUtils.getLongs(alertConfigDTO.getProperties().get("detectionConfigIds")).contains(id)){
         subscriptionGroupAlertDTOs.add(alertConfigDTO);
       }
     }
