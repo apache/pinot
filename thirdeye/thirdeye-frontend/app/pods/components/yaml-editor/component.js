@@ -176,14 +176,25 @@ export default Component.extend({
                 id: metric.id,
                 completer:{
                   insertMatch: (editor, data) => {
+                    // replace metric row with selected metric
                     editor.session.replace({
                       start: { row: data.row, column: 0 },
                       end: { row: data.row, column: Number.MAX_VALUE }},
                     `metric: ${data.metricname}`);
-                    editor.session.replace({
-                      start: { row: data.row+2, column: 0},
-                      end: { row: data.row+2, column: Number.MAX_VALUE }},
-                    `dataset: ${data.dataset}`);
+                    // find dataset: field in text
+                    const datasetLocation = editor.find('dataset:');
+                    // if found, replace with dataset
+                    if (datasetLocation) {
+                      editor.session.replace({
+                        start: { row: datasetLocation.start.row, column: 0},
+                        end: { row: datasetLocation.end.row, column: Number.MAX_VALUE }},
+                      `dataset: ${data.dataset}`);
+                      // otherwise, add it to the line below the metric field
+                    } else {
+                      editor.session.insert({
+                        row: data.row + 1, column: 0 },
+                      `dataset: ${data.dataset}\n`);
+                    }
                     editor.metricId = data.id;
                   }
                 }};
