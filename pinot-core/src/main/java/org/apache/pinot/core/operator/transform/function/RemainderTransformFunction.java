@@ -28,7 +28,11 @@ import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.core.util.ArrayCopyUtils;
 
-
+/**
+ * MOD(Remainder) transform function, takes exactly 2 arguments which could have types of
+ * INT, LONG, FLOAT, DOUBLE or STRING. For STRING type, it needs to be parsed as double,
+ * otherwise it will throw {@link NumberFormatException}
+ */
 public class RemainderTransformFunction extends BaseTransformFunction {
   public static final String FUNCTION_NAME = "mod";
 

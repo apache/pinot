@@ -202,6 +202,9 @@ Supported transform functions
 ``DIV``
    Quotient of two values
 
+``MOD``
+   Remainder between two values
+
 ``TIMECONVERT``
    Takes 3 arguments, converts the value into another time unit. E.g. ``TIMECONVERT(time, 'MILLISECONDS', 'SECONDS')``
 

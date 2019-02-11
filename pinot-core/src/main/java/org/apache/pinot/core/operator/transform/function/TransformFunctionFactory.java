@@ -44,11 +44,11 @@ public class TransformFunctionFactory {
           put(SubtractionTransformFunction.FUNCTION_NAME.toLowerCase(), SubtractionTransformFunction.class);
           put(MultiplicationTransformFunction.FUNCTION_NAME.toLowerCase(), MultiplicationTransformFunction.class);
           put(DivisionTransformFunction.FUNCTION_NAME.toLowerCase(), DivisionTransformFunction.class);
+          put(RemainderTransformFunction.FUNCTION_NAME.toLowerCase(), RemainderTransformFunction.class);
           put(TimeConversionTransformFunction.FUNCTION_NAME.toLowerCase(), TimeConversionTransformFunction.class);
           put(DateTimeConversionTransformFunction.FUNCTION_NAME.toLowerCase(),
               DateTimeConversionTransformFunction.class);
           put(ValueInTransformFunction.FUNCTION_NAME.toLowerCase(), ValueInTransformFunction.class);
-          put(RemainderTransformFunction.FUNCTION_NAME.toLowerCase(), RemainderTransformFunction.class);
         }
       };
 
