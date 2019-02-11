@@ -85,7 +85,7 @@ public class DetectionConfigValidator extends ConfigValidator {
       // set id back
       detectionConfig.setId(id);
     } catch (Exception e) {
-      throw new ValidationException("Semantic error while initializing the detection pipeline.");
+      throw new ValidationException("Semantic error while initializing the detection pipeline.", e.getMessage());
     }
   }
 

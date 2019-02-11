@@ -45,6 +45,7 @@ import javax.ws.rs.core.Response;
 import javax.xml.bind.ValidationException;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.thirdeye.anomaly.task.TaskConstants;
 import org.apache.pinot.thirdeye.api.Constants;
 import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionAlertConfigManager;
@@ -52,8 +53,10 @@ import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.EventManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
+import org.apache.pinot.thirdeye.datalayer.bao.TaskManager;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.TaskDTO;
 import org.apache.pinot.thirdeye.datalayer.util.Predicate;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
@@ -67,6 +70,7 @@ import org.apache.pinot.thirdeye.detection.DefaultDataProvider;
 import org.apache.pinot.thirdeye.detection.DetectionPipeline;
 import org.apache.pinot.thirdeye.detection.DetectionPipelineLoader;
 import org.apache.pinot.thirdeye.detection.DetectionPipelineResult;
+import org.apache.pinot.thirdeye.detection.onboard.YamlOnboardingTaskInfo;
 import org.apache.pinot.thirdeye.detection.validators.DetectionConfigValidator;
 import org.apache.pinot.thirdeye.detection.validators.SubscriptionConfigValidator;
 import org.slf4j.Logger;
@@ -81,6 +85,7 @@ public class YamlResource {
   private static ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   private static final String PROP_SUBS_GROUP_NAME = "subscriptionGroupName";
+  private static final long ONBOARDING_REPLAY_LOOKBACK = TimeUnit.DAYS.toMillis(30);
 
   private final DetectionConfigManager detectionConfigDAO;
   private final DetectionAlertConfigManager detectionAlertConfigDAO;
@@ -93,6 +98,7 @@ public class YamlResource {
   private final DatasetConfigManager datasetDAO;
   private final EventManager eventDAO;
   private final MergedAnomalyResultManager anomalyDAO;
+  private final TaskManager taskDAO;
   private final DetectionPipelineLoader loader;
   private final Yaml yaml;
 
@@ -107,6 +113,7 @@ public class YamlResource {
     this.datasetDAO = DAORegistry.getInstance().getDatasetConfigDAO();
     this.eventDAO = DAORegistry.getInstance().getEventDAO();
     this.anomalyDAO = DAORegistry.getInstance().getMergedAnomalyResultDAO();
+    this.taskDAO = DAORegistry.getInstance().getTaskDAO();
     this.yaml = new Yaml();
 
     TimeSeriesLoader timeseriesLoader =
@@ -128,21 +135,51 @@ public class YamlResource {
   /*
    * Build the detection config from a yaml.
    */
-  private DetectionConfigDTO buildDetectionConfigFromYaml(long startTime, long endTime, Map<String, Object> yamlConfig,
+  private DetectionConfigDTO buildDetectionConfigFromYaml(long tuningStartTime, long tuningEndTime, Map<String, Object> yamlConfig,
       DetectionConfigDTO existingDetectionConfig) throws Exception {
 
     // Configure the tuning window
-    if (startTime == 0L && endTime == 0L) {
+    if (tuningStartTime == 0L && tuningEndTime == 0L) {
       // default tuning window 28 days
-      endTime = System.currentTimeMillis();
-      startTime = endTime - TimeUnit.DAYS.toMillis(28);
+      tuningEndTime = System.currentTimeMillis();
+      tuningStartTime = tuningEndTime - TimeUnit.DAYS.toMillis(28);
     }
 
     YamlDetectionConfigTranslator translator = this.translatorLoader.from(yamlConfig, this.provider);
-    return translator.withTrainingWindow(startTime, endTime)
+    return translator.withTuningWindow(tuningStartTime, tuningEndTime)
         .withExistingDetectionConfig(existingDetectionConfig)
         .generateDetectionConfig();
   }
+
+  /*
+   * Create a yaml onboarding task. It runs 1 month replay and re-tune the pipeline.
+   */
+  private void createYamlOnboardingTask(long configId, long tuningWindowStart, long tuningWindowEnd) throws Exception {
+    YamlOnboardingTaskInfo info = new YamlOnboardingTaskInfo();
+    info.setConfigId(configId);
+    if (tuningWindowStart == 0L && tuningWindowEnd == 0L) {
+      // default tuning window 28 days
+      tuningWindowEnd = System.currentTimeMillis();
+      tuningWindowStart = tuningWindowEnd - TimeUnit.DAYS.toMillis(28);
+    }
+    info.setTuningWindowStart(tuningWindowStart);
+    info.setTuningWindowEnd(tuningWindowEnd);
+    info.setEnd(System.currentTimeMillis());
+    info.setStart(info.getEnd() - ONBOARDING_REPLAY_LOOKBACK);
+
+    String taskInfoJson = OBJECT_MAPPER.writeValueAsString(info);
+    String jobName = String.format("%s_%d", TaskConstants.TaskType.YAML_DETECTION_ONBOARD, configId);
+
+    TaskDTO taskDTO = new TaskDTO();
+    taskDTO.setTaskType(TaskConstants.TaskType.YAML_DETECTION_ONBOARD);
+    taskDTO.setJobName(jobName);
+    taskDTO.setStatus(TaskConstants.TaskStatus.WAITING);
+    taskDTO.setTaskInfo(taskInfoJson);
+
+    long taskId = this.taskDAO.save(taskDTO);
+    LOG.info("Created yaml detection onboarding task {} with taskId {}", taskDTO, taskId);
+  }
+
 
   @POST
   @Path("/create-alert")
@@ -195,7 +232,8 @@ public class YamlResource {
       return Response.serverError().entity(response.getEntity()).build();
     }
     long alertId = Long.parseLong(ConfigUtils.getMap(response.getEntity()).get("detectionAlertConfigId").toString());
-
+    // create an yaml onboarding task to run replay and tuning
+    createYamlOnboardingTask(detectionConfigId, startTime, endTime);
     return Response.ok().entity(ImmutableMap.of("detectionConfigId", detectionConfigId, "detectionAlertConfigId", alertId)).build();
   }
 

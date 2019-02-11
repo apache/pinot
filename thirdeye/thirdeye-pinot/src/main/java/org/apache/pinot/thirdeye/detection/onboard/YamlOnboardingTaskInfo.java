@@ -15,32 +15,31 @@
  * KIND, either express or implied.  See the License for the
  * specific language governing permissions and limitations
  * under the License.
+ *
  */
 
-package org.apache.pinot.thirdeye.anomaly.task;
+package org.apache.pinot.thirdeye.detection.onboard;
 
-public class TaskConstants {
+import org.apache.pinot.thirdeye.detection.DetectionPipelineTaskInfo;
 
-  public enum TaskType {
-    DETECTION,
-    DETECTION_ALERT,
-    YAML_DETECTION_ONBOARD,
-    ANOMALY_DETECTION,
-    MERGE,
-    // TODO: deprecate ALERT task type
-    ALERT,
-    ALERT2,
-    MONITOR,
-    DATA_COMPLETENESS,
-    CLASSIFICATION,
-    REPLAY
+
+public class YamlOnboardingTaskInfo extends DetectionPipelineTaskInfo {
+  private long tuningWindowStart;
+  private long tuningWindowEnd;
+
+  public long getTuningWindowStart() {
+    return tuningWindowStart;
   }
 
-  public enum TaskStatus {
-    WAITING,
-    RUNNING,
-    COMPLETED,
-    FAILED,
-    TIMEOUT
+  public void setTuningWindowStart(long tuningWindowStart) {
+    this.tuningWindowStart = tuningWindowStart;
+  }
+
+  public long getTuningWindowEnd() {
+    return tuningWindowEnd;
+  }
+
+  public void setTuningWindowEnd(long tuningWindowEnd) {
+    this.tuningWindowEnd = tuningWindowEnd;
   }
 }

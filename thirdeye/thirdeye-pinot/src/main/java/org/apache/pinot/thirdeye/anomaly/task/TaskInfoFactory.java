@@ -30,6 +30,7 @@ import org.apache.pinot.thirdeye.completeness.checker.DataCompletenessTaskInfo;
 import org.apache.pinot.thirdeye.detection.DetectionPipelineTaskInfo;
 import org.apache.pinot.thirdeye.detection.alert.DetectionAlertTaskInfo;
 import java.io.IOException;
+import org.apache.pinot.thirdeye.detection.onboard.YamlOnboardingTaskInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -51,6 +52,9 @@ public class TaskInfoFactory {
           break;
         case DETECTION_ALERT:
           taskInfo = OBJECT_MAPPER.readValue(taskInfoString, DetectionAlertTaskInfo.class);
+          break;
+        case YAML_DETECTION_ONBOARD:
+          taskInfo = OBJECT_MAPPER.readValue(taskInfoString, YamlOnboardingTaskInfo.class);
           break;
         case ANOMALY_DETECTION:
           taskInfo = OBJECT_MAPPER.readValue(taskInfoString, DetectionTaskInfo.class);

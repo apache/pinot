@@ -54,7 +54,7 @@ public abstract class YamlDetectionConfigTranslator {
     this.existingComponentSpecs = new HashMap<>();
   }
 
-  public YamlDetectionConfigTranslator withTrainingWindow(long startTime, long endTime) {
+  public YamlDetectionConfigTranslator withTuningWindow(long startTime, long endTime) {
     this.startTime = startTime;
     this.endTime = endTime;
     return this;
