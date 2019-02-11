@@ -24,7 +24,7 @@ import org.apache.pinot.thirdeye.datalayer.dto.AbstractDTO;
 
 
 /**
- * Validate a config used in detection and alerter
+ * Validate a config
  * @param <T> the type of the config
  */
 interface ConfigValidator<T extends AbstractDTO> {
