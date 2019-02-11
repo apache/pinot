@@ -21,7 +21,7 @@ package org.apache.pinot.thirdeye.dashboard.resources.v2;
 
 import com.google.common.base.Strings;
 import com.google.common.cache.LoadingCache;
-import org.apache.pinot.thirdeye.api.TimeGranularity;
+import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.dashboard.Utils;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.pojo.TimeSeriesCompareMetricView;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.pojo.ValuesContainer;

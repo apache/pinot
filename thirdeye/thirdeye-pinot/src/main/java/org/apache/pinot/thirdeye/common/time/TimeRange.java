@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.pinot.thirdeye.api;
+package org.apache.pinot.thirdeye.common.time;
 
 import java.io.Serializable;
 import java.sql.Timestamp;

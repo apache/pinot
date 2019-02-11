@@ -34,7 +34,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
 
 import com.google.common.collect.Multimap;
-import org.apache.pinot.thirdeye.api.TimeSpec;
+import org.apache.pinot.thirdeye.common.time.TimeSpec;
 import org.apache.pinot.thirdeye.dashboard.views.GenericResponse;
 import org.apache.pinot.thirdeye.dashboard.views.GenericResponse.ResponseSchema;
 import org.apache.pinot.thirdeye.dashboard.views.TimeBucket;

@@ -25,8 +25,8 @@ import org.apache.pinot.thirdeye.anomaly.onboard.framework.DetectionOnboardExecu
 import org.apache.pinot.thirdeye.anomaly.onboard.framework.DetectionOnboardTaskContext;
 import org.apache.pinot.thirdeye.anomaly.onboard.utils.FunctionCreationUtils;
 import org.apache.pinot.thirdeye.anomaly.utils.EmailUtils;
-import org.apache.pinot.thirdeye.api.TimeGranularity;
-import org.apache.pinot.thirdeye.api.TimeSpec;
+import org.apache.pinot.thirdeye.common.time.TimeGranularity;
+import org.apache.pinot.thirdeye.common.time.TimeSpec;
 import org.apache.pinot.thirdeye.constant.MetricAggFunction;
 import org.apache.pinot.thirdeye.datalayer.bao.AlertConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.AnomalyFunctionManager;

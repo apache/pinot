@@ -19,7 +19,7 @@
 
 package org.apache.pinot.thirdeye.detector.metric.transfer;
 
-import org.apache.pinot.thirdeye.api.MetricTimeSeries;
+import org.apache.pinot.thirdeye.common.metric.MetricTimeSeries;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;

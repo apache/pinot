@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.pinot.thirdeye.api;
+package org.apache.pinot.thirdeye.common.metric;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 

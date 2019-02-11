@@ -29,15 +29,12 @@ import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
-import org.apache.pinot.thirdeye.api.DimensionKey;
-import org.apache.pinot.thirdeye.api.MetricSchema;
-import org.apache.pinot.thirdeye.api.MetricTimeSeries;
-import org.apache.pinot.thirdeye.api.MetricType;
+import org.apache.pinot.thirdeye.common.dimension.DimensionKey;
+import org.apache.pinot.thirdeye.common.metric.MetricSchema;
+import org.apache.pinot.thirdeye.common.metric.MetricTimeSeries;
+import org.apache.pinot.thirdeye.common.metric.MetricType;
 import org.apache.pinot.thirdeye.constant.MetricAggFunction;
 import org.apache.pinot.thirdeye.datasource.MetricFunction;
-import org.apache.pinot.thirdeye.datasource.timeseries.TimeSeriesResponse;
-import org.apache.pinot.thirdeye.datasource.timeseries.TimeSeriesResponseConverter;
-import org.apache.pinot.thirdeye.datasource.timeseries.TimeSeriesRow;
 import org.apache.pinot.thirdeye.datasource.timeseries.TimeSeriesRow.Builder;
 import org.apache.pinot.thirdeye.datasource.timeseries.TimeSeriesRow.TimeSeriesMetric;
 

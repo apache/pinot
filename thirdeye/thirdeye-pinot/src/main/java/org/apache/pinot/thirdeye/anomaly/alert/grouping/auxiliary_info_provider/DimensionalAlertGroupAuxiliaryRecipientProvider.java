@@ -20,7 +20,7 @@
 package org.apache.pinot.thirdeye.anomaly.alert.grouping.auxiliary_info_provider;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.apache.pinot.thirdeye.api.DimensionMap;
+import org.apache.pinot.thirdeye.common.dimension.DimensionMap;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import java.io.IOException;
 import java.util.HashMap;

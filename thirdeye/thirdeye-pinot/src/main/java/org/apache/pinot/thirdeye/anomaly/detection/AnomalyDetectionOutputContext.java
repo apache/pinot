@@ -20,7 +20,7 @@
 package org.apache.pinot.thirdeye.anomaly.detection;
 
 import com.google.common.collect.ListMultimap;
-import org.apache.pinot.thirdeye.api.DimensionMap;
+import org.apache.pinot.thirdeye.common.dimension.DimensionMap;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 
 public class AnomalyDetectionOutputContext {

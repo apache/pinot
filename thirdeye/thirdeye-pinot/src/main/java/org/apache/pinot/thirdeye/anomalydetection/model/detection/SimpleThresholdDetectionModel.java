@@ -25,7 +25,7 @@ import org.apache.pinot.thirdeye.anomalydetection.context.RawAnomalyResult;
 import org.apache.pinot.thirdeye.anomalydetection.context.TimeSeries;
 import org.apache.pinot.thirdeye.anomalydetection.model.prediction.ExpectedTimeSeriesPredictionModel;
 import org.apache.pinot.thirdeye.anomalydetection.model.prediction.PredictionModel;
-import org.apache.pinot.thirdeye.api.DimensionMap;
+import org.apache.pinot.thirdeye.common.dimension.DimensionMap;
 import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
 import java.util.ArrayList;
 import java.util.List;

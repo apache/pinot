@@ -20,7 +20,7 @@
 package org.apache.pinot.thirdeye.auto.onboard;
 
 import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
-import org.apache.pinot.thirdeye.api.TimeGranularity;
+import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;

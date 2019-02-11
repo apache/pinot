@@ -18,7 +18,7 @@ package org.apache.pinot.thirdeye.tools;
 
 import org.apache.pinot.thirdeye.anomaly.utils.AbstractResourceHttpUtils;
 import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyFeedback;
-import org.apache.pinot.thirdeye.api.DimensionMap;
+import org.apache.pinot.thirdeye.common.dimension.DimensionMap;
 import org.apache.pinot.thirdeye.constant.AnomalyFeedbackType;
 import org.apache.pinot.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MergedAnomalyResultManager;

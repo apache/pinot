@@ -25,7 +25,7 @@ import java.util.Map;
 import org.joda.time.DateTimeZone;
 import org.joda.time.format.DateTimeFormatter;
 
-import org.apache.pinot.thirdeye.api.TimeSpec;
+import org.apache.pinot.thirdeye.common.time.TimeSpec;
 
 /**
  * This will serve as the interface for any algorithm we plug in to the completeness checker

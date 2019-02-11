@@ -25,7 +25,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.Multimap;
 import org.apache.pinot.thirdeye.anomaly.merge.AnomalyMergeConfig;
 import org.apache.pinot.thirdeye.anomaly.onboard.framework.DetectionOnboardJobStatus;
-import org.apache.pinot.thirdeye.api.TimeGranularity;
+import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.constant.MetricAggFunction;
 import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
 import java.util.List;

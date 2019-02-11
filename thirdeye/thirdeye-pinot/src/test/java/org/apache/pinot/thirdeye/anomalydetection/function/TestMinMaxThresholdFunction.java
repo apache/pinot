@@ -22,7 +22,7 @@ import org.apache.pinot.thirdeye.anomalydetection.context.RawAnomalyResult;
 import org.apache.pinot.thirdeye.anomalydetection.context.TimeSeries;
 import org.apache.pinot.thirdeye.anomalydetection.context.TimeSeriesKey;
 import org.apache.pinot.thirdeye.anomalydetection.model.detection.MinMaxThresholdDetectionModel;
-import org.apache.pinot.thirdeye.api.DimensionMap;
+import org.apache.pinot.thirdeye.common.dimension.DimensionMap;
 import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import java.util.ArrayList;

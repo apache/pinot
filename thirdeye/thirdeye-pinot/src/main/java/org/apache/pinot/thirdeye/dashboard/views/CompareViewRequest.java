@@ -24,7 +24,7 @@ import java.util.List;
 import org.joda.time.DateTime;
 
 import com.google.common.collect.Multimap;
-import org.apache.pinot.thirdeye.api.TimeGranularity;
+import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.datasource.MetricExpression;
 
 public class CompareViewRequest implements ViewRequest {

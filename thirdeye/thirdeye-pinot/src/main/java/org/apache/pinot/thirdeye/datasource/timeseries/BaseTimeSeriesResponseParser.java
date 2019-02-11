@@ -20,7 +20,7 @@
 package org.apache.pinot.thirdeye.datasource.timeseries;
 
 import com.google.common.collect.Range;
-import org.apache.pinot.thirdeye.api.TimeGranularity;
+import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.datasource.MetricFunction;
 import org.apache.pinot.thirdeye.datasource.ResponseParserUtils;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeRequest;

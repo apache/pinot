@@ -31,8 +31,8 @@ import org.testng.annotations.Test;
 
 import com.google.common.collect.ListMultimap;
 import com.google.common.collect.Lists;
-import org.apache.pinot.thirdeye.api.TimeGranularity;
-import org.apache.pinot.thirdeye.api.TimeSpec;
+import org.apache.pinot.thirdeye.common.time.TimeGranularity;
+import org.apache.pinot.thirdeye.common.time.TimeSpec;
 
 public class DataCompletenessUtilsTest {
 

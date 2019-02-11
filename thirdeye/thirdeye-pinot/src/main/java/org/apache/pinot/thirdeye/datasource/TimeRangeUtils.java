@@ -26,12 +26,11 @@ import java.util.concurrent.TimeUnit;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.Days;
-import org.joda.time.Duration;
 
 import com.google.common.collect.Range;
-import org.apache.pinot.thirdeye.api.TimeGranularity;
-import org.apache.pinot.thirdeye.api.TimeRange;
-import org.joda.time.Hours;
+import org.apache.pinot.thirdeye.common.time.TimeGranularity;
+import org.apache.pinot.thirdeye.common.time.TimeRange;
+
 
 /**
  * Not to be confused with {@link TimeRange}. This class handles splitting time windows into

@@ -21,7 +21,6 @@ package org.apache.pinot.thirdeye.dashboard.resources.v2;
 
 import org.apache.pinot.thirdeye.api.Constants;
 import com.wordnik.swagger.annotations.Api;
-import com.wordnik.swagger.annotations.ApiModel;
 import com.wordnik.swagger.annotations.ApiOperation;
 import com.wordnik.swagger.annotations.ApiParam;
 import java.net.URLDecoder;
@@ -57,7 +56,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Strings;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.Multimap;
-import org.apache.pinot.thirdeye.api.TimeRange;
+import org.apache.pinot.thirdeye.common.time.TimeRange;
 import org.apache.pinot.thirdeye.dashboard.Utils;
 import org.apache.pinot.thirdeye.dashboard.views.heatmap.HeatMapViewHandler;
 import org.apache.pinot.thirdeye.dashboard.views.heatmap.HeatMapViewRequest;

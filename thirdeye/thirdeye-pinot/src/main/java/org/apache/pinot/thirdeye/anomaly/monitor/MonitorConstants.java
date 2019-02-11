@@ -21,7 +21,7 @@ package org.apache.pinot.thirdeye.anomaly.monitor;
 
 import java.util.concurrent.TimeUnit;
 
-import org.apache.pinot.thirdeye.api.TimeGranularity;
+import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 
 public class MonitorConstants {
   public enum MonitorType {

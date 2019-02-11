@@ -19,7 +19,7 @@
 
 package org.apache.pinot.thirdeye.anomaly.monitor;
 
-import org.apache.pinot.thirdeye.api.TimeGranularity;
+import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 
 public class MonitorConfiguration {
 

@@ -16,6 +16,7 @@
 
 package org.apache.pinot.thirdeye.api;
 
+import org.apache.pinot.thirdeye.common.dimension.DimensionMap;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
