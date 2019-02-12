@@ -19,30 +19,25 @@
 
 package org.apache.pinot.thirdeye.detection.validators;
 
-import javax.xml.bind.ValidationException;
-import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import java.util.List;
 import java.util.Map;
+import javax.xml.bind.ValidationException;
 import org.apache.commons.lang.StringUtils;
-import org.apache.pinot.thirdeye.datalayer.util.Predicate;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.apache.pinot.thirdeye.detection.ConfigUtils;
 
 import static org.apache.pinot.thirdeye.detection.yaml.YamlDetectionAlertConfigTranslator.*;
 
 
-public class SubscriptionConfigValidator extends ConfigValidator {
+public class SubscriptionConfigValidator implements ConfigValidator<DetectionAlertConfigDTO> {
 
-  private static final SubscriptionConfigValidator INSTANCE = new SubscriptionConfigValidator();
   private static final String PROP_CLASS_NAME = "className";
-
-  public static SubscriptionConfigValidator getInstance() {
-    return INSTANCE;
-  }
 
   /**
    * Perform validation on the alert config like verifying if all the required fields are set
    */
+  @Override
   public void validateConfig(DetectionAlertConfigDTO alertConfig) throws ValidationException {
     // Check for all the required fields in the alert
     if (StringUtils.isEmpty(alertConfig.getName())) {
@@ -93,6 +88,7 @@ public class SubscriptionConfigValidator extends ConfigValidator {
    * Perform validation on the updated alert config. Check for fields which shouldn't be
    * updated by the user.
    */
+  @Override
   public void validateUpdatedConfig(DetectionAlertConfigDTO updatedAlertConfig, DetectionAlertConfigDTO oldAlertConfig)
       throws ValidationException {
     validateConfig(updatedAlertConfig);

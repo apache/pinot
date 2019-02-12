@@ -61,7 +61,7 @@ public class YamlResourceTest {
       this.yamlResource.createSubscriptionGroup(inValidYaml);
       Assert.fail("Exception not thrown on empty yaml");
     } catch (Exception e) {
-      Assert.assertEquals(e.getMessage(), "Error parsing the Yaml payload. Check for syntax issues.");
+      Assert.assertEquals(e.getMessage(), "Could not parse as map: application:test:application");
     }
 
     String noSubscriptGroupYaml = "application: test_application";
@@ -147,7 +147,7 @@ public class YamlResourceTest {
       this.yamlResource.updateSubscriptionGroup(oldId, inValidYaml);
       Assert.fail("Exception not thrown on empty yaml");
     } catch (Exception e) {
-      Assert.assertEquals(e.getMessage(), "Error parsing the Yaml payload. Check for syntax issues.");
+      Assert.assertEquals(e.getMessage(), "Could not parse as map: application:test:application");
     }
 
     String noSubscriptGroupYaml = "application: test_application";

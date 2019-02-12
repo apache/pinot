@@ -19,6 +19,7 @@
 
 package org.apache.pinot.thirdeye.detection.validators;
 
+import com.google.common.base.Preconditions;
 import javax.xml.bind.ValidationException;
 import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
@@ -32,26 +33,14 @@ import org.apache.pinot.thirdeye.datasource.loader.TimeSeriesLoader;
 import org.apache.pinot.thirdeye.detection.DataProvider;
 import org.apache.pinot.thirdeye.detection.DefaultDataProvider;
 import org.apache.pinot.thirdeye.detection.DetectionPipelineLoader;
-import org.apache.pinot.thirdeye.detection.yaml.YamlDetectionAlertConfigTranslator;
-import org.apache.pinot.thirdeye.detection.yaml.YamlDetectionTranslatorLoader;
-import org.yaml.snakeyaml.Yaml;
 
 
-public class DetectionConfigValidator extends ConfigValidator {
-
-  private static DetectionConfigValidator INSTANCE;
+public class DetectionConfigValidator implements ConfigValidator<DetectionConfigDTO> {
 
   private final DataProvider provider;
   private final DetectionPipelineLoader loader;
 
-  public static DetectionConfigValidator getInstance() {
-    if (INSTANCE == null) {
-      INSTANCE = new DetectionConfigValidator();
-    }
-    return INSTANCE;
-  }
-
-  DetectionConfigValidator() {
+  public DetectionConfigValidator() {
     MetricConfigManager metricDAO = DAORegistry.getInstance().getMetricConfigDAO();
     DatasetConfigManager datasetDAO = DAORegistry.getInstance().getDatasetConfigDAO();
 
@@ -84,28 +73,29 @@ public class DetectionConfigValidator extends ConfigValidator {
 
       // set id back
       detectionConfig.setId(id);
-    } catch (Exception e) {
-      throw new ValidationException("Semantic error while initializing the detection pipeline.", e.getMessage());
+    } catch (Exception e){
+      // exception thrown in validate pipeline via reflection
+      throw new ValidationException("Semantic error: " + e.getCause().getMessage());
     }
   }
 
   /**
    * Perform validation on the detection config like verifying if all the required fields are set
    */
+  @Override
   public void validateConfig(DetectionConfigDTO detectionConfig) throws ValidationException {
     semanticValidation(detectionConfig);
-
-    // TODO: Add more static validations here
   }
 
   /**
    * Perform validation on the updated detection config. Check for fields which shouldn't be
    * updated by the user.
    */
+  @Override
   public void validateUpdatedConfig(DetectionConfigDTO updatedConfig, DetectionConfigDTO oldConfig)
       throws ValidationException {
     validateConfig(updatedConfig);
-
-    // TODO: Add more checks here
+    Preconditions.checkArgument(updatedConfig.getId().equals(oldConfig.getId()));
+    Preconditions.checkArgument(updatedConfig.getLastTimestamp() == oldConfig.getLastTimestamp());
   }
 }
