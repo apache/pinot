@@ -78,7 +78,7 @@ public class RuleBaselineProviderTest {
   @Test
   public void testFetchBaselineAggregates() {
     Assert.assertEquals(
-        this.baselineProvider.computePredictedAggregates(slice1, DoubleSeries.MEAN), 100.0);
+        this.baselineProvider.computePredictedAggregates(slice1, DoubleSeries.MEAN), 150.0);
   }
 
   @Test

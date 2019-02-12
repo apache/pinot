@@ -177,7 +177,7 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
       ImmutableSet.of("MIGRATED_ALGORITHM_FILTER", "MIGRATED_ALGORITHM", "MIGRATED_ALGORITHM_BASELINE");
   private static final Map<String, String> DETECTOR_TO_BASELINE =
       ImmutableMap.of("ALGORITHM", "ALGORITHM_BASELINE", "MIGRATED_ALGORITHM", "MIGRATED_ALGORITHM_BASELINE");
-  private static final Set<String> MOVING_WINDOW_DETECTOR_TYPES = ImmutableSet.of("ALGORITHM");
+  private static final Set<String> MOVING_WINDOW_DETECTOR_TYPES = ImmutableSet.of("ALGORITHM", "MIGRATED_ALGORITHM");
 
   private final Map<String, Object> components = new HashMap<>();
   private MetricConfigDTO metricConfig;

@@ -205,7 +205,7 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
           monitoringWindows.add(new Interval(startTime, endTime, dateTimeZone));
         }
         for (Interval window : monitoringWindows){
-          LOG.info("running detections in windows {}", window);
+          LOG.info("Will run detection in window {}", window);
         }
         // pre cache the time series for the whole detection time period instead of fetching for each window
         MetricSlice cacheSlice = MetricSlice.from(this.metricEntity.getId(), startTime - DEFAULT_CACHING_PERIOD_LOOKBACK, endTime, this.metricEntity.getFilters(), toTimeGranularity(this.bucketPeriod));
