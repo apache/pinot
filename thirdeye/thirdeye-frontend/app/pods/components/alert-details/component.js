@@ -18,6 +18,7 @@ import { computed, observer, set, get, getProperties } from '@ember/object';
 import { later } from '@ember/runloop';
 import { checkStatus, humanizeFloat } from 'thirdeye-frontend/utils/utils';
 import { colorMapping, toColor, makeTime } from 'thirdeye-frontend/utils/rca-utils';
+import { getFormatedDuration } from 'thirdeye-frontend/utils/anomaly';
 import { inject as service } from '@ember/service';
 import { task } from 'ember-concurrency';
 import floatToPercent from 'thirdeye-frontend/utils/float-to-percent';
@@ -293,8 +294,9 @@ export default Component.extend({
       anomalies.forEach(a => {
         let tableRow = {
           number: i,
-          start: a,
+          start: a.startTime,
           startDateStr: this._formatAnomaly(a),
+          durationStr: getFormatedDuration(a.startTime, a.endTime),
           shownCurrent: humanizeFloat(a.avgCurrentVal),
           shownBaseline: humanizeFloat(a.avgBaselineVal),
           change: ((a.avgCurrentVal/a.avgBaselineVal - 1.0) * 100.0),
@@ -603,7 +605,8 @@ export default Component.extend({
     getPreview() {
       this.setProperties({
         isLoading: true,
-        showPreview: true
+        showPreview: true,
+        disableYamlSave: true
       });
       this._fetchAnomalies();
     },
@@ -646,9 +649,5 @@ export default Component.extend({
       //On sort, set table to first pagination page
       this.set('currentPage', 1);
     },
-
-    refreshPreview(){
-      set(this, 'disableYamlSave', true);
-    }
   }
 });
