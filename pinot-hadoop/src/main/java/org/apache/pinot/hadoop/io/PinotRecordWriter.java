@@ -88,7 +88,8 @@ public class PinotRecordWriter<K, V> extends RecordWriter<K, V> {
     String localTarPath = getLocalTarFile(PinotOutputFormat.getTempSegmentDir(context));
     LOGGER.info("Trying to tar the segment to: {}", localTarPath);
     TarGzCompressionUtils.createTarGzOfDirectory(localSegmentPath, localTarPath);
-    String hdfsTarPath = _workDir + "/segmentTar/" + _segmentConfig.getSegmentName() + JobConfigConstants.TARGZ;
+    String hdfsTarPath =
+        _workDir + "/segmentTar/" + _segmentConfig.getSegmentName() + JobConfigConstants.TAR_GZ_FILE_EXT;
 
     LOGGER.info("*********************************************************************");
     LOGGER.info("Copy from : {} to {}", localTarPath, hdfsTarPath);
@@ -113,7 +114,7 @@ public class PinotRecordWriter<K, V> extends RecordWriter<K, V> {
     if (!f.exists()) {
       f.mkdirs();
     }
-    return localTarDir + "/" + _segmentConfig.getSegmentName() + JobConfigConstants.TARGZ;
+    return localTarDir + "/" + _segmentConfig.getSegmentName() + JobConfigConstants.TAR_GZ_FILE_EXT;
   }
 
   /**

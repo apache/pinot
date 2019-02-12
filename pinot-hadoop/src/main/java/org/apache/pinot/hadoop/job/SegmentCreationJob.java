@@ -18,15 +18,17 @@
  */
 package org.apache.pinot.hadoop.job;
 
-import java.io.File;
+import com.google.common.base.Preconditions;
+import java.io.DataOutputStream;
 import java.io.IOException;
-import java.util.ArrayList;
+import java.io.InputStream;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
+import javax.annotation.Nullable;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.conf.Configured;
-import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -35,169 +37,131 @@ import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapred.JobContext;
 import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
-import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.config.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.data.Schema;
-import org.apache.pinot.hadoop.job.mapper.HadoopSegmentCreationMapReduceJob;
+import org.apache.pinot.common.utils.StringUtil;
+import org.apache.pinot.hadoop.job.mapper.SegmentCreationMapper;
 import org.apache.pinot.hadoop.utils.PushLocation;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
-public class SegmentCreationJob extends Configured {
-  private static final Logger LOGGER = LoggerFactory.getLogger(SegmentCreationJob.class);
+public class SegmentCreationJob extends BaseSegmentJob {
+  protected static final String APPEND = "APPEND";
 
-  private static final String PATH_TO_DEPS_JAR = "path.to.deps.jar";
-  private static final String APPEND = "APPEND";
+  protected final Path _inputPattern;
+  protected final Path _outputDir;
+  protected final Path _stagingDir;
+  protected final String _rawTableName;
 
-  private final String _jobName;
-  private final Properties _properties;
+  // Optional
+  protected final Path _depsJarDir;
+  protected final Path _schemaFile;
+  protected final String _defaultPermissionsMask;
+  protected final List<PushLocation> _pushLocations;
 
-  private final String _inputSegmentDir;
-  private final String _stagingDir;
-  private final Schema _dataSchema;
-  private final String _depsJarPath;
-  private final String _outputDir;
-  private final String _tableName;
+  protected FileSystem _fileSystem;
 
-  private final String _readerConfigFile;
+  public SegmentCreationJob(Properties properties) {
+    super(properties);
+    _conf.set("mapreduce.job.user.classpath.first", "true");
 
-  private final String _defaultPermissionsMask;
+    _inputPattern = Preconditions.checkNotNull(getPathFromProperty(JobConfigConstants.PATH_TO_INPUT));
+    _outputDir = Preconditions.checkNotNull(getPathFromProperty(JobConfigConstants.PATH_TO_OUTPUT));
+    _stagingDir = new Path(_outputDir, UUID.randomUUID().toString());
+    _rawTableName = Preconditions.checkNotNull(_properties.getProperty(JobConfigConstants.SEGMENT_TABLE_NAME));
 
-  private String[] _hosts;
-  private int _port;
+    // Optional
+    _depsJarDir = getPathFromProperty(JobConfigConstants.PATH_TO_DEPS_JAR);
+    _schemaFile = getPathFromProperty(JobConfigConstants.PATH_TO_SCHEMA);
+    _defaultPermissionsMask = _properties.getProperty(JobConfigConstants.DEFAULT_PERMISSIONS_MASK);
 
-  public SegmentCreationJob(String jobName, Properties properties)
-      throws Exception {
-    super(new Configuration());
-    getConf().set("mapreduce.job.user.classpath.first", "true");
-    _jobName = jobName;
-    _properties = properties;
-
-    _inputSegmentDir = _properties.getProperty(JobConfigConstants.PATH_TO_INPUT);
-    String schemaFilePath = _properties.getProperty(JobConfigConstants.PATH_TO_SCHEMA);
-    _outputDir = getOutputDir();
-    _stagingDir = new File(_outputDir, UUID.randomUUID().toString()).getAbsolutePath();
-    _depsJarPath = _properties.getProperty(PATH_TO_DEPS_JAR, null);
-    _readerConfigFile = _properties.getProperty(JobConfigConstants.PATH_TO_READER_CONFIG);
-    String hostsString = _properties.getProperty(JobConfigConstants.PUSH_TO_HOSTS);
-    String portString = _properties.getProperty(JobConfigConstants.PUSH_TO_PORT);
-
-    _defaultPermissionsMask = _properties.getProperty(JobConfigConstants.DEFAULT_PERMISSIONS_MASK, null);
-    LOGGER.info("Default permissions mask is {}", _defaultPermissionsMask);
-
-    // For backwards compatibility, we want to allow users to create segments without setting push location parameters
-    // in their creation jobs.
-    if (hostsString != null && portString != null) {
-      _hosts = hostsString.split(",");
-      _port = Integer.parseInt(portString);
-    }
-    _tableName = _properties.getProperty(JobConfigConstants.SEGMENT_TABLE_NAME);
-
-    Utils.logVersions();
-
-    LOGGER.info("*********************************************************************");
-    LOGGER.info("path.to.input: {}", _inputSegmentDir);
-    LOGGER.info("path.to.deps.jar: {}", _depsJarPath);
-    LOGGER.info("path.to.output: {}", _outputDir);
-    LOGGER.info("path.to.schema: {}", schemaFilePath);
-    if (_readerConfigFile != null) {
-      LOGGER.info("path.to.reader.config: {}", _readerConfigFile);
-    }
-    if (schemaFilePath != null) {
-      _dataSchema = Schema.fromFile(new File(schemaFilePath));
+    // Optional push location and table parameters. If set, will use the table config and schema from the push hosts.
+    String pushHostsString = _properties.getProperty(JobConfigConstants.PUSH_TO_HOSTS);
+    String pushPortString = _properties.getProperty(JobConfigConstants.PUSH_TO_PORT);
+    if (pushHostsString != null && pushPortString != null) {
+      _pushLocations =
+          PushLocation.getPushLocations(StringUtils.split(pushHostsString, ','), Integer.parseInt(pushPortString));
     } else {
-      _dataSchema = null;
+      _pushLocations = null;
     }
-    LOGGER.info("schema: {}", _dataSchema);
-    LOGGER.info("*********************************************************************");
+
+    _logger.info("*********************************************************************");
+    _logger.info("Input Pattern: {}", _inputPattern);
+    _logger.info("Output Directory: {}", _outputDir);
+    _logger.info("Staging Directory: {}", _stagingDir);
+    _logger.info("Raw Table Name: {}", _rawTableName);
+    _logger.info("Dependencies Directory: {}", _depsJarDir);
+    _logger.info("Schema File: {}", _schemaFile);
+    _logger.info("Default Permissions Mask: {}", _defaultPermissionsMask);
+    _logger.info("Push Locations: {}", _pushLocations);
+    _logger.info("*********************************************************************");
   }
 
-  protected String getOutputDir() {
-    return _properties.getProperty(JobConfigConstants.PATH_TO_OUTPUT);
-  }
-
-  protected String getInputDir() {
-    return _inputSegmentDir;
-  }
-
-  protected void setOutputPath(Configuration configuration) {
-
+  @Override
+  protected boolean isDataFile(String fileName) {
+    return fileName.endsWith(".avro") || fileName.endsWith(".csv") || fileName.endsWith(".json") || fileName
+        .endsWith(".thrift");
   }
 
   public void run()
       throws Exception {
-    LOGGER.info("Starting {}", getClass().getSimpleName());
+    _logger.info("Starting {}", getClass().getSimpleName());
 
-    FileSystem fs = FileSystem.get(getConf());
-    Path inputPathPattern = new Path(_inputSegmentDir);
-    Path stagingDir = new Path(_stagingDir);
-    Path outputDir = new Path(_outputDir);
+    // Initialize all directories
+    _fileSystem = FileSystem.get(_conf);
+    mkdirs(_outputDir);
+    mkdirs(_stagingDir);
+    Path stagingInputDir = new Path(_stagingDir, "input");
+    mkdirs(stagingInputDir);
 
-    if (fs.exists(outputDir)) {
-      LOGGER.warn("Found the output folder {}, deleting it", _outputDir);
-      fs.delete(outputDir, true);
-    }
-    fs.mkdirs(outputDir);
-
-    if (fs.exists(stagingDir)) {
-      LOGGER.warn("Found the temp folder {}, deleting it", stagingDir);
-      fs.delete(stagingDir, true);
-    }
-    fs.mkdirs(stagingDir);
-
-    Path stagingDirInputPath = new Path(_stagingDir + "/input/");
-    fs.mkdirs(stagingDirInputPath);
-    LOGGER.info("Staging dir input path is {}", stagingDirInputPath);
-
-    if (_defaultPermissionsMask != null) {
-      FsPermission umask = new FsPermission(_defaultPermissionsMask);
-      FsPermission permission = FsPermission.getDirDefault().applyUMask(umask);
-
-      setDirPermission(stagingDir, permission, fs);
-      setDirPermission(stagingDirInputPath, permission, fs);
-      setDirPermission(outputDir, permission, fs);
+    // Gather all data files
+    List<Path> dataFilePaths = getDataFilePaths(_inputPattern);
+    int numDataFiles = dataFilePaths.size();
+    if (numDataFiles == 0) {
+      String errorMessage = "No data file founded with pattern: " + _inputPattern;
+      _logger.error(errorMessage);
+      throw new RuntimeException(errorMessage);
+    } else {
+      _logger.info("Creating segments with data files: {}", dataFilePaths);
+      for (int i = 0; i < numDataFiles; i++) {
+        Path dataFilePath = dataFilePaths.get(i);
+        try (DataOutputStream dataOutputStream = _fileSystem.create(new Path(stagingInputDir, Integer.toString(i)))) {
+          dataOutputStream.write(StringUtil.encodeUtf8(dataFilePath.toString() + " " + i));
+          dataOutputStream.flush();
+        }
+      }
     }
 
-    List<FileStatus> inputDataFiles = new ArrayList<FileStatus>();
-    FileStatus[] fileStatusArr = fs.globStatus(inputPathPattern);
-    for (FileStatus fileStatus : fileStatusArr) {
-      inputDataFiles.addAll(getDataFilesFromPath(fs, fileStatus.getPath()));
+    // Set up the job
+    Job job = Job.getInstance(_conf);
+
+    Configuration jobConf = job.getConfiguration();
+    String hadoopTokenFileLocation = System.getenv("HADOOP_TOKEN_FILE_LOCATION");
+    if (hadoopTokenFileLocation != null) {
+      jobConf.set("mapreduce.job.credentials.binary", hadoopTokenFileLocation);
     }
-    if (inputDataFiles.isEmpty()) {
-      LOGGER.error("No Input paths {}", inputPathPattern);
-      throw new RuntimeException("No input files " + inputPathPattern);
+    jobConf.setInt(JobContext.NUM_MAPS, numDataFiles);
+
+    // Set table config and schema
+    TableConfig tableConfig = getTableConfig();
+    if (tableConfig != null) {
+      validateTableConfig(tableConfig);
+      jobConf.set(JobConfigConstants.TABLE_CONFIG, tableConfig.toJSONConfigString());
+    }
+    jobConf.set(JobConfigConstants.SCHEMA, getSchema().toSingleLineJsonString());
+
+    // Set additional configurations
+    for (Map.Entry<Object, Object> entry : _properties.entrySet()) {
+      jobConf.set(entry.getKey().toString(), entry.getValue().toString());
     }
 
-    for (int seqId = 0; seqId < inputDataFiles.size(); ++seqId) {
-      FileStatus file = inputDataFiles.get(seqId);
-      String completeFilePath = " " + file.getPath().toString() + " " + seqId;
-      Path newOutPutFile = new Path(
-          (_stagingDir + "/input/" + file.getPath().toString().replace('.', '_').replace('/', '_').replace(':', '_')
-              + ".txt"));
-      FSDataOutputStream stream = fs.create(newOutPutFile);
-      stream.writeUTF(completeFilePath);
-      stream.flush();
-      stream.close();
-    }
-
-    Job job = Job.getInstance(getConf());
-
-    setAdditionalJobProperties(job);
-
-    job.setJarByClass(SegmentCreationJob.class);
-    job.setJobName(_jobName);
-
-    setMapperClass(job);
-
-    if (System.getenv("HADOOP_TOKEN_FILE_LOCATION") != null) {
-      job.getConfiguration().set("mapreduce.job.credentials.binary", System.getenv("HADOOP_TOKEN_FILE_LOCATION"));
-    }
+    job.setMapperClass(getMapperClass());
+    job.setNumReduceTasks(0);
 
     job.setInputFormatClass(TextInputFormat.class);
     job.setOutputFormatClass(TextOutputFormat.class);
@@ -205,158 +169,129 @@ public class SegmentCreationJob extends Configured {
     job.setMapOutputKeyClass(LongWritable.class);
     job.setMapOutputValueClass(Text.class);
 
-    FileInputFormat.addInputPath(job, new Path(_stagingDir + "/input/"));
-    FileOutputFormat.setOutputPath(job, new Path(_stagingDir + "/output/"));
+    FileInputFormat.addInputPath(job, stagingInputDir);
+    FileOutputFormat.setOutputPath(job, new Path(_stagingDir, "output"));
 
-    job.getConfiguration().setInt(JobContext.NUM_MAPS, inputDataFiles.size());
-    if (_dataSchema != null) {
-      job.getConfiguration().set(JobConfigConstants.SCHEMA, _dataSchema.toSingleLineJsonString());
-    }
-    setOutputPath(job.getConfiguration());
+    addDepsJarToDistributedCache(job);
+    addAdditionalJobProperties(job);
 
-    job.setNumReduceTasks(0);
-    for (Object key : _properties.keySet()) {
-      job.getConfiguration().set(key.toString(), _properties.getProperty(key.toString()));
-    }
-
-    if (_depsJarPath != null && _depsJarPath.length() > 0) {
-      addDepsJarToDistributedCache(new Path(_depsJarPath), job);
-    }
-
-    // Submit the job for execution.
+    // Submit the job
     job.waitForCompletion(true);
     if (!job.isSuccessful()) {
-      throw new RuntimeException("Job failed : " + job);
+      throw new RuntimeException("Job failed: " + job);
     }
 
-    moveToOutputDirectory(fs);
+    moveSegmentsToOutputDir();
 
-    // Delete temporary directory.
-    LOGGER.info("Cleanup the working directory.");
-    LOGGER.info("Deleting the dir: {}", _stagingDir);
-    fs.delete(new Path(_stagingDir), true);
+    // Delete the staging directory
+    _logger.info("Deleting the staging directory: {}", _stagingDir);
+    _fileSystem.delete(_stagingDir, true);
   }
 
-  private void setDirPermission(Path directory, FsPermission permission, FileSystem fs)
+  protected void mkdirs(Path dirPath)
       throws IOException {
-    fs.setPermission(directory, permission);
-    LOGGER.info("Setting permissions '{}' for directory: '{}'", permission, directory);
+    if (_fileSystem.exists(dirPath)) {
+      _logger.warn("Deleting existing file: {}", dirPath);
+      _fileSystem.delete(dirPath, true);
+    }
+    _logger.info("Making directory: {}", dirPath);
+    _fileSystem.mkdirs(dirPath);
+    setDirPermission(dirPath);
   }
 
-  protected void setAdditionalJobProperties(Job job)
-      throws Exception {
-    // Check host and port information before set table config dependent properties
-    if (_hosts == null || _port == 0) {
-      LOGGER.warn("Unable to set TableConfig-dependent properties. Please set host {} ({}) and port {} ({})",
-          JobConfigConstants.PUSH_TO_HOSTS, _port, JobConfigConstants.PUSH_TO_PORT, _port);
-      return;
+  protected void setDirPermission(Path dirPath)
+      throws IOException {
+    if (_defaultPermissionsMask != null) {
+      FsPermission permission = FsPermission.getDirDefault().applyUMask(new FsPermission(_defaultPermissionsMask));
+      _logger.info("Setting permission: {} to directory: {}", permission, dirPath);
+      _fileSystem.setPermission(dirPath, permission);
     }
+  }
 
-    // Add push locations
-    List<PushLocation> pushLocations = new ArrayList<>();
-    for (String host : _hosts) {
-      pushLocations.add(new PushLocation.PushLocationBuilder().setHost(host).setPort(_port).build());
-    }
-
-    ControllerRestApi controllerRestApiObject = new ControllerRestApi(pushLocations, _tableName);
-
-    // Fetch table config from controller API
-    TableConfig tableConfig = controllerRestApiObject.getTableConfig();
-    job.getConfiguration().set(JobConfigConstants.TABLE_CONFIG, tableConfig.toJSONConfigString());
-
-    SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
-    if (validationConfig == null) {
-      throw new RuntimeException(
-          "Segment validation config should not be null. Please configure them correctly in the table config");
-    }
-
-    // Check if pushType is set correctly
-    String segmentPushType = validationConfig.getSegmentPushType();
-    if (segmentPushType == null) {
-      throw new RuntimeException("Segment push type is null. Please configure the value correctly in the table config. "
-          + "We support APPEND or REFRESH for push types.");
-    }
-
-    // Update table push type
-    job.getConfiguration().set(JobConfigConstants.TABLE_PUSH_TYPE, segmentPushType);
-
-    if (segmentPushType.equalsIgnoreCase(APPEND)) {
-      // For append use cases, timeColumnName and timeType must be set
-      String timeColumnName = validationConfig.getTimeColumnName();
-      String timeColumnType = validationConfig.getTimeType();
-      if (timeColumnName == null || timeColumnType == null) {
-        throw new RuntimeException("Time column or time column type is null. Both are required for APPEND use case. "
-            + "Please configure them correctly in the table config.");
+  @Nullable
+  protected TableConfig getTableConfig()
+      throws IOException {
+    if (_pushLocations != null) {
+      try (ControllerRestApi controllerRestApi = getControllerRestApi()) {
+        return controllerRestApi.getTableConfig();
       }
-      LOGGER.info("Time column: {}, time column type: {}", timeColumnName, timeColumnType);
-      job.getConfiguration().set(JobConfigConstants.TIME_COLUMN_NAME, timeColumnName);
-      job.getConfiguration().set(JobConfigConstants.TIME_COLUMN_TYPE, timeColumnType);
     } else {
-      LOGGER.info("Refresh use case. Not setting timeColumnName and timeColumnType for table: " + _tableName);
-    }
-
-    // Fetch schema from controller API and set it to the job configuration
-    String schema = controllerRestApiObject.getSchema();
-    LOGGER.info("Setting schema for tableName {} to {}", _tableName, schema);
-    job.getConfiguration().set(JobConfigConstants.SCHEMA, schema);
-  }
-
-  protected void moveToOutputDirectory(FileSystem fs)
-      throws Exception {
-    LOGGER.info("Moving Segment Tar files from {} to: {}", _stagingDir + "/output/segmentTar", _outputDir);
-    FileStatus[] segmentArr = fs.listStatus(new Path(_stagingDir + "/output/segmentTar"));
-    for (FileStatus segment : segmentArr) {
-      fs.rename(segment.getPath(), new Path(_outputDir, segment.getPath().getName()));
+      return null;
     }
   }
 
-  protected Job setMapperClass(Job job) {
-    job.setMapperClass(HadoopSegmentCreationMapReduceJob.HadoopSegmentCreationMapper.class);
-    return job;
-  }
-
-  private void addDepsJarToDistributedCache(Path path, Job job)
+  protected Schema getSchema()
       throws IOException {
-    LOGGER.info("Trying to add all the deps jar files from directory: {}", path);
-    FileSystem fs = FileSystem.get(getConf());
-    FileStatus[] fileStatusArr = fs.listStatus(path);
-    for (FileStatus fileStatus : fileStatusArr) {
+    if (_pushLocations != null) {
+      try (ControllerRestApi controllerRestApi = getControllerRestApi()) {
+        return controllerRestApi.getSchema();
+      }
+    } else {
+      try (InputStream inputStream = _fileSystem.open(_schemaFile)) {
+        return Schema.fromInputSteam(inputStream);
+      }
+    }
+  }
+
+  protected DefaultControllerRestApi getControllerRestApi() {
+    return new DefaultControllerRestApi(_pushLocations, _rawTableName);
+  }
+
+  protected void validateTableConfig(TableConfig tableConfig) {
+    SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
+
+    // For APPEND use case, timeColumnName and timeType must be set
+    if (APPEND.equalsIgnoreCase(validationConfig.getSegmentPushType())) {
+      Preconditions.checkState(validationConfig.getTimeColumnName() != null && validationConfig.getTimeType() != null,
+          "For APPEND use case, time column and type must be set");
+    }
+  }
+
+  /**
+   * Can be override to plug in custom mapper.
+   */
+  protected Class<? extends Mapper<LongWritable, Text, LongWritable, Text>> getMapperClass() {
+    return SegmentCreationMapper.class;
+  }
+
+  protected void addDepsJarToDistributedCache(Job job)
+      throws IOException {
+    if (_depsJarDir != null) {
+      addDepsJarToDistributedCacheHelper(job, _depsJarDir);
+    }
+  }
+
+  protected void addDepsJarToDistributedCacheHelper(Job job, Path depsJarDir)
+      throws IOException {
+    FileStatus[] fileStatuses = _fileSystem.listStatus(depsJarDir);
+    for (FileStatus fileStatus : fileStatuses) {
       if (fileStatus.isDirectory()) {
-        addDepsJarToDistributedCache(fileStatus.getPath(), job);
+        addDepsJarToDistributedCacheHelper(job, fileStatus.getPath());
       } else {
         Path depJarPath = fileStatus.getPath();
         if (depJarPath.getName().endsWith(".jar")) {
-          LOGGER.info("Adding deps jar files: {}", path);
-          job.addCacheArchive(path.toUri());
+          _logger.info("Adding deps jar: {} to distributed cache", depJarPath);
+          job.addCacheArchive(depJarPath.toUri());
         }
       }
     }
   }
 
-  private ArrayList<FileStatus> getDataFilesFromPath(FileSystem fs, Path inBaseDir)
+  /**
+   * Can be override to set additional job properties.
+   */
+  @SuppressWarnings("unused")
+  protected void addAdditionalJobProperties(Job job) {
+  }
+
+  protected void moveSegmentsToOutputDir()
       throws IOException {
-    ArrayList<FileStatus> dataFileStatusList = new ArrayList<FileStatus>();
-    FileStatus[] fileStatusArr = fs.listStatus(inBaseDir);
-    for (FileStatus fileStatus : fileStatusArr) {
-      if (fileStatus.isDirectory()) {
-        LOGGER.info("Trying to add all the data files from directory: {}", fileStatus.getPath());
-        dataFileStatusList.addAll(getDataFilesFromPath(fs, fileStatus.getPath()));
-      } else {
-        String fileName = fileStatus.getPath().getName();
-        if (fileName.endsWith(".avro")) {
-          LOGGER.info("Adding avro files: {}", fileStatus.getPath());
-          dataFileStatusList.add(fileStatus);
-        }
-        if (fileName.endsWith(".csv")) {
-          LOGGER.info("Adding csv files: {}", fileStatus.getPath());
-          dataFileStatusList.add(fileStatus);
-        }
-        if (fileName.endsWith(".json")) {
-          LOGGER.info("Adding json files: {}", fileStatus.getPath());
-          dataFileStatusList.add(fileStatus);
-        }
-      }
+    Path segmentTarDir = new Path(new Path(_stagingDir, "output"), JobConfigConstants.SEGMENT_TAR_DIR);
+    for (FileStatus segmentTarStatus : _fileSystem.listStatus(segmentTarDir)) {
+      Path segmentTarPath = segmentTarStatus.getPath();
+      Path dest = new Path(_outputDir, segmentTarPath.getName());
+      _logger.info("Moving segment tar file from: {} to: {}", segmentTarPath, dest);
+      _fileSystem.rename(segmentTarPath, dest);
     }
-    return dataFileStatusList;
   }
 }
