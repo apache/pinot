@@ -20,6 +20,9 @@
 package org.apache.pinot.thirdeye.detection;
 
 import com.google.common.collect.Multimap;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
@@ -29,9 +32,6 @@ import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
 import org.apache.pinot.thirdeye.detection.spi.model.AnomalySlice;
 import org.apache.pinot.thirdeye.detection.spi.model.EventSlice;
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
 
 
 /**
@@ -53,6 +53,14 @@ public interface DataProvider {
    * @return map of timeseries (keyed by slice)
    */
   Map<MetricSlice, DataFrame> fetchTimeseries(Collection<MetricSlice> slices);
+
+  /**
+   * Caches the time series for the metric slices for later use
+   * @param slices
+   */
+  default void cacheTimeseries(Collection<MetricSlice> slices){
+    // do nothing if not implemented
+  }
 
   /**
    * Returns a map of aggregation values (keyed by slice) for a given set of slices,

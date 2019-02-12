@@ -41,7 +41,11 @@ public interface BaselineProvider<T extends AbstractSpec> extends BaseComponent<
    * @return the predicted value.
    */
   default Double computePredictedAggregates(MetricSlice slice, Series.DoubleFunction aggregateFunction){
-    TimeSeries baselineTimeSeries = this.computePredictedTimeSeries(slice);
-    return baselineTimeSeries.getPredictedBaseline().aggregate(aggregateFunction).getDouble(0);
+    try {
+      TimeSeries baselineTimeSeries = this.computePredictedTimeSeries(slice);
+      return baselineTimeSeries.getPredictedBaseline().aggregate(aggregateFunction).getDouble(0);
+    } catch (Exception e){
+      return Double.NaN;
+    }
   }
 }

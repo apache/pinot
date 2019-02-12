@@ -21,7 +21,8 @@ package org.apache.pinot.thirdeye.detection;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
-import java.io.IOException;
+import com.wordnik.swagger.annotations.Api;
+import com.wordnik.swagger.annotations.ApiOperation;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -41,6 +42,7 @@ import javax.ws.rs.core.Response;
 import javax.xml.bind.ValidationException;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.thirdeye.anomaly.detection.AnomalyDetectionInputContextBuilder;
+import org.apache.pinot.thirdeye.api.Constants;
 import org.apache.pinot.thirdeye.datalayer.bao.AlertConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
@@ -56,10 +58,10 @@ import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.util.Predicate;
-import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.apache.pinot.thirdeye.detection.yaml.YamlDetectionAlertConfigTranslator;
 import org.apache.pinot.thirdeye.detection.yaml.YamlResource;
 import org.joda.time.Period;
+import org.omg.CORBA.OBJ_ADAPTER;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.DumperOptions;
@@ -73,6 +75,7 @@ import static org.apache.pinot.thirdeye.detection.yaml.YamlDetectionAlertConfigT
  * The Detection migration resource.
  */
 @Path("/migrate")
+@Api(tags = {Constants.YAML_TAG})
 public class DetectionMigrationResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(DetectionMigrationResource.class);
   private static final String PROP_WINDOW_DELAY = "windowDelay";
@@ -146,10 +149,19 @@ public class DetectionMigrationResource {
           "params", getMinMaxThresholdRuleDetectorParams(anomalyFunctionDTO))));
     } else{
       // algorithm detector
-      ruleYaml.put("detection", Collections.singletonList(
-          ImmutableMap.of("name", "detection_rule1", "type", "MIGRATED_ALGORITHM", "params", getAlgorithmDetectorParams(anomalyFunctionDTO),
-              PROP_WINDOW_SIZE, anomalyFunctionDTO.getWindowSize(),
-              PROP_WINDOW_UNIT, anomalyFunctionDTO.getWindowUnit().toString())));
+      Map<String, Object> detectionProperties = new HashMap<>();
+      if (anomalyFunctionDTO.getWindowDelay() != 0) {
+        detectionProperties.put(PROP_WINDOW_DELAY, anomalyFunctionDTO.getWindowDelay());
+        detectionProperties.put(PROP_WINDOW_DELAY_UNIT, anomalyFunctionDTO.getWindowDelayUnit().toString());
+      }
+      detectionProperties.put("name", "detection_rule1");
+      detectionProperties.put("type", "MIGRATED_ALGORITHM");
+      detectionProperties.put("params", getAlgorithmDetectorParams(anomalyFunctionDTO));
+      detectionProperties.put(PROP_WINDOW_SIZE, anomalyFunctionDTO.getWindowSize());
+      detectionProperties.put(PROP_WINDOW_UNIT, anomalyFunctionDTO.getWindowUnit().toString());
+      detectionProperties.put("bucketPeriod", getBucketPeriod(anomalyFunctionDTO));
+
+      ruleYaml.put("detection", Collections.singletonList(detectionProperties));
     }
 
     // filters
@@ -288,10 +300,6 @@ public class DetectionMigrationResource {
     }
     params.put("variables.bucketPeriod", getBucketPeriod(functionDTO));
     params.put("variables.timeZone", getTimezone(functionDTO));
-    if (functionDTO.getWindowDelay() != 0) {
-      detectorYaml.put(PROP_WINDOW_DELAY, functionDTO.getWindowDelay());
-      detectorYaml.put(PROP_WINDOW_DELAY_UNIT, functionDTO.getWindowDelayUnit().toString());
-    }
     return detectorYaml;
   }
 
@@ -535,8 +543,7 @@ public class DetectionMigrationResource {
   }
 
   @POST
-  @Produces(MediaType.APPLICATION_JSON)
-  @Consumes(MediaType.APPLICATION_JSON)
+  @ApiOperation("migrate an application")
   @Path("/application/{name}")
   public Response migrateApplication(@PathParam("name") String application) {
     List<AlertConfigDTO> alertConfigDTOList = alertConfigDAO.findByPredicate(Predicate.EQ("application", application));

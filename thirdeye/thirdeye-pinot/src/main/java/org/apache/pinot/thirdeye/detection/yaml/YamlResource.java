@@ -527,7 +527,6 @@ public class YamlResource {
       responseMessage.put("message", "Failed to run the preview due to " + e.getMessage());
       return Response.serverError().entity(responseMessage).build();
     }
-
     LOG.info("Preview successful using payload " + payload);
     return Response.ok(result).build();
   }

@@ -20,6 +20,12 @@
 package org.apache.pinot.thirdeye.detection.wrapper;
 
 import com.google.common.base.Preconditions;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
+import org.apache.commons.collections.MapUtils;
 import org.apache.pinot.thirdeye.anomaly.detection.DetectionJobSchedulerUtils;
 import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.common.time.TimeSpec;
@@ -37,12 +43,6 @@ import org.apache.pinot.thirdeye.detection.DetectionUtils;
 import org.apache.pinot.thirdeye.detection.spi.components.AnomalyDetector;
 import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
 import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.TimeUnit;
-import org.apache.commons.collections.MapUtils;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.Interval;
@@ -71,6 +71,8 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
   private static final String PROP_DETECTOR = "detector";
   private static final String PROP_DETECTOR_COMPONENT_NAME = "detectorComponentName";
   private static final String PROP_TIMEZONE = "timezone";
+  private static final String PROP_BUCKET_PERIOD = "bucketPeriod";
+  private static final long DEFAULT_CACHING_PERIOD_LOOKBACK = TimeUnit.DAYS.toMillis(60);
 
   private static final Logger LOG = LoggerFactory.getLogger(
       AnomalyDetectorWrapper.class);
@@ -91,6 +93,7 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
   private final long windowSizeMillis;
   private final DatasetConfigDTO dataset;
   private final DateTimeZone dateTimeZone;
+  private final Period bucketPeriod;
 
 
   public AnomalyDetectorWrapper(DataProvider provider, DetectionConfigDTO config, long startTime, long endTime) {
@@ -123,18 +126,30 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
     this.dataset = this.provider.fetchDatasets(Collections.singletonList(metricConfigDTO.getDataset()))
         .get(metricConfigDTO.getDataset());
     // date time zone for moving windows. use dataset time zone as default
-    this.dateTimeZone = DateTimeZone.forID(MapUtils.getString(config.getProperties(), PROP_TIMEZONE, this.dataset.getTimezone()));
+    this.dateTimeZone = DateTimeZone.forID(MapUtils.getString(config.getProperties(), PROP_TIMEZONE, "America/Los_Angeles"));
+
+    String bucketStr = MapUtils.getString(config.getProperties(), PROP_BUCKET_PERIOD);
+    this.bucketPeriod = bucketStr == null ? this.getBucketSizePeriodForDataset() : Period.parse(bucketStr);
   }
 
   @Override
   public DetectionPipelineResult run() throws Exception {
+    // pre-cache time series with default granularity. this is used in multiple places:
+    // 1. get the last time stamp for the time series.
+    // 2. to calculate current values and  baseline values for the anomalies detected
+    // 3. anomaly detection current and baseline time series value
+    MetricSlice cacheSlice = MetricSlice.from(this.metricEntity.getId(), startTime - DEFAULT_CACHING_PERIOD_LOOKBACK, endTime, this.metricEntity.getFilters());
+    this.provider.cacheTimeseries(Collections.singleton(cacheSlice));
+
     List<Interval> monitoringWindows = this.getMonitoringWindows();
     List<MergedAnomalyResultDTO> anomalies = new ArrayList<>();
     for (Interval window : monitoringWindows) {
       List<MergedAnomalyResultDTO> anomaliesForOneWindow = new ArrayList<>();
       try {
-        LOG.info("[New Pipeline] running detection for config {} metricUrn {}. start time {}, end time{}", config.getId(), metricUrn, window.getStart(), window.getEnd());
+        LOG.info("[New Pipeline] running detection for config {} metricUrn {}. start time {}, end time {}", config.getId(), metricUrn, window.getStart(), window.getEnd());
+        long ts = System.currentTimeMillis();
         anomaliesForOneWindow = anomalyDetector.runDetection(window, this.metricUrn);
+        LOG.info("[New Pipeline] run anomaly detection for window {} - {} used {} milliseconds", window.getStart(), window.getEnd(), System.currentTimeMillis() - ts);
       } catch (Exception e) {
         LOG.warn("[DetectionConfigID{}] detecting anomalies for window {} to {} failed.", this.config.getId(), window.getStart(), window.getEnd(), e);
       }
@@ -190,8 +205,11 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
           monitoringWindows.add(new Interval(startTime, endTime, dateTimeZone));
         }
         for (Interval window : monitoringWindows){
-          LOG.info("running detections in windows {}", window);
+          LOG.info("Will run detection in window {}", window);
         }
+        // pre cache the time series for the whole detection time period instead of fetching for each window
+        MetricSlice cacheSlice = MetricSlice.from(this.metricEntity.getId(), startTime - DEFAULT_CACHING_PERIOD_LOOKBACK, endTime, this.metricEntity.getFilters(), toTimeGranularity(this.bucketPeriod));
+        this.provider.cacheTimeseries(Collections.singleton(cacheSlice));
         return monitoringWindows;
       } catch (Exception e) {
         LOG.info("can't generate moving monitoring windows, calling with single detection window", e);
@@ -208,9 +226,8 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
     DateTime currentEndTime = new DateTime(getBoundaryAlignedTimeForDataset(new DateTime(endTime, dateTimeZone)), dateTimeZone);
 
     DateTime lastDateTime = new DateTime(getBoundaryAlignedTimeForDataset(new DateTime(startTime, dateTimeZone)), dateTimeZone);
-    Period bucketSizePeriod = getBucketSizePeriodForDataset();
     while (lastDateTime.isBefore(currentEndTime)) {
-      lastDateTime = lastDateTime.plus(bucketSizePeriod);
+      lastDateTime = lastDateTime.plus(this.bucketPeriod);
       endTimes.add(lastDateTime.getMillis());
     }
     return endTimes;
@@ -271,4 +288,17 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
     }
     return bucketSizePeriod;
   }
+
+  public static TimeGranularity toTimeGranularity(Period period) {
+    if (period.getDays() > 0) {
+      return new TimeGranularity(period.getDays(), TimeUnit.DAYS);
+    } else if (period.getHours() > 0) {
+      return new TimeGranularity(period.getHours(), TimeUnit.HOURS);
+    } else if (period.getMinutes() > 0)  {
+      return new TimeGranularity(period.getMinutes(), TimeUnit.MINUTES);
+    } else {
+      return new TimeGranularity(period.getMillis(), TimeUnit.MILLISECONDS);
+    }
+  }
+
 }
