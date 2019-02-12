@@ -21,6 +21,7 @@ package org.apache.pinot.controller.helix.core.periodictask;
 import java.util.List;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.metrics.ControllerGauge;
+import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.periodictask.BasePeriodicTask;
@@ -50,7 +51,13 @@ public abstract class ControllerPeriodicTask<C> extends BasePeriodicTask {
 
   @Override
   protected final void runTask() {
-    processTables(_pinotHelixResourceManager.getAllTables());
+    _controllerMetrics.addMeteredTableValue(_taskName, ControllerMeter.CONTROLLER_PERIODIC_TASK_RUN, 1L);
+    try {
+      processTables(_pinotHelixResourceManager.getAllTables());
+    } catch (Exception e) {
+      LOGGER.error("Caught exception while running task: {}", _taskName, e);
+      _controllerMetrics.addMeteredTableValue(_taskName, ControllerMeter.CONTROLLER_PERIODIC_TASK_ERROR, 1L);
+    }
   }
 
   /**
@@ -82,7 +89,7 @@ public abstract class ControllerPeriodicTask<C> extends BasePeriodicTask {
   }
 
   /**
-   * Can be override to provide context before processing the tables.
+   * Can be overridden to provide context before processing the tables.
    */
   protected C preprocess() {
     return null;
@@ -106,14 +113,14 @@ public abstract class ControllerPeriodicTask<C> extends BasePeriodicTask {
   }
 
   /**
-   * Can be override to perform cleanups after processing the tables.
+   * Can be overridden to perform cleanups after processing the tables.
    */
   protected void postprocess(C context) {
     postprocess();
   }
 
   /**
-   * Can be override to perform cleanups after processing the tables.
+   * Can be overridden to perform cleanups after processing the tables.
    */
   protected void postprocess() {
   }

@@ -88,10 +88,12 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
   public synchronized Map<String, String> scheduleTasks() {
     Map<String, String> tasksScheduled = scheduleTasks(_pinotHelixResourceManager.getAllTables());
 
-    // For non-leader controller, perform non-leader cleanup
+    // NOTE: this method might be called from the Rest API instead of the periodic task scheduler on non-leader
+    // controllers, so if the task is stopped (non-leader controller), clean up the task
     if (!isStarted()) {
-      nonLeaderCleanUp();
+      cleanUpTask();
     }
+
     return tasksScheduled;
   }
 
@@ -149,13 +151,6 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
     return tasksScheduled;
   }
 
-  private void nonLeaderCleanUp() {
-    LOGGER.info("Performing non-leader cleanups");
-    for (String taskType : _taskGeneratorRegistry.getAllTaskTypes()) {
-      _taskGeneratorRegistry.getTaskGenerator(taskType).nonLeaderCleanUp();
-    }
-  }
-
   @Override
   protected void processTables(List<String> tableNamesWithType) {
     scheduleTasks(tableNamesWithType);
@@ -163,6 +158,9 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
 
   @Override
   public void cleanUpTask() {
-    nonLeaderCleanUp();
+    LOGGER.info("Cleaning up all task generators");
+    for (String taskType : _taskGeneratorRegistry.getAllTaskTypes()) {
+      _taskGeneratorRegistry.getTaskGenerator(taskType).nonLeaderCleanUp();
+    }
   }
 }

@@ -30,7 +30,7 @@ import org.slf4j.LoggerFactory;
 public abstract class BasePeriodicTask implements PeriodicTask {
   private static final Logger LOGGER = LoggerFactory.getLogger(BasePeriodicTask.class);
 
-  // Wait for at most 5 minutes while calling stop() for task to terminate
+  // Wait for at most 30 seconds while calling stop() for task to terminate
   private static final long MAX_PERIODIC_TASK_STOP_TIME_MILLIS = 30_000L;
 
   protected final String _taskName;
@@ -97,7 +97,9 @@ public abstract class BasePeriodicTask implements PeriodicTask {
   }
 
   /**
-   * Can be override for extra task setups.
+   * Can be overridden for extra task setups. This method will be called when the periodic task starts.
+   * <p>
+   * Possible setups include adding or resetting the metric values.
    */
   protected void setUpTask() {
   }
@@ -136,8 +138,8 @@ public abstract class BasePeriodicTask implements PeriodicTask {
   /**
    * {@inheritDoc}
    * <p>
-   * This method sets {@code started} flag to false. If the task is running, this method will block for at most 5
-   * minutes until the task finishes.
+   * This method sets {@code started} flag to false. If the task is running, this method will block for at most 30
+   * seconds until the task finishes.
    */
   @Override
   public final synchronized void stop() {
@@ -164,9 +166,9 @@ public abstract class BasePeriodicTask implements PeriodicTask {
       }
       long waitTimeMs = System.currentTimeMillis() - startTimeMs;
       if (_running) {
-        LOGGER.info("Task: {} is finished in {}ms", waitTimeMs);
-      } else {
         LOGGER.warn("Task: {} is not finished in {}ms", waitTimeMs);
+      } else {
+        LOGGER.info("Task: {} is finished in {}ms", waitTimeMs);
       }
     }
 
@@ -178,7 +180,9 @@ public abstract class BasePeriodicTask implements PeriodicTask {
   }
 
   /**
-   * Can be override for extra task cleanups.
+   * Can be overridden for extra task cleanups. This method will be called when the periodic task stops.
+   * <p>
+   * Possible cleanups include removing or resetting the metric values.
    */
   protected void cleanUpTask() {
   }
