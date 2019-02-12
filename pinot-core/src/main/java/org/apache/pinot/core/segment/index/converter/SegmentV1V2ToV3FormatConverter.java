@@ -86,9 +86,7 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
     File newLocation = SegmentDirectoryPaths.segmentDirectoryFor(v2SegmentDirectory, SegmentVersion.v3);
     LOGGER.info("v3 segment location for segment: {} is {}", v2Metadata.getName(), newLocation);
 
-    if (!v3TempDirectory.renameTo(newLocation)) {
-      LOGGER.error("cannot rename {} to {}", v3TempDirectory.getName(), newLocation.getName());
-    }
+    v3TempDirectory.renameTo(newLocation);
     deleteV2Files(v2SegmentDirectory);
   }
 
