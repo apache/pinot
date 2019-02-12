@@ -29,7 +29,7 @@ import org.testng.annotations.Test;
 
 
 public class LoaderUtilsTest {
-  private static final File TEST_DIR = new File("tmp", LoaderUtils.class.getName());
+  private static final File TEST_DIR = new File(FileUtils.getTempDirectory(), LoaderUtils.class.getName());
 
   @BeforeClass
   public void setUp()
