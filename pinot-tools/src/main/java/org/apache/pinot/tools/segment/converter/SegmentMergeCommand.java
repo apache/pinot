@@ -179,7 +179,7 @@ public class SegmentMergeCommand extends AbstractBaseAdminCommand implements Com
 
       // Compute segment name if it is not specified
       if (_outputSegmentName == null) {
-        _outputSegmentName = getDefaultSegmentName(tableConfig, schema, inputIndexDirs, minStartTime, maxEndTime);
+        _outputSegmentName = getDefaultSegmentName(tableConfig, schema, minStartTime, maxEndTime);
       }
       LOGGER.info("Output segment name: {}", _outputSegmentName);
 
@@ -234,23 +234,20 @@ public class SegmentMergeCommand extends AbstractBaseAdminCommand implements Com
     return "Create the merged segment using concatenation";
   }
 
-  private String getDefaultSegmentName(TableConfig tableConfig, Schema schema, List<File> inputIndexDirs,
-      long minStartTime, long maxEndTime)
-      throws Exception {
+  private String getDefaultSegmentName(TableConfig tableConfig, Schema schema, long minStartTime, long maxEndTime) {
     String tableName = tableConfig.getTableName();
 
     // Fetch time related configurations from schema and table config.
     String pushFrequency = tableConfig.getValidationConfig().getSegmentPushFrequency();
-    String timeColumnType = tableConfig.getValidationConfig().getTimeType();
+    String timeType = tableConfig.getValidationConfig().getTimeType();
     String pushType = tableConfig.getValidationConfig().getSegmentPushType();
     String timeFormat = schema.getTimeFieldSpec().getOutgoingGranularitySpec().getTimeFormat();
 
     // Generate the final segment name using segment name generator
     NormalizedDateSegmentNameGenerator segmentNameGenerator =
-        new NormalizedDateSegmentNameGenerator(tableName, DEFAULT_SEQUENCE_ID, timeColumnType, pushFrequency, pushType,
-            null, null, timeFormat);
+        new NormalizedDateSegmentNameGenerator(tableName, null, null, pushType, pushFrequency, timeType, timeFormat);
 
-    return segmentNameGenerator.generateSegmentName(minStartTime, maxEndTime);
+    return segmentNameGenerator.generateSegmentName(DEFAULT_SEQUENCE_ID, minStartTime, maxEndTime);
   }
 
   private boolean isPinotSegment(File path) {

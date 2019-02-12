@@ -51,8 +51,9 @@ import org.apache.pinot.core.data.readers.CSVRecordReaderConfig;
 import org.apache.pinot.core.data.readers.FileFormat;
 import org.apache.pinot.core.data.readers.RecordReaderConfig;
 import org.apache.pinot.core.io.compression.ChunkCompressorFactory;
-import org.apache.pinot.core.segment.name.DefaultSegmentNameGenerator;
+import org.apache.pinot.core.segment.name.FixedSegmentNameGenerator;
 import org.apache.pinot.core.segment.name.SegmentNameGenerator;
+import org.apache.pinot.core.segment.name.SimpleSegmentNameGenerator;
 import org.apache.pinot.core.startree.v2.builder.StarTreeV2BuilderConfig;
 import org.apache.pinot.core.util.AvroUtils;
 import org.apache.pinot.startree.hll.HllConfig;
@@ -544,10 +545,9 @@ public class SegmentGeneratorConfig {
       return _segmentNameGenerator;
     }
     if (_segmentName != null) {
-      return new DefaultSegmentNameGenerator(_segmentName);
+      return new FixedSegmentNameGenerator(_segmentName);
     }
-    return new DefaultSegmentNameGenerator(getTimeColumnName(), getTableName(), getSegmentNamePostfix(),
-        getSequenceId());
+    return new SimpleSegmentNameGenerator(_tableName, _segmentNamePostfix);
   }
 
   public void setSegmentNameGenerator(SegmentNameGenerator segmentNameGenerator) {

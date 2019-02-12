@@ -25,13 +25,10 @@ import org.apache.pinot.common.data.StarTreeIndexSpec;
 import org.apache.pinot.common.segment.SegmentMetadata;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.core.data.readers.FileFormat;
-import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
-import org.apache.pinot.core.segment.name.DefaultSegmentNameGenerator;
-import org.apache.pinot.core.segment.name.SegmentNameGenerator;
 import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.Option;
 
@@ -111,26 +108,21 @@ public class ColumnarToStarTreeConverter {
    */
   private void convertSegment(File columnarSegment)
       throws Exception {
-    PinotSegmentRecordReader pinotSegmentRecordReader = new PinotSegmentRecordReader(columnarSegment);
-    SegmentGeneratorConfig config = new SegmentGeneratorConfig(pinotSegmentRecordReader.getSchema());
-
+    SegmentMetadata segmentMetadata = new SegmentMetadataImpl(columnarSegment);
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(segmentMetadata.getSchema());
     config.setDataDir(_inputDirName);
     config.setInputFilePath(columnarSegment.getAbsolutePath());
     config.setFormat(FileFormat.PINOT);
     config.setOutDir(_outputDirName);
     config.setOverwrite(_overwrite);
+    config.setTableName(segmentMetadata.getTableName());
+    config.setSegmentName(segmentMetadata.getName());
 
     StarTreeIndexSpec starTreeIndexSpec = null;
     if (_starTreeConfigFileName != null) {
       starTreeIndexSpec = StarTreeIndexSpec.fromFile(new File(_starTreeConfigFileName));
     }
     config.enableStarTreeIndex(starTreeIndexSpec);
-
-    // Read the segment and table name from the segment's metadata.
-    SegmentMetadata metadata = new SegmentMetadataImpl(columnarSegment);
-    SegmentNameGenerator nameGenerator = new DefaultSegmentNameGenerator(metadata.getName());
-    config.setSegmentNameGenerator(nameGenerator);
-    config.setTableName(metadata.getTableName());
 
     SegmentIndexCreationDriver indexCreator = new SegmentIndexCreationDriverImpl();
     indexCreator.init(config);

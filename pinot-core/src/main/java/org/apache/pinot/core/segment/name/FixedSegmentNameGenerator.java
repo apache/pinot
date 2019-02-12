@@ -18,23 +18,26 @@
  */
 package org.apache.pinot.core.segment.name;
 
-import com.google.common.base.Joiner;
 import javax.annotation.Nullable;
 
 
 /**
- * Interface for segment name generator based on the segment sequence id and time range.
+ * Fixed segment name generator which always returns the fixed segment name.
  */
-public interface SegmentNameGenerator {
-  Joiner JOINER = Joiner.on('_').skipNulls();
+public class FixedSegmentNameGenerator implements SegmentNameGenerator {
+  private final String _segmentName;
 
-  /**
-   * Generates the segment name.
-   *
-   * @param sequenceId Segment sequence id (negative value means INVALID)
-   * @param minTimeValue Minimum time value
-   * @param maxTimeValue Maximum time value
-   * @return Segment name generated
-   */
-  String generateSegmentName(int sequenceId, @Nullable Object minTimeValue, @Nullable Object maxTimeValue);
+  public FixedSegmentNameGenerator(String segmentName) {
+    _segmentName = segmentName;
+  }
+
+  @Override
+  public String generateSegmentName(int sequenceId, @Nullable Object minTimeValue, @Nullable Object maxTimeValue) {
+    return _segmentName;
+  }
+
+  @Override
+  public String toString() {
+    return String.format("FixedSegmentNameGenerator: segmentName=%s", _segmentName);
+  }
 }
