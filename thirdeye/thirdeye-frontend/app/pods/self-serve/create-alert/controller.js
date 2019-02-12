@@ -31,6 +31,7 @@ import {
 import config from 'thirdeye-frontend/config/environment';
 
 export default Controller.extend({
+  notifications: service('toast'),
 
   /**
    * Initialized alert creation page settings
@@ -69,7 +70,6 @@ export default Controller.extend({
     snippet: ''
   }],
   metricHelpMailto: `mailto:${config.email}?subject=Metric Onboarding Request (non-additive UMP or derived)`,
-  isDevEnv: config.environment === 'development',
 
   /**
    * Component property initial settings
@@ -114,8 +114,6 @@ export default Controller.extend({
       'Absolute Value of Change': 'deviation'
     }
   },
-
-  notifications: service('toast'),
 
   /**
    * Severity display options (power-select) and values
@@ -204,6 +202,11 @@ export default Controller.extend({
    * The list of all existing alert configuration groups.
    */
   allAlertsConfigGroups: reads('model.allConfigGroups'),
+
+  /**
+   * The debug flag
+   */
+  debug: reads('model.debug'),
 
   /**
    * Handler for search by function name - using ember concurrency (task)

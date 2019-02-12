@@ -14,20 +14,24 @@ import {
 } from 'thirdeye-frontend/utils/api/self-serve';
 import { postProps, checkStatus } from 'thirdeye-frontend/utils/utils';
 import { inject as service } from '@ember/service';
+import { get } from '@ember/object';
 
 let onboardStartTime = {};
 
 export default Route.extend({
   session: service(),
+
   /**
    * Model hook for the create alert route.
    * @method model
    * @return {Object}
    */
   model(params, transition) {
+    const debug = transition.state.queryParams.debug || '';
     return RSVP.hash({
       allConfigGroups: fetch(selfServeApiCommon.allConfigGroups).then(checkStatus),
-      allAppNames: fetch(selfServeApiCommon.allApplications).then(checkStatus)
+      allAppNames: fetch(selfServeApiCommon.allApplications).then(checkStatus),
+      debug
     });
   },
 
