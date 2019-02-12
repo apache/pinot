@@ -20,7 +20,6 @@
 package org.apache.pinot.thirdeye.detection.validators;
 
 import com.google.common.base.Preconditions;
-import java.lang.reflect.InvocationTargetException;
 import javax.xml.bind.ValidationException;
 import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
@@ -83,6 +82,7 @@ public class DetectionConfigValidator implements ConfigValidator<DetectionConfig
   /**
    * Perform validation on the detection config like verifying if all the required fields are set
    */
+  @Override
   public void validateConfig(DetectionConfigDTO detectionConfig) throws ValidationException {
     semanticValidation(detectionConfig);
   }
@@ -91,6 +91,7 @@ public class DetectionConfigValidator implements ConfigValidator<DetectionConfig
    * Perform validation on the updated detection config. Check for fields which shouldn't be
    * updated by the user.
    */
+  @Override
   public void validateUpdatedConfig(DetectionConfigDTO updatedConfig, DetectionConfigDTO oldConfig)
       throws ValidationException {
     validateConfig(updatedConfig);
