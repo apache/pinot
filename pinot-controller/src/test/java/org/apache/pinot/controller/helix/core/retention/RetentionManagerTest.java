@@ -92,7 +92,7 @@ public class RetentionManagerTest {
     conf.setRetentionControllerFrequencyInSeconds(0);
     conf.setDeletedSegmentsRetentionInDays(0);
     RetentionManager retentionManager = new RetentionManager(pinotHelixResourceManager, conf, controllerMetrics);
-    retentionManager.init();
+    retentionManager.start();
     retentionManager.run();
 
     SegmentDeletionManager deletionManager = pinotHelixResourceManager.getSegmentDeletionManager();
@@ -215,7 +215,7 @@ public class RetentionManagerTest {
     conf.setRetentionControllerFrequencyInSeconds(0);
     conf.setDeletedSegmentsRetentionInDays(0);
     RetentionManager retentionManager = new RetentionManager(pinotHelixResourceManager, conf, controllerMetrics);
-    retentionManager.init();
+    retentionManager.start();
     retentionManager.run();
 
     SegmentDeletionManager deletionManager = pinotHelixResourceManager.getSegmentDeletionManager();

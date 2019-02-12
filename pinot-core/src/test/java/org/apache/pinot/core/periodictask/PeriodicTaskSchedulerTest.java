@@ -34,24 +34,24 @@ public class PeriodicTaskSchedulerTest {
   @Test
   public void testTaskWithInvalidInterval()
       throws Exception {
-    AtomicBoolean initCalled = new AtomicBoolean();
+    AtomicBoolean startCalled = new AtomicBoolean();
     AtomicBoolean runCalled = new AtomicBoolean();
     AtomicBoolean stopCalled = new AtomicBoolean();
 
     List<PeriodicTask> periodicTasks = Collections.singletonList(new BasePeriodicTask("TestTask", 0L/*Invalid*/, 0L) {
       @Override
-      public void init() {
-        initCalled.set(true);
+      protected void setUpTask() {
+        startCalled.set(true);
       }
 
       @Override
-      public void stop() {
-        stopCalled.set(true);
-      }
-
-      @Override
-      public void run() {
+      protected void runTask() {
         runCalled.set(true);
+      }
+
+      @Override
+      protected void cleanUpTask() {
+        stopCalled.set(true);
       }
     });
 
@@ -61,7 +61,7 @@ public class PeriodicTaskSchedulerTest {
     Thread.sleep(100L);
     taskScheduler.stop();
 
-    assertFalse(initCalled.get());
+    assertFalse(startCalled.get());
     assertFalse(runCalled.get());
     assertFalse(stopCalled.get());
   }
@@ -70,26 +70,26 @@ public class PeriodicTaskSchedulerTest {
   public void testScheduleMultipleTasks()
       throws Exception {
     int numTasks = 3;
-    AtomicInteger numTimesInitCalled = new AtomicInteger();
+    AtomicInteger numTimesStartCalled = new AtomicInteger();
     AtomicInteger numTimesRunCalled = new AtomicInteger();
     AtomicInteger numTimesStopCalled = new AtomicInteger();
 
     List<PeriodicTask> periodicTasks = new ArrayList<>(numTasks);
     for (int i = 0; i < numTasks; i++) {
-      periodicTasks.add(new BasePeriodicTask("Task", 1L, 0L) {
+      periodicTasks.add(new BasePeriodicTask("TestTask", 1L, 0L) {
         @Override
-        public void init() {
-          numTimesInitCalled.getAndIncrement();
+        protected void setUpTask() {
+          numTimesStartCalled.getAndIncrement();
         }
 
         @Override
-        public void stop() {
-          numTimesStopCalled.getAndIncrement();
-        }
-
-        @Override
-        public void run() {
+        protected void runTask() {
           numTimesRunCalled.getAndIncrement();
+        }
+
+        @Override
+        protected void cleanUpTask() {
+          numTimesStopCalled.getAndIncrement();
         }
       });
     }
@@ -100,7 +100,7 @@ public class PeriodicTaskSchedulerTest {
     Thread.sleep(1100L);
     taskScheduler.stop();
 
-    assertEquals(numTimesInitCalled.get(), numTasks);
+    assertEquals(numTimesStartCalled.get(), numTasks);
     assertEquals(numTimesRunCalled.get(), numTasks * 2);
     assertEquals(numTimesStopCalled.get(), numTasks);
   }

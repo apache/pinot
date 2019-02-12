@@ -44,30 +44,30 @@ public class ControllerPeriodicTaskTest {
 
   private final PinotHelixResourceManager _resourceManager = mock(PinotHelixResourceManager.class);
   private final ControllerMetrics _controllerMetrics = new ControllerMetrics(new MetricsRegistry());
+  private final AtomicBoolean _startTaskCalled = new AtomicBoolean();
   private final AtomicBoolean _stopTaskCalled = new AtomicBoolean();
-  private final AtomicBoolean _initTaskCalled = new AtomicBoolean();
-  private final AtomicBoolean _processCalled = new AtomicBoolean();
+  private final AtomicBoolean _processTablesCalled = new AtomicBoolean();
   private final AtomicInteger _tablesProcessed = new AtomicInteger();
   private final int _numTables = 3;
   private static final String TASK_NAME = "TestTask";
 
-  private final MockControllerPeriodicTask _task = new MockControllerPeriodicTask(TASK_NAME, RUN_FREQUENCY_IN_SECONDS,
+  private final ControllerPeriodicTask _task = new ControllerPeriodicTask<Void>(TASK_NAME, RUN_FREQUENCY_IN_SECONDS,
       _controllerConf.getPeriodicTaskInitialDelayInSeconds(), _resourceManager, _controllerMetrics) {
 
     @Override
-    protected void initTask() {
-      _initTaskCalled.set(true);
+    protected void setUpTask() {
+      _startTaskCalled.set(true);
     }
 
     @Override
-    public void stopTask() {
+    public void cleanUpTask() {
       _stopTaskCalled.set(true);
     }
 
     @Override
-    public void process(List<String> tableNamesWithType) {
-      _processCalled.set(true);
-      super.process(tableNamesWithType);
+    public void processTables(List<String> tableNamesWithType) {
+      _processTablesCalled.set(true);
+      super.processTables(tableNamesWithType);
     }
 
     @Override
@@ -84,9 +84,9 @@ public class ControllerPeriodicTaskTest {
   }
 
   private void resetState() {
-    _initTaskCalled.set(false);
+    _startTaskCalled.set(false);
     _stopTaskCalled.set(false);
-    _processCalled.set(false);
+    _processTablesCalled.set(false);
     _tablesProcessed.set(0);
     _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED, TASK_NAME, 0);
   }
@@ -103,86 +103,72 @@ public class ControllerPeriodicTaskTest {
 
   @Test
   public void testControllerPeriodicTaskCalls() {
-    // Initial state
+    // Start periodic task - leadership gained
     resetState();
-    _task.init();
-    assertTrue(_initTaskCalled.get());
-    assertFalse(_processCalled.get());
+    _task.start();
+    assertTrue(_startTaskCalled.get());
+    assertFalse(_processTablesCalled.get());
     assertEquals(_tablesProcessed.get(), 0);
     assertFalse(_stopTaskCalled.get());
-    assertFalse(_task.shouldStopPeriodicTask());
+    assertTrue(_task.isStarted());
     assertEquals(
         _controllerMetrics.getValueOfGlobalGauge(ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED, TASK_NAME), 0);
 
-    // run task - leadership gained
+    // Run periodic task with leadership
     resetState();
     _task.run();
-    assertFalse(_initTaskCalled.get());
-    assertTrue(_processCalled.get());
+    assertFalse(_startTaskCalled.get());
+    assertTrue(_processTablesCalled.get());
     assertEquals(_tablesProcessed.get(), _numTables);
     assertEquals(
         _controllerMetrics.getValueOfGlobalGauge(ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED, TASK_NAME),
         _numTables);
     assertFalse(_stopTaskCalled.get());
-    assertFalse(_task.shouldStopPeriodicTask());
+    assertTrue(_task.isStarted());
 
-    // stop periodic task - leadership lost
+    // Stop periodic task - leadership lost
     resetState();
     _task.stop();
-    assertFalse(_initTaskCalled.get());
-    assertFalse(_processCalled.get());
+    assertFalse(_startTaskCalled.get());
+    assertFalse(_processTablesCalled.get());
     assertEquals(_tablesProcessed.get(), 0);
     assertEquals(
         _controllerMetrics.getValueOfGlobalGauge(ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED, TASK_NAME), 0);
     assertTrue(_stopTaskCalled.get());
-    assertTrue(_task.shouldStopPeriodicTask());
+    assertFalse(_task.isStarted());
 
-    // call to run after periodic task stop invoked - leadership gained back on same controller
+    // Run periodic task without leadership
     resetState();
     _task.run();
-    assertFalse(_task.shouldStopPeriodicTask());
-    assertFalse(_initTaskCalled.get());
-    assertTrue(_processCalled.get());
+    assertFalse(_startTaskCalled.get());
+    assertFalse(_processTablesCalled.get());
+    assertEquals(_tablesProcessed.get(), 0);
+    assertEquals(
+        _controllerMetrics.getValueOfGlobalGauge(ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED, TASK_NAME), 0);
+    assertFalse(_stopTaskCalled.get());
+    assertFalse(_task.isStarted());
+
+    // Restart periodic task - leadership re-gained
+    resetState();
+    _task.start();
+    assertTrue(_startTaskCalled.get());
+    assertFalse(_processTablesCalled.get());
+    assertEquals(_tablesProcessed.get(), 0);
+    assertFalse(_stopTaskCalled.get());
+    assertTrue(_task.isStarted());
+    assertEquals(
+        _controllerMetrics.getValueOfGlobalGauge(ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED, TASK_NAME), 0);
+
+    // Run periodic task with leadership
+    resetState();
+    _task.run();
+    assertFalse(_startTaskCalled.get());
+    assertTrue(_processTablesCalled.get());
     assertEquals(_tablesProcessed.get(), _numTables);
     assertEquals(
         _controllerMetrics.getValueOfGlobalGauge(ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED, TASK_NAME),
         _numTables);
     assertFalse(_stopTaskCalled.get());
-  }
-
-  private class MockControllerPeriodicTask extends ControllerPeriodicTask {
-
-    public MockControllerPeriodicTask(String taskName, long runFrequencyInSeconds, long initialDelayInSeconds,
-        PinotHelixResourceManager pinotHelixResourceManager, ControllerMetrics controllerMetrics) {
-      super(taskName, runFrequencyInSeconds, initialDelayInSeconds, pinotHelixResourceManager, controllerMetrics);
-    }
-
-    @Override
-    protected void initTask() {
-
-    }
-
-    @Override
-    protected void preprocess() {
-    }
-
-    @Override
-    protected void processTable(String tableNameWithType) {
-
-    }
-
-    @Override
-    public void postprocess() {
-    }
-
-    @Override
-    public void exceptionHandler(String tableNameWithType, Exception e) {
-
-    }
-
-    @Override
-    public void stopTask() {
-
-    }
+    assertTrue(_task.isStarted());
   }
 }
