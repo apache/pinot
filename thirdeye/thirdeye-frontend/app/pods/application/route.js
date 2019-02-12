@@ -5,11 +5,20 @@ import fetch from 'fetch';
 import { checkStatus } from 'thirdeye-frontend/utils/utils';
 import config from 'thirdeye-frontend/config/environment';
 
+// Prevent a full transition and pushState
+const queryParamsConfig = {
+  refreshModel: false,
+  replace: false
+};
+
 export default Route.extend(ApplicationRouteMixin, {
   moment: service(),
   session: service(),
   notifications: service('toast'),
-
+  queryParams: {
+    debug: queryParamsConfig,
+  },
+  
   beforeModel() {
     // calling this._super to trigger ember-simple-auth's hook
     this._super(...arguments);

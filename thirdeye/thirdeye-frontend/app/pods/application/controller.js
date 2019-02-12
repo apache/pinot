@@ -4,13 +4,15 @@
  * @exports application
  */
 import { inject as service } from '@ember/service';
-
+import { observer, get, set } from '@ember/object';
 import { alias } from '@ember/object/computed';
 import Controller from '@ember/controller';
 
 export default Controller.extend({
   showNavbar: alias('model'),
   session: service(),
+  queryParams: ['debug'],
+  debug: null,
 
   /**
    * Global navbar items
