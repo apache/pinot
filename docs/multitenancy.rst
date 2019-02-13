@@ -337,4 +337,3 @@ The znode ``/IDEALSTATES/XLNT (XLNT Data Resource IdealState)``
     }
 
 
-For all other admin operations, take a look at this [wiki](https://iwww.corp.linkedin.com/wiki/cf/display/PRT/Deployment+Tutorials).
