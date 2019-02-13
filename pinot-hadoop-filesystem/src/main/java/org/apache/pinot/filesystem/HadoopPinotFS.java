@@ -92,8 +92,16 @@ public class HadoopPinotFS extends PinotFS {
   @Override
   public boolean move(URI srcUri, URI dstUri, boolean overwrite)
       throws IOException {
-    if (exists(dstUri) && !overwrite) {
-      return false;
+    if (exists(dstUri)) {
+      if (overwrite) {
+        delete(dstUri, true);
+      } else {
+        // dst file exists, returning
+        return false;
+      }
+    } else {
+      // ensure the dst path exists
+      _hadoopFS.mkdirs(new Path(dstUri).getParent());
     }
     return _hadoopFS.rename(new Path(srcUri), new Path(dstUri));
   }

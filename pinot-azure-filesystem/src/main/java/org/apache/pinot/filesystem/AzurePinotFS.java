@@ -100,6 +100,18 @@ public class AzurePinotFS extends PinotFS {
   @Override
   public boolean move(URI srcUri, URI dstUri, boolean overwrite)
       throws IOException {
+    if (exists(dstUri)) {
+      if (overwrite) {
+        delete(dstUri, true);
+      } else {
+        // dst file exists, returning
+        return false;
+      }
+    } else {
+      URI parentUri = Paths.get(dstUri).toUri();
+      // ensure the dst path exists
+      _adlStoreClient.createDirectory(parentUri.getPath());
+    }
     if (exists(dstUri) && !overwrite) {
       return false;
     }
