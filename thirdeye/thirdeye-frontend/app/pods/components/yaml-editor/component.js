@@ -268,7 +268,7 @@ export default Component.extend({
           const yamlAlertProps = get(this, 'yamlAlertProps');
           set(this, 'alertYaml', yamlAlertProps);
         }
-      } else if (field === 'notification') {
+      } else if (field === 'subscription') {
         if(isEditMode) {
           set(this, 'detectionSettingsYaml', get(this, 'currentYamlSettingsOriginal'));
         } else {
@@ -290,7 +290,7 @@ export default Component.extend({
     },
 
     /**
-     * Updates the notification settings yaml with user section
+     * Updates the subscription settings yaml with user section
      */
     onYAMLGroupSelectionAction(value) {
       if(value.yaml) {
@@ -368,7 +368,7 @@ export default Component.extend({
     createAlertYamlAction() {
       const content = {
         detection: get(this, 'alertYaml'),
-        notification: get(this, 'detectionSettingsYaml')
+        subscription: get(this, 'detectionSettingsYaml')
       };
       const url = '/yaml/create-alert';
       const postProps = {
@@ -428,7 +428,7 @@ export default Component.extend({
       }
 
       //PUT settings
-      const setting_url = `/yaml/notification/${subscriptionGroupId}`;
+      const setting_url = `/yaml/subscription/${subscriptionGroupId}`;
       const settingsPostProps = {
         method: 'PUT',
         body: detectionSettingsYaml,
