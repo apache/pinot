@@ -567,8 +567,10 @@ public class DetectionMigrationResource {
     }
 
     if (responseMessage.isEmpty()) {
+      LOGGER.info("[MIG] Application " + application + " has been successfully migrated");
       return Response.ok("Application " + application + " has been successfully migrated").build();
     } else {
+      LOGGER.error("[MIG] Found errors while migrating application " + application);
       return Response.status(Response.Status.BAD_REQUEST).entity(responseMessage).build();
     }
   }
@@ -636,8 +638,10 @@ public class DetectionMigrationResource {
     }
 
     if (responseMessage.isEmpty()) {
+      LOGGER.info("[MIG] Successfully migrated all the applications");
       return Response.ok("All applications have been successfully migrated").build();
     } else {
+      LOGGER.error("[MIG] Errors found while migrating application. Errors:\n" + responseMessage);
       return Response.status(Response.Status.BAD_REQUEST).entity(responseMessage).build();
     }
   }
