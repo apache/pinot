@@ -57,10 +57,7 @@ import java.util.List;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-
-import io.swagger.models.auth.In;
 import org.apache.commons.configuration.Configuration;
-import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
 import org.apache.commons.io.FileUtils;
@@ -101,15 +98,17 @@ public class ControllerStarter {
 
   public ControllerStarter(ControllerConf conf) {
     _config = conf;
-    if (_config.getUseSSL()) {
+
+    if (_config.getUseHttps()) {
       LOGGER.info("Initializing https server");
-      _encryptedAdminApp = new ControllerAdminApiApplication(_config.getQueryConsoleWebappPath(), _config.getQueryConsoleUseHttps());
-      _encryptedAdminApp.setSSLConfigs(_config.getKeyStoreFile(), _config.getKeyStorePassword(),
+      _encryptedAdminApp = new ControllerAdminApiApplication(_config.getQueryConsoleWebappPath(), true);
+      _encryptedAdminApp.setHttpsConfigs(_config.getKeyStoreFile(), _config.getKeyStorePassword(),
               _config.getTrustStoreFile(), _config.getTrustStorePassword());
     }
     else {
       _encryptedAdminApp = null;
     }
+
     if (_config.getUseHttp()) {
       LOGGER.info("Initializing http server");
       _adminApp = new ControllerAdminApiApplication(_config.getQueryConsoleWebappPath(), false);
@@ -290,7 +289,7 @@ public class ControllerStarter {
       LOGGER.info("Started Jersey API for https server on port {}", httpsJerseyPort);
       LOGGER.info("Pinot controller ready and listening on port {} for API requests", httpsJerseyPort);
     }
-    if (_config.getUseSSL() && _config.getQueryConsoleUseHttps()) {
+    if (_config.getUseHttps()) {
       LOGGER.info("Controller services available at https://{}:{}/", _config.getControllerHost(),
     	_config.getControllerHttpsPort());
     }

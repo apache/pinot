@@ -47,11 +47,11 @@ public class ControllerConf extends PropertiesConfiguration {
   private static final String USE_HTTP = "controller.http.enabled";
   private static final String USE_HTTPS = "controller.https.enabled";
   private static final String CONTROLLER_HTTPS_PORT = "controller.https.port";
-  private static final String KEYSTORE_FILE = "controller.ssl.keystore.file";
-  private static final String KEYSTORE_PASSWORD = "controller.ssl.keystore.pass";
-  private static final String TRUSTSTORE_FILE = "controller.ssl.truststore.file";
-  private static final String TRUSTSTORE_PASSWORD = "controller.ssl.truststore.pass";
-  private static final String BROKER_SSL_LOADBALANCER_ADDRESS = "broker.ssl.loadbalancer";
+  private static final String KEYSTORE_FILE = "controller.https.keystore.file";
+  private static final String KEYSTORE_PASSWORD = "controller.https.keystore.pass";
+  private static final String TRUSTSTORE_FILE = "controller.https.truststore.file";
+  private static final String TRUSTSTORE_PASSWORD = "controller.https.truststore.pass";
+  private static final String BROKER_LOADBALANCER_ADDRESS = "broker.https.loadbalancer";
   private static final String DATA_DIR = "controller.data.dir";
   // Potentially same as data dir if local
   private static final String LOCAL_TEMP_DIR = "controller.local.temp.dir";
@@ -60,7 +60,6 @@ public class ControllerConf extends PropertiesConfiguration {
   private static final String HELIX_CLUSTER_NAME = "controller.helix.cluster.name";
   private static final String CLUSTER_TENANT_ISOLATION_ENABLE = "cluster.tenant.isolation.enable";
   private static final String CONSOLE_WEBAPP_ROOT_PATH = "controller.query.console";
-  private static final String CONSOLE_WEBAPP_USE_HTTPS = "controller.query.console.useHttps";
   private static final String EXTERNAL_VIEW_ONLINE_TO_OFFLINE_TIMEOUT = "controller.upload.onlineToOfflineTimeout";
 
   public static class ControllerPeriodicTasksConf {
@@ -208,15 +207,7 @@ public class ControllerConf extends PropertiesConfiguration {
     return ControllerConf.class.getClassLoader().getResource("webapp").toExternalForm();
   }
 
-  public void setQueryConsoleUseHttps(boolean useHttps) {
-    setProperty(CONSOLE_WEBAPP_USE_HTTPS, useHttps);
-  }
-
-  public boolean getQueryConsoleUseHttps() {
-    return containsKey(CONSOLE_WEBAPP_USE_HTTPS) && getBoolean(CONSOLE_WEBAPP_USE_HTTPS);
-  }
-
-  public void setUseHTTP(boolean useHTTP) {
+  public void setUseHttp(boolean useHTTP) {
     setProperty(USE_HTTP, useHTTP);
   }
 
@@ -227,12 +218,12 @@ public class ControllerConf extends PropertiesConfiguration {
       return (boolean) getBoolean(USE_HTTP);
     }
   }
-  
-  public void setUseSSL(boolean useSSL) {
-	setProperty(USE_HTTPS, useSSL);
+
+  public void setUseHttps(boolean useHttps) {
+	setProperty(USE_HTTPS, useHttps);
   }
   
-  public boolean getUseSSL() {
+  public boolean getUseHttps() {
 	return containsKey(USE_HTTPS) && getBoolean(USE_HTTPS);
   }
   
@@ -240,11 +231,11 @@ public class ControllerConf extends PropertiesConfiguration {
 	setProperty(KEYSTORE_FILE, keyStoreFile);
   }
 
-  public String getBrokerSslLoadbalancerAddress() {
-    if(!containsKey(BROKER_SSL_LOADBALANCER_ADDRESS)){
+  public String getBrokerLoadbalancerAddress() {
+    if(!containsKey(BROKER_LOADBALANCER_ADDRESS)){
       return null;
     } else {
-      return getString(BROKER_SSL_LOADBALANCER_ADDRESS);
+      return getString(BROKER_LOADBALANCER_ADDRESS);
     }
   }
 

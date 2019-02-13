@@ -82,7 +82,7 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     // property("jersey.config.server.tracing.threshold", "VERBOSE");
   }
   
-  public void setSSLConfigs(String keyStoreFile, String keyStorePass, String trustStoreFile, String trustStorePass) {
+  public void setHttpsConfigs(String keyStoreFile, String keyStorePass, String trustStoreFile, String trustStorePass) {
 	  _useSSL = true;
 	  _keyStoreFile = keyStoreFile;
 	  _keyStorePass = keyStorePass;
