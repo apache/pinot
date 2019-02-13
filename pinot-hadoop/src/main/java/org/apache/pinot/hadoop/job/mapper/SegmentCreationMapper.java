@@ -233,7 +233,7 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
   }
 
   /**
-   * Can be override to set additional segment generator configs.
+   * Can be overridden to set additional segment generator configs.
    */
   @SuppressWarnings("unused")
   protected void addAdditionalSegmentGeneratorConfigs(SegmentGeneratorConfig segmentGeneratorConfig, Path hdfsInputFile,
