@@ -1,6 +1,9 @@
 package org.apache.pinot.thirdeye.dashboard.resource.v2;
 
-import org.apache.pinot.thirdeye.dashboard.resources.v2.UserDashboardResource;
+import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyFeedback;
+import org.apache.pinot.thirdeye.api.user.dashboard.UserDashboardResource;
+import org.apache.pinot.thirdeye.common.dimension.DimensionMap;
+import org.apache.pinot.thirdeye.constant.AnomalyFeedbackType;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.pojo.AnomalySummary;
 import org.apache.pinot.thirdeye.datalayer.bao.AlertConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.AnomalyFunctionManager;
@@ -11,6 +14,7 @@ import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
 import org.apache.pinot.thirdeye.datalayer.dto.AlertConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.datalayer.pojo.AlertConfigBean;
@@ -68,10 +72,10 @@ public class UserDashboardResourceTest {
     // anomalies
     this.anomalyDAO = DAORegistry.getInstance().getMergedAnomalyResultDAO();
     this.anomalyIds = new ArrayList<>();
-    this.anomalyIds.add(this.anomalyDAO.save(makeAnomaly(100, 500, this.functionIds.get(0)))); // func A
-    this.anomalyIds.add(this.anomalyDAO.save(makeAnomaly(700, 1200, this.functionIds.get(0)))); // func A
-    this.anomalyIds.add(this.anomalyDAO.save(makeAnomaly(300, 1500, this.functionIds.get(1)))); // func B
-    this.anomalyIds.add(this.anomalyDAO.save(makeAnomaly(300, 1600, this.functionIds.get(2)))); // func C
+    this.anomalyIds.add(this.anomalyDAO.save(makeAnomaly(100, 500, this.functionIds.get(0), "test_metric", "test_dataset"))); // func A
+    this.anomalyIds.add(this.anomalyDAO.save(makeAnomaly(800, 1200, this.functionIds.get(0), "test_metric", "test_dataset"))); // func A
+    this.anomalyIds.add(this.anomalyDAO.save(makeAnomaly(300, 1500, this.functionIds.get(1), "test_metric", "test_dataset"))); // func B
+    this.anomalyIds.add(this.anomalyDAO.save(makeAnomaly(300, 1600, this.functionIds.get(2), "test_metric_2", "test_dataset"))); // func C
 
     for (Long id : this.anomalyIds) {
       Assert.assertNotNull(id);
@@ -106,41 +110,57 @@ public class UserDashboardResourceTest {
 
   @Test
   public void testAnomaliesByApplication() throws Exception {
-    List<AnomalySummary> anomalies = this.resource.queryAnomalies(1000L, null, null, "myApplicationA", null, null);
+    List<AnomalySummary> anomalies = this.resource.queryAnomalies(1000L, null, null, "myApplicationA", null, null, null, false, null);
     Assert.assertEquals(anomalies.size(), 2);
     Assert.assertEquals(extractIds(anomalies), makeSet(this.anomalyIds.get(1), this.anomalyIds.get(2)));
   }
 
   @Test
   public void testAnomaliesByApplicationInvalid() throws Exception {
-    List<AnomalySummary> anomalies = this.resource.queryAnomalies(1000L, null, null, "Invalid", null, null);
+    List<AnomalySummary> anomalies = this.resource.queryAnomalies(1000L, null, null, "Invalid", null, null, null, false, null);
     Assert.assertEquals(anomalies.size(), 0);
   }
 
   @Test
   public void testAnomaliesByGroup() throws Exception {
-    List<AnomalySummary> anomalies = this.resource.queryAnomalies(1000L, null, null, null, "myAlertB", null);
+    List<AnomalySummary> anomalies = this.resource.queryAnomalies(1000L, null, null, null, "myAlertB", null, null, false, null);
     Assert.assertEquals(anomalies.size(), 1);
     Assert.assertEquals(extractIds(anomalies), makeSet(this.anomalyIds.get(3)));
   }
 
   @Test
   public void testAnomaliesByGroupInvalid() throws Exception {
-    List<AnomalySummary> anomalies = this.resource.queryAnomalies(1000L, null, null, null, "Invalid", null);
+    List<AnomalySummary> anomalies = this.resource.queryAnomalies(1000L, null, null, null, "Invalid", null, null, false, null);
     Assert.assertEquals(anomalies.size(), 0);
   }
 
   @Test
   public void testAnomaliesLimit() throws Exception {
-    List<AnomalySummary> anomalies = this.resource.queryAnomalies(1000L, null, null, "myApplicationA", null, 1);
+    List<AnomalySummary> anomalies = this.resource.queryAnomalies(1000L, null, null, "myApplicationA", null, null, null, false, 1);
     Assert.assertEquals(anomalies.size(), 1);
     Assert.assertEquals(extractIds(anomalies), makeSet(this.anomalyIds.get(1)));
   }
 
-  private MergedAnomalyResultDTO makeAnomaly(long start, long end, Long functionId) {
+  @Test
+  public void testAnomaliesByMetric() throws Exception {
+    List<AnomalySummary> anomalies = this.resource.queryAnomalies(1000L, null, null, null, null, "test_metric", "test_dataset", false, null);
+    Assert.assertEquals(anomalies.size(), 2);
+    Assert.assertEquals(extractIds(anomalies), makeSet(this.anomalyIds.get(1), this.anomalyIds.get(2)));
+  }
+
+  @Test
+  public void testAnomaliesByDataset() throws Exception {
+    List<AnomalySummary> anomalies = this.resource.queryAnomalies(1000L, null, null, null, null, null, "test_dataset", false, null);
+    Assert.assertEquals(anomalies.size(), 3);
+    Assert.assertEquals(extractIds(anomalies), makeSet(this.anomalyIds.get(1), this.anomalyIds.get(2), this.anomalyIds.get(3)));
+  }
+
+  private MergedAnomalyResultDTO makeAnomaly(long start, long end, Long functionId, String metric, String dataset) {
     MergedAnomalyResultDTO anomaly = new MergedAnomalyResultDTO();
     anomaly.setStartTime(start);
     anomaly.setEndTime(end);
+    anomaly.setMetric(metric);
+    anomaly.setCollection(dataset);
     anomaly.setFunctionId(functionId);
     anomaly.setNotified(true);
     return anomaly;
