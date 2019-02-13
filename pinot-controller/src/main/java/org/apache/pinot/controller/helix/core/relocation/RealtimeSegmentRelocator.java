@@ -34,7 +34,6 @@ import org.apache.pinot.common.config.RealtimeTagConfig;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.metrics.ControllerMetrics;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.common.utils.retry.RetryPolicies;
 import org.apache.pinot.common.utils.time.TimeUtils;
@@ -53,7 +52,7 @@ import org.slf4j.LoggerFactory;
  * We only relocate segments for realtime tables, and only if tenant config indicates that relocation is required
  * A segment will be relocated, one replica at a time, once all of its replicas are in ONLINE state and all/some are on servers other than completed servers
  */
-public class RealtimeSegmentRelocator extends ControllerPeriodicTask {
+public class RealtimeSegmentRelocator extends ControllerPeriodicTask<Void> {
   private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeSegmentRelocator.class);
 
   public RealtimeSegmentRelocator(PinotHelixResourceManager pinotHelixResourceManager, ControllerConf config,
@@ -63,29 +62,10 @@ public class RealtimeSegmentRelocator extends ControllerPeriodicTask {
   }
 
   @Override
-  protected void initTask() {
-
-  }
-
-  @Override
-  protected void preprocess() {
-  }
-
-  @Override
   protected void processTable(String tableNameWithType) {
-    CommonConstants.Helix.TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
-    if (tableType == CommonConstants.Helix.TableType.REALTIME) {
+    if (TableNameBuilder.REALTIME.tableHasTypeSuffix(tableNameWithType)) {
       runRelocation(tableNameWithType);
     }
-  }
-
-  @Override
-  protected void postprocess() {
-  }
-
-  @Override
-  protected void exceptionHandler(String tableNameWithType, Exception e) {
-    LOGGER.error("Exception in relocating realtime segments of table {}", tableNameWithType, e);
   }
 
   /**
@@ -276,10 +256,5 @@ public class RealtimeSegmentRelocator extends ControllerPeriodicTask {
       throw new RuntimeException("Invalid time spec '" + timeStr + "' (Valid examples: '3h', '4h30m', '30m')", e);
     }
     return seconds;
-  }
-
-  @Override
-  public void stopTask() {
-
   }
 }

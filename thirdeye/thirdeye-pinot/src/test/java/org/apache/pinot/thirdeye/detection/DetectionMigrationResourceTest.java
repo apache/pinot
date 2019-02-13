@@ -94,7 +94,7 @@ public class DetectionMigrationResourceTest {
     this.applicationDAO = DAORegistry.getInstance().getApplicationDAO();
 
     migrationResource = new DetectionMigrationResource(
-        anomalyFunctionDAO, alertConfigDAO, metricDAO, detectionConfigDAO, detectionAlertConfigDAO, datasetDAO, anomalyDAO);
+        anomalyFunctionDAO, alertConfigDAO, applicationDAO, metricDAO, detectionConfigDAO, detectionAlertConfigDAO, datasetDAO, anomalyDAO);
 
     DetectionRegistry.registerYamlConvertor(CompositePipelineConfigTranslator.class.getName(), "COMPOSITE");
     DetectionRegistry.registerComponent(PercentageChangeRuleDetector.class.getName(), "PERCENTAGE_RULE");

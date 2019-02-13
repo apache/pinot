@@ -37,8 +37,7 @@ public class PeriodicTaskScheduler {
   private List<PeriodicTask> _tasksWithValidInterval;
 
   /**
-   * Initialize the PeriodicTaskScheduler with list of PeriodicTasks
-   * @param periodicTasks
+   * Initializes the periodic task scheduler with a list of periodic tasks.
    */
   public void init(List<PeriodicTask> periodicTasks) {
     _tasksWithValidInterval = new ArrayList<>();
@@ -46,7 +45,6 @@ public class PeriodicTaskScheduler {
       if (periodicTask.getIntervalInSeconds() > 0) {
         LOGGER.info("Adding periodic task: {}", periodicTask);
         _tasksWithValidInterval.add(periodicTask);
-        periodicTask.init();
       } else {
         LOGGER.info("Skipping periodic task: {}", periodicTask);
       }
@@ -54,7 +52,7 @@ public class PeriodicTaskScheduler {
   }
 
   /**
-   * Start scheduling periodic tasks.
+   * Starts scheduling periodic tasks.
    */
   public synchronized void start() {
     if (_executorService != null) {
@@ -67,6 +65,7 @@ public class PeriodicTaskScheduler {
       LOGGER.info("Starting periodic task scheduler with tasks: {}", _tasksWithValidInterval);
       _executorService = Executors.newScheduledThreadPool(_tasksWithValidInterval.size());
       for (PeriodicTask periodicTask : _tasksWithValidInterval) {
+        periodicTask.start();
         _executorService.scheduleWithFixedDelay(() -> {
           try {
             LOGGER.info("Starting {} with running frequency of {} seconds.", periodicTask.getTaskName(),
@@ -83,7 +82,7 @@ public class PeriodicTaskScheduler {
   }
 
   /**
-   * Shutdown executor service and stop the periodic tasks
+   * Shuts down the executor service and stops the periodic tasks.
    */
   public synchronized void stop() {
     if (_executorService != null) {

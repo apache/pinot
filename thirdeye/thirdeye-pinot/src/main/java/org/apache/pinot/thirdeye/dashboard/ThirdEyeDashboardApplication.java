@@ -60,7 +60,7 @@ import org.apache.pinot.thirdeye.dashboard.resources.v2.RootCauseMetricResource;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.RootCauseResource;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.RootCauseSessionResource;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.TimeSeriesResource;
-import org.apache.pinot.thirdeye.dashboard.resources.v2.UserDashboardResource;
+import org.apache.pinot.thirdeye.api.user.dashboard.UserDashboardResource;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.rootcause.DefaultEntityFormatter;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.rootcause.FormatterLoader;
 import org.apache.pinot.thirdeye.dataset.DatasetAutoOnboardResource;
@@ -172,9 +172,10 @@ public class ThirdEyeDashboardApplication
     env.jersey().register(new DataResource(anomalyFunctionFactory, alertFilterFactory));
     env.jersey().register(new AnomaliesResource(anomalyFunctionFactory, alertFilterFactory));
     env.jersey().register(new DetectionMigrationResource(
-        DAO_REGISTRY.getAnomalyFunctionDAO(), DAO_REGISTRY.getAlertConfigDAO(), DAO_REGISTRY.getMetricConfigDAO(),
-        DAO_REGISTRY.getDetectionConfigManager(), DAO_REGISTRY.getDetectionAlertConfigManager(),
-        DAO_REGISTRY.getDatasetConfigDAO(), DAO_REGISTRY.getMergedAnomalyResultDAO()));
+        DAO_REGISTRY.getAnomalyFunctionDAO(), DAO_REGISTRY.getAlertConfigDAO(), DAO_REGISTRY.getApplicationDAO(),
+        DAO_REGISTRY.getMetricConfigDAO(), DAO_REGISTRY.getDetectionConfigManager(),
+        DAO_REGISTRY.getDetectionAlertConfigManager(), DAO_REGISTRY.getDatasetConfigDAO(),
+        DAO_REGISTRY.getMergedAnomalyResultDAO()));
     env.jersey().register(new OnboardResource(config));
     env.jersey().register(new EntityMappingResource());
     env.jersey().register(new OnboardDatasetMetricResource());

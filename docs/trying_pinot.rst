@@ -15,11 +15,6 @@ All of the setup is automated, so the only thing required at the beginning is to
 Compiling the code
 ~~~~~~~~~~~~~~~~~~
 
-.. note::
-
-    You can skip this step if you are planning to run the pre-built docker image. Make sure you have Docker installed.
-    Some of the newer query features may not be available in docker as of this writing
-
 One can also run the Pinot demonstration by checking out the code on GitHub, compiling it, and running it. Compiling
 Pinot requires JDK 8 or later and Apache Maven 3.
 
@@ -30,8 +25,6 @@ Pinot requires JDK 8 or later and Apache Maven 3.
 Trying out Offline quickstart demo
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-To run the demo with docker
-  ``docker run -it -p 9000:9000 linkedin/pinot-quickstart-offline``
 To run the demo with compiled code:
   ``bin/quick-start-offline.sh``
 
@@ -66,8 +59,6 @@ Trying out Realtime quickstart demo
 
 Pinot can ingest data from streaming sources such as Kafka.
 
-To run the demo with docker
-  ``docker run -it -p 9000:9000 linkedin/pinot-quickstart-realtime``
 To run the demo with compiled code:
   ``bin/quick-start-realtime.sh``
 

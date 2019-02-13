@@ -1,11 +1,11 @@
 Pluggable Streams
 =================
 
-Prior to commit `ba9f2d <https://github.com/linkedin/pinot/commit/ba9f2ddfc0faa42fadc2cc48df1d77fec6b174fb>`_, Pinot was only able to support reading
+Prior to commit `ba9f2d <https://github.com/apache/incubator-pinot/commit/ba9f2ddfc0faa42fadc2cc48df1d77fec6b174fb>`_, Pinot was only able to support reading
 from `Kafka <https://kafka.apache.org/documentation/>`_ stream.
 
 Pinot now enables its users to write plug-ins to read from pub-sub streams
-other than Kafka. (Please refer to `Issue #2583 <https://github.com/linkedin/pinot/issues/2583>`_)
+other than Kafka. (Please refer to `Issue #2583 <https://github.com/apache/incubator-pinot/issues/2583>`_)
 
 Some of the streams for which plug-ins can be added are:
 
@@ -63,16 +63,16 @@ Stream plug-in implementation
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 In order to add a new type of stream (say,Foo) implement the following classes:
 
-#. FooConsumerFactory extends `StreamConsumerFactory <https://github.com/linkedin/pinot/blob/master/pinot-core/src/main/java/com/linkedin/pinot/core/realtime/stream/StreamConsumerFactory.java>`_
-#. FooPartitionLevelConsumer implements `PartitionLevelConsumer <https://github.com/linkedin/pinot/blob/master/pinot-core/src/main/java/com/linkedin/pinot/core/realtime/stream/PartitionLevelConsumer.java>`_
-#. FooStreamLevelConsumer implements `StreamLevelConsumer <https://github.com/linkedin/pinot/blob/master/pinot-core/src/main/java/com/linkedin/pinot/core/realtime/stream/StreamLevelConsumer.java>`_
-#. FooMetadataProvider implements `StreamMetadataProvider <https://github.com/linkedin/pinot/blob/master/pinot-core/src/main/java/com/linkedin/pinot/core/realtime/stream/StreamMetadataProvider.java>`_
-#. FooMessageDecoder implements `StreamMessageDecoder <https://github.com/linkedin/pinot/blob/master/pinot-core/src/main/java/com/linkedin/pinot/core/realtime/stream/StreamMessageDecoder.java>`_
+#. FooConsumerFactory extends `StreamConsumerFactory <https://github.com/apache/incubator-pinot/blob/master/pinot-core/src/main/java/org/apache/pinot/core/realtime/stream/StreamConsumerFactory.java>`_
+#. FooPartitionLevelConsumer implements `PartitionLevelConsumer <https://github.com/apache/incubator-pinot/blob/master/pinot-core/src/main/java/org/apache/pinot/core/realtime/stream/PartitionLevelConsumer.java>`_
+#. FooStreamLevelConsumer implements `StreamLevelConsumer <https://github.com/apache/incubator-pinot/blob/master/pinot-core/src/main/java/org/apache/pinot/core/realtime/stream/StreamLevelConsumer.java>`_
+#. FooMetadataProvider implements `StreamMetadataProvider <https://github.com/apache/incubator-pinot/blob/master/pinot-core/src/main/java/org/apache/pinot/core/realtime/stream/StreamMetadataProvider.java>`_
+#. FooMessageDecoder implements `StreamMessageDecoder <https://github.com/apache/incubator-pinot/blob/master/pinot-core/src/main/java/org/apache/pinot/core/realtime/stream/StreamMessageDecoder.java>`_
 
 Depending on stream level or partition level, your implementation needs to include StreamLevelConsumer or PartitionLevelConsumer.
 
 
-The properties for the stream implementation are to be set in the table configuration, inside `streamConfigs <https://github.com/linkedin/pinot/blob/master/pinot-core/src/main/java/com/linkedin/pinot/core/realtime/stream/StreamConfig.java>`_ section.
+The properties for the stream implementation are to be set in the table configuration, inside `streamConfigs <https://github.com/apache/incubator-pinot/blob/master/pinot-core/src/main/java/org/apache/pinot/core/realtime/stream/StreamConfig.java>`_ section.
 
 Use the ``streamType`` property to define the stream type. For example, for the implementation of stream ``foo``, set the property ``"streamType" : "foo"``.
 
@@ -122,4 +122,4 @@ The properties for the thresholds are as follows:
   "realtime.segment.flush.threshold.time" : "6h"
 
 
-An example of this implementation can be found in the `KafkaConsumerFactory <com.linkedin.pinot.core.realtime.impl.kafka.KafkaConsumerFactory>`_, which is an implementation for the kafka stream.
+An example of this implementation can be found in the `KafkaConsumerFactory <org.apache.pinot.core.realtime.impl.kafka.KafkaConsumerFactory>`_, which is an implementation for the kafka stream.

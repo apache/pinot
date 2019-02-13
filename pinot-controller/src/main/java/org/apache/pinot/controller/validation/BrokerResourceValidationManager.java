@@ -33,10 +33,8 @@ import org.slf4j.LoggerFactory;
 /**
  * Rebuilds the broker resource if the instance set has changed
  */
-public class BrokerResourceValidationManager extends ControllerPeriodicTask {
+public class BrokerResourceValidationManager extends ControllerPeriodicTask<BrokerResourceValidationManager.Context> {
   private static final Logger LOGGER = LoggerFactory.getLogger(BrokerResourceValidationManager.class);
-
-  private List<InstanceConfig> _instanceConfigs;
 
   public BrokerResourceValidationManager(ControllerConf config, PinotHelixResourceManager pinotHelixResourceManager,
       ControllerMetrics controllerMetrics) {
@@ -45,12 +43,14 @@ public class BrokerResourceValidationManager extends ControllerPeriodicTask {
   }
 
   @Override
-  protected void preprocess() {
-    _instanceConfigs = _pinotHelixResourceManager.getAllHelixInstanceConfigs();
+  protected Context preprocess() {
+    Context context = new Context();
+    context._instanceConfigs = _pinotHelixResourceManager.getAllHelixInstanceConfigs();
+    return context;
   }
 
   @Override
-  protected void processTable(String tableNameWithType) {
+  protected void processTable(String tableNameWithType, Context context) {
     TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
     if (tableConfig == null) {
       LOGGER.warn("Failed to find table config for table: {}, skipping broker resource validation", tableNameWithType);
@@ -59,25 +59,11 @@ public class BrokerResourceValidationManager extends ControllerPeriodicTask {
 
     // Rebuild broker resource
     Set<String> brokerInstances = _pinotHelixResourceManager
-        .getAllInstancesForBrokerTenant(_instanceConfigs, tableConfig.getTenantConfig().getBroker());
+        .getAllInstancesForBrokerTenant(context._instanceConfigs, tableConfig.getTenantConfig().getBroker());
     _pinotHelixResourceManager.rebuildBrokerResource(tableNameWithType, brokerInstances);
   }
 
-  @Override
-  protected void postprocess() {
-  }
-
-  @Override
-  protected void exceptionHandler(String tableNameWithType, Exception e) {
-    LOGGER.error("Caught exception while validating broker resource for table: {}", tableNameWithType, e);
-  }
-
-  @Override
-  protected void initTask() {
-
-  }
-
-  @Override
-  public void stopTask() {
+  public static final class Context {
+    private List<InstanceConfig> _instanceConfigs;
   }
 }

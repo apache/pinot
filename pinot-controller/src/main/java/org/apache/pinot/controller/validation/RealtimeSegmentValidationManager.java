@@ -43,7 +43,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Validates realtime ideal states and segment metadata, fixing any partitions which have stopped consuming
  */
-public class RealtimeSegmentValidationManager extends ControllerPeriodicTask {
+public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<RealtimeSegmentValidationManager.Context> {
   private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeSegmentValidationManager.class);
 
   private final PinotLLCRealtimeSegmentManager _llcRealtimeSegmentManager;
@@ -51,7 +51,6 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask {
 
   private final int _segmentLevelValidationIntervalInSeconds;
   private long _lastUpdateRealtimeDocumentCountTimeMs = 0L;
-  private boolean _updateRealtimeDocumentCount;
 
   public RealtimeSegmentValidationManager(ControllerConf config, PinotHelixResourceManager pinotHelixResourceManager,
       PinotLLCRealtimeSegmentManager llcRealtimeSegmentManager, ValidationMetrics validationMetrics,
@@ -66,20 +65,21 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask {
   }
 
   @Override
-  protected void preprocess() {
+  protected Context preprocess() {
+    Context context = new Context();
     // Update realtime document counts only if certain time has passed after previous run
-    _updateRealtimeDocumentCount = false;
     long currentTimeMs = System.currentTimeMillis();
     if (TimeUnit.MILLISECONDS.toSeconds(currentTimeMs - _lastUpdateRealtimeDocumentCountTimeMs)
         >= _segmentLevelValidationIntervalInSeconds) {
       LOGGER.info("Run segment-level validation");
-      _updateRealtimeDocumentCount = true;
+      context._updateRealtimeDocumentCount = true;
       _lastUpdateRealtimeDocumentCountTimeMs = currentTimeMs;
     }
+    return context;
   }
 
   @Override
-  protected void processTable(String tableNameWithType) {
+  protected void processTable(String tableNameWithType, Context context) {
     CommonConstants.Helix.TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
     if (tableType == CommonConstants.Helix.TableType.REALTIME) {
 
@@ -89,7 +89,7 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask {
         return;
       }
 
-      if (_updateRealtimeDocumentCount) {
+      if (context._updateRealtimeDocumentCount) {
         updateRealtimeDocumentCount(tableConfig);
       }
 
@@ -148,22 +148,12 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask {
   }
 
   @Override
-  protected void postprocess() {
-  }
-
-  @Override
-  protected void exceptionHandler(String tableNameWithType, Exception e) {
-    LOGGER.error("Caught exception while validating realtime table: {}", tableNameWithType, e);
-  }
-
-  @Override
-  protected void initTask() {
-
-  }
-
-  @Override
-  public void stopTask() {
+  public void cleanUpTask() {
     LOGGER.info("Unregister all the validation metrics.");
     _validationMetrics.unregisterAllMetrics();
+  }
+
+  public static final class Context {
+    private boolean _updateRealtimeDocumentCount;
   }
 }

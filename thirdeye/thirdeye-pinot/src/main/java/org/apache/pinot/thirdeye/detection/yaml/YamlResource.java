@@ -191,62 +191,80 @@ public class YamlResource {
   public Response createYamlAlert(@ApiParam(value =  "a json contains both subscription and detection yaml as string")  String payload,
       @ApiParam("tuning window start time for tunable components") @QueryParam("startTime") long startTime,
       @ApiParam("tuning window end time for tunable components") @QueryParam("endTime") long endTime) throws Exception {
-    Map<String, String> yamls = OBJECT_MAPPER.readValue(payload, Map.class);
-    if (StringUtils.isBlank(payload)){
-      return Response.status(Response.Status.BAD_REQUEST).entity(ImmutableMap.of("message", "The Yaml Payload in the request is empty.")).build();
-    }
-    if (!yamls.containsKey("detection")) {
-      return Response.status(Response.Status.BAD_REQUEST).entity(ImmutableMap.of("message", "detection pipeline yaml is missing")).build();
-    }
-    if (!yamls.containsKey("notification")){
-      return Response.status(Response.Status.BAD_REQUEST).entity(ImmutableMap.of("message", "subscription group yaml is missing")).build();
-    }
+    Map<String, String> yamls;
 
     // Detection
+    Map<String, String> responseMessage = new HashMap<>();
     long detectionConfigId;
     try {
+      yamls = OBJECT_MAPPER.readValue(payload, Map.class);
+
+      if (StringUtils.isBlank(payload)) {
+        throw new ValidationException("The Yaml Payload in the request is empty.");
+      }
+
+      if (!yamls.containsKey("detection")) {
+        throw new ValidationException("Detection pipeline yaml is missing");
+      }
+
       detectionConfigId = createDetectionPipeline(yamls.get("detection"), startTime, endTime);
     } catch (ValidationException e) {
       LOG.warn("Validation error while creating detection pipeline with payload " + payload, e);
-      return Response.status(Response.Status.BAD_REQUEST).entity(ImmutableMap.of("message", "Validation Error! " + e.getMessage())).build();
+      responseMessage.put("detectionMsg", "Validation Error! " + e.getMessage());
+      return Response.status(Response.Status.BAD_REQUEST).entity(responseMessage).build();
     } catch (Exception e) {
       LOG.error("Error creating detection pipeline with payload " + payload, e);
-      return Response.serverError().entity(ImmutableMap.of("message", "Failed to create the detection pipeline. Reach out to the ThirdEye team.",
-          "more-info", "Error = " + e.getMessage())).build();
+      responseMessage.put("detectionMsg", "Failed to create the detection pipeline. Reach out to the ThirdEye team.");
+      responseMessage.put("detectionMsg-moreInfo", "Error = " + e.getMessage());
+      return Response.serverError().entity(responseMessage).build();
     }
 
     // Notification
-    String notificationYaml = yamls.get("notification");
-
-    Map<String, Object> notificationYamlConfig;
+    long detectionAlertConfigId;
     try {
-      notificationYamlConfig = ConfigUtils.getMap(this.yaml.load(notificationYaml));
-    } catch (Exception e){
-      this.detectionConfigDAO.deleteById(detectionConfigId);
-      return Response.status(Response.Status.BAD_REQUEST)
-          .entity(ImmutableMap.of("message", "notification yaml parsing error, " + e.getMessage())).build();
-    }
+      if (!yamls.containsKey("subscription")) {
+        throw new ValidationException("Subscription group yaml is missing.");
+      }
 
-    // Check if existing or new subscription group
-    String groupName = MapUtils.getString(notificationYamlConfig, PROP_SUBS_GROUP_NAME);
-    List<DetectionAlertConfigDTO> alertConfigDTOS = detectionAlertConfigDAO.findByPredicate(Predicate.EQ("name", groupName));
-    Response response;
-    if (!alertConfigDTOS.isEmpty()) {
-      response = updateSubscriptionGroupApi(notificationYaml, alertConfigDTOS.get(0).getId());
-    } else {
-      response = createSubscriptionGroupApi(notificationYaml);
-    }
-    if (response.getStatusInfo() != Response.Status.OK) {
-      // revert detection DTO
+      String subscriptionYaml = yamls.get("subscription");
+      Map<String, Object> subscriptionYamlConfig;
+      try {
+        subscriptionYamlConfig = ConfigUtils.getMap(this.yaml.load(subscriptionYaml));
+      } catch (Exception e) {
+        throw new ValidationException(e.getMessage());
+      }
+
+      // Check if existing or new subscription group
+      String groupName = MapUtils.getString(subscriptionYamlConfig, PROP_SUBS_GROUP_NAME);
+      List<DetectionAlertConfigDTO> alertConfigDTOS = detectionAlertConfigDAO.findByPredicate(Predicate.EQ("name", groupName));
+      if (!alertConfigDTOS.isEmpty()) {
+        detectionAlertConfigId = alertConfigDTOS.get(0).getId();
+        updateSubscriptionGroup(detectionAlertConfigId, subscriptionYaml);
+      } else {
+        detectionAlertConfigId = createSubscriptionGroup(subscriptionYaml);
+      }
+    } catch (ValidationException e) {
+      LOG.warn("Validation error while creating subscription group with payload " + payload, e);
       this.detectionConfigDAO.deleteById(detectionConfigId);
-      return response;
+      responseMessage.put("subscriptionMsg", "Validation Error! " + e.getMessage());
+      return Response.status(Response.Status.BAD_REQUEST).entity(responseMessage).build();
+    } catch (Exception e) {
+      LOG.error("Error creating subscription group with payload " + payload, e);
+      this.detectionConfigDAO.deleteById(detectionConfigId);
+      responseMessage.put("subscriptionMsg", "Failed to create the subscription group. Reach out to the ThirdEye team.");
+      responseMessage.put("subscriptionMsg-moreInfo", "Error = " + e.getMessage());
+      return Response.serverError().entity(responseMessage).build();
     }
 
     // create an yaml onboarding task to run replay and tuning
     createYamlOnboardingTask(detectionConfigId, startTime, endTime);
 
-    long alertId = Long.parseLong(ConfigUtils.getMap(response.getEntity()).get("detectionAlertConfigId").toString());
-    return Response.ok().entity(ImmutableMap.of("detectionConfigId", detectionConfigId, "detectionAlertConfigId", alertId)).build();
+    LOG.info("Alert created successfully with detection ID " + detectionConfigId + " and subscription ID "
+        + detectionAlertConfigId);
+    return Response.ok().entity(ImmutableMap.of(
+        "detectionConfigId", detectionConfigId,
+        "detectionAlertConfigId", detectionAlertConfigId)
+    ).build();
   }
 
   long createDetectionPipeline(String yamlDetectionConfig, long startTime, long endTime) throws ValidationException {
@@ -315,7 +333,8 @@ public class YamlResource {
     return Response.ok().entity(responseMessage).build();
   }
 
-  void updateDetectionPipeline(long detectionID, String yamlDetectionConfig, long startTime, long endTime) throws Exception {
+  void updateDetectionPipeline(long detectionID, String yamlDetectionConfig, long startTime, long endTime)
+      throws ValidationException {
     DetectionConfigDTO existingDetectionConfig = this.detectionConfigDAO.findById(detectionID);
     DetectionConfigDTO detectionConfig;
     if (existingDetectionConfig == null) {
@@ -405,10 +424,10 @@ public class YamlResource {
   }
 
   @POST
-  @Path("/notification")
+  @Path("/subscription")
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.TEXT_PLAIN)
-  @ApiOperation("Create a notification group using a YAML config")
+  @ApiOperation("Create a subscription group using a YAML config")
   @SuppressWarnings("unchecked")
   public Response createSubscriptionGroupApi(
       @ApiParam("payload") String yamlAlertConfig) {
@@ -483,10 +502,10 @@ public class YamlResource {
   }
 
   @PUT
-  @Path("/notification/{id}")
+  @Path("/subscription/{id}")
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.TEXT_PLAIN)
-  @ApiOperation("Edit a notification group using a YAML config")
+  @ApiOperation("Edit a subscription group using a YAML config")
   public Response updateSubscriptionGroupApi(
       @ApiParam("payload") String yamlAlertConfig,
       @ApiParam("the detection alert config id to edit") @PathParam("id") long id) {

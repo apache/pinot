@@ -87,20 +87,20 @@
           defaultText="Reset"
           type="outline-primary"
           buttonType="reset"
-          onClick=(action "resetYAML" "notification")
+          onClick=(action "resetYAML" "subscription")
           class="te-button te-button--link"
         }}
         {{bs-button
           defaultText="View Documentation"
           type="outline-primary"
           buttonType="link"
-          onClick=(action "triggerDoc" "Notification")
+          onClick=(action "triggerDoc" "subscription")
           class="te-button te-button--cancel"
         }}
       </div>
     </div>
     <div class="col-xs-12">
-      {{!-- notification settings editor --}}
+      {{!-- subscription settings editor --}}
       {{ember-ace
         lines=25
         value=currentYamlSettings
