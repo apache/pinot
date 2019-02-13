@@ -23,6 +23,7 @@ import java.io.UnsupportedEncodingException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URLEncoder;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -156,7 +157,7 @@ public class ControllerConf extends PropertiesConfiguration {
    */
   public static URI getUriFromPath(String path) {
     try {
-      URI uri = new URI(path);
+      URI uri = Paths.get(path).toUri();
       if (uri.getScheme() != null) {
         return uri;
       } else {
