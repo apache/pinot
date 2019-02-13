@@ -160,7 +160,7 @@ public class SegmentCompletionIntegrationTests extends LLCRealtimeClusterIntegra
 
     // Now call the validation manager, and the segment should fix itself
     RealtimeSegmentValidationManager validationManager = _controllerStarter.getRealtimeSegmentValidationManager();
-    validationManager.init();
+    validationManager.start();
     validationManager.run();
 
     // Check if a new segment get into CONSUMING state

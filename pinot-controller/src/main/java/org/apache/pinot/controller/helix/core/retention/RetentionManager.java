@@ -47,7 +47,7 @@ import org.slf4j.LoggerFactory;
  * The <code>RetentionManager</code> class manages retention for all segments and delete expired segments.
  * <p>It is scheduled to run only on leader controller.
  */
-public class RetentionManager extends ControllerPeriodicTask {
+public class RetentionManager extends ControllerPeriodicTask<Void> {
   public static final long OLD_LLC_SEGMENTS_RETENTION_IN_MILLIS = TimeUnit.DAYS.toMillis(5L);
 
   private static final Logger LOGGER = LoggerFactory.getLogger(RetentionManager.class);
@@ -65,15 +65,6 @@ public class RetentionManager extends ControllerPeriodicTask {
   }
 
   @Override
-  protected void initTask() {
-
-  }
-
-  @Override
-  protected void preprocess() {
-  }
-
-  @Override
   protected void processTable(String tableNameWithType) {
     LOGGER.info("Start managing retention for table: {}", tableNameWithType);
     manageRetentionForTable(tableNameWithType);
@@ -83,11 +74,6 @@ public class RetentionManager extends ControllerPeriodicTask {
   protected void postprocess() {
     LOGGER.info("Removing aged (more than {} days) deleted segments for all tables", _deletedSegmentsRetentionInDays);
     _pinotHelixResourceManager.getSegmentDeletionManager().removeAgedDeletedSegments(_deletedSegmentsRetentionInDays);
-  }
-
-  @Override
-  protected void exceptionHandler(String tableNameWithType, Exception e) {
-    LOGGER.error("Caught exception while managing retention for table: {}", tableNameWithType, e);
   }
 
   private void manageRetentionForTable(String tableNameWithType) {
@@ -189,10 +175,5 @@ public class RetentionManager extends ControllerPeriodicTask {
       return states.size() == 1 && states
           .contains(CommonConstants.Helix.StateModel.SegmentOnlineOfflineStateModel.OFFLINE);
     }
-  }
-
-  @Override
-  public void stopTask() {
-
   }
 }
