@@ -45,6 +45,7 @@ import org.apache.pinot.thirdeye.anomaly.detection.AnomalyDetectionInputContextB
 import org.apache.pinot.thirdeye.api.Constants;
 import org.apache.pinot.thirdeye.datalayer.bao.AlertConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.AnomalyFunctionManager;
+import org.apache.pinot.thirdeye.datalayer.bao.ApplicationManager;
 import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionAlertConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
@@ -52,6 +53,7 @@ import org.apache.pinot.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
 import org.apache.pinot.thirdeye.datalayer.dto.AlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.ApplicationDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
@@ -91,6 +93,7 @@ public class DetectionMigrationResource {
   private final DatasetConfigManager datasetConfigDAO;
   private final MergedAnomalyResultManager mergedAnomalyResultDAO;
   private final AlertConfigManager alertConfigDAO;
+  private final ApplicationManager appDAO;
   private final MetricConfigManager metricConfigDAO;
   private final Yaml yaml;
 
@@ -100,6 +103,7 @@ public class DetectionMigrationResource {
   public DetectionMigrationResource(
       AnomalyFunctionManager anomalyFunctionDAO,
       AlertConfigManager alertConfigDAO,
+      ApplicationManager appDAO,
       MetricConfigManager metricConfigDAO,
       DetectionConfigManager detectionConfigDAO,
       DetectionAlertConfigManager detectionAlertConfigDAO,
@@ -109,6 +113,7 @@ public class DetectionMigrationResource {
     this.detectionConfigDAO = detectionConfigDAO;
     this.detectionAlertConfigDAO = detectionAlertConfigDAO;
     this.alertConfigDAO = alertConfigDAO;
+    this.appDAO = appDAO;
     this.metricConfigDAO = metricConfigDAO;
     this.datasetConfigDAO = datasetConfigDAO;
     this.mergedAnomalyResultDAO = mergedAnomalyResultDAO;
@@ -559,13 +564,14 @@ public class DetectionMigrationResource {
             String.format("Failed to migrate alert ID %d with name %s due to %s", alertConfigDTO.getId(),
                 alertConfigDTO.getName(), e.getMessage()));
       }
-
     }
 
     if (responseMessage.isEmpty()) {
+      LOGGER.info("[MIG] Application " + application + " has been successfully migrated");
       return Response.ok("Application " + application + " has been successfully migrated").build();
     } else {
-      return Response.status(Response.Status.OK).entity(responseMessage).build();
+      LOGGER.error("[MIG] Found errors while migrating application " + application);
+      return Response.status(Response.Status.BAD_REQUEST).entity(responseMessage).build();
     }
   }
 
@@ -608,5 +614,35 @@ public class DetectionMigrationResource {
     }
 
     return Response.ok(responseMessage).build();
+  }
+
+  @POST
+  @ApiOperation("migrate all applications")
+  @Path("/applications")
+  public Response migrateApplication() {
+    List<ApplicationDTO> applicationDTOS = this.appDAO.findAll();
+    Map<String, String> responseMessage = new HashMap<>();
+
+    for (ApplicationDTO app : applicationDTOS) {
+      try {
+        Response response = migrateApplication(app.getApplication());
+        if (response.getStatusInfo() != Response.Status.OK) {
+          throw new RuntimeException("Found " + ConfigUtils.getMap(response.getEntity()).size() + " issues while migrating alerts.");
+        }
+      } catch (Exception e) {
+        // Skip migrating this application
+        LOGGER.error("[MIG] Failed to migrate application {}. Exception {}", app.getApplication(), e);
+        responseMessage.put("Status of application " + app.getApplication(),
+            String.format("Failed to migrate application %s due to %s", app.getApplication(), e.getMessage()));
+      }
+    }
+
+    if (responseMessage.isEmpty()) {
+      LOGGER.info("[MIG] Successfully migrated all the applications");
+      return Response.ok("All applications have been successfully migrated").build();
+    } else {
+      LOGGER.error("[MIG] Errors found while migrating application. Errors:\n" + responseMessage);
+      return Response.status(Response.Status.BAD_REQUEST).entity(responseMessage).build();
+    }
   }
 }
