@@ -58,6 +58,7 @@ import org.apache.pinot.controller.helix.core.realtime.PinotRealtimeSegmentManag
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceSegmentStrategyFactory;
 import org.apache.pinot.controller.helix.core.relocation.RealtimeSegmentRelocator;
 import org.apache.pinot.controller.helix.core.retention.RetentionManager;
+import org.apache.pinot.controller.helix.core.util.HelixSetupUtils;
 import org.apache.pinot.controller.validation.BrokerResourceValidationManager;
 import org.apache.pinot.controller.validation.OfflineSegmentIntervalChecker;
 import org.apache.pinot.controller.validation.RealtimeSegmentValidationManager;
@@ -83,6 +84,7 @@ public class ControllerStarter {
   private final MetricsRegistry _metricsRegistry;
   private final ControllerMetrics _controllerMetrics;
   private final ExecutorService _executorService;
+  private final HelixSetupUtils.ControllerMode _controllerMode;
 
   // Can only be constructed after resource manager getting started
   private OfflineSegmentIntervalChecker _offlineSegmentIntervalChecker;
@@ -102,6 +104,7 @@ public class ControllerStarter {
         new ControllerAdminApiApplication(_config.getQueryConsoleWebappPath(), _config.getQueryConsoleUseHttps());
     // Do not use this before the invocation of {@link PinotHelixResourceManager::start()}, which happens in {@link ControllerStarter::start()}
     _helixResourceManager = new PinotHelixResourceManager(_config);
+    _controllerMode = _helixResourceManager.getControllerMode();
     _metricsRegistry = new MetricsRegistry();
     _controllerMetrics = new ControllerMetrics(_metricsRegistry);
     _executorService =
@@ -133,7 +136,7 @@ public class ControllerStarter {
   }
 
   public void start() {
-    LOGGER.info("Starting Pinot controller");
+    LOGGER.info("Starting Pinot controller in mode: {}.", _controllerMode.name());
 
     Utils.logVersions();
 
@@ -141,32 +144,23 @@ public class ControllerStarter {
     MetricsHelper.initializeMetrics(_config.subset(METRICS_REGISTRY_NAME));
     MetricsHelper.registerMetricsRegistry(_metricsRegistry);
 
-    Configuration pinotFSConfig = _config.subset(CommonConstants.Controller.PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY);
-    Configuration segmentFetcherFactoryConfig =
-        _config.subset(CommonConstants.Controller.PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY);
-    Configuration pinotCrypterConfig = _config.subset(CommonConstants.Controller.PREFIX_OF_CONFIG_OF_PINOT_CRYPTER);
+    if (HelixSetupUtils.ControllerMode.HELIX_ONLY.equals(_controllerMode)) {
+      // start helix only controller.
+      _helixResourceManager.start();
+      return;
+    }
+
+    // Note: Right now we don't allow pinot-only mode to be used in production yet.
+    // Now we only have this mode used in tests.
+    // TODO: Remove this logic once all the helix separation PRs are committed.
+    if (!isPinotOnlyModeSupported()) {
+      throw new RuntimeException("Pinot only controller currently isn't supported in production yet.");
+    }
 
     // Start all components
-    LOGGER.info("Initializing PinotFSFactory");
-    try {
-      PinotFSFactory.init(pinotFSConfig);
-    } catch (Exception e) {
-      Utils.rethrowException(e);
-    }
-
-    LOGGER.info("Initializing SegmentFetcherFactory");
-    try {
-      SegmentFetcherFactory.getInstance().init(segmentFetcherFactoryConfig);
-    } catch (Exception e) {
-      throw new RuntimeException("Caught exception while initializing SegmentFetcherFactory", e);
-    }
-
-    LOGGER.info("Initializing PinotCrypterFactory");
-    try {
-      PinotCrypterFactory.init(pinotCrypterConfig);
-    } catch (Exception e) {
-      throw new RuntimeException("Caught exception while initializing PinotCrypterFactory", e);
-    }
+    initPinotFSFactory();
+    initSegmentFetcherFactory();
+    initPinotCrypterFactory();
 
     LOGGER.info("Starting Pinot Helix resource manager and connecting to Zookeeper");
     _helixResourceManager.start();
@@ -292,6 +286,37 @@ public class ControllerStarter {
     _controllerMetrics.initializeGlobalMeters();
   }
 
+  private void initPinotFSFactory() {
+    Configuration pinotFSConfig = _config.subset(CommonConstants.Controller.PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY);
+    LOGGER.info("Initializing PinotFSFactory");
+    try {
+      PinotFSFactory.init(pinotFSConfig);
+    } catch (Exception e) {
+      Utils.rethrowException(e);
+    }
+  }
+
+  private void initSegmentFetcherFactory() {
+    Configuration segmentFetcherFactoryConfig =
+        _config.subset(CommonConstants.Controller.PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY);
+    LOGGER.info("Initializing SegmentFetcherFactory");
+    try {
+      SegmentFetcherFactory.getInstance().init(segmentFetcherFactoryConfig);
+    } catch (Exception e) {
+      throw new RuntimeException("Caught exception while initializing SegmentFetcherFactory", e);
+    }
+  }
+
+  private void initPinotCrypterFactory() {
+    Configuration pinotCrypterConfig = _config.subset(CommonConstants.Controller.PREFIX_OF_CONFIG_OF_PINOT_CRYPTER);
+    LOGGER.info("Initializing PinotCrypterFactory");
+    try {
+      PinotCrypterFactory.init(pinotCrypterConfig);
+    } catch (Exception e) {
+      throw new RuntimeException("Caught exception while initializing PinotCrypterFactory", e);
+    }
+  }
+
   @VisibleForTesting
   protected List<PeriodicTask> setupControllerPeriodicTasks() {
     LOGGER.info("Setting up periodic tasks");
@@ -320,6 +345,12 @@ public class ControllerStarter {
 
   public void stop() {
     try {
+      if (HelixSetupUtils.ControllerMode.HELIX_ONLY.equals(_controllerMode)) {
+        LOGGER.info("Stopping resource manager");
+        _helixResourceManager.stop();
+        return;
+      }
+
       LOGGER.info("Stopping controller leadership manager");
       ControllerLeadershipManager.getInstance().stop();
 
@@ -343,6 +374,10 @@ public class ControllerStarter {
     } catch (final Exception e) {
       LOGGER.error("Caught exception while shutting down", e);
     }
+  }
+
+  public boolean isPinotOnlyModeSupported() {
+    return false;
   }
 
   public MetricsRegistry getMetricsRegistry() {

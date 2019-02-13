@@ -105,11 +105,27 @@ public abstract class ControllerTest {
     return config;
   }
 
+  public class TestOnlyControllerStarter extends ControllerStarter {
+
+    TestOnlyControllerStarter(ControllerConf conf) {
+      super(conf);
+    }
+
+    @Override
+    public boolean isPinotOnlyModeSupported() {
+      return true;
+    }
+  }
+
   protected void startController() {
     startController(getDefaultControllerConfiguration());
   }
 
   protected void startController(ControllerConf config) {
+    startController(config, true);
+  }
+
+  protected void startController(ControllerConf config, boolean deleteCluster) {
     Assert.assertNotNull(config);
     Assert.assertNull(_controllerStarter);
 
@@ -123,7 +139,7 @@ public abstract class ControllerTest {
 
     String zkStr = config.getZkStr();
     _zkClient = new ZkClient(zkStr);
-    if (_zkClient.exists("/" + helixClusterName)) {
+    if (_zkClient.exists("/" + helixClusterName) && deleteCluster) {
       _zkClient.deleteRecursive("/" + helixClusterName);
     }
 
@@ -135,7 +151,7 @@ public abstract class ControllerTest {
   }
 
   protected void startControllerStarter(ControllerConf config) {
-    _controllerStarter = new ControllerStarter(config);
+    _controllerStarter = new TestOnlyControllerStarter(config);
     _controllerStarter.start();
     _helixResourceManager = _controllerStarter.getHelixResourceManager();
   }

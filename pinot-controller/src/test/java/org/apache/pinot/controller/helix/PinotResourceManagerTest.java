@@ -56,7 +56,7 @@ public class PinotResourceManagerTest {
     final String instanceId = "localhost_helixController";
     _pinotHelixResourceManager =
         new PinotHelixResourceManager(ZkStarter.DEFAULT_ZK_STR, HELIX_CLUSTER_NAME, instanceId, null, 10000L, true,
-            /*isUpdateStateModel=*/ false, false);
+            /*isUpdateStateModel=*/ false, false, null);
     _pinotHelixResourceManager.start();
     _helixAdmin = _pinotHelixResourceManager.getHelixAdmin();
 

@@ -23,6 +23,7 @@ import org.apache.commons.configuration.ConfigurationException;
 import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.ControllerStarter;
+import org.apache.pinot.controller.helix.core.util.HelixSetupUtils;
 import org.apache.pinot.tools.Command;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
@@ -51,7 +52,10 @@ public class StartControllerCommand extends AbstractBaseAdminCommand implements 
   @Option(name = "-clusterName", required = false, metaVar = "<String>", usage = "Pinot cluster name.")
   private String _clusterName = DEFAULT_CLUSTER_NAME;
 
-  @Option(name = "-configFileName", required = false, metaVar = "<FilePathName>", usage = "Controller Starter config file", forbids = {"-controllerHost", "-controllerPort", "-dataDir", "-zkAddress", "-clusterName"})
+  @Option(name = "-controllerMode", required = false, metaVar = "<String>", usage = "Pinot controller mode.")
+  private String _controllerMode = HelixSetupUtils.ControllerMode.DUAL.name();
+
+  @Option(name = "-configFileName", required = false, metaVar = "<FilePathName>", usage = "Controller Starter config file", forbids = {"-controllerHost", "-controllerPort", "-dataDir", "-zkAddress", "-clusterName", "-controllerMode"})
   private String _configFileName;
 
   @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
@@ -150,6 +154,8 @@ public class StartControllerCommand extends AbstractBaseAdminCommand implements 
         conf.setOfflineSegmentIntervalCheckerFrequencyInSeconds(3600);
         conf.setRealtimeSegmentValidationFrequencyInSeconds(3600);
         conf.setBrokerResourceValidationFrequencyInSeconds(3600);
+
+        conf.setControllerMode(_controllerMode);
       }
 
       LOGGER.info("Executing command: " + toString());

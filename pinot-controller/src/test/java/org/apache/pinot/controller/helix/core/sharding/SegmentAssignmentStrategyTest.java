@@ -81,7 +81,7 @@ public class SegmentAssignmentStrategyTest {
     final String instanceId = "localhost_helixController";
     _pinotHelixResourceManager = new PinotHelixResourceManager(ZK_SERVER, HELIX_CLUSTER_NAME, instanceId, null, 10000L,
         true, /*isUpdateStateModel=*/
-        false, false);
+        false, false, null);
     _pinotHelixResourceManager.start();
 
     final String helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(ZK_SERVER);
