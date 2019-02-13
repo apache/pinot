@@ -44,8 +44,9 @@ public class ControllerConf extends PropertiesConfiguration {
   private static final String CONTROLLER_VIP_PROTOCOL = "controller.vip.protocol";
   private static final String CONTROLLER_HOST = "controller.host";
   private static final String CONTROLLER_PORT = "controller.port";
-  private static final String USE_HTTP_AND_SSL = "controller.ssl.enable.both";
-  private static final String USE_SSL = "controller.ssl.enabled";
+  private static final String USE_HTTP = "controller.http.enabled";
+  private static final String USE_HTTPS = "controller.https.enabled";
+  private static final String CONTROLLER_HTTPS_PORT = "controller.https.port";
   private static final String KEYSTORE_FILE = "controller.ssl.keystore.file";
   private static final String KEYSTORE_PASSWORD = "controller.ssl.keystore.pass";
   private static final String TRUSTSTORE_FILE = "controller.ssl.truststore.file";
@@ -215,16 +216,24 @@ public class ControllerConf extends PropertiesConfiguration {
     return containsKey(CONSOLE_WEBAPP_USE_HTTPS) && getBoolean(CONSOLE_WEBAPP_USE_HTTPS);
   }
 
-  public boolean getUseHTTPAndSSL() {
-    return containsKey(USE_HTTP_AND_SSL) && getBoolean(USE_HTTP_AND_SSL);
+  public void setUseHTTP(boolean useHTTP) {
+    setProperty(USE_HTTP, useHTTP);
   }
 
+  public boolean getUseHttp() {
+    if (!containsKey(USE_HTTP)) {
+      return true;
+    } else {
+      return (boolean) getBoolean(USE_HTTP);
+    }
+  }
+  
   public void setUseSSL(boolean useSSL) {
-	setProperty(USE_SSL, useSSL);
+	setProperty(USE_HTTPS, useSSL);
   }
   
   public boolean getUseSSL() {
-	return containsKey(USE_SSL) && getBoolean(USE_SSL);
+	return containsKey(USE_HTTPS) && getBoolean(USE_HTTPS);
   }
   
   public void setKeyStoreFile(String keyStoreFile) {
@@ -295,6 +304,10 @@ public class ControllerConf extends PropertiesConfiguration {
     setProperty(CONTROLLER_PORT, port);
   }
 
+  public void setControllerHttpsPort(String httpsPort) {
+    setProperty(CONTROLLER_HTTPS_PORT, httpsPort);
+  }
+
   public void setDataDir(String dataDir) {
     setProperty(DATA_DIR, dataDir);
   }
@@ -327,6 +340,14 @@ public class ControllerConf extends PropertiesConfiguration {
 
   public String getControllerPort() {
     return (String) getProperty(CONTROLLER_PORT);
+  }
+
+  public String getControllerHttpsPort() {
+    if (!containsKey(CONTROLLER_HTTPS_PORT)) {
+      return "443";
+    } else {
+      return (String) getProperty(CONTROLLER_HTTPS_PORT);
+    }
   }
 
   public String getDataDir() {

@@ -57,7 +57,10 @@ import java.util.List;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+
+import io.swagger.models.auth.In;
 import org.apache.commons.configuration.Configuration;
+import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
 import org.apache.commons.io.FileUtils;
@@ -78,6 +81,7 @@ public class ControllerStarter {
 
   private final ControllerConf _config;
   private final ControllerAdminApiApplication _adminApp;
+  private final ControllerAdminApiApplication _encryptedAdminApp;
   private final PinotHelixResourceManager _helixResourceManager;
   private final RetentionManager _retentionManager;
   private final MetricsRegistry _metricsRegistry;
@@ -97,11 +101,21 @@ public class ControllerStarter {
 
   public ControllerStarter(ControllerConf conf) {
     _config = conf;
-    _adminApp = new ControllerAdminApiApplication(_config.getQueryConsoleWebappPath(), _config.getQueryConsoleUseHttps());
     if (_config.getUseSSL()) {
-    	LOGGER.info("Using SSL");
-    	_adminApp.setSSLConfigs(_config.getKeyStoreFile(), _config.getKeyStorePassword(), 
-    			_config.getTrustStoreFile(), _config.getTrustStorePassword());
+      LOGGER.info("Initializing https server");
+      _encryptedAdminApp = new ControllerAdminApiApplication(_config.getQueryConsoleWebappPath(), _config.getQueryConsoleUseHttps());
+      _encryptedAdminApp.setSSLConfigs(_config.getKeyStoreFile(), _config.getKeyStorePassword(),
+              _config.getTrustStoreFile(), _config.getTrustStorePassword());
+    }
+    else {
+      _encryptedAdminApp = null;
+    }
+    if (_config.getUseHttp()) {
+      LOGGER.info("Initializing http server");
+      _adminApp = new ControllerAdminApiApplication(_config.getQueryConsoleWebappPath(), false);
+    }
+    else {
+      _adminApp = null;
     }
     _helixResourceManager = new PinotHelixResourceManager(_config);
     _retentionManager = new RetentionManager(_helixResourceManager, _config);
@@ -230,14 +244,16 @@ public class ControllerStarter {
     final MetadataEventNotifierFactory metadataEventNotifierFactory =
         MetadataEventNotifierFactory.loadFactory(_config.subset(METADATA_EVENT_NOTIFIER_PREFIX));
 
-    int jerseyPort = Integer.parseInt(_config.getControllerPort());
+    int httpJerseyPort = Integer.parseInt(_config.getControllerPort());
+    int httpsJerseyPort = Integer.parseInt(_config.getControllerHttpsPort());
 
     LOGGER.info("Controller download url base: {}", _config.generateVipUrl());
     LOGGER.info("Injecting configuration and resource managers to the API context");
     final MultiThreadedHttpConnectionManager connectionManager = new MultiThreadedHttpConnectionManager();
     connectionManager.getParams().setConnectionTimeout(_config.getServerAdminRequestTimeoutSeconds() * 1000);
     // register all the controller objects for injection to jersey resources
-    _adminApp.registerBinder(new AbstractBinder() {
+    if (_adminApp != null) {
+      _adminApp.registerBinder(new AbstractBinder() {
       @Override
       protected void configure() {
         bind(_config).to(ControllerConf.class);
@@ -249,17 +265,36 @@ public class ControllerStarter {
         bind(_controllerMetrics).to(ControllerMetrics.class);
         bind(accessControlFactory).to(AccessControlFactory.class);
         bind(metadataEventNotifierFactory).to(MetadataEventNotifierFactory.class);
-      }
-    });
-
-    _adminApp.start(jerseyPort);
-    LOGGER.info("Started Jersey API on port {}", jerseyPort);
-    LOGGER.info("Pinot controller ready and listening on port {} for API requests", _config.getControllerPort());
+        }
+      });
+      _adminApp.start(httpJerseyPort);
+      LOGGER.info("Started Jersey API for http server on port {}", httpJerseyPort);
+      LOGGER.info("Pinot controller ready and listening on port {} for API requests", httpJerseyPort);
+    }
+    if (_encryptedAdminApp != null) {
+       _encryptedAdminApp.registerBinder(new AbstractBinder() {
+      @Override
+      protected void configure() {
+        bind(_config).to(ControllerConf.class);
+        bind(_helixResourceManager).to(PinotHelixResourceManager.class);
+        bind(_helixTaskResourceManager).to(PinotHelixTaskResourceManager.class);
+        bind(_taskManager).to(PinotTaskManager.class);
+        bind(connectionManager).to(HttpConnectionManager.class);
+        bind(_executorService).to(Executor.class);
+        bind(_controllerMetrics).to(ControllerMetrics.class);
+        bind(accessControlFactory).to(AccessControlFactory.class);
+        bind(metadataEventNotifierFactory).to(MetadataEventNotifierFactory.class);
+        }
+      });
+      _encryptedAdminApp.start(httpsJerseyPort);
+      LOGGER.info("Started Jersey API for https server on port {}", httpsJerseyPort);
+      LOGGER.info("Pinot controller ready and listening on port {} for API requests", httpsJerseyPort);
+    }
     if (_config.getUseSSL() && _config.getQueryConsoleUseHttps()) {
       LOGGER.info("Controller services available at https://{}:{}/", _config.getControllerHost(),
-    	_config.getControllerPort());
+    	_config.getControllerHttpsPort());
     }
-    else {
+    if (_config.getUseHttp()){
        LOGGER.info("Controller services available at http://{}:{}/", _config.getControllerHost(),
          _config.getControllerPort());
     }
@@ -334,8 +369,15 @@ public class ControllerStarter {
       LOGGER.info("Closing PinotFS classes");
       PinotFSFactory.shutdown();
 
-      LOGGER.info("Stopping Jersey admin API");
-      _adminApp.stop();
+      if (_adminApp != null) {
+        LOGGER.info("Stopping Jersey admin API");
+        _adminApp.stop();
+      }
+
+      if (_encryptedAdminApp != null) {
+        LOGGER.info("Stopping Jersey admin API");
+        _encryptedAdminApp.stop();
+      }
 
       LOGGER.info("Stopping realtime segment manager");
       _realtimeSegmentsManager.stop();
