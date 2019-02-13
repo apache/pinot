@@ -233,7 +233,10 @@ public class SegmentCreationJob extends BaseSegmentJob {
     }
   }
 
-  protected DefaultControllerRestApi getControllerRestApi() {
+  /**
+   * Can be overridden to provide custom controller Rest API.
+   */
+  protected ControllerRestApi getControllerRestApi() {
     return new DefaultControllerRestApi(_pushLocations, _rawTableName);
   }
 
@@ -248,7 +251,7 @@ public class SegmentCreationJob extends BaseSegmentJob {
   }
 
   /**
-   * Can be override to plug in custom mapper.
+   * Can be overridden to plug in custom mapper.
    */
   protected Class<? extends Mapper<LongWritable, Text, LongWritable, Text>> getMapperClass() {
     return SegmentCreationMapper.class;
@@ -278,7 +281,7 @@ public class SegmentCreationJob extends BaseSegmentJob {
   }
 
   /**
-   * Can be override to set additional job properties.
+   * Can be overridden to set additional job properties.
    */
   @SuppressWarnings("unused")
   protected void addAdditionalJobProperties(Job job) {
