@@ -18,147 +18,115 @@
  */
 package org.apache.pinot.core.segment.name;
 
-import com.google.common.base.Joiner;
+import com.google.common.base.Preconditions;
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.Arrays;
 import java.util.Date;
 import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
-import org.apache.pinot.common.data.TimeGranularitySpec;
-import org.apache.pinot.core.segment.creator.ColumnStatistics;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import javax.annotation.Nullable;
+import org.apache.pinot.common.data.TimeGranularitySpec.TimeFormat;
 
 
 /**
  * Segment name generator that normalizes the date to human readable format.
  */
 public class NormalizedDateSegmentNameGenerator implements SegmentNameGenerator {
-  private static final Logger LOGGER = LoggerFactory.getLogger(NormalizedDateSegmentNameGenerator.class);
-
-  private final String _tableName;
-  private final int _sequenceId;
-  private final String _timeColumnType;
-  private final String _tablePushFrequency;
-  private final String _tablePushType;
   private final String _segmentNamePrefix;
-  private final String _segmentExcludeSequenceId;
-  private final String _schemaTimeFormat;
+  private final boolean _appendPushType;
+  private final boolean _excludeSequenceId;
 
-  public NormalizedDateSegmentNameGenerator(String tableName, int sequenceId, String timeColumnType,
-      String tablePushFrequency, String tablePushType, String segmentNamePrefix, String segmentExcludeSequenceId,
-      String schemaTimeFormat) {
-    _tableName = tableName;
-    _sequenceId = sequenceId;
-    _timeColumnType = timeColumnType;
-    _tablePushFrequency = tablePushFrequency;
-    _tablePushType = tablePushType;
-    _segmentNamePrefix = segmentNamePrefix;
-    _segmentExcludeSequenceId = segmentExcludeSequenceId;
-    _schemaTimeFormat = schemaTimeFormat;
+  // For APPEND tables
+  private final SimpleDateFormat _outputSDF;
+  // For EPOCH time format
+  private final TimeUnit _inputTimeUnit;
+  // For SIMPLE_DATE_FORMAT time format
+  private final SimpleDateFormat _inputSDF;
+
+  public NormalizedDateSegmentNameGenerator(String tableName, @Nullable String segmentNamePrefix,
+      @Nullable String excludeSequenceId, @Nullable String pushType, @Nullable String pushFrequency,
+      @Nullable String timeType, @Nullable String timeFormat) {
+    _segmentNamePrefix = segmentNamePrefix != null ? segmentNamePrefix.trim() : tableName;
+    _appendPushType = "APPEND".equalsIgnoreCase(pushType);
+    _excludeSequenceId = Boolean.parseBoolean(excludeSequenceId);
+
+    // Include time info for APPEND push type
+    if (_appendPushType) {
+      // For HOURLY push frequency, include hours into output format
+      if ("HOURLY".equalsIgnoreCase(pushFrequency)) {
+        _outputSDF = new SimpleDateFormat("yyyy-MM-dd-HH");
+      } else {
+        _outputSDF = new SimpleDateFormat("yyyy-MM-dd");
+      }
+      _outputSDF.setTimeZone(TimeZone.getTimeZone("UTC"));
+
+      // Parse input time format: 'EPOCH' or 'SIMPLE_DATE_FORMAT:<pattern>'
+      if (Preconditions.checkNotNull(timeFormat).equals(TimeFormat.EPOCH.toString())) {
+        _inputTimeUnit = TimeUnit.valueOf(timeType);
+        _inputSDF = null;
+      } else {
+        Preconditions.checkArgument(timeFormat.startsWith(TimeFormat.SIMPLE_DATE_FORMAT.toString()),
+            "Invalid time format: %s, must be one of '%s' or '%s:<pattern>'", timeFormat, TimeFormat.EPOCH,
+            TimeFormat.SIMPLE_DATE_FORMAT);
+        _inputTimeUnit = null;
+        _inputSDF = new SimpleDateFormat(timeFormat.substring(timeFormat.indexOf(':') + 1));
+        _inputSDF.setTimeZone(TimeZone.getTimeZone("UTC"));
+      }
+    } else {
+      _outputSDF = null;
+      _inputTimeUnit = null;
+      _inputSDF = null;
+    }
   }
 
   @Override
-  public String generateSegmentName(ColumnStatistics statsCollector)
-      throws Exception {
-    long minTimeValue = Long.parseLong(statsCollector.getMinValue().toString());
-    long maxTimeValue = Long.parseLong(statsCollector.getMaxValue().toString());
-    String segmentName = generateSegmentName(minTimeValue, maxTimeValue);
-    LOGGER.info("Segment name is: " + segmentName + " for table name: " + _tableName);
-    return segmentName;
+  public String generateSegmentName(int sequenceId, @Nullable Object minTimeValue, @Nullable Object maxTimeValue) {
+    Integer sequenceIdInSegmentName = !_excludeSequenceId && sequenceId >= 0 ? sequenceId : null;
+    if (!_appendPushType) {
+      return JOINER.join(_segmentNamePrefix, sequenceIdInSegmentName);
+    } else {
+      return JOINER.join(_segmentNamePrefix, getNormalizedDate(Preconditions.checkNotNull(minTimeValue)),
+          getNormalizedDate(Preconditions.checkNotNull(maxTimeValue)), sequenceIdInSegmentName);
+    }
   }
 
   /**
-   * Generate the segment name given raw min, max time value
+   * Converts the time value into human readable date format.
    *
-   * @param minTimeValue min time value from a segment
-   * @param maxTimeValue max time value from a segment
-   * @return segment name with normalized time
+   * @param timeValue Time value
+   * @return Normalized date string
    */
-  public String generateSegmentName(long minTimeValue, long maxTimeValue) {
-    // Use table name for prefix by default unless explicitly set
-    String segmentPrefix = _tableName;
-    if (_segmentNamePrefix != null) {
-      LOGGER.info("Using prefix for table " + _tableName + ", prefix " + _segmentNamePrefix);
-      segmentPrefix = _segmentNamePrefix;
-    } else {
-      LOGGER.info("Using default naming scheme for " + _tableName);
-    }
-
-    String sequenceId = Integer.toString(_sequenceId);
-    Boolean excludeSequenceId = Boolean.valueOf(_segmentExcludeSequenceId);
-    if (excludeSequenceId) {
-      sequenceId = null;
-    }
-
-    String minTimeValueNormalized = null;
-    String maxTimeValueNormalized = null;
-    // For append use cases, we add dates; otherwise, we don't
-    if (_tablePushType.equalsIgnoreCase("APPEND")) {
-      minTimeValueNormalized = getNormalizedDate(minTimeValue);
-      maxTimeValueNormalized = getNormalizedDate(maxTimeValue);
-      LOGGER.info("Table push type is append. Min time value = " + minTimeValueNormalized + " and max time value = "
-          + maxTimeValueNormalized + " table name: " + _tableName);
-    } else {
-      LOGGER.info("Table push type is refresh for table: " + _tableName);
-    }
-    return Joiner.on("_").skipNulls()
-        .join(Arrays.asList(segmentPrefix.trim(), minTimeValueNormalized, maxTimeValueNormalized, sequenceId));
-  }
-
-  /**
-   * Convert the raw time value into human readable date format
-   *
-   * @param timeValue time column value
-   * @return normalized date string
-   */
-  private String getNormalizedDate(long timeValue) {
-    Date sinceEpoch = null;
-    if (_schemaTimeFormat.equals(TimeGranularitySpec.TimeFormat.EPOCH.toString())) {
-      TimeUnit timeUnit = TimeUnit.valueOf(_timeColumnType);
-
-      switch (timeUnit) {
-        case MILLISECONDS:
-          sinceEpoch = new Date(timeValue);
-          break;
-        case SECONDS:
-          sinceEpoch = new Date(TimeUnit.SECONDS.toMillis(timeValue));
-          break;
-        case MINUTES:
-          sinceEpoch = new Date(TimeUnit.MINUTES.toMillis(timeValue));
-          break;
-        case HOURS:
-          sinceEpoch = new Date(TimeUnit.HOURS.toMillis(timeValue));
-          break;
-        case DAYS:
-          sinceEpoch = new Date(TimeUnit.DAYS.toMillis(timeValue));
-          break;
-      }
+  private String getNormalizedDate(Object timeValue) {
+    if (_inputTimeUnit != null) {
+      return _outputSDF.format(new Date(_inputTimeUnit.toMillis(Long.parseLong(timeValue.toString()))));
     } else {
       try {
-        SimpleDateFormat dateFormatPassedIn = new SimpleDateFormat(_schemaTimeFormat);
-        dateFormatPassedIn.setTimeZone(TimeZone.getTimeZone("UTC"));
-        sinceEpoch = dateFormatPassedIn.parse(Long.toString(timeValue));
-      } catch (Exception e) {
-        throw new RuntimeException("Could not parse simple date format: '" + _schemaTimeFormat);
+        return _outputSDF.format(_inputSDF.parse(timeValue.toString()));
+      } catch (ParseException e) {
+        throw new RuntimeException(String
+            .format("Caught exception while parsing simple date format: %s with value: %s", _inputSDF.toPattern(),
+                timeValue), e);
       }
     }
+  }
 
-    // Pick the current time when having a parsing error
-    if (sinceEpoch == null) {
-      LOGGER.warn("Could not translate timeType '" + _timeColumnType);
-      sinceEpoch = new Date();
+  @Override
+  public String toString() {
+    StringBuilder stringBuilder =
+        new StringBuilder("NormalizedDateSegmentNameGenerator: segmentNamePrefix=").append(_segmentNamePrefix)
+            .append(", appendPushType=").append(_appendPushType);
+    if (_excludeSequenceId) {
+      stringBuilder.append(", excludeSequenceId=true");
     }
-
-    // Get date format
-    SimpleDateFormat dateFormat;
-    if (_tablePushFrequency.equalsIgnoreCase("HOURLY")) {
-      dateFormat = new SimpleDateFormat("yyyy-MM-dd-HH");
-    } else {
-      dateFormat = new SimpleDateFormat("yyyy-MM-dd");
+    if (_outputSDF != null) {
+      stringBuilder.append(", outputSDF=").append(_outputSDF.toPattern());
     }
-    dateFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
-
-    return dateFormat.format(sinceEpoch);
+    if (_inputTimeUnit != null) {
+      stringBuilder.append(", inputTimeUnit=").append(_inputTimeUnit);
+    }
+    if (_inputSDF != null) {
+      stringBuilder.append(", inputSDF=").append(_inputSDF.toPattern());
+    }
+    return stringBuilder.toString();
   }
 }

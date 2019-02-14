@@ -358,8 +358,14 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
 
   private void handlePostCreation()
       throws Exception {
-    final String timeColumn = config.getTimeColumnName();
-    segmentName = config.getSegmentNameGenerator().generateSegmentName(segmentStats.getColumnProfileFor(timeColumn));
+    ColumnStatistics timeColumnStatistics = segmentStats.getColumnProfileFor(config.getTimeColumnName());
+    int sequenceId = config.getSequenceId();
+    if (timeColumnStatistics != null) {
+      segmentName = config.getSegmentNameGenerator()
+          .generateSegmentName(sequenceId, timeColumnStatistics.getMinValue(), timeColumnStatistics.getMaxValue());
+    } else {
+      segmentName = config.getSegmentNameGenerator().generateSegmentName(sequenceId, null, null);
+    }
 
     try {
       // Write the index files to disk

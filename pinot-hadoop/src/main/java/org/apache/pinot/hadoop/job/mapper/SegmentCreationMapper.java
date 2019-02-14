@@ -32,8 +32,10 @@ import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+import org.apache.pinot.common.config.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.common.data.TimeFieldSpec;
 import org.apache.pinot.common.utils.DataSize;
 import org.apache.pinot.common.utils.JsonUtils;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
@@ -44,6 +46,9 @@ import org.apache.pinot.core.data.readers.ThriftRecordReaderConfig;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.core.segment.name.NormalizedDateSegmentNameGenerator;
+import org.apache.pinot.core.segment.name.SegmentNameGenerator;
+import org.apache.pinot.core.segment.name.SimpleSegmentNameGenerator;
 import org.apache.pinot.hadoop.job.JobConfigConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -57,10 +62,10 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
   protected Configuration _jobConf;
   protected String _rawTableName;
   protected Schema _schema;
+  protected SegmentNameGenerator _segmentNameGenerator;
 
   // Optional
   protected TableConfig _tableConfig;
-  protected String _segmentNamePostfix;
   protected Path _readerConfigFile;
 
   // HDFS segment tar directory
@@ -90,10 +95,34 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
     if (tableConfigString != null) {
       _tableConfig = TableConfig.fromJsonString(tableConfigString);
     }
-    _segmentNamePostfix = _jobConf.get(JobConfigConstants.SEGMENT_NAME_POSTFIX);
     String readerConfigFile = _jobConf.get(JobConfigConstants.PATH_TO_READER_CONFIG);
     if (readerConfigFile != null) {
       _readerConfigFile = new Path(readerConfigFile);
+    }
+
+    // Set up segment name generator
+    String segmentNameGeneratorType =
+        _jobConf.get(JobConfigConstants.SEGMENT_NAME_GENERATOR_TYPE, JobConfigConstants.DEFAULT_SEGMENT_NAME_GENERATOR);
+    switch (segmentNameGeneratorType) {
+      case JobConfigConstants.SIMPLE_SEGMENT_NAME_GENERATOR:
+        _segmentNameGenerator =
+            new SimpleSegmentNameGenerator(_rawTableName, _jobConf.get(JobConfigConstants.SEGMENT_NAME_POSTFIX));
+        break;
+      case JobConfigConstants.NORMALIZED_DATE_SEGMENT_NAME_GENERATOR:
+        Preconditions.checkState(_tableConfig != null,
+            "In order to use NormalizedDateSegmentNameGenerator, table config must be provided");
+        SegmentsValidationAndRetentionConfig validationConfig = _tableConfig.getValidationConfig();
+        String timeFormat = null;
+        TimeFieldSpec timeFieldSpec = _schema.getTimeFieldSpec();
+        if (timeFieldSpec != null) {
+          timeFormat = timeFieldSpec.getOutgoingGranularitySpec().getTimeFormat();
+        }
+        _segmentNameGenerator =
+            new NormalizedDateSegmentNameGenerator(_rawTableName, _jobConf.get(JobConfigConstants.SEGMENT_NAME_PREFIX),
+                _jobConf.get(JobConfigConstants.EXCLUDE_SEQUENCE_ID), validationConfig.getSegmentPushType(),
+                validationConfig.getSegmentPushFrequency(), validationConfig.getTimeType(), timeFormat);
+      default:
+        throw new UnsupportedOperationException("Unsupported segment name generator type: " + segmentNameGeneratorType);
     }
 
     // Working directories
@@ -119,8 +148,8 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
     _logger.info("*********************************************************************");
     _logger.info("Raw Table Name: {}", _rawTableName);
     _logger.info("Schema: {}", _schema);
+    _logger.info("Segment Name Generator: {}", _segmentNameGenerator);
     _logger.info("Table Config: {}", _tableConfig);
-    _logger.info("Segment Name Postfix: {}", _segmentNamePostfix);
     _logger.info("Reader Config File: {}", _readerConfigFile);
     _logger.info("*********************************************************************");
     _logger.info("HDFS Segment Tar Directory: {}", _hdfsSegmentTarDir);
@@ -149,10 +178,8 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
     segmentGeneratorConfig.setTableName(_rawTableName);
     segmentGeneratorConfig.setInputFilePath(localInputFile.getPath());
     segmentGeneratorConfig.setOutDir(_localSegmentDir.getPath());
+    segmentGeneratorConfig.setSegmentNameGenerator(_segmentNameGenerator);
     segmentGeneratorConfig.setSequenceId(sequenceId);
-    if (_segmentNamePostfix != null) {
-      segmentGeneratorConfig.setSegmentNamePostfix(_segmentNamePostfix);
-    }
     FileFormat fileFormat = getFileFormat(inputFileName);
     segmentGeneratorConfig.setFormat(fileFormat);
     segmentGeneratorConfig.setReaderConfig(getReaderConfig(fileFormat));

@@ -18,135 +18,141 @@
  */
 package org.apache.pinot.core.segment.name;
 
-import org.apache.pinot.common.data.DateTimeFieldSpec;
-import org.apache.pinot.core.segment.creator.ColumnStatistics;
-import org.mockito.Mockito;
-import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertEquals;
 
 
 public class NormalizedDateSegmentNameGeneratorTest {
   private static final String TABLE_NAME = "myTable";
-  private static final int SEQUENCE_ID = 1;
-  private static final String TIME_COLUMN_TYPE = "DAYS";
-  private static final String TABLE_PUSH_FREQUENCY = "daily";
-  private static final String PREFIX = "myTable_daily";
+  private static final String SEGMENT_NAME_PREFIX = "myTable_daily";
   private static final String APPEND_PUSH_TYPE = "APPEND";
   private static final String REFRESH_PUSH_TYPE = "REFRESH";
+  private static final String DAYS_TIME_TYPE = "DAYS";
+  private static final String HOURS_TIME_TYPE = "HOURS";
+  private static final String EPOCH_TIME_FORMAT = "EPOCH";
+  private static final String LONG_SIMPLE_DATE_FORMAT = "SIMPLE_DATE_FORMAT:yyyyMMdd";
+  private static final String STRING_SIMPLE_DATE_FORMAT = "SIMPLE_DATE_FORMAT:yyyy-MM-dd";
+  private static final String DAILY_PUSH_FREQUENCY = "daily";
+  private static final String HOURLY_PUSH_FREQUENCY = "hourly";
+  private static final int INVALID_SEQUENCE_ID = -1;
+  private static final int VALID_SEQUENCE_ID = 1;
 
   @Test
-  public void testAppend()
-      throws Exception {
-    ColumnStatistics columnStatisticsClass = Mockito.mock(ColumnStatistics.class);
-    when(columnStatisticsClass.getMaxValue()).thenReturn(3L);
-    when(columnStatisticsClass.getMinValue()).thenReturn(1L);
-    NormalizedDateSegmentNameGenerator normalizedDataSegmentNameGenerator =
-        new NormalizedDateSegmentNameGenerator(TABLE_NAME, SEQUENCE_ID, TIME_COLUMN_TYPE, TABLE_PUSH_FREQUENCY,
-            APPEND_PUSH_TYPE, null, null, DateTimeFieldSpec.TimeFormat.EPOCH.toString());
-    Assert.assertEquals(normalizedDataSegmentNameGenerator.generateSegmentName(columnStatisticsClass),
+  public void testRefresh() {
+    SegmentNameGenerator segmentNameGenerator =
+        new NormalizedDateSegmentNameGenerator(TABLE_NAME, null, null, REFRESH_PUSH_TYPE, null, null, null);
+    assertEquals(segmentNameGenerator.toString(),
+        "NormalizedDateSegmentNameGenerator: segmentNamePrefix=myTable, appendPushType=false");
+    assertEquals(segmentNameGenerator.generateSegmentName(INVALID_SEQUENCE_ID, null, null), "myTable");
+    assertEquals(segmentNameGenerator.generateSegmentName(VALID_SEQUENCE_ID, null, null), "myTable_1");
+  }
+
+  @Test
+  public void testWithSegmentNamePrefix() {
+    SegmentNameGenerator segmentNameGenerator =
+        new NormalizedDateSegmentNameGenerator(TABLE_NAME, SEGMENT_NAME_PREFIX, null, REFRESH_PUSH_TYPE, null, null,
+            null);
+    assertEquals(segmentNameGenerator.toString(),
+        "NormalizedDateSegmentNameGenerator: segmentNamePrefix=myTable_daily, appendPushType=false");
+    assertEquals(segmentNameGenerator.generateSegmentName(INVALID_SEQUENCE_ID, null, null), "myTable_daily");
+    assertEquals(segmentNameGenerator.generateSegmentName(VALID_SEQUENCE_ID, null, null), "myTable_daily_1");
+  }
+
+  @Test
+  public void testWithUntrimmedSegmentNamePrefix() {
+    SegmentNameGenerator segmentNameGenerator =
+        new NormalizedDateSegmentNameGenerator(TABLE_NAME, SEGMENT_NAME_PREFIX + "  ", null, REFRESH_PUSH_TYPE, null,
+            null, null);
+    assertEquals(segmentNameGenerator.toString(),
+        "NormalizedDateSegmentNameGenerator: segmentNamePrefix=myTable_daily, appendPushType=false");
+    assertEquals(segmentNameGenerator.generateSegmentName(INVALID_SEQUENCE_ID, null, null), "myTable_daily");
+    assertEquals(segmentNameGenerator.generateSegmentName(VALID_SEQUENCE_ID, null, null), "myTable_daily_1");
+  }
+
+  @Test
+  public void testExcludeSequenceId() {
+    SegmentNameGenerator segmentNameGenerator =
+        new NormalizedDateSegmentNameGenerator(TABLE_NAME, null, "true", REFRESH_PUSH_TYPE, null, null, null);
+    assertEquals(segmentNameGenerator.toString(),
+        "NormalizedDateSegmentNameGenerator: segmentNamePrefix=myTable, appendPushType=false, excludeSequenceId=true");
+    assertEquals(segmentNameGenerator.generateSegmentName(INVALID_SEQUENCE_ID, null, null), "myTable");
+    assertEquals(segmentNameGenerator.generateSegmentName(VALID_SEQUENCE_ID, null, null), "myTable");
+  }
+
+  @Test
+  public void testWithPrefixExcludeSequenceId() {
+    SegmentNameGenerator segmentNameGenerator =
+        new NormalizedDateSegmentNameGenerator(TABLE_NAME, SEGMENT_NAME_PREFIX, "true", REFRESH_PUSH_TYPE, null, null,
+            null);
+    assertEquals(segmentNameGenerator.toString(),
+        "NormalizedDateSegmentNameGenerator: segmentNamePrefix=myTable_daily, appendPushType=false, excludeSequenceId=true");
+    assertEquals(segmentNameGenerator.generateSegmentName(INVALID_SEQUENCE_ID, null, null), "myTable_daily");
+    assertEquals(segmentNameGenerator.generateSegmentName(VALID_SEQUENCE_ID, null, null), "myTable_daily");
+  }
+
+  @Test
+  public void testAppend() {
+    SegmentNameGenerator segmentNameGenerator =
+        new NormalizedDateSegmentNameGenerator(TABLE_NAME, null, null, APPEND_PUSH_TYPE, DAILY_PUSH_FREQUENCY,
+            DAYS_TIME_TYPE, EPOCH_TIME_FORMAT);
+    assertEquals(segmentNameGenerator.toString(),
+        "NormalizedDateSegmentNameGenerator: segmentNamePrefix=myTable, appendPushType=true, outputSDF=yyyy-MM-dd, inputTimeUnit=DAYS");
+    assertEquals(segmentNameGenerator.generateSegmentName(INVALID_SEQUENCE_ID, 1L, 3L),
+        "myTable_1970-01-02_1970-01-04");
+    assertEquals(segmentNameGenerator.generateSegmentName(VALID_SEQUENCE_ID, 1L, 3L),
         "myTable_1970-01-02_1970-01-04_1");
   }
 
   @Test
-  public void testAppendWithPrefix()
-      throws Exception {
-    ColumnStatistics columnStatisticsClass = Mockito.mock(ColumnStatistics.class);
-    when(columnStatisticsClass.getMaxValue()).thenReturn(3L);
-    when(columnStatisticsClass.getMinValue()).thenReturn(1L);
-    NormalizedDateSegmentNameGenerator normalizedDataSegmentNameGenerator =
-        new NormalizedDateSegmentNameGenerator(TABLE_NAME, SEQUENCE_ID, TIME_COLUMN_TYPE, TABLE_PUSH_FREQUENCY,
-            APPEND_PUSH_TYPE, PREFIX, null, DateTimeFieldSpec.TimeFormat.EPOCH.toString());
-    Assert.assertEquals(normalizedDataSegmentNameGenerator.generateSegmentName(columnStatisticsClass),
-        "myTable_daily_1970-01-02_1970-01-04_1");
+  public void testHoursTimeType() {
+    SegmentNameGenerator segmentNameGenerator =
+        new NormalizedDateSegmentNameGenerator(TABLE_NAME, null, null, APPEND_PUSH_TYPE, DAILY_PUSH_FREQUENCY,
+            HOURS_TIME_TYPE, EPOCH_TIME_FORMAT);
+    assertEquals(segmentNameGenerator.toString(),
+        "NormalizedDateSegmentNameGenerator: segmentNamePrefix=myTable, appendPushType=true, outputSDF=yyyy-MM-dd, inputTimeUnit=HOURS");
+    assertEquals(segmentNameGenerator.generateSegmentName(INVALID_SEQUENCE_ID, 24L, 72L),
+        "myTable_1970-01-02_1970-01-04");
+    assertEquals(segmentNameGenerator.generateSegmentName(VALID_SEQUENCE_ID, 24L, 72L),
+        "myTable_1970-01-02_1970-01-04_1");
   }
 
   @Test
-  public void testRefresh()
-      throws Exception {
-    ColumnStatistics columnStatisticsClass = Mockito.mock(ColumnStatistics.class);
-    when(columnStatisticsClass.getMaxValue()).thenReturn(3L);
-    when(columnStatisticsClass.getMinValue()).thenReturn(1L);
-    NormalizedDateSegmentNameGenerator normalizedDataSegmentNameGenerator =
-        new NormalizedDateSegmentNameGenerator(TABLE_NAME, SEQUENCE_ID, null, TABLE_PUSH_FREQUENCY, REFRESH_PUSH_TYPE,
-            null, null, null);
-    Assert.assertEquals(normalizedDataSegmentNameGenerator.generateSegmentName(columnStatisticsClass), "myTable_1");
+  public void testLongSimpleDateFormat() {
+    SegmentNameGenerator segmentNameGenerator =
+        new NormalizedDateSegmentNameGenerator(TABLE_NAME, null, null, APPEND_PUSH_TYPE, DAILY_PUSH_FREQUENCY,
+            DAYS_TIME_TYPE, LONG_SIMPLE_DATE_FORMAT);
+    assertEquals(segmentNameGenerator.toString(),
+        "NormalizedDateSegmentNameGenerator: segmentNamePrefix=myTable, appendPushType=true, outputSDF=yyyy-MM-dd, inputSDF=yyyyMMdd");
+    assertEquals(segmentNameGenerator.generateSegmentName(INVALID_SEQUENCE_ID, 19700102L, 19700104L),
+        "myTable_1970-01-02_1970-01-04");
+    assertEquals(segmentNameGenerator.generateSegmentName(VALID_SEQUENCE_ID, 19700102L, 19700104L),
+        "myTable_1970-01-02_1970-01-04_1");
   }
 
   @Test
-  public void testNoSequenceIdWithParameter()
-      throws Exception {
-    ColumnStatistics columnStatisticsClass = Mockito.mock(ColumnStatistics.class);
-    when(columnStatisticsClass.getMaxValue()).thenReturn(3L);
-    when(columnStatisticsClass.getMinValue()).thenReturn(1L);
-    NormalizedDateSegmentNameGenerator normalizedDataSegmentNameGenerator =
-        new NormalizedDateSegmentNameGenerator(TABLE_NAME, SEQUENCE_ID, null, TABLE_PUSH_FREQUENCY, REFRESH_PUSH_TYPE,
-            null, "true", null);
-    Assert.assertEquals(normalizedDataSegmentNameGenerator.generateSegmentName(columnStatisticsClass), "myTable");
+  public void testStringSimpleDateFormat() {
+    SegmentNameGenerator segmentNameGenerator =
+        new NormalizedDateSegmentNameGenerator(TABLE_NAME, null, null, APPEND_PUSH_TYPE, DAILY_PUSH_FREQUENCY,
+            DAYS_TIME_TYPE, STRING_SIMPLE_DATE_FORMAT);
+    assertEquals(segmentNameGenerator.toString(),
+        "NormalizedDateSegmentNameGenerator: segmentNamePrefix=myTable, appendPushType=true, outputSDF=yyyy-MM-dd, inputSDF=yyyy-MM-dd");
+    assertEquals(segmentNameGenerator.generateSegmentName(INVALID_SEQUENCE_ID, "1970-01-02", "1970-01-04"),
+        "myTable_1970-01-02_1970-01-04");
+    assertEquals(segmentNameGenerator.generateSegmentName(VALID_SEQUENCE_ID, "1970-01-02", "1970-01-04"),
+        "myTable_1970-01-02_1970-01-04_1");
   }
 
   @Test
-  public void testRefreshWithPrefixNoSequenceId()
-      throws Exception {
-    ColumnStatistics columnStatisticsClass = Mockito.mock(ColumnStatistics.class);
-    when(columnStatisticsClass.getMaxValue()).thenReturn(3L);
-    when(columnStatisticsClass.getMinValue()).thenReturn(1L);
-    NormalizedDateSegmentNameGenerator normalizedDataSegmentNameGenerator =
-        new NormalizedDateSegmentNameGenerator(TABLE_NAME, SEQUENCE_ID, null, TABLE_PUSH_FREQUENCY, REFRESH_PUSH_TYPE,
-            "prefix", "true", null);
-    Assert.assertEquals(normalizedDataSegmentNameGenerator.generateSegmentName(columnStatisticsClass), "prefix");
-  }
-
-  @Test
-  public void testAppendWithPrefixNoSequenceId()
-      throws Exception {
-    ColumnStatistics columnStatisticsClass = Mockito.mock(ColumnStatistics.class);
-    when(columnStatisticsClass.getMaxValue()).thenReturn(3L);
-    when(columnStatisticsClass.getMinValue()).thenReturn(1L);
-    NormalizedDateSegmentNameGenerator normalizedDataSegmentNameGenerator =
-        new NormalizedDateSegmentNameGenerator(TABLE_NAME, SEQUENCE_ID, TIME_COLUMN_TYPE, TABLE_PUSH_FREQUENCY,
-            APPEND_PUSH_TYPE, "prefix", "true", DateTimeFieldSpec.TimeFormat.EPOCH.toString());
-    Assert.assertEquals(normalizedDataSegmentNameGenerator.generateSegmentName(columnStatisticsClass),
-        "prefix_1970-01-02_1970-01-04");
-  }
-
-  @Test
-  public void testMirrorShare()
-      throws Exception {
-    ColumnStatistics columnStatisticsClass = Mockito.mock(ColumnStatistics.class);
-    when(columnStatisticsClass.getMaxValue()).thenReturn(3L);
-    when(columnStatisticsClass.getMinValue()).thenReturn(1L);
-    NormalizedDateSegmentNameGenerator normalizedDataSegmentNameGenerator =
-        new NormalizedDateSegmentNameGenerator(TABLE_NAME, SEQUENCE_ID, TIME_COLUMN_TYPE, TABLE_PUSH_FREQUENCY,
-            APPEND_PUSH_TYPE, "mirrorShareEvents_daily", null, DateTimeFieldSpec.TimeFormat.EPOCH.toString());
-    Assert.assertEquals(normalizedDataSegmentNameGenerator.generateSegmentName(columnStatisticsClass),
-        "mirrorShareEvents_daily_1970-01-02_1970-01-04_1");
-  }
-
-  @Test
-  public void testUntrimmedPrefix()
-      throws Exception {
-    ColumnStatistics columnStatisticsClass = Mockito.mock(ColumnStatistics.class);
-    when(columnStatisticsClass.getMaxValue()).thenReturn(3L);
-    when(columnStatisticsClass.getMinValue()).thenReturn(1L);
-    NormalizedDateSegmentNameGenerator normalizedDataSegmentNameGenerator =
-        new NormalizedDateSegmentNameGenerator(TABLE_NAME, SEQUENCE_ID, TIME_COLUMN_TYPE, TABLE_PUSH_FREQUENCY,
-            APPEND_PUSH_TYPE, "mirrorShareEvents_daily  ", null, DateTimeFieldSpec.TimeFormat.EPOCH.toString());
-    Assert.assertEquals(normalizedDataSegmentNameGenerator.generateSegmentName(columnStatisticsClass),
-        "mirrorShareEvents_daily_1970-01-02_1970-01-04_1");
-  }
-
-  @Test
-  public void testSimpleDateFormat()
-      throws Exception {
-    ColumnStatistics columnStatisticsClass = Mockito.mock(ColumnStatistics.class);
-    when(columnStatisticsClass.getMaxValue()).thenReturn(19700104);
-    when(columnStatisticsClass.getMinValue()).thenReturn(19700102);
-    NormalizedDateSegmentNameGenerator normalizedDataSegmentNameGenerator =
-        new NormalizedDateSegmentNameGenerator(TABLE_NAME, SEQUENCE_ID, TIME_COLUMN_TYPE, TABLE_PUSH_FREQUENCY,
-            APPEND_PUSH_TYPE, "mirrorShareEvents_daily  ", null, "yyyyMMdd");
-    Assert.assertEquals(normalizedDataSegmentNameGenerator.generateSegmentName(columnStatisticsClass),
-        "mirrorShareEvents_daily_1970-01-02_1970-01-04_1");
+  public void testHourlyPushFrequency() {
+    SegmentNameGenerator segmentNameGenerator =
+        new NormalizedDateSegmentNameGenerator(TABLE_NAME, null, null, APPEND_PUSH_TYPE, HOURLY_PUSH_FREQUENCY,
+            DAYS_TIME_TYPE, EPOCH_TIME_FORMAT);
+    assertEquals(segmentNameGenerator.toString(),
+        "NormalizedDateSegmentNameGenerator: segmentNamePrefix=myTable, appendPushType=true, outputSDF=yyyy-MM-dd-HH, inputTimeUnit=DAYS");
+    assertEquals(segmentNameGenerator.generateSegmentName(INVALID_SEQUENCE_ID, 1L, 3L),
+        "myTable_1970-01-02-00_1970-01-04-00");
+    assertEquals(segmentNameGenerator.generateSegmentName(VALID_SEQUENCE_ID, 1L, 3L),
+        "myTable_1970-01-02-00_1970-01-04-00_1");
   }
 }

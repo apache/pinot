@@ -29,14 +29,24 @@ public class JobConfigConstants {
   public static final String SEGMENT_TAR_DIR = "segmentTar";
   public static final String TAR_GZ_FILE_EXT = ".tar.gz";
 
-  public static final String SCHEMA = "data.schema";
   public static final String SEGMENT_TABLE_NAME = "segment.table.name";
+  public static final String TABLE_CONFIG = "table.config";
+  public static final String SCHEMA = "data.schema";
+
+  public static final String SEGMENT_NAME_GENERATOR_TYPE = "segment.name.generator.type";
+  public static final String SIMPLE_SEGMENT_NAME_GENERATOR = "simple";
+  public static final String NORMALIZED_DATE_SEGMENT_NAME_GENERATOR = "normalizedDate";
+  public static final String DEFAULT_SEGMENT_NAME_GENERATOR = SIMPLE_SEGMENT_NAME_GENERATOR;
+
+  // For SimpleSegmentNameGenerator
   public static final String SEGMENT_NAME_POSTFIX = "segment.name.postfix";
+
+  // For NormalizedDateSegmentNameGenerator
+  public static final String SEGMENT_NAME_PREFIX = "segment.name.prefix";
+  public static final String EXCLUDE_SEQUENCE_ID = "exclude.sequence.id";
 
   public static final String PUSH_TO_HOSTS = "push.to.hosts";
   public static final String PUSH_TO_PORT = "push.to.port";
-
-  public static final String TABLE_CONFIG = "table.config";
 
   public static final String DEFAULT_PERMISSIONS_MASK = "fs.permissions.umask-mode";
 }
