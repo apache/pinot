@@ -218,13 +218,13 @@ public class SegmentDeletionManager {
       URI deletedDirURI = ControllerConf.getUriFromPath(StringUtil.join(File.separator, _dataDir, DELETED_SEGMENTS));
       PinotFS pinotFS = PinotFSFactory.create(dataDirURI.getScheme());
 
-      // Check that the directory for deleted segments exists
-      if (!pinotFS.isDirectory(deletedDirURI)) {
-        LOGGER.warn("Deleted segment directory {} does not exist or it is not directory.", deletedDirURI.toString());
-        return;
-      }
-
       try {
+        // Check that the directory for deleted segments exists.
+        if (!pinotFS.isDirectory(deletedDirURI)) {
+          LOGGER.warn("Deleted segment directory {} does not exist or it is not directory.", deletedDirURI.toString());
+          return;
+        }
+
         String[] tableNameDirs = pinotFS.listFiles(deletedDirURI, false);
         if (tableNameDirs == null) {
           LOGGER.warn("Deleted segment directory {} does not exist.", deletedDirURI.toString());
@@ -256,7 +256,7 @@ public class SegmentDeletionManager {
           }
         }
       } catch (IOException e) {
-        LOGGER.error("Had trouble deleting directories: {}", deletedDirURI.toString(), e.toString());
+        LOGGER.error("Had trouble deleting directories: {}", deletedDirURI.toString(), e);
       }
     } else {
       LOGGER.info("dataDir is not configured, won't delete any expired segments from deleted directory.");
