@@ -98,24 +98,17 @@ public class AzurePinotFS extends PinotFS {
   }
 
   @Override
-  public boolean move(URI srcUri, URI dstUri, boolean overwrite)
+  /**
+   * Note: One corner scenario for this method in AzureFS is if the destination is a non-empty directory,
+   * then the call fails rather than overwrite the directory. Thus, it's best to specify
+   * the full paths of both src and dst when using this method in AzurePinotFS.
+   */
+  public boolean doMove(URI srcUri, URI dstUri)
       throws IOException {
-    if (exists(dstUri)) {
-      if (overwrite) {
-        delete(dstUri, true);
-      } else {
-        // dst file exists, returning
-        return false;
-      }
-    } else {
-      URI parentUri = Paths.get(dstUri).toUri();
-      // ensure the dst path exists
-      _adlStoreClient.createDirectory(parentUri.getPath());
-    }
-    if (exists(dstUri) && !overwrite) {
-      return false;
-    }
-    //rename the file
+    // ensures the parent path of dst exists.
+    URI parentUri = Paths.get(dstUri).toUri();
+    _adlStoreClient.createDirectory(parentUri.getPath());
+    // renames the source file/directory to destination.
     return _adlStoreClient.rename(srcUri.getPath(), dstUri.getPath());
   }
 

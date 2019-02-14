@@ -75,24 +75,17 @@ public class LocalPinotFS extends PinotFS {
   }
 
   @Override
-  public boolean move(URI srcUri, URI dstUri, boolean overwrite)
+  public boolean doMove(URI srcUri, URI dstUri)
       throws IOException {
     File srcFile = new File(decodeURI(srcUri.getRawPath()));
     File dstFile = new File(decodeURI(dstUri.getRawPath()));
-    if (dstFile.exists()) {
-      if (overwrite) {
-        FileUtils.deleteQuietly(dstFile);
-      } else {
-        // dst file exists, returning
-        return false;
-      }
+    // ensures the parent path of dst exists.
+    FileUtils.forceMkdir(dstFile.getParentFile());
+    if (srcFile.isDirectory()) {
+      FileUtils.moveDirectoryToDirectory(srcFile, dstFile, true);
     } else {
-      // ensure the dst path exists
-      FileUtils.forceMkdir(dstFile.getParentFile());
+      FileUtils.moveFile(srcFile, dstFile);
     }
-
-    Files.move(srcFile.toPath(), dstFile.toPath());
-
     return true;
   }
 

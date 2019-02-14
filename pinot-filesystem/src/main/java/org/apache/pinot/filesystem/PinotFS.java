@@ -23,6 +23,8 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import org.apache.commons.configuration.Configuration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -30,6 +32,8 @@ import org.apache.commons.configuration.Configuration;
  * Pinot use only. This class will be implemented for each pluggable storage type.
  */
 public abstract class PinotFS implements Closeable {
+  private static final Logger LOGGER = LoggerFactory.getLogger(PinotFS.class);
+
   /**
    * Initializes the configurations specific to that filesystem. For instance, any security related parameters can be
    * initialized here and will not be logged.
@@ -59,7 +63,7 @@ public abstract class PinotFS implements Closeable {
    * Moves the file or directory from the src to dst. Does not keep the original file. If the dst has parent directories
    * that haven't been created, this method will create all the necessary parent directories.
    * If both src and dst are files, dst will be overwritten.
-   * If src is a file and dst is a directory, src file will get moved under dst directory.
+   * If src is a file and dst is an empty directory, src file will get moved under dst directory.
    * If both src and dst are directories, src directory will get moved under dst directory.
    * If src is a directory and dst is a file, operation will fail.
    * For example, if a file /a/b/c is moved to a file /x/y/z, in the case of overwrite, the directory /a/b still exists,
@@ -71,7 +75,34 @@ public abstract class PinotFS implements Closeable {
    * @return true if move is successful
    * @throws IOException on IO failure
    */
-  public abstract boolean move(URI srcUri, URI dstUri, boolean overwrite)
+  public boolean move(URI srcUri, URI dstUri, boolean overwrite)
+      throws IOException {
+    if (!exists(srcUri)) {
+      LOGGER.warn("Source {} does not exist", srcUri);
+      return false;
+    }
+    // if dst is an existing file
+    if (exists(dstUri) && !isDirectory(dstUri)) {
+      if (isDirectory(srcUri)) {
+        String errorMsg = String.format("Source %s is a directory while destination %s is a file", srcUri, dstUri);
+        LOGGER.warn(errorMsg);
+        throw new IOException(errorMsg);
+      } else {
+        if (overwrite) {
+          delete(dstUri, true);
+        } else {
+          // dst file exists, returning
+          return false;
+        }
+      }
+    }
+    return doMove(srcUri, dstUri);
+  }
+
+  /**
+   * Does the actual behavior of move in each FS.
+   */
+  public abstract boolean doMove(URI srcUri, URI dstUri)
       throws IOException;
 
   /**

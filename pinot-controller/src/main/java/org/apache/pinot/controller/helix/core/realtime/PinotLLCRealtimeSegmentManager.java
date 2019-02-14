@@ -385,7 +385,10 @@ public class PinotLLCRealtimeSegmentManager {
     }
 
     try {
-      pinotFS.move(segmentFileURI, uriToMoveTo, true);
+      if (!pinotFS.move(segmentFileURI, uriToMoveTo, true)) {
+        LOGGER.error("Could not move {} to {}", segmentLocation, segmentName);
+        return false;
+      }
     } catch (Exception e) {
       LOGGER.error("Could not move {} to {}", segmentLocation, segmentName, e);
       return false;
