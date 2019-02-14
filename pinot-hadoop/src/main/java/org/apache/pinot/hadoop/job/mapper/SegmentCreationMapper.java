@@ -56,6 +56,8 @@ import org.slf4j.LoggerFactory;
 
 public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritable, Text> {
   protected static final String LOCAL_TEMP_DIR = "pinot_hadoop_tmp";
+  protected static final String PROGRESS_REPORTER_THREAD_NAME = "pinot-hadoop-progress-reporter";
+  protected static final long PROGRESS_REPORTER_JOIN_WAIT_TIME_MS = 5_000L;
 
   protected final Logger _logger = LoggerFactory.getLogger(getClass());
 
@@ -189,6 +191,11 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
 
     _logger.info("Start creating segment with sequence id: {}", sequenceId);
     SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
+
+    // Start a thread that reports progress every minute during segment generation to prevent job getting killed
+    Thread progressReporterThread = new Thread(getProgressReporter(context));
+    progressReporterThread.setName(PROGRESS_REPORTER_THREAD_NAME);
+    progressReporterThread.start();
     try {
       driver.init(segmentGeneratorConfig);
       driver.build();
@@ -196,6 +203,12 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
       _logger.error("Caught exception while creating segment with HDFS input file: {}, sequence id: {}", hdfsInputFile,
           sequenceId, e);
       throw new RuntimeException(e);
+    } finally {
+      progressReporterThread.interrupt();
+      progressReporterThread.join(PROGRESS_REPORTER_JOIN_WAIT_TIME_MS);
+      if (progressReporterThread.isAlive()) {
+        _logger.error("Failed to interrupt progress reporter thread: {}", progressReporterThread);
+      }
     }
     String segmentName = driver.getSegmentName();
     _logger.info("Finish creating segment: {} with sequence id: {}", segmentName, sequenceId);
@@ -259,6 +272,10 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
     return null;
   }
 
+  protected Runnable getProgressReporter(Context context) {
+    return new ProgressReporter(context);
+  }
+
   /**
    * Can be overridden to set additional segment generator configs.
    */
@@ -271,5 +288,31 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
   public void cleanup(Context context) {
     _logger.info("Deleting local temporary directory: {}", _localStagingDir);
     FileUtils.deleteQuietly(_localStagingDir);
+  }
+
+  private static class ProgressReporter implements Runnable {
+    private static final Logger LOGGER = LoggerFactory.getLogger(ProgressReporter.class);
+    private static final long PROGRESS_REPORTER_INTERVAL_MS = 60_000L;
+
+    private final Context _context;
+
+    ProgressReporter(Context context) {
+      _context = context;
+    }
+
+    @Override
+    public void run() {
+      LOGGER.info("Starting progress reporter thread: {}", Thread.currentThread());
+      while (true) {
+        try {
+          Thread.sleep(PROGRESS_REPORTER_INTERVAL_MS);
+          LOGGER.info("============== Reporting progress ==============");
+          _context.progress();
+        } catch (InterruptedException e) {
+          LOGGER.info("Progress reporter thread: {} interrupted", Thread.currentThread());
+          return;
+        }
+      }
+    }
   }
 }
