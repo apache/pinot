@@ -211,24 +211,20 @@ public class SegmentCreationJob extends BaseSegmentJob {
   @Nullable
   protected TableConfig getTableConfig()
       throws IOException {
-    if (_pushLocations != null) {
-      try (ControllerRestApi controllerRestApi = getControllerRestApi()) {
-        return controllerRestApi.getTableConfig();
-      }
-    } else {
-      return null;
+    try (ControllerRestApi controllerRestApi = getControllerRestApi()) {
+      return controllerRestApi != null ? controllerRestApi.getTableConfig() : null;
     }
   }
 
   protected Schema getSchema()
       throws IOException {
-    if (_pushLocations != null) {
-      try (ControllerRestApi controllerRestApi = getControllerRestApi()) {
+    try (ControllerRestApi controllerRestApi = getControllerRestApi()) {
+      if (controllerRestApi != null) {
         return controllerRestApi.getSchema();
-      }
-    } else {
-      try (InputStream inputStream = _fileSystem.open(_schemaFile)) {
-        return Schema.fromInputSteam(inputStream);
+      } else {
+        try (InputStream inputStream = _fileSystem.open(_schemaFile)) {
+          return Schema.fromInputSteam(inputStream);
+        }
       }
     }
   }
@@ -236,8 +232,9 @@ public class SegmentCreationJob extends BaseSegmentJob {
   /**
    * Can be overridden to provide custom controller Rest API.
    */
+  @Nullable
   protected ControllerRestApi getControllerRestApi() {
-    return new DefaultControllerRestApi(_pushLocations, _rawTableName);
+    return _pushLocations != null ? new DefaultControllerRestApi(_pushLocations, _rawTableName) : null;
   }
 
   protected void validateTableConfig(TableConfig tableConfig) {
