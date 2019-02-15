@@ -22,7 +22,7 @@
  */
 
 import Component from '@ember/component';
-import { computed, set, get, getProperties } from '@ember/object';
+import { computed, set, get, getProperties, setProperties } from '@ember/object';
 import { checkStatus } from 'thirdeye-frontend/utils/utils';
 import { yamlAlertProps, yamlAlertSettings } from 'thirdeye-frontend/utils/constants';
 import yamljs from 'yamljs';
@@ -49,8 +49,9 @@ export default Component.extend({
   isEditMode: false,
   showSettings: true,
   disableYamlSave: true,
-  errorMsg: '',
-  alertYaml: null,           // The YAML for the anomaly alert detection
+  detectionMsg: '',                   //General alert failures
+  subscriptionMsg: '',                //General subscription failures
+  alertYaml: null,                // The YAML for the anomaly alert detection
   detectionSettingsYaml:  null,   // The YAML for the subscription group
   yamlAlertProps: yamlAlertProps,
   yamlAlertSettings: yamlAlertSettings,
@@ -110,11 +111,19 @@ export default Component.extend({
   ),
 
 
-  isErrorMsg: computed(
-    'errorMsg',
+  isDetectionMsg: computed(
+    'detectionMsg',
     function() {
-      const errorMsg = get(this, 'errorMsg');
-      return errorMsg !== '';
+      const detectionMsg = get(this, 'detectionMsg');
+      return detectionMsg !== '';
+    }
+  ),
+
+  isSubscriptionMsg: computed(
+    'subscriptionMsg',
+    function() {
+      const subscriptionMsg = get(this, 'subscriptionMsg');
+      return subscriptionMsg !== '';
     }
   ),
 
@@ -323,7 +332,7 @@ export default Component.extend({
         return get(this, '_loadAutocompleteById')(currentMetric)
           .then(resultObj => {
             const { filters, dimensions } = resultObj;
-            this.setProperties({
+            setProperties(this, {
               dimensionsCache: dimensions,
               filtersCache: filters
             });
@@ -348,17 +357,22 @@ export default Component.extend({
      * Activates 'Create changes' button and stores YAML content in alertYaml
      */
     onYMLSelectorAction(value) {
-      set(this, 'disableYamlSave', false);
-      set(this, 'alertYaml', value);
-      set(this, 'errorMsg', '');
+      setProperties(this, {
+        disableYamlSave: false,
+        alertYaml: value,
+        detectionMsg: '',
+        subscriptionMsg: ''
+      });
     },
 
     /**
      * Activates 'Create changes' button and stores YAML content in detectionSettingsYaml
      */
     onYMLSettingsSelectorAction(value) {
-      set(this, 'disableYamlSave', false);
-      set(this, 'detectionSettingsYaml', value);
+      setProperties(this, {
+        disableYamlSave: false,
+        detectionSettingsYaml: value
+      });
     },
 
     /**
@@ -380,16 +394,20 @@ export default Component.extend({
 
       fetch(url, postProps).then((res) => {
         res.json().then((result) => {
-          if (result && result.message) {
-            set(this, 'errorMsg', result.message);
-          }
-          if (result.detectionAlertConfigId && result.detectionConfigId) {
-            notifications.success('Save alert yaml successfully.', 'Saved');
+          if(result){
+            if (result.detectionMsg) {
+              set(this, 'detectionMsg', result.detectionMsg);
+            }
+            if (result.subscriptionMsg) {
+              set(this, 'subscriptionMsg', result.subscriptionMsg);
+            }
+            if (result.detectionAlertConfigId && result.detectionConfigId) {
+              notifications.success('Created alert successfully.', 'Created');
+            }
           }
         });
-
       }).catch((error) => {
-        notifications.error('Save alert yaml file failed.', error);
+        notifications.error('Create alert failed.', error);
       });
     },
 

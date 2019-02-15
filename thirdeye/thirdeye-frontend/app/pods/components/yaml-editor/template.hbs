@@ -38,6 +38,14 @@
     }}
   </div>
   <div class="col-xs-12">
+    {{#if isDetectionMsg}}
+      <div class="yaml-editor-msg">
+        <p class="yaml-editor-msg__icon"><i class="yaml-editor-msg__icon--error glyphicon glyphicon-remove-circle"></i>Error in alert yaml</p>
+        <p>Message: {{detectionMsg}}</p>
+      </div>
+    {{/if}}
+  </div>
+  <div class="col-xs-12">
     {{#bs-accordion onChange=(action "changeAccordion") as |acc|}}
       {{#acc.item value=preview as |aitem|}}
         {{#aitem.title}}
@@ -108,15 +116,15 @@
         mode="ace/mode/yaml"
       }}
     </div>
+    <div class="col-xs-12">
+      {{#if isSubscriptionMsg}}
+        <div class="yaml-editor-msg">
+          <p class="yaml-editor-msg__icon"><i class="yaml-editor-msg__icon--error glyphicon glyphicon-remove-circle"></i>Error in the subscription yaml</p>
+          <p>Message: {{subscriptionMsg}}</p>
+        </div>
+      {{/if}}
+    </div>
   {{/if}}
-  <div class="col-xs-12">
-    {{#if isErrorMsg}}
-      <div class="yaml-editor-msg">
-        <p class="yaml-editor-msg__icon"><i class="yaml-editor-msg__icon--error glyphicon glyphicon-remove-circle"></i>Error in the yaml file</p>
-        <p>Message: {{errorMsg}}</p>
-      </div>
-    {{/if}}
-  </div>
 </fieldset>
 
 <fieldset class="te-form__section-submit">
