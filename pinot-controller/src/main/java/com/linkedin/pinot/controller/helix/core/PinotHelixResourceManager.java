@@ -143,7 +143,6 @@ public class PinotHelixResourceManager {
 
   public PinotHelixResourceManager(@Nonnull String zkURL, @Nonnull String helixClusterName,
       @Nonnull String controllerInstanceId, String dataDir, long externalViewOnlineToOfflineTimeoutMillis,
-      boolean isSingleTenantCluster, boolean isUpdateStateModel, boolean enableBatchMessageMode) {
       boolean isSingleTenantCluster, boolean isUpdateStateModel, boolean enableBatchMessageMode, String overloadBrokerWithLB) {
     _helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(zkURL);
     _helixClusterName = helixClusterName;
@@ -156,10 +155,8 @@ public class PinotHelixResourceManager {
     _overloadBrokerWithLB = overloadBrokerWithLB;
   }
 
-  public PinotHelixResourceManager(@Nonnull String zkURL, @Nonnull String helixClusterName,
-      @Nonnull String controllerInstanceId, @Nonnull String dataDir) {
+  public PinotHelixResourceManager(@Nonnull String zkURL, @Nonnull String helixClusterName, @Nonnull String controllerInstanceId, @Nonnull String dataDir) {
     this(zkURL, helixClusterName, controllerInstanceId, dataDir, DEFAULT_EXTERNAL_VIEW_UPDATE_TIMEOUT_MILLIS,
-        false, false, true);
         false, false, true, null);
   }
 
@@ -167,7 +164,7 @@ public class PinotHelixResourceManager {
     this(controllerConf.getZkStr(), controllerConf.getHelixClusterName(),
         controllerConf.getControllerHost() + "_" + controllerConf.getControllerPort(), controllerConf.getDataDir(),
         controllerConf.getExternalViewOnlineToOfflineTimeout(), controllerConf.tenantIsolationEnabled(),
-        controllerConf.isUpdateSegmentStateModel(), controllerConf.getEnableBatchMessageMode(), controllerConf.getBrokerSslLoadbalancerAddress());
+        controllerConf.isUpdateSegmentStateModel(), controllerConf.getEnableBatchMessageMode(), controllerConf.getBrokerLoadbalancerAddress());
   }
 
   /**
