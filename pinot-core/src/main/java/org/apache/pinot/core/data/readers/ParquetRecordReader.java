@@ -18,45 +18,33 @@
  */
 package org.apache.pinot.core.data.readers;
 
-import java.io.File;
-import java.io.IOException;
-import java.util.List;
-import org.apache.avro.file.DataFileStream;
 import org.apache.avro.generic.GenericRecord;
-import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.common.utils.ParquetUtils;
 import org.apache.pinot.core.data.GenericRow;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.util.AvroUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+
+import java.io.File;
+import java.io.IOException;
+import java.util.Iterator;
 
 
 /**
- * Record reader for AVRO file.
+ * Record reader for Parquet file.
  */
-public class AvroRecordReader implements RecordReader {
-  private static final Logger LOGGER = LoggerFactory.getLogger(AvroRecordReader.class);
-
-  private final File _dataFile;
+public class ParquetRecordReader implements RecordReader {
+  private final String _dataFilePath;
   private final Schema _schema;
-  private final List<FieldSpec> _fieldSpecs;
 
-  private DataFileStream<GenericRecord> _avroReader;
-  private GenericRecord _reusableAvroRecord = null;
+  private Iterator<GenericRecord> _reader;
 
-  public AvroRecordReader(File dataFile, Schema schema)
+  public ParquetRecordReader(File dataFile, Schema schema)
       throws IOException {
-    _dataFile = dataFile;
+    _dataFilePath = "file://" + dataFile.getAbsolutePath();
     _schema = schema;
-    _fieldSpecs = RecordReaderUtils.extractFieldSpecs(schema);
-    _avroReader = AvroUtils.getAvroReader(dataFile);
-    try {
-      AvroUtils.validateSchema(_schema, _avroReader.getSchema());
-    } catch (Exception e) {
-      _avroReader.close();
-      throw e;
-    }
+    _reader = ParquetUtils.getParquetReader(_dataFilePath);
+    AvroUtils.validateSchema(_schema, ParquetUtils.getParquetSchema(_dataFilePath));
   }
 
   @Override
@@ -66,7 +54,7 @@ public class AvroRecordReader implements RecordReader {
 
   @Override
   public boolean hasNext() {
-    return _avroReader.hasNext();
+    return _reader.hasNext();
   }
 
   @Override
@@ -75,28 +63,18 @@ public class AvroRecordReader implements RecordReader {
     return next(new GenericRow());
   }
 
-  // NOTE: hard to extract common code further
-  @SuppressWarnings("Duplicates")
   @Override
   public GenericRow next(GenericRow reuse)
       throws IOException {
-    _reusableAvroRecord = _avroReader.next(_reusableAvroRecord);
-    for (FieldSpec fieldSpec : _fieldSpecs) {
-      String fieldName = fieldSpec.getName();
-      Object value = _reusableAvroRecord.get(fieldName);
-      // Allow default value for non-time columns
-      if (value != null || fieldSpec.getFieldType() != FieldSpec.FieldType.TIME) {
-        reuse.putField(fieldName, RecordReaderUtils.convert(fieldSpec, value));
-      }
-    }
+    GenericRecord next = _reader.next();
+    AvroUtils.fillGenericRow(next, reuse, _schema);
     return reuse;
   }
 
   @Override
   public void rewind()
       throws IOException {
-    _avroReader.close();
-    _avroReader = AvroUtils.getAvroReader(_dataFile);
+    _reader = ParquetUtils.getParquetReader(_dataFilePath);
   }
 
   @Override
@@ -107,6 +85,5 @@ public class AvroRecordReader implements RecordReader {
   @Override
   public void close()
       throws IOException {
-    _avroReader.close();
   }
 }

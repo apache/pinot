@@ -70,6 +70,8 @@ public class RecordReaderFactory {
       // NOTE: PinotSegmentRecordReader does not support time conversion (field spec must match)
       case PINOT:
         return new PinotSegmentRecordReader(dataFile, schema, segmentGeneratorConfig.getColumnSortOrder());
+      case PARQUET:
+        return new ParquetRecordReader(dataFile, schema);
       default:
         throw new UnsupportedOperationException("Unsupported input file format: " + fileFormat);
     }
