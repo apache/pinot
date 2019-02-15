@@ -1085,7 +1085,7 @@
 
             <!-- Top level directories -->
             <exclude>thirdeye/**</exclude>
-            <exclude>docs/**</exclude>
+
             <!-- Note: this will exclude all single character directories under the root directory.
             We use this to exclude the temporary files generated during build -->
             <exclude>?/**</exclude>
@@ -1137,9 +1137,8 @@
         </executions>
         <configuration>
           <excludes>
-            <!-- Documentation -->
-            <exclude>**/*.md</exclude>
-            <exclude>docs/**</exclude>
+            <!-- Sphynx auto generated makefile -->
+            <exclude>docs/Makefile</exclude>
 
             <!-- Exclude license copies -->
             <exclude>licenses/**</exclude>
