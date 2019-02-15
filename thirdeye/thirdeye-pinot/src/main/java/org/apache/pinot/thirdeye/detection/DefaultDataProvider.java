@@ -22,8 +22,10 @@ package org.apache.pinot.thirdeye.detection;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
+import com.google.common.cache.Weigher;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Collections2;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -33,6 +35,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -85,24 +88,31 @@ public class DefaultDataProvider implements DataProvider {
     this.aggregationLoader = aggregationLoader;
     this.loader = loader;
     this.timeseriesCache = CacheBuilder.newBuilder()
-        .maximumSize(100)
+        // don't use more than one third of memory for detection time series
+        .maximumWeight(Runtime.getRuntime().maxMemory() / 3)
         .expireAfterWrite(30, TimeUnit.MINUTES)
+        .weigher((Weigher<MetricSlice, DataFrame>) (slice, dataFrame) -> dataFrame.size() * 2 * Double.BYTES)
         .build(new CacheLoader<MetricSlice, DataFrame>() {
+          // load single slice
           @Override
           public DataFrame load(MetricSlice slice) {
-            return fetchTimeseries(Collections.singleton(slice)).get(slice);
+            return loadTimeseries(Collections.singleton(slice)).get(slice);
+          }
+
+          // buck loading time series slice in parallel
+          @Override
+          public Map<MetricSlice, DataFrame> loadAll(Iterable<? extends MetricSlice> slices) throws Exception {
+            return loadTimeseries(Lists.newArrayList(slices));
           }
         });
   }
 
-
-  @Override
-  public Map<MetricSlice, DataFrame> fetchTimeseries(Collection<MetricSlice> slices) {
+  private Map<MetricSlice, DataFrame> loadTimeseries(Collection<MetricSlice> slices) {
     try {
       long ts = System.currentTimeMillis();
       Map<MetricSlice, DataFrame> output = new HashMap<>();
 
-      // if already in cache, return directly
+      // if the time series slice is already in cache, return directly
       for (MetricSlice slice : slices){
         for (Map.Entry<MetricSlice, DataFrame> entry : this.timeseriesCache.asMap().entrySet()) {
           if (entry.getKey().containSlice(slice)){
@@ -136,13 +146,17 @@ public class DefaultDataProvider implements DataProvider {
   }
 
   @Override
-  public void cacheTimeseries(Collection<MetricSlice> slices) {
-    for (MetricSlice slice : slices){
-      try {
-        this.timeseriesCache.get(slice);
-      } catch (Exception e){
-        LOG.warn("cache time series for slice {} failed", slice.toString());
+  public Map<MetricSlice, DataFrame> fetchTimeseries(Collection<MetricSlice> slices) {
+    try {
+      Map<MetricSlice, DataFrame> cacheResult = this.timeseriesCache.getAll(slices);
+      Map<MetricSlice, DataFrame> timeseriesResult = new HashMap<>();
+      for (Map.Entry<MetricSlice, DataFrame> entry : cacheResult.entrySet()){
+        // make a copy of the result so that cache won't be contaminated by client code
+        timeseriesResult.put(entry.getKey(), entry.getValue().copy());
       }
+      return  timeseriesResult;
+    } catch (ExecutionException e) {
+      throw new RuntimeException("fetch time series failed", e);
     }
   }
 

@@ -55,14 +55,6 @@ public interface DataProvider {
   Map<MetricSlice, DataFrame> fetchTimeseries(Collection<MetricSlice> slices);
 
   /**
-   * Caches the time series for the metric slices for later use
-   * @param slices
-   */
-  default void cacheTimeseries(Collection<MetricSlice> slices){
-    // do nothing if not implemented
-  }
-
-  /**
    * Returns a map of aggregation values (keyed by slice) for a given set of slices,
    * grouped by the given dimensions.
    * The format of the DataFrame follows the standard convention of DataFrameUtils.
