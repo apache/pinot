@@ -2512,7 +2512,7 @@ ember-cli-app-version@^3.0.0:
     ember-cli-babel "^6.12.0"
     git-repo-version "^1.0.2"
 
-ember-cli-babel@^5.1.5, ember-cli-babel@^5.1.6, ember-cli-babel@^5.1.7, ember-cli-babel@^5.2.4:
+ember-cli-babel@^5.0.0, ember-cli-babel@^5.1.5, ember-cli-babel@^5.1.6, ember-cli-babel@^5.1.7, ember-cli-babel@^5.2.4:
   version "5.2.8"
   resolved "https://registry.yarnpkg.com/ember-cli-babel/-/ember-cli-babel-5.2.8.tgz#0356b03cc3fdff5d0f2ecaa46a0e1cfaebffd876"
   dependencies:
@@ -2731,6 +2731,13 @@ ember-cli-normalize-entity-name@^1.0.0:
 ember-cli-path-utils@^1.0.0:
   version "1.0.0"
   resolved "https://registry.yarnpkg.com/ember-cli-path-utils/-/ember-cli-path-utils-1.0.0.tgz#4e39af8b55301cddc5017739b77a804fba2071ed"
+
+ember-cli-piwik@^0.0.5:
+  version "0.0.5"
+  resolved "https://registry.yarnpkg.com/ember-cli-piwik/-/ember-cli-piwik-0.0.5.tgz#0ed67b150b06c9b7d7dfc88199e10a26a5515e43"
+  integrity sha1-DtZ7FQsGybfX38iBmeEKJqVRXkM=
+  dependencies:
+    ember-cli-babel "^5.0.0"
 
 ember-cli-preprocess-registry@^3.1.2:
   version "3.1.2"
