@@ -49,14 +49,15 @@
     {{#bs-accordion onChange=(action "changeAccordion") as |acc|}}
       {{#acc.item value=preview as |aitem|}}
         {{#aitem.title}}
-          <section class="dashboard-container__title">Preview alert {{if toggleCollapsed "/ Enter YAML configuration to preview alert." ""}}
+          <section class="dashboard-container__title">Preview alert [Beta] {{if toggleCollapsed "/ Enter YAML configuration to preview alert." ""}}
             <span class="pull-right"><i class="glyphicon glyphicon-menu-{{if toggleCollapsed "down" "up"}}"></i></span>
           </section>
         {{/aitem.title}}
         {{#aitem.body}}
           {{#alert-details
+            isPreviewMode=true
             alertYaml=alertYaml
-            disableYamlSave=disableYamlSave
+            dataIsCurrent=disableYamlSave
           }}
             {{yield}}
           {{/alert-details}}

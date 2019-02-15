@@ -18,7 +18,7 @@ import { computed, observer, set, get, getProperties } from '@ember/object';
 import { later } from '@ember/runloop';
 import { checkStatus, humanizeFloat } from 'thirdeye-frontend/utils/utils';
 import { colorMapping, toColor, makeTime } from 'thirdeye-frontend/utils/rca-utils';
-import { getFormatedDuration } from 'thirdeye-frontend/utils/anomaly';
+import { getYamlPreviewAnomalies, getAnomaliesByAlertId, getFormattedDuration } from 'thirdeye-frontend/utils/anomaly';
 import { inject as service } from '@ember/service';
 import { task } from 'ember-concurrency';
 import floatToPercent from 'thirdeye-frontend/utils/float-to-percent';
@@ -40,7 +40,7 @@ export default Component.extend({
   anomalyMapping: {},
   timeseries: null,
   isLoading: false,
-  analysisRange: [moment().subtract(1, 'month').startOf('hour').valueOf(), moment().startOf('hour').valueOf()],
+  analysisRange: [moment().subtract(1, 'week').startOf('hour').valueOf(), moment().startOf('hour').valueOf()],
   isPendingData: false,
   colorMapping: colorMapping,
   zoom: {
@@ -58,7 +58,7 @@ export default Component.extend({
   compareMode: 'wo1w',
   baseline: null,
   errorAnomalies: null,
-  showPreview: false,
+  showDetails: false,
   componentId: 'timeseries-chart',
   anomalies: null,
   baselineOptions: [
@@ -75,28 +75,21 @@ export default Component.extend({
   sortColumnStartUp: false,
   sortColumnChangeUp: false,
   sortColumnNumberUp: true,
-  sortColumnResolutionUp: false,
+  sortColumnFeedbackUp: false,
   selectedSortMode: '',
   selectedBaseline: 'wo1w',
   pageSize: 10,
   currentPage: 1,
+  isPreviewMode: false,
+  alertId: null,
 
 
-  // alertYamlChanged: observer('alertYaml', 'analysisRange', 'disableYamlSave', async function() {
-  //   set(this, 'isPendingData', true);
-  //   // deal with the change
-  //   const alertYaml = get(this, 'alertYaml');
-  //   if(alertYaml) {
-  //     try {
-  //       const anomalyMapping = await this.get('_getAnomalyMapping').perform(alertYaml);
-  //       set(this, 'isPendingData', false);
-  //       set(this, 'anomalyMapping', anomalyMapping);
-  //       debugger;
-  //     } catch (error) {
-  //       throw new Error(`Unable to retrieve anomaly data. ${error}`);
-  //     }
-  //   }
-  // }),
+  updateVisuals: observer('analysisRange', function() {
+    const isPreviewMode = get(this, 'isPreviewMode');
+    if(!isPreviewMode) {
+      this._fetchAnomalies();
+    }
+  }),
 
   /**
    * Table pagination: number of pages to display
@@ -294,9 +287,10 @@ export default Component.extend({
       anomalies.forEach(a => {
         let tableRow = {
           number: i,
+          anomalyId: a.id,
           start: a.startTime,
           startDateStr: this._formatAnomaly(a),
-          durationStr: getFormatedDuration(a.startTime, a.endTime),
+          durationStr: getFormattedDuration(a.startTime, a.endTime),
           shownCurrent: humanizeFloat(a.avgCurrentVal),
           shownBaseline: humanizeFloat(a.avgBaselineVal),
           change: ((a.avgCurrentVal/a.avgBaselineVal - 1.0) * 100.0),
@@ -316,7 +310,10 @@ export default Component.extend({
   stats: computed(
     'anomalyMapping',
     function() {
-      const anomalyMapping = get(this, 'anomalyMapping');
+      const {
+        anomalyMapping,
+        isPreviewMode
+      } = this.getProperties('anomalyMapping', 'isPreviewMode');
       if (!anomalyMapping) {
         return {};
       }
@@ -325,19 +322,18 @@ export default Component.extend({
       let falsePositives = 0;
       let falseNegatives = 0;
       let numberOfAnomalies = 0;
-
       Object.keys(anomalyMapping).forEach(function (key) {
         anomalyMapping[key].forEach(function (attr) {
           numberOfAnomalies++;
-          if(attr.anomaly && attr.anomaly.data) {
-            const classification = attr.anomaly.data.classification;
-            if (classification != 'NONE') {
+          if(attr.anomaly && attr.anomaly.statusClassification) {
+            const classification = attr.anomaly.statusClassification;
+            if (classification !== 'NONE') {
               respondedAnomaliesCount++;
-              if (classification == 'TRUE_POSITIVE') {
+              if (classification === 'TRUE_POSITIVE') {
                 truePositives++;
-              } else if (classification == 'FALSE_POSITIVE') {
+              } else if (classification === 'FALSE_POSITIVE') {
                 falsePositives++;
-              } else if (classification == 'FALSE_NEGATIVE') {
+              } else if (classification === 'FALSE_NEGATIVE') {
                 falseNegatives++;
               }
             }
@@ -348,7 +344,7 @@ export default Component.extend({
       const totalAnomaliesCount = numberOfAnomalies;
       const totalAlertsDescription = 'Total number of anomalies that occured over a period of time';
       let statsArray = [];
-      if(respondedAnomaliesCount > 0) {
+      if(!isPreviewMode) {
         const responseRate = respondedAnomaliesCount / totalAnomaliesCount;
         const precision = truePositives / (truePositives + falsePositives);
         const recall = truePositives / (truePositives + falseNegatives);
@@ -401,49 +397,46 @@ export default Component.extend({
 
   _getAnomalyMapping: task (function * (alertYaml) {//TODO: need to add to anomaly util - LH
     let anomalyMapping = {};
-    const analysisRange = get(this, 'analysisRange');
-    const postProps = {
-      method: 'POST',
-      body: alertYaml,
-      headers: { 'content-type': 'text/plain' }
-    };
-    const notifications = get(this, 'notifications');
+    const {
+      analysisRange,
+      notifications,
+      isPreviewMode,
+      alertId,
+      metricUrn,
+    } = this.getProperties('analysisRange', 'notifications', 'isPreviewMode', 'alertId', 'metricUrn');
 
     //detection alert fetch
     const start = analysisRange[0];
     const end = analysisRange[1];
-    const alertUrl = `/yaml/preview?start=${start}&end=${end}&tuningStart=0&tuningEnd=0`;
     let anomalies;
+    let applicationAnomalies;
     try {
-      const alert_result = yield fetch(alertUrl, postProps);
-      const alert_status  = get(alert_result, 'status');
-      const applicationAnomalies = yield alert_result.json();
-
-      if (alert_status !== 200 && applicationAnomalies.message) {
-        notifications.error(applicationAnomalies.message, 'Preview alert failed');
-      } else {
-        anomalies = applicationAnomalies.anomalies;
+      if(isPreviewMode){
+        applicationAnomalies = yield getYamlPreviewAnomalies(alertYaml, start, end);
         set(this, 'metricUrn', Object.keys(applicationAnomalies.diagnostics['0'])[0]);
+        anomalies = applicationAnomalies.anomalies;
+      } else {
+        applicationAnomalies = yield getAnomaliesByAlertId(alertId, start, end);
+        anomalies = applicationAnomalies;
+      }
 
-        if (anomalies && anomalies.length > 0) {
-          const humanizedObject = {
-            queryDuration: '1m',
-            queryStart: start,
-            queryEnd: end
-          };
-          this.set('applicationAnomalies', anomalies);
+      if (anomalies && anomalies.length > 0) {
+        const humanizedObject = {
+          queryDuration: '1m',
+          queryStart: start,
+          queryEnd: end
+        };
 
-          anomalies.forEach(anomaly => {
-            const metricName = anomaly.metric;
-            //Grouping the anomalies of the same metric name
-            if (!anomalyMapping[metricName]) {
-              anomalyMapping[metricName] = [];
-            }
+        anomalies.forEach(anomaly => {
+          const metricName = anomaly.metric;
+          //Grouping the anomalies of the same metric name
+          if (!anomalyMapping[metricName]) {
+            anomalyMapping[metricName] = [];
+          }
 
-            // Group anomalies by metricName and function name (alertName) and wrap it into the Humanized cache. Each `anomaly` is the raw data from ember data cache.
-            anomalyMapping[metricName].push(this.get('anomaliesApiService').getHumanizedEntity(anomaly, humanizedObject));
-          });
-        }
+          // Group anomalies by metricName and function name (alertName) and wrap it into the Humanized cache. Each `anomaly` is the raw data from ember data cache.
+          anomalyMapping[metricName].push(this.get('anomaliesApiService').getHumanizedEntity(anomaly, humanizedObject));
+        });
       }
     } catch (error) {
       notifications.error('Preview alert failed', error);
@@ -454,6 +447,15 @@ export default Component.extend({
       anomalies
     };
   }).drop(),
+
+  init() {
+    this._super(...arguments);
+    const isPreviewMode = get(this, 'isPreviewMode');
+    if (!isPreviewMode) {
+      set(this, 'analysisRange', [moment().subtract(1, 'month').startOf('hour').valueOf(), moment().startOf('hour').valueOf()])
+      this._fetchAnomalies();
+    }
+  },
 
   didRender(){
     this._super(...arguments);
@@ -544,7 +546,11 @@ export default Component.extend({
           anomalies: results.anomalies,
           isLoading: false
         });
-        this._fetchTimeseries();
+        if (get(this, 'metricUrn')) {
+          this._fetchTimeseries();
+        } else {
+          throw new Error('Unable to get MetricUrn from response');
+        }
       });
     } catch (error) {
       set(this, 'isLoading', false);
@@ -605,8 +611,8 @@ export default Component.extend({
     getPreview() {
       this.setProperties({
         isLoading: true,
-        showPreview: true,
-        disableYamlSave: true
+        showDetails: true,
+        dataIsCurrent: true
       });
       this._fetchAnomalies();
     },
