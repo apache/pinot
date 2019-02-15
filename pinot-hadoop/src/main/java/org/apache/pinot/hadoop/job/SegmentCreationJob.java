@@ -139,6 +139,8 @@ public class SegmentCreationJob extends BaseSegmentJob {
 
     // Set up the job
     Job job = Job.getInstance(_conf);
+    job.setJarByClass(getClass());
+    job.setJobName(getClass().getName());
 
     Configuration jobConf = job.getConfiguration();
     String hadoopTokenFileLocation = System.getenv("HADOOP_TOKEN_FILE_LOCATION");
