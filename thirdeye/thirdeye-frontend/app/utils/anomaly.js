@@ -3,10 +3,15 @@ import moment from 'moment';
 import _ from 'lodash';
 import {
   checkStatus,
-  postProps
+  postProps,
+  postYamlProps
 } from 'thirdeye-frontend/utils/utils';
 import fetch from 'fetch';
-import { anomalyApiUrls } from 'thirdeye-frontend/utils/api/anomaly';
+import {
+  anomalyApiUrls,
+  getAnomaliesForYamlPreviewUrl,
+  getAnomaliesByAlertIdUrl
+} from 'thirdeye-frontend/utils/api/anomaly';
 
 /**
  * Response type options for anomalies.
@@ -59,6 +64,32 @@ export function updateAnomalyFeedback(anomalyId, feedbackType) {
 }
 
 /**
+ * Post Yaml to preview anomalies detected with given configuration
+ * @method getYamlPreviewAnomalies
+ * @param {String} yamlString - the alert configuration in Yaml
+ * @param {Number} startTime - start time of analysis range
+ * @param {Number} endTime - end time of analysis range
+ * @return {Ember.RSVP.Promise}
+ */
+export function getYamlPreviewAnomalies(yamlString, startTime, endTime) {
+  const url = getAnomaliesForYamlPreviewUrl(startTime, endTime);
+  return fetch(url, postYamlProps(yamlString)).then((res) => checkStatus(res, 'post', false, true));
+}
+
+/**
+ * Get anomalies for a given detection id over a specified time range
+ * @method getAnomaliesByAlertId
+ * @param {Number} alertId - the alert id aka detection config id
+ * @param {Number} startTime - start time of analysis range
+ * @param {Number} endTime - end time of analysis range
+ * @return {Ember.RSVP.Promise}
+ */
+export function getAnomaliesByAlertId(alertId, startTime, endTime) {
+  const url = getAnomaliesByAlertIdUrl(alertId, startTime, endTime);
+  return fetch(url).then(checkStatus);
+}
+
+/**
  * Fetch a single anomaly record for verification
  * @method verifyAnomalyFeedback
  * @param {Number} anomalyId
@@ -70,50 +101,13 @@ export function verifyAnomalyFeedback(anomalyId) {
 }
 
 /**
- * Fetch all anomalies by application name and start time
- * @method getAnomaliesByAppName
- * @param {String} appName - the application name
- * @param {Number} startStamp - the anomaly iso start time
- * @return {Ember.RSVP.Promise}
- * @example: /userdashboard/anomalies?application=someAppName&start=1508472800000
- */
-export function getAnomaliesByAppName(appName, startTime) {
-  if (!appName) {
-    return Promise.reject(new Error('appName param is required.'));
-  }
-  if (!startTime) {
-    return Promise.reject(new Error('startTime param is required.'));
-  }
-  const url = anomalyApiUrls.getAnomaliesByAppNameUrl(appName, startTime);
-  return fetch(url).then(checkStatus).catch(() => {});
-}
-
-/**
- * Fetch the application performance details
- * @method getPerformanceByAppNameUrl
- * @param {String} appName - the application name
- * @param {Number} startStamp - the anomaly iso start time
- * @param {Number} endStamp - the anomaly iso end time
- * @return {Ember.RSVP.Promise}
- * @example: /detection-job/eval/application/lms-ads?start=2017-09-01T00:00:00Z&end=2018-04-01T00:00:00Z
- */
-export function getPerformanceByAppNameUrl(appName, startTime, endTime) {
-  if (!appName || !startTime || !endTime) {
-    return Promise.reject(new Error('param required.'));
-  }
-  const url = anomalyApiUrls.getPerformanceByAppNameUrl(appName, startTime, endTime) ;
-  return fetch(url).then(checkStatus).catch(() => {});
-}
-
-
-/**
  * Formats anomaly duration property for display on the table
  * @param {Number} anomalyStart - the anomaly start time
  * @param {Number} anomalyEnd - the anomaly end time
  * @returns {String} the fomatted duration time
  * @example getFormatDuration(1491804013000, 1491890413000) // yields => 'Apr 9, 11:00 PM'
  */
-export function getFormatedDuration(anomalyStart, anomalyEnd) {
+export function getFormattedDuration(anomalyStart, anomalyEnd) {
   const startMoment = moment(anomalyStart);
   const endMoment = moment(anomalyEnd);
   const anomalyDuration = moment.duration(endMoment.diff(startMoment));
@@ -144,9 +138,9 @@ export default {
   anomalyResponseObj,
   anomalyResponseMap,
   updateAnomalyFeedback,
-  getFormatedDuration,
+  getFormattedDuration,
   verifyAnomalyFeedback,
   pluralizeTime,
-  getAnomaliesByAppName,
-  getPerformanceByAppNameUrl
+  getYamlPreviewAnomalies,
+  getAnomaliesByAlertId
 };

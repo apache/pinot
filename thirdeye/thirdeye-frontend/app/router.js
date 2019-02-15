@@ -27,6 +27,7 @@ Router.map(function() {
     this.route('alerts', function() {
       this.route('performance');
     });
+    this.route('explore-new', { path: 'explore-new/:alert_id'});
     this.route('yaml', { path: 'yaml/:alert_id' });
   });
 

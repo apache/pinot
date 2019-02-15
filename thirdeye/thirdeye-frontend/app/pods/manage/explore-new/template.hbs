@@ -4,11 +4,11 @@
       alertData=model.alertData
       isLoadError=isLoadError
     }}
-    <div class="te-search-results__cta">
-      {{#link-to "manage.explore-new" model.alertId}}
-        <button class="te-button te-button--outline">Alert Overview</button>
-      {{/link-to}}
-    </div>
+      <div class="te-search-results__cta">
+        {{#link-to "manage.yaml" model.alertId}}
+          <button class="te-button te-button--outline">Edit</button>
+        {{/link-to}}
+      </div>
     {{/self-serve-alert-yaml-details}}
   </div>
 </section>
@@ -22,14 +22,13 @@
         <p class="te-alert-page-pending__text">{{errorText}}</p>
       </div>
     {{else}}
-      {{yaml-editor
-        alertId=model.alertId
-        subscriptionGroupId=model.subscriptionGroupId
-        isEditMode=true
-        showSettings=true
-        subscriptionGroupNames=model.subscriptionGroups
+      {{alert-details
+        isPreviewMode=false
         alertYaml=model.detectionYaml
-        detectionSettingsYaml=model.subscriptionGroupYamlDisplay
+        showDetails=true
+        dataIsCurrent=true
+        alertId=model.alertId
+        metricUrn=model.metricUrn
       }}
     {{/if}}
   </div>

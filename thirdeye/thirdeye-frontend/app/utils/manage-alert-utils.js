@@ -2,7 +2,7 @@ import moment from 'moment';
 import { isPresent, isBlank } from "@ember/utils";
 import { getWithDefault } from '@ember/object';
 import { buildDateEod } from 'thirdeye-frontend/utils/utils';
-import { getFormatedDuration } from 'thirdeye-frontend/utils/anomaly';
+import { getFormattedDuration } from 'thirdeye-frontend/utils/anomaly';
 import floatToPercent from 'thirdeye-frontend/utils/float-to-percent';
 
 /**
@@ -105,7 +105,7 @@ export function enhanceAnomalies(rawAnomalies, severityScores) {
       shownChangeRate: changeRate,
       isUserReported: anomaly.anomalyResultSource === 'USER_LABELED_ANOMALY',
       startDateStr: moment(anomaly.anomalyStart).format('MMM D, hh:mm A'),
-      durationStr: getFormatedDuration(anomaly.anomalyStart, anomaly.anomalyEnd),
+      durationStr: getFormattedDuration(anomaly.anomalyStart, anomaly.anomalyEnd),
       severityScore: score && !isNaN(score) ? score.toFixed(2) : 'N/A',
       shownCurrent: Number(anomaly.current) > 0 ? anomaly.current : 'N/A',
       shownBaseline: Number(anomaly.baseline) > 0 ? anomaly.baseline : 'N/A',
