@@ -80,6 +80,8 @@ import org.apache.pinot.core.crypt.PinotCrypter;
 import org.apache.pinot.core.crypt.PinotCrypterFactory;
 import org.apache.pinot.core.metadata.DefaultMetadataExtractor;
 import org.apache.pinot.core.metadata.MetadataExtractorFactory;
+import org.apache.pinot.filesystem.PinotFS;
+import org.apache.pinot.filesystem.PinotFSFactory;
 import org.glassfish.grizzly.http.server.Request;
 import org.glassfish.jersey.media.multipart.FormDataBodyPart;
 import org.glassfish.jersey.media.multipart.FormDataMultiPart;
@@ -158,7 +160,7 @@ public class PinotSegmentUploadRestletResource {
   public Response downloadSegment(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
-      @Context HttpHeaders httpHeaders) {
+      @Context HttpHeaders httpHeaders) throws Exception {
     // Validate data access
     boolean hasDataAccess;
     try {
@@ -185,14 +187,24 @@ public class PinotSegmentUploadRestletResource {
       String errStr = "Could not decode segment name '" + segmentName + "'";
       throw new ControllerApplicationException(LOGGER, errStr, Response.Status.BAD_REQUEST);
     }
-    final File dataFile = new File(provider.getBaseDataDir(), StringUtil.join("/", tableName, segmentName));
-    if (!dataFile.exists()) {
+
+    final java.net.URI segmentFileURI =
+            ControllerConf.getUriFromPath(StringUtil.join("/", provider.getBaseDataDirURI().toString(),
+                    tableName, segmentName));
+    PinotFS pinotFS = PinotFSFactory.create(provider.getBaseDataDirURI().getScheme());
+
+    if (!pinotFS.exists(segmentFileURI)) {
       throw new ControllerApplicationException(LOGGER,
-          "Segment " + segmentName + " or table " + tableName + " not found", Response.Status.NOT_FOUND);
+          "Segment " + segmentName + " or table " + tableName + " not found in " + segmentFileURI.toString(), Response.Status.NOT_FOUND);
     }
-    Response.ResponseBuilder builder = Response.ok(dataFile);
-    builder.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + dataFile.getName());
-    builder.header(HttpHeaders.CONTENT_LENGTH, dataFile.length());
+    File tmpSegmentFile = new File(StringUtil.join("/",
+            _controllerConf.getLocalTempDir(),
+            tableName, segmentName, String.valueOf(System.currentTimeMillis())));
+    pinotFS.copyToLocalFile(segmentFileURI, tmpSegmentFile);
+    tmpSegmentFile.deleteOnExit();
+    Response.ResponseBuilder builder = Response.ok(tmpSegmentFile);
+    builder.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + tmpSegmentFile.getName());
+    builder.header(HttpHeaders.CONTENT_LENGTH, tmpSegmentFile.length());
     return builder.build();
   }
 
