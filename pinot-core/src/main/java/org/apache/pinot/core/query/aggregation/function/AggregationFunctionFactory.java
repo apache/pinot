@@ -75,6 +75,8 @@ public class AggregationFunctionFactory {
             return new SumAggregationFunction();
           case AVG:
             return new AvgAggregationFunction();
+          case VARPOP:
+            return new VarPopAggregationFunction();
           case MINMAXRANGE:
             return new MinMaxRangeAggregationFunction();
           case DISTINCTCOUNT:
@@ -93,6 +95,8 @@ public class AggregationFunctionFactory {
             return new SumMVAggregationFunction();
           case AVGMV:
             return new AvgMVAggregationFunction();
+          case VARPOPMV:
+            return new VarPopMVAggregationFunction();
           case MINMAXRANGEMV:
             return new MinMaxRangeMVAggregationFunction();
           case DISTINCTCOUNTMV:

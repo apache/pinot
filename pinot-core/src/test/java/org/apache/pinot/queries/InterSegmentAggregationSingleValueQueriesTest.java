@@ -139,6 +139,27 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
   }
 
   @Test
+  public void testVarPop() {
+    String query = "SELECT VARPOP(column1), VARPOP(column3) FROM testTable";
+
+    BrokerResponseNative brokerResponse = getBrokerResponseForQuery(query);
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 240000L, 120000L,
+        new String[]{"391391485773847040.00000", "387938568318363904.00000"});
+
+    brokerResponse = getBrokerResponseForQueryWithFilter(query);
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 24516L, 336536L, 49032L, 120000L,
+        new String[]{"349778658553323008.00000", "78565678759077760.00000"});
+
+    brokerResponse = getBrokerResponseForQuery(query + GROUP_BY);
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 360000L, 120000L,
+        new String[]{"909675751724946688.00000", "1065170734813787904.00000"});
+
+    brokerResponse = getBrokerResponseForQueryWithFilter(query + GROUP_BY);
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 24516L, 336536L, 73548L, 120000L,
+        new String[]{"917679579589159424.00000", "219749451689817824.00000"});
+  }
+
+  @Test
   public void testMinMaxRange() {
     String query = "SELECT MINMAXRANGE(column1), MINMAXRANGE(column3) FROM testTable";
 

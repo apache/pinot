@@ -37,6 +37,7 @@ import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.core.query.aggregation.function.customobject.AvgPair;
 import org.apache.pinot.core.query.aggregation.function.customobject.MinMaxRangePair;
 import org.apache.pinot.core.query.aggregation.function.customobject.QuantileDigest;
+import org.apache.pinot.core.query.aggregation.function.customobject.VarianceTuple;
 
 
 /**
@@ -58,7 +59,8 @@ public class ObjectSerDeUtils {
     QuantileDigest(7),
     Map(8),
     IntSet(9),
-    TDigest(10);
+    TDigest(10),
+    VarianceTuple(11);
 
     private int _value;
 
@@ -81,6 +83,8 @@ public class ObjectSerDeUtils {
         return ObjectType.DoubleArrayList;
       } else if (value instanceof AvgPair) {
         return ObjectType.AvgPair;
+      } else if (value instanceof VarianceTuple) {
+        return ObjectType.VarianceTuple;
       } else if (value instanceof MinMaxRangePair) {
         return ObjectType.MinMaxRangePair;
       } else if (value instanceof HyperLogLog) {
@@ -224,6 +228,24 @@ public class ObjectSerDeUtils {
     @Override
     public AvgPair deserialize(ByteBuffer byteBuffer) {
       return AvgPair.fromByteBuffer(byteBuffer);
+    }
+  };
+
+  public static final ObjectSerDe<VarianceTuple> VARIANCE_TUPLE_SER_DE = new ObjectSerDe<VarianceTuple>() {
+
+    @Override
+    public byte[] serialize(VarianceTuple varTuple) {
+      return varTuple.toBytes();
+    }
+
+    @Override
+    public VarianceTuple deserialize(byte[] bytes) {
+      return VarianceTuple.fromBytes(bytes);
+    }
+
+    @Override
+    public VarianceTuple deserialize(ByteBuffer byteBuffer) {
+      return VarianceTuple.fromByteBuffer(byteBuffer);
     }
   };
 
@@ -426,7 +448,7 @@ public class ObjectSerDeUtils {
 
   // NOTE: DO NOT change the order, it has to be the same order as the ObjectType
   private static final ObjectSerDe[] SER_DES =
-      {STRING_SER_DE, LONG_SER_DE, DOUBLE_SER_DE, DOUBLE_ARRAY_LIST_SER_DE, AVG_PAIR_SER_DE, MIN_MAX_RANGE_PAIR_SER_DE, HYPER_LOG_LOG_SER_DE, QUANTILE_DIGEST_SER_DE, MAP_SER_DE, INT_SET_SER_DE, TDIGEST_SER_DE};
+      {STRING_SER_DE, LONG_SER_DE, DOUBLE_SER_DE, DOUBLE_ARRAY_LIST_SER_DE, AVG_PAIR_SER_DE, MIN_MAX_RANGE_PAIR_SER_DE, HYPER_LOG_LOG_SER_DE, QUANTILE_DIGEST_SER_DE, MAP_SER_DE, INT_SET_SER_DE, TDIGEST_SER_DE, VARIANCE_TUPLE_SER_DE};
 
   public static byte[] serialize(Object value) {
     return serialize(value, ObjectType.getObjectType(value)._value);

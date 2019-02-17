@@ -32,6 +32,7 @@ import org.apache.pinot.core.query.aggregation.function.PercentileTDigestAggrega
 import org.apache.pinot.core.query.aggregation.function.customobject.AvgPair;
 import org.apache.pinot.core.query.aggregation.function.customobject.MinMaxRangePair;
 import org.apache.pinot.core.query.aggregation.function.customobject.QuantileDigest;
+import org.apache.pinot.core.query.aggregation.function.customobject.VarianceTuple;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -104,6 +105,20 @@ public class ObjectSerDeUtilsTest {
       byte[] bytes = ObjectSerDeUtils.serialize(expected);
       AvgPair actual = ObjectSerDeUtils.deserialize(bytes, ObjectSerDeUtils.ObjectType.AvgPair);
 
+      assertEquals(actual.getSum(), expected.getSum(), ERROR_MESSAGE);
+      assertEquals(actual.getCount(), expected.getCount(), ERROR_MESSAGE);
+    }
+  }
+
+  @Test
+  public void testVarinaceTuple() {
+    for (int i = 0; i < NUM_ITERATIONS; i++) {
+      VarianceTuple expected = new VarianceTuple(RANDOM.nextDouble(), RANDOM.nextDouble(), RANDOM.nextLong());
+
+      byte[] bytes = ObjectSerDeUtils.serialize(expected);
+      VarianceTuple actual = ObjectSerDeUtils.deserialize(bytes, ObjectSerDeUtils.ObjectType.VarianceTuple);
+
+      assertEquals(actual.getSum2(), expected.getSum2(), ERROR_MESSAGE);
       assertEquals(actual.getSum(), expected.getSum(), ERROR_MESSAGE);
       assertEquals(actual.getCount(), expected.getCount(), ERROR_MESSAGE);
     }

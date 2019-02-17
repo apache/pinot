@@ -126,6 +126,7 @@ Supported aggregations on single-value columns
 * ``MAX``
 * ``SUM``
 * ``AVG``
+* ``VARPOP``
 * ``MINMAXRANGE``
 * ``DISTINCTCOUNT``
 * ``DISTINCTCOUNTHLL``
@@ -141,6 +142,7 @@ Supported aggregations on multi-value columns
 * ``MAXMV``
 * ``SUMMV``
 * ``AVGMV``
+* ``VARPOPMV``
 * ``MINMAXRANGEMV``
 * ``DISTINCTCOUNTMV``
 * ``DISTINCTCOUNTHLLMV``

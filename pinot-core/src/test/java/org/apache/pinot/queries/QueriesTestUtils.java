@@ -25,6 +25,7 @@ import org.apache.pinot.common.response.broker.AggregationResult;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.query.aggregation.function.customobject.AvgPair;
+import org.apache.pinot.core.query.aggregation.function.customobject.VarianceTuple;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.testng.Assert;
@@ -45,19 +46,25 @@ public class QueriesTestUtils {
 
   public static void testInnerSegmentAggregationResult(List<Object> aggregationResult, long expectedCountResult,
       long expectedSumResult, int expectedMaxResult, int expectedMinResult, long expectedAvgResultSum,
-      long expectedAvgResultCount) {
+      long expectedAvgResultCount, double expectedVarPopResultSum2) {
     Assert.assertEquals(((Number) aggregationResult.get(0)).longValue(), expectedCountResult);
     Assert.assertEquals(((Number) aggregationResult.get(1)).longValue(), expectedSumResult);
     Assert.assertEquals(((Number) aggregationResult.get(2)).intValue(), expectedMaxResult);
     Assert.assertEquals(((Number) aggregationResult.get(3)).intValue(), expectedMinResult);
     AvgPair avgResult = (AvgPair) aggregationResult.get(4);
+
     Assert.assertEquals((long) avgResult.getSum(), expectedAvgResultSum);
     Assert.assertEquals(avgResult.getCount(), expectedAvgResultCount);
+
+    VarianceTuple varPopResult = (VarianceTuple) aggregationResult.get(5);
+    Assert.assertEquals(varPopResult.getSum2(), expectedVarPopResultSum2);
+    Assert.assertEquals((long) varPopResult.getSum(), expectedAvgResultSum);
+    Assert.assertEquals(varPopResult.getCount(), expectedAvgResultCount);
   }
 
   public static void testInnerSegmentAggregationGroupByResult(AggregationGroupByResult aggregationGroupByResult,
       String expectedGroupKey, long expectedCountResult, long expectedSumResult, int expectedMaxResult,
-      int expectedMinResult, long expectedAvgResultSum, long expectedAvgResultCount) {
+      int expectedMinResult, long expectedAvgResultSum, long expectedAvgResultCount, double expectedVarPopResultSum2) {
     Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator = aggregationGroupByResult.getGroupKeyIterator();
     while (groupKeyIterator.hasNext()) {
       GroupKeyGenerator.GroupKey groupKey = groupKeyIterator.next();
@@ -73,6 +80,11 @@ public class QueriesTestUtils {
         AvgPair avgResult = (AvgPair) aggregationGroupByResult.getResultForKey(groupKey, 4);
         Assert.assertEquals((long) avgResult.getSum(), expectedAvgResultSum);
         Assert.assertEquals(avgResult.getCount(), expectedAvgResultCount);
+
+        VarianceTuple varPopResult = (VarianceTuple) aggregationGroupByResult.getResultForKey(groupKey, 5);
+        Assert.assertEquals(varPopResult.getSum2(), expectedVarPopResultSum2);
+        Assert.assertEquals((long) varPopResult.getSum(), expectedAvgResultSum);
+        Assert.assertEquals(varPopResult.getCount(), expectedAvgResultCount);
         return;
       }
     }

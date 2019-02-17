@@ -136,6 +136,27 @@ public class InterSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
   }
 
   @Test
+  public void testVarPopMV() {
+    String query = "SELECT VARPOPMV(column6) FROM testTable";
+
+    BrokerResponseNative brokerResponse = getBrokerResponseForQuery(query);
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 400000L, 0L, 400000L, 400000L,
+        new String[]{"1148195657848298496.00000"});
+
+    brokerResponse = getBrokerResponseForQueryWithFilter(query);
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 62480L, 1053656L, 62480L, 400000L,
+        new String[]{"573268625567877632.00000"});
+
+    brokerResponse = getBrokerResponseForQuery(query + SV_GROUP_BY);
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 400000L, 0L, 800000L, 400000L,
+        new String[]{"1152911617927213056.00000"});
+
+    brokerResponse = getBrokerResponseForQuery(query + MV_GROUP_BY);
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 400000L, 0L, 800000L, 400000L,
+        new String[]{"1152902398168590592.00000"});
+  }
+
+  @Test
   public void testMinMaxRangeMV() {
     String query = "SELECT MINMAXRANGEMV(column6) FROM testTable";
 

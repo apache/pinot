@@ -54,6 +54,11 @@ public class AggregationFunctionFactoryTest {
     Assert.assertEquals(aggregationFunction.getType(), AggregationFunctionType.AVG);
     Assert.assertEquals(aggregationFunction.getColumnName(COLUMN), "avg_column");
 
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction("vArpOP");
+    Assert.assertTrue(aggregationFunction instanceof VarPopAggregationFunction);
+    Assert.assertEquals(aggregationFunction.getType(), AggregationFunctionType.VARPOP);
+    Assert.assertEquals(aggregationFunction.getColumnName(COLUMN), "varPop_column");
+
     aggregationFunction = AggregationFunctionFactory.getAggregationFunction("MiNmAxRaNgE");
     Assert.assertTrue(aggregationFunction instanceof MinMaxRangeAggregationFunction);
     Assert.assertEquals(aggregationFunction.getType(), AggregationFunctionType.MINMAXRANGE);
@@ -113,6 +118,11 @@ public class AggregationFunctionFactoryTest {
     Assert.assertTrue(aggregationFunction instanceof AvgMVAggregationFunction);
     Assert.assertEquals(aggregationFunction.getType(), AggregationFunctionType.AVGMV);
     Assert.assertEquals(aggregationFunction.getColumnName(COLUMN), "avgMV_column");
+
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction("vArpOPmV");
+    Assert.assertTrue(aggregationFunction instanceof VarPopMVAggregationFunction);
+    Assert.assertEquals(aggregationFunction.getType(), AggregationFunctionType.VARPOPMV);
+    Assert.assertEquals(aggregationFunction.getColumnName(COLUMN), "varPopMV_column");
 
     aggregationFunction = AggregationFunctionFactory.getAggregationFunction("MiNmAxRaNgEmV");
     Assert.assertTrue(aggregationFunction instanceof MinMaxRangeMVAggregationFunction);

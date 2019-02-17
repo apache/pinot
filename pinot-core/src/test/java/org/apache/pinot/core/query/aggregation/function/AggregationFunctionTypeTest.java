@@ -31,6 +31,7 @@ public class AggregationFunctionTypeTest {
     Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("MaX"), AggregationFunctionType.MAX);
     Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("SuM"), AggregationFunctionType.SUM);
     Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("AvG"), AggregationFunctionType.AVG);
+    Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("vArpOP"), AggregationFunctionType.VARPOP);
     Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("MiNmAxRaNgE"),
         AggregationFunctionType.MINMAXRANGE);
     Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("DiStInCtCoUnT"),
@@ -49,6 +50,7 @@ public class AggregationFunctionTypeTest {
     Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("MaXmV"), AggregationFunctionType.MAXMV);
     Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("SuMmV"), AggregationFunctionType.SUMMV);
     Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("AvGmV"), AggregationFunctionType.AVGMV);
+    Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("vArpOPmV"), AggregationFunctionType.VARPOPMV);
     Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("MiNmAxRaNgEmV"),
         AggregationFunctionType.MINMAXRANGEMV);
     Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("DiStInCtCoUnTmV"),
