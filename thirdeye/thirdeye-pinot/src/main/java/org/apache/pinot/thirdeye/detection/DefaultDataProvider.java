@@ -75,7 +75,8 @@ public class DefaultDataProvider implements DataProvider {
   private final TimeSeriesLoader timeseriesLoader;
   private final AggregationLoader aggregationLoader;
   private final DetectionPipelineLoader loader;
-  private final LoadingCache<MetricSlice, DataFrame> timeseriesCache;
+  private static LoadingCache<MetricSlice, DataFrame> DETECTION_TIME_SERIES_CACHE;
+
 
   public DefaultDataProvider(MetricConfigManager metricDAO, DatasetConfigManager datasetDAO, EventManager eventDAO,
       MergedAnomalyResultManager anomalyDAO, TimeSeriesLoader timeseriesLoader, AggregationLoader aggregationLoader,
@@ -87,24 +88,28 @@ public class DefaultDataProvider implements DataProvider {
     this.timeseriesLoader = timeseriesLoader;
     this.aggregationLoader = aggregationLoader;
     this.loader = loader;
-    this.timeseriesCache = CacheBuilder.newBuilder()
-        // don't use more than one third of memory for detection time series
-        .maximumWeight(Runtime.getRuntime().maxMemory() / 3)
-        .expireAfterWrite(30, TimeUnit.MINUTES)
-        .weigher((Weigher<MetricSlice, DataFrame>) (slice, dataFrame) -> dataFrame.size() * 2 * Double.BYTES)
-        .build(new CacheLoader<MetricSlice, DataFrame>() {
-          // load single slice
-          @Override
-          public DataFrame load(MetricSlice slice) {
-            return loadTimeseries(Collections.singleton(slice)).get(slice);
-          }
 
-          // buck loading time series slice in parallel
-          @Override
-          public Map<MetricSlice, DataFrame> loadAll(Iterable<? extends MetricSlice> slices) throws Exception {
-            return loadTimeseries(Lists.newArrayList(slices));
-          }
-        });
+    if (DETECTION_TIME_SERIES_CACHE == null) {
+      LOG.info("initializing detection timeseries cache");
+      DETECTION_TIME_SERIES_CACHE = CacheBuilder.newBuilder()
+          // don't use more than one third of memory for detection time series
+          .maximumWeight(Runtime.getRuntime().freeMemory() / 3)
+          .expireAfterWrite(15, TimeUnit.MINUTES)
+          .weigher((Weigher<MetricSlice, DataFrame>) (slice, dataFrame) -> dataFrame.size() * (Long.BYTES + Double.BYTES))
+          .build(new CacheLoader<MetricSlice, DataFrame>() {
+            // load single slice
+            @Override
+            public DataFrame load(MetricSlice slice) {
+              return loadTimeseries(Collections.singleton(slice)).get(slice);
+            }
+
+            // buck loading time series slice in parallel
+            @Override
+            public Map<MetricSlice, DataFrame> loadAll(Iterable<? extends MetricSlice> slices) {
+              return loadTimeseries(Lists.newArrayList(slices));
+            }
+          });
+    }
   }
 
   private Map<MetricSlice, DataFrame> loadTimeseries(Collection<MetricSlice> slices) {
@@ -114,7 +119,7 @@ public class DefaultDataProvider implements DataProvider {
 
       // if the time series slice is already in cache, return directly
       for (MetricSlice slice : slices){
-        for (Map.Entry<MetricSlice, DataFrame> entry : this.timeseriesCache.asMap().entrySet()) {
+        for (Map.Entry<MetricSlice, DataFrame> entry : DETECTION_TIME_SERIES_CACHE.asMap().entrySet()) {
           if (entry.getKey().containSlice(slice)){
             DataFrame df = entry.getValue().filter(entry.getValue().getLongs(COL_TIME).between(slice.getStart(), slice.getEnd())).dropNull(COL_TIME);
             output.put(slice, df);
@@ -148,7 +153,7 @@ public class DefaultDataProvider implements DataProvider {
   @Override
   public Map<MetricSlice, DataFrame> fetchTimeseries(Collection<MetricSlice> slices) {
     try {
-      Map<MetricSlice, DataFrame> cacheResult = this.timeseriesCache.getAll(slices);
+      Map<MetricSlice, DataFrame> cacheResult = DETECTION_TIME_SERIES_CACHE.getAll(slices);
       Map<MetricSlice, DataFrame> timeseriesResult = new HashMap<>();
       for (Map.Entry<MetricSlice, DataFrame> entry : cacheResult.entrySet()){
         // make a copy of the result so that cache won't be contaminated by client code
