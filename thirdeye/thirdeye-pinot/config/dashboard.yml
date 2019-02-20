@@ -10,12 +10,12 @@ rootCause:
   definitionsPath: rca.yml
   parallelism: 5
   formatters:
-    - com.linkedin.thirdeye.dashboard.resources.v2.rootcause.AnomalyEventFormatter
-    - com.linkedin.thirdeye.dashboard.resources.v2.rootcause.ThirdEyeEventFormatter
-    - com.linkedin.thirdeye.dashboard.resources.v2.rootcause.MetricEntityFormatter
-    - com.linkedin.thirdeye.dashboard.resources.v2.rootcause.DimensionEntityFormatter
-    - com.linkedin.thirdeye.dashboard.resources.v2.rootcause.ServiceEntityFormatter
-    - com.linkedin.thirdeye.dashboard.resources.v2.rootcause.DefaultEventEntityFormatter
+    - org.apache.pinot.thirdeye.dashboard.resources.v2.rootcause.AnomalyEventFormatter
+    - org.apache.pinot.thirdeye.dashboard.resources.v2.rootcause.ThirdEyeEventFormatter
+    - org.apache.pinot.thirdeye.dashboard.resources.v2.rootcause.MetricEntityFormatter
+    - org.apache.pinot.thirdeye.dashboard.resources.v2.rootcause.DimensionEntityFormatter
+    - org.apache.pinot.thirdeye.dashboard.resources.v2.rootcause.ServiceEntityFormatter
+    - org.apache.pinot.thirdeye.dashboard.resources.v2.rootcause.DefaultEventEntityFormatter
 dashboardHost: "http://localhost:1426"
 failureFromAddress: thirdeye@localhost
 failureToAddress: user@localhost
@@ -33,5 +33,5 @@ server:
       port: 1427
 whitelistDatasets: []
 swagger:
-  resourcePackage: "com.linkedin.thirdeye.dashboard.resources,com.linkedin.thirdeye.dashboard.resources.v2,com.linkedin.thirdeye.anomaly.onboard"
+  resourcePackage: "org.apache.pinot.thirdeye.dashboard.resources,org.apache.pinot.thirdeye.dashboard.resources.v2,org.apache.pinot.thirdeye.anomaly.onboard"
 

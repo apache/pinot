@@ -9,9 +9,10 @@ import { splitFilterFragment, toFilterMap, makeTime } from 'thirdeye-frontend/ut
  * @param {Object} response - the response object from a fetch call
  * @param {String} mode - the request type: 'post', 'get'
  * @param {Boolean} recoverBlank - whether silent failure is allowed
+ * @param {Boolean} isYamlPreview - handle response differently for post of yaml preview
  * @return {Object} either json-formatted payload or error object
  */
-export function checkStatus(response, mode = 'get', recoverBlank = false) {
+export function checkStatus(response, mode = 'get', recoverBlank = false, isYamlPreview = false) {
   if (response.status === 401) {
     // We want to throw a 401 error up the error substate(s) to handle it
     throw new Error('401');
@@ -20,7 +21,7 @@ export function checkStatus(response, mode = 'get', recoverBlank = false) {
     if (response.status === 204) {
       return '';
     } else {
-      return (mode === 'get') ? response.json() : JSON.parse(JSON.stringify(response));
+      return (mode === 'get' || isYamlPreview) ? response.json() : JSON.parse(JSON.stringify(response));
     }
   } else {
     const error = new Error(response.statusText);
@@ -147,6 +148,19 @@ export function postProps(postData) {
 }
 
 /**
+ * Preps post object for Yaml payload
+ * @param {string} text to post
+ * @returns {Object}
+ */
+export function postYamlProps(postData) {
+  return {
+    method: 'post',
+    body: postData,
+    headers: { 'content-type': 'text/plain' }
+  };
+}
+
+/**
  * Format conversion helper
  * @param {String} dateStr - date to convert
  */
@@ -162,5 +176,6 @@ export default {
   makeFilterString,
   parseProps,
   postProps,
-  toIso
+  toIso,
+  postYamlProps
 };

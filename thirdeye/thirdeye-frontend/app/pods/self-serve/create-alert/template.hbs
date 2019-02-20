@@ -1,22 +1,23 @@
 <h1 class="te-title">Create Alert
-
-  {{#x-toggle
-    value=isForm
-    classNames="te-toggle te-toggle--form te-toggle--left report-toggle pull-right"
-    theme="ios"
-    id="label-toggle"
-    showLabels=true
-    name="activeToggle"
-    onToggle=(action (mut isForm))
-    as |toggle|}}
-      {{#toggle.label value=isForm}}
-        <span class="te-label te-label--flush">YAML</span>
-      {{/toggle.label}}
-      {{toggle.switch theme='ios' onLabel='diff on' offLabel='diff off'}}
-      {{#toggle.label value=isForm}}
-        <span class="te-label te-label--flush">Form</span>
-      {{/toggle.label}}
-  {{/x-toggle}}
+  {{#if (eq debug "show")}}
+    {{#x-toggle
+      value=isForm
+      classNames="te-toggle te-toggle--form te-toggle--left report-toggle pull-right"
+      theme="ios"
+      id="label-toggle"
+      showLabels=true
+      name="activeToggle"
+      onToggle=(action (mut isForm))
+      as |toggle|}}
+        {{#toggle.label value=isForm}}
+          <span class="te-label te-label--flush">YAML</span>
+        {{/toggle.label}}
+        {{toggle.switch theme='ios' onLabel='diff on' offLabel='diff off'}}
+        {{#toggle.label value=isForm}}
+          <span class="te-label te-label--flush">Form</span>
+        {{/toggle.label}}
+    {{/x-toggle}}
+  {{/if}}
 </h1>
 <main class="alert-create card-container card-container--padded te-form">
   {{#if isForm}}
@@ -421,52 +422,11 @@
       {{/if}}
     </fieldset>
   {{else}}
-    <fieldset class="te-form__section te-form__section--first row">
-      <div class="col-xs-12">
-        <legend class="te-form__section-title">Define anomaly detection in YAML</legend>
-        {{ember-ace
-          lines=35
-          value=currentYamlValues
-          update=(action 'onYMLSelector')
-          mode="ace/mode/yaml"
-          suggestCompletions=(action 'yamlSuggestions')
-          enableLiveAutocompletion=true
-        }}
-      </div>
-      {{!-- TOD: save for Alert settings
-      <div class="col-xs-12">
-        <legend class="te-form__section-title">Define alert settings</legend>
-        {{ember-ace
-          lines=15
-          value="value"
-          theme="ace/theme/chaos"
-          mode="ace/mode/yaml"
-        }}
-      </div> --}}
-    </fieldset>
-    {{#unless isYamlParseable}}
-      <div class="yaml alert alert-warning fade in">
-        Could not parse YAML.  If you want autocomplete for filter name,
-        please insert a colon and type before the colon
-      </div>
-    {{/unless}}
-    <fieldset class="te-form__section-submit">
-      {{bs-button
-        defaultText="Cancel"
-        type="outline-primary"
-        buttonType="cancel"
-        onClick=(action "cancelAlertYaml")
-        class="te-button te-button--cancel"
-      }}
-      {{bs-button
-        defaultText="Save changes"
-        type="primary"
-        buttonType="submit"
-        disabled=disableYamlSave
-        onClick=(action "saveAlertYaml")
-        class="te-button te-button--submit"
-      }}
-    </fieldset>
+    {{#yaml-editor
+      isEditMode=false
+      showSettings=true
+    }}
+    {{/yaml-editor}}
   {{/if}}
   {{outlet}}
 </main>

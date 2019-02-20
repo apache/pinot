@@ -1,3 +1,22 @@
+..
+.. Licensed to the Apache Software Foundation (ASF) under one
+.. or more contributor license agreements.  See the NOTICE file
+.. distributed with this work for additional information
+.. regarding copyright ownership.  The ASF licenses this file
+.. to you under the Apache License, Version 2.0 (the
+.. "License"); you may not use this file except in compliance
+.. with the License.  You may obtain a copy of the License at
+..
+..   http://www.apache.org/licenses/LICENSE-2.0
+..
+.. Unless required by applicable law or agreed to in writing,
+.. software distributed under the License is distributed on an
+.. "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+.. KIND, either express or implied.  See the License for the
+.. specific language governing permissions and limitations
+.. under the License.
+..
+
 Quick Demo
 ==========
 
@@ -15,23 +34,16 @@ All of the setup is automated, so the only thing required at the beginning is to
 Compiling the code
 ~~~~~~~~~~~~~~~~~~
 
-.. note::
-
-    You can skip this step if you are planning to run the pre-built docker image. Make sure you have Docker installed.
-    Some of the newer query features may not be available in docker as of this writing
-
 One can also run the Pinot demonstration by checking out the code on GitHub, compiling it, and running it. Compiling
 Pinot requires JDK 8 or later and Apache Maven 3.
 
 #. Check out the code from GitHub (https://github.com/apache/incubator-pinot)
-#. With Maven installed, run ``mvn install package -DskipTests`` in the directory in which you checked out Pinot.
-#. Make the generated scripts executable ``cd pinot-distribution/target/pinot-0.016-pkg; chmod +x bin/*.sh``
+#. With Maven installed, run ``mvn install package -DskipTests -Pbin-dist`` in the directory in which you checked out Pinot.
+#. Make the generated scripts executable ``cd pinot-distribution/target/apache-pinot-incubating-<version>-SNAPSHOT-bin; chmod +x bin/*.sh``
 
 Trying out Offline quickstart demo
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-To run the demo with docker
-  ``docker run -it -p 9000:9000 linkedin/pinot-quickstart-offline``
 To run the demo with compiled code:
   ``bin/quick-start-offline.sh``
 
@@ -64,10 +76,8 @@ The full reference for the PQL query language is present in the :ref:`pql` secti
 Trying out Realtime quickstart demo
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Pinot can ingest data from streaming sources such as Kafka. 
+Pinot can ingest data from streaming sources such as Kafka.
 
-To run the demo with docker
-  ``docker run -it -p 9000:9000 linkedin/pinot-quickstart-realtime``
 To run the demo with compiled code:
   ``bin/quick-start-realtime.sh``
 

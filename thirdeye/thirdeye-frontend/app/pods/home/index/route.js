@@ -82,7 +82,7 @@ export default Route.extend(AuthenticatedRouteMixin, {
 
     return new RSVP.Promise(async (resolve, reject) => {
       try {
-        const anomalyMapping = appName ? await this.get('_getAnomalyMapping').perform(model) : [];//DEMO:
+        const anomalyMapping = appName ? await this.get('_getAnomalyMapping').perform(model) : [];
         const alertsByMetric = appName ? this.getAlertsByMetric() : [];
         const defaultParams = {
           anomalyMapping,

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
-import sys
 import argparse
+import sys
 from fastavro import writer
 
 parser = argparse.ArgumentParser()

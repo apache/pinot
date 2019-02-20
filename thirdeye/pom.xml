@@ -20,7 +20,7 @@
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0                              http://maven.apache.org/maven-v4_0_0.xsd">
   <modelVersion>4.0.0</modelVersion>
-  <groupId>com.linkedin.thirdeye</groupId>
+  <groupId>org.apache.pinot.thirdeye</groupId>
   <artifactId>thirdeye</artifactId>
   <version>1.0-SNAPSHOT</version>
   <packaging>pom</packaging>
@@ -34,7 +34,7 @@
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <pinot.version>0.1.076-SNAPSHOT</pinot.version>
+    <pinot.version>0.1.0-SNAPSHOT</pinot.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <jdk.version>1.8</jdk.version>
     <dropwizard.version>0.9.2</dropwizard.version>
@@ -54,6 +54,7 @@
     <commons-cli.version>1.3</commons-cli.version>
     <commons-csv.version>1.3</commons-csv.version>
     <commons-dbcp2.version>2.1.1</commons-dbcp2.version>
+    <reflections.version>0.9.11</reflections.version>
     <mrunit.version>1.1.0</mrunit.version>
     <slf4j-api.version>1.7.12</slf4j-api.version>
     <jodatime.version>2.7</jodatime.version>
@@ -79,6 +80,7 @@
     <kafka.clients.version>0.10.2.1</kafka.clients.version>
     <swagger.version>0.7.0</swagger.version>
     <calendar-api.version>v3-rev300-1.23.0</calendar-api.version>
+    <json.version>20170516</json.version>
   </properties>
 
   <licenses>
@@ -123,7 +125,7 @@
   </developers>
 
   <scm>
-    <developerConnection>scm:git:git://git@github.com/linkedin/pinot.git</developerConnection>
+    <developerConnection>scm:git:git://git@github.com/apache/incubator-pinot.git</developerConnection>
   </scm>
 
   <inceptionYear>2014-2018</inceptionYear>
@@ -157,19 +159,37 @@
     <dependencies>
       <!-- project dependencies -->
       <dependency>
-        <groupId>com.linkedin.pinot</groupId>
+        <groupId>org.apache.pinot</groupId>
         <artifactId>pinot-api</artifactId>
         <version>${pinot.version}</version>
+          <exclusions>
+            <exclusion>
+              <groupId>org.glassfish.jersey.core</groupId>
+              <artifactId>jersey-server</artifactId>
+            </exclusion>
+          </exclusions>
       </dependency>
       <dependency>
-        <groupId>com.linkedin.pinot</groupId>
+        <groupId>org.apache.pinot</groupId>
         <artifactId>pinot-common</artifactId>
         <version>${pinot.version}</version>
+          <exclusions>
+            <exclusion>
+              <groupId>org.glassfish.jersey.core</groupId>
+              <artifactId>jersey-server</artifactId>
+            </exclusion>
+          </exclusions>
       </dependency>
       <dependency>
-        <groupId>com.linkedin.pinot</groupId>
+        <groupId>org.apache.pinot</groupId>
         <artifactId>pinot-core</artifactId>
         <version>${pinot.version}</version>
+          <exclusions>
+            <exclusion>
+              <groupId>org.glassfish.jersey.core</groupId>
+              <artifactId>jersey-server</artifactId>
+            </exclusion>
+          </exclusions>
       </dependency>
 
       <!-- hadoop specific -->
@@ -364,6 +384,11 @@
         <artifactId>json-path</artifactId>
         <version>${jsonpath.version}</version>
       </dependency>
+      <dependency>
+        <groupId>org.reflections</groupId>
+        <artifactId>reflections</artifactId>
+        <version>${reflections.version}</version>
+      </dependency>
 
       <!-- UI dependencies -->
       <dependency>
@@ -454,6 +479,12 @@
         <groupId>org.hsqldb</groupId>
         <artifactId>hsqldb</artifactId>
         <version>${hsqldb.version}</version>
+      </dependency>
+      <dependency>
+        <!-- TODO: replace code dependencies and remove -->
+        <groupId>org.json</groupId>
+        <artifactId>json</artifactId>
+        <version>${json.version}</version>
       </dependency>
 
       <!-- swagger -->

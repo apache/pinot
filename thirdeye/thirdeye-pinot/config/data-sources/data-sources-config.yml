@@ -1,5 +1,5 @@
 dataSourceConfigs:
-  - className: com.linkedin.thirdeye.datasource.mock.MockThirdEyeDataSource
+  - className: org.apache.pinot.thirdeye.datasource.mock.MockThirdEyeDataSource
     properties:
       populateMetaData: true
       lookback: 90

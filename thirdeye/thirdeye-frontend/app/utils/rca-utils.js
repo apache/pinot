@@ -111,6 +111,12 @@ export function stripTail(urn) {
   if (urn.startsWith('frontend:anomalyfunction:')) {
     return _.slice(parts, 0, 3).join(':');
   }
+  if (urn.startsWith('thirdeye:dimensions:')) {
+    return _.slice(parts, 0, 2).join(':');
+  }
+  if (urn.startsWith('thirdeye:callgraph:')) {
+    return _.slice(parts, 0, 2).join(':');
+  }
   return urn;
 }
 
@@ -124,13 +130,19 @@ export function stripTail(urn) {
 export function extractTail(urn) {
   const parts = urn.split(':');
   if (urn.startsWith('thirdeye:metric:')) {
-    return _.slice(parts, 3);
+    return _.slice(parts, 3).filter(p => !_.isEmpty(p));
   }
   if (urn.startsWith('frontend:metric:')) {
-    return _.slice(parts, 4);
+    return _.slice(parts, 4).filter(p => !_.isEmpty(p));
   }
   if (urn.startsWith('frontend:anomalyfunction:')) {
-    return _.slice(parts, 3);
+    return _.slice(parts, 3).filter(p => !_.isEmpty(p));
+  }
+  if (urn.startsWith('thirdeye:dimensions:')) {
+    return _.slice(parts, 2).filter(p => !_.isEmpty(p));
+  }
+  if (urn.startsWith('thirdeye:callgraph:')) {
+    return _.slice(parts, 2).filter(p => !_.isEmpty(p));
   }
   return [];
 }
@@ -187,6 +199,17 @@ export function toCurrentUrn(urn) {
  */
 export function toBaselineUrn(urn) {
   return metricUrnHelper('frontend:metric:baseline:', urn);
+}
+
+/**
+ * Converts any metric urn to its dimensions equivalent
+ * Example: 'thirdeye:metric:123:country=IT' returns 'thirdeye:dimensions:country=IT'
+ *
+ * @param {string} urn metric urn
+ * @returns {string} dimensions urn
+ */
+export function toDimensionsUrn(urn) {
+  return appendTail('thirdeye:dimensions:', extractTail(urn));
 }
 
 /**
@@ -309,7 +332,7 @@ export function toEventLabel(urn, entities) {
 
   if (urn.includes('anomaly')) {
     const [, id] = urn.split(':anomaly:');
-    label = `#${id} ${label}`;
+    label = `Anomaly #${id} ${label}`;
   }
 
   return label;
@@ -336,7 +359,7 @@ function metricUrnHelper(prefix, urn) {
     const tail = makeUrnTail(parts, 3);
     return `${prefix}${parts[2]}${tail}`;
   }
-  throw new Error(`Requires metric urn, but found ${urn}`);
+  throw new Error(`Requires supported urn, but found ${urn}`);
 }
 
 /**
@@ -376,48 +399,62 @@ export function filterPrefix(urns, prefixes) {
 }
 
 /**
- * Converts a time range tuple to another time range with a given offset
+ * Converts a time range tuple to another time range with a given offset (in Pacific time zone)
  *
  * @param {Array} range time range tuple [start, end]
  * @param {string} offset time offset ('current', 'baseline', 'wo1w', 'wo2w', 'wo3w', 'wo4w)
  * @returns {Array} offset time range tuple
  */
 export function toBaselineRange(range, offset) {
-  const offsetWeeks = {
-    current: 0,
-    none: 0,
-    predicted: 0,
-    wow: 1,
-    wo1w: 1,
-    wo2w: 2,
-    wo3w: 3,
-    wo4w: 4,
-    mean4w: 1, // default. not fully supported by backend yet
-    median4w: 1, // default. not fully supported by backend yet
-    min4w: 1, // default. not fully supported by backend yet
-    max4w: 1, // default. not fully supported by backend yet
-    ho1h: 1,
-    ho2h: 1,
-    ho3h: 1,
-    median4h: 1,
-    mean4h: 1,
-    do1d: 1,
-    do2d: 1,
-    do3d: 1,
-    median4d: 1,
-    mean4d: 1,
-    mo1m: 1,
-    mo2m: 1,
-    mo3m: 1,
-    median4m: 1,
-    mean4m: 1
+  const timeOffset = {
+    current: [0, 'weeks'],
+    predicted: [0, 'weeks'], // no backend support
+    none: [0, 'weeks'], // no backend support
+
+    wow: [1, 'weeks'],
+    wo1w: [1, 'weeks'],
+    wo2w: [2, 'weeks'],
+    wo3w: [3, 'weeks'],
+    wo4w: [4, 'weeks'],
+    mean4w: [1, 'weeks'], // no backend support
+    median4w: [1, 'weeks'], // no backend support
+    min4w: [1, 'weeks'], // no backend support
+    max4w: [1, 'weeks'], // no backend support
+
+    ho1h: [1, 'hours'],
+    ho2h: [2, 'hours'],
+    ho3h: [3, 'hours'],
+    ho6h: [6, 'hours'],
+    median6h: [1, 'hours'], // no backend support
+    mean6h: [1, 'hours'], // no backend support
+    min6h: [1, 'hours'], // no backend support
+    max6h: [1, 'hours'], // no backend support
+
+    do1d: [1, 'days'],
+    do2d: [2, 'days'],
+    do3d: [3, 'days'],
+    do4d: [4, 'days'],
+    median4d: [1, 'days'], // no backend support
+    mean4d: [1, 'days'], // no backend support
+    min4d: [1, 'days'], // no backend support
+    max4d: [1, 'days'], // no backend support
+
+    mo1m: [1, 'months'],
+    mo2m: [2, 'months'],
+    mo3m: [3, 'months'],
+    mo6m: [6, 'months'],
+    median6m: [1, 'months'], // no backend support
+    mean6m: [1, 'months'], // no backend support
+    min6m: [1, 'months'], // no backend support
+    max6m: [1, 'months'] // no backend support
+
   }[offset.toLowerCase()];
 
-  if (offsetWeeks === 0) {
+  if (!timeOffset || timeOffset[0] === 0) {
     return range;
   }
 
-  const start = makeTime(range[0]).subtract(offsetWeeks, 'weeks').valueOf();
+  const start = makeTime(range[0]).subtract(timeOffset[0], timeOffset[1]).valueOf();
   const end = start + (range[1] - range[0]);
 
   return [start, end];
@@ -453,12 +490,13 @@ export function toAbsoluteRange(urn, currentRange, baselineCompareMode) {
 export function toFilters(urns) {
   const flatten = (agg, l) => agg.concat(l);
   const dimensionFilters = filterPrefix(urns, 'thirdeye:dimension:').map(urn => _.slice(urn.split(':').map(decodeURIComponent), 2, 4).insertAt(1, '='));
-
+  const dimensionsFilters = filterPrefix(urns, 'thirdeye:dimensions:').map(extractTail).map(enc => enc.map(tup => splitFilterFragment(decodeURIComponent(tup)))).reduce(flatten, []);
   const metricFilters = filterPrefix(urns, 'thirdeye:metric:').map(extractTail).map(enc => enc.map(tup => splitFilterFragment(decodeURIComponent(tup)))).reduce(flatten, []);
   const frontendMetricFilters = filterPrefix(urns, 'frontend:metric:').map(extractTail).map(enc => enc.map(tup => splitFilterFragment(decodeURIComponent(tup)))).reduce(flatten, []);
   const anomalyFunctionFilters = filterPrefix(urns, 'frontend:anomalyfunction:').map(extractTail).map(enc => enc.map(tup => splitFilterFragment(decodeURIComponent(tup)))).reduce(flatten, []);
+  const callgraphFilters = filterPrefix(urns, 'thirdeye:callgraph:').map(extractTail).map(enc => enc.map(tup => splitFilterFragment(decodeURIComponent(tup)))).reduce(flatten, []);
 
-  return [...new Set([...dimensionFilters, ...metricFilters, ...frontendMetricFilters, ...anomalyFunctionFilters])].sort();
+  return [...new Set([...dimensionFilters, ...dimensionsFilters, ...metricFilters, ...frontendMetricFilters, ...anomalyFunctionFilters, ...callgraphFilters])].sort();
 }
 
 /**
@@ -715,6 +753,7 @@ export default {
   toMetricUrn,
   toOffsetUrn,
   toAbsoluteUrn,
+  toDimensionsUrn,
   stripTail,
   extractTail,
   appendTail,

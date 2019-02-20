@@ -1,3 +1,22 @@
+..
+.. Licensed to the Apache Software Foundation (ASF) under one
+.. or more contributor license agreements.  See the NOTICE file
+.. distributed with this work for additional information
+.. regarding copyright ownership.  The ASF licenses this file
+.. to you under the Apache License, Version 2.0 (the
+.. "License"); you may not use this file except in compliance
+.. with the License.  You may obtain a copy of the License at
+..
+..   http://www.apache.org/licenses/LICENSE-2.0
+..
+.. Unless required by applicable law or agreed to in writing,
+.. software distributed under the License is distributed on an
+.. "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+.. KIND, either express or implied.  See the License for the
+.. specific language governing permissions and limitations
+.. under the License.
+..
+
 Architecture
 ============
 
@@ -23,7 +42,7 @@ Pinot Components
 *Pinot Broker*
     Accepts queries from clients and routes them to one or more servers, and returns consolidated response to the client.
 
-Pinot leverages `Apache Helix <http://helix.apache.org>`_ for cluster management. 
+Pinot leverages `Apache Helix <http://helix.apache.org>`_ for cluster management.
 Helix is a cluster management framework to manage replicated, partitioned resources in a distributed system.
 Helix uses Zookeeper to store cluster state and metadata.
 
@@ -68,7 +87,7 @@ Table Schema defines column names and their metadata. Table configuration and sc
 Offline tables ingest pre-built pinot-segments from external data stores, whereas Reatime tables
 ingest data from streams (such as Kafka) and build segments.
 
-A hybrid Pinot table essentially has both realtime as well as offline tables. 
+A hybrid Pinot table essentially has both realtime as well as offline tables.
 In such a table, offline segments may be pushed periodically (say, once a day). The retention on the offline table
 can be set to a high value (say, a few years) since segments are coming in on a periodic basis, whereas the retention
 on the realtime part can be small (say, a few days). Once an offline segment is pushed to cover a recent time period,
@@ -87,7 +106,7 @@ Pinot provides libraries to create Pinot segments out of input files in AVRO, JS
 the constructed segments to the controlers via REST APIs.
 
 When an Offline segment is ingested, the controller looks up the table's configuration and assigns the segment
-to the servers that host the table. It may assign multiple servers for each servers depending on the number of replicas 
+to the servers that host the table. It may assign multiple servers for each servers depending on the number of replicas
 configured for that table.
 
 Pinot supports different segment assignment strategies that are optimized for various use cases.
@@ -96,7 +115,7 @@ Once segments are assigned, Pinot servers get notified via Helix to "host" the s
 (as a cached local copy to serve queries) and load them into local memory. All segment data is maintained in memory as long
 as the server hosts that segment.
 
-Once the server has loaded the segment, Helix notifies brokers of the availability of these segments. The brokers 
+Once the server has loaded the segment, Helix notifies brokers of the availability of these segments. The brokers
 start include the new
 segments for queries. Brokers support different routing strategies depending on the type of table, the segment assignment
 strategy and the use case.
@@ -120,7 +139,7 @@ Realtime segments are immutable once they are completed. While realtime segments
 in the sense that new rows can be added to them. Rows cannot be deleted from segments.
 
 
-See :doc:`realtime design <llc>` for details.
+See `Consuming and Indexing rows in Realtime <https://cwiki.apache.org/confluence/display/PINOT/Consuming+and+Indexing+rows+in+Realtime>`_ for details.
 
 
 Pinot Segments

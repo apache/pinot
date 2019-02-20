@@ -15,6 +15,7 @@ export default DS.Model.extend({
   functionName: DS.attr(),
   functionId: DS.attr(),
   dataset: DS.attr(),
-  classification: DS.attr()
+  classification: DS.attr(),
+  detectionConfigId: DS.attr()
 });
 //DEMO: avoidTheSharedObject: attr('object', { defaultValue: () => {} })

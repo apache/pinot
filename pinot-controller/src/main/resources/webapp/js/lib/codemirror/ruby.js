@@ -1,3 +1,6 @@
+// CodeMirror, copyright (c) by Marijn Haverbeke and others
+// Distributed under an MIT license: http://codemirror.net/LICENSE
+
 CodeMirror.defineMode("ruby", function(config, parserConfig) {
   function wordObj(words) {
     var o = {};

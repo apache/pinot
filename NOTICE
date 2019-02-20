@@ -1,37 +1,5 @@
-Pinot
-Copyright 2014 The Apache Software Foundation
-
-
-I. Included Software
+Apache Pinot (incubating)
+Copyright 2018-2019 The Apache Software Foundation
 
 This product includes software developed at
 The Apache Software Foundation (http://www.apache.org/).
-Licensed under the Apache License 2.0.
-
-This product includes software developed at
-Codehaus (http://www.codehaus.org/).
-Licensed under the BSD License.
-
-This product includes software developed at
-jline (http://jline.sourceforge.net/).
-Licensed under the BSD License.
-
-This product includes software developed at
-Google (http://www.google.com/).
-Licensed under the Apache License 2.0.
-
-This product includes software developed at
-snakeyaml (http://www.snakeyaml.org/).
-Licensed under the Apache License 2.0.
-
-This product includes software developed at
-zkclient (https://github.com/sgroschupf/zkclient).
-Licensed under the Apache License 2.0.
-
-This product includes software developed at
-eclipse (https://eclipse.org/jetty)
-Licensed under the Apache License 2.0.
-
-II. License Summary
-- Apache License 2.0
-- BSD License

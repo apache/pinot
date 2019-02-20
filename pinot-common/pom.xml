@@ -1,34 +1,37 @@
 <?xml version="1.0"?>
 <!--
 
-    Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
+    Licensed to the Apache Software Foundation (ASF) under one
+    or more contributor license agreements.  See the NOTICE file
+    distributed with this work for additional information
+    regarding copyright ownership.  The ASF licenses this file
+    to you under the Apache License, Version 2.0 (the
+    "License"); you may not use this file except in compliance
+    with the License.  You may obtain a copy of the License at
 
-    Licensed under the Apache License, Version 2.0 (the "License");
-    you may not use this file except in compliance with the License.
-    You may obtain a copy of the License at
+      http://www.apache.org/licenses/LICENSE-2.0
 
-            http://www.apache.org/licenses/LICENSE-2.0
-
-    Unless required by applicable law or agreed to in writing, software
-    distributed under the License is distributed on an "AS IS" BASIS,
-    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-    See the License for the specific language governing permissions and
-    limitations under the License.
+    Unless required by applicable law or agreed to in writing,
+    software distributed under the License is distributed on an
+    "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+    KIND, either express or implied.  See the License for the
+    specific language governing permissions and limitations
+    under the License.
 
 -->
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <artifactId>pinot</artifactId>
-    <groupId>com.linkedin.pinot</groupId>
-    <version>0.1.097-SNAPSHOT</version>
+    <groupId>org.apache.pinot</groupId>
+    <version>0.1.0-SNAPSHOT</version>
   </parent>
   <artifactId>pinot-common</artifactId>
-  <version>0.1.097-SNAPSHOT</version>
-  <name>pinot-common</name>
-  <url>http://maven.apache.org</url>
+  <name>Pinot Common</name>
+  <url>https://pinot.apache.org/</url>
   <properties>
-    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <pinot.root>${basedir}/..</pinot.root>
   </properties>
   <build>
     <!-- Antlr stuff -->
@@ -94,10 +97,6 @@
       <artifactId>antlr4-runtime</artifactId>
     </dependency>
     <dependency>
-      <groupId>com.alibaba</groupId>
-      <artifactId>fastjson</artifactId>
-    </dependency>
-    <dependency>
       <groupId>org.testng</groupId>
       <artifactId>testng</artifactId>
       <scope>test</scope>
@@ -135,10 +134,6 @@
     <dependency>
       <groupId>joda-time</groupId>
       <artifactId>joda-time</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.json</groupId>
-      <artifactId>json</artifactId>
     </dependency>
     <dependency>
       <groupId>commons-configuration</groupId>
@@ -222,16 +217,16 @@
       <artifactId>swagger-ui</artifactId>
     </dependency>
     <dependency>
-      <groupId>com.fasterxml.jackson.core</groupId>
-      <artifactId>jackson-annotations</artifactId>
-    </dependency>
-    <dependency>
       <groupId>com.google.code.findbugs</groupId>
       <artifactId>jsr305</artifactId>
     </dependency>
     <dependency>
-      <groupId>com.google.code.gson</groupId>
-      <artifactId>gson</artifactId>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-annotations</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
@@ -306,7 +301,7 @@
       <artifactId>zookeeper</artifactId>
     </dependency>
     <dependency>
-      <groupId>com.linkedin.pinot</groupId>
+      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-filesystem</artifactId>
     </dependency>
     <dependency>
@@ -370,24 +365,24 @@
                 <phase>generate-sources</phase>
                 <configuration>
                   <tasks>
-                    <delete dir="target/generated-sources/gen-javabean" />
-                    <mkdir dir="target/generated-sources" />
+                    <delete dir="target/generated-sources/gen-javabean"/>
+                    <mkdir dir="target/generated-sources"/>
                     <exec executable="/usr/local/bin/thrift">
-                      <arg value="--gen" />
-                      <arg value="java:beans" />
-                      <arg value="-o" />
-                      <arg value="target/generated-sources" />
-                      <arg value="src/thrift/request.thrift" />
+                      <arg value="--gen"/>
+                      <arg value="java:beans"/>
+                      <arg value="-o"/>
+                      <arg value="target/generated-sources"/>
+                      <arg value="src/thrift/request.thrift"/>
                     </exec>
                     <exec executable="/usr/local/bin/thrift">
-                      <arg value="--gen" />
-                      <arg value="java:beans" />
-                      <arg value="-o" />
-                      <arg value="target/generated-sources" />
-                      <arg value="src/thrift/response.thrift" />
+                      <arg value="--gen"/>
+                      <arg value="java:beans"/>
+                      <arg value="-o"/>
+                      <arg value="target/generated-sources"/>
+                      <arg value="src/thrift/response.thrift"/>
                     </exec>
                     <copy todir="src/main/java/">
-                      <fileset dir="target/generated-sources/gen-javabean" />
+                      <fileset dir="target/generated-sources/gen-javabean"/>
                     </copy>
                   </tasks>
                 </configuration>
