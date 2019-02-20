@@ -24,7 +24,6 @@ import org.apache.helix.InstanceType;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.manager.zk.ZKHelixManager;
 import org.apache.helix.manager.zk.ZNRecordSerializer;
-import org.apache.helix.manager.zk.ZkBaseDataAccessor;
 import org.apache.helix.manager.zk.ZkClient;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -71,21 +70,12 @@ public class TableQueryQuotaManagerTest {
   }
 
   public class FakeHelixManager extends ZKHelixManager {
-    private ZkHelixPropertyStore<ZNRecord> _propertyStore;
-
     FakeHelixManager(String clusterName, String instanceName, InstanceType instanceType, String zkAddress) {
       super(clusterName, instanceName, instanceType, zkAddress);
-      super._zkclient = new ZkClient(StringUtil.join("/", StringUtils.chomp(ZkStarter.DEFAULT_ZK_STR, "/")),
+      _zkclient = new ZkClient(StringUtil.join("/", StringUtils.chomp(ZkStarter.DEFAULT_ZK_STR, "/")),
           ZkClient.DEFAULT_SESSION_TIMEOUT, ZkClient.DEFAULT_CONNECTION_TIMEOUT, new ZNRecordSerializer());
-      _zkclient.deleteRecursive("/" + clusterName + "/PROPERTYSTORE");
+      _zkclient.deleteRecursively("/" + clusterName + "/PROPERTYSTORE");
       _zkclient.createPersistent("/" + clusterName + "/PROPERTYSTORE", true);
-      setPropertyStore(clusterName);
-    }
-
-    void setPropertyStore(String clusterName) {
-      _propertyStore =
-          new ZkHelixPropertyStore<>(new ZkBaseDataAccessor<ZNRecord>(_zkclient), "/" + clusterName + "/PROPERTYSTORE",
-              null);
     }
 
     void closeZkClient() {
