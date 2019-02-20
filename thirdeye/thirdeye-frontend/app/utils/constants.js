@@ -10,88 +10,73 @@ export default {
 };
 
 
-export const yamlAlertProps = `# Below are all dummy example. Please update accordingly.
-# give a name for this detection
+export const yamlAlertProps = `# Below is a sample template for setting up a WoW percentage rule. You may refer the documentation for more examples and update the fields accordingly.
+
+# Give a name for this anomaly detection pipeline (should be unique)
 detectionName: name_of_the_detection
-# the metric to detect the anomalies
+
+# Tell the alert recipients what it means if this alert is fired
+description: If this alert fires then it means so-and-so and check so-and-so for irregularities
+
+# The metric you want to do anomaly detection on. You may type a few characters and look ahead (ctrl + space) to auto-fill
 metric: metric_name
-# the data set name for this metric
+
+# The dataset or UMP table name to which the metric belongs. Look ahead should auto populate this field
 dataset: dataset_name
-# ThirdEye pipeline type. Just fill in Composite
+
+# ThirdEye pipeline type. Only "Composite" is supported now.
 pipelineType: Composite
 
-# (Optional) Config dimension exploration
-dimensionExploration:
-  # Create an alert for each dimension value in the dimension
-  dimensions:
-    - dimensionName
-
-  # (Optional) only create alert for the dimension value if the contribution to
-  # overall metric is above the threshold
-  minContribution: 0.05
-
-  # (Optional) only create alert for the top k dimension values
-  k: 10
-
-# (Optional) Filter the metric by
-filters:
-  dimensionName1:
-     - dimensionValue1
-     - dimensionValue2
-  dimensionName2:
-     - dimensionValue3
-
-# configure rules of anomaly detection
+# Configure multiple rules. ThirdEye supports single or a list of rules combined together with "OR" relationship
 rules:
-# configure the first rule
-- # configure the detection rule. ThirdEye will detect anomalies based on the
-  # detection rules.
-  detection:
-      # give a name for the detection rule
-    - name: detection_rule_1
-      # ThirdEye rule type
-      type: PERCENTAGE_RULE
-      # parameters for this rule
-      params:
-        offset: wo1w
-        change: 0.1
+- detection:                      # Eg. Detect anomalies if the week over week change of this metric is more than 10%
+    - name: detection_rule_1      # Give a unique name for this detection rule.
+      type: PERCENTAGE_RULE       # Configure the detection type here. See doc for more details.
+      params:                     # The parameters for this rule. Different rules have different params.
+        offset: wo1w              # Compare current value with last week. (Values supported - wo1w, wo2w, median3w etc)
+        change: 0.1               # The threshold above which you want to be alerted.
+        pattern: UP_OR_DOWN       # Alert when value goes up or down by the configured threshold. (Values supported - UP, DOWN, UP_OR_DOWN)
 
-  # (Optional) configure the exclusion rule. (Exclude the anomalies you don't
-  # want to see but detected by the detection rule above)
-  filter:
-    - name: filter_rule_1
-      type: ABSOLUTE_CHANGE_FILTER
-      params:
-        threshold: 10000
-
-# configure more rule if you'd like to
-- detection:
-    - name: detection_rule_2
-      type: ABSOLUTE_CHANGE_RULE
-      params:
-        offset: wo1w
-        change: 1000000
-        pattern: UP
-
+# Refer to examples and documentation for exploring other types of detection rules, algorithms and filters with more detailed settings.
 `;
 
-export const yamlAlertSettings = `# Below are all dummy example. Please update accordingly.
+export const yamlAlertSettings = `# Below is a sample subscription group template. You may refer the documentation and update accordingly.
+
+# The name of the subscription group. You may choose an existing or a provide a new subscription group name
 subscriptionGroupName: test_subscription_group
+
+# Every alert in ThirdEye is attached to an application. Please specify the registered application name here. You may request for a new application by dropping an email to ask_thirdeye
 application: thirdeye-internal
+
+# The default notification type. See additional settings for details and exploring other notification types like dimension alerter.
+type: DEFAULT_ALERTER_PIPELINE
+
+# List of detection names that you want to subscribe. Copy-paste the detection name from the above anomaly detection config here. 
 subscribedDetections:
   - name_of_the_detection_above
 
+# Configure how you want to be alerted. You can receive the standard ThirdEye email alert (recommended)
+# or for advanced critical use-cases setup Iris alert by referring to the documentation
 alertSchemes:
 - type: EMAIL
 recipients:
  to:
+  - "me@company.com"          # Specify alert recipient email address here
   - "me@company.com"
  cc:
   - "cc_email@company.com"
 fromAddress: thirdeye-dev@linkedin.com
 
+# The frequency at which you want to be notified. Typically you want to be notified immediately after
+# an anomaly is detected. The below cron runs every 5 minutes. Use online cronmaker to compute this.
 cron: "0 0/5 * 1/1 * ? *"
-type: DEFAULT_ALERTER_PIPELINE
+
+# Enable or disable notification of alert
 active: true
+
+# The below links will appear in the email alerts. This will help alert recipients to quickly refer and act on.
 referenceLinks:
- "My Company FAQs": "http://www.company.com/faq"`;
+- "Oncall Runbook": "http://go/oncall",
+- "Thirdeye FAQs": "http://go/thirdeyefaqs"
+
+`;
