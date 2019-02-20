@@ -21,13 +21,6 @@
   dependencies:
     "@glimmer/di" "^0.2.0"
 
-"@kysmith/ember-cli-piwik@^0.1.1":
-  version "0.1.1"
-  resolved "https://registry.yarnpkg.com/@kysmith/ember-cli-piwik/-/ember-cli-piwik-0.1.1.tgz#d44cf9d66a54fe30a875b26f46f2dd2d5af64678"
-  integrity sha1-1Ez51mpU/jCodbJvRvLdLVr2Rng=
-  dependencies:
-    ember-cli-babel "^6.6.0"
-
 "@types/acorn@^4.0.3":
   version "4.0.3"
   resolved "https://registry.yarnpkg.com/@types/acorn/-/acorn-4.0.3.tgz#d1f3e738dde52536f9aad3d3380d14e448820afd"

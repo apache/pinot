@@ -31,7 +31,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.thirdeye.common.dimension.DimensionMap;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
-import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
 import org.apache.pinot.thirdeye.datalayer.bao.DAOTestBase;
 import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.EventManager;
@@ -52,7 +51,7 @@ import org.apache.pinot.thirdeye.detection.spi.model.AnomalySlice;
 import org.apache.pinot.thirdeye.detection.spi.model.EventSlice;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
-import org.testng.annotations.BeforeClass;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
@@ -78,7 +77,7 @@ public class DataProviderTest {
   private List<Long> metricIds;
   private List<Long> datasetIds;
 
-  @BeforeClass
+  @BeforeMethod
   public void beforeMethod() throws Exception {
     this.testBase = DAOTestBase.getInstance();
 
@@ -149,46 +148,6 @@ public class DataProviderTest {
   public void afterMethod() {
     this.testBase.cleanup();
   }
-
-  //
-  // timeseries
-  //
-
-  @Test
-  public void testTimeseriesSingle() {
-    MetricSlice slice = MetricSlice.from(this.metricIds.get(0), 604800000L, 1814400000L);
-
-    DataFrame df = this.provider.fetchTimeseries(Collections.singleton(slice)).get(slice);
-
-    Assert.assertEquals(df.size(), 336);
-
-    double mean = df.getDoubles(COL_VALUE).mean().doubleValue();
-    Assert.assertTrue(Math.abs(mean - 1000) < EPSILON_MEAN);
-  }
-
-  @Test
-  public void testTimeseriesMultiple() {
-    MetricSlice slice1 = MetricSlice.from(this.metricIds.get(0), 604800000L, 1814400000L);
-    MetricSlice slice2 = MetricSlice.from(this.metricIds.get(1), 604800000L, 1209600000L);
-
-    Map<MetricSlice, DataFrame> output = this.provider.fetchTimeseries(Arrays.asList(slice1, slice2));
-
-    Assert.assertEquals(output.size(), 2);
-
-    double mean1 = output.get(slice1).getDoubles(COL_VALUE).mean().doubleValue();
-    Assert.assertTrue(Math.abs(mean1 - 1000) < EPSILON_MEAN);
-
-    double mean2 = output.get(slice2).getDoubles(COL_VALUE).mean().doubleValue();
-    Assert.assertTrue(Math.abs(mean2 - 1000) < EPSILON_MEAN);
-
-    Assert.assertNotEquals(mean1, mean2);
-  }
-
-  //
-  // aggregates
-  //
-
-  // TODO fetch aggregates tests
 
   //
   // metric
