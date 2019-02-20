@@ -26,10 +26,12 @@ import com.wordnik.swagger.annotations.ApiOperation;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.GET;
@@ -60,6 +62,7 @@ import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.util.Predicate;
+import org.apache.pinot.thirdeye.detection.alert.filter.ToAllRecipientsDetectionAlertFilter;
 import org.apache.pinot.thirdeye.detection.yaml.YamlDetectionAlertConfigTranslator;
 import org.apache.pinot.thirdeye.detection.yaml.YamlResource;
 import org.joda.time.Period;
@@ -644,6 +647,60 @@ public class DetectionMigrationResource {
       return Response.ok("All applications have been successfully migrated").build();
     } else {
       LOGGER.error("[MIG] Errors found while migrating application. Errors:\n" + responseMessage);
+      return Response.status(Response.Status.BAD_REQUEST).entity(responseMessage).build();
+    }
+  }
+
+  @POST
+  @Produces(MediaType.APPLICATION_JSON)
+  @Consumes(MediaType.APPLICATION_JSON)
+  @ApiOperation("migrate the partially migrated alerts")
+  @Path("/partial-alerts")
+  public Response migratePartialAlerts() {
+    List<DetectionAlertConfigDTO> subsGroups = this.detectionAlertConfigDAO.findAll();
+    Map<String, String> responseMessage = new HashMap<>();
+
+    for (DetectionAlertConfigDTO subsGroup : subsGroups) {
+      try {
+        if (subsGroup.isOnlyFetchLegacyAnomalies()) {
+          Set<Long> detectionIds = new HashSet<>();
+          // Update and point these to the new detection ids
+          if (subsGroup.getVectorClocks() != null) {
+            Map<Long, Long> migratedVectorClock = new HashMap<>();
+            Map<Long, Long> legacyVectorClock = subsGroup.getVectorClocks();
+            for (long id : legacyVectorClock.keySet()) {
+              long migratedId = migrateLegacyAnomalyFunction(id);
+              detectionIds.add(migratedId);
+              migratedVectorClock.put(migratedId, legacyVectorClock.get(id));
+            }
+            subsGroup.setVectorClocks(migratedVectorClock);
+          }
+          subsGroup.getProperties().put(PROP_DETECTION_CONFIG_IDS, detectionIds);
+
+          // Remove Alert Filters! These are migrated and part of the detection yaml
+          subsGroup.getProperties().remove("legacyAlertFilterConfigs");
+          subsGroup.getProperties().remove("legacyAlertFilterClassName");
+
+          subsGroup.getProperties().put("className", ToAllRecipientsDetectionAlertFilter.class.getName());
+
+          int detectionAlertConfigId = this.detectionAlertConfigDAO.update(subsGroup);
+          if (detectionAlertConfigId <= 0) {
+            throw new RuntimeException("Failed to update the detection alert config.");
+          }
+        }
+      } catch (Exception e) {
+        // Skip migrating this partial migrated alert
+        LOGGER.error("[MIG] Failed to migrate partial subscription group id {} name {}. Exception {}", subsGroup.getId(), subsGroup.getName(), e);
+        responseMessage.put("Status of subscription group " + subsGroup.getName(),
+            String.format("Failed to migrate subscription group %s due to %s", subsGroup.getName(), e.getMessage()));
+      }
+    }
+
+    if (responseMessage.isEmpty()) {
+      LOGGER.info("[MIG] Successfully migrated all the partially migrated alerts");
+      return Response.ok("All partial alerts have been successfully migrated").build();
+    } else {
+      LOGGER.error("[MIG] Errors found while migrating partially migrated alerts. Errors:\n" + responseMessage);
       return Response.status(Response.Status.BAD_REQUEST).entity(responseMessage).build();
     }
   }
