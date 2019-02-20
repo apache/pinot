@@ -34,7 +34,7 @@ rules:
       type: PERCENTAGE_RULE       # Configure the detection type here. See doc for more details.
       params:                     # The parameters for this rule. Different rules have different params.
         offset: wo1w              # Compare current value with last week. (Values supported - wo1w, wo2w, median3w etc)
-        change: 0.1               # The threshold above which you want to be alerted.
+        percentageChange: 0.1     # The threshold above which you want to be alerted.
         pattern: UP_OR_DOWN       # Alert when value goes up or down by the configured threshold. (Values supported - UP, DOWN, UP_OR_DOWN)
 
 # Refer to examples and documentation for exploring other types of detection rules, algorithms and filters with more detailed settings.
