@@ -75,6 +75,7 @@ public class UserDashboardResourceTest {
     this.anomalyIds.add(this.anomalyDAO.save(makeAnomaly(100, 500, this.functionIds.get(0), "test_metric", "test_dataset"))); // func A
     this.anomalyIds.add(this.anomalyDAO.save(makeAnomaly(800, 1200, this.functionIds.get(0), "test_metric", "test_dataset"))); // func A
     this.anomalyIds.add(this.anomalyDAO.save(makeAnomaly(300, 1500, this.functionIds.get(1), "test_metric", "test_dataset"))); // func B
+    this.anomalyIds.add(this.anomalyDAO.save(makeAnomaly(300, 1600, this.functionIds.get(2), "test_metric", "test_dataset"))); // func C
     this.anomalyIds.add(this.anomalyDAO.save(makeAnomaly(300, 1600, this.functionIds.get(2), "test_metric_2", "test_dataset"))); // func C
 
     for (Long id : this.anomalyIds) {
@@ -124,8 +125,8 @@ public class UserDashboardResourceTest {
   @Test
   public void testAnomaliesByGroup() throws Exception {
     List<AnomalySummary> anomalies = this.resource.queryAnomalies(1000L, null, null, null, "myAlertB", null, null, false, null);
-    Assert.assertEquals(anomalies.size(), 1);
-    Assert.assertEquals(extractIds(anomalies), makeSet(this.anomalyIds.get(3)));
+    Assert.assertEquals(anomalies.size(), 2);
+    Assert.assertEquals(extractIds(anomalies), makeSet(this.anomalyIds.get(3), this.anomalyIds.get(4)));
   }
 
   @Test
@@ -144,15 +145,15 @@ public class UserDashboardResourceTest {
   @Test
   public void testAnomaliesByMetric() throws Exception {
     List<AnomalySummary> anomalies = this.resource.queryAnomalies(1000L, null, null, null, null, "test_metric", "test_dataset", false, null);
-    Assert.assertEquals(anomalies.size(), 2);
-    Assert.assertEquals(extractIds(anomalies), makeSet(this.anomalyIds.get(1), this.anomalyIds.get(2)));
+    Assert.assertEquals(anomalies.size(), 3);
+    Assert.assertEquals(extractIds(anomalies), makeSet(this.anomalyIds.get(1), this.anomalyIds.get(2), this.anomalyIds.get(3)));
   }
 
   @Test
   public void testAnomaliesByDataset() throws Exception {
     List<AnomalySummary> anomalies = this.resource.queryAnomalies(1000L, null, null, null, null, null, "test_dataset", false, null);
-    Assert.assertEquals(anomalies.size(), 3);
-    Assert.assertEquals(extractIds(anomalies), makeSet(this.anomalyIds.get(1), this.anomalyIds.get(2), this.anomalyIds.get(3)));
+    Assert.assertEquals(anomalies.size(), 4);
+    Assert.assertEquals(extractIds(anomalies), makeSet(this.anomalyIds.get(1), this.anomalyIds.get(2), this.anomalyIds.get(3), this.anomalyIds.get(4)));
   }
 
   private MergedAnomalyResultDTO makeAnomaly(long start, long end, Long functionId, String metric, String dataset) {

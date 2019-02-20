@@ -617,6 +617,8 @@ public class DetectionMigrationResource {
   }
 
   @POST
+  @Produces(MediaType.APPLICATION_JSON)
+  @Consumes(MediaType.APPLICATION_JSON)
   @ApiOperation("migrate all applications")
   @Path("/applications")
   public Response migrateApplication() {
