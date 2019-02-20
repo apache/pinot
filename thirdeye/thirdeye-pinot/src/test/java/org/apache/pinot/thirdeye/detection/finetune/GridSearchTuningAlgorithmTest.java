@@ -18,6 +18,14 @@ package org.apache.pinot.thirdeye.detection.finetune;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import org.apache.commons.collections.MapUtils;
 import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyFeedback;
 import org.apache.pinot.thirdeye.constant.AnomalyFeedbackType;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
@@ -36,17 +44,9 @@ import org.apache.pinot.thirdeye.datasource.ThirdEyeDataSource;
 import org.apache.pinot.thirdeye.datasource.cache.QueryCache;
 import org.apache.pinot.thirdeye.datasource.csv.CSVThirdEyeDataSource;
 import org.apache.pinot.thirdeye.detection.spi.model.AnomalySlice;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
-import org.apache.commons.collections.MapUtils;
 import org.testng.Assert;
-import org.testng.annotations.AfterClass;
-import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.AfterSuite;
+import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
 
@@ -56,7 +56,7 @@ public class GridSearchTuningAlgorithmTest {
   private TuningAlgorithm gridSearch;
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
-  @BeforeMethod
+  @BeforeTest
   public void beforeMethod() throws JsonProcessingException {
     testDAOProvider = DAOTestBase.getInstance();
 
@@ -117,7 +117,7 @@ public class GridSearchTuningAlgorithmTest {
     gridSearch = new GridSearchTuningAlgorithm(OBJECT_MAPPER.writeValueAsString(properties), parameters);
   }
 
-  @AfterClass(alwaysRun = true)
+  @AfterSuite(alwaysRun = true)
   void afterClass() {
     testDAOProvider.cleanup();
   }

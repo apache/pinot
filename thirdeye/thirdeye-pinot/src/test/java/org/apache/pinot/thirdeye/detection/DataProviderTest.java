@@ -18,6 +18,17 @@ package org.apache.pinot.thirdeye.detection;
 
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.SetMultimap;
+import java.io.InputStreamReader;
+import java.io.Reader;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import org.apache.pinot.thirdeye.common.dimension.DimensionMap;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
@@ -39,20 +50,10 @@ import org.apache.pinot.thirdeye.datasource.loader.DefaultTimeSeriesLoader;
 import org.apache.pinot.thirdeye.datasource.loader.TimeSeriesLoader;
 import org.apache.pinot.thirdeye.detection.spi.model.AnomalySlice;
 import org.apache.pinot.thirdeye.detection.spi.model.EventSlice;
-import java.io.InputStreamReader;
-import java.io.Reader;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 import org.testng.Assert;
-import org.testng.annotations.AfterMethod;
-import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.AfterSuite;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
@@ -78,7 +79,7 @@ public class DataProviderTest {
   private List<Long> metricIds;
   private List<Long> datasetIds;
 
-  @BeforeMethod
+  @BeforeClass
   public void beforeMethod() throws Exception {
     this.testBase = DAOTestBase.getInstance();
 
@@ -145,7 +146,7 @@ public class DataProviderTest {
         this.timeseriesLoader, null, null);
   }
 
-  @AfterMethod(alwaysRun = true)
+  @AfterClass(alwaysRun = true)
   public void afterMethod() {
     this.testBase.cleanup();
   }
@@ -166,7 +167,7 @@ public class DataProviderTest {
     Assert.assertTrue(Math.abs(mean - 1000) < EPSILON_MEAN);
   }
 
-  @Test
+  @Test(dependsOnMethods = {"testTimeseriesSingle"})
   public void testTimeseriesMultiple() {
     MetricSlice slice1 = MetricSlice.from(this.metricIds.get(0), 604800000L, 1814400000L);
     MetricSlice slice2 = MetricSlice.from(this.metricIds.get(1), 604800000L, 1209600000L);
