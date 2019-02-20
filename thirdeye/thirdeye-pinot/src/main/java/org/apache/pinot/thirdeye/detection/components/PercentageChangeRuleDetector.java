@@ -53,11 +53,11 @@ import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
     description = "Computes a multi-week aggregate baseline and compares the current value "
         + "based on relative change.",
     presentation = {
-        @PresentationOption(name = "percentage change", template = "comparing ${offset} is ${pattern} more than ${change}")
+        @PresentationOption(name = "percentage change", template = "comparing ${offset} is ${pattern} more than ${percentageChange}")
     },
     params = {
         @Param(name = "offset", defaultValue = "wo1w"),
-        @Param(name = "change", placeholder = "value"),
+        @Param(name = "percentageChange", placeholder = "value"),
         @Param(name = "pattern", allowableValues = {"up", "down"})
     })
 public class PercentageChangeRuleDetector implements AnomalyDetector<PercentageChangeRuleDetectorSpec> {
