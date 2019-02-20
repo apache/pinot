@@ -89,10 +89,12 @@ public class DefaultDataProvider implements DataProvider {
     this.loader = loader;
 
     if (DETECTION_TIME_SERIES_CACHE == null) {
-      LOG.info("initializing detection timeseries cache");
+      // don't use more than one third of memory for detection time series
+      long cacheSize = Runtime.getRuntime().freeMemory() / 3;
+      LOG.info("initializing detection timeseries cache with {} bytes", cacheSize);
       DETECTION_TIME_SERIES_CACHE = CacheBuilder.newBuilder()
-          // don't use more than one third of memory for detection time series
-          .maximumWeight(Runtime.getRuntime().freeMemory() / 3)
+          .maximumWeight(cacheSize)
+          // Estimate that most detection tasks will complete within 15 minutes
           .expireAfterWrite(15, TimeUnit.MINUTES)
           .weigher((Weigher<MetricSlice, DataFrame>) (slice, dataFrame) -> dataFrame.size() * (Long.BYTES + Double.BYTES))
           .build(new CacheLoader<MetricSlice, DataFrame>() {
