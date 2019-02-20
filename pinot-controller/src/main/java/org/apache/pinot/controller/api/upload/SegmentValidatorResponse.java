@@ -25,10 +25,10 @@ import org.apache.pinot.controller.validation.StorageQuotaChecker;
 
 
 public class SegmentValidatorResponse {
-  private TableConfig _offlineTableConfig;
-  private ZNRecord _segmentMetadataZnRecord;
-  private List<String> _assignedInstances;
-  private StorageQuotaChecker.QuotaCheckerResponse _quotaCheckerResponse;
+  private final TableConfig _offlineTableConfig;
+  private final ZNRecord _segmentMetadataZnRecord;
+  private final List<String> _assignedInstances;
+  private final StorageQuotaChecker.QuotaCheckerResponse _quotaCheckerResponse;
 
   public SegmentValidatorResponse(TableConfig offlineTableConfig, ZNRecord segmentMetadataZnRecord, List<String> assignedInstances, StorageQuotaChecker.QuotaCheckerResponse quotaCheckerResponse) {
     _offlineTableConfig = offlineTableConfig;
