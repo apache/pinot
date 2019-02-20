@@ -52,7 +52,6 @@ import org.apache.pinot.thirdeye.detection.spi.model.AnomalySlice;
 import org.apache.pinot.thirdeye.detection.spi.model.EventSlice;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
-import org.testng.annotations.AfterSuite;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -167,7 +166,7 @@ public class DataProviderTest {
     Assert.assertTrue(Math.abs(mean - 1000) < EPSILON_MEAN);
   }
 
-  @Test(dependsOnMethods = {"testTimeseriesSingle"})
+  @Test
   public void testTimeseriesMultiple() {
     MetricSlice slice1 = MetricSlice.from(this.metricIds.get(0), 604800000L, 1814400000L);
     MetricSlice slice2 = MetricSlice.from(this.metricIds.get(1), 604800000L, 1209600000L);
