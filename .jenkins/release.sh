@@ -16,6 +16,7 @@
 #
 # Merge from the open source Pinot. If the merge failed due to conflict, the Jenkin release will fail, and the user need
 # to manually resolved the conflicts and push the change to Uber pinot. After that, the user can run this script again.
+git config merge.renameLimit 999999
 git remote add upstream git@github.com:linkedin/pinot.git
 git fetch --all
 # if there is no upstream change, the script will do the maven release.
