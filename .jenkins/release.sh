@@ -40,4 +40,4 @@ if [ -n "$NEXT_VERSION" ]; then
 release_opts="$release_opts -DdevelopmentVersion=$NEXT_VERSION"
 fi
 # This step also push the merged change to the Uber pinot
-mvn -e -B release:clean release:prepare release:perform -Darguments="-Dlicense.skip=true -DskipTests -Dmaven.javadoc.skip=true -P build-shaded-jar" $release_opts
+mvn -e -B release:clean release:prepare release:perform -Darguments="-Drat.skip=true -Dlicense.skip=true -DskipTests -Dmaven.javadoc.skip=true -P build-shaded-jar" $release_opts
