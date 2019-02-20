@@ -18,9 +18,19 @@ package org.apache.pinot.thirdeye.detection;
 
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.SetMultimap;
+import java.io.InputStreamReader;
+import java.io.Reader;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import org.apache.pinot.thirdeye.common.dimension.DimensionMap;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
-import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
 import org.apache.pinot.thirdeye.datalayer.bao.DAOTestBase;
 import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.EventManager;
@@ -39,19 +49,8 @@ import org.apache.pinot.thirdeye.datasource.loader.DefaultTimeSeriesLoader;
 import org.apache.pinot.thirdeye.datasource.loader.TimeSeriesLoader;
 import org.apache.pinot.thirdeye.detection.spi.model.AnomalySlice;
 import org.apache.pinot.thirdeye.detection.spi.model.EventSlice;
-import java.io.InputStreamReader;
-import java.io.Reader;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 import org.testng.Assert;
-import org.testng.annotations.AfterMethod;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
@@ -145,50 +144,10 @@ public class DataProviderTest {
         this.timeseriesLoader, null, null);
   }
 
-  @AfterMethod(alwaysRun = true)
+  @AfterClass(alwaysRun = true)
   public void afterMethod() {
     this.testBase.cleanup();
   }
-
-  //
-  // timeseries
-  //
-
-  @Test
-  public void testTimeseriesSingle() {
-    MetricSlice slice = MetricSlice.from(this.metricIds.get(0), 604800000L, 1814400000L);
-
-    DataFrame df = this.provider.fetchTimeseries(Collections.singleton(slice)).get(slice);
-
-    Assert.assertEquals(df.size(), 336);
-
-    double mean = df.getDoubles(COL_VALUE).mean().doubleValue();
-    Assert.assertTrue(Math.abs(mean - 1000) < EPSILON_MEAN);
-  }
-
-  @Test
-  public void testTimeseriesMultiple() {
-    MetricSlice slice1 = MetricSlice.from(this.metricIds.get(0), 604800000L, 1814400000L);
-    MetricSlice slice2 = MetricSlice.from(this.metricIds.get(1), 604800000L, 1209600000L);
-
-    Map<MetricSlice, DataFrame> output = this.provider.fetchTimeseries(Arrays.asList(slice1, slice2));
-
-    Assert.assertEquals(output.size(), 2);
-
-    double mean1 = output.get(slice1).getDoubles(COL_VALUE).mean().doubleValue();
-    Assert.assertTrue(Math.abs(mean1 - 1000) < EPSILON_MEAN);
-
-    double mean2 = output.get(slice2).getDoubles(COL_VALUE).mean().doubleValue();
-    Assert.assertTrue(Math.abs(mean2 - 1000) < EPSILON_MEAN);
-
-    Assert.assertNotEquals(mean1, mean2);
-  }
-
-  //
-  // aggregates
-  //
-
-  // TODO fetch aggregates tests
 
   //
   // metric
@@ -302,21 +261,6 @@ public class DataProviderTest {
     Assert.assertTrue(anomalies.contains(makeAnomaly(this.anomalyIds.get(0), 100L, 4000000L, 8000000L, Arrays.asList("a=1", "c=3", "b=2"))));
     Assert.assertTrue(anomalies.contains(makeAnomaly(this.anomalyIds.get(2), 200L, 604800000L, 1209600000L, Collections.<String>emptyList())));
     Assert.assertTrue(anomalies.contains(makeAnomaly(this.anomalyIds.get(3), 200L, 14400000L, 18000000L, Arrays.asList("a=1", "c=3"))));
-  }
-
-  // cache
-
-  @Test
-  public void testTimeseriesCache(){
-    MetricSlice slice = MetricSlice.from(this.metricIds.get(0), 604800000L, 1814400000L);
-    this.provider.cacheTimeseries(Collections.singleton(slice));
-
-    DataFrame df = this.provider.fetchTimeseries(Collections.singleton(slice)).get(slice);
-
-    Assert.assertEquals(df.size(), 336);
-
-    double mean = df.getDoubles(COL_VALUE).mean().doubleValue();
-    Assert.assertTrue(Math.abs(mean - 1000) < EPSILON_MEAN);
   }
 
   //

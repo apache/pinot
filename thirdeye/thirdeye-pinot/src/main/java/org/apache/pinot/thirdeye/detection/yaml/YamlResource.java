@@ -542,6 +542,7 @@ public class YamlResource {
       @ApiParam("jsonPayload") String payload) {
     Map<String, String> responseMessage = new HashMap<>();
     DetectionPipelineResult result;
+    long ts = System.currentTimeMillis();
     try {
       Preconditions.checkArgument(StringUtils.isNotBlank(payload), "The Yaml Payload in the request is empty.");
 
@@ -563,7 +564,7 @@ public class YamlResource {
       responseMessage.put("message", "Failed to run the preview due to " + e.getMessage());
       return Response.serverError().entity(responseMessage).build();
     }
-    LOG.info("Preview successful using payload " + payload);
+    LOG.info("Preview successful, used {} milliseconds", System.currentTimeMillis() - ts);
     return Response.ok(result).build();
   }
 
