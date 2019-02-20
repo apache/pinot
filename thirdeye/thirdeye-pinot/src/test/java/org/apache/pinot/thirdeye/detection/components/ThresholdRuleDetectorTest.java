@@ -16,6 +16,11 @@
 
 package org.apache.pinot.thirdeye.detection.components;
 
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
@@ -23,15 +28,11 @@ import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
 import org.apache.pinot.thirdeye.detection.DataProvider;
-import org.apache.pinot.thirdeye.detection.DetectionPipeline;
-import org.apache.pinot.thirdeye.detection.DetectionPipelineResult;
+import org.apache.pinot.thirdeye.detection.DefaultInputDataFetcher;
 import org.apache.pinot.thirdeye.detection.MockDataProvider;
-import org.apache.pinot.thirdeye.detection.wrapper.AnomalyDetectorWrapper;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.TimeUnit;
+import org.apache.pinot.thirdeye.detection.spec.ThresholdRuleDetectorSpec;
+import org.apache.pinot.thirdeye.detection.spi.components.AnomalyDetector;
+import org.joda.time.Interval;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -41,10 +42,9 @@ import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
 
 public class ThresholdRuleDetectorTest {
   private DataProvider testDataProvider;
-  private DetectionPipeline detectionPipeline;
 
   @BeforeMethod
-  public void beforeMethod() throws Exception {
+  public void beforeMethod() {
     Map<MetricSlice, DataFrame> timeSeries = new HashMap<>();
     timeSeries.put(MetricSlice.from(123L, 0, 10),
         new DataFrame().addSeries(COL_VALUE, 0, 100, 200, 500, 1000).addSeries(COL_TIME, 0, 2, 4, 6, 8));
@@ -64,8 +64,6 @@ public class ThresholdRuleDetectorTest {
     DetectionConfigDTO detectionConfigDTO = new DetectionConfigDTO();
     detectionConfigDTO.setId(125L);
     Map<String, Object> detectorSpecs = new HashMap<>();
-    detectorSpecs.put("min", 100);
-    detectorSpecs.put("max", 500);
     detectorSpecs.put("className", ThresholdRuleDetector.class.getName());
     Map<String, Object> properties = new HashMap<>();
     properties.put("metricUrn", "thirdeye:metric:123");
@@ -79,14 +77,16 @@ public class ThresholdRuleDetectorTest {
         .setMetrics(Collections.singletonList(metricConfigDTO))
         .setDatasets(Collections.singletonList(datasetConfigDTO))
         .setTimeseries(timeSeries);
-    this.detectionPipeline = new AnomalyDetectorWrapper(this.testDataProvider, detectionConfigDTO, 0, 10);
   }
 
   @Test
-  public void testThresholdAlgorithmRun() throws Exception {
-    DetectionPipelineResult result = this.detectionPipeline.run();
-    List<MergedAnomalyResultDTO> anomalies = result.getAnomalies();
-    Assert.assertEquals(result.getLastTimestamp(), 10);
+  public void testThresholdAlgorithmRun() {
+    AnomalyDetector thresholdAlgorithm = new ThresholdRuleDetector();
+    ThresholdRuleDetectorSpec spec = new ThresholdRuleDetectorSpec();
+    spec.setMin(100);
+    spec.setMax(500);
+    thresholdAlgorithm.init(spec, new DefaultInputDataFetcher(testDataProvider, -1));
+    List<MergedAnomalyResultDTO> anomalies = thresholdAlgorithm.runDetection(new Interval(0, 10), "thirdeye:metric:123");
     Assert.assertEquals(anomalies.size(), 2);
     Assert.assertEquals(anomalies.get(0).getStartTime(), 0);
     Assert.assertEquals(anomalies.get(0).getEndTime(), 2);
