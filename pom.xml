@@ -1064,15 +1064,13 @@
         <version>2.8</version>
         <configuration>
           <header>${pinot.root}/HEADER</header>
+          <headerDefinitions>
+            <headerDefinition>${pinot.root}/rstheaderdefinition.xml</headerDefinition>
+          </headerDefinitions>
           <excludes>
             <!-- Exclude build files for docs -->
             <exclude>docs/_build/**</exclude>
             <exlude>docs/Makefile</exlude>
-
-            <!-- Exclude .rst files from license-maven-plugin since there is no easy way to check license on rst files.
-            rst files will be checked via RAT.
-            -->
-            <exclude>docs/*.rst</exclude>
 
             <!-- Text and log files -->
             <exclude>**/*.txt</exclude>
@@ -1122,6 +1120,7 @@
           <mapping>
             <thrift>JAVADOC_STYLE</thrift>
             <g4>JAVADOC_STYLE</g4>
+            <rst>RST_STYLE</rst>
           </mapping>
         </configuration>
         <executions>
