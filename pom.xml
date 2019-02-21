@@ -1065,6 +1065,15 @@
         <configuration>
           <header>${pinot.root}/HEADER</header>
           <excludes>
+            <!-- Exclude build files for docs -->
+            <exclude>docs/_build/**</exclude>
+            <exlude>docs/Makefile</exlude>
+
+            <!-- Exclude .rst files from license-maven-plugin since there is no easy way to check license on rst files.
+            rst files will be checked via RAT.
+            -->
+            <exclude>docs/*.rst</exclude>
+
             <!-- Text and log files -->
             <exclude>**/*.txt</exclude>
             <exclude>**/*.log</exclude>
@@ -1139,6 +1148,9 @@
           <excludes>
             <!-- Sphynx auto generated makefile -->
             <exclude>docs/Makefile</exclude>
+
+            <!-- Exclude build files for docs -->
+            <exclude>docs/_build/**</exclude>
 
             <!-- Exclude license copies -->
             <exclude>licenses/**</exclude>
