@@ -16,7 +16,10 @@
 
 package org.apache.pinot.thirdeye.detection.wrapper;
 
+import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ListMultimap;
+import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.common.time.TimeSpec;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
@@ -76,7 +79,13 @@ public class AnomalyDetectorWrapperTest {
         MetricSlice.from(1L, 1546819200000L, 1546905600000L),
         DataFrame.builder(COL_TIME, COL_VALUE).build(),
         MetricSlice.from(1L, 1546300800000L, 1546560000000L),
-        new DataFrame().addSeries(COL_VALUE, 500, 1000).addSeries(COL_TIME, 1546300800000L, 1546387200000L)));
+        new DataFrame().addSeries(COL_VALUE, 500, 1000).addSeries(COL_TIME, 1546300800000L, 1546387200000L),
+        MetricSlice.from(1L, 1540147725000L - TimeUnit.DAYS.toMillis(90), 1540493325000L, HashMultimap.create(),
+            new TimeGranularity(1, TimeUnit.DAYS)),
+        new DataFrame().addSeries(COL_VALUE, 500, 1000).addSeries(COL_TIME, 1546646400000L, 1546732800000L),
+        MetricSlice.from(1L, 1540080000000L - TimeUnit.DAYS.toMillis(90), 1540425600000L, HashMultimap.create(),
+            new TimeGranularity(1, TimeUnit.DAYS)),
+        new DataFrame().addSeries(COL_VALUE, 500, 1000).addSeries(COL_TIME, 1546646400000L, 1546732800000L)));
   }
 
   @Test
