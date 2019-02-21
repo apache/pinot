@@ -48,6 +48,7 @@ import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.util.EntityUtils;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.JsonUtils;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
@@ -67,7 +68,7 @@ import org.testng.annotations.Test;
 /**
  * Tests the URI upload path through a local file uri.
  */
-public class PinotURIUploadIntegrationTest extends BaseClusterIntegrationTest {
+public class PinotURIUploadIntegrationTest extends BaseClusterIntegrationTestSet {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotURIUploadIntegrationTest.class);
   private String _tableName;
   private File _metadataDir = new File(_segmentDir, "tmpMeta");
@@ -184,6 +185,34 @@ public class PinotURIUploadIntegrationTest extends BaseClusterIntegrationTest {
       }
     }
     Assert.fail("Failed to get from " + currentNrows + " to " + finalNrows);
+  }
+
+  @Test(dataProvider = "configProvider")
+  public void testSegmentValidator(String tableName, SegmentVersion version) {
+    completeTableConfiguration();
+    String serverInstanceId = "Server_localhost_" + CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT;
+
+    // Disable server instance.
+    _helixAdmin.enableInstance(getHelixClusterName(), serverInstanceId, false);
+
+    final String segment6 = "segmentToBeRefreshed_6";
+    final int nRows1 = 69;
+    try {
+      generateAndUploadRandomSegment(segment6, nRows1);
+      Assert.fail("Uploading segments should fail.");
+    } catch (Exception e) {
+      Assert.assertNotNull(e);
+      Assert.assertTrue(e.getMessage().contains("No assigned Instances for Segment"));
+    }
+
+    // Re-enable the server instance.
+    _helixAdmin.enableInstance(getHelixClusterName(), serverInstanceId, true);
+
+    try {
+      generateAndUploadRandomSegment(segment6, nRows1);
+    } catch (Exception e) {
+      Assert.fail("Uploading segments should succeed.");
+    }
   }
 
   @AfterClass

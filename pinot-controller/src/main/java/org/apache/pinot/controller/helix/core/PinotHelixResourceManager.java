@@ -1461,11 +1461,12 @@ public class PinotHelixResourceManager {
   }
 
   public void addNewSegment(@Nonnull SegmentMetadata segmentMetadata, @Nonnull String downloadUrl) {
-    addNewSegment(segmentMetadata, downloadUrl, null, null);
+    List<String> assignedInstances = getAssignedInstancesForSegment(segmentMetadata);
+    addNewSegment(segmentMetadata, downloadUrl, null, assignedInstances);
   }
 
   public void addNewSegment(@Nonnull SegmentMetadata segmentMetadata, @Nonnull String downloadUrl, String crypter,
-      List<String> assignedInstances) {
+      @Nonnull List<String> assignedInstances) {
     String segmentName = segmentMetadata.getName();
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(segmentMetadata.getTableName());
 
@@ -1688,8 +1689,7 @@ public class PinotHelixResourceManager {
   }
 
   /**
-   * Gets assigned instances for uploading new segment. This method can be used to detect
-   * whether table config is misconfigured when validating segment.
+   * Gets assigned instances for uploading new segment.
    * @param segmentMetadata segment metadata
    * @return a list of assigned instances.
    */
@@ -1722,9 +1722,6 @@ public class PinotHelixResourceManager {
     String segmentName = segmentMetadata.getName();
 
     // Assign new segment to instances
-    if (assignedInstances == null) {
-      assignedInstances = getAssignedInstancesForSegment(segmentMetadata);
-    }
     HelixHelper.addSegmentToIdealState(_helixZkManager, offlineTableName, segmentName, assignedInstances);
   }
 
