@@ -38,14 +38,21 @@ import org.slf4j.LoggerFactory;
 public class KafkaPartitionLevelConsumer extends KafkaConnectionHandler implements PartitionLevelConsumer {
   private static final Logger LOGGER = LoggerFactory.getLogger(KafkaPartitionLevelConsumer.class);
 
+  private final int _fetchRequestMinBytes;
+  private final int _fetchRequestSize;
+
   public KafkaPartitionLevelConsumer(String clientId, StreamConfig streamConfig, int partition) {
     super(clientId, streamConfig, partition, new KafkaSimpleConsumerFactoryImpl());
+    this._fetchRequestSize = getkafkaLowLevelStreamConfig().getKafkaFetcherSizeBytes();
+    this._fetchRequestMinBytes = getkafkaLowLevelStreamConfig().getKafkaFetcherMinBytes();
   }
 
   @VisibleForTesting
   public KafkaPartitionLevelConsumer(String clientId, StreamConfig streamConfig, int partition,
       KafkaSimpleConsumerFactory kafkaSimpleConsumerFactory) {
     super(clientId, streamConfig, partition, kafkaSimpleConsumerFactory);
+    this._fetchRequestSize = getkafkaLowLevelStreamConfig().getKafkaFetcherSizeBytes();
+    this._fetchRequestMinBytes = getkafkaLowLevelStreamConfig().getKafkaFetcherMinBytes();
   }
 
   /**
@@ -75,8 +82,8 @@ public class KafkaPartitionLevelConsumer extends KafkaConnectionHandler implemen
     }
 
     FetchResponse fetchResponse = _simpleConsumer.fetch(
-        new FetchRequestBuilder().minBytes(100000).maxWait(timeoutMillis)
-            .addFetch(_topic, _partition, startOffset, 500000).build());
+        new FetchRequestBuilder().minBytes(_fetchRequestMinBytes).maxWait(timeoutMillis)
+            .addFetch(_topic, _partition, startOffset, _fetchRequestSize).build());
 
     if (!fetchResponse.hasError()) {
       final Iterable<MessageAndOffset> messageAndOffsetIterable =
@@ -106,6 +113,16 @@ public class KafkaPartitionLevelConsumer extends KafkaConnectionHandler implemen
 
       return true;
     });
+  }
+
+  @VisibleForTesting
+  public int getFetchRequestSize() {
+    return _fetchRequestSize;
+  }
+
+  @VisibleForTesting
+  public int getFetchRequestMinBytes() {
+    return _fetchRequestMinBytes;
   }
 
   @Override
