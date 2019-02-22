@@ -21,7 +21,10 @@ package org.apache.pinot.thirdeye.detection;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.IOException;
+import java.util.stream.Collectors;
 import org.apache.pinot.thirdeye.anomaly.task.TaskConstants;
+import org.apache.pinot.thirdeye.anomaly.task.TaskInfo;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.TaskManager;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
@@ -65,12 +68,22 @@ public class DetectionPipelineJob implements Job {
       )
     );
 
-    Optional<TaskDTO> latestScheduledTask = scheduledTasks.stream().reduce((task1, task2) -> task1.getEndTime() > task2.getEndTime() ? task1 : task2);
-    if (latestScheduledTask.isPresent() && taskInfo.getEnd() - latestScheduledTask.get().getEndTime() < DETECTION_TASK_TIMEOUT){
-      // if a task is pending and not time out yet, don't schedule more
-      LOG.info("Skip scheduling detection task for {} with start time {}. Task is already in the queue.", jobName, taskInfo.getStart());
-      return;
-    }
+      List<DetectionPipelineTaskInfo> scheduledTaskInfos = scheduledTasks.stream().map(taskDTO -> {
+        try {
+          return OBJECT_MAPPER.readValue(taskDTO.getTaskInfo(), DetectionPipelineTaskInfo.class);
+        } catch (IOException e) {
+          throw new RuntimeException(e);
+        }
+      }).collect(Collectors.toList());
+      Optional<DetectionPipelineTaskInfo> latestScheduledTask = scheduledTaskInfos.stream()
+          .reduce((taskInfo1, taskInfo2) -> taskInfo1.getEnd() > taskInfo2.getEnd() ? taskInfo1 : taskInfo2);
+      if (latestScheduledTask.isPresent()
+          && taskInfo.getEnd() - latestScheduledTask.get().getEnd() < DETECTION_TASK_TIMEOUT) {
+        // if a task is pending and not time out yet, don't schedule more
+        LOG.info("Skip scheduling detection task for {} with start time {}. Task is already in the queue.", jobName,
+            taskInfo.getStart());
+        return;
+      }
 
     String taskInfoJson = null;
     try {
@@ -84,8 +97,6 @@ public class DetectionPipelineJob implements Job {
     taskDTO.setJobName(jobName);
     taskDTO.setStatus(TaskConstants.TaskStatus.WAITING);
     taskDTO.setTaskInfo(taskInfoJson);
-    taskDTO.setStartTime(taskInfo.getStart());
-    taskDTO.setEndTime(taskInfo.getEnd());
 
     long taskId = taskDAO.save(taskDTO);
     LOG.info("Created detection pipeline task {} with taskId {}", taskDTO, taskId);
