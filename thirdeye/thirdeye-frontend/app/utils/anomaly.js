@@ -41,12 +41,43 @@ export const anomalyResponseObj = [
   }
 ];
 
+export const anomalyResponseObjNew = [
+  { name: 'Not reviewed yet',
+    value: 'NONE',
+    status: 'Not Resolved'
+  },
+  { name: 'Yes - unexpected',
+    value: 'ANOMALY',
+    status: 'Confirmed Anomaly'
+  },
+  { name: 'Expected temporary change',
+    value: 'ANOMALY_EXPECTED',
+    status: 'Expected Anomaly'
+  },
+  { name: 'Expected permanent change',
+    value: 'ANOMALY_NEW_TREND',
+    status: 'Confirmed - New Trend'
+  },
+  { name: 'No change observed',
+    value: 'NOT_ANOMALY',
+    status: 'False Alarm'
+  }
+];
+
 /**
  * Mapping for anomalyResponseObj 'status' to 'name' for easy lookup
  */
 export let anomalyResponseMap = {};
 anomalyResponseObj.forEach((obj) => {
   anomalyResponseMap[obj.status] = obj.name;
+});
+
+/**
+ * Mapping for anomalyResponseObjNew 'value' to 'name' for easy lookup
+ */
+export let anomalyResponseMapNew = {};
+anomalyResponseObjNew.forEach((obj) => {
+  anomalyResponseMapNew[obj.value] = obj.name;
 });
 
 
@@ -137,6 +168,8 @@ export function pluralizeTime(time, unit) {
 export default {
   anomalyResponseObj,
   anomalyResponseMap,
+  anomalyResponseObjNew,
+  anomalyResponseMapNew,
   updateAnomalyFeedback,
   getFormattedDuration,
   verifyAnomalyFeedback,

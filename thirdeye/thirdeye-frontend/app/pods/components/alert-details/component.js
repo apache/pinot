@@ -14,11 +14,17 @@
  */
 
 import Component from '@ember/component';
-import { computed, observer, set, get, getProperties } from '@ember/object';
+import { computed, observer, set, get, getProperties, getWithDefault } from '@ember/object';
 import { later } from '@ember/runloop';
 import { checkStatus, humanizeFloat } from 'thirdeye-frontend/utils/utils';
-import { colorMapping, toColor, makeTime } from 'thirdeye-frontend/utils/rca-utils';
-import { getYamlPreviewAnomalies, getAnomaliesByAlertId, getFormattedDuration } from 'thirdeye-frontend/utils/anomaly';
+import { colorMapping, toColor, makeTime, toMetricLabel, extractTail } from 'thirdeye-frontend/utils/rca-utils';
+import { getYamlPreviewAnomalies,
+  getAnomaliesByAlertId,
+  getFormattedDuration,
+  anomalyResponseMapNew,
+  anomalyResponseObj,
+  updateAnomalyFeedback,
+  verifyAnomalyFeedback  } from 'thirdeye-frontend/utils/anomaly';
 import { inject as service } from '@ember/service';
 import { task } from 'ember-concurrency';
 import floatToPercent from 'thirdeye-frontend/utils/float-to-percent';
@@ -32,7 +38,7 @@ const TIME_PICKER_INCREMENT = 5; // tells date picker hours field how granularly
 const DEFAULT_ACTIVE_DURATION = '1m'; // setting this date range selection as default (Last 24 Hours)
 const UI_DATE_FORMAT = 'MMM D, YYYY hh:mm a'; // format for date picker to use (usually varies by route or metric)
 const DISPLAY_DATE_FORMAT = 'YYYY-MM-DD HH:mm'; // format used consistently across app to display custom date range
-const TIME_RANGE_OPTIONS = ['1m', '3m'];
+const TIME_RANGE_OPTIONS = ['1w', '1m', '3m'];
 
 export default Component.extend({
   anomaliesApiService: service('services/api/anomalies'),
@@ -54,6 +60,7 @@ export default Component.extend({
   },
   errorTimeseries: null,
   metricUrn: null,
+  metricUrnList: [],
   errorBaseline: null,
   compareMode: 'wo1w',
   baseline: null,
@@ -82,14 +89,51 @@ export default Component.extend({
   currentPage: 1,
   isPreviewMode: false,
   alertId: null,
+  feedbackOptions: ['Not reviewed yet', 'Yes - unexpected', 'Expected temporary change', 'Expected permanent change', 'No change observed'],
+  labelMap: anomalyResponseMapNew,
+  labelResponse: {},
+  selectedDimension: null,
 
 
-  updateVisuals: observer('analysisRange', function() {
-    const isPreviewMode = get(this, 'isPreviewMode');
-    if(!isPreviewMode) {
-      this._fetchAnomalies();
+  updateVisuals: observer(
+    'analysisRange',
+    'metricUrn',
+    function() {
+      const isPreviewMode = get(this, 'isPreviewMode');
+      if(!isPreviewMode) {
+        this._fetchAnomalies();
+      } else {
+        this._fetchTimeseries();
+      }
+    }),
+
+  /**
+   * Whether the alert has multiple dimensions
+   * @type {Boolean}
+   */
+  dimensionOptions: computed(
+    'metricUrnList',
+    function() {
+      const metricUrnList = get(this, 'metricUrnList');
+      let options = [];
+      metricUrnList.forEach(urn => {
+        options.push(toMetricLabel(extractTail(decodeURIComponent(urn))));
+      });
+      return options;
     }
-  }),
+  ),
+
+  /**
+   * Whether the alert has multiple dimensions
+   * @type {Boolean}
+   */
+  alertHasDimensions: computed(
+    'metricUrnList',
+    function() {
+      const metricUrnList = get(this, 'metricUrnList');
+      return (metricUrnList.length > 1);
+    }
+  ),
 
   /**
    * Table pagination: number of pages to display
@@ -224,30 +268,30 @@ export default Component.extend({
     'analysisRange',
     function () {
       const {
-        metricUrn, anomalies, timeseries, baseline, analysisRange
+        metricUrn, anomalies, timeseries, baseline
       } = getProperties(this, 'metricUrn', 'anomalies', 'timeseries',
-        'baseline', 'analysisRange');
+        'baseline');
 
       const series = {};
 
       if (!_.isEmpty(anomalies)) {
 
-          anomalies
-            .filter(anomaly => anomaly.metricUrn === metricUrn)
-            .forEach(anomaly => {
-              const key = this._formatAnomaly(anomaly);
-              series[key] = {
-                timestamps: [anomaly.startTime, anomaly.endTime],
-                values: [1, 1],
-                type: 'line',
-                color: 'teal',
-                axis: 'y2'
-              };
-              series[key + '-region'] = Object.assign({}, series[key], {
-                type: 'region',
-                color: 'orange'
-              });
+        anomalies
+          .filter(anomaly => anomaly.metricUrn === metricUrn)
+          .forEach(anomaly => {
+            const key = this._formatAnomaly(anomaly);
+            series[key] = {
+              timestamps: [anomaly.startTime, anomaly.endTime],
+              values: [1, 1],
+              type: 'line',
+              color: 'teal',
+              axis: 'y2'
+            };
+            series[key + '-region'] = Object.assign({}, series[key], {
+              type: 'region',
+              color: 'orange'
             });
+          });
       }
 
       if (timeseries && !_.isEmpty(timeseries.value)) {
@@ -267,7 +311,6 @@ export default Component.extend({
           color: 'light-' + toColor(metricUrn)
         };
       }
-
       return series;
     }
   ),
@@ -279,12 +322,15 @@ export default Component.extend({
    */
   tableAnomalies: computed(
     'anomalies',
+    'labelResponse',
     function() {
       const anomalies = get(this, 'anomalies');
+      const labelResponse = get(this, 'labelResponse');
       let tableData = [];
       let i = 1;
 
       anomalies.forEach(a => {
+        const change = (a.avgBaselineVal !== 0) ? (a.avgCurrentVal/a.avgBaselineVal - 1.0) * 100.0 : 0;
         let tableRow = {
           number: i,
           anomalyId: a.id,
@@ -293,12 +339,18 @@ export default Component.extend({
           durationStr: getFormattedDuration(a.startTime, a.endTime),
           shownCurrent: humanizeFloat(a.avgCurrentVal),
           shownBaseline: humanizeFloat(a.avgBaselineVal),
-          change: ((a.avgCurrentVal/a.avgBaselineVal - 1.0) * 100.0),
-          shownChangeRate: humanizeFloat(((a.avgCurrentVal/a.avgBaselineVal - 1.0) * 100.0))
+          change: change,
+          shownChangeRate: humanizeFloat(change),
+          anomalyFeedback: a.feedback ? a.feedback.feedbackType : a.statusClassification,
+          dimensionList: Object.keys(a.dimensions),
+          dimensions: a.dimensions,
+          showResponseSaved: (labelResponse.anomalyId === a.id) ? labelResponse.showResponseSaved : false,
+          showResponseFailed: (labelResponse.anomalyId === a.id) ? labelResponse.showResponseFailed: false
         };
         tableData.push(tableRow);
         i++;
       });
+
       return tableData;
     }
   ),
@@ -378,10 +430,10 @@ export default Component.extend({
       const endDate = Number(analysisRange[1]) || Number(get(this, 'endDate'));
       const duration = get(this, 'duration') || DEFAULT_ACTIVE_DURATION;
       const predefinedRanges = {
-        'Today': [moment().startOf('day'), moment()],
+        'Today': [moment().startOf('day'), moment().startOf('day').add(1, 'days')],
         'Last 24 hours': [moment().subtract(1, 'day'), moment()],
-        'Yesterday': [moment().subtract(1, 'day').startOf('day'), moment().subtract(1, 'days').endOf('day')],
-        'Last Week': [moment().subtract(1, 'week'), moment()]
+        'Yesterday': [moment().subtract(1, 'day').startOf('day'), moment().startOf('day')],
+        'Last Week': [moment().subtract(1, 'week').startOf('day'), moment().startOf('day')]
       };
 
       return {
@@ -401,9 +453,8 @@ export default Component.extend({
       analysisRange,
       notifications,
       isPreviewMode,
-      alertId,
-      metricUrn,
-    } = this.getProperties('analysisRange', 'notifications', 'isPreviewMode', 'alertId', 'metricUrn');
+      alertId
+    } = this.getProperties('analysisRange', 'notifications', 'isPreviewMode', 'alertId');
 
     //detection alert fetch
     const start = analysisRange[0];
@@ -413,7 +464,10 @@ export default Component.extend({
     try {
       if(isPreviewMode){
         applicationAnomalies = yield getYamlPreviewAnomalies(alertYaml, start, end);
-        set(this, 'metricUrn', Object.keys(applicationAnomalies.diagnostics['0'])[0]);
+        const metricUrnList = Object.keys(applicationAnomalies.diagnostics['0']);
+        set(this, 'metricUrnList', metricUrnList);
+        set(this, 'selectedDimension', toMetricLabel(extractTail(decodeURIComponent(metricUrnList[0]))));
+        set(this, 'metricUrn', metricUrnList[0]);
         anomalies = applicationAnomalies.anomalies;
       } else {
         applicationAnomalies = yield getAnomaliesByAlertId(alertId, start, end);
@@ -452,8 +506,11 @@ export default Component.extend({
     this._super(...arguments);
     const isPreviewMode = get(this, 'isPreviewMode');
     if (!isPreviewMode) {
-      set(this, 'analysisRange', [moment().subtract(1, 'month').startOf('hour').valueOf(), moment().startOf('hour').valueOf()])
+      set(this, 'analysisRange', [moment().subtract(1, 'month').startOf('hour').valueOf(), moment().startOf('hour').valueOf()]);
+      set(this, 'duration', '1m');
       this._fetchAnomalies();
+    } else {
+      set(this, 'duration', '1w');
     }
   },
 
@@ -540,18 +597,18 @@ export default Component.extend({
     try {
       const content = get(this, 'alertYaml');
       this.get('_getAnomalyMapping').perform(content)
-      .then(results => {
-        this.setProperties({
-          anomalyMapping: results.anomalyMapping,
-          anomalies: results.anomalies,
-          isLoading: false
+        .then(results => {
+          this.setProperties({
+            anomalyMapping: results.anomalyMapping,
+            anomalies: results.anomalies,
+            isLoading: false
+          });
+          if (get(this, 'metricUrn')) {
+            this._fetchTimeseries();
+          } else {
+            throw new Error('Unable to get MetricUrn from response');
+          }
         });
-        if (get(this, 'metricUrn')) {
-          this._fetchTimeseries();
-        } else {
-          throw new Error('Unable to get MetricUrn from response');
-        }
-      });
     } catch (error) {
       set(this, 'isLoading', false);
       throw new Error(`Unable to retrieve anomaly data. ${error}`);
@@ -560,31 +617,96 @@ export default Component.extend({
 
   actions: {
     /**
+     * Handle dynamically saving anomaly feedback responses
+     * @method onChangeAnomalyResponse
+     * @param {Object} anomalyRecord - the anomaly being responded to
+     * @param {String} selectedResponse - user-selected anomaly feedback option
+     * @param {Object} inputObj - the selection object
+     */
+    onChangeAnomalyFeedback: async function(anomalyRecord, selectedResponse, inputObj) {
+      const labelMap = get(this, 'labelMap');
+      const loadedResponsesArr = [];
+      const newOptionsArr = [];
+      // Update select field
+      set(inputObj, 'selected', selectedResponse);
+      // Reset status icon
+      set(this, 'renderStatusIcon', false);
+      const responseObj = anomalyResponseObj.find(res => res.name === selectedResponse);
+      try {
+        // Save anomaly feedback
+        await updateAnomalyFeedback(anomalyRecord.anomalyId, responseObj.value);
+        // We make a call to ensure our new response got saved
+        const anomaly = await verifyAnomalyFeedback(anomalyRecord.anomalyId, responseObj.status);
+        const filterMap = getWithDefault(anomaly, 'searchFilters.statusFilterMap', null);
+        // This verifies that the status change got saved as key in the anomaly statusFilterMap property
+        const keyPresent = filterMap && Object.keys(filterMap).find(key => responseObj.status.includes(key));
+        if (keyPresent) {
+          this.set('labelResponse', {
+            anomalyId: anomalyRecord.id,
+            showResponseSaved: true,
+            showResponseFailed: false
+          });
+
+          // Collect all available new labels
+          loadedResponsesArr.push(responseObj.status, ...get(this, 'anomalyData').mapBy('anomalyFeedback'));
+          loadedResponsesArr.forEach((response) => {
+            if (labelMap[response]) { newOptionsArr.push(labelMap[response]); }
+          });
+          // Update resolutionOptions array - we may have a new option now
+          set(this, 'resolutionOptions', [ ...new Set([ 'All Resolutions', ...newOptionsArr ])]);
+        } else {
+          throw 'Response not saved';
+        }
+      } catch (err) {
+        this.set('labelResponse', {
+          anomalyId: anomalyRecord.id,
+          showResponseSaved: false,
+          showResponseFailed: true
+        });
+      }
+      // Force status icon to refresh
+      set(this, 'renderStatusIcon', true);
+    },
+
+    onSelectDimension(selected) {
+      const metricUrnList = get(this, 'metricUrnList');
+      const newMetricUrn = metricUrnList.find(urn => {
+        if (toMetricLabel(extractTail(decodeURIComponent(urn))) === selected) {
+          return urn;
+        }
+      });
+      this.setProperties({
+        metricUrn: newMetricUrn,
+        selectedDimension: toMetricLabel(extractTail(decodeURIComponent(newMetricUrn)))
+      });
+    },
+
+    /**
       * Action handler for page clicks
       * @param {Number|String} page
       */
-     onPaginationClick(page) {
-       let newPage = page;
-       let currentPage = this.get('currentPage');
+    onPaginationClick(page) {
+      let newPage = page;
+      let currentPage = this.get('currentPage');
 
-       switch (page) {
-         case 'previous':
-           if (currentPage > 1) {
-             newPage = --currentPage;
-           } else {
-             newPage = currentPage;
-           }
-           break;
-         case 'next':
-         if (currentPage < this.get('pagesNum')) {
-           newPage = ++currentPage;
-         } else {
-           newPage = currentPage;
-         }
-           break;
-       }
-       this.set('currentPage', newPage);
-     },
+      switch (page) {
+        case 'previous':
+          if (currentPage > 1) {
+            newPage = --currentPage;
+          } else {
+            newPage = currentPage;
+          }
+          break;
+        case 'next':
+          if (currentPage < this.get('pagesNum')) {
+            newPage = ++currentPage;
+          } else {
+            newPage = currentPage;
+          }
+          break;
+      }
+      this.set('currentPage', newPage);
+    },
 
     /**
      * Sets the new custom date range for anomaly coverage
@@ -654,6 +776,6 @@ export default Component.extend({
 
       //On sort, set table to first pagination page
       this.set('currentPage', 1);
-    },
+    }
   }
 });
