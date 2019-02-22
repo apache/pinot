@@ -668,6 +668,7 @@ public class MutableSegmentImpl implements MutableSegment {
     int i = 0;
     int[] dictIds = new int[_numKeyColumns]; // dimensions + time column.
 
+    // TODO: this for loop breaks for multi value columns. https://github.com/apache/incubator-pinot/issues/3867
     for (String column : _schema.getDimensionNames()) {
       dictIds[i++] = (Integer) dictIdMap.get(column);
     }
@@ -715,10 +716,18 @@ public class MutableSegmentImpl implements MutableSegment {
     }
 
     // All dimension columns should be dictionary encoded.
+    // All dimensions must be single value
     for (String dimension : schema.getDimensionNames()) {
       if (noDictionaryColumns.contains(dimension)) {
         _logger
             .warn("Metrics aggregation cannot be turned ON in presence of no-dictionary dimensions, eg: {}", dimension);
+        _aggregateMetrics = false;
+        break;
+      }
+      // https://github.com/apache/incubator-pinot/issues/3867
+      if (!schema.getDimensionSpec(dimension).isSingleValueField()) {
+        _logger
+            .warn("Metrics aggregation cannot be turned ON in presence of multi-value dimension columns, eg: {}", dimension);
         _aggregateMetrics = false;
         break;
       }
