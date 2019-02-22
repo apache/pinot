@@ -111,8 +111,7 @@ public class PinotURIUploadIntegrationTest extends BaseClusterIntegrationTestSet
     }
   }
 
-  protected void generateAndUploadRandomSegment(String segmentName, int rowCount)
-      throws Exception {
+  private File generateRandomSegment(String segmentName, int rowCount) throws Exception {
     ThreadLocalRandom random = ThreadLocalRandom.current();
     Schema schema = new Schema.Parser()
         .parse(new File(TestUtils.getFileFromResourceUrl(getClass().getClassLoader().getResource("dummy.avsc"))));
@@ -140,10 +139,8 @@ public class PinotURIUploadIntegrationTest extends BaseClusterIntegrationTestSet
     executor.shutdown();
     executor.awaitTermination(1L, TimeUnit.MINUTES);
 
-    uploadSegmentsDirectly(segmentTarDir);
-
     FileUtils.forceDelete(avroFile);
-    FileUtils.forceDelete(segmentTarDir);
+    return new File(_tarDir, segmentName);
   }
 
   @DataProvider(name = "configProvider")
@@ -157,8 +154,10 @@ public class PinotURIUploadIntegrationTest extends BaseClusterIntegrationTestSet
       throws Exception {
     final String segment6 = "segmentToBeRefreshed_6";
     final int nRows1 = 69;
-    generateAndUploadRandomSegment(segment6, nRows1);
+    File segmentTarDir = generateRandomSegment(segment6, nRows1);
+    uploadSegmentsDirectly(segmentTarDir);
     verifyNRows(0, nRows1);
+    FileUtils.forceDelete(segmentTarDir);
   }
 
   // Verify that the number of rows is either the initial value or the final value but not something else.
@@ -188,7 +187,8 @@ public class PinotURIUploadIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   @Test(dataProvider = "configProvider")
-  public void testSegmentValidator(String tableName, SegmentVersion version) {
+  public void testSegmentValidator(String tableName, SegmentVersion version)
+      throws Exception {
     completeTableConfiguration();
     String serverInstanceId = "Server_localhost_" + CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT;
 
@@ -197,8 +197,9 @@ public class PinotURIUploadIntegrationTest extends BaseClusterIntegrationTestSet
 
     final String segment6 = "segmentToBeRefreshed_6";
     final int nRows1 = 69;
+    File segmentTarDir = generateRandomSegment(segment6, nRows1);
     try {
-      generateAndUploadRandomSegment(segment6, nRows1);
+      uploadSegmentsDirectly(segmentTarDir);
       Assert.fail("Uploading segments should fail.");
     } catch (Exception e) {
       Assert.assertNotNull(e);
@@ -209,10 +210,12 @@ public class PinotURIUploadIntegrationTest extends BaseClusterIntegrationTestSet
     _helixAdmin.enableInstance(getHelixClusterName(), serverInstanceId, true);
 
     try {
-      generateAndUploadRandomSegment(segment6, nRows1);
+      uploadSegmentsDirectly(segmentTarDir);
     } catch (Exception e) {
       Assert.fail("Uploading segments should succeed.");
     }
+
+    FileUtils.forceDelete(segmentTarDir);
   }
 
   @AfterClass
@@ -231,7 +234,7 @@ public class PinotURIUploadIntegrationTest extends BaseClusterIntegrationTestSet
    *
    * @param segmentDir Segment directory
    */
-  protected void uploadSegmentsDirectly(@Nonnull File segmentDir)
+  private void uploadSegmentsDirectly(@Nonnull File segmentDir)
       throws Exception {
     String[] segmentNames = segmentDir.list();
     Assert.assertNotNull(segmentNames);

@@ -1467,6 +1467,7 @@ public class PinotHelixResourceManager {
 
   public void addNewSegment(@Nonnull SegmentMetadata segmentMetadata, @Nonnull String downloadUrl, String crypter,
       @Nonnull List<String> assignedInstances) {
+    Preconditions.checkNotNull(assignedInstances, "Assigned Instances should not be null!");
     String segmentName = segmentMetadata.getName();
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(segmentMetadata.getTableName());
 
