@@ -362,7 +362,7 @@ export default Component.extend({
     function () {
       // Don't show warning when granularity is 1 or 5 minutes, regardless of discrepancy
       const metricGranularity = get(this, 'metricGranularity');
-      if (metricGranularity === '5_MINUTES' || metricGranularity === '1_MINUTES') {
+      if (metricGranularity !== '1_DAYS') {
         return false;
       }
       if(!get(this, 'isRangeChanged')) {
