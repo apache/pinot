@@ -171,8 +171,9 @@ public abstract class QueryScheduler {
     TimerContext timerContext = queryRequest.getTimerContext();
     int numSegmentsQueried = queryRequest.getSegmentsToQuery().size();
     LOGGER.info(
-        "Processed requestId={},table={},Segments(Queried/processed/matched)={}/{}/{},totalExecMs={},totalTimeMs={},broker={},numDocsScanned={},scanInFilter={},scanPostFilter={},sched={}",
+        "Processed requestId={},table={},segments(queried/processed/matched)={}/{}/{},schedulerWaitMs={},totalExecMs={},totalTimeMs={},broker={},numDocsScanned={},scanInFilter={},scanPostFilter={},sched={}",
         requestId, tableNameWithType, numSegmentsQueried, numSegmentsProcessed, numSegmentsMatched,
+        timerContext.getPhaseDurationMs(ServerQueryPhase.SCHEDULER_WAIT),
         timerContext.getPhaseDurationMs(ServerQueryPhase.QUERY_PROCESSING),
         timerContext.getPhaseDurationMs(ServerQueryPhase.TOTAL_QUERY_TIME), queryRequest.getBrokerId(), numDocsScanned,
         numEntriesScannedInFilter, numEntriesScannedPostFilter, name());
