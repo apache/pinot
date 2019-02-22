@@ -22,18 +22,17 @@ package org.apache.pinot.thirdeye.detection;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
+import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.apache.pinot.thirdeye.anomaly.task.TaskConstants;
-import org.apache.pinot.thirdeye.anomaly.task.TaskInfo;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.TaskManager;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.TaskDTO;
 import org.apache.pinot.thirdeye.datalayer.util.Predicate;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
-import java.util.List;
-import java.util.Optional;
-import java.util.concurrent.TimeUnit;
 import org.quartz.Job;
 import org.quartz.JobExecutionContext;
 import org.quartz.JobExecutionException;
@@ -60,7 +59,6 @@ public class DetectionPipelineJob implements Job {
     String jobName = String.format("%s_%d", TaskConstants.TaskType.DETECTION, id);
     List<TaskDTO> scheduledTasks = taskDAO.findByPredicate(Predicate.AND(
         Predicate.EQ("name", jobName),
-        Predicate.EQ("startTime", taskInfo.getStart()),
         Predicate.OR(
             Predicate.EQ("status", TaskConstants.TaskStatus.RUNNING.toString()),
             Predicate.EQ("status", TaskConstants.TaskStatus.WAITING.toString())
