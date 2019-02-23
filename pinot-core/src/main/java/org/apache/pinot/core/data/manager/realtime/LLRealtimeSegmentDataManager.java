@@ -21,25 +21,21 @@ package org.apache.pinot.core.data.manager.realtime;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.Uninterruptibles;
+import com.linkedin.pinot.opal.common.RpcQueue.ProduceTask;
+import com.linkedin.pinot.opal.common.messages.KeyCoordinatorMessageContext;
+import com.linkedin.pinot.opal.common.messages.KeyCoordinatorQueueMsg;
+import com.linkedin.pinot.opal.distributed.keyCoordinator.server.KeyCoordinatorProvider;
+import com.linkedin.pinot.opal.distributed.keyCoordinator.server.KeyCoordinatorQueueProducer;
 import com.yammer.metrics.core.Meter;
-import java.io.File;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.Semaphore;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.config.IndexingConfig;
 import org.apache.pinot.common.config.SegmentPartitionConfig;
 import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.common.data.DimensionFieldSpec;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.data.StarTreeIndexSpec;
+import org.apache.pinot.common.data.TimeFieldSpec;
 import org.apache.pinot.common.metadata.RowMetadata;
 import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
 import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
@@ -77,6 +73,19 @@ import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicLong;
 
 
 /**
@@ -254,6 +263,10 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private String _stopReason = null;
   private final Semaphore _segBuildSemaphore;
   private final boolean _isOffHeap;
+
+  // upsert related info
+  private boolean _isCurrentSegmentForUpsert;
+  private KeyCoordinatorQueueProducer _keyCoordinatorQueueProducer = null;
 
   // TODO each time this method is called, we print reason for stop. Good to print only once.
   private boolean endCriteriaReached() {
@@ -451,16 +464,23 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           GenericRow transformedRow = _recordTransformer.transform(decodedRow);
 
           if (transformedRow != null) {
+            if (_isCurrentSegmentForUpsert) {
+              transformedRow.putField(_schema.getOffsetKey(), _currentOffset);
+            }
+
             realtimeRowsConsumedMeter = _serverMetrics
                 .addMeteredTableValue(_metricKeyName, ServerMeter.REALTIME_ROWS_CONSUMED, 1, realtimeRowsConsumedMeter);
             indexedMessageCount++;
+
+            canTakeMore = _realtimeSegment.index(transformedRow, msgMetadata);
+            if (_isCurrentSegmentForUpsert) {
+              emitEventToKeyCoordinator(transformedRow, _currentOffset);
+            }
           } else {
             realtimeRowsDroppedMeter = _serverMetrics
                 .addMeteredTableValue(_metricKeyName, ServerMeter.INVALID_REALTIME_ROWS_DROPPED, 1,
                     realtimeRowsDroppedMeter);
           }
-
-          canTakeMore = _realtimeSegment.index(transformedRow, msgMetadata);
         } catch (Exception e) {
           segmentLogger.error("Caught exception while transforming the record: {}", decodedRow, e);
           _numRowsErrored++;
@@ -484,6 +504,35 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       // If there were no messages to be fetched from stream, wait for a little bit as to avoid hammering the stream
       Uninterruptibles.sleepUninterruptibly(idlePipeSleepTimeMillis, TimeUnit.MILLISECONDS);
     }
+  }
+
+  private void emitEventToKeyCoordinator(GenericRow row, long offset) {
+    if (_keyCoordinatorQueueProducer != null) {
+      final byte[] primaryKeyBytes = getPrimaryKeyBytesFromRow(row);
+      final long timestampMillis = getTimestampFromRow(row);
+      ProduceTask<byte[], KeyCoordinatorQueueMsg> task = new ProduceTask<>(primaryKeyBytes, new KeyCoordinatorQueueMsg(_tableNameWithType,
+          primaryKeyBytes, new KeyCoordinatorMessageContext(_segmentNameStr, timestampMillis, offset)));
+      CountDownLatch countDownLatch = new CountDownLatch(1);
+      task.setCountDownLatch(countDownLatch);
+      _keyCoordinatorQueueProducer.produce(task);
+      try {
+        countDownLatch.wait();
+      } catch (InterruptedException e) {
+        throw new RuntimeException("failed to produce the task");
+      }
+    } else {
+      throw new RuntimeException("kafka producer is not initialized while ingesting for upsert table");
+    }
+  }
+
+  private byte[] getPrimaryKeyBytesFromRow(GenericRow row) {
+    DimensionFieldSpec primaryKeyDimension = _schema.getPrimaryKeyFieldSpec();
+    return _schema.getByteArrayFromField(row.getValue(primaryKeyDimension.getName()), primaryKeyDimension);
+  }
+
+  private long getTimestampFromRow(GenericRow row) {
+    TimeFieldSpec spec = _schema.getTimeFieldSpec();
+    return spec.getIncomingGranularitySpec().toMillis(row.getValue(spec.getIncomingTimeColumnName()));
   }
 
   public class PartitionConsumer implements Runnable {
@@ -1038,6 +1087,14 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     _instanceId = _realtimeTableDataManager.getServerInstance();
     _leaseExtender = SegmentBuildTimeLeaseExtender.getLeaseExtender(_instanceId);
     _protocolHandler = new ServerSegmentCompletionProtocolHandler(_serverMetrics);
+
+    // verify upsert config
+    _isCurrentSegmentForUpsert = _schema.isTableForUpsert();
+    if (_isCurrentSegmentForUpsert) {
+      _keyCoordinatorQueueProducer = KeyCoordinatorProvider.getInstance().getProducer();
+      Preconditions.checkState(_schema.getPrimaryKeyFieldSpec() != null, "primary key not found");
+      Preconditions.checkState(_schema.getOffsetKeyFieldSpec() != null, "offset key not found");
+    }
 
     // TODO Validate configs
     IndexingConfig indexingConfig = _tableConfig.getIndexingConfig();

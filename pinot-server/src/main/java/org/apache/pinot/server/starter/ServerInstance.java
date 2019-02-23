@@ -20,6 +20,8 @@ package org.apache.pinot.server.starter;
 
 import java.util.concurrent.atomic.LongAccumulator;
 import javax.annotation.Nonnull;
+
+import com.linkedin.pinot.opal.distributed.keyCoordinator.server.KeyCoordinatorProvider;
 import org.apache.commons.configuration.Configuration;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -51,6 +53,7 @@ public class ServerInstance {
   private ScheduledRequestHandler _requestHandler;
   private NettyServer _nettyServer;
   private LongAccumulator _latestQueryTime;
+  private KeyCoordinatorProvider _keyCoordinatorProvider;
 
   private boolean _started = false;
 
@@ -72,6 +75,7 @@ public class ServerInstance {
         return _requestHandler;
       }
     });
+    _keyCoordinatorProvider = serverBuilder.buildKeyCoordinatorProvider();
 
     LOGGER.info("Finish initializing server instance");
   }
@@ -109,6 +113,8 @@ public class ServerInstance {
     _queryScheduler.stop();
     LOGGER.info("Shutting down query executor");
     _queryExecutor.shutDown();
+    LOGGER.info("shutting down key coordinator");
+    _keyCoordinatorProvider.close();
     LOGGER.info("Shutting down instance data manager");
     _instanceDataManager.shutDown();
 
