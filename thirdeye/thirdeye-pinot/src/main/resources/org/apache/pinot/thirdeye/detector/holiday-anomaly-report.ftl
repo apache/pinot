@@ -70,12 +70,15 @@
                   <#list functionAnomalyDetails[function] as anomaly>
                     <#if anomaly.metric==metric>
                       <#assign newTable=true>
+                      <#assign description=anomaly.funcDescription>
                     </#if>
                   </#list>
                   <#if newTable>
                   <p>
                     <span style="color: #606060;">Alert</span>
-                    <a href="${dashboardHost}/app/#/manage/alert/${functionToId[function]?string.computer}" target="blank" style="text-decoration: none; color: #0B5EA1; font-weight: bold;">${function}</a>
+                    <span style="color: #1D1D1D; text-decoration: none;  font-weight: bold;">${function}</span>
+                    <a href="${dashboardHost}/app/#/manage/alert/${functionToId[function]?string.computer}" target="blank" style="text-decoration: none; color: #0B5EA1; font-weight: bold;">(View/Edit Alert)</a>
+                    <span style="color: #1D1D1D; text-decoration: none;">${description}</span>
                   </p>
                   </#if>
                   <table border="0" width="100%" align="center" style="width:100%; padding:0; margin:0; border-collapse: collapse;text-align:left;">
