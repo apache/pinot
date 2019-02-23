@@ -333,6 +333,8 @@ public class MutableSegmentImpl implements MutableSegment {
           (FixedByteSingleColumnSingleValueReaderWriter) _indexReaderWriterMap.get(column);
       Preconditions.checkState(_dictionaryMap.get(column) == null, "Updating metrics not supported with dictionary.");
       FieldSpec.DataType dataType = metricSpec.getDataType();
+
+      // FIXME: this breaks for multi value metrics. https://github.com/apache/incubator-pinot/issues/3867
       switch (dataType) {
         case INT:
           indexReaderWriter.setInt(docId, (Integer) value + indexReaderWriter.getInt(docId));
@@ -668,6 +670,7 @@ public class MutableSegmentImpl implements MutableSegment {
     int i = 0;
     int[] dictIds = new int[_numKeyColumns]; // dimensions + time column.
 
+    // FIXME: this for loop breaks for multi value dimensions. https://github.com/apache/incubator-pinot/issues/3867
     for (String column : _schema.getDimensionNames()) {
       dictIds[i++] = (Integer) dictIdMap.get(column);
     }
@@ -705,6 +708,7 @@ public class MutableSegmentImpl implements MutableSegment {
     }
 
     // All metric columns should have no-dictionary index.
+    // All metric columns must be single value
     for (String metric : schema.getMetricNames()) {
       if (!noDictionaryColumns.contains(metric)) {
         _logger
@@ -712,13 +716,28 @@ public class MutableSegmentImpl implements MutableSegment {
         _aggregateMetrics = false;
         break;
       }
+      // https://github.com/apache/incubator-pinot/issues/3867
+      if (!schema.getMetricSpec(metric).isSingleValueField()) {
+        _logger
+            .warn("Metrics aggregation cannot be turned ON in presence of multi-value metric columns, eg: {}", metric);
+        _aggregateMetrics = false;
+        break;
+      }
     }
 
     // All dimension columns should be dictionary encoded.
+    // All dimension columns must be single value
     for (String dimension : schema.getDimensionNames()) {
       if (noDictionaryColumns.contains(dimension)) {
         _logger
             .warn("Metrics aggregation cannot be turned ON in presence of no-dictionary dimensions, eg: {}", dimension);
+        _aggregateMetrics = false;
+        break;
+      }
+      // https://github.com/apache/incubator-pinot/issues/3867
+      if (!schema.getDimensionSpec(dimension).isSingleValueField()) {
+        _logger
+            .warn("Metrics aggregation cannot be turned ON in presence of multi-value dimension columns, eg: {}", dimension);
         _aggregateMetrics = false;
         break;
       }
