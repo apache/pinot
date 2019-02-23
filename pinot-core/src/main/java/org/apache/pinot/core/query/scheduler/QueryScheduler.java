@@ -150,7 +150,7 @@ public abstract class QueryScheduler {
     long numEntriesScannedInFilter = Long.parseLong(
         dataTableMetadata.getOrDefault(DataTable.NUM_ENTRIES_SCANNED_IN_FILTER_METADATA_KEY, INVALID_NUM_SCANNED));
     long numEntriesScannedPostFilter =
-        Long.parseLong(dataTableMetadata.getOrDefault(DataTable.NUM_SEGMENTS_QUERIED, INVALID_NUM_SCANNED));
+        Long.parseLong(dataTableMetadata.getOrDefault(DataTable.NUM_ENTRIES_SCANNED_POST_FILTER_METADATA_KEY, INVALID_NUM_SCANNED));
     long numSegmentsProcessed =
         Long.parseLong(dataTableMetadata.getOrDefault(DataTable.NUM_SEGMENTS_PROCESSED, INVALID_SEGMENTS_COUNT));
     long numSegmentsMatched =
