@@ -22,7 +22,6 @@ import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.parquet.avro.AvroParquetReader;
 import org.apache.parquet.avro.AvroParquetWriter;
@@ -33,68 +32,33 @@ import org.apache.parquet.hadoop.ParquetWriter;
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
 
 import java.io.IOException;
-import java.util.Iterator;
 import java.util.List;
-import java.util.NoSuchElementException;
 
 
 public class ParquetUtils {
   /**
-   * Get the parquet record iterator for the given file
+   * Get a ParquetReader with the given file.
+   * @param fileName the parquet file to read
+   * @return a ParquetReader
+   * @throws IOException
    */
-  public static Iterator<GenericRecord> getParquetReader(String fileName)
+  public static ParquetReader<GenericRecord> getParquetReader(String fileName)
       throws IOException {
     Path dataFsPath = new Path(fileName);
-    Configuration conf = new Configuration();
-    ParquetReader<GenericRecord> parquet =
-        AvroParquetReader.<GenericRecord>builder(dataFsPath).disableCompatibility().withDataModel(GenericData.get())
-            .withConf(conf).build();
-
-    return new Iterator<GenericRecord>() {
-      private boolean hasNext = false;
-      private GenericRecord next = advance();
-
-      @Override
-      public boolean hasNext() {
-        return hasNext;
-      }
-
-      @Override
-      public GenericRecord next() {
-        if (!hasNext) {
-          throw new NoSuchElementException();
-        }
-
-        GenericRecord toReturn = next;
-        next = advance();
-        return toReturn;
-      }
-
-      private GenericRecord advance() {
-        try {
-          GenericRecord next = parquet.read();
-          hasNext = (next != null);
-
-          if (hasNext == false) {
-            parquet.close();
-          }
-
-          return next;
-        } catch (IOException e) {
-          throw new RuntimeException("Failed while reading parquet file: " + fileName, e);
-        }
-      }
-    };
+    return AvroParquetReader.<GenericRecord>builder(dataFsPath).disableCompatibility().withDataModel(GenericData.get())
+        .withConf(getConfiguration()).build();
   }
 
   /**
-   * Get parquet schema for the given file
+   * Read the parquet file schema
+   * @param fileName
+   * @return the parquet file schema
+   * @throws IOException
    */
   public static Schema getParquetSchema(String fileName)
       throws IOException {
     Path dataFsPath = new Path(fileName);
-    FileSystem fs = dataFsPath.getFileSystem(new Configuration());
-    ParquetMetadata footer = ParquetFileReader.readFooter(fs.getConf(), dataFsPath);
+    ParquetMetadata footer = ParquetFileReader.readFooter(getConfiguration(), dataFsPath);
 
     String schemaString = footer.getFileMetaData().getKeyValueMetaData().get("parquet.avro.schema");
     if (schemaString == null) {
@@ -115,7 +79,8 @@ public class ParquetUtils {
   public static void writeParquetRecord(String fileName, Schema schema, List<GenericRecord> records)
       throws IOException {
     ParquetWriter<GenericRecord> writer =
-        AvroParquetWriter.<GenericRecord>builder(new Path(fileName)).withSchema(schema).build();
+        AvroParquetWriter.<GenericRecord>builder(new Path(fileName)).withSchema(schema).withConf(getConfiguration())
+            .build();
 
     try {
       for (GenericRecord r : records) {
@@ -124,5 +89,12 @@ public class ParquetUtils {
     } finally {
       writer.close();
     }
+  }
+
+  private static Configuration getConfiguration() {
+    Configuration conf = new Configuration();
+    conf.set("fs.defaultFS", "file:///");
+    conf.set("fs.file.impl", org.apache.hadoop.fs.LocalFileSystem.class.getName());
+    return conf;
   }
 }

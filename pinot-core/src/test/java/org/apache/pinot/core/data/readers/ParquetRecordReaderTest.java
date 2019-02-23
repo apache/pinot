@@ -34,7 +34,7 @@ import org.testng.annotations.Test;
 public class ParquetRecordReaderTest extends RecordReaderTest {
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "ParquetRecordReaderTest");
   private static final File DATA_FILE = new File(TEMP_DIR, "data.parquet");
-  private static final String DATA_FILE_PATH = "file://" + DATA_FILE.getAbsolutePath();
+  private static final String DATA_FILE_PATH = DATA_FILE.getAbsolutePath();
 
   @BeforeClass
   public void setUp()
