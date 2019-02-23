@@ -31,6 +31,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.response.ProcessingException;
@@ -97,6 +98,7 @@ public class CombineGroupByOperator extends BaseOperator<IntermediateResultsBloc
     ConcurrentHashMap<String, Object[]> resultsMap = new ConcurrentHashMap<>();
     AtomicInteger numGroups = new AtomicInteger();
     ConcurrentLinkedQueue<ProcessingException> mergedProcessingExceptions = new ConcurrentLinkedQueue<>();
+    AtomicLong numGroupsIgnored = new AtomicLong();
 
     AggregationFunctionContext[] aggregationFunctionContexts =
         AggregationFunctionUtils.getAggregationFunctionContexts(_brokerRequest.getAggregationsInfo(), null);
@@ -140,6 +142,8 @@ public class CombineGroupByOperator extends BaseOperator<IntermediateResultsBloc
                       for (int i = 0; i < numAggregationFunctions; i++) {
                         value[i] = aggregationGroupByResult.getResultForKey(groupKey, i);
                       }
+                    } else {
+                      numGroupsIgnored.getAndIncrement();
                     }
                   } else {
                     for (int i = 0; i < numAggregationFunctions; i++) {
@@ -192,12 +196,20 @@ public class CombineGroupByOperator extends BaseOperator<IntermediateResultsBloc
           executionStatistics.merge(executionStatisticsToMerge);
         }
       }
+      int totalGroups = numGroups.get();
+      int trimmedGroups = aggregationGroupByTrimmingService.getNumGroupsTrimmed();
+
       mergedBlock.setNumDocsScanned(executionStatistics.getNumDocsScanned());
       mergedBlock.setNumEntriesScannedInFilter(executionStatistics.getNumEntriesScannedInFilter());
       mergedBlock.setNumEntriesScannedPostFilter(executionStatistics.getNumEntriesScannedPostFilter());
       mergedBlock.setNumSegmentsProcessed(executionStatistics.getNumSegmentsProcessed());
       mergedBlock.setNumSegmentsMatched(executionStatistics.getNumSegmentsMatched());
       mergedBlock.setNumTotalRawDocs(executionStatistics.getNumTotalRawDocs());
+      mergedBlock.setNumGroupsIgnoredPreCombine(executionStatistics.getNumGroupsIgnoredPreCombine());
+      mergedBlock.setNumGroupsIgnoredInCombine(numGroupsIgnored.get());
+      mergedBlock.setNumGroupsAggrInCombine(totalGroups);
+      mergedBlock.setNumGroupsIgnoredPostCombine(trimmedGroups);
+
       // NOTE: numGroups might go slightly over numGroupsLimit because the comparison is not atomic
       if (numGroups.get() >= _numGroupsLimit) {
         mergedBlock.setNumGroupsLimitReached(true);

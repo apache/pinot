@@ -168,15 +168,44 @@ public abstract class QueryScheduler {
           numEntriesScannedPostFilter);
     }
 
+    // emit group-by metrics
+    long numGroupsIgnoredPreCombine =
+        Long.parseLong(dataTableMetadata.getOrDefault(DataTable.NUM_GROUPS_IGNORED_PRE_COMBINE, "0"));
+    if (numGroupsIgnoredPreCombine > 0) {
+      serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_GROUPS_IGNORED_PRE_COMBINE,
+          numGroupsIgnoredPreCombine);
+    }
+
+    long numGroupsIgnoredInCombine =
+        Long.parseLong(dataTableMetadata.getOrDefault(DataTable.NUM_GROUPS_IGNORED_IN_COMBINE, "0"));
+    if (numGroupsIgnoredInCombine > 0) {
+      serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_GROUPS_IGNORED_IN_COMBINE,
+          numGroupsIgnoredInCombine);
+    }
+    long numGroupsAggrInCombine =
+        Long.parseLong(dataTableMetadata.getOrDefault(DataTable.NUM_GROUPS_AGGR_IN_COMBINE, "0"));
+    if (numGroupsAggrInCombine > 0) {
+      serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_GROUPS_AGGR_IN_COMBINE,
+          numGroupsAggrInCombine);
+    }
+    long numGroupsIgnoredPostCombine =
+        Long.parseLong(dataTableMetadata.getOrDefault(DataTable.NUM_GROUPS_IGNORED_POST_COMBINE, "0"));
+    if (numGroupsIgnoredPostCombine > 0) {
+      serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_GROUPS_IGNORED_POST_COMBINE,
+          numGroupsIgnoredPostCombine);
+    }
+
     TimerContext timerContext = queryRequest.getTimerContext();
     int numSegmentsQueried = queryRequest.getSegmentsToQuery().size();
     LOGGER.info(
-        "Processed requestId={},table={},segments(queried/processed/matched)={}/{}/{},schedulerWaitMs={},totalExecMs={},totalTimeMs={},broker={},numDocsScanned={},scanInFilter={},scanPostFilter={},sched={}",
+        "Processed requestId={},table={},segments(queried/processed/matched)={}/{}/{},schedulerWaitMs={},totalExecMs={},totalTimeMs={},broker={},numDocsScanned={},scanInFilter={},scanPostFilter={},"
+            + "numGroupsIgnoredPreCombine={},numGroupsIgnoredInCombine={},numGroupsAggrInCombine={},numGroupsIgnoredPostCombine={},sched={}",
         requestId, tableNameWithType, numSegmentsQueried, numSegmentsProcessed, numSegmentsMatched,
         timerContext.getPhaseDurationMs(ServerQueryPhase.SCHEDULER_WAIT),
         timerContext.getPhaseDurationMs(ServerQueryPhase.QUERY_PROCESSING),
         timerContext.getPhaseDurationMs(ServerQueryPhase.TOTAL_QUERY_TIME), queryRequest.getBrokerId(), numDocsScanned,
-        numEntriesScannedInFilter, numEntriesScannedPostFilter, name());
+        numEntriesScannedInFilter, numEntriesScannedPostFilter, numGroupsIgnoredPreCombine,
+        numGroupsIgnoredInCombine, numGroupsAggrInCombine, numGroupsIgnoredPostCombine, name());
 
     serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_SEGMENTS_QUERIED, numSegmentsQueried);
     serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_SEGMENTS_PROCESSED, numSegmentsProcessed);

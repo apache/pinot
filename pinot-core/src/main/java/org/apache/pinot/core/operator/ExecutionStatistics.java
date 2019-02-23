@@ -28,6 +28,11 @@ public class ExecutionStatistics {
   private long _numTotalRawDocs;
   private long _numSegmentsProcessed;
   private long _numSegmentsMatched;
+  private long _numGroupsIgnoredPreCombine;
+  private long _numGroupsIgnoredInCombine;
+  // number of groups aggregated in combine phase
+  private int _numGroupsAggrInCombine;
+  private int _numGroupsIgnoredPostCombine;
 
   public ExecutionStatistics() {
   }
@@ -66,6 +71,14 @@ public class ExecutionStatistics {
     return _numSegmentsMatched;
   }
 
+  public void setNumGroupsIgnoredPreCombine(long ignored) {
+   _numGroupsIgnoredPreCombine = ignored;
+  }
+
+  public long getNumGroupsIgnoredPreCombine() {
+    return _numGroupsIgnoredPreCombine;
+  }
+
   /**
    * Merge another execution statistics into the current one.
    *
@@ -78,6 +91,7 @@ public class ExecutionStatistics {
     _numTotalRawDocs += executionStatisticsToMerge._numTotalRawDocs;
     _numSegmentsProcessed += executionStatisticsToMerge._numSegmentsProcessed;
     _numSegmentsMatched += executionStatisticsToMerge._numSegmentsMatched;
+    _numGroupsIgnoredPreCombine += executionStatisticsToMerge._numGroupsIgnoredPreCombine;
   }
 
   @Override
@@ -85,6 +99,7 @@ public class ExecutionStatistics {
     return "Execution Statistics:" + "\n  numDocsScanned: " + _numDocsScanned + "\n  numEntriesScannedInFilter: "
         + _numEntriesScannedInFilter + "\n  numEntriesScannedPostFilter: " + _numEntriesScannedPostFilter
         + "\n  numTotalRawDocs: " + _numTotalRawDocs + "\n  numSegmentsProcessed: " + _numSegmentsProcessed
-        + "\n  numSegmentsMatched: " + _numSegmentsMatched;
+        + "\n  numSegmentsMatched: " + _numSegmentsMatched
+        + "\n  numGroupsIgnoredPreCombine: " + _numGroupsIgnoredPreCombine;
   }
 }

@@ -59,6 +59,10 @@ public class IntermediateResultsBlock implements Block {
   private long _numSegmentsProcessed;
   private long _numSegmentsMatched;
   private boolean _numGroupsLimitReached;
+  private long _numGroupsIgnoredInCombine;
+  private long _numGroupsIgnoredPreCombine;
+  private int _numGroupsAggrInCombine;
+  private int _numGroupsIgnoredPostCombine;
 
   /**
    * Constructor for selection result.
@@ -198,9 +202,26 @@ public class IntermediateResultsBlock implements Block {
     _numTotalRawDocs = numTotalRawDocs;
   }
 
+  public void setNumGroupsIgnoredInCombine(long ignored) {
+    _numGroupsIgnoredInCombine = ignored;
+  }
+
+  public void setNumGroupsIgnoredPreCombine(long ignored) {
+    _numGroupsIgnoredPreCombine = ignored;
+  }
+
+  public void setNumGroupsAggrInCombine(int aggr) {
+    _numGroupsAggrInCombine = aggr;
+  }
+
+  public void setNumGroupsIgnoredPostCombine(int ignored) {
+    _numGroupsIgnoredPostCombine = _numGroupsIgnoredPostCombine;
+  }
+
   public void setNumGroupsLimitReached(boolean numGroupsLimitReached) {
     _numGroupsLimitReached = numGroupsLimitReached;
   }
+
 
   @Nonnull
   public DataTable getDataTable()
@@ -296,11 +317,10 @@ public class IntermediateResultsBlock implements Block {
   }
 
   private DataTable attachMetadataToDataTable(DataTable dataTable) {
+
     dataTable.getMetadata().put(DataTable.NUM_DOCS_SCANNED_METADATA_KEY, String.valueOf(_numDocsScanned));
-    dataTable.getMetadata()
-        .put(DataTable.NUM_ENTRIES_SCANNED_IN_FILTER_METADATA_KEY, String.valueOf(_numEntriesScannedInFilter));
-    dataTable.getMetadata()
-        .put(DataTable.NUM_ENTRIES_SCANNED_POST_FILTER_METADATA_KEY, String.valueOf(_numEntriesScannedPostFilter));
+    dataTable.getMetadata().put(DataTable.NUM_ENTRIES_SCANNED_IN_FILTER_METADATA_KEY, String.valueOf(_numEntriesScannedInFilter));
+    dataTable.getMetadata().put(DataTable.NUM_ENTRIES_SCANNED_POST_FILTER_METADATA_KEY, String.valueOf(_numEntriesScannedPostFilter));
     dataTable.getMetadata().put(DataTable.NUM_SEGMENTS_PROCESSED, String.valueOf(_numSegmentsProcessed));
     dataTable.getMetadata().put(DataTable.NUM_SEGMENTS_MATCHED, String.valueOf(_numSegmentsMatched));
 
@@ -308,6 +328,10 @@ public class IntermediateResultsBlock implements Block {
     if (_numGroupsLimitReached) {
       dataTable.getMetadata().put(DataTable.NUM_GROUPS_LIMIT_REACHED_KEY, "true");
     }
+    dataTable.getMetadata().put(DataTable.NUM_GROUPS_IGNORED_PRE_COMBINE, String.valueOf(_numGroupsIgnoredPreCombine));
+    dataTable.getMetadata().put(DataTable.NUM_GROUPS_IGNORED_IN_COMBINE, String.valueOf(_numGroupsIgnoredInCombine));
+    dataTable.getMetadata().put(DataTable.NUM_GROUPS_AGGR_IN_COMBINE, String.valueOf(_numGroupsAggrInCombine));
+    dataTable.getMetadata().put(DataTable.NUM_GROUPS_IGNORED_POST_COMBINE, String.valueOf(_numGroupsIgnoredPostCombine));
     if (_processingExceptions != null && _processingExceptions.size() > 0) {
       for (ProcessingException exception : _processingExceptions) {
         dataTable.addException(exception);

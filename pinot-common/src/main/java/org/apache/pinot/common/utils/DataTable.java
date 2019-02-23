@@ -37,6 +37,10 @@ public interface DataTable {
   String NUM_SEGMENTS_MATCHED = "numSegmentsMatched";
   String TOTAL_DOCS_METADATA_KEY = "totalDocs";
   String NUM_GROUPS_LIMIT_REACHED_KEY = "numGroupsLimitReached";
+  String NUM_GROUPS_IGNORED_PRE_COMBINE = "numGroupsIgnoredPreCombine";
+  String NUM_GROUPS_IGNORED_IN_COMBINE = "numGroupsIgnoredInCombine";
+  String NUM_GROUPS_AGGR_IN_COMBINE = "numGroupsAggrInCombine";
+  String NUM_GROUPS_IGNORED_POST_COMBINE = "numGroupsIgnoredPostCombine";
   String TIME_USED_MS_METADATA_KEY = "timeUsedMs";
   String TRACE_INFO_METADATA_KEY = "traceInfo";
   String REQUEST_ID_METADATA_KEY = "requestId";

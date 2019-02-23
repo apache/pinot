@@ -59,7 +59,11 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   NUM_SEGMENTS_MATCHED("numSegmentsMatched", false),
   NUM_MISSING_SEGMENTS("segments", false),
   RELOAD_FAILURES("segments", false),
-  REFRESH_FAILURES("segments", false);
+  REFRESH_FAILURES("segments", false),
+  NUM_GROUPS_IGNORED_PRE_COMBINE("numGroupsIgnoredPreCombine", false),
+  NUM_GROUPS_IGNORED_IN_COMBINE("numGroupsIgnoredInCombine", false),
+  NUM_GROUPS_AGGR_IN_COMBINE("numGroupsAggrInCombine", false),
+  NUM_GROUPS_IGNORED_POST_COMBINE("numGroupsIgnoredPostCombine", false);
 
   private final String meterName;
   private final String unit;

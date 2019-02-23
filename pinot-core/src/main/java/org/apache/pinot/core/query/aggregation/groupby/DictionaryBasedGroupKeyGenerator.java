@@ -162,6 +162,11 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
   }
 
   @Override
+  public long getNumIgnoredGroups() {
+    return _rawKeyHolder.getNumIgnoredGroups();
+  }
+
+  @Override
   public Iterator<GroupKey> getUniqueGroupKeys() {
     return _rawKeyHolder.iterator();
   }
@@ -190,6 +195,11 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
      * @return Upper bound of group id inside the holder
      */
     int getGroupIdUpperBound();
+
+    /**
+     * Get the number of groups ignored as the max-group-by limit was reached.
+     */
+    long getNumIgnoredGroups();
   }
 
   private class ArrayBasedHolder implements RawKeyHolder {
@@ -222,6 +232,11 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     @Override
     public int getGroupIdUpperBound() {
       return _globalGroupIdUpperBound;
+    }
+
+    @Override
+    public long getNumIgnoredGroups() {
+      return 0;
     }
 
     @Nonnull
@@ -262,6 +277,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     private final Int2IntOpenHashMap _rawKeyToGroupIdMap = new Int2IntOpenHashMap();
 
     private int _numGroups = 0;
+    private long _numIgnoredGroups = 0;
 
     public IntMapBasedHolder() {
       _rawKeyToGroupIdMap.defaultReturnValue(INVALID_ID);
@@ -296,6 +312,8 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
         if (_numGroups < _globalGroupIdUpperBound) {
           groupId = _numGroups;
           _rawKeyToGroupIdMap.put(rawKey, _numGroups++);
+        } else {
+          _numIgnoredGroups++;
         }
       }
       return groupId;
@@ -304,6 +322,11 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     @Override
     public int getGroupIdUpperBound() {
       return _numGroups;
+    }
+
+    @Override
+    public long getNumIgnoredGroups() {
+      return _numIgnoredGroups;
     }
 
     @Nonnull
@@ -440,6 +463,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     private final Long2IntOpenHashMap _rawKeyToGroupIdMap = new Long2IntOpenHashMap();
 
     private int _numGroups = 0;
+    private long _numIgnoredGroups = 0;
 
     public LongMapBasedHolder() {
       _rawKeyToGroupIdMap.defaultReturnValue(INVALID_ID);
@@ -475,6 +499,8 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
         if (_numGroups < _globalGroupIdUpperBound) {
           groupId = _numGroups;
           _rawKeyToGroupIdMap.put(rawKey, _numGroups++);
+        } else {
+          _numIgnoredGroups++;
         }
       }
       return groupId;
@@ -483,6 +509,11 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     @Override
     public int getGroupIdUpperBound() {
       return _numGroups;
+    }
+
+    @Override
+    public long getNumIgnoredGroups() {
+      return _numIgnoredGroups;
     }
 
     @Nonnull
@@ -610,6 +641,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     private final Object2IntOpenHashMap<IntArray> _rawKeyToGroupIdMap = new Object2IntOpenHashMap<>();
 
     private int _numGroups = 0;
+    private long _numIgnoredGroups = 0;
 
     public ArrayMapBasedHolder() {
       _rawKeyToGroupIdMap.defaultReturnValue(INVALID_ID);
@@ -645,6 +677,8 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
         if (_numGroups < _globalGroupIdUpperBound) {
           groupId = _numGroups;
           _rawKeyToGroupIdMap.put(rawKey, _numGroups++);
+        } else {
+          _numIgnoredGroups++;
         }
       }
       return groupId;
@@ -653,6 +687,11 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     @Override
     public int getGroupIdUpperBound() {
       return _numGroups;
+    }
+
+    @Override
+    public long getNumIgnoredGroups() {
+      return _numIgnoredGroups;
     }
 
     @Nonnull

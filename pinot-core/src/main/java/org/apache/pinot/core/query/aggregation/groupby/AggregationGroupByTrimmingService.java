@@ -33,21 +33,26 @@ import javax.annotation.Nonnull;
 import org.apache.commons.collections.comparators.ComparableComparator;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.pinot.common.response.broker.GroupByResult;
+import org.apache.pinot.core.operator.CombineGroupByOperator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.aggregation.function.MinAggregationFunction;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
  * The <code>AggregationGroupByTrimmingService</code> class provides trimming service for aggregation group-by queries.
  */
 public class AggregationGroupByTrimmingService {
+
   public static final String GROUP_KEY_DELIMITER = "\t";
 
   private final AggregationFunction[] _aggregationFunctions;
   private final int _groupByTopN;
   private final int _trimSize;
   private final int _trimThreshold;
+  private int _numGroupsTrimmed;
 
   public AggregationGroupByTrimmingService(@Nonnull AggregationFunction[] aggregationFunctions, int groupByTopN) {
     Preconditions.checkArgument(groupByTopN > 0);
@@ -73,8 +78,10 @@ public class AggregationGroupByTrimmingService {
     Map<String, Object>[] trimmedResultMaps = new Map[numAggregationFunctions];
 
     int numGroups = intermediateResultsMap.size();
+
+    // Trim the result only if number of groups is larger than the threshold
     if (numGroups > _trimThreshold) {
-      // Trim the result only if number of groups is larger than the threshold
+      _numGroupsTrimmed = numGroups - _trimSize;
 
       Sorter[] sorters = new Sorter[numAggregationFunctions];
       for (int i = 0; i < numAggregationFunctions; i++) {
@@ -146,6 +153,10 @@ public class AggregationGroupByTrimmingService {
     }
 
     return trimmedResults;
+  }
+
+  public int getNumGroupsTrimmed() {
+    return _numGroupsTrimmed;
   }
 
   private interface Sorter {

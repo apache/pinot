@@ -18,34 +18,35 @@
  */
 package org.apache.pinot.core.query.aggregation.groupby;
 
-import javax.annotation.Nonnull;
-import org.apache.pinot.core.operator.blocks.TransformBlock;
-
-
 /**
- * Interface class for executing the actual group-by operation.
+ * Statistics recorded during the execution of group-by operator.
  */
-public interface GroupByExecutor {
+public class GroupByStatistics {
+  private long _numGroupsIgnored;
+
+  public GroupByStatistics() {
+  }
+
+  public GroupByStatistics(long numGroupsIgnored) {
+    _numGroupsIgnored = numGroupsIgnored;
+  }
+
+  public long getNumGroupsIgnored() {
+    return _numGroupsIgnored;
+  }
 
   /**
-   * Performs the group-by aggregation on the given transform block.
+   * Merge another group-by statistics into the current one.
    *
-   * @param transformBlock Transform block
+   * @param statsToMerge statistics to merge.
    */
-  void process(@Nonnull TransformBlock transformBlock);
+  public void merge(GroupByStatistics statsToMerge) {
+    _numGroupsIgnored += statsToMerge._numGroupsIgnored;
+  }
 
-  /**
-   * Returns the result of group-by aggregation.
-   * <p>Should be called after all transform blocks has been processed.
-   *
-   * @return Result of aggregation
-   */
-  AggregationGroupByResult getResult();
-
-  /**
-   * Returns the statistics collected during group-by aggregation.
-   *
-   * @return group-by statistics
-   */
-  GroupByStatistics getStatistics();
+  @Override
+  public String toString() {
+    return "GroupBy Statistics:" + "\n  numGroupsIgnored: " + _numGroupsIgnored;
+  }
 }
+

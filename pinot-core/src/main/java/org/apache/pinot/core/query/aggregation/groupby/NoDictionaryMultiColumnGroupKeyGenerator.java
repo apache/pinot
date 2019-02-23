@@ -53,6 +53,7 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
   private final int _globalGroupIdUpperBound;
 
   private int _numGroups = 0;
+  private long _numIgnoredGroups = 0;
 
   public NoDictionaryMultiColumnGroupKeyGenerator(TransformOperator transformOperator,
       TransformExpressionTree[] groupByExpressions, int numGroupsLimit) {
@@ -146,6 +147,11 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
   }
 
   @Override
+  public long getNumIgnoredGroups() {
+    return _numIgnoredGroups;
+  }
+
+  @Override
   public Iterator<GroupKey> getUniqueGroupKeys() {
     return new GroupKeyIterator(_groupKeyMap);
   }
@@ -162,6 +168,8 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
       if (_numGroups < _globalGroupIdUpperBound) {
         groupId = _numGroups;
         _groupKeyMap.put(keyList, _numGroups++);
+      } else {
+        _numIgnoredGroups++;
       }
     }
     return groupId;

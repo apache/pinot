@@ -171,4 +171,9 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
   public AggregationGroupByResult getResult() {
     return new AggregationGroupByResult(_groupKeyGenerator, _functions, _resultHolders);
   }
+
+  @Override
+  public GroupByStatistics getStatistics() {
+    return new GroupByStatistics(_groupKeyGenerator.getNumIgnoredGroups());
+  }
 }

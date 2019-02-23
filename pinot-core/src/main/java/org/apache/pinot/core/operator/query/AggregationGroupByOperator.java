@@ -29,6 +29,7 @@ import org.apache.pinot.core.query.aggregation.AggregationFunctionContext;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.DefaultGroupByExecutor;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByExecutor;
+import org.apache.pinot.core.query.aggregation.groupby.GroupByStatistics;
 import org.apache.pinot.core.startree.executor.StarTreeGroupByExecutor;
 
 
@@ -36,6 +37,7 @@ import org.apache.pinot.core.startree.executor.StarTreeGroupByExecutor;
  * The <code>AggregationOperator</code> class provides the operator for aggregation group-by query on a single segment.
  */
 public class AggregationGroupByOperator extends BaseOperator<IntermediateResultsBlock> {
+
   private static final String OPERATOR_NAME = "AggregationGroupByOperator";
 
   private final AggregationFunctionContext[] _functionContexts;
@@ -81,6 +83,7 @@ public class AggregationGroupByOperator extends BaseOperator<IntermediateResults
       groupByExecutor.process(transformBlock);
     }
     AggregationGroupByResult groupByResult = groupByExecutor.getResult();
+    GroupByStatistics stats = groupByExecutor.getStatistics();
 
     // Gather execution statistics
     long numEntriesScannedInFilter = _transformOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
@@ -88,6 +91,7 @@ public class AggregationGroupByOperator extends BaseOperator<IntermediateResults
     _executionStatistics =
         new ExecutionStatistics(numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter,
             _numTotalRawDocs);
+    _executionStatistics.setNumGroupsIgnoredPreCombine(stats.getNumGroupsIgnored());
 
     // Build intermediate result block based on aggregation group-by result from the executor
     return new IntermediateResultsBlock(_functionContexts, groupByResult);

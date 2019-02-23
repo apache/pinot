@@ -50,6 +50,7 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
   private final int _globalGroupIdUpperBound;
 
   private int _numGroups = 0;
+  private long _numIgnoredGroups = 0;
 
   public NoDictionarySingleColumnGroupKeyGenerator(TransformOperator transformOperator,
       TransformExpressionTree groupByExpression, int numGroupsLimit) {
@@ -163,6 +164,11 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
   }
 
   @Override
+  public long getNumIgnoredGroups() {
+    return _numIgnoredGroups;
+  }
+
+  @Override
   public Iterator<GroupKey> getUniqueGroupKeys() {
     return new GroupKeyIterator(_groupKeyMap);
   }
@@ -175,6 +181,8 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
       if (_numGroups < _globalGroupIdUpperBound) {
         groupId = _numGroups;
         map.put(value, _numGroups++);
+      } else {
+        _numIgnoredGroups++;
       }
     }
     return groupId;

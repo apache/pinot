@@ -66,6 +66,11 @@ public interface GroupKeyGenerator {
   int getCurrentGroupKeyUpperBound();
 
   /**
+   * Return the number of groups that were ignored as the max-group-limit was hit.
+   */
+  long getNumIgnoredGroups();
+
+  /**
    * Returns an iterator of group keys. Use this interface to iterate through all the group keys.
    *
    * @return iterator of group keys.
