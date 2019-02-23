@@ -334,7 +334,7 @@ public class MutableSegmentImpl implements MutableSegment {
       Preconditions.checkState(_dictionaryMap.get(column) == null, "Updating metrics not supported with dictionary.");
       FieldSpec.DataType dataType = metricSpec.getDataType();
 
-      // TODO: this breaks for multi value metrics. https://github.com/apache/incubator-pinot/issues/3867
+      // FIXME: this breaks for multi value metrics. https://github.com/apache/incubator-pinot/issues/3867
       switch (dataType) {
         case INT:
           indexReaderWriter.setInt(docId, (Integer) value + indexReaderWriter.getInt(docId));
@@ -670,7 +670,7 @@ public class MutableSegmentImpl implements MutableSegment {
     int i = 0;
     int[] dictIds = new int[_numKeyColumns]; // dimensions + time column.
 
-    // TODO: this for loop breaks for multi value columns. https://github.com/apache/incubator-pinot/issues/3867
+    // FIXME: this for loop breaks for multi value dimensions. https://github.com/apache/incubator-pinot/issues/3867
     for (String column : _schema.getDimensionNames()) {
       dictIds[i++] = (Integer) dictIdMap.get(column);
     }
