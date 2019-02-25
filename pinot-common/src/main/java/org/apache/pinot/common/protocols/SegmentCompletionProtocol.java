@@ -23,6 +23,8 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
+
+import org.apache.pinot.common.segment.SegmentMetadata;
 import org.apache.pinot.common.utils.JsonUtils;
 
 
@@ -112,6 +114,7 @@ public class SegmentCompletionProtocol {
   public static final String MSG_TYPE_COMMIT_START = "segmentCommitStart";
   public static final String MSG_TYPE_SEGMENT_UPLOAD = "segmentUpload";
   public static final String MSG_TYPE_COMMIT_END = "segmentCommitEnd";
+  public static final String MSG_TYPE_COMMIT_END_METADATA = "segmentCommitEndWithMetadata";
   public static final String MSG_TYPE_STOPPED_CONSUMING = "segmentStoppedConsuming";
   public static final String MSG_TYPE_EXTEND_BUILD_TIME = "extendBuildTime";
 
@@ -200,6 +203,7 @@ public class SegmentCompletionProtocol {
       private String _segmentLocation;
       private long _memoryUsedBytes;
       private long _segmentSizeBytes;
+      private SegmentMetadata _segmentMetadata;
 
       public Params() {
         _offset = -1L;
@@ -269,6 +273,11 @@ public class SegmentCompletionProtocol {
         return this;
       }
 
+      public Params withSegmentMetadata(SegmentMetadata segmentMetadata) {
+        _segmentMetadata = segmentMetadata;
+        return this;
+      }
+
       public String getSegmentName() {
         return _segmentName;
       }
@@ -313,11 +322,14 @@ public class SegmentCompletionProtocol {
         return _segmentSizeBytes;
       }
 
+      public SegmentMetadata getSegmentMetadata() { return _segmentMetadata; }
+
       public String toString() {
         return "Offset: " + _offset + ",Segment name: " + _segmentName + ",Instance Id: " + _instanceId + ",Reason: "
             + _reason + ",NumRows: " + _numRows + ",BuildTimeMillis: " + _buildTimeMillis + ",WaitTimeMillis: "
             + _waitTimeMillis + ",ExtraTimeSec: " + _extraTimeSec + ",SegmentLocation: " + _segmentLocation
-            + ",MemoryUsedBytes: " + _memoryUsedBytes + ",SegmentSizeBytes: " + _segmentSizeBytes;
+            + ",MemoryUsedBytes: " + _memoryUsedBytes + ",SegmentSizeBytes: " + _segmentSizeBytes
+            + ", SegmentMetadata:" + _segmentMetadata;
       }
     }
   }

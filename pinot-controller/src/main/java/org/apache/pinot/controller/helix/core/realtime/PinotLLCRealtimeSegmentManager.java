@@ -479,7 +479,8 @@ public class PinotLLCRealtimeSegmentManager {
     }
 
     // Step-1
-    boolean success = updateOldSegmentMetadataZNRecord(realtimeTableName, committingLLCSegmentName, nextOffset);
+    boolean success = updateOldSegmentMetadataZNRecord(realtimeTableName, committingLLCSegmentName, nextOffset,
+            committingSegmentDescriptor);
     if (!success) {
       return false;
     }
@@ -522,10 +523,12 @@ public class PinotLLCRealtimeSegmentManager {
    * @param realtimeTableName - table name for which segment is being committed
    * @param committingLLCSegmentName - name of the segment being committed
    * @param nextOffset - the end offset for this committing segment
+   * @param committingSegmentDescriptor - the metadata of the commit segment.
    * @return
    */
   protected boolean updateOldSegmentMetadataZNRecord(String realtimeTableName, LLCSegmentName committingLLCSegmentName,
-      long nextOffset) {
+                                                     long nextOffset,
+                                                     CommittingSegmentDescriptor committingSegmentDescriptor) {
 
     String committingSegmentNameStr = committingLLCSegmentName.getSegmentName();
     Stat stat = new Stat();
@@ -544,8 +547,18 @@ public class PinotLLCRealtimeSegmentManager {
     String rawTableName = TableNameBuilder.extractRawTableName(realtimeTableName);
     committingSegmentMetadata.setDownloadUrl(
         ControllerConf.constructDownloadUrl(rawTableName, committingSegmentNameStr, _controllerConf.generateVipUrl()));
-    // Pull segment metadata from incoming segment and set it in zk segment metadata
-    SegmentMetadataImpl segmentMetadata = extractSegmentMetadata(rawTableName, committingSegmentNameStr);
+    // Pull segment metadata from committingSegmentDescriptor if present. Otherwise extract it from the incoming segment
+    // and set it in zk segment metadata.
+    // Note: ideally we should use the interface SegmentMetadata here for the class of segmentMetadata. However,
+    // SegmentMetadataImpl has member like ColumnMetadata which is not in the interface. Adding these members to the
+    // interface will introduce circular dependency between Pinot-Core and Pinot-common.
+    SegmentMetadataImpl segmentMetadata;
+    if (committingSegmentDescriptor.getSegmentMetadata() != null &&
+        committingSegmentDescriptor.getSegmentMetadata() instanceof SegmentMetadataImpl) {
+      segmentMetadata = (SegmentMetadataImpl)committingSegmentDescriptor.getSegmentMetadata();
+    } else {
+      segmentMetadata = extractSegmentMetadata(rawTableName, committingSegmentNameStr);
+    }
     committingSegmentMetadata.setCrc(Long.valueOf(segmentMetadata.getCrc()));
     committingSegmentMetadata.setStartTime(segmentMetadata.getTimeInterval().getStartMillis());
     committingSegmentMetadata.setEndTime(segmentMetadata.getTimeInterval().getEndMillis());

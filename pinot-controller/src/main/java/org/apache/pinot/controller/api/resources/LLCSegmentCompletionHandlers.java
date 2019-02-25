@@ -19,11 +19,10 @@
 package org.apache.pinot.controller.api.resources;
 
 import com.google.common.annotations.VisibleForTesting;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
+
+import java.io.*;
+import java.nio.file.FileSystems;
+import java.nio.file.Files;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -36,15 +35,20 @@ import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
+
+import com.google.common.base.Preconditions;
 import org.apache.commons.httpclient.URI;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.StringUtil;
+import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.realtime.SegmentCompletionManager;
 import org.apache.pinot.controller.util.SegmentCompletionUtils;
+import org.apache.pinot.core.segment.creator.impl.V1Constants;
+import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
 import org.apache.pinot.filesystem.PinotFS;
 import org.apache.pinot.filesystem.PinotFSFactory;
 import org.glassfish.jersey.media.multipart.FormDataBodyPart;
@@ -60,6 +64,7 @@ public class LLCSegmentCompletionHandlers {
 
   private static Logger LOGGER = LoggerFactory.getLogger(LLCSegmentCompletionHandlers.class);
   private static final String SCHEME = "file://";
+  private static final String METADATA_TEMP_DIR_SUFFIX = ".metadata.tmp";
 
   @Inject
   ControllerConf _controllerConf;
@@ -274,6 +279,79 @@ public class LLCSegmentCompletionHandlers {
     LOGGER.info("Response to segmentUpload:{}", response);
 
     return response;
+  }
+
+  @POST
+  @Path(SegmentCompletionProtocol.MSG_TYPE_COMMIT_END_METADATA)
+  @Produces(MediaType.APPLICATION_JSON)
+  @Consumes(MediaType.MULTIPART_FORM_DATA)
+  public String segmentCommitEndWithMetadata(@QueryParam(SegmentCompletionProtocol.PARAM_INSTANCE_ID) String instanceId,
+                                             @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_NAME) String segmentName,
+                                             @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_LOCATION) String segmentLocation,
+                                             @QueryParam(SegmentCompletionProtocol.PARAM_OFFSET) long offset,
+                                             @QueryParam(SegmentCompletionProtocol.PARAM_MEMORY_USED_BYTES) long memoryUsedBytes,
+                                             @QueryParam(SegmentCompletionProtocol.PARAM_BUILD_TIME_MILLIS) long buildTimeMillis,
+                                             @QueryParam(SegmentCompletionProtocol.PARAM_WAIT_TIME_MILLIS) long waitTimeMillis,
+                                             @QueryParam(SegmentCompletionProtocol.PARAM_ROW_COUNT) int numRows,
+                                             @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_SIZE_BYTES) long segmentSizeBytes,
+                                             FormDataMultiPart metadataFiles) {
+    if (instanceId == null || segmentName == null || offset == -1 || segmentLocation == null || metadataFiles == null) {
+      LOGGER.error("Invalid call: offset={}, segmentName={}, instanceId={}, segmentLocation={}", offset, segmentName,
+              instanceId, segmentLocation);
+      // TODO: memoryUsedInBytes = 0 if not present in params. Add validation when we start using it
+      return SegmentCompletionProtocol.RESP_FAILED.toJsonString();
+    }
+
+    SegmentMetadataImpl segmentMetadata = extractSegmentMetadata(metadataFiles, segmentName);
+
+    SegmentCompletionProtocol.Request.Params requestParams = new SegmentCompletionProtocol.Request.Params();
+    requestParams.withInstanceId(instanceId).withSegmentName(segmentName).withOffset(offset)
+            .withSegmentLocation(segmentLocation).withSegmentSizeBytes(segmentSizeBytes)
+            .withBuildTimeMillis(buildTimeMillis).withWaitTimeMillis(waitTimeMillis).withNumRows(numRows)
+            .withMemoryUsedBytes(memoryUsedBytes).withSegmentMetadata(segmentMetadata);
+    LOGGER.info("Processing segmentCommitEnd:{}", requestParams.toString());
+
+
+    final boolean isSuccess = true;
+    final boolean isSplitCommit = true;
+
+    SegmentCompletionProtocol.Response response =
+            SegmentCompletionManager.getInstance().segmentCommitEnd(requestParams, isSuccess, isSplitCommit);
+    final String responseStr = response.toJsonString();
+    LOGGER.info("Response to segmentCommitEnd:{}", responseStr);
+    return responseStr;
+  }
+
+  private SegmentMetadataImpl extractSegmentMetadata(FormDataMultiPart metadataFiles, String segmentNameStr) {
+    String tempMetadataDirStr = StringUtil.join("/", _controllerConf.getLocalTempDir(), segmentNameStr + METADATA_TEMP_DIR_SUFFIX);
+    File tempMetadataDir = new File(tempMetadataDirStr);
+
+    try {
+      Preconditions.checkState(tempMetadataDir.mkdirs(), "Failed to create directory: %s", tempMetadataDirStr);
+      // Extract metadata.properties from the metadataFiles.
+      extractMetadataFromInputForm(metadataFiles, tempMetadataDirStr, V1Constants.MetadataKeys.METADATA_FILE_NAME);
+      // Extract creation.meta from the metadataFiles.
+      extractMetadataFromInputForm(metadataFiles, tempMetadataDirStr, V1Constants.SEGMENT_CREATION_META);
+      // Load segment metadata
+      return new SegmentMetadataImpl(tempMetadataDir);
+    } catch (Exception e) {
+      throw new RuntimeException("Exception extracting and reading segment metadata for " + segmentNameStr, e);
+    } finally {
+      FileUtils.deleteQuietly(tempMetadataDir);
+    }
+  }
+
+  private void extractMetadataFromInputForm(FormDataMultiPart metadataFiles, String tempMetadataDirStr,
+                                            String metaFileName) throws IOException {
+    FormDataBodyPart metadataFilesField = metadataFiles.getField(metaFileName);
+    Preconditions.checkNotNull(metadataFilesField, "The metadata input field %s does not exist.",
+            metaFileName);
+    InputStream metadataPropertiesInputStream = metadataFilesField.getValueAs(InputStream.class);
+    Preconditions.checkNotNull(metadataPropertiesInputStream, "Unable to parse %s from input.",
+            metaFileName);
+    java.nio.file.Path metadataPropertiesPath =
+            FileSystems.getDefault().getPath(tempMetadataDirStr, metaFileName);
+    Files.copy(metadataPropertiesInputStream, metadataPropertiesPath);
   }
 
   @Nullable
