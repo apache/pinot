@@ -192,6 +192,7 @@ export default Component.extend({
     const chart = this.get('_chart');
     chart.regions(diffConfig.regions);
     chart.axis.range(this._makeAxisRange(diffConfig.axis));
+    chart.unzoom();
     chart.load(diffConfig);
     this._updateCache();
   },

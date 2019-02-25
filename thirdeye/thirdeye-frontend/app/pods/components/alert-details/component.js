@@ -46,7 +46,7 @@ export default Component.extend({
   anomalyMapping: {},
   timeseries: null,
   isLoading: false,
-  analysisRange: [moment().subtract(1, 'week').startOf('hour').valueOf(), moment().startOf('hour').valueOf()],
+  analysisRange: [moment().add(1, 'day').startOf('day').subtract(1, 'week').valueOf(), moment().add(1, 'day').startOf('day').valueOf()],
   isPendingData: false,
   colorMapping: colorMapping,
   zoom: {
@@ -105,6 +105,7 @@ export default Component.extend({
       } else {
         this._fetchTimeseries();
       }
+
     }),
 
   /**
@@ -227,7 +228,7 @@ export default Component.extend({
   axis: computed(
     'analysisRange',
     function () {
-      const analysisRange = getProperties(this, 'analysisRange');
+      const analysisRange = get(this, 'analysisRange');
 
       return {
         y: {
@@ -426,8 +427,8 @@ export default Component.extend({
     'analysisRange', 'startDate', 'endDate', 'duration',
     function() {
       const analysisRange = get(this, 'analysisRange');
-      const startDate = Number(analysisRange[0]) || Number(get(this, 'startDate'));
-      const endDate = Number(analysisRange[1]) || Number(get(this, 'endDate'));
+      const startDate = Number(analysisRange[0]);
+      const endDate = Number(analysisRange[1]);
       const duration = get(this, 'duration') || DEFAULT_ACTIVE_DURATION;
       const predefinedRanges = {
         'Today': [moment().startOf('day'), moment().startOf('day').add(1, 'days')],
@@ -506,7 +507,7 @@ export default Component.extend({
     this._super(...arguments);
     const isPreviewMode = get(this, 'isPreviewMode');
     if (!isPreviewMode) {
-      set(this, 'analysisRange', [moment().subtract(1, 'month').startOf('hour').valueOf(), moment().startOf('hour').valueOf()]);
+      set(this, 'analysisRange', [moment().add(1, 'day').subtract(1, 'month').startOf('day').valueOf(), moment().add(1, 'day').startOf('day').valueOf()]);
       set(this, 'duration', '1m');
       this._fetchAnomalies();
     } else {
