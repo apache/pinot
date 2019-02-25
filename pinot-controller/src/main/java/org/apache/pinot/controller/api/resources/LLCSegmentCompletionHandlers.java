@@ -43,7 +43,6 @@ import org.apache.commons.io.IOUtils;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.StringUtil;
-import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.realtime.SegmentCompletionManager;
 import org.apache.pinot.controller.util.SegmentCompletionUtils;
