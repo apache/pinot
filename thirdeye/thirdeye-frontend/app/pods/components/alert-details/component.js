@@ -23,6 +23,7 @@ import { getYamlPreviewAnomalies,
   getFormattedDuration,
   anomalyResponseMapNew,
   anomalyResponseObj,
+  anomalyResponseObjNew,
   updateAnomalyFeedback,
   verifyAnomalyFeedback  } from 'thirdeye-frontend/utils/anomaly';
 import { inject as service } from '@ember/service';
@@ -351,7 +352,6 @@ export default Component.extend({
         tableData.push(tableRow);
         i++;
       });
-
       return tableData;
     }
   ),
@@ -624,15 +624,14 @@ export default Component.extend({
      * @param {String} selectedResponse - user-selected anomaly feedback option
      * @param {Object} inputObj - the selection object
      */
-    onChangeAnomalyFeedback: async function(anomalyRecord, selectedResponse, inputObj) {
-      const labelMap = get(this, 'labelMap');
-      const loadedResponsesArr = [];
-      const newOptionsArr = [];
-      // Update select field
-      set(inputObj, 'selected', selectedResponse);
+    onChangeAnomalyFeedback: async function(anomalyRecord, selectedResponse) {
+      const anomalies = get(this, 'anomalies');
       // Reset status icon
       set(this, 'renderStatusIcon', false);
+  
       const responseObj = anomalyResponseObj.find(res => res.name === selectedResponse);
+      // get the response object from anomalyResponseObjNew
+      const newFeedbackValue = anomalyResponseObjNew.find(res => res.name === selectedResponse).value;
       try {
         // Save anomaly feedback
         await updateAnomalyFeedback(anomalyRecord.anomalyId, responseObj.value);
@@ -643,24 +642,28 @@ export default Component.extend({
         const keyPresent = filterMap && Object.keys(filterMap).find(key => responseObj.status.includes(key));
         if (keyPresent) {
           this.set('labelResponse', {
-            anomalyId: anomalyRecord.id,
+            anomalyId: anomalyRecord.anomalyId,
             showResponseSaved: true,
             showResponseFailed: false
           });
 
-          // Collect all available new labels
-          loadedResponsesArr.push(responseObj.status, ...get(this, 'anomalyData').mapBy('anomalyFeedback'));
-          loadedResponsesArr.forEach((response) => {
-            if (labelMap[response]) { newOptionsArr.push(labelMap[response]); }
-          });
-          // Update resolutionOptions array - we may have a new option now
-          set(this, 'resolutionOptions', [ ...new Set([ 'All Resolutions', ...newOptionsArr ])]);
+          // replace anomaly feedback with selectedFeedback
+          let i = 0;
+          let found = false;
+          while (i < anomalies.length && !found) {
+            if (anomalies[i].id === anomalyRecord.anomalyId) {
+              anomalies[i].feedback.feedbackType = newFeedbackValue;
+              found = true;
+            }
+            i++;
+          }
+          set(this, 'anomalies', anomalies);
         } else {
           throw 'Response not saved';
         }
       } catch (err) {
         this.set('labelResponse', {
-          anomalyId: anomalyRecord.id,
+          anomalyId: anomalyRecord.anomalyId,
           showResponseSaved: false,
           showResponseFailed: true
         });

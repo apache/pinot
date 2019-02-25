@@ -60,6 +60,7 @@ export default Component.extend({
   currentYamlAlertOriginal: '',
   currentYamlSettingsOriginal: '',
   toggleCollapsed: true,
+  alertDataIsCurrent: true,
 
 
 
@@ -361,7 +362,8 @@ export default Component.extend({
         disableYamlSave: false,
         alertYaml: value,
         detectionMsg: '',
-        subscriptionMsg: ''
+        subscriptionMsg: '',
+        alertDataIsCurrent: false
       });
     },
 
