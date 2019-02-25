@@ -394,7 +394,7 @@ public class PinotLLCRealtimeSegmentManager {
     // Cleans up tmp segment files under table dir.
     // We only clean up tmp segment files in table level dir, so there's no need to list recursively.
     // See LLCSegmentCompletionHandlers.uploadSegment().
-    // See LLCSegmentCompletionHandlers.uploadSegment().
+    // TODO: move tmp file logic into SegmentCompletionUtils.
     try {
       for (String uri : pinotFS.listFiles(tableDirURI, false)) {
         if (uri.contains(SegmentCompletionUtils.getSegmentNamePrefix(segmentName))) {
