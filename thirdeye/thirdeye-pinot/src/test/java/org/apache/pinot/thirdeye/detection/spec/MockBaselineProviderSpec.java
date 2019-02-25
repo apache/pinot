@@ -16,9 +16,9 @@
 
 package org.apache.pinot.thirdeye.detection.spec;
 
+import java.util.Map;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
 import org.apache.pinot.thirdeye.detection.spi.model.TimeSeries;
-import java.util.Map;
 
 
 public class MockBaselineProviderSpec extends AbstractSpec {

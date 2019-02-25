@@ -23,11 +23,9 @@ import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
 import org.apache.pinot.thirdeye.detection.DataProvider;
 import org.apache.pinot.thirdeye.detection.DefaultInputDataFetcher;
-import org.apache.pinot.thirdeye.detection.InputDataFetcher;
 import org.apache.pinot.thirdeye.detection.MockDataProvider;
 import org.apache.pinot.thirdeye.detection.algorithm.AlgorithmUtils;
 import org.apache.pinot.thirdeye.detection.spec.AbsoluteChangeRuleDetectorSpec;
-import org.apache.pinot.thirdeye.detection.spec.PercentageChangeRuleDetectorSpec;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.util.Collections;
@@ -35,6 +33,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.thirdeye.detection.spi.model.DetectionOutput;
+import org.apache.pinot.thirdeye.detection.spi.model.TimeSeries;
 import org.joda.time.Interval;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
@@ -46,6 +46,7 @@ import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
 public class AbsoluteChangeRuleDetectorTest {
   private DataProvider provider;
   private DataFrame data;
+  private final double delta = 0.000001;
 
   @BeforeMethod
   public void beforeMethod() throws Exception {
@@ -84,11 +85,20 @@ public class AbsoluteChangeRuleDetectorTest {
     spec.setAbsoluteChange(400);
     spec.setPattern("up");
     detector.init(spec, new DefaultInputDataFetcher(this.provider, -1));
-    List<MergedAnomalyResultDTO> anomalies = detector.runDetection(new Interval(1814400000L, 2419200000L), "thirdeye:metric:1");
+    DetectionOutput result = detector.runDetection(new Interval(1814400000L, 2419200000L), "thirdeye:metric:1");
 
+    List<MergedAnomalyResultDTO> anomalies = result.getAnomalies();
     Assert.assertEquals(anomalies.size(), 1);
     Assert.assertEquals(anomalies.get(0).getStartTime(), 2372400000L);
     Assert.assertEquals(anomalies.get(0).getEndTime(), 2376000000L);
+
+    TimeSeries timeSeries = result.getPredictions();
+    double[] upperBound = timeSeries.getPredictedUpperBound().values();
+    double[] baseline = timeSeries.getPredictedBaseline().values();
+    Assert.assertEquals(upperBound.length, baseline.length);
+    for (int i = 0; i < baseline.length; i++) {
+      Assert.assertEquals(upperBound[i] - baseline[i], 400.0, delta);
+    }
   }
 
 }

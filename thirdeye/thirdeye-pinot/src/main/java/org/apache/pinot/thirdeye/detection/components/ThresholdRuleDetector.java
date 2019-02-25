@@ -21,6 +21,7 @@ package org.apache.pinot.thirdeye.detection.components;
 
 import org.apache.pinot.thirdeye.dataframe.BooleanSeries;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
+import org.apache.pinot.thirdeye.dataframe.DoubleSeries;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
@@ -32,6 +33,8 @@ import org.apache.pinot.thirdeye.detection.annotation.Param;
 import org.apache.pinot.thirdeye.detection.annotation.PresentationOption;
 import org.apache.pinot.thirdeye.detection.spec.ThresholdRuleDetectorSpec;
 import org.apache.pinot.thirdeye.detection.spi.components.AnomalyDetector;
+import org.apache.pinot.thirdeye.detection.spi.model.DetectionOutput;
+import org.apache.pinot.thirdeye.detection.spi.model.TimeSeries;
 import org.apache.pinot.thirdeye.detection.spi.model.InputData;
 import org.apache.pinot.thirdeye.detection.spi.model.InputDataSpec;
 import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
@@ -56,7 +59,7 @@ public class ThresholdRuleDetector implements AnomalyDetector<ThresholdRuleDetec
   private InputDataFetcher dataFetcher;
 
   @Override
-  public List<MergedAnomalyResultDTO> runDetection(Interval window, String metricUrn) {
+  public DetectionOutput runDetection(Interval window, String metricUrn) {
     MetricEntity me = MetricEntity.fromURN(metricUrn);
     Long endTime = window.getEndMillis();
     MetricSlice slice = MetricSlice.from(me.getId(), window.getStartMillis(), endTime, me.getFilters());
@@ -66,6 +69,10 @@ public class ThresholdRuleDetector implements AnomalyDetector<ThresholdRuleDetec
             .withMetricIdsForDataset(Collections.singletonList(me.getId())));
     DataFrame df = data.getTimeseries().get(slice);
 
+    // calculate predicted timeseries
+    TimeSeries timeSeries = new TimeSeries();
+    timeSeries.addTimeStamps(df.getLongs(COL_TIME));
+
     // defaults
     df.addSeries(COL_TOO_HIGH, BooleanSeries.fillValues(df.size(), false));
     df.addSeries(COL_TOO_LOW, BooleanSeries.fillValues(df.size(), false));
@@ -73,17 +80,20 @@ public class ThresholdRuleDetector implements AnomalyDetector<ThresholdRuleDetec
     // max
     if (!Double.isNaN(this.max)) {
       df.addSeries(COL_TOO_HIGH, df.getDoubles(COL_VALUE).gt(this.max));
+      timeSeries.addPredictedUpperBound(DoubleSeries.fillValues(df.size(), this.max));
     }
 
     // min
     if (!Double.isNaN(this.min)) {
       df.addSeries(COL_TOO_LOW, df.getDoubles(COL_VALUE).lt(this.min));
+      timeSeries.addPredictedLowerBound(DoubleSeries.fillValues(df.size(), this.min ));
     }
 
     df.mapInPlace(BooleanSeries.HAS_TRUE, COL_ANOMALY, COL_TOO_HIGH, COL_TOO_LOW);
 
     DatasetConfigDTO datasetConfig = data.getDatasetForMetricId().get(me.getId());
-    return DetectionUtils.makeAnomalies(slice, df, COL_ANOMALY, endTime, datasetConfig);
+    List<MergedAnomalyResultDTO> anomalies = DetectionUtils.makeAnomalies(slice, df, COL_ANOMALY, endTime, datasetConfig);
+    return new DetectionOutput(anomalies, timeSeries);
   }
 
   @Override

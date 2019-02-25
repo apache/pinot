@@ -41,6 +41,8 @@ import org.apache.pinot.thirdeye.detection.DetectionPipeline;
 import org.apache.pinot.thirdeye.detection.DetectionPipelineResult;
 import org.apache.pinot.thirdeye.detection.DetectionUtils;
 import org.apache.pinot.thirdeye.detection.spi.components.AnomalyDetector;
+import org.apache.pinot.thirdeye.detection.spi.model.DetectionOutput;
+import org.apache.pinot.thirdeye.detection.spi.model.TimeSeries;
 import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
 import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
 import org.joda.time.DateTime;
@@ -143,12 +145,15 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
 
     List<Interval> monitoringWindows = this.getMonitoringWindows();
     List<MergedAnomalyResultDTO> anomalies = new ArrayList<>();
+    TimeSeries predictions = new TimeSeries();
     for (Interval window : monitoringWindows) {
       List<MergedAnomalyResultDTO> anomaliesForOneWindow = new ArrayList<>();
       try {
         LOG.info("[New Pipeline] running detection for config {} metricUrn {}. start time {}, end time {}", config.getId(), metricUrn, window.getStart(), window.getEnd());
         long ts = System.currentTimeMillis();
-        anomaliesForOneWindow = anomalyDetector.runDetection(window, this.metricUrn);
+        DetectionOutput output = anomalyDetector.runDetection(window, this.metricUrn);
+        anomaliesForOneWindow = output.getAnomalies();
+        predictions.merge(output.getPredictions());
         LOG.info("[New Pipeline] run anomaly detection for window {} - {} used {} milliseconds", window.getStart(), window.getEnd(), System.currentTimeMillis() - ts);
       } catch (Exception e) {
         LOG.warn("[DetectionConfigID{}] detecting anomalies for window {} to {} failed.", this.config.getId(), window.getStart(), window.getEnd(), e);
@@ -164,7 +169,7 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
       anomaly.setDimensions(DetectionUtils.toFilterMap(this.metricEntity.getFilters()));
       anomaly.getProperties().put(PROP_DETECTOR_COMPONENT_NAME, this.detectorName);
     }
-    return new DetectionPipelineResult(anomalies, this.getLastTimeStamp());
+    return new DetectionPipelineResult(anomalies, predictions, this.getLastTimeStamp());
   }
 
   // guess-timate next time stamp

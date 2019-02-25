@@ -23,6 +23,7 @@ import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.thirdeye.detection.spi.model.TimeSeries;
 
 
 public class DetectionPipelineResult {
@@ -31,12 +32,19 @@ public class DetectionPipelineResult {
 
   Map<String, Object> diagnostics;
   List<MergedAnomalyResultDTO> anomalies;
+  TimeSeries predictions;
   long lastTimestamp;
 
   public DetectionPipelineResult(List<MergedAnomalyResultDTO> anomalies) {
     this.anomalies = anomalies;
     this.lastTimestamp = getMaxTime(anomalies);
     this.diagnostics = new HashMap<>();
+  }
+
+  public DetectionPipelineResult(List<MergedAnomalyResultDTO> anomalies, TimeSeries predictions, long lastTimestamp) {
+    this.anomalies = anomalies;
+    this.predictions = predictions;
+    this.lastTimestamp = lastTimestamp;
   }
 
   public DetectionPipelineResult(List<MergedAnomalyResultDTO> anomalies, long lastTimestamp) {
@@ -50,6 +58,15 @@ public class DetectionPipelineResult {
 
   public DetectionPipelineResult setAnomalies(List<MergedAnomalyResultDTO> anomalies) {
     this.anomalies = anomalies;
+    return this;
+  }
+
+  public TimeSeries getPredictions() {
+    return predictions;
+  }
+
+  public DetectionPipelineResult setPredictions(TimeSeries predictions) {
+    this.predictions = predictions;
     return this;
   }
 

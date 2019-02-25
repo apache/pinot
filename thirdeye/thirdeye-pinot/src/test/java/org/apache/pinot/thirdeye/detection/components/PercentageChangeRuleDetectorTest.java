@@ -23,7 +23,6 @@ import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
 import org.apache.pinot.thirdeye.detection.DataProvider;
 import org.apache.pinot.thirdeye.detection.DefaultInputDataFetcher;
-import org.apache.pinot.thirdeye.detection.InputDataFetcher;
 import org.apache.pinot.thirdeye.detection.MockDataProvider;
 import org.apache.pinot.thirdeye.detection.algorithm.AlgorithmUtils;
 import org.apache.pinot.thirdeye.detection.spec.PercentageChangeRuleDetectorSpec;
@@ -34,6 +33,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.thirdeye.detection.spi.model.DetectionOutput;
+import org.apache.pinot.thirdeye.detection.spi.model.TimeSeries;
 import org.joda.time.Interval;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
@@ -46,6 +47,7 @@ public class PercentageChangeRuleDetectorTest {
 
   private DataProvider provider;
   private DataFrame data;
+  private final double delta = 0.000001;
 
   @BeforeMethod
   public void beforeMethod() throws Exception {
@@ -84,12 +86,21 @@ public class PercentageChangeRuleDetectorTest {
     spec.setPattern("up");
     spec.setPercentageChange(0.4);
     detector.init(spec, new DefaultInputDataFetcher(this.provider, -1));
-    List<MergedAnomalyResultDTO> anomalies = detector.runDetection(new Interval(1814400000L, 2419200000L), "thirdeye:metric:1");
+    DetectionOutput result = detector.runDetection(new Interval(1814400000L, 2419200000L), "thirdeye:metric:1");
+    List<MergedAnomalyResultDTO> anomalies = result.getAnomalies();
     Assert.assertEquals(anomalies.size(), 2);
     Assert.assertEquals(anomalies.get(0).getStartTime(), 2372400000L);
     Assert.assertEquals(anomalies.get(0).getEndTime(), 2376000000L);
     Assert.assertEquals(anomalies.get(1).getStartTime(), 2379600000L);
     Assert.assertEquals(anomalies.get(1).getEndTime(), 2383200000L);
+
+    TimeSeries timeSeries = result.getPredictions();
+    double[] baseline = timeSeries.getPredictedBaseline().values();
+    double[] upperBound = timeSeries.getPredictedUpperBound().values();
+    Assert.assertEquals(upperBound.length, baseline.length);
+    for (int i = 0; i < baseline.length; i++) {
+      Assert.assertEquals(upperBound[i] / baseline[i], 1.4, delta);
+    }
   }
 
   @Test
@@ -100,7 +111,8 @@ public class PercentageChangeRuleDetectorTest {
     spec.setOffset("median3w");
     spec.setPattern("up");
     detector.init(spec, new DefaultInputDataFetcher(this.provider, -1));
-    List<MergedAnomalyResultDTO> anomalies = detector.runDetection(new Interval(1814400000L, 2419200000L), "thirdeye:metric:1");
+    DetectionOutput result = detector.runDetection(new Interval(1814400000L, 2419200000L), "thirdeye:metric:1");
+    List<MergedAnomalyResultDTO> anomalies = result.getAnomalies();
     Assert.assertEquals(anomalies.size(), 4);
     Assert.assertEquals(anomalies.get(0).getStartTime(), 2005200000L);
     Assert.assertEquals(anomalies.get(0).getEndTime(), 2008800000L);
@@ -110,6 +122,14 @@ public class PercentageChangeRuleDetectorTest {
     Assert.assertEquals(anomalies.get(2).getEndTime(), 2156400000L);
     Assert.assertEquals(anomalies.get(3).getStartTime(), 2322000000L);
     Assert.assertEquals(anomalies.get(3).getEndTime(), 2325600000L);
+
+    TimeSeries timeSeries = result.getPredictions();
+    double[] baseline = timeSeries.getPredictedBaseline().values();
+    double[] upperBound = timeSeries.getPredictedUpperBound().values();
+    Assert.assertEquals(upperBound.length, baseline.length);
+    for (int i = 0; i < baseline.length; i++) {
+      Assert.assertEquals(upperBound[i] / baseline[i], 1.3, delta);
+    }
   }
 
   @Test
@@ -120,10 +140,19 @@ public class PercentageChangeRuleDetectorTest {
     spec.setOffset("median3w");
     spec.setPattern("down");
     detector.init(spec, new DefaultInputDataFetcher(this.provider, -1));
-    List<MergedAnomalyResultDTO> anomalies = detector.runDetection(new Interval(1814400000L, 2419200000L), "thirdeye:metric:1");
+    DetectionOutput result = detector.runDetection(new Interval(1814400000L, 2419200000L), "thirdeye:metric:1");
+    List<MergedAnomalyResultDTO> anomalies = result.getAnomalies();
     Assert.assertEquals(anomalies.size(), 1);
     Assert.assertEquals(anomalies.get(0).getStartTime(), 2181600000L);
     Assert.assertEquals(anomalies.get(0).getEndTime(), 2185200000L);
+
+    TimeSeries timeSeries = result.getPredictions();
+    double[] baseline = timeSeries.getPredictedBaseline().values();
+    double[] lowerBound = timeSeries.getPredictedLowerBound().values();
+    Assert.assertEquals(lowerBound.length, baseline.length);
+    for (int i = 0; i < baseline.length; i++) {
+      Assert.assertEquals(lowerBound[i] / baseline[i], 0.7, delta);
+    }
   }
 
   @Test
@@ -134,7 +163,9 @@ public class PercentageChangeRuleDetectorTest {
     spec.setOffset("median3w");
     spec.setPattern("up_or_down");
     detector.init(spec, new DefaultInputDataFetcher(this.provider, -1));
-    List<MergedAnomalyResultDTO> anomalies = detector.runDetection(new Interval(1814400000L, 2419200000L), "thirdeye:metric:1");
+    DetectionOutput result = detector.runDetection(new Interval(1814400000L, 2419200000L), "thirdeye:metric:1");
+
+    List<MergedAnomalyResultDTO> anomalies = result.getAnomalies();
     Assert.assertEquals(anomalies.size(), 5);
     Assert.assertEquals(anomalies.get(0).getStartTime(), 2005200000L);
     Assert.assertEquals(anomalies.get(0).getEndTime(), 2008800000L);
@@ -146,6 +177,17 @@ public class PercentageChangeRuleDetectorTest {
     Assert.assertEquals(anomalies.get(3).getEndTime(), 2185200000L);
     Assert.assertEquals(anomalies.get(4).getStartTime(), 2322000000L);
     Assert.assertEquals(anomalies.get(4).getEndTime(), 2325600000L);
+
+    TimeSeries timeSeries = result.getPredictions();
+    double[] upperBound = timeSeries.getPredictedUpperBound().values();
+    double[] baseline = timeSeries.getPredictedBaseline().values();
+    double[] lowerBound = timeSeries.getPredictedLowerBound().values();
+    Assert.assertEquals(upperBound.length, baseline.length);
+    Assert.assertEquals(lowerBound.length, baseline.length);
+    for (int i = 0; i < baseline.length; i++) {
+      Assert.assertEquals(upperBound[i] / baseline[i], 1.3, delta);
+      Assert.assertEquals(lowerBound[i] / baseline[i], 0.7, delta);
+    }
   }
 
 }

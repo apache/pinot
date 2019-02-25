@@ -32,6 +32,8 @@ import org.apache.pinot.thirdeye.detection.DefaultInputDataFetcher;
 import org.apache.pinot.thirdeye.detection.MockDataProvider;
 import org.apache.pinot.thirdeye.detection.spec.ThresholdRuleDetectorSpec;
 import org.apache.pinot.thirdeye.detection.spi.components.AnomalyDetector;
+import org.apache.pinot.thirdeye.detection.spi.model.DetectionOutput;
+import org.apache.pinot.thirdeye.detection.spi.model.TimeSeries;
 import org.joda.time.Interval;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
@@ -42,6 +44,7 @@ import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
 
 public class ThresholdRuleDetectorTest {
   private DataProvider testDataProvider;
+  private final double delta = 0.000001;
 
   @BeforeMethod
   public void beforeMethod() {
@@ -86,12 +89,22 @@ public class ThresholdRuleDetectorTest {
     spec.setMin(100);
     spec.setMax(500);
     thresholdAlgorithm.init(spec, new DefaultInputDataFetcher(testDataProvider, -1));
-    List<MergedAnomalyResultDTO> anomalies = thresholdAlgorithm.runDetection(new Interval(0, 10), "thirdeye:metric:123");
+    DetectionOutput result = thresholdAlgorithm.runDetection(new Interval(0, 10), "thirdeye:metric:123");
+    List<MergedAnomalyResultDTO> anomalies = result.getAnomalies();
     Assert.assertEquals(anomalies.size(), 2);
     Assert.assertEquals(anomalies.get(0).getStartTime(), 0);
     Assert.assertEquals(anomalies.get(0).getEndTime(), 2);
     Assert.assertEquals(anomalies.get(1).getStartTime(), 8);
     Assert.assertEquals(anomalies.get(1).getEndTime(), 10);
+
+    TimeSeries timeSeries = result.getPredictions();
+    double[] upperBound = timeSeries.getPredictedUpperBound().values();
+    double[] lowerBound = timeSeries.getPredictedLowerBound().values();
+    Assert.assertEquals(upperBound.length, lowerBound.length);
+    for (int i = 0; i < upperBound.length; i++) {
+      Assert.assertEquals(upperBound[i], 500.0, delta);
+      Assert.assertEquals(lowerBound[i], 100.0, delta);
+    }
   }
 
 }

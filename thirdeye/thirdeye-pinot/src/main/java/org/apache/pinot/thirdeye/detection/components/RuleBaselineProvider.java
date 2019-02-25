@@ -20,18 +20,15 @@
 package org.apache.pinot.thirdeye.detection.components;
 
 import org.apache.pinot.thirdeye.dashboard.resources.v2.BaselineParsingUtils;
-import org.apache.pinot.thirdeye.dataframe.Series;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
 import org.apache.pinot.thirdeye.detection.InputDataFetcher;
 import org.apache.pinot.thirdeye.detection.annotation.Components;
 import org.apache.pinot.thirdeye.detection.spec.RuleBaselineProviderSpec;
 import org.apache.pinot.thirdeye.detection.spi.components.BaselineProvider;
+import org.apache.pinot.thirdeye.detection.spi.model.TimeSeries;
 import org.apache.pinot.thirdeye.detection.spi.model.InputData;
 import org.apache.pinot.thirdeye.detection.spi.model.InputDataSpec;
-import org.apache.pinot.thirdeye.detection.spi.model.TimeSeries;
 import org.apache.pinot.thirdeye.rootcause.timeseries.Baseline;
-
-import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
 
 @Components(title = "rule baseline",
     type = "RULE_BASELINE"

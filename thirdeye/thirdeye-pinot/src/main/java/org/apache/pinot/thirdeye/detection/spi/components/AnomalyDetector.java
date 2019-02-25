@@ -19,11 +19,8 @@
 
 package org.apache.pinot.thirdeye.detection.spi.components;
 
-import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.detection.spec.AbstractSpec;
-import org.apache.pinot.thirdeye.detection.spi.model.InputData;
-import org.apache.pinot.thirdeye.detection.spi.model.InputDataSpec;
-import java.util.List;
+import org.apache.pinot.thirdeye.detection.spi.model.DetectionOutput;
 import org.joda.time.Interval;
 
 
@@ -32,6 +29,5 @@ public interface AnomalyDetector<T extends AbstractSpec> extends BaseComponent<T
    * Run detection in the specified time range and return a list of anomalies
    * @return list of anomalies
    */
-  List<MergedAnomalyResultDTO> runDetection(Interval window, String metricUrn);
-
+  DetectionOutput runDetection(Interval window, String metricUrn);
 }

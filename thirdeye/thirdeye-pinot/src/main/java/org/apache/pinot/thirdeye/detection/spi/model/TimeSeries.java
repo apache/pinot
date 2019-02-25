@@ -28,7 +28,7 @@ import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
 
 
 /**
- * Time series. wrapper object of data frame. Used by baselineProvider to return the predicted time series
+ * Wrapper object of data frame which contains baseline, upper and lower bounds.
  */
 public class TimeSeries {
   private DataFrame df;
@@ -53,6 +53,22 @@ public class TimeSeries {
     this.df.addSeries(DataFrameUtils.COL_VALUE, baselineValues);
   }
 
+  /**
+   * Add the predicted upper bound into the timeseries
+   * @param upperValues predicted upper bound.
+   */
+  public void addPredictedUpperBound(DoubleSeries upperValues) {
+    this.df.addSeries(DataFrameUtils.COL_UPPER, upperValues);
+  }
+
+  /**
+   * Add the lower bound into the timeseries
+   * @param lowerValues predicted baseline values
+   */
+  public void addPredictedLowerBound(DoubleSeries lowerValues) {
+    this.df.addSeries(DataFrameUtils.COL_LOWER, lowerValues);
+  }
+
   public static TimeSeries fromDataFrame(DataFrame df) {
     TimeSeries ts = new TimeSeries();
     ts.df.addSeries(COL_TIME, df.get(COL_TIME)).setIndex(COL_TIME);
@@ -63,8 +79,23 @@ public class TimeSeries {
   public DoubleSeries getPredictedBaseline() {
     return this.df.getDoubles(DataFrameUtils.COL_VALUE);
   }
+  public DoubleSeries getPredictedLowerBound() {
+    return this.df.getDoubles(DataFrameUtils.COL_LOWER);
+  }
+  public DoubleSeries getPredictedUpperBound() {
+    return this.df.getDoubles(DataFrameUtils.COL_UPPER);
+  }
+
+  public boolean isEmpty() {
+    return df.isEmpty();
+  }
 
   public DataFrame getDataFrame() {
     return df;
+  }
+
+  public TimeSeries merge(TimeSeries other) {
+    df.append(other.df);
+    return this;
   }
 }
