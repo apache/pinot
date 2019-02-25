@@ -90,7 +90,7 @@ public class HadoopPinotFS extends PinotFS {
   }
 
   @Override
-  public boolean doMove(URI srcUri, URI dstUri)
+  protected boolean doMove(URI srcUri, URI dstUri)
       throws IOException {
     return _hadoopFS.rename(new Path(srcUri), new Path(dstUri));
   }

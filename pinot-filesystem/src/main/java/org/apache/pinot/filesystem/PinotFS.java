@@ -22,6 +22,7 @@ import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
+import java.nio.file.Paths;
 import org.apache.commons.configuration.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -62,13 +63,11 @@ public abstract class PinotFS implements Closeable {
   /**
    * Moves the file or directory from the src to dst. Does not keep the original file. If the dst has parent directories
    * that haven't been created, this method will create all the necessary parent directories.
-   * If both src and dst are files, dst will be overwritten.
-   * If src is a file and dst is an empty directory, src file will get moved under dst directory.
-   * If both src and dst are directories, src directory will get moved under dst directory.
-   * If src is a directory and dst is a file, operation will fail.
+   * Note: In Pinot we recommend the full paths of both src and dst be specified.
    * For example, if a file /a/b/c is moved to a file /x/y/z, in the case of overwrite, the directory /a/b still exists,
    * but will not contain the file 'c'. Instead, /x/y/z will contain the contents of 'c'.
-   * If a file /a is moved to a directory /x/y, all the original files under /x/y will be kept.
+   * If a directory /a/b/ is renamed to another directory /x/y/, the directory /x/y/ will contains the content of /a/b/.
+   * If a directory /a/b/ is moved under the directory /x/y/, the dst needs to be specify as /x/y/b/.
    * @param srcUri URI of the original file
    * @param dstUri URI of the final file location
    * @param overwrite true if we want to overwrite the dstURI, false otherwise
@@ -81,20 +80,18 @@ public abstract class PinotFS implements Closeable {
       LOGGER.warn("Source {} does not exist", srcUri);
       return false;
     }
-    // if dst is an existing file
-    if (exists(dstUri) && !isDirectory(dstUri)) {
-      if (isDirectory(srcUri)) {
-        String errorMsg = String.format("Source %s is a directory while destination %s is a file", srcUri, dstUri);
-        LOGGER.warn(errorMsg);
-        throw new IOException(errorMsg);
+    if (exists(dstUri)) {
+      if (overwrite) {
+        delete(dstUri, true);
       } else {
-        if (overwrite) {
-          delete(dstUri, true);
-        } else {
-          // dst file exists, returning
-          return false;
-        }
+        // dst file exists, returning
+        LOGGER.warn("Cannot move {} to {}. Destination exists and overwrite flag set to false.", srcUri, dstUri);
+        return false;
       }
+    } else {
+      // ensures the parent path of dst exists.
+      URI parentUri = Paths.get(dstUri).getParent().toUri();
+      mkdir(parentUri);
     }
     return doMove(srcUri, dstUri);
   }
@@ -102,18 +99,17 @@ public abstract class PinotFS implements Closeable {
   /**
    * Does the actual behavior of move in each FS.
    */
-  public abstract boolean doMove(URI srcUri, URI dstUri)
+  protected abstract boolean doMove(URI srcUri, URI dstUri)
       throws IOException;
 
   /**
    * Copies the file or directory from the src to dst. The original file is retained. If the dst has parent directories
    * that haven't been created, this method will create all the necessary parent directories.
-   * If both src and dst are files, dst will be overwritten.
-   * If src is a file and dst is a directory, src file will get copied under dst directory.
-   * If both src and dst are directories, src directory will get copied under dst directory.
-   * If src is a directory and dst is a file, operation will fail.
-   * For example, if a file /x/y/z is copied to /a/b/c, /x/y/z will be retained and /x/y/z will also be present as /a/b/c;
-   * if a file /a is copied to a directory /x/y, all the original files under /x/y will be kept.
+   * Note: In Pinot we recommend the full paths of both src and dst be specified.
+   * For example, if a file /a/b/c is copied to a file /x/y/z, in the case of overwrite, the directory /a/b still exists,
+   * but will not contain the file 'c'. Instead, /x/y/z will contain the contents of 'c'.
+   * If a directory /a/b/ is copied to another directory /x/y/, the directory /x/y/ will contains the content of /a/b/.
+   * If a directory /a/b/ is copied under the directory /x/y/, the dst needs to be specify as /x/y/b/.
    * @param srcUri URI of the original file
    * @param dstUri URI of the final file location
    * @return true if copy is successful

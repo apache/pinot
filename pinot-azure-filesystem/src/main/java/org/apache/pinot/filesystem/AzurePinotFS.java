@@ -103,12 +103,8 @@ public class AzurePinotFS extends PinotFS {
    * then the call fails rather than overwrite the directory. Thus, it's best to specify
    * the full paths of both src and dst when using this method in AzurePinotFS.
    */
-  public boolean doMove(URI srcUri, URI dstUri)
+  protected boolean doMove(URI srcUri, URI dstUri)
       throws IOException {
-    // ensures the parent path of dst exists.
-    URI parentUri = Paths.get(dstUri).toUri();
-    _adlStoreClient.createDirectory(parentUri.getPath());
-    // renames the source file/directory to destination.
     return _adlStoreClient.rename(srcUri.getPath(), dstUri.getPath());
   }
 

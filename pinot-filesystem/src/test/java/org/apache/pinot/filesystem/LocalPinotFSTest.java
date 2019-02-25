@@ -117,10 +117,8 @@ public class LocalPinotFSTest {
     localPinotFS.move(newAbsoluteTempDirPath.toURI(), newAbsoluteTempDirPath3.toURI(), true);
     Assert.assertFalse(localPinotFS.exists(newAbsoluteTempDirPath.toURI()));
     Assert.assertTrue(localPinotFS.exists(newAbsoluteTempDirPath3.toURI()));
-    File testDirUnderNewAbsoluteTempDirPath3 = new File(newAbsoluteTempDirPath3, "absoluteTwo");
-    Assert.assertTrue(localPinotFS.exists(testDirUnderNewAbsoluteTempDirPath3.toURI()));
-    File testSubDirUnderNewAbsoluteTempDirPath3 = new File(testDirUnderNewAbsoluteTempDirPath3, "testDir");
-    Assert.assertTrue(localPinotFS.exists(new File(testSubDirUnderNewAbsoluteTempDirPath3, "testFile").toURI()));
+    Assert.assertTrue(localPinotFS.exists(new File(newAbsoluteTempDirPath3, "testDir").toURI()));
+    Assert.assertTrue(localPinotFS.exists(new File(new File(newAbsoluteTempDirPath3, "testDir"), "testFile").toURI()));
 
     // Check file copy to location where something already exists still works
     localPinotFS.copy(testFileUri, thirdTestFile.toURI());
@@ -135,18 +133,15 @@ public class LocalPinotFSTest {
     dstFile.createNewFile();
 
     // Expected that a move without overwrite will not succeed
-    Assert.assertFalse(localPinotFS.move(secondTestFileUri, thirdTestFile.toURI(), false));
-    Assert.assertTrue(localPinotFS.move(secondTestFileUri, thirdTestFile.toURI(), true));
+    Assert.assertFalse(localPinotFS.move(_absoluteTmpDirPath.toURI(), _newTmpDir.toURI(), false));
 
     int files = _absoluteTmpDirPath.listFiles().length;
-    String dirName  = _absoluteTmpDirPath.getName();
-    Assert.assertTrue(localPinotFS.move(_absoluteTmpDirPath.toURI(), _newTmpDir.toURI(), false));
-    Assert.assertFalse(_absoluteTmpDirPath.exists());
+    Assert.assertTrue(localPinotFS.move(_absoluteTmpDirPath.toURI(), _newTmpDir.toURI(), true));
     Assert.assertEquals(_absoluteTmpDirPath.length(), 0);
-    Assert.assertEquals(new File(_newTmpDir, dirName).listFiles().length, files);
-    Assert.assertTrue(dstFile.exists());
+    Assert.assertEquals(_newTmpDir.listFiles().length, files);
+    Assert.assertFalse(dstFile.exists());
 
-    // Check that a moving a file a non-existent destination folder will work
+    // Check that a moving a file to a non-existent destination folder will work
     FileUtils.deleteQuietly(_nonExistentTmpFolder);
     Assert.assertFalse(_nonExistentTmpFolder.exists());
     File srcFile = new File(_absoluteTmpDirPath, "srcFile");
@@ -158,13 +153,13 @@ public class LocalPinotFSTest {
     Assert.assertFalse(srcFile.exists());
     Assert.assertTrue(dstFile.exists());
 
-    //Check that moving a folder to a non-existent destination folder works
+    // Check that moving a folder to a non-existent destination folder works
     FileUtils.deleteQuietly(_nonExistentTmpFolder);
     Assert.assertFalse(_nonExistentTmpFolder.exists());
     srcFile = new File(_absoluteTmpDirPath, "srcFile");
     localPinotFS.mkdir(_absoluteTmpDirPath.toURI());
     Assert.assertTrue(srcFile.createNewFile());
-    dstFile = new File(_nonExistentTmpFolder.getPath() + "/" + dirName + "/srcFile");
+    dstFile = new File(_nonExistentTmpFolder.getPath() + "/srcFile");
     Assert.assertFalse(dstFile.exists());
     Assert.assertTrue(localPinotFS
         .move(_absoluteTmpDirPath.toURI(), _nonExistentTmpFolder.toURI(), true)); // overwrite flag has no impact
