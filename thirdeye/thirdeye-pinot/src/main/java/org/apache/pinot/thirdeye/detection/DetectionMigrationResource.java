@@ -129,7 +129,7 @@ public class DetectionMigrationResource {
   private Map<String, Object> translateAnomalyFunctionToYaml(AnomalyFunctionDTO anomalyFunctionDTO) {
     Map<String, Object> yamlConfigs = new LinkedHashMap<>();
     yamlConfigs.put("detectionName", anomalyFunctionDTO.getFunctionName());
-    yamlConfigs.put("description", "<Please edit and provide a description for this alert>");
+    yamlConfigs.put("description", "Please update description - If this alert fires then it means so-and-so and check so-and-so for irregularities");
     yamlConfigs.put("metric", anomalyFunctionDTO.getMetric());
     yamlConfigs.put("active", anomalyFunctionDTO.getIsActive());
     yamlConfigs.put("dataset", anomalyFunctionDTO.getCollection());
