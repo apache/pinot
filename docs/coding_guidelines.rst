@@ -32,6 +32,9 @@ Intellij
 
 Eclipse
 ^^^^^^^
+.. todo::
+
+   Add instructions for eclipse here
 
 Verifying code-style
 ^^^^^^^^^^^^^^^^^^^^
