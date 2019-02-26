@@ -632,10 +632,18 @@ export default Controller.extend({
 
       switch (page) {
         case 'previous':
-          newPage = --currentPage;
+          if (currentPage > 1) {
+            newPage = --currentPage;
+          } else {
+            newPage = currentPage;
+          }
           break;
         case 'next':
-          newPage = ++currentPage;
+          if (currentPage < this.get('pagesNum')) {
+            newPage = ++currentPage;
+          } else {
+            newPage = currentPage;
+          }
           break;
       }
 

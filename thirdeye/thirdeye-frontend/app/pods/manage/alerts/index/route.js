@@ -54,11 +54,19 @@ export default Route.extend({
     // format Yaml configs
     const yamlAlerts = model.detectionYaml;
     for (let yamlAlert of yamlAlerts) {
+      let dimensions = '';
+      let dimensionsArray = yamlAlert.dimensionExploration ? yamlAlert.dimensionExploration.dimensions : null;
+      if (Array.isArray(dimensionsArray)) {
+        dimensionsArray.forEach(dim => {
+          dimensions = dimensions + `${dim}, `;
+        });
+        dimensions = dimensions.substring(0, dimensions.length-2);
+      }
       Object.assign(yamlAlert, {
         functionName: yamlAlert.detectionName,
         collection: yamlAlert.dataset,
         type: yamlAlert.pipelineType,
-        exploreDimensions: yamlAlert.dimensions,
+        exploreDimensions: dimensions,
         filters: this._formatYamlFilter(yamlAlert.filters),
         isNewPipeline: true
       });
