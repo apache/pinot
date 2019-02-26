@@ -311,7 +311,7 @@ public class AnomalyReportGenerator {
 
       String imgPath = null;
       String cid = "";
-      if (anomalyReports.size() == 1) {
+      /*if (anomalyReports.size() == 1) {
         AnomalyReportDTO singleAnomaly = anomalyReports.get(0);
         try {
           imgPath = EmailScreenshotHelper.takeGraphScreenShot(singleAnomaly.getAnomalyId(), configuration);
@@ -321,7 +321,7 @@ public class AnomalyReportGenerator {
         } catch (Exception e) {
           LOG.error("Exception while embedding screenshot for anomaly {}", singleAnomaly.getAnomalyId(), e);
         }
-      }
+      }*/
       templateData.put("cid", cid);
 
       // TODO remove this code. It is dead (minus certain endpoints).

@@ -177,7 +177,7 @@ public class MultipleAnomaliesEmailContentFormatter extends BaseEmailContentForm
     });
 
     // Insert anomaly snapshot image
-    if (anomalyDetails.size() == 1) {
+    /*if (anomalyDetails.size() == 1) {
       AnomalyReportEntity singleAnomaly = anomalyDetails.get(0);
       try {
         imgPath = EmailScreenshotHelper.takeGraphScreenShot(singleAnomaly.getAnomalyId(),
@@ -185,7 +185,7 @@ public class MultipleAnomaliesEmailContentFormatter extends BaseEmailContentForm
       } catch (Exception e) {
         LOG.error("Exception while embedding screenshot for anomaly {}", singleAnomaly.getAnomalyId(), e);
       }
-    }
+    }*/
 
     templateData.put("anomalyDetails", anomalyDetails);
     templateData.put("anomalyIds", Joiner.on(",").join(anomalyIds));
