@@ -32,10 +32,11 @@ import org.apache.parquet.hadoop.ParquetWriter;
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
 
 import java.io.IOException;
-import java.util.List;
 
 
 public class ParquetUtils {
+  public static final String DEFAULT_FS = "file:///";
+
   /**
    * Get a ParquetReader with the given file.
    * @param fileName the parquet file to read
@@ -74,26 +75,24 @@ public class ParquetUtils {
   }
 
   /**
-   * write records as parquet file
+   * Get a ParquetWriter with the given file
+   * @param fileName
+   * @param schema
+   * @return a ParquetWriter
+   * @throws IOException
    */
-  public static void writeParquetRecord(String fileName, Schema schema, List<GenericRecord> records)
+  public static ParquetWriter<GenericRecord> getParquetWriter(String fileName, Schema schema)
       throws IOException {
-    ParquetWriter<GenericRecord> writer =
-        AvroParquetWriter.<GenericRecord>builder(new Path(fileName)).withSchema(schema).withConf(getConfiguration())
-            .build();
-
-    try {
-      for (GenericRecord r : records) {
-        writer.write(r);
-      }
-    } finally {
-      writer.close();
-    }
+    Path dataFsPath = new Path(fileName);
+    return AvroParquetWriter.<GenericRecord>builder(dataFsPath).withSchema(schema).withConf(getConfiguration()).build();
   }
 
   private static Configuration getConfiguration() {
+    // The file path used in ParquetRecordReader is a local file path without prefix 'file:///',
+    // so we have to make sure that the configuration item 'fs.defaultFS' is set to 'file:///'
+    // in case that user's hadoop conf overwrite this item
     Configuration conf = new Configuration();
-    conf.set("fs.defaultFS", "file:///");
+    conf.set("fs.defaultFS", DEFAULT_FS);
     conf.set("fs.file.impl", org.apache.hadoop.fs.LocalFileSystem.class.getName());
     return conf;
   }

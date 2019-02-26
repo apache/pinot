@@ -26,10 +26,12 @@ import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.commons.io.FileUtils;
+import org.apache.parquet.hadoop.ParquetWriter;
 import org.apache.pinot.common.utils.ParquetUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+
 
 public class ParquetRecordReaderTest extends RecordReaderTest {
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "ParquetRecordReaderTest");
@@ -68,7 +70,14 @@ public class ParquetRecordReaderTest extends RecordReaderTest {
       records.add(record);
     }
 
-    ParquetUtils.writeParquetRecord(DATA_FILE_PATH, schema, records);
+    ParquetWriter<GenericRecord> writer = ParquetUtils.getParquetWriter(DATA_FILE_PATH, schema);
+    try {
+      for (GenericRecord r : records) {
+        writer.write(r);
+      }
+    } finally {
+      writer.close();
+    }
   }
 
   @Test
