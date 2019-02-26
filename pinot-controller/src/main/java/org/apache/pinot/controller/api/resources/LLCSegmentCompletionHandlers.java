@@ -45,6 +45,7 @@ import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.realtime.SegmentCompletionManager;
+import org.apache.pinot.controller.helix.core.realtime.segment.CommittingSegmentDescriptor;
 import org.apache.pinot.controller.util.SegmentCompletionUtils;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
@@ -212,7 +213,8 @@ public class LLCSegmentCompletionHandlers {
     final boolean isSplitCommit = true;
 
     SegmentCompletionProtocol.Response response =
-        SegmentCompletionManager.getInstance().segmentCommitEnd(requestParams, isSuccess, isSplitCommit);
+        SegmentCompletionManager.getInstance().segmentCommitEnd(requestParams, isSuccess, isSplitCommit,
+                        CommittingSegmentDescriptor.fromSegmentCompletionReqParams(requestParams));
     final String responseStr = response.toJsonString();
     LOGGER.info("Response to segmentCommitEnd:{}", responseStr);
     return responseStr;
@@ -241,8 +243,8 @@ public class LLCSegmentCompletionHandlers {
     if (response.equals(SegmentCompletionProtocol.RESP_COMMIT_CONTINUE)) {
       // Get the segment and put it in the right place.
       boolean success = uploadSegment(multiPart, instanceId, segmentName, false) != null;
-
-      response = segmentCompletionManager.segmentCommitEnd(requestParams, success, false);
+      response = segmentCompletionManager.segmentCommitEnd(requestParams, success, false,
+              CommittingSegmentDescriptor.fromSegmentCompletionReqParams(requestParams));
     }
 
     LOGGER.info("Response to segmentCommit: instance={}  segment={} status={} offset={}", requestParams.getInstanceId(),
@@ -301,21 +303,23 @@ public class LLCSegmentCompletionHandlers {
       return SegmentCompletionProtocol.RESP_FAILED.toJsonString();
     }
 
-    SegmentMetadataImpl segmentMetadata = extractSegmentMetadata(metadataFiles, segmentName);
-
     SegmentCompletionProtocol.Request.Params requestParams = new SegmentCompletionProtocol.Request.Params();
     requestParams.withInstanceId(instanceId).withSegmentName(segmentName).withOffset(offset)
             .withSegmentLocation(segmentLocation).withSegmentSizeBytes(segmentSizeBytes)
             .withBuildTimeMillis(buildTimeMillis).withWaitTimeMillis(waitTimeMillis).withNumRows(numRows)
-            .withMemoryUsedBytes(memoryUsedBytes).withSegmentMetadata(segmentMetadata);
+            .withMemoryUsedBytes(memoryUsedBytes);
     LOGGER.info("Processing segmentCommitEnd:{}", requestParams.toString());
 
 
     final boolean isSuccess = true;
     final boolean isSplitCommit = true;
-
+    CommittingSegmentDescriptor committingSegmentDescriptor =
+            CommittingSegmentDescriptor.fromSegmentCompletionReqParams(requestParams);
+    SegmentMetadataImpl segmentMetadata = extractSegmentMetadata(metadataFiles, segmentName);
+    committingSegmentDescriptor.setSegmentMetadata(segmentMetadata);
     SegmentCompletionProtocol.Response response =
-            SegmentCompletionManager.getInstance().segmentCommitEnd(requestParams, isSuccess, isSplitCommit);
+            SegmentCompletionManager.getInstance().segmentCommitEnd(requestParams, isSuccess, isSplitCommit,
+                    committingSegmentDescriptor);
     final String responseStr = response.toJsonString();
     LOGGER.info("Response to segmentCommitEnd:{}", responseStr);
     return responseStr;
@@ -328,9 +332,13 @@ public class LLCSegmentCompletionHandlers {
     try {
       Preconditions.checkState(tempMetadataDir.mkdirs(), "Failed to create directory: %s", tempMetadataDirStr);
       // Extract metadata.properties from the metadataFiles.
-      extractMetadataFromInputForm(metadataFiles, tempMetadataDirStr, V1Constants.MetadataKeys.METADATA_FILE_NAME);
+      if (extractMetadataFromInputForm(metadataFiles, tempMetadataDirStr, V1Constants.MetadataKeys.METADATA_FILE_NAME)) {
+        return null;
+      }
       // Extract creation.meta from the metadataFiles.
-      extractMetadataFromInputForm(metadataFiles, tempMetadataDirStr, V1Constants.SEGMENT_CREATION_META);
+      if (extractMetadataFromInputForm(metadataFiles, tempMetadataDirStr, V1Constants.SEGMENT_CREATION_META)) {
+        return null;
+      }
       // Load segment metadata
       return new SegmentMetadataImpl(tempMetadataDir);
     } catch (Exception e) {
@@ -340,17 +348,23 @@ public class LLCSegmentCompletionHandlers {
     }
   }
 
-  private void extractMetadataFromInputForm(FormDataMultiPart metadataFiles, String tempMetadataDirStr,
-                                            String metaFileName) throws IOException {
+  private boolean extractMetadataFromInputForm(FormDataMultiPart metadataFiles, String tempMetadataDirStr,
+                                            String metaFileName) {
     FormDataBodyPart metadataFilesField = metadataFiles.getField(metaFileName);
     Preconditions.checkNotNull(metadataFilesField, "The metadata input field %s does not exist.",
             metaFileName);
-    InputStream metadataPropertiesInputStream = metadataFilesField.getValueAs(InputStream.class);
-    Preconditions.checkNotNull(metadataPropertiesInputStream, "Unable to parse %s from input.",
-            metaFileName);
-    java.nio.file.Path metadataPropertiesPath =
-            FileSystems.getDefault().getPath(tempMetadataDirStr, metaFileName);
-    Files.copy(metadataPropertiesInputStream, metadataPropertiesPath);
+
+    try (InputStream metadataPropertiesInputStream = metadataFilesField.getValueAs(InputStream.class)) {
+      Preconditions.checkNotNull(metadataPropertiesInputStream, "Unable to parse %s from input.",
+              metaFileName);
+      java.nio.file.Path metadataPropertiesPath =
+              FileSystems.getDefault().getPath(tempMetadataDirStr, metaFileName);
+      Files.copy(metadataPropertiesInputStream, metadataPropertiesPath);
+      return true;
+    } catch (IOException e) {
+      LOGGER.error("Failed to copy metadata property file: {}", metaFileName);
+    }
+    return false;
   }
 
   @Nullable

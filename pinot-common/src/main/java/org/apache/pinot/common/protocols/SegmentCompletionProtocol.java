@@ -203,7 +203,6 @@ public class SegmentCompletionProtocol {
       private String _segmentLocation;
       private long _memoryUsedBytes;
       private long _segmentSizeBytes;
-      private SegmentMetadata _segmentMetadata;
 
       public Params() {
         _offset = -1L;
@@ -273,11 +272,6 @@ public class SegmentCompletionProtocol {
         return this;
       }
 
-      public Params withSegmentMetadata(SegmentMetadata segmentMetadata) {
-        _segmentMetadata = segmentMetadata;
-        return this;
-      }
-
       public String getSegmentName() {
         return _segmentName;
       }
@@ -322,14 +316,11 @@ public class SegmentCompletionProtocol {
         return _segmentSizeBytes;
       }
 
-      public SegmentMetadata getSegmentMetadata() { return _segmentMetadata; }
-
       public String toString() {
         return "Offset: " + _offset + ",Segment name: " + _segmentName + ",Instance Id: " + _instanceId + ",Reason: "
             + _reason + ",NumRows: " + _numRows + ",BuildTimeMillis: " + _buildTimeMillis + ",WaitTimeMillis: "
             + _waitTimeMillis + ",ExtraTimeSec: " + _extraTimeSec + ",SegmentLocation: " + _segmentLocation
-            + ",MemoryUsedBytes: " + _memoryUsedBytes + ",SegmentSizeBytes: " + _segmentSizeBytes
-            + ", SegmentMetadata:" + _segmentMetadata;
+            + ",MemoryUsedBytes: " + _memoryUsedBytes + ",SegmentSizeBytes: " + _segmentSizeBytes;
       }
     }
   }

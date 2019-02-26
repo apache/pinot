@@ -38,7 +38,6 @@ public class CommittingSegmentDescriptor {
         new CommittingSegmentDescriptor(reqParams.getSegmentName(), reqParams.getOffset(),
             reqParams.getSegmentSizeBytes());
     committingSegmentDescriptor.setSegmentLocation(reqParams.getSegmentLocation());
-    committingSegmentDescriptor.setSegmentMetadata(reqParams.getSegmentMetadata());
     return committingSegmentDescriptor;
   }
 
