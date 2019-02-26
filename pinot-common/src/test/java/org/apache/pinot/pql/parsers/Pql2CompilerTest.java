@@ -134,6 +134,16 @@ public class Pql2CompilerTest {
   }
 
   @Test
+  public void testDotColumns() {
+    BrokerRequest brokerRequest = COMPILER.compileToBrokerRequest("select veggie.type.code from vegetables where name != 'Brussels sprouts'");
+    Assert.assertEquals(brokerRequest.getSelections().getSelectionColumns().get(0), "veggie.type.code");
+    brokerRequest = COMPILER.compileToBrokerRequest("select veggie.type.code, sum(veggie.price) from vegetables where veggie.name != 'Brussels sprouts' group by veggie.type.code");
+    Assert.assertEquals(brokerRequest.getGroupBy().getExpressions().get(0), "veggie.type.code");
+    Assert.assertEquals(brokerRequest.getAggregationsInfo().get(0).getAggregationParams().get("column"), "veggie.price");
+    Assert.assertEquals(brokerRequest.getFilterQuery().getColumn(), "veggie.name");
+  }
+
+  @Test
   public void testCompilationWithHaving() {
     BrokerRequest brokerRequest = COMPILER
         .compileToBrokerRequest("select avg(age) as avg_age from person group by address_city having avg(age)=20");

@@ -40,8 +40,7 @@ outputColumnProjection:
   expression (AS (IDENTIFIER | STRING_LITERAL))?    # OutputColumn;
 
 expression:
-  IDENTIFIER                                    # Identifier
-  | IDENTIFIER '.' IDENTIFIER                   # Identifier
+  IDENTIFIER ('.' IDENTIFIER)*                  # Identifier
   | literal                                     # Constant
   | '(' expression ')'                          # ExpressionParenthesisGroup
   | function '(' expressions? ')'               # FunctionCall
