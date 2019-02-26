@@ -17,51 +17,31 @@
 .. under the License.
 ..
 
-.. Pinot documentation master file, created by
-   sphinx-quickstart on Fri Feb  9 14:54:43 2018.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
+Coding Guidelines
+=================
 
-############
-Introduction
-############
+To contribute to Pinot, please follow the code-style as described below:
 
+Intellij
+^^^^^^^^
 
-.. toctree::
-   :maxdepth: 1
+* `Import <https://www.jetbrains.com/help/idea/settings-code-style.html>`_ code style to Intellij
+* Navigate to ``Preferences`` -> ``Editor`` -> ``Code Style`` -> ``Java``
+* Select ``Import Scheme`` -> ``Intellij IDES code style XML``
+* Choose ``codestyle-intellij.xml``
 
-   intro
-   architecture
-   trying_pinot
+Eclipse
+^^^^^^^
+.. todo::
 
-#########
-Reference
-#########
+   Add instructions for eclipse here
 
-.. toctree::
-   :maxdepth: 1
+Verifying code-style
+^^^^^^^^^^^^^^^^^^^^
 
+Run the following command to verify the code-style before posting a PR
 
-   reference
-   in_production
+.. code-block:: none
 
-#################
-Customizing Pinot
-#################
+    mvn checkstyle:check
 
-.. toctree::
-   :maxdepth: 1
-
-
-   pluggable_streams
-   segment_fetcher
-   pluggable_storage
-
-################
-Getting Involved
-################
-
-.. toctree::
-   :maxdepth: 1
-
-   coding_guidelines
