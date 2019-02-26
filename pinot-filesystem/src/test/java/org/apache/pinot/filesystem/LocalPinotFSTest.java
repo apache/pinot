@@ -210,6 +210,15 @@ public class LocalPinotFSTest {
     localPinotFS.copy(firstTempDir.toURI(), secondTempDir.toURI());
     Assert.assertEquals(localPinotFS.listFiles(secondTempDir.toURI(), true).length, 1);
 
+    // Copying directory with files under another directory.
+    File firstTempDirUnderSecondTempDir = new File(secondTempDir, firstTempDir.getName());
+    localPinotFS.copy(firstTempDir.toURI(), firstTempDirUnderSecondTempDir.toURI());
+    Assert.assertTrue(localPinotFS.exists(firstTempDirUnderSecondTempDir.toURI()));
+    // There're two files/directories under secondTempDir.
+    Assert.assertEquals(localPinotFS.listFiles(secondTempDir.toURI(), false).length, 2);
+    // The file under src directory also got copied under dst directory.
+    Assert.assertEquals(localPinotFS.listFiles(firstTempDirUnderSecondTempDir.toURI(), true).length, 1);
+
     // len of dir = exception
     try {
       localPinotFS.length(firstTempDir.toURI());

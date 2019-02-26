@@ -98,11 +98,6 @@ public class AzurePinotFS extends PinotFS {
   }
 
   @Override
-  /**
-   * Note: One corner scenario for this method in AzureFS is if the destination is a non-empty directory,
-   * then the call fails rather than overwrite the directory. Thus, it's best to specify
-   * the full paths of both src and dst when using this method in AzurePinotFS.
-   */
   protected boolean doMove(URI srcUri, URI dstUri)
       throws IOException {
     return _adlStoreClient.rename(srcUri.getPath(), dstUri.getPath());
