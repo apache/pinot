@@ -401,7 +401,7 @@ public class DetectionMigrationResource {
       MetricEntity me = MetricEntity.fromMetric(1.0, metricConfigDAO.findByMetricAndDataset(anomaly.getMetric(), anomaly.getCollection()).getId(), filters);
       return me.getUrn();
     } catch (Exception e) {
-      throw new RuntimeException("Resolve metric urn failed for anomaly " + anomaly.getId());
+      throw new RuntimeException("Resolve metric urn failed for anomaly " + anomaly.getId(), e);
     }
   }
 
