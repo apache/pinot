@@ -26,7 +26,7 @@ can then be used to add the segment to the table to which the segment belongs.
 Creating segments using hadoop
 ------------------------------
 
-.. figure:: Pinot-Offline-only-flow.png
+.. figure:: img/Pinot-Offline-only-flow.png
 
   Offline Pinot workflow
 
