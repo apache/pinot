@@ -170,8 +170,8 @@ public class ControllerConf extends PropertiesConfiguration {
 
   public static URI constructSegmentLocation(String baseDataDir, String tableName, String segmentName) {
     try {
-      return new URI(StringUtil.join(File.separator, baseDataDir, tableName, URLEncoder.encode(segmentName, "UTF-8")));
-    } catch (UnsupportedEncodingException | URISyntaxException e) {
+      return getUriFromPath(StringUtil.join(File.separator, baseDataDir, tableName, URLEncoder.encode(segmentName, "UTF-8")));
+    } catch (UnsupportedEncodingException e) {
       LOGGER
           .error("Could not construct segment location with baseDataDir {}, tableName {}, segmentName {}", baseDataDir,
               tableName, segmentName);
