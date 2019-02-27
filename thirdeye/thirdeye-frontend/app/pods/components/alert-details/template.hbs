@@ -101,11 +101,6 @@
                   <thead>
                     <tr class="te-anomaly-table__row te-anomaly-table__head">
                       <th class="te-anomaly-table__cell-head te-anomaly-table__cell-head--left">
-                        <a class="te-anomaly-table__cell-link" {{action "toggleSortDirection" "number"}}>#
-                          <i class="te-anomaly-table__icon glyphicon {{if sortColumnNumberUp "glyphicon-menu-down" "glyphicon-menu-up"}}"></i>
-                        </a>
-                      </th>
-                      <th class="te-anomaly-table__cell-head te-anomaly-table__cell-head--left">
                         <a class="te-anomaly-table__cell-link" {{action "toggleSortDirection" "start"}}>
                           Start/Duration (PDT)
                           <i class="te-anomaly-table__icon glyphicon {{if sortColumnStartUp "glyphicon-menu-up" "glyphicon-menu-down"}}"></i>
@@ -135,7 +130,6 @@
                 <tbody>
                   {{#each paginatedFilteredAnomalies as |anomaly|}}
                     <tr class="te-anomaly-table__row">
-                       <td class="te-anomaly-table__cell te-anomaly-table__cell--index">{{anomaly.number}}</td>
                        <td class="te-anomaly-table__cell">
                         <ul class="te-anomaly-table__list te-anomaly-table__list--left">
                           <li class="te-anomaly-table__list-item te-anomaly-table__list-item--stronger">
