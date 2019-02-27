@@ -38,6 +38,7 @@ import javax.ws.rs.core.MediaType;
 
 import com.google.common.base.Preconditions;
 import org.apache.commons.httpclient.URI;
+import org.apache.commons.httpclient.URIException;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
@@ -203,7 +204,8 @@ public class LLCSegmentCompletionHandlers {
       return SegmentCompletionProtocol.RESP_FAILED.toJsonString();
     }
 
-    SegmentMetadataImpl segmentMetadata = extractMetadataFromSegmentFile(segmentName);
+    SegmentMetadataImpl segmentMetadata = extractMetadataFromLocalSegmentFile(segmentName,
+            ControllerConf.getUriFromPath(segmentLocation).getPath());
     if (segmentMetadata == null) {
       return SegmentCompletionProtocol.RESP_FAILED.toJsonString();
     }
@@ -249,9 +251,16 @@ public class LLCSegmentCompletionHandlers {
     SegmentCompletionProtocol.Response response = segmentCompletionManager.segmentCommitStart(requestParams);
     if (response.equals(SegmentCompletionProtocol.RESP_COMMIT_CONTINUE)) {
       // Get the segment and put it in the right place.
-      boolean success = uploadSegment(multiPart, instanceId, segmentName, false) != null;
-      SegmentMetadataImpl segmentMetadata = extractMetadataFromSegmentFile(segmentName);
-      if (segmentMetadata == null) {
+      URI segmentURI = uploadSegment(multiPart, instanceId, segmentName, false);
+      boolean success =  (segmentURI != null);
+      SegmentMetadataImpl segmentMetadata;
+      try {
+        segmentMetadata = extractMetadataFromLocalSegmentFile(segmentName, segmentURI.getPath());
+        if (segmentMetadata == null) {
+          return SegmentCompletionProtocol.RESP_FAILED.toJsonString();
+        }
+      } catch (URIException e) {
+        LOGGER.error("segment location URI error: ", e);
         return SegmentCompletionProtocol.RESP_FAILED.toJsonString();
       }
       CommittingSegmentDescriptor committingSegmentDescriptor =
@@ -280,13 +289,13 @@ public class LLCSegmentCompletionHandlers {
     requestParams.withInstanceId(instanceId).withSegmentName(segmentName).withOffset(offset);
     LOGGER.info("Processing segmentUpload:{}", requestParams.toString());
 
-    final String segmentLocation = uploadSegment(multiPart, instanceId, segmentName, true);
-    if (segmentLocation == null) {
+    final URI segmentLocationURI = uploadSegment(multiPart, instanceId, segmentName, true);
+    if (segmentLocationURI == null) {
       return SegmentCompletionProtocol.RESP_FAILED.toJsonString();
     }
     SegmentCompletionProtocol.Response.Params responseParams =
         new SegmentCompletionProtocol.Response.Params().withOffset(requestParams.getOffset())
-            .withSegmentLocation(segmentLocation)
+            .withSegmentLocation(segmentLocationURI.toString())
             .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.UPLOAD_SUCCESS);
 
     String response = new SegmentCompletionProtocol.Response(responseParams).toJsonString();
@@ -332,7 +341,7 @@ public class LLCSegmentCompletionHandlers {
     if (segmentMetadata == null) {
       LOGGER.info("Failed to extract segment metadata for {} from input form, fallback to use the segment file.",
               segmentName);
-      segmentMetadata = extractMetadataFromSegmentFile(segmentName);
+      segmentMetadata = extractMetadataFromLocalSegmentFile(segmentName, segmentLocation);
     }
     // Return failure to server if both extraction efforts fail.
     if (segmentMetadata == null) {
@@ -404,26 +413,27 @@ public class LLCSegmentCompletionHandlers {
   /**
    * Extract the segment metadata files from the tar-zipped segment file that is expected to be in the directory for the
    * table.
-   * <p>Segment tar-zipped file path: DATADIR/rawTableName/segmentName.
+   * <p>Segment tar-zipped file path: segmentLocation.
    * <p>We extract the metadata.properties and creation.meta into a temporary metadata directory:
    * DATADIR/rawTableName/segmentName.metadata.tmp, and load metadata from there.
    *
    * @param segmentNameStr Name of the segment
+   * @param segmentLocation the location of the segment file.
    * @return SegmentMetadataImpl if it is able to extract the metadata file from the tar-zipped segment file.
    */
-  private SegmentMetadataImpl extractMetadataFromSegmentFile(final String segmentNameStr) {
+  private SegmentMetadataImpl extractMetadataFromLocalSegmentFile(final String segmentNameStr,
+                                                                  final String segmentLocation) {
     LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
     String baseDirStr = StringUtil.join("/", _controllerConf.getDataDir(), segmentName.getTableName());
-    String segFileStr = StringUtil.join("/", baseDirStr, segmentNameStr);
     String tempMetadataDirStr = StringUtil.join("/", baseDirStr, segmentNameStr + METADATA_TEMP_DIR_SUFFIX);
     File tempMetadataDir = new File(tempMetadataDirStr);
 
     try (// Extract metadata.properties
          InputStream metadataPropertiesInputStream = TarGzCompressionUtils
-                 .unTarOneFile(new FileInputStream(new File(segFileStr)), V1Constants.MetadataKeys.METADATA_FILE_NAME);
+                 .unTarOneFile(new FileInputStream(new File(segmentLocation)), V1Constants.MetadataKeys.METADATA_FILE_NAME);
          // Extract creation.meta
          InputStream creationMetaInputStream = TarGzCompressionUtils
-                 .unTarOneFile(new FileInputStream(new File(segFileStr)), V1Constants.SEGMENT_CREATION_META)
+                 .unTarOneFile(new FileInputStream(new File(segmentLocation)), V1Constants.SEGMENT_CREATION_META)
          ) {
       Preconditions.checkState(tempMetadataDir.mkdirs(), "Failed to create directory: %s", tempMetadataDirStr);
       Preconditions.checkNotNull(metadataPropertiesInputStream, "%s does not exist",
@@ -446,7 +456,7 @@ public class LLCSegmentCompletionHandlers {
   }
 
   @Nullable
-  private String uploadSegment(FormDataMultiPart multiPart, String instanceId, String segmentName,
+  private URI uploadSegment(FormDataMultiPart multiPart, String instanceId, String segmentName,
       boolean isSplitCommit) {
     try {
       Map<String, List<FormDataBodyPart>> map = multiPart.getFields();
@@ -515,7 +525,7 @@ public class LLCSegmentCompletionHandlers {
       }
 
       LOGGER.info("Moved file {} to {}", localTmpFile.getAbsolutePath(), segmentFileURI.toString());
-      return new URI(SCHEME + segmentFileURI.toString(), /* boolean escaped */ false).toString();
+      return new URI(SCHEME + segmentFileURI.toString(), /* boolean escaped */ false);
     } catch (InvalidControllerConfigException e) {
       LOGGER.error("Invalid controller config exception from instance {} for segment {}", instanceId, segmentName, e);
       return null;
