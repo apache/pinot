@@ -47,7 +47,8 @@ export default Route.extend({
           this.setProperties({
             detectionYaml: yaml,
             alertId: alertId,
-            metricUrn: alert_json.properties.nested[0].nestedMetricUrns[0]
+            metricUrn: alert_json.properties.nested[0].nestedMetricUrns[0],
+            metricUrnList: alert_json.properties.nested[0].nestedMetricUrns
           });
         }
       }
@@ -80,7 +81,8 @@ export default Route.extend({
       detectionYaml: get(this, 'detectionYaml').yaml,
       subscriptionGroups: get(this, 'subscriptionGroups'),
       subscriptionGroupYamlDisplay,
-      metricUrn: get(this, 'metricUrn')
+      metricUrn: get(this, 'metricUrn'),
+      metricUrnList: get(this, 'metricUrnList')
     });
   },
 
