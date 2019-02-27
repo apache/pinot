@@ -203,6 +203,10 @@ public class LLCSegmentCompletionHandlers {
       return SegmentCompletionProtocol.RESP_FAILED.toJsonString();
     }
 
+    SegmentMetadataImpl segmentMetadata = extractMetadataFromSegmentFile(segmentName);
+    if (segmentMetadata == null) {
+      return SegmentCompletionProtocol.RESP_FAILED.toJsonString();
+    }
     SegmentCompletionProtocol.Request.Params requestParams = new SegmentCompletionProtocol.Request.Params();
     requestParams.withInstanceId(instanceId).withSegmentName(segmentName).withOffset(offset)
         .withSegmentLocation(segmentLocation).withSegmentSizeBytes(segmentSizeBytes)
@@ -214,8 +218,7 @@ public class LLCSegmentCompletionHandlers {
     final boolean isSplitCommit = true;
 
     CommittingSegmentDescriptor committingSegmentDescriptor =
-            CommittingSegmentDescriptor.fromSegmentCompletionReqParamsAndMetadata(requestParams,
-                    extractMetadataFromSegmentFile(segmentName));
+            CommittingSegmentDescriptor.fromSegmentCompletionReqParamsAndMetadata(requestParams, segmentMetadata);
     SegmentCompletionProtocol.Response response =
         SegmentCompletionManager.getInstance().segmentCommitEnd(requestParams, isSuccess, isSplitCommit,
                 committingSegmentDescriptor);
@@ -247,9 +250,13 @@ public class LLCSegmentCompletionHandlers {
     if (response.equals(SegmentCompletionProtocol.RESP_COMMIT_CONTINUE)) {
       // Get the segment and put it in the right place.
       boolean success = uploadSegment(multiPart, instanceId, segmentName, false) != null;
+      SegmentMetadataImpl segmentMetadata = extractMetadataFromSegmentFile(segmentName);
+      if (segmentMetadata == null) {
+        return SegmentCompletionProtocol.RESP_FAILED.toJsonString();
+      }
       CommittingSegmentDescriptor committingSegmentDescriptor =
               CommittingSegmentDescriptor.fromSegmentCompletionReqParamsAndMetadata(requestParams,
-                      extractMetadataFromSegmentFile(segmentName));
+                      segmentMetadata);
       response = segmentCompletionManager.segmentCommitEnd(requestParams, success, false,
               committingSegmentDescriptor);
     }
@@ -325,6 +332,10 @@ public class LLCSegmentCompletionHandlers {
     if (segmentMetadata == null) {
       segmentMetadata = extractMetadataFromSegmentFile(segmentName);
     }
+    // Return failure to server if both extraction efforts fail.
+    if (segmentMetadata == null) {
+      return SegmentCompletionProtocol.RESP_FAILED.toJsonString();
+    }
     SegmentCompletionProtocol.Response response =
             SegmentCompletionManager.getInstance().segmentCommitEnd(requestParams, isSuccess, isSplitCommit,
                     CommittingSegmentDescriptor.fromSegmentCompletionReqParamsAndMetadata(requestParams, segmentMetadata));
@@ -333,6 +344,11 @@ public class LLCSegmentCompletionHandlers {
     return responseStr;
   }
 
+  /**
+   * Extract and return the segment metadata from the two input form data files (metadata file and creation meta).
+   * Return null if any of the two files is missing or there is exception during parsing and extraction.
+   *
+   */
   private SegmentMetadataImpl extractMetadataFromInput(FormDataMultiPart metadataFiles, String segmentNameStr) {
     String tempMetadataDirStr = StringUtil.join("/", _controllerConf.getLocalTempDir(), segmentNameStr + METADATA_TEMP_DIR_SUFFIX);
     File tempMetadataDir = new File(tempMetadataDirStr);
@@ -340,22 +356,29 @@ public class LLCSegmentCompletionHandlers {
     try {
       Preconditions.checkState(tempMetadataDir.mkdirs(), "Failed to create directory: %s", tempMetadataDirStr);
       // Extract metadata.properties from the metadataFiles.
-      if (extractMetadataFromInputField(metadataFiles, tempMetadataDirStr, V1Constants.MetadataKeys.METADATA_FILE_NAME)) {
+      if (!extractMetadataFromInputField(metadataFiles, tempMetadataDirStr, V1Constants.MetadataKeys.METADATA_FILE_NAME)) {
         return null;
       }
       // Extract creation.meta from the metadataFiles.
-      if (extractMetadataFromInputField(metadataFiles, tempMetadataDirStr, V1Constants.SEGMENT_CREATION_META)) {
+      if (!extractMetadataFromInputField(metadataFiles, tempMetadataDirStr, V1Constants.SEGMENT_CREATION_META)) {
         return null;
       }
       // Load segment metadata
       return new SegmentMetadataImpl(tempMetadataDir);
     } catch (Exception e) {
-      throw new RuntimeException("Exception extracting and reading segment metadata for " + segmentNameStr, e);
+      LOGGER.error("Exception extracting and reading segment metadata for " + segmentNameStr, e);
+      return null;
     } finally {
       FileUtils.deleteQuietly(tempMetadataDir);
     }
   }
 
+  /**
+   *
+   * Extract a single file with name metaFileName from the input FormDataMultiPart and put it under the path
+   * tempMetadataDirStr + metaFileName.
+   * Return true iff the extraction and copy is successful.
+   */
   private boolean extractMetadataFromInputField(FormDataMultiPart metadataFiles, String tempMetadataDirStr,
                                                 String metaFileName) {
     FormDataBodyPart metadataFilesField = metadataFiles.getField(metaFileName);
@@ -412,7 +435,8 @@ public class LLCSegmentCompletionHandlers {
       // Load segment metadata
       return new SegmentMetadataImpl(tempMetadataDir);
     } catch (Exception e) {
-      throw new RuntimeException("Exception extracting and reading segment metadata for " + segmentNameStr, e);
+      LOGGER.error("Exception extracting and reading segment metadata for " + segmentNameStr, e);
+      return null;
     } finally {
       FileUtils.deleteQuietly(tempMetadataDir);
     }
