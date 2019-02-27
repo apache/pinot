@@ -330,10 +330,13 @@ public class LLCSegmentCompletionHandlers {
     SegmentMetadataImpl segmentMetadata = extractMetadataFromInput(metadataFiles, segmentName);
     // If it fails to extract metadata from the input form, try to download the segment and extract it from the segment.
     if (segmentMetadata == null) {
+      LOGGER.info("Failed to extract segment metadata for {} from input form, fallback to use the segment file.",
+              segmentName);
       segmentMetadata = extractMetadataFromSegmentFile(segmentName);
     }
     // Return failure to server if both extraction efforts fail.
     if (segmentMetadata == null) {
+      LOGGER.warn("Segment metadata extraction failure for segment {}", segmentName);
       return SegmentCompletionProtocol.RESP_FAILED.toJsonString();
     }
     SegmentCompletionProtocol.Response response =
@@ -393,7 +396,7 @@ public class LLCSegmentCompletionHandlers {
       Files.copy(metadataPropertiesInputStream, metadataPropertiesPath);
       return true;
     } catch (IOException e) {
-      LOGGER.error("Failed to copy metadata property file: {}", metaFileName);
+      LOGGER.error("Failed to copy metadata property file: {}", metaFileName, e);
     }
     return false;
   }
