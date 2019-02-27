@@ -43,6 +43,7 @@ import org.apache.commons.io.IOUtils;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.StringUtil;
+import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.realtime.SegmentCompletionManager;
 import org.apache.pinot.controller.helix.core.realtime.segment.CommittingSegmentDescriptor;
@@ -212,9 +213,12 @@ public class LLCSegmentCompletionHandlers {
     final boolean isSuccess = true;
     final boolean isSplitCommit = true;
 
+    CommittingSegmentDescriptor committingSegmentDescriptor =
+            CommittingSegmentDescriptor.fromSegmentCompletionReqParamsAndMetadata(requestParams,
+                    extractMetadataFromSegmentFile(segmentName));
     SegmentCompletionProtocol.Response response =
         SegmentCompletionManager.getInstance().segmentCommitEnd(requestParams, isSuccess, isSplitCommit,
-                        CommittingSegmentDescriptor.fromSegmentCompletionReqParams(requestParams));
+                committingSegmentDescriptor);
     final String responseStr = response.toJsonString();
     LOGGER.info("Response to segmentCommitEnd:{}", responseStr);
     return responseStr;
@@ -243,8 +247,11 @@ public class LLCSegmentCompletionHandlers {
     if (response.equals(SegmentCompletionProtocol.RESP_COMMIT_CONTINUE)) {
       // Get the segment and put it in the right place.
       boolean success = uploadSegment(multiPart, instanceId, segmentName, false) != null;
+      CommittingSegmentDescriptor committingSegmentDescriptor =
+              CommittingSegmentDescriptor.fromSegmentCompletionReqParamsAndMetadata(requestParams,
+                      extractMetadataFromSegmentFile(segmentName));
       response = segmentCompletionManager.segmentCommitEnd(requestParams, success, false,
-              CommittingSegmentDescriptor.fromSegmentCompletionReqParams(requestParams));
+              committingSegmentDescriptor);
     }
 
     LOGGER.info("Response to segmentCommit: instance={}  segment={} status={} offset={}", requestParams.getInstanceId(),
@@ -313,30 +320,31 @@ public class LLCSegmentCompletionHandlers {
 
     final boolean isSuccess = true;
     final boolean isSplitCommit = true;
-    CommittingSegmentDescriptor committingSegmentDescriptor =
-            CommittingSegmentDescriptor.fromSegmentCompletionReqParams(requestParams);
-    SegmentMetadataImpl segmentMetadata = extractSegmentMetadata(metadataFiles, segmentName);
-    committingSegmentDescriptor.setSegmentMetadata(segmentMetadata);
+    SegmentMetadataImpl segmentMetadata = extractMetadataFromInput(metadataFiles, segmentName);
+    // If it fails to extract metadata from the input form, try to download the segment and extract it from the segment.
+    if (segmentMetadata == null) {
+      segmentMetadata = extractMetadataFromSegmentFile(segmentName);
+    }
     SegmentCompletionProtocol.Response response =
             SegmentCompletionManager.getInstance().segmentCommitEnd(requestParams, isSuccess, isSplitCommit,
-                    committingSegmentDescriptor);
+                    CommittingSegmentDescriptor.fromSegmentCompletionReqParamsAndMetadata(requestParams, segmentMetadata));
     final String responseStr = response.toJsonString();
     LOGGER.info("Response to segmentCommitEnd:{}", responseStr);
     return responseStr;
   }
 
-  private SegmentMetadataImpl extractSegmentMetadata(FormDataMultiPart metadataFiles, String segmentNameStr) {
+  private SegmentMetadataImpl extractMetadataFromInput(FormDataMultiPart metadataFiles, String segmentNameStr) {
     String tempMetadataDirStr = StringUtil.join("/", _controllerConf.getLocalTempDir(), segmentNameStr + METADATA_TEMP_DIR_SUFFIX);
     File tempMetadataDir = new File(tempMetadataDirStr);
 
     try {
       Preconditions.checkState(tempMetadataDir.mkdirs(), "Failed to create directory: %s", tempMetadataDirStr);
       // Extract metadata.properties from the metadataFiles.
-      if (extractMetadataFromInputForm(metadataFiles, tempMetadataDirStr, V1Constants.MetadataKeys.METADATA_FILE_NAME)) {
+      if (extractMetadataFromInputField(metadataFiles, tempMetadataDirStr, V1Constants.MetadataKeys.METADATA_FILE_NAME)) {
         return null;
       }
       // Extract creation.meta from the metadataFiles.
-      if (extractMetadataFromInputForm(metadataFiles, tempMetadataDirStr, V1Constants.SEGMENT_CREATION_META)) {
+      if (extractMetadataFromInputField(metadataFiles, tempMetadataDirStr, V1Constants.SEGMENT_CREATION_META)) {
         return null;
       }
       // Load segment metadata
@@ -348,8 +356,8 @@ public class LLCSegmentCompletionHandlers {
     }
   }
 
-  private boolean extractMetadataFromInputForm(FormDataMultiPart metadataFiles, String tempMetadataDirStr,
-                                            String metaFileName) {
+  private boolean extractMetadataFromInputField(FormDataMultiPart metadataFiles, String tempMetadataDirStr,
+                                                String metaFileName) {
     FormDataBodyPart metadataFilesField = metadataFiles.getField(metaFileName);
     Preconditions.checkNotNull(metadataFilesField, "The metadata input field %s does not exist.",
             metaFileName);
@@ -365,6 +373,49 @@ public class LLCSegmentCompletionHandlers {
       LOGGER.error("Failed to copy metadata property file: {}", metaFileName);
     }
     return false;
+  }
+
+  /**
+   * Extract the segment metadata files from the tar-zipped segment file that is expected to be in the directory for the
+   * table.
+   * <p>Segment tar-zipped file path: DATADIR/rawTableName/segmentName.
+   * <p>We extract the metadata.properties and creation.meta into a temporary metadata directory:
+   * DATADIR/rawTableName/segmentName.metadata.tmp, and load metadata from there.
+   *
+   * @param segmentNameStr Name of the segment
+   * @return SegmentMetadataImpl if it is able to extract the metadata file from the tar-zipped segment file.
+   */
+  private SegmentMetadataImpl extractMetadataFromSegmentFile(final String segmentNameStr) {
+    LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
+    String baseDirStr = StringUtil.join("/", _controllerConf.getDataDir(), segmentName.getTableName());
+    String segFileStr = StringUtil.join("/", baseDirStr, segmentNameStr);
+    String tempMetadataDirStr = StringUtil.join("/", baseDirStr, segmentNameStr + METADATA_TEMP_DIR_SUFFIX);
+    File tempMetadataDir = new File(tempMetadataDirStr);
+
+    try (// Extract metadata.properties
+         InputStream metadataPropertiesInputStream = TarGzCompressionUtils
+                 .unTarOneFile(new FileInputStream(new File(segFileStr)), V1Constants.MetadataKeys.METADATA_FILE_NAME);
+         // Extract creation.meta
+         InputStream creationMetaInputStream = TarGzCompressionUtils
+                 .unTarOneFile(new FileInputStream(new File(segFileStr)), V1Constants.SEGMENT_CREATION_META)
+         ) {
+      Preconditions.checkState(tempMetadataDir.mkdirs(), "Failed to create directory: %s", tempMetadataDirStr);
+      Preconditions.checkNotNull(metadataPropertiesInputStream, "%s does not exist",
+              V1Constants.MetadataKeys.METADATA_FILE_NAME);
+      java.nio.file.Path metadataPropertiesPath =
+              FileSystems.getDefault().getPath(tempMetadataDirStr, V1Constants.MetadataKeys.METADATA_FILE_NAME);
+      Files.copy(metadataPropertiesInputStream, metadataPropertiesPath);
+
+      Preconditions.checkNotNull(creationMetaInputStream, "%s does not exist", V1Constants.SEGMENT_CREATION_META);
+      java.nio.file.Path creationMetaPath = FileSystems.getDefault().getPath(tempMetadataDirStr, V1Constants.SEGMENT_CREATION_META);
+      Files.copy(creationMetaInputStream, creationMetaPath);
+      // Load segment metadata
+      return new SegmentMetadataImpl(tempMetadataDir);
+    } catch (Exception e) {
+      throw new RuntimeException("Exception extracting and reading segment metadata for " + segmentNameStr, e);
+    } finally {
+      FileUtils.deleteQuietly(tempMetadataDir);
+    }
   }
 
   @Nullable

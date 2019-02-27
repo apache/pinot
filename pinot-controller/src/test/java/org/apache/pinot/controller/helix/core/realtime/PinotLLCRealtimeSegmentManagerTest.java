@@ -896,7 +896,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
     segmentManager.IS_CONNECTED = false;
     reqParams.withSegmentName(committingSegmentMetadata.getSegmentName()).withOffset(nextOffset);
     CommittingSegmentDescriptor committingSegmentDescriptor =
-        CommittingSegmentDescriptor.fromSegmentCompletionReqParams(reqParams);
+        CommittingSegmentDescriptor.fromSegmentCompletionReqParamsAndMetadata(reqParams,
+                segmentManager.newMockSegmentMetadata());
     boolean status = segmentManager.commitSegmentMetadata(rawTableName, committingSegmentDescriptor);
     Assert.assertFalse(status);
     Assert.assertEquals(segmentManager._nCallsToUpdateHelix, 0);  // Idealstate not updated
@@ -952,7 +953,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     Set<String> prevInstances = idealState.getInstanceSet(committingSegmentMetadata.getSegmentName());
     reqParams.withSegmentName(committingSegmentMetadata.getSegmentName()).withOffset(nextOffset);
     CommittingSegmentDescriptor committingSegmentDescriptor =
-        CommittingSegmentDescriptor.fromSegmentCompletionReqParams(reqParams);
+        CommittingSegmentDescriptor.fromSegmentCompletionReqParamsAndMetadata(reqParams, segmentManager.newMockSegmentMetadata());
     boolean status = segmentManager.commitSegmentMetadata(rawTableName, committingSegmentDescriptor);
     segmentManager.verifyMetadataInteractions();
     Assert.assertTrue(status);
@@ -975,7 +976,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
     segmentManager._records.clear();
     prevInstances = idealState.getInstanceSet(committingSegmentMetadata.getSegmentName());
     reqParams.withSegmentName(committingSegmentMetadata.getSegmentName()).withOffset(nextOffset);
-    committingSegmentDescriptor = CommittingSegmentDescriptor.fromSegmentCompletionReqParams(reqParams);
+    committingSegmentDescriptor = CommittingSegmentDescriptor.fromSegmentCompletionReqParamsAndMetadata(reqParams,
+            segmentManager.newMockSegmentMetadata());
     status = segmentManager.commitSegmentMetadata(rawTableName, committingSegmentDescriptor);
     segmentManager.verifyMetadataInteractions();
     Assert.assertTrue(status);
@@ -993,7 +995,9 @@ public class PinotLLCRealtimeSegmentManagerTest {
     segmentManager._paths.clear();
     segmentManager._records.clear();
     reqParams.withSegmentName(committingSegmentMetadata.getSegmentName()).withOffset(nextOffset);
-    committingSegmentDescriptor = CommittingSegmentDescriptor.fromSegmentCompletionReqParams(reqParams);
+    // We do not expect the segment metadata to be used. Thus reuse the current metadata.
+    committingSegmentDescriptor = CommittingSegmentDescriptor.fromSegmentCompletionReqParamsAndMetadata(reqParams,
+            segmentManager.getMockSegmentMetadata());
     status = segmentManager.commitSegmentMetadata(rawTableName, committingSegmentDescriptor);
     segmentManager.verifyMetadataInteractions();
     Assert.assertFalse(status);
@@ -1008,7 +1012,9 @@ public class PinotLLCRealtimeSegmentManagerTest {
     segmentManager._paths.clear();
     segmentManager._records.clear();
     reqParams.withSegmentName(committingSegmentMetadata.getSegmentName()).withOffset(nextOffset);
-    committingSegmentDescriptor = CommittingSegmentDescriptor.fromSegmentCompletionReqParams(reqParams);
+    // We do not expect the segment metadata to be used. Thus reuse the current metadata.
+    committingSegmentDescriptor = CommittingSegmentDescriptor.fromSegmentCompletionReqParamsAndMetadata(reqParams,
+            segmentManager.getMockSegmentMetadata());
     status = segmentManager.commitSegmentMetadata(rawTableName, committingSegmentDescriptor);
     segmentManager.verifyMetadataInteractions();
     Assert.assertFalse(status);
@@ -1023,7 +1029,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
     committingSegmentMetadata = new LLCRealtimeSegmentZKMetadata(newZnRec);
     prevInstances = idealState.getInstanceSet(committingSegmentMetadata.getSegmentName());
     reqParams.withSegmentName(committingSegmentMetadata.getSegmentName()).withOffset(nextOffset);
-    committingSegmentDescriptor = CommittingSegmentDescriptor.fromSegmentCompletionReqParams(reqParams);
+    committingSegmentDescriptor = CommittingSegmentDescriptor.fromSegmentCompletionReqParamsAndMetadata(reqParams,
+            segmentManager.newMockSegmentMetadata());
     status = segmentManager.commitSegmentMetadata(rawTableName, committingSegmentDescriptor);
     segmentManager.verifyMetadataInteractions();
     Assert.assertTrue(status);
@@ -1093,7 +1100,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     reqParams.withSegmentName(committingSegmentMetadata.getSegmentName()).withOffset(nextOffset);
     CommittingSegmentDescriptor committingSegmentDescriptor =
-        CommittingSegmentDescriptor.fromSegmentCompletionReqParams(reqParams);
+        CommittingSegmentDescriptor.fromSegmentCompletionReqParamsAndMetadata(reqParams,
+                segmentManager1.newMockSegmentMetadata());
     boolean status = segmentManager1.commitSegmentMetadata(rawTableName, committingSegmentDescriptor);
     Assert.assertTrue(status);  // Committing segment metadata succeeded.
 
@@ -1302,6 +1310,19 @@ public class PinotLLCRealtimeSegmentManagerTest {
       _tableConfigStore = new TableConfigStore();
     }
 
+    private SegmentMetadataImpl newMockSegmentMetadata() {
+      segmentMetadata = mock(SegmentMetadataImpl.class);
+      when(segmentMetadata.getCrc()).thenReturn(FakePinotLLCRealtimeSegmentManager.CRC);
+      when(segmentMetadata.getTimeInterval()).thenReturn(FakePinotLLCRealtimeSegmentManager.INTERVAL);
+      when(segmentMetadata.getVersion()).thenReturn(FakePinotLLCRealtimeSegmentManager.SEGMENT_VERSION);
+      when(segmentMetadata.getTotalRawDocs()).thenReturn(FakePinotLLCRealtimeSegmentManager.NUM_DOCS);
+      return segmentMetadata;
+    }
+
+    private SegmentMetadataImpl getMockSegmentMetadata() {
+      return segmentMetadata;
+    }
+
     void addTableToStore(String tableName, TableConfig tableConfig, int nStreamPartitions) {
       _tableConfigStore.addTable(tableName, tableConfig, nStreamPartitions);
     }
@@ -1414,15 +1435,6 @@ public class PinotLLCRealtimeSegmentManagerTest {
       return metadata;
     }
 
-    @Override
-    protected SegmentMetadataImpl extractSegmentMetadata(final String rawTableName, final String segmentNameStr) {
-      segmentMetadata = mock(SegmentMetadataImpl.class);
-      when(segmentMetadata.getCrc()).thenReturn(CRC);
-      when(segmentMetadata.getTimeInterval()).thenReturn(INTERVAL);
-      when(segmentMetadata.getVersion()).thenReturn(SEGMENT_VERSION);
-      when(segmentMetadata.getTotalRawDocs()).thenReturn(NUM_DOCS);
-      return segmentMetadata;
-    }
 
     public void verifyMetadataInteractions() {
       verify(segmentMetadata, times(1)).getCrc();

@@ -540,6 +540,12 @@ public class PinotLLCRealtimeSegmentManager {
           committingSegmentNameStr, realtimeTableName, committingSegmentMetadata.getStatus());
       return false;
     }
+    if (committingSegmentDescriptor.getSegmentMetadata() == null) {
+      LOGGER.error("No segment metadata found in descriptor for committing segment {} for table {}", committingLLCSegmentName,
+              realtimeTableName);
+      return false;
+    }
+    SegmentMetadataImpl segmentMetadata = committingSegmentDescriptor.getSegmentMetadata();
 
     // TODO: set number of rows to end consumption in new segment metadata, based on memory used and number of rows from old segment
     committingSegmentMetadata.setEndOffset(nextOffset);
@@ -547,18 +553,6 @@ public class PinotLLCRealtimeSegmentManager {
     String rawTableName = TableNameBuilder.extractRawTableName(realtimeTableName);
     committingSegmentMetadata.setDownloadUrl(
         ControllerConf.constructDownloadUrl(rawTableName, committingSegmentNameStr, _controllerConf.generateVipUrl()));
-    // Pull segment metadata from committingSegmentDescriptor if present. Otherwise extract it from the incoming segment
-    // and set it in zk segment metadata.
-    // Note: ideally we should use the interface SegmentMetadata here for the class of segmentMetadata. However,
-    // SegmentMetadataImpl has member like ColumnMetadata which is not in the interface. Adding these members to the
-    // interface will introduce circular dependency between Pinot-Core and Pinot-common.
-    SegmentMetadataImpl segmentMetadata;
-    if (committingSegmentDescriptor.getSegmentMetadata() != null &&
-        committingSegmentDescriptor.getSegmentMetadata() instanceof SegmentMetadataImpl) {
-      segmentMetadata = (SegmentMetadataImpl)committingSegmentDescriptor.getSegmentMetadata();
-    } else {
-      segmentMetadata = extractSegmentMetadata(rawTableName, committingSegmentNameStr);
-    }
     committingSegmentMetadata.setCrc(Long.valueOf(segmentMetadata.getCrc()));
     committingSegmentMetadata.setStartTime(segmentMetadata.getTimeInterval().getStartMillis());
     committingSegmentMetadata.setEndTime(segmentMetadata.getTimeInterval().getEndMillis());
@@ -684,51 +678,6 @@ public class PinotLLCRealtimeSegmentManager {
       }
     }
     return commitTimeoutMS;
-  }
-
-  /**
-   * Extract the segment metadata files from the tar-zipped segment file that is expected to be in the directory for the
-   * table.
-   * <p>Segment tar-zipped file path: DATADIR/rawTableName/segmentName.
-   * <p>We extract the metadata.properties and creation.meta into a temporary metadata directory:
-   * DATADIR/rawTableName/segmentName.metadata.tmp, and load metadata from there.
-   *
-   * @param rawTableName Name of the table (not including the REALTIME extension)
-   * @param segmentNameStr Name of the segment
-   * @return SegmentMetadataImpl if it is able to extract the metadata file from the tar-zipped segment file.
-   */
-  protected SegmentMetadataImpl extractSegmentMetadata(final String rawTableName, final String segmentNameStr) {
-    String baseDirStr = StringUtil.join("/", _controllerConf.getDataDir(), rawTableName);
-    String segFileStr = StringUtil.join("/", baseDirStr, segmentNameStr);
-    String tempMetadataDirStr = StringUtil.join("/", baseDirStr, segmentNameStr + METADATA_TEMP_DIR_SUFFIX);
-    File tempMetadataDir = new File(tempMetadataDirStr);
-
-    try {
-      Preconditions.checkState(tempMetadataDir.mkdirs(), "Failed to create directory: %s", tempMetadataDirStr);
-
-      // Extract metadata.properties
-      InputStream metadataPropertiesInputStream = TarGzCompressionUtils
-          .unTarOneFile(new FileInputStream(new File(segFileStr)), V1Constants.MetadataKeys.METADATA_FILE_NAME);
-      Preconditions.checkNotNull(metadataPropertiesInputStream, "%s does not exist",
-          V1Constants.MetadataKeys.METADATA_FILE_NAME);
-      Path metadataPropertiesPath =
-          FileSystems.getDefault().getPath(tempMetadataDirStr, V1Constants.MetadataKeys.METADATA_FILE_NAME);
-      Files.copy(metadataPropertiesInputStream, metadataPropertiesPath);
-
-      // Extract creation.meta
-      InputStream creationMetaInputStream = TarGzCompressionUtils
-          .unTarOneFile(new FileInputStream(new File(segFileStr)), V1Constants.SEGMENT_CREATION_META);
-      Preconditions.checkNotNull(creationMetaInputStream, "%s does not exist", V1Constants.SEGMENT_CREATION_META);
-      Path creationMetaPath = FileSystems.getDefault().getPath(tempMetadataDirStr, V1Constants.SEGMENT_CREATION_META);
-      Files.copy(creationMetaInputStream, creationMetaPath);
-
-      // Load segment metadata
-      return new SegmentMetadataImpl(tempMetadataDir);
-    } catch (Exception e) {
-      throw new RuntimeException("Exception extracting and reading segment metadata for " + segmentNameStr, e);
-    } finally {
-      FileUtils.deleteQuietly(tempMetadataDir);
-    }
   }
 
   public LLCRealtimeSegmentZKMetadata getRealtimeSegmentZKMetadata(String realtimeTableName, String segmentName,
