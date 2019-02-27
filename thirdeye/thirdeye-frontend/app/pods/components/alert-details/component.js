@@ -80,11 +80,10 @@ export default Component.extend({
     { name: 'max4w', isActive: false},
     { name: 'none', isActive: false}
   ],
-  sortColumnStartUp: false,
+  sortColumnStartUp: true,
   sortColumnChangeUp: false,
-  sortColumnNumberUp: true,
   sortColumnFeedbackUp: false,
-  selectedSortMode: '',
+  selectedSortMode: 'start:down',
   selectedBaseline: 'wo1w',
   pageSize: 10,
   currentPage: 1,
@@ -264,26 +263,26 @@ export default Component.extend({
   ),
 
   series: computed(
-    'anomalies',
+    'paginatedFilteredAnomalies',
     'timeseries',
     'baseline',
     'analysisRange',
     function () {
       const {
-        metricUrn, anomalies, timeseries, baseline
-      } = getProperties(this, 'metricUrn', 'anomalies', 'timeseries',
+        metricUrn, paginatedFilteredAnomalies, timeseries, baseline
+      } = getProperties(this, 'metricUrn', 'paginatedFilteredAnomalies', 'timeseries',
         'baseline');
 
       const series = {};
 
-      if (!_.isEmpty(anomalies)) {
+      if (!_.isEmpty(paginatedFilteredAnomalies)) {
 
-        anomalies
+        paginatedFilteredAnomalies
           .filter(anomaly => anomaly.metricUrn === metricUrn)
           .forEach(anomaly => {
-            const key = this._formatAnomaly(anomaly);
+            const key = anomaly.startDateStr;
             series[key] = {
-              timestamps: [anomaly.startTime, anomaly.endTime],
+              timestamps: [anomaly.start, anomaly.end],
               values: [1, 1],
               type: 'line',
               color: 'teal',
@@ -329,29 +328,30 @@ export default Component.extend({
       const anomalies = get(this, 'anomalies');
       const labelResponse = get(this, 'labelResponse');
       let tableData = [];
-      let i = 1;
 
-      anomalies.forEach(a => {
-        const change = (a.avgBaselineVal !== 0) ? (a.avgCurrentVal/a.avgBaselineVal - 1.0) * 100.0 : 0;
-        let tableRow = {
-          number: i,
-          anomalyId: a.id,
-          start: a.startTime,
-          startDateStr: this._formatAnomaly(a),
-          durationStr: getFormattedDuration(a.startTime, a.endTime),
-          shownCurrent: humanizeFloat(a.avgCurrentVal),
-          shownBaseline: humanizeFloat(a.avgBaselineVal),
-          change: change,
-          shownChangeRate: humanizeFloat(change),
-          anomalyFeedback: a.feedback ? a.feedback.feedbackType : a.statusClassification,
-          dimensionList: Object.keys(a.dimensions),
-          dimensions: a.dimensions,
-          showResponseSaved: (labelResponse.anomalyId === a.id) ? labelResponse.showResponseSaved : false,
-          showResponseFailed: (labelResponse.anomalyId === a.id) ? labelResponse.showResponseFailed: false
-        };
-        tableData.push(tableRow);
-        i++;
-      });
+      if (anomalies) {
+        anomalies.forEach(a => {
+          const change = (a.avgBaselineVal !== 0) ? (a.avgCurrentVal/a.avgBaselineVal - 1.0) * 100.0 : 0;
+          let tableRow = {
+            anomalyId: a.id,
+            metricUrn: a.metricUrn,
+            start: a.startTime,
+            end: a.endTime,
+            startDateStr: this._formatAnomaly(a),
+            durationStr: getFormattedDuration(a.startTime, a.endTime),
+            shownCurrent: humanizeFloat(a.avgCurrentVal),
+            shownBaseline: humanizeFloat(a.avgBaselineVal),
+            change: change,
+            shownChangeRate: humanizeFloat(change),
+            anomalyFeedback: a.feedback ? a.feedback.feedbackType : a.statusClassification,
+            dimensionList: Object.keys(a.dimensions),
+            dimensions: a.dimensions,
+            showResponseSaved: (labelResponse.anomalyId === a.id) ? labelResponse.showResponseSaved : false,
+            showResponseFailed: (labelResponse.anomalyId === a.id) ? labelResponse.showResponseFailed: false
+          };
+          tableData.push(tableRow);
+        });
+      }
       return tableData;
     }
   ),
@@ -628,7 +628,6 @@ export default Component.extend({
       const anomalies = get(this, 'anomalies');
       // Reset status icon
       set(this, 'renderStatusIcon', false);
-  
       const responseObj = anomalyResponseObj.find(res => res.name === selectedResponse);
       // get the response object from anomalyResponseObjNew
       const newFeedbackValue = anomalyResponseObjNew.find(res => res.name === selectedResponse).value;
