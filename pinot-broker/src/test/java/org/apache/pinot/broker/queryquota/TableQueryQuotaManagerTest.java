@@ -77,7 +77,7 @@ public class TableQueryQuotaManagerTest {
       super(clusterName, instanceName, instanceType, zkAddress);
       super._zkclient = new ZkClient(StringUtil.join("/", StringUtils.chomp(ZkStarter.DEFAULT_ZK_STR, "/")),
           ZkClient.DEFAULT_SESSION_TIMEOUT, ZkClient.DEFAULT_CONNECTION_TIMEOUT, new ZNRecordSerializer());
-      _zkclient.deleteRecursive("/" + clusterName + "/PROPERTYSTORE");
+      _zkclient.deleteRecursively("/" + clusterName + "/PROPERTYSTORE");
       _zkclient.createPersistent("/" + clusterName + "/PROPERTYSTORE", true);
       setPropertyStore(clusterName);
     }
