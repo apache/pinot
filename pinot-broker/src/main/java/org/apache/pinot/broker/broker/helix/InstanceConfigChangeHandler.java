@@ -16,39 +16,23 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.metrics;
+package org.apache.pinot.broker.broker.helix;
 
-import org.apache.pinot.common.Utils;
+import org.apache.pinot.broker.routing.HelixExternalViewBasedRouting;
 
 
 /**
- * Enumeration containing all the timers exposed by the Pinot broker.
- *
+ * Cluster change handler for instance config changes.
  */
-public enum BrokerTimer implements AbstractMetrics.Timer {
-  ROUTING_TABLE_UPDATE_TIME(true),
-  CLUSTER_CHANGE_QUEUE_TIME(true);
+public class InstanceConfigChangeHandler implements ClusterChangeHandler {
+  private final HelixExternalViewBasedRouting _helixExternalViewBasedRouting;
 
-  private final String timerName;
-  private final boolean global;
-
-  BrokerTimer(boolean global) {
-    this.global = global;
-    this.timerName = Utils.toCamelCase(name().toLowerCase());
+  public InstanceConfigChangeHandler(HelixExternalViewBasedRouting helixExternalViewBasedRouting) {
+    _helixExternalViewBasedRouting = helixExternalViewBasedRouting;
   }
 
   @Override
-  public String getTimerName() {
-    return timerName;
-  }
-
-  /**
-   * Returns true if the timer is global (not attached to a particular resource)
-   *
-   * @return true if the timer is global
-   */
-  @Override
-  public boolean isGlobal() {
-    return global;
+  public void processClusterChange() {
+    _helixExternalViewBasedRouting.processInstanceConfigChange();
   }
 }

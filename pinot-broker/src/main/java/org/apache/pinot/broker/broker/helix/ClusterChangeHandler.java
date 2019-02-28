@@ -16,39 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.metrics;
-
-import org.apache.pinot.common.Utils;
-
+package org.apache.pinot.broker.broker.helix;
 
 /**
- * Enumeration containing all the timers exposed by the Pinot broker.
- *
+ * Handles cluster changes such as external view changes, instance config changes, live instance changes etc.
  */
-public enum BrokerTimer implements AbstractMetrics.Timer {
-  ROUTING_TABLE_UPDATE_TIME(true),
-  CLUSTER_CHANGE_QUEUE_TIME(true);
+public interface ClusterChangeHandler {
 
-  private final String timerName;
-  private final boolean global;
-
-  BrokerTimer(boolean global) {
-    this.global = global;
-    this.timerName = Utils.toCamelCase(name().toLowerCase());
-  }
-
-  @Override
-  public String getTimerName() {
-    return timerName;
-  }
-
-  /**
-   * Returns true if the timer is global (not attached to a particular resource)
-   *
-   * @return true if the timer is global
-   */
-  @Override
-  public boolean isGlobal() {
-    return global;
-  }
+  void processClusterChange();
 }
