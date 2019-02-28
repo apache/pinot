@@ -1,5 +1,4 @@
 <h1 class="te-title">Create Alert
-  {{#if (eq debug "show")}}
     {{#x-toggle
       value=isForm
       classNames="te-toggle te-toggle--form te-toggle--left report-toggle pull-right"
@@ -17,7 +16,6 @@
           <span class="te-label te-label--flush">Form</span>
         {{/toggle.label}}
     {{/x-toggle}}
-  {{/if}}
 </h1>
 <main class="alert-create card-container card-container--padded te-form">
   {{#if isForm}}

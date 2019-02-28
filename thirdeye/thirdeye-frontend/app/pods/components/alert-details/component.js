@@ -40,6 +40,7 @@ const DEFAULT_ACTIVE_DURATION = '1m'; // setting this date range selection as de
 const UI_DATE_FORMAT = 'MMM D, YYYY hh:mm a'; // format for date picker to use (usually varies by route or metric)
 const DISPLAY_DATE_FORMAT = 'YYYY-MM-DD HH:mm'; // format used consistently across app to display custom date range
 const TIME_RANGE_OPTIONS = ['1w', '1m', '3m'];
+const ANOMALY_LEGEND_THRESHOLD = 20; // If number of anomalies is larger than this threshold, don't show the legend
 
 export default Component.extend({
   anomaliesApiService: service('services/api/anomalies'),
@@ -263,26 +264,37 @@ export default Component.extend({
   ),
 
   series: computed(
-    'paginatedFilteredAnomalies',
+    'anomalies',
     'timeseries',
     'baseline',
     'analysisRange',
     function () {
       const {
-        metricUrn, paginatedFilteredAnomalies, timeseries, baseline
-      } = getProperties(this, 'metricUrn', 'paginatedFilteredAnomalies', 'timeseries',
+        metricUrn, anomalies, timeseries, baseline
+      } = getProperties(this, 'metricUrn', 'anomalies', 'timeseries',
         'baseline');
 
       const series = {};
 
-      if (!_.isEmpty(paginatedFilteredAnomalies)) {
+      if (!_.isEmpty(anomalies)) {
 
-        paginatedFilteredAnomalies
-          .filter(anomaly => anomaly.metricUrn === metricUrn)
-          .forEach(anomaly => {
-            const key = anomaly.startDateStr;
+        const anomaliesInGraph = anomalies.filter(anomaly => anomaly.metricUrn === metricUrn);
+        if (anomaliesInGraph.length > ANOMALY_LEGEND_THRESHOLD) {
+          this.setProperties({legend: {
+              show: false,
+              position: 'right'
+          }})
+        } else {
+          this.setProperties({legend: {
+              show: true,
+              position: 'right'
+            }})
+
+        }
+        anomaliesInGraph.forEach(anomaly => {
+            const key = this._formatAnomaly(anomaly);
             series[key] = {
-              timestamps: [anomaly.start, anomaly.end],
+              timestamps: [anomaly.startTime, anomaly.endTime],
               values: [1, 1],
               type: 'line',
               color: 'teal',
