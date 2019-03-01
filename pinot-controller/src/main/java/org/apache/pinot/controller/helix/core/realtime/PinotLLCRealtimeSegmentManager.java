@@ -107,7 +107,7 @@ public class PinotLLCRealtimeSegmentManager {
   private static final String METADATA_TEMP_DIR_SUFFIX = ".metadata.tmp";
   private static final String METADATA_EVENT_NOTIFIER_PREFIX = "metadata.event.notifier";
 
-  // Max time to wait for all LLC segments to complete committing their metadata.
+  // Max time to wait for all LLC segments to complete committing their metadata while stopping the controller.
   private static final long MAX_LLC_SEGMENT_METADATA_COMMIT_TIME_MILLIS = 30_000L;
 
   // TODO: make this configurable with default set to 10
@@ -118,7 +118,7 @@ public class PinotLLCRealtimeSegmentManager {
    * This includes any backoffs and retries for the steps 2 and 3
    * The segment will be eligible for repairs by the validation manager, if the time  exceeds this value
    */
-  private static int MAX_SEGMENT_COMPLETION_TIME_MINS = 10;
+  private static int MAX_SEGMENT_COMPLETION_TIME_MILLIS = 300_000; // 5 MINUTES
 
   private static PinotLLCRealtimeSegmentManager INSTANCE = null;
 
@@ -503,7 +503,7 @@ public class PinotLLCRealtimeSegmentManager {
     // TODO Introduce a controller failure here for integration testing
 
     // When multiple segments of the same table complete around the same time it is possible that
-    // the idealstate udpate fails due to contention. We serialize the updates to the idealstate
+    // the idealstate update fails due to contention. We serialize the updates to the idealstate
     // to reduce this contention. We may still contend with RetentionManager, or other updates
     // to idealstate from other controllers, but then we have the retry mechanism to get around that.
     // hash code can be negative, so make sure we are getting a positive lock index
@@ -514,7 +514,10 @@ public class PinotLLCRealtimeSegmentManager {
       updateIdealStateOnSegmentCompletion(realtimeTableName, committingSegmentNameStr, newSegmentNameStr,
           partitionAssignment);
       LOGGER.info("Changed {} to ONLINE and created {} in CONSUMING", committingSegmentNameStr, newSegmentNameStr);
-    } finally {
+    } catch (Exception e) {
+      LOGGER.error("Caught exception when updating ideal state for {}", committingSegmentNameStr, e);
+      return false;
+    }  finally {
       lock.unlock();
     }
 
@@ -987,6 +990,18 @@ public class PinotLLCRealtimeSegmentManager {
       @Nullable
       @Override
       public IdealState apply(@Nullable IdealState idealState) {
+        // When segment completion begins, the zk metadata is updated, followed by ideal state.
+        // We allow only {@link PinotLLCRealtimeSegmentManager::MAX_SEGMENT_COMPLETION_TIME_MILLIS} ms for a segment to complete,
+        // after which the segment is eligible for repairs by the {@link org.apache.pinot.controller.validation.RealtimeSegmentValidationManager}
+        // After updating metadata, if more than {@link PinotLLCRealtimeSegmentManager::MAX_SEGMENT_COMPLETION_TIME_MILLIS} ms elapse and ideal state is still not updated,
+        // the segment could have already been fixed by {@link org.apache.pinot.controller.validation.RealtimeSegmentValidationManager}
+        // Therefore, we do not want to proceed with ideal state update if max segment completion time has exceeded
+        if (isExceededMaxSegmentCompletionTime(tableNameWithType, currentSegmentId, System.currentTimeMillis())) {
+          LOGGER.error("Exceeded max segment completion time. Skipping ideal state update for segment {}",
+              currentSegmentId);
+          throw new HelixHelper.PermanentUpdaterException(
+              "Exceeded max segment completion time for segment " + currentSegmentId);
+        }
         return updateIdealStateOnSegmentCompletion(idealState, currentSegmentId, newSegmentId, partitionAssignment);
       }
     }, RetryPolicies.exponentialBackoffRetryPolicy(10, 1000L, 1.2f));
@@ -1052,8 +1067,24 @@ public class PinotLLCRealtimeSegmentManager {
     Stat stat = new Stat();
     LLCRealtimeSegmentZKMetadata metadata = getRealtimeSegmentZKMetadata(tableNameWithType, segmentId, stat);
     long metadataUpdateTime = stat.getMtime();
-    if (now < metadataUpdateTime + TimeUnit.MILLISECONDS.convert(MAX_SEGMENT_COMPLETION_TIME_MINS, TimeUnit.MINUTES)) {
+    if (now < metadataUpdateTime + MAX_SEGMENT_COMPLETION_TIME_MILLIS) {
       LOGGER.info("Too soon to correct segment:{} updateTime: {} now:{}", segmentId, metadataUpdateTime, now);
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   *
+   * Returns true if more than {@link PinotLLCRealtimeSegmentManager::MAX_SEGMENT_COMPLETION_TIME_MILLIS} ms have elapsed since segment metadata update
+   */
+  private boolean isExceededMaxSegmentCompletionTime(String tableNameWithType, String segmentId, long now) {
+    Stat stat = new Stat();
+    LLCRealtimeSegmentZKMetadata metadata = getRealtimeSegmentZKMetadata(tableNameWithType, segmentId, stat);
+    long metadataUpdateTime = stat.getMtime();
+    if (now > metadataUpdateTime + MAX_SEGMENT_COMPLETION_TIME_MILLIS) {
+      LOGGER.info("Segment:{}, Now:{}, metadataUpdateTime:{}, Exceeded MAX_SEGMENT_COMPLETION_TIME_MILLIS:{}",
+          segmentId, now, metadataUpdateTime, MAX_SEGMENT_COMPLETION_TIME_MILLIS);
       return true;
     }
     return false;
@@ -1357,7 +1388,7 @@ public class PinotLLCRealtimeSegmentManager {
       @Nonnull String currentSegmentId, @Nonnull String newSegmentId,
       @Nonnull PartitionAssignment partitionAssignment) {
 
-    Map<String, List<String>> instanceAssignments = null;
+    Map<String, List<String>> instanceAssignments;
 
     RealtimeSegmentAssignmentStrategy strategy = new ConsumingSegmentAssignmentStrategy();
     try {
@@ -1375,15 +1406,16 @@ public class PinotLLCRealtimeSegmentManager {
           PinotHelixSegmentOnlineOfflineStateModelGenerator.ONLINE_STATE);
     }
 
-    // We may have (for whatever reason) a different instance list in the idealstate for the new segment.
-    // If so, clear it, and then set the instance state for the set of instances that we know should be there.
+    // The {@link RealtimeSegmentValidationManager} will fix metadata and ideal state after {@link MAX_SEGMENT_COMPLETION_TIME_MILLIS} of inactivity on the committing segment
+    // If the ideal state update during completion took longer than {@link MAX_SEGMENT_COMPLETION_TIME_MILLIS},the update could already have been done by the fixer thread .
+    // We do not want to overwrite the ideal state. It is possible that the new segment created by the fixer has already progressed to ONLINE.
+    // If we let the below update happen, we will be bringing an ONLINE segment back to CONSUMING, and end up with 2 CONSUMING segments for the partition
     Map<String, String> stateMap = idealState.getInstanceStateMap(newSegmentId);
-    if (stateMap != null) {
-      stateMap.clear();
-    }
-    for (String instance : newSegmentInstances) {
-      idealState
-          .setPartitionState(newSegmentId, instance, PinotHelixSegmentOnlineOfflineStateModelGenerator.CONSUMING_STATE);
+    if (stateMap == null) {
+      for (String instance : newSegmentInstances) {
+        idealState
+            .setPartitionState(newSegmentId, instance, PinotHelixSegmentOnlineOfflineStateModelGenerator.CONSUMING_STATE);
+      }
     }
 
     return idealState;
