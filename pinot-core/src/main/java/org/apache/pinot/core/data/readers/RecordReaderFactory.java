@@ -35,6 +35,7 @@ public class RecordReaderFactory {
 
     Schema schema = segmentGeneratorConfig.getSchema();
     FileFormat fileFormat = segmentGeneratorConfig.getFormat();
+    String recordReaderPath = segmentGeneratorConfig.getRecordReaderPath();
     switch (fileFormat) {
       case AVRO:
       case GZIPPED_AVRO:
@@ -49,6 +50,14 @@ public class RecordReaderFactory {
       // NOTE: PinotSegmentRecordReader does not support time conversion (field spec must match)
       case PINOT:
         return new PinotSegmentRecordReader(dataFile, schema, segmentGeneratorConfig.getColumnSortOrder());
+      case ORC:
+        // The ORC reader currently uses hive, we don't want to bring this dependency into pinot-core
+        if (recordReaderPath == null) {
+          throw new RuntimeException("Record reader path must be set for ORC");
+        }
+        RecordReader recordReader = (RecordReader) Class.forName(recordReaderPath).newInstance();
+        recordReader.init(segmentGeneratorConfig);
+        return recordReader;
       default:
         throw new UnsupportedOperationException("Unsupported input file format: " + fileFormat);
     }

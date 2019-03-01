@@ -69,6 +69,7 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
 
   // Optional
   protected TableConfig _tableConfig;
+  protected String _inputFileFormat;
   protected Path _readerConfigFile;
 
   // HDFS segment tar directory
@@ -100,6 +101,8 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
     if (readerConfigFile != null) {
       _readerConfigFile = new Path(readerConfigFile);
     }
+
+    _inputFileFormat = _jobConf.get(JobConfigConstants.INPUT_FILE_FORMAT, null);
 
     // Set up segment name generator
     String segmentNameGeneratorType =
@@ -256,6 +259,12 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
   }
 
   protected FileFormat getFileFormat(String fileName) {
+    // ORC files do not necessarily have the .orc file extension nor is there a reliable way to decide
+    // whether they are orc files, so the user will have to pass the fact that the file is orc
+    // in as a parameter.
+    if (_inputFileFormat != null && _inputFileFormat.equalsIgnoreCase(FileFormat.ORC.toString())) {
+      return FileFormat.ORC;
+    }
     if (fileName.endsWith(".avro")) {
       return FileFormat.AVRO;
     }

@@ -49,4 +49,5 @@ public class JobConfigConstants {
   public static final String PUSH_TO_PORT = "push.to.port";
 
   public static final String DEFAULT_PERMISSIONS_MASK = "fs.permissions.umask-mode";
+  public static final String INPUT_FILE_FORMAT = "input.file.format";
 }
