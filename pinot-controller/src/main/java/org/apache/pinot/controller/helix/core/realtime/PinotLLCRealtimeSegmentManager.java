@@ -511,7 +511,10 @@ public class PinotLLCRealtimeSegmentManager {
       updateIdealStateOnSegmentCompletion(realtimeTableName, committingSegmentNameStr, newSegmentNameStr,
           partitionAssignment);
       LOGGER.info("Changed {} to ONLINE and created {} in CONSUMING", committingSegmentNameStr, newSegmentNameStr);
-    } finally {
+    } catch (Exception e) {
+      LOGGER.error("Caught exception when updating ideal state for {}", committingSegmentNameStr, e);
+      return false;
+    }  finally {
       lock.unlock();
     }
 
@@ -984,6 +987,18 @@ public class PinotLLCRealtimeSegmentManager {
       @Nullable
       @Override
       public IdealState apply(@Nullable IdealState idealState) {
+        // When segment completion begins, the zk metadata is updated, followed by ideal state.
+        // We allow only {@link PinotLLCRealtimeSegmentManager::MAX_SEGMENT_COMPLETION_TIME_MILLIS} ms for a segment to complete,
+        // after which the segment is eligible for repairs by the {@link org.apache.pinot.controller.validation.RealtimeSegmentValidationManager}
+        // After updating metadata, if more than {@link PinotLLCRealtimeSegmentManager::MAX_SEGMENT_COMPLETION_TIME_MILLIS} ms elapse and ideal state is still not updated,
+        // the segment could have already been fixed by {@link org.apache.pinot.controller.validation.RealtimeSegmentValidationManager}
+        // Therefore, we do not want to proceed with ideal state update if max segment completion time has exceeded
+        if (isExceededMaxSegmentCompletionTime(tableNameWithType, currentSegmentId, System.currentTimeMillis())) {
+          LOGGER.error("Exceeded max segment completion time. Skipping ideal state update for segment {}",
+              currentSegmentId);
+          throw new HelixHelper.PermanentUpdaterException(
+              "Exceeded max segment completion time for segment " + currentSegmentId);
+        }
         return updateIdealStateOnSegmentCompletion(idealState, currentSegmentId, newSegmentId, partitionAssignment);
       }
     }, RetryPolicies.exponentialBackoffRetryPolicy(10, 1000L, 1.2f));
@@ -1051,6 +1066,22 @@ public class PinotLLCRealtimeSegmentManager {
     long metadataUpdateTime = stat.getMtime();
     if (now < metadataUpdateTime + MAX_SEGMENT_COMPLETION_TIME_MILLIS) {
       LOGGER.info("Too soon to correct segment:{} updateTime: {} now:{}", segmentId, metadataUpdateTime, now);
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   *
+   * Returns true if more than {@link PinotLLCRealtimeSegmentManager::MAX_SEGMENT_COMPLETION_TIME_MILLIS} ms have elapsed since segment metadata update
+   */
+  private boolean isExceededMaxSegmentCompletionTime(String tableNameWithType, String segmentId, long now) {
+    Stat stat = new Stat();
+    LLCRealtimeSegmentZKMetadata metadata = getRealtimeSegmentZKMetadata(tableNameWithType, segmentId, stat);
+    long metadataUpdateTime = stat.getMtime();
+    if (now > metadataUpdateTime + MAX_SEGMENT_COMPLETION_TIME_MILLIS) {
+      LOGGER.info("Segment:{}, Now:{}, metadataUpdateTime:{}, Exceeded MAX_SEGMENT_COMPLETION_TIME_MILLIS:{}",
+          segmentId, now, metadataUpdateTime, MAX_SEGMENT_COMPLETION_TIME_MILLIS);
       return true;
     }
     return false;
