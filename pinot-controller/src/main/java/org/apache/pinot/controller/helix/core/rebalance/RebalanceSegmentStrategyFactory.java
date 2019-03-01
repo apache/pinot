@@ -63,4 +63,8 @@ public class RebalanceSegmentStrategyFactory {
         return new DefaultRebalanceSegmentStrategy(_helixManager);
     }
   }
+
+  public static void stop() {
+    INSTANCE = null;
+  }
 }

@@ -59,6 +59,20 @@ public class ControllerConf extends PropertiesConfiguration {
   private static final String EXTERNAL_VIEW_ONLINE_TO_OFFLINE_TIMEOUT = "controller.upload.onlineToOfflineTimeout";
   private static final String CONTROLLER_MODE = "controller.mode";
 
+  public enum ControllerMode {
+    DUAL,
+    PINOT_ONLY,
+    HELIX_ONLY;
+
+    public static ControllerMode getMode(String mode) {
+      if (mode == null) {
+        LOGGER.info("No controller mode specified. Using dual mode by default.");
+        return ControllerMode.DUAL;
+      }
+      return ControllerMode.valueOf(mode.toUpperCase());
+    }
+  }
+
   public static class ControllerPeriodicTasksConf {
     // frequency configs
     private static final String RETENTION_MANAGER_FREQUENCY_IN_SECONDS = "controller.retention.frequencyInSeconds";
@@ -586,13 +600,11 @@ public class ControllerConf extends PropertiesConfiguration {
     return ControllerPeriodicTasksConf.getRandomInitialDelayInSeconds();
   }
 
-  public void setControllerMode(String controllerMode) {
-    if (controllerMode != null) {
-      setProperty(CONTROLLER_MODE, controllerMode);
-    }
+  public void setControllerMode(ControllerMode controllerMode) {
+    setProperty(CONTROLLER_MODE, controllerMode.name());
   }
 
-  public String getControllerMode() {
-    return getString(CONTROLLER_MODE, DEFAULT_CONTROLLER_MODE);
+  public ControllerMode getControllerMode() {
+    return ControllerMode.getMode(getString(CONTROLLER_MODE, DEFAULT_CONTROLLER_MODE.name()));
   }
 }

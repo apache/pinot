@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.controller.helix.core.util;
 
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -61,35 +60,6 @@ import org.slf4j.LoggerFactory;
  *
  */
 public class HelixSetupUtils {
-
-  public enum ControllerMode {
-    DUAL("dual"),
-    PINOT_ONLY("pinot_only"),
-    HELIX_ONLY("helix_only");
-
-    private String _mode;
-
-    ControllerMode(String mode) {
-      _mode = mode;
-    }
-
-    public static ControllerMode getMode(String mode) {
-      if (mode == null) {
-        LOGGER.info("No controller mode specified. Using dual mode by default.");
-        return ControllerMode.DUAL;
-      }
-
-      for (ControllerMode controllerMode : ControllerMode.values()) {
-        if (controllerMode._mode.equalsIgnoreCase(mode)) {
-          return controllerMode;
-        }
-      }
-      String errorMsg = String.format("Invalid controller mode: %s. It should be one of the following: %s", mode,
-          Arrays.toString(ControllerMode.values()));
-      LOGGER.error(errorMsg);
-      throw new RuntimeException(errorMsg);
-    }
-  }
 
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixSetupUtils.class);
 

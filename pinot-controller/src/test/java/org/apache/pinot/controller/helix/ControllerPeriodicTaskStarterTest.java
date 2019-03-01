@@ -20,6 +20,7 @@ package org.apache.pinot.controller.helix;
 
 import java.util.List;
 import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.controller.ControllerStarter;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.periodictask.PeriodicTask;
 import org.testng.Assert;
@@ -54,6 +55,7 @@ public class ControllerPeriodicTaskStarterTest extends ControllerTest {
     _mockControllerStarter = new MockControllerStarter(config);
     _mockControllerStarter.start();
     _helixResourceManager = _mockControllerStarter.getHelixResourceManager();
+    _helixManager = _mockControllerStarter.getHelixControllerManager();
   }
 
   @Override
@@ -62,6 +64,11 @@ public class ControllerPeriodicTaskStarterTest extends ControllerTest {
 
     _mockControllerStarter.stop();
     _mockControllerStarter = null;
+  }
+
+  @Override
+  protected ControllerStarter getControllerStarter() {
+    return _mockControllerStarter;
   }
 
   private class MockControllerStarter extends TestOnlyControllerStarter {

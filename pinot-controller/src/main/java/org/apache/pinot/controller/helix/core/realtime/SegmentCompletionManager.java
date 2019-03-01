@@ -1116,6 +1116,10 @@ public class SegmentCompletionManager {
     }
   }
 
+  public static void stop() {
+    _instance = null;
+  }
+
   @VisibleForTesting
   protected boolean isLeader() {
     return ControllerLeadershipManager.getInstance().isLeader();

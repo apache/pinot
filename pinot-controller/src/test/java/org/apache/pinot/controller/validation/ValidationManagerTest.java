@@ -77,11 +77,14 @@ public class ValidationManagerTest {
     _zkClient = new ZkClient(ZK_STR);
     Thread.sleep(1000);
 
+    final boolean enableBatchMessageMode = false;
     _pinotHelixResourceManager =
-        new PinotHelixResourceManager(ZK_STR, HELIX_CLUSTER_NAME, CONTROLLER_INSTANCE_NAME, null, 1000L,
-            true, /*isUpdateStateModel=*/
-            false, false, null);
-    _pinotHelixResourceManager.start();
+        new PinotHelixResourceManager(ZkStarter.DEFAULT_ZK_STR, HELIX_CLUSTER_NAME, null, 1000L,
+            true, enableBatchMessageMode);
+    HelixManager helixZkManager = HelixSetupUtils
+        .setup(HELIX_CLUSTER_NAME, ZK_STR, CONTROLLER_INSTANCE_NAME, false, enableBatchMessageMode);
+    Assert.assertNotNull(helixZkManager);
+    _pinotHelixResourceManager.start(helixZkManager);
 
     ControllerRequestBuilderUtil.addFakeDataInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZK_STR, 2, true);
     ControllerRequestBuilderUtil.addFakeBrokerInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZK_STR, 2, true);

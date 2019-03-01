@@ -79,10 +79,14 @@ public class SegmentAssignmentStrategyTest {
       _zkClient.deleteRecursive(zkPath);
     }
     final String instanceId = "localhost_helixController";
-    _pinotHelixResourceManager = new PinotHelixResourceManager(ZK_SERVER, HELIX_CLUSTER_NAME, instanceId, null, 10000L,
-        true, /*isUpdateStateModel=*/
-        false, false, null);
-    _pinotHelixResourceManager.start();
+    final boolean enableBatchMessageMode = false;
+    _pinotHelixResourceManager =
+        new PinotHelixResourceManager(ZkStarter.DEFAULT_ZK_STR, HELIX_CLUSTER_NAME, null, 10000L,
+            true, enableBatchMessageMode);
+    HelixManager helixZkManager = HelixSetupUtils
+        .setup(HELIX_CLUSTER_NAME, ZkStarter.DEFAULT_ZK_STR, instanceId, false, enableBatchMessageMode);
+    Assert.assertNotNull(helixZkManager);
+    _pinotHelixResourceManager.start(helixZkManager);
 
     final String helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(ZK_SERVER);
     _helixZkManager =

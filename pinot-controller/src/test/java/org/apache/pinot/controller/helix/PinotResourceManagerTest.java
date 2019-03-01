@@ -23,6 +23,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.apache.helix.HelixAdmin;
+import org.apache.helix.HelixManager;
 import org.apache.helix.manager.zk.ZkClient;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.config.TableConfig;
@@ -31,6 +32,7 @@ import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.helix.core.util.HelixSetupUtils;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -54,10 +56,14 @@ public class PinotResourceManagerTest {
     _zkClient = new ZkClient(ZkStarter.DEFAULT_ZK_STR);
 
     final String instanceId = "localhost_helixController";
+    final boolean enableBatchMessageMode = false;
     _pinotHelixResourceManager =
-        new PinotHelixResourceManager(ZkStarter.DEFAULT_ZK_STR, HELIX_CLUSTER_NAME, instanceId, null, 10000L, true,
-            /*isUpdateStateModel=*/ false, false, null);
-    _pinotHelixResourceManager.start();
+        new PinotHelixResourceManager(ZkStarter.DEFAULT_ZK_STR, HELIX_CLUSTER_NAME, null, 10000L,
+            true, enableBatchMessageMode);
+    HelixManager helixZkManager = HelixSetupUtils
+        .setup(HELIX_CLUSTER_NAME, ZkStarter.DEFAULT_ZK_STR, instanceId, false, enableBatchMessageMode);
+    Assert.assertNotNull(helixZkManager);
+    _pinotHelixResourceManager.start(helixZkManager);
     _helixAdmin = _pinotHelixResourceManager.getHelixAdmin();
 
     ControllerRequestBuilderUtil

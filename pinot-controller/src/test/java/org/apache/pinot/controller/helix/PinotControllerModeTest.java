@@ -20,67 +20,37 @@ package org.apache.pinot.controller.helix;
 
 import org.apache.helix.HelixManager;
 import org.apache.pinot.controller.ControllerConf;
-import org.apache.pinot.controller.ControllerLeadershipManager;
 import org.apache.pinot.controller.ControllerStarter;
-import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
-import org.apache.pinot.controller.helix.core.rebalance.RebalanceSegmentStrategyFactory;
-import org.apache.pinot.controller.helix.core.util.HelixSetupUtils;
 import org.apache.pinot.util.TestUtils;
-import org.mockito.Mock;
-import org.powermock.api.mockito.PowerMockito;
-import org.powermock.core.classloader.annotations.PowerMockIgnore;
-import org.powermock.core.classloader.annotations.PrepareForTest;
 import org.testng.Assert;
-import org.testng.IObjectFactory;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
-import org.testng.annotations.ObjectFactory;
 import org.testng.annotations.Test;
 
-import static org.mockito.Mockito.when;
 
-
-@PowerMockIgnore({"org.mockito.*", "javax.management.*", "javax.security.*", "javax.net.ssl.*", "org.glassfish.jersey.*", "org.glassfish.*", "org.apache.log4j.*"})
-@PrepareForTest({ControllerLeadershipManager.class, PinotLLCRealtimeSegmentManager.class, RebalanceSegmentStrategyFactory.class})
 public class PinotControllerModeTest extends ControllerTest {
   private static long TIMEOUT_IN_MS = 10_000L;
   private ControllerConf config;
   private int controllerPortOffset;
-
-  @Mock
-  private ControllerLeadershipManager _controllerLeadershipManager;
-
-  @Mock
-  private PinotLLCRealtimeSegmentManager _pinotLLCRealtimeSegmentManager;
-
-  @ObjectFactory
-  public IObjectFactory getObjectFactory() {
-    return new org.powermock.modules.testng.PowerMockObjectFactory();
-  }
 
   @BeforeClass
   public void setUp() {
     startZk();
     config = getDefaultControllerConfiguration();
     controllerPortOffset = 0;
-
-    PowerMockito.mockStatic(ControllerLeadershipManager.class);
-    when(ControllerLeadershipManager.getInstance()).thenReturn(_controllerLeadershipManager);
-    Assert.assertEquals(ControllerLeadershipManager.getInstance(), _controllerLeadershipManager);
   }
 
   @Test
   public void testHelixOnlyController()
       throws Exception {
-    config.setControllerMode(HelixSetupUtils.ControllerMode.HELIX_ONLY.name());
+    config.setControllerMode(ControllerConf.ControllerMode.HELIX_ONLY);
     config.setControllerPort(Integer.toString(Integer.parseInt(config.getControllerPort()) + controllerPortOffset++));
 
     startController(config);
     TestUtils.waitForCondition(aVoid -> _helixManager.isConnected(), TIMEOUT_IN_MS,
         "Failed to start " + config.getControllerMode() + " controller in " + TIMEOUT_IN_MS + "ms.");
 
-    Assert.assertEquals(_helixResourceManager.getControllerMode(), HelixSetupUtils.ControllerMode.HELIX_ONLY);
-    Assert.assertTrue(_helixManager.isLeader());
+    Assert.assertEquals(_controllerStarter.getControllerMode(), ControllerConf.ControllerMode.HELIX_ONLY);
 
     stopController();
     _controllerStarter = null;
@@ -89,14 +59,13 @@ public class PinotControllerModeTest extends ControllerTest {
   @Test
   public void testDualModeController()
       throws Exception {
-    config.setControllerMode(HelixSetupUtils.ControllerMode.DUAL.name());
+    config.setControllerMode(ControllerConf.ControllerMode.DUAL);
     config.setControllerPort(Integer.toString(Integer.parseInt(config.getControllerPort()) + controllerPortOffset++));
 
     startController(config);
     TestUtils.waitForCondition(aVoid -> _helixManager.isConnected(), TIMEOUT_IN_MS,
         "Failed to start " + config.getControllerMode() + " controller in " + TIMEOUT_IN_MS + "ms.");
-    Assert.assertEquals(_helixResourceManager.getControllerMode(), HelixSetupUtils.ControllerMode.DUAL);
-    Assert.assertTrue(_helixManager.isLeader());
+    Assert.assertEquals(_controllerStarter.getControllerMode(), ControllerConf.ControllerMode.DUAL);
 
     stopController();
     _controllerStarter = null;
@@ -105,13 +74,8 @@ public class PinotControllerModeTest extends ControllerTest {
   @Test
   public void testPinotOnlyController()
       throws Exception {
-    PowerMockito.mockStatic(PinotLLCRealtimeSegmentManager.class);
-    when(PinotLLCRealtimeSegmentManager.getInstance()).thenReturn(_pinotLLCRealtimeSegmentManager);
-    Assert.assertEquals(PinotLLCRealtimeSegmentManager.getInstance(), _pinotLLCRealtimeSegmentManager);
 
-    PowerMockito.mockStatic(RebalanceSegmentStrategyFactory.class);
-
-    config.setControllerMode(HelixSetupUtils.ControllerMode.PINOT_ONLY.name());
+    config.setControllerMode(ControllerConf.ControllerMode.PINOT_ONLY);
     config.setControllerPort(Integer.toString(Integer.parseInt(config.getControllerPort()) + controllerPortOffset++));
 
     // Starting pinot only controller before starting helix controller should fail.
@@ -125,20 +89,19 @@ public class PinotControllerModeTest extends ControllerTest {
     // Starting a helix controller.
     ControllerConf config2 = getDefaultControllerConfiguration();
     config2.setHelixClusterName(getHelixClusterName());
-    config2.setControllerMode(HelixSetupUtils.ControllerMode.HELIX_ONLY.name());
+    config2.setControllerMode(ControllerConf.ControllerMode.HELIX_ONLY);
     config2.setControllerPort(Integer.toString(Integer.parseInt(config.getControllerPort()) + controllerPortOffset++));
     ControllerStarter helixControllerStarter = new ControllerStarter(config2);
     helixControllerStarter.start();
-    HelixManager helixManager = helixControllerStarter.getHelixResourceManager().getHelixZkManager();
-    TestUtils.waitForCondition(aVoid -> helixManager.isConnected(), TIMEOUT_IN_MS,
+    HelixManager helixControllerManager = helixControllerStarter.getHelixControllerManager();
+    TestUtils.waitForCondition(aVoid -> helixControllerManager.isConnected(), TIMEOUT_IN_MS,
         "Failed to start " + config2.getControllerMode() + " controller in " + TIMEOUT_IN_MS + "ms.");
-    Assert.assertTrue(helixManager.isLeader());
 
     // Starting a pinot only controller.
     startController(config, false);
-    TestUtils.waitForCondition(aVoid -> _helixManager.isConnected(), TIMEOUT_IN_MS,
+    TestUtils.waitForCondition(aVoid -> _helixResourceManager.getHelixZkManager().isConnected(), TIMEOUT_IN_MS,
         "Failed to start " + config.getControllerMode() + " controller in " + TIMEOUT_IN_MS + "ms.");
-    Assert.assertEquals(_helixResourceManager.getControllerMode(), HelixSetupUtils.ControllerMode.PINOT_ONLY);
+    Assert.assertEquals(_controllerStarter.getControllerMode(), ControllerConf.ControllerMode.PINOT_ONLY);
 
     stopController();
     _controllerStarter = null;

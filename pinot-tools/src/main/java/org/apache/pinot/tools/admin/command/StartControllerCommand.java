@@ -23,7 +23,6 @@ import org.apache.commons.configuration.ConfigurationException;
 import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.ControllerStarter;
-import org.apache.pinot.controller.helix.core.util.HelixSetupUtils;
 import org.apache.pinot.tools.Command;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
@@ -53,7 +52,7 @@ public class StartControllerCommand extends AbstractBaseAdminCommand implements 
   private String _clusterName = DEFAULT_CLUSTER_NAME;
 
   @Option(name = "-controllerMode", required = false, metaVar = "<String>", usage = "Pinot controller mode.")
-  private String _controllerMode = HelixSetupUtils.ControllerMode.DUAL.name();
+  private ControllerConf.ControllerMode _controllerMode = ControllerConf.ControllerMode.DUAL;
 
   @Option(name = "-configFileName", required = false, metaVar = "<FilePathName>", usage = "Controller Starter config file", forbids = {"-controllerHost", "-controllerPort", "-dataDir", "-zkAddress", "-clusterName", "-controllerMode"})
   private String _configFileName;

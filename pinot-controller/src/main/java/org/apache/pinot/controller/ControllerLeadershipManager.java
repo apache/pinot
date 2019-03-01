@@ -75,6 +75,7 @@ public class ControllerLeadershipManager {
     if (_amILeader) {
       onBecomingNonLeader();
     }
+    INSTANCE = null;
   }
 
   /**
