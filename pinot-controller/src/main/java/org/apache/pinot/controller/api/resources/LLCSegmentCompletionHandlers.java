@@ -21,6 +21,7 @@ package org.apache.pinot.controller.api.resources;
 import com.google.common.annotations.VisibleForTesting;
 
 import java.io.*;
+import java.net.URISyntaxException;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.util.List;
@@ -204,8 +205,13 @@ public class LLCSegmentCompletionHandlers {
       return SegmentCompletionProtocol.RESP_FAILED.toJsonString();
     }
 
-    SegmentMetadataImpl segmentMetadata = extractMetadataFromSegmentFile(segmentName,
-            ControllerConf.getUriFromPath(segmentLocation));
+    SegmentMetadataImpl segmentMetadata;
+    try {
+      segmentMetadata = extractMetadataFromSegmentFile(segmentName, new java.net.URI(segmentLocation));
+    } catch (URISyntaxException e) {
+      LOGGER.error("Invalid segment location: ", segmentLocation);
+      return SegmentCompletionProtocol.RESP_FAILED.toJsonString();
+    }
     if (segmentMetadata == null) {
       return SegmentCompletionProtocol.RESP_FAILED.toJsonString();
     }
@@ -337,7 +343,12 @@ public class LLCSegmentCompletionHandlers {
     if (segmentMetadata == null) {
       LOGGER.info("Failed to extract segment metadata for {} from input form, fallback to use the segment file.",
               segmentName);
-      segmentMetadata = extractMetadataFromSegmentFile(segmentName, ControllerConf.getUriFromPath(segmentLocation));
+      try {
+        segmentMetadata = extractMetadataFromSegmentFile(segmentName, new java.net.URI(segmentLocation));
+      } catch (URISyntaxException e) {
+        LOGGER.error("Invalid segment location: ", segmentLocation);
+        return SegmentCompletionProtocol.RESP_FAILED.toJsonString();
+      }
     }
     // Return failure to server if both extraction efforts fail.
     if (segmentMetadata == null) {
