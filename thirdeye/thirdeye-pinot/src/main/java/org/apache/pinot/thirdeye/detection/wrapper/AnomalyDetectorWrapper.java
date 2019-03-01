@@ -145,7 +145,7 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
 
     List<Interval> monitoringWindows = this.getMonitoringWindows();
     List<MergedAnomalyResultDTO> anomalies = new ArrayList<>();
-    TimeSeries predictions = new TimeSeries();
+    TimeSeries prediction = new TimeSeries(metricUrn);
     for (Interval window : monitoringWindows) {
       List<MergedAnomalyResultDTO> anomaliesForOneWindow = new ArrayList<>();
       try {
@@ -153,7 +153,7 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
         long ts = System.currentTimeMillis();
         DetectionOutput output = anomalyDetector.runDetection(window, this.metricUrn);
         anomaliesForOneWindow = output.getAnomalies();
-        predictions.merge(output.getPredictions());
+        prediction.merge(output.getPrediction());
         LOG.info("[New Pipeline] run anomaly detection for window {} - {} used {} milliseconds", window.getStart(), window.getEnd(), System.currentTimeMillis() - ts);
       } catch (Exception e) {
         LOG.warn("[DetectionConfigID{}] detecting anomalies for window {} to {} failed.", this.config.getId(), window.getStart(), window.getEnd(), e);
@@ -169,6 +169,9 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
       anomaly.setDimensions(DetectionUtils.toFilterMap(this.metricEntity.getFilters()));
       anomaly.getProperties().put(PROP_DETECTOR_COMPONENT_NAME, this.detectorName);
     }
+
+    List<TimeSeries> predictions = new ArrayList<>();
+    predictions.add(prediction);
     return new DetectionPipelineResult(anomalies, predictions, this.getLastTimeStamp());
   }
 

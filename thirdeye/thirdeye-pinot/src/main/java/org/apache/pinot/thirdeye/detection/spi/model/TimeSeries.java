@@ -23,6 +23,7 @@ import org.apache.pinot.thirdeye.dataframe.DataFrame;
 import org.apache.pinot.thirdeye.dataframe.DoubleSeries;
 import org.apache.pinot.thirdeye.dataframe.LongSeries;
 import org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils;
+import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 
 import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
 
@@ -32,6 +33,29 @@ import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
  */
 public class TimeSeries {
   private DataFrame df;
+  private String metricUrn;
+  private AnomalyFunctionDTO function;
+
+  public AnomalyFunctionDTO getFunction() {
+    return function;
+  }
+
+  public void setFunction(AnomalyFunctionDTO function) {
+    this.function = function;
+  }
+
+  public String getMetricUrn() {
+    return metricUrn;
+  }
+
+  public void setMetricUrn(String metricUrn) {
+    this.metricUrn = metricUrn;
+  }
+
+  public TimeSeries(String metricUrn) {
+    this.df = new DataFrame();
+    this.metricUrn = metricUrn;
+  }
 
   public TimeSeries() {
     this.df = new DataFrame();
@@ -95,7 +119,7 @@ public class TimeSeries {
   }
 
   public TimeSeries merge(TimeSeries other) {
-    df.append(other.df);
+    df.joinOuter(other.df, COL_TIME);
     return this;
   }
 }

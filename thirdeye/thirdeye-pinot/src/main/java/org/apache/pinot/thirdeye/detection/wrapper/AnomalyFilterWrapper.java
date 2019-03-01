@@ -37,6 +37,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.collections.MapUtils;
+import org.apache.pinot.thirdeye.detection.spi.model.TimeSeries;
 
 
 /**
@@ -73,6 +74,7 @@ public class AnomalyFilterWrapper extends DetectionPipeline {
   @Override
   public final DetectionPipelineResult run() throws Exception {
     List<MergedAnomalyResultDTO> candidates = new ArrayList<>();
+    List<TimeSeries> predictions = new ArrayList<>();
     Set<Long> lastTimeStamps = new HashSet<>();
     for (Map<String, Object> properties : this.nestedProperties) {
       DetectionConfigDTO nestedConfig = new DetectionConfigDTO();
@@ -92,11 +94,12 @@ public class AnomalyFilterWrapper extends DetectionPipeline {
       DetectionPipelineResult intermediate = pipeline.run();
       lastTimeStamps.add(intermediate.getLastTimestamp());
       candidates.addAll(intermediate.getAnomalies());
+      predictions.addAll(intermediate.getPredictions());
     }
 
     Collection<MergedAnomalyResultDTO> anomalies =
         Collections2.filter(candidates, mergedAnomaly -> mergedAnomaly != null && !mergedAnomaly.isChild() && anomalyFilter.isQualified(mergedAnomaly));
 
-    return new DetectionPipelineResult(new ArrayList<>(anomalies), DetectionUtils.consolidateNestedLastTimeStamps(lastTimeStamps));
+    return new DetectionPipelineResult(new ArrayList<>(anomalies), predictions, DetectionUtils.consolidateNestedLastTimeStamps(lastTimeStamps));
   }
 }

@@ -94,7 +94,7 @@ public class PercentageChangeRuleDetectorTest {
     Assert.assertEquals(anomalies.get(1).getStartTime(), 2379600000L);
     Assert.assertEquals(anomalies.get(1).getEndTime(), 2383200000L);
 
-    TimeSeries timeSeries = result.getPredictions();
+    TimeSeries timeSeries = result.getPrediction();
     double[] baseline = timeSeries.getPredictedBaseline().values();
     double[] upperBound = timeSeries.getPredictedUpperBound().values();
     Assert.assertEquals(upperBound.length, baseline.length);
@@ -123,7 +123,7 @@ public class PercentageChangeRuleDetectorTest {
     Assert.assertEquals(anomalies.get(3).getStartTime(), 2322000000L);
     Assert.assertEquals(anomalies.get(3).getEndTime(), 2325600000L);
 
-    TimeSeries timeSeries = result.getPredictions();
+    TimeSeries timeSeries = result.getPrediction();
     double[] baseline = timeSeries.getPredictedBaseline().values();
     double[] upperBound = timeSeries.getPredictedUpperBound().values();
     Assert.assertEquals(upperBound.length, baseline.length);
@@ -146,7 +146,7 @@ public class PercentageChangeRuleDetectorTest {
     Assert.assertEquals(anomalies.get(0).getStartTime(), 2181600000L);
     Assert.assertEquals(anomalies.get(0).getEndTime(), 2185200000L);
 
-    TimeSeries timeSeries = result.getPredictions();
+    TimeSeries timeSeries = result.getPrediction();
     double[] baseline = timeSeries.getPredictedBaseline().values();
     double[] lowerBound = timeSeries.getPredictedLowerBound().values();
     Assert.assertEquals(lowerBound.length, baseline.length);
@@ -178,7 +178,7 @@ public class PercentageChangeRuleDetectorTest {
     Assert.assertEquals(anomalies.get(4).getStartTime(), 2322000000L);
     Assert.assertEquals(anomalies.get(4).getEndTime(), 2325600000L);
 
-    TimeSeries timeSeries = result.getPredictions();
+    TimeSeries timeSeries = result.getPrediction();
     double[] upperBound = timeSeries.getPredictedUpperBound().values();
     double[] baseline = timeSeries.getPredictedBaseline().values();
     double[] lowerBound = timeSeries.getPredictedLowerBound().values();

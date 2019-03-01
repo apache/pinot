@@ -97,7 +97,7 @@ public class ThresholdRuleDetectorTest {
     Assert.assertEquals(anomalies.get(1).getStartTime(), 8);
     Assert.assertEquals(anomalies.get(1).getEndTime(), 10);
 
-    TimeSeries timeSeries = result.getPredictions();
+    TimeSeries timeSeries = result.getPrediction();
     double[] upperBound = timeSeries.getPredictedUpperBound().values();
     double[] lowerBound = timeSeries.getPredictedLowerBound().values();
     Assert.assertEquals(upperBound.length, lowerBound.length);

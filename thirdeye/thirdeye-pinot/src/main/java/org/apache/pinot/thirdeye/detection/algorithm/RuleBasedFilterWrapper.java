@@ -22,6 +22,7 @@ package org.apache.pinot.thirdeye.detection.algorithm;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.collect.Collections2;
+import org.apache.pinot.thirdeye.anomalydetection.context.TimeSeries;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.detection.ConfigUtils;
@@ -56,6 +57,7 @@ public abstract class RuleBasedFilterWrapper extends DetectionPipeline {
   @Override
   public final DetectionPipelineResult run() throws Exception {
     List<MergedAnomalyResultDTO> candidates = new ArrayList<>();
+    List<org.apache.pinot.thirdeye.detection.spi.model.TimeSeries> predictions = new ArrayList<>();
     for (Map<String, Object> properties : this.nestedProperties) {
       DetectionConfigDTO nestedConfig = new DetectionConfigDTO();
 
@@ -69,6 +71,7 @@ public abstract class RuleBasedFilterWrapper extends DetectionPipeline {
 
       DetectionPipelineResult intermediate = pipeline.run();
       candidates.addAll(intermediate.getAnomalies());
+      predictions.addAll(intermediate.getPredictions());
     }
 
     Collection<MergedAnomalyResultDTO> anomalies =
@@ -79,7 +82,7 @@ public abstract class RuleBasedFilterWrapper extends DetectionPipeline {
           }
         });
 
-    return new DetectionPipelineResult(new ArrayList<>(anomalies));
+    return new DetectionPipelineResult(new ArrayList<>(anomalies), predictions);
   }
 
   /**

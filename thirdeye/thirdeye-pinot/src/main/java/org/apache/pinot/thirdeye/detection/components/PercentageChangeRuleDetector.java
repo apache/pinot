@@ -88,7 +88,7 @@ public class PercentageChangeRuleDetector implements AnomalyDetector<PercentageC
     DataFrame df = new DataFrame(dfCurr).addSeries(dfBase);
 
     // calculate predicted timeseries
-    TimeSeries timeSeries = new TimeSeries();
+    TimeSeries timeSeries = new TimeSeries(metricUrn);
     timeSeries.addTimeStamps(df.getLongs(COL_TIME));
     DoubleSeries baseline = df.getDoubles(COL_BASE);
     timeSeries.addPredictedBaseline(baseline);

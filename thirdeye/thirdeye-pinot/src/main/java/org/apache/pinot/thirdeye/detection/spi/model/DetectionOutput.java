@@ -25,14 +25,14 @@ import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 /**
  * Result for anomaly detector which contains anomalies and TimeSeries, which contains baseline/upper/lower bounds.
  *
- * @see TimeSeries
+ * @see org.apache.pinot.thirdeye.detection.spi.model.TimeSeries
  *
  */
 public class DetectionOutput {
 
-  public DetectionOutput(List<MergedAnomalyResultDTO> anomalies, TimeSeries predictions) {
+  public DetectionOutput(List<MergedAnomalyResultDTO> anomalies, TimeSeries prediction) {
     this.anomalies = anomalies;
-    this.predictions = predictions;
+    this.prediction = prediction;
   }
 
   public List<MergedAnomalyResultDTO> getAnomalies() {
@@ -43,14 +43,14 @@ public class DetectionOutput {
     this.anomalies = anomalies;
   }
 
-  public TimeSeries getPredictions() {
-    return predictions;
+  public TimeSeries getPrediction() {
+    return prediction;
   }
 
-  public void setPredictions(TimeSeries predictions) {
-    this.predictions = predictions;
+  public void setPrediction(TimeSeries prediction) {
+    this.prediction = prediction;
   }
 
   List<MergedAnomalyResultDTO> anomalies;
-  TimeSeries predictions;
+  TimeSeries prediction;
 }

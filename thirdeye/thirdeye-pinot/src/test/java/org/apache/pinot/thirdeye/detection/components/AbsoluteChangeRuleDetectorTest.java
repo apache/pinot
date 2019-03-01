@@ -92,7 +92,7 @@ public class AbsoluteChangeRuleDetectorTest {
     Assert.assertEquals(anomalies.get(0).getStartTime(), 2372400000L);
     Assert.assertEquals(anomalies.get(0).getEndTime(), 2376000000L);
 
-    TimeSeries timeSeries = result.getPredictions();
+    TimeSeries timeSeries = result.getPrediction();
     double[] upperBound = timeSeries.getPredictedUpperBound().values();
     double[] baseline = timeSeries.getPredictedBaseline().values();
     Assert.assertEquals(upperBound.length, baseline.length);

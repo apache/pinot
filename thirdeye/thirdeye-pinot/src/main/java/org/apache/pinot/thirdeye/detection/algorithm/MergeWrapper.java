@@ -40,6 +40,7 @@ import org.apache.pinot.thirdeye.detection.DetectionPipeline;
 import org.apache.pinot.thirdeye.detection.DetectionPipelineResult;
 import org.apache.pinot.thirdeye.detection.DetectionUtils;
 import org.apache.pinot.thirdeye.detection.spi.model.AnomalySlice;
+import org.apache.pinot.thirdeye.detection.spi.model.TimeSeries;
 
 
 /**
@@ -100,6 +101,8 @@ public class MergeWrapper extends DetectionPipeline {
 
     // generate anomalies
     List<MergedAnomalyResultDTO> generated = new ArrayList<>();
+    // baselines
+    List<TimeSeries> predictions = new ArrayList<>();
 
     int i = 0;
     Set<Long> lastTimeStamps = new HashSet<>();
@@ -119,6 +122,7 @@ public class MergeWrapper extends DetectionPipeline {
       lastTimeStamps.add(intermediate.getLastTimestamp());
 
       generated.addAll(intermediate.getAnomalies());
+      predictions.addAll(intermediate.getPredictions());
       diagnostics.put(String.valueOf(i), intermediate.getDiagnostics());
 
       i++;
@@ -129,7 +133,7 @@ public class MergeWrapper extends DetectionPipeline {
     all.addAll(retrieveAnomaliesFromDatabase(generated));
     all.addAll(generated);
 
-    return new DetectionPipelineResult(this.merge(all), DetectionUtils.consolidateNestedLastTimeStamps(lastTimeStamps)).setDiagnostics(diagnostics);
+    return new DetectionPipelineResult(this.merge(all), predictions, DetectionUtils.consolidateNestedLastTimeStamps(lastTimeStamps)).setDiagnostics(diagnostics);
   }
 
   protected List<MergedAnomalyResultDTO> retrieveAnomaliesFromDatabase(List<MergedAnomalyResultDTO> generated) {

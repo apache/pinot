@@ -24,6 +24,7 @@ import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
 import java.util.HashSet;
 import java.util.Set;
+import org.apache.pinot.thirdeye.anomalydetection.context.TimeSeries;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
@@ -196,6 +197,7 @@ public class DimensionWrapper extends DetectionPipeline {
     }
 
     List<MergedAnomalyResultDTO> anomalies = new ArrayList<>();
+    List<org.apache.pinot.thirdeye.detection.spi.model.TimeSeries> predictions = new ArrayList<>();
     Map<String, Object> diagnostics = new HashMap<>();
     Set<Long> lastTimeStamps = new HashSet<>();
     LOG.info("exploring {} metrics", nestedMetrics.size());
@@ -205,11 +207,12 @@ public class DimensionWrapper extends DetectionPipeline {
         DetectionPipelineResult intermediate = this.runNested(metric, properties);
         lastTimeStamps.add(intermediate.getLastTimestamp());
         anomalies.addAll(intermediate.getAnomalies());
+        predictions.addAll(intermediate.getPredictions());
         diagnostics.put(metric.getUrn(), intermediate.getDiagnostics());
       }
     }
 
-    return new DetectionPipelineResult(anomalies, DetectionUtils.consolidateNestedLastTimeStamps(lastTimeStamps))
+    return new DetectionPipelineResult(anomalies, predictions, DetectionUtils.consolidateNestedLastTimeStamps(lastTimeStamps))
         .setDiagnostics(diagnostics);
   }
 

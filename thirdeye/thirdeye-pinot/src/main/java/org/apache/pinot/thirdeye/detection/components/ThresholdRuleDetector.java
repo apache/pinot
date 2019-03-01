@@ -19,6 +19,8 @@
 
 package org.apache.pinot.thirdeye.detection.components;
 
+import java.util.Collections;
+import java.util.List;
 import org.apache.pinot.thirdeye.dataframe.BooleanSeries;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
 import org.apache.pinot.thirdeye.dataframe.DoubleSeries;
@@ -34,12 +36,10 @@ import org.apache.pinot.thirdeye.detection.annotation.PresentationOption;
 import org.apache.pinot.thirdeye.detection.spec.ThresholdRuleDetectorSpec;
 import org.apache.pinot.thirdeye.detection.spi.components.AnomalyDetector;
 import org.apache.pinot.thirdeye.detection.spi.model.DetectionOutput;
-import org.apache.pinot.thirdeye.detection.spi.model.TimeSeries;
 import org.apache.pinot.thirdeye.detection.spi.model.InputData;
 import org.apache.pinot.thirdeye.detection.spi.model.InputDataSpec;
+import org.apache.pinot.thirdeye.detection.spi.model.TimeSeries;
 import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
-import java.util.Collections;
-import java.util.List;
 import org.joda.time.Interval;
 
 import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
@@ -70,7 +70,7 @@ public class ThresholdRuleDetector implements AnomalyDetector<ThresholdRuleDetec
     DataFrame df = data.getTimeseries().get(slice);
 
     // calculate predicted timeseries
-    TimeSeries timeSeries = new TimeSeries();
+    TimeSeries timeSeries = new TimeSeries(metricUrn);
     timeSeries.addTimeStamps(df.getLongs(COL_TIME));
 
     // defaults
@@ -86,7 +86,7 @@ public class ThresholdRuleDetector implements AnomalyDetector<ThresholdRuleDetec
     // min
     if (!Double.isNaN(this.min)) {
       df.addSeries(COL_TOO_LOW, df.getDoubles(COL_VALUE).lt(this.min));
-      timeSeries.addPredictedLowerBound(DoubleSeries.fillValues(df.size(), this.min ));
+      timeSeries.addPredictedLowerBound(DoubleSeries.fillValues(df.size(), this.min));
     }
 
     df.mapInPlace(BooleanSeries.HAS_TRUE, COL_ANOMALY, COL_TOO_HIGH, COL_TOO_LOW);
