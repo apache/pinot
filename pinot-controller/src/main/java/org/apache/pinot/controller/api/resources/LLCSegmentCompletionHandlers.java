@@ -38,7 +38,6 @@ import javax.ws.rs.core.MediaType;
 
 import com.google.common.base.Preconditions;
 import org.apache.commons.httpclient.URI;
-import org.apache.commons.httpclient.URIException;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
@@ -64,6 +63,7 @@ import org.slf4j.LoggerFactory;
 @Path("/")
 public class LLCSegmentCompletionHandlers {
 
+  public static final String SEGMENT_TMP_DIR = "segment.tmp";
   private static Logger LOGGER = LoggerFactory.getLogger(LLCSegmentCompletionHandlers.class);
   private static final String SCHEME = "file://";
   private static final String METADATA_TEMP_DIR_SUFFIX = ".metadata.tmp";
@@ -204,8 +204,8 @@ public class LLCSegmentCompletionHandlers {
       return SegmentCompletionProtocol.RESP_FAILED.toJsonString();
     }
 
-    SegmentMetadataImpl segmentMetadata = extractMetadataFromLocalSegmentFile(segmentName,
-            ControllerConf.getUriFromPath(segmentLocation).getPath());
+    SegmentMetadataImpl segmentMetadata = extractMetadataFromSegmentFile(segmentName,
+            ControllerConf.getUriFromPath(segmentLocation));
     if (segmentMetadata == null) {
       return SegmentCompletionProtocol.RESP_FAILED.toJsonString();
     }
@@ -253,16 +253,12 @@ public class LLCSegmentCompletionHandlers {
       // Get the segment and put it in the right place.
       URI segmentURI = uploadSegment(multiPart, instanceId, segmentName, false);
       boolean success =  (segmentURI != null);
-      SegmentMetadataImpl segmentMetadata;
-      try {
-        segmentMetadata = extractMetadataFromLocalSegmentFile(segmentName, segmentURI.getPath());
-        if (segmentMetadata == null) {
+      SegmentMetadataImpl segmentMetadata =
+              extractMetadataFromSegmentFile(segmentName, java.net.URI.create(segmentURI.toString()));
+      if (segmentMetadata == null) {
           return SegmentCompletionProtocol.RESP_FAILED.toJsonString();
-        }
-      } catch (URIException e) {
-        LOGGER.error("segment location URI error: ", e);
-        return SegmentCompletionProtocol.RESP_FAILED.toJsonString();
       }
+
       CommittingSegmentDescriptor committingSegmentDescriptor =
               CommittingSegmentDescriptor.fromSegmentCompletionReqParamsAndMetadata(requestParams,
                       segmentMetadata);
@@ -341,7 +337,7 @@ public class LLCSegmentCompletionHandlers {
     if (segmentMetadata == null) {
       LOGGER.info("Failed to extract segment metadata for {} from input form, fallback to use the segment file.",
               segmentName);
-      segmentMetadata = extractMetadataFromLocalSegmentFile(segmentName, segmentLocation);
+      segmentMetadata = extractMetadataFromSegmentFile(segmentName, ControllerConf.getUriFromPath(segmentLocation));
     }
     // Return failure to server if both extraction efforts fail.
     if (segmentMetadata == null) {
@@ -411,29 +407,41 @@ public class LLCSegmentCompletionHandlers {
   }
 
   /**
-   * Extract the segment metadata files from the tar-zipped segment file that is expected to be in the directory for the
-   * table.
-   * <p>Segment tar-zipped file path: segmentLocation.
+   * Extract the segment metadata files from the tar-zipped segment file
+   * <p>Segment tar-zipped file path: segmentLocation URI which can be either local or remote storage.
    * <p>We extract the metadata.properties and creation.meta into a temporary metadata directory:
    * DATADIR/rawTableName/segmentName.metadata.tmp, and load metadata from there.
    *
    * @param segmentNameStr Name of the segment
-   * @param segmentLocation the location of the segment file.
+   * @param segmentLocation the location of the segment file which could be local or in deep storage.
    * @return SegmentMetadataImpl if it is able to extract the metadata file from the tar-zipped segment file.
    */
-  private SegmentMetadataImpl extractMetadataFromLocalSegmentFile(final String segmentNameStr,
-                                                                  final String segmentLocation) {
+  private SegmentMetadataImpl extractMetadataFromSegmentFile(final String segmentNameStr,
+                                                             final java.net.URI segmentLocation) {
     LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
     String baseDirStr = StringUtil.join("/", _controllerConf.getDataDir(), segmentName.getTableName());
-    String tempMetadataDirStr = StringUtil.join("/", baseDirStr, segmentNameStr + METADATA_TEMP_DIR_SUFFIX);
+    String tempMetadataDirStr = StringUtil.join("/", baseDirStr,
+            segmentNameStr + METADATA_TEMP_DIR_SUFFIX + String.valueOf(System.currentTimeMillis()));
+    String tempSegmentDataDirStr = StringUtil.join("/", baseDirStr, segmentNameStr +
+            SEGMENT_TMP_DIR + String.valueOf(System.currentTimeMillis()));
     File tempMetadataDir = new File(tempMetadataDirStr);
-
+    File tempSegmentDataDir = new File(tempSegmentDataDirStr);
+    File segDstFile = new File(StringUtil.join("/", tempSegmentDataDirStr, segmentNameStr));
+    // Use PinotFS to copy the segment file to local fs for metadata extraction.
+    PinotFS pinotFS = PinotFSFactory.create(ControllerConf.getUriFromPath(_controllerConf.getDataDir()).getScheme());
+    try {
+      Preconditions.checkState(tempSegmentDataDir.mkdirs(), "Failed to create directory: %s", tempSegmentDataDir);
+      pinotFS.copyToLocalFile(segmentLocation, segDstFile);
+    } catch (Exception e) {
+      LOGGER.error("Exception copy segment file to local " + segmentNameStr, e);
+      return null;
+    }
     try (// Extract metadata.properties
          InputStream metadataPropertiesInputStream = TarGzCompressionUtils
-                 .unTarOneFile(new FileInputStream(new File(segmentLocation)), V1Constants.MetadataKeys.METADATA_FILE_NAME);
+                 .unTarOneFile(new FileInputStream(segDstFile), V1Constants.MetadataKeys.METADATA_FILE_NAME);
          // Extract creation.meta
          InputStream creationMetaInputStream = TarGzCompressionUtils
-                 .unTarOneFile(new FileInputStream(new File(segmentLocation)), V1Constants.SEGMENT_CREATION_META)
+                 .unTarOneFile(new FileInputStream(segDstFile), V1Constants.SEGMENT_CREATION_META)
          ) {
       Preconditions.checkState(tempMetadataDir.mkdirs(), "Failed to create directory: %s", tempMetadataDirStr);
       Preconditions.checkNotNull(metadataPropertiesInputStream, "%s does not exist",
@@ -452,6 +460,7 @@ public class LLCSegmentCompletionHandlers {
       return null;
     } finally {
       FileUtils.deleteQuietly(tempMetadataDir);
+      FileUtils.deleteQuietly(tempSegmentDataDir);
     }
   }
 
