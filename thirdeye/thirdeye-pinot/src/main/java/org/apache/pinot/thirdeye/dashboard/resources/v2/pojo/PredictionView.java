@@ -17,18 +17,32 @@
  * under the License.
  */
 
-package org.apache.pinot.thirdeye.detection.spi.components;
+package org.apache.pinot.thirdeye.dashboard.resources.v2.pojo;
 
-import org.apache.pinot.thirdeye.detection.spec.AbstractSpec;
-import org.apache.pinot.thirdeye.detection.spi.model.DetectionOutput;
-import org.joda.time.Interval;
+import java.util.HashMap;
+import java.util.Map;
+import org.apache.pinot.thirdeye.detection.spi.model.TimeSeries;
 
 
-public interface AnomalyDetector<T extends AbstractSpec> extends BaseComponent<T> {
-  /**
-   * Run detection in the specified time range and return a list of anomalies
-   * @return list of anomalies
-   */
-  DetectionOutput runDetection(Interval window, String metricUrn);
+public class PredictionView {
 
+  public Map<String, double[]> getTimeSeries() {
+    return timeSeries;
+  }
+
+  public String getMetricUrn() {
+    return metricUrn;
+  }
+
+
+  Map<String, double[]> timeSeries;
+  private String metricUrn;
+
+  public PredictionView(TimeSeries timeSeries) {
+    this.metricUrn = timeSeries.getMetricUrn();
+    this.timeSeries = new HashMap<>();
+    for (String name : timeSeries.getDf().getSeriesNames()) {
+      this.timeSeries.put(name, timeSeries.getDf().getDoubles(name).values());
+    }
+  }
 }

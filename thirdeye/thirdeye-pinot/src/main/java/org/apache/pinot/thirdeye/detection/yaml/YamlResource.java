@@ -47,6 +47,7 @@ import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.thirdeye.anomaly.task.TaskConstants;
 import org.apache.pinot.thirdeye.api.Constants;
+import org.apache.pinot.thirdeye.dashboard.resources.v2.pojo.DetectionPipelineResultView;
 import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionAlertConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
@@ -565,7 +566,8 @@ public class YamlResource {
       return Response.serverError().entity(responseMessage).build();
     }
     LOG.info("Preview successful, used {} milliseconds", System.currentTimeMillis() - ts);
-    return Response.ok(result).build();
+    DetectionPipelineResultView resultView = new DetectionPipelineResultView(result);
+    return Response.ok(resultView).build();
   }
 
 

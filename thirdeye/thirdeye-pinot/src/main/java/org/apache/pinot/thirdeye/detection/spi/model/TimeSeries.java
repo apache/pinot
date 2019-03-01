@@ -24,6 +24,7 @@ import org.apache.pinot.thirdeye.dataframe.DoubleSeries;
 import org.apache.pinot.thirdeye.dataframe.LongSeries;
 import org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils;
 import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import org.apache.pinot.thirdeye.detection.spi.components.AnomalyDetector;
 
 import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
 
@@ -34,14 +35,9 @@ import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
 public class TimeSeries {
   private DataFrame df;
   private String metricUrn;
-  private AnomalyFunctionDTO function;
 
-  public AnomalyFunctionDTO getFunction() {
-    return function;
-  }
-
-  public void setFunction(AnomalyFunctionDTO function) {
-    this.function = function;
+  public DataFrame getDf() {
+    return df;
   }
 
   public String getMetricUrn() {
