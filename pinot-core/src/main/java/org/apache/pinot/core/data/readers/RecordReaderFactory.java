@@ -22,9 +22,14 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class RecordReaderFactory {
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(RecordReaderFactory.class);
+
   private RecordReaderFactory() {
   }
 
@@ -36,6 +41,21 @@ public class RecordReaderFactory {
     Schema schema = segmentGeneratorConfig.getSchema();
     FileFormat fileFormat = segmentGeneratorConfig.getFormat();
     String recordReaderPath = segmentGeneratorConfig.getRecordReaderPath();
+
+    // Allow for instantiation general record readers from a record reader path passed into segment generator config
+    // If this is set, this will override the file format
+    if (recordReaderPath != null) {
+      if (fileFormat != null) {
+        // We currently have default file format set to AVRO inside segment generator config,
+        // do not want to break this behavior for clients.
+        LOGGER.warn("Using recordReaderPath {} to read segment, ignoring fileformat {}",
+            recordReaderPath, fileFormat.toString());
+      }
+      RecordReader recordReader = (RecordReader) Class.forName(recordReaderPath).newInstance();
+      recordReader.init(segmentGeneratorConfig);
+      return recordReader;
+    }
+
     switch (fileFormat) {
       case AVRO:
       case GZIPPED_AVRO:

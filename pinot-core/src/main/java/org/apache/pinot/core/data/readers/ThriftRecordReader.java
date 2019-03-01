@@ -27,6 +27,7 @@ import java.util.Map;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.core.data.GenericRow;
+import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.thrift.TBase;
 import org.apache.thrift.TFieldIdEnum;
 import org.apache.thrift.protocol.TBinaryProtocol;
@@ -75,6 +76,11 @@ public class ThriftRecordReader implements RecordReader {
       _inputStream.close();
       throw e;
     }
+  }
+
+  @Override
+  public void init(SegmentGeneratorConfig segmentGeneratorConfig) {
+
   }
 
   private boolean hasMoreToRead()

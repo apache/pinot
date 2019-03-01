@@ -34,7 +34,7 @@ import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 public interface RecordReader extends Closeable {
 
   /**
-   * A temporary method only for the ORCRecordReader to allow instantiation through reflection.
+   * Initializes the record reader when needed
    */
   void init(SegmentGeneratorConfig segmentGeneratorConfig);
 
