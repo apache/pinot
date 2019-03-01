@@ -271,6 +271,9 @@ public class DetectionMigrationResource {
   }
 
   private String getBucketPeriod(AnomalyFunctionDTO functionDTO) {
+    if (functionDTO.getBucketSize() == 24 && functionDTO.getBucketUnit().equals(TimeUnit.HOURS)){
+      return Period.parse("P1D").toString();
+    }
     return new Period(TimeUnit.MILLISECONDS.convert(functionDTO.getBucketSize(), functionDTO.getBucketUnit())).toString();
   }
 
