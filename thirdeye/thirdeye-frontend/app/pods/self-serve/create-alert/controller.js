@@ -70,6 +70,7 @@ export default Controller.extend({
     snippet: ''
   }],
   metricHelpMailto: `mailto:${config.email}?subject=Metric Onboarding Request (non-additive UMP or derived)`,
+  helpDocLink: config.docs.createAlert,
 
   /**
    * Component property initial settings
