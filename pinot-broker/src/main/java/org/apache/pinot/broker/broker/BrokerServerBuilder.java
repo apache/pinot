@@ -22,7 +22,7 @@ import com.google.common.base.Preconditions;
 import com.yammer.metrics.core.MetricsRegistry;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.configuration.Configuration;
-import org.apache.pinot.broker.broker.helix.LiveInstancesChangeListenerImpl;
+import org.apache.pinot.broker.broker.helix.LiveInstanceChangeHandler;
 import org.apache.pinot.broker.queryquota.TableQueryQuotaManager;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
 import org.apache.pinot.broker.requesthandler.ConnectionPoolBrokerRequestHandler;
@@ -60,7 +60,7 @@ public class BrokerServerBuilder {
   private final long _delayedShutdownTimeMs;
   private final RoutingTable _routingTable;
   private final TimeBoundaryService _timeBoundaryService;
-  private final LiveInstancesChangeListenerImpl _liveInstanceChangeListener;
+  private final LiveInstanceChangeHandler _liveInstanceChangeHandler;
   private final TableQueryQuotaManager _tableQueryQuotaManager;
   private final AccessControlFactory _accessControlFactory;
   private final MetricsRegistry _metricsRegistry;
@@ -69,13 +69,13 @@ public class BrokerServerBuilder {
   private final BrokerAdminApiApplication _brokerAdminApplication;
 
   public BrokerServerBuilder(Configuration config, RoutingTable routingTable, TimeBoundaryService timeBoundaryService,
-      LiveInstancesChangeListenerImpl liveInstanceChangeListener, TableQueryQuotaManager tableQueryQuotaManager) {
+      LiveInstanceChangeHandler liveInstanceChangeHandler, TableQueryQuotaManager tableQueryQuotaManager) {
     _state.set(State.INIT);
     _config = config;
     _delayedShutdownTimeMs = config.getLong(DELAY_SHUTDOWN_TIME_MS_CONFIG, DEFAULT_DELAY_SHUTDOWN_TIME_MS);
     _routingTable = routingTable;
     _timeBoundaryService = timeBoundaryService;
-    _liveInstanceChangeListener = liveInstanceChangeListener;
+    _liveInstanceChangeHandler = liveInstanceChangeHandler;
     _tableQueryQuotaManager = tableQueryQuotaManager;
     _accessControlFactory = AccessControlFactory.loadFactory(_config.subset(ACCESS_CONTROL_PREFIX));
     _metricsRegistry = new MetricsRegistry();
@@ -96,7 +96,7 @@ public class BrokerServerBuilder {
     } else {
       LOGGER.info("Using ConnectionPoolBrokerRequestHandler");
       return new ConnectionPoolBrokerRequestHandler(_config, _routingTable, _timeBoundaryService, _accessControlFactory,
-          _tableQueryQuotaManager, _brokerMetrics, _liveInstanceChangeListener, _metricsRegistry);
+          _tableQueryQuotaManager, _brokerMetrics, _liveInstanceChangeHandler, _metricsRegistry);
     }
   }
 

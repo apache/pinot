@@ -119,7 +119,11 @@ public class TimeSeries {
   }
 
   public TimeSeries merge(TimeSeries other) {
-    df.joinOuter(other.df, COL_TIME);
+    if (df.isEmpty()) {
+      df = other.df.copy();
+    } else {
+      df.joinOuter(other.df, COL_TIME);
+    }
     return this;
   }
 }

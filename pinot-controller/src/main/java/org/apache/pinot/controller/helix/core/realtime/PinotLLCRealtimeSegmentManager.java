@@ -385,14 +385,21 @@ public class PinotLLCRealtimeSegmentManager {
     }
 
     try {
-      pinotFS.move(segmentFileURI, uriToMoveTo, true);
+      if (!pinotFS.move(segmentFileURI, uriToMoveTo, true)) {
+        LOGGER.error("Could not move {} to {}", segmentLocation, segmentName);
+        return false;
+      }
     } catch (Exception e) {
       LOGGER.error("Could not move {} to {}", segmentLocation, segmentName, e);
       return false;
     }
 
+    // Cleans up tmp segment files under table dir.
+    // We only clean up tmp segment files in table level dir, so there's no need to list recursively.
+    // See LLCSegmentCompletionHandlers.uploadSegment().
+    // TODO: move tmp file logic into SegmentCompletionUtils.
     try {
-      for (String uri : pinotFS.listFiles(tableDirURI, true)) {
+      for (String uri : pinotFS.listFiles(tableDirURI, false)) {
         if (uri.contains(SegmentCompletionUtils.getSegmentNamePrefix(segmentName))) {
           LOGGER.warn("Deleting " + uri);
           pinotFS.delete(new URI(uri), true);

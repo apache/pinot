@@ -21,8 +21,9 @@ package org.apache.pinot.broker.broker.helix;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.helix.NotificationContext;
-import org.apache.helix.api.listeners.LiveInstanceChangeListener;
+import org.apache.helix.HelixDataAccessor;
+import org.apache.helix.HelixManager;
+import org.apache.helix.PropertyKey;
 import org.apache.helix.model.LiveInstance;
 import org.apache.pinot.common.response.ServerInstance;
 import org.apache.pinot.common.utils.CommonConstants;
@@ -32,35 +33,40 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class LiveInstancesChangeListenerImpl implements LiveInstanceChangeListener {
-
-  private static final Logger LOGGER = LoggerFactory.getLogger(LiveInstancesChangeListenerImpl.class);
+/**
+ * Cluster change handler for live instance changes.
+ */
+public class LiveInstanceChangeHandler implements ClusterChangeHandler {
+  private static final Logger LOGGER = LoggerFactory.getLogger(LiveInstanceChangeHandler.class);
 
   private static final boolean DO_NOT_RECREATE = false;
 
-  private long timeout;
-  private final Map<String, String> liveInstanceToSessionIdMap;
-  private KeyedPool<PooledNettyClientResourceManager.PooledClientConnection> connectionPool;
+  private final HelixDataAccessor _helixDataAccessor;
+  private final PropertyKey _liveInstancesKey;
 
-  public LiveInstancesChangeListenerImpl(String clusterName) {
-    this.liveInstanceToSessionIdMap = new HashMap<String, String>();
+  private KeyedPool<PooledNettyClientResourceManager.PooledClientConnection> _connectionPool;
+  private Map<String, String> _liveInstanceToSessionIdMap;
+
+  public LiveInstanceChangeHandler(HelixManager helixManager) {
+    _helixDataAccessor = helixManager.getHelixDataAccessor();
+    _liveInstancesKey = new PropertyKey.Builder(helixManager.getClusterName()).liveInstances();
   }
 
-  public void init(final KeyedPool<PooledNettyClientResourceManager.PooledClientConnection> connectionPool,
-      final long timeout) {
-    this.connectionPool = connectionPool;
-    this.timeout = timeout;
+  public void init(KeyedPool<PooledNettyClientResourceManager.PooledClientConnection> connectionPool) {
+    _connectionPool = connectionPool;
+    _liveInstanceToSessionIdMap = new HashMap<>();
   }
 
   @Override
-  public void onLiveInstanceChange(List<LiveInstance> liveInstances, NotificationContext changeContext) {
-    if (connectionPool == null) {
-      LOGGER.warn("init has not been called on the live instances listener, ignoring live instance change.");
+  public void processClusterChange() {
+    // Skip processing live instance change for single-connection routing
+    if (_connectionPool == null) {
       return;
     }
 
-    for (LiveInstance instance : liveInstances) {
+    List<LiveInstance> liveInstances = _helixDataAccessor.getChildValues(_liveInstancesKey);
 
+    for (LiveInstance instance : liveInstances) {
       String instanceId = instance.getInstanceName();
       String sessionId = instance.getSessionId();
 
@@ -80,15 +86,15 @@ public class LiveInstancesChangeListenerImpl implements LiveInstanceChangeListen
             .warn("Port for server instance {} does not appear to be numeric, defaulting to {}.", instanceId, port, e);
       }
 
-      if (liveInstanceToSessionIdMap.containsKey(instanceId)) {
+      if (_liveInstanceToSessionIdMap.containsKey(instanceId)) {
         // sessionId has changed
-        if (!sessionId.equals(liveInstanceToSessionIdMap.get(instanceId))) {
+        if (!sessionId.equals(_liveInstanceToSessionIdMap.get(instanceId))) {
           try {
             LOGGER.info("Instance {} has changed session id {} -> {}, validating connection pool for this instance.",
-                instanceId, sessionId, liveInstanceToSessionIdMap.get(instanceId));
+                instanceId, sessionId, _liveInstanceToSessionIdMap.get(instanceId));
             ServerInstance ins = ServerInstance.forHostPort(hostName, port);
-            connectionPool.validatePool(ins, DO_NOT_RECREATE);
-            liveInstanceToSessionIdMap.put(instanceId, sessionId);
+            _connectionPool.validatePool(ins, DO_NOT_RECREATE);
+            _liveInstanceToSessionIdMap.put(instanceId, sessionId);
           } catch (Exception e) {
             LOGGER.error("Error trying to validate & destroy dead connections for {}", instanceId, e);
           }
@@ -99,8 +105,8 @@ public class LiveInstancesChangeListenerImpl implements LiveInstanceChangeListen
         // lets first check if the connection is valid or not
         try {
           ServerInstance ins = ServerInstance.forHostPort(hostName, port);
-          connectionPool.validatePool(ins, DO_NOT_RECREATE);
-          liveInstanceToSessionIdMap.put(instanceId, sessionId);
+          _connectionPool.validatePool(ins, DO_NOT_RECREATE);
+          _liveInstanceToSessionIdMap.put(instanceId, sessionId);
         } catch (Exception e) {
           LOGGER.error("Error trying to destroy dead connections for {}", instanceId, e);
         }

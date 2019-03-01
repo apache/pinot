@@ -31,9 +31,10 @@ public class DetectionPipelineResult {
   public static String DIAGNOSTICS_CHANGE_POINTS = "changepoints";
 
   Map<String, Object> diagnostics;
+
   List<MergedAnomalyResultDTO> anomalies;
-  List<TimeSeries> predictions;
   long lastTimestamp;
+  List<TimeSeries> predictions;
 
   public DetectionPipelineResult(List<MergedAnomalyResultDTO> anomalies) {
     this.anomalies = anomalies;
