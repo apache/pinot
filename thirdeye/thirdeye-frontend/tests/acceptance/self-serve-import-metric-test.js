@@ -19,12 +19,12 @@ module('Acceptance | import metric', function(hooks) {
     await visit(`/self-serve/create-alert`);
 
     assert.equal(
-      $(selfServeConst.SECONDARY_LINK).get(0).innerText.trim(),
+      $(selfServeConst.SECONDARY_LINK).get(1).innerText.trim(),
       importLinkText,
       'Import link appears.'
     );
 
-    await click(selfServeConst.SECONDARY_LINK);
+    await click($(selfServeConst.SECONDARY_LINK).get(1));
 
     assert.equal(
       currentURL(),

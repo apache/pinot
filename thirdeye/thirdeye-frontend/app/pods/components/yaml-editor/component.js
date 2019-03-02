@@ -22,19 +22,18 @@
  */
 
 import Component from '@ember/component';
-import { computed, set, get, getProperties, setProperties } from '@ember/object';
-import { checkStatus } from 'thirdeye-frontend/utils/utils';
-import { yamlAlertProps, yamlAlertSettings } from 'thirdeye-frontend/utils/constants';
+import {computed, set, get, getProperties, setProperties} from '@ember/object';
+import {checkStatus} from 'thirdeye-frontend/utils/utils';
+import {yamlAlertProps, yamlAlertSettings} from 'thirdeye-frontend/utils/constants';
 import yamljs from 'yamljs';
 import RSVP from "rsvp";
 import fetch from 'fetch';
 import {
-  selfServeApiGraph,
-  selfServeApiCommon
+  selfServeApiGraph, selfServeApiCommon
 } from 'thirdeye-frontend/utils/api/self-serve';
-import { inject as service } from '@ember/service';
-import { task } from 'ember-concurrency';
-
+import {inject as service} from '@ember/service';
+import {task} from 'ember-concurrency';
+import config from 'thirdeye-frontend/config/environment';
 
 export default Component.extend({
   classNames: ['yaml-editor'],
@@ -293,9 +292,9 @@ export default Component.extend({
      */
     triggerDoc(field) {
       if (field === 'Anomaly') {
-        window.open('https://iwww.corp.linkedin.com/wiki/cf/display/ENGS/ThirdEye+Alert+Configuration+Reference#ThirdEyeAlertConfigurationReference-2.WriteAnomaly-Function/DetectionConfiguration');
+        window.open(config.docs.detectionConfig);
       } else {
-        window.open('https://iwww.corp.linkedin.com/wiki/cf/display/ENGS/ThirdEye+Alert+Configuration+Reference#ThirdEyeAlertConfigurationReference-3.WriteSubscription-Group/NotificationConfiguration');
+        window.open(config.docs.subscriptionConfig);
       }
     },
 
