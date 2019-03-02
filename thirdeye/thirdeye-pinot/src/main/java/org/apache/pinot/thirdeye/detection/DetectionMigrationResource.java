@@ -271,6 +271,9 @@ public class DetectionMigrationResource {
   }
 
   private String getBucketPeriod(AnomalyFunctionDTO functionDTO) {
+    if (functionDTO.getBucketUnit().equals(TimeUnit.DAYS)){
+      return Period.days(functionDTO.getBucketSize()).toString();
+    }
     return new Period(TimeUnit.MILLISECONDS.convert(functionDTO.getBucketSize(), functionDTO.getBucketUnit())).toString();
   }
 
@@ -544,6 +547,7 @@ public class DetectionMigrationResource {
   @GET
   @Produces(MediaType.TEXT_PLAIN)
   @Consumes(MediaType.APPLICATION_JSON)
+  @ApiOperation("migrate a function")
   @Path("/legacy-anomaly-function-to-yaml/{id}")
   public Response getYamlFromLegacyAnomalyFunction(@PathParam("id") long anomalyFunctionID) {
     AnomalyFunctionDTO anomalyFunctionDTO = this.anomalyFunctionDAO.findById(anomalyFunctionID);
