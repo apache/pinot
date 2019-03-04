@@ -190,6 +190,7 @@ export default Component.extend({
   _updateChart() {
     const diffConfig = this._makeDiffConfig();
     const chart = this.get('_chart');
+    diffConfig.legend.show ? chart.legend.show() : chart.legend.hide();
     chart.regions(diffConfig.regions);
     chart.axis.range(this._makeAxisRange(diffConfig.axis));
     chart.unzoom();

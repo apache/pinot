@@ -280,16 +280,15 @@ export default Component.extend({
 
         const anomaliesInGraph = anomalies.filter(anomaly => anomaly.metricUrn === metricUrn);
         if (anomaliesInGraph.length > ANOMALY_LEGEND_THRESHOLD) {
-          this.setProperties({legend: {
-              show: false,
-              position: 'right'
-          }})
+          set(this, 'legend', {
+            show: false,
+            position: 'right'
+          });
         } else {
-          this.setProperties({legend: {
-              show: true,
-              position: 'right'
-            }})
-
+          set(this, 'legend', {
+            show: true,
+            position: 'right'
+          });
         }
         anomaliesInGraph.forEach(anomaly => {
             const key = this._formatAnomaly(anomaly);
@@ -474,16 +473,27 @@ export default Component.extend({
     const end = analysisRange[1];
     let anomalies;
     let applicationAnomalies;
+    let metricUrnList;
     try {
       if(isPreviewMode){
         applicationAnomalies = yield getYamlPreviewAnomalies(alertYaml, start, end);
-        const metricUrnList = Object.keys(applicationAnomalies.diagnostics['0']);
+        metricUrnList = Object.keys(applicationAnomalies.diagnostics['0']);
         set(this, 'metricUrnList', metricUrnList);
         set(this, 'selectedDimension', toMetricLabel(extractTail(decodeURIComponent(metricUrnList[0]))));
         set(this, 'metricUrn', metricUrnList[0]);
         anomalies = applicationAnomalies.anomalies;
       } else {
         applicationAnomalies = yield getAnomaliesByAlertId(alertId, start, end);
+        const metricUrnObj = {};
+        if (applicationAnomalies) {
+          applicationAnomalies.forEach(anomaly => {
+            metricUrnObj[anomaly.metricUrn] = 1;
+          });
+          metricUrnList = Object.keys(metricUrnObj);
+          if (metricUrnList.length > 0) {
+            set(this, 'metricUrnList', metricUrnList);
+          }
+        }
         anomalies = applicationAnomalies;
       }
 
@@ -521,6 +531,7 @@ export default Component.extend({
     if (!isPreviewMode) {
       set(this, 'analysisRange', [moment().add(1, 'day').subtract(1, 'month').startOf('day').valueOf(), moment().add(1, 'day').startOf('day').valueOf()]);
       set(this, 'duration', '1m');
+      set(this, 'selectedDimension', 'Choose a dimension');
       this._fetchAnomalies();
     } else {
       set(this, 'duration', '1w');
