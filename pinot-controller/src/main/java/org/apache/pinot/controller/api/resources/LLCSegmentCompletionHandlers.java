@@ -21,6 +21,7 @@ package org.apache.pinot.controller.api.resources;
 import com.google.common.annotations.VisibleForTesting;
 
 import java.io.*;
+import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
@@ -38,9 +39,9 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 
 import com.google.common.base.Preconditions;
-import org.apache.commons.httpclient.URI;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.StringUtil;
@@ -257,12 +258,11 @@ public class LLCSegmentCompletionHandlers {
     SegmentCompletionProtocol.Response response = segmentCompletionManager.segmentCommitStart(requestParams);
     if (response.equals(SegmentCompletionProtocol.RESP_COMMIT_CONTINUE)) {
       // Get the segment and put it in the right place.
-      URI segmentURI = uploadSegment(multiPart, instanceId, segmentName, false);
-      boolean success =  (segmentURI != null);
-      SegmentMetadataImpl segmentMetadata =
-              extractMetadataFromSegmentFile(segmentName, java.net.URI.create(segmentURI.toString()));
-      if (segmentMetadata == null) {
-          return SegmentCompletionProtocol.RESP_FAILED.toJsonString();
+      ImmutablePair<URI, SegmentMetadataImpl>  uploadResult = uploadSegment(multiPart, instanceId, segmentName, false);
+      boolean success =  (uploadResult != null && uploadResult.getLeft() != null && uploadResult.getRight() != null);
+      SegmentMetadataImpl segmentMetadata = null;
+      if (uploadResult != null) {
+        segmentMetadata = uploadResult.getRight();
       }
 
       CommittingSegmentDescriptor committingSegmentDescriptor =
@@ -291,13 +291,13 @@ public class LLCSegmentCompletionHandlers {
     requestParams.withInstanceId(instanceId).withSegmentName(segmentName).withOffset(offset);
     LOGGER.info("Processing segmentUpload:{}", requestParams.toString());
 
-    final URI segmentLocationURI = uploadSegment(multiPart, instanceId, segmentName, true);
-    if (segmentLocationURI == null) {
+    final ImmutablePair<URI, SegmentMetadataImpl> uploadResults = uploadSegment(multiPart, instanceId, segmentName, true);
+    if (uploadResults == null || uploadResults.getLeft() == null) {
       return SegmentCompletionProtocol.RESP_FAILED.toJsonString();
     }
     SegmentCompletionProtocol.Response.Params responseParams =
         new SegmentCompletionProtocol.Response.Params().withOffset(requestParams.getOffset())
-            .withSegmentLocation(segmentLocationURI.toString())
+            .withSegmentLocation(uploadResults.left.toString())
             .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.UPLOAD_SUCCESS);
 
     String response = new SegmentCompletionProtocol.Response(responseParams).toJsonString();
@@ -431,11 +431,8 @@ public class LLCSegmentCompletionHandlers {
                                                              final java.net.URI segmentLocation) {
     LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
     String baseDirStr = StringUtil.join("/", _controllerConf.getDataDir(), segmentName.getTableName());
-    String tempMetadataDirStr = StringUtil.join("/", baseDirStr,
-            segmentNameStr + METADATA_TEMP_DIR_SUFFIX + String.valueOf(System.currentTimeMillis()));
     String tempSegmentDataDirStr = StringUtil.join("/", baseDirStr, segmentNameStr +
             SEGMENT_TMP_DIR + String.valueOf(System.currentTimeMillis()));
-    File tempMetadataDir = new File(tempMetadataDirStr);
     File tempSegmentDataDir = new File(tempSegmentDataDirStr);
     File segDstFile = new File(StringUtil.join("/", tempSegmentDataDirStr, segmentNameStr));
     // Use PinotFS to copy the segment file to local fs for metadata extraction.
@@ -443,16 +440,26 @@ public class LLCSegmentCompletionHandlers {
     try {
       Preconditions.checkState(tempSegmentDataDir.mkdirs(), "Failed to create directory: %s", tempSegmentDataDir);
       pinotFS.copyToLocalFile(segmentLocation, segDstFile);
+      return getSegmentMetadataFromLocalFile(segmentName, segDstFile);
     } catch (Exception e) {
       LOGGER.error("Exception copy segment file to local " + segmentNameStr, e);
       return null;
+    } finally {
+      FileUtils.deleteQuietly(tempSegmentDataDir);
     }
+  }
+
+  private SegmentMetadataImpl getSegmentMetadataFromLocalFile(LLCSegmentName segmentName, File segmentFile) {
+    String baseDirStr = StringUtil.join("/", _controllerConf.getDataDir(), segmentName.getTableName());
+    String tempMetadataDirStr = StringUtil.join("/", baseDirStr,
+            segmentName.getSegmentName() + METADATA_TEMP_DIR_SUFFIX + String.valueOf(System.currentTimeMillis()));
+    File tempMetadataDir = new File(tempMetadataDirStr);
     try (// Extract metadata.properties
          InputStream metadataPropertiesInputStream = TarGzCompressionUtils
-                 .unTarOneFile(new FileInputStream(segDstFile), V1Constants.MetadataKeys.METADATA_FILE_NAME);
+                 .unTarOneFile(new FileInputStream(segmentFile), V1Constants.MetadataKeys.METADATA_FILE_NAME);
          // Extract creation.meta
          InputStream creationMetaInputStream = TarGzCompressionUtils
-                 .unTarOneFile(new FileInputStream(segDstFile), V1Constants.SEGMENT_CREATION_META)
+                 .unTarOneFile(new FileInputStream(segmentFile), V1Constants.SEGMENT_CREATION_META)
          ) {
       Preconditions.checkState(tempMetadataDir.mkdirs(), "Failed to create directory: %s", tempMetadataDirStr);
       Preconditions.checkNotNull(metadataPropertiesInputStream, "%s does not exist",
@@ -467,18 +474,18 @@ public class LLCSegmentCompletionHandlers {
       // Load segment metadata
       return new SegmentMetadataImpl(tempMetadataDir);
     } catch (Exception e) {
-      LOGGER.error("Exception extracting and reading segment metadata for " + segmentNameStr, e);
+      LOGGER.error("Exception extracting and reading segment metadata for " + segmentName.getSegmentName(), e);
       return null;
     } finally {
       FileUtils.deleteQuietly(tempMetadataDir);
-      FileUtils.deleteQuietly(tempSegmentDataDir);
     }
   }
 
   @Nullable
-  private URI uploadSegment(FormDataMultiPart multiPart, String instanceId, String segmentName,
+  private ImmutablePair<URI, SegmentMetadataImpl> uploadSegment(FormDataMultiPart multiPart, String instanceId, String segmentName,
       boolean isSplitCommit) {
     try {
+      SegmentMetadataImpl segmentMetadata = null;
       Map<String, List<FormDataBodyPart>> map = multiPart.getFields();
       if (!PinotSegmentUploadRestletResource.validateMultiPart(map, segmentName)) {
         return null;
@@ -508,6 +515,8 @@ public class LLCSegmentCompletionHandlers {
             ControllerConf.getUriFromPath(StringUtil.join("/", tableDirURI.toString(), uniqueSegmentFileName));
       } else {
         segmentFileURI = ControllerConf.getUriFromPath(StringUtil.join("/", tableDirURI.toString(), segmentName));
+        // Extract metadata from the upload file.
+        segmentMetadata = getSegmentMetadataFromLocalFile(llcSegmentName, localTmpFile);
       }
 
       PinotFS pinotFS = PinotFSFactory.create(provider.getBaseDataDirURI().getScheme());
@@ -545,7 +554,7 @@ public class LLCSegmentCompletionHandlers {
       }
 
       LOGGER.info("Moved file {} to {}", localTmpFile.getAbsolutePath(), segmentFileURI.toString());
-      return new URI(SCHEME + segmentFileURI.toString(), /* boolean escaped */ false);
+      return new ImmutablePair(URI.create(SCHEME + segmentFileURI.toString()), segmentMetadata);
     } catch (InvalidControllerConfigException e) {
       LOGGER.error("Invalid controller config exception from instance {} for segment {}", instanceId, segmentName, e);
       return null;
