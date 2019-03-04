@@ -280,16 +280,15 @@ export default Component.extend({
 
         const anomaliesInGraph = anomalies.filter(anomaly => anomaly.metricUrn === metricUrn);
         if (anomaliesInGraph.length > ANOMALY_LEGEND_THRESHOLD) {
-          this.setProperties({legend: {
-              show: false,
-              position: 'right'
-          }})
+          set(this, 'legend', {
+            show: false,
+            position: 'right'
+          });
         } else {
-          this.setProperties({legend: {
-              show: true,
-              position: 'right'
-            }})
-
+          set(this, 'legend', {
+            show: true,
+            position: 'right'
+          });
         }
         anomaliesInGraph.forEach(anomaly => {
             const key = this._formatAnomaly(anomaly);
