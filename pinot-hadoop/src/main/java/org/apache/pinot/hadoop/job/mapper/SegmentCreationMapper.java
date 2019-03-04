@@ -69,7 +69,7 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
 
   // Optional
   protected TableConfig _tableConfig;
-  protected String _inputFileFormat;
+  protected String _recordReaderPath;
   protected Path _readerConfigFile;
 
   // HDFS segment tar directory
@@ -102,7 +102,7 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
       _readerConfigFile = new Path(readerConfigFile);
     }
 
-    _inputFileFormat = _jobConf.get(JobConfigConstants.INPUT_FILE_FORMAT, null);
+    _recordReaderPath = _jobConf.get(JobConfigConstants.RECORD_READER_PATH, null);
 
     // Set up segment name generator
     String segmentNameGeneratorType =
@@ -210,6 +210,7 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
     FileFormat fileFormat = getFileFormat(inputFileName);
     segmentGeneratorConfig.setFormat(fileFormat);
     segmentGeneratorConfig.setReaderConfig(getReaderConfig(fileFormat));
+    segmentGeneratorConfig.setRecordReaderPath(_recordReaderPath);
     segmentGeneratorConfig.setOnHeap(true);
 
     addAdditionalSegmentGeneratorConfigs(segmentGeneratorConfig, hdfsInputFile, sequenceId);
@@ -259,12 +260,6 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
   }
 
   protected FileFormat getFileFormat(String fileName) {
-    // ORC files do not necessarily have the .orc file extension nor is there a reliable way to decide
-    // whether they are orc files, so the user will have to pass the fact that the file is orc
-    // in as a parameter.
-    if (_inputFileFormat != null && _inputFileFormat.equalsIgnoreCase(FileFormat.ORC.toString())) {
-      return FileFormat.ORC;
-    }
     if (fileName.endsWith(".avro")) {
       return FileFormat.AVRO;
     }
@@ -277,7 +272,9 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
     if (fileName.endsWith(".thrift")) {
       return FileFormat.THRIFT;
     }
-    throw new IllegalArgumentException("Unsupported file format: {}" + fileName);
+    _logger.warn("File name is not one of avro, csv, json, thrift. Please make sure you have configured"
+        + "a record reader for {}", fileName);
+    return FileFormat.OTHER;
   }
 
   @Nullable
