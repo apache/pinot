@@ -64,7 +64,7 @@ public class AvroRecordReader implements RecordReader {
     org.apache.avro.Schema avroSchema = _avroReader.getSchema();
     for (FieldSpec fieldSpec : _fieldSpecs) {
       String fieldName = fieldSpec.getName();
-      Field avroField = avroSchema.getField(fieldSpec.getName());
+      Field avroField = avroSchema.getField(fieldName);
       if (avroField == null) {
         LOGGER.warn("Pinot field: {} does not exist in Avro Schema", fieldName);
       } else {

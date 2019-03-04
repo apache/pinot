@@ -27,6 +27,8 @@ import org.apache.pinot.core.data.GenericRow;
 /**
  * The <code>RecordReader</code> interface is used to read records from various file formats into {@link GenericRow}s.
  * Pinot segments will be generated from {@link GenericRow}s.
+ * <p>NOTE: for time column, record reader should be able to read both incoming and outgoing time (see
+ * {@link RecordReaderUtils#extractFieldSpecs(Schema)} for details).
  */
 public interface RecordReader extends Closeable {
 
