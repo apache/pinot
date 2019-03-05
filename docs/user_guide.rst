@@ -17,14 +17,9 @@
 .. under the License.
 ..
 
-Coding Guidelines
-=================
-Verifying code-style
-^^^^^^^^^^^^^^^^^^^^
+.. toctree::
+   :maxdepth: 1
 
-Run the following command to verify the code-style before posting a PR
-
-.. code-block:: none
-
-    mvn checkstyle:check
+   pql_examples
+   client_api
 

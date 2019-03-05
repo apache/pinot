@@ -17,14 +17,13 @@
 .. under the License.
 ..
 
-Coding Guidelines
-=================
-Verifying code-style
-^^^^^^^^^^^^^^^^^^^^
+Extending Pinot
+===============
+This section provides an overview of options to extend Pinot code to make Pinot work for environments not covered by default.
 
-Run the following command to verify the code-style before posting a PR
+.. toctree::
+   :maxdepth: 1
 
-.. code-block:: none
-
-    mvn checkstyle:check
-
+   pluggable_streams
+   segment_fetcher
+   pluggable_storage
