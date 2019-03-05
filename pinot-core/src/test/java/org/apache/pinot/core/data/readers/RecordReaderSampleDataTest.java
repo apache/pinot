@@ -48,15 +48,19 @@ public class RecordReaderSampleDataTest {
       .addSingleValueDimension("unknown_dimension", FieldSpec.DataType.STRING)
       .addMetric("met_impressionCount", FieldSpec.DataType.LONG).addMetric("unknown_metric", FieldSpec.DataType.DOUBLE)
       .build();
+  // Same incoming and outgoing time column name, should read value with the incoming time data type
   private final Schema SCHEMA_SAME_INCOMING_OUTGOING = new Schema.SchemaBuilder()
       .addTime("time_day", TimeUnit.SECONDS, FieldSpec.DataType.LONG, "time_day", TimeUnit.DAYS, FieldSpec.DataType.INT)
       .build();
+  // Different incoming and outgoing time column name, should read both incoming and outgoing time
   private final Schema SCHEMA_DIFFERENT_INCOMING_OUTGOING = new Schema.SchemaBuilder()
       .addTime("time_day", TimeUnit.SECONDS, FieldSpec.DataType.LONG, "column2", TimeUnit.DAYS, FieldSpec.DataType.INT)
       .build();
+  // Incoming time column does not exist in the record, should read outgoing time only
   private final Schema SCHEMA_NO_INCOMING = new Schema.SchemaBuilder()
       .addTime("incoming", TimeUnit.SECONDS, FieldSpec.DataType.LONG, "time_day", TimeUnit.DAYS, FieldSpec.DataType.INT)
       .build();
+  // Outgoing time column does not exist in the record, should read incoming time only
   private final Schema SCHEMA_NO_OUTGOING = new Schema.SchemaBuilder()
       .addTime("time_day", TimeUnit.SECONDS, FieldSpec.DataType.LONG, "outgoing", TimeUnit.DAYS, FieldSpec.DataType.INT)
       .build();
