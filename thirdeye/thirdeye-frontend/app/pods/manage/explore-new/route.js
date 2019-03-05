@@ -78,11 +78,11 @@ export default Route.extend({
       alertId,
       subscriptionGroupId,
       alertData: get(this, 'detectionYaml'),
-      detectionYaml: get(this, 'detectionYaml').yaml,
+      detectionYaml: get(this, 'detectionYaml') ? get(this, 'detectionYaml').yaml : null,
       subscriptionGroups: get(this, 'subscriptionGroups'),
       subscriptionGroupYamlDisplay,
       metricUrn: get(this, 'metricUrn'),
-      metricUrnList: get(this, 'metricUrnList')
+      metricUrnList: get(this, 'metricUrnList') || []
     });
   },
 

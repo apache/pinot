@@ -72,7 +72,7 @@ export default Route.extend({
       alertId,
       subscriptionGroupId,
       alertData: get(this, 'detectionYaml'),
-      detectionYaml: get(this, 'detectionYaml').yaml,
+      detectionYaml: get (this, 'detectionYaml') ? get(this, 'detectionYaml').yaml : 'Yaml retrieval failed',
       subscriptionGroups: get(this, 'subscriptionGroups'),
       subscriptionGroupYamlDisplay
     });
