@@ -17,8 +17,8 @@
 .. under the License.
 ..
 
-Quick Demo
-==========
+Getting Started
+===============
 
 A quick way to get familiar with Pinot is to run the Pinot examples. The examples can be run either by compiling the
 code or by running the prepackaged Docker images.

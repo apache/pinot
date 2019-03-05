@@ -32,30 +32,35 @@ Introduction
 
    intro
    architecture
-   trying_pinot
+   getting_started
 
 #########
-Reference
+User Guide
 #########
 
 .. toctree::
    :maxdepth: 1
 
+   user_guide
 
-   reference
-   in_production
+
+#########
+Admin Guide
+#########
+
+.. toctree::
+   :maxdepth: 1
+
+   admin_guide
 
 #################
-Customizing Pinot
+Developer Guide
 #################
 
 .. toctree::
    :maxdepth: 1
 
-
-   pluggable_streams
-   segment_fetcher
-   pluggable_storage
+   dev_guide
 
 ################
 Getting Involved
@@ -64,4 +69,4 @@ Getting Involved
 .. toctree::
    :maxdepth: 1
 
-   coding_guidelines
+   getting_involved

@@ -17,14 +17,23 @@
 .. under the License.
 ..
 
-Coding Guidelines
-=================
-Verifying code-style
-^^^^^^^^^^^^^^^^^^^^
+Dev Environment Setup
+=====================
 
-Run the following command to verify the code-style before posting a PR
+To contribute to Pinot, please follow the code-style as described below:
 
-.. code-block:: none
+Intellij
+^^^^^^^^
 
-    mvn checkstyle:check
+* `Import <https://www.jetbrains.com/help/idea/settings-code-style.html>`_ code style to Intellij
+* Navigate to ``Preferences`` -> ``Editor`` -> ``Code Style`` -> ``Java``
+* Select ``Import Scheme`` -> ``Intellij IDES code style XML``
+* Choose ``codestyle-intellij.xml``
+
+Eclipse
+^^^^^^^
+.. todo::
+
+   Add instructions for eclipse here
+
 

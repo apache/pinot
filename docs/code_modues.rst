@@ -17,14 +17,5 @@
 .. under the License.
 ..
 
-Coding Guidelines
-=================
-Verifying code-style
-^^^^^^^^^^^^^^^^^^^^
-
-Run the following command to verify the code-style before posting a PR
-
-.. code-block:: none
-
-    mvn checkstyle:check
-
+Code Modules and organization
+=============================

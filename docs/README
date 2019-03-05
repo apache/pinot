@@ -17,13 +17,7 @@
 .. under the License.
 ..
 
-.. _reference:
-
-.. toctree::
-   :maxdepth: 1
-
-   pql_examples
-   index_techniques
-   client_api
-   management_api
-   pinot_hadoop
+Updating the docs:
+1. Edit or add files as needed.
+2. Run "make html"
+3. Open _build/html/index.html in your favorite browser and ensure contents and links work correctly.

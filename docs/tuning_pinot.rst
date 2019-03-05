@@ -17,14 +17,11 @@
 .. under the License.
 ..
 
-Coding Guidelines
-=================
-Verifying code-style
-^^^^^^^^^^^^^^^^^^^^
+Tuning Pinot
+============
+This section provides information on various options to tune Pinot cluster for storage and query efficiency.
 
-Run the following command to verify the code-style before posting a PR
+.. toctree::
+   :maxdepth: 1
 
-.. code-block:: none
-
-    mvn checkstyle:check
-
+   index_techniques
