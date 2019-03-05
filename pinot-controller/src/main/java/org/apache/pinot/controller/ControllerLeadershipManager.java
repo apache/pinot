@@ -34,6 +34,7 @@ public class ControllerLeadershipManager {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(ControllerLeadershipManager.class);
 
+  // TODO: fix the misuse of singleton.
   private static ControllerLeadershipManager INSTANCE = null;
 
   private HelixManager _helixManager;

@@ -37,9 +37,6 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
-import org.apache.helix.HelixManager;
-import org.apache.helix.HelixManagerFactory;
-import org.apache.helix.InstanceType;
 import org.apache.helix.manager.zk.ZKHelixAdmin;
 import org.apache.helix.tools.ClusterVerifiers.StrictMatchExternalViewVerifier;
 import org.apache.pinot.broker.broker.helix.HelixBrokerStarter;
@@ -55,7 +52,6 @@ import org.apache.pinot.common.utils.TenantRole;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.ControllerStarter;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
-import org.apache.pinot.controller.helix.starter.HelixConfig;
 import org.apache.pinot.server.starter.helix.HelixServerStarter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -242,7 +238,7 @@ public class PerfBenchmarkDriver {
   private void startHelixResourceManager()
       throws Exception {
     _helixResourceManager = new PinotHelixResourceManager(getControllerConf());
-    _helixResourceManager.start(registerAndConnectAsHelixParticipant());
+    _helixResourceManager.start();
 
     // Create broker tenant.
     Tenant brokerTenant = new TenantBuilder(_brokerTenantName).setRole(TenantRole.BROKER).setTotalInstances(1).build();
@@ -253,15 +249,6 @@ public class PerfBenchmarkDriver {
         new TenantBuilder(_serverTenantName).setRole(TenantRole.SERVER).setTotalInstances(1).setOfflineInstances(1)
             .build();
     _helixResourceManager.createServerTenant(serverTenant);
-  }
-
-  private HelixManager registerAndConnectAsHelixParticipant()
-      throws Exception {
-    HelixManager helixManager = HelixManagerFactory
-        .getZKHelixManager(_clusterName, CommonConstants.Helix.PREFIX_OF_CONTROLLER_INSTANCE + _controllerHost,
-            InstanceType.PARTICIPANT, HelixConfig.getAbsoluteZkPathForHelix(_zkAddress));
-    helixManager.connect();
-    return helixManager;
   }
 
   private void configureResources()

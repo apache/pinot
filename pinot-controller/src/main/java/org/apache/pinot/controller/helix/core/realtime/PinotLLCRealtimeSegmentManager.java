@@ -120,6 +120,7 @@ public class PinotLLCRealtimeSegmentManager {
    */
   private static int MAX_SEGMENT_COMPLETION_TIME_MILLIS = 300_000; // 5 MINUTES
 
+  // TODO: fix the misuse of singleton.
   private static PinotLLCRealtimeSegmentManager INSTANCE = null;
 
   private final HelixAdmin _helixAdmin;

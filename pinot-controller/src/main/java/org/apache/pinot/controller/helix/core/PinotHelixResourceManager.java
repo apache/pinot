@@ -46,6 +46,7 @@ import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixException;
 import org.apache.helix.HelixManager;
+import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.InstanceType;
 import org.apache.helix.PropertyKey;
 import org.apache.helix.PropertyKey.Builder;
@@ -123,6 +124,7 @@ public class PinotHelixResourceManager {
 
   private final String _helixZkURL;
   private final String _helixClusterName;
+  private final String _instanceId;
   private final String _dataDir;
   private final long _externalViewOnlineToOfflineTimeoutMillis;
   private final boolean _isSingleTenantCluster;
@@ -138,23 +140,26 @@ public class PinotHelixResourceManager {
   private TableRebalancer _tableRebalancer;
 
   public PinotHelixResourceManager(@Nonnull String zkURL, @Nonnull String helixClusterName,
-      String dataDir, long externalViewOnlineToOfflineTimeoutMillis,
+      @Nonnull String controllerInstanceId, String dataDir, long externalViewOnlineToOfflineTimeoutMillis,
       boolean isSingleTenantCluster, boolean enableBatchMessageMode) {
     _helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(zkURL);
     _helixClusterName = helixClusterName;
+    _instanceId = controllerInstanceId;
     _dataDir = dataDir;
     _externalViewOnlineToOfflineTimeoutMillis = externalViewOnlineToOfflineTimeoutMillis;
     _isSingleTenantCluster = isSingleTenantCluster;
     _enableBatchMessageMode = enableBatchMessageMode;
   }
 
-  public PinotHelixResourceManager(@Nonnull String zkURL, @Nonnull String helixClusterName, @Nonnull String dataDir) {
-    this(zkURL, helixClusterName, dataDir, DEFAULT_EXTERNAL_VIEW_UPDATE_TIMEOUT_MILLIS, false,
-        false);
+  public PinotHelixResourceManager(@Nonnull String zkURL, @Nonnull String helixClusterName,
+      @Nonnull String controllerInstanceId, @Nonnull String dataDir) {
+    this(zkURL, helixClusterName, controllerInstanceId, dataDir, DEFAULT_EXTERNAL_VIEW_UPDATE_TIMEOUT_MILLIS, false,
+        true);
   }
 
   public PinotHelixResourceManager(@Nonnull ControllerConf controllerConf) {
-    this(controllerConf.getZkStr(), controllerConf.getHelixClusterName(), controllerConf.getDataDir(),
+    this(controllerConf.getZkStr(), controllerConf.getHelixClusterName(),
+        controllerConf.getControllerHost() + "_" + controllerConf.getControllerPort(), controllerConf.getDataDir(),
         controllerConf.getExternalViewOnlineToOfflineTimeout(), controllerConf.tenantIsolationEnabled(),
         controllerConf.getEnableBatchMessageMode());
   }
@@ -162,8 +167,8 @@ public class PinotHelixResourceManager {
   /**
    * Create Helix cluster if needed, and then start a Pinot controller instance.
    */
-  public synchronized void start(@Nonnull HelixManager helixZkManager) {
-    _helixZkManager = helixZkManager;
+  public synchronized void start() {
+    _helixZkManager = registerAndConnectAsHelixParticipant();
     _helixAdmin = _helixZkManager.getClusterManagmentTool();
     _propertyStore = _helixZkManager.getHelixPropertyStore();
     _helixDataAccessor = _helixZkManager.getHelixDataAccessor();
@@ -184,9 +189,7 @@ public class PinotHelixResourceManager {
    * Stop the Pinot controller instance.
    */
   public synchronized void stop() {
-    if (_segmentDeletionManager != null) {
-      _segmentDeletionManager.stop();
-    }
+    _segmentDeletionManager.stop();
     _helixZkManager.disconnect();
   }
 
@@ -244,6 +247,24 @@ public class PinotHelixResourceManager {
    */
   public ZkHelixPropertyStore<ZNRecord> getPropertyStore() {
     return _propertyStore;
+  }
+
+  /**
+   * Register and connect to Helix cluster as PARTICIPANT role.
+   */
+  private HelixManager registerAndConnectAsHelixParticipant() {
+    HelixManager helixManager = HelixManagerFactory
+        .getZKHelixManager(_helixClusterName, CommonConstants.Helix.PREFIX_OF_CONTROLLER_INSTANCE + _instanceId,
+            InstanceType.PARTICIPANT, _helixZkURL);
+    try {
+      helixManager.connect();
+      return helixManager;
+    } catch (Exception e) {
+      String errorMsg =
+          String.format("Exception when connecting the instance %s as Participant to Helix.", _instanceId);
+      LOGGER.error(errorMsg, e);
+      throw new RuntimeException(errorMsg);
+    }
   }
 
   /**
