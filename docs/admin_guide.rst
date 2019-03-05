@@ -22,6 +22,5 @@
 
    in_production
    management_api
-   multitenancy
    customizations
    tuning_pinot

@@ -61,12 +61,3 @@ Developer Guide
    :maxdepth: 1
 
    dev_guide
-
-################
-Getting Involved
-################
-
-.. toctree::
-   :maxdepth: 1
-
-   getting_involved
