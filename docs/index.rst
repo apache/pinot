@@ -22,42 +22,32 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-############
-Introduction
-############
-
+#####
+Pinot
+#####
 
 .. toctree::
+   :caption: Introduction
    :maxdepth: 1
 
    intro
    architecture
    getting_started
 
-#########
-User Guide
-#########
-
 .. toctree::
+   :caption: User Guide
    :maxdepth: 1
 
    user_guide
 
-
-#########
-Admin Guide
-#########
-
 .. toctree::
+   :caption: Admin Guide
    :maxdepth: 1
 
    admin_guide
 
-#################
-Developer Guide
-#################
-
 .. toctree::
+   :caption: Developer Guide
    :maxdepth: 1
 
    dev_guide

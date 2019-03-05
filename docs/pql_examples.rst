@@ -17,8 +17,6 @@
 .. under the License.
 ..
 
-.. _pql:
-
 PQL
 ===
 
