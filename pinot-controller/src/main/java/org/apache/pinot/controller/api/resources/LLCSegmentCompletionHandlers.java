@@ -487,7 +487,7 @@ public class LLCSegmentCompletionHandlers {
    * @param instanceId
    * @param segmentName
    * @param isSplitCommit
-   * @return (1) the URI for the uploaded segment file and; (2) for a split commit, the corresponding segment metadata.
+   * @return (1) the URI for the uploaded segment file and; (2) for a non-split commit, the corresponding segment metadata.
    */
   @Nullable
   private ImmutablePair<URI, SegmentMetadataImpl> uploadSegment(FormDataMultiPart multiPart, String instanceId, String segmentName,
