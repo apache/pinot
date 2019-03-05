@@ -100,11 +100,16 @@ export default Component.extend({
     'analysisRange',
     'metricUrn',
     function() {
-      const isPreviewMode = get(this, 'isPreviewMode');
-      if(!isPreviewMode) {
-        this._fetchAnomalies();
-      } else {
-        this._fetchTimeseries();
+      const {
+        isPreviewMode,
+        metricUrn
+      } = this.getProperties('isPreviewMode', 'metricUrn');
+      if(metricUrn) {
+        if(!isPreviewMode) {
+          this._fetchAnomalies();
+        } else {
+          this._fetchTimeseries();
+        }
       }
 
     }),
@@ -291,19 +296,19 @@ export default Component.extend({
           });
         }
         anomaliesInGraph.forEach(anomaly => {
-            const key = this._formatAnomaly(anomaly);
-            series[key] = {
-              timestamps: [anomaly.startTime, anomaly.endTime],
-              values: [1, 1],
-              type: 'line',
-              color: 'teal',
-              axis: 'y2'
-            };
-            series[key + '-region'] = Object.assign({}, series[key], {
-              type: 'region',
-              color: 'orange'
-            });
+          const key = this._formatAnomaly(anomaly);
+          series[key] = {
+            timestamps: [anomaly.startTime, anomaly.endTime],
+            values: [1, 1],
+            type: 'line',
+            color: 'teal',
+            axis: 'y2'
+          };
+          series[key + '-region'] = Object.assign({}, series[key], {
+            type: 'region',
+            color: 'orange'
           });
+        });
       }
 
       if (timeseries && !_.isEmpty(timeseries.value)) {

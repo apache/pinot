@@ -96,7 +96,7 @@ export default Route.extend({
       Object.keys(filters).forEach(
         function(filterKey) {
           const filter = filters[filterKey];
-          if (typeof filter === 'object') {
+          if (filter && typeof filter === 'object') {
             filter.forEach(
               function (filterValue) {
                 filterStrings.push(filterKey + '=' + filterValue);

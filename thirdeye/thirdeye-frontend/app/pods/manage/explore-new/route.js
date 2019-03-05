@@ -38,22 +38,26 @@ export default Route.extend({
             updatedBy: alert_json.updatedBy,
             functionName: yaml.detectionName,
             collection: yaml.dataset,
-            type: alert_json.pipelineType,
+            type: yaml.pipelineType,
             exploreDimensions: alert_json.dimensions,
             filters: this._formatYamlFilter(yaml.filters),
             dimensionExploration: this._formatYamlFilter(yaml.dimensionExploration),
             yaml: alert_json.yaml
           });
+
           this.setProperties({
             detectionYaml: yaml,
+            alertData: alert_json,
             alertId: alertId,
             metricUrn: alert_json.properties.nested[0].nestedMetricUrns[0],
             metricUrnList: alert_json.properties.nested[0].nestedMetricUrns
           });
+
         }
       }
     } catch (error) {
       notifications.error('Retrieving alert yaml failed.', error);
+
     }
 
     //subscription group fetch
@@ -73,16 +77,16 @@ export default Route.extend({
 
     const subscriptionGroupYamlDisplay = typeof get(this, 'subscriptionGroups') === 'object' && get(this, 'subscriptionGroups').length > 0 ? get(this, 'subscriptionGroups')[0].yaml : get(this, 'subscriptionGroups').yaml;
     const subscriptionGroupId = typeof get(this, 'subscriptionGroups') === 'object' && get(this, 'subscriptionGroups').length > 0 ? get(this, 'subscriptionGroups')[0].id : get(this, 'subscriptionGroups').id;
-    const metricUrn = get(this, 'metricUrn');
+
     return RSVP.hash({
       alertId,
       subscriptionGroupId,
       alertData: get(this, 'detectionYaml'),
-      detectionYaml: get(this, 'detectionYaml') ? get(this, 'detectionYaml').yaml : null,
+      detectionYaml: get (this, 'detectionYaml') ? get(this, 'detectionYaml').yaml : null,
       subscriptionGroups: get(this, 'subscriptionGroups'),
       subscriptionGroupYamlDisplay,
       metricUrn: get(this, 'metricUrn'),
-      metricUrnList: get(this, 'metricUrnList') || []
+      metricUrnList: get(this, 'metricUrnList') ? get(this, 'metricUrnList') : []
     });
   },
 
@@ -101,10 +105,12 @@ export default Route.extend({
   _formatYamlFilter(filters) {
     if (filters){
       const filterStrings = [];
+
       Object.keys(filters).forEach(
         function(filterKey) {
           const filter = filters[filterKey];
-          if (typeof filter === 'object') {
+          if (filter && typeof filter === 'object') {
+
             filter.forEach(
               function (filterValue) {
                 filterStrings.push(filterKey + '=' + filterValue);
