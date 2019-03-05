@@ -43,11 +43,12 @@ public class RecordReaderFactory {
         return new CSVRecordReader(dataFile, schema, (CSVRecordReaderConfig) segmentGeneratorConfig.getReaderConfig());
       case JSON:
         return new JSONRecordReader(dataFile, schema);
-      case PINOT:
-        return new PinotSegmentRecordReader(dataFile, schema, segmentGeneratorConfig.getColumnSortOrder());
       case THRIFT:
         return new ThriftRecordReader(dataFile, schema,
             (ThriftRecordReaderConfig) segmentGeneratorConfig.getReaderConfig());
+      // NOTE: PinotSegmentRecordReader does not support time conversion (field spec must match)
+      case PINOT:
+        return new PinotSegmentRecordReader(dataFile, schema, segmentGeneratorConfig.getColumnSortOrder());
       default:
         throw new UnsupportedOperationException("Unsupported input file format: " + fileFormat);
     }
