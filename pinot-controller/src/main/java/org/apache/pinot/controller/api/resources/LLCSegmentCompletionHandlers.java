@@ -208,7 +208,7 @@ public class LLCSegmentCompletionHandlers {
 
     SegmentMetadataImpl segmentMetadata;
     try {
-      segmentMetadata = extractMetadataFromSegmentFile(segmentName, new java.net.URI(segmentLocation));
+      segmentMetadata = extractMetadataFromSegmentFile(segmentName, new URI(segmentLocation));
     } catch (URISyntaxException e) {
       LOGGER.error("Invalid segment location: ", segmentLocation);
       return SegmentCompletionProtocol.RESP_FAILED.toJsonString();
@@ -344,7 +344,7 @@ public class LLCSegmentCompletionHandlers {
       LOGGER.info("Failed to extract segment metadata for {} from input form, fallback to use the segment file.",
               segmentName);
       try {
-        segmentMetadata = extractMetadataFromSegmentFile(segmentName, new java.net.URI(segmentLocation));
+        segmentMetadata = extractMetadataFromSegmentFile(segmentName, new URI(segmentLocation));
       } catch (URISyntaxException e) {
         LOGGER.error("Invalid segment location: ", segmentLocation);
         return SegmentCompletionProtocol.RESP_FAILED.toJsonString();
@@ -428,7 +428,7 @@ public class LLCSegmentCompletionHandlers {
    * @return SegmentMetadataImpl if it is able to extract the metadata file from the tar-zipped segment file.
    */
   private SegmentMetadataImpl extractMetadataFromSegmentFile(final String segmentNameStr,
-                                                             final java.net.URI segmentLocation) {
+                                                             final URI segmentLocation) {
     LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
     String baseDirStr = StringUtil.join("/", _controllerConf.getDataDir(), segmentName.getTableName());
     String tempSegmentDataDirStr = StringUtil.join("/", baseDirStr, segmentNameStr +
@@ -481,6 +481,14 @@ public class LLCSegmentCompletionHandlers {
     }
   }
 
+  /**
+   *
+   * @param multiPart input uploaded files.
+   * @param instanceId
+   * @param segmentName
+   * @param isSplitCommit
+   * @return (1) the URI for the uploaded segment file and; (2) for a split commit, the corresponding segment metadata.
+   */
   @Nullable
   private ImmutablePair<URI, SegmentMetadataImpl> uploadSegment(FormDataMultiPart multiPart, String instanceId, String segmentName,
       boolean isSplitCommit) {
@@ -506,9 +514,9 @@ public class LLCSegmentCompletionHandlers {
 
       LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
       final String rawTableName = llcSegmentName.getTableName();
-      final java.net.URI tableDirURI =
+      final URI tableDirURI =
           ControllerConf.getUriFromPath(StringUtil.join("/", provider.getBaseDataDirURI().toString(), rawTableName));
-      java.net.URI segmentFileURI;
+      URI segmentFileURI;
       if (isSplitCommit) {
         String uniqueSegmentFileName = SegmentCompletionUtils.generateSegmentFileName(segmentName);
         segmentFileURI =
@@ -554,7 +562,7 @@ public class LLCSegmentCompletionHandlers {
       }
 
       LOGGER.info("Moved file {} to {}", localTmpFile.getAbsolutePath(), segmentFileURI.toString());
-      return new ImmutablePair(URI.create(SCHEME + segmentFileURI.toString()), segmentMetadata);
+      return new ImmutablePair(segmentFileURI, segmentMetadata);
     } catch (InvalidControllerConfigException e) {
       LOGGER.error("Invalid controller config exception from instance {} for segment {}", instanceId, segmentName, e);
       return null;
