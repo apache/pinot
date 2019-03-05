@@ -1071,6 +1071,8 @@
             <!-- Exclude build files for docs -->
             <exclude>docs/_build/**</exclude>
             <exlude>docs/Makefile</exlude>
+            <!-- Exclude theme files for docs -->
+            <exclude>docs/_themes/**</exclude>
 
             <!-- Text and log files -->
             <exclude>**/*.txt</exclude>
