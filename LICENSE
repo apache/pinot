@@ -219,7 +219,6 @@ pinot-controller/src/main/resources/*/css/lib/codemirror*
 pinot-controller/src/main/resources/*/css/lib/foundation*
 pinot-controller/src/main/resources/*/css/lib/normalize.css
 
-
 BSD 3-Clause
 ------------
 pinot-controller/src/main/resources/*/js/lib/jquery.dataTables.min.js
