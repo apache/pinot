@@ -46,6 +46,7 @@ import org.apache.pinot.common.data.FieldSpec.FieldType;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.data.StarTreeIndexSpec;
 import org.apache.pinot.common.data.TimeFieldSpec;
+import org.apache.pinot.common.data.TimeGranularitySpec;
 import org.apache.pinot.common.utils.JsonUtils;
 import org.apache.pinot.core.data.readers.CSVRecordReaderConfig;
 import org.apache.pinot.core.data.readers.FileFormat;
@@ -160,12 +161,10 @@ public class SegmentGeneratorConfig {
   /**
    * This constructor is used during offline data generation. Note that it has an option that will generate inverted
    * index.
-   * @param tableConfig
-   * @param schema
    */
   public SegmentGeneratorConfig(@Nullable TableConfig tableConfig, Schema schema) {
     Preconditions.checkNotNull(schema);
-    _schema = schema;
+    setSchema(schema);
 
     if (tableConfig == null) {
       return;
@@ -213,7 +212,7 @@ public class SegmentGeneratorConfig {
   }
 
   public SegmentGeneratorConfig(Schema schema) {
-    _schema = schema;
+    setSchema(schema);
   }
 
   public Map<String, String> getCustomProperties() {
@@ -406,16 +405,7 @@ public class SegmentGeneratorConfig {
   }
 
   public TimeUnit getSegmentTimeUnit() {
-    if (_segmentTimeUnit != null) {
-      return _segmentTimeUnit;
-    } else {
-      TimeFieldSpec timeFieldSpec = _schema.getTimeFieldSpec();
-      if (timeFieldSpec != null) {
-        // Outgoing granularity is always non-null.
-        return timeFieldSpec.getOutgoingGranularitySpec().getTimeType();
-      }
-      return TimeUnit.DAYS;
-    }
+    return _segmentTimeUnit;
   }
 
   public void setSegmentTimeUnit(TimeUnit timeUnit) {
@@ -469,6 +459,28 @@ public class SegmentGeneratorConfig {
   public void setSchema(Schema schema) {
     Preconditions.checkNotNull(schema);
     _schema = schema;
+
+    // Set time related fields
+    // TODO: remove all time related fields and always extract from schema
+    TimeFieldSpec timeFieldSpec = _schema.getTimeFieldSpec();
+    if (timeFieldSpec != null) {
+      TimeGranularitySpec timeGranularitySpec = timeFieldSpec.getOutgoingGranularitySpec();
+      setTimeColumnName(timeGranularitySpec.getName());
+      String timeFormat = timeGranularitySpec.getTimeFormat();
+      if (timeFormat.equals(TimeGranularitySpec.TimeFormat.EPOCH.toString())) {
+        // Time format: 'EPOCH'
+        setSegmentTimeUnit(timeGranularitySpec.getTimeType());
+      } else {
+        // Time format: 'SIMPLE_DATE_FORMAT:<pattern>'
+        Preconditions.checkArgument(timeFormat.startsWith(TimeGranularitySpec.TimeFormat.SIMPLE_DATE_FORMAT.toString()),
+            "Invalid time format: %s, must be one of '%s' or '%s:<pattern>'", timeFormat,
+            TimeGranularitySpec.TimeFormat.EPOCH, TimeGranularitySpec.TimeFormat.SIMPLE_DATE_FORMAT);
+        setSimpleDateFormat(timeFormat.substring(timeFormat.indexOf(':') + 1));
+      }
+    }
+
+    // Remove inverted index columns not in schema
+    // TODO: add a validate() method to perform all validations
     if (_invertedIndexCreationColumns != null) {
       Iterator<String> iterator = _invertedIndexCreationColumns.iterator();
       while (iterator.hasNext()) {
@@ -592,13 +604,6 @@ public class SegmentGeneratorConfig {
       setSchema(schema);
     } else {
       throw new RuntimeException("Input format " + _format + " requires schema.");
-    }
-    setTimeColumnName(schema.getTimeColumnName());
-    TimeFieldSpec timeFieldSpec = schema.getTimeFieldSpec();
-    if (timeFieldSpec != null) {
-      setSegmentTimeUnit(timeFieldSpec.getIncomingGranularitySpec().getTimeType());
-    } else {
-      setSegmentTimeUnit(TimeUnit.DAYS);
     }
 
     if (_readerConfigFile != null) {
