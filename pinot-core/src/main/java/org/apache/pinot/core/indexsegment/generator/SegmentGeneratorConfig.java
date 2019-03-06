@@ -382,11 +382,7 @@ public class SegmentGeneratorConfig {
   }
 
   public String getTimeColumnName() {
-    if (_segmentTimeColumnName != null) {
-      return _segmentTimeColumnName;
-    }
-    // TODO: if segmentTimeColumnName is null, getQualifyingFields DATETIME. If multiple found, throw exception "must specify primary timeColumnName"
-    return getQualifyingFields(FieldType.TIME, true);
+    return _segmentTimeColumnName;
   }
 
   public void setTimeColumnName(String timeColumnName) {
@@ -461,7 +457,7 @@ public class SegmentGeneratorConfig {
     _schema = schema;
 
     // Set time related fields
-    // TODO: remove all time related fields and always extract from schema
+    // TODO: support datetime field as time column
     TimeFieldSpec timeFieldSpec = _schema.getTimeFieldSpec();
     if (timeFieldSpec != null) {
       TimeGranularitySpec timeGranularitySpec = timeFieldSpec.getOutgoingGranularitySpec();
