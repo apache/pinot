@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.Nullable;
@@ -65,6 +66,7 @@ import static org.apache.pinot.common.utils.CommonConstants.Broker.Request.TRACE
 public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseBrokerRequestHandler.class);
   private static final Pql2Compiler REQUEST_COMPILER = new Pql2Compiler();
+  private static final Random RANDOM = new Random();
 
   protected final Configuration _config;
   protected final RoutingTable _routingTable;
@@ -81,6 +83,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   protected final long _brokerTimeoutMs;
   protected final int _queryResponseLimit;
   protected final int _queryLogLength;
+  protected final float _queryLogSamplingRate;
 
   public BaseBrokerRequestHandler(Configuration config, RoutingTable routingTable,
       TimeBoundaryService timeBoundaryService, AccessControlFactory accessControlFactory,
@@ -96,9 +99,12 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     _brokerTimeoutMs = config.getLong(CONFIG_OF_BROKER_TIMEOUT_MS, DEFAULT_BROKER_TIMEOUT_MS);
     _queryResponseLimit = config.getInt(CONFIG_OF_BROKER_QUERY_RESPONSE_LIMIT, DEFAULT_BROKER_QUERY_RESPONSE_LIMIT);
     _queryLogLength = config.getInt(CONFIG_OF_BROKER_QUERY_LOG_LENGTH, DEFAULT_BROKER_QUERY_LOG_LENGTH);
+    _queryLogSamplingRate =
+        config.getFloat(CONFIG_OF_BROKER_QUERY_LOG_SAMPLING_RATE, DEFAULT_BROKER_QUERY_LOG_SAMPLING_RATE);
 
-    LOGGER.info("Broker Id: {}, timeout: {}ms, query response limit: {}, query log length: {}", _brokerId,
-        _brokerTimeoutMs, _queryResponseLimit, _queryLogLength);
+    LOGGER.info(
+        "Broker Id: {}, timeout: {}ms, query response limit: {}, query log length: {}, query log sampling rate: {}",
+        _brokerId, _brokerTimeoutMs, _queryResponseLimit, _queryLogLength, _queryLogSamplingRate);
   }
 
   private String getDefaultBrokerId() {
@@ -292,17 +298,21 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
     LOGGER.debug("Broker Response: {}", brokerResponse);
 
-    // Table name might have been changed (with suffix _OFFLINE/_REALTIME appended)
-    LOGGER.info(
-        "RequestId:{}, table:{}, timeMs:{}, docs:{}/{}, entries:{}/{}, segments(queried/processed/matched):{}/{}/{} "
-            + "servers:{}/{}, groupLimitReached:{}, exceptions:{}, serverStats:{}, query:{}", requestId,
-        brokerRequest.getQuerySource().getTableName(), totalTimeMs, brokerResponse.getNumDocsScanned(),
-        brokerResponse.getTotalDocs(), brokerResponse.getNumEntriesScannedInFilter(),
-        brokerResponse.getNumEntriesScannedPostFilter(), brokerResponse.getNumSegmentsQueried(),
-        brokerResponse.getNumSegmentsProcessed(), brokerResponse.getNumSegmentsMatched(),
-        brokerResponse.getNumServersResponded(), brokerResponse.getNumServersQueried(),
-        brokerResponse.isNumGroupsLimitReached(), brokerResponse.getExceptionsSize(), serverStats.getServerStats(),
-        StringUtils.substring(query, 0, _queryLogLength));
+    // Sampling the query log based on the sampling rate configuration
+    if(_queryLogSamplingRate > RANDOM.nextFloat()) {
+      // Table name might have been changed (with suffix _OFFLINE/_REALTIME appended)
+      LOGGER.info(
+          "RequestId:{}, table:{}, timeMs:{}, docs:{}/{}, entries:{}/{}, segments(queried/processed/matched):{}/{}/{} "
+              + "servers:{}/{}, groupLimitReached:{}, exceptions:{}, serverStats:{}, query:{}", requestId,
+          brokerRequest.getQuerySource().getTableName(), totalTimeMs, brokerResponse.getNumDocsScanned(),
+          brokerResponse.getTotalDocs(), brokerResponse.getNumEntriesScannedInFilter(),
+          brokerResponse.getNumEntriesScannedPostFilter(), brokerResponse.getNumSegmentsQueried(),
+          brokerResponse.getNumSegmentsProcessed(), brokerResponse.getNumSegmentsMatched(),
+          brokerResponse.getNumServersResponded(), brokerResponse.getNumServersQueried(),
+          brokerResponse.isNumGroupsLimitReached(), brokerResponse.getExceptionsSize(), serverStats.getServerStats(),
+          StringUtils.substring(query, 0, _queryLogLength));
+    }
+
 
     return brokerResponse;
   }

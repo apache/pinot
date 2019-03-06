@@ -23,10 +23,12 @@ import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListenableFutureTask;
 import java.util.Map;
+import java.util.Random;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.LongAccumulator;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import org.apache.commons.configuration.Configuration;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -48,9 +50,14 @@ import org.slf4j.LoggerFactory;
  */
 public abstract class QueryScheduler {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryScheduler.class);
+  private static final Random RANDOM = new Random();
+
   private static final String INVALID_NUM_SCANNED = "-1";
   private static final String INVALID_SEGMENTS_COUNT = "-1";
+  private static final String QUERY_LOG_SAMPLING_RATE_KEY = "query_log_sampling_rate";
+  private static final float DEFAULT_QUERY_LOG_SAMPLING_RATE = 1.0f;
 
+  private final float queryLogSamplingRate;
   protected final ServerMetrics serverMetrics;
   protected final QueryExecutor queryExecutor;
   protected final ResourceManager resourceManager;
@@ -63,8 +70,9 @@ public abstract class QueryScheduler {
    * @param resourceManager for managing server thread resources
    * @param serverMetrics server metrics collector
    */
-  public QueryScheduler(@Nonnull QueryExecutor queryExecutor, @Nonnull ResourceManager resourceManager,
+  public QueryScheduler(@Nonnull Configuration config, @Nonnull QueryExecutor queryExecutor, @Nonnull ResourceManager resourceManager,
       @Nonnull ServerMetrics serverMetrics, @Nonnull LongAccumulator latestQueryTime) {
+    Preconditions.checkNotNull(config);
     Preconditions.checkNotNull(queryExecutor);
     Preconditions.checkNotNull(resourceManager);
     Preconditions.checkNotNull(serverMetrics);
@@ -73,6 +81,9 @@ public abstract class QueryScheduler {
     this.resourceManager = resourceManager;
     this.queryExecutor = queryExecutor;
     this.latestQueryTime = latestQueryTime;
+    this.queryLogSamplingRate = config.getFloat(QUERY_LOG_SAMPLING_RATE_KEY, DEFAULT_QUERY_LOG_SAMPLING_RATE);
+
+    LOGGER.info("Query log sampling rate: {}", queryLogSamplingRate);
   }
 
   /**
@@ -170,13 +181,17 @@ public abstract class QueryScheduler {
 
     TimerContext timerContext = queryRequest.getTimerContext();
     int numSegmentsQueried = queryRequest.getSegmentsToQuery().size();
-    LOGGER.info(
-        "Processed requestId={},table={},segments(queried/processed/matched)={}/{}/{},schedulerWaitMs={},totalExecMs={},totalTimeMs={},broker={},numDocsScanned={},scanInFilter={},scanPostFilter={},sched={}",
-        requestId, tableNameWithType, numSegmentsQueried, numSegmentsProcessed, numSegmentsMatched,
-        timerContext.getPhaseDurationMs(ServerQueryPhase.SCHEDULER_WAIT),
-        timerContext.getPhaseDurationMs(ServerQueryPhase.QUERY_PROCESSING),
-        timerContext.getPhaseDurationMs(ServerQueryPhase.TOTAL_QUERY_TIME), queryRequest.getBrokerId(), numDocsScanned,
-        numEntriesScannedInFilter, numEntriesScannedPostFilter, name());
+
+    // Sampling the query log based on the sampling rate configuration
+    if (queryLogSamplingRate > RANDOM.nextFloat()) {
+      LOGGER.info(
+          "Processed requestId={},table={},segments(queried/processed/matched)={}/{}/{},schedulerWaitMs={},totalExecMs={},totalTimeMs={},broker={},numDocsScanned={},scanInFilter={},scanPostFilter={},sched={}",
+          requestId, tableNameWithType, numSegmentsQueried, numSegmentsProcessed, numSegmentsMatched,
+          timerContext.getPhaseDurationMs(ServerQueryPhase.SCHEDULER_WAIT),
+          timerContext.getPhaseDurationMs(ServerQueryPhase.QUERY_PROCESSING),
+          timerContext.getPhaseDurationMs(ServerQueryPhase.TOTAL_QUERY_TIME), queryRequest.getBrokerId(), numDocsScanned,
+          numEntriesScannedInFilter, numEntriesScannedPostFilter, name());
+    }
 
     serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_SEGMENTS_QUERIED, numSegmentsQueried);
     serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_SEGMENTS_PROCESSED, numSegmentsProcessed);
