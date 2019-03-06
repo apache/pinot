@@ -21,8 +21,8 @@
 package org.apache.pinot.thirdeye.detection.spec;
 
 public class DurationAnomalyFilterSpec extends AbstractSpec {
-  private String minDuration;
-  private String maxDuration;
+  private String minDuration = "PT0S";
+  private String maxDuration = "P365D";
 
   public String getMinDuration() {
     return minDuration;
