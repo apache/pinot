@@ -341,11 +341,11 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         properties.setProperty(SEGMENT_END_TIME, Preconditions.checkNotNull(config.getEndTime()));
         properties.setProperty(TIME_UNIT, Preconditions.checkNotNull(config.getSegmentTimeUnit()));
       } else {
-        Object minTime = timeColumnIndexCreationInfo.getMin();
-        Object maxTime = timeColumnIndexCreationInfo.getMax();
+        Object minTime = Preconditions.checkNotNull(timeColumnIndexCreationInfo.getMin());
+        Object maxTime = Preconditions.checkNotNull(timeColumnIndexCreationInfo.getMax());
 
-        // Convert time value into millis since epoch for SIMPLE_DATE
         if (config.getTimeColumnType() == SegmentGeneratorConfig.TimeColumnType.SIMPLE_DATE) {
+          // For simple date format, convert time value into millis since epoch
           DateTimeFormatter dateTimeFormatter = DateTimeFormat.forPattern(config.getSimpleDateFormat());
           properties.setProperty(SEGMENT_START_TIME, dateTimeFormatter.parseMillis(minTime.toString()));
           properties.setProperty(SEGMENT_END_TIME, dateTimeFormatter.parseMillis(maxTime.toString()));
@@ -353,7 +353,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         } else {
           properties.setProperty(SEGMENT_START_TIME, minTime);
           properties.setProperty(SEGMENT_END_TIME, maxTime);
-          properties.setProperty(TIME_UNIT, config.getSegmentTimeUnit());
+          properties.setProperty(TIME_UNIT, Preconditions.checkNotNull(config.getSegmentTimeUnit()));
         }
       }
     }
