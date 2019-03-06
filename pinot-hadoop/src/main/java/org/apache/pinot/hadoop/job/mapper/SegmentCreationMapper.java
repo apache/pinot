@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -85,9 +86,7 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
   public void setup(Context context)
       throws IOException, InterruptedException {
     _jobConf = context.getConfiguration();
-    _logger.info("*********************************************************************");
-    _logger.info("Job Configurations: {}", _jobConf);
-    _logger.info("*********************************************************************");
+    logConfigurations();
 
     _rawTableName = Preconditions.checkNotNull(_jobConf.get(JobConfigConstants.SEGMENT_TABLE_NAME));
     _schema = Schema.fromString(_jobConf.get(JobConfigConstants.SCHEMA));
@@ -159,6 +158,28 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
     _logger.info("Local Staging Directory: {}", _localStagingDir);
     _logger.info("Local Input Directory: {}", _localInputDir);
     _logger.info("Local Segment Tar Directory: {}", _localSegmentTarDir);
+    _logger.info("*********************************************************************");
+  }
+
+  protected void logConfigurations() {
+    StringBuilder stringBuilder = new StringBuilder();
+    stringBuilder.append('{');
+    boolean firstEntry = true;
+    for (Map.Entry<String, String> entry : _jobConf) {
+      if (!firstEntry) {
+        stringBuilder.append(", ");
+      } else {
+        firstEntry = false;
+      }
+
+      stringBuilder.append(entry.getKey());
+      stringBuilder.append('=');
+      stringBuilder.append(entry.getValue());
+    }
+    stringBuilder.append('}');
+
+    _logger.info("*********************************************************************");
+    _logger.info("Job Configurations: {}", stringBuilder.toString());
     _logger.info("*********************************************************************");
   }
 
