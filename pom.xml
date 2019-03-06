@@ -1149,6 +1149,7 @@
           <excludes>
             <!-- Sphynx auto generated makefile -->
             <exclude>docs/Makefile</exclude>
+            <exclude>docs/_themes/**</exclude>
 
             <!-- Exclude build files for docs -->
             <exclude>docs/_build/**</exclude>
