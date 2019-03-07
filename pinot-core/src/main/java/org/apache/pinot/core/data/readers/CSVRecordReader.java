@@ -90,7 +90,7 @@ public class CSVRecordReader implements RecordReader {
       _multiValueDelimiter = config.getMultiValueDelimiter();
     }
 
-    initialize();
+    init();
   }
 
   @Override
@@ -98,7 +98,7 @@ public class CSVRecordReader implements RecordReader {
 
   }
 
-  private void initialize()
+  private void init()
       throws IOException {
     _parser = _format.parse(RecordReaderUtils.getBufferedReader(_dataFile));
     _iterator = _parser.iterator();
@@ -137,7 +137,7 @@ public class CSVRecordReader implements RecordReader {
   public void rewind()
       throws IOException {
     _parser.close();
-    initialize();
+    init();
   }
 
   @Override

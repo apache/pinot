@@ -51,10 +51,10 @@ public class JSONRecordReader implements RecordReader {
     _schema = schema;
     _fieldSpecs = RecordReaderUtils.extractFieldSpecs(schema);
 
-    initialize();
+    init();
   }
 
-  private void initialize()
+  private void init()
       throws IOException {
     _parser = _factory.createParser(RecordReaderUtils.getBufferedReader(_dataFile));
     try {
@@ -100,7 +100,7 @@ public class JSONRecordReader implements RecordReader {
   public void rewind()
       throws IOException {
     _parser.close();
-    initialize();
+    init();
   }
 
   @Override
