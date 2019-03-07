@@ -172,7 +172,10 @@ After this, create a PullRequest in `github <https://github.com/apache/incubator
 
 * Evidence of sufficient testing. You ``MUST`` indicate the tests done, either manually or automated.
 
-Request reviews from atleast 2 committers on the project and be sure to gently to followup on the issue with the reviewers.
+Once the PR is created, the code base is compiled and all tests are run via ``travis``. Make sure you followup on any issues flagged by travis and address them.
+If you see test failures that are intermittent, ``please`` create an issue to track them.
+
+Once the ``travis`` run is clear, request reviews from atleast 2 committers on the project and be sure to gently to followup on the issue with the reviewers.
 
 * Addressing comments and Rebasing
 Once you receive comments on github on your changes, be sure to respond to them on github and address the concerns.
