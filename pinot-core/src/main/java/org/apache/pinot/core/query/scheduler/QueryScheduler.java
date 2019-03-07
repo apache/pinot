@@ -25,6 +25,7 @@ import com.google.common.util.concurrent.ListenableFutureTask;
 import com.google.common.util.concurrent.RateLimiter;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.LongAccumulator;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -53,10 +54,13 @@ public abstract class QueryScheduler {
 
   private static final String INVALID_NUM_SCANNED = "-1";
   private static final String INVALID_SEGMENTS_COUNT = "-1";
-  private static final String QUERY_LOG_MAX_RATE_KEY = "query_log_max_rate";
+  private static final String QUERY_LOG_MAX_RATE_KEY = "query.log.maxRatePerSecond";
   private static final double DEFAULT_QUERY_LOG_MAX_RATE = 10_000d;
 
   private final RateLimiter queryLogRateLimiter;
+  private final RateLimiter numDroppedLogRateLimiter;
+  private final AtomicInteger numDroppedLogCounter;
+
   protected final ServerMetrics serverMetrics;
   protected final QueryExecutor queryExecutor;
   protected final ResourceManager resourceManager;
@@ -82,6 +86,8 @@ public abstract class QueryScheduler {
     this.queryExecutor = queryExecutor;
     this.latestQueryTime = latestQueryTime;
     this.queryLogRateLimiter = RateLimiter.create(config.getDouble(QUERY_LOG_MAX_RATE_KEY, DEFAULT_QUERY_LOG_MAX_RATE));
+    this.numDroppedLogRateLimiter = RateLimiter.create(1.0d);
+    this.numDroppedLogCounter = new AtomicInteger(0);
 
     LOGGER.info("Query log max rate: {}", queryLogRateLimiter.getRate());
   }
@@ -133,6 +139,7 @@ public abstract class QueryScheduler {
    * @param executorService Executor service to use for parallelizing query processing
    * @return serialized query response
    */
+  @SuppressWarnings("Duplicates")
   @Nullable
   protected byte[] processQueryAndSerialize(@Nonnull ServerQueryRequest queryRequest,
       @Nonnull ExecutorService executorService) {
@@ -190,6 +197,20 @@ public abstract class QueryScheduler {
           timerContext.getPhaseDurationMs(ServerQueryPhase.QUERY_PROCESSING),
           timerContext.getPhaseDurationMs(ServerQueryPhase.TOTAL_QUERY_TIME), queryRequest.getBrokerId(),
           numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, name());
+
+      // Limit the dropping log message at most once per second.
+      if (numDroppedLogRateLimiter.tryAcquire()) {
+        // NOTE: the reported number may not be accurate since we will be missing some increments happened between
+        // get() and set().
+        int numDroppedLog = numDroppedLogCounter.get();
+        if (numDroppedLog > 0) {
+          LOGGER.info("{} logs were dropped. (log max rate per second: {})", numDroppedLog,
+              queryLogRateLimiter.getRate());
+          numDroppedLogCounter.set(0);
+        }
+      }
+    } else {
+      numDroppedLogCounter.incrementAndGet();
     }
 
     serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_SEGMENTS_QUERIED, numSegmentsQueried);
@@ -208,7 +229,7 @@ public abstract class QueryScheduler {
   private boolean forceLog(long schedulerWaitMs, long numDocsScanned) {
     // If scheduler wait time is larger than 100ms, force the log
     if (schedulerWaitMs > 100L) {
-      return false;
+      return true;
     }
 
     // If the number of document scanned is larger than 1 million rows, force the log
