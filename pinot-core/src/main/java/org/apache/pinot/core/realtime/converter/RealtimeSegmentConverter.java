@@ -114,10 +114,6 @@ public class RealtimeSegmentConverter {
       genConfig.enableStarTreeIndex(starTreeIndexSpec);
     }
 
-    // TODO: use timeColumnName field
-    genConfig.setTimeColumnName(dataSchema.getTimeFieldSpec().getOutgoingTimeColumnName());
-    // TODO: find timeColumnName in schema.getDateTimeFieldSpec, in order to get the timeUnit
-    genConfig.setSegmentTimeUnit(dataSchema.getTimeFieldSpec().getOutgoingGranularitySpec().getTimeType());
     if (segmentVersion != null) {
       genConfig.setSegmentVersion(segmentVersion);
     }
