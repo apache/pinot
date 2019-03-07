@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListenableFutureTask;
+import com.google.common.util.concurrent.RateLimiter;
 import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.ExecutorService;
@@ -50,14 +51,13 @@ import org.slf4j.LoggerFactory;
  */
 public abstract class QueryScheduler {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryScheduler.class);
-  private static final Random RANDOM = new Random();
 
   private static final String INVALID_NUM_SCANNED = "-1";
   private static final String INVALID_SEGMENTS_COUNT = "-1";
-  private static final String QUERY_LOG_SAMPLING_RATE_KEY = "query_log_sampling_rate";
-  private static final float DEFAULT_QUERY_LOG_SAMPLING_RATE = 1.0f;
+  private static final String QUERY_LOG_MAX_RATE_KEY = "query_log_max_rate";
+  private static final double DEFAULT_QUERY_LOG_MAX_RATE = 10_000d;
 
-  private final float queryLogSamplingRate;
+  private final RateLimiter queryLogRateLimiter;
   protected final ServerMetrics serverMetrics;
   protected final QueryExecutor queryExecutor;
   protected final ResourceManager resourceManager;
@@ -70,8 +70,9 @@ public abstract class QueryScheduler {
    * @param resourceManager for managing server thread resources
    * @param serverMetrics server metrics collector
    */
-  public QueryScheduler(@Nonnull Configuration config, @Nonnull QueryExecutor queryExecutor, @Nonnull ResourceManager resourceManager,
-      @Nonnull ServerMetrics serverMetrics, @Nonnull LongAccumulator latestQueryTime) {
+  public QueryScheduler(@Nonnull Configuration config, @Nonnull QueryExecutor queryExecutor,
+      @Nonnull ResourceManager resourceManager, @Nonnull ServerMetrics serverMetrics,
+      @Nonnull LongAccumulator latestQueryTime) {
     Preconditions.checkNotNull(config);
     Preconditions.checkNotNull(queryExecutor);
     Preconditions.checkNotNull(resourceManager);
@@ -81,9 +82,9 @@ public abstract class QueryScheduler {
     this.resourceManager = resourceManager;
     this.queryExecutor = queryExecutor;
     this.latestQueryTime = latestQueryTime;
-    this.queryLogSamplingRate = config.getFloat(QUERY_LOG_SAMPLING_RATE_KEY, DEFAULT_QUERY_LOG_SAMPLING_RATE);
+    this.queryLogRateLimiter = RateLimiter.create(config.getDouble(QUERY_LOG_MAX_RATE_KEY, DEFAULT_QUERY_LOG_MAX_RATE));
 
-    LOGGER.info("Query log sampling rate: {}", queryLogSamplingRate);
+    LOGGER.info("Query log max rate: {}", queryLogRateLimiter.getRate());
   }
 
   /**
@@ -181,16 +182,15 @@ public abstract class QueryScheduler {
 
     TimerContext timerContext = queryRequest.getTimerContext();
     int numSegmentsQueried = queryRequest.getSegmentsToQuery().size();
+    long schedulerWaitMs = timerContext.getPhaseDurationMs(ServerQueryPhase.SCHEDULER_WAIT);
 
-    // Sampling the query log based on the sampling rate configuration
-    if (queryLogSamplingRate > RANDOM.nextFloat()) {
+    if (queryLogRateLimiter.tryAcquire() || forceLog(schedulerWaitMs, numDocsScanned)) {
       LOGGER.info(
           "Processed requestId={},table={},segments(queried/processed/matched)={}/{}/{},schedulerWaitMs={},totalExecMs={},totalTimeMs={},broker={},numDocsScanned={},scanInFilter={},scanPostFilter={},sched={}",
-          requestId, tableNameWithType, numSegmentsQueried, numSegmentsProcessed, numSegmentsMatched,
-          timerContext.getPhaseDurationMs(ServerQueryPhase.SCHEDULER_WAIT),
+          requestId, tableNameWithType, numSegmentsQueried, numSegmentsProcessed, numSegmentsMatched, schedulerWaitMs,
           timerContext.getPhaseDurationMs(ServerQueryPhase.QUERY_PROCESSING),
-          timerContext.getPhaseDurationMs(ServerQueryPhase.TOTAL_QUERY_TIME), queryRequest.getBrokerId(), numDocsScanned,
-          numEntriesScannedInFilter, numEntriesScannedPostFilter, name());
+          timerContext.getPhaseDurationMs(ServerQueryPhase.TOTAL_QUERY_TIME), queryRequest.getBrokerId(),
+          numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, name());
     }
 
     serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_SEGMENTS_QUERIED, numSegmentsQueried);
@@ -198,6 +198,25 @@ public abstract class QueryScheduler {
     serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_SEGMENTS_MATCHED, numSegmentsMatched);
 
     return responseData;
+  }
+
+  /**
+   * Helper function to decide whether to force the log
+   *
+   * TODO: come up with other criteria for forcing a log and come up with better numbers
+   *
+   */
+  private boolean forceLog(long schedulerWaitMs, long numDocsScanned) {
+    // If scheduler wait time is larger than 100ms, force the log
+    if (schedulerWaitMs > 100L) {
+      return false;
+    }
+
+    // If the number of document scanned is larger than 1 million rows, force the log
+    if (numDocsScanned > 1_000_000L) {
+      return true;
+    }
+    return false;
   }
 
   /**

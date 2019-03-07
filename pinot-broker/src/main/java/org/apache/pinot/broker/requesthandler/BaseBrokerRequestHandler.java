@@ -20,6 +20,7 @@ package org.apache.pinot.broker.requesthandler;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Splitter;
+import com.google.common.util.concurrent.RateLimiter;
 import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -66,7 +67,6 @@ import static org.apache.pinot.common.utils.CommonConstants.Broker.Request.TRACE
 public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseBrokerRequestHandler.class);
   private static final Pql2Compiler REQUEST_COMPILER = new Pql2Compiler();
-  private static final Random RANDOM = new Random();
 
   protected final Configuration _config;
   protected final RoutingTable _routingTable;
@@ -83,7 +83,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   protected final long _brokerTimeoutMs;
   protected final int _queryResponseLimit;
   protected final int _queryLogLength;
-  protected final float _queryLogSamplingRate;
+  protected final RateLimiter _queryLogRateLimiter;
 
   public BaseBrokerRequestHandler(Configuration config, RoutingTable routingTable,
       TimeBoundaryService timeBoundaryService, AccessControlFactory accessControlFactory,
@@ -99,12 +99,12 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     _brokerTimeoutMs = config.getLong(CONFIG_OF_BROKER_TIMEOUT_MS, DEFAULT_BROKER_TIMEOUT_MS);
     _queryResponseLimit = config.getInt(CONFIG_OF_BROKER_QUERY_RESPONSE_LIMIT, DEFAULT_BROKER_QUERY_RESPONSE_LIMIT);
     _queryLogLength = config.getInt(CONFIG_OF_BROKER_QUERY_LOG_LENGTH, DEFAULT_BROKER_QUERY_LOG_LENGTH);
-    _queryLogSamplingRate =
-        config.getFloat(CONFIG_OF_BROKER_QUERY_LOG_SAMPLING_RATE, DEFAULT_BROKER_QUERY_LOG_SAMPLING_RATE);
+    _queryLogRateLimiter = RateLimiter
+        .create(config.getDouble(CONFIG_OF_BROKER_QUERY_LOG_MAX_RATE, DEFAULT_BROKER_QUERY_LOG_MAX_RATE));
 
     LOGGER.info(
-        "Broker Id: {}, timeout: {}ms, query response limit: {}, query log length: {}, query log sampling rate: {}",
-        _brokerId, _brokerTimeoutMs, _queryResponseLimit, _queryLogLength, _queryLogSamplingRate);
+        "Broker Id: {}, timeout: {}ms, query response limit: {}, query log length: {}, query log max rate: {}qps",
+        _brokerId, _brokerTimeoutMs, _queryResponseLimit, _queryLogLength, _queryLogRateLimiter.getRate());
   }
 
   private String getDefaultBrokerId() {
@@ -298,8 +298,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
     LOGGER.debug("Broker Response: {}", brokerResponse);
 
-    // Sampling the query log based on the sampling rate configuration
-    if(_queryLogSamplingRate > RANDOM.nextFloat()) {
+    if(_queryLogRateLimiter.tryAcquire() || forceLog(brokerResponse, totalTimeMs)) {
       // Table name might have been changed (with suffix _OFFLINE/_REALTIME appended)
       LOGGER.info(
           "RequestId:{}, table:{}, timeMs:{}, docs:{}/{}, entries:{}/{}, segments(queried/processed/matched):{}/{}/{} "
@@ -312,9 +311,30 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
           brokerResponse.isNumGroupsLimitReached(), brokerResponse.getExceptionsSize(), serverStats.getServerStats(),
           StringUtils.substring(query, 0, _queryLogLength));
     }
-
-
     return brokerResponse;
+  }
+
+  /**
+   * Helper function to decide whether to force the log
+   *
+   * TODO: come up with other criteria for forcing a log and come up with better numbers
+   *
+   */
+  private boolean forceLog(BrokerResponse brokerResponse, long totalTimeMs) {
+    if (brokerResponse.isNumGroupsLimitReached()) {
+      return true;
+    }
+
+    if (brokerResponse.getExceptionsSize() > 0) {
+      return true;
+    }
+
+    // If response time is more than 1 sec, force the log
+    if (totalTimeMs > 1000L) {
+      return true;
+    }
+
+    return false;
   }
 
   /**
