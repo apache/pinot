@@ -138,7 +138,7 @@ public class ControllerConf extends PropertiesConfiguration {
   private static final long DEFAULT_SEGMENT_UPLOAD_TIMEOUT_IN_MILLIS = 600_000L; // 10 minutes
   private static final int DEFAULT_REALTIME_SEGMENT_METADATA_COMMIT_NUMLOCKS = 64;
   private static final boolean DEFAULT_ENABLE_STORAGE_QUOTA_CHECK = true;
-  private static final boolean DEFAULT_ENABLE_BATCH_MESSAGE_MODE = true;
+  private static final boolean DEFAULT_ENABLE_BATCH_MESSAGE_MODE = false;
 
   private static final String DEFAULT_PINOT_FS_FACTORY_CLASS_LOCAL = LocalPinotFS.class.getName();
 
