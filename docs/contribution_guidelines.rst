@@ -35,8 +35,8 @@ Create a branch for your change
 
 .. code-block:: none
 
-  $cd incubator-pinot
-  $git checkout -b <your issue branch>
+  $ cd incubator-pinot
+  $ git checkout -b <your issue branch>
 
 Make the necessary changes. If the changes you plan to make are too big, make sure you break it down into smaller tasks.
 
@@ -117,8 +117,7 @@ Identify a list of tests for the changes you have made. Depending on the scope o
 License Headers for newly added files
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-All source code files should have license headers. To automatically add the header for any new file you plan to checkin,
- run:
+All source code files should have license headers. To automatically add the header for any new file you plan to checkin, run in ``incubator-pinot`` top-level folder:
 
 .. code-block:: none
 
@@ -126,7 +125,15 @@ All source code files should have license headers. To automatically add the head
 
 .. note::
 
-If you checkin third-party code or files, ensure they are distributed under Apache, MIT or BSD-3 licenses.
+If you checkin third-party code or files, please make sure you review Apache guidelines:
+
+* `Licences that can be included <https://www.apache.org/legal/resolved.html#what-can-we-include-in-an-asf-project-category-a>`_
+
+* `Licences that may be included <https://www.apache.org/legal/resolved.html#what-can-we-maybe-include-in-an-asf-project-category-b>`_
+
+* `Licenses that should not be included <https://www.apache.org/legal/resolved.html#what-can-we-not-include-in-an-asf-project-category-x>`_
+
+Once you determine the code you are pulling in adhere to the guidelines above, go ahead pull the changes in.
 Do not add license headers for them. Follow these instructions to ensure we are compliant with Apache Licensing process:
 
 * Under ``incubator-pinot/licenses`` add a LICENSE-<newlib> file that has the license terms of the included library.
@@ -186,19 +193,19 @@ It is possible that while your change is being reviewed, other changes were made
 .. code-block:: none
 
   # commit your changes
-  $git add <updated files>
-  $git commit -m "Meaningful message for the udpate"
+  $ git add <updated files>
+  $ git commit -m "Meaningful message for the udpate"
   # pull new changes
-  $git checkout master
-  $git pull
-  $git checkout <your issue branch>
-  $git rebase master
+  $ git checkout master
+  $ git pull
+  $ git checkout <your issue branch>
+  $ git rebase master
 
 At this time, if rebase flags any conflicts, resolve the conflicts and follow the instructions provided by the rebase command.
 
 Run additional tests/validations for the new changes and update the PR by pushing your changes:
 
 .. code-block:: none
-  $git push origin <your issue branch>
+  $ git push origin <your issue branch>
 
 * Once your change is merged, check to see if any documentation needs to be updated. If so, create a PR for documentation.
