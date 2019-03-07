@@ -28,17 +28,21 @@ Dev Environment Setup
 
 To contribute to Pinot, please follow the instructions below.
 
+Git
+---
+Pinot uses git for source code management. If you are new to Git, it will be good to review `basics <https://git-scm.com/book/en/v1/Getting-Started-Git-Basics>`_ of Git and a common tasks like `managing branches <https://git-scm.com/book/en/v2/Git-Branching-Branches-in-a-Nutshell>`_ and `rebasing <https://git-scm.com/book/en/v2/Git-Branching-Rebasing>`_.
+
 Getting the Source Code
 -----------------------
-
 Create a fork
 ^^^^^^^^^^^^^
-To limit the number of branches created on the main Pinot repository, we recommend that you create a fork by clicking on the fork button `here <https://github.com/apache/incubator-pinot>`_.
-
-.. code-block:: none
+To limit the number of branches created on the Apache Pinot repository, we recommend that you create a fork by clicking on the fork button `here <https://github.com/apache/incubator-pinot>`_.
 
 Clone the repository locally
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: none
+
   $mkdir workspace
   $cd workspace
   $git clone https://github.com/<username>/incubator-pinot.git
@@ -47,9 +51,10 @@ Clone the repository locally
 Maven
 -----
 Pinot is a Maven project and familiarity with Maven will help you work with Pinot code. If you are new to Maven, you can
-more `here <maven.apache.org>`_ and `here <http://maven.apache.org/guides/getting-started/maven-in-five-minutes.html>`_.
+read about Maven `here <maven.apache.org>`_ and `get a quick overview here <http://maven.apache.org/guides/getting-started/maven-in-five-minutes.html>`_.
 
 Run the following maven command to setup the project.
+
 .. code-block:: none
 
   # compile, download sources
