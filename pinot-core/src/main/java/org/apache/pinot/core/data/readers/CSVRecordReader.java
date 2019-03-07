@@ -29,6 +29,7 @@ import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.core.data.GenericRow;
+import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 
 
 /**
@@ -90,6 +91,11 @@ public class CSVRecordReader implements RecordReader {
     }
 
     init();
+  }
+
+  @Override
+  public void init(SegmentGeneratorConfig segmentGeneratorConfig) {
+
   }
 
   private void init()

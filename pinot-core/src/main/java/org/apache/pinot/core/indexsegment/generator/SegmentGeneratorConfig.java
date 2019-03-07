@@ -83,6 +83,7 @@ public class SegmentGeneratorConfig {
   private String _dataDir = null;
   private String _inputFilePath = null;
   private FileFormat _format = FileFormat.AVRO;
+  private String _recordReaderPath = null;
   private String _outDir = null;
   private boolean _overwrite = false;
   private String _tableName = null;
@@ -156,6 +157,7 @@ public class SegmentGeneratorConfig {
     _timeColumnType = config._timeColumnType;
     _simpleDateFormat = config._simpleDateFormat;
     _onHeap = config._onHeap;
+    _recordReaderPath = config._recordReaderPath;
   }
 
   /**
@@ -321,6 +323,14 @@ public class SegmentGeneratorConfig {
 
   public void setFormat(FileFormat format) {
     _format = format;
+  }
+
+  public String getRecordReaderPath() {
+    return _recordReaderPath;
+  }
+
+  public void setRecordReaderPath(String recordReaderPath) {
+    _recordReaderPath = recordReaderPath;
   }
 
   public String getOutDir() {

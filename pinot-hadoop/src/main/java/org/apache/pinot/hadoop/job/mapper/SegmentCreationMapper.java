@@ -69,6 +69,7 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
 
   // Optional
   protected TableConfig _tableConfig;
+  protected String _recordReaderPath;
   protected Path _readerConfigFile;
 
   // HDFS segment tar directory
@@ -100,6 +101,8 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
     if (readerConfigFile != null) {
       _readerConfigFile = new Path(readerConfigFile);
     }
+
+    _recordReaderPath = _jobConf.get(JobConfigConstants.RECORD_READER_PATH, null);
 
     // Set up segment name generator
     String segmentNameGeneratorType =
@@ -204,9 +207,14 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
     segmentGeneratorConfig.setOutDir(_localSegmentDir.getPath());
     segmentGeneratorConfig.setSegmentNameGenerator(_segmentNameGenerator);
     segmentGeneratorConfig.setSequenceId(sequenceId);
-    FileFormat fileFormat = getFileFormat(inputFileName);
-    segmentGeneratorConfig.setFormat(fileFormat);
-    segmentGeneratorConfig.setReaderConfig(getReaderConfig(fileFormat));
+    segmentGeneratorConfig.setRecordReaderPath(_recordReaderPath);
+    if (_recordReaderPath != null) {
+      segmentGeneratorConfig.setFormat(FileFormat.OTHER);
+    } else {
+      FileFormat fileFormat = getFileFormat(inputFileName);
+      segmentGeneratorConfig.setFormat(fileFormat);
+      segmentGeneratorConfig.setReaderConfig(getReaderConfig(fileFormat));
+    }
     segmentGeneratorConfig.setOnHeap(true);
 
     addAdditionalSegmentGeneratorConfigs(segmentGeneratorConfig, hdfsInputFile, sequenceId);
