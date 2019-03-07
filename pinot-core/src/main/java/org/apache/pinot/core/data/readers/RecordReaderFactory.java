@@ -45,7 +45,7 @@ public class RecordReaderFactory {
     // Allow for instantiation general record readers from a record reader path passed into segment generator config
     // If this is set, this will override the file format
     if (recordReaderPath != null) {
-      if (fileFormat != null) {
+      if (fileFormat != FileFormat.OTHER) {
         // We currently have default file format set to AVRO inside segment generator config,
         // do not want to break this behavior for clients.
         LOGGER.warn("Using recordReaderPath {} to read segment, ignoring fileformat {}",
@@ -70,14 +70,6 @@ public class RecordReaderFactory {
       // NOTE: PinotSegmentRecordReader does not support time conversion (field spec must match)
       case PINOT:
         return new PinotSegmentRecordReader(dataFile, schema, segmentGeneratorConfig.getColumnSortOrder());
-      case ORC:
-        // The ORC reader currently uses hive, we don't want to bring this dependency into pinot-core
-        if (recordReaderPath == null) {
-          throw new RuntimeException("Record reader path must be set for ORC");
-        }
-        RecordReader recordReader = (RecordReader) Class.forName(recordReaderPath).newInstance();
-        recordReader.init(segmentGeneratorConfig);
-        return recordReader;
       default:
         throw new UnsupportedOperationException("Unsupported input file format: " + fileFormat);
     }

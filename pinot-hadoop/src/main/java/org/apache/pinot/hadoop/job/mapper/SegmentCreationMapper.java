@@ -207,10 +207,14 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
     segmentGeneratorConfig.setOutDir(_localSegmentDir.getPath());
     segmentGeneratorConfig.setSegmentNameGenerator(_segmentNameGenerator);
     segmentGeneratorConfig.setSequenceId(sequenceId);
-    FileFormat fileFormat = getFileFormat(inputFileName);
-    segmentGeneratorConfig.setFormat(fileFormat);
-    segmentGeneratorConfig.setReaderConfig(getReaderConfig(fileFormat));
     segmentGeneratorConfig.setRecordReaderPath(_recordReaderPath);
+    if (_recordReaderPath != null) {
+      segmentGeneratorConfig.setFormat(FileFormat.OTHER);
+    } else {
+      FileFormat fileFormat = getFileFormat(inputFileName);
+      segmentGeneratorConfig.setFormat(fileFormat);
+      segmentGeneratorConfig.setReaderConfig(getReaderConfig(fileFormat));
+    }
     segmentGeneratorConfig.setOnHeap(true);
 
     addAdditionalSegmentGeneratorConfigs(segmentGeneratorConfig, hdfsInputFile, sequenceId);
@@ -272,9 +276,7 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
     if (fileName.endsWith(".thrift")) {
       return FileFormat.THRIFT;
     }
-    _logger.warn("File name is not one of avro, csv, json, thrift. Please make sure you have configured"
-        + "a record reader for {}", fileName);
-    return FileFormat.OTHER;
+    throw new IllegalArgumentException("Unsupported file format: {}" + fileName);
   }
 
   @Nullable
