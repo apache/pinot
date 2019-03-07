@@ -17,23 +17,65 @@
 .. under the License.
 ..
 
-Dev Environment Setup
-=====================
+.. _dev-setup:
 
-To contribute to Pinot, please follow the code-style as described below:
+*********************
+Dev Environment Setup
+*********************
+
+.. contents:: Table of Contents
+
+
+To contribute to Pinot, please follow the instructions below.
+
+Getting the Source Code
+-----------------------
+
+Create a fork
+^^^^^^^^^^^^^
+To limit the number of branches created on the main Pinot repository, we recommend that you create a fork by clicking on the fork button `here <https://github.com/apache/incubator-pinot>`_.
+
+.. code-block:: none
+
+Clone the repository locally
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  $mkdir workspace
+  $cd workspace
+  $git clone https://github.com/<username>/incubator-pinot.git
+  $cd incubator-pinot
+
+Maven
+-----
+Pinot is a Maven project and familiarity with Maven will help you work with Pinot code. If you are new to Maven, you can
+more `here <maven.apache.org>`_ and `here <http://maven.apache.org/guides/getting-started/maven-in-five-minutes.html>`_.
+
+Run the following maven command to setup the project.
+.. code-block:: none
+
+  # compile, download sources
+  $mvn install package -DskipTests -Pbin-dist -DdownloadSources -DdownloadJavadocs
+
+Setup IDE
+---------
+Import the project into your favorite IDE. Setup stylesheet according to your IDE. We have provided instructions for
+intellij and eclipse. If you are using other IDEs, please ensure you use stylesheet based on
+`this <https://github.com/apache/incubator-pinot/blob/master/config/codestyle-intellij.xml>`_.
 
 Intellij
 ^^^^^^^^
+To import the Pinot stylesheet this launch intellij and navigate to ``Preferences`` (on Mac) or ``Settings`` on Linux.
 
-* `Import <https://www.jetbrains.com/help/idea/settings-code-style.html>`_ code style to Intellij
-* Navigate to ``Preferences`` -> ``Editor`` -> ``Code Style`` -> ``Java``
+* Navigate to ``Editor`` -> ``Code Style`` -> ``Java``
 * Select ``Import Scheme`` -> ``Intellij IDES code style XML``
-* Choose ``codestyle-intellij.xml``
+* Choose ``codestyle-intellij.xml`` from ``incubator-pinot/config`` folder of your workspace. Click Apply.
+
+.. figure:: img/import_scheme.png
 
 Eclipse
 ^^^^^^^
-.. todo::
+To import the Pinot stylesheet this launch eclipse and navigate to ``Preferences`` (on Mac) or ``Settings`` on Linux.
 
-   Add instructions for eclipse here
+* Navigate to Java->Code Style->Formatter
+* Choose ``codestyle-eclipse.xml`` from ``incubator-pinot/config folder`` of your workspace. Click Apply.
 
-
+.. figure:: img/eclipse_style.png

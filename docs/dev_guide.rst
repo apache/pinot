@@ -21,6 +21,6 @@
    :maxdepth: 1
 
    dev_env
-   coding_guidelines
    code_modules
+   contribution_guidelines
    extensions

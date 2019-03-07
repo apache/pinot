@@ -26,6 +26,7 @@
 Pinot
 #####
 
+.. _introduction:
 .. toctree::
    :caption: Introduction
    :maxdepth: 1
@@ -34,18 +35,21 @@ Pinot
    architecture
    getting_started
 
+.. _user-guide:
 .. toctree::
    :caption: User Guide
    :maxdepth: 1
 
    user_guide
 
+.. _admin_guide:
 .. toctree::
    :caption: Admin Guide
    :maxdepth: 1
 
    admin_guide
 
+.. _dev_guide:
 .. toctree::
    :caption: Developer Guide
    :maxdepth: 1
