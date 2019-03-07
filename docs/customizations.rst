@@ -17,6 +17,7 @@
 .. under the License.
 ..
 
+.. _customizing-pinot:
 
 Customizing Pinot
 ===================
@@ -29,19 +30,19 @@ There are a lot of places in Pinot which can be customized depending on the infr
 
 1. Generating Pinot segments
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Typically, data files will be available on some offline data storage, such as HDFS, and a Hadoop job can be written to read the data and create the segment. The `SegmentCreationJob <https://github.com/apache/incubator-pinot/blob/master/pinot-hadoop/src/main/java/org/apache/pinot/hadoop/job/SegmentCreationJob.java>`_ class contains a hadoop job for creating segments. This is a map only job, and the mapper can be found in `SegmentCreationMapper <https://github.com/apache/incubator-pinot/blob/master/pinot-hadoop/src/main/java/org/apache/pinot/hadoop/job/mapper/SegmentCreationMapper.java>`_. You can override the SegmentCreationMapper with a custom mapper by overriding the SegmentCreationJob::getMapperClass() method. 
+Typically, data files will be available on some offline data storage, such as HDFS, and a Hadoop job can be written to read the data and create the segment. The `SegmentCreationJob <https://github.com/apache/incubator-pinot/blob/master/pinot-hadoop/src/main/java/org/apache/pinot/hadoop/job/SegmentCreationJob.java>`_ class contains a hadoop job for creating segments. This is a map only job, and the mapper can be found in `SegmentCreationMapper <https://github.com/apache/incubator-pinot/blob/master/pinot-hadoop/src/main/java/org/apache/pinot/hadoop/job/mapper/SegmentCreationMapper.java>`_. You can override the SegmentCreationMapper with a custom mapper by overriding the SegmentCreationJob::getMapperClass() method. You can read more details about creating segments on Hadoop in :ref:`creating-segments`
 
-New offline data is typically available in a daily or hourly frequency. You can schedule your jobs to run periodically using either cron or a scheduler such as `Azkaban <https://azkaban.github.io/>`_.    
+Depending on how frequently new data is generated, you can schedule your jobs to run periodically using either cron or a scheduler such as `Azkaban <https://azkaban.github.io/>`_.
 
 
 2. Pluggable storage
 ^^^^^^^^^^^^^^^^^^^^
-We expect the storage to be shared across controllers of the same cluster, such as NFS. You can write your own implementation of PinotFS to store segments in a data layer of your choice, for example Azure or S3. Please refer to `this doc <https://pinot.readthedocs.io/en/latest/pluggable_storage.html>`_ for more details.
+We expect the storage to be shared across controllers of the same cluster, such as NFS. You can write your own implementation of PinotFS to store segments in a data layer of your choice, for example Azure or S3. Please refer to the :ref:`pluggable-storage` doc for more details.
 
 
 3. Pluggable streams
 ^^^^^^^^^^^^^^^^^^^^
-We provide out of the box support for consumption from Kafka stream. You can write your own plugin in order to consume from another pub-sub stream such as Azure EventHubs or Amazon Kinesis. Refer to the `Pluggable Streams <https://pinot.readthedocs.io/en/latest/pluggable_streams.html>`_ doc for more details  
+We provide out of the box support for consumption from Kafka stream. You can write your own plugin in order to consume from another pub-sub stream such as Azure EventHubs or Amazon Kinesis. Refer to the :ref:`pluggable-streams` doc for more details.  
 
 
 4. Encrypting segments
@@ -53,7 +54,7 @@ You can write your own implementation by extending the ``org.apache.pinot.core.c
 
 5. Segment assignment strategies
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-We have various strategies for assigning segments to the available servers. These can be found under the `SegmentAssignmentStrategy <https://github.com/apache/incubator-pinot/blob/master/pinot-controller/src/main/java/org/apache/pinot/controller/helix/core/sharding/SegmentAssignmentStrategy.java>`_ interface. More details about which one to use depending on your usecase can be found in `Tuning Pinot <https://pinot.readthedocs.io/en/latest/tuning_pinot.html>`_. By default, the `BalanceNumSegmentAssignmentStrategy <https://github.com/apache/incubator-pinot/blob/master/pinot-controller/src/main/java/org/apache/pinot/controller/helix/core/sharding/BalanceNumSegmentAssignmentStrategy.java>`_ will be used. 
+We have various strategies for assigning segments to the available servers. These can be found under the `SegmentAssignmentStrategy <https://github.com/apache/incubator-pinot/blob/master/pinot-controller/src/main/java/org/apache/pinot/controller/helix/core/sharding/SegmentAssignmentStrategy.java>`_ interface. More details about which one to use depending on your usecase can be found in :ref:`tuning-pinot`. By default, the `BalanceNumSegmentAssignmentStrategy <https://github.com/apache/incubator-pinot/blob/master/pinot-controller/src/main/java/org/apache/pinot/controller/helix/core/sharding/BalanceNumSegmentAssignmentStrategy.java>`_ will be used. 
 
 You can also write your own by implementing the ``org.apache.pinot.controller.helix.core.sharding.SegmentAssignmentStrategy`` interface. The segment assignment strategy can be configured for a table by setting it in the table config as 
 
@@ -89,7 +90,7 @@ We have various algorithms to partition data during segment creation, as listed 
 
 7. Routing strategies
 ^^^^^^^^^^^^^^^^^^^^^
-We have many routing strategies which you can find under the `RoutingTableBuilder <https://github.com/apache/incubator-pinot/blob/master/pinot-broker/src/main/java/org/apache/pinot/broker/routing/builder/RoutingTableBuilder.java>`_ interface. More details about which one to use depending on your usecase can be found in `Tuning Pinot <https://pinot.readthedocs.io/en/latest/tuning_pinot.html>`_. By default we will use `DefaultOfflineRoutingTableBuilder <https://github.com/apache/incubator-pinot/blob/master/pinot-broker/src/main/java/org/apache/pinot/broker/routing/builder/DefaultOfflineRoutingTableBuilder.java>`_ or the `DefaultRealtimeRoutingTableBuilder <https://github.com/apache/incubator-pinot/blob/master/pinot-broker/src/main/java/org/apache/pinot/broker/routing/builder/DefaultRealtimeRoutingTableBuilder.java>`_. 
+We have many routing strategies which you can find under the `RoutingTableBuilder <https://github.com/apache/incubator-pinot/blob/master/pinot-broker/src/main/java/org/apache/pinot/broker/routing/builder/RoutingTableBuilder.java>`_ interface. More details about which one to use depending on your usecase can be found in :ref:`tuning-pinot`. By default we will use `DefaultOfflineRoutingTableBuilder <https://github.com/apache/incubator-pinot/blob/master/pinot-broker/src/main/java/org/apache/pinot/broker/routing/builder/DefaultOfflineRoutingTableBuilder.java>`_ or the `DefaultRealtimeRoutingTableBuilder <https://github.com/apache/incubator-pinot/blob/master/pinot-broker/src/main/java/org/apache/pinot/broker/routing/builder/DefaultRealtimeRoutingTableBuilder.java>`_. 
 
 You can write your own routing table builder by implementing the ``org.apache.pinot.broker.routing.builder.RoutingTableBuilder`` interface. The routing table builder can be set in the table config as 
 
@@ -106,7 +107,7 @@ You can write your own routing table builder by implementing the ``org.apache.pi
 
 8. Broker endpoint
 ^^^^^^^^^^^^^^^^^^
-If you setup a usecase to have multiple brokers, you will have to develop your restful service to accept queries and distribute them across the brokers
+If you setup a usecase to have multiple brokers, you will have to develop your restful service to accept queries and distribute them across the brokers.
 
 
 9. Access Control
@@ -157,12 +158,12 @@ We use `yammer MetricsRegistry <https://metrics.dropwizard.io/4.0.0/>`_ to colle
 
 You can write a listener to publish metrics to another metrics server by implementing the  ``MetricsRegistryRegistrationListener`` interface. This listener can be injected into the controller by setting the fully qualified name of the class in the controller configs for the property ``pinot.controller.metrics.metricsRegistryRegistrationListeners``.
 
-You would have to design your own systems to view and monitor these metrics. A list of all the metrics published for each component can be found in `ControllerMeter <https://github.com/apache/incubator-pinot/blob/master/pinot-common/src/main/java/org/apache/pinot/common/metrics/ControllerMeter.java>`_, `ControllerGauge <https://github.com/apache/incubator-pinot/blob/master/pinot-common/src/main/java/org/apache/pinot/common/metrics/ControllerGauge.java>`_, `BrokerMeter <https://github.com/apache/incubator-pinot/blob/master/pinot-common/src/main/java/org/apache/pinot/common/metrics/BrokerMeter.java>`_, `BrokerGauge <https://github.com/apache/incubator-pinot/blob/master/pinot-common/src/main/java/org/apache/pinot/common/metrics/BrokerGauge.java>`_, `ServerMeter <https://github.com/apache/incubator-pinot/blob/master/pinot-common/src/main/java/org/apache/pinot/common/metrics/ServerMeter.java>`_, `ServerGauge <https://github.com/apache/incubator-pinot/blob/master/pinot-common/src/main/java/org/apache/pinot/common/metrics/ServerGauge.java>`_, `MinionMeter <https://github.com/apache/incubator-pinot/blob/master/pinot-common/src/main/java/org/apache/pinot/common/metrics/MinionMeter.java>`_ and `MinionGauge <https://github.com/apache/incubator-pinot/blob/master/pinot-common/src/main/java/org/apache/pinot/common/metrics/MinionGauge.java>`_
+You would have to design your own systems to view and monitor these metrics. A list of all the metrics published for each component can be found in `ControllerMeter <https://github.com/apache/incubator-pinot/blob/master/pinot-common/src/main/java/org/apache/pinot/common/metrics/ControllerMeter.java>`_, `ControllerGauge <https://github.com/apache/incubator-pinot/blob/master/pinot-common/src/main/java/org/apache/pinot/common/metrics/ControllerGauge.java>`_, `BrokerMeter <https://github.com/apache/incubator-pinot/blob/master/pinot-common/src/main/java/org/apache/pinot/common/metrics/BrokerMeter.java>`_, `BrokerGauge <https://github.com/apache/incubator-pinot/blob/master/pinot-common/src/main/java/org/apache/pinot/common/metrics/BrokerGauge.java>`_, `ServerMeter <https://github.com/apache/incubator-pinot/blob/master/pinot-common/src/main/java/org/apache/pinot/common/metrics/ServerMeter.java>`_, `ServerGauge <https://github.com/apache/incubator-pinot/blob/master/pinot-common/src/main/java/org/apache/pinot/common/metrics/ServerGauge.java>`_, `MinionMeter <https://github.com/apache/incubator-pinot/blob/master/pinot-common/src/main/java/org/apache/pinot/common/metrics/MinionMeter.java>`_ and `MinionGauge <https://github.com/apache/incubator-pinot/blob/master/pinot-common/src/main/java/org/apache/pinot/common/metrics/MinionGauge.java>`_.
 
 
 13. Deployables 
 ^^^^^^^^^^^^^^^
-You can deploy pinot server, broker, controller and minion individually. You can either use out of the box jars and start the components via `PinotAdministrator <https://github.com/apache/incubator-pinot/blob/master/pinot-tools/src/main/java/org/apache/pinot/tools/admin/PinotAdministrator.java>`_, or run via scripts as described in the `Quick Start Guide <https://pinot.readthedocs.io/en/latest/getting_started.html#>`_
+You can deploy pinot server, broker, controller and minion individually. You can either use out of the box jars and start the components via `PinotAdministrator <https://github.com/apache/incubator-pinot/blob/master/pinot-tools/src/main/java/org/apache/pinot/tools/admin/PinotAdministrator.java>`_, or run via scripts as described in the :ref:`getting-started`.
 
 The starter classes for pinot controller, broker, server and minion are `ControllerStarter <https://github.com/apache/incubator-pinot/blob/master/pinot-controller/src/main/java/org/apache/pinot/controller/ControllerStarter.java>`_, `HelixBrokerStarter <https://github.com/apache/incubator-pinot/blob/master/pinot-broker/src/main/java/org/apache/pinot/broker/broker/helix/HelixBrokerStarter.java>`_, `HelixServerStarter <https://github.com/apache/incubator-pinot/blob/master/pinot-server/src/main/java/org/apache/pinot/server/starter/helix/HelixServerStarter.java>`_ and `MinionStarter <https://github.com/apache/incubator-pinot/blob/master/pinot-minion/src/main/java/org/apache/pinot/minion/MinionStarter.java>`_ respectively.
 
