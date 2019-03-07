@@ -19,38 +19,37 @@ export default Route.extend({
       headers: { 'content-type': 'application/json' }
     };
     const notifications = get(this, 'notifications');
-
     //detection alert fetch
-    const alertUrl = `/detection/${alertId}`;
+    const detectionUrl = `/detection/${alertId}`;
     try {
-      const alert_result = await fetch(alertUrl, postProps);
-      const alert_status  = get(alert_result, 'status');
-      const alert_json = await alert_result.json();
-      if (alert_status !== 200) {
+      const detection_result = await fetch(detectionUrl, postProps);
+      const detection_status  = get(detection_result, 'status');
+      const detection_json = await detection_result.json();
+      if (detection_status !== 200) {
         notifications.error('Retrieval of alert yaml failed.', 'Error');
       } else {
-        if (alert_json.yaml) {
-          const yaml = yamljs.parse(alert_json.yaml);
-          Object.assign(yaml, {
-            application: alert_json.name,
-            isActive: alert_json.active,
-            createdBy: alert_json.createdBy,
-            updatedBy: alert_json.updatedBy,
-            functionName: yaml.detectionName,
-            collection: yaml.dataset,
-            type: yaml.pipelineType,
-            exploreDimensions: alert_json.dimensions,
-            filters: this._formatYamlFilter(yaml.filters),
-            dimensionExploration: this._formatYamlFilter(yaml.dimensionExploration),
-            yaml: alert_json.yaml
+        if (detection_json.yaml) {
+          const detectionYaml = yamljs.parse(detection_json.yaml);
+          const lastDetection = new Date(detection_json.lastTimestamp);
+          Object.assign(detectionYaml, {
+            lastDetectionTime: lastDetection.toDateString() + ", " +  lastDetection.toLocaleTimeString() + " (" + Intl.DateTimeFormat().resolvedOptions().timeZone + ")",
+            isActive: detection_json.active,
+            createdBy: detection_json.createdBy,
+            updatedBy: detection_json.updatedBy,
+            functionName: detectionYaml.detectionName,
+            collection: detectionYaml.dataset,
+            type: detectionYaml.pipelineType,
+            exploreDimensions: detection_json.dimensions,
+            filters: this._formatYamlFilter(detectionYaml.filters),
+            dimensionExploration: this._formatYamlFilter(detectionYaml.dimensionExploration),
+            yaml: detection_json.yaml
           });
 
           this.setProperties({
-            detectionYaml: yaml,
-            alertData: alert_json,
+            alertHeaderFields: detectionYaml,
             alertId: alertId,
-            metricUrn: alert_json.properties.nested[0].nestedMetricUrns[0],
-            metricUrnList: alert_json.properties.nested[0].nestedMetricUrns
+            metricUrn: detection_json.properties.nested[0].nestedMetricUrns[0],
+            metricUrnList: detection_json.properties.nested[0].nestedMetricUrns
           });
 
         }
@@ -81,8 +80,8 @@ export default Route.extend({
     return RSVP.hash({
       alertId,
       subscriptionGroupId,
-      alertData: get(this, 'detectionYaml'),
-      detectionYaml: get (this, 'detectionYaml') ? get(this, 'detectionYaml').yaml : null,
+      alertData: get(this, 'alertHeaderFields'),
+      detectionYaml: get(this, 'detectionYaml') ? get(this, 'detectionYaml').yaml : null,
       subscriptionGroups: get(this, 'subscriptionGroups'),
       subscriptionGroupYamlDisplay,
       metricUrn: get(this, 'metricUrn'),
