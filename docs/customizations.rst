@@ -30,7 +30,7 @@ There are a lot of places in Pinot which can be customized depending on the infr
 
 1. Generating Pinot segments
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Typically, data files will be available on some offline data storage, such as HDFS, and a Hadoop job can be written to read the data and create the segment. The `SegmentCreationJob <https://github.com/apache/incubator-pinot/blob/master/pinot-hadoop/src/main/java/org/apache/pinot/hadoop/job/SegmentCreationJob.java>`_ class contains a hadoop job for creating segments. This is a map only job, and the mapper can be found in `SegmentCreationMapper <https://github.com/apache/incubator-pinot/blob/master/pinot-hadoop/src/main/java/org/apache/pinot/hadoop/job/mapper/SegmentCreationMapper.java>`_. You can override the SegmentCreationMapper with a custom mapper by overriding the SegmentCreationJob::getMapperClass() method. You can read more details about creating segments on Hadoop in :ref:`creating-segments`
+Typically, data files will be available on some offline data storage, such as HDFS, and a Hadoop job can be written to read the data and create the segment. The `SegmentCreationJob <https://github.com/apache/incubator-pinot/blob/master/pinot-hadoop/src/main/java/org/apache/pinot/hadoop/job/SegmentCreationJob.java>`_ class contains a hadoop job for creating segments. This is a map only job, and the mapper can be found in `SegmentCreationMapper <https://github.com/apache/incubator-pinot/blob/master/pinot-hadoop/src/main/java/org/apache/pinot/hadoop/job/mapper/SegmentCreationMapper.java>`_. You can override the SegmentCreationMapper with a custom mapper by overriding the ``SegmentCreationJob::getMapperClass()`` method. You can read more details about creating segments on Hadoop in :ref:`creating-segments`
 
 Depending on how frequently new data is generated, you can schedule your jobs to run periodically using either cron or a scheduler such as `Azkaban <https://azkaban.github.io/>`_.
 
@@ -118,7 +118,7 @@ The access control factory can be configured in the controller configs by settin
 ``controller.admin.access.control.factory.class``
 The access control factory can be configured in the broker configs by setting the fully qualified class name of the AccessControlFactory in the property
 ``pinot.broker.access.control.class``
-Any other properties required for initializing the factory can be set in the broker configs as properties with the prefix "pinot.broker.access.control".
+Any other properties required for initializing the factory can be set in the broker configs as properties with the prefix ``pinot.broker.access.control``.
 
 
 10. Minion tasks 
