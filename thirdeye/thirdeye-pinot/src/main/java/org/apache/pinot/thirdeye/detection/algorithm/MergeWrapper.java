@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.collections.MapUtils;
 import org.apache.pinot.thirdeye.common.dimension.DimensionMap;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
@@ -84,7 +85,7 @@ public class MergeWrapper extends DetectionPipeline {
   public MergeWrapper(DataProvider provider, DetectionConfigDTO config, long startTime, long endTime) {
     super(provider, config, startTime, endTime);
 
-    this.maxGap = MapUtils.getLongValue(config.getProperties(), "maxGap", 0);
+    this.maxGap = MapUtils.getLongValue(config.getProperties(), "maxGap", TimeUnit.HOURS.toMillis(2));
     this.maxDuration = MapUtils.getLongValue(config.getProperties(), "maxDuration", Long.MAX_VALUE);
     Preconditions.checkArgument(this.maxDuration > 0, "Max duration must be a positive number.");
     this.slice = new AnomalySlice().withStart(startTime).withEnd(endTime);
