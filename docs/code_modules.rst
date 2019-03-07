@@ -59,6 +59,10 @@ overall executable size for individually deployable component.
 Each module has a ``src/main/java`` folder where the code resides and ``src/test/java`` where the *unit* tests corresponding to
 the module's code reside.
 
+.. _pinot-foundation:
+
+Foundational modules
+--------------------
 The following figure provides a high-level overview of the foundational Pinot modules.
 
 .. figure:: img/PinotFoundation.png
@@ -132,10 +136,21 @@ Auxiliary modules
 -----------------
 In addition to the core modules described above, Pinot code provides the following modules:
 
-* ``pinot-tools``: This module is a collection of many tools useful for setting up Pinot cluster, creating/updating segments. It also houses the Pinot quick start guide code.
+* ``pinot-tools``: This module is a collection of many tools useful for setting up Pinot cluster, creating/updating segments.
+It also houses the Pinot quick start guide code.
 
 * ``pinot-perf``: This module has a collection of benchmark test code used to evaluate design options.
 
 * ``pinot-client-api``: This module houses the Java client API. See :ref:`java-client` for more info.
 
-* ``pinot-integration-tests``: This module holds integration tests that test functionality across multiple classes or components. These tests typically do not rely on mocking and provide more end to end coverage for code.
+* ``pinot-integration-tests``: This module holds integration tests that test functionality across multiple classes or components.
+These tests typically do not rely on mocking and provide more end to end coverage for code.
+
+.. _extension-modules:
+
+Extension modules
+-----------------
+``pinot-hadoop-filesystem`` and ``pinot-azure-filesystem`` are module added to support extensions to Pinot filesystem.
+The functionality is broken down into modules of their own to avoid polluting the common modules with additional large libraries.
+These libraries bring in transitive dependencies of their own that can cause classpath conflicts at runtime. We would like to
+avoid this for the common usage of Pinot as much as possible.
