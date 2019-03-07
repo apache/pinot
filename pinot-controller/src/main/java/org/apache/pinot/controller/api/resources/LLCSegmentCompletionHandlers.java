@@ -20,7 +20,13 @@ package org.apache.pinot.controller.api.resources;
 
 import com.google.common.annotations.VisibleForTesting;
 
-import java.io.*;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.file.FileSystems;
@@ -65,7 +71,7 @@ import org.slf4j.LoggerFactory;
 @Path("/")
 public class LLCSegmentCompletionHandlers {
 
-  public static final String SEGMENT_TMP_DIR = "segment.tmp";
+  private static final String SEGMENT_TMP_DIR = "segment.tmp";
   private static Logger LOGGER = LoggerFactory.getLogger(LLCSegmentCompletionHandlers.class);
   private static final String SCHEME = "file://";
   private static final String METADATA_TEMP_DIR_SUFFIX = ".metadata.tmp";
@@ -264,6 +270,10 @@ public class LLCSegmentCompletionHandlers {
       if (uploadResult != null) {
         segmentMetadata = uploadResult.getRight();
       }
+      if (segmentMetadata == null) {
+        LOGGER.error("Unable to extract segment metadata from segment data: {}", segmentName);
+        return SegmentCompletionProtocol.RESP_FAILED.toJsonString();
+      }
 
       CommittingSegmentDescriptor committingSegmentDescriptor =
               CommittingSegmentDescriptor.fromSegmentCompletionReqParamsAndMetadata(requestParams,
@@ -346,7 +356,7 @@ public class LLCSegmentCompletionHandlers {
       try {
         segmentMetadata = extractMetadataFromSegmentFile(segmentName, new URI(segmentLocation));
       } catch (URISyntaxException e) {
-        LOGGER.error("Invalid segment location: ", segmentLocation);
+        LOGGER.error("Invalid segment location: {}", segmentLocation);
         return SegmentCompletionProtocol.RESP_FAILED.toJsonString();
       }
     }
@@ -385,7 +395,7 @@ public class LLCSegmentCompletionHandlers {
       // Load segment metadata
       return new SegmentMetadataImpl(tempMetadataDir);
     } catch (Exception e) {
-      LOGGER.error("Exception extracting and reading segment metadata for " + segmentNameStr, e);
+      LOGGER.error("Exception extracting and reading segment metadata for {}", segmentNameStr, e);
       return null;
     } finally {
       FileUtils.deleteQuietly(tempMetadataDir);
@@ -442,7 +452,7 @@ public class LLCSegmentCompletionHandlers {
       pinotFS.copyToLocalFile(segmentLocation, segDstFile);
       return getSegmentMetadataFromLocalFile(segmentName, segDstFile);
     } catch (Exception e) {
-      LOGGER.error("Exception copy segment file to local " + segmentNameStr, e);
+      LOGGER.error("Exception copy segment file to local {}",  segmentNameStr, e);
       return null;
     } finally {
       FileUtils.deleteQuietly(tempSegmentDataDir);
@@ -474,7 +484,7 @@ public class LLCSegmentCompletionHandlers {
       // Load segment metadata
       return new SegmentMetadataImpl(tempMetadataDir);
     } catch (Exception e) {
-      LOGGER.error("Exception extracting and reading segment metadata for " + segmentName.getSegmentName(), e);
+      LOGGER.error("Exception extracting and reading segment metadata for {}", segmentName.getSegmentName(), e);
       return null;
     } finally {
       FileUtils.deleteQuietly(tempMetadataDir);
