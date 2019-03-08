@@ -45,8 +45,8 @@ Clone the repository locally
 
   $mkdir workspace
   $cd workspace
-  $git clone https://github.com/<username>/incubator-pinot.git
-  $cd incubator-pinot
+  $git clone git@github.com:<github username>/pinot.git
+  $cd pinot
 
 Maven
 -----
