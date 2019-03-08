@@ -17,6 +17,12 @@
 .. under the License.
 ..
 
+###########
+Admin Guide
+###########
+
+.. _admin-guide:
+
 .. toctree::
    :maxdepth: 1
 
