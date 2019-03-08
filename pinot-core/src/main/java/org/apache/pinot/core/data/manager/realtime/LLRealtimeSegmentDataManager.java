@@ -23,10 +23,13 @@ import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.Uninterruptibles;
 import com.yammer.metrics.core.Meter;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Set;
+import java.io.InputStream;
+import java.nio.file.FileSystems;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
+import java.util.*;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -67,6 +70,7 @@ import org.apache.pinot.core.realtime.stream.StreamDecoderProvider;
 import org.apache.pinot.core.realtime.stream.StreamMessageDecoder;
 import org.apache.pinot.core.realtime.stream.StreamMetadataProvider;
 import org.apache.pinot.core.realtime.stream.TransientConsumerException;
+import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import org.joda.time.DateTime;
@@ -735,12 +739,41 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     if (_isOffHeap) {
       params.withMemoryUsedBytes(_memoryManager.getTotalAllocatedBytes());
     }
-    SegmentCompletionProtocol.Response commitEndResponse = _protocolHandler.segmentCommitEnd(params);
+    SegmentCompletionProtocol.Response commitEndResponse;
+    if (!ServerSegmentCompletionProtocolHandler.isCommitWithMetadata()) {
+        commitEndResponse = _protocolHandler.segmentCommitEnd(params);
+    } else {
+        Map<String, File> metadataFiles = new HashMap<>();
+        metadataFiles.put(V1Constants.MetadataKeys.METADATA_FILE_NAME,
+                extractMetadataFromSegmentTarFile(segmentTarFile, V1Constants.MetadataKeys.METADATA_FILE_NAME));
+        metadataFiles.put(V1Constants.SEGMENT_CREATION_META,
+                extractMetadataFromSegmentTarFile(segmentTarFile, V1Constants.SEGMENT_CREATION_META));
+        commitEndResponse = _protocolHandler.segmentCommitEndWithMetadata(params,metadataFiles);
+    }
+
     if (!commitEndResponse.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS)) {
       segmentLogger.warn("CommitEnd failed  with response {}", commitEndResponse.toJsonString());
       return SegmentCompletionProtocol.RESP_FAILED;
     }
     return commitEndResponse;
+  }
+
+  private File extractMetadataFromSegmentTarFile(File segmentTarFile, final String metaFileName) {
+        try (
+                InputStream metadataInputStream = TarGzCompressionUtils
+                        .unTarOneFile(new FileInputStream(segmentTarFile), metaFileName)
+        ) {
+            Preconditions.checkNotNull(metadataInputStream, "%s does not exist",
+                    metaFileName);
+            File tmpFile = File.createTempFile(metaFileName, "llc-split-commit");
+            Files.copy(metadataInputStream, tmpFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+            tmpFile.deleteOnExit();
+            return tmpFile;
+        } catch (Exception e) {
+            segmentLogger.error("Exception during extracting and reading segment metadata for file {} on metadata ",
+                    segmentTarFile, metaFileName, e);
+        }
+        return null;
   }
 
   protected boolean commitSegment(SegmentCompletionProtocol.Response response) {
