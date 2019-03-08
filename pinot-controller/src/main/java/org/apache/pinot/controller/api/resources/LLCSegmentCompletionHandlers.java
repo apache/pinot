@@ -349,18 +349,7 @@ public class LLCSegmentCompletionHandlers {
     final boolean isSuccess = true;
     final boolean isSplitCommit = true;
     SegmentMetadataImpl segmentMetadata = extractMetadataFromInput(metadataFiles, segmentName);
-    // If it fails to extract metadata from the input form, try to download the segment and extract it from the segment.
-    if (segmentMetadata == null) {
-      LOGGER.info("Failed to extract segment metadata for {} from input form, fallback to use the segment file.",
-              segmentName);
-      try {
-        segmentMetadata = extractMetadataFromSegmentFile(segmentName, new URI(segmentLocation));
-      } catch (URISyntaxException e) {
-        LOGGER.error("Invalid segment location: {}", segmentLocation);
-        return SegmentCompletionProtocol.RESP_FAILED.toJsonString();
-      }
-    }
-    // Return failure to server if both extraction efforts fail.
+    // If it fails to extract metadata from the input form, return failure.
     if (segmentMetadata == null) {
       LOGGER.warn("Segment metadata extraction failure for segment {}", segmentName);
       return SegmentCompletionProtocol.RESP_FAILED.toJsonString();
