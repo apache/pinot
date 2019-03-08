@@ -80,7 +80,7 @@ public interface TableDataManager {
   void removeSegment(@Nonnull String segmentName);
 
   /**
-   * Track a deleted segment from the table.
+   * Track a deleted segment.
    */
   void deleteSegment(@Nonnull String segmentName);
 

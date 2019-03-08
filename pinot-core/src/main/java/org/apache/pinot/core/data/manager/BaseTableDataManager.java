@@ -164,7 +164,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
   }
 
   /**
-   * Called when a segment is deleted. The actual handling of semgent delete is outside of this method.
+   * Called when a segment is deleted. The actual handling of segment delete is outside of this method.
    * This method provides book-keeping around deleted segments.
    */
   public void deleteSegment(@Nonnull String segmentName) {
@@ -212,14 +212,6 @@ public abstract class BaseTableDataManager implements TableDataManager {
       return segmentDataManager;
     } else {
       return null;
-    }
-  }
-
-  private void handleMissingSegment(String segmentName) {
-    if (_deletedSegmentsCache.getIfPresent(segmentName) == null) {
-      // could not find segment and its not recently deleted
-      LOGGER.error("Could not find segment " + segmentName + " for table " + _tableNameWithType);
-      _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.NUM_MISSING_SEGMENTS, 1);
     }
   }
 
