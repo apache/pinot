@@ -26,10 +26,13 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -759,21 +762,21 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   }
 
   private File extractMetadataFromSegmentTarFile(File segmentTarFile, final String metaFileName) {
-        try (
-                InputStream metadataInputStream = TarGzCompressionUtils
-                        .unTarOneFile(new FileInputStream(segmentTarFile), metaFileName)
-        ) {
-            Preconditions.checkNotNull(metadataInputStream, "%s does not exist",
-                    metaFileName);
-            File tmpFile = File.createTempFile(metaFileName, "llc-split-commit");
-            Files.copy(metadataInputStream, tmpFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
-            tmpFile.deleteOnExit();
-            return tmpFile;
-        } catch (Exception e) {
-            segmentLogger.error("Exception during extracting and reading segment metadata for file {} on metadata ",
-                    segmentTarFile, metaFileName, e);
-        }
-        return null;
+    try (
+            InputStream metadataInputStream = TarGzCompressionUtils
+                    .unTarOneFile(new FileInputStream(segmentTarFile), metaFileName)
+    ) {
+      Preconditions.checkNotNull(metadataInputStream, "%s does not exist",
+              metaFileName);
+      File tmpFile = File.createTempFile(metaFileName, "llc-split-commit");
+      Files.copy(metadataInputStream, tmpFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+      tmpFile.deleteOnExit();
+      return tmpFile;
+    } catch (Exception e) {
+      segmentLogger.error("Exception during extracting and reading segment metadata for file {} on metadata ",
+              segmentTarFile, metaFileName, e);
+    }
+    return null;
   }
 
   protected boolean commitSegment(SegmentCompletionProtocol.Response response) {

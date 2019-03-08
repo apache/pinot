@@ -239,7 +239,7 @@ public class FileUploadDownloadClient implements Closeable {
     }
     HttpEntity entity = multipartEntityBuilder.build();
 
-    // Build the request
+    // Build the POST request.
     RequestBuilder requestBuilder =
             RequestBuilder.create(HttpPost.METHOD_NAME).setVersion(HttpVersion.HTTP_1_1).setUri(uri).setEntity(entity);
     setTimeout(requestBuilder, segmentUploadRequestTimeoutMs);
@@ -445,6 +445,7 @@ public class FileUploadDownloadClient implements Closeable {
       throws IOException, HttpErrorStatusException {
     return uploadSegment(uri, segmentName, segmentFile, null, null, DEFAULT_SOCKET_TIMEOUT_MS);
   }
+
   /**
    * Upload segment with segment file input stream.
    *
