@@ -50,11 +50,19 @@ You also need to configure pinot.controller.local.temp.dir for the local dir on 
 
 For filesystem specific configs, you can pass in the following with either the pinot.controller prefix or the pinot.server prefix.
 
-All the following configs need to be prefixed with storage.factory. AzurePinotFS requires the following configs:
+All the following configs need to be prefixed with storage.factory.
 
-adl.accountId, adl.authEndpoint, adl.clientId, adl.clientSecret segment.fetcher.protocols : adl
+AzurePinotFS requires the following configs according to your environment:
+
+adl.accountId, adl.authEndpoint, adl.clientId, adl.clientSecret
+
+Please also make sure to set the following config with the value "adl"
+segment.fetcher.protocols : adl
 
 
-HadoopPinotFS requires the following configs:
+HadoopPinotFS requires the following configs according to your environment:
 
-hadoop.kerberos.principle, hadoop.kerberos.keytab, hadoop.conf.path segment.fetcher.protocols : hdfs
+hadoop.kerberos.principle, hadoop.kerberos.keytab, hadoop.conf.path
+
+Please make sure to also set the following config with the value "hdfs"
+segment.fetcher.protocols : hdfs
