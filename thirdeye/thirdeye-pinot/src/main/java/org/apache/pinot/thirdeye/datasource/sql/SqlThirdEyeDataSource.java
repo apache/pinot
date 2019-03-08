@@ -45,9 +45,6 @@ public class SqlThirdEyeDataSource implements ThirdEyeDataSource {
   private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
   protected LoadingCache<RelationalQuery, ThirdEyeResultSetGroup> sqlResponseCache;
   private SqlResponseCacheLoader sqlResponseCacheLoader;
-  public static final String DATA_SOURCE_NAME = SqlThirdEyeDataSource.class.getSimpleName();
-
-
 
   public SqlThirdEyeDataSource(Map<String, Object> properties) throws Exception {
     sqlResponseCacheLoader = new SqlResponseCacheLoader(properties);
@@ -91,7 +88,6 @@ public class SqlThirdEyeDataSource implements ThirdEyeDataSource {
     } catch (Exception e) {
       throw e;
     }
-
   }
 
   /**
