@@ -196,6 +196,8 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
       String tableNameWithType = message.getResourceName();
       String segmentName = message.getPartitionName();
 
+      _instanceDataManager.deleteSegment(tableNameWithType, segmentName);
+
       // This method might modify the file on disk. Use segment lock to prevent race condition
       Lock segmentLock = SegmentLocks.getSegmentLock(tableNameWithType, segmentName);
       try {

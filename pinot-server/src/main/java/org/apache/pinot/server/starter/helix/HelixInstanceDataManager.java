@@ -152,6 +152,15 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   }
 
   @Override
+  public void deleteSegment(@Nonnull String tableNameWithType, @Nonnull String segmentName) {
+    LOGGER.info("Tracking deleted segment: {} from table: {}", segmentName, tableNameWithType);
+    TableDataManager tableDataManager = _tableDataManagerMap.get(tableNameWithType);
+    if (tableDataManager != null) {
+      tableDataManager.deleteSegment(segmentName);
+    }
+  }
+
+  @Override
   public void reloadSegment(@Nonnull String tableNameWithType, @Nonnull String segmentName)
       throws Exception {
     LOGGER.info("Reloading single segment: {} in table: {}", segmentName, tableNameWithType);

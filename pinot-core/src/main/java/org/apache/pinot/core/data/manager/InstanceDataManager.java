@@ -79,6 +79,13 @@ public interface InstanceDataManager {
       throws Exception;
 
   /**
+   * Handles deletion of a segment from the table.
+   *
+   * This method performs book keeping of deleted segments.
+   */
+  void deleteSegment(@Nonnull String tableNameWithType, @Nonnull String segmentName);
+
+  /**
    * Reloads a segment in a table.
    */
   void reloadSegment(@Nonnull String tableNameWithType, @Nonnull String segmentName)
