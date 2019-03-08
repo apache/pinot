@@ -80,7 +80,7 @@ public class HelixBrokerStarterTest {
     final String instanceId = "localhost_helixController";
     _pinotResourceManager =
         new PinotHelixResourceManager(ZkStarter.DEFAULT_ZK_STR, HELIX_CLUSTER_NAME, instanceId, null, 10000L,
-            true, /*isUpdateStateModel=*/false, true);
+            true, /*isUpdateStateModel=*/false, false);
     _pinotResourceManager.start();
     _helixAdmin = _pinotResourceManager.getHelixAdmin();
 
