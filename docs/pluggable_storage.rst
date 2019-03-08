@@ -17,6 +17,8 @@
 .. under the License.
 ..
 
+.. _pluggable-storage:
+
 Pluggable Storage
 =================
 
@@ -36,7 +38,6 @@ New Storage Type implementation
 In order to add a new type of storage backend (say, Amazon s3) implement the following class:
 
 S3FS extends `PinotFS <https://github.com/apache/incubator-pinot/blob/master/pinot-filesystem/src/main/java/org/apache/pinot/filesystem/PinotFS.java>`_
-
 
 Configurations
 ^^^^^^^^^^^^^^

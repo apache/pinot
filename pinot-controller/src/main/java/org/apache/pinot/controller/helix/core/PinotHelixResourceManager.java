@@ -156,7 +156,7 @@ public class PinotHelixResourceManager {
   public PinotHelixResourceManager(@Nonnull String zkURL, @Nonnull String helixClusterName,
       @Nonnull String controllerInstanceId, @Nonnull String dataDir) {
     this(zkURL, helixClusterName, controllerInstanceId, dataDir, DEFAULT_EXTERNAL_VIEW_UPDATE_TIMEOUT_MILLIS, false,
-        false, true);
+        false, false);
   }
 
   public PinotHelixResourceManager(@Nonnull ControllerConf controllerConf) {
