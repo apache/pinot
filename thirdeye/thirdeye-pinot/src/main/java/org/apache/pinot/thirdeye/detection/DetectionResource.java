@@ -167,7 +167,7 @@ public class DetectionResource {
             Predicate.EQ("detectionConfigId", detectionConfigId),
             Predicate.LT("startTime", endTime),
             Predicate.GT("endTime", startTime)));
-    List result = anomalies.stream().map(anomaly -> {
+    List result = anomalies.stream().filter(anomaly -> !anomaly.isChild()).map(anomaly -> {
       Map<String, Object> anomalyResult = OBJECT_MAPPER.convertValue(anomaly, Map.class);
       anomalyResult.put(AnomalyEventFormatter.ATTR_STATUS_CLASSIFICATION, ResourceUtils.getStatusClassification(anomaly).toString());
       return anomalyResult;
