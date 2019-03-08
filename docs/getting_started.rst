@@ -17,6 +17,8 @@
 .. under the License.
 ..
 
+.. _getting-started:
+
 Getting Started
 ===============
 

@@ -17,6 +17,8 @@
 .. under the License.
 ..
 
+.. _tuning-pinot:
+
 Tuning Pinot
 ============
 This section provides information on various options to tune Pinot cluster for storage and query efficiency.
