@@ -42,7 +42,7 @@ public class FCFSQueryScheduler extends QueryScheduler {
 
   public FCFSQueryScheduler(@Nonnull Configuration config, @Nonnull QueryExecutor queryExecutor,
       @Nonnull ServerMetrics serverMetrics, @Nonnull LongAccumulator latestQueryTime) {
-    super(queryExecutor, new UnboundedResourceManager(config), serverMetrics, latestQueryTime);
+    super(config, queryExecutor, new UnboundedResourceManager(config), serverMetrics, latestQueryTime);
   }
 
   @Nonnull
