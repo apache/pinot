@@ -599,12 +599,11 @@ export default Component.extend({
       analysisRange,
       selectedBaseline
     } = this.getProperties('metricUrn', 'analysisRange', 'selectedBaseline');
-    const granularity = '15_MINUTES';
-    const timezone = moment.tz.guess();
 
     set(this, 'errorTimeseries', null);
 
-    const urlCurrent = `/rootcause/metric/timeseries?urn=${metricUrn}&start=${analysisRange[0]}&end=${analysisRange[1]}&offset=current&granularity=${granularity}&timezone=${timezone}`;
+    const timeZone = 'America/Los_Angeles';
+    const urlCurrent = `/rootcause/metric/timeseries?urn=${metricUrn}&start=${analysisRange[0]}&end=${analysisRange[1]}&offset=current&timezone=${timeZone}`;
     fetch(urlCurrent)
       .then(checkStatus)
       .then(res => {
@@ -616,7 +615,7 @@ export default Component.extend({
 
     set(this, 'errorBaseline', null);
 
-    const urlBaseline = `/rootcause/metric/timeseries?urn=${metricUrn}&start=${analysisRange[0]}&end=${analysisRange[1]}&offset=${selectedBaseline}&granularity=${granularity}&timezone=${timezone}`;
+    const urlBaseline = `/rootcause/metric/timeseries?urn=${metricUrn}&start=${analysisRange[0]}&end=${analysisRange[1]}&offset=${selectedBaseline}&timezone=${timeZone}`;
     fetch(urlBaseline)
       .then(checkStatus)
       .then(res => set(this, 'baseline', res));
