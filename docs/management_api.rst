@@ -17,11 +17,35 @@
 .. under the License.
 ..
 
-Managing Pinot via REST API on the Controller
-=============================================
+Managing Pinot
+==============
 
-*TODO* : Remove this section altogether and find a place somewhere for a pointer to the management API. Maybe in the 'Running pinot in production' section?
+There are two ways to manage Pinot cluster, i.e. using Pinot management console and ``pinot-admin.sh`` script.
 
-There is a REST API which allows management of tables, tenants, segments and schemas. It can be accessed by going to ``http://[controller host]/help`` which offers a web UI to do these tasks, as well as document the REST API.
+Pinot Management Console
+------------------------
+
+There is a REST API which allows management of tables, tenants, segments and schemas. It can be accessed by going to
+``http://[controller host]/help`` which offers a web UI to do these tasks, as well as document the REST API.
+
+For example, list all the schema within Pinot cluster:
+
+  .. figure:: img/list-schemas.png
+
+Upload a pinot segment:
+
+  .. figure:: img/upload-segment.png
+
+
+Pinot-admin.sh
+--------------
 
 It can be used instead of the ``pinot-admin.sh`` commands to automate the creation of tables and tenants.
+
+For example, create a pinot segment:
+
+  .. figure:: img/generate-segment.png
+
+Query a table:
+
+  .. figure:: img/query-table.png
