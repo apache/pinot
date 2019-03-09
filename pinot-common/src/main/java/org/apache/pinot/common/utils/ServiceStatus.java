@@ -187,6 +187,8 @@ public class ServiceStatus {
 
     protected abstract Map<String, String> getPartitionStateMap(T state);
 
+    protected abstract String getMatchName();
+
     @Override
     public synchronized Status getServiceStatus() {
       if (_resourcesToMonitor.isEmpty()) {
@@ -205,8 +207,8 @@ public class ServiceStatus {
         }
 
         String descriptionSuffix = String
-            .format("resource=%s, numResourcesLeft=%d, numTotalResources=%d", resourceName, _resourcesToMonitor.size(),
-                _numTotalResourcesToMonitor);
+            .format("waitingFor=%s, resource=%s, numResourcesLeft=%d, numTotalResources=%d", getMatchName(),
+                resourceName, _resourcesToMonitor.size(), _numTotalResourcesToMonitor);
         T helixState = getState(resourceName);
         if (helixState == null) {
           _statusDescription = "Helix state does not exist: " + descriptionSuffix;
@@ -233,7 +235,7 @@ public class ServiceStatus {
               LOGGER.error(String.format("Resource: %s, partition: %s is in ERROR state", resourceName, partitionName));
             } else {
               _statusDescription = String
-                  .format("partition=%s, idealStateStatus=%s, currentStateStatus=%s, %s", partitionName,
+                  .format("partition=%s, expected=%s, found=%s, %s", partitionName,
                       idealStateStatus, currentStateStatus, descriptionSuffix);
               return Status.STARTING;
             }
@@ -265,6 +267,7 @@ public class ServiceStatus {
    * the ideal state value.
    */
   public static class IdealStateAndCurrentStateMatchServiceStatusCallback extends IdealStateMatchServiceStatusCallback<CurrentState> {
+    private static final String MATCH_NAME = "CurrentStateMatch";
     public IdealStateAndCurrentStateMatchServiceStatusCallback(HelixManager helixManager, String clusterName,
         String instanceName) {
       super(helixManager, clusterName, instanceName);
@@ -287,6 +290,11 @@ public class ServiceStatus {
     protected Map<String, String> getPartitionStateMap(CurrentState state) {
       return state.getPartitionStateMap();
     }
+
+    @Override
+    protected String getMatchName() {
+      return MATCH_NAME;
+    }
   }
 
   /**
@@ -295,6 +303,7 @@ public class ServiceStatus {
    * ideal state value.
    */
   public static class IdealStateAndExternalViewMatchServiceStatusCallback extends IdealStateMatchServiceStatusCallback<ExternalView> {
+    private static final String MATCH_NAME = "ExternalViewMatch";
     public IdealStateAndExternalViewMatchServiceStatusCallback(HelixManager helixManager, String clusterName,
         String instanceName) {
       super(helixManager, clusterName, instanceName);
@@ -322,6 +331,11 @@ public class ServiceStatus {
       }
 
       return partitionState;
+    }
+
+    @Override
+    protected String getMatchName() {
+      return MATCH_NAME;
     }
   }
 }
