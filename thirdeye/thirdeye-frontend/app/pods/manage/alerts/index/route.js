@@ -34,26 +34,10 @@ export default Route.extend({
 
   afterModel(model) {
     this._super(model);
-    // Work only with valid alerts - with metric association
-    let alerts = model.rawAlerts.filter(alert => isPresent(alert.metric));
 
-    // Iterate through config groups to enhance all alerts with extra properties (group name, application)
-    for (let config of model.subscriberGroups) {
-      let groupFunctionIds = config.emailConfig && config.emailConfig.functionIds ? config.emailConfig.functionIds : [];
-      for (let id of groupFunctionIds) {
-        let foundAlert = alerts.find(alert => alert.id === id);
-        if (foundAlert) {
-          Object.assign(foundAlert, {
-            application: config.application,
-            group: foundAlert.group ? foundAlert.group + ", " + config.name : config.name
-          });
-        }
-      }
-    }
-
-    // format Yaml configs
-    const yamlAlerts = model.detectionYaml;
-    for (let yamlAlert of yamlAlerts) {
+    // Fetch all the detection alerts
+    const alerts = model.detectionYaml;
+    for (let yamlAlert of alerts) {
       let dimensions = '';
       let dimensionsArray = yamlAlert.dimensionExploration ? yamlAlert.dimensionExploration.dimensions : null;
       if (Array.isArray(dimensionsArray)) {
@@ -76,7 +60,7 @@ export default Route.extend({
     for (let subscriptionGroup of model.detectionAlertConfig){
       const detectionConfigIds = Object.keys(subscriptionGroup.vectorClocks);
       for (let id of detectionConfigIds) {
-        let foundAlert = yamlAlerts.find(yamlAlert => yamlAlert.id.toString() === id);
+        let foundAlert = alerts.find(yamlAlert => yamlAlert.id.toString() === id);
         if (foundAlert) {
           Object.assign(foundAlert, {
             application: subscriptionGroup.application,
@@ -85,9 +69,6 @@ export default Route.extend({
         }
       }
     }
-
-    // concat legacy alerts and yaml alerts
-    alerts = alerts.concat(yamlAlerts);
 
     // Perform initial filters for our 'primary' filter types and add counts
     const user = getWithDefault(get(this, 'session'), 'data.authenticated.name', null);
