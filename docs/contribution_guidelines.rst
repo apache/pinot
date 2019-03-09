@@ -36,6 +36,14 @@ Create a branch for your change
 .. code-block:: none
 
   $ cd pinot
+  #
+  # ensure you are starting from the latest code base
+  # the following steps, ensure your fork's (origin's) master is up-to-date
+  #
+  $ git fetch upstream
+  $ git checkout master
+  $ git merge upstream/master
+  # create a branch for your issue
   $ git checkout -b <your issue branch>
 
 Make the necessary changes. If the changes you plan to make are too big, make sure you break it down into smaller tasks.
@@ -197,7 +205,7 @@ It is possible that while your change is being reviewed, other changes were made
   $ git commit -m "Meaningful message for the udpate"
   # pull new changes
   $ git checkout master
-  $ git pull
+  $ git merge upstream/master
   $ git checkout <your issue branch>
   $ git rebase master
 

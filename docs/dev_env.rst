@@ -44,10 +44,14 @@ Clone the repository locally
 
 .. code-block:: none
 
-  $mkdir workspace
-  $cd workspace
-  $git clone git@github.com:<github username>/pinot.git
-  $cd pinot
+  $ mkdir workspace
+  $ cd workspace
+  $ git clone git@github.com:<github username>/pinot.git
+  $ cd pinot
+  # set upstream
+  $ git remote add upstream https://github.com/apache/incubator-pinot
+  # check that the upstream shows up correctly
+  $ git remote -v
 
 Maven
 -----
