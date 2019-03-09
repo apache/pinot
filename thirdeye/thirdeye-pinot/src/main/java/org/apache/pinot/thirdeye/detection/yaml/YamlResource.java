@@ -492,7 +492,7 @@ public class YamlResource {
     // Update existing alert config with the newly supplied config.
     DetectionAlertConfigDTO updatedAlertConfig = updateDetectionAlertConfig(oldAlertConfig, newAlertConfig);
     updatedAlertConfig.setYaml(yamlAlertConfig);
-    
+
     // Update watermarks to reflect changes to detectionName list in subscription config
     Map<Long, Long> currentVectorClocks = updatedAlertConfig.getVectorClocks();
     Map<Long, Long> updatedVectorClocks = new HashMap<>();
