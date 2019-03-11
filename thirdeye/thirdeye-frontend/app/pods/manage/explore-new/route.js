@@ -8,6 +8,7 @@ import RSVP from 'rsvp';
 import { set, get } from '@ember/object';
 import { inject as service } from '@ember/service';
 import yamljs from 'yamljs';
+import moment from 'moment';
 
 export default Route.extend({
   notifications: service('toast'),
@@ -29,25 +30,23 @@ export default Route.extend({
         notifications.error('Retrieval of alert yaml failed.', 'Error');
       } else {
         if (detection_json.yaml) {
-          const detectionYaml = yamljs.parse(detection_json.yaml);
+          const detectionInfo = yamljs.parse(detection_json.yaml);
           const lastDetection = new Date(detection_json.lastTimestamp);
-          Object.assign(detectionYaml, {
-            lastDetectionTime: lastDetection.toDateString() + ", " +  lastDetection.toLocaleTimeString() + " (" + Intl.DateTimeFormat().resolvedOptions().timeZone + ")",
+          Object.assign(detectionInfo, {
             isActive: detection_json.active,
             createdBy: detection_json.createdBy,
             updatedBy: detection_json.updatedBy,
-            functionName: detectionYaml.detectionName,
-            collection: detectionYaml.dataset,
-            type: detectionYaml.pipelineType,
             exploreDimensions: detection_json.dimensions,
-            filters: this._formatYamlFilter(detectionYaml.filters),
-            dimensionExploration: this._formatYamlFilter(detectionYaml.dimensionExploration),
-            yaml: detection_json.yaml
+            filters: this._formatYamlFilter(detectionInfo.filters),
+            dimensionExploration: this._formatYamlFilter(detectionInfo.dimensionExploration),
+            lastDetectionTime: lastDetection.toDateString() + ", " +  lastDetection.toLocaleTimeString() + " (" + moment.tz.guess() + ")",
+            rawYaml: detection_json.yaml
           });
 
           this.setProperties({
-            alertHeaderFields: detectionYaml,
             alertId: alertId,
+            detectionInfo,
+            rawDetectionYaml: get(this, 'detectionInfo') ? get(this, 'detectionInfo').rawYaml : null,
             metricUrn: detection_json.properties.nested[0].nestedMetricUrns[0],
             metricUrnList: detection_json.properties.nested[0].nestedMetricUrns
           });
@@ -56,7 +55,6 @@ export default Route.extend({
       }
     } catch (error) {
       notifications.error('Retrieving alert yaml failed.', error);
-
     }
 
     //subscription group fetch
@@ -74,16 +72,26 @@ export default Route.extend({
       notifications.error('Retrieving subscription groups failed.', error);
     }
 
-    const subscriptionGroupYamlDisplay = typeof get(this, 'subscriptionGroups') === 'object' && get(this, 'subscriptionGroups').length > 0 ? get(this, 'subscriptionGroups')[0].yaml : get(this, 'subscriptionGroups').yaml;
-    const subscriptionGroupId = typeof get(this, 'subscriptionGroups') === 'object' && get(this, 'subscriptionGroups').length > 0 ? get(this, 'subscriptionGroups')[0].id : get(this, 'subscriptionGroups').id;
+    let subscribedGroups = "";
+    if (typeof get(this, 'subscriptionGroups') === 'object' && get(this, 'subscriptionGroups').length > 0) {
+      const groups = get(this, 'subscriptionGroups');
+      for (let key in groups) {
+        if (groups.hasOwnProperty(key)) {
+          let group = groups[key];
+          if (subscribedGroups === "") {
+            subscribedGroups = group.name
+          } else {
+            subscribedGroups = subscribedGroups + ", " + group.name;
+          }
+        }
+      }
+    }
 
     return RSVP.hash({
       alertId,
-      subscriptionGroupId,
-      alertData: get(this, 'alertHeaderFields'),
-      detectionYaml: get(this, 'detectionYaml') ? get(this, 'detectionYaml').yaml : null,
-      subscriptionGroups: get(this, 'subscriptionGroups'),
-      subscriptionGroupYamlDisplay,
+      alertData: get(this, 'detectionInfo'),
+      detectionYaml: get(this, 'rawDetectionYaml'),
+      subscribedGroups,
       metricUrn: get(this, 'metricUrn'),
       metricUrnList: get(this, 'metricUrnList') ? get(this, 'metricUrnList') : []
     });
