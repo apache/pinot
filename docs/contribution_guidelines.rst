@@ -20,7 +20,7 @@
 Contribution Guidelines
 =======================
 
-Before you begin to contribute, make sure you have reviewed :ref:`dev-setup` and :ref:`code-modules` sections.
+Before you begin to contribute, make sure you have reviewed :ref:`dev-setup` and :ref:`code-modules` sections and that you have created your own fork of the pinot source code.
 
 Create an issue for the change
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -35,7 +35,15 @@ Create a branch for your change
 
 .. code-block:: none
 
-  $ cd incubator-pinot
+  $ cd pinot
+  #
+  # ensure you are starting from the latest code base
+  # the following steps, ensure your fork's (origin's) master is up-to-date
+  #
+  $ git fetch upstream
+  $ git checkout master
+  $ git merge upstream/master
+  # create a branch for your issue
   $ git checkout -b <your issue branch>
 
 Make the necessary changes. If the changes you plan to make are too big, make sure you break it down into smaller tasks.
@@ -117,7 +125,7 @@ Identify a list of tests for the changes you have made. Depending on the scope o
 License Headers for newly added files
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-All source code files should have license headers. To automatically add the header for any new file you plan to checkin, run in ``incubator-pinot`` top-level folder:
+All source code files should have license headers. To automatically add the header for any new file you plan to checkin, run in ``pinot`` top-level folder:
 
 .. code-block:: none
 
@@ -136,9 +144,9 @@ If you checkin third-party code or files, please make sure you review Apache gui
 Once you determine the code you are pulling in adhere to the guidelines above, go ahead pull the changes in.
 Do not add license headers for them. Follow these instructions to ensure we are compliant with Apache Licensing process:
 
-* Under ``incubator-pinot/licenses`` add a LICENSE-<newlib> file that has the license terms of the included library.
-* Update the ``incubator-pinot/LICENSE`` file to indicate the newly added library file paths under the corresponding supported Licenses.
-* Update the exclusion rules for ``license`` and ``rat`` maven plugins in the parent pom: ``incubator-pinot/pom.xml``.
+* Under ``pinot/licenses`` add a LICENSE-<newlib> file that has the license terms of the included library.
+* Update the ``pinot/LICENSE`` file to indicate the newly added library file paths under the corresponding supported Licenses.
+* Update the exclusion rules for ``license`` and ``rat`` maven plugins in the parent pom: ``pinot/pom.xml``.
 
 If attention to the licensing terms in not paid early on, they will be caught much later in the process, when we prepare to make a new release.
 Updating code at that time to work with the right libraries at that time might require bigger refactoring changes and delay the release process.
@@ -197,7 +205,7 @@ It is possible that while your change is being reviewed, other changes were made
   $ git commit -m "Meaningful message for the udpate"
   # pull new changes
   $ git checkout master
-  $ git pull
+  $ git merge upstream/master
   $ git checkout <your issue branch>
   $ git rebase master
 
