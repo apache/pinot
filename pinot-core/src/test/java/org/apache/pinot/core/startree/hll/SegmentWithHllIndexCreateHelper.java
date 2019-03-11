@@ -124,7 +124,7 @@ public class SegmentWithHllIndexCreateHelper {
         new SegmentGeneratorConfig(SegmentTestUtils.extractSchemaFromAvroWithoutTime(inputAvro));
 
     // set other fields in segmentGenConfig
-    segmentGenConfig.setInputFilePath(inputAvro.getAbsolutePath());
+    segmentGenConfig.setInputFilePath(inputAvro.getAbsolutePath(), true);
     segmentGenConfig.setTimeColumnName(timeColumnName);
     segmentGenConfig.setSegmentTimeUnit(timeUnit);
     segmentGenConfig.setFormat(FileFormat.AVRO);

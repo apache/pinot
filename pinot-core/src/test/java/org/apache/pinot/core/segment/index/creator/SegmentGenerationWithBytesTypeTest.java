@@ -320,7 +320,7 @@ public class SegmentGenerationWithBytesTypeTest {
   private IndexSegment buildSegmentFromAvro(Schema schema, String dirName, String avroName, String segmentName)
       throws Exception {
     SegmentGeneratorConfig config = new SegmentGeneratorConfig();
-    config.setInputFilePath(dirName + File.separator + avroName);
+    config.setInputFilePath(dirName + File.separator + avroName, true);
     config.setOutDir(dirName);
     config.setSegmentName(segmentName);
     config.setSchema(schema);

@@ -111,7 +111,7 @@ public class ColumnarToStarTreeConverter {
     SegmentMetadata segmentMetadata = new SegmentMetadataImpl(columnarSegment);
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(segmentMetadata.getSchema());
     config.setDataDir(_inputDirName);
-    config.setInputFilePath(columnarSegment.getAbsolutePath());
+    config.setInputFilePath(columnarSegment.getAbsolutePath(), true);
     config.setFormat(FileFormat.PINOT);
     config.setOutDir(_outputDirName);
     config.setOverwrite(_overwrite);

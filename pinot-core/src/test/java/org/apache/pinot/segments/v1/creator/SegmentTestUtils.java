@@ -62,7 +62,7 @@ public class SegmentTestUtils {
       throws IOException {
     SegmentGeneratorConfig segmentGeneratorConfig =
         new SegmentGeneratorConfig(extractSchemaFromAvroWithoutTime(avroFile));
-    segmentGeneratorConfig.setInputFilePath(avroFile.getAbsolutePath());
+    segmentGeneratorConfig.setInputFilePath(avroFile.getAbsolutePath(), true);
     segmentGeneratorConfig.setOutDir(outputDir.getAbsolutePath());
     segmentGeneratorConfig.setTableName(tableName);
     return segmentGeneratorConfig;
@@ -73,7 +73,7 @@ public class SegmentTestUtils {
       throws IOException {
     final SegmentGeneratorConfig segmentGenSpec =
         new SegmentGeneratorConfig(extractSchemaFromAvroWithoutTime(inputAvro));
-    segmentGenSpec.setInputFilePath(inputAvro.getAbsolutePath());
+    segmentGenSpec.setInputFilePath(inputAvro.getAbsolutePath(), true);
     segmentGenSpec.setTimeColumnName(timeColumn);
     segmentGenSpec.setSegmentTimeUnit(timeUnit);
     segmentGenSpec.setFormat(FileFormat.AVRO);
@@ -87,7 +87,7 @@ public class SegmentTestUtils {
   public static SegmentGeneratorConfig getSegmentGeneratorConfigWithSchema(File inputAvro, File outputDir,
       String tableName, Schema schema) {
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(schema);
-    segmentGeneratorConfig.setInputFilePath(inputAvro.getAbsolutePath());
+    segmentGeneratorConfig.setInputFilePath(inputAvro.getAbsolutePath(), true);
     segmentGeneratorConfig.setOutDir(outputDir.getAbsolutePath());
     segmentGeneratorConfig.setFormat(FileFormat.AVRO);
     segmentGeneratorConfig.setSegmentVersion(SegmentVersion.v1);

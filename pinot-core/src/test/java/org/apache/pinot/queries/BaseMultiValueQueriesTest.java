@@ -96,7 +96,7 @@ public abstract class BaseMultiValueQueriesTest extends BaseQueriesTest {
 
     // Create the segment generator config.
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(schema);
-    segmentGeneratorConfig.setInputFilePath(filePath);
+    segmentGeneratorConfig.setInputFilePath(filePath, true);
     segmentGeneratorConfig.setTableName("testTable");
     segmentGeneratorConfig.setOutDir(INDEX_DIR.getAbsolutePath());
     segmentGeneratorConfig.setInvertedIndexCreationColumns(Arrays.asList("column3", "column7", "column8", "column9"));

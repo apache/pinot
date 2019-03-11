@@ -90,7 +90,7 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
 
     // Create the segment generator config.
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(schema);
-    segmentGeneratorConfig.setInputFilePath(filePath);
+    segmentGeneratorConfig.setInputFilePath(filePath, true);
     segmentGeneratorConfig.setTableName("testTable");
     segmentGeneratorConfig.setSegmentName(SEGMENT_NAME);
     segmentGeneratorConfig.setOutDir(INDEX_DIR.getAbsolutePath());
@@ -116,7 +116,7 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
 
     // Create the segment generator config.
     segmentGeneratorConfig = new SegmentGeneratorConfig(schema);
-    segmentGeneratorConfig.setInputFilePath(filePath);
+    segmentGeneratorConfig.setInputFilePath(filePath, true);
     segmentGeneratorConfig.setTableName("testTableStarTree");
     segmentGeneratorConfig.setSegmentName(SEGMENT_NAME_STARTREE);
     segmentGeneratorConfig.setOutDir(INDEX_DIR_STARTREE.getAbsolutePath());

@@ -52,4 +52,7 @@ public class JobConfigConstants {
 
   // The path to the record reader to be configured
   public static final String RECORD_READER_PATH = "record.reader.path";
+
+  // Path to segments, local v. on hdfs
+  public static final String USE_HDFS_PATH_FOR_SEGMENT_GEN = "use.hdfs.path.for.segment.gen";
 }

@@ -232,7 +232,7 @@ public class FastHllQueriesTest extends BaseQueriesTest {
 
     // Create the segment generator config
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(schemaBuilder.build());
-    segmentGeneratorConfig.setInputFilePath(filePath);
+    segmentGeneratorConfig.setInputFilePath(filePath, true);
     segmentGeneratorConfig.setTableName("testTable");
     segmentGeneratorConfig.setOutDir(INDEX_DIR.getAbsolutePath());
     segmentGeneratorConfig

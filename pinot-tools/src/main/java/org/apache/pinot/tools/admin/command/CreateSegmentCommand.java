@@ -370,7 +370,7 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
         public void run() {
           try {
             SegmentGeneratorConfig config = new SegmentGeneratorConfig(segmentGeneratorConfig);
-            config.setInputFilePath(file.getAbsolutePath());
+            config.setInputFilePath(file.getAbsolutePath(), true);
             config.setSegmentName(_segmentName + "_" + segCnt);
             config.loadConfigFiles();
 

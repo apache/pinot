@@ -83,6 +83,8 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
 
   protected FileSystem _fileSystem;
 
+  protected boolean _useHDFSPathForSegmentGen;
+
   @Override
   public void setup(Context context)
       throws IOException, InterruptedException {
@@ -103,6 +105,7 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
     }
 
     _recordReaderPath = _jobConf.get(JobConfigConstants.RECORD_READER_PATH, null);
+    _useHDFSPathForSegmentGen = _jobConf.getBoolean(JobConfigConstants.USE_HDFS_PATH_FOR_SEGMENT_GEN, false);
 
     // Set up segment name generator
     String segmentNameGeneratorType =
@@ -203,7 +206,11 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
 
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(_tableConfig, _schema);
     segmentGeneratorConfig.setTableName(_rawTableName);
-    segmentGeneratorConfig.setInputFilePath(localInputFile.getPath());
+    if (_useHDFSPathForSegmentGen) {
+      segmentGeneratorConfig.setInputFilePath(hdfsInputFile.toString(), false);
+    } else {
+      segmentGeneratorConfig.setInputFilePath(localInputFile.getPath(), true);
+    }
     segmentGeneratorConfig.setOutDir(_localSegmentDir.getPath());
     segmentGeneratorConfig.setSegmentNameGenerator(_segmentNameGenerator);
     segmentGeneratorConfig.setSequenceId(sequenceId);

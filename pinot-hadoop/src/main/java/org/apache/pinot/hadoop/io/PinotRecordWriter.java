@@ -100,7 +100,7 @@ public class PinotRecordWriter<K, V> extends RecordWriter<K, V> {
 
   private void createSegment(String inputFile, SegmentIndexCreationDriver driver) {
     try {
-      _segmentConfig.setInputFilePath(inputFile);
+      _segmentConfig.setInputFilePath(inputFile, true);
       driver.init(_segmentConfig);
       driver.build();
     } catch (Exception e) {
