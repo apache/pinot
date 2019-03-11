@@ -364,7 +364,7 @@ public class LLCSegmentCompletionHandlers {
     SegmentMetadataImpl segmentMetadata = extractMetadataFromInput(metadataFiles, segmentName);
     // If it fails to extract metadata from the input form, return failure.
     if (segmentMetadata == null) {
-      LOGGER.warn("Segment metadata extraction failure for segment {}", segmentName);
+      LOGGER.error("Segment metadata extraction failure for segment {}", segmentName);
       return SegmentCompletionProtocol.RESP_FAILED.toJsonString();
     }
     SegmentCompletionProtocol.Response response =
