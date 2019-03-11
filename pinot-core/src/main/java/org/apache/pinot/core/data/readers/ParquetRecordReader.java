@@ -18,8 +18,10 @@
  */
 package org.apache.pinot.core.data.readers;
 
+import java.util.List;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.parquet.hadoop.ParquetReader;
+import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.utils.ParquetUtils;
 import org.apache.pinot.core.data.GenericRow;
@@ -36,6 +38,7 @@ import java.io.IOException;
 public class ParquetRecordReader implements RecordReader {
   private final String _dataFilePath;
   private final Schema _schema;
+  private final List<FieldSpec> _fieldSpecs;
 
   private ParquetReader<GenericRecord> _reader;
   private GenericRecord _next;
@@ -45,6 +48,7 @@ public class ParquetRecordReader implements RecordReader {
       throws IOException {
     _dataFilePath = dataFile.getAbsolutePath();
     _schema = schema;
+    _fieldSpecs = RecordReaderUtils.extractFieldSpecs(schema);
 
     _reader = ParquetUtils.getParquetReader(_dataFilePath);
     advanceToNext();
@@ -71,7 +75,14 @@ public class ParquetRecordReader implements RecordReader {
   @Override
   public GenericRow next(GenericRow reuse)
       throws IOException {
-    AvroUtils.fillGenericRow(_next, reuse, _schema);
+    for (FieldSpec fieldSpec : _fieldSpecs) {
+      String fieldName = fieldSpec.getName();
+      Object value = _next.get(fieldName);
+      // Allow default value for non-time columns
+      if (value != null || fieldSpec.getFieldType() != FieldSpec.FieldType.TIME) {
+        reuse.putField(fieldName, RecordReaderUtils.convert(fieldSpec, value));
+      }
+    }
     advanceToNext();
     return reuse;
   }
