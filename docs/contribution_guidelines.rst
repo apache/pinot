@@ -20,7 +20,7 @@
 Contribution Guidelines
 =======================
 
-Before you begin to contribute, make sure you have reviewed :ref:`dev-setup` and :ref:`code-modules` sections.
+Before you begin to contribute, make sure you have reviewed :ref:`dev-setup` and :ref:`code-modules` sections and that you have created your own fork of the pinot source code.
 
 Create an issue for the change
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
