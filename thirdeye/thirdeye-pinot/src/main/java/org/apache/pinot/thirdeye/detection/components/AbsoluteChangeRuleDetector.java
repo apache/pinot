@@ -19,6 +19,7 @@
 
 package org.apache.pinot.thirdeye.detection.components;
 
+import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.BaselineParsingUtils;
 import org.apache.pinot.thirdeye.dataframe.BooleanSeries;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
@@ -42,6 +43,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import org.joda.time.Interval;
+import org.joda.time.Period;
 
 import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
 
@@ -62,6 +64,9 @@ public class AbsoluteChangeRuleDetector implements AnomalyDetector<AbsoluteChang
   private InputDataFetcher dataFetcher;
   private Baseline baseline;
   private Pattern pattern;
+  private String monitoringGranularity;
+  private TimeGranularity timeGranularity;
+
   private static final String COL_CURR = "current";
   private static final String COL_BASE = "baseline";
   private static final String COL_ANOMALY = "anomaly";
@@ -72,7 +77,7 @@ public class AbsoluteChangeRuleDetector implements AnomalyDetector<AbsoluteChang
   @Override
   public List<MergedAnomalyResultDTO> runDetection(Interval window, String metricUrn) {
     MetricEntity me = MetricEntity.fromURN(metricUrn);
-    MetricSlice slice = MetricSlice.from(me.getId(), window.getStartMillis(), window.getEndMillis(), me.getFilters());
+    MetricSlice slice = MetricSlice.from(me.getId(), window.getStartMillis(), window.getEndMillis(), me.getFilters(), timeGranularity);
     List<MetricSlice> slices = new ArrayList<>(this.baseline.scatter(slice));
     slices.add(slice);
     InputData data = this.dataFetcher.fetchData(new InputDataSpec().withTimeseriesSlices(slices).withMetricIdsForDataset(
@@ -100,7 +105,8 @@ public class AbsoluteChangeRuleDetector implements AnomalyDetector<AbsoluteChang
 
     // make anomalies
     DatasetConfigDTO datasetConfig = data.getDatasetForMetricId().get(me.getId());
-    return DetectionUtils.makeAnomalies(slice, df, COL_ANOMALY, window.getEndMillis(), datasetConfig);
+    return DetectionUtils.makeAnomalies(slice, df, COL_ANOMALY, window.getEndMillis(),
+        DetectionUtils.getMonitoringGranularityPeriod(monitoringGranularity, datasetConfig), datasetConfig);
   }
 
   @Override
@@ -111,5 +117,13 @@ public class AbsoluteChangeRuleDetector implements AnomalyDetector<AbsoluteChang
     String offset = spec.getOffset();
     this.baseline = BaselineParsingUtils.parseOffset(offset, timezone);
     this.pattern = Pattern.valueOf(spec.getPattern().toUpperCase());
+
+    this.monitoringGranularity = spec.getMonitoringGranularity();
+    if (this.monitoringGranularity.equals("1_MONTHS")) {
+      this.timeGranularity = MetricSlice.NATIVE_GRANULARITY;
+    } else {
+      this.timeGranularity = TimeGranularity.fromString(spec.getMonitoringGranularity());
+    }
+
   }
 }
