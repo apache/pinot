@@ -310,9 +310,11 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
       }
       // override from yaml
       if (yamlConfig.containsKey(PROP_WINDOW_SIZE)) {
+        properties.put(PROP_MOVING_WINDOW_DETECTION, true);
         properties.put(PROP_WINDOW_SIZE, MapUtils.getString(yamlConfig, PROP_WINDOW_SIZE));
       }
       if (yamlConfig.containsKey(PROP_WINDOW_UNIT)) {
+        properties.put(PROP_MOVING_WINDOW_DETECTION, true);
         properties.put(PROP_WINDOW_UNIT, MapUtils.getString(yamlConfig, PROP_WINDOW_UNIT));
       }
       if (yamlConfig.containsKey(PROP_WINDOW_DELAY)) {
