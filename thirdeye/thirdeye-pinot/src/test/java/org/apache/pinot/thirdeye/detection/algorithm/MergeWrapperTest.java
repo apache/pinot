@@ -111,6 +111,7 @@ public class MergeWrapperTest {
 
   @Test
   public void testMergerPassthru() throws Exception {
+    this.config.getProperties().put(PROP_MAX_GAP, 0);
     this.wrapper = new MergeWrapper(this.provider, this.config, 1000, 3000);
     DetectionPipelineResult output = this.wrapper.run();
 
