@@ -32,6 +32,12 @@ module.exports = function(environment) {
       url: 'https://your-piwik.endpoint.com'
     },
 
+    docs: {
+      createAlert: "/link/to/create/alert/wiki",
+      detectionConfig: "/link/to/DetectionConfiguration/wiki",
+      subscriptionConfig: "/link/to/NotificationConfiguration/wiki"
+    },
+
     EmberENV: {
 
       FEATURES: {

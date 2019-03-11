@@ -10,10 +10,11 @@
         {{/if}}
       </div>
       {{#if (eq displayMode "list")}}
-        {{#link-to "manage.yaml" alertData.id}}
+        {{#link-to "manage.explore-new" alertData.id}}
           <div class="te-search-results__title-name" title={{alertData.functionName}}>{{alertData.functionName}}</div>
         {{/link-to}}
       {{/if}}
+      <h4 class="te-alert-page__subtitle">{{alertData.description}}</h4>
     </div>
   </div>
   {{yield}}
@@ -53,14 +54,6 @@
     </div>
     <div class="col-xs-12 col-sm-7">
       <li class="te-search-results__row">
-        <div class="te-search-results__option te-search-results__option--{{modeSubClass}} te-search-results__option--left">Application</div>
-        <div class="te-search-results__value{{valueClassSuffix}}" title={{alertData.application}}>
-          <span class="{{unless alertData.application 'te-search-results__prop--missing' 'te-search-results__prop'}}">
-            {{if alertData.application alertData.application 'N/A'}}
-          </span>
-        </div>
-      </li>
-      <li class="te-search-results__row">
         <div class="te-search-results__option te-search-results__option--{{modeSubClass}} te-search-results__option--left">Owner</div>
         <div class="te-search-results__value{{valueClassSuffix}}" title={{alertData.createdBy}}>
           <span class="{{unless alertData.createdBy 'te-search-results__prop--missing' 'te-search-results__prop'}}">
@@ -73,6 +66,14 @@
         <div class="te-search-results__value{{valueClassSuffix}}" title={{alertData.updatedBy}}>
           <span class="{{unless alertData.updatedBy 'te-search-results__prop--missing' 'te-search-results__prop'}}">
             {{if alertData.updatedBy alertData.updatedBy 'N/A'}}
+          </span>
+        </div>
+      </li>
+      <li class="te-search-results__row">
+        <div class="te-search-results__option te-search-results__option--{{modeSubClass}} te-search-results__option--left">Last detection</div>
+        <div class="te-search-results__value{{valueClassSuffix}}" title={{alertData.lastDetectionTime}}>
+          <span class="{{unless alertData.lastDetectionTime 'te-search-results__prop--missing' 'te-search-results__prop'}}">
+            {{if alertData.lastDetectionTime alertData.lastDetectionTime 'N/A'}}
           </span>
         </div>
       </li>

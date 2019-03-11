@@ -17,13 +17,15 @@
 .. under the License.
 ..
 
-.. _reference:
+############
+Introduction
+############
+
+.. _introduction:
 
 .. toctree::
-   :maxdepth: 1
+    :maxdepth: 1
 
-   pql_examples
-   index_techniques
-   client_api
-   management_api
-   pinot_hadoop
+    intro
+    architecture
+    getting_started

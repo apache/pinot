@@ -136,6 +136,7 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
   private static final String PROP_DIMENSION_EXPLORATION = "dimensionExploration";
 
   private static final String PROP_DETECTION = "detection";
+  private static final String PROP_CRON = "cron";
   private static final String PROP_FILTER = "filter";
   private static final String PROP_FILTERS = "filters";
   private static final String PROP_METRIC = "metric";
@@ -206,7 +207,8 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
 
     Map<String, Collection<String>> filterMaps = MapUtils.getMap(yamlConfig, PROP_FILTERS);
     this.metricUrn = buildMetricUrn(filterMaps, this.metricConfig.getId());
-    String cron = buildCron();
+    String detectionCronInYaml = MapUtils.getString(yamlConfig, PROP_CRON);
+    String cron = (detectionCronInYaml == null) ? buildCron() : detectionCronInYaml;
 
     List<Map<String, Object>> ruleYamls = getList(yamlConfig.get(PROP_RULES));
     List<Map<String, Object>> nestedPipelines = new ArrayList<>();
@@ -308,9 +310,11 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
       }
       // override from yaml
       if (yamlConfig.containsKey(PROP_WINDOW_SIZE)) {
+        properties.put(PROP_MOVING_WINDOW_DETECTION, true);
         properties.put(PROP_WINDOW_SIZE, MapUtils.getString(yamlConfig, PROP_WINDOW_SIZE));
       }
       if (yamlConfig.containsKey(PROP_WINDOW_UNIT)) {
+        properties.put(PROP_MOVING_WINDOW_DETECTION, true);
         properties.put(PROP_WINDOW_UNIT, MapUtils.getString(yamlConfig, PROP_WINDOW_UNIT));
       }
       if (yamlConfig.containsKey(PROP_WINDOW_DELAY)) {

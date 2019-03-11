@@ -35,6 +35,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
@@ -213,7 +214,8 @@ public class UserDashboardResource {
       }
       anomalies = trueAnomalies;
     }
-
+    // filter child anomalies
+    anomalies = anomalies.stream().filter(anomaly -> !anomaly.isChild()).collect(Collectors.toList());
     // limit result size
     anomalies = anomalies.subList(0, Math.min(anomalies.size(), limit));
 

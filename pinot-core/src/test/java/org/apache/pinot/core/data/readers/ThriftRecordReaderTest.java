@@ -146,7 +146,6 @@ public class ThriftRecordReaderTest {
         .addSingleValueDimension("created_at", FieldSpec.DataType.LONG)
         .addSingleValueDimension("active", FieldSpec.DataType.BOOLEAN)
         .addMultiValueDimension("groups", FieldSpec.DataType.INT)
-        .addMultiValueDimension("map_values", FieldSpec.DataType.STRING)
         .addMultiValueDimension("set_values", FieldSpec.DataType.STRING).build();
   }
 

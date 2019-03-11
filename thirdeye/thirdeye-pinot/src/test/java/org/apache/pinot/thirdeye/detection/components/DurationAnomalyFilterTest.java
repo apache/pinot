@@ -43,4 +43,16 @@ public class DurationAnomalyFilterTest {
     Assert.assertEquals(anomalyFilter.isQualified(makeAnomaly(1547164800000L, 1547175600000L)), true);
     Assert.assertEquals(anomalyFilter.isQualified(makeAnomaly(1547164800000L, 1547179200000L)), false);
   }
+
+  @Test
+  public void testDefaultQualified() {
+    AnomalyFilter anomalyFilter = new DurationAnomalyFilter();
+    DurationAnomalyFilterSpec spec = new DurationAnomalyFilterSpec();
+    anomalyFilter.init(spec, new DefaultInputDataFetcher(new MockDataProvider(), -1));
+    Assert.assertEquals(anomalyFilter.isQualified(makeAnomaly(1547164800000L, 1547168400000L)), true);
+    Assert.assertEquals(anomalyFilter.isQualified(makeAnomaly(1547164800000L, 1547172000000L)), true);
+    Assert.assertEquals(anomalyFilter.isQualified(makeAnomaly(1547164800000L, 1547175600000L)), true);
+    Assert.assertEquals(anomalyFilter.isQualified(makeAnomaly(1547164800000L, 1547179200000L)), true);
+  }
+
 }

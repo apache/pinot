@@ -77,6 +77,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
 
+import static org.apache.pinot.thirdeye.detection.yaml.YamlDetectionAlertConfigTranslator.*;
+
 
 @Path("/yaml")
 @Api(tags = {Constants.YAML_TAG})
@@ -490,6 +492,22 @@ public class YamlResource {
     // Update existing alert config with the newly supplied config.
     DetectionAlertConfigDTO updatedAlertConfig = updateDetectionAlertConfig(oldAlertConfig, newAlertConfig);
     updatedAlertConfig.setYaml(yamlAlertConfig);
+
+    // Update watermarks to reflect changes to detectionName list in subscription config
+    Map<Long, Long> currentVectorClocks = updatedAlertConfig.getVectorClocks();
+    Map<Long, Long> updatedVectorClocks = new HashMap<>();
+    Map<String, Object> properties = updatedAlertConfig.getProperties();
+    long currentTimestamp = System.currentTimeMillis();
+    if (properties.get(PROP_DETECTION_CONFIG_IDS) != null) {
+      for (long detectionId : ConfigUtils.getLongs(properties.get(PROP_DETECTION_CONFIG_IDS))) {
+        if (currentVectorClocks != null && currentVectorClocks.keySet().contains(detectionId)) {
+          updatedVectorClocks.put(detectionId, currentVectorClocks.get(detectionId));
+        } else {
+          updatedVectorClocks.put(detectionId, currentTimestamp);
+        }
+      }
+    }
+    updatedAlertConfig.setVectorClocks(updatedVectorClocks);
 
     // Validate before updating the config
     subscriptionValidator.validateUpdatedConfig(updatedAlertConfig, oldAlertConfig);

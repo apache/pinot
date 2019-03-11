@@ -21,6 +21,11 @@ package org.apache.pinot.thirdeye.detection;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.IOException;
+import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import org.apache.pinot.thirdeye.anomaly.task.TaskConstants;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.TaskManager;
@@ -28,9 +33,6 @@ import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.TaskDTO;
 import org.apache.pinot.thirdeye.datalayer.util.Predicate;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
-import java.util.List;
-import java.util.Optional;
-import java.util.concurrent.TimeUnit;
 import org.quartz.Job;
 import org.quartz.JobExecutionContext;
 import org.quartz.JobExecutionException;
@@ -57,7 +59,6 @@ public class DetectionPipelineJob implements Job {
     String jobName = String.format("%s_%d", TaskConstants.TaskType.DETECTION, id);
     List<TaskDTO> scheduledTasks = taskDAO.findByPredicate(Predicate.AND(
         Predicate.EQ("name", jobName),
-        Predicate.EQ("startTime", taskInfo.getStart()),
         Predicate.OR(
             Predicate.EQ("status", TaskConstants.TaskStatus.RUNNING.toString()),
             Predicate.EQ("status", TaskConstants.TaskStatus.WAITING.toString())
@@ -65,10 +66,20 @@ public class DetectionPipelineJob implements Job {
       )
     );
 
-    Optional<TaskDTO> latestScheduledTask = scheduledTasks.stream().reduce((task1, task2) -> task1.getEndTime() > task2.getEndTime() ? task1 : task2);
-    if (latestScheduledTask.isPresent() && taskInfo.getEnd() - latestScheduledTask.get().getEndTime() < DETECTION_TASK_TIMEOUT){
+    List<DetectionPipelineTaskInfo> scheduledTaskInfos = scheduledTasks.stream().map(taskDTO -> {
+      try {
+        return OBJECT_MAPPER.readValue(taskDTO.getTaskInfo(), DetectionPipelineTaskInfo.class);
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    }).collect(Collectors.toList());
+    Optional<DetectionPipelineTaskInfo> latestScheduledTask = scheduledTaskInfos.stream()
+        .reduce((taskInfo1, taskInfo2) -> taskInfo1.getEnd() > taskInfo2.getEnd() ? taskInfo1 : taskInfo2);
+    if (latestScheduledTask.isPresent()
+        && taskInfo.getEnd() - latestScheduledTask.get().getEnd() < DETECTION_TASK_TIMEOUT) {
       // if a task is pending and not time out yet, don't schedule more
-      LOG.info("Skip scheduling detection task for {} with start time {}. Task is already in the queue.", jobName, taskInfo.getStart());
+      LOG.info("Skip scheduling detection task for {} with start time {}. Task is already in the queue.", jobName,
+          taskInfo.getStart());
       return;
     }
 

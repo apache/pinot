@@ -543,6 +543,9 @@ public class LLCSegmentCompletionHandlers {
           ControllerConf.getUriFromPath(StringUtil.join("/", provider.getBaseDataDirURI().toString(), rawTableName));
       URI segmentFileURI;
       if (isSplitCommit) {
+        // We only clean up tmp segment file under table dir, so don't create any sub-dir under table dir.
+        // See PinotLLCRealtimeSegmentManager.commitSegmentFile().
+        // TODO: move tmp file logic into SegmentCompletionUtils.
         String uniqueSegmentFileName = SegmentCompletionUtils.generateSegmentFileName(segmentName);
         segmentFileURI =
             ControllerConf.getUriFromPath(StringUtil.join("/", tableDirURI.toString(), uniqueSegmentFileName));

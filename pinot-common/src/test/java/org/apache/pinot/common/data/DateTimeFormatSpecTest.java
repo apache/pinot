@@ -20,6 +20,7 @@ package org.apache.pinot.common.data;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.data.DateTimeFieldSpec.TimeFormat;
@@ -106,9 +107,9 @@ public class DateTimeFormatSpecTest {
             1498892400000L)});
     entries.add(
         new Object[]{"1:HOURS:SIMPLE_DATE_FORMAT:M/d/yyyy h:mm:ss a", 1498892400000L, String.class, DateTimeFormat
-            .forPattern("M/d/yyyy h:mm:ss a").withZoneUTC().print(1498892400000L)});
+            .forPattern("M/d/yyyy h:mm:ss a").withZoneUTC().withLocale(Locale.ENGLISH).print(1498892400000L)});
     entries.add(new Object[]{"1:HOURS:SIMPLE_DATE_FORMAT:M/d/yyyy h a", 1502066750000L, String.class, DateTimeFormat
-        .forPattern("M/d/yyyy h a").withZoneUTC().print(1502066750000L)});
+        .forPattern("M/d/yyyy h a").withZoneUTC().withLocale(Locale.ENGLISH).print(1502066750000L)});
     return entries.toArray(new Object[entries.size()][]);
   }
 

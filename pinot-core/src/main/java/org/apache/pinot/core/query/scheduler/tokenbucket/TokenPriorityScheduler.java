@@ -59,13 +59,13 @@ public class TokenPriorityScheduler extends PriorityScheduler {
     };
 
     MultiLevelPriorityQueue queue = new MultiLevelPriorityQueue(config, rm, groupFactory, new TableBasedGroupMapper());
-    return new TokenPriorityScheduler(rm, queryExecutor, queue, metrics, latestQueryTime);
+    return new TokenPriorityScheduler(config, rm, queryExecutor, queue, metrics, latestQueryTime);
   }
 
-  private TokenPriorityScheduler(@Nonnull ResourceManager resourceManager, @Nonnull QueryExecutor queryExecutor,
-      @Nonnull MultiLevelPriorityQueue queue, @Nonnull ServerMetrics metrics,
+  private TokenPriorityScheduler(@Nonnull Configuration config, @Nonnull ResourceManager resourceManager,
+      @Nonnull QueryExecutor queryExecutor, @Nonnull MultiLevelPriorityQueue queue, @Nonnull ServerMetrics metrics,
       @Nonnull LongAccumulator latestQueryTime) {
-    super(resourceManager, queryExecutor, queue, metrics, latestQueryTime);
+    super(config, resourceManager, queryExecutor, queue, metrics, latestQueryTime);
   }
 
   @Override

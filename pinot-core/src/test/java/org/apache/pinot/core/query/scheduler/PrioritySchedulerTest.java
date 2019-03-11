@@ -231,13 +231,13 @@ public class PrioritySchedulerTest {
     static TestSchedulerGroupFactory groupFactory;
     static LongAccumulator latestQueryTime;
 
-    public static TestPriorityScheduler create(Configuration conf) {
-      ResourceManager rm = new PolicyBasedResourceManager(conf);
+    public static TestPriorityScheduler create(Configuration config) {
+      ResourceManager rm = new PolicyBasedResourceManager(config);
       QueryExecutor qe = new TestQueryExecutor();
       groupFactory = new TestSchedulerGroupFactory();
-      MultiLevelPriorityQueue queue = new MultiLevelPriorityQueue(conf, rm, groupFactory, new TableBasedGroupMapper());
+      MultiLevelPriorityQueue queue = new MultiLevelPriorityQueue(config, rm, groupFactory, new TableBasedGroupMapper());
       latestQueryTime = new LongAccumulator(Long::max, 0);
-      return new TestPriorityScheduler(rm, qe, queue, metrics, latestQueryTime);
+      return new TestPriorityScheduler(config, rm, qe, queue, metrics, latestQueryTime);
     }
 
     public static TestPriorityScheduler create() {
@@ -246,10 +246,10 @@ public class PrioritySchedulerTest {
     }
 
     // store locally for easy access
-    public TestPriorityScheduler(@Nonnull ResourceManager resourceManager, @Nonnull QueryExecutor queryExecutor,
-        @Nonnull SchedulerPriorityQueue queue, @Nonnull ServerMetrics metrics,
+    public TestPriorityScheduler(@Nonnull Configuration config, @Nonnull ResourceManager resourceManager,
+        @Nonnull QueryExecutor queryExecutor, @Nonnull SchedulerPriorityQueue queue, @Nonnull ServerMetrics metrics,
         @Nonnull LongAccumulator latestQueryTime) {
-      super(resourceManager, queryExecutor, queue, metrics, latestQueryTime);
+      super(config, resourceManager, queryExecutor, queue, metrics, latestQueryTime);
     }
 
     ResourceManager getResourceManager() {

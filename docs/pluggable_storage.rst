@@ -17,6 +17,8 @@
 .. under the License.
 ..
 
+.. _pluggable-storage:
+
 Pluggable Storage
 =================
 
@@ -35,6 +37,33 @@ New Storage Type implementation
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 In order to add a new type of storage backend (say, Amazon s3) implement the following class:
 
-#. S3FS extends `PinotFS <https://github.com/apache/incubator-pinot/blob/master/pinot-filesystem/src/main/java/org/apache/pinot/filesystem/PinotFS.java>`_
+S3FS extends `PinotFS <https://github.com/apache/incubator-pinot/blob/master/pinot-filesystem/src/main/java/org/apache/pinot/filesystem/PinotFS.java>`_
 
-The properties for the stream implementation are to be set in your controller and server configurations, `like so <https://github.com/apache/incubator-pinot/wiki/Pluggable-Storage>`_.
+Configurations
+^^^^^^^^^^^^^^
+These properties for the stream implementation are to be set in your controller and server configurations.
+
+Pinot supports different kinds of storage; eg: NFS, HDFS, ADL. In order to get this working with your cluster, you will need to configure the following.
+
+In your controller and server configs, please set the FS class you would like to support. pinot.controller.storage.factory.class.${YOUR_URI_SCHEME} to the full path of the FS class you would like to include
+
+You also need to configure pinot.controller.local.temp.dir for the local dir on the controller machine.
+
+For filesystem specific configs, you can pass in the following with either the pinot.controller prefix or the pinot.server prefix.
+
+All the following configs need to be prefixed with storage.factory.
+
+AzurePinotFS requires the following configs according to your environment:
+
+adl.accountId, adl.authEndpoint, adl.clientId, adl.clientSecret
+
+Please also make sure to set the following config with the value "adl"
+segment.fetcher.protocols : adl
+
+
+HadoopPinotFS requires the following configs according to your environment:
+
+hadoop.kerberos.principle, hadoop.kerberos.keytab, hadoop.conf.path
+
+Please make sure to also set the following config with the value "hdfs"
+segment.fetcher.protocols : hdfs

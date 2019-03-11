@@ -167,7 +167,7 @@ public class DetectionResource {
             Predicate.EQ("detectionConfigId", detectionConfigId),
             Predicate.LT("startTime", endTime),
             Predicate.GT("endTime", startTime)));
-    List result = anomalies.stream().map(anomaly -> {
+    List result = anomalies.stream().filter(anomaly -> !anomaly.isChild()).map(anomaly -> {
       Map<String, Object> anomalyResult = OBJECT_MAPPER.convertValue(anomaly, Map.class);
       anomalyResult.put(AnomalyEventFormatter.ATTR_STATUS_CLASSIFICATION, ResourceUtils.getStatusClassification(anomaly).toString());
       return anomalyResult;
@@ -372,12 +372,11 @@ public class DetectionResource {
       DetectionPipeline pipeline = this.loader.from(this.provider, config, monitoringWindow.getStartMillis(), monitoringWindow.getEndMillis());
       DetectionPipelineResult result = pipeline.run();
 
-      // save state
-      if (result.getLastTimestamp() > 0) {
+      // Update
+      if (result.getLastTimestamp() > config.getLastTimestamp()) {
         config.setLastTimestamp(result.getLastTimestamp());
+        this.configDAO.update(config);
       }
-
-      this.configDAO.update(config);
 
       for (MergedAnomalyResultDTO anomaly : result.getAnomalies()) {
         anomaly.setAnomalyResultSource(AnomalyResultSource.ANOMALY_REPLAY);
@@ -393,40 +392,47 @@ public class DetectionResource {
 
   /**
    * Replay for a given time range. Without cron schedule behavior
+   *
+   * @param detectionId detection config id (must exist)
+   * @param start start time in epoch (millis)
+   * @param end end time in epoch (millis)
+   * @param deleteExistingAnomaly (optional, default false) delete existing anomaly or not
    */
   @POST
   @Path("/replay/{id}")
   public Response detectionReplay(
-      @PathParam("id") long configId,
+      @PathParam("id") long detectionId,
       @QueryParam("start") long start,
-      @QueryParam("end") long end) throws Exception {
+      @QueryParam("end") long end,
+      @QueryParam("deleteExistingAnomaly") @DefaultValue("false") boolean deleteExistingAnomaly) throws Exception {
 
-    DetectionConfigDTO config = this.configDAO.findById(configId);
+    DetectionConfigDTO config = this.configDAO.findById(detectionId);
     if (config == null) {
-      throw new IllegalArgumentException(String.format("Cannot find config %d", configId));
+      throw new IllegalArgumentException(String.format("Cannot find config %d", detectionId));
     }
 
-    // clear existing anomalies
-    AnomalySlice slice = new AnomalySlice().withStart(start).withEnd(end);
-    Collection<MergedAnomalyResultDTO> existing = this.provider.fetchAnomalies(Collections.singleton(slice), configId).get(slice);
+    if (deleteExistingAnomaly) {
+      AnomalySlice slice = new AnomalySlice().withStart(start).withEnd(end);
+      Collection<MergedAnomalyResultDTO> existing =
+          this.provider.fetchAnomalies(Collections.singleton(slice), detectionId).get(slice);
 
-    List<Long> existingIds = new ArrayList<>();
-    for (MergedAnomalyResultDTO anomaly : existing) {
-      existingIds.add(anomaly.getId());
+      List<Long> existingIds = new ArrayList<>();
+      for (MergedAnomalyResultDTO anomaly : existing) {
+        existingIds.add(anomaly.getId());
+      }
+
+      this.anomalyDAO.deleteByIds(existingIds);
     }
-
-    this.anomalyDAO.deleteByIds(existingIds);
 
     // execute replay
     DetectionPipeline pipeline = this.loader.from(this.provider, config, start, end);
     DetectionPipelineResult result = pipeline.run();
 
-    // save state
-    if (result.getLastTimestamp() > 0) {
+    // Update state
+    if (result.getLastTimestamp() > config.getLastTimestamp()) {
       config.setLastTimestamp(result.getLastTimestamp());
+      this.configDAO.update(config);
     }
-
-    this.configDAO.update(config);
 
     for (MergedAnomalyResultDTO anomaly : result.getAnomalies()) {
       anomaly.setAnomalyResultSource(AnomalyResultSource.ANOMALY_REPLAY);

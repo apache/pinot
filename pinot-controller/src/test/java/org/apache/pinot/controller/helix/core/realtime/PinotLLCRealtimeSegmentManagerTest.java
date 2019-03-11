@@ -1112,6 +1112,71 @@ public class PinotLLCRealtimeSegmentManagerTest {
     Assert.assertFalse(status); // Committing segment metadata failed.
   }
 
+  /**
+   * Tests the scenario where ideal state for new segment, was already updated by some external thread, after step 2 and before step 3 of segment commit.
+   * This can happen if step 3 (ideal state update) took longer than {@link PinotLLCRealtimeSegmentManager::MAX_SEGMENT_COMPLETION_TIME_MILLIS},
+   * making the segment eligible for repairs by {@link org.apache.pinot.controller.validation.RealtimeSegmentValidationManager}
+   * @throws InvalidConfigException
+   */
+  @Test
+  public void testIdealStateAlreadyUpdated() throws InvalidConfigException {
+    FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager(null);
+    String tableNameWithType = "tableName_REALTIME";
+    String rawTableName = "tableName";
+    int nPartitions = 4;
+    int nReplicas = 2;
+    int nInstances = 3;
+    setupSegmentManager(segmentManager, tableNameWithType, nPartitions, nReplicas, nInstances);
+
+    IdealState idealState = segmentManager._tableIdealState;
+    TableConfig tableConfig = segmentManager._tableConfigStore.getTableConfig(tableNameWithType);
+    PartitionAssignment partitionAssignment =
+        segmentManager._partitionAssignmentGenerator.getStreamPartitionAssignmentFromIdealState(tableConfig,
+            idealState);
+    int partitionId = 0;
+    int seq = 0;
+    IdealStateBuilderUtil idealStateBuilderUtil = new IdealStateBuilderUtil(idealState, tableNameWithType);
+    String currentSegmentId = idealStateBuilderUtil.getSegment(partitionId, seq);
+    LLCSegmentName newSegment = new LLCSegmentName(rawTableName, partitionId, ++seq, System.currentTimeMillis());
+    String newSegmentId = newSegment.getSegmentName();
+    ZNRecordSerializer znRecordSerializer = new ZNRecordSerializer();
+    IdealState idealStateCopy =
+        new IdealState((ZNRecord) znRecordSerializer.deserialize(znRecordSerializer.serialize(idealState.getRecord())));
+    segmentManager.updateIdealStateOnSegmentCompletion(idealState, currentSegmentId, newSegmentId, partitionAssignment);
+
+    // check ideal state updates
+    Assert.assertNotEquals(idealState, idealStateCopy);
+
+    // progress ideal state, but send update for old. Should not update
+    currentSegmentId = newSegmentId;
+    List<String> instances = idealStateBuilderUtil.getInstances(partitionId, seq);
+    idealStateBuilderUtil.setSegmentState(partitionId, seq, "ONLINE");
+    idealStateBuilderUtil.addConsumingSegment(partitionId, ++seq, nReplicas, instances);
+    newSegmentId = idealStateBuilderUtil.getSegment(partitionId, seq);
+    idealStateBuilderUtil.setSegmentState(partitionId, seq, "ONLINE");
+    idealStateBuilderUtil.addConsumingSegment(partitionId, ++seq, nReplicas, instances);
+    idealState = idealStateBuilderUtil.build();
+    idealStateCopy =
+        new IdealState((ZNRecord) znRecordSerializer.deserialize(znRecordSerializer.serialize(idealState.getRecord())));
+
+    segmentManager.updateIdealStateOnSegmentCompletion(idealState, currentSegmentId, newSegmentId, partitionAssignment);
+
+    // check no change
+    Assert.assertEquals(idealState, idealStateCopy);
+  }
+
+  private void setupSegmentManager(FakePinotLLCRealtimeSegmentManager segmentManager, String rtTableName, int nPartitions, int nReplicas, int nInstances)
+      throws InvalidConfigException {
+
+    List<String> instances = getInstanceList(nInstances);
+    TableConfig tableConfig = makeTableConfig(rtTableName, nReplicas, DUMMY_HOST, DEFAULT_SERVER_TENANT);
+    IdealState idealState = PinotTableIdealStateBuilder.buildEmptyRealtimeIdealStateFor(rtTableName, nReplicas, true);
+
+    segmentManager.addTableToStore(rtTableName, tableConfig, nPartitions);
+    segmentManager._partitionAssignmentGenerator.setConsumingInstances(instances);
+    segmentManager.setupNewTable(tableConfig, idealState);
+  }
+
   private void setupSegmentManager(FakePinotLLCRealtimeSegmentManager segmentManager, String rtTableName)
       throws InvalidConfigException {
     final int nInstances = 6;

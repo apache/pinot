@@ -20,7 +20,7 @@
 Architecture
 ============
 
-.. figure:: pinot-architecture.png
+.. figure:: img/pinot-architecture.png
 
    Pinot Architecture Overview
 
