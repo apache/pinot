@@ -26,11 +26,11 @@ export function checkStatus(response, mode = 'get', recoverBlank = false, isYaml
   } else {
     if (isYamlPreview) {
       return response.json()
-              .then(data => {
-                const error = new Error(data);
-                error.body= data;
-                throw error;
-              })
+        .then(data => {
+          const error = new Error(data);
+          error.body= data;
+          throw error;
+        });
     }
     const error = new Error(response.statusText);
     error.response = response;
