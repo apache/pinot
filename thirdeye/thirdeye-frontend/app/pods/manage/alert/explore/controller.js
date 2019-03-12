@@ -128,6 +128,24 @@ export default Controller.extend({
   },
 
   /**
+   * newLink: Id of new alert (for migrated alerts)
+   * @type {String}
+   */
+  newId: computed(
+    'alertData',
+    function() {
+      const alertData = get(this, 'alertData');
+      if(alertData && alertData.functionName) {
+        let pieces = alertData.functionName.split('_');
+        if (pieces.length > 0) {
+          return pieces[pieces.length-1];
+        }
+      }
+      return null;
+    }
+  ),
+
+  /**
    * Table pagination: number of pages to display
    * @type {Number}
    */
@@ -277,7 +295,6 @@ export default Controller.extend({
       } = this.getProperties('alertData', 'alertEvalMetrics', 'DEFAULT_SEVERITY');
       const features = getWithDefault(alertData, 'alertFilter.features', null);
       const mttdStr = _.has(alertData, 'alertFilter.mttd') ? alertData.alertFilter.mttd.split(';') : null;
-      const severityUnitFeatures = (features && features.split(',')[1] !== 'deviation') ? '%' : '';
       const severityUnit = (!mttdStr || mttdStr && mttdStr[1].split('=')[0] !== 'deviation') ? '%' : '';
       const mttdWeight = Number(extractSeverity(alertData, defaultSeverity));
       const convertedWeight = severityUnit === '%' ? mttdWeight * 100 : mttdWeight;
@@ -495,7 +512,7 @@ export default Controller.extend({
       });
       // Step 1: Report the anomaly
       return fetch(queryStringUrl, postProps('')).then((res) => checkStatus(res, 'post'))
-        .then((saveResult) => {
+        .then(() => {
           // Step 2: Automatically update anomaly feedback in that range
           return fetch(updateUrl, postProps('')).then((res) => checkStatus(res, 'post'));
         });
