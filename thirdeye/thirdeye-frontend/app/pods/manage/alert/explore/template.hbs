@@ -107,6 +107,29 @@
         </div>
       {{/if}}
 
+      {{!-- Redirect Modal --}}
+      {{#te-modal
+        isShowingModal=true
+        headerText="Your Alert Has Been Migrated"
+        noButtons=true
+        isCancellable=false
+      }}
+        <main class="te-form alert-report-modal__redirect">
+          <legend class="te-report-title">This alert has been deprecated.</legend>
+          <div class="te-form__note">Please click the following link and update any bookmarks:
+            {{#if newId}}
+              {{#link-to "manage.explore" newId class="thirdeye-link-secondary"}}
+                Migrated Alert
+              {{/link-to}}
+            {{else}}
+              {{#link-to "manage.alerts" class="thirdeye-link-secondary"}}
+                Migrated Alert
+              {{/link-to}}
+            {{/if}}
+          </div>
+        </main>
+      {{/te-modal}}
+
       {{!-- Missing anomaly modal --}}
       {{#te-modal
         cancelButtonText="Cancel"
