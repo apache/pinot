@@ -406,7 +406,8 @@ public class LLCSegmentCompletionHandlers {
         return null;
       }
       // Extract creation.meta from the metadataFiles.
-      if (!extractMetadataFromInputField(metadataFiles, tempMetadataDirStr, V1Constants.SEGMENT_CREATION_META)) {
+      if (!extractMetadataFromInputField(metadataFiles, tempMetadataDirStr, V1Constants.SEGMENT_CREATION_META,
+          segmentNameStr)) {
         return null;
       }
       // Load segment metadata
