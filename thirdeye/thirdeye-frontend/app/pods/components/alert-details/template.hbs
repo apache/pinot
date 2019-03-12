@@ -15,7 +15,8 @@
   {{#unless errorAnomalies}}
     {{#if showDetails}}
       {{#if isLoading}}
-        {{ember-spinner scale=0.5 rotate=10 speed='1.1' color='#3498DB'}}Please wait while we compile the data.
+        {{ember-spinner scale=0.5 rotate=10 speed='1.1' color='#3498DB'}}Preview may take a long time if it is more than one week (for daily metrics) or one day (for hourly/minute metrics).
+        Please click "Refresh Preview" if you changed time window.
       {{else}}
         {{#if dataIsCurrent}}
         {{range-pill-selectors
