@@ -77,7 +77,7 @@
                   <p>
                     <span style="color: #606060;">Alert</span>
                     <span style="color: #1D1D1D; text-decoration: none;  font-weight: bold;">${function}</span>
-                    <a href="${dashboardHost}/app/#/manage/explore-new/${functionToId[function]?string.computer}" target="blank" style="text-decoration: none; color: #0B5EA1; font-weight: bold;">(View/Edit Alert)</a>
+                    <a href="${dashboardHost}/app/#/manage/explore/${functionToId[function]?string.computer}" target="blank" style="text-decoration: none; color: #0B5EA1; font-weight: bold;">(View/Edit Alert)</a>
                     <#-- TODO: Enable after migration -->
                     <#--<span style="color: #1D1D1D; text-decoration: none;">${description}</span>-->
                   </p>
