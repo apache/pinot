@@ -24,6 +24,14 @@ export function checkStatus(response, mode = 'get', recoverBlank = false, isYaml
       return (mode === 'get' || isYamlPreview) ? response.json() : JSON.parse(JSON.stringify(response));
     }
   } else {
+    if (isYamlPreview) {
+      return response.json()
+              .then(data => {
+                const error = new Error(data);
+                error.body= data;
+                throw error;
+              })
+    }
     const error = new Error(response.statusText);
     error.response = response;
     if (recoverBlank) {

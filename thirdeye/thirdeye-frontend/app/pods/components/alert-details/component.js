@@ -523,7 +523,7 @@ export default Component.extend({
         });
       }
     } catch (error) {
-      notifications.error('Preview alert failed', error);
+      notifications.error(error.body.message);
     }
 
     return {
