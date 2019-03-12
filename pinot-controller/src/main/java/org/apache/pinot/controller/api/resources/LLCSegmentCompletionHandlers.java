@@ -34,7 +34,6 @@ import java.nio.file.Files;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.GET;
@@ -47,7 +46,6 @@ import javax.ws.rs.core.MediaType;
 import com.google.common.base.Preconditions;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.StringUtil;
@@ -89,9 +87,9 @@ public class LLCSegmentCompletionHandlers {
   @Path(SegmentCompletionProtocol.MSG_TYPE_EXTEND_BUILD_TIME)
   @Produces(MediaType.APPLICATION_JSON)
   public String extendBuildTime(@QueryParam(SegmentCompletionProtocol.PARAM_INSTANCE_ID) String instanceId,
-      @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_NAME) String segmentName,
-      @QueryParam(SegmentCompletionProtocol.PARAM_OFFSET) long offset,
-      @QueryParam(SegmentCompletionProtocol.PARAM_EXTRA_TIME_SEC) int extraTimeSec) {
+                                @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_NAME) String segmentName,
+                                @QueryParam(SegmentCompletionProtocol.PARAM_OFFSET) long offset,
+                                @QueryParam(SegmentCompletionProtocol.PARAM_EXTRA_TIME_SEC) int extraTimeSec) {
 
     if (instanceId == null || segmentName == null || offset == -1) {
       LOGGER.error("Invalid call: offset={}, segmentName={}, instanceId={}", offset, segmentName, instanceId);
@@ -99,13 +97,13 @@ public class LLCSegmentCompletionHandlers {
     }
     if (extraTimeSec <= 0) {
       LOGGER.warn("Invalid value {} for extra build time from instance {} for segment {}", extraTimeSec, instanceId,
-          segmentName);
+              segmentName);
       extraTimeSec = SegmentCompletionProtocol.getDefaultMaxSegmentCommitTimeSeconds();
     }
 
     SegmentCompletionProtocol.Request.Params requestParams = new SegmentCompletionProtocol.Request.Params();
     requestParams.withInstanceId(instanceId).withSegmentName(segmentName).withOffset(offset)
-        .withExtraTimeSec(extraTimeSec);
+            .withExtraTimeSec(extraTimeSec);
     LOGGER.info("Processing extendBuildTime:{}", requestParams.toString());
 
     SegmentCompletionProtocol.Response response = SegmentCompletionManager.getInstance().extendBuildTime(requestParams);
@@ -119,11 +117,11 @@ public class LLCSegmentCompletionHandlers {
   @Path(SegmentCompletionProtocol.MSG_TYPE_CONSUMED)
   @Produces(MediaType.APPLICATION_JSON)
   public String segmentConsumed(@QueryParam(SegmentCompletionProtocol.PARAM_INSTANCE_ID) String instanceId,
-      @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_NAME) String segmentName,
-      @QueryParam(SegmentCompletionProtocol.PARAM_OFFSET) long offset,
-      @QueryParam(SegmentCompletionProtocol.PARAM_REASON) String stopReason,
-      @QueryParam(SegmentCompletionProtocol.PARAM_MEMORY_USED_BYTES) long memoryUsedBytes,
-      @QueryParam(SegmentCompletionProtocol.PARAM_ROW_COUNT) int numRows) {
+                                @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_NAME) String segmentName,
+                                @QueryParam(SegmentCompletionProtocol.PARAM_OFFSET) long offset,
+                                @QueryParam(SegmentCompletionProtocol.PARAM_REASON) String stopReason,
+                                @QueryParam(SegmentCompletionProtocol.PARAM_MEMORY_USED_BYTES) long memoryUsedBytes,
+                                @QueryParam(SegmentCompletionProtocol.PARAM_ROW_COUNT) int numRows) {
 
     if (instanceId == null || segmentName == null || offset == -1) {
       LOGGER.error("Invalid call: offset={}, segmentName={}, instanceId={}", offset, segmentName, instanceId);
@@ -131,7 +129,7 @@ public class LLCSegmentCompletionHandlers {
     }
     SegmentCompletionProtocol.Request.Params requestParams = new SegmentCompletionProtocol.Request.Params();
     requestParams.withInstanceId(instanceId).withSegmentName(segmentName).withOffset(offset).withReason(stopReason)
-        .withMemoryUsedBytes(memoryUsedBytes).withNumRows(numRows);
+            .withMemoryUsedBytes(memoryUsedBytes).withNumRows(numRows);
     LOGGER.info("Processing segmentConsumed:{}", requestParams.toString());
 
     SegmentCompletionProtocol.Response response = SegmentCompletionManager.getInstance().segmentConsumed(requestParams);
@@ -144,9 +142,9 @@ public class LLCSegmentCompletionHandlers {
   @Path(SegmentCompletionProtocol.MSG_TYPE_STOPPED_CONSUMING)
   @Produces(MediaType.APPLICATION_JSON)
   public String segmentStoppedConsuming(@QueryParam(SegmentCompletionProtocol.PARAM_INSTANCE_ID) String instanceId,
-      @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_NAME) String segmentName,
-      @QueryParam(SegmentCompletionProtocol.PARAM_OFFSET) long offset,
-      @QueryParam(SegmentCompletionProtocol.PARAM_REASON) String stopReason) {
+                                        @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_NAME) String segmentName,
+                                        @QueryParam(SegmentCompletionProtocol.PARAM_OFFSET) long offset,
+                                        @QueryParam(SegmentCompletionProtocol.PARAM_REASON) String stopReason) {
 
     if (instanceId == null || segmentName == null || offset == -1) {
       LOGGER.error("Invalid call: offset={}, segmentName={}, instanceId={}", offset, segmentName, instanceId);
@@ -157,7 +155,7 @@ public class LLCSegmentCompletionHandlers {
     LOGGER.info("Processing segmentStoppedConsuming:{}", requestParams.toString());
 
     SegmentCompletionProtocol.Response response =
-        SegmentCompletionManager.getInstance().segmentStoppedConsuming(requestParams);
+            SegmentCompletionManager.getInstance().segmentStoppedConsuming(requestParams);
     final String responseStr = response.toJsonString();
     LOGGER.info("Response to segmentStoppedConsuming:{}", responseStr);
     return responseStr;
@@ -167,13 +165,13 @@ public class LLCSegmentCompletionHandlers {
   @Path(SegmentCompletionProtocol.MSG_TYPE_COMMIT_START)
   @Produces(MediaType.APPLICATION_JSON)
   public String segmentCommitStart(@QueryParam(SegmentCompletionProtocol.PARAM_INSTANCE_ID) String instanceId,
-      @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_NAME) String segmentName,
-      @QueryParam(SegmentCompletionProtocol.PARAM_OFFSET) long offset,
-      @QueryParam(SegmentCompletionProtocol.PARAM_MEMORY_USED_BYTES) long memoryUsedBytes,
-      @QueryParam(SegmentCompletionProtocol.PARAM_BUILD_TIME_MILLIS) long buildTimeMillis,
-      @QueryParam(SegmentCompletionProtocol.PARAM_WAIT_TIME_MILLIS) long waitTimeMillis,
-      @QueryParam(SegmentCompletionProtocol.PARAM_ROW_COUNT) int numRows,
-      @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_SIZE_BYTES) long segmentSizeBytes) {
+                                   @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_NAME) String segmentName,
+                                   @QueryParam(SegmentCompletionProtocol.PARAM_OFFSET) long offset,
+                                   @QueryParam(SegmentCompletionProtocol.PARAM_MEMORY_USED_BYTES) long memoryUsedBytes,
+                                   @QueryParam(SegmentCompletionProtocol.PARAM_BUILD_TIME_MILLIS) long buildTimeMillis,
+                                   @QueryParam(SegmentCompletionProtocol.PARAM_WAIT_TIME_MILLIS) long waitTimeMillis,
+                                   @QueryParam(SegmentCompletionProtocol.PARAM_ROW_COUNT) int numRows,
+                                   @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_SIZE_BYTES) long segmentSizeBytes) {
     if (instanceId == null || segmentName == null || offset == -1) {
       LOGGER.error("Invalid call: offset={}, segmentName={}, instanceId={}", offset, segmentName, instanceId);
       return SegmentCompletionProtocol.RESP_FAILED.toJsonString();
@@ -181,13 +179,13 @@ public class LLCSegmentCompletionHandlers {
 
     SegmentCompletionProtocol.Request.Params requestParams = new SegmentCompletionProtocol.Request.Params();
     requestParams.withInstanceId(instanceId).withSegmentName(segmentName).withOffset(offset)
-        .withMemoryUsedBytes(memoryUsedBytes).withBuildTimeMillis(buildTimeMillis).withWaitTimeMillis(waitTimeMillis)
-        .withNumRows(numRows).withSegmentSizeBytes(segmentSizeBytes);
+            .withMemoryUsedBytes(memoryUsedBytes).withBuildTimeMillis(buildTimeMillis).withWaitTimeMillis(waitTimeMillis)
+            .withNumRows(numRows).withSegmentSizeBytes(segmentSizeBytes);
 
     LOGGER.info("Processing segmentCommitStart:{}", requestParams.toString());
 
     SegmentCompletionProtocol.Response response =
-        SegmentCompletionManager.getInstance().segmentCommitStart(requestParams);
+            SegmentCompletionManager.getInstance().segmentCommitStart(requestParams);
     final String responseStr = response.toJsonString();
     LOGGER.info("Response to segmentCommitStart:{}", responseStr);
     return responseStr;
@@ -197,17 +195,17 @@ public class LLCSegmentCompletionHandlers {
   @Path(SegmentCompletionProtocol.MSG_TYPE_COMMIT_END)
   @Produces(MediaType.APPLICATION_JSON)
   public String segmentCommitEnd(@QueryParam(SegmentCompletionProtocol.PARAM_INSTANCE_ID) String instanceId,
-      @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_NAME) String segmentName,
-      @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_LOCATION) String segmentLocation,
-      @QueryParam(SegmentCompletionProtocol.PARAM_OFFSET) long offset,
-      @QueryParam(SegmentCompletionProtocol.PARAM_MEMORY_USED_BYTES) long memoryUsedBytes,
-      @QueryParam(SegmentCompletionProtocol.PARAM_BUILD_TIME_MILLIS) long buildTimeMillis,
-      @QueryParam(SegmentCompletionProtocol.PARAM_WAIT_TIME_MILLIS) long waitTimeMillis,
-      @QueryParam(SegmentCompletionProtocol.PARAM_ROW_COUNT) int numRows,
-      @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_SIZE_BYTES) long segmentSizeBytes) {
+                                 @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_NAME) String segmentName,
+                                 @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_LOCATION) String segmentLocation,
+                                 @QueryParam(SegmentCompletionProtocol.PARAM_OFFSET) long offset,
+                                 @QueryParam(SegmentCompletionProtocol.PARAM_MEMORY_USED_BYTES) long memoryUsedBytes,
+                                 @QueryParam(SegmentCompletionProtocol.PARAM_BUILD_TIME_MILLIS) long buildTimeMillis,
+                                 @QueryParam(SegmentCompletionProtocol.PARAM_WAIT_TIME_MILLIS) long waitTimeMillis,
+                                 @QueryParam(SegmentCompletionProtocol.PARAM_ROW_COUNT) int numRows,
+                                 @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_SIZE_BYTES) long segmentSizeBytes) {
     if (instanceId == null || segmentName == null || offset == -1 || segmentLocation == null) {
       LOGGER.error("Invalid call: offset={}, segmentName={}, instanceId={}, segmentLocation={}", offset, segmentName,
-          instanceId, segmentLocation);
+              instanceId, segmentLocation);
       // TODO: memoryUsedInBytes = 0 if not present in params. Add validation when we start using it
       return SegmentCompletionProtocol.RESP_FAILED.toJsonString();
     }
@@ -224,9 +222,9 @@ public class LLCSegmentCompletionHandlers {
     }
     SegmentCompletionProtocol.Request.Params requestParams = new SegmentCompletionProtocol.Request.Params();
     requestParams.withInstanceId(instanceId).withSegmentName(segmentName).withOffset(offset)
-        .withSegmentLocation(segmentLocation).withSegmentSizeBytes(segmentSizeBytes)
-        .withBuildTimeMillis(buildTimeMillis).withWaitTimeMillis(waitTimeMillis).withNumRows(numRows)
-        .withMemoryUsedBytes(memoryUsedBytes);
+            .withSegmentLocation(segmentLocation).withSegmentSizeBytes(segmentSizeBytes)
+            .withBuildTimeMillis(buildTimeMillis).withWaitTimeMillis(waitTimeMillis).withNumRows(numRows)
+            .withMemoryUsedBytes(memoryUsedBytes);
     LOGGER.info("Processing segmentCommitEnd:{}", requestParams.toString());
 
     final boolean isSuccess = true;
@@ -235,8 +233,8 @@ public class LLCSegmentCompletionHandlers {
     CommittingSegmentDescriptor committingSegmentDescriptor =
             CommittingSegmentDescriptor.fromSegmentCompletionReqParamsAndMetadata(requestParams, segmentMetadata);
     SegmentCompletionProtocol.Response response =
-        SegmentCompletionManager.getInstance().segmentCommitEnd(requestParams, isSuccess, isSplitCommit,
-                committingSegmentDescriptor);
+            SegmentCompletionManager.getInstance().segmentCommitEnd(requestParams, isSuccess, isSplitCommit,
+                    committingSegmentDescriptor);
     final String responseStr = response.toJsonString();
     LOGGER.info("Response to segmentCommitEnd:{}", responseStr);
     return responseStr;
@@ -247,47 +245,61 @@ public class LLCSegmentCompletionHandlers {
   @Consumes(MediaType.MULTIPART_FORM_DATA)
   @Produces(MediaType.APPLICATION_JSON)
   public String segmentCommit(@QueryParam(SegmentCompletionProtocol.PARAM_INSTANCE_ID) String instanceId,
-      @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_NAME) String segmentName,
-      @QueryParam(SegmentCompletionProtocol.PARAM_OFFSET) long offset,
-      @QueryParam(SegmentCompletionProtocol.PARAM_MEMORY_USED_BYTES) long memoryUsedBytes,
-      @QueryParam(SegmentCompletionProtocol.PARAM_BUILD_TIME_MILLIS) long buildTimeMillis,
-      @QueryParam(SegmentCompletionProtocol.PARAM_WAIT_TIME_MILLIS) long waitTimeMillis,
-      @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_SIZE_BYTES) long segmentSizeBytes,
-      @QueryParam(SegmentCompletionProtocol.PARAM_ROW_COUNT) int numRows, FormDataMultiPart multiPart) {
+                              @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_NAME) String segmentName,
+                              @QueryParam(SegmentCompletionProtocol.PARAM_OFFSET) long offset,
+                              @QueryParam(SegmentCompletionProtocol.PARAM_MEMORY_USED_BYTES) long memoryUsedBytes,
+                              @QueryParam(SegmentCompletionProtocol.PARAM_BUILD_TIME_MILLIS) long buildTimeMillis,
+                              @QueryParam(SegmentCompletionProtocol.PARAM_WAIT_TIME_MILLIS) long waitTimeMillis,
+                              @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_SIZE_BYTES) long segmentSizeBytes,
+                              @QueryParam(SegmentCompletionProtocol.PARAM_ROW_COUNT) int numRows, FormDataMultiPart multiPart) {
     SegmentCompletionProtocol.Request.Params requestParams = new SegmentCompletionProtocol.Request.Params();
     requestParams.withInstanceId(instanceId).withSegmentName(segmentName).withOffset(offset)
-        .withSegmentSizeBytes(segmentSizeBytes).withBuildTimeMillis(buildTimeMillis).withWaitTimeMillis(waitTimeMillis)
-        .withNumRows(numRows).withMemoryUsedBytes(memoryUsedBytes);
+            .withSegmentSizeBytes(segmentSizeBytes).withBuildTimeMillis(buildTimeMillis).withWaitTimeMillis(waitTimeMillis)
+            .withNumRows(numRows).withMemoryUsedBytes(memoryUsedBytes);
     LOGGER.info("Processing segmentCommit:{}", requestParams.toString());
 
     final SegmentCompletionManager segmentCompletionManager = SegmentCompletionManager.getInstance();
     SegmentCompletionProtocol.Response response = segmentCompletionManager.segmentCommitStart(requestParams);
+
+    CommittingSegmentDescriptor committingSegmentDescriptor =
+            CommittingSegmentDescriptor.fromSegmentCompletionReqParams(requestParams);
+    boolean success = false;
+
     if (response.equals(SegmentCompletionProtocol.RESP_COMMIT_CONTINUE)) {
-      // Get the segment from the form input and put it in the right place.
-      File localTmpFile = uploadFileToLocalTmpFile(multiPart, instanceId, segmentName);
-      if (localTmpFile == null) {
-        LOGGER.error("Unable to get the segment file from multipart input to local file {}", segmentName);
-        return SegmentCompletionProtocol.RESP_FAILED.toJsonString();
+      File localTmpFile = null;
+      try {
+        // Get the segment from the form input and put it in the right place.
+        localTmpFile = uploadFileToLocalTmpFile(multiPart, instanceId, segmentName);
+        if (localTmpFile == null) {
+          LOGGER.error("Unable to get the segment file from multipart input to local file {}", segmentName);
+        } else {
+          // Extract the segment metadata from the segment file.
+          SegmentMetadataImpl segmentMetadata =
+                  getSegmentMetadataFromLocalFile(new LLCSegmentName(segmentName), localTmpFile);
+          if (segmentMetadata == null) {
+            LOGGER.error("Unable to extract segment metadata from segment data: {}", segmentName);
+          } else {
+            // Store the segment file to Pinot FS.
+            try {
+              FileUploadPathProvider provider = new FileUploadPathProvider(_controllerConf);
+              localSegmentFileToPinotFSFinalLocation(provider, localTmpFile, segmentName, instanceId);
+              committingSegmentDescriptor =
+                      CommittingSegmentDescriptor.fromSegmentCompletionReqParamsAndMetadata(requestParams, segmentMetadata);
+              success = true;
+            } catch (Exception e) {
+              LOGGER.error("Could not save segment {} to PinotFS", segmentName, e);
+            }
+          }
+        }
+      } finally {
+        FileUtils.deleteQuietly(localTmpFile);
       }
-      // Extract the segment metadata from the segment file.
-      SegmentMetadataImpl segmentMetadata = getSegmentMetadataFromLocalFile(new LLCSegmentName(segmentName),
-                                                                            localTmpFile);
-      if (segmentMetadata == null) {
-        LOGGER.error("Unable to extract segment metadata from segment data: {}", segmentName);
-        return SegmentCompletionProtocol.RESP_FAILED.toJsonString();
-      }
-      // Store the segment file to Pinot FS.
-      URI uri = storeLocalSegmentFileToPinotFS(localTmpFile, segmentName, instanceId, false);
-      boolean success =  (uri != null);
-      CommittingSegmentDescriptor committingSegmentDescriptor =
-              CommittingSegmentDescriptor.fromSegmentCompletionReqParamsAndMetadata(requestParams,
-                      segmentMetadata);
-      response = segmentCompletionManager.segmentCommitEnd(requestParams, success, false,
-              committingSegmentDescriptor);
     }
 
+    response =
+            segmentCompletionManager.segmentCommitEnd(requestParams, success, false, committingSegmentDescriptor);
     LOGGER.info("Response to segmentCommit: instance={}  segment={} status={} offset={}", requestParams.getInstanceId(),
-        requestParams.getSegmentName(), response.getStatus(), response.getOffset());
+            requestParams.getSegmentName(), response.getStatus(), response.getOffset());
 
     return response.toJsonString();
   }
@@ -299,8 +311,8 @@ public class LLCSegmentCompletionHandlers {
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.MULTIPART_FORM_DATA)
   public String segmentUpload(@QueryParam(SegmentCompletionProtocol.PARAM_INSTANCE_ID) String instanceId,
-      @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_NAME) String segmentName,
-      @QueryParam(SegmentCompletionProtocol.PARAM_OFFSET) long offset, FormDataMultiPart multiPart) {
+                              @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_NAME) String segmentName,
+                              @QueryParam(SegmentCompletionProtocol.PARAM_OFFSET) long offset, FormDataMultiPart multiPart) {
     SegmentCompletionProtocol.Request.Params requestParams = new SegmentCompletionProtocol.Request.Params();
     requestParams.withInstanceId(instanceId).withSegmentName(segmentName).withOffset(offset);
     LOGGER.info("Processing segmentUpload:{}", requestParams.toString());
@@ -311,23 +323,29 @@ public class LLCSegmentCompletionHandlers {
       LOGGER.error("Unable to get the segment file from multipart input to local file {}", segmentName);
       return SegmentCompletionProtocol.RESP_FAILED.toJsonString();
     }
-    // Store the segment file to Pinot FS.
-    URI uri = storeLocalSegmentFileToPinotFS(localTmpFile, segmentName, instanceId, true);
-    if (uri == null) {
-      LOGGER.error("Unable to upload local segment file {} to Pinot storage", localTmpFile.toPath());
+    try {
+      FileUploadPathProvider provider = new FileUploadPathProvider(_controllerConf);
+      URI uri = localSegementFileToPinotFsTmpLocation(provider, localTmpFile, segmentName);
+      if (uri == null) {
+        LOGGER.error("Unable to upload local segment file {} to Pinot storage", localTmpFile.toPath());
+        return SegmentCompletionProtocol.RESP_FAILED.toJsonString();
+      }
+      SegmentCompletionProtocol.Response.Params responseParams =
+              new SegmentCompletionProtocol.Response.Params().withOffset(requestParams.getOffset())
+                      .withSegmentLocation(uri.toString())
+                      .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.UPLOAD_SUCCESS);
+
+      String response = new SegmentCompletionProtocol.Response(responseParams).toJsonString();
+
+      LOGGER.info("Response to segmentUpload:{}", response);
+
+      return response;
+    } catch (Exception e) {
+
       return SegmentCompletionProtocol.RESP_FAILED.toJsonString();
+    } finally {
+      FileUtils.deleteQuietly(localTmpFile);
     }
-
-    SegmentCompletionProtocol.Response.Params responseParams =
-        new SegmentCompletionProtocol.Response.Params().withOffset(requestParams.getOffset())
-            .withSegmentLocation(uri.toString())
-            .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.UPLOAD_SUCCESS);
-
-    String response = new SegmentCompletionProtocol.Response(responseParams).toJsonString();
-
-    LOGGER.info("Response to segmentUpload:{}", response);
-
-    return response;
   }
 
   @POST
@@ -472,7 +490,7 @@ public class LLCSegmentCompletionHandlers {
          // Extract creation.meta
          InputStream creationMetaInputStream = TarGzCompressionUtils
                  .unTarOneFile(new FileInputStream(segmentFile), V1Constants.SEGMENT_CREATION_META)
-         ) {
+    ) {
       Preconditions.checkState(tempMetadataDir.mkdirs(), "Failed to create directory: %s", tempMetadataDirStr);
       Preconditions.checkNotNull(metadataPropertiesInputStream, "%s does not exist",
               V1Constants.MetadataKeys.METADATA_FILE_NAME);
@@ -528,69 +546,47 @@ public class LLCSegmentCompletionHandlers {
       multiPart.cleanup();
     }
   }
-  /**
-   *
-   * @return the URI for the uploaded segment file.
-   */
-  @Nullable
-  private URI storeLocalSegmentFileToPinotFS(File localTmpFile, String segmentName, String instanceId,
-                                             boolean isSplitCommit) {
-    try {
-      FileUploadPathProvider provider = new FileUploadPathProvider(_controllerConf);
-      LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
-      final String rawTableName = llcSegmentName.getTableName();
-      final URI tableDirURI =
-          ControllerConf.getUriFromPath(StringUtil.join("/", provider.getBaseDataDirURI().toString(), rawTableName));
-      URI segmentFileURI;
-      if (isSplitCommit) {
-        // We only clean up tmp segment file under table dir, so don't create any sub-dir under table dir.
-        // See PinotLLCRealtimeSegmentManager.commitSegmentFile().
-        // TODO: move tmp file logic into SegmentCompletionUtils.
-        String uniqueSegmentFileName = SegmentCompletionUtils.generateSegmentFileName(segmentName);
-        segmentFileURI =
-            ControllerConf.getUriFromPath(StringUtil.join("/", tableDirURI.toString(), uniqueSegmentFileName));
-      } else {
-        segmentFileURI = ControllerConf.getUriFromPath(StringUtil.join("/", tableDirURI.toString(), segmentName));
-      }
 
-      PinotFS pinotFS = PinotFSFactory.create(provider.getBaseDataDirURI().getScheme());
-      try {
-        if (isSplitCommit) {
-          pinotFS.copyFromLocalFile(localTmpFile, segmentFileURI);
-        } else {
-          // Multiple threads can reach this point at the same time, if the following scenario happens
-          // The server that was asked to commit did so very slowly (due to network speeds). Meanwhile the FSM in
-          // SegmentCompletionManager timed out, and allowed another server to commit, which did so very quickly (somehow
-          // the network speeds changed). The second server made it through the FSM and reached this point.
-          // The synchronization below takes care that exactly one file gets moved in place.
-          // There are still corner conditions that are not handled correctly. For example,
-          // 1. What if the offset of the faster server was different?
-          // 2. We know that only the faster server will get to complete the COMMIT call successfully. But it is possible
-          //    that the race to this statement is won by the slower server, and so the real segment that is in there is that
-          //    of the slower server.
-          // In order to overcome controller restarts after the segment is renamed, but before it is committed, we DO need to
-          // check for existing segment file and remove it. So, the block cannot be removed altogether.
-          // For now, we live with these corner cases. Once we have split-commit enabled and working, this code will no longer
-          // be used.
-          synchronized (SegmentCompletionManager.getInstance()) {
-            if (pinotFS.exists(segmentFileURI)) {
-              LOGGER
-                  .warn("Segment file {} exists. Replacing with upload from {}", segmentFileURI.toString(), instanceId);
-              pinotFS.delete(segmentFileURI, true);
-            }
-            pinotFS.copyFromLocalFile(localTmpFile, segmentFileURI);
-          }
-        }
-      } catch (Exception e) {
-        LOGGER.error("Could not copy from {} to {}", localTmpFile.getAbsolutePath(), segmentFileURI.toString());
-      } finally {
-        FileUtils.deleteQuietly(localTmpFile);
+  private void localSegmentFileToPinotFSFinalLocation(FileUploadPathProvider provider, File localTmpFile,
+                                                      String segmentName, String instanceId)
+          throws Exception {
+    final String rawTableName = new LLCSegmentName(segmentName).getTableName();
+    URI segmentFileURI = ControllerConf.getUriFromPath(StringUtil.join("/", provider.getBaseDataDirURI().toString(),
+                                                                        rawTableName, segmentName));
+    PinotFS pinotFS = PinotFSFactory.create(provider.getBaseDataDirURI().getScheme());
+    // Multiple threads can reach this point at the same time, if the following scenario happens
+    // The server that was asked to commit did so very slowly (due to network speeds). Meanwhile the FSM in
+    // SegmentCompletionManager timed out, and allowed another server to commit, which did so very quickly (somehow
+    // the network speeds changed). The second server made it through the FSM and reached this point.
+    // The synchronization below takes care that exactly one file gets moved in place.
+    // There are still corner conditions that are not handled correctly. For example,
+    // 1. What if the offset of the faster server was different?
+    // 2. We know that only the faster server will get to complete the COMMIT call successfully. But it is possible
+    //    that the race to this statement is won by the slower server, and so the real segment that is in there is that
+    //    of the slower server.
+    // In order to overcome controller restarts after the segment is renamed, but before it is committed, we DO need to
+    // check for existing segment file and remove it. So, the block cannot be removed altogether.
+    // For now, we live with these corner cases. Once we have split-commit enabled and working, this code will no longer
+    // be used.
+    synchronized (SegmentCompletionManager.getInstance()) {
+      if (pinotFS.exists(segmentFileURI)) {
+        LOGGER.warn("Segment file {} exists. Replacing with upload from {}", segmentFileURI.toString(), instanceId);
+        pinotFS.delete(segmentFileURI, true);
       }
-      LOGGER.info("Moved file {} to {}", localTmpFile.getAbsolutePath(), segmentFileURI.toString());
-      return segmentFileURI;
-    } catch (InvalidControllerConfigException e) {
-      LOGGER.error("Invalid controller config exception from instance {} for segment {}", instanceId, segmentName, e);
-      return null;
+      pinotFS.copyFromLocalFile(localTmpFile, segmentFileURI);
     }
+  }
+
+  private URI localSegementFileToPinotFsTmpLocation(FileUploadPathProvider provider, File localTmpFile,
+                                                    String segmentName) throws Exception {
+    final String rawTableName = new LLCSegmentName(segmentName).getTableName();
+    // We only clean up tmp segment file under table dir, so don't create any sub-dir under table dir.
+    // See PinotLLCRealtimeSegmentManager.commitSegmentFile().
+    String uniqueSegmentFileName = SegmentCompletionUtils.generateSegmentFileName(segmentName);
+    URI segmentFileURI = ControllerConf.getUriFromPath(StringUtil.join("/", provider.getBaseDataDirURI().toString(),
+                                                                        rawTableName, uniqueSegmentFileName));
+    PinotFS pinotFS = PinotFSFactory.create(provider.getBaseDataDirURI().getScheme());
+    pinotFS.copyFromLocalFile(localTmpFile, segmentFileURI);
+    return segmentFileURI;
   }
 }
