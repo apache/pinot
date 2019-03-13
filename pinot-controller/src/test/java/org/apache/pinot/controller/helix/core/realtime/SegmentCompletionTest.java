@@ -151,7 +151,8 @@ public class SegmentCompletionTest {
 
     segmentCompletionMgr._secconds += 5;
     params = new Request.Params().withInstanceId(s2).withOffset(s2Offset).withSegmentName(segmentNameStr);
-    response = segmentCompletionMgr.segmentCommitEnd(params, true, false);
+    response = segmentCompletionMgr.segmentCommitEnd(params, true, false,
+            CommittingSegmentDescriptor.fromSegmentCompletionReqParams(params));
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS);
 
     // Now the FSM should have disappeared from the map
@@ -220,7 +221,8 @@ public class SegmentCompletionTest {
 
     segmentCompletionMgr._secconds += 5;
     params = new Request.Params().withInstanceId(s2).withOffset(s2Offset).withSegmentName(segmentNameStr);
-    response = segmentCompletionMgr.segmentCommitEnd(params, true, false);
+    response = segmentCompletionMgr.segmentCommitEnd(params, true, false,
+            CommittingSegmentDescriptor.fromSegmentCompletionReqParams(params));
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS);
 
     // Now the FSM should have disappeared from the map
@@ -330,7 +332,8 @@ public class SegmentCompletionTest {
     segmentCompletionMgr._secconds += 5;
     params = new Request.Params().withInstanceId(s2).withOffset(s2Offset).withSegmentName(segmentNameStr)
         .withSegmentLocation("doNotCommitMe");
-    response = segmentCompletionMgr.segmentCommitEnd(params, true, true);
+    response = segmentCompletionMgr.segmentCommitEnd(params, true, true,
+            CommittingSegmentDescriptor.fromSegmentCompletionReqParams(params));
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.FAILED);
 
     // Now the FSM should have aborted
@@ -363,7 +366,8 @@ public class SegmentCompletionTest {
     segmentCompletionMgr._secconds += 5;
     params = new Request.Params().withInstanceId(s3).withOffset(s2Offset).withSegmentName(segmentNameStr)
         .withSegmentLocation("location");
-    response = segmentCompletionMgr.segmentCommitEnd(params, true, true);
+    response = segmentCompletionMgr.segmentCommitEnd(params, true, true,
+            CommittingSegmentDescriptor.fromSegmentCompletionReqParams(params));
     Assert.assertEquals(response.getStatus(), ControllerResponseStatus.COMMIT_SUCCESS);
     // And the FSM should be removed.
     Assert.assertFalse(fsmMap.containsKey(segmentNameStr));
@@ -415,7 +419,8 @@ public class SegmentCompletionTest {
     segmentCompletionMgr._secconds += 5;
     params = new Request.Params().withInstanceId(s2).withOffset(s2Offset).withSegmentName(segmentNameStr)
         .withSegmentLocation("location");
-    response = segmentCompletionMgr.segmentCommitEnd(params, true, true);
+    response = segmentCompletionMgr.segmentCommitEnd(params, true, true,
+            CommittingSegmentDescriptor.fromSegmentCompletionReqParams(params));
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS);
 
     // Now the FSM should have disappeared from the map
@@ -464,7 +469,8 @@ public class SegmentCompletionTest {
     segmentCompletionMgr._secconds += 5;
     params = new Request.Params().withInstanceId(s3).withOffset(s3Offset).withSegmentName(segmentNameStr)
         .withSegmentLocation("location");
-    response = segmentCompletionMgr.segmentCommitEnd(params, true, true);
+    response = segmentCompletionMgr.segmentCommitEnd(params, true, true,
+            CommittingSegmentDescriptor.fromSegmentCompletionReqParams(params));
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.FAILED);
 
     // Now the FSM should have disappeared from the map
@@ -523,7 +529,8 @@ public class SegmentCompletionTest {
 
     segmentCompletionMgr._secconds += 5;
     params = new Request.Params().withInstanceId(s2).withOffset(s2Offset).withSegmentName(segmentNameStr);
-    response = segmentCompletionMgr.segmentCommitEnd(params, true, false);
+    response = segmentCompletionMgr.segmentCommitEnd(params, true, false,
+            CommittingSegmentDescriptor.fromSegmentCompletionReqParams(params));
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS);
 
     // Now the FSM should have disappeared from the map
@@ -595,7 +602,8 @@ public class SegmentCompletionTest {
 
     segmentCompletionMgr._secconds += 5;
     params = new Request.Params().withInstanceId(s1).withOffset(s1Offset).withSegmentName(segmentNameStr);
-    response = segmentCompletionMgr.segmentCommitEnd(params, true, false);
+    response = segmentCompletionMgr.segmentCommitEnd(params, true, false,
+            CommittingSegmentDescriptor.fromSegmentCompletionReqParams(params));
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS);
     // We ask S2 to keep the segment
     params = new Request.Params().withInstanceId(s2).withOffset(s1Offset).withSegmentName(segmentNameStr)
@@ -661,7 +669,8 @@ public class SegmentCompletionTest {
     segmentCompletionMgr._secconds += 5;
     params = new Request.Params().withInstanceId(s2).withOffset(s2Offset).withSegmentName(segmentNameStr)
         .withSegmentLocation("location");
-    response = segmentCompletionMgr.segmentCommitEnd(params, true, isSplitCommit);
+    response = segmentCompletionMgr.segmentCommitEnd(params, true, isSplitCommit,
+            CommittingSegmentDescriptor.fromSegmentCompletionReqParams(params));
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS);
     // Now the FSM should have disappeared from the map
     Assert.assertFalse(fsmMap.containsKey(segmentNameStr));
@@ -855,7 +864,8 @@ public class SegmentCompletionTest {
     long commitTimeMs = (segmentCompletionMgr._secconds - startTime) * 1000;
     Assert.assertEquals(commitTimeMap.get(tableName).longValue(), commitTimeMs);
     segmentCompletionMgr._secconds += 55;
-    response = segmentCompletionMgr.segmentCommitEnd(params, true, false);
+    response = segmentCompletionMgr.segmentCommitEnd(params, true, false,
+            CommittingSegmentDescriptor.fromSegmentCompletionReqParams(params));
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS);
     // now FSM should be out of the map.
     Assert.assertFalse((fsmMap.containsKey(segmentNameStr)));

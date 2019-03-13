@@ -290,7 +290,7 @@ public class SegmentCompletionManager {
    * @return
    */
   public SegmentCompletionProtocol.Response segmentCommitEnd(SegmentCompletionProtocol.Request.Params reqParams,
-      boolean success, boolean isSplitCommit) {
+      boolean success, boolean isSplitCommit, CommittingSegmentDescriptor committingSegmentDescriptor) {
     if (!isLeader() || !_helixManager.isConnected()) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_NOT_LEADER, 1L);
       return SegmentCompletionProtocol.RESP_NOT_LEADER;
@@ -301,7 +301,7 @@ public class SegmentCompletionManager {
     SegmentCompletionProtocol.Response response = SegmentCompletionProtocol.RESP_FAILED;
     try {
       fsm = lookupOrCreateFsm(segmentName, SegmentCompletionProtocol.MSG_TYPE_COMMIT);
-      response = fsm.segmentCommitEnd(reqParams, success, isSplitCommit);
+      response = fsm.segmentCommitEnd(reqParams, success, isSplitCommit, committingSegmentDescriptor);
     } catch (Exception e) {
       LOGGER.error("Caught exception in segmentCommitEnd for segment {}", segmentNameStr, e);
     }
@@ -605,7 +605,7 @@ public class SegmentCompletionManager {
      * the _winner.
      */
     public SegmentCompletionProtocol.Response segmentCommitEnd(SegmentCompletionProtocol.Request.Params reqParams,
-        boolean success, boolean isSplitCommit) {
+        boolean success, boolean isSplitCommit, CommittingSegmentDescriptor committingSegmentDescriptor) {
       String instanceId = reqParams.getInstanceId();
       long offset = reqParams.getOffset();
       synchronized (this) {
@@ -624,7 +624,7 @@ public class SegmentCompletionManager {
           LOGGER.error("Segment upload failed");
           return abortAndReturnFailed();
         }
-        SegmentCompletionProtocol.Response response = commitSegment(reqParams, isSplitCommit);
+        SegmentCompletionProtocol.Response response = commitSegment(reqParams, isSplitCommit, committingSegmentDescriptor);
         if (!response.equals(SegmentCompletionProtocol.RESP_COMMIT_SUCCESS)) {
           return abortAndReturnFailed();
         } else {
@@ -1005,7 +1005,8 @@ public class SegmentCompletionManager {
     }
 
     private SegmentCompletionProtocol.Response commitSegment(SegmentCompletionProtocol.Request.Params reqParams,
-        boolean isSplitCommit) {
+                                                             boolean isSplitCommit,
+                                                             CommittingSegmentDescriptor committingSegmentDescriptor) {
       boolean success;
       String instanceId = reqParams.getInstanceId();
       long offset = reqParams.getOffset();
@@ -1019,8 +1020,6 @@ public class SegmentCompletionManager {
       _state = State.COMMITTING;
       // In case of splitCommit, the segment is uploaded to a unique file name indicated by segmentLocation,
       // so we need to move the segment file to its permanent location first before committing the metadata.
-      CommittingSegmentDescriptor committingSegmentDescriptor =
-          CommittingSegmentDescriptor.fromSegmentCompletionReqParams(reqParams);
       if (isSplitCommit) {
         if (!_segmentManager.commitSegmentFile(_segmentName.getTableName(), committingSegmentDescriptor)) {
           return SegmentCompletionProtocol.RESP_FAILED;
