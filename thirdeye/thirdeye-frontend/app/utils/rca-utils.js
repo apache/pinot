@@ -111,6 +111,9 @@ export function stripTail(urn) {
   if (urn.startsWith('frontend:anomalyfunction:')) {
     return _.slice(parts, 0, 3).join(':');
   }
+  if (urn.startsWith('thirdeye:event:anomaly:')) {
+    return _.slice(parts, 0, 4).join(':');
+  }
   if (urn.startsWith('thirdeye:dimensions:')) {
     return _.slice(parts, 0, 2).join(':');
   }
@@ -137,6 +140,9 @@ export function extractTail(urn) {
   }
   if (urn.startsWith('frontend:anomalyfunction:')) {
     return _.slice(parts, 3).filter(p => !_.isEmpty(p));
+  }
+  if (urn.startsWith('thirdeye:event:anomaly:')) {
+    return _.slice(parts, 4).filter(p => !_.isEmpty(p));
   }
   if (urn.startsWith('thirdeye:dimensions:')) {
     return _.slice(parts, 2).filter(p => !_.isEmpty(p));
@@ -359,6 +365,10 @@ function metricUrnHelper(prefix, urn) {
     const tail = makeUrnTail(parts, 3);
     return `${prefix}${parts[2]}${tail}`;
   }
+  if (hasPrefix(urn, 'thirdeye:event:anomaly:')) {
+    const tail = makeUrnTail(parts, 4);
+    return `${prefix}${parts[2]}${tail}`;
+  }
   throw new Error(`Requires supported urn, but found ${urn}`);
 }
 
@@ -494,9 +504,10 @@ export function toFilters(urns) {
   const metricFilters = filterPrefix(urns, 'thirdeye:metric:').map(extractTail).map(enc => enc.map(tup => splitFilterFragment(decodeURIComponent(tup)))).reduce(flatten, []);
   const frontendMetricFilters = filterPrefix(urns, 'frontend:metric:').map(extractTail).map(enc => enc.map(tup => splitFilterFragment(decodeURIComponent(tup)))).reduce(flatten, []);
   const anomalyFunctionFilters = filterPrefix(urns, 'frontend:anomalyfunction:').map(extractTail).map(enc => enc.map(tup => splitFilterFragment(decodeURIComponent(tup)))).reduce(flatten, []);
+  const anomalyFilters = filterPrefix(urns, 'thirdeye:event:anomaly:').map(extractTail).map(enc => enc.map(tup => splitFilterFragment(decodeURIComponent(tup)))).reduce(flatten, []);
   const callgraphFilters = filterPrefix(urns, 'thirdeye:callgraph:').map(extractTail).map(enc => enc.map(tup => splitFilterFragment(decodeURIComponent(tup)))).reduce(flatten, []);
 
-  return [...new Set([...dimensionFilters, ...dimensionsFilters, ...metricFilters, ...frontendMetricFilters, ...anomalyFunctionFilters, ...callgraphFilters])].sort();
+  return [...new Set([...dimensionFilters, ...dimensionsFilters, ...metricFilters, ...frontendMetricFilters, ...anomalyFunctionFilters, ...anomalyFilters, ...callgraphFilters])].sort();
 }
 
 /**
