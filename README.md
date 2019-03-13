@@ -52,7 +52,7 @@ Because of the design choices we made to achieve these goals, there are certain 
 Pinot works very well for querying time series data with lots of Dimensions and Metrics. Example - Query (profile views, ad campaign performance, etc.) in an analytical fashion (who viewed this profile in the last weeks, how many ads were clicked per campaign). 
 
 ## Instructions to build Pinot
-More detailed instructions can be found at [Quick Demo](https://pinot.readthedocs.io/en/latest/trying_pinot.html) section in the documentation.
+More detailed instructions can be found at [Quick Demo](https://pinot.readthedocs.io/en/latest/getting_started.html) section in the documentation.
 ```
 # Clone a repo
 $ git clone https://github.com/apache/incubator-pinot.git
@@ -76,7 +76,7 @@ $ bin/quick-start-offline.sh
 
 ## Documentation
 Check out [Pinot documentation](https://pinot.readthedocs.io) for a complete description of Pinot's features.
-- [Quick Demo](https://pinot.readthedocs.io/en/latest/trying_pinot.html)
+- [Quick Demo](https://pinot.readthedocs.io/en/latest/getting_started.html)
 - [Pinot Architecture](https://pinot.readthedocs.io/en/latest/architecture.html)
 - [Pinot Query Language](https://pinot.readthedocs.io/en/latest/pql_examples.html)
 
