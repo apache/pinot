@@ -23,18 +23,18 @@ export default Route.extend({
 
   model() {
     return hash({
-      subscriberGroups: fetch('/thirdeye/entity/ALERT_CONFIG').then(checkStatus),
       applications: fetch('/thirdeye/entity/APPLICATION').then(checkStatus),
       detectionAlertConfig: fetch('/thirdeye/entity/DETECTION_ALERT_CONFIG').then(checkStatus),
-      detectionYaml: fetch('/yaml/list').then(checkStatus)
+      polishedDetectionYaml: fetch('/yaml/list').then(checkStatus)
     });
   },
 
   afterModel(model) {
     this._super(model);
-    // format Yaml configs
-    const yamlAlerts = model.detectionYaml;
-    for (let yamlAlert of yamlAlerts) {
+
+    // Fetch all the detection alerts
+    const alerts = model.polishedDetectionYaml;
+    for (let yamlAlert of alerts) {
       let dimensions = '';
       let dimensionsArray = yamlAlert.dimensionExploration ? yamlAlert.dimensionExploration.dimensions : null;
       if (Array.isArray(dimensionsArray)) {
@@ -57,7 +57,7 @@ export default Route.extend({
     for (let subscriptionGroup of model.detectionAlertConfig){
       const detectionConfigIds = Object.keys(subscriptionGroup.vectorClocks);
       for (let id of detectionConfigIds) {
-        let foundAlert = yamlAlerts.find(yamlAlert => yamlAlert.id.toString() === id);
+        let foundAlert = alerts.find(yamlAlert => yamlAlert.id.toString() === id);
         if (foundAlert) {
           Object.assign(foundAlert, {
             application: subscriptionGroup.application,
@@ -67,11 +67,9 @@ export default Route.extend({
       }
     }
 
-    const alerts = yamlAlerts;
-
     // Perform initial filters for our 'primary' filter types and add counts
     const user = getWithDefault(get(this, 'session'), 'data.authenticated.name', null);
-    const myAlertIds = user ? this._findAlertIdsByUserGroup(user, model.subscriberGroups) : [];
+    const myAlertIds = user ? this._findAlertIdsByUserGroup(user, model.detectionAlertConfig) : [];
     const ownedAlerts = alerts.filter(alert => alert.createdBy === user);
     const subscribedAlerts = alerts.filter(alert => myAlertIds.includes(alert.id));
     const totalCounts = [subscribedAlerts.length, ownedAlerts.length, alerts.length];
@@ -217,13 +215,13 @@ export default Route.extend({
     const isLookupLenient = true; // For 'alerts I subscribe to'
     // Find subscription groups current user is associated with
     const myGroups = subscriberGroups.filter((group) => {
-      let userInRecipients = getWithDefault(group, 'receiverAddresses.to', []).includes(user);
+      let userInRecipients = getWithDefault(group, 'properties.recipients.to', []).includes(user);
       let userAnywhere = userInRecipients || group.updatedBy === user || group.createdBy === user;
       return isLookupLenient ? userAnywhere : userInRecipients;
     });
     // Extract alert ids from these groups
     const myAlertIds = [ ...new Set(myGroups
-      .map(group => getWithDefault(group, 'emailConfig.functionIds', []))
+      .map(group => getWithDefault(group, 'properties.detectionConfigIds', []))
       .reduce((a, b) => [...a, ...b], [])
     )];
     return myAlertIds;

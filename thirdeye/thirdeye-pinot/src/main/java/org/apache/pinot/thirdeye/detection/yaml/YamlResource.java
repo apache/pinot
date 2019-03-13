@@ -588,9 +588,10 @@ public class YamlResource {
 
 
   /**
-   List all yaml configurations as JSON. enhanced with detection config id, isActive and createBy information.
-   @param id id of a specific detection config yaml to list (optional)
-   @return the yaml configuration converted in to JSON, with enhanced information from detection config DTO.
+   * List all yaml configurations as JSON enhanced with detection config id, isActive and createBy information.
+   *
+   * @param id id of a specific detection config yaml to list (optional)
+   * @return the yaml configuration converted in to JSON, with enhanced information from detection config DTO.
    */
   @GET
   @Path("/list")
@@ -609,8 +610,10 @@ public class YamlResource {
         Map<String, Object> yamlObject = new HashMap<>();
         yamlObject.putAll((Map<? extends String, ?>) this.yaml.load(detectionConfigDTO.getYaml()));
         yamlObject.put("id", detectionConfigDTO.getId());
-        yamlObject.put("isActive", detectionConfigDTO.isActive());
+        yamlObject.put("cron", detectionConfigDTO.getCron());
+        yamlObject.put("active", detectionConfigDTO.isActive());
         yamlObject.put("createdBy", detectionConfigDTO.getCreatedBy());
+        yamlObject.put("updatedBy", detectionConfigDTO.getUpdatedBy());
         yamlObjects.add(yamlObject);
       }
     }

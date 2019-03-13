@@ -29,7 +29,7 @@ export default Factory.extend({
     dimensionName2 : [ "dimensionValue3" ]
   },
   pipelineType : "Composite",
-  isActive : true,
+  active : true,
   dataset : null,
   dimensionExploration : {
     dimensions : [ "dimensionName" ],
