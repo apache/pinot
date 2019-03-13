@@ -163,6 +163,7 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
   private static final String DEFAULT_TIMEZONE = "America/Los_Angeles";
   private static final String DEFAULT_BASELINE_PROVIDER_YAML_TYPE = "RULE_BASELINE";
   private static final String PROP_BUCKET_PERIOD = "bucketPeriod";
+  private static final String PROP_MAX_DURATION = "maxDuration";
 
   private static final DetectionRegistry DETECTION_REGISTRY = DetectionRegistry.getInstance();
   static {
@@ -465,6 +466,14 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
       Preconditions.checkArgument(MapUtils.getString(yamlConfig, PROP_METRIC).equals(MapUtils.getString(existingYamlConfig, PROP_METRIC)), "metric name cannot be modified");
       Preconditions.checkArgument(MapUtils.getString(yamlConfig, PROP_DATASET).equals(MapUtils.getString(existingYamlConfig, PROP_DATASET)), "dataset name cannot be modified");
     }
+
+    // Safety condition: Validate if maxDuration is greater than 15 minutes
+    Map<String, Object> mergerProperties = MapUtils.getMap(yamlConfig, PROP_MERGER, new HashMap());
+    if (mergerProperties.get(PROP_MAX_DURATION) != null) {
+      Preconditions.checkArgument(MapUtils.getLong(mergerProperties, PROP_MAX_DURATION) >= TimeUnit.MINUTES.toMillis(15),
+          "The maxDuration field set is not acceptable. Please check the the document  and set it correctly.");
+    }
+
     Set<String> names = new HashSet<>();
     List<Map<String, Object>> ruleYamls = getList(yamlConfig.get(PROP_RULES));
     for (int i = 0; i < ruleYamls.size(); i++) {
