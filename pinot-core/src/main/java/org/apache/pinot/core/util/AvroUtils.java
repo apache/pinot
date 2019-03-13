@@ -22,7 +22,6 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -32,7 +31,6 @@ import javax.annotation.Nullable;
 import org.apache.avro.Schema.Field;
 import org.apache.avro.SchemaBuilder;
 import org.apache.avro.file.DataFileStream;
-import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.pinot.common.data.DimensionFieldSpec;
@@ -40,7 +38,6 @@ import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.MetricFieldSpec;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.data.TimeFieldSpec;
-import org.apache.pinot.core.data.GenericRow;
 
 
 public class AvroUtils {
@@ -270,59 +267,5 @@ public class AvroUtils {
     } else {
       return fieldSchema;
     }
-  }
-
-  /**
-   * Fill the data in a {@link GenericRecord} to a {@link GenericRow}.
-   */
-  public static void fillGenericRow(GenericRecord from, GenericRow to, Schema schema) {
-    for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
-      String fieldName = fieldSpec.getName();
-      Object avroValue = from.get(fieldName);
-      if (fieldSpec.isSingleValueField()) {
-        to.putField(fieldName, transformAvroValueToObject(avroValue, fieldSpec));
-      } else {
-        to.putField(fieldName, transformAvroArrayToObjectArray((GenericData.Array) avroValue, fieldSpec));
-      }
-    }
-  }
-
-  /**
-   * Transform a single-value Avro value into an object in Pinot format.
-   */
-  public static Object transformAvroValueToObject(Object avroValue, FieldSpec fieldSpec) {
-    if (avroValue == null) {
-      return fieldSpec.getDefaultNullValue();
-    }
-    if (avroValue instanceof GenericData.Record) {
-      return transformAvroValueToObject(((GenericData.Record) avroValue).get(0), fieldSpec);
-    }
-    if (fieldSpec.getDataType() == FieldSpec.DataType.STRING) {
-      return avroValue.toString();
-    } else if (fieldSpec.getDataType() == FieldSpec.DataType.BYTES && avroValue instanceof ByteBuffer) {
-      // Avro ByteBuffer maps to byte[].
-      ByteBuffer byteBuffer = (ByteBuffer) avroValue;
-
-      // Assumes byte-buffer is ready to read. Also, avoid getting underlying array, as it may be over-sized.
-      byte[] bytes = new byte[byteBuffer.remaining()];
-      byteBuffer.get(bytes);
-      return bytes;
-    }
-    return avroValue;
-  }
-
-  /**
-   * Transform an Avro array into an object array in Pinot format.
-   */
-  public static Object[] transformAvroArrayToObjectArray(GenericData.Array avroArray, FieldSpec fieldSpec) {
-    if (avroArray == null || avroArray.size() == 0) {
-      return new Object[]{fieldSpec.getDefaultNullValue()};
-    }
-    int numValues = avroArray.size();
-    Object[] objects = new Object[numValues];
-    for (int i = 0; i < numValues; i++) {
-      objects[i] = transformAvroValueToObject(avroArray.get(i), fieldSpec);
-    }
-    return objects;
   }
 }

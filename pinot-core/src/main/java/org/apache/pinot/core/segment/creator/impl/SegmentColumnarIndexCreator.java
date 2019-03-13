@@ -26,6 +26,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.pinot.common.data.DateTimeFieldSpec;
@@ -335,25 +336,26 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     ColumnIndexCreationInfo timeColumnIndexCreationInfo = indexCreationInfoMap.get(timeColumn);
     if (timeColumnIndexCreationInfo != null) {
       // Use start/end time in config if defined
-      if (config.getStartTime() != null && config.getEndTime() != null) {
+      if (config.getStartTime() != null) {
         properties.setProperty(SEGMENT_START_TIME, config.getStartTime());
-        properties.setProperty(SEGMENT_END_TIME, config.getEndTime());
+        properties.setProperty(SEGMENT_END_TIME, Preconditions.checkNotNull(config.getEndTime()));
+        properties.setProperty(TIME_UNIT, Preconditions.checkNotNull(config.getSegmentTimeUnit()));
       } else {
-        Object minTime = timeColumnIndexCreationInfo.getMin();
-        Object maxTime = timeColumnIndexCreationInfo.getMax();
+        Object minTime = Preconditions.checkNotNull(timeColumnIndexCreationInfo.getMin());
+        Object maxTime = Preconditions.checkNotNull(timeColumnIndexCreationInfo.getMax());
 
-        // Convert time value into millis since epoch for SIMPLE_DATE
         if (config.getTimeColumnType() == SegmentGeneratorConfig.TimeColumnType.SIMPLE_DATE) {
+          // For simple date format, convert time value into millis since epoch
           DateTimeFormatter dateTimeFormatter = DateTimeFormat.forPattern(config.getSimpleDateFormat());
           properties.setProperty(SEGMENT_START_TIME, dateTimeFormatter.parseMillis(minTime.toString()));
           properties.setProperty(SEGMENT_END_TIME, dateTimeFormatter.parseMillis(maxTime.toString()));
+          properties.setProperty(TIME_UNIT, TimeUnit.MILLISECONDS);
         } else {
           properties.setProperty(SEGMENT_START_TIME, minTime);
           properties.setProperty(SEGMENT_END_TIME, maxTime);
+          properties.setProperty(TIME_UNIT, Preconditions.checkNotNull(config.getSegmentTimeUnit()));
         }
       }
-
-      properties.setProperty(TIME_UNIT, config.getSegmentTimeUnit());
     }
 
     for (Map.Entry<String, String> entry : config.getCustomProperties().entrySet()) {

@@ -2,6 +2,7 @@
   <div class="container">
     {{#self-serve-alert-yaml-details
       alertData=model.alertData
+      subscribedGroups=model.subscribedGroups
       isLoadError=isLoadError
     }}
       <div class="te-search-results__cta">
@@ -29,6 +30,7 @@
         dataIsCurrent=true
         alertId=model.alertId
         metricUrn=model.metricUrn
+        metricUrnList=model.metricUrnList
       }}
     {{/if}}
   </div>

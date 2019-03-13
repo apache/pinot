@@ -17,6 +17,7 @@
 package org.apache.pinot.thirdeye.detection.wrapper;
 
 import com.google.common.collect.ImmutableSet;
+import java.util.concurrent.TimeUnit;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.detection.DataProvider;
 import org.apache.pinot.thirdeye.detection.DetectionPipelineResult;
@@ -106,12 +107,11 @@ public class ChildKeepingMergeWrapperTest {
 
   @Test
   public void testMergerPassthru() throws Exception {
-    this.config.getProperties().put(PROP_MAX_DURATION, 0);
-
+    this.config.getProperties().put(PROP_MAX_GAP, 0);
     this.wrapper = new ChildKeepingMergeWrapper(this.provider, this.config, 1000, 3000);
     DetectionPipelineResult output = this.wrapper.run();
 
-    Assert.assertEquals(output.getAnomalies().size(), 6);
+    Assert.assertEquals(output.getAnomalies().size(), 5);
     Assert.assertEquals(output.getLastTimestamp(), 2900);
   }
 

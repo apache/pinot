@@ -313,4 +313,11 @@ public class DefaultDataProvider implements DataProvider {
     long diff = deadline - System.currentTimeMillis();
     return diff > 0 ? diff : 0;
   }
+
+  public static void cleanCache() {
+    if (DETECTION_TIME_SERIES_CACHE != null) {
+      DETECTION_TIME_SERIES_CACHE.cleanUp();
+      DETECTION_TIME_SERIES_CACHE = null;
+    }
+  }
 }

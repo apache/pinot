@@ -80,7 +80,7 @@ public class ValidationManagerTest {
     _pinotHelixResourceManager =
         new PinotHelixResourceManager(ZK_STR, HELIX_CLUSTER_NAME, CONTROLLER_INSTANCE_NAME, null, 1000L,
             true, /*isUpdateStateModel=*/
-            false, true);
+            false, false);
     _pinotHelixResourceManager.start();
 
     ControllerRequestBuilderUtil.addFakeDataInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZK_STR, 2, true);

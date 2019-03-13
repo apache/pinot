@@ -136,6 +136,7 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
   private static final String PROP_DIMENSION_EXPLORATION = "dimensionExploration";
 
   private static final String PROP_DETECTION = "detection";
+  private static final String PROP_CRON = "cron";
   private static final String PROP_FILTER = "filter";
   private static final String PROP_FILTERS = "filters";
   private static final String PROP_METRIC = "metric";
@@ -162,6 +163,7 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
   private static final String DEFAULT_TIMEZONE = "America/Los_Angeles";
   private static final String DEFAULT_BASELINE_PROVIDER_YAML_TYPE = "RULE_BASELINE";
   private static final String PROP_BUCKET_PERIOD = "bucketPeriod";
+  private static final String PROP_MAX_DURATION = "maxDuration";
 
   private static final DetectionRegistry DETECTION_REGISTRY = DetectionRegistry.getInstance();
   static {
@@ -206,7 +208,8 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
 
     Map<String, Collection<String>> filterMaps = MapUtils.getMap(yamlConfig, PROP_FILTERS);
     this.metricUrn = buildMetricUrn(filterMaps, this.metricConfig.getId());
-    String cron = buildCron();
+    String detectionCronInYaml = MapUtils.getString(yamlConfig, PROP_CRON);
+    String cron = (detectionCronInYaml == null) ? buildCron() : detectionCronInYaml;
 
     List<Map<String, Object>> ruleYamls = getList(yamlConfig.get(PROP_RULES));
     List<Map<String, Object>> nestedPipelines = new ArrayList<>();
@@ -308,9 +311,11 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
       }
       // override from yaml
       if (yamlConfig.containsKey(PROP_WINDOW_SIZE)) {
+        properties.put(PROP_MOVING_WINDOW_DETECTION, true);
         properties.put(PROP_WINDOW_SIZE, MapUtils.getString(yamlConfig, PROP_WINDOW_SIZE));
       }
       if (yamlConfig.containsKey(PROP_WINDOW_UNIT)) {
+        properties.put(PROP_MOVING_WINDOW_DETECTION, true);
         properties.put(PROP_WINDOW_UNIT, MapUtils.getString(yamlConfig, PROP_WINDOW_UNIT));
       }
       if (yamlConfig.containsKey(PROP_WINDOW_DELAY)) {
@@ -461,6 +466,14 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
       Preconditions.checkArgument(MapUtils.getString(yamlConfig, PROP_METRIC).equals(MapUtils.getString(existingYamlConfig, PROP_METRIC)), "metric name cannot be modified");
       Preconditions.checkArgument(MapUtils.getString(yamlConfig, PROP_DATASET).equals(MapUtils.getString(existingYamlConfig, PROP_DATASET)), "dataset name cannot be modified");
     }
+
+    // Safety condition: Validate if maxDuration is greater than 15 minutes
+    Map<String, Object> mergerProperties = MapUtils.getMap(yamlConfig, PROP_MERGER, new HashMap());
+    if (mergerProperties.get(PROP_MAX_DURATION) != null) {
+      Preconditions.checkArgument(MapUtils.getLong(mergerProperties, PROP_MAX_DURATION) >= TimeUnit.MINUTES.toMillis(15),
+          "The maxDuration field set is not acceptable. Please check the the document  and set it correctly.");
+    }
+
     Set<String> names = new HashSet<>();
     List<Map<String, Object>> ruleYamls = getList(yamlConfig.get(PROP_RULES));
     for (int i = 0; i < ruleYamls.size(); i++) {

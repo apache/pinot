@@ -17,13 +17,13 @@
 .. under the License.
 ..
 
-.. _reference:
+Extending Pinot
+===============
+This section provides an overview of options to extend Pinot code to make Pinot work for environments not covered by default.
 
 .. toctree::
    :maxdepth: 1
 
-   pql_examples
-   index_techniques
-   client_api
-   management_api
-   pinot_hadoop
+   pluggable_streams
+   segment_fetcher
+   pluggable_storage

@@ -20,12 +20,22 @@
 package org.apache.pinot.thirdeye.detection.spec;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
 
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class ThresholdRuleDetectorSpec extends AbstractSpec {
   private double min = Double.NaN;
   private double max = Double.NaN;
+  private String monitoringGranularity = MetricSlice.NATIVE_GRANULARITY.toAggregationGranularityString(); // use native granularity by default
+
+  public String getMonitoringGranularity() {
+    return monitoringGranularity;
+  }
+
+  public void setMonitoringGranularity(String monitoringGranularity) {
+    this.monitoringGranularity = monitoringGranularity;
+  }
 
   public double getMin() {
     return min;

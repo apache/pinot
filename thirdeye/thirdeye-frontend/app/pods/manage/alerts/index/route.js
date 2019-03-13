@@ -37,7 +37,7 @@ export default Route.extend({
     // Work only with valid alerts - with metric association
     let alerts = model.rawAlerts.filter(alert => isPresent(alert.metric));
 
-    // Itereate through config groups to enhance all alerts with extra properties (group name, application)
+    // Iterate through config groups to enhance all alerts with extra properties (group name, application)
     for (let config of model.subscriberGroups) {
       let groupFunctionIds = config.emailConfig && config.emailConfig.functionIds ? config.emailConfig.functionIds : [];
       for (let id of groupFunctionIds) {
@@ -45,7 +45,7 @@ export default Route.extend({
         if (foundAlert) {
           Object.assign(foundAlert, {
             application: config.application,
-            group: config.name
+            group: foundAlert.group ? foundAlert.group + ", " + config.name : config.name
           });
         }
       }
@@ -72,15 +72,15 @@ export default Route.extend({
       });
     }
 
-    // Itereate through detection alerter to enhance all yaml alert with extra properties (group name, application)
-    for (let detectionAlert of model.detectionAlertConfig){
-      const detectionConfigIds = Object.keys(detectionAlert.vectorClocks);
+    // Iterate through detection alerter to enhance all yaml alert with extra properties (group name, application)
+    for (let subscriptionGroup of model.detectionAlertConfig){
+      const detectionConfigIds = Object.keys(subscriptionGroup.vectorClocks);
       for (let id of detectionConfigIds) {
         let foundAlert = yamlAlerts.find(yamlAlert => yamlAlert.id.toString() === id);
         if (foundAlert) {
           Object.assign(foundAlert, {
-            application: detectionAlert.application,
-            group: detectionAlert.name
+            application: subscriptionGroup.application,
+            group: foundAlert.group ? foundAlert.group + ", " + subscriptionGroup.name : subscriptionGroup.name
           });
         }
       }

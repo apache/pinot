@@ -17,31 +17,15 @@
 .. under the License.
 ..
 
-Coding Guidelines
-=================
+############
+Introduction
+############
 
-To contribute to Pinot, please follow the code-style as described below:
+.. _introduction:
 
-Intellij
-^^^^^^^^
+.. toctree::
+    :maxdepth: 1
 
-* `Import <https://www.jetbrains.com/help/idea/settings-code-style.html>`_ code style to Intellij
-* Navigate to ``Preferences`` -> ``Editor`` -> ``Code Style`` -> ``Java``
-* Select ``Import Scheme`` -> ``Intellij IDES code style XML``
-* Choose ``codestyle-intellij.xml``
-
-Eclipse
-^^^^^^^
-.. todo::
-
-   Add instructions for eclipse here
-
-Verifying code-style
-^^^^^^^^^^^^^^^^^^^^
-
-Run the following command to verify the code-style before posting a PR
-
-.. code-block:: none
-
-    mvn checkstyle:check
-
+    intro
+    architecture
+    getting_started

@@ -157,8 +157,10 @@ Selection
   }
 
 
-Java
-----
+.. _java-client:
+
+Executing queries via Java Client API
+=====================================
 
 The Pinot client API is similar to JDBC, although there are some differences, due to how Pinot behaves. For example, a query with multiple aggregation function will return one result set per aggregation function, as they are computed in parallel.
 

@@ -22,46 +22,26 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-############
-Introduction
-############
-
-
-.. toctree::
-   :maxdepth: 1
-
-   intro
-   architecture
-   trying_pinot
-
-#########
-Reference
-#########
+#####
+Pinot
+#####
 
 .. toctree::
-   :maxdepth: 1
+   :maxdepth: 2
 
-
-   reference
-   in_production
-
-#################
-Customizing Pinot
-#################
+   introduction
 
 .. toctree::
-   :maxdepth: 1
+   :maxdepth: 2
 
-
-   pluggable_streams
-   segment_fetcher
-   pluggable_storage
-
-################
-Getting Involved
-################
+   user_guide
 
 .. toctree::
-   :maxdepth: 1
+   :maxdepth: 2
 
-   coding_guidelines
+   admin_guide
+
+.. toctree::
+   :maxdepth: 2
+
+   dev_guide

@@ -72,7 +72,10 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
   private static final String PROP_DETECTOR_COMPONENT_NAME = "detectorComponentName";
   private static final String PROP_TIMEZONE = "timezone";
   private static final String PROP_BUCKET_PERIOD = "bucketPeriod";
-  private static final long DEFAULT_CACHING_PERIOD_LOOKBACK = TimeUnit.DAYS.toMillis(90);
+  private static final long DEFAULT_CACHING_PERIOD_LOOKBACK = TimeUnit.DAYS.toMillis(30);
+  private static final long CACHING_PERIOD_LOOKBACK_DAILY = TimeUnit.DAYS.toMillis(90);
+  private static final long CACHING_PERIOD_LOOKBACK_HOURLY = TimeUnit.DAYS.toMillis(60);
+  private static final long CACHING_PERIOD_LOOKBACK_MINUTELY = TimeUnit.DAYS.toMillis(28);
 
   private static final Logger LOG = LoggerFactory.getLogger(
       AnomalyDetectorWrapper.class);
@@ -138,7 +141,8 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
     // 1. get the last time stamp for the time series.
     // 2. to calculate current values and  baseline values for the anomalies detected
     // 3. anomaly detection current and baseline time series value
-    MetricSlice cacheSlice = MetricSlice.from(this.metricEntity.getId(), startTime - DEFAULT_CACHING_PERIOD_LOOKBACK, endTime, this.metricEntity.getFilters());
+    long cachingPeriodLookback = getCachingPeriodLookback(this.dataset.bucketTimeGranularity());
+    MetricSlice cacheSlice = MetricSlice.from(this.metricEntity.getId(), startTime - cachingPeriodLookback, endTime, this.metricEntity.getFilters());
     this.provider.fetchTimeseries(Collections.singleton(cacheSlice));
 
     List<Interval> monitoringWindows = this.getMonitoringWindows();
@@ -208,7 +212,8 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
           LOG.info("Will run detection in window {}", window);
         }
         // pre cache the time series for the whole detection time period instead of fetching for each window
-        MetricSlice cacheSlice = MetricSlice.from(this.metricEntity.getId(), startTime - DEFAULT_CACHING_PERIOD_LOOKBACK, endTime, this.metricEntity.getFilters(), toTimeGranularity(this.bucketPeriod));
+        long cachingPeriodLookback = getCachingPeriodLookback(this.dataset.bucketTimeGranularity());
+        MetricSlice cacheSlice = MetricSlice.from(this.metricEntity.getId(), startTime - cachingPeriodLookback, endTime, this.metricEntity.getFilters(), toTimeGranularity(this.bucketPeriod));
         this.provider.fetchTimeseries(Collections.singleton(cacheSlice));
         return monitoringWindows;
       } catch (Exception e) {
@@ -216,6 +221,24 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
       }
     }
     return Collections.singletonList(new Interval(startTime, endTime));
+  }
+
+  private long getCachingPeriodLookback(TimeGranularity granularity) {
+    long period;
+    switch (granularity.getUnit()) {
+      case DAYS:
+        period = CACHING_PERIOD_LOOKBACK_DAILY;
+        break;
+      case HOURS:
+        period = CACHING_PERIOD_LOOKBACK_HOURLY;
+        break;
+      case MINUTES:
+        period = CACHING_PERIOD_LOOKBACK_MINUTELY;
+        break;
+      default:
+        period = DEFAULT_CACHING_PERIOD_LOOKBACK;
+    }
+    return period;
   }
 
   // get the list of monitoring window end times

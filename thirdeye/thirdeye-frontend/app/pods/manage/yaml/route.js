@@ -72,7 +72,7 @@ export default Route.extend({
       alertId,
       subscriptionGroupId,
       alertData: get(this, 'detectionYaml'),
-      detectionYaml: get(this, 'detectionYaml').yaml,
+      detectionYaml: get (this, 'detectionYaml') ? get(this, 'detectionYaml').yaml : 'Yaml retrieval failed',
       subscriptionGroups: get(this, 'subscriptionGroups'),
       subscriptionGroupYamlDisplay
     });
@@ -96,7 +96,7 @@ export default Route.extend({
       Object.keys(filters).forEach(
         function(filterKey) {
           const filter = filters[filterKey];
-          if (typeof filter === 'object') {
+          if (filter && typeof filter === 'object') {
             filter.forEach(
               function (filterValue) {
                 filterStrings.push(filterKey + '=' + filterValue);

@@ -15,7 +15,8 @@
   {{#unless errorAnomalies}}
     {{#if showDetails}}
       {{#if isLoading}}
-        {{ember-spinner scale=0.5 rotate=10 speed='1.1' color='#3498DB'}}Please wait while we compile the data.
+        {{ember-spinner scale=0.5 rotate=10 speed='1.1' color='#3498DB'}}Preview may take a long time if it is more than one week (for daily metrics) or one day (for hourly/minute metrics).
+        Please click "Refresh Preview" if you changed time window.
       {{else}}
         {{#if dataIsCurrent}}
         {{range-pill-selectors
@@ -101,11 +102,6 @@
                   <thead>
                     <tr class="te-anomaly-table__row te-anomaly-table__head">
                       <th class="te-anomaly-table__cell-head te-anomaly-table__cell-head--left">
-                        <a class="te-anomaly-table__cell-link" {{action "toggleSortDirection" "number"}}>#
-                          <i class="te-anomaly-table__icon glyphicon {{if sortColumnNumberUp "glyphicon-menu-down" "glyphicon-menu-up"}}"></i>
-                        </a>
-                      </th>
-                      <th class="te-anomaly-table__cell-head te-anomaly-table__cell-head--left">
                         <a class="te-anomaly-table__cell-link" {{action "toggleSortDirection" "start"}}>
                           Start/Duration (PDT)
                           <i class="te-anomaly-table__icon glyphicon {{if sortColumnStartUp "glyphicon-menu-up" "glyphicon-menu-down"}}"></i>
@@ -135,7 +131,6 @@
                 <tbody>
                   {{#each paginatedFilteredAnomalies as |anomaly|}}
                     <tr class="te-anomaly-table__row">
-                       <td class="te-anomaly-table__cell te-anomaly-table__cell--index">{{anomaly.number}}</td>
                        <td class="te-anomaly-table__cell">
                         <ul class="te-anomaly-table__list te-anomaly-table__list--left">
                           <li class="te-anomaly-table__list-item te-anomaly-table__list-item--stronger">

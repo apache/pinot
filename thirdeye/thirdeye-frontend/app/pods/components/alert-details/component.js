@@ -23,6 +23,7 @@ import { getYamlPreviewAnomalies,
   getFormattedDuration,
   anomalyResponseMapNew,
   anomalyResponseObj,
+  anomalyResponseObjNew,
   updateAnomalyFeedback,
   verifyAnomalyFeedback  } from 'thirdeye-frontend/utils/anomaly';
 import { inject as service } from '@ember/service';
@@ -38,7 +39,8 @@ const TIME_PICKER_INCREMENT = 5; // tells date picker hours field how granularly
 const DEFAULT_ACTIVE_DURATION = '1m'; // setting this date range selection as default (Last 24 Hours)
 const UI_DATE_FORMAT = 'MMM D, YYYY hh:mm a'; // format for date picker to use (usually varies by route or metric)
 const DISPLAY_DATE_FORMAT = 'YYYY-MM-DD HH:mm'; // format used consistently across app to display custom date range
-const TIME_RANGE_OPTIONS = ['1w', '1m', '3m'];
+const TIME_RANGE_OPTIONS = ['1d', '1w', '1m', '3m'];
+const ANOMALY_LEGEND_THRESHOLD = 20; // If number of anomalies is larger than this threshold, don't show the legend
 
 export default Component.extend({
   anomaliesApiService: service('services/api/anomalies'),
@@ -46,7 +48,7 @@ export default Component.extend({
   anomalyMapping: {},
   timeseries: null,
   isLoading: false,
-  analysisRange: [moment().subtract(1, 'week').startOf('hour').valueOf(), moment().startOf('hour').valueOf()],
+  analysisRange: [moment().subtract(1, 'day').startOf('day').valueOf(), moment().startOf('day').valueOf()],
   isPendingData: false,
   colorMapping: colorMapping,
   zoom: {
@@ -79,11 +81,10 @@ export default Component.extend({
     { name: 'max4w', isActive: false},
     { name: 'none', isActive: false}
   ],
-  sortColumnStartUp: false,
+  sortColumnStartUp: true,
   sortColumnChangeUp: false,
-  sortColumnNumberUp: true,
   sortColumnFeedbackUp: false,
-  selectedSortMode: '',
+  selectedSortMode: 'start:down',
   selectedBaseline: 'wo1w',
   pageSize: 10,
   currentPage: 1,
@@ -99,12 +100,18 @@ export default Component.extend({
     'analysisRange',
     'metricUrn',
     function() {
-      const isPreviewMode = get(this, 'isPreviewMode');
-      if(!isPreviewMode) {
-        this._fetchAnomalies();
-      } else {
-        this._fetchTimeseries();
+      const {
+        isPreviewMode,
+        metricUrn
+      } = this.getProperties('isPreviewMode', 'metricUrn');
+      if(metricUrn) {
+        if(!isPreviewMode) {
+          this._fetchAnomalies();
+        } else {
+          this._fetchTimeseries();
+        }
       }
+
     }),
 
   /**
@@ -227,7 +234,7 @@ export default Component.extend({
   axis: computed(
     'analysisRange',
     function () {
-      const analysisRange = getProperties(this, 'analysisRange');
+      const analysisRange = get(this, 'analysisRange');
 
       return {
         y: {
@@ -276,22 +283,32 @@ export default Component.extend({
 
       if (!_.isEmpty(anomalies)) {
 
-        anomalies
-          .filter(anomaly => anomaly.metricUrn === metricUrn)
-          .forEach(anomaly => {
-            const key = this._formatAnomaly(anomaly);
-            series[key] = {
-              timestamps: [anomaly.startTime, anomaly.endTime],
-              values: [1, 1],
-              type: 'line',
-              color: 'teal',
-              axis: 'y2'
-            };
-            series[key + '-region'] = Object.assign({}, series[key], {
-              type: 'region',
-              color: 'orange'
-            });
+        const anomaliesInGraph = anomalies.filter(anomaly => anomaly.metricUrn === metricUrn);
+        if (anomaliesInGraph.length > ANOMALY_LEGEND_THRESHOLD) {
+          set(this, 'legend', {
+            show: false,
+            position: 'right'
           });
+        } else {
+          set(this, 'legend', {
+            show: true,
+            position: 'right'
+          });
+        }
+        anomaliesInGraph.forEach(anomaly => {
+          const key = this._formatAnomaly(anomaly);
+          series[key] = {
+            timestamps: [anomaly.startTime, anomaly.endTime],
+            values: [1, 1],
+            type: 'line',
+            color: 'teal',
+            axis: 'y2'
+          };
+          series[key + '-region'] = Object.assign({}, series[key], {
+            type: 'region',
+            color: 'orange'
+          });
+        });
       }
 
       if (timeseries && !_.isEmpty(timeseries.value)) {
@@ -327,30 +344,30 @@ export default Component.extend({
       const anomalies = get(this, 'anomalies');
       const labelResponse = get(this, 'labelResponse');
       let tableData = [];
-      let i = 1;
 
-      anomalies.forEach(a => {
-        const change = (a.avgBaselineVal !== 0) ? (a.avgCurrentVal/a.avgBaselineVal - 1.0) * 100.0 : 0;
-        let tableRow = {
-          number: i,
-          anomalyId: a.id,
-          start: a.startTime,
-          startDateStr: this._formatAnomaly(a),
-          durationStr: getFormattedDuration(a.startTime, a.endTime),
-          shownCurrent: humanizeFloat(a.avgCurrentVal),
-          shownBaseline: humanizeFloat(a.avgBaselineVal),
-          change: change,
-          shownChangeRate: humanizeFloat(change),
-          anomalyFeedback: a.feedback ? a.feedback.feedbackType : a.statusClassification,
-          dimensionList: Object.keys(a.dimensions),
-          dimensions: a.dimensions,
-          showResponseSaved: (labelResponse.anomalyId === a.id) ? labelResponse.showResponseSaved : false,
-          showResponseFailed: (labelResponse.anomalyId === a.id) ? labelResponse.showResponseFailed: false
-        };
-        tableData.push(tableRow);
-        i++;
-      });
-
+      if (anomalies) {
+        anomalies.forEach(a => {
+          const change = (a.avgBaselineVal !== 0) ? (a.avgCurrentVal/a.avgBaselineVal - 1.0) * 100.0 : 0;
+          let tableRow = {
+            anomalyId: a.id,
+            metricUrn: a.metricUrn,
+            start: a.startTime,
+            end: a.endTime,
+            startDateStr: this._formatAnomaly(a),
+            durationStr: getFormattedDuration(a.startTime, a.endTime),
+            shownCurrent: humanizeFloat(a.avgCurrentVal),
+            shownBaseline: humanizeFloat(a.avgBaselineVal),
+            change: change,
+            shownChangeRate: humanizeFloat(change),
+            anomalyFeedback: a.feedback ? a.feedback.feedbackType : a.statusClassification,
+            dimensionList: Object.keys(a.dimensions),
+            dimensions: a.dimensions,
+            showResponseSaved: (labelResponse.anomalyId === a.id) ? labelResponse.showResponseSaved : false,
+            showResponseFailed: (labelResponse.anomalyId === a.id) ? labelResponse.showResponseFailed: false
+          };
+          tableData.push(tableRow);
+        });
+      }
       return tableData;
     }
   ),
@@ -426,8 +443,8 @@ export default Component.extend({
     'analysisRange', 'startDate', 'endDate', 'duration',
     function() {
       const analysisRange = get(this, 'analysisRange');
-      const startDate = Number(analysisRange[0]) || Number(get(this, 'startDate'));
-      const endDate = Number(analysisRange[1]) || Number(get(this, 'endDate'));
+      const startDate = Number(analysisRange[0]);
+      const endDate = Number(analysisRange[1]);
       const duration = get(this, 'duration') || DEFAULT_ACTIVE_DURATION;
       const predefinedRanges = {
         'Today': [moment().startOf('day'), moment().startOf('day').add(1, 'days')],
@@ -461,16 +478,29 @@ export default Component.extend({
     const end = analysisRange[1];
     let anomalies;
     let applicationAnomalies;
+    let metricUrnList;
     try {
       if(isPreviewMode){
         applicationAnomalies = yield getYamlPreviewAnomalies(alertYaml, start, end);
-        const metricUrnList = Object.keys(applicationAnomalies.diagnostics['0']);
-        set(this, 'metricUrnList', metricUrnList);
-        set(this, 'selectedDimension', toMetricLabel(extractTail(decodeURIComponent(metricUrnList[0]))));
-        set(this, 'metricUrn', metricUrnList[0]);
+        if (applicationAnomalies && applicationAnomalies.diagnostics && applicationAnomalies.diagnostics['0']) {
+          metricUrnList = Object.keys(applicationAnomalies.diagnostics['0']);
+          set(this, 'metricUrnList', metricUrnList);
+          set(this, 'selectedDimension', toMetricLabel(extractTail(decodeURIComponent(metricUrnList[0]))));
+          set(this, 'metricUrn', metricUrnList[0]);
+        }
         anomalies = applicationAnomalies.anomalies;
       } else {
         applicationAnomalies = yield getAnomaliesByAlertId(alertId, start, end);
+        const metricUrnObj = {};
+        if (applicationAnomalies) {
+          applicationAnomalies.forEach(anomaly => {
+            metricUrnObj[anomaly.metricUrn] = 1;
+          });
+          metricUrnList = Object.keys(metricUrnObj);
+          if (metricUrnList.length > 0) {
+            set(this, 'metricUrnList', metricUrnList);
+          }
+        }
         anomalies = applicationAnomalies;
       }
 
@@ -493,7 +523,7 @@ export default Component.extend({
         });
       }
     } catch (error) {
-      notifications.error('Preview alert failed', error);
+      notifications.error(error.body.message);
     }
 
     return {
@@ -506,11 +536,12 @@ export default Component.extend({
     this._super(...arguments);
     const isPreviewMode = get(this, 'isPreviewMode');
     if (!isPreviewMode) {
-      set(this, 'analysisRange', [moment().subtract(1, 'month').startOf('hour').valueOf(), moment().startOf('hour').valueOf()]);
+      set(this, 'analysisRange', [moment().add(1, 'day').subtract(1, 'month').startOf('day').valueOf(), moment().add(1, 'day').startOf('day').valueOf()]);
       set(this, 'duration', '1m');
+      set(this, 'selectedDimension', 'Choose a dimension');
       this._fetchAnomalies();
     } else {
-      set(this, 'duration', '1w');
+      set(this, 'duration', '1d');
     }
   },
 
@@ -568,12 +599,11 @@ export default Component.extend({
       analysisRange,
       selectedBaseline
     } = this.getProperties('metricUrn', 'analysisRange', 'selectedBaseline');
-    const granularity = '15_MINUTES';
-    const timezone = moment.tz.guess();
 
     set(this, 'errorTimeseries', null);
 
-    const urlCurrent = `/rootcause/metric/timeseries?urn=${metricUrn}&start=${analysisRange[0]}&end=${analysisRange[1]}&offset=current&granularity=${granularity}&timezone=${timezone}`;
+    const timeZone = 'America/Los_Angeles';
+    const urlCurrent = `/rootcause/metric/timeseries?urn=${metricUrn}&start=${analysisRange[0]}&end=${analysisRange[1]}&offset=current&timezone=${timeZone}`;
     fetch(urlCurrent)
       .then(checkStatus)
       .then(res => {
@@ -585,7 +615,7 @@ export default Component.extend({
 
     set(this, 'errorBaseline', null);
 
-    const urlBaseline = `/rootcause/metric/timeseries?urn=${metricUrn}&start=${analysisRange[0]}&end=${analysisRange[1]}&offset=${selectedBaseline}&granularity=${granularity}&timezone=${timezone}`;
+    const urlBaseline = `/rootcause/metric/timeseries?urn=${metricUrn}&start=${analysisRange[0]}&end=${analysisRange[1]}&offset=${selectedBaseline}&timezone=${timeZone}`;
     fetch(urlBaseline)
       .then(checkStatus)
       .then(res => set(this, 'baseline', res));
@@ -623,15 +653,13 @@ export default Component.extend({
      * @param {String} selectedResponse - user-selected anomaly feedback option
      * @param {Object} inputObj - the selection object
      */
-    onChangeAnomalyFeedback: async function(anomalyRecord, selectedResponse, inputObj) {
-      const labelMap = get(this, 'labelMap');
-      const loadedResponsesArr = [];
-      const newOptionsArr = [];
-      // Update select field
-      set(inputObj, 'selected', selectedResponse);
+    onChangeAnomalyFeedback: async function(anomalyRecord, selectedResponse) {
+      const anomalies = get(this, 'anomalies');
       // Reset status icon
       set(this, 'renderStatusIcon', false);
       const responseObj = anomalyResponseObj.find(res => res.name === selectedResponse);
+      // get the response object from anomalyResponseObjNew
+      const newFeedbackValue = anomalyResponseObjNew.find(res => res.name === selectedResponse).value;
       try {
         // Save anomaly feedback
         await updateAnomalyFeedback(anomalyRecord.anomalyId, responseObj.value);
@@ -642,24 +670,28 @@ export default Component.extend({
         const keyPresent = filterMap && Object.keys(filterMap).find(key => responseObj.status.includes(key));
         if (keyPresent) {
           this.set('labelResponse', {
-            anomalyId: anomalyRecord.id,
+            anomalyId: anomalyRecord.anomalyId,
             showResponseSaved: true,
             showResponseFailed: false
           });
 
-          // Collect all available new labels
-          loadedResponsesArr.push(responseObj.status, ...get(this, 'anomalyData').mapBy('anomalyFeedback'));
-          loadedResponsesArr.forEach((response) => {
-            if (labelMap[response]) { newOptionsArr.push(labelMap[response]); }
-          });
-          // Update resolutionOptions array - we may have a new option now
-          set(this, 'resolutionOptions', [ ...new Set([ 'All Resolutions', ...newOptionsArr ])]);
+          // replace anomaly feedback with selectedFeedback
+          let i = 0;
+          let found = false;
+          while (i < anomalies.length && !found) {
+            if (anomalies[i].id === anomalyRecord.anomalyId) {
+              anomalies[i].feedback.feedbackType = newFeedbackValue;
+              found = true;
+            }
+            i++;
+          }
+          set(this, 'anomalies', anomalies);
         } else {
           throw 'Response not saved';
         }
       } catch (err) {
         this.set('labelResponse', {
-          anomalyId: anomalyRecord.id,
+          anomalyId: anomalyRecord.anomalyId,
           showResponseSaved: false,
           showResponseFailed: true
         });

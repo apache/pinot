@@ -27,6 +27,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.thirdeye.common.dimension.DimensionMap;
+import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.dataframe.BooleanSeries;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
 import org.apache.pinot.thirdeye.dataframe.LongSeries;
@@ -42,6 +43,7 @@ import org.apache.pinot.thirdeye.detection.spi.model.TimeSeries;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.Period;
+import org.joda.time.PeriodType;
 
 import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
 
@@ -84,10 +86,11 @@ public class DetectionUtils {
    * @param df time series with COL_TIME and at least one boolean value series
    * @param seriesName name of the value series
    * @param endTime end time of this detection window
+   * @param monitoringGranularityPeriod the monitoring granularity period
    * @param dataset dataset config for the metric
    * @return list of anomalies
    */
-  public static List<MergedAnomalyResultDTO> makeAnomalies(MetricSlice slice, DataFrame df, String seriesName, long endTime, DatasetConfigDTO dataset) {
+  public static List<MergedAnomalyResultDTO> makeAnomalies(MetricSlice slice, DataFrame df, String seriesName, long endTime, Period monitoringGranularityPeriod, DatasetConfigDTO dataset) {
     if (df.isEmpty()) {
       return Collections.emptyList();
     }
@@ -128,12 +131,11 @@ public class DetectionUtils {
 
       // guess-timate of next time series timestamp
       if (dataset != null) {
-        Period period = dataset.bucketTimeGranularity().toPeriod();
         DateTimeZone timezone = DateTimeZone.forID(dataset.getTimezone());
 
         long lastTimestamp = sTime.getLong(sTime.size() - 1);
 
-        end = new DateTime(lastTimestamp, timezone).plus(period).getMillis();
+        end = new DateTime(lastTimestamp, timezone).plus(monitoringGranularityPeriod).getMillis();
       }
 
       // truncate at analysis end time
@@ -202,4 +204,19 @@ public class DetectionUtils {
     }
     return baselineProvider.computePredictedTimeSeries(MetricSlice.from(metricId, start, end, filters));
   }
+
+  /**
+   * Get the joda period for a monitoring granularity
+   * @param monitoringGranularity
+   */
+  public static Period getMonitoringGranularityPeriod(String monitoringGranularity, DatasetConfigDTO datasetConfigDTO) {
+    if (monitoringGranularity.equals(MetricSlice.NATIVE_GRANULARITY.toAggregationGranularityString())) {
+      return datasetConfigDTO.bucketTimeGranularity().toPeriod();
+    }
+    if (monitoringGranularity.equals("1_MONTHS")) {
+      return new Period(0,1,0,0,0,0,0,0, PeriodType.months());
+    }
+    return TimeGranularity.fromString(monitoringGranularity).toPeriod();
+  }
+
 }
