@@ -20,14 +20,7 @@ package org.apache.pinot.integration.tests;
 
 import org.apache.commons.configuration.Configuration;
 import org.apache.pinot.common.utils.CommonConstants;
-import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.controller.ControllerConf;
-import org.apache.pinot.filesystem.LocalPinotFS;
-import org.testng.Assert;
-import org.testng.annotations.Test;
-
-import java.io.File;
-import java.net.URI;
 
 
 /**
