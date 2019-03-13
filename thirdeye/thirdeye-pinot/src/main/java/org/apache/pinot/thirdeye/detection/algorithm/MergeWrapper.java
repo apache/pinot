@@ -52,6 +52,7 @@ public class MergeWrapper extends DetectionPipeline {
   private static final String PROP_CLASS_NAME = "className";
   private static final String PROP_MERGE_KEY = "mergeKey";
   private static final String PROP_DETECTOR_COMPONENT_NAME = "detectorComponentName";
+  private static final int NUMBER_OF_SPLITED_ANOMALIES_LIMIT = 1000;
 
   protected static final Comparator<MergedAnomalyResultDTO> COMPARATOR = new Comparator<MergedAnomalyResultDTO>() {
     @Override
@@ -87,7 +88,7 @@ public class MergeWrapper extends DetectionPipeline {
 
     this.maxGap = MapUtils.getLongValue(config.getProperties(), "maxGap", TimeUnit.HOURS.toMillis(2));
     this.maxDuration = MapUtils.getLongValue(config.getProperties(), "maxDuration", Long.MAX_VALUE);
-    Preconditions.checkArgument(this.maxDuration > 0, "Max duration must be a positive number.");
+    Preconditions.checkArgument(this.maxDuration > 0 , "Max duration must be a positive number");
     this.slice = new AnomalySlice().withStart(startTime).withEnd(endTime);
     this.nestedProperties = new ArrayList<>();
     List<Map<String, Object>> nested = ConfigUtils.getList(config.getProperties().get(PROP_NESTED));
@@ -209,6 +210,10 @@ public class MergeWrapper extends DetectionPipeline {
   */
   private Collection<MergedAnomalyResultDTO> splitAnomaly(MergedAnomalyResultDTO anomaly, long maxDuration) {
     int anomalyCountAfterSplit = (int) Math.ceil((anomaly.getEndTime() - anomaly.getStartTime()) / (double) maxDuration);
+    if (anomalyCountAfterSplit > NUMBER_OF_SPLITED_ANOMALIES_LIMIT) {
+      // if the number of anomalies after split is more than the limit, don't split
+      return Collections.singleton(anomaly);
+    }
     Set<MergedAnomalyResultDTO> result = new HashSet<>();
 
     long nextStartTime = anomaly.getStartTime();
