@@ -146,7 +146,7 @@ public class HelixServerStarter {
     // Need to do this before we start receiving state transitions.
     ServerSegmentCompletionProtocolHandler
         .init(_helixServerConfig.subset(CommonConstants.Server.PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER),
-                _helixServerConfig.getBoolean(CommonConstants.Server.CONFIG_OF_ENABLE_COMMIT_END_WITH_METADATA,false));
+            _helixServerConfig.getBoolean(CommonConstants.Server.CONFIG_OF_ENABLE_COMMIT_END_WITH_METADATA, false));
     _serverInstance = new ServerInstance();
     _serverInstance.init(serverInstanceConfig, propertyStore);
     _serverInstance.start();

@@ -231,17 +231,17 @@ public class FileUploadDownloadClient implements Closeable {
   }
 
   private static HttpUriRequest getUploadSegmentMetadataFilesRequest(URI uri, Map<String, File> metadataFiles,
-                                                                     int segmentUploadRequestTimeoutMs) {
+      int segmentUploadRequestTimeoutMs) {
     MultipartEntityBuilder multipartEntityBuilder = MultipartEntityBuilder.create().
-            setMode(HttpMultipartMode.BROWSER_COMPATIBLE);
+        setMode(HttpMultipartMode.BROWSER_COMPATIBLE);
     for (Map.Entry<String, File> entry : metadataFiles.entrySet()) {
-      multipartEntityBuilder.addPart(entry.getKey(),getContentBody(entry.getKey(), entry.getValue()));
+      multipartEntityBuilder.addPart(entry.getKey(), getContentBody(entry.getKey(), entry.getValue()));
     }
     HttpEntity entity = multipartEntityBuilder.build();
 
     // Build the POST request.
     RequestBuilder requestBuilder =
-            RequestBuilder.create(HttpPost.METHOD_NAME).setVersion(HttpVersion.HTTP_1_1).setUri(uri).setEntity(entity);
+        RequestBuilder.create(HttpPost.METHOD_NAME).setVersion(HttpVersion.HTTP_1_1).setUri(uri).setEntity(entity);
     setTimeout(requestBuilder, segmentUploadRequestTimeoutMs);
     return requestBuilder.build();
   }
@@ -407,9 +407,9 @@ public class FileUploadDownloadClient implements Closeable {
 
   // Upload a set of segment meta data files (e.g., meta.properties and creation.meta) to controllers.
   public SimpleHttpResponse uploadSegmentMetadataFiles(URI uri, Map<String, File> metadataFiles,
-                                                       int segmentUploadRequestTimeoutMs)
-          throws IOException, HttpErrorStatusException {
-    return sendRequest(getUploadSegmentMetadataFilesRequest(uri, metadataFiles,  segmentUploadRequestTimeoutMs));
+      int segmentUploadRequestTimeoutMs)
+      throws IOException, HttpErrorStatusException {
+    return sendRequest(getUploadSegmentMetadataFilesRequest(uri, metadataFiles, segmentUploadRequestTimeoutMs));
   }
 
   /**

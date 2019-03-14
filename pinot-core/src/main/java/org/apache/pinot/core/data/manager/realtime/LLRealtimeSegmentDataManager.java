@@ -24,6 +24,7 @@ import com.google.common.util.concurrent.Uninterruptibles;
 import com.yammer.metrics.core.Meter;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
@@ -744,14 +745,20 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     }
     SegmentCompletionProtocol.Response commitEndResponse;
     if (!ServerSegmentCompletionProtocolHandler.isCommitWithMetadata()) {
-        commitEndResponse = _protocolHandler.segmentCommitEnd(params);
+      commitEndResponse = _protocolHandler.segmentCommitEnd(params);
     } else {
-        Map<String, File> metadataFiles = new HashMap<>();
+      Map<String, File> metadataFiles = new HashMap<>();
+      try {
         metadataFiles.put(V1Constants.MetadataKeys.METADATA_FILE_NAME,
-                extractMetadataFromSegmentTarFile(segmentTarFile, V1Constants.MetadataKeys.METADATA_FILE_NAME));
+            extractMetadataFromSegmentTarFile(segmentTarFile, V1Constants.MetadataKeys.METADATA_FILE_NAME));
         metadataFiles.put(V1Constants.SEGMENT_CREATION_META,
-                extractMetadataFromSegmentTarFile(segmentTarFile, V1Constants.SEGMENT_CREATION_META));
-        commitEndResponse = _protocolHandler.segmentCommitEndWithMetadata(params,metadataFiles);
+            extractMetadataFromSegmentTarFile(segmentTarFile, V1Constants.SEGMENT_CREATION_META));
+        commitEndResponse = _protocolHandler.segmentCommitEndWithMetadata(params, metadataFiles);
+      } finally {
+        for(File f : metadataFiles.values()) {
+          FileUtils.deleteQuietly(f);
+        }
+      }
     }
 
     if (!commitEndResponse.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS)) {
@@ -762,19 +769,15 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   }
 
   private File extractMetadataFromSegmentTarFile(File segmentTarFile, final String metaFileName) {
-    try (
-            InputStream metadataInputStream = TarGzCompressionUtils
-                    .unTarOneFile(new FileInputStream(segmentTarFile), metaFileName)
-    ) {
-      Preconditions.checkNotNull(metadataInputStream, "%s does not exist",
-              metaFileName);
+    try (InputStream metadataInputStream = TarGzCompressionUtils
+        .unTarOneFile(new FileInputStream(segmentTarFile), metaFileName)) {
+      Preconditions.checkNotNull(metadataInputStream, "%s does not exist", metaFileName);
       File tmpFile = File.createTempFile(metaFileName, "llc-split-commit");
       Files.copy(metadataInputStream, tmpFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
-      tmpFile.deleteOnExit();
       return tmpFile;
     } catch (Exception e) {
-      segmentLogger.error("Exception during extracting and reading segment metadata for file {} on metadata ",
-              segmentTarFile, metaFileName, e);
+      segmentLogger.error("Exception during extracting and reading segment metadata for file {} on metadata {} ",
+          segmentTarFile.toPath(), metaFileName, e);
     }
     return null;
   }

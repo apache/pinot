@@ -71,9 +71,8 @@ public class ServerSegmentCompletionProtocolHandler {
   }
 
   public static boolean isCommitWithMetadata() {
-        return _commitWithMetadata;
+    return _commitWithMetadata;
   }
-
 
   public SegmentCompletionProtocol.Response segmentCommitStart(SegmentCompletionProtocol.Request.Params params) {
     SegmentCompletionProtocol.SegmentCommitStartRequest request =
@@ -114,10 +113,10 @@ public class ServerSegmentCompletionProtocolHandler {
     return sendRequest(url);
   }
 
-  public SegmentCompletionProtocol.Response segmentCommitEndWithMetadata(SegmentCompletionProtocol.Request.Params params,
-                                                                         final Map<String, File> metadataFiles) {
+  public SegmentCompletionProtocol.Response segmentCommitEndWithMetadata(
+      SegmentCompletionProtocol.Request.Params params, final Map<String, File> metadataFiles) {
     SegmentCompletionProtocol.SegmentCommitEndWithMetadataRequest request =
-            new SegmentCompletionProtocol.SegmentCommitEndWithMetadataRequest(params);
+        new SegmentCompletionProtocol.SegmentCommitEndWithMetadataRequest(params);
     String url = createSegmentCompletionUrl(request);
     if (url == null) {
       return SegmentCompletionProtocol.RESP_NOT_SENT;
@@ -202,12 +201,12 @@ public class ServerSegmentCompletionProtocolHandler {
     return response;
   }
 
-  private SegmentCompletionProtocol.Response sendCommitEndWithMetadataFiles(String url, Map<String, File> metadataFiles) {
+  private SegmentCompletionProtocol.Response sendCommitEndWithMetadataFiles(String url,
+      Map<String, File> metadataFiles) {
     SegmentCompletionProtocol.Response response;
     try {
-      String responseStr =
-              _fileUploadDownloadClient.uploadSegmentMetadataFiles(new URI(url), metadataFiles, SEGMENT_UPLOAD_REQUEST_TIMEOUT_MS)
-              .getResponse();
+      String responseStr = _fileUploadDownloadClient
+          .uploadSegmentMetadataFiles(new URI(url), metadataFiles, SEGMENT_UPLOAD_REQUEST_TIMEOUT_MS).getResponse();
       response = SegmentCompletionProtocol.Response.fromJsonString(responseStr);
       LOGGER.info("Controller response {} for {}", response.toJsonString(), url);
       if (response.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.NOT_LEADER)) {
