@@ -312,11 +312,14 @@ public class SegmentGeneratorConfig {
 
   public void setInputFilePath(String inputFilePath, boolean isLocalPath) {
     Preconditions.checkNotNull(inputFilePath);
-    File inputFile = new File(inputFilePath);
     if (isLocalPath) {
-    Preconditions.checkState(inputFile.exists(), "Input path {} does not exist.", inputFilePath);
+      File inputFile = new File(inputFilePath);
+      Preconditions.checkState(inputFile.exists(), "Input path {} does not exist.", inputFilePath);
+      _inputFilePath = inputFile.getAbsolutePath();
+    } else {
+      // Remote path
+      _inputFilePath = inputFilePath;
     }
-    _inputFilePath = inputFile.getAbsolutePath();
   }
 
   public FileFormat getFormat() {
