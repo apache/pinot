@@ -35,9 +35,6 @@ public class RecordReaderFactory {
 
   public static RecordReader getRecordReader(SegmentGeneratorConfig segmentGeneratorConfig)
       throws Exception {
-    File dataFile = new File(segmentGeneratorConfig.getInputFilePath());
-    Preconditions.checkState(dataFile.exists(), "Input file: " + dataFile.getAbsolutePath() + " does not exist");
-
     Schema schema = segmentGeneratorConfig.getSchema();
     FileFormat fileFormat = segmentGeneratorConfig.getFormat();
     String recordReaderPath = segmentGeneratorConfig.getRecordReaderPath();
@@ -55,6 +52,9 @@ public class RecordReaderFactory {
       recordReader.init(segmentGeneratorConfig);
       return recordReader;
     }
+
+    File dataFile = new File(segmentGeneratorConfig.getInputFilePath());
+    Preconditions.checkState(dataFile.exists(), "Input file: " + dataFile.getAbsolutePath() + " does not exist");
 
     switch (fileFormat) {
       case AVRO:
