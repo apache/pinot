@@ -4,11 +4,11 @@
       {{#if (eq displayMode "single")}}
         <span title={{alertData.functionName}}>{{alertData.functionName}}</span>
       {{/if}}
-      <div class="te-search-results__tag {{if (eq displayMode "list") "te-search-results__tag--list"}} {{if alertData.isActive "te-search-results__tag--active"}}">
+      <div class="te-search-results__tag {{if (eq displayMode "list") "te-search-results__tag--list"}} {{if alertData.active "te-search-results__tag--active"}}">
         {{#if isLoadError}}
           Error
         {{else}}
-          {{if alertData.isActive "Active" "Inactive"}}
+          {{if alertData.active "Active" "Inactive"}}
         {{/if}}
       </div>
       {{#if (eq displayMode "list")}}
