@@ -1,7 +1,6 @@
 import { hash } from 'rsvp';
 import Route from '@ember/routing/route';
 import fetch from 'fetch';
-import { isPresent } from '@ember/utils';
 import { get, getWithDefault } from '@ember/object';
 import { inject as service } from '@ember/service';
 import { checkStatus } from 'thirdeye-frontend/utils/utils';
@@ -24,7 +23,6 @@ export default Route.extend({
 
   model() {
     return hash({
-      rawAlerts: fetch('/thirdeye/entity/ANOMALY_FUNCTION').then(checkStatus),
       subscriberGroups: fetch('/thirdeye/entity/ALERT_CONFIG').then(checkStatus),
       applications: fetch('/thirdeye/entity/APPLICATION').then(checkStatus),
       detectionAlertConfig: fetch('/thirdeye/entity/DETECTION_ALERT_CONFIG').then(checkStatus),
@@ -34,23 +32,6 @@ export default Route.extend({
 
   afterModel(model) {
     this._super(model);
-    // Work only with valid alerts - with metric association
-    let alerts = model.rawAlerts.filter(alert => isPresent(alert.metric));
-
-    // Iterate through config groups to enhance all alerts with extra properties (group name, application)
-    for (let config of model.subscriberGroups) {
-      let groupFunctionIds = config.emailConfig && config.emailConfig.functionIds ? config.emailConfig.functionIds : [];
-      for (let id of groupFunctionIds) {
-        let foundAlert = alerts.find(alert => alert.id === id);
-        if (foundAlert) {
-          Object.assign(foundAlert, {
-            application: config.application,
-            group: foundAlert.group ? foundAlert.group + ", " + config.name : config.name
-          });
-        }
-      }
-    }
-
     // format Yaml configs
     const yamlAlerts = model.detectionYaml;
     for (let yamlAlert of yamlAlerts) {
@@ -65,7 +46,7 @@ export default Route.extend({
       Object.assign(yamlAlert, {
         functionName: yamlAlert.detectionName,
         collection: yamlAlert.dataset,
-        type: yamlAlert.pipelineType,
+        type: this._detectionType(yamlAlert),
         exploreDimensions: dimensions,
         filters: this._formatYamlFilter(yamlAlert.filters),
         isNewPipeline: true
@@ -86,8 +67,7 @@ export default Route.extend({
       }
     }
 
-    // concat legacy alerts and yaml alerts
-    alerts = alerts.concat(yamlAlerts);
+    const alerts = yamlAlerts;
 
     // Perform initial filters for our 'primary' filter types and add counts
     const user = getWithDefault(get(this, 'session'), 'data.authenticated.name', null);
@@ -99,8 +79,7 @@ export default Route.extend({
     Object.assign(model, { alerts, ownedAlerts, subscribedAlerts, totalCounts });
   },
 
-  setupController(controller, model, transition) {
-    const { queryParams } = transition;
+  setupController(controller, model) {
 
     // This filter category is "global" in nature. When selected, they reset the rest of the filters
     const filterBlocksGlobal = [
@@ -184,6 +163,18 @@ export default Route.extend({
       totalFilteredAlerts: model.alerts.length,
       sortModes: ['Edited:first', 'Edited:last', 'A to Z', 'Z to A'] // Alerts Search Mode options
     });
+  },
+
+  /**
+   * Grab detection type if available, else return yamlAlert.pipelineType
+   */
+  _detectionType(yamlAlert) {
+    if (yamlAlert.rules && Array.isArray(yamlAlert.rules) && yamlAlert.rules.length > 0) {
+      if (yamlAlert.rules[0].detection && Array.isArray(yamlAlert.rules[0].detection) && yamlAlert.rules[0].detection.length > 0) {
+        return yamlAlert.rules[0].detection[0].type;
+      }
+    }
+    return yamlAlert.pipelineType;
   },
 
   /**

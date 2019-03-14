@@ -12,15 +12,9 @@
         {{/if}}
       </div>
       {{#if (eq displayMode "list")}}
-        {{#if alertData.isNewPipeline}}
-          {{#link-to "manage.explore" alertData.id}}
-            <div class="te-search-results__title-name" title={{alertData.functionName}}>{{alertData.functionName}}</div>
-          {{/link-to}}
-        {{else}}
-          {{#link-to "manage.alert" alertData.id}}
-            <div class="te-search-results__title-name" title={{alertData.functionName}}>{{alertData.functionName}}</div>
-          {{/link-to}}
-        {{/if}}
+        {{#link-to "manage.explore" alertData.id}}
+          <div class="te-search-results__title-name" title={{alertData.functionName}}>{{alertData.functionName}}</div>
+        {{/link-to}}
       {{/if}}
     </div>
   </div>
