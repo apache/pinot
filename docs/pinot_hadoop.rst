@@ -79,13 +79,13 @@ workflow to generate Pinot segments.
 .. code-block:: none
 
   mvn clean install -DskipTests -Pbuild-shaded-jar
-  hadoop jar pinot-hadoop-0.1.0-shaded.jar SegmentCreation job.properties
+  hadoop jar pinot-hadoop-<version>-SNAPSHOT-shaded.jar SegmentCreation job.properties
 
 You can then use the SegmentTarPush job to push segments via the controller REST API.
 
 .. code-block:: none
 
-  hadoop jar pinot-hadoop-0.1.0-SNAPSHOT-shaded.jar SegmentTarPush job.properties
+  hadoop jar pinot-hadoop-<version>-SNAPSHOT-shaded.jar SegmentTarPush job.properties
 
 
 Creating Pinot segments outside of Hadoop
