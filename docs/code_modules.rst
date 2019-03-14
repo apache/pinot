@@ -19,8 +19,12 @@
 
 .. _code-modules:
 
+
+*****************************
 Code Modules and Organization
-=============================
+*****************************
+
+.. contents:: Table of Contents
 
 Before proceeding to contributing changes to Pinot, review the contents of this section.
 
