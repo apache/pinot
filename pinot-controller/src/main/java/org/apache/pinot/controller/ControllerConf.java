@@ -84,6 +84,10 @@ public class ControllerConf extends PropertiesConfiguration {
     // Initial delays
     private static final String STATUS_CHECKER_INITIAL_DELAY_IN_SECONDS =
         "controller.statusChecker.initialDelayInSeconds";
+    private static final String RETENTION_MANAGER_INITIAL_DELAY_IN_SECONDS =
+        "controller.retentionManager.initialDelayInSeconds";
+    private static final String OFFLINE_SEGMENT_INTERVAL_CHECKER_INITIAL_DELAY_IN_SECONDS =
+        "controller.offlineSegmentIntervalChecker.initialDelayInSeconds";
 
     public static final int MIN_INITIAL_DELAY_IN_SECONDS = 120;
     public static final int MAX_INITIAL_DELAY_IN_SECONDS = 300;
@@ -572,6 +576,16 @@ public class ControllerConf extends PropertiesConfiguration {
 
   public long getStatusCheckerInitialDelayInSeconds() {
     return getLong(ControllerPeriodicTasksConf.STATUS_CHECKER_INITIAL_DELAY_IN_SECONDS,
+        ControllerPeriodicTasksConf.getRandomInitialDelayInSeconds());
+  }
+
+  public long getRetentionManagerInitialDelayInSeconds() {
+    return getLong(ControllerPeriodicTasksConf.RETENTION_MANAGER_INITIAL_DELAY_IN_SECONDS,
+        ControllerPeriodicTasksConf.getRandomInitialDelayInSeconds());
+  }
+
+  public long getOfflineSegmentIntervalCheckerInitialDelayInSeconds() {
+    return getLong(ControllerPeriodicTasksConf.OFFLINE_SEGMENT_INTERVAL_CHECKER_INITIAL_DELAY_IN_SECONDS,
         ControllerPeriodicTasksConf.getRandomInitialDelayInSeconds());
   }
 
