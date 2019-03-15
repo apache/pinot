@@ -159,9 +159,9 @@ public class BaseTableDataManagerTest {
     tableDataManager.removeSegment(segmentName);
 
     // Delete the segment
-    tableDataManager.deleteSegment(segmentName);
+    tableDataManager.trackDeletedSegment(segmentName);
     // check that it is recorded as deleted
-    Assert.assertTrue(tableDataManager.isDeleted(segmentName));
+    Assert.assertTrue(tableDataManager.isRecentlyDeleted(segmentName));
 
     // Add a new segment and remove it in order this time.
     final String anotherSeg = "AnotherSegment";

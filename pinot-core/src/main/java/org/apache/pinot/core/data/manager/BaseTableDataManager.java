@@ -25,6 +25,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.helix.ZNRecord;
@@ -44,8 +45,8 @@ import org.slf4j.LoggerFactory;
 @ThreadSafe
 public abstract class BaseTableDataManager implements TableDataManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseTableDataManager.class);
-  // cache atmost a given max of deleted segments
-  private static final int MAX_DELETED_SEGMENT_CACHE_SIZE = 1000;
+  // cache deleted segment names for utmost this duration
+  private static final int MAX_CACHE_DURATION_SEC = 6 * 3600; // 6 hours
 
   protected final ConcurrentHashMap<String, SegmentDataManager> _segmentDataManagerMap = new ConcurrentHashMap<>();
 
@@ -65,7 +66,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
       @Nonnull ZkHelixPropertyStore<ZNRecord> propertyStore, @Nonnull ServerMetrics serverMetrics) {
     LOGGER.info("Initializing table data manager for table: {}", tableDataManagerConfig.getTableName());
 
-    _deletedSegmentsCache = CacheBuilder.newBuilder().maximumSize(MAX_DELETED_SEGMENT_CACHE_SIZE).build();
+    _deletedSegmentsCache = CacheBuilder.newBuilder().expireAfterWrite(MAX_CACHE_DURATION_SEC, TimeUnit.SECONDS).build();
     _tableDataManagerConfig = tableDataManagerConfig;
     _instanceId = instanceId;
     _propertyStore = propertyStore;
@@ -167,8 +168,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
    * Called when a segment is deleted. The actual handling of segment delete is outside of this method.
    * This method provides book-keeping around deleted segments.
    */
-  public void deleteSegment(@Nonnull String segmentName) {
-
+  public void trackDeletedSegment(@Nonnull String segmentName) {
     // add segment to the cache
     _deletedSegmentsCache.put(segmentName, true);
   }
@@ -176,7 +176,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
   /**
    * Check if a segment is recently deleted.
    */
-  public boolean isDeleted(@Nonnull String segmentName) {
+  public boolean isRecentlyDeleted(@Nonnull String segmentName) {
     return _deletedSegmentsCache.getIfPresent(segmentName) != null;
   }
 

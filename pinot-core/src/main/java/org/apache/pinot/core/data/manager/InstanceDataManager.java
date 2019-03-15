@@ -83,7 +83,7 @@ public interface InstanceDataManager {
    *
    * This method performs book keeping of deleted segments.
    */
-  void deleteSegment(@Nonnull String tableNameWithType, @Nonnull String segmentName);
+  void trackDeletedSegment(@Nonnull String tableNameWithType, @Nonnull String segmentName);
 
   /**
    * Reloads a segment in a table.

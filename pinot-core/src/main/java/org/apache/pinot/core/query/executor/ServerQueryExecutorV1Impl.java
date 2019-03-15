@@ -135,7 +135,9 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       if (segmentDataManager != null) {
         segmentDataManagers.add(segmentDataManager);
       } else {
-        if (!tableDataManager.isDeleted(segmentName)) {
+        if (!tableDataManager.isRecentlyDeleted(segmentName)) {
+          LOGGER.error("Could not find segment {} for table {} for requestId {}", segmentName, tableNameWithType,
+              requestId);
           missingSegments++;
         }
       }

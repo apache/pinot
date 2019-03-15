@@ -82,12 +82,12 @@ public interface TableDataManager {
   /**
    * Track a deleted segment.
    */
-  void deleteSegment(@Nonnull String segmentName);
+  void trackDeletedSegment(@Nonnull String segmentName);
 
   /**
    * Check if a segment is recently deleted.
    */
-  boolean isDeleted(@Nonnull String segmentName);
+  boolean isRecentlyDeleted(@Nonnull String segmentName);
 
   /**
    * Acquires all segments of the table.
