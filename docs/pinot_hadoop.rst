@@ -23,7 +23,8 @@ Creating Pinot segments
 =======================
 
 Pinot segments can be created offline on Hadoop, or via command line from data files. Controller REST endpoint
-can then be used to add the segment to the table to which the segment belongs.
+can then be used to add the segment to the table to which the segment belongs. Pinot segments can also be created by
+ingesting data from realtime resources (such as Kafka).
 
 Creating segments using hadoop
 ------------------------------
@@ -79,13 +80,13 @@ workflow to generate Pinot segments.
 .. code-block:: none
 
   mvn clean install -DskipTests -Pbuild-shaded-jar
-  hadoop jar pinot-hadoop-0.016-shaded.jar SegmentCreation job.properties
+  hadoop jar pinot-hadoop-<version>-SNAPSHOT-shaded.jar SegmentCreation job.properties
 
 You can then use the SegmentTarPush job to push segments via the controller REST API.
 
 .. code-block:: none
 
-  hadoop jar pinot-hadoop-0.016-shaded.jar SegmentTarPush job.properties
+  hadoop jar pinot-hadoop-<version>-SNAPSHOT-shaded.jar SegmentTarPush job.properties
 
 
 Creating Pinot segments outside of Hadoop
@@ -177,8 +178,8 @@ Sample Schema:
     "schemaName" : "mySchema",
   }
 
-Pushing segments to Pinot
-^^^^^^^^^^^^^^^^^^^^^^^^^
+Pushing offline segments to Pinot
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 You can use curl to push a segment to pinot:
 
@@ -196,3 +197,67 @@ Alternatively you can use the pinot-admin.sh utility to upload one or more segme
 The command uploads all the segments found in ``segmentDirectoryPath``.
 The segments could be either tar-compressed (in which case it is a file under ``segmentDirectoryPath``)
 or uncompressed (in which case it is a directory under ``segmentDirectoryPath``).
+
+Realtime segment generation
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+To consume in realtime, we simply need to create a table that uses the same schema and points to the Kafka topic to
+consume from, using a table definition such as this one:
+
+.. code-block:: none
+  {
+    "tableName":"flights",
+    "segmentsConfig" : {
+        "retentionTimeUnit":"DAYS",
+        "retentionTimeValue":"7",
+        "segmentPushFrequency":"daily",
+        "segmentPushType":"APPEND",
+        "replication" : "1",
+        "schemaName" : "flights",
+        "timeColumnName" : "daysSinceEpoch",
+        "timeType" : "DAYS",
+        "segmentAssignmentStrategy" : "BalanceNumSegmentAssignmentStrategy"
+    },
+    "tableIndexConfig" : {
+        "invertedIndexColumns" : ["Carrier"],
+        "loadMode"  : "HEAP",
+        "lazyLoad"  : "false",
+                "streamConfigs": {
+                        "streamType": "kafka",
+                        "stream.kafka.consumer.type": "highLevel",
+                        "stream.kafka.topic.name": "flights-realtime",
+                        "stream.kafka.decoder.class.name": "org.apache.pinot.core.realtime.impl.kafka.KafkaJSONMessageDecoder",
+                        "stream.kafka.zk.broker.url": "localhost:2181",
+                        "stream.kafka.hlc.zk.connect.string": "localhost:2181"
+                }
+    },
+    "tableType":"REALTIME",
+        "tenants" : {
+                "broker":"DefaultTenant_BROKER",
+                "server":"DefaultTenant_SERVER"
+        },
+    "metadata": {
+    }
+  }
+
+First, we'll start a local instance of Kafka and start streaming data into it:
+
+.. code-block:: none
+
+  bin/pinot-admin.sh StartKafka &
+  bin/pinot-admin.sh StreamAvroIntoKafka -avroFile flights-2014.avro -kafkaTopic flights-realtime &
+
+This will stream one event per second from the Avro file to the Kafka topic. Then, we'll create a realtime table, which
+will start consuming from the Kafka topic.
+
+.. code-block:: none
+
+  bin/pinot-admin.sh AddTable -filePath flights-definition-realtime.json
+
+We can then query the table and see the events stream in:
+
+.. code-block:: none
+
+  {"traceInfo":{},"numDocsScanned":17,"aggregationResults":[{"function":"count_star","value":"17"}],"timeUsedMs":27,"segmentStatistics":[],"exceptions":[],"totalDocs":17}
+
+Repeating the query multiple times should show the events slowly being streamed into the table.

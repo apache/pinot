@@ -39,7 +39,7 @@ export default Route.extend({
             exploreDimensions: detection_json.dimensions,
             filters: this._formatYamlFilter(detectionInfo.filters),
             dimensionExploration: this._formatYamlFilter(detectionInfo.dimensionExploration),
-            lastDetectionTime: lastDetection.toDateString() + ", " +  lastDetection.toLocaleTimeString() + " (" + moment.tz.guess() + ")",
+            lastDetectionTime: lastDetection.toDateString() + ", " +  lastDetection.toLocaleTimeString() + " (" + moment().tz(moment.tz.guess()).format('z') + ")",
             rawYaml: detection_json.yaml
           });
 

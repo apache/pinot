@@ -17,21 +17,24 @@
 .. under the License.
 ..
 
+***********************
 Contribution Guidelines
-=======================
+***********************
+
+.. contents:: Table of Contents
 
 Before you begin to contribute, make sure you have reviewed :ref:`dev-setup` and :ref:`code-modules` sections and that you have created your own fork of the pinot source code.
 
 Create an issue for the change
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+------------------------------
 Create a Pinot issue for the change you would like to make. Provide information on why the change is needed and how you
 plan to address it. Use the conversations on the issue as a way to validate assumptions and the right way to proceed.
-Be sure to review sections on :ref:`compatiblity-changes` and :ref:`external-libs`.
+Be sure to review sections on :ref:`compatibility-changes` and :ref:`external-libs`.
 
 Once you are clear about what you want to do, proceed with the next steps listed below.
 
 Create a branch for your change
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+-------------------------------
 
 .. code-block:: none
 
@@ -47,6 +50,11 @@ Create a branch for your change
   $ git checkout -b <your issue branch>
 
 Make the necessary changes. If the changes you plan to make are too big, make sure you break it down into smaller tasks.
+
+Making the changes
+------------------
+
+Follow the recommendations/best-practices noted here when you are making changes.
 
 Code documentation
 ^^^^^^^^^^^^^^^^^^
@@ -152,7 +160,7 @@ If attention to the licensing terms in not paid early on, they will be caught mu
 Updating code at that time to work with the right libraries at that time might require bigger refactoring changes and delay the release process.
 
 Creating a PR
-^^^^^^^^^^^^^
+-------------
 
 * Verifying code-style
 
@@ -214,6 +222,7 @@ At this time, if rebase flags any conflicts, resolve the conflicts and follow th
 Run additional tests/validations for the new changes and update the PR by pushing your changes:
 
 .. code-block:: none
+
   $ git push origin <your issue branch>
 
 * Once your change is merged, check to see if any documentation needs to be updated. If so, create a PR for documentation.

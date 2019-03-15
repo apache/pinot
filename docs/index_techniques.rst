@@ -23,6 +23,8 @@
 Index Techniques
 ================
 
+.. contents:: Table of Contents
+
 Pinot currently supports the following index techniques, where each of them have their own advantages in different query
 scenarios. By default, Pinot will use ``dictionary-encoded forward index`` for each column.
 
@@ -68,11 +70,13 @@ Raw value forward index can be configured for a table by setting it in the table
 .. code-block:: none
 
     {
-        "noDictionaryColumns": [
-          "column_name",
-          ...
-        ],
-        ...
+        "tableIndexConfig": {
+            "noDictionaryColumns": [
+                "column_name",
+                ...
+            ],
+            ...
+        }
     }
 
 
@@ -94,10 +98,12 @@ Sorted index can be configured for a table by setting it in the table config as
 .. code-block:: none
 
     {
-        "sortedColumn": [
-          "memberId"
-        ],
-        ...
+        "tableIndexConfig": {
+            "sortedColumn": [
+                "column_name"
+            ],
+            ...
+        }
     }
 
 Realtime server will sort data on ``sortedColumn`` when generating segment internally. For offline push, input data
@@ -126,10 +132,13 @@ Inverted index can be configured for a table by setting it in the table config a
 .. code-block:: none
 
     {
-        "invertedIndexColumns": [
-          "column_name"
-        ],
-        ...
+        "tableIndexConfig": {
+            "invertedIndexColumns": [
+                "column_name",
+                ...
+            ],
+            ...
+        }
     }
 
 

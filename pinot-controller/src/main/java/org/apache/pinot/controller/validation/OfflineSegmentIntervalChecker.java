@@ -51,7 +51,7 @@ public class OfflineSegmentIntervalChecker extends ControllerPeriodicTask<Void> 
   public OfflineSegmentIntervalChecker(ControllerConf config, PinotHelixResourceManager pinotHelixResourceManager,
       ValidationMetrics validationMetrics, ControllerMetrics controllerMetrics) {
     super("OfflineSegmentIntervalChecker", config.getOfflineSegmentIntervalCheckerFrequencyInSeconds(),
-        config.getPeriodicTaskInitialDelayInSeconds(), pinotHelixResourceManager, controllerMetrics);
+        config.getOfflineSegmentIntervalCheckerInitialDelayInSeconds(), pinotHelixResourceManager, controllerMetrics);
     _validationMetrics = validationMetrics;
   }
 
