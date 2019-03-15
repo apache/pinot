@@ -405,7 +405,7 @@ public class FileUploadDownloadClient implements Closeable {
         getUploadSegmentMetadataRequest(uri, segmentName, segmentMetadataFile, headers, parameters, socketTimeoutMs));
   }
 
-  // Upload a set of segment meta data files (e.g., meta.properties and creation.meta) to controllers.
+  // Upload a set of segment metadata files (e.g., meta.properties and creation.meta) to controllers.
   public SimpleHttpResponse uploadSegmentMetadataFiles(URI uri, Map<String, File> metadataFiles,
       int segmentUploadRequestTimeoutMs)
       throws IOException, HttpErrorStatusException {
