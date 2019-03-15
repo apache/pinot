@@ -51,27 +51,20 @@ public class ServerSegmentCompletionProtocolHandler {
   private static SSLContext _sslContext;
   private static Integer _controllerHttpsPort;
 
-  private static boolean _commitWithMetadata;
-
   private final FileUploadDownloadClient _fileUploadDownloadClient;
   private final ServerMetrics _serverMetrics;
 
-  public static void init(Configuration uploaderConfig, boolean commitWithMetadata) {
+  public static void init(Configuration uploaderConfig) {
     Configuration httpsConfig = uploaderConfig.subset(HTTPS_PROTOCOL);
     if (httpsConfig.getBoolean(CONFIG_OF_CONTROLLER_HTTPS_ENABLED, false)) {
       _sslContext = new ClientSSLContextGenerator(httpsConfig.subset(CommonConstants.PREFIX_OF_SSL_SUBSET)).generate();
       _controllerHttpsPort = httpsConfig.getInt(CONFIG_OF_CONTROLLER_HTTPS_PORT);
     }
-    _commitWithMetadata = commitWithMetadata;
   }
 
   public ServerSegmentCompletionProtocolHandler(ServerMetrics serverMetrics) {
     _fileUploadDownloadClient = new FileUploadDownloadClient(_sslContext);
     _serverMetrics = serverMetrics;
-  }
-
-  public static boolean isCommitWithMetadata() {
-    return _commitWithMetadata;
   }
 
   public SegmentCompletionProtocol.Response segmentCommitStart(SegmentCompletionProtocol.Request.Params params) {

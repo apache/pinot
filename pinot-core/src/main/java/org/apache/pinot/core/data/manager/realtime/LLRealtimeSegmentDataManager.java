@@ -24,7 +24,6 @@ import com.google.common.util.concurrent.Uninterruptibles;
 import com.yammer.metrics.core.Meter;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
@@ -744,7 +743,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       params.withMemoryUsedBytes(_memoryManager.getTotalAllocatedBytes());
     }
     SegmentCompletionProtocol.Response commitEndResponse;
-    if (!ServerSegmentCompletionProtocolHandler.isCommitWithMetadata()) {
+    if (!_indexLoadingConfig.isEnableSplitCommitEndWithMetadata()) {
       commitEndResponse = _protocolHandler.segmentCommitEnd(params);
     } else {
       Map<String, File> metadataFiles = new HashMap<>();

@@ -27,7 +27,6 @@ import org.apache.pinot.controller.ControllerConf;
  * Integration test that extends LLCRealtimeClusterIntegrationTest but with split commit enabled.
  */
 public class LLCRealtimeClusterSplitCommitIntegrationTest extends LLCRealtimeClusterIntegrationTest {
-
   @Override
   public void startController() {
     ControllerConf controllerConfig = getDefaultControllerConfiguration();
@@ -39,6 +38,7 @@ public class LLCRealtimeClusterSplitCommitIntegrationTest extends LLCRealtimeClu
   public void startServer() {
     Configuration serverConfig = getDefaultServerConfiguration();
     serverConfig.setProperty(CommonConstants.Server.CONFIG_OF_ENABLE_SPLIT_COMMIT, true);
+    serverConfig.setProperty(CommonConstants.Server.CONFIG_OF_ENABLE_COMMIT_END_WITH_METADATA, true);
     startServer(serverConfig);
   }
 }

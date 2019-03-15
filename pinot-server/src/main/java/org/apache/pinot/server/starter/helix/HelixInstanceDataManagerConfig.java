@@ -68,6 +68,8 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
 
   // Key of whether to enable split commit
   private static final String ENABLE_SPLIT_COMMIT = "enable.split.commit";
+  // Key of whether to enable split commit end of metadata.
+  private static final String ENABLE_SPLIT_COMMIT_END_WITH_METADATA = "enable.commitend.metadata";
 
   // Whether memory for realtime consuming segments should be allocated off-heap.
   private static final String REALTIME_OFFHEAP_ALLOCATION = "realtime.alloc.offheap";
@@ -161,6 +163,11 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   @Override
   public boolean isEnableSplitCommit() {
     return _instanceDataManagerConfiguration.getBoolean(ENABLE_SPLIT_COMMIT, false);
+  }
+
+  @Override
+  public boolean isEnableSplitCommitEndWithMetadata() {
+    return _instanceDataManagerConfiguration.getBoolean(ENABLE_SPLIT_COMMIT_END_WITH_METADATA, false);
   }
 
   @Override
