@@ -68,7 +68,7 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
 
   // Key of whether to enable split commit
   private static final String ENABLE_SPLIT_COMMIT = "enable.split.commit";
-  // Key of whether to enable split commit end of metadata.
+  // Key of whether to enable split commit end with segment metadata files.
   private static final String ENABLE_SPLIT_COMMIT_END_WITH_METADATA = "enable.commitend.metadata";
 
   // Whether memory for realtime consuming segments should be allocated off-heap.
