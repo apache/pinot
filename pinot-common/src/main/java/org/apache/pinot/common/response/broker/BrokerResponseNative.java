@@ -53,6 +53,8 @@ public class BrokerResponseNative implements BrokerResponse {
   private long _numSegmentsQueried = 0L;
   private long _numSegmentsProcessed = 0L;
   private long _numSegmentsMatched = 0L;
+  private long _numConsumingQueried = 0L;
+  private long _minConsumingIndexTs = 0L;
 
   private long _totalDocs = 0L;
   private boolean _numGroupsLimitReached = false;
@@ -202,6 +204,27 @@ public class BrokerResponseNative implements BrokerResponse {
   public void setNumSegmentsMatched(long numSegmentsMatched) {
     _numSegmentsMatched = numSegmentsMatched;
   }
+
+  @JsonProperty("numConsumingQueried")
+  public long getNumConsumingQueried() {
+    return _numConsumingQueried;
+  }
+
+  @JsonProperty("numConsumingQueried")
+  public void setNumConsumingQueried(long queried) {
+    _numConsumingQueried = queried;
+  }
+
+  @JsonProperty("minConsumingIndexTs")
+  public long getMinConsumingIndexTs() {
+    return _minConsumingIndexTs;
+  }
+
+  @JsonProperty("minConsumingIndexTs")
+  public void setMinConsumingIndexTs(long ts) {
+    _minConsumingIndexTs = ts;
+  }
+
 
   @JsonProperty("totalDocs")
   @Override

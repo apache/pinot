@@ -82,6 +82,8 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
     long numSegmentsQueried = 0L;
     long numSegmentsProcessed = 0L;
     long numSegmentsMatched = 0L;
+    long numConsumingQueried = 0L;
+    long minConsumingIndexTs = Long.MAX_VALUE;
     long numTotalRawDocs = 0L;
     boolean numGroupsLimitReached = false;
 
@@ -136,6 +138,16 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
         numSegmentsMatched += Long.parseLong(numSegmentsMatchedString);
       }
 
+      String numConsumingString = metadata.get(DataTable.NUM_CONSUMING_SEGMENTS_QUERIED);
+      if (numConsumingString != null) {
+        numConsumingQueried += Long.parseLong(numConsumingString);
+      }
+
+      String minConsumingIndexTsString = metadata.get(DataTable.MIN_CONSUMING_INDEX_TIMESTAMP);
+      if (minConsumingIndexTsString != null) {
+        minConsumingIndexTs = Math.min(Long.parseLong(minConsumingIndexTsString), minConsumingIndexTs);
+      }
+
       String numTotalRawDocsString = metadata.get(DataTable.TOTAL_DOCS_METADATA_KEY);
       if (numTotalRawDocsString != null) {
         numTotalRawDocs += Long.parseLong(numTotalRawDocsString);
@@ -168,6 +180,14 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
     brokerResponseNative.setNumSegmentsMatched(numSegmentsMatched);
     brokerResponseNative.setTotalDocs(numTotalRawDocs);
     brokerResponseNative.setNumGroupsLimitReached(numGroupsLimitReached);
+    if (numConsumingQueried > 0) {
+      if (minConsumingIndexTs == Long.MAX_VALUE) {
+        LOGGER.error("Invalid lastIndexedTimestamp across {} consuming segments", numConsumingQueried);
+        minConsumingIndexTs = 0L;
+      }
+      brokerResponseNative.setNumConsumingQueried(numConsumingQueried);
+      brokerResponseNative.setMinConsumingIndexTs(minConsumingIndexTs);
+    }
 
     // Update broker metrics.
     String tableName = brokerRequest.getQuerySource().getTableName();

@@ -97,8 +97,8 @@ public class MutableSegmentImpl implements MutableSegment {
 
   // default message metadata
   private static final StreamMessageMetadata _defaultMetadata = new StreamMessageMetadata();
-  private long _lastIndexedTimestamp = Long.MIN_VALUE;
-  private long _latestIngestionTimestamp = Long.MIN_VALUE;
+  private volatile long _lastIndexedTimestamp = Long.MIN_VALUE;
+  private volatile long _latestIngestionTimestamp = Long.MIN_VALUE;
 
   public MutableSegmentImpl(RealtimeSegmentConfig config) {
     _segmentName = config.getSegmentName();
@@ -386,6 +386,16 @@ public class MutableSegmentImpl implements MutableSegment {
   @Override
   public int getNumDocsIndexed() {
     return _numDocsIndexed;
+  }
+
+  @Override
+  public long getLastIndexedTimestamp() {
+    return _lastIndexedTimestamp;
+  }
+
+  @Override
+  public IndexSegmentType getType() {
+    return IndexSegmentType.MUTABLE;
   }
 
   @Override

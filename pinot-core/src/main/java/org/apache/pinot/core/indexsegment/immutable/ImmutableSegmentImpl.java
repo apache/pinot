@@ -78,6 +78,11 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   }
 
   @Override
+  public IndexSegmentType getType() {
+    return IndexSegmentType.IMMUTABLE;
+  }
+
+  @Override
   public String getSegmentName() {
     return _segmentMetadata.getName();
   }

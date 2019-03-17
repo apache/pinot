@@ -54,6 +54,8 @@ public class MutableSegmentImplTest {
   private Schema _schema;
   private MutableSegmentImpl _mutableSegmentImpl;
   private ImmutableSegment _immutableSegment;
+  private long _lastIndexedTs;
+  private long _startTimeMs;
 
   @BeforeClass
   public void setUp()
@@ -75,10 +77,12 @@ public class MutableSegmentImplTest {
     _mutableSegmentImpl = MutableSegmentImplTestUtils
         .createMutableSegmentImpl(_schema, Collections.emptySet(), Collections.emptySet(), false);
     StreamMessageMetadata defaultMetadata = new StreamMessageMetadata();
+    _startTimeMs = System.currentTimeMillis();
     try (RecordReader recordReader = new AvroRecordReader(avroFile, _schema)) {
       GenericRow reuse = new GenericRow();
       while (recordReader.hasNext()) {
         _mutableSegmentImpl.index(recordReader.next(reuse), defaultMetadata);
+        _lastIndexedTs = System.currentTimeMillis();
       }
     }
   }
@@ -88,6 +92,11 @@ public class MutableSegmentImplTest {
     SegmentMetadata actualSegmentMetadata = _mutableSegmentImpl.getSegmentMetadata();
     SegmentMetadata expectedSegmentMetadata = _immutableSegment.getSegmentMetadata();
     Assert.assertEquals(actualSegmentMetadata.getTotalDocs(), expectedSegmentMetadata.getTotalDocs());
+
+    // assert that the last indexed timestamp is close to what we expect
+    long actualTs = _mutableSegmentImpl.getLastIndexedTimestamp();
+    Assert.assertTrue(actualTs >= _startTimeMs);
+    Assert.assertTrue(actualTs <= _lastIndexedTs);
 
     for (FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
       String column = fieldSpec.getName();

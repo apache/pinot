@@ -41,6 +41,7 @@ import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.SegmentDataManager;
 import org.apache.pinot.core.data.manager.TableDataManager;
 import org.apache.pinot.core.indexsegment.IndexSegment;
+import org.apache.pinot.core.indexsegment.mutable.MutableSegment;
 import org.apache.pinot.core.plan.Plan;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.core.plan.maker.PlanMaker;
@@ -149,6 +150,27 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       TraceContext.register(requestId);
     }
 
+    Integer numConsuming = 0;
+    Long minIndexTime = Long.MAX_VALUE;
+    // gather stats for realtime consuming segments
+    for (SegmentDataManager segmentMgr : segmentDataManagers) {
+      if (segmentMgr.getSegment().getType() == IndexSegment.IndexSegmentType.MUTABLE) {
+        numConsuming += 1;
+        MutableSegment segment = (MutableSegment) segmentMgr.getSegment();
+        if (segment.getLastIndexedTimestamp() < minIndexTime) {
+          minIndexTime = segment.getLastIndexedTimestamp();
+        }
+      }
+    }
+
+    if (numConsuming > 0) {
+      if (minIndexTime == Long.MAX_VALUE) {
+        LOGGER.error("Did not find valid lastIndexedTimestamp across consuming segments!");
+        minIndexTime = 0L;
+      }
+      LOGGER.info("Querying {} consuming segments with min lastIndexedTime {}", numConsuming, minIndexTime);
+    }
+
     DataTable dataTable = null;
     try {
       TimerContext.Timer segmentPruneTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.SEGMENT_PRUNING);
@@ -219,11 +241,16 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       // Currently, given the deleted segments cache is in-memory only, a server restart will reset it
       // We might end up sending partial-response metadata in such cases. It appears that the likelihood of
       // this occurence is low; ie, segment has to be retained out and the server must be restarted while the
-      // broker view is still behind. We would however like to validate that and/or conf control this based on 
+      // broker view is still behind. We would however like to validate that and/or conf control this based on
       // data.
       /*dataTable.addException(QueryException.getException(QueryException.SEGMENTS_MISSING_ERROR,
           "Could not find " + missingSegments + " segments on the server"));*/
       _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_MISSING_SEGMENTS, missingSegments);
+    }
+
+    if (numConsuming > 0) {
+      dataTable.getMetadata().put(DataTable.NUM_CONSUMING_SEGMENTS_QUERIED, numConsuming.toString());
+      dataTable.getMetadata().put(DataTable.MIN_CONSUMING_INDEX_TIMESTAMP, minIndexTime.toString());
     }
 
     LOGGER.debug("Query processing time for request Id - {}: {}", requestId, queryProcessingTime);

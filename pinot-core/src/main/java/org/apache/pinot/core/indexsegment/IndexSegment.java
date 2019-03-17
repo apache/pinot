@@ -29,6 +29,15 @@ import org.apache.pinot.core.startree.v2.StarTreeV2;
 @InterfaceAudience.Private
 public interface IndexSegment {
 
+  public enum IndexSegmentType{
+    IMMUTABLE, MUTABLE;
+  }
+
+  /**
+   * Return the index segment type.
+   */
+  IndexSegmentType getType();
+
   /**
    * Returns the name of the segment.
    *
