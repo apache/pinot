@@ -213,7 +213,7 @@ public class MutableSegmentImpl implements MutableSegment {
   @Override
   public boolean index(GenericRow row, StreamMessageMetadata msgMetadata) {
 
-    boolean canTakeMore = false;
+    boolean canTakeMore;
     // Update dictionary first
     Map<String, Object> dictIdMap = updateDictionary(row);
 
@@ -243,7 +243,6 @@ public class MutableSegmentImpl implements MutableSegment {
     if (msgMetadata != null) {
       _latestIngestionTimestamp = Math.max(_latestIngestionTimestamp, msgMetadata.getIngestionTimestamp());
     }
-
     return canTakeMore;
   }
 
