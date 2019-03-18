@@ -137,15 +137,17 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
   protected class SegmentBuildDescriptor {
     final String _segmentTarFilePath;
+    final Map<String, File> _metadataFileMap;
     final long _offset;
     final long _waitTimeMillis;
     final long _buildTimeMillis;
     final String _segmentDirPath;
     final long _segmentSizeBytes;
 
-    SegmentBuildDescriptor(String segmentTarFilePath, long offset, String segmentDirPath, long buildTimeMillis,
-        long waitTimeMillis, long segmentSizeBytes) {
+    SegmentBuildDescriptor(String segmentTarFilePath, Map<String, File> metadataFileMap, long offset,
+        String segmentDirPath, long buildTimeMillis, long waitTimeMillis, long segmentSizeBytes) {
       _segmentTarFilePath = segmentTarFilePath;
+      _metadataFileMap = metadataFileMap;
       _offset = offset;
       _buildTimeMillis = buildTimeMillis;
       _waitTimeMillis = waitTimeMillis;
@@ -179,6 +181,10 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       if (_segmentTarFilePath != null) {
         FileUtils.deleteQuietly(new File(_segmentTarFilePath));
       }
+    }
+
+    public Map<String, File> getMetadataFiles() {
+      return _metadataFileMap;
     }
   }
 
@@ -688,11 +694,23 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           TimeUnit.MILLISECONDS.toSeconds(waitTimeMillis));
 
       if (forCommit) {
+        Preconditions.checkState(destDir.listFiles() != null && destDir.listFiles().length > 0,
+            "The index dir is empty: ", destDir);
+        File metadataFileName = new File(destDir.listFiles()[0], V1Constants.MetadataKeys.METADATA_FILE_NAME);
+        Preconditions.checkState(metadataFileName.exists(),
+                                "File does not exist in :" + destDir + " for " + V1Constants.MetadataKeys.METADATA_FILE_NAME);
+        File creationMetaFile = new File(destDir.listFiles()[0], V1Constants.SEGMENT_CREATION_META);
+        Preconditions.checkState(creationMetaFile.exists(),
+            "File does not exist in :" + destDir + " for " + V1Constants.SEGMENT_CREATION_META);
+
+        Map<String, File> metadataFiles = new HashMap<>();
+        metadataFiles.put(V1Constants.MetadataKeys.METADATA_FILE_NAME, metadataFileName);
+        metadataFiles.put(V1Constants.SEGMENT_CREATION_META, creationMetaFile);
         return new SegmentBuildDescriptor(destDir.getAbsolutePath() + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION,
-            _currentOffset, null, buildTimeMillis, waitTimeMillis, segmentSizeBytes);
+            metadataFiles, _currentOffset, null, buildTimeMillis, waitTimeMillis, segmentSizeBytes);
       }
-      return new SegmentBuildDescriptor(null, _currentOffset, destDir.getAbsolutePath(), buildTimeMillis,
-          waitTimeMillis, segmentSizeBytes);
+      return new SegmentBuildDescriptor(null, null, _currentOffset, destDir.getAbsolutePath(),
+          buildTimeMillis, waitTimeMillis, segmentSizeBytes);
     } catch (InterruptedException e) {
       segmentLogger.error("Interrupted while waiting for semaphore");
       return null;
@@ -746,18 +764,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     if (!_indexLoadingConfig.isEnableSplitCommitEndWithMetadata()) {
       commitEndResponse = _protocolHandler.segmentCommitEnd(params);
     } else {
-      Map<String, File> metadataFiles = new HashMap<>();
-      try {
-        metadataFiles.put(V1Constants.MetadataKeys.METADATA_FILE_NAME,
-            extractMetadataFromSegmentTarFile(segmentTarFile, V1Constants.MetadataKeys.METADATA_FILE_NAME));
-        metadataFiles.put(V1Constants.SEGMENT_CREATION_META,
-            extractMetadataFromSegmentTarFile(segmentTarFile, V1Constants.SEGMENT_CREATION_META));
-        commitEndResponse = _protocolHandler.segmentCommitEndWithMetadata(params, metadataFiles);
-      } finally {
-        for(File f : metadataFiles.values()) {
-          FileUtils.deleteQuietly(f);
-        }
-      }
+      commitEndResponse = _protocolHandler.segmentCommitEndWithMetadata(params, _segmentBuildDescriptor.getMetadataFiles());
     }
 
     if (!commitEndResponse.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS)) {
@@ -765,20 +772,6 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       return SegmentCompletionProtocol.RESP_FAILED;
     }
     return commitEndResponse;
-  }
-
-  private File extractMetadataFromSegmentTarFile(File segmentTarFile, final String metaFileName) {
-    try (InputStream metadataInputStream = TarGzCompressionUtils
-        .unTarOneFile(new FileInputStream(segmentTarFile), metaFileName)) {
-      Preconditions.checkNotNull(metadataInputStream, "%s does not exist", metaFileName);
-      File tmpFile = File.createTempFile(metaFileName, "llc-split-commit");
-      Files.copy(metadataInputStream, tmpFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
-      return tmpFile;
-    } catch (Exception e) {
-      segmentLogger.error("Exception during extracting and reading segment metadata for file {} on metadata {} ",
-          segmentTarFile.toPath(), metaFileName, e);
-    }
-    return null;
   }
 
   protected boolean commitSegment(SegmentCompletionProtocol.Response response) {
