@@ -177,6 +177,7 @@ public class DetectionResource {
 
   @POST
   @Path("/preview")
+  @ApiOperation("preview a detection with detection config json")
   public Response detectionPreview(
       @QueryParam("start") long start,
       @QueryParam("end") long end,
@@ -230,6 +231,7 @@ public class DetectionResource {
 
   @POST
   @Path("/preview/{id}")
+  @ApiOperation("preview a detection with a existing detection config")
   public Response detectionPreview(
       @PathParam("id") long id,
       @QueryParam("start") long start,
@@ -340,6 +342,8 @@ public class DetectionResource {
    */
   @POST
   @Path("/legacy-replay/{id}")
+  @ApiOperation("Legacy replay endpoint. Replay all the moving windows within start time and end time. "
+      + "Saves anomaly for each moving window before starting detection for next window and emulates the cron schedule")
   public Response legacyReplay(
       @PathParam("id") long configId,
       @QueryParam("start") long start,
@@ -400,6 +404,7 @@ public class DetectionResource {
    */
   @POST
   @Path("/replay/{id}")
+  @ApiOperation("Replay for a given time range for a existing detection config id")
   public Response detectionReplay(
       @PathParam("id") long detectionId,
       @QueryParam("start") long start,
