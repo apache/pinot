@@ -182,19 +182,17 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
   private static final Set<String> MOVING_WINDOW_DETECTOR_TYPES = ImmutableSet.of("ALGORITHM", "MIGRATED_ALGORITHM");
 
   private final Map<String, Object> components = new HashMap<>();
-  private MetricConfigDTO metricConfig;
-  private DatasetConfigDTO datasetConfig;
-  private String metricUrn;
-  private Map<String, Object> mergerProperties = new HashMap<>();
+  private final MetricConfigDTO metricConfig;
+  private final DatasetConfigDTO datasetConfig;
+  private final String metricUrn;
+  private final Map<String, Object> mergerProperties;
+  // metric dimension filter maps
+  private final Map<String, Collection<String>> filterMaps;
   protected final org.yaml.snakeyaml.Yaml yaml;
 
   public CompositePipelineConfigTranslator(Map<String, Object> yamlConfig, DataProvider provider) {
     super(yamlConfig, provider);
     this.yaml = new org.yaml.snakeyaml.Yaml();
-  }
-
-  @Override
-  YamlTranslationResult translateYaml() {
     this.metricConfig = this.dataProvider.fetchMetric(MapUtils.getString(yamlConfig, PROP_METRIC),
         MapUtils.getString(yamlConfig, PROP_DATASET));
     Preconditions.checkNotNull(this.metricConfig, "Metric not found");
@@ -202,12 +200,13 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
     this.datasetConfig = this.dataProvider.fetchDatasets(Collections.singletonList(metricConfig.getDataset()))
         .get(metricConfig.getDataset());
     Preconditions.checkNotNull(this.datasetConfig, "dataset not found");
-
-    // if user set merger properties
     this.mergerProperties = MapUtils.getMap(yamlConfig, PROP_MERGER, new HashMap());
-
-    Map<String, Collection<String>> filterMaps = MapUtils.getMap(yamlConfig, PROP_FILTERS);
+    this.filterMaps = MapUtils.getMap(yamlConfig, PROP_FILTERS);
     this.metricUrn = buildMetricUrn(filterMaps, this.metricConfig.getId());
+  }
+
+  @Override
+  YamlTranslationResult translateYaml() {
     String detectionCronInYaml = MapUtils.getString(yamlConfig, PROP_CRON);
     String cron = (detectionCronInYaml == null) ? buildCron() : detectionCronInYaml;
 
@@ -228,14 +227,14 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
         nestedPipelines.addAll(filterNestedProperties);
       }
     }
-    Map<String, Object> dimensionWrapperProperties = buildDimensionWrapperProperties(filterMaps);
+    Map<String, Object> dimensionWrapperProperties = buildDimensionWrapperProperties();
     Map<String, Object> properties = buildWrapperProperties(ChildKeepingMergeWrapper.class.getName(),
         Collections.singletonList(
             buildWrapperProperties(DimensionWrapper.class.getName(), nestedPipelines, dimensionWrapperProperties)), this.mergerProperties);
     return new YamlTranslationResult().withProperties(properties).withComponents(this.components).withCron(cron);
   }
 
-  private Map<String, Object> buildDimensionWrapperProperties(Map<String, Collection<String>> filterMaps) {
+  private Map<String, Object> buildDimensionWrapperProperties() {
     Map<String, Object> dimensionWrapperProperties = new HashMap<>();
     dimensionWrapperProperties.put(PROP_NESTED_METRIC_URNS, Collections.singletonList(this.metricUrn));
     if (yamlConfig.containsKey(PROP_DIMENSION_EXPLORATION)) {
@@ -470,7 +469,7 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
     // Safety condition: Validate if maxDuration is greater than 15 minutes
     Map<String, Object> mergerProperties = MapUtils.getMap(yamlConfig, PROP_MERGER, new HashMap());
     if (mergerProperties.get(PROP_MAX_DURATION) != null) {
-      Preconditions.checkArgument(MapUtils.getLong(mergerProperties, PROP_MAX_DURATION) >= TimeUnit.MINUTES.toMillis(15),
+      Preconditions.checkArgument(MapUtils.getLong(mergerProperties, PROP_MAX_DURATION) >= datasetConfig.bucketTimeGranularity().toMillis(),
           "The maxDuration field set is not acceptable. Please check the the document  and set it correctly.");
     }
 
