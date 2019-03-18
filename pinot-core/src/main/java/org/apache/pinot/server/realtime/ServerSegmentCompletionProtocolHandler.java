@@ -96,6 +96,8 @@ public class ServerSegmentCompletionProtocolHandler {
     return uploadSegment(url, params.getSegmentName(), segmentTarFile);
   }
 
+  // Replaced by segmentCommitEndWithMetadata().
+  @Deprecated
   public SegmentCompletionProtocol.Response segmentCommitEnd(SegmentCompletionProtocol.Request.Params params) {
     SegmentCompletionProtocol.SegmentCommitEndRequest request =
         new SegmentCompletionProtocol.SegmentCommitEndRequest(params);
