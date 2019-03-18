@@ -48,7 +48,7 @@ export default Component.extend({
   anomalyMapping: {},
   timeseries: null,
   isLoading: false,
-  analysisRange: [moment().subtract(1, 'day').startOf('day').valueOf(), moment().startOf('day').valueOf()],
+  analysisRange: [moment().subtract(1, 'day').startOf('day').valueOf(), moment().add(1, 'day').startOf('day').valueOf()],
   isPendingData: false,
   colorMapping: colorMapping,
   zoom: {
