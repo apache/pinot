@@ -766,10 +766,10 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       params.withMemoryUsedBytes(_memoryManager.getTotalAllocatedBytes());
     }
     SegmentCompletionProtocol.Response commitEndResponse;
-    if (!_indexLoadingConfig.isEnableSplitCommitEndWithMetadata()) {
-      commitEndResponse = _protocolHandler.segmentCommitEnd(params);
-    } else {
+    if (_indexLoadingConfig.isEnableSplitCommitEndWithMetadata()) {
       commitEndResponse = _protocolHandler.segmentCommitEndWithMetadata(params, _segmentBuildDescriptor.getMetadataFiles());
+    } else {
+      commitEndResponse = _protocolHandler.segmentCommitEnd(params);
     }
 
     if (!commitEndResponse.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS)) {
