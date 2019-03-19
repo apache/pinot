@@ -695,6 +695,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           segmentLogger.error("The index dir is empty: {}", destDir);
           return null;
         }
+        // segmentfiles[0] is the sub directory with version name (e.g., V3).
         File metadataFileName = new File(segmentfiles[0], V1Constants.MetadataKeys.METADATA_FILE_NAME);
         if (!metadataFileName.exists()) {
           segmentLogger
