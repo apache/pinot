@@ -77,6 +77,8 @@ public class KafkaConnectionHandler {
 
   boolean isPartitionProvided;
 
+  private final KafkaLowLevelStreamConfig _kafkaLowLevelStreamConfig;
+
   @VisibleForTesting
   public SimpleConsumer getSimpleConsumer() {
     return _simpleConsumer;
@@ -109,19 +111,19 @@ public class KafkaConnectionHandler {
    */
   public KafkaConnectionHandler(String clientId, StreamConfig streamConfig,
       KafkaSimpleConsumerFactory simpleConsumerFactory) {
-    KafkaLowLevelStreamConfig kafkaLowLevelStreamConfig = new KafkaLowLevelStreamConfig(streamConfig);
+    _kafkaLowLevelStreamConfig = new KafkaLowLevelStreamConfig(streamConfig);
     _simpleConsumerFactory = simpleConsumerFactory;
     _clientId = clientId;
-    _topic = kafkaLowLevelStreamConfig.getKafkaTopicName();
+    _topic = _kafkaLowLevelStreamConfig.getKafkaTopicName();
     _connectTimeoutMillis = streamConfig.getConnectionTimeoutMillis();
     _simpleConsumer = null;
 
     isPartitionProvided = false;
     _partition = Integer.MIN_VALUE;
 
-    _bufferSize = kafkaLowLevelStreamConfig.getKafkaBufferSize();
-    _socketTimeout = kafkaLowLevelStreamConfig.getKafkaSocketTimeout();
-    initializeBootstrapNodeList(kafkaLowLevelStreamConfig.getBootstrapHosts());
+    _bufferSize = _kafkaLowLevelStreamConfig.getKafkaBufferSize();
+    _socketTimeout = _kafkaLowLevelStreamConfig.getKafkaSocketTimeout();
+    initializeBootstrapNodeList(_kafkaLowLevelStreamConfig.getBootstrapHosts());
     setCurrentState(new ConnectingToBootstrapNode());
   }
 
@@ -134,19 +136,19 @@ public class KafkaConnectionHandler {
   public KafkaConnectionHandler(String clientId, StreamConfig streamConfig, int partition,
       KafkaSimpleConsumerFactory simpleConsumerFactory) {
 
-    KafkaLowLevelStreamConfig kafkaLowLevelStreamConfig = new KafkaLowLevelStreamConfig(streamConfig);
+    _kafkaLowLevelStreamConfig = new KafkaLowLevelStreamConfig(streamConfig);
     _simpleConsumerFactory = simpleConsumerFactory;
     _clientId = clientId;
-    _topic = kafkaLowLevelStreamConfig.getKafkaTopicName();
+    _topic = _kafkaLowLevelStreamConfig.getKafkaTopicName();
     _connectTimeoutMillis = streamConfig.getConnectionTimeoutMillis();
     _simpleConsumer = null;
 
     isPartitionProvided = true;
     _partition = partition;
 
-    _bufferSize = kafkaLowLevelStreamConfig.getKafkaBufferSize();
-    _socketTimeout = kafkaLowLevelStreamConfig.getKafkaSocketTimeout();
-    initializeBootstrapNodeList(kafkaLowLevelStreamConfig.getBootstrapHosts());
+    _bufferSize = _kafkaLowLevelStreamConfig.getKafkaBufferSize();
+    _socketTimeout = _kafkaLowLevelStreamConfig.getKafkaSocketTimeout();
+    initializeBootstrapNodeList(_kafkaLowLevelStreamConfig.getBootstrapHosts());
     setCurrentState(new ConnectingToBootstrapNode());
   }
 
@@ -178,6 +180,10 @@ public class KafkaConnectionHandler {
             "Could not parse port number " + splitHostAndPort[1] + " for host:port combination " + hostAndPort);
       }
     }
+  }
+
+  protected KafkaLowLevelStreamConfig getkafkaLowLevelStreamConfig() {
+    return _kafkaLowLevelStreamConfig;
   }
 
   abstract class State {
