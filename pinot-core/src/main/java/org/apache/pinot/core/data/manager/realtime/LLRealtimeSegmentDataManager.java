@@ -25,7 +25,9 @@ import com.yammer.metrics.core.Meter;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
@@ -67,6 +69,7 @@ import org.apache.pinot.core.realtime.stream.StreamDecoderProvider;
 import org.apache.pinot.core.realtime.stream.StreamMessageDecoder;
 import org.apache.pinot.core.realtime.stream.StreamMetadataProvider;
 import org.apache.pinot.core.realtime.stream.TransientConsumerException;
+import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import org.joda.time.DateTime;
@@ -130,15 +133,17 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
   protected class SegmentBuildDescriptor {
     final String _segmentTarFilePath;
+    final Map<String, File> _metadataFileMap;
     final long _offset;
     final long _waitTimeMillis;
     final long _buildTimeMillis;
     final String _segmentDirPath;
     final long _segmentSizeBytes;
 
-    SegmentBuildDescriptor(String segmentTarFilePath, long offset, String segmentDirPath, long buildTimeMillis,
-        long waitTimeMillis, long segmentSizeBytes) {
+    SegmentBuildDescriptor(String segmentTarFilePath, Map<String, File> metadataFileMap, long offset,
+        String segmentDirPath, long buildTimeMillis, long waitTimeMillis, long segmentSizeBytes) {
       _segmentTarFilePath = segmentTarFilePath;
+      _metadataFileMap = metadataFileMap;
       _offset = offset;
       _buildTimeMillis = buildTimeMillis;
       _waitTimeMillis = waitTimeMillis;
@@ -172,6 +177,10 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       if (_segmentTarFilePath != null) {
         FileUtils.deleteQuietly(new File(_segmentTarFilePath));
       }
+    }
+
+    public Map<String, File> getMetadataFiles() {
+      return _metadataFileMap;
     }
   }
 
@@ -681,11 +690,32 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           TimeUnit.MILLISECONDS.toSeconds(waitTimeMillis));
 
       if (forCommit) {
+        File[] segmentfiles = destDir.listFiles();
+        if (segmentfiles == null || segmentfiles.length == 0) {
+          segmentLogger.error("The index dir is empty: {}", destDir);
+          return null;
+        }
+        // segmentfiles[0] is the sub directory with version name (e.g., V3).
+        File metadataFileName = new File(segmentfiles[0], V1Constants.MetadataKeys.METADATA_FILE_NAME);
+        if (!metadataFileName.exists()) {
+          segmentLogger
+              .error("File does not exist in {} for {}.", destDir, V1Constants.MetadataKeys.METADATA_FILE_NAME);
+          return null;
+        }
+        File creationMetaFile = new File(segmentfiles[0], V1Constants.SEGMENT_CREATION_META);
+        if (!creationMetaFile.exists()) {
+          segmentLogger.error("File does not exist in {} for {}.", destDir, V1Constants.SEGMENT_CREATION_META);
+          return null;
+        }
+
+        Map<String, File> metadataFiles = new HashMap<>();
+        metadataFiles.put(V1Constants.MetadataKeys.METADATA_FILE_NAME, metadataFileName);
+        metadataFiles.put(V1Constants.SEGMENT_CREATION_META, creationMetaFile);
         return new SegmentBuildDescriptor(destDir.getAbsolutePath() + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION,
-            _currentOffset, null, buildTimeMillis, waitTimeMillis, segmentSizeBytes);
+            metadataFiles, _currentOffset, null, buildTimeMillis, waitTimeMillis, segmentSizeBytes);
       }
-      return new SegmentBuildDescriptor(null, _currentOffset, destDir.getAbsolutePath(), buildTimeMillis,
-          waitTimeMillis, segmentSizeBytes);
+      return new SegmentBuildDescriptor(null, null, _currentOffset, destDir.getAbsolutePath(),
+          buildTimeMillis, waitTimeMillis, segmentSizeBytes);
     } catch (InterruptedException e) {
       segmentLogger.error("Interrupted while waiting for semaphore");
       return null;
@@ -735,7 +765,13 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     if (_isOffHeap) {
       params.withMemoryUsedBytes(_memoryManager.getTotalAllocatedBytes());
     }
-    SegmentCompletionProtocol.Response commitEndResponse = _protocolHandler.segmentCommitEnd(params);
+    SegmentCompletionProtocol.Response commitEndResponse;
+    if (_indexLoadingConfig.isEnableSplitCommitEndWithMetadata()) {
+      commitEndResponse = _protocolHandler.segmentCommitEndWithMetadata(params, _segmentBuildDescriptor.getMetadataFiles());
+    } else {
+      commitEndResponse = _protocolHandler.segmentCommitEnd(params);
+    }
+
     if (!commitEndResponse.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS)) {
       segmentLogger.warn("CommitEnd failed  with response {}", commitEndResponse.toJsonString());
       return SegmentCompletionProtocol.RESP_FAILED;

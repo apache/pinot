@@ -359,6 +359,12 @@ public class SegmentCompletionProtocol {
     }
   }
 
+  public static class SegmentCommitEndWithMetadataRequest extends Request {
+    public SegmentCommitEndWithMetadataRequest(Params params) {
+      super(params, MSG_TYPE_COMMIT_END_METADATA);
+    }
+  }
+
   public static class SegmentStoppedConsuming extends Request {
     public SegmentStoppedConsuming(Params params) {
       super(params, MSG_TYPE_STOPPED_CONSUMING);
