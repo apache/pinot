@@ -5,8 +5,8 @@
  * @returns {String} the complete anomaly data url
  * @example getAnomalyDataUrl(1491804013000, 1491890413000) // yields => /anomalies/search/anomalyIds/1491804013000/1491890413000/1?anomalyIds=
  */
-export function getAnomalyDataUrl(startStamp = 0, endStamp = 0) {
-  return `/anomalies/search/anomalyIds/${startStamp}/${endStamp}/1?anomalyIds=`;
+export function getAnomalyDataUrl(anomalyId) {
+  return `/dashboard/anomalies/view/${anomalyId}`;
 }
 
 /**
