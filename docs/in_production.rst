@@ -88,7 +88,7 @@ Pinot Server
 
 * Realtime Consumption Status - `LLC_PARTITION_CONSUMING <https://github.com/apache/incubator-pinot/blob/master/pinot-common/src/main/java/org/apache/pinot/common/metrics/ServerGauge.java>`_
 
-  * This gives a binary 1 or 0 based on whether low-level consumption is healthy (1) or not (0). It's important to ensure at least a single replica of each partition is consuming
+  * This gives a binary value based on whether low-level consumption is healthy (1) or unhealthy (0). It's important to ensure at least a single replica of each partition is consuming
 
 * Realtime Highest Offset Consumed - `HIGHEST_STREAM_OFFSET_CONSUMED <https://github.com/apache/incubator-pinot/blob/master/pinot-common/src/main/java/org/apache/pinot/common/metrics/ServerGauge.java>`_
 
@@ -123,7 +123,7 @@ Pinot Controller
 * Missing Segment Count -
 * Segments in Error State -
 * Last push delay -
-* Percent of replicas up - `PERCENT_OF_REPLICAS <https://github.com/apache/incubator-pinot/blob/master/pinot-common/src/main/java/org/apache/pinot/common/metrics/ControllerGauge.java#L33>_`
+* Percent of replicas up - `PERCENT_OF_REPLICAS <https://github.com/apache/incubator-pinot/blob/master/pinot-common/src/main/java/org/apache/pinot/common/metrics/ControllerGauge.java#L33>`_
 * Table quota usage percent - `TABLE_STORAGE_QUOTA_UTILIZATION <https://github.com/apache/incubator-pinot/blob/master/pinot-common/src/main/java/org/apache/pinot/common/metrics/ControllerGauge.java#L61>`_
 
 
