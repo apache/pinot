@@ -18,13 +18,13 @@
 ..
 
 Table Config
-=======================
+============
 
 Table Config
 -------------
 
-Introduction to table configs
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Introduction
+~~~~~~~~~~~~
 
 Using tables is how Pinot serves and organizes data. There are many settings in the table config which will influence how Pinot operates. The first and most significant distinction is using an offline versus a realtime table.
 
@@ -57,13 +57,39 @@ The ``tableType`` will indicate the type of the table, ``OFFLINE`` or ``REALTIME
 Segments Config Section
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-The ``segmentsConfig`` section has information about configuring
+The ``segmentsConfig`` section has information about configuring the following:
 
-* Segment Retention - with the  ``retentionTimeUnit`` and ``retentionTimeValue`` options.
-* Segment Push - Using ``segmentPushFrequency`` to indicate how frequently segments are uploaded.
-* Replication - Using ``replication`` for offline tables and ``replicasPerPartition`` for realtime tables will indicate how many replicas of data will be present.
-* Schema - The name of the schema that's been uploaded to the controller
+* Segment Retention - with the ``retentionTimeUnit`` and ``retentionTimeValue`` options.
+
+  * Allowed values:
+
+    * ``retentionTimeUnit`` - ``DAYS``
+    * ``retentionTimeValue`` - Positive integers
+
+* ``segmentPushFrequency`` - to indicate how frequently segments are uploaded.
+
+  * Allowed values - ``daily``, ``hourly``
+
+* ``segmentPushType`` - Indicates the type of push to the table.
+
+  * Allowed values - ``APPEND`` means new data will be pushed and appended to the current data in the table, all realtime tables *must* be ``APPEND``. ``REFRESH`` will refresh the entire dataset contained within the table.
+
+* ``replication`` - Number of replicas of data in a table, used for offline tables only.
+
+  * Allowed values - Positive integers
+
+* ``replicasPerPartition`` - Number of of data in a table, used for offline tables only.
+
+  * Allowed values - Positive integers
+
+* ``schemaName`` - Name of the schema that's been uploaded to the controller
+
+  * Allowed values - String
+
 * Time column - using ``timeColumnName`` and ``timeType``, this must match what's configured in the preceeding schema
+
+  * Allowed values - String, this must match the ``timeFieldSpec`` section in the schema
+
 * Segment assignment strategy - Described more on the page `Customizing Pinot <customizations.html#segment-assignment-strategies>`_
 
 
@@ -76,7 +102,7 @@ The ``segmentsConfig`` section has information about configuring
       "segmentPushType": "APPEND",
       "replication": "3",
       "replicasPerPartition": "3",
-      "schemaName": "ugcGestureEvents",
+      "schemaName": "myPinotSchmea",
       "timeColumnName": "daysSinceEpoch",
       "timeType": "DAYS",
       "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy"
@@ -87,15 +113,31 @@ Table Index Config Section
 
 The ``tableIndexConfig`` section has information about how to configure:
 
-* Inverted Indexes - Using the ``invertedIndexColumns`` to specify a list of real column names as specified in the schema.
-* No Dictionary Columns - Using the ``noDictionaryColumns`` to specify a list of real column names as specified in the schema. Column names present will NOT have a dictionary created. More info on indexes can be found on the `Index Techniques <index_techniques.html>`_ page.
-* Sorted Column - Using the ``sortedColumn`` to specify a list of real column names as specified in the schema.
-* Aggregate Metrics - Using ``aggregateMetrics`` set to ``"true"`` to enable the feature and ``"false"`` to disable. This feature is only available on REALTIME tables.
-* Data Partitioning Strategy using the ``segmentPartitionConfig`` to configure based on documentation in the `Data Partitioning Strategies <customizations.html#data-partitioning-strategies>`_ section.
-* Load Mode - Using ``loadMode`` either ``"MMAP"`` or ``"HEAP"`` can be configured.
-* Lazy Loading of Data - Using ``lazyLoad`` this feature can be enabled by setting it to ``"true"`` and disabled by setting to ``"false"``
-* Segment Format Version - Using the ``segmentFormatVersion`` field, this should always be set to ``"v3"``.
-* Stream Configs - This section is where the bulk of the settings specific to only REALTIME tables are found. These options are explained in detail in the `Pluggable Streams <pluggable_streams.html#pluggable-streams>`_ page.
+* ``invertedIndexColumns`` - Indicates a list of real column names as specified in the schema to create inverted indexes for. More info on indexes can be found on the `Index Techniques <index_techniques.html>`_ page.
+
+  * Allowed values - String; string must match the column name in the corresponding schema
+
+* ``noDictionaryColumns`` - Indicates a list of real column names as specified in the schema. Column names present will **not** have a dictionary created. More info on indexes can be found on the `Index Techniques <index_techniques.html>`_ page.
+
+  * Allowed values - String; string must match the column name in the corresponding schema
+
+* ``sortedColumn`` - Indicates a list of real column names as specified in the schema. Data should be sorted based on the column names provided. More info on indexes can be found on the `Index Techniques <index_techniques.html>`_ page.
+
+  * Allowed values - String; string must match the column name in the corresponding schema
+
+* ``aggregateMetrics`` - Switch for the aggregate metrics feature. This feature will aggregate realtime stream data as it is consumed, where applicable, in order to reduce segment sizes. This feature is only available on REALTIME tables.
+
+  * Allowed values - ``true`` to enable, ``false`` to disable.
+
+* ``segmentPartitionConfig`` - Cofigures the Data Partitioning Strategy. Further documentation on this feather available in the `Data Partitioning Strategies <customizations.html#data-partitioning-strategies>`_ section.
+* ``loadMode`` - indicates how data will be loaded on pinot-server. either ``"MMAP"`` or ``"HEAP"`` can be configured.
+
+  * Allowed values:
+
+    * ``MMAP`` - Configures pinot-server to load data segments to off-heap memory.
+    * ``HEAP`` - Configures pinot-server to load data directly into heap memory.
+
+* ``streamConfigs`` - This section is where the bulk of the settings specific to only REALTIME tables are found. These options are explained in detail in the `Pluggable Streams <pluggable_streams.html#pluggable-streams>`_ page.
 
 .. code-block:: none
 
@@ -126,13 +168,13 @@ The ``tableIndexConfig`` section has information about how to configure:
 Tenants Section
 ~~~~~~~~~~~~~~~
 
-The ``tenants`` section has two config fields in it. These fields are used to configure which tenants are used within Helix.
+The ``tenants`` section has two main config fields in it. These fields are used to configure which tenants are used within Helix.
 
 .. code-block:: none
 
     "tenants": {
-      "broker": "ugcAnalytics",
-      "server": "ugcAnalytics"
+      "broker": "brokerTenant",
+      "server": "serverTenant"
     },
 
 Routing Section
@@ -160,13 +202,3 @@ The ``metadata`` section is used for passing special key-value pairs into Pinot 
         "anotherSpecialConfig": "value"
       }
     }
-
-Example Offline Config
-~~~~~~~~~~~~~~~~~~~~~~
-
-
-
-Example Realtime Config
-~~~~~~~~~~~~~~~~~~~~~~~
-
-
