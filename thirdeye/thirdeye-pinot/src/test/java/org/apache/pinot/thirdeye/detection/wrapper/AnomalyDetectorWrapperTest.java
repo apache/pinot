@@ -19,14 +19,12 @@ package org.apache.pinot.thirdeye.detection.wrapper;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ListMultimap;
-import java.util.ArrayList;
 import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.common.time.TimeSpec;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
-import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
 import org.apache.pinot.thirdeye.detection.MockDataProvider;
 import org.apache.pinot.thirdeye.detection.components.ThresholdRuleDetector;
@@ -130,33 +128,20 @@ public class AnomalyDetectorWrapperTest {
   public void testGetLastTimestampWithEstimate() {
     AnomalyDetectorWrapper detectionPipeline =
         new AnomalyDetectorWrapper(this.provider, this.config, 1546300800000L, 1546560000000L);
-    Assert.assertEquals(detectionPipeline.getLastTimeStamp(null), 1546473600000L);
+    Assert.assertEquals(detectionPipeline.getLastTimeStamp(), 1546473600000L);
   }
 
   @Test
   public void testGetLastTimestampTruncate() {
     AnomalyDetectorWrapper detectionPipeline =
         new AnomalyDetectorWrapper(this.provider, this.config, 1546646400000L, 1546732800000L);
-    Assert.assertEquals(detectionPipeline.getLastTimeStamp(null), 1546732800000L);
+    Assert.assertEquals(detectionPipeline.getLastTimeStamp(), 1546732800000L);
   }
 
   @Test
   public void testGetLastTimestampNoData() {
     AnomalyDetectorWrapper detectionPipeline =
         new AnomalyDetectorWrapper(this.provider, this.config, 1546819200000L, 1546905600000L);
-    Assert.assertEquals(detectionPipeline.getLastTimeStamp(null), -1);
-  }
-
-  @Test
-  public void testGetLastTimestampWithAnomalies() {
-    MergedAnomalyResultDTO anomaly = new MergedAnomalyResultDTO();
-    anomaly.setStartTime(1546904600000L);
-    anomaly.setEndTime(1546905600000L);
-
-    List<MergedAnomalyResultDTO> anomalies = new ArrayList<>();
-    anomalies.add(anomaly);
-    AnomalyDetectorWrapper detectionPipeline =
-        new AnomalyDetectorWrapper(this.provider, this.config, 1546819200000L, 1546905600000L);
-    Assert.assertEquals(detectionPipeline.getLastTimeStamp(anomalies), -1);
+    Assert.assertEquals(detectionPipeline.getLastTimeStamp(), -1);
   }
 }

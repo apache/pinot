@@ -168,15 +168,14 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
       anomaly.setDimensions(DetectionUtils.toFilterMap(this.metricEntity.getFilters()));
       anomaly.getProperties().put(PROP_DETECTOR_COMPONENT_NAME, this.detectorName);
     }
-    return new DetectionPipelineResult(anomalies, this.getLastTimeStamp(anomalies));
+    return new DetectionPipelineResult(anomalies, this.getLastTimeStamp());
   }
 
   // guess-timate next time stamp
   // there are two cases. If the data is complete, next detection starts from the end time of this detection
   // If data is incomplete, next detection starts from the latest available data's time stamp plus the one time granularity.
-  long getLastTimeStamp(List<MergedAnomalyResultDTO> anomalies){
+  long getLastTimeStamp(){
     long end = this.endTime;
-
     if (this.dataset != null) {
       MetricSlice metricSlice = MetricSlice.from(this.metricEntity.getId(),
           this.startTime,
@@ -194,22 +193,8 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
       end = new DateTime(lastTimestamp, timezone).plus(period).getMillis();
     }
 
-    if (anomalies != null && anomalies.size() != 0) {
-      end = Math.max(end, getMaxEndTimestamp(anomalies));
-    }
-
     // truncate at analysis end time
     return Math.min(end, this.endTime);
-  }
-
-  private long getMaxEndTimestamp(List<MergedAnomalyResultDTO> anomalies) {
-    long maxTimeStamp = -1;
-    for (MergedAnomalyResultDTO anomaly : anomalies) {
-      if (anomaly.getEndTime() > maxTimeStamp) {
-        maxTimeStamp = anomaly.getEndTime();
-      }
-    }
-    return maxTimeStamp;
   }
 
   // get a list of the monitoring window, if no sliding window used, use start time and end time as window
