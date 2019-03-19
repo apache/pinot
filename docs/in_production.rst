@@ -123,7 +123,7 @@ Pinot Controller
 * Missing Segment Count -
 * Segments in Error State -
 * Last push delay -
-* Percent of replicas up - `PERCENT_OF_REPLICAS <https://github.com/apache/incubator-pinot/blob/master/pinot-common/src/main/java/org/apache/pinot/common/metrics/ControllerGauge.java#L33>`_
-* Table quota usage percent - `TABLE_STORAGE_QUOTA_UTILIZATION <https://github.com/apache/incubator-pinot/blob/master/pinot-common/src/main/java/org/apache/pinot/common/metrics/ControllerGauge.java#L61>`_
+* Percent of replicas up - `PERCENT_OF_REPLICAS <https://github.com/apache/incubator-pinot/blob/master/pinot-common/src/main/java/org/apache/pinot/common/metrics/ControllerGauge.java>`_
+* Table quota usage percent - `TABLE_STORAGE_QUOTA_UTILIZATION <https://github.com/apache/incubator-pinot/blob/master/pinot-common/src/main/java/org/apache/pinot/common/metrics/ControllerGauge.java>`_
 
 
