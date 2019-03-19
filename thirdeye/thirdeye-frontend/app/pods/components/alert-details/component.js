@@ -505,7 +505,7 @@ export default Component.extend({
     let metricUrnList;
     try {
       if(isPreviewMode){
-        applicationAnomalies = yield getYamlPreviewAnomalies(alertYaml, start, end);
+        applicationAnomalies = yield getYamlPreviewAnomalies(alertYaml, start, end, alertId);
         if (applicationAnomalies && applicationAnomalies.diagnostics && applicationAnomalies.diagnostics['0']) {
           metricUrnList = Object.keys(applicationAnomalies.diagnostics['0']);
           set(this, 'metricUrnList', metricUrnList);
