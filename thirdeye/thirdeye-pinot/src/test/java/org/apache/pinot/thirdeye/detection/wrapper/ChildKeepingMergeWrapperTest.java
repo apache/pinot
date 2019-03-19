@@ -112,7 +112,7 @@ public class ChildKeepingMergeWrapperTest {
     DetectionPipelineResult output = this.wrapper.run();
 
     Assert.assertEquals(output.getAnomalies().size(), 5);
-    Assert.assertEquals(output.getLastTimestamp(), 2900);
+    Assert.assertEquals(output.getLastTimestamp(), 3000);
   }
 
   @Test
@@ -123,7 +123,7 @@ public class ChildKeepingMergeWrapperTest {
     DetectionPipelineResult output = this.wrapper.run();
 
     Assert.assertEquals(output.getAnomalies().size(), 3);
-    Assert.assertEquals(output.getLastTimestamp(), 2900);
+    Assert.assertEquals(output.getLastTimestamp(), 3000);
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(0, 1250, ImmutableSet.of(makeAnomaly(1150, 1250), makeAnomaly(0, 1000), makeAnomaly(1100, 1200)))));
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(1500, 2000)));
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(2200, 2800, ImmutableSet.of(makeAnomaly(2200, 2300), makeAnomaly(2400, 2800)))));
@@ -138,7 +138,7 @@ public class ChildKeepingMergeWrapperTest {
     DetectionPipelineResult output = this.wrapper.run();
 
     Assert.assertEquals(output.getAnomalies().size(), 3);
-    Assert.assertEquals(output.getLastTimestamp(), 2900);
+    Assert.assertEquals(output.getLastTimestamp(), 3000);
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(0, 1250, ImmutableSet.of(makeAnomaly(1150, 1250), makeAnomaly(0, 1000), makeAnomaly(1100, 1200)))));
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(1500, 2300, ImmutableSet.of(makeAnomaly(2200, 2300), makeAnomaly(1500, 2000)))));
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(2400, 2800)));
@@ -164,7 +164,7 @@ public class ChildKeepingMergeWrapperTest {
     DetectionPipelineResult output = this.wrapper.run();
 
     Assert.assertEquals(output.getAnomalies().size(), 4);
-    Assert.assertEquals(output.getLastTimestamp(), 2900);
+    Assert.assertEquals(output.getLastTimestamp(), 3700);
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(0, 1250, ImmutableSet.of(makeAnomaly(1150, 1250), makeAnomaly(0, 1000), makeAnomaly(1100, 1200)))));
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(1500, 2300, ImmutableSet.of(makeAnomaly(2200, 2300), makeAnomaly(1500, 2000)))));
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(2400, 2800)));
@@ -191,7 +191,7 @@ public class ChildKeepingMergeWrapperTest {
     DetectionPipelineResult output = this.wrapper.run();
 
     Assert.assertEquals(output.getAnomalies().size(), 4);
-    Assert.assertEquals(output.getLastTimestamp(), 2900);
+    Assert.assertEquals(output.getLastTimestamp(), 3700);
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(0, 1250, ImmutableSet.of(makeAnomaly(1150, 1250), makeAnomaly(0, 1000), makeAnomaly(1100, 1200)))));
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(1500, 2300, ImmutableSet.of(makeAnomaly(2200, 2300), makeAnomaly(1500, 2000)))));
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(2400, 2800)));
@@ -253,7 +253,7 @@ public class ChildKeepingMergeWrapperTest {
     DetectionPipelineResult output = this.wrapper.run();
 
     Assert.assertEquals(output.getAnomalies().size(), 6);
-    Assert.assertEquals(output.getLastTimestamp(), 2900);
+    Assert.assertEquals(output.getLastTimestamp(), 3000);
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(0, 1250, ImmutableSet.of(makeAnomaly(1150, 1250), makeAnomaly(1100, 1200), makeAnomaly(0, 1000)))));
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(1500, 2300, ImmutableSet.of(makeAnomaly(1500, 2000), makeAnomaly(2200, 2300)))));
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(2400, 2800)));
