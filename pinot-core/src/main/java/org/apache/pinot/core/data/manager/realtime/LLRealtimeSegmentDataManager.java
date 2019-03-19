@@ -690,14 +690,22 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           TimeUnit.MILLISECONDS.toSeconds(waitTimeMillis));
 
       if (forCommit) {
-        Preconditions.checkState(destDir.listFiles() != null && destDir.listFiles().length > 0,
-            "The index dir is empty: ", destDir);
-        File metadataFileName = new File(destDir.listFiles()[0], V1Constants.MetadataKeys.METADATA_FILE_NAME);
-        Preconditions.checkState(metadataFileName.exists(),
-                                "File does not exist in :" + destDir + " for " + V1Constants.MetadataKeys.METADATA_FILE_NAME);
-        File creationMetaFile = new File(destDir.listFiles()[0], V1Constants.SEGMENT_CREATION_META);
-        Preconditions.checkState(creationMetaFile.exists(),
-            "File does not exist in :" + destDir + " for " + V1Constants.SEGMENT_CREATION_META);
+        File[] segmentfiles = destDir.listFiles();
+        if (segmentfiles == null || segmentfiles.length == 0) {
+          segmentLogger.error("The index dir is empty: {}", destDir);
+          return null;
+        }
+        File metadataFileName = new File(segmentfiles[0], V1Constants.MetadataKeys.METADATA_FILE_NAME);
+        if (!metadataFileName.exists()) {
+          segmentLogger
+              .error("File does not exist in {} for {}.", destDir, V1Constants.MetadataKeys.METADATA_FILE_NAME);
+          return null;
+        }
+        File creationMetaFile = new File(segmentfiles[0], V1Constants.SEGMENT_CREATION_META);
+        if (!creationMetaFile.exists()) {
+          segmentLogger.error("File does not exist in {} for {}.", destDir, V1Constants.SEGMENT_CREATION_META);
+          return null;
+        }
 
         Map<String, File> metadataFiles = new HashMap<>();
         metadataFiles.put(V1Constants.MetadataKeys.METADATA_FILE_NAME, metadataFileName);
