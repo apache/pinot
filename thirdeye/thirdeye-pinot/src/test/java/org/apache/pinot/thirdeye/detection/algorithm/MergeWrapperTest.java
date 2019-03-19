@@ -116,7 +116,7 @@ public class MergeWrapperTest {
     DetectionPipelineResult output = this.wrapper.run();
 
     Assert.assertEquals(output.getAnomalies().size(), 5);
-    Assert.assertEquals(output.getLastTimestamp(), 2900);
+    Assert.assertEquals(output.getLastTimestamp(), 3000);
   }
 
   @Test
@@ -127,7 +127,7 @@ public class MergeWrapperTest {
     DetectionPipelineResult output = this.wrapper.run();
 
     Assert.assertEquals(output.getAnomalies().size(), 3);
-    Assert.assertEquals(output.getLastTimestamp(), 2900);
+    Assert.assertEquals(output.getLastTimestamp(), 3000);
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(0, 1250)));
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(1500, 2000)));
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(2200, 2800)));
@@ -142,7 +142,7 @@ public class MergeWrapperTest {
     DetectionPipelineResult output = this.wrapper.run();
 
     Assert.assertEquals(output.getAnomalies().size(), 3);
-    Assert.assertEquals(output.getLastTimestamp(), 2900);
+    Assert.assertEquals(output.getLastTimestamp(), 3000);
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(0, 1250)));
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(1500, 2300)));
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(2400, 2800)));
@@ -168,7 +168,7 @@ public class MergeWrapperTest {
     DetectionPipelineResult output = this.wrapper.run();
 
     Assert.assertEquals(output.getAnomalies().size(), 4);
-    Assert.assertEquals(output.getLastTimestamp(), 2900);
+    Assert.assertEquals(output.getLastTimestamp(), 3700);
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(0, 1250)));
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(1500, 2300)));
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(2400, 3650)));
@@ -195,7 +195,7 @@ public class MergeWrapperTest {
     DetectionPipelineResult output = this.wrapper.run();
 
     Assert.assertEquals(output.getAnomalies().size(), 4);
-    Assert.assertEquals(output.getLastTimestamp(), 2900);
+    Assert.assertEquals(output.getLastTimestamp(), 3700);
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(0, 1250)));
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(1500, 2300)));
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(2400, 3650)));
@@ -221,7 +221,7 @@ public class MergeWrapperTest {
     DetectionPipelineResult output = this.wrapper.run();
 
     Assert.assertEquals(output.getAnomalies().size(), 8);
-    Assert.assertEquals(output.getLastTimestamp(), 2900);
+    Assert.assertEquals(output.getLastTimestamp(), 3700);
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(0, 500)));
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(500, 1000)));
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(1100, 1250)));
@@ -288,7 +288,7 @@ public class MergeWrapperTest {
     DetectionPipelineResult output = this.wrapper.run();
 
     Assert.assertEquals(output.getAnomalies().size(), 6);
-    Assert.assertEquals(output.getLastTimestamp(), 2900);
+    Assert.assertEquals(output.getLastTimestamp(), 3000);
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(0, 1250)));
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(1500, 2300)));
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(2400, 2800)));
