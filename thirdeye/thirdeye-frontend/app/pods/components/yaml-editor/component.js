@@ -305,6 +305,7 @@ export default Component.extend({
       if(value.yaml) {
         set(this, 'currentYamlSettings', value.yaml);
         set(this, 'groupName', value);
+        set(this, 'subscriptionGroupId', value.id);
       }
     },
 
@@ -419,12 +420,11 @@ export default Component.extend({
     async saveEditYamlAction() {
       const {
         alertYaml,
-        detectionSettingsYaml,
+        currentYamlSettings,
         notifications,
         alertId,
         subscriptionGroupId
-      } = getProperties(this, 'alertYaml', 'detectionSettingsYaml', 'notifications', 'alertId', 'subscriptionGroupId');
-
+      } = getProperties(this, 'alertYaml', 'currentYamlSettings', 'notifications', 'alertId', 'subscriptionGroupId');
       //PUT alert
       const alert_url = `/yaml/${alertId}`;
       const alertPostProps = {
@@ -450,7 +450,7 @@ export default Component.extend({
       const setting_url = `/yaml/subscription/${subscriptionGroupId}`;
       const settingsPostProps = {
         method: 'PUT',
-        body: detectionSettingsYaml,
+        body: currentYamlSettings,
         headers: { 'content-type': 'text/plain' }
       };
       try {

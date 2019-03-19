@@ -1,9 +1,15 @@
 <main class="te-form alert-report-modal__body">
 
   <fieldset class="te-form__section te-form__section--first row" id="select-target1">
-    <div class="col-xs-12">
-      <legend class="te-report-title">Specify Metric, Alert, and Dimensions</legend>
-    </div>
+    {{#if showDimension}}
+      <div class="col-xs-12">
+        <legend class="te-report-title">Specify Metric, Alert, and Dimensions</legend>
+      </div>
+    {{else}}
+      <div class="col-xs-12">
+        <legend class="te-report-title">Specify Metric and Alert</legend>
+      </div>
+    {{/if}}
 
     <div class="form-group col-xs-5">
       <label for="select-metric" class="control-label te-label required">Metric</label>
@@ -27,23 +33,18 @@
       }}
     </div>
 
-    <div class="form-group col-xs-7">
-      <label for="report-select-dimension" class="control-label te-label">Dimensions</label>
-      {{#power-select
-        triggerId="report-select-dimension"
-        triggerClass="te-form__select"
-        verticalPosition="below"
-        placeholder="Select a dimension"
-        renderInPlace=true
-        options=dimensionOptions
-        searchEnabled=false
-        selected=selectedDimension
-        onchange=(action "onSelectDimension")
-        as |dimension|
-      }}
-        {{dimension}}
-      {{/power-select}}
-    </div>
+    {{#if showDimension}}
+      <div class="form-group col-xs-7">
+        <label for="report-select-dimension" class="control-label te-label">Dimensions</label>
+        {{input
+          type="text"
+          id="report-select-dimension"
+          class="form-control te-input"
+          value=selectedDimension
+          disabled=true
+        }}
+      </div>
+    {{/if}}
   </fieldset>
 
   <fieldset class="te-form__section row">
@@ -69,20 +70,12 @@
   </fieldset>
 
   <fieldset class="te-form__section te-form__section--graph">
-    {{self-serve-graph
-      isMetricDataLoading=isMetricDataLoading
-      isMetricDataInvalid=isMetricDataInvalid
-      isFetchingDimensions=isFetchingDimensions
-      isDimensionFetchDone=isDimensionFetchDone
-      availableDimensions=availableDimensions
-      selectedDimension=alertDimension
-      graphMailtoLink=graphMailtoLink
-      isTopDimensionsAllowed=false
-      isDimensionError=false
-      isMetricSelected=true
-      metricData=metricData
-      topDimensions=topDimensions
-      componentId='report-anomaly'
+    {{timeseries-chart
+      series=series
+      colorMapping=colorMapping
+      axis=axis
+      zoom=zoom
+      legend=legend
     }}
   </fieldset>
 
