@@ -33,7 +33,7 @@
       value=currentYamlAlert
       suggestCompletions=(action 'yamlSuggestions')
       enableLiveAutocompletion=true
-      update=(action "onYMLSelectorAction")
+      update=(action "onEditingDetectionYamlAction")
       mode="ace/mode/yaml"
     }}
   </div>
@@ -56,7 +56,7 @@
         {{#aitem.body}}
           {{#alert-details
             isPreviewMode=true
-            alertYaml=alertYaml
+            alertYaml=detectionYaml
             alertId=alertId
             dataIsCurrent=alertDataIsCurrent
           }}
@@ -82,7 +82,7 @@
         options=subscriptionGroupNamesDisplay
         selected=groupName
         searchField="name"
-        onchange=(action 'onYAMLGroupSelectionAction')
+        onchange=(action 'onSubscriptionGroupSelectionAction')
         as |groupName|
       }}
         {{groupName.name}} ({{groupName.id}})
@@ -113,8 +113,8 @@
       {{!-- subscription settings editor --}}
       {{ember-ace
         lines=25
-        value=currentYamlSettings
-        update=(action "onYMLSettingsSelectorAction")
+        value=currentSubscriptionYaml
+        update=(action "onEditingSubscriptionYamlAction")
         mode="ace/mode/yaml"
       }}
     </div>
