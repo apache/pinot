@@ -137,7 +137,7 @@ public final class Schema {
   public List<MetricFieldSpec> getMetricFieldSpecs() {
     return _metricFieldSpecs;
   }
-  
+
   /**
    * Required by JSON deserializer. DO NOT USE. DO NOT REMOVE.
    * Adding @Deprecated to prevent usage
