@@ -6,17 +6,17 @@
  * @property {boolean} isEditMode - to activate the edit mode
  * @property {boolean} showSettings - to show the subscriber groups yaml editor
  * @property {Object} subscriptionGroupNames - the list of subscription groups
- * @property {Object} alertYaml - the alert yaml to display
- * @property {Object} detectionSettingsYaml - the subscription group yaml to display
+ * @property {Object} detectionYaml - the detection yaml to display
+ * @property {Object} subscriptionYaml - the subscription group yaml to display
  * @example
    {{yaml-editor
      alertId=model.alertId
      subscriptionGroupId=model.subscriptionGroupId
      isEditMode=true
      showSettings=true
-     subscriptionGroupNames=model.detectionSettingsYaml
-     alertYaml=model.detectionYaml
-     detectionSettingsYaml=model.detectionSettingsYaml
+     subscriptionGroupNames=model.subscriptionGroupNames
+     detectionYaml=model.detectionYaml
+     subscriptionYaml=model.subscriptionYaml
    }}
  * @author lohuynh
  */
@@ -43,15 +43,15 @@ export default Component.extend({
    */
   currentMetric: null,
   isYamlParseable: true,
-  alertTitle: 'Define anomaly detection in YAML',
-  alertSettingsTitle: 'Define notification settings',
+  alertTitle: 'Define detection configuration',
+  alertSettingsTitle: 'Define subscription configuration',
   isEditMode: false,
   showSettings: true,
   disableYamlSave: true,
   detectionMsg: '',                   //General alert failures
   subscriptionMsg: '',                //General subscription failures
-  alertYaml: null,                // The YAML for the anomaly alert detection
-  detectionSettingsYaml:  null,   // The YAML for the subscription group
+  detectionYaml: null,                // The YAML for the anomaly detection
+  subscriptionYaml:  null,            // The YAML for the subscription group
   yamlAlertProps: yamlAlertProps,
   yamlAlertSettings: yamlAlertSettings,
   showAnomalyModal: false,
@@ -66,13 +66,13 @@ export default Component.extend({
   init() {
     this._super(...arguments);
     if(get(this, 'isEditMode')) {
-      set(this, 'currentYamlAlertOriginal', get(this, 'alertYaml') || get(this, 'yamlAlertProps'));
-      set(this, 'currentYamlSettingsOriginal', get(this, 'detectionSettingsYaml') || get(this, 'yamlAlertSettings'));
+      set(this, 'currentYamlAlertOriginal', get(this, 'detectionYaml') || get(this, 'yamlAlertProps'));
+      set(this, 'currentYamlSettingsOriginal', get(this, 'subscriptionYaml') || get(this, 'yamlAlertSettings'));
     }
   },
 
   /**
-   * sets Yaml value displayed to contents of alertYaml or yamlAlertProps
+   * sets Yaml value displayed to contents of detectionYaml or yamlAlertProps
    * @method currentYamlAlert
    * @return {String}
    */
@@ -85,28 +85,28 @@ export default Component.extend({
   ),
 
   /**
-   * sets Yaml value displayed to contents of alertYaml or yamlAlertProps
+   * sets Yaml value displayed to contents of detectionYaml or yamlAlertProps
    * @method currentYamlAlert
    * @return {String}
    */
   currentYamlAlert: computed(
-    'alertYaml',
+    'detectionYaml',
     function() {
-      const inputYaml = get(this, 'alertYaml');
+      const inputYaml = get(this, 'detectionYaml');
       return inputYaml || get(this, 'yamlAlertProps');
     }
   ),
 
   /**
-   * sets Yaml value displayed to contents of detectionSettingsYaml or yamlAlertSettings
+   * sets Yaml value displayed to contents of subscriptionYaml or yamlAlertSettings
    * @method currentYamlAlert
    * @return {String}
    */
-  currentYamlSettings: computed(
-    'detectionSettingsYaml',
+  currentSubscriptionYaml: computed(
+    'subscriptionYaml',
     function() {
-      const detectionSettingsYaml = get(this, 'detectionSettingsYaml');
-      return detectionSettingsYaml || get(this, 'yamlAlertSettings');
+      const subscriptionYaml = get(this, 'subscriptionYaml');
+      return subscriptionYaml || get(this, 'yamlAlertSettings');
     }
   ),
 
@@ -272,17 +272,17 @@ export default Component.extend({
       const isEditMode = get(this, 'isEditMode');
       if (field === 'anomaly') {
         if(isEditMode) {
-          set(this, 'alertYaml', get(this, 'currentYamlAlertOriginal'));
+          set(this, 'detectionYaml', get(this, 'currentYamlAlertOriginal'));
         } else {
           const yamlAlertProps = get(this, 'yamlAlertProps');
-          set(this, 'alertYaml', yamlAlertProps);
+          set(this, 'detectionYaml', yamlAlertProps);
         }
       } else if (field === 'subscription') {
         if(isEditMode) {
-          set(this, 'detectionSettingsYaml', get(this, 'currentYamlSettingsOriginal'));
+          set(this, 'subscriptionYaml', get(this, 'currentYamlSettingsOriginal'));
         } else {
           const yamlAlertSettings = get(this, 'yamlAlertSettings');
-          set(this, 'detectionSettingsYaml', yamlAlertSettings);
+          set(this, 'subscriptionYaml', yamlAlertSettings);
         }
       }
     },
@@ -299,27 +299,16 @@ export default Component.extend({
     },
 
     /**
-     * Updates the subscription settings yaml with user section
-     */
-    onYAMLGroupSelectionAction(value) {
-      if(value.yaml) {
-        set(this, 'detectionSettingsYaml', value.yaml);
-        set(this, 'groupName', value);
-        set(this, 'subscriptionGroupId', value.id);
-      }
-    },
-
-    /**
      * returns array of suggestions for Yaml editor autocompletion
      */
     yamlSuggestions(editor, session, position, prefix) {
       const {
-        alertYaml,
+        detectionYaml,
         noResultsArray
-      } = getProperties(this, 'alertYaml', 'noResultsArray');
+      } = getProperties(this, 'detectionYaml', 'noResultsArray');
       let yamlAsObject = {};
       try {
-        yamlAsObject = yamljs.parse(alertYaml);
+        yamlAsObject = yamljs.parse(detectionYaml);
         set(this, 'isYamlParseable', true);
       }
       catch(err){
@@ -355,12 +344,12 @@ export default Component.extend({
     },
 
     /**
-     * Activates 'Create changes' button and stores YAML content in alertYaml
+     * Activates 'Create changes' button and stores YAML content in detectionYaml
      */
-    onYMLSelectorAction(value) {
+    onEditingDetectionYamlAction(value) {
       setProperties(this, {
         disableYamlSave: false,
-        alertYaml: value,
+        detectionYaml: value,
         detectionMsg: '',
         subscriptionMsg: '',
         alertDataIsCurrent: false
@@ -368,13 +357,24 @@ export default Component.extend({
     },
 
     /**
-     * Activates 'Create changes' button and stores YAML content in detectionSettingsYaml
+     * Activates 'Create changes' button and stores YAML content in subscriptionYaml
      */
-    onYMLSettingsSelectorAction(value) {
+    onEditingSubscriptionYamlAction(value) {
       setProperties(this, {
         disableYamlSave: false,
-        detectionSettingsYaml: value
+        subscriptionYaml: value
       });
+    },
+
+    /**
+     * Updates the subscription settings yaml with user section
+     */
+    onSubscriptionGroupSelectionAction(value) {
+      if(value.yaml) {
+        set(this, 'subscriptionYaml', value.yaml);
+        set(this, 'groupName', value);
+        set(this, 'subscriptionGroupId', value.id);
+      }
     },
 
     /**
@@ -383,8 +383,8 @@ export default Component.extend({
      */
     createAlertYamlAction() {
       const content = {
-        detection: get(this, 'alertYaml'),
-        subscription: get(this, 'detectionSettingsYaml')
+        detection: get(this, 'detectionYaml'),
+        subscription: get(this, 'subscriptionYaml')
       };
       const url = '/yaml/create-alert';
       const postProps = {
@@ -419,17 +419,17 @@ export default Component.extend({
      */
     async saveEditYamlAction() {
       const {
-        alertYaml,
-        detectionSettingsYaml,
+        detectionYaml,
+        subscriptionYaml,
         notifications,
         alertId,
         subscriptionGroupId
-      } = getProperties(this, 'alertYaml', 'detectionSettingsYaml', 'notifications', 'alertId', 'subscriptionGroupId');
+      } = getProperties(this, 'detectionYaml', 'subscriptionYaml', 'notifications', 'alertId', 'subscriptionGroupId');
       //PUT alert
       const alert_url = `/yaml/${alertId}`;
       const alertPostProps = {
         method: 'PUT',
-        body: alertYaml,
+        body: detectionYaml,
         headers: { 'content-type': 'text/plain' }
       };
       try {
@@ -438,18 +438,18 @@ export default Component.extend({
         const alert_json = await alert_result.json();
         if (alert_status !== 200) {
           set(this, 'errorMsg', get(alert_json, 'message'));
-          notifications.error('Save alert yaml file failed.', 'Error');
+          notifications.error('Failed to save the detection configuration.', 'Error');
         } else {
-          notifications.success('Alert saved successfully', 'Done', alert_json);
+          notifications.success('Detection configuration saved successfully', 'Done', alert_json);
         }
       } catch (error) {
-        notifications.error('Save alert yaml file failed.', error);
+        notifications.error('Error while saving detection config.', error);
       }
       //PUT settings
       const setting_url = `/yaml/subscription/${subscriptionGroupId}`;
       const settingsPostProps = {
         method: 'PUT',
-        body: detectionSettingsYaml,
+        body: subscriptionYaml,
         headers: { 'content-type': 'text/plain' }
       };
       try {
@@ -458,12 +458,12 @@ export default Component.extend({
         const settings_json = await settings_result.json();
         if (settings_status !== 200) {
           set(this, 'errorMsg', get(settings_json, 'message'));
-          notifications.error('Save settings yaml file failed.', 'Error');
+          notifications.error('Failed to save the subscription configuration.', 'Error');
         } else {
-          notifications.success('Settings saved successfully', 'Done', settings_json);
+          notifications.success('Subscription configuration saved successfully', 'Done', settings_json);
         }
       } catch (error) {
-        notifications.error('Save settings yaml file failed.', error);
+        notifications.error('Error while saving subscription config', error);
       }
     }
   }
