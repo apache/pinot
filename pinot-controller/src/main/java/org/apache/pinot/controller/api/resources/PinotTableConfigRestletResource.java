@@ -94,93 +94,101 @@ public class PinotTableConfigRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/v2/tables")
   public Response createNewTable(String tableConfiguration) {
-    CombinedConfig config = null;
-
     try {
-      config = Deserializer.deserializeFromString(CombinedConfig.class, tableConfiguration);
+      CombinedConfig config;
+
+      try {
+        config = Deserializer.deserializeFromString(CombinedConfig.class, tableConfiguration);
+      } catch (Exception e) {
+        LOGGER.warn("Caught exception while deserializing the table configuration", e);
+        return Response.serverError().entity(e.getMessage()).type(MediaType.TEXT_PLAIN_TYPE).build();
+      }
+
+      if (config == null) {
+        LOGGER.warn("Failed to deserialize the table configuration: {}", tableConfiguration);
+        return Response.serverError().entity("Failed to deserialize the table configuration")
+            .type(MediaType.TEXT_PLAIN_TYPE).build();
+      }
+
+      if (config.getSchema() != null) {
+        _resourceManager.addOrUpdateSchema(config.getSchema());
+      }
+
+      if (config.getOfflineTableConfig() != null) {
+        _resourceManager.addTable(config.getOfflineTableConfig());
+      }
+
+      if (config.getRealtimeTableConfig() != null) {
+        _resourceManager.addTable(config.getRealtimeTableConfig());
+      }
+
+      return Response.ok().build();
     } catch (Exception e) {
-      LOGGER.warn("Caught exception while deserializing the table configuration", e);
-      return Response.serverError().entity(e.getMessage()).type(MediaType.TEXT_PLAIN_TYPE).build();
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
     }
-
-    if (config == null) {
-      LOGGER.warn("Failed to deserialize the table configuration: {}", tableConfiguration);
-      return Response.serverError().entity("Failed to deserialize the table configuration")
-          .type(MediaType.TEXT_PLAIN_TYPE).build();
-    }
-
-    if (config.getSchema() != null) {
-      _resourceManager.addOrUpdateSchema(config.getSchema());
-    }
-
-    if (config.getOfflineTableConfig() != null) {
-      _resourceManager.addTable(config.getOfflineTableConfig());
-    }
-
-    if (config.getRealtimeTableConfig() != null) {
-      _resourceManager.addTable(config.getRealtimeTableConfig());
-    }
-
-    return Response.ok().build();
   }
 
   @PUT
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/v2/tables/{tableName}")
   public Response updateTable(String tableConfiguration) {
-    CombinedConfig config = null;
-
     try {
-      config = Deserializer.deserializeFromString(CombinedConfig.class, tableConfiguration);
+      CombinedConfig config;
+
+      try {
+        config = Deserializer.deserializeFromString(CombinedConfig.class, tableConfiguration);
+      } catch (Exception e) {
+        LOGGER.warn("Caught exception while deserializing the table configuration", e);
+        return Response.serverError().entity(e.getMessage()).type(MediaType.TEXT_PLAIN_TYPE).build();
+      }
+
+      if (config == null) {
+        LOGGER.warn("Failed to deserialize the table configuration: {}", tableConfiguration);
+        return Response.serverError().entity("Failed to deserialize the table configuration")
+            .type(MediaType.TEXT_PLAIN_TYPE).build();
+      }
+
+      if (config.getSchema() != null) {
+        _resourceManager.addOrUpdateSchema(config.getSchema());
+      }
+
+      if (config.getOfflineTableConfig() != null) {
+        if (_resourceManager.getAllTables().contains(config.getOfflineTableConfig().getTableName())) {
+          try {
+            _resourceManager
+                .setExistingTableConfig(config.getOfflineTableConfig(), config.getOfflineTableConfig().getTableName(),
+                    CommonConstants.Helix.TableType.OFFLINE);
+          } catch (IOException e) {
+            LOGGER.warn("Failed to update the offline table configuration for table {}", e,
+                config.getOfflineTableConfig().getTableName());
+            return Response.serverError().entity("Failed to update the offline table configuration")
+                .type(MediaType.TEXT_PLAIN_TYPE).build();
+          }
+        } else {
+          _resourceManager.addTable(config.getOfflineTableConfig());
+        }
+      }
+
+      if (config.getRealtimeTableConfig() != null) {
+        if (_resourceManager.getAllTables().contains(config.getRealtimeTableConfig().getTableName())) {
+          try {
+            _resourceManager
+                .setExistingTableConfig(config.getRealtimeTableConfig(), config.getRealtimeTableConfig().getTableName(),
+                    CommonConstants.Helix.TableType.REALTIME);
+          } catch (IOException e) {
+            LOGGER.warn("Failed to update the realtime table configuration for table {}", e,
+                config.getRealtimeTableConfig().getTableName());
+            return Response.serverError().entity("Failed to update the realtime table configuration")
+                .type(MediaType.TEXT_PLAIN_TYPE).build();
+          }
+        } else {
+          _resourceManager.addTable(config.getRealtimeTableConfig());
+        }
+      }
+
+      return Response.ok().build();
     } catch (Exception e) {
-      LOGGER.warn("Caught exception while deserializing the table configuration", e);
-      return Response.serverError().entity(e.getMessage()).type(MediaType.TEXT_PLAIN_TYPE).build();
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
     }
-
-    if (config == null) {
-      LOGGER.warn("Failed to deserialize the table configuration: {}", tableConfiguration);
-      return Response.serverError().entity("Failed to deserialize the table configuration")
-          .type(MediaType.TEXT_PLAIN_TYPE).build();
-    }
-
-    if (config.getSchema() != null) {
-      _resourceManager.addOrUpdateSchema(config.getSchema());
-    }
-
-    if (config.getOfflineTableConfig() != null) {
-      if (_resourceManager.getAllTables().contains(config.getOfflineTableConfig().getTableName())) {
-        try {
-          _resourceManager
-              .setExistingTableConfig(config.getOfflineTableConfig(), config.getOfflineTableConfig().getTableName(),
-                  CommonConstants.Helix.TableType.OFFLINE);
-        } catch (IOException e) {
-          LOGGER.warn("Failed to update the offline table configuration for table {}", e,
-              config.getOfflineTableConfig().getTableName());
-          return Response.serverError().entity("Failed to update the offline table configuration")
-              .type(MediaType.TEXT_PLAIN_TYPE).build();
-        }
-      } else {
-        _resourceManager.addTable(config.getOfflineTableConfig());
-      }
-    }
-
-    if (config.getRealtimeTableConfig() != null) {
-      if (_resourceManager.getAllTables().contains(config.getRealtimeTableConfig().getTableName())) {
-        try {
-          _resourceManager
-              .setExistingTableConfig(config.getRealtimeTableConfig(), config.getRealtimeTableConfig().getTableName(),
-                  CommonConstants.Helix.TableType.REALTIME);
-        } catch (IOException e) {
-          LOGGER.warn("Failed to update the realtime table configuration for table {}", e,
-              config.getRealtimeTableConfig().getTableName());
-          return Response.serverError().entity("Failed to update the realtime table configuration")
-              .type(MediaType.TEXT_PLAIN_TYPE).build();
-        }
-      } else {
-        _resourceManager.addTable(config.getRealtimeTableConfig());
-      }
-    }
-
-    return Response.ok().build();
   }
 }
