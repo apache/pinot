@@ -215,8 +215,9 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     dataTable.getMetadata().put(DataTable.TIME_USED_MS_METADATA_KEY, Long.toString(queryProcessingTime));
 
     if (missingSegments > 0) {
-      dataTable.addException(QueryException.getException(QueryException.SEGMENTS_MISSING_ERROR,
-          "Could not find " + missingSegments + " segments on the server"));
+      // TODO: add this exception to the datatable after verfying the metrics
+      /*dataTable.addException(QueryException.getException(QueryException.SEGMENTS_MISSING_ERROR,
+          "Could not find " + missingSegments + " segments on the server"));*/
       _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_MISSING_SEGMENTS, missingSegments);
     }
 
