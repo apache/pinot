@@ -66,28 +66,33 @@ public class ORCRecordReader implements RecordReader {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(ORCRecordReader.class);
 
-  @Override
-  public void init(SegmentGeneratorConfig segmentGeneratorConfig) {
+  private void init(String inputPath, Schema schema) {
     Configuration conf = new Configuration();
-    LOGGER.info("Creating segment for {}", segmentGeneratorConfig.getInputFilePath());
+    LOGGER.info("Creating segment for {}", inputPath);
     try {
-      Path orcReaderPath = new Path("file://" + segmentGeneratorConfig.getInputFilePath());
+      Path orcReaderPath = new Path("file://" + inputPath);
       LOGGER.info("orc reader path is {}", orcReaderPath);
       _reader = OrcFile.createReader(orcReaderPath, OrcFile.readerOptions(conf));
       _orcSchema = _reader.getSchema();
       LOGGER.info("ORC schema is {}", _orcSchema.toJson());
 
-      _pinotSchema = segmentGeneratorConfig.getSchema();
+      _pinotSchema = schema;
       if (_pinotSchema == null) {
-        throw new IllegalArgumentException("ORCRecordReader requires schema");
+        LOGGER.warn("Pinot schema is not set in segment generator config");
       }
       _recordReader = _reader.rows(_reader.options().schema(_orcSchema));
     } catch (Exception e) {
-      LOGGER.error("Caught exception initializing record reader at path {}", segmentGeneratorConfig.getInputFilePath());
+      LOGGER.error("Caught exception initializing record reader at path {}", inputPath);
       throw new RuntimeException(e);
     }
 
+    // Create a row batch with max size 1
     _reusableVectorizedRowBatch = _orcSchema.createRowBatch(1);
+  }
+
+  @Override
+  public void init(SegmentGeneratorConfig segmentGeneratorConfig) {
+    init(segmentGeneratorConfig.getInputFilePath(), segmentGeneratorConfig.getSchema());
   }
 
   @Override
@@ -115,15 +120,18 @@ public class ORCRecordReader implements RecordReader {
   }
 
   private void fillGenericRow(GenericRow genericRow, VectorizedRowBatch rowBatch) throws IOException {
-    // Read the row data
-    TypeDescription schema = _reader.getSchema();
-    // Create a row batch with max size 1
-
-    if (schema.getCategory().equals(TypeDescription.Category.STRUCT)) {
-      for (int i = 0; i < schema.getChildren().size(); i++) {
+    // ORC's TypeDescription is the equivalent of a schema. The way we will support ORC in Pinot
+    // will be to get the top level struct that contains all our fields and look through its
+    // children to determine the fields in our schemas.
+    if (_orcSchema.getCategory().equals(TypeDescription.Category.STRUCT)) {
+      for (int i = 0; i < _orcSchema.getChildren().size(); i++) {
         // Get current column in schema
-        TypeDescription currColumn = schema.getChildren().get(i);
+        TypeDescription currColumn = _orcSchema.getChildren().get(i);
         String currColumnName = currColumn.getFieldNames().get(0);
+        if (!_pinotSchema.getColumnNames().contains(currColumnName)) {
+          LOGGER.warn("Skipping column {} because it is not in pinot schema", currColumnName);
+          continue;
+        }
         int currColRowIndex = currColumn.getId();
         ColumnVector vector = rowBatch.cols[currColRowIndex];
         // Previous value set to null, not used except to save allocation memory in OrcMapredRecordReader
