@@ -36,7 +36,26 @@ rules:
         offset: wo1w              # Compare current value with last week. (Values supported - wo1w, wo2w, median3w etc)
         percentageChange: 0.1     # The threshold above which you want to be alerted.
         pattern: UP_OR_DOWN       # Alert when value goes up or down by the configured threshold. (Values supported - UP, DOWN, UP_OR_DOWN)
-
+# Uncomment the following lines for algorithm based detection.
+#    - name: detection_algorithm_1
+#      type: ALGORITHM
+#      params:
+#       configuration:
+# for daily metrics:
+#         bucketPeriod: P1D
+#         timeZone: America/Los_Angeles
+#         windowPeriod: P0D
+#         windowStep: P1D
+# for hourly metrics:
+#         bucketPeriod: PT1H
+#         timeZone: America/Los_Angeles
+#         windowPeriod: PT24H
+#         windowStep: PT1H
+# for minute level metrics (inGraph metrics):
+#         bucketPeriod: PT5M
+#         timeZone: America/Los_Angeles
+#         windowPeriod: P7D
+#         windowStep: P7D
 # Refer to examples and documentation for exploring other types of detection rules, algorithms and filters with more detailed settings.
 `;
 
