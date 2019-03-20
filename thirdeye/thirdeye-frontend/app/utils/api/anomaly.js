@@ -16,8 +16,8 @@ export function getAnomalyDataUrl(anomalyId) {
  * @returns {String} the complete yaml/preview url
  * @example getAnomaliesForYamlPreview(1508472700000, 1508472800000) // yields => /yaml/preview?start=1508472700000&end=1508472800000&tuningStart=0&tuningEnd=0
  */
-export function getAnomaliesForYamlPreviewUrl(startTime, endTime) {
-  return `/yaml/preview?start=${startTime}&end=${endTime}&tuningStart=0&tuningEnd=0`;
+export function getAnomaliesForYamlPreviewUrl(startTime, endTime, alertId) {
+  return `/yaml/preview${alertId ? `/${alertId}` : ''}?start=${startTime}&end=${endTime}&tuningStart=0&tuningEnd=0`;
 }
 
 /**
