@@ -303,7 +303,7 @@ export default Component.extend({
      */
     onYAMLGroupSelectionAction(value) {
       if(value.yaml) {
-        set(this, 'currentYamlSettings', value.yaml);
+        set(this, 'detectionSettingsYaml', value.yaml);
         set(this, 'groupName', value);
         set(this, 'subscriptionGroupId', value.id);
       }
@@ -420,11 +420,11 @@ export default Component.extend({
     async saveEditYamlAction() {
       const {
         alertYaml,
-        currentYamlSettings,
+        detectionSettingsYaml,
         notifications,
         alertId,
         subscriptionGroupId
-      } = getProperties(this, 'alertYaml', 'currentYamlSettings', 'notifications', 'alertId', 'subscriptionGroupId');
+      } = getProperties(this, 'alertYaml', 'detectionSettingsYaml', 'notifications', 'alertId', 'subscriptionGroupId');
       //PUT alert
       const alert_url = `/yaml/${alertId}`;
       const alertPostProps = {
@@ -445,12 +445,11 @@ export default Component.extend({
       } catch (error) {
         notifications.error('Save alert yaml file failed.', error);
       }
-
       //PUT settings
       const setting_url = `/yaml/subscription/${subscriptionGroupId}`;
       const settingsPostProps = {
         method: 'PUT',
-        body: currentYamlSettings,
+        body: detectionSettingsYaml,
         headers: { 'content-type': 'text/plain' }
       };
       try {
