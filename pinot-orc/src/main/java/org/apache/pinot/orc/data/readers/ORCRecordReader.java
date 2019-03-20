@@ -54,7 +54,7 @@ public class ORCRecordReader implements RecordReader {
   private TypeDescription _orcSchema;
   Reader _reader;
   org.apache.orc.RecordReader _recordReader;
-  VectorizedRowBatch _reusableVectorizedRowBatch = new VectorizedRowBatch(1);
+  VectorizedRowBatch _reusableVectorizedRowBatch;
 
   private static final Logger LOGGER = LoggerFactory.getLogger(ORCRecordReader.class);
 
@@ -78,6 +78,8 @@ public class ORCRecordReader implements RecordReader {
       LOGGER.error("Caught exception initializing record reader at path {}", segmentGeneratorConfig.getInputFilePath());
       throw new RuntimeException(e);
     }
+
+    _reusableVectorizedRowBatch = _orcSchema.createRowBatch(1);
   }
 
   @Override
@@ -99,7 +101,6 @@ public class ORCRecordReader implements RecordReader {
   @Override
   public GenericRow next(GenericRow reuse)
       throws IOException {
-    _reusableVectorizedRowBatch = _orcSchema.createRowBatch(1);
     _recordReader.nextBatch(_reusableVectorizedRowBatch);
     fillGenericRow(reuse, _reusableVectorizedRowBatch);
     return reuse;
