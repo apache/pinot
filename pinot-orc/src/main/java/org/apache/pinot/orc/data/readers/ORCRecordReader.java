@@ -48,6 +48,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/**
+ * The ORCRecordReader uses a VectorizedRowBatch, which we convert to a Writable. Then, we convert these
+ * Writable objects to primitives that we can then store in a GenericRow.
+ *
+ * When new data types are added to Pinot, we will need to update them here as well.
+ * Note that not all ORC types are supported; we only support the ORC types that correspond to either
+ * primitives or multivalue columns in Pinot, which is similar to other record readers.
+ */
 public class ORCRecordReader implements RecordReader {
 
   private Schema _pinotSchema;
