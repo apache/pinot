@@ -168,6 +168,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
   /**
    * Called when a segment is deleted. The actual handling of segment delete is outside of this method.
    * This method provides book-keeping around deleted segments.
+   * @param segmentName name of the segment to track.
    */
   public void trackDeletedSegment(@Nonnull String segmentName) {
     // add segment to the cache
@@ -176,6 +177,9 @@ public abstract class BaseTableDataManager implements TableDataManager {
 
   /**
    * Check if a segment is recently deleted.
+   *
+   * @param segmentName name of the segment to check.
+   * @return true if segment is in the cache, false otherwise
    */
   public boolean isRecentlyDeleted(@Nonnull String segmentName) {
     return _deletedSegmentsCache.getIfPresent(segmentName) != null;
@@ -183,6 +187,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
 
   /**
    * Remove a segment from the deleted cache if it is being added back.
+   *
+   * @param segmentName name of the segment that needs to removed from the cache (if needed)
    */
   private void untrackIfDeleted(@Nonnull String segmentName) {
     _deletedSegmentsCache.invalidate(segmentName);
