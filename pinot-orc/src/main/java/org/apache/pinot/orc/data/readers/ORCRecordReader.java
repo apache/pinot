@@ -64,13 +64,15 @@ public class ORCRecordReader implements RecordReader {
   org.apache.orc.RecordReader _recordReader;
   VectorizedRowBatch _reusableVectorizedRowBatch;
 
+  public static final String LOCAL_FS_PREFIX = "file://";
+
   private static final Logger LOGGER = LoggerFactory.getLogger(ORCRecordReader.class);
 
   private void init(String inputPath, Schema schema) {
     Configuration conf = new Configuration();
     LOGGER.info("Creating segment for {}", inputPath);
     try {
-      Path orcReaderPath = new Path("file://" + inputPath);
+      Path orcReaderPath = new Path(LOCAL_FS_PREFIX + inputPath);
       LOGGER.info("orc reader path is {}", orcReaderPath);
       _reader = OrcFile.createReader(orcReaderPath, OrcFile.readerOptions(conf));
       _orcSchema = _reader.getSchema();
@@ -119,7 +121,7 @@ public class ORCRecordReader implements RecordReader {
     return reuse;
   }
 
-  private void fillGenericRow(GenericRow genericRow, VectorizedRowBatch rowBatch) throws IOException {
+  private void fillGenericRow(GenericRow genericRow, VectorizedRowBatch rowBatch) {
     // ORC's TypeDescription is the equivalent of a schema. The way we will support ORC in Pinot
     // will be to get the top level struct that contains all our fields and look through its
     // children to determine the fields in our schemas.
@@ -127,7 +129,7 @@ public class ORCRecordReader implements RecordReader {
       for (int i = 0; i < _orcSchema.getChildren().size(); i++) {
         // Get current column in schema
         TypeDescription currColumn = _orcSchema.getChildren().get(i);
-        String currColumnName = currColumn.getFieldNames().get(0);
+        String currColumnName = _orcSchema.getFieldNames().get(i);
         if (!_pinotSchema.getColumnNames().contains(currColumnName)) {
           LOGGER.warn("Skipping column {} because it is not in pinot schema", currColumnName);
           continue;
@@ -135,7 +137,7 @@ public class ORCRecordReader implements RecordReader {
         int currColRowIndex = currColumn.getId();
         ColumnVector vector = rowBatch.cols[currColRowIndex];
         // Previous value set to null, not used except to save allocation memory in OrcMapredRecordReader
-        WritableComparable writableComparable = OrcMapredRecordReader.nextValue(vector, currColRowIndex, _orcSchema, null);
+        WritableComparable writableComparable = OrcMapredRecordReader.nextValue(vector, currColRowIndex, currColumn, null);
         genericRow.putField(currColumnName, getBaseObject(writableComparable));
       }
     } else {
