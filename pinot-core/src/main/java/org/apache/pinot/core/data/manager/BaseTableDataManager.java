@@ -118,6 +118,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
   @Override
   public void addSegment(@Nonnull ImmutableSegment immutableSegment) {
     String segmentName = immutableSegment.getSegmentName();
+    untrackIfDeleted(segmentName);
     _logger.info("Adding immutable segment: {} to table: {}", segmentName, _tableNameWithType);
     _serverMetrics.addValueToTableGauge(_tableNameWithType, ServerGauge.DOCUMENT_COUNT,
         immutableSegment.getSegmentMetadata().getTotalRawDocs());
@@ -178,6 +179,13 @@ public abstract class BaseTableDataManager implements TableDataManager {
    */
   public boolean isRecentlyDeleted(@Nonnull String segmentName) {
     return _deletedSegmentsCache.getIfPresent(segmentName) != null;
+  }
+
+  /**
+   * Remove a segment from the deleted cache if it is being added back.
+   */
+  private void untrackIfDeleted(@Nonnull String segmentName) {
+    _deletedSegmentsCache.invalidate(segmentName);
   }
 
   @Nonnull
