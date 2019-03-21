@@ -135,9 +135,11 @@ public class ORCRecordReader implements RecordReader {
           continue;
         }
         int currColRowIndex = currColumn.getId();
-        ColumnVector vector = rowBatch.cols[currColRowIndex];
+        // Struct is top level, so the id of the struct is 0. However, the children start from 1+, etc, so we need to
+        // subtract one since the row batch we get has only children column vectors
+        ColumnVector vector = rowBatch.cols[currColRowIndex - 1];
         // Previous value set to null, not used except to save allocation memory in OrcMapredRecordReader
-        WritableComparable writableComparable = OrcMapredRecordReader.nextValue(vector, currColRowIndex, currColumn, null);
+        WritableComparable writableComparable = OrcMapredRecordReader.nextValue(vector, 0, currColumn, null);
         genericRow.putField(currColumnName, getBaseObject(writableComparable));
       }
     } else {

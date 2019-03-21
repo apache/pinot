@@ -54,6 +54,7 @@ public class ORCRecordReaderTest {
     FileUtils.deleteQuietly(TEMP_DIR);
     TypeDescription schema =
         TypeDescription.fromString("struct<x:int,y:string>");
+
     Writer writer = OrcFile.createWriter(new Path(ORC_FILE.getAbsolutePath()),
         OrcFile.writerOptions(new Configuration())
             .setSchema(schema));
@@ -103,7 +104,7 @@ public class ORCRecordReaderTest {
 
     for (int i = 0; i < genericRows.size(); i++) {
       Assert.assertEquals(genericRows.get(i).getValue("x"), i);
-      Assert.assertEquals(genericRows.get(i).getValue("y"), ("Last-" + (i * 3)).getBytes(StandardCharsets.UTF_8));
+      Assert.assertEquals(genericRows.get(i).getValue("y"), "Last-" + (i * 3));
     }
   }
 
