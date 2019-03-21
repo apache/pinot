@@ -17,6 +17,7 @@ import Component from '@ember/component';
 import { computed, observer, set, get, getProperties } from '@ember/object';
 import { later } from '@ember/runloop';
 import { checkStatus, humanizeFloat, postProps } from 'thirdeye-frontend/utils/utils';
+import { toastOptions } from 'thirdeye-frontend/utils/constants';
 import { colorMapping, toColor, makeTime, toMetricLabel, extractTail } from 'thirdeye-frontend/utils/rca-utils';
 import { getYamlPreviewAnomalies,
   getAnomaliesByAlertId,
@@ -496,7 +497,6 @@ export default Component.extend({
       isPreviewMode,
       alertId
     } = this.getProperties('analysisRange', 'notifications', 'isPreviewMode', 'alertId');
-
     //detection alert fetch
     const start = analysisRange[0];
     const end = analysisRange[1];
@@ -547,7 +547,7 @@ export default Component.extend({
         });
       }
     } catch (error) {
-      notifications.error(error.body.message);
+      notifications.error(error.body.message, toastOptions);
     }
 
     return {
