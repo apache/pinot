@@ -134,10 +134,8 @@ public class ORCRecordReader implements RecordReader {
           LOGGER.warn("Skipping column {} because it is not in pinot schema", currColumnName);
           continue;
         }
-        int currColRowIndex = currColumn.getId();
-        // Struct is top level, so the id of the struct is 0. However, the children start from 1+, etc, so we need to
-        // subtract one since the row batch we get has only children column vectors
-        ColumnVector vector = rowBatch.cols[currColRowIndex - 1];
+        // ORC will keep your columns in the same order as the schema provided
+        ColumnVector vector = rowBatch.cols[i];
         // Previous value set to null, not used except to save allocation memory in OrcMapredRecordReader
         WritableComparable writableComparable = OrcMapredRecordReader.nextValue(vector, 0, currColumn, null);
         genericRow.putField(currColumnName, getBaseObject(writableComparable));
