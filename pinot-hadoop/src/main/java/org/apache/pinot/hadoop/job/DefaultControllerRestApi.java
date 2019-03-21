@@ -58,7 +58,7 @@ public class DefaultControllerRestApi implements ControllerRestApi {
             .getRetrieveTableConfigHttpURI(pushLocation.getHost(), pushLocation.getPort(), _rawTableName));
         JsonNode offlineJsonTableConfig = JsonUtils.stringToJsonNode(response.getResponse()).get(OFFLINE);
         if (offlineJsonTableConfig != null) {
-          TableConfig offlineTableConfig = TableConfig.fromJSONConfig(offlineJsonTableConfig);
+          TableConfig offlineTableConfig = TableConfig.fromJsonConfig(offlineJsonTableConfig);
           LOGGER.info("Got table config: {}", offlineTableConfig);
           return offlineTableConfig;
         }

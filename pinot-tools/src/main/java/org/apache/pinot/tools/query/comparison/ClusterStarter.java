@@ -206,7 +206,7 @@ public class ClusterStarter {
     String tableJSONConfigString =
         new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(_tableName)
             .setTimeColumnName(_timeColumnName).setTimeType(_timeUnit).setNumReplicas(3).setBrokerTenant("broker")
-            .setServerTenant("server").build().toJSONConfigString();
+            .setServerTenant("server").build().toJsonConfigString();
     sendPostRequest(ControllerRequestURLBuilder.baseUrl(controllerAddress).forTableCreate(), tableJSONConfigString);
   }
 

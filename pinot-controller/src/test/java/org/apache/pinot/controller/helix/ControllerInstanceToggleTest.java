@@ -59,7 +59,7 @@ public class ControllerInstanceToggleTest extends ControllerTest {
     // Create an offline table
     String tableJSONConfigString =
         new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
-            .setNumReplicas(NUM_INSTANCES).build().toJSONConfigString();
+            .setNumReplicas(NUM_INSTANCES).build().toJsonConfigString();
     sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableJSONConfigString);
     Assert.assertEquals(
         _helixAdmin.getResourceIdealState(_helixClusterName, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)

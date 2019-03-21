@@ -93,7 +93,7 @@ public class PinotTenantRestletResourceTest extends ControllerTest {
 
     TableConfig offlineTableConfig = _offlineBuilder.build();
     offlineTableConfig.setTableName("mytable_OFFLINE");
-    String offlineTableJSONConfigString = offlineTableConfig.toJSONConfigString();
+    String offlineTableJSONConfigString = offlineTableConfig.toJsonConfigString();
     sendPostRequest(createTableUrl, offlineTableJSONConfigString);
 
     // Try to make sure both kinds of tags work

@@ -19,6 +19,7 @@
 package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Function;
 import com.google.common.collect.ImmutableList;
 import java.io.File;
@@ -33,6 +34,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.JsonUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
@@ -147,6 +149,22 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(_serviceStatusCallbacks.size(), getNumBrokers() + getNumServers());
     for (ServiceStatus.ServiceStatusCallback serviceStatusCallback : _serviceStatusCallbacks) {
       assertEquals(serviceStatusCallback.getServiceStatus(), ServiceStatus.Status.GOOD);
+    }
+  }
+
+  @Test
+  public void testInvalidTableConfig() {
+    TableConfig tableConfig =
+        new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName("badTable").build();
+    ObjectNode jsonConfig = tableConfig.toJsonConfig();
+    // Remove a mandatory field
+    jsonConfig.remove(TableConfig.VALIDATION_CONFIG_KEY);
+    try {
+      sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), jsonConfig.toString());
+      fail();
+    } catch (IOException e) {
+      // Should get response code 400 (BAD_REQUEST)
+      assertTrue(e.getMessage().startsWith("Server returned HTTP response code: 400"));
     }
   }
 
