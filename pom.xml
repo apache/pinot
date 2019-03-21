@@ -54,6 +54,7 @@
     <module>pinot-filesystem</module>
     <module>pinot-hadoop-filesystem</module>
     <module>pinot-azure-filesystem</module>
+    <module>pinot-orc</module>
   </modules>
 
   <licenses>
@@ -283,6 +284,11 @@
       <dependency>
         <groupId>org.apache.pinot</groupId>
         <artifactId>pinot-azure-filesystem</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-orc</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
@@ -590,6 +596,16 @@
             <artifactId>jersey-json</artifactId>
           </exclusion>
         </exclusions>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.orc</groupId>
+        <artifactId>orc-core</artifactId>
+        <version>1.5.2</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.orc</groupId>
+        <artifactId>orc-mapreduce</artifactId>
+        <version>1.5.2</version>
       </dependency>
       <dependency>
         <groupId>org.codehaus.jackson</groupId>
