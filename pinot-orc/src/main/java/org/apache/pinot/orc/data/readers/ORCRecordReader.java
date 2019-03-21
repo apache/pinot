@@ -20,6 +20,8 @@ package org.apache.pinot.orc.data.readers;
  */
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.ql.exec.vector.ColumnVector;
@@ -63,6 +65,7 @@ public class ORCRecordReader implements RecordReader {
   Reader _reader;
   org.apache.orc.RecordReader _recordReader;
   VectorizedRowBatch _reusableVectorizedRowBatch;
+  OrcMapredRecordReader _orcMapredRecordReader;
 
   public static final String LOCAL_FS_PREFIX = "file://";
 
@@ -83,6 +86,8 @@ public class ORCRecordReader implements RecordReader {
         LOGGER.warn("Pinot schema is not set in segment generator config");
       }
       _recordReader = _reader.rows(_reader.options().schema(_orcSchema));
+
+      _orcMapredRecordReader = new OrcMapredRecordReader<>(_recordReader, _orcSchema);
     } catch (Exception e) {
       LOGGER.error("Caught exception initializing record reader at path {}", inputPath);
       throw new RuntimeException(e);
@@ -176,8 +181,14 @@ public class ORCRecordReader implements RecordReader {
     } else if (Text.class.isAssignableFrom(w.getClass())) {
       obj = ((Text) w).toString();
     } else if (OrcList.class.isAssignableFrom(w.getClass())) {
-      // TODO: This is probably multivalue columns
-      LOGGER.info("Skipping unsupported type: list");
+      OrcList orcList = (OrcList) w;
+      LOGGER.info("ORC list is {}", orcList.toString());
+      List<Object> list = new ArrayList();
+      for (Object wc : orcList) {
+        Object objectToAdd = getBaseObject((WritableComparable) wc);
+        list.add(objectToAdd);
+      }
+      return list;
     } else {
       LOGGER.info("Unknown type found: " + w.getClass().getSimpleName());
       throw new IllegalArgumentException("Unknown type: " + w.getClass().getSimpleName());
