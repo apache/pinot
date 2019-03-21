@@ -36,6 +36,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
 
@@ -45,6 +47,7 @@ import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
  */
 @Components(type = "PERCENTAGE_CHANGE_FILTER", tags = {DetectionTag.RULE_FILTER})
 public class PercentageChangeRuleAnomalyFilter implements AnomalyFilter<PercentageChangeRuleAnomalyFilterSpec> {
+  private static final Logger LOG = LoggerFactory.getLogger(PercentageChangeRuleAnomalyFilter.class);
   private double threshold;
   private InputDataFetcher dataFetcher;
   private Baseline baseline;
@@ -67,6 +70,11 @@ public class PercentageChangeRuleAnomalyFilter implements AnomalyFilter<Percenta
 
     Map<MetricSlice, DataFrame> aggregates =
         this.dataFetcher.fetchData(new InputDataSpec().withAggregateSlices(slices)).getAggregates();
+    if (aggregates.get(currentSlice).isEmpty() || aggregates.get(baselineSlice).isEmpty()) {
+      LOG.warn("Unable to fetch data for current or baseline slice for anomaly {}. start = {} end = {} filters = {}",
+          anomaly.getId(), anomaly.getStartTime(), anomaly.getEndTime(), me.getFilters());
+      return false;
+    }
 
     double currentValue = getValueFromAggregates(currentSlice, aggregates);
     double baselineValue =
