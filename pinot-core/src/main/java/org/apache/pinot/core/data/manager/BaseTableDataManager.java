@@ -125,8 +125,6 @@ public abstract class BaseTableDataManager implements TableDataManager {
 
     ImmutableSegmentDataManager newSegmentManager = new ImmutableSegmentDataManager(immutableSegment);
     SegmentDataManager oldSegmentManager = _segmentDataManagerMap.put(segmentName, newSegmentManager);
-    // update the deleted cache if needed
-    notifySegmentAdded(segmentName);
 
     // release old segment if needed
     if (oldSegmentManager == null) {
@@ -193,7 +191,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
    *
    * @param segmentName name of the segment that needs to removed from the cache (if needed)
    */
-  private void notifySegmentAdded(@Nonnull String segmentName) {
+  public void notifySegmentAdded(@Nonnull String segmentName) {
     _deletedSegmentsCache.invalidate(segmentName);
   }
 

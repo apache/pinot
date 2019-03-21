@@ -158,7 +158,7 @@ public class QueryExecutorTest {
   @Test
   public void testDeletedSegmentQuery() {
     String query = "SELECT count(*) FROM " + TABLE_NAME;
-    _instanceDataManager.trackDeletedSegment(TABLE_NAME, _segmentNames.get(0));
+    _instanceDataManager.notifySegmentDeleted(TABLE_NAME, _segmentNames.get(0));
 
     InstanceRequest instanceRequest = new InstanceRequest(0L, COMPILER.compileToBrokerRequest(query));
     instanceRequest.setSearchSegments(_segmentNames);

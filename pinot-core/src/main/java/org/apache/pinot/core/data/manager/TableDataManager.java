@@ -85,6 +85,11 @@ public interface TableDataManager {
   void notifySegmentDeleted(@Nonnull String segmentName);
 
   /**
+   * Track addition of a segment
+   */
+  void notifySegmentAdded(@Nonnull String segmentName);
+
+  /**
    * Check if a segment is recently deleted.
    */
   boolean isRecentlyDeleted(@Nonnull String segmentName);

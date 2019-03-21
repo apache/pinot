@@ -166,6 +166,8 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
         } else {
           _instanceDataManager.addRealtimeSegment(tableNameWithType, segmentName);
         }
+        // handle any book-keeping after a segment is added
+        _instanceDataManager.notifySegmentAdded(tableNameWithType, segmentName);
       } catch (Exception e) {
         _logger.error("Caught exception in state transition from OFFLINE -> ONLINE for resource: {}, partition: {}",
             tableNameWithType, segmentName, e);
@@ -196,6 +198,9 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
       String tableNameWithType = message.getResourceName();
       String segmentName = message.getPartitionName();
 
+      // handle any additional book-keeping that needs to be done when a segment is dropped
+      _instanceDataManager.notifySegmentDeleted(tableNameWithType, segmentName);
+
       // This method might modify the file on disk. Use segment lock to prevent race condition
       Lock segmentLock = SegmentLocks.getSegmentLock(tableNameWithType, segmentName);
       try {
@@ -205,7 +210,6 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
         if (segmentDir.exists()) {
           FileUtils.deleteQuietly(segmentDir);
           _logger.info("Deleted segment directory {}", segmentDir);
-          _instanceDataManager.trackDeletedSegment(tableNameWithType, segmentName);
         }
       } catch (final Exception e) {
         _logger.error("Cannot delete the segment : " + segmentName + " from local directory!\n" + e.getMessage(), e);
