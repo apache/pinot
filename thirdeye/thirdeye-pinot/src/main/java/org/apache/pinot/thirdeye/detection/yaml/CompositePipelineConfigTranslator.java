@@ -460,6 +460,8 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
     Preconditions.checkArgument(yamlConfig.containsKey(PROP_METRIC), "Property missing " + PROP_METRIC);
     Preconditions.checkArgument(yamlConfig.containsKey(PROP_DATASET), "Property missing " + PROP_DATASET);
     Preconditions.checkArgument(yamlConfig.containsKey(PROP_RULES), "Property missing " + PROP_RULES);
+    Preconditions.checkArgument(!yamlConfig.containsKey(PROP_FILTER),
+        "Please double check the filter config. Adding dimensions filters should be in the yaml root level using 'filters' as the key. Anomaly filter should be added in to the indentation level of detection yaml it apples to.");
     if (existingConfig != null) {
       Map<String, Object> existingYamlConfig = (Map<String, Object>) this.yaml.load(existingConfig.getYaml());
       Preconditions.checkArgument(MapUtils.getString(yamlConfig, PROP_METRIC).equals(MapUtils.getString(existingYamlConfig, PROP_METRIC)), "metric name cannot be modified");
