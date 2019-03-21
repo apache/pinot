@@ -155,7 +155,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   public void trackDeletedSegment(@Nonnull String tableNameWithType, @Nonnull String segmentName) {
     TableDataManager tableDataManager = _tableDataManagerMap.get(tableNameWithType);
     if (tableDataManager != null) {
-      tableDataManager.trackDeletedSegment(segmentName);
+      tableDataManager.notifySegmentDeleted(segmentName);
     }
   }
 

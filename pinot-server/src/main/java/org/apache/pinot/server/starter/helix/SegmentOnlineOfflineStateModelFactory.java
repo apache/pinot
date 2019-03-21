@@ -196,8 +196,6 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
       String tableNameWithType = message.getResourceName();
       String segmentName = message.getPartitionName();
 
-      _instanceDataManager.trackDeletedSegment(tableNameWithType, segmentName);
-
       // This method might modify the file on disk. Use segment lock to prevent race condition
       Lock segmentLock = SegmentLocks.getSegmentLock(tableNameWithType, segmentName);
       try {
@@ -207,6 +205,7 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
         if (segmentDir.exists()) {
           FileUtils.deleteQuietly(segmentDir);
           _logger.info("Deleted segment directory {}", segmentDir);
+          _instanceDataManager.trackDeletedSegment(tableNameWithType, segmentName);
         }
       } catch (final Exception e) {
         _logger.error("Cannot delete the segment : " + segmentName + " from local directory!\n" + e.getMessage(), e);

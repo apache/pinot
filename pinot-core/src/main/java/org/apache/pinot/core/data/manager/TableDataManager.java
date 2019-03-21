@@ -82,7 +82,7 @@ public interface TableDataManager {
   /**
    * Track a deleted segment.
    */
-  void trackDeletedSegment(@Nonnull String segmentName);
+  void notifySegmentDeleted(@Nonnull String segmentName);
 
   /**
    * Check if a segment is recently deleted.

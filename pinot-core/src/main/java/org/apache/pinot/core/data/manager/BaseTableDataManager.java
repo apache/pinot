@@ -118,7 +118,6 @@ public abstract class BaseTableDataManager implements TableDataManager {
   @Override
   public void addSegment(@Nonnull ImmutableSegment immutableSegment) {
     String segmentName = immutableSegment.getSegmentName();
-    untrackIfDeleted(segmentName);
     _logger.info("Adding immutable segment: {} to table: {}", segmentName, _tableNameWithType);
     _serverMetrics.addValueToTableGauge(_tableNameWithType, ServerGauge.DOCUMENT_COUNT,
         immutableSegment.getSegmentMetadata().getTotalRawDocs());
@@ -126,6 +125,10 @@ public abstract class BaseTableDataManager implements TableDataManager {
 
     ImmutableSegmentDataManager newSegmentManager = new ImmutableSegmentDataManager(immutableSegment);
     SegmentDataManager oldSegmentManager = _segmentDataManagerMap.put(segmentName, newSegmentManager);
+    // update the deleted cache if needed
+    notifySegmentAdded(segmentName);
+
+    // release old segment if needed
     if (oldSegmentManager == null) {
       _logger.info("Added new immutable segment: {} to table: {}", segmentName, _tableNameWithType);
     } else {
@@ -170,7 +173,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
    * This method provides book-keeping around deleted segments.
    * @param segmentName name of the segment to track.
    */
-  public void trackDeletedSegment(@Nonnull String segmentName) {
+  public void notifySegmentDeleted(@Nonnull String segmentName) {
     // add segment to the cache
     _deletedSegmentsCache.put(segmentName, true);
   }
@@ -190,7 +193,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
    *
    * @param segmentName name of the segment that needs to removed from the cache (if needed)
    */
-  private void untrackIfDeleted(@Nonnull String segmentName) {
+  private void notifySegmentAdded(@Nonnull String segmentName) {
     _deletedSegmentsCache.invalidate(segmentName);
   }
 
