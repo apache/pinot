@@ -216,6 +216,11 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
     if (missingSegments > 0) {
       // TODO: add this exception to the datatable after verfying the metrics
+      // Currently, given the deleted segments cache is in-memory only, a server restart will reset it
+      // We might end up sending partial-response metadata in such cases. It appears that the likelihood of
+      // this occurence is low; ie, segment has to be retained out and the server must be restarted while the
+      // broker view is still behind. We would however like to validate that and/or conf control this based on 
+      // data.
       /*dataTable.addException(QueryException.getException(QueryException.SEGMENTS_MISSING_ERROR,
           "Could not find " + missingSegments + " segments on the server"));*/
       _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_MISSING_SEGMENTS, missingSegments);
