@@ -20,17 +20,14 @@
 Table Config
 ============
 
-Table Config
--------------
-
 Introduction
 ~~~~~~~~~~~~
 
 Using tables is how Pinot serves and organizes data. There are many settings in the table config which will influence how Pinot operates. The first and most significant distinction is using an offline versus a realtime table.
 
-An offline table in Pinot is used to host data which might be periodically uploaded - daily, weekly, etc. A realtime table, however, is used to consume data from incoming data streams and serve this data in a near-realtime manner. This might also be referred to as nearline or just plain 'realtime'.
+An offline table in Pinot is used to host data which might be periodically uploaded - daily, weekly, etc. A realtime table, however, is used to consume data from incoming data streams and serve this data in a near-realtime manner. 'Near-realtime' might also be referred to as nearline or just plain 'realtime'.
 
-In this section a sample table configuration will be shown and all sections will be explained and if applicable have appropriate sections linked to for further explanation of those corresponding Pinot features.
+This section includes a sample table config and all sections will be explained, if applicable appropriate sections will be linked to for further explanation of those features.
 
 Sample table config and descriptions
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -46,12 +43,12 @@ The ``tableType`` will indicate the type of the table, ``OFFLINE`` or ``REALTIME
     {
       "tableName": "myPinotTable",
       "tableType": "REALTIME"
-      "segmentsConfig": {},
-      "tableIndexConfig": {},
-      "tenants": {},
-      "routing": {},
-      "task": {},
-      "metadata": {}
+      "segmentsConfig": {...},
+      "tableIndexConfig": {...},
+      "tenants": {...},
+      "routing": {...},
+      "task": {...},
+      "metadata": {...}
     }
 
 Segments Config Section
@@ -59,7 +56,7 @@ Segments Config Section
 
 The ``segmentsConfig`` section has information about configuring the following:
 
-* Segment Retention - with the ``retentionTimeUnit`` and ``retentionTimeValue`` options.
+* Segment Retention - with the ``retentionTimeUnit`` and ``retentionTimeValue`` options. Retention is only applicable to tables of type ``APPEND``.
 
   * Allowed values:
 
@@ -72,19 +69,18 @@ The ``segmentsConfig`` section has information about configuring the following:
 
 * ``segmentPushType`` - Indicates the type of push to the table.
 
-  * Allowed values - ``APPEND`` means new data will be pushed and appended to the current data in the table, all realtime tables *must* be ``APPEND``. ``REFRESH`` will refresh the entire dataset contained within the table.
+  * Allowed values:
+
+    * ``APPEND`` means new data will be pushed and appended to the current data in the table, all realtime tables *must* be ``APPEND``.
+    * ``REFRESH`` will refresh the entire dataset contained within the table. Segment retention is ignored when set to ``REFRESH``.
 
 * ``replication`` - Number of replicas of data in a table, used for offline tables only.
 
   * Allowed values - Positive integers
 
-* ``replicasPerPartition`` - Number of of data in a table, used for offline tables only.
+* ``replicasPerPartition`` - Number of of data in a table, used for realtime LLC tables only.
 
   * Allowed values - Positive integers
-
-* ``schemaName`` - Name of the schema that's been uploaded to the controller
-
-  * Allowed values - String
 
 * Time column - using ``timeColumnName`` and ``timeType``, this must match what's configured in the preceeding schema
 
@@ -125,7 +121,7 @@ The ``tableIndexConfig`` section has information about how to configure:
 
   * Allowed values - String; string must match the column name in the corresponding schema
 
-* ``aggregateMetrics`` - Switch for the aggregate metrics feature. This feature will aggregate realtime stream data as it is consumed, where applicable, in order to reduce segment sizes. This feature is only available on REALTIME tables.
+* ``aggregateMetrics`` - Switch for the aggregate metrics feature. This feature will aggregate realtime stream data as it is consumed, where applicable, in order to reduce segment sizes. We sum the metric column values of all rows that have the same value for dimension columns and create one row in a realtime segment for all such rows. This feature is only available on REALTIME tables.
 
   * Allowed values - ``true`` to enable, ``false`` to disable.
 
@@ -135,7 +131,7 @@ The ``tableIndexConfig`` section has information about how to configure:
   * Allowed values:
 
     * ``MMAP`` - Configures pinot-server to load data segments to off-heap memory.
-    * ``HEAP`` - Configures pinot-server to load data directly into heap memory.
+    * ``HEAP`` - Configures pinot-server to load data directly into direct memory.
 
 * ``streamConfigs`` - This section is where the bulk of the settings specific to only REALTIME tables are found. These options are explained in detail in the `Pluggable Streams <pluggable_streams.html#pluggable-streams>`_ page.
 

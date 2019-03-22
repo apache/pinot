@@ -40,7 +40,7 @@ Recommended environment
 Deploying Pinot
 ---------------
 
-In general, when deploying Pinot services, it is best to adhere to a specific ordering in which the various components should be deployed. This deployment order is recommended incase of the scenario that there might be protocol or other significant differences, the deployments go out in a predictable order in which failure  due to these changes can be avoided.
+In general, when deploying Pinot services, it is best to adhere to a specific ordering in which the various components should be deployed. This deployment order is recommended in case of the scenario that there might be protocol or other significant differences, the deployments go out in a predictable order in which failure  due to these changes can be avoided.
 
 The ordering is as follows:
 
@@ -67,9 +67,7 @@ Configuring realtime data ingestion
 Monitoring Pinot
 ~~~~~~~~~~~~~~~~
 
-In order for Pinot to provide effective service there is a core set of metrics which should be monitored to ensure service stability, fault tolerance and acceptable response times. In the section following, there are service level metrics which are recommended to be monitored.
-
-More info on metrics collection and viewing a complete set of available metric is available in the `Metrics <customizations.html#metrics>`_ section.
+Pinot exposes several metrics to monitor the service and ensure that pinot users are not experiencing issues. In this section we discuss some of the key metrics that are useful to monitor. A full list of metrics is available in the `Metrics <customizations.html#metrics>`_ section.
 
 Pinot Server
 ^^^^^^^^^^^^
