@@ -9,6 +9,7 @@ import { set, get } from '@ember/object';
 import { inject as service } from '@ember/service';
 import yamljs from 'yamljs';
 import moment from 'moment';
+import { toastOptions } from 'thirdeye-frontend/utils/constants';
 
 export default Route.extend({
   notifications: service('toast'),
@@ -28,7 +29,7 @@ export default Route.extend({
       const detection_status  = get(detection_result, 'status');
       const detection_json = await detection_result.json();
       if (detection_status !== 200) {
-        notifications.error('Retrieval of alert yaml failed.', 'Error');
+        notifications.error('Retrieval of alert yaml failed.', 'Error', toastOptions);
       } else {
         if (detection_json.yaml) {
           const detectionInfo = yamljs.parse(detection_json.yaml);
@@ -51,7 +52,7 @@ export default Route.extend({
         }
       }
     } catch (error) {
-      notifications.error('Retrieving alert yaml failed.', error);
+      notifications.error('Retrieving alert yaml failed.', error, toastOptions);
     }
 
     //subscription group fetch
@@ -61,12 +62,12 @@ export default Route.extend({
       const settings_status  = get(settings_result, 'status');
       const settings_json = await settings_result.json();
       if (settings_status !== 200) {
-        notifications.error('Retrieving subscription groups failed.', 'Error');
+        notifications.error('Retrieving subscription groups failed.', 'Error', toastOptions);
       } else {
         set(this, 'subscriptionGroups', settings_json);
       }
     } catch (error) {
-      notifications.error('Retrieving subscription groups failed.', error);
+      notifications.error('Retrieving subscription groups failed.', error, toastOptions);
     }
 
     let subscribedGroups = "";

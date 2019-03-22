@@ -24,7 +24,7 @@
 import Component from '@ember/component';
 import {computed, set, get, getProperties, setProperties} from '@ember/object';
 import {checkStatus} from 'thirdeye-frontend/utils/utils';
-import {yamlAlertProps, yamlAlertSettings} from 'thirdeye-frontend/utils/constants';
+import {yamlAlertProps, yamlAlertSettings, toastOptions} from 'thirdeye-frontend/utils/constants';
 import yamljs from 'yamljs';
 import RSVP from "rsvp";
 import fetch from 'fetch';
@@ -141,7 +141,7 @@ export default Component.extend({
       const json = yield response.json();
       return json.filterBy('yaml');
     } catch (error) {
-      notifications.error('Failed to retrieve subscription groups.', 'Error');
+      notifications.error('Failed to retrieve subscription groups.', 'Error', toastOptions);
     }
   }).drop(),
 
@@ -404,12 +404,12 @@ export default Component.extend({
               set(this, 'subscriptionMsg', result.subscriptionMsg);
             }
             if (result.detectionAlertConfigId && result.detectionConfigId) {
-              notifications.success('Created alert successfully.', 'Created');
+              notifications.success('Created alert successfully.', 'Created', toastOptions);
             }
           }
         });
       }).catch((error) => {
-        notifications.error('Create alert failed.', error);
+        notifications.error('Create alert failed.', error, toastOptions);
       });
     },
 
@@ -425,6 +425,7 @@ export default Component.extend({
         alertId,
         subscriptionGroupId
       } = getProperties(this, 'detectionYaml', 'subscriptionYaml', 'notifications', 'alertId', 'subscriptionGroupId');
+
       //PUT alert
       const alert_url = `/yaml/${alertId}`;
       const alertPostProps = {
@@ -438,12 +439,12 @@ export default Component.extend({
         const alert_json = await alert_result.json();
         if (alert_status !== 200) {
           set(this, 'errorMsg', get(alert_json, 'message'));
-          notifications.error('Failed to save the detection configuration.', 'Error');
+          notifications.error('Failed to save the detection configuration.', 'Error', toastOptions);
         } else {
-          notifications.success('Detection configuration saved successfully', 'Done', alert_json);
+          notifications.success('Detection configuration saved successfully', 'Done', toastOptions);
         }
       } catch (error) {
-        notifications.error('Error while saving detection config.', error);
+        notifications.error('Error while saving detection config.', error, toastOptions);
       }
       //PUT settings
       const setting_url = `/yaml/subscription/${subscriptionGroupId}`;
@@ -458,12 +459,12 @@ export default Component.extend({
         const settings_json = await settings_result.json();
         if (settings_status !== 200) {
           set(this, 'errorMsg', get(settings_json, 'message'));
-          notifications.error('Failed to save the subscription configuration.', 'Error');
+          notifications.error('Failed to save the subscription configuration.', 'Error', toastOptions);
         } else {
-          notifications.success('Subscription configuration saved successfully', 'Done', settings_json);
+          notifications.success('Subscription configuration saved successfully', 'Done', toastOptions);
         }
       } catch (error) {
-        notifications.error('Error while saving subscription config', error);
+        notifications.error('Error while saving subscription config', error, toastOptions);
       }
     }
   }
