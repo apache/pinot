@@ -64,6 +64,7 @@ public class SegmentCompletionManager {
     ABORTED,      // state machine is aborted. we will start a fresh one when the next segmentConsumed comes in.
   }
 
+  // TODO: fix the misuse of singleton.
   private static SegmentCompletionManager _instance = null;
 
   private final HelixManager _helixManager;
@@ -1113,6 +1114,10 @@ public class SegmentCompletionManager {
       }
       return false;
     }
+  }
+
+  public static void stop() {
+    _instance = null;
   }
 
   @VisibleForTesting

@@ -516,7 +516,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     JsonNode response = JsonUtils.stringToJsonNode(sendGetRequest(_controllerRequestURLBuilder.forInstanceList()));
     JsonNode instanceList = response.get("instances");
     int numInstances = instanceList.size();
-    assertEquals(numInstances, getNumBrokers() + getNumServers());
+    // The total number of instances is equal to the sum of num brokers, num servers and 1 controller.
+    assertEquals(numInstances, getNumBrokers() + getNumServers() + 1);
 
     // Try to delete a server that does not exist
     String deleteInstanceRequest = _controllerRequestURLBuilder.forInstanceDelete("potato");

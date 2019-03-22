@@ -46,9 +46,9 @@ public class PinotInstanceRestletResourceTest extends ControllerTest {
   @Test
   public void testInstanceListingAndCreation()
       throws Exception {
-    // Check that there are no instances
+    // Check that there is only one instance, which is the controller instance.
     JsonNode instanceList = JsonUtils.stringToJsonNode(sendGetRequest(_controllerRequestURLBuilder.forInstanceList()));
-    assertEquals(instanceList.get("instances").size(), 0, "Expected empty instance list at beginning of test");
+    assertEquals(instanceList.get("instances").size(), 1, "Expected only one instance at beginning of test");
 
     // Create untagged broker and server instances
     ObjectNode brokerInstance =
@@ -59,17 +59,17 @@ public class PinotInstanceRestletResourceTest extends ControllerTest {
         (ObjectNode) JsonUtils.stringToJsonNode("{\"host\":\"1.2.3.4\", \"type\":\"server\", \"port\":\"2345\"}");
     sendPostRequest(_controllerRequestURLBuilder.forInstanceCreate(), serverInstance.toString());
 
-    // Check that there are two instances
+    // Check that there are three instances
     TestUtils.waitForCondition(aVoid -> {
       try {
         // Check that there are two instances
         return
             JsonUtils.stringToJsonNode(sendGetRequest(_controllerRequestURLBuilder.forInstanceList())).get("instances")
-                .size() == 2;
+                .size() == 3;
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
-    }, 500L, 10_000L, "Expected two instances after creation of tagged instances");
+    }, 500L, 10_000L, "Expected three instances after creation of tagged instances");
 
     // Create tagged broker and server instances
     brokerInstance.put("tag", "someTag");
@@ -83,14 +83,14 @@ public class PinotInstanceRestletResourceTest extends ControllerTest {
     // It may take some time for cache data accessor to update its data.
     TestUtils.waitForCondition(aVoid -> {
       try {
-        // Check that there are four instances
+        // Check that there are five instances
         return
             JsonUtils.stringToJsonNode(sendGetRequest(_controllerRequestURLBuilder.forInstanceList())).get("instances")
-                .size() == 4;
+                .size() == 5;
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
-    }, 500L, 10_000L, "Expected four instances after creation of tagged instances");
+    }, 500L, 10_000L, "Expected five instances after creation of tagged instances");
 
     // Create duplicate broker and server instances (both calls should fail)
     try {
@@ -107,11 +107,11 @@ public class PinotInstanceRestletResourceTest extends ControllerTest {
       // Expected
     }
 
-    // Check that there are four instances
+    // Check that there are five instances
     JsonUtils.stringToJsonNode(sendGetRequest(_controllerRequestURLBuilder.forInstanceList()));
     assertEquals(
         JsonUtils.stringToJsonNode(sendGetRequest(_controllerRequestURLBuilder.forInstanceList())).get("instances")
-            .size(), 4, "Expected fore instances after creation of duplicate instances");
+            .size(), 5, "Expected five instances after creation of duplicate instances");
 
     // Check that the instances are properly created
     JsonNode instance = JsonUtils

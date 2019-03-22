@@ -28,6 +28,7 @@ import org.apache.pinot.controller.helix.core.sharding.SegmentAssignmentStrategy
  */
 public class RebalanceSegmentStrategyFactory {
 
+  // TODO: fix the misuse of singleton.
   private static RebalanceSegmentStrategyFactory INSTANCE = null;
 
   private HelixManager _helixManager;
@@ -62,5 +63,9 @@ public class RebalanceSegmentStrategyFactory {
       default:
         return new DefaultRebalanceSegmentStrategy(_helixManager);
     }
+  }
+
+  public static void stop() {
+    INSTANCE = null;
   }
 }

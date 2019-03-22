@@ -111,6 +111,7 @@ public class PinotLLCRealtimeSegmentManager {
    */
   private static int MAX_SEGMENT_COMPLETION_TIME_MILLIS = 300_000; // 5 MINUTES
 
+  // TODO: fix the misuse of singleton.
   private static PinotLLCRealtimeSegmentManager INSTANCE = null;
 
   private final HelixAdmin _helixAdmin;
@@ -179,6 +180,8 @@ public class PinotLLCRealtimeSegmentManager {
       }
     }
     LOGGER.info("Wait completed: Number of completing segments = {}", _numCompletingSegments.get());
+    INSTANCE = null;
+    SegmentCompletionManager.stop();
   }
 
   protected PinotLLCRealtimeSegmentManager(HelixAdmin helixAdmin, String clusterName, HelixManager helixManager,
