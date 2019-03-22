@@ -71,7 +71,7 @@ The ``segmentsConfig`` section has information about configuring the following:
 
   * Allowed values:
 
-    * ``APPEND`` means new data will be pushed and appended to the current data in the table, all realtime tables *must* be ``APPEND``.
+    * ``APPEND`` means new data will be pushed and appended to the current data in the table, all realtime tables *must* be explicity set to ``APPEND``.
     * ``REFRESH`` will refresh the entire dataset contained within the table. Segment retention is ignored when set to ``REFRESH``.
 
 * ``replication`` - Number of replicas of data in a table, used for offline tables only.
@@ -117,7 +117,7 @@ The ``tableIndexConfig`` section has information about how to configure:
 
   * Allowed values - String; string must match the column name in the corresponding schema
 
-* ``sortedColumn`` - Indicates a list of real column names as specified in the schema. Data should be sorted based on the column names provided. More info on indexes can be found on the `Index Techniques <index_techniques.html>`_ page.
+* ``sortedColumn`` - Indicates a list of real column names as specified in the schema. Data should be sorted based on the column names provided. This field needs to be set only for realtime tables. For offline, if the data at source is sorted, we will create a sorted index automatically. More info on indexes can be found on the `Index Techniques <index_techniques.html>`_ page.
 
   * Allowed values - String; string must match the column name in the corresponding schema
 

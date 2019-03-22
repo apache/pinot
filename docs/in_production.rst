@@ -118,10 +118,26 @@ Pinot Broker
 Pinot Controller
 ^^^^^^^^^^^^^^^^
 
+The controller metrics are generated dynamically due to generally including a table name as a part of the metric.
+
 * Missing Segment Count -
+
+  * The controller will determine which segments are missing based on gaps in time coverage for segments. If a table is missing data for any time period(s) this metric will be set accordingly.
+
 * Segments in Error State -
+
+  * Number of segments in an ``ERROR`` state for a given table.
+
 * Last push delay -
+
+  * The time in hours since the last time an offline segment has been pushed to the controller.
+
 * Percent of replicas up - `PERCENT_OF_REPLICAS <https://github.com/apache/incubator-pinot/blob/master/pinot-common/src/main/java/org/apache/pinot/common/metrics/ControllerGauge.java>`_
-* Table quota usage percent - `TABLE_STORAGE_QUOTA_UTILIZATION <https://github.com/apache/incubator-pinot/blob/master/pinot-common/src/main/java/org/apache/pinot/common/metrics/ControllerGauge.java>`_
+
+  * Percentage of complete online replicas in external view as compared to replicas in ideal state.
+
+* Table storage quota usage percent - `TABLE_STORAGE_QUOTA_UTILIZATION <https://github.com/apache/incubator-pinot/blob/master/pinot-common/src/main/java/org/apache/pinot/common/metrics/ControllerGauge.java>`_
+
+  * Shows how much of the table's storage quota is currently being used, metric will a percentage of a the entire quota.
 
 
