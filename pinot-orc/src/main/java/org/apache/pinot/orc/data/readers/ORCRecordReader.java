@@ -19,6 +19,7 @@ package org.apache.pinot.orc.data.readers;
  * under the License.
  */
 
+import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -142,7 +143,8 @@ public class ORCRecordReader implements RecordReader {
         // ORC will keep your columns in the same order as the schema provided
         ColumnVector vector = rowBatch.cols[i];
         // Previous value set to null, not used except to save allocation memory in OrcMapredRecordReader
-        WritableComparable writableComparable = OrcMapredRecordReader.nextValue(vector, 0, currColumn, null);
+        WritableComparable writableComparable;
+        writableComparable = OrcMapredRecordReader.nextValue(vector, 0, currColumn, null);
         genericRow.putField(currColumnName, getBaseObject(writableComparable));
       }
     } else {
@@ -181,20 +183,27 @@ public class ORCRecordReader implements RecordReader {
     } else if (Text.class.isAssignableFrom(w.getClass())) {
       obj = ((Text) w).toString();
     } else if (OrcList.class.isAssignableFrom(w.getClass())) {
-      OrcList orcList = (OrcList) w;
-      LOGGER.info("ORC list is {}", orcList.toString());
-      List<Object> list = new ArrayList();
-      for (Object wc : orcList) {
-        Object objectToAdd = getBaseObject((WritableComparable) wc);
-        list.add(objectToAdd);
-      }
-      return list;
+      obj = translateList((OrcList) w);
     } else {
       LOGGER.info("Unknown type found: " + w.getClass().getSimpleName());
       throw new IllegalArgumentException("Unknown type: " + w.getClass().getSimpleName());
     }
 
     return obj;
+  }
+
+  private List<Object> translateList(OrcList<? extends WritableComparable> l) {
+    if (l == null || l.size() < 1) {
+      return ImmutableList.of();
+    }
+
+    List<Object> retArray = new ArrayList<>(l.size());
+
+    for (WritableComparable w : l) {
+      Object o = getBaseObject(w);
+      retArray.add(o);
+    }
+    return ImmutableList.copyOf(retArray);
   }
 
   @Override

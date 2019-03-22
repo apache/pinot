@@ -28,15 +28,15 @@ import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.ql.exec.vector.BytesColumnVector;
-import org.apache.hadoop.hive.ql.exec.vector.ColumnVector;
-import org.apache.hadoop.hive.ql.exec.vector.ListColumnVector;
 import org.apache.hadoop.hive.ql.exec.vector.LongColumnVector;
 import org.apache.hadoop.hive.ql.exec.vector.VectorizedRowBatch;
-import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.Text;
 import org.apache.orc.OrcFile;
 import org.apache.orc.TypeDescription;
 import org.apache.orc.Writer;
 import org.apache.orc.mapred.OrcList;
+import org.apache.orc.mapred.OrcMapredRecordWriter;
+import org.apache.orc.mapred.OrcStruct;
 import org.apache.pinot.common.data.DimensionFieldSpec;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.Schema;
@@ -84,52 +84,32 @@ public class ORCRecordReaderTest {
     }
     writer.close();
 
-    TypeDescription mvSchema = TypeDescription.fromString("struct<key:string,ints:array<int>>");
+    // Define the mv orc schema - TypeDescription
+    TypeDescription orcTypeDesc = TypeDescription.createStruct();
+    orcTypeDesc.addField("emails", TypeDescription.createList(TypeDescription.createString()));
+
+    TypeDescription typeEmails = TypeDescription.createList(TypeDescription.createString());
+
+    OrcList<Text> emails = new OrcList<>(typeEmails);
+    emails.add(new Text("hello"));
+    emails.add(new Text("no"));
+
+    OrcStruct struct = new OrcStruct(orcTypeDesc);
+    struct.setFieldValue("emails", emails);
+
     Writer mvWriter = OrcFile.createWriter(new Path(MULTIVALUE_ORC_FILE.getAbsolutePath()),
         OrcFile.writerOptions(new Configuration())
-            .setSchema(mvSchema));
+            .setSchema(orcTypeDesc));
 
-    VectorizedRowBatch mvbatch = mvSchema.createRowBatch();
-    BytesColumnVector key = (BytesColumnVector) mvbatch.cols[0];
-    ListColumnVector ints = (ListColumnVector) mvbatch.cols[1];
-    for(int r=0; r < 5; ++r) {
-      int row = mvbatch.size++;
-      byte[] buffer = ("Last-" + (r * 3)).getBytes(StandardCharsets.UTF_8);
-      key.setRef(row, buffer, 0, buffer.length);
-
-//      generate(ints, 5);
-      OrcList leftList = new OrcList(mvSchema.getChildren().get(1));
-      leftList.add(new IntWritable(r + 1));
-      leftList.add(new IntWritable(r + 2));
-      leftList.add(new IntWritable(r + 3));
-
-      // If the batch is full, write it out and start over.
-      if (mvbatch.size == mvbatch.getMaxSize()) {
-        mvWriter.addRowBatch(mvbatch);
-        mvbatch.reset();
-      }
-    }
-    if (mvbatch.size != 0) {
-      mvWriter.addRowBatch(mvbatch);
-    }
-    mvWriter.close();
-
-  }
-
-  public void generate(ColumnVector v, int valueCount) {
-    ListColumnVector vector = (ListColumnVector) v;
-    for(int r=0; r < valueCount; ++r) {
-        vector.offsets[r] = vector.childCount;
-        vector.lengths[r] = r;
-        vector.childCount += vector.lengths[r];
-    }
-    vector.child.ensureSize(vector.childCount, false);
+    OrcMapredRecordWriter mrRecordWriter = new OrcMapredRecordWriter(mvWriter);
+    mrRecordWriter.write(null, struct);
+    mrRecordWriter.close(null);
+    System.out.println();
   }
 
   @Test
   public void testReadData()
       throws IOException {
-
     ORCRecordReader orcRecordReader = new ORCRecordReader();
 
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig();
@@ -162,10 +142,8 @@ public class ORCRecordReaderTest {
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig();
     segmentGeneratorConfig.setInputFilePath(MULTIVALUE_ORC_FILE.getAbsolutePath());
     Schema schema = new Schema();
-    FieldSpec xFieldSpec = new DimensionFieldSpec("key", FieldSpec.DataType.BYTES, true);
-    schema.addField(xFieldSpec);
-    FieldSpec yFieldSpec = new DimensionFieldSpec("ints", FieldSpec.DataType.INT, false);
-    schema.addField(yFieldSpec);
+    FieldSpec emailsFieldSpec = new DimensionFieldSpec("emails", FieldSpec.DataType.STRING, false);
+    schema.addField(emailsFieldSpec);
     segmentGeneratorConfig.setSchema(schema);
     orcRecordReader.init(segmentGeneratorConfig);
 
@@ -174,14 +152,14 @@ public class ORCRecordReaderTest {
       genericRows.add(orcRecordReader.next());
     }
     orcRecordReader.close();
-    Assert.assertEquals(genericRows.size(), 5, "Generic row size must be 5");
 
-    for (int i = 0; i < genericRows.size(); i++) {
-      Assert.assertEquals(genericRows.get(i).getValue("key"), "Last-" + (i * 3));
-      List<Integer> l = (List) genericRows.get(i).getValue("ints");
-      Assert.assertTrue(l.size() == 5);
-      Assert.assertEquals((Integer) l.get(i), (Integer) i);
-    }
+    Assert.assertEquals(genericRows.size(), 1, "Generic row size must be 1");
+
+    List<Integer> l = (List) genericRows.get(0).getValue("emails");
+    Assert.assertTrue(l.size() == 2);
+    Assert.assertEquals(l.get(0), "hello");
+    Assert.assertEquals(l.get(1), "no");
+
   }
 
   @AfterClass
