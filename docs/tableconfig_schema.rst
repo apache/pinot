@@ -20,23 +20,19 @@
 Table Config
 ============
 
-Introduction
-~~~~~~~~~~~~
-
-Using tables is how Pinot serves and organizes data. There are many settings in the table config which will influence how Pinot operates. The first and most significant distinction is using an offline versus a realtime table.
-
-An offline table in Pinot is used to host data which might be periodically uploaded - daily, weekly, etc. A realtime table, however, is used to consume data from incoming data streams and serve this data in a near-realtime manner. 'Near-realtime' might also be referred to as nearline or just plain 'realtime'.
-
-This section includes a sample table config and all sections will be explained, if applicable appropriate sections will be linked to for further explanation of those features.
-
 Sample table config and descriptions
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-A sample table config is shown below which has sub-sections collasped. The sub sections will be described individually in following sections.
+A sample table config is shown below which has sub-sections collasped. The sub-sections will be described individually in following sections. Further links to feature specific documention will be included where available.
 
-The ``tableName`` should only contain alpha-numeric characters, hyphens ('-'), or underscores ('_'). Though using a double-underscore ('__') is not allowed and reserved for other features within Pinot.
+``tableName`` - Should only contain alpha-numeric characters, hyphens ('-'), or underscores ('_'). Though using a double-underscore ('__') is not allowed and reserved for other features within Pinot.
 
-The ``tableType`` will indicate the type of the table, ``OFFLINE`` or ``REALTIME``. There are some settings specific to each type. This differentiation will be called out below as options are explained.
+``tableType`` - Indicates the type of the table. There are some settings specific to each type. This will be clarified below as each sub-section is explained.
+
+  * Allowed values:
+
+    * ``OFFLINE`` - An offline table is used to host data which might be periodically uploaded - daily, weekly, etc. More information on `Offline Tables <architecture.html#ingesting-offline-data>`_
+    * ``REALTIME`` - A realtime table is used to consume data from incoming data streams and serve this data in a near-realtime manner. More information on `Realtime Tables <architecture.html#ingesting-realtime-data>`_
 
 .. code-block:: none
 
