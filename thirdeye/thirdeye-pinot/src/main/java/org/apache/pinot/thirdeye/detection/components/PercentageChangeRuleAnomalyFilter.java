@@ -70,15 +70,25 @@ public class PercentageChangeRuleAnomalyFilter implements AnomalyFilter<Percenta
 
     Map<MetricSlice, DataFrame> aggregates =
         this.dataFetcher.fetchData(new InputDataSpec().withAggregateSlices(slices)).getAggregates();
-    if (aggregates.get(currentSlice).isEmpty() || aggregates.get(baselineSlice).isEmpty()) {
-      LOG.warn("Unable to fetch data for current or baseline slice for anomaly {}. start = {} end = {} filters = {}",
-          anomaly.getId(), anomaly.getStartTime(), anomaly.getEndTime(), me.getFilters());
-      return false;
+
+    double currentValue;
+    if (aggregates.get(currentSlice).isEmpty()) {
+      currentValue = anomaly.getAvgCurrentVal();
+    } else {
+      currentValue = getValueFromAggregates(currentSlice, aggregates);
     }
 
-    double currentValue = getValueFromAggregates(currentSlice, aggregates);
-    double baselineValue =
-        baselineSlice == null ? anomaly.getAvgBaselineVal() : getValueFromAggregates(baselineSlice, aggregates);
+    double baselineValue;
+    if (baselineSlice == null) {
+      baselineValue = anomaly.getAvgBaselineVal();
+    } else if (aggregates.get(baselineSlice).isEmpty()) {
+      baselineValue = anomaly.getAvgBaselineVal();
+      LOG.warn("Unable to fetch data for baseline slice for anomaly {}. start = {} end = {} filters = {}. Using anomaly"
+              + " baseline ", anomaly.getId(), anomaly.getStartTime(), anomaly.getEndTime(), me.getFilters());
+    } else {
+      baselineValue = getValueFromAggregates(baselineSlice, aggregates);
+    }
+
     // if inconsistent with up/down, filter the anomaly
     if (!pattern.equals(Pattern.UP_OR_DOWN) && (currentValue < baselineValue && pattern.equals(Pattern.UP)) || (
         currentValue > baselineValue && pattern.equals(Pattern.DOWN))) {
