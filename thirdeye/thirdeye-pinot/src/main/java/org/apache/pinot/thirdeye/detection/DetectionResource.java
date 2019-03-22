@@ -514,7 +514,7 @@ public class DetectionResource {
     if (metric == null) {
       throw new IllegalArgumentException(String.format("Could not resolve metric '%s' in dataset '%s' for anomaly id %d", anomaly.getMetric(), anomaly.getCollection(), anomaly.getId()));
     }
-    TimeSeries ts = DetectionUtils.getBaselineTimeseries(anomaly, Multimaps.forMap(anomaly.getDimensions()), metric.getId(), configDAO.findById(anomaly.getId()), start, end, loader, provider);
+    TimeSeries ts = DetectionUtils.getBaselineTimeseries(anomaly, Multimaps.forMap(anomaly.getDimensions()), metric.getId(), configDAO.findById(anomaly.getDetectionConfigId()), start, end, loader, provider);
     return Response.ok(ts.getDataFrame()).build();
   }
 
