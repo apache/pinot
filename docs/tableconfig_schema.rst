@@ -47,6 +47,15 @@ A sample table config is shown below which has sub-sections collasped. The sub-s
       "metadata": {...}
     }
 
+Some sections are required, otherwise the table config will be rejected by pinot-controller. The required sections are:
+
+* ``tableName``
+* ``tabletype``
+* ``"segmentsConfig": {...}``
+* ``"tableIndexConfig": {...}``
+* ``"tenants": {...}``
+* ``"metadata": {...}``
+
 Segments Config Section
 ~~~~~~~~~~~~~~~~~~~~~~~
 
