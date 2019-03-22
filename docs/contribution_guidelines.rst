@@ -25,11 +25,25 @@ Contribution Guidelines
 
 Before you begin to contribute, make sure you have reviewed :ref:`dev-setup` and :ref:`code-modules` sections and that you have created your own fork of the pinot source code.
 
+Create a design document
+------------------------
+If your change is relatively minor, you can skip this step. If you are
+adding new major feature, we suggest that you add a design document 
+and solicit comments from the community before submitting any code.
+
+`Here <https://cwiki.apache.org/confluence/display/PINOT/Design+Documents>`_
+is a list of current design documents.
+
+
 Create an issue for the change
 ------------------------------
 Create a Pinot issue for the change you would like to make. Provide information on why the change is needed and how you
 plan to address it. Use the conversations on the issue as a way to validate assumptions and the right way to proceed.
 Be sure to review sections on :ref:`compatibility-changes` and :ref:`external-libs`.
+
+If you have a design document, please refer to the design documents
+in your Issue. You may even want to create multiple
+issues depending on the extent of your change.
 
 Once you are clear about what you want to do, proceed with the next steps listed below.
 
@@ -61,8 +75,8 @@ Code documentation
 Please ensure your code is adequately documented. Some things to consider for documentation:
 
 * Always include class level java docs.
-At the top class level, we are looking for information about what functionality is provided by the class,
-what state is maintained by the class, whether there are concurrency/thread-safety concerns and any exceptional behavior that the class might exhibit.
+  At the top class level, we are looking for information about what functionality is provided by the class,
+  what state is maintained by the class, whether there are concurrency/thread-safety concerns and any exceptional behavior that the class might exhibit.
 
 * Document public methods and their parameters.
 
@@ -101,8 +115,8 @@ Be cautious about pulling in external dependencies. You will need to consider mu
 * Is the external library maintained by an active community of contributors?
 * What are the licensing terms for the library. For more information about handling licenses, see :ref:`handling-licenses`.
 * Are you adding the library to :ref:`pinot-foundation` modules? This will affect the rest of the Pinot code base.
-If the new library pulls in a lot of transitive dependencies, then we might encounter unexpected issues with multiple classes in the classpath.
-These issues are hard to catch with tests as the order of loading the libraries at runtime matters. If you absolutely need the support, consider adding it via extension modules, see :ref:`extension-modules`.
+  If the new library pulls in a lot of transitive dependencies, then we might encounter unexpected issues with multiple classes in the classpath.
+  These issues are hard to catch with tests as the order of loading the libraries at runtime matters. If you absolutely need the support, consider adding it via extension modules, see :ref:`extension-modules`.
 
 Testing your changes
 ^^^^^^^^^^^^^^^^^^^^
@@ -141,13 +155,13 @@ All source code files should have license headers. To automatically add the head
 
 .. note::
 
-If you checkin third-party code or files, please make sure you review Apache guidelines:
+  If you checkin third-party code or files, please make sure you review Apache guidelines:
 
-* `Licences that can be included <https://www.apache.org/legal/resolved.html#what-can-we-include-in-an-asf-project-category-a>`_
+  * `Licences that can be included <https://www.apache.org/legal/resolved.html#what-can-we-include-in-an-asf-project-category-a>`_
 
-* `Licences that may be included <https://www.apache.org/legal/resolved.html#what-can-we-maybe-include-in-an-asf-project-category-b>`_
+  * `Licences that may be included <https://www.apache.org/legal/resolved.html#what-can-we-maybe-include-in-an-asf-project-category-b>`_
 
-* `Licenses that should not be included <https://www.apache.org/legal/resolved.html#what-can-we-not-include-in-an-asf-project-category-x>`_
+  * `Licenses that should not be included <https://www.apache.org/legal/resolved.html#what-can-we-not-include-in-an-asf-project-category-x>`_
 
 Once you determine the code you are pulling in adhere to the guidelines above, go ahead pull the changes in.
 Do not add license headers for them. Follow these instructions to ensure we are compliant with Apache Licensing process:
@@ -159,12 +173,12 @@ Do not add license headers for them. Follow these instructions to ensure we are 
 If attention to the licensing terms in not paid early on, they will be caught much later in the process, when we prepare to make a new release.
 Updating code at that time to work with the right libraries at that time might require bigger refactoring changes and delay the release process.
 
-Creating a PR
--------------
+Creating a Pull Request (PR)
+----------------------------
 
 * Verifying code-style
 
-Run the following command to verify the code-style before posting a PR
+  Run the following command to verify the code-style before posting a PR
 
 .. code-block:: none
 
@@ -172,14 +186,14 @@ Run the following command to verify the code-style before posting a PR
 
 * Run tests
 
-Before you create a review request for the changes, make sure you have run the corresponding unit tests for your changes.
-You can run individual tests via the IDE or via maven command-line. Finally run all tests locally by running ``mvn clean install -Pbin-dist``.
+  Before you create a review request for the changes, make sure you have run the corresponding unit tests for your changes.
+  You can run individual tests via the IDE or via maven command-line. Finally run all tests locally by running ``mvn clean install -Pbin-dist``.
 
-For changes that are related to performance issues or race conditions, it is hard to write reliable tests, so we recommend running manual stress tests to validate the changes. You ``MUST`` note the manual tests done in the PR description.
+  For changes that are related to performance issues or race conditions, it is hard to write reliable tests, so we recommend running manual stress tests to validate the changes. You ``MUST`` note the manual tests done in the PR description.
 
 * Push changes and create a PR for review
 
-Commit your changes with a meaningful commit message.
+  Commit your changes with a meaningful commit message.
 
 .. code-block:: none
 
@@ -187,24 +201,25 @@ Commit your changes with a meaningful commit message.
   $ git commit -m "Meaningful oneliner for the change"
   $ git push origin <your issue branch>
 
-After this, create a PullRequest in `github <https://github.com/apache/incubator-pinot/pulls>`_. Include the following information in the description:
+  After this, create a PullRequest in `github <https://github.com/apache/incubator-pinot/pulls>`_. Include the following information in the description:
 
-* The changes that are included in the PR.
+    * The changes that are included in the PR.
 
-* Information on any implementation choices that were made.
+    * Design document, if any.
 
-* Evidence of sufficient testing. You ``MUST`` indicate the tests done, either manually or automated.
+    * Information on any implementation choices that were made.
 
-Once the PR is created, the code base is compiled and all tests are run via ``travis``. Make sure you followup on any issues flagged by travis and address them.
-If you see test failures that are intermittent, ``please`` create an issue to track them.
+    * Evidence of sufficient testing. You ``MUST`` indicate the tests done, either manually or automated.
 
-Once the ``travis`` run is clear, request reviews from atleast 2 committers on the project and be sure to gently to followup on the issue with the reviewers.
+  Once the PR is created, the code base is compiled and all tests are run via ``travis``. Make sure you followup on any issues flagged by travis and address them.
+  If you see test failures that are intermittent, ``please`` create an issue to track them.
 
-* Addressing comments and Rebasing
-Once you receive comments on github on your changes, be sure to respond to them on github and address the concerns.
-If any discussions happen offline for the changes in question, make sure to capture the outcome of the discussion, so others can follow along as well.
+  Once the ``travis`` run is clear, request reviews from atleast 2 committers on the project and be sure to gently to followup on the issue with the reviewers.
 
-It is possible that while your change is being reviewed, other changes were made to the master branch. Be sure to pull rebase your change on the new changes thus:
+* Once you receive comments on github on your changes, be sure to respond to them on github and address the concerns.
+  If any discussions happen offline for the changes in question, make sure to capture the outcome of the discussion, so others can follow along as well.
+
+  It is possible that while your change is being reviewed, other changes were made to the master branch. Be sure to pull rebase your change on the new changes thus:
 
 .. code-block:: none
 
@@ -217,12 +232,14 @@ It is possible that while your change is being reviewed, other changes were made
   $ git checkout <your issue branch>
   $ git rebase master
 
-At this time, if rebase flags any conflicts, resolve the conflicts and follow the instructions provided by the rebase command.
+  At this time, if rebase flags any conflicts, resolve the conflicts and follow the instructions provided by the rebase command.
 
-Run additional tests/validations for the new changes and update the PR by pushing your changes:
+  Run additional tests/validations for the new changes and update the PR by pushing your changes:
 
 .. code-block:: none
 
   $ git push origin <your issue branch>
 
-* Once your change is merged, check to see if any documentation needs to be updated. If so, create a PR for documentation.
+* When you have addressed all comments and have an approved PR, one of the committers can merge your PR.
+
+* After your change is merged, check to see if any documentation needs to be updated. If so, create a PR for documentation.

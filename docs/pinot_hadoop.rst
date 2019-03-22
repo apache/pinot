@@ -205,6 +205,7 @@ To consume in realtime, we simply need to create a table that uses the same sche
 consume from, using a table definition such as this one:
 
 .. code-block:: none
+
   {
     "tableName":"flights",
     "segmentsConfig" : {
