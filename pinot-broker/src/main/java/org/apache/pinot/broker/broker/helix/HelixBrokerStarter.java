@@ -153,13 +153,15 @@ public class HelixBrokerStarter {
         .registerMessageHandlerFactory(Message.MessageType.USER_DEFINE_MSG.toString(), _tbiMessageHandler);
 
     addInstanceTagIfNeeded(helixClusterName, brokerId);
+    final double minResourcePercentForStartup = _pinotHelixProperties.getDouble(CommonConstants.Broker.CONFIG_OF_BROKER_MIN_RESOURCE_PERCENT_FOR_START,
+        CommonConstants.Broker.DEFAULT_BROKER_MIN_RESOURCE_PERCENT_FOR_START);
 
     // Register the service status handler
     ServiceStatus.setServiceStatusCallback(new ServiceStatus.MultipleCallbackServiceStatusCallback(ImmutableList
         .of(new ServiceStatus.IdealStateAndCurrentStateMatchServiceStatusCallback(_helixManager, helixClusterName,
-                brokerId),
+                brokerId, minResourcePercentForStartup),
             new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(_helixManager, helixClusterName,
-                brokerId))));
+                brokerId, minResourcePercentForStartup))));
 
     _brokerServerBuilder.getBrokerMetrics().addCallbackGauge("helix.connected", new Callable<Long>() {
       @Override
