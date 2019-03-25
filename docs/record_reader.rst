@@ -29,11 +29,9 @@ Pinot package provides the following record readers out of the box:
 - Avro record reader: record reader for Avro format files
 - CSV record reader: record reader for CSV format files
 - JSON record reader: record reader for JSON format files
+- ORC record reader: record reader for ORC format files
 - Thrift record reader: record reader for Thrift format files
 - Pinot segment record reader: record reader for Pinot segment
-
-For other file formats, we provide a general interface for record reader - `RecordReader`. To index the file into Pinot
-segment, implement the interface and plug it into the index engine - `SegmentCreationDriverImpl`.
 
 Initialize Record Reader
 ------------------------
@@ -42,7 +40,7 @@ To initialize a record reader, the data file and table schema should be provided
 need to provide the index directory because schema can be derived from the segment). The output record will follow the
 table schema provided.
 
-For Avro/JSON/Pinot segment record reader, no extra configuration is required as column names and multi-values are
+For Avro/JSON/ORC/Pinot segment record reader, no extra configuration is required as column names and multi-values are
 embedded in the data file.
 
 For CSV/Thrift record reader, extra configuration might be provided to determine the column names and multi-values for
@@ -72,46 +70,17 @@ the Thrift objects.
 Implement Your Own Record Reader
 --------------------------------
 
-You can implement your own record reader for file formats that is not supported natively. The following methods need to
-be implemented:
-
-.. code-block:: none
-
-  /**
-   * Return true if more records remain to be read.
-   */
-  boolean hasNext();
-
-  /**
-   * Get the next record.
-   */
-  GenericRow next()
-      throws IOException;
-
-  /**
-   * Get the next record. Re-use the given row if possible to reduce garbage.
-   * The passed in row should be returned by previous call to next().
-   */
-  GenericRow next(GenericRow reuse)
-      throws IOException;
-
-  /**
-   * Rewind the reader to start reading from the first record again.
-   */
-  void rewind()
-      throws IOException;
-
-  /**
-   * Get the Pinot schema.
-   */
-  Schema getSchema();
-
+For other file formats, we provide a general interface for record reader - `RecordReader <https://github.com/apache/incubator-pinot/blob/master/pinot-core/src/main/java/org/apache/pinot/core/data/readers/RecordReader.java>`_.
+To index the file into Pinot segment, simply implement the interface and plug it into the index engine - `SegmentCreationDriverImpl <https://github.com/apache/incubator-pinot/blob/master/pinot-core/src/main/java/org/apache/pinot/core/segment/creator/impl/SegmentIndexCreationDriverImpl.java>`_.
+We use a 2-passes algorithm to index the file into Pinot segment, hence the *rewind()* method is required for the record
+reader.
 
 Generic Row
 ~~~~~~~~~~~
 
-Generic row is the record abstraction which the index engine can read and index with. It is a map from column name
-(String) to column value (Object). For multi-valued column, the value should be an object array (Object[]).
+`GenericRow <https://github.com/apache/incubator-pinot/blob/master/pinot-core/src/main/java/org/apache/pinot/core/data/GenericRow.java>`_
+is the record abstraction which the index engine can read and index with. It is a map from column name (String) to
+column value (Object). For multi-valued column, the value should be an object array (Object[]).
 
 Contracts for Record Reader
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -122,10 +91,12 @@ There are several contracts for record readers that developers should follow whe
 
   - All the columns in the schema should be preserved (if column does not exist in the original record, put default
     value instead)
-  - Columns not in the schema should be escaped
+  - Columns not in the schema should not be included
   - Values for the column should follow the field spec from the schema (data type, single-valued/multi-valued)
 
-- For the time column, record reader should be able to read both incoming and outgoing time:
+- For the time column (refer to `TimeFieldSpec <https://github.com/apache/incubator-pinot/blob/master/pinot-common/src/main/java/org/apache/pinot/common/data/TimeFieldSpec.java>`_),
+  record reader should be able to read both incoming and outgoing time (we allow *incoming time - time value from the
+  original data* to *outgoing time - time value stored in Pinot* conversion during index creation).
 
   - If incoming and outgoing time column name are the same, use incoming time field spec
   - If incoming and outgoing time column name are different, put both of them as time field spec
