@@ -86,9 +86,9 @@ public class ORCRecordReaderTest {
 
     // Define the mv orc schema - TypeDescription
     TypeDescription orcTypeDesc = TypeDescription.createStruct();
-    orcTypeDesc.addField("emails", TypeDescription.createList(TypeDescription.createString()));
-
     TypeDescription typeEmails = TypeDescription.createList(TypeDescription.createString());
+
+    orcTypeDesc.addField("emails", typeEmails);
 
     OrcList<Text> emails = new OrcList<>(typeEmails);
     emails.add(new Text("hello"));
@@ -96,7 +96,7 @@ public class ORCRecordReaderTest {
 
     OrcStruct struct = new OrcStruct(orcTypeDesc);
     struct.setFieldValue("emails", emails);
-
+    
     Writer mvWriter = OrcFile.createWriter(new Path(MULTIVALUE_ORC_FILE.getAbsolutePath()),
         OrcFile.writerOptions(new Configuration())
             .setSchema(orcTypeDesc));
@@ -104,7 +104,6 @@ public class ORCRecordReaderTest {
     OrcMapredRecordWriter mrRecordWriter = new OrcMapredRecordWriter(mvWriter);
     mrRecordWriter.write(null, struct);
     mrRecordWriter.close(null);
-    System.out.println();
   }
 
   @Test
@@ -159,7 +158,6 @@ public class ORCRecordReaderTest {
     Assert.assertTrue(l.size() == 2);
     Assert.assertEquals(l.get(0), "hello");
     Assert.assertEquals(l.get(1), "no");
-
   }
 
   @AfterClass

@@ -66,7 +66,6 @@ public class ORCRecordReader implements RecordReader {
   Reader _reader;
   org.apache.orc.RecordReader _recordReader;
   VectorizedRowBatch _reusableVectorizedRowBatch;
-  OrcMapredRecordReader _orcMapredRecordReader;
 
   public static final String LOCAL_FS_PREFIX = "file://";
 
@@ -87,8 +86,6 @@ public class ORCRecordReader implements RecordReader {
         LOGGER.warn("Pinot schema is not set in segment generator config");
       }
       _recordReader = _reader.rows(_reader.options().schema(_orcSchema));
-
-      _orcMapredRecordReader = new OrcMapredRecordReader<>(_recordReader, _orcSchema);
     } catch (Exception e) {
       LOGGER.error("Caught exception initializing record reader at path {}", inputPath);
       throw new RuntimeException(e);
@@ -193,7 +190,7 @@ public class ORCRecordReader implements RecordReader {
   }
 
   private List<Object> translateList(OrcList<? extends WritableComparable> l) {
-    if (l == null || l.size() < 1) {
+    if (l == null || l.isEmpty()) {
       return ImmutableList.of();
     }
 
