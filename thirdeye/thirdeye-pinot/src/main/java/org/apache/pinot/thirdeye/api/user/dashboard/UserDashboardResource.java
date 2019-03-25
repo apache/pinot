@@ -78,8 +78,6 @@ public class UserDashboardResource {
   private final DatasetConfigManager datasetDAO;
   private final DetectionConfigManager detectionDAO;
   private final DetectionAlertConfigManager detectionAlertDAO;
-  private final AggregationLoader aggregationLoader;
-  private final CurrentAndBaselineLoader currentAndBaselineLoader;
 
 
   public UserDashboardResource(MergedAnomalyResultManager anomalyDAO, MetricConfigManager metricDAO,
@@ -90,11 +88,6 @@ public class UserDashboardResource {
     this.datasetDAO = datasetDAO;
     this.detectionDAO = detectionDAO;
     this.detectionAlertDAO = detectionAlertDAO;
-
-    this.aggregationLoader =
-        new DefaultAggregationLoader(this.metricDAO, this.datasetDAO, ThirdEyeCacheRegistry.getInstance().getQueryCache(),
-            ThirdEyeCacheRegistry.getInstance().getDatasetMaxDataTimeCache());
-    this.currentAndBaselineLoader = new CurrentAndBaselineLoader(this.metricDAO, this.datasetDAO, this.aggregationLoader);
   }
 
   /**
@@ -334,8 +327,6 @@ public class UserDashboardResource {
         return !mergedAnomalyResultDTO.isChild();
       }
     });
-
-    this.currentAndBaselineLoader.fillInCurrentAndBaselineValue(anomalies);
 
     return anomalies;
   }
