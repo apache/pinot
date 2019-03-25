@@ -65,20 +65,34 @@ export default Component.extend({
 
   init() {
     this._super(...arguments);
-    if(get(this, 'isEditMode')) {
+    // In edit mode, sets subscription group to an existing group by default and sets default yamls
+    if (get(this, 'isEditMode')) {
+      const subscriptionGroupNames = get(this, 'subscriptionGroupNames');
+      // Checks to make sure there is a subscription group array with at least one subscription group
+      if (subscriptionGroupNames && Array.isArray(subscriptionGroupNames) && subscriptionGroupNames.length > 0) {
+        const firstGroup = subscriptionGroupNames[0];
+        set(this, 'subscriptionYaml', firstGroup.yaml);
+        set(this, 'groupName', firstGroup);
+        set(this, 'subscriptionGroupId', firstGroup.id);
+      }
+      // Sets default yamls after checking for and setting default subscription group
       set(this, 'currentYamlAlertOriginal', get(this, 'detectionYaml') || get(this, 'yamlAlertProps'));
       set(this, 'currentYamlSettingsOriginal', get(this, 'subscriptionYaml') || get(this, 'yamlAlertSettings'));
     }
   },
 
   /**
-   * sets Yaml value displayed to contents of detectionYaml or yamlAlertProps
-   * @method currentYamlAlert
-   * @return {String}
+   * populates subscription group dropdown with options from fetch or model
+   * @method subscriptionGroupNamesDisplay
+   * @return {Object}
    */
   subscriptionGroupNamesDisplay: computed(
     'subscriptionGroupNames',
     async function() {
+      const isEditMode = get(this, 'isEditMode');
+      if (isEditMode) {
+        return get(this, 'subscriptionGroupNames');
+      }
       const subscriptionGroups = await get(this, '_fetchSubscriptionGroups').perform();
       return get(this, 'subscriptionGroupNames') || subscriptionGroups;
     }
