@@ -28,7 +28,6 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.ql.exec.vector.ColumnVector;
 import org.apache.hadoop.hive.ql.exec.vector.VectorizedRowBatch;
 import org.apache.hadoop.io.BooleanWritable;
-import org.apache.hadoop.io.ByteWritable;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.DoubleWritable;
 import org.apache.hadoop.io.FloatWritable;
@@ -163,8 +162,6 @@ public class ORCRecordReader implements RecordReader {
       obj = null;
     } else if (BooleanWritable.class.isAssignableFrom(w.getClass())) {
       obj = ((BooleanWritable) w).get();
-    } else if (ByteWritable.class.isAssignableFrom(w.getClass())) {
-      obj = ((ByteWritable) w).get();
     } else if (ShortWritable.class.isAssignableFrom(w.getClass())) {
       obj = ((ShortWritable) w).get();
     } else if (IntWritable.class.isAssignableFrom(w.getClass())) {
@@ -200,7 +197,7 @@ public class ORCRecordReader implements RecordReader {
       Object o = getBaseObject(w);
       retArray.add(o);
     }
-    return ImmutableList.copyOf(retArray);
+    return retArray;
   }
 
   @Override

@@ -30,6 +30,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.ql.exec.vector.BytesColumnVector;
 import org.apache.hadoop.hive.ql.exec.vector.LongColumnVector;
 import org.apache.hadoop.hive.ql.exec.vector.VectorizedRowBatch;
+import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.orc.OrcFile;
 import org.apache.orc.TypeDescription;
@@ -89,6 +90,7 @@ public class ORCRecordReaderTest {
     TypeDescription typeEmails = TypeDescription.createList(TypeDescription.createString());
 
     orcTypeDesc.addField("emails", typeEmails);
+    orcTypeDesc.addField("x", TypeDescription.createInt());
 
     OrcList<Text> emails = new OrcList<>(typeEmails);
     emails.add(new Text("hello"));
@@ -96,7 +98,8 @@ public class ORCRecordReaderTest {
 
     OrcStruct struct = new OrcStruct(orcTypeDesc);
     struct.setFieldValue("emails", emails);
-    
+    struct.setFieldValue("x", new IntWritable(1));
+
     Writer mvWriter = OrcFile.createWriter(new Path(MULTIVALUE_ORC_FILE.getAbsolutePath()),
         OrcFile.writerOptions(new Configuration())
             .setSchema(orcTypeDesc));
@@ -143,6 +146,8 @@ public class ORCRecordReaderTest {
     Schema schema = new Schema();
     FieldSpec emailsFieldSpec = new DimensionFieldSpec("emails", FieldSpec.DataType.STRING, false);
     schema.addField(emailsFieldSpec);
+    FieldSpec xFieldSpec = new DimensionFieldSpec("x", FieldSpec.DataType.INT, true);
+    schema.addField(xFieldSpec);
     segmentGeneratorConfig.setSchema(schema);
     orcRecordReader.init(segmentGeneratorConfig);
 
@@ -158,6 +163,9 @@ public class ORCRecordReaderTest {
     Assert.assertTrue(l.size() == 2);
     Assert.assertEquals(l.get(0), "hello");
     Assert.assertEquals(l.get(1), "no");
+
+    int val = (Integer) genericRows.get(0).getValue("x");
+    Assert.assertTrue(val == 1);
   }
 
   @AfterClass
