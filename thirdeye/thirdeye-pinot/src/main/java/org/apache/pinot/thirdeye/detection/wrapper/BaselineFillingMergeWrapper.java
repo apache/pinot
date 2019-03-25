@@ -22,6 +22,7 @@ package org.apache.pinot.thirdeye.detection.wrapper;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Collections2;
 import java.util.HashMap;
+import java.util.stream.Collectors;
 import org.apache.pinot.thirdeye.dataframe.DoubleSeries;
 import org.apache.pinot.thirdeye.dataframe.Series;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
@@ -124,7 +125,13 @@ public class BaselineFillingMergeWrapper extends MergeWrapper {
 
   @Override
   protected List<MergedAnomalyResultDTO> merge(Collection<MergedAnomalyResultDTO> anomalies) {
-    return this.fillCurrentAndBaselineValue(super.merge(anomalies));
+    List<MergedAnomalyResultDTO> mergedAnomalies = super.merge(anomalies);
+
+    // skip current & baseline filling if the anomaly is not merged
+    this.fillCurrentAndBaselineValue(mergedAnomalies.stream()
+        .filter(mergedAnomaly -> !isExistingAnomaly(this.existingAnomalies, mergedAnomaly)).collect(Collectors.toList()));
+
+    return mergedAnomalies;
   }
 
   @Override
@@ -157,10 +164,6 @@ public class BaselineFillingMergeWrapper extends MergeWrapper {
    */
   List<MergedAnomalyResultDTO> fillCurrentAndBaselineValue(List<MergedAnomalyResultDTO> mergedAnomalies) {
     for (MergedAnomalyResultDTO anomaly : mergedAnomalies) {
-      // skip current & baseline filling if the anomaly is not merged
-      if (this.isExistingAnomaly(this.existingAnomalies, anomaly)) {
-        continue;
-      }
       try {
         String metricUrn = anomaly.getMetricUrn();
         MetricEntity me = MetricEntity.fromURN(metricUrn);
