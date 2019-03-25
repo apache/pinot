@@ -62,7 +62,7 @@ public class BaselineFillingMergeWrapper extends MergeWrapper {
   private static final String PROP_BASELINE_PROVIDER_COMPONENT_NAME = "baselineProviderComponentName";
   private static final String PROP_DETECTOR = "detector";
   private static final String PROP_DETECTOR_COMPONENT_NAME = "detectorComponentName";
-  public static final String DEFAULT_WOW_BASELINE_PROVIDER_NAME = "DEFAULT_WOW";
+  private static final String DEFAULT_WOW_BASELINE_PROVIDER_NAME = "DEFAULT_WOW";
 
   private final BaselineProvider baselineValueProvider; // optionally configure a baseline value loader
   private final BaselineProvider currentValueProvider;
