@@ -15,9 +15,9 @@ module('Acceptance | tune alert settings', function(hooks) {
     'Dataset',
     'Granularity',
     'Application',
-    'Alert Owner',
-    'Data Filter',
-    'Dimensions',
+    'Created By',
+    'Filtered By',
+    'Breakdown By',
     'Detection Type',
     'Subscription Group'
   ];

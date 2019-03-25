@@ -97,6 +97,7 @@ public abstract class YamlDetectionConfigTranslator {
     if (existingConfig != null) {
       config.setId(existingConfig.getId());
       config.setLastTimestamp(existingConfig.getLastTimestamp());
+      config.setCreatedBy(existingConfig.getCreatedBy());
     }
 
     return config;

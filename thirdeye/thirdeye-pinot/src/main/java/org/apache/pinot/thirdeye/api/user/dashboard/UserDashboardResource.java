@@ -43,7 +43,6 @@ import org.apache.pinot.thirdeye.api.Constants;
 import org.apache.pinot.thirdeye.constant.AnomalyFeedbackType;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.ResourceUtils;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.pojo.AnomalySummary;
-import org.apache.pinot.thirdeye.datalayer.bao.AlertConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionAlertConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
@@ -127,7 +126,6 @@ public class UserDashboardResource {
    *
    * @param start window start time
    * @param end window end time (optional)
-   * @param owner anomaly function owner only (optional)
    * @param application anomaly function for application alert groups only (optional)
    *
    * @return List of AnomalySummary
@@ -140,8 +138,6 @@ public class UserDashboardResource {
       @QueryParam("start") Long start,
       @ApiParam(value = "end time of anomaly retrieval window")
       @QueryParam("end") Long end,
-      @ApiParam(value = "alert owner")
-      @QueryParam("owner") String owner,
       @ApiParam(value = "alert application/product/team")
       @QueryParam("application") String application,
       @ApiParam(value = "subscription group")
@@ -155,7 +151,7 @@ public class UserDashboardResource {
       @ApiParam(value = "max number of results")
       @QueryParam("limit") Integer limit) throws Exception {
     LOG.info("[USER DASHBOARD] Fetching anomalies with filters. Start: " + start + " end: " + end + " metric: "
-        + metric + " dataset: " + dataset + " owner: " + owner + " application: " + application + " group: " + group
+        + metric + " dataset: " + dataset + " application: " + application + " group: " + group
         + " fetchTrueAnomaly: " + fetchTrueAnomaly + " limit: " + limit);
 
     // Safety conditions
