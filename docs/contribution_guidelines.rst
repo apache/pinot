@@ -121,8 +121,10 @@ Be cautious about pulling in external dependencies. You will need to consider mu
 Testing your changes
 ^^^^^^^^^^^^^^^^^^^^
 Automated tests are always recommended for contributions. Make sure you write tests so that:
-# You verify the correctness of your contribution
-# You future proof you changes against code refactors or other changes.
+
+#. You verify the correctness of your contribution. This serves as proof to you as well as the reviewers.
+
+#. You future proof your contributions against code refactors or other changes.
 
 Identify a list of tests for the changes you have made. Depending on the scope of changes, you may need one or more of the following tests:
 
@@ -131,9 +133,13 @@ Identify a list of tests for the changes you have made. Depending on the scope o
   Make sure your code has the necessary class or method level unit tests. It is important to write both positive case as well as negative case tests.
   Document your tests well and add meaningful assertions in the tests; when the assertions fail, ensure that the right messages are logged with information that allows other to debug.
 
+
 * Integration Tests
+
   Add integration tests to cover End-to-End paths without relying on *mocking* (see note below). You ``MUST`` add integration tests for REST APIs, and must include tests that cover different error codes; i.e., 200 OK, 4xx or 5xx errors that are explicit contracts of the API.
 
+Testing Guidelines
+^^^^^^^^^^^^^^^^^^
 * Mocking
 
   Use `Mockito <https://site.mockito.org/>`_ to mock classes to control specific behaviors - e.g., simulate various error conditions.
@@ -144,6 +150,7 @@ Identify a list of tests for the changes you have made. Depending on the scope o
 * Validate assumptions in tests
 
   Make sure that adequate asserts are added in the tests to verify that the tests are passing for the right reasons.
+
 
 * Write reliable tests
 
