@@ -87,7 +87,7 @@ public class MergeWrapper extends DetectionPipeline {
     super(provider, config, startTime, endTime);
 
     this.maxGap = MapUtils.getLongValue(config.getProperties(), "maxGap", TimeUnit.HOURS.toMillis(2));
-    this.maxDuration = MapUtils.getLongValue(config.getProperties(), "maxDuration", Long.MAX_VALUE);
+    this.maxDuration = MapUtils.getLongValue(config.getProperties(), "maxDuration", TimeUnit.DAYS.toMillis(7));
     Preconditions.checkArgument(this.maxDuration > 0 , "Max duration must be a positive number");
     this.slice = new AnomalySlice().withStart(startTime).withEnd(endTime);
     this.nestedProperties = new ArrayList<>();
