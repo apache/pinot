@@ -26,4 +26,5 @@ This section provides an overview of options to extend Pinot code to make Pinot 
 
    pluggable_streams
    segment_fetcher
+   record_reader
    pluggable_storage
