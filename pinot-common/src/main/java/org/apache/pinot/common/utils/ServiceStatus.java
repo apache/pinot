@@ -137,7 +137,8 @@ public class ServiceStatus {
     private final Set<String> _resourcesToMonitor;
     private final int _numTotalResourcesToMonitor;
     private Iterator<String> _resourceIterator = null;
-    private final double _minResourcesStartPercent;
+    // Minimum number of resources to be in converged state before we declare the service state as STARTED
+    private final int _minResourcesStartCount;
 
     private String _statusDescription = STATUS_DESCRIPTION_INIT;
 
@@ -167,7 +168,7 @@ public class ServiceStatus {
         }
       }
       _numTotalResourcesToMonitor = _resourcesToMonitor.size();
-      _minResourcesStartPercent = minResourcesStartPercent;
+      _minResourcesStartCount = (int)Math.round(Math.ceil(minResourcesStartPercent * _numTotalResourcesToMonitor/100));
 
       LOGGER.info("Monitoring {} resources: {} for start up of instance {}", _numTotalResourcesToMonitor,
           _resourcesToMonitor, _instanceName);
@@ -182,8 +183,8 @@ public class ServiceStatus {
 
       _resourcesToMonitor = new HashSet<>(resourcesToMonitor);
       _numTotalResourcesToMonitor = _resourcesToMonitor.size();
-      _minResourcesStartPercent = minResourcesStartPercent;
 
+      _minResourcesStartCount = (int)Math.round(Math.ceil(minResourcesStartPercent * _numTotalResourcesToMonitor/100));
       LOGGER.info("Monitoring {} resources: {} for start up of instance {}", _numTotalResourcesToMonitor,
           _resourcesToMonitor, _instanceName);
     }
@@ -198,8 +199,7 @@ public class ServiceStatus {
       if (_resourcesToMonitor.isEmpty() || _numTotalResourcesToMonitor <= 0) {
         return true;
       }
-      if ((double)(_numTotalResourcesToMonitor - _resourcesToMonitor.size())*100/_numTotalResourcesToMonitor
-          >= _minResourcesStartPercent) {
+      if (_numTotalResourcesToMonitor - _resourcesToMonitor.size() >= _minResourcesStartCount) {
         return true;
       }
       return false;
@@ -285,8 +285,8 @@ public class ServiceStatus {
         _statusDescription = STATUS_DESCRIPTION_NONE;
         LOGGER.info("Instance {} has finished starting up", _instanceName);
       } else {
-        _statusDescription = String.format("waitingFor=%s, numResourcesLeft=%d, numTotalResources=%d, minPercent=%f",
-            getMatchName(), _resourcesToMonitor.size(), _numTotalResourcesToMonitor, _minResourcesStartPercent);
+        _statusDescription = String.format("waitingFor=%s, numResourcesLeft=%d, numTotalResources=%d, minStartCount=%d",
+            getMatchName(), _resourcesToMonitor.size(), _numTotalResourcesToMonitor, _minResourcesStartCount);
         LOGGER.info("Instance {} returning GOOD because {}", _statusDescription);
       }
 

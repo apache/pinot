@@ -269,7 +269,11 @@ public class ServiceStatusTest {
       callback.setExternalViews(externalViews);
 
       ServiceStatus.Status status = callback.getServiceStatus();
-      for (int i = 1; i < tableCount; i++) {
+      // we need to call getServiceStatus() at most the number of bad tables plus 1,
+      // to get a STARTED condition if we can. After that, the return value should
+      // never change.
+      final int nBadTables = tableCount - readyTables;
+      for (int i = 0; i <= nBadTables; i++) {
         status = callback.getServiceStatus();
       }
 
@@ -278,6 +282,14 @@ public class ServiceStatusTest {
       String errorMsg = "Mismatch at " + minReadyPercent + "%, tableCount=" + tableCount +
           ", percentTablesReady=" + actualReadyPercent + ":" + callback.getStatusDescription();
       Assert.assertEquals(status, expected, errorMsg);
+
+      // The status should never change going forward from here.
+      for (int i = nBadTables + 1; i < tableCount; i++) {
+        ServiceStatus.Status laterStatus = callback.getServiceStatus();
+        String msg = "Mismatch at " + minReadyPercent + "%, tableCount=" + tableCount +
+            ", percentTablesReady=" + actualReadyPercent + ", i=" + i + ":" + callback.getStatusDescription();
+        Assert.assertEquals(laterStatus, status, msg);
+      }
     }
   }
 
