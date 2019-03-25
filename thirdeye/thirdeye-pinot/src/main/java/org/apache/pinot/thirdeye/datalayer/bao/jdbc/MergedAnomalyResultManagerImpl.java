@@ -414,11 +414,9 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
           if (child.getChildren() != null && !child.getChildren().isEmpty()) {
             throw new IllegalArgumentException("Multi-level anomaly nesting not supported");
           }
-
-          child.setChild(true);
-          save(child);
         }
-
+        child.setChild(true);
+        save(child);
         childIds.add(child.getId());
       }
 

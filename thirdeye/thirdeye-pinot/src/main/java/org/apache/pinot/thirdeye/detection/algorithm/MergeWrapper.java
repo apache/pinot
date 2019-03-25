@@ -245,22 +245,23 @@ public class MergeWrapper extends DetectionPipeline {
   }
 
 
-  protected MergedAnomalyResultDTO copyAnomalyInfo(MergedAnomalyResultDTO anomaly, MergedAnomalyResultDTO newAnomaly) {
-    newAnomaly.setStartTime(anomaly.getStartTime());
-    newAnomaly.setEndTime(anomaly.getEndTime());
-    newAnomaly.setMetric(anomaly.getMetric());
-    newAnomaly.setMetricUrn(anomaly.getMetricUrn());
-    newAnomaly.setCollection(anomaly.getCollection());
-    newAnomaly.setDimensions(anomaly.getDimensions());
-    newAnomaly.setDetectionConfigId(anomaly.getDetectionConfigId());
-    newAnomaly.setAnomalyResultSource(anomaly.getAnomalyResultSource());
-    newAnomaly.setAvgBaselineVal(anomaly.getAvgBaselineVal());
-    newAnomaly.setAvgCurrentVal(anomaly.getAvgCurrentVal());
-    newAnomaly.setFeedback(anomaly.getFeedback());
-    newAnomaly.setAnomalyFeedbackId(anomaly.getAnomalyFeedbackId());
-    newAnomaly.setScore(anomaly.getScore());
-    newAnomaly.setWeight(anomaly.getWeight());
-    return newAnomaly;
+  protected MergedAnomalyResultDTO copyAnomalyInfo(MergedAnomalyResultDTO from, MergedAnomalyResultDTO to) {
+    to.setStartTime(from.getStartTime());
+    to.setEndTime(from.getEndTime());
+    to.setMetric(from.getMetric());
+    to.setMetricUrn(from.getMetricUrn());
+    to.setCollection(from.getCollection());
+    to.setDimensions(from.getDimensions());
+    to.setDetectionConfigId(from.getDetectionConfigId());
+    to.setAnomalyResultSource(from.getAnomalyResultSource());
+    to.setAvgBaselineVal(from.getAvgBaselineVal());
+    to.setAvgCurrentVal(from.getAvgCurrentVal());
+    to.setFeedback(from.getFeedback());
+    to.setAnomalyFeedbackId(from.getAnomalyFeedbackId());
+    to.setScore(from.getScore());
+    to.setWeight(from.getWeight());
+    to.setProperties(from.getProperties());
+    return to;
   }
 
   protected static class AnomalyKey {
