@@ -28,7 +28,7 @@ Before you begin to contribute, make sure you have reviewed :ref:`dev-setup` and
 Create a design document
 ------------------------
 If your change is relatively minor, you can skip this step. If you are
-adding new major feature, we suggest that you add a design document 
+adding new major feature, we suggest that you add a design document
 and solicit comments from the community before submitting any code.
 
 `Here <https://cwiki.apache.org/confluence/display/PINOT/Design+Documents>`_
@@ -120,12 +120,19 @@ Be cautious about pulling in external dependencies. You will need to consider mu
 
 Testing your changes
 ^^^^^^^^^^^^^^^^^^^^
+Automated tests are always recommended for contributions. Make sure you write tests so that:
+# You verify the correctness of your contribution
+# You future proof you changes against code refactors or other changes.
+
 Identify a list of tests for the changes you have made. Depending on the scope of changes, you may need one or more of the following tests:
 
 * Unit Tests
 
   Make sure your code has the necessary class or method level unit tests. It is important to write both positive case as well as negative case tests.
   Document your tests well and add meaningful assertions in the tests; when the assertions fail, ensure that the right messages are logged with information that allows other to debug.
+
+* Integration Tests
+  Add integration tests to cover End-to-End paths without relying on *mocking* (see note below). You ``MUST`` add integration tests for REST APIs, and must include tests that cover different error codes; i.e., 200 OK, 4xx or 5xx errors that are explicit contracts of the API.
 
 * Mocking
 
