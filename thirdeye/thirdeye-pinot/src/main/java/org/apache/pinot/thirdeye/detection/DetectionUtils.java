@@ -168,10 +168,10 @@ public class DetectionUtils {
    * @return the last time stamp
    */
   public static long consolidateNestedLastTimeStamps(Collection<Long> nestedLastTimeStamps){
-    if(nestedLastTimeStamps.isEmpty() || nestedLastTimeStamps.contains(-1L)){
+    if(nestedLastTimeStamps.isEmpty()){
       return -1L;
     }
-    return Collections.min(nestedLastTimeStamps);
+    return Collections.max(nestedLastTimeStamps);
   }
 
   /**

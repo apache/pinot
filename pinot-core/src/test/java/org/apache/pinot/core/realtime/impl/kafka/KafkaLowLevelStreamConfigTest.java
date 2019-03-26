@@ -29,7 +29,12 @@ import org.testng.annotations.Test;
 public class KafkaLowLevelStreamConfigTest {
 
   private KafkaLowLevelStreamConfig getStreamConfig(String topic, String bootstrapHosts, String buffer,
-      String socketTimeout) {
+                                                    String socketTimeout) {
+    return getStreamConfig(topic, bootstrapHosts, buffer, socketTimeout, null, null);
+  }
+
+  private KafkaLowLevelStreamConfig getStreamConfig(String topic, String bootstrapHosts, String buffer,
+      String socketTimeout, String fetcherSize, String fetcherMinBytes) {
     Map<String, String> streamConfigMap = new HashMap<>();
     String streamType = "kafka";
     String consumerType = StreamConfig.ConsumerType.LOWLEVEL.toString();
@@ -53,7 +58,13 @@ public class KafkaLowLevelStreamConfigTest {
       streamConfigMap.put("stream.kafka.buffer.size", buffer);
     }
     if (socketTimeout != null) {
-      streamConfigMap.put("stream.kafka.socket.timeout", String.valueOf(socketTimeout));
+      streamConfigMap.put("stream.kafka.socket.timeout", socketTimeout);
+    }
+    if (fetcherSize != null) {
+      streamConfigMap.put("stream.kafka.fetcher.size", fetcherSize);
+    }
+    if (fetcherMinBytes != null) {
+      streamConfigMap.put("stream.kafka.fetcher.minBytes", fetcherMinBytes);
     }
     return new KafkaLowLevelStreamConfig(new StreamConfig(streamConfigMap));
   }
@@ -108,5 +119,43 @@ public class KafkaLowLevelStreamConfigTest {
     // correct config
     config = getStreamConfig("topic", "host1", "", "100");
     Assert.assertEquals(100, config.getKafkaSocketTimeout());
+  }
+
+  @Test
+  public void testGetFetcherSize() {
+    // test default
+    KafkaLowLevelStreamConfig config = getStreamConfig("topic", "host1", "", "", "",null);
+    Assert.assertEquals(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_BUFFER_SIZE_DEFAULT,
+        config.getKafkaFetcherSizeBytes());
+
+    config = getStreamConfig("topic", "host1", "100", "", "", null);
+    Assert.assertEquals(100, config.getKafkaFetcherSizeBytes());
+
+    config = getStreamConfig("topic", "host1", "100", "", "bad value", null);
+    Assert.assertEquals(100, config.getKafkaFetcherSizeBytes());
+
+    // correct config
+    config = getStreamConfig("topic", "host1", "100", "", "200", null);
+    Assert.assertEquals(200, config.getKafkaFetcherSizeBytes());
+  }
+
+  @Test
+  public void testGetFetcherMinBytes() {
+    // test default
+    KafkaLowLevelStreamConfig config = getStreamConfig("topic", "host1", "", "", "", null);
+    Assert.assertEquals(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_FETCHER_MIN_BYTES_DEFAULT,
+        config.getKafkaFetcherMinBytes());
+
+    config = getStreamConfig("topic", "host1", "", "", "", "");
+    Assert.assertEquals(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_FETCHER_MIN_BYTES_DEFAULT,
+        config.getKafkaFetcherMinBytes());
+
+    config = getStreamConfig("topic", "host1", "", "", "", "bad value");
+    Assert.assertEquals(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_FETCHER_MIN_BYTES_DEFAULT,
+        config.getKafkaFetcherMinBytes());
+
+    // correct config
+    config = getStreamConfig("topic", "host1", "", "", "", "100");
+    Assert.assertEquals(100, config.getKafkaFetcherMinBytes());
   }
 }

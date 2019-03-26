@@ -19,6 +19,7 @@
 package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Function;
 import com.google.common.collect.ImmutableList;
 import java.io.File;
@@ -33,6 +34,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.JsonUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
@@ -99,14 +101,14 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       if (instance.startsWith(CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE)) {
         _serviceStatusCallbacks.add(
             new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(_helixManager, _clusterName, instance,
-                Collections.singletonList(CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)));
+                Collections.singletonList(CommonConstants.Helix.BROKER_RESOURCE_INSTANCE), 100.0));
       }
       if (instance.startsWith(CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE)) {
         _serviceStatusCallbacks.add(new ServiceStatus.MultipleCallbackServiceStatusCallback(ImmutableList
             .of(new ServiceStatus.IdealStateAndCurrentStateMatchServiceStatusCallback(_helixManager, _clusterName,
-                    instance),
+                    instance, 100.0),
                 new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(_helixManager, _clusterName,
-                    instance))));
+                    instance, 100.0))));
       }
     }
 
@@ -147,6 +149,22 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(_serviceStatusCallbacks.size(), getNumBrokers() + getNumServers());
     for (ServiceStatus.ServiceStatusCallback serviceStatusCallback : _serviceStatusCallbacks) {
       assertEquals(serviceStatusCallback.getServiceStatus(), ServiceStatus.Status.GOOD);
+    }
+  }
+
+  @Test
+  public void testInvalidTableConfig() {
+    TableConfig tableConfig =
+        new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName("badTable").build();
+    ObjectNode jsonConfig = tableConfig.toJsonConfig();
+    // Remove a mandatory field
+    jsonConfig.remove(TableConfig.VALIDATION_CONFIG_KEY);
+    try {
+      sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), jsonConfig.toString());
+      fail();
+    } catch (IOException e) {
+      // Should get response code 400 (BAD_REQUEST)
+      assertTrue(e.getMessage().startsWith("Server returned HTTP response code: 400"));
     }
   }
 
@@ -498,7 +516,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     JsonNode response = JsonUtils.stringToJsonNode(sendGetRequest(_controllerRequestURLBuilder.forInstanceList()));
     JsonNode instanceList = response.get("instances");
     int numInstances = instanceList.size();
-    assertEquals(numInstances, getNumBrokers() + getNumServers());
+    // The total number of instances is equal to the sum of num brokers, num servers and 1 controller.
+    assertEquals(numInstances, getNumBrokers() + getNumServers() + 1);
 
     // Try to delete a server that does not exist
     String deleteInstanceRequest = _controllerRequestURLBuilder.forInstanceDelete("potato");

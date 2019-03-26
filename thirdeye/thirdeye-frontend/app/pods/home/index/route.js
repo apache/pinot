@@ -1,14 +1,10 @@
 import Route from '@ember/routing/route';
 import columns from 'thirdeye-frontend/shared/anomaliesTableColumns';
-import fetch from 'fetch';
 import { hash } from 'rsvp';
-import { selfServeApiCommon } from 'thirdeye-frontend/utils/api/self-serve';
-import { setProperties } from '@ember/object';
 import { task } from 'ember-concurrency';
 import RSVP from "rsvp";
 import moment from 'moment';
 import { inject as service } from '@ember/service';
-import _ from 'lodash';
 import AuthenticatedRouteMixin from 'ember-simple-auth/mixins/authenticated-route-mixin';
 
 const queryParamsConfig = {
@@ -29,9 +25,9 @@ export default Route.extend(AuthenticatedRouteMixin, {
   },
   applicationAnomalies: null,
   appName: null,
-  startDate: moment().subtract(1, 'day').utc().valueOf(), //taylored for Last 24 hours vs Today -> moment().startOf('day').utc().valueOf(),
-  endDate: moment().utc().valueOf(),//taylored for Last 24 hours
-  duration: '1d',//taylored for Last 24 hours
+  startDate: moment().startOf('day').utc().valueOf(), //set default to 0:00 for data consistency
+  endDate: moment().startOf('day').add(1, 'day').utc().valueOf(), //set default to 0:00 for data consistency
+  duration: 'today', //set default to today
   feedbackType: 'All Resolutions',
 
   /**
@@ -101,7 +97,7 @@ export default Route.extend(AuthenticatedRouteMixin, {
     });
   },
 
-  _getAnomalyMapping: task (function * (model) {//TODO: need to add to anomaly util - LH
+  _getAnomalyMapping: task (function * () {//TODO: need to add to anomaly util - LH
     let anomalyMapping = {};
     //fetch the anomalies from the onion wrapper cache.
     const applicationAnomalies = yield this.get('anomaliesApiService').queryAnomaliesByAppName(this.get('appName'), this.get('startDate'), this.get('endDate'));

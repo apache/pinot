@@ -57,7 +57,7 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
   public RetentionManager(PinotHelixResourceManager pinotHelixResourceManager, ControllerConf config,
       ControllerMetrics controllerMetrics) {
     super("RetentionManager", config.getRetentionControllerFrequencyInSeconds(),
-        config.getPeriodicTaskInitialDelayInSeconds(), pinotHelixResourceManager, controllerMetrics);
+        config.getRetentionManagerInitialDelayInSeconds(), pinotHelixResourceManager, controllerMetrics);
     _deletedSegmentsRetentionInDays = config.getDeletedSegmentsRetentionInDays();
 
     LOGGER.info("Starting RetentionManager with runFrequencyInSeconds: {}, deletedSegmentsRetentionInDays: {}",

@@ -89,7 +89,7 @@ anomalyResponseObjNew.forEach((obj) => {
  * @return {Ember.RSVP.Promise}
  */
 export function updateAnomalyFeedback(anomalyId, feedbackType) {
-  const url = `/anomalies/updateFeedback/${anomalyId}`;
+  const url = `/dashboard/anomaly-merged-result/feedback/${anomalyId}`;
   const data = { feedbackType, comment: '' };
   return fetch(url, postProps(data)).then((res) => checkStatus(res, 'post'));
 }
@@ -102,8 +102,8 @@ export function updateAnomalyFeedback(anomalyId, feedbackType) {
  * @param {Number} endTime - end time of analysis range
  * @return {Ember.RSVP.Promise}
  */
-export function getYamlPreviewAnomalies(yamlString, startTime, endTime) {
-  const url = getAnomaliesForYamlPreviewUrl(startTime, endTime);
+export function getYamlPreviewAnomalies(yamlString, startTime, endTime, alertId) {
+  const url = getAnomaliesForYamlPreviewUrl(startTime, endTime, alertId);
   return fetch(url, postYamlProps(yamlString)).then((res) => checkStatus(res, 'post', false, true));
 }
 
@@ -127,7 +127,7 @@ export function getAnomaliesByAlertId(alertId, startTime, endTime) {
  * @return {Ember.RSVP.Promise}
  */
 export function verifyAnomalyFeedback(anomalyId) {
-  const url = `${anomalyApiUrls.getAnomalyDataUrl()}${anomalyId}`;
+  const url = `${anomalyApiUrls.getAnomalyDataUrl(anomalyId)}`;
   return fetch(url).then(checkStatus);
 }
 

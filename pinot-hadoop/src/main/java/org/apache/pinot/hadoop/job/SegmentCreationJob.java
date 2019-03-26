@@ -157,7 +157,7 @@ public class SegmentCreationJob extends BaseSegmentJob {
     TableConfig tableConfig = getTableConfig();
     if (tableConfig != null) {
       validateTableConfig(tableConfig);
-      jobConf.set(JobConfigConstants.TABLE_CONFIG, tableConfig.toJSONConfigString());
+      jobConf.set(JobConfigConstants.TABLE_CONFIG, tableConfig.toJsonConfigString());
     }
     jobConf.set(JobConfigConstants.SCHEMA, getSchema().toSingleLineJsonString());
 

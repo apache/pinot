@@ -19,8 +19,12 @@
 
 .. _code-modules:
 
+
+*****************************
 Code Modules and Organization
-=============================
+*****************************
+
+.. contents:: Table of Contents
 
 Before proceeding to contributing changes to Pinot, review the contents of this section.
 
@@ -137,13 +141,14 @@ Auxiliary modules
 In addition to the core modules described above, Pinot code provides the following modules:
 
 * ``pinot-tools``: This module is a collection of many tools useful for setting up Pinot cluster, creating/updating segments.
-It also houses the Pinot quick start guide code.
+   It also houses the Pinot quick start guide code.
 
 * ``pinot-perf``: This module has a collection of benchmark test code used to evaluate design options.
 
 * ``pinot-client-api``: This module houses the Java client API. See :ref:`java-client` for more info.
 
 * ``pinot-integration-tests``: This module holds integration tests that test functionality across multiple classes or components.
+
 These tests typically do not rely on mocking and provide more end to end coverage for code.
 
 .. _extension-modules:

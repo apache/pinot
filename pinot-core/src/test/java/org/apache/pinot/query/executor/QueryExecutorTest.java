@@ -68,6 +68,7 @@ public class QueryExecutorTest {
   private final List<ImmutableSegment> _indexSegments = new ArrayList<>(NUM_SEGMENTS_TO_GENERATE);
   private final List<String> _segmentNames = new ArrayList<>(NUM_SEGMENTS_TO_GENERATE);
 
+  private InstanceDataManager _instanceDataManager;
   private ServerMetrics _serverMetrics;
   private QueryExecutor _queryExecutor;
 
@@ -105,8 +106,8 @@ public class QueryExecutorTest {
     for (ImmutableSegment indexSegment : _indexSegments) {
       tableDataManager.addSegment(indexSegment);
     }
-    InstanceDataManager instanceDataManager = mock(InstanceDataManager.class);
-    when(instanceDataManager.getTableDataManager(TABLE_NAME)).thenReturn(tableDataManager);
+    _instanceDataManager = mock(InstanceDataManager.class);
+    when(_instanceDataManager.getTableDataManager(TABLE_NAME)).thenReturn(tableDataManager);
 
     // Set up the query executor
     resourceUrl = getClass().getClassLoader().getResource(QUERY_EXECUTOR_CONFIG_PATH);
@@ -115,7 +116,7 @@ public class QueryExecutorTest {
     queryExecutorConfig.setDelimiterParsingDisabled(false);
     queryExecutorConfig.load(new File(resourceUrl.getFile()));
     _queryExecutor = new ServerQueryExecutorV1Impl();
-    _queryExecutor.init(queryExecutorConfig, instanceDataManager, _serverMetrics);
+    _queryExecutor.init(queryExecutorConfig, _instanceDataManager, _serverMetrics);
   }
 
   @Test
@@ -153,6 +154,49 @@ public class QueryExecutorTest {
     DataTable instanceResponse = _queryExecutor.processQuery(getQueryRequest(instanceRequest), QUERY_RUNNERS);
     Assert.assertEquals(instanceResponse.getDouble(0, 0), 0.0);
   }
+
+  @Test
+  public void testDeletedSegmentQuery() {
+    String query = "SELECT count(*) FROM " + TABLE_NAME;
+    _instanceDataManager.notifySegmentDeleted(TABLE_NAME, _segmentNames.get(0));
+
+    InstanceRequest instanceRequest = new InstanceRequest(0L, COMPILER.compileToBrokerRequest(query));
+    instanceRequest.setSearchSegments(_segmentNames);
+    DataTable instanceResponse = _queryExecutor.processQuery(getQueryRequest(instanceRequest), QUERY_RUNNERS);
+    Assert.assertEquals(instanceResponse.getLong(0, 0), 400002L);
+
+    for (String key : instanceResponse.getMetadata().keySet()) {
+      if (key.startsWith(DataTable.EXCEPTION_METADATA_KEY)) {
+        Assert.fail("Response should not contain exceptions");
+      }
+    }
+  }
+
+  // TODO: enable this when the code is updated to set the exception
+  @Test(enabled=false)
+  public void testMissingSegmentQuery() {
+    String query = "SELECT count(*) FROM " + TABLE_NAME;
+
+    List<String> searchSegments = new ArrayList<>(NUM_SEGMENTS_TO_GENERATE + 1);
+    searchSegments.addAll(_segmentNames);
+    searchSegments.add("NON_EXISTENT_SEGMENT");
+
+    InstanceRequest instanceRequest = new InstanceRequest(0L, COMPILER.compileToBrokerRequest(query));
+    instanceRequest.setSearchSegments(searchSegments);
+    DataTable instanceResponse = _queryExecutor.processQuery(getQueryRequest(instanceRequest), QUERY_RUNNERS);
+    Assert.assertEquals(instanceResponse.getLong(0, 0), 400002L);
+
+    boolean exception = false;
+    for (String key : instanceResponse.getMetadata().keySet()) {
+      if (key.startsWith(DataTable.EXCEPTION_METADATA_KEY)) {
+        // "null" below stems from a quirk around how the processing exception is built
+        Assert.assertEquals("null:\nCould not find 1 segments on the server", instanceResponse.getMetadata().get(key));
+        exception = true;
+      }
+    }
+    Assert.assertTrue(exception, "Expected missing segment exception");
+  }
+
 
   @AfterClass
   public void tearDown() {

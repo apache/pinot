@@ -22,6 +22,7 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.helix.InstanceType;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.utils.CommonConstants;
@@ -65,6 +66,7 @@ public class TableViewsTest extends ControllerTest {
     TableConfig tableConfig =
         new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(OFFLINE_TABLE_NAME)
             .setNumReplicas(2).build();
+    Assert.assertEquals(_helixManager.getInstanceType(), InstanceType.CONTROLLER);
     _helixResourceManager.addTable(tableConfig);
     _helixResourceManager
         .addNewSegment(SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, OFFLINE_SEGMENT_NAME),

@@ -7,6 +7,7 @@ import Route from '@ember/routing/route';
 import RSVP from 'rsvp';
 import { set, get } from '@ember/object';
 import { inject as service } from '@ember/service';
+import { toastOptions } from 'thirdeye-frontend/utils/constants';
 import yamljs from 'yamljs';
 import moment from 'moment';
 
@@ -20,6 +21,7 @@ export default Route.extend({
       headers: { 'content-type': 'application/json' }
     };
     const notifications = get(this, 'notifications');
+
     //detection alert fetch
     const detectionUrl = `/detection/${alertId}`;
     try {
@@ -27,7 +29,7 @@ export default Route.extend({
       const detection_status  = get(detection_result, 'status');
       const detection_json = await detection_result.json();
       if (detection_status !== 200) {
-        notifications.error('Retrieval of alert yaml failed.', 'Error');
+        notifications.error('Retrieval of alert yaml failed.', 'Error', toastOptions);
       } else {
         if (detection_json.yaml) {
           const detectionInfo = yamljs.parse(detection_json.yaml);
@@ -39,7 +41,7 @@ export default Route.extend({
             exploreDimensions: detection_json.dimensions,
             filters: this._formatYamlFilter(detectionInfo.filters),
             dimensionExploration: this._formatYamlFilter(detectionInfo.dimensionExploration),
-            lastDetectionTime: lastDetection.toDateString() + ", " +  lastDetection.toLocaleTimeString() + " (" + moment.tz.guess() + ")",
+            lastDetectionTime: lastDetection.toDateString() + ", " +  lastDetection.toLocaleTimeString() + " (" + moment().tz(moment.tz.guess()).format('z') + ")",
             rawYaml: detection_json.yaml
           });
 
@@ -54,7 +56,7 @@ export default Route.extend({
         }
       }
     } catch (error) {
-      notifications.error('Retrieving alert yaml failed.', error);
+      notifications.error('Retrieving alert yaml failed.', error, toastOptions);
     }
 
     //subscription group fetch
@@ -64,12 +66,12 @@ export default Route.extend({
       const settings_status  = get(settings_result, 'status');
       const settings_json = await settings_result.json();
       if (settings_status !== 200) {
-        notifications.error('Retrieving subscription groups failed.', 'Error');
+        notifications.error('Retrieving subscription groups failed.', 'Error', toastOptions);
       } else {
         set(this, 'subscriptionGroups', settings_json);
       }
     } catch (error) {
-      notifications.error('Retrieving subscription groups failed.', error);
+      notifications.error('Retrieving subscription groups failed.', error, toastOptions);
     }
 
     let subscribedGroups = "";
@@ -79,7 +81,7 @@ export default Route.extend({
         if (groups.hasOwnProperty(key)) {
           let group = groups[key];
           if (subscribedGroups === "") {
-            subscribedGroups = group.name
+            subscribedGroups = group.name;
           } else {
             subscribedGroups = subscribedGroups + ", " + group.name;
           }

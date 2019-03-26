@@ -91,7 +91,7 @@ public class PercentageChangeRuleDetector implements AnomalyDetector<PercentageC
     // calculate percentage change
     df.addSeries(COL_CHANGE, map((Series.DoubleFunction) values -> {
       if (values[1] == 0) {
-        return values[0] > 0 ? Double.POSITIVE_INFINITY : Double.NEGATIVE_INFINITY;
+        return values[0] == 0 ? 0.0 : (values[0] > 0 ? Double.POSITIVE_INFINITY : Double.NEGATIVE_INFINITY);
       }
       return values[0] / values[1];
     }, df.getDoubles(COL_CURR), df.get(COL_BASE)).subtract(1));

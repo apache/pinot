@@ -8,6 +8,8 @@ import RSVP from 'rsvp';
 import { set, get } from '@ember/object';
 import { inject as service } from '@ember/service';
 import yamljs from 'yamljs';
+import moment from 'moment';
+import { toastOptions } from 'thirdeye-frontend/utils/constants';
 
 export default Route.extend({
   notifications: service('toast'),
@@ -21,34 +23,36 @@ export default Route.extend({
     const notifications = get(this, 'notifications');
 
     //detection alert fetch
-    const alertUrl = `/detection/${alertId}`;
+    const detectionUrl = `/detection/${alertId}`;
     try {
-      const alert_result = await fetch(alertUrl, postProps);
-      const alert_status  = get(alert_result, 'status');
-      const alert_json = await alert_result.json();
-      if (alert_status !== 200) {
-        notifications.error('Retrieval of alert yaml failed.', 'Error');
+      const detection_result = await fetch(detectionUrl, postProps);
+      const detection_status  = get(detection_result, 'status');
+      const detection_json = await detection_result.json();
+      if (detection_status !== 200) {
+        notifications.error('Retrieval of alert yaml failed.', 'Error', toastOptions);
       } else {
-        if (alert_json.yaml) {
-          const yaml = yamljs.parse(alert_json.yaml);
-          Object.assign(yaml, {
-            application: alert_json.name,
-            isActive: alert_json.active,
-            createdBy: alert_json.createdBy,
-            updatedBy: alert_json.updatedBy,
-            functionName: yaml.detectionName,
-            collection: yaml.dataset,
-            type: alert_json.pipelineType,
-            exploreDimensions: alert_json.dimensions,
-            filters: this._formatYamlFilter(yaml.filters),
-            dimensionExploration: this._formatYamlFilter(yaml.dimensionExploration),
-            yaml: alert_json.yaml
+        if (detection_json.yaml) {
+          const detectionInfo = yamljs.parse(detection_json.yaml);
+          const lastDetection = new Date(detection_json.lastTimestamp);
+          Object.assign(detectionInfo, {
+            isActive: detection_json.active,
+            createdBy: detection_json.createdBy,
+            updatedBy: detection_json.updatedBy,
+            exploreDimensions: detection_json.dimensions,
+            filters: this._formatYamlFilter(detectionInfo.filters),
+            dimensionExploration: this._formatYamlFilter(detectionInfo.dimensionExploration),
+            lastDetectionTime: lastDetection.toDateString() + ", " +  lastDetection.toLocaleTimeString() + " (" + moment().tz(moment.tz.guess()).format('z') + ")"
           });
-          set(this, 'detectionYaml', yaml);
+
+          this.setProperties({
+            alertId: alertId,
+            detectionInfo,
+            rawDetectionYaml: detection_json.yaml
+          });
         }
       }
     } catch (error) {
-      notifications.error('Retrieving alert yaml failed.', error);
+      notifications.error('Retrieving alert yaml failed.', error, toastOptions);
     }
 
     //subscription group fetch
@@ -58,23 +62,35 @@ export default Route.extend({
       const settings_status  = get(settings_result, 'status');
       const settings_json = await settings_result.json();
       if (settings_status !== 200) {
-        notifications.error('Retrieving subscription groups failed.', 'Error');
+        notifications.error('Retrieving subscription groups failed.', 'Error', toastOptions);
       } else {
         set(this, 'subscriptionGroups', settings_json);
       }
     } catch (error) {
-      notifications.error('Retrieving subscription groups failed.', error);
+      notifications.error('Retrieving subscription groups failed.', error, toastOptions);
     }
 
-    const subscriptionGroupYamlDisplay = typeof get(this, 'subscriptionGroups') === 'object' && get(this, 'subscriptionGroups').length > 0 ? get(this, 'subscriptionGroups')[0].yaml : get(this, 'subscriptionGroups').yaml;
-    const subscriptionGroupId = typeof get(this, 'subscriptionGroups') === 'object' && get(this, 'subscriptionGroups').length > 0 ? get(this, 'subscriptionGroups')[0].id : get(this, 'subscriptionGroups').id;
+    let subscribedGroups = "";
+    if (typeof get(this, 'subscriptionGroups') === 'object' && get(this, 'subscriptionGroups').length > 0) {
+      const groups = get(this, 'subscriptionGroups');
+      for (let key in groups) {
+        if (groups.hasOwnProperty(key)) {
+          let group = groups[key];
+          if (subscribedGroups === "") {
+            subscribedGroups = group.name;
+          } else {
+            subscribedGroups = subscribedGroups + ", " + group.name;
+          }
+        }
+      }
+    }
+
     return RSVP.hash({
       alertId,
-      subscriptionGroupId,
-      alertData: get(this, 'detectionYaml'),
-      detectionYaml: get (this, 'detectionYaml') ? get(this, 'detectionYaml').yaml : 'Yaml retrieval failed',
+      alertData: get(this, 'detectionInfo'),
+      detectionYaml: get (this, 'rawDetectionYaml'),
       subscriptionGroups: get(this, 'subscriptionGroups'),
-      subscriptionGroupYamlDisplay
+      subscribedGroups
     });
   },
 

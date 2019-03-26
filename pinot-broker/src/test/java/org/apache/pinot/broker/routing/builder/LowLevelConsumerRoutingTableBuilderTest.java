@@ -52,8 +52,8 @@ public class LowLevelConsumerRoutingTableBuilderTest {
     final int ITERATIONS = 50;
     Random random = new Random();
 
-    TableConfig tableConfig = new TableConfig();
-    tableConfig.setTableName("tableName");
+    TableConfig tableConfig =
+        new TableConfig.Builder(CommonConstants.Helix.TableType.REALTIME).setTableName("tableName").build();
     LowLevelConsumerRoutingTableBuilder routingTableBuilder = new LowLevelConsumerRoutingTableBuilder();
     routingTableBuilder.init(new BaseConfiguration(), tableConfig, null, null);
 
@@ -161,8 +161,8 @@ public class LowLevelConsumerRoutingTableBuilderTest {
     final int ONLINE_SEGMENT_COUNT = 8;
     final int CONSUMING_SEGMENT_COUNT = SEGMENT_COUNT - ONLINE_SEGMENT_COUNT;
 
-    TableConfig tableConfig = new TableConfig();
-    tableConfig.setTableName("tableName");
+    TableConfig tableConfig =
+        new TableConfig.Builder(CommonConstants.Helix.TableType.REALTIME).setTableName("tableName").build();
     LowLevelConsumerRoutingTableBuilder routingTableBuilder = new LowLevelConsumerRoutingTableBuilder();
     routingTableBuilder.init(new BaseConfiguration(), tableConfig, null, null);
 
@@ -207,8 +207,8 @@ public class LowLevelConsumerRoutingTableBuilderTest {
     final int SEGMENT_COUNT = 10;
     final int ONLINE_SEGMENT_COUNT = 8;
 
-    TableConfig tableConfig = new TableConfig();
-    tableConfig.setTableName("tableName");
+    TableConfig tableConfig =
+        new TableConfig.Builder(CommonConstants.Helix.TableType.REALTIME).setTableName("tableName").build();
     LowLevelConsumerRoutingTableBuilder routingTableBuilder = new LowLevelConsumerRoutingTableBuilder();
     routingTableBuilder.init(new BaseConfiguration(), tableConfig, null, null);
 

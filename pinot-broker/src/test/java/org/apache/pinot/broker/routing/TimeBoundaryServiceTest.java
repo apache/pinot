@@ -125,7 +125,6 @@ public class TimeBoundaryServiceTest {
       throws Exception {
     TableConfig tableConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(tableName)
         .setTimeColumnName("timestamp").setTimeType("DAYS").build();
-    ZKMetadataProvider
-        .setOfflineTableConfig(_propertyStore, tableConfig.getTableName(), TableConfig.toZnRecord(tableConfig));
+    ZKMetadataProvider.setOfflineTableConfig(_propertyStore, tableConfig.getTableName(), tableConfig.toZNRecord());
   }
 }

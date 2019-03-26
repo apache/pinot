@@ -23,9 +23,7 @@ import _ from 'lodash';
 
 const ROOTCAUSE_TAB_DIMENSIONS = 'dimensions';
 const ROOTCAUSE_TAB_METRICS = 'metrics';
-const ROOTCAUSE_TAB_EVENTS = 'events';
 const ROOTCAUSE_TAB_TREND = 'trend';
-const ROOTCAUSE_TAB_CALLGRAPH = 'callgraph';
 
 const ROOTCAUSE_SETUP_MODE_CONTEXT = "context";
 const ROOTCAUSE_SETUP_MODE_SELECTED = "selected";
@@ -361,7 +359,7 @@ export default Controller.extend({
       //
       // anomaly function baselines
       //
-      const anomalyFunctionUrns = filterPrefix(context.anomalyUrns, 'frontend:anomalyfunction:');
+      const anomalyFunctionUrns = filterPrefix(context.anomalyUrns, 'thirdeye:event:anomaly');
       anomalyFunctionService.request(context, new Set(anomalyFunctionUrns));
 
       //
@@ -469,7 +467,7 @@ export default Controller.extend({
       }
 
       // NOTE: only supports a single anomaly function baseline
-      const anomalyFunctionUrns = filterPrefix(context.anomalyUrns, 'frontend:anomalyfunction:');
+      const anomalyFunctionUrns = filterPrefix(context.anomalyUrns, 'thirdeye:event:anomaly:');
       const anomalyFunctionUrn = anomalyFunctionUrns[0];
 
       filterPrefix(context.anomalyUrns, 'thirdeye:metric:').forEach(urn => {

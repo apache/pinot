@@ -14,9 +14,10 @@
  */
 
 import Component from '@ember/component';
-import { computed, observer, set, get, getProperties, getWithDefault } from '@ember/object';
+import { computed, observer, set, get, getProperties } from '@ember/object';
 import { later } from '@ember/runloop';
-import { checkStatus, humanizeFloat } from 'thirdeye-frontend/utils/utils';
+import { checkStatus, humanizeFloat, postProps } from 'thirdeye-frontend/utils/utils';
+import { toastOptions } from 'thirdeye-frontend/utils/constants';
 import { colorMapping, toColor, makeTime, toMetricLabel, extractTail } from 'thirdeye-frontend/utils/rca-utils';
 import { getYamlPreviewAnomalies,
   getAnomaliesByAlertId,
@@ -48,7 +49,7 @@ export default Component.extend({
   anomalyMapping: {},
   timeseries: null,
   isLoading: false,
-  analysisRange: [moment().subtract(1, 'day').startOf('day').valueOf(), moment().startOf('day').valueOf()],
+  analysisRange: [moment().subtract(1, 'day').startOf('day').valueOf(), moment().add(1, 'day').startOf('day').valueOf()],
   isPendingData: false,
   colorMapping: colorMapping,
   zoom: {
@@ -90,10 +91,16 @@ export default Component.extend({
   currentPage: 1,
   isPreviewMode: false,
   alertId: null,
+  alertData: null,
   feedbackOptions: ['Not reviewed yet', 'Yes - unexpected', 'Expected temporary change', 'Expected permanent change', 'No change observed'],
   labelMap: anomalyResponseMapNew,
   labelResponse: {},
   selectedDimension: null,
+  isReportSuccess: false,
+  isReportFailure: false,
+  openReportModal: false,
+  missingAnomalyProps: {},
+
 
 
   updateVisuals: observer(
@@ -168,6 +175,24 @@ export default Component.extend({
       return Math.ceil(anomalyCount/pageSize);
     }
   ),
+
+  /**
+   * date-time-picker: indicates the date format to be used based on granularity
+   * @type {String}
+   */
+  uiDateFormat: computed('alertData.windowUnit', function() {
+    const rawGranularity = this.get('alertData.bucketUnit');
+    const granularity = rawGranularity ? rawGranularity.toLowerCase() : '';
+
+    switch(granularity) {
+      case 'days':
+        return 'MMM D, YYYY';
+      case 'hours':
+        return 'MMM D, YYYY h a';
+      default:
+        return 'MMM D, YYYY hh:mm a';
+    }
+  }),
 
   /**
    * Table pagination: creates the page Array for view
@@ -472,7 +497,6 @@ export default Component.extend({
       isPreviewMode,
       alertId
     } = this.getProperties('analysisRange', 'notifications', 'isPreviewMode', 'alertId');
-
     //detection alert fetch
     const start = analysisRange[0];
     const end = analysisRange[1];
@@ -481,7 +505,7 @@ export default Component.extend({
     let metricUrnList;
     try {
       if(isPreviewMode){
-        applicationAnomalies = yield getYamlPreviewAnomalies(alertYaml, start, end);
+        applicationAnomalies = yield getYamlPreviewAnomalies(alertYaml, start, end, alertId);
         if (applicationAnomalies && applicationAnomalies.diagnostics && applicationAnomalies.diagnostics['0']) {
           metricUrnList = Object.keys(applicationAnomalies.diagnostics['0']);
           set(this, 'metricUrnList', metricUrnList);
@@ -523,7 +547,7 @@ export default Component.extend({
         });
       }
     } catch (error) {
-      notifications.error('Preview alert failed', error);
+      notifications.error(error.body.message, toastOptions);
     }
 
     return {
@@ -645,6 +669,54 @@ export default Component.extend({
     }
   },
 
+  /**
+   * Send a POST request to the report anomaly API (2-step process)
+   * http://go/te-ss-alert-flow-api
+   * @method reportAnomaly
+   * @param {String} id - The alert id
+   * @param {Object} data - The input values from 'report new anomaly' modal
+   * @return {Promise}
+   */
+  _reportAnomaly(id, metricUrn, data) {
+    const reportUrl = `/detection/report-anomaly/${id}?metricUrn=${metricUrn}`;
+    const requiredProps = ['startTime', 'endTime', 'feedbackType'];
+    let missingData = false;
+    requiredProps.forEach(prop => {
+      if (!data[prop]) {
+        missingData = true;
+      }
+    });
+    let queryStringUrl = reportUrl;
+
+    if (missingData) {
+      return Promise.reject(new Error('missing data'));
+    } else {
+      Object.entries(data).forEach(([key, value]) => {
+        queryStringUrl += `&${encodeURIComponent(key)}=${encodeURIComponent(value)}`;
+      });
+      // Step 1: Report the anomaly
+      return fetch(queryStringUrl, postProps('')).then((res) => checkStatus(res, 'post'));
+    }
+  },
+
+  /**
+   * Modal opener for "report missing anomaly".
+   * @method _triggerOpenReportModal
+   * @return {undefined}
+   */
+  _triggerOpenReportModal() {
+    this.setProperties({
+      isReportSuccess: false,
+      isReportFailure: false,
+      openReportModal: true
+    });
+    // We need the C3/D3 graph to render after its containing parent elements are rendered
+    // in order to avoid strange overflow effects.
+    later(() => {
+      this.set('renderModalContent', true);
+    });
+  },
+
   actions: {
     /**
      * Handle dynamically saving anomaly feedback responses
@@ -664,11 +736,9 @@ export default Component.extend({
         // Save anomaly feedback
         await updateAnomalyFeedback(anomalyRecord.anomalyId, responseObj.value);
         // We make a call to ensure our new response got saved
-        const anomaly = await verifyAnomalyFeedback(anomalyRecord.anomalyId, responseObj.status);
-        const filterMap = getWithDefault(anomaly, 'searchFilters.statusFilterMap', null);
-        // This verifies that the status change got saved as key in the anomaly statusFilterMap property
-        const keyPresent = filterMap && Object.keys(filterMap).find(key => responseObj.status.includes(key));
-        if (keyPresent) {
+        const anomaly = await verifyAnomalyFeedback(anomalyRecord.anomalyId);
+
+        if (anomaly.feedback && responseObj.value === anomaly.feedback.feedbackType) {
           this.set('labelResponse', {
             anomalyId: anomalyRecord.anomalyId,
             showResponseSaved: true,
@@ -680,7 +750,13 @@ export default Component.extend({
           let found = false;
           while (i < anomalies.length && !found) {
             if (anomalies[i].id === anomalyRecord.anomalyId) {
-              anomalies[i].feedback.feedbackType = newFeedbackValue;
+              if (anomalies[i].feedback) {
+                anomalies[i].feedback.feedbackType = newFeedbackValue;
+              } else {
+                anomalies[i].feedback = {
+                  feedbackType: newFeedbackValue
+                };
+              }
               found = true;
             }
             i++;
@@ -698,6 +774,60 @@ export default Component.extend({
       }
       // Force status icon to refresh
       set(this, 'renderStatusIcon', true);
+    },
+
+    /**
+     * Handle missing anomaly modal cancel
+     */
+    onCancel() {
+      this.setProperties({
+        isReportSuccess: false,
+        isReportFailure: false,
+        openReportModal: false,
+        renderModalContent: false
+      });
+    },
+
+    /**
+     * Open modal for missing anomalies
+     */
+    onClickReportAnomaly() {
+      this._triggerOpenReportModal();
+    },
+
+    /**
+     * Received bubbled-up action from modal
+     * @param {Object} all input field values
+     */
+    onInputMissingAnomaly(inputObj) {
+      this.set('missingAnomalyProps', inputObj);
+    },
+
+    /**
+     * Handle submission of missing anomaly form from alert-report-modal
+     */
+    onSave() {
+      const { alertId, missingAnomalyProps, metricUrn } = this.getProperties('alertId', 'missingAnomalyProps', 'metricUrn');
+      this._reportAnomaly(alertId, metricUrn, missingAnomalyProps)
+        .then(() => {
+          const rangeFormat = 'YYYY-MM-DD HH:mm';
+          const startStr = moment(missingAnomalyProps.startTime).format(rangeFormat);
+          const endStr = moment(missingAnomalyProps.endTime).format(rangeFormat);
+          this.setProperties({
+            isReportSuccess: true,
+            isReportFailure: false,
+            openReportModal: false,
+            reportedRange: `${startStr} - ${endStr}`
+          });
+        })
+        // If failure, leave modal open and report
+        .catch(() => {
+          this.setProperties({
+            missingAnomalyProps: {},
+            isReportFailure: true,
+            isReportSuccess: false
+          });
+        });
     },
 
     onSelectDimension(selected) {

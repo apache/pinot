@@ -112,6 +112,7 @@ public class SegmentCompletionProtocol {
   public static final String MSG_TYPE_COMMIT_START = "segmentCommitStart";
   public static final String MSG_TYPE_SEGMENT_UPLOAD = "segmentUpload";
   public static final String MSG_TYPE_COMMIT_END = "segmentCommitEnd";
+  public static final String MSG_TYPE_COMMIT_END_METADATA = "segmentCommitEndWithMetadata";
   public static final String MSG_TYPE_STOPPED_CONSUMING = "segmentStoppedConsuming";
   public static final String MSG_TYPE_EXTEND_BUILD_TIME = "extendBuildTime";
 
@@ -355,6 +356,12 @@ public class SegmentCompletionProtocol {
   public static class SegmentCommitEndRequest extends Request {
     public SegmentCommitEndRequest(Params params) {
       super(params, MSG_TYPE_COMMIT_END);
+    }
+  }
+
+  public static class SegmentCommitEndWithMetadataRequest extends Request {
+    public SegmentCommitEndWithMetadataRequest(Params params) {
+      super(params, MSG_TYPE_COMMIT_END_METADATA);
     }
   }
 

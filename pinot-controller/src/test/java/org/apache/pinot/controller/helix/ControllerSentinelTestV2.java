@@ -57,7 +57,7 @@ public class ControllerSentinelTestV2 extends ControllerTest {
     String tableName = "testTable";
     String tableJSONConfigString =
         new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(tableName).setNumReplicas(3)
-            .build().toJSONConfigString();
+            .build().toJsonConfigString();
     sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableJSONConfigString);
     Assert.assertEquals(
         _helixAdmin.getResourceIdealState(_helixClusterName, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)

@@ -15,7 +15,8 @@
   {{#unless errorAnomalies}}
     {{#if showDetails}}
       {{#if isLoading}}
-        {{ember-spinner scale=0.5 rotate=10 speed='1.1' color='#3498DB'}}Please wait while we compile the data.
+        {{ember-spinner scale=0.5 rotate=10 speed='1.1' color='#3498DB'}}Preview may take a long time if it is more than one week (for daily metrics) or one day (for hourly/minute metrics).
+        Please click "Refresh Preview" if you changed time window.
       {{else}}
         {{#if dataIsCurrent}}
         {{range-pill-selectors
@@ -48,12 +49,30 @@
           {{/if}}
         </div>
 
+        {{#if isReportSuccess}}
+          {{#bs-alert type="success" class="te-form__banner te-form__banner--success"}}
+            <strong>Success:</strong> Anomaly reported for dates <strong>{{reportedRange}}</strong>. Refresh page to see new anomalies...
+          {{/bs-alert}}
+        {{/if}}
+
+        {{#if isReportFailure}}
+          {{#bs-alert type="danger" class="te-form__banner te-form__banner--failure"}}
+            <strong>Error:</strong> Failed to save reported anomaly.
+          {{/bs-alert}}
+        {{/if}}
+
         <div class="te-content-block">
           {{#if alertHasDimensions}}
             <h4 class="te-self-serve__block-title">Anomalies over time for dimension {{selectedDimension}}</h4>
           {{else}}
             <h4 class="te-self-serve__block-title">Anomalies over time </h4>
           {{/if}}
+
+          {{#unless isPreviewMode}}
+            <a class="te-self-serve__side-link te-self-serve__side-link--high" {{action "onClickReportAnomaly" this}}>Report missing anomaly</a>
+          {{/unless}}
+
+          {{!-- Dimension selector --}}
           {{#if alertHasDimensions}}
             <div class="te-form__select te-form__select--wider col-md-3">
               {{#power-select
@@ -72,6 +91,38 @@
               {{/power-select}}
             </div>
           {{/if}}
+
+          {{!-- Missing anomaly modal --}}
+          {{#te-modal
+            cancelButtonText="Cancel"
+            submitButtonText="Report"
+            submitAction=(action "onSave")
+            cancelAction=(action "onCancel")
+            isShowingModal=openReportModal
+            headerText="Report Undetected Anomaly"
+          }}
+            {{#if renderModalContent}}
+              {{alert-report-modal
+                series=series
+                colorMapping=colorMapping
+                axis=axis
+                zoom=zoom
+                legend=legend
+                metricName=alertData.metric
+                alertName=alertData.detectionName
+                predefinedRanges=predefinedRanges
+                dimensionOptions=dimensionOptions
+                selectedDimension=selectedDimension
+                alertHasDimensions=alertHasDimensions
+                isMetricDataLoading=isMetricDataLoading
+                isMetricDataInvalid=isMetricDataInvalid
+                inputAction=(action "onInputMissingAnomaly")
+              }}
+            {{else}}
+              {{ember-spinner}}
+            {{/if}}
+          {{/te-modal}}
+
           <div class="col-xs-12 te-graph-container">
             {{timeseries-chart
               series=series

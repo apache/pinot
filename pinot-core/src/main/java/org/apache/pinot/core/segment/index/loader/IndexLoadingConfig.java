@@ -57,6 +57,7 @@ public class IndexLoadingConfig {
   private boolean _enableSplitCommit;
   private boolean _isRealtimeOffheapAllocation;
   private boolean _isDirectRealtimeOffheapAllocation;
+  private boolean _enableSplitCommitEndWithMetadata;
 
   public IndexLoadingConfig(@Nonnull InstanceDataManagerConfig instanceDataManagerConfig,
       @Nonnull TableConfig tableConfig) {
@@ -135,6 +136,7 @@ public class IndexLoadingConfig {
     if (avgMultiValueCount != null) {
       _realtimeAvgMultiValueCount = Integer.valueOf(avgMultiValueCount);
     }
+    _enableSplitCommitEndWithMetadata = instanceDataManagerConfig.isEnableSplitCommitEndWithMetadata();
   }
 
   /**
@@ -221,6 +223,8 @@ public class IndexLoadingConfig {
   public boolean isEnableSplitCommit() {
     return _enableSplitCommit;
   }
+
+  public boolean isEnableSplitCommitEndWithMetadata() { return _enableSplitCommitEndWithMetadata; }
 
   public boolean isRealtimeOffheapAllocation() {
     return _isRealtimeOffheapAllocation;

@@ -586,11 +586,52 @@ public class YamlResource {
     return Response.ok(result).build();
   }
 
+  @POST
+  @Path("/preview/{id}")
+  @Produces(MediaType.APPLICATION_JSON)
+  @Consumes(MediaType.TEXT_PLAIN)
+  @ApiOperation("Preview the anomaly detection result of a YAML configuration, with an existing config and historical anomalies")
+  public Response yamlPreviewWithHistoricalAnomalies(
+      @PathParam("id") long id,
+      @QueryParam("start") long start,
+      @QueryParam("end") long end,
+      @QueryParam("tuningStart") long tuningStart,
+      @QueryParam("tuningEnd") long tuningEnd,
+      @ApiParam("jsonPayload") String payload) {
+    Map<String, String> responseMessage = new HashMap<>();
+    DetectionPipelineResult result;
+    long ts = System.currentTimeMillis();
+    try {
+      Preconditions.checkArgument(StringUtils.isNotBlank(payload), "The Yaml Payload in the request is empty.");
+      DetectionConfigDTO existingConfig = this.detectionConfigDAO.findById(id);
+      Preconditions.checkNotNull(existingConfig, "can not find existing detection config " + id);
+
+      // Translate config from YAML to detection config (JSON)
+      Map<String, Object> newDetectionConfigMap = new HashMap<>(ConfigUtils.getMap(this.yaml.load(payload)));
+      DetectionConfigDTO detectionConfig = buildDetectionConfigFromYaml(tuningStart, tuningEnd, newDetectionConfigMap, existingConfig);
+      Preconditions.checkNotNull(detectionConfig);
+
+      DetectionPipeline pipeline = this.loader.from(this.provider, detectionConfig, start, end);
+      result = pipeline.run();
+
+    } catch (ValidationException e) {
+      LOG.warn("Validation error while running preview with payload  " + payload, e);
+      responseMessage.put("message", "Validation Error! " + e.getMessage());
+      return Response.serverError().entity(responseMessage).build();
+    } catch (Exception e) {
+      LOG.error("Error running preview with payload " + payload, e);
+      responseMessage.put("message", "Failed to run the preview due to " + e.getMessage());
+      return Response.serverError().entity(responseMessage).build();
+    }
+    LOG.info("Preview successful, used {} milliseconds", System.currentTimeMillis() - ts);
+    return Response.ok(result).build();
+  }
 
   /**
-   List all yaml configurations as JSON. enhanced with detection config id, isActive and createBy information.
-   @param id id of a specific detection config yaml to list (optional)
-   @return the yaml configuration converted in to JSON, with enhanced information from detection config DTO.
+   * List all yaml configurations as JSON enhanced with detection config id, isActive and createBy information.
+   *
+   * @param id id of a specific detection config yaml to list (optional)
+   * @return the yaml configuration converted in to JSON, with enhanced information from detection config DTO.
    */
   @GET
   @Path("/list")
@@ -609,8 +650,10 @@ public class YamlResource {
         Map<String, Object> yamlObject = new HashMap<>();
         yamlObject.putAll((Map<? extends String, ?>) this.yaml.load(detectionConfigDTO.getYaml()));
         yamlObject.put("id", detectionConfigDTO.getId());
-        yamlObject.put("isActive", detectionConfigDTO.isActive());
+        yamlObject.put("cron", detectionConfigDTO.getCron());
+        yamlObject.put("active", detectionConfigDTO.isActive());
         yamlObject.put("createdBy", detectionConfigDTO.getCreatedBy());
+        yamlObject.put("updatedBy", detectionConfigDTO.getUpdatedBy());
         yamlObjects.add(yamlObject);
       }
     }

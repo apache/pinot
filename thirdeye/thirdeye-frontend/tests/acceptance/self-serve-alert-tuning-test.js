@@ -15,9 +15,9 @@ module('Acceptance | tune alert settings', function(hooks) {
     'Dataset',
     'Granularity',
     'Application',
-    'Alert Owner',
-    'Data Filter',
-    'Dimensions',
+    'Created By',
+    'Filtered By',
+    'Breakdown By',
     'Detection Type',
     'Subscription Group'
   ];
@@ -26,43 +26,13 @@ module('Acceptance | tune alert settings', function(hooks) {
     server.createList('alert', 5);
     await visit(`/manage/alerts`);
     const $targetAlertLink = $(`${selfServeConst.RESULTS_LINK}:contains(${alertLinkTitle})`);
+    const problem = $(selfServeConst.RESULTS_TITLE).get(0).innerText.trim();
 
     // Verify default search results
     assert.equal(
       $(selfServeConst.RESULTS_TITLE).get(0).innerText.trim(),
       'Alerts (5)',
       'Number of alerts displayed and title are correct.'
-    );
-
-    // Click into Alert Page for first listed alert
-    await click($targetAlertLink.get(0));
-    const alertPropsElementArray = Object.values($(selfServeConst.ALERT_PROPS_ITEM)).filter(el => el.nodeName ==='DIV');
-    const alertPropLabelsArray = alertPropsElementArray.map(el => el.innerText.trim());
-
-    // Verify transition to Alert Page
-    assert.ok(
-      currentURL().includes(`/manage/alert/1/explore?duration=3m`),
-      'Navigation to alert page succeeded'
-    );
-
-    // Verify all alert property labels are present
-    assert.ok(
-      alertPropLabelsArray.join() === alertProps.join(),
-      'All needed labels are displayed in header for Alert Page'
-    );
-
-    // Change the default date range, confirm it is cached in tuning page
-    await click($(selfServeConst.RANGE_PILL_SELECTOR_TRIGGER).get(0));
-    await click($(selfServeConst.RANGE_PILL_PRESET_OPTION).get(0));
-    const urlCustomTune = currentURL().replace('explore', 'tune');
-
-    // Navigate to tuning page, verify time range options in URL are the same
-    await click($(selfServeConst.LINK_TUNE_ALERT).get(0));
-
-    assert.equal(
-      currentURL(),
-      urlCustomTune,
-      'In transition to tuning page, the user-selected custom date range was persisted'
     );
   });
 
