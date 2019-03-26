@@ -182,7 +182,7 @@ public class PercentageChangeRuleDetectorTest {
     percentageRule.init(spec, new DefaultInputDataFetcher(this.provider, -1));
     List<MergedAnomalyResultDTO> anomalies = percentageRule.runDetection(new Interval(1551398400000L, 1551571200000L), "thirdeye:metric:1");
     Assert.assertEquals(anomalies.size(), 1);
-    Assert.assertEquals(anomalies.get(0).getStartTime(), 1551398400000L);
+    Assert.assertEquals(anomalies.get(0).getStartTime(), 1551484800000L);
     Assert.assertEquals(anomalies.get(0).getEndTime(), 1551488400000L);
 
   }
