@@ -19,13 +19,15 @@ package org.apache.pinot.orc.data.readers;
  * under the License.
  */
 
+import com.google.common.collect.ImmutableList;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.ql.exec.vector.ColumnVector;
 import org.apache.hadoop.hive.ql.exec.vector.VectorizedRowBatch;
 import org.apache.hadoop.io.BooleanWritable;
-import org.apache.hadoop.io.ByteWritable;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.DoubleWritable;
 import org.apache.hadoop.io.FloatWritable;
@@ -137,7 +139,8 @@ public class ORCRecordReader implements RecordReader {
         // ORC will keep your columns in the same order as the schema provided
         ColumnVector vector = rowBatch.cols[i];
         // Previous value set to null, not used except to save allocation memory in OrcMapredRecordReader
-        WritableComparable writableComparable = OrcMapredRecordReader.nextValue(vector, 0, currColumn, null);
+        WritableComparable writableComparable;
+        writableComparable = OrcMapredRecordReader.nextValue(vector, 0, currColumn, null);
         genericRow.putField(currColumnName, getBaseObject(writableComparable));
       }
     } else {
@@ -159,8 +162,6 @@ public class ORCRecordReader implements RecordReader {
       obj = null;
     } else if (BooleanWritable.class.isAssignableFrom(w.getClass())) {
       obj = ((BooleanWritable) w).get();
-    } else if (ByteWritable.class.isAssignableFrom(w.getClass())) {
-      obj = ((ByteWritable) w).get();
     } else if (ShortWritable.class.isAssignableFrom(w.getClass())) {
       obj = ((ShortWritable) w).get();
     } else if (IntWritable.class.isAssignableFrom(w.getClass())) {
@@ -176,14 +177,27 @@ public class ORCRecordReader implements RecordReader {
     } else if (Text.class.isAssignableFrom(w.getClass())) {
       obj = ((Text) w).toString();
     } else if (OrcList.class.isAssignableFrom(w.getClass())) {
-      // TODO: This is probably multivalue columns
-      LOGGER.info("Skipping unsupported type: list");
+      obj = translateList((OrcList) w);
     } else {
       LOGGER.info("Unknown type found: " + w.getClass().getSimpleName());
       throw new IllegalArgumentException("Unknown type: " + w.getClass().getSimpleName());
     }
 
     return obj;
+  }
+
+  private List<Object> translateList(OrcList<? extends WritableComparable> l) {
+    if (l == null || l.isEmpty()) {
+      return ImmutableList.of();
+    }
+
+    List<Object> retArray = new ArrayList<>(l.size());
+
+    for (WritableComparable w : l) {
+      Object o = getBaseObject(w);
+      retArray.add(o);
+    }
+    return retArray;
   }
 
   @Override
