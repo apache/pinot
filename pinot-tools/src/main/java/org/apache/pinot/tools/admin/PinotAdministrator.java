@@ -97,8 +97,10 @@ public class PinotAdministrator {
       }
     } catch (CmdLineException e) {
       LOGGER.error("Error: {}", e.getMessage());
+      System.exit(1);
     } catch (Exception e) {
       LOGGER.error("Exception caught: ", e);
+      System.exit(1);
     }
   }
 
