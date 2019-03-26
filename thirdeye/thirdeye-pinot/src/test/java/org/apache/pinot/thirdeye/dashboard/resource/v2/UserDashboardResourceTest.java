@@ -110,47 +110,47 @@ public class UserDashboardResourceTest {
 
   @Test
   public void testAnomaliesByApplication() throws Exception {
-    List<AnomalySummary> anomalies = this.resource.queryAnomalies(1000L, null, null, "myApplicationA", null, null, null, false, null);
+    List<AnomalySummary> anomalies = this.resource.queryAnomalies(1000L, null, "myApplicationA", null, null, null, false, null);
     Assert.assertEquals(anomalies.size(), 2);
     Assert.assertEquals(extractIds(anomalies), makeSet(this.anomalyIds.get(1), this.anomalyIds.get(2)));
   }
 
   @Test
   public void testAnomaliesByApplicationInvalid() throws Exception {
-    List<AnomalySummary> anomalies = this.resource.queryAnomalies(1000L, null, null, "Invalid", null, null, null, false, null);
+    List<AnomalySummary> anomalies = this.resource.queryAnomalies(1000L, null, "Invalid", null, null, null, false, null);
     Assert.assertEquals(anomalies.size(), 0);
   }
 
   @Test
   public void testAnomaliesByGroup() throws Exception {
-    List<AnomalySummary> anomalies = this.resource.queryAnomalies(1000L, null, null, null, "myAlertB", null, null, false, null);
+    List<AnomalySummary> anomalies = this.resource.queryAnomalies(1000L, null, null, "myAlertB", null, null, false, null);
     Assert.assertEquals(anomalies.size(), 2);
     Assert.assertEquals(extractIds(anomalies), makeSet(this.anomalyIds.get(3), this.anomalyIds.get(4)));
   }
 
   @Test
   public void testAnomaliesByGroupInvalid() throws Exception {
-    List<AnomalySummary> anomalies = this.resource.queryAnomalies(1000L, null, null, null, "Invalid", null, null, false, null);
+    List<AnomalySummary> anomalies = this.resource.queryAnomalies(1000L, null, null, "Invalid", null, null, false, null);
     Assert.assertEquals(anomalies.size(), 0);
   }
 
   @Test
   public void testAnomaliesLimit() throws Exception {
-    List<AnomalySummary> anomalies = this.resource.queryAnomalies(1000L, null, null, "myApplicationA", null, null, null, false, 1);
+    List<AnomalySummary> anomalies = this.resource.queryAnomalies(1000L, null, "myApplicationA", null, null, null, false, 1);
     Assert.assertEquals(anomalies.size(), 1);
     Assert.assertEquals(extractIds(anomalies), makeSet(this.anomalyIds.get(1)));
   }
 
   @Test
   public void testAnomaliesByMetric() throws Exception {
-    List<AnomalySummary> anomalies = this.resource.queryAnomalies(1000L, null, null, null, null, "test_metric", "test_dataset", false, null);
+    List<AnomalySummary> anomalies = this.resource.queryAnomalies(1000L, null, null, null, "test_metric", "test_dataset", false, null);
     Assert.assertEquals(anomalies.size(), 3);
     Assert.assertEquals(extractIds(anomalies), makeSet(this.anomalyIds.get(1), this.anomalyIds.get(2), this.anomalyIds.get(3)));
   }
 
   @Test
   public void testAnomaliesByDataset() throws Exception {
-    List<AnomalySummary> anomalies = this.resource.queryAnomalies(1000L, null, null, null, null, null, "test_dataset", false, null);
+    List<AnomalySummary> anomalies = this.resource.queryAnomalies(1000L, null, null, null, null, "test_dataset", false, null);
     Assert.assertEquals(anomalies.size(), 4);
     Assert.assertEquals(extractIds(anomalies), makeSet(this.anomalyIds.get(1), this.anomalyIds.get(2), this.anomalyIds.get(3), this.anomalyIds.get(4)));
   }
