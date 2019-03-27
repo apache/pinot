@@ -17,7 +17,7 @@
 .. under the License.
 ..
 
-Running Pinot in production
+Running Pinot in Production
 ===========================
 
 Requirements
@@ -32,7 +32,7 @@ You will need the following in order to run pinot in production:
 * HTTP load balancers for spraying controller requests (e.g. segment push, or other controller APIs) or other mechanisms for distribution of these requests.
 
 Deploying Pinot
----------------
+~~~~~~~~~~~~~~~
 
 In general, when deploying Pinot services, it is best to adhere to a specific ordering in which the various components should be deployed. This deployment order is recommended in case of the scenario that there might be protocol or other significant differences, the deployments go out in a predictable order in which failure  due to these changes can be avoided.
 
@@ -44,19 +44,19 @@ The ordering is as follows:
 #. pinot-minion
 
 Managing Pinot
---------------
-
-Creating tables
-~~~~~~~~~~~~~~~
-
-Updating tables
-~~~~~~~~~~~~~~~
-
-Uploading data
 ~~~~~~~~~~~~~~
 
+Creating tables
+---------------
+
+Updating tables
+---------------
+
+Uploading data
+--------------
+
 Configuring realtime data ingestion
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-----------------------------------
 
 Monitoring Pinot
 ~~~~~~~~~~~~~~~~
@@ -64,7 +64,7 @@ Monitoring Pinot
 Pinot exposes several metrics to monitor the service and ensure that pinot users are not experiencing issues. In this section we discuss some of the key metrics that are useful to monitor. A full list of metrics is available in the `Metrics <customizations.html#metrics>`_ section.
 
 Pinot Server
-^^^^^^^^^^^^
+------------
 
 * Missing Segments - `NUM_MISSING_SEGMENTS <https://github.com/apache/incubator-pinot/blob/master/pinot-common/src/main/java/org/apache/pinot/common/metrics/ServerMeter.java>`_
 
@@ -87,7 +87,7 @@ Pinot Server
   * The highest offset which has been consumed so far.
 
 Pinot Broker
-^^^^^^^^^^^^
+------------
 
 * Incoming QPS (per broker) - `QUERIES <https://github.com/apache/incubator-pinot/blob/master/pinot-common/src/main/java/org/apache/pinot/common/metrics/BrokerMeter.java>`_
 
@@ -110,19 +110,25 @@ Pinot Broker
   * Percentage of the configured QPS quota being utilized.
 
 Pinot Controller
-^^^^^^^^^^^^^^^^
+----------------
 
-The controller metrics are generated dynamically due to generally including a table name as a part of the metric.
+Many of the controller metrics include a table name and thus are dynamically generated in the code. The metrics below point to the classes which generate the corresponding metrics.
 
-* Missing Segment Count -
+To get the real metric name, the easiest route is to spin up a controller instance, create a table with the desired name and look through the generated metrics.
 
-  * The controller will determine which segments are missing based on gaps in time coverage for segments. If a table is missing data for any time period(s) this metric will be set accordingly.
+.. todo::
 
-* Segments in Error State -
+  Give a more detailed explanation of how metrics are generated, how to identify real metrics names and where to find them in the code.
+
+* Percent Segments Available - `PERCENT_SEGMENTS_AVAILABLE <https://github.com/apache/incubator-pinot/blob/ce2d9ee9dc73b2d7273a63a4eede774eb024ea8f/pinot-common/src/main/java/org/apache/pinot/common/metrics/ControllerGauge.java>`_
+
+  * Percentage of complete online replicas in external view as compared to replicas in ideal state.
+
+* Segments in Error State - `SEGMENTS_IN_ERROR_STATE <https://github.com/apache/incubator-pinot/blob/ce2d9ee9dc73b2d7273a63a4eede774eb024ea8f/pinot-common/src/main/java/org/apache/pinot/common/metrics/ControllerGauge.java>`_
 
   * Number of segments in an ``ERROR`` state for a given table.
 
-* Last push delay -
+* Last push delay - Generated in the `ValidationMetrics <https://github.com/apache/incubator-pinot/blob/ce2d9ee9dc73b2d7273a63a4eede774eb024ea8f/pinot-common/src/main/java/org/apache/pinot/common/metrics/ValidationMetrics.java>`_ class.
 
   * The time in hours since the last time an offline segment has been pushed to the controller.
 
