@@ -26,9 +26,13 @@ Installing Pinot
 Requirements
 ~~~~~~~~~~~~
 
-* Java 8+
-* Several nodes with enough memory
-* A working installation of Zookeeper
+You will need the following in order to run pinot in production:
+
+* Hardware for controller/broker/servers as per your load
+* Working installation of Zookeeper that Pinot can use. We recommend setting aside a path within zookpeer and including that path in pinot.controller.zkStr. Pinot will create its own cluster under this path (cluster name decided by pinot.controller.helixClusterName)
+* Shared storage mounted on controllers (if you plan to have multiple controllers for the same cluster). Alternatively, an implementation of PinotFS that the Pinot hosts have access to.
+* HTTP load balancers for spraying queries across brokers (or other mechanism to balance queries)
+* HTTP load balancers for spraying controller requests (e.g. segment push, or other controller APIs) or other mechanisms for distribution of these requests.
 
 Recommended environment
 ~~~~~~~~~~~~~~~~~~~~~~~

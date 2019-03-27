@@ -130,6 +130,10 @@ The ``tableIndexConfig`` section has information about how to configure:
 
   * Allowed values - ``true`` to enable, ``false`` to disable.
 
+.. todo::
+
+  Create a separate section to describe this feature and design, then link to it from this config description
+
 * ``segmentPartitionConfig`` - Cofigures the Data Partitioning Strategy. Further documentation on this feather available in the `Data Partitioning Strategies <customizations.html#data-partitioning-strategies>`_ section.
 * ``loadMode`` - indicates how data will be loaded on pinot-server. either ``"MMAP"`` or ``"HEAP"`` can be configured.
 
