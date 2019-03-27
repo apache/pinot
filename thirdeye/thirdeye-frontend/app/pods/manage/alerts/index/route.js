@@ -3,7 +3,7 @@ import Route from '@ember/routing/route';
 import fetch from 'fetch';
 import { get, getWithDefault } from '@ember/object';
 import { inject as service } from '@ember/service';
-import { checkStatus } from 'thirdeye-frontend/utils/utils';
+import { checkStatus, formatYamlFilter } from 'thirdeye-frontend/utils/utils';
 import { powerSort } from 'thirdeye-frontend/utils/manage-alert-utils';
 
 // Maps filter name to alert property for filtering
@@ -48,7 +48,7 @@ export default Route.extend({
         collection: yamlAlert.dataset,
         type: this._detectionType(yamlAlert),
         exploreDimensions: dimensions,
-        filters: this._formatYamlFilter(yamlAlert.filters),
+        filters: formatYamlFilter(yamlAlert.filters),
         isNewPipeline: true
       });
     }
@@ -187,22 +187,27 @@ export default Route.extend({
    * @param {Map} filters multimap of filters
    * @return {String} - formatted filters string
    */
-  _formatYamlFilter(filters) {
-    if (filters){
-      const filterStrings = [];
-      Object.keys(filters).forEach(
-        function(filterKey) {
-          filters[filterKey].forEach(
-            function (filterValue) {
-              filterStrings.push(filterKey + "=" + filterValue);
-            }
-          );
-        }
-      );
-      return filterStrings.join(";");
-    }
-    return "";
-  },
+   _formatYamlFilter(filters) {
+     if (filters){
+       const filterStrings = [];
+       Object.keys(filters).forEach(
+         function(filterKey) {
+           const filter = filters[filterKey];
+           if (filter && Array.isArray(filter)) {
+             filter.forEach(
+               function (filterValue) {
+                 filterStrings.push(filterKey + '=' + filterValue);
+               }
+             );
+           } else {
+             filterStrings.push(filterKey + '=' + filter);
+           }
+         }
+       );
+       return filterStrings.join(';');
+     }
+     return '';
+   },
 
   /**
    * A local helper to find "Alerts I subscribe to"
