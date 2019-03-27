@@ -125,10 +125,14 @@ public class DefaultDataProvider implements DataProvider {
       // if the time series slice is already in cache, return directly
       for (MetricSlice slice : slices){
         for (Map.Entry<MetricSlice, DataFrame> entry : DETECTION_TIME_SERIES_CACHE.asMap().entrySet()) {
+          // current slice potentially contained in cache
           if (entry.getKey().containSlice(slice)){
             DataFrame df = entry.getValue().filter(entry.getValue().getLongs(COL_TIME).between(slice.getStart(), slice.getEnd())).dropNull(COL_TIME);
-            output.put(slice, df);
-            break;
+            // double check if it is cache hit
+            if (df.getLongs(COL_TIME).size() > 0) {
+              output.put(slice, df);
+              break;
+            }
           }
         }
       }
@@ -140,14 +144,14 @@ public class DefaultDataProvider implements DataProvider {
           futures.put(slice, this.executor.submit(() -> DefaultDataProvider.this.timeseriesLoader.load(slice)));
         }
       }
-      LOG.info("Fetching {} slices of timeseries, {} cache hit, {} cache miss", slices.size(), output.size(), futures.size());
+      //LOG.info("Fetching {} slices of timeseries, {} cache hit, {} cache miss", slices.size(), output.size(), futures.size());
       final long deadline = System.currentTimeMillis() + TIMEOUT;
       for (MetricSlice slice : slices) {
         if (!output.containsKey(slice)) {
           output.put(slice, futures.get(slice).get(makeTimeout(deadline), TimeUnit.MILLISECONDS));
         }
       }
-      LOG.info("Fetching {} slices used {} milliseconds", slices.size(), System.currentTimeMillis() - ts);
+      //LOG.info("Fetching {} slices used {} milliseconds", slices.size(), System.currentTimeMillis() - ts);
       return output;
 
     } catch (Exception e) {
@@ -236,7 +240,7 @@ public class DefaultDataProvider implements DataProvider {
       // filter all child anomalies. those are kept in the parent anomaly children set.
       anomalies = Collections2.filter(anomalies, mergedAnomaly -> mergedAnomaly != null && !mergedAnomaly.isChild());
 
-      LOG.info("Fetched {} anomalies between (startTime = {}, endTime = {}) with confid Id = {}", anomalies.size(), slice.getStart(), slice.getEnd(), configId);
+      //LOG.info("Fetched {} anomalies between (startTime = {}, endTime = {}) with confid Id = {}", anomalies.size(), slice.getStart(), slice.getEnd(), configId);
       output.putAll(slice, anomalies);
     }
     return output;
