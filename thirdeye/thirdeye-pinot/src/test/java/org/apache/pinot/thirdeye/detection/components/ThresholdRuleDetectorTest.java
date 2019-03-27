@@ -32,6 +32,7 @@ import org.apache.pinot.thirdeye.detection.DefaultInputDataFetcher;
 import org.apache.pinot.thirdeye.detection.MockDataProvider;
 import org.apache.pinot.thirdeye.detection.spec.ThresholdRuleDetectorSpec;
 import org.apache.pinot.thirdeye.detection.spi.components.AnomalyDetector;
+import org.apache.pinot.thirdeye.detection.spi.exception.DetectorException;
 import org.joda.time.Interval;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
@@ -82,7 +83,7 @@ public class ThresholdRuleDetectorTest {
   }
 
   @Test
-  public void testThresholdAlgorithmRun() {
+  public void testThresholdAlgorithmRun() throws DetectorException {
     AnomalyDetector thresholdAlgorithm = new ThresholdRuleDetector();
     ThresholdRuleDetectorSpec spec = new ThresholdRuleDetectorSpec();
     spec.setMin(100);
@@ -97,7 +98,7 @@ public class ThresholdRuleDetectorTest {
   }
 
   @Test
-  public void testMonthlyDetectionThreshold() {
+  public void testMonthlyDetectionThreshold() throws DetectorException {
     AnomalyDetector thresholdRule = new ThresholdRuleDetector();
     ThresholdRuleDetectorSpec spec = new ThresholdRuleDetectorSpec();
     spec.setMin(200);
@@ -110,7 +111,7 @@ public class ThresholdRuleDetectorTest {
   }
 
   @Test
-  public void testMonthlyDetectionThresholdMax() {
+  public void testMonthlyDetectionThresholdMax() throws DetectorException {
     AnomalyDetector thresholdRule = new ThresholdRuleDetector();
     ThresholdRuleDetectorSpec spec = new ThresholdRuleDetectorSpec();
     spec.setMax(200);
