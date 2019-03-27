@@ -20,9 +20,6 @@
 Running Pinot in production
 ===========================
 
-Installing Pinot
-----------------
-
 Requirements
 ~~~~~~~~~~~~
 
@@ -33,13 +30,6 @@ You will need the following in order to run pinot in production:
 * Shared storage mounted on controllers (if you plan to have multiple controllers for the same cluster). Alternatively, an implementation of PinotFS that the Pinot hosts have access to.
 * HTTP load balancers for spraying queries across brokers (or other mechanism to balance queries)
 * HTTP load balancers for spraying controller requests (e.g. segment push, or other controller APIs) or other mechanisms for distribution of these requests.
-
-Recommended environment
-~~~~~~~~~~~~~~~~~~~~~~~
-
-* Shared storage infrastructure (such as NFS)
-* Regular Zookeeper backups
-* HTTP load balancers (such as nginx/haproxy)
 
 Deploying Pinot
 ---------------
