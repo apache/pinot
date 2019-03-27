@@ -95,6 +95,7 @@ public class DetectionPipelineJob implements Job {
     taskDTO.setJobName(jobName);
     taskDTO.setStatus(TaskConstants.TaskStatus.WAITING);
     taskDTO.setTaskInfo(taskInfoJson);
+    taskDTO.setJobId(id);
 
     long taskId = taskDAO.save(taskDTO);
     LOG.info("Created detection pipeline task {} with taskId {}", taskDTO, taskId);
