@@ -136,6 +136,11 @@ public class BackfillDateTimeColumn {
     }
 
     @Override
+    public void init(SegmentGeneratorConfig segmentGeneratorConfig) {
+
+    }
+
+    @Override
     public boolean hasNext() {
       return _baseRecordReader.hasNext();
     }

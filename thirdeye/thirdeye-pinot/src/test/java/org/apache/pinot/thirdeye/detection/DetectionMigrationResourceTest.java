@@ -181,6 +181,8 @@ public class DetectionMigrationResourceTest {
 
     MergedAnomalyResultDTO mergedAnomalyResultDTO = new MergedAnomalyResultDTO();
     mergedAnomalyResultDTO.setFunction(actual);
+    mergedAnomalyResultDTO.setMetric("test_metric");
+    mergedAnomalyResultDTO.setCollection("test_collection");
     anomalyDAO.save(mergedAnomalyResultDTO);
 
     Response responseId = migrationResource.migrateAnomalyFunction(oldID);
@@ -216,6 +218,8 @@ public class DetectionMigrationResourceTest {
 
     MergedAnomalyResultDTO mergedAnomalyResultDTO = new MergedAnomalyResultDTO();
     mergedAnomalyResultDTO.setFunction(actual);
+    mergedAnomalyResultDTO.setMetric("test_metric");
+    mergedAnomalyResultDTO.setCollection("test_collection");
     anomalyDAO.save(mergedAnomalyResultDTO);
 
     Response responseId = migrationResource.migrateAnomalyFunction(oldID);

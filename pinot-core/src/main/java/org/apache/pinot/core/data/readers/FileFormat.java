@@ -19,5 +19,5 @@
 package org.apache.pinot.core.data.readers;
 
 public enum FileFormat {
-  AVRO, GZIPPED_AVRO, CSV, JSON, PINOT, THRIFT
+  AVRO, GZIPPED_AVRO, CSV, JSON, PINOT, THRIFT, OTHER
 }

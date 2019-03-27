@@ -235,6 +235,8 @@ public class KafkaPartitionLevelConsumerTest {
     streamConfigMap
         .put("stream.kafka.consumer.factory.class.name", mockKafkaSimpleConsumerFactory.getClass().getName());
     streamConfigMap.put("stream.kafka.decoder.class.name", "decoderClass");
+    streamConfigMap.put("stream.kafka.fetcher.size", "10000");
+    streamConfigMap.put("stream.kafka.fetcher.minBytes", "20000");
     StreamConfig streamConfig = new StreamConfig(streamConfigMap);
 
     KafkaStreamMetadataProvider streamMetadataProvider =
@@ -244,10 +246,15 @@ public class KafkaPartitionLevelConsumerTest {
     KafkaPartitionLevelConsumer kafkaSimpleStreamConsumer =
         new KafkaPartitionLevelConsumer(clientId, streamConfig, 0, mockKafkaSimpleConsumerFactory);
     kafkaSimpleStreamConsumer.fetchMessages(12345L, 23456L, 10000);
+
     Assert.assertEquals(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_BUFFER_SIZE_DEFAULT,
         kafkaSimpleStreamConsumer.getSimpleConsumer().bufferSize());
     Assert.assertEquals(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_SOCKET_TIMEOUT_DEFAULT,
         kafkaSimpleStreamConsumer.getSimpleConsumer().soTimeout());
+
+    // test parsing values
+    Assert.assertEquals(10000, kafkaSimpleStreamConsumer.getFetchRequestSize());
+    Assert.assertEquals(20000, kafkaSimpleStreamConsumer.getFetchRequestMinBytes());
 
     // test user defined values
     streamConfigMap.put("stream.kafka.buffer.size", "100");

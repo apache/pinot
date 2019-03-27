@@ -31,6 +31,7 @@ public class CommonConstants {
 
     public static final String PREFIX_OF_SERVER_INSTANCE = "Server_";
     public static final String PREFIX_OF_BROKER_INSTANCE = "Broker_";
+    public static final String PREFIX_OF_CONTROLLER_INSTANCE = "Controller_";
 
     public static final String SERVER_INSTANCE_TYPE = "server";
     public static final String BROKER_INSTANCE_TYPE = "broker";
@@ -111,6 +112,8 @@ public class CommonConstants {
     public static final int DEFAULT_BROKER_QUERY_RESPONSE_LIMIT = Integer.MAX_VALUE;
     public static final String CONFIG_OF_BROKER_QUERY_LOG_LENGTH = "pinot.broker.query.log.length";
     public static final int DEFAULT_BROKER_QUERY_LOG_LENGTH = Integer.MAX_VALUE;
+    public static final String CONFIG_OF_BROKER_QUERY_LOG_MAX_RATE_PER_SECOND = "pinot.broker.query.log.maxRatePerSecond";
+    public static final double DEFAULT_BROKER_QUERY_LOG_MAX_RATE_PER_SECOND = 10_000d;
     public static final String CONFIG_OF_BROKER_TIMEOUT_MS = "pinot.broker.timeoutMs";
     public static final long DEFAULT_BROKER_TIMEOUT_MS = 10_000L;
     public static final String CONFIG_OF_BROKER_ID = "pinot.broker.id";
@@ -121,6 +124,11 @@ public class CommonConstants {
     public static final String CONFIG_OF_BROKER_REFRESH_TIMEBOUNDARY_INFO_SLEEP_INTERVAL =
         "pinot.broker.refresh.timeBoundaryInfo.sleepInterval";
     public static final long DEFAULT_BROKER_REFRESH_TIMEBOUNDARY_INFO_SLEEP_INTERVAL_MS = 10000L;
+    // Configuration to consider the broker ServiceStatus as being STARTED if the percent of resources (tables) that
+    // are ONLINE for this this broker has crossed the threshold percentage of the total number of tables
+    // that it is expected to serve.
+    public static final String CONFIG_OF_BROKER_MIN_RESOURCE_PERCENT_FOR_START = "pinot.broker.startup.minResourcePercent";
+    public static final double DEFAULT_BROKER_MIN_RESOURCE_PERCENT_FOR_START = 100.0;
 
     public static class Request {
       public static final String PQL = "pql";
@@ -154,6 +162,7 @@ public class CommonConstants {
     public static final String CONFIG_OF_ENABLE_DEFAULT_COLUMNS = "pinot.server.instance.enable.default.columns";
     public static final String CONFIG_OF_ENABLE_SHUTDOWN_DELAY = "pinot.server.instance.enable.shutdown.delay";
     public static final String CONFIG_OF_ENABLE_SPLIT_COMMIT = "pinot.server.instance.enable.split.commit";
+    public static final String CONFIG_OF_ENABLE_COMMIT_END_WITH_METADATA = "pinot.server.instance.enable.commitend.metadata";
     public static final String CONFIG_OF_REALTIME_OFFHEAP_ALLOCATION = "pinot.server.instance.realtime.alloc.offheap";
     public static final String CONFIG_OF_REALTIME_OFFHEAP_DIRECT_ALLOCATION =
         "pinot.server.instance.realtime.alloc.offheap.direct";
@@ -163,6 +172,11 @@ public class CommonConstants {
         "pinot.server.instance.starter.maxShutdownWaitTime";
     public static final String CONFIG_OF_INSTANCE_CHECK_INTERVAL_TIME =
         "pinot.server.instance.starter.checkIntervalTime";
+    // Configuration to consider the server ServiceStatus as being STARTED if the percent of resources (tables) that
+    // are ONLINE for this this server has crossed the threshold percentage of the total number of tables
+    // that it is expected to serve.
+    public static final String CONFIG_OF_SERVER_MIN_RESOURCE_PERCENT_FOR_START = "pinot.server.startup.minResourcePercent";
+    public static final double DEFAULT_SERVER_MIN_RESOURCE_PERCENT_FOR_START = 100.0;
 
     public static final int DEFAULT_ADMIN_API_PORT = 8097;
     public static final boolean DEFAULT_STARTER_ENABLE_SEGMENTS_LOADING_CHECK = false;

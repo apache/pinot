@@ -1,7 +1,7 @@
 {
   "cron":"0 0 14 * * ? *",
   "name":"test_function",
-  "description":"<Please edit and provide a description for this alert>",
+  "description":"Please update description - If this alert fires then it means so-and-so and check so-and-so for irregularities",
   "lastTimestamp":1547772179159,
   "properties":{
     "className":"org.apache.pinot.thirdeye.detection.wrapper.ChildKeepingMergeWrapper",
@@ -27,7 +27,7 @@
     ]
   },
   "active":true,
-  "yaml":"detectionName: test_function\ndescription: <Please edit and provide a description for this alert>\nmetric: test_metric\nactive: true\ndataset: test_collection\npipelineType: Composite\nfilters:\n  score_challenge_type:\n  - Captcha Challenge\nrules:\n- detection:\n  - name: detection_rule1\n    type: THRESHOLD\n    params:\n      min: '0.70'\n",
+  "yaml":"detectionName: test_function\ndescription: Please update description - If this alert fires then it means so-and-so and check so-and-so for irregularities\nmetric: test_metric\nactive: true\ndataset: test_collection\npipelineType: Composite\nfilters:\n  score_challenge_type:\n  - Captcha Challenge\nrules:\n- detection:\n  - name: detection_rule1\n    type: THRESHOLD\n    params:\n      min: '0.70'\n",
   "componentSpecs":{
     "detection_rule1:THRESHOLD":{
       "min":"0.70",

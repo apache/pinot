@@ -18,74 +18,82 @@
  */
 package org.apache.pinot.core.data.readers;
 
-import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
+import java.io.InputStream;
 import java.util.HashMap;
-import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.core.data.GenericRow;
+import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.thrift.TBase;
 import org.apache.thrift.TFieldIdEnum;
 import org.apache.thrift.protocol.TBinaryProtocol;
+import org.apache.thrift.protocol.TProtocol;
 import org.apache.thrift.transport.TIOStreamTransport;
 
 
+/**
+ * Record reader for Thrift file.
+ */
 public class ThriftRecordReader implements RecordReader {
-
-  private final Schema _schema;
-
-  private final ThriftRecordReaderConfig _recordReaderConfig;
-
-  private final Class<TBase<?, ?>> _thriftClass;
-
-  /**
-   * For reading the binary thrift objects.
-   */
-  private TBinaryProtocol _binaryIn;
-
-  private BufferedInputStream _bufferIn;
-
   private final File _dataFile;
+  private final Schema _schema;
+  private final List<FieldSpec> _fieldSpecs;
+  private final Class<?> _thriftClass;
+  private final Map<String, Integer> _fieldIds = new HashMap<>();
 
-  Map<String, Integer> _fieldNameToIndexMap;
+  private InputStream _inputStream;
+  private TProtocol _tProtocol;
+  private boolean _hasNext;
 
   public ThriftRecordReader(File dataFile, Schema schema, ThriftRecordReaderConfig recordReaderConfig)
       throws IOException, ClassNotFoundException, IllegalAccessException, InstantiationException {
-    this._schema = schema;
-    this._dataFile = dataFile;
-    this._recordReaderConfig = recordReaderConfig;
-    this._thriftClass = initThriftInstanceCreator();
-    this._bufferIn = RecordReaderUtils.getFileBufferStream(dataFile);
-    this._binaryIn = new TBinaryProtocol(new TIOStreamTransport(_bufferIn));
-    this._fieldNameToIndexMap = new HashMap();
-    TBase t = this._thriftClass.newInstance();
+    _dataFile = dataFile;
+    _schema = schema;
+    _fieldSpecs = RecordReaderUtils.extractFieldSpecs(schema);
+    _thriftClass = Class.forName(recordReaderConfig.getThriftClass());
+    TBase tObject = (TBase) _thriftClass.newInstance();
     int index = 1;
-    TFieldIdEnum fieldIdEnum = null;
-    do {
-      fieldIdEnum = t.fieldForId(index);
-      if (fieldIdEnum != null) {
-        _fieldNameToIndexMap.put(fieldIdEnum.getFieldName(), index);
-      }
-      index = index + 1;
-    } while (fieldIdEnum != null);
+    TFieldIdEnum tFieldIdEnum;
+    while ((tFieldIdEnum = tObject.fieldForId(index)) != null) {
+      _fieldIds.put(tFieldIdEnum.getFieldName(), index);
+      index++;
+    }
+
+    init();
+  }
+
+  private void init()
+      throws IOException {
+    _inputStream = RecordReaderUtils.getBufferedInputStream(_dataFile);
+    try {
+      _tProtocol = new TBinaryProtocol(new TIOStreamTransport(_inputStream));
+      _hasNext = hasMoreToRead();
+    } catch (Exception e) {
+      _inputStream.close();
+      throw e;
+    }
+  }
+
+  @Override
+  public void init(SegmentGeneratorConfig segmentGeneratorConfig) {
+
+  }
+
+  private boolean hasMoreToRead()
+      throws IOException {
+    _inputStream.mark(1);
+    int nextByte = _inputStream.read();
+    _inputStream.reset();
+    return nextByte != -1;
   }
 
   @Override
   public boolean hasNext() {
-    _bufferIn.mark(1);
-    int val = 0;
-    try {
-      val = _bufferIn.read();
-      _bufferIn.reset();
-    } catch (IOException e) {
-      val = -1;
-      throw new RuntimeException("Error in iterating Reader", e);
-    }
-    return val != -1;
+    return _hasNext;
   }
 
   @Override
@@ -97,41 +105,35 @@ public class ThriftRecordReader implements RecordReader {
   @Override
   public GenericRow next(GenericRow reuse)
       throws IOException {
-    TBase t = null;
+    TBase tObject;
     try {
-      t = this._thriftClass.newInstance();
-      t.read(_binaryIn);
+      tObject = (TBase) _thriftClass.newInstance();
+      tObject.read(_tProtocol);
     } catch (Exception e) {
-      throw new RuntimeException("Caught exception while serialize thrift instance", e);
+      throw new IOException("Caught exception while reading thrift object", e);
     }
-    for (FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
+    for (FieldSpec fieldSpec : _fieldSpecs) {
       String fieldName = fieldSpec.getName();
-      if (_fieldNameToIndexMap.containsKey(fieldName)) {
-        int tFieldId = _fieldNameToIndexMap.get(fieldName);
-        TFieldIdEnum tFieldIdEnum = t.fieldForId(tFieldId);
-        Object thriftValue = t.getFieldValue(tFieldIdEnum);
-        Object value = null;
-        if (fieldSpec.isSingleValueField()) {
-          String token = thriftValue != null ? thriftValue.toString() : null;
-          value = RecordReaderUtils.convertToDataType(token, fieldSpec);
-        } else {
-          if (thriftValue instanceof ArrayList) {
-            value = RecordReaderUtils.convertToDataTypeArray((ArrayList) thriftValue, fieldSpec);
-          } else if (thriftValue instanceof HashSet) {
-            value = RecordReaderUtils.convertToDataTypeSet((HashSet) thriftValue, fieldSpec);
-          }
-        }
-        reuse.putField(fieldName, value);
+      Object value = null;
+      Integer fieldId = _fieldIds.get(fieldName);
+      if (fieldId != null) {
+        //noinspection unchecked
+        value = tObject.getFieldValue(tObject.fieldForId(fieldId));
+      }
+      // Allow default value for non-time columns
+      if (value != null || fieldSpec.getFieldType() != FieldSpec.FieldType.TIME) {
+        reuse.putField(fieldName, RecordReaderUtils.convert(fieldSpec, value));
       }
     }
+    _hasNext = hasMoreToRead();
     return reuse;
   }
 
   @Override
   public void rewind()
       throws IOException {
-    _bufferIn = RecordReaderUtils.getFileBufferStream(_dataFile);
-    _binaryIn = new TBinaryProtocol(new TIOStreamTransport(_bufferIn));
+    _inputStream.close();
+    init();
   }
 
   @Override
@@ -142,19 +144,6 @@ public class ThriftRecordReader implements RecordReader {
   @Override
   public void close()
       throws IOException {
-    _bufferIn.close();
-  }
-
-  private Class<TBase<?, ?>> initThriftInstanceCreator() {
-    Class<TBase<?, ?>> tBase = null;
-    if (_recordReaderConfig == null || _recordReaderConfig.getThriftClass() == null) {
-      throw new IllegalArgumentException("Thrift class not found in the configuration");
-    }
-    try {
-      tBase = (Class<TBase<?, ?>>) Class.forName(_recordReaderConfig.getThriftClass());
-    } catch (ClassNotFoundException e) {
-      throw new RuntimeException("Caught exception while thrift class initialize", e);
-    }
-    return tBase;
+    _inputStream.close();
   }
 }

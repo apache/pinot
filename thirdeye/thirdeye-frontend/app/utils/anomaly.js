@@ -41,12 +41,43 @@ export const anomalyResponseObj = [
   }
 ];
 
+export const anomalyResponseObjNew = [
+  { name: 'Not reviewed yet',
+    value: 'NONE',
+    status: 'Not Resolved'
+  },
+  { name: 'Yes - unexpected',
+    value: 'ANOMALY',
+    status: 'Confirmed Anomaly'
+  },
+  { name: 'Expected temporary change',
+    value: 'ANOMALY_EXPECTED',
+    status: 'Expected Anomaly'
+  },
+  { name: 'Expected permanent change',
+    value: 'ANOMALY_NEW_TREND',
+    status: 'Confirmed - New Trend'
+  },
+  { name: 'No change observed',
+    value: 'NOT_ANOMALY',
+    status: 'False Alarm'
+  }
+];
+
 /**
  * Mapping for anomalyResponseObj 'status' to 'name' for easy lookup
  */
 export let anomalyResponseMap = {};
 anomalyResponseObj.forEach((obj) => {
   anomalyResponseMap[obj.status] = obj.name;
+});
+
+/**
+ * Mapping for anomalyResponseObjNew 'value' to 'name' for easy lookup
+ */
+export let anomalyResponseMapNew = {};
+anomalyResponseObjNew.forEach((obj) => {
+  anomalyResponseMapNew[obj.value] = obj.name;
 });
 
 
@@ -58,7 +89,7 @@ anomalyResponseObj.forEach((obj) => {
  * @return {Ember.RSVP.Promise}
  */
 export function updateAnomalyFeedback(anomalyId, feedbackType) {
-  const url = `/anomalies/updateFeedback/${anomalyId}`;
+  const url = `/dashboard/anomaly-merged-result/feedback/${anomalyId}`;
   const data = { feedbackType, comment: '' };
   return fetch(url, postProps(data)).then((res) => checkStatus(res, 'post'));
 }
@@ -71,8 +102,8 @@ export function updateAnomalyFeedback(anomalyId, feedbackType) {
  * @param {Number} endTime - end time of analysis range
  * @return {Ember.RSVP.Promise}
  */
-export function getYamlPreviewAnomalies(yamlString, startTime, endTime) {
-  const url = getAnomaliesForYamlPreviewUrl(startTime, endTime);
+export function getYamlPreviewAnomalies(yamlString, startTime, endTime, alertId) {
+  const url = getAnomaliesForYamlPreviewUrl(startTime, endTime, alertId);
   return fetch(url, postYamlProps(yamlString)).then((res) => checkStatus(res, 'post', false, true));
 }
 
@@ -96,7 +127,7 @@ export function getAnomaliesByAlertId(alertId, startTime, endTime) {
  * @return {Ember.RSVP.Promise}
  */
 export function verifyAnomalyFeedback(anomalyId) {
-  const url = `${anomalyApiUrls.getAnomalyDataUrl()}${anomalyId}`;
+  const url = `${anomalyApiUrls.getAnomalyDataUrl(anomalyId)}`;
   return fetch(url).then(checkStatus);
 }
 
@@ -137,6 +168,8 @@ export function pluralizeTime(time, unit) {
 export default {
   anomalyResponseObj,
   anomalyResponseMap,
+  anomalyResponseObjNew,
+  anomalyResponseMapNew,
   updateAnomalyFeedback,
   getFormattedDuration,
   verifyAnomalyFeedback,

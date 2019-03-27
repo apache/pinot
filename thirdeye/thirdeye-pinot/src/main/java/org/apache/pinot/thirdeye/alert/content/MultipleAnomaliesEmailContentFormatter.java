@@ -114,6 +114,7 @@ public class MultipleAnomaliesEmailContentFormatter extends BaseEmailContentForm
       String feedbackVal = getFeedbackValue(feedback);
 
       String functionName = "Alerts";
+      String funcDescription = "";
       Long id = -1L;
 
       if (anomaly.getFunction() != null){
@@ -123,9 +124,9 @@ public class MultipleAnomaliesEmailContentFormatter extends BaseEmailContentForm
         DetectionConfigDTO config = this.configDAO.findById(anomaly.getDetectionConfigId());
         Preconditions.checkNotNull(config, String.format("Cannot find detection config %d", anomaly.getDetectionConfigId()));
         functionName = config.getName();
+        funcDescription = config.getDescription();
         id = config.getId();
       }
-
 
       AnomalyReportEntity anomalyReport = new AnomalyReportEntity(String.valueOf(anomaly.getId()),
           getAnomalyURL(anomaly, emailContentFormatterConfiguration.getDashboardHost()),
@@ -136,6 +137,7 @@ public class MultipleAnomaliesEmailContentFormatter extends BaseEmailContentForm
           getTimeDiffInHours(anomaly.getStartTime(), anomaly.getEndTime()), // duration
           feedbackVal,
           functionName,
+          funcDescription,
           anomaly.getMetric(),
           getDateString(anomaly.getStartTime(), dateTimeZone),
           getDateString(anomaly.getEndTime(), dateTimeZone),
@@ -188,8 +190,8 @@ public class MultipleAnomaliesEmailContentFormatter extends BaseEmailContentForm
     templateData.put("anomalyDetails", anomalyDetails);
     templateData.put("anomalyIds", Joiner.on(",").join(anomalyIds));
     templateData.put("holidays", holidays);
-    templateData.put("functionAnomalyDetails", functionAnomalyReports.asMap());
-    templateData.put("metricAnomalyDetails", metricAnomalyReports.asMap());
+    templateData.put("detectionToAnomalyDetailsMap", functionAnomalyReports.asMap());
+    templateData.put("metricToAnomalyDetailsMap", metricAnomalyReports.asMap());
     templateData.put("functionToId", functionToId);
   }
 }

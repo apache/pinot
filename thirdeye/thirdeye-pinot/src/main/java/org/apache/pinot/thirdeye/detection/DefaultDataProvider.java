@@ -22,8 +22,10 @@ package org.apache.pinot.thirdeye.detection;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
+import com.google.common.cache.Weigher;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Collections2;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -37,6 +39,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
 import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
@@ -49,10 +53,12 @@ import org.apache.pinot.thirdeye.datalayer.dto.EventDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.util.Predicate;
+import org.apache.pinot.thirdeye.datasource.comparison.Row;
 import org.apache.pinot.thirdeye.datasource.loader.AggregationLoader;
 import org.apache.pinot.thirdeye.datasource.loader.TimeSeriesLoader;
 import org.apache.pinot.thirdeye.detection.spi.model.AnomalySlice;
 import org.apache.pinot.thirdeye.detection.spi.model.EventSlice;
+import org.joda.time.DateTimeZone;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -72,7 +78,8 @@ public class DefaultDataProvider implements DataProvider {
   private final TimeSeriesLoader timeseriesLoader;
   private final AggregationLoader aggregationLoader;
   private final DetectionPipelineLoader loader;
-  private final LoadingCache<MetricSlice, DataFrame> timeseriesCache;
+  private static LoadingCache<MetricSlice, DataFrame> DETECTION_TIME_SERIES_CACHE;
+
 
   public DefaultDataProvider(MetricConfigManager metricDAO, DatasetConfigManager datasetDAO, EventManager eventDAO,
       MergedAnomalyResultManager anomalyDAO, TimeSeriesLoader timeseriesLoader, AggregationLoader aggregationLoader,
@@ -84,27 +91,40 @@ public class DefaultDataProvider implements DataProvider {
     this.timeseriesLoader = timeseriesLoader;
     this.aggregationLoader = aggregationLoader;
     this.loader = loader;
-    this.timeseriesCache = CacheBuilder.newBuilder()
-        .maximumSize(100)
-        .expireAfterWrite(30, TimeUnit.MINUTES)
-        .build(new CacheLoader<MetricSlice, DataFrame>() {
-          @Override
-          public DataFrame load(MetricSlice slice) {
-            return fetchTimeseries(Collections.singleton(slice)).get(slice);
-          }
-        });
+
+    if (DETECTION_TIME_SERIES_CACHE == null) {
+      // don't use more than one third of memory for detection time series
+      long cacheSize = Runtime.getRuntime().freeMemory() / 3;
+      LOG.info("initializing detection timeseries cache with {} bytes", cacheSize);
+      DETECTION_TIME_SERIES_CACHE = CacheBuilder.newBuilder()
+          .maximumWeight(cacheSize)
+          // Estimate that most detection tasks will complete within 15 minutes
+          .expireAfterWrite(15, TimeUnit.MINUTES)
+          .weigher((Weigher<MetricSlice, DataFrame>) (slice, dataFrame) -> dataFrame.size() * (Long.BYTES + Double.BYTES))
+          .build(new CacheLoader<MetricSlice, DataFrame>() {
+            // load single slice
+            @Override
+            public DataFrame load(MetricSlice slice) {
+              return loadTimeseries(Collections.singleton(slice)).get(slice);
+            }
+
+            // buck loading time series slice in parallel
+            @Override
+            public Map<MetricSlice, DataFrame> loadAll(Iterable<? extends MetricSlice> slices) {
+              return loadTimeseries(Lists.newArrayList(slices));
+            }
+          });
+    }
   }
 
-
-  @Override
-  public Map<MetricSlice, DataFrame> fetchTimeseries(Collection<MetricSlice> slices) {
+  private Map<MetricSlice, DataFrame> loadTimeseries(Collection<MetricSlice> slices) {
     try {
       long ts = System.currentTimeMillis();
       Map<MetricSlice, DataFrame> output = new HashMap<>();
 
-      // if already in cache, return directly
+      // if the time series slice is already in cache, return directly
       for (MetricSlice slice : slices){
-        for (Map.Entry<MetricSlice, DataFrame> entry : this.timeseriesCache.asMap().entrySet()) {
+        for (Map.Entry<MetricSlice, DataFrame> entry : DETECTION_TIME_SERIES_CACHE.asMap().entrySet()) {
           if (entry.getKey().containSlice(slice)){
             DataFrame df = entry.getValue().filter(entry.getValue().getLongs(COL_TIME).between(slice.getStart(), slice.getEnd())).dropNull(COL_TIME);
             output.put(slice, df);
@@ -136,13 +156,21 @@ public class DefaultDataProvider implements DataProvider {
   }
 
   @Override
-  public void cacheTimeseries(Collection<MetricSlice> slices) {
-    for (MetricSlice slice : slices){
-      try {
-        this.timeseriesCache.get(slice);
-      } catch (Exception e){
-        LOG.warn("cache time series for slice {} failed", slice.toString());
+  public Map<MetricSlice, DataFrame> fetchTimeseries(Collection<MetricSlice> slices) {
+    try {
+      Map<MetricSlice, MetricSlice> alignedMetricSlicesToOriginalSlice = new HashMap<>();
+      for (MetricSlice slice: slices) {
+        alignedMetricSlicesToOriginalSlice.put(alignSlice(slice), slice);
       }
+      Map<MetricSlice, DataFrame> cacheResult = DETECTION_TIME_SERIES_CACHE.getAll(alignedMetricSlicesToOriginalSlice.keySet());
+      Map<MetricSlice, DataFrame> timeseriesResult = new HashMap<>();
+      for (Map.Entry<MetricSlice, DataFrame> entry : cacheResult.entrySet()){
+        // make a copy of the result so that cache won't be contaminated by client code
+        timeseriesResult.put(alignedMetricSlicesToOriginalSlice.get(entry.getKey()), entry.getValue().copy());
+      }
+      return  timeseriesResult;
+    } catch (Exception e) {
+      throw new RuntimeException("fetch time series failed", e);
     }
   }
 
@@ -292,5 +320,42 @@ public class DefaultDataProvider implements DataProvider {
   private static long makeTimeout(long deadline) {
     long diff = deadline - System.currentTimeMillis();
     return diff > 0 ? diff : 0;
+  }
+
+  /**
+   * Aligns a metric slice based on its granularity, or the dataset granularity.
+   *
+   * @param slice metric slice
+   * @return aligned metric slice
+   */
+  private MetricSlice alignSlice(MetricSlice slice) {
+    MetricConfigDTO metric = this.metricDAO.findById(slice.getMetricId());
+    if (metric == null) {
+      throw new IllegalArgumentException(String.format("Could not resolve metric id %d", slice.getMetricId()));
+    }
+
+    DatasetConfigDTO dataset = this.datasetDAO.findByDataset(metric.getDataset());
+    if (dataset == null) {
+      throw new IllegalArgumentException(String.format("Could not resolve dataset '%s' for metric id %d", metric.getDataset(), slice.getMetricId()));
+    }
+
+    TimeGranularity granularity = dataset.bucketTimeGranularity();
+    if (!MetricSlice.NATIVE_GRANULARITY.equals(slice.getGranularity())) {
+      granularity = slice.getGranularity();
+    }
+
+    // align to time buckets and request time zone
+    long timeGranularity = granularity.toMillis();
+    long start = (slice.getStart() / timeGranularity) * timeGranularity;
+    long end = ((slice.getEnd() + timeGranularity - 1) / timeGranularity) * timeGranularity;
+
+    return slice.withStart(start).withEnd(end).withGranularity(granularity);
+  }
+
+  public static void cleanCache() {
+    if (DETECTION_TIME_SERIES_CACHE != null) {
+      DETECTION_TIME_SERIES_CACHE.cleanUp();
+      DETECTION_TIME_SERIES_CACHE = null;
+    }
   }
 }

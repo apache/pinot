@@ -20,6 +20,7 @@ package org.apache.pinot.core.data.readers;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.List;
 import org.apache.avro.Schema.Field;
 import org.apache.avro.file.DataFileStream;
 import org.apache.avro.generic.GenericRecord;
@@ -27,6 +28,7 @@ import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.FieldSpec.DataType;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.core.data.GenericRow;
+import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.util.AvroUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,6 +42,7 @@ public class AvroRecordReader implements RecordReader {
 
   private final File _dataFile;
   private final Schema _schema;
+  private final List<FieldSpec> _fieldSpecs;
 
   private DataFileStream<GenericRecord> _avroReader;
   private GenericRecord _reusableAvroRecord = null;
@@ -48,6 +51,7 @@ public class AvroRecordReader implements RecordReader {
       throws IOException {
     _dataFile = dataFile;
     _schema = schema;
+    _fieldSpecs = RecordReaderUtils.extractFieldSpecs(schema);
     _avroReader = AvroUtils.getAvroReader(dataFile);
     try {
       validateSchema();
@@ -57,9 +61,14 @@ public class AvroRecordReader implements RecordReader {
     }
   }
 
+  @Override
+  public void init(SegmentGeneratorConfig segmentGeneratorConfig) {
+
+  }
+
   private void validateSchema() {
     org.apache.avro.Schema avroSchema = _avroReader.getSchema();
-    for (FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
+    for (FieldSpec fieldSpec : _fieldSpecs) {
       String fieldName = fieldSpec.getName();
       Field avroField = avroSchema.getField(fieldName);
       if (avroField == null) {
@@ -95,11 +104,20 @@ public class AvroRecordReader implements RecordReader {
     return next(new GenericRow());
   }
 
+  // NOTE: hard to extract common code further
+  @SuppressWarnings("Duplicates")
   @Override
   public GenericRow next(GenericRow reuse)
       throws IOException {
     _reusableAvroRecord = _avroReader.next(_reusableAvroRecord);
-    AvroUtils.fillGenericRow(_reusableAvroRecord, reuse, _schema);
+    for (FieldSpec fieldSpec : _fieldSpecs) {
+      String fieldName = fieldSpec.getName();
+      Object value = _reusableAvroRecord.get(fieldName);
+      // Allow default value for non-time columns
+      if (value != null || fieldSpec.getFieldType() != FieldSpec.FieldType.TIME) {
+        reuse.putField(fieldName, RecordReaderUtils.convert(fieldSpec, value));
+      }
+    }
     return reuse;
   }
 

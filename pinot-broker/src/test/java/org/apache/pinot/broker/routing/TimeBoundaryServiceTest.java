@@ -53,7 +53,7 @@ public class TimeBoundaryServiceTest {
     _zkClient = new ZkClient(StringUtil.join("/", StringUtils.chomp(ZkStarter.DEFAULT_ZK_STR, "/")),
         ZkClient.DEFAULT_SESSION_TIMEOUT, ZkClient.DEFAULT_CONNECTION_TIMEOUT, new ZNRecordSerializer());
     String helixClusterName = "TestTimeBoundaryService";
-    _zkClient.deleteRecursive("/" + helixClusterName + "/PROPERTYSTORE");
+    _zkClient.deleteRecursively("/" + helixClusterName + "/PROPERTYSTORE");
     _zkClient.createPersistent("/" + helixClusterName + "/PROPERTYSTORE", true);
     _propertyStore = new ZkHelixPropertyStore<>(new ZkBaseDataAccessor<ZNRecord>(_zkClient),
         "/" + helixClusterName + "/PROPERTYSTORE", null);
@@ -125,7 +125,6 @@ public class TimeBoundaryServiceTest {
       throws Exception {
     TableConfig tableConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(tableName)
         .setTimeColumnName("timestamp").setTimeType("DAYS").build();
-    ZKMetadataProvider
-        .setOfflineTableConfig(_propertyStore, tableConfig.getTableName(), TableConfig.toZnRecord(tableConfig));
+    ZKMetadataProvider.setOfflineTableConfig(_propertyStore, tableConfig.getTableName(), tableConfig.toZNRecord());
   }
 }

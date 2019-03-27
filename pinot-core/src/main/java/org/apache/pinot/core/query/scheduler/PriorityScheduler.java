@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.LongAccumulator;
 import javax.annotation.Nonnull;
+import org.apache.commons.configuration.Configuration;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -53,9 +54,10 @@ public abstract class PriorityScheduler extends QueryScheduler {
   @VisibleForTesting
   Thread scheduler;
 
-  public PriorityScheduler(@Nonnull ResourceManager resourceManager, @Nonnull QueryExecutor queryExecutor,
-      @Nonnull SchedulerPriorityQueue queue, @Nonnull ServerMetrics metrics, @Nonnull LongAccumulator latestQueryTime) {
-    super(queryExecutor, resourceManager, metrics, latestQueryTime);
+  public PriorityScheduler(@Nonnull Configuration config, @Nonnull ResourceManager resourceManager,
+      @Nonnull QueryExecutor queryExecutor, @Nonnull SchedulerPriorityQueue queue, @Nonnull ServerMetrics metrics,
+      @Nonnull LongAccumulator latestQueryTime) {
+    super(config, queryExecutor, resourceManager, metrics, latestQueryTime);
     Preconditions.checkNotNull(queue);
     this.queryQueue = queue;
     this.numRunners = resourceManager.getNumQueryRunnerThreads();

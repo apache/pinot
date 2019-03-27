@@ -105,11 +105,27 @@ public abstract class ControllerTest {
     return config;
   }
 
+  public class TestOnlyControllerStarter extends ControllerStarter {
+
+    TestOnlyControllerStarter(ControllerConf conf) {
+      super(conf);
+    }
+
+    @Override
+    public boolean isPinotOnlyModeSupported() {
+      return true;
+    }
+  }
+
   protected void startController() {
     startController(getDefaultControllerConfiguration());
   }
 
   protected void startController(ControllerConf config) {
+    startController(config, true);
+  }
+
+  protected void startController(ControllerConf config, boolean deleteCluster) {
     Assert.assertNotNull(config);
     Assert.assertNull(_controllerStarter);
 
@@ -123,21 +139,31 @@ public abstract class ControllerTest {
 
     String zkStr = config.getZkStr();
     _zkClient = new ZkClient(zkStr);
-    if (_zkClient.exists("/" + helixClusterName)) {
+    if (_zkClient.exists("/" + helixClusterName) && deleteCluster) {
       _zkClient.deleteRecursive("/" + helixClusterName);
     }
 
     startControllerStarter(config);
 
-    _helixManager = _helixResourceManager.getHelixZkManager();
-    _helixAdmin = _helixResourceManager.getHelixAdmin();
-    _propertyStore = _helixResourceManager.getPropertyStore();
+    // HelixResourceManager is null in Helix only mode, while HelixManager is null in Pinot only mode.
+    switch (getControllerStarter().getControllerMode()) {
+      case DUAL:
+      case PINOT_ONLY:
+        _helixAdmin = _helixResourceManager.getHelixAdmin();
+        _propertyStore = _helixResourceManager.getPropertyStore();
+        break;
+      case HELIX_ONLY:
+        _helixAdmin = _helixManager.getClusterManagmentTool();
+        _propertyStore = _helixManager.getHelixPropertyStore();
+        break;
+    }
   }
 
   protected void startControllerStarter(ControllerConf config) {
-    _controllerStarter = new ControllerStarter(config);
+    _controllerStarter = new TestOnlyControllerStarter(config);
     _controllerStarter.start();
     _helixResourceManager = _controllerStarter.getHelixResourceManager();
+    _helixManager = _controllerStarter.getHelixControllerManager();
   }
 
   protected void stopController() {
@@ -151,6 +177,10 @@ public abstract class ControllerTest {
 
     _controllerStarter.stop();
     _controllerStarter = null;
+  }
+
+  protected ControllerStarter getControllerStarter() {
+    return _controllerStarter;
   }
 
   protected Schema createDummySchema(String tableName) {

@@ -136,10 +136,14 @@ public class ServiceStatus {
 
     private final Set<String> _resourcesToMonitor;
     private final int _numTotalResourcesToMonitor;
+    private Iterator<String> _resourceIterator = null;
+    // Minimum number of resources to be in converged state before we declare the service state as STARTED
+    private final int _minResourcesStartCount;
 
     private String _statusDescription = STATUS_DESCRIPTION_INIT;
 
-    public IdealStateMatchServiceStatusCallback(HelixManager helixManager, String clusterName, String instanceName) {
+    public IdealStateMatchServiceStatusCallback(HelixManager helixManager, String clusterName, String instanceName,
+        double minResourcesStartPercent) {
       _clusterName = clusterName;
       _instanceName = instanceName;
       _helixAdmin = helixManager.getClusterManagmentTool();
@@ -164,13 +168,14 @@ public class ServiceStatus {
         }
       }
       _numTotalResourcesToMonitor = _resourcesToMonitor.size();
+      _minResourcesStartCount = (int)Math.round(Math.ceil(minResourcesStartPercent * _numTotalResourcesToMonitor/100));
 
       LOGGER.info("Monitoring {} resources: {} for start up of instance {}", _numTotalResourcesToMonitor,
           _resourcesToMonitor, _instanceName);
     }
 
     public IdealStateMatchServiceStatusCallback(HelixManager helixManager, String clusterName, String instanceName,
-        List<String> resourcesToMonitor) {
+        List<String> resourcesToMonitor, double minResourcesStartPercent) {
       _clusterName = clusterName;
       _instanceName = instanceName;
       _helixAdmin = helixManager.getClusterManagmentTool();
@@ -179,6 +184,7 @@ public class ServiceStatus {
       _resourcesToMonitor = new HashSet<>(resourcesToMonitor);
       _numTotalResourcesToMonitor = _resourcesToMonitor.size();
 
+      _minResourcesStartCount = (int)Math.round(Math.ceil(minResourcesStartPercent * _numTotalResourcesToMonitor/100));
       LOGGER.info("Monitoring {} resources: {} for start up of instance {}", _numTotalResourcesToMonitor,
           _resourcesToMonitor, _instanceName);
     }
@@ -187,26 +193,57 @@ public class ServiceStatus {
 
     protected abstract Map<String, String> getPartitionStateMap(T state);
 
+    protected abstract String getMatchName();
+
+    private boolean isDone() {
+      if (_resourcesToMonitor.isEmpty() || _numTotalResourcesToMonitor <= 0) {
+        return true;
+      }
+      if (_numTotalResourcesToMonitor - _resourcesToMonitor.size() >= _minResourcesStartCount) {
+        return true;
+      }
+      return false;
+    }
+
+    // Each time getServiceStatus is called, we move on to the next resource that needs to be examined. If we
+    // reach the end, we set the iterator back to the beginning, starting again on the resource we left off
+    // a while ago.
+    // We do so until minResourcesStartPercent percent of resources have converged their externalview (or currentstate)
+    // to the idealstate. If any resource has not converged (and we have still not reached the threshold percent) then
+    // we return immediately.
+    // This allows us to move forward with resources that have converged as opposed to getting stuck with those that
+    // have not.
+    // In large installations with 1000s of resources, some resources may be stuck in transitions due to zookpeer
+    // connection issues in helix. In such cases, setting a percentage threshold to be (say) 99.9% allows us to move
+    // past and declare the server as having STARTED as opposed to waiting for the one resource that may never converge.
+    // Note:
+    //   - We still keep the number of zk access to a minimum, like before. Another method maybe to get all tables all
+    //     the time, but that may increase the number of zk reads.
+    //   - We may also need to keep track of how many partitions within a resource have converged, and track that
+    //     percentage as well. For now, we keep the code simple(r), and revisit this if necessary.
+    //   - It may be useful to consider a rewrite of this class where we expose the tables and partitions still
+    //     pending, thus allowing an external system to make the decision on whether or not to declare the status
+    //     as STARTING (perhaps depending on SLA for the resource, etc.).
     @Override
     public synchronized Status getServiceStatus() {
-      if (_resourcesToMonitor.isEmpty()) {
-        return Status.GOOD;
-      }
 
-      Iterator<String> iterator = _resourcesToMonitor.iterator();
-      while (iterator.hasNext()) {
-        String resourceName = iterator.next();
+      while (!isDone()) {
+        String resourceName;
+        if (_resourceIterator == null || !_resourceIterator.hasNext()) {
+          _resourceIterator = _resourcesToMonitor.iterator();
+        }
+        resourceName = _resourceIterator.next();
         IdealState idealState = getResourceIdealState(resourceName);
 
         // If the resource has been removed or disabled, ignore it
         if (idealState == null || !idealState.isEnabled()) {
-          iterator.remove();
+          _resourceIterator.remove();
           continue;
         }
 
         String descriptionSuffix = String
-            .format("resource=%s, numResourcesLeft=%d, numTotalResources=%d", resourceName, _resourcesToMonitor.size(),
-                _numTotalResourcesToMonitor);
+            .format("waitingFor=%s, resource=%s, numResourcesLeft=%d, numTotalResources=%d", getMatchName(),
+                resourceName, _resourcesToMonitor.size(), _numTotalResourcesToMonitor);
         T helixState = getState(resourceName);
         if (helixState == null) {
           _statusDescription = "Helix state does not exist: " + descriptionSuffix;
@@ -233,7 +270,7 @@ public class ServiceStatus {
               LOGGER.error(String.format("Resource: %s, partition: %s is in ERROR state", resourceName, partitionName));
             } else {
               _statusDescription = String
-                  .format("partition=%s, idealStateStatus=%s, currentStateStatus=%s, %s", partitionName,
+                  .format("partition=%s, expected=%s, found=%s, %s", partitionName,
                       idealStateStatus, currentStateStatus, descriptionSuffix);
               return Status.STARTING;
             }
@@ -241,11 +278,18 @@ public class ServiceStatus {
         }
 
         // Resource is done starting up, remove it from the set
-        iterator.remove();
+        _resourceIterator.remove();
       }
 
-      LOGGER.info("Instance {} has finished starting up", _instanceName);
-      _statusDescription = STATUS_DESCRIPTION_NONE;
+      if (_resourcesToMonitor.isEmpty()) {
+        _statusDescription = STATUS_DESCRIPTION_NONE;
+        LOGGER.info("Instance {} has finished starting up", _instanceName);
+      } else {
+        _statusDescription = String.format("waitingFor=%s, numResourcesLeft=%d, numTotalResources=%d, minStartCount=%d",
+            getMatchName(), _resourcesToMonitor.size(), _numTotalResourcesToMonitor, _minResourcesStartCount);
+        LOGGER.info("Instance {} returning GOOD because {}", _statusDescription);
+      }
+
       return Status.GOOD;
     }
 
@@ -265,14 +309,15 @@ public class ServiceStatus {
    * the ideal state value.
    */
   public static class IdealStateAndCurrentStateMatchServiceStatusCallback extends IdealStateMatchServiceStatusCallback<CurrentState> {
+    private static final String MATCH_NAME = "CurrentStateMatch";
     public IdealStateAndCurrentStateMatchServiceStatusCallback(HelixManager helixManager, String clusterName,
-        String instanceName) {
-      super(helixManager, clusterName, instanceName);
+        String instanceName, double minResourcesStartPercent) {
+      super(helixManager, clusterName, instanceName, minResourcesStartPercent);
     }
 
     public IdealStateAndCurrentStateMatchServiceStatusCallback(HelixManager helixManager, String clusterName,
-        String instanceName, List<String> resourcesToMonitor) {
-      super(helixManager, clusterName, instanceName, resourcesToMonitor);
+        String instanceName, List<String> resourcesToMonitor, double minResourcesStartPercent) {
+      super(helixManager, clusterName, instanceName, resourcesToMonitor, minResourcesStartPercent);
     }
 
     @Override
@@ -287,6 +332,11 @@ public class ServiceStatus {
     protected Map<String, String> getPartitionStateMap(CurrentState state) {
       return state.getPartitionStateMap();
     }
+
+    @Override
+    protected String getMatchName() {
+      return MATCH_NAME;
+    }
   }
 
   /**
@@ -295,14 +345,15 @@ public class ServiceStatus {
    * ideal state value.
    */
   public static class IdealStateAndExternalViewMatchServiceStatusCallback extends IdealStateMatchServiceStatusCallback<ExternalView> {
+    private static final String MATCH_NAME = "ExternalViewMatch";
     public IdealStateAndExternalViewMatchServiceStatusCallback(HelixManager helixManager, String clusterName,
-        String instanceName) {
-      super(helixManager, clusterName, instanceName);
+        String instanceName, double minResourcesStartPercent) {
+      super(helixManager, clusterName, instanceName, minResourcesStartPercent);
     }
 
     public IdealStateAndExternalViewMatchServiceStatusCallback(HelixManager helixManager, String clusterName,
-        String instanceName, List<String> resourcesToMonitor) {
-      super(helixManager, clusterName, instanceName, resourcesToMonitor);
+        String instanceName, List<String> resourcesToMonitor, double minResourcesStartPercent) {
+      super(helixManager, clusterName, instanceName, resourcesToMonitor, minResourcesStartPercent);
     }
 
     @Override
@@ -322,6 +373,11 @@ public class ServiceStatus {
       }
 
       return partitionState;
+    }
+
+    @Override
+    protected String getMatchName() {
+      return MATCH_NAME;
     }
   }
 }

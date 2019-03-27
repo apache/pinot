@@ -73,7 +73,7 @@ public class ConvertToRawIndexTaskGenerator implements PinotTaskGenerator {
       Preconditions.checkNotNull(tableTaskConfig);
       Map<String, String> taskConfigs =
           tableTaskConfig.getConfigsForTaskType(MinionConstants.ConvertToRawIndexTask.TASK_TYPE);
-      Preconditions.checkNotNull(tableConfigs);
+      Preconditions.checkNotNull(taskConfigs, "Task config shouldn't be null for Table: {}", offlineTableName);
 
       // Get max number of tasks for this table
       int tableMaxNumTasks;

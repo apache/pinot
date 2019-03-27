@@ -24,6 +24,7 @@ import com.google.common.cache.CacheBuilder;
 import org.apache.pinot.thirdeye.anomaly.detection.DetectionJobScheduler;
 import org.apache.pinot.thirdeye.anomaly.onboard.DetectionOnboardResource;
 import org.apache.pinot.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutotuneFactory;
+import org.apache.pinot.thirdeye.api.application.ApplicationResource;
 import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.auth.Credentials;
 import org.apache.pinot.thirdeye.auth.ThirdEyeAuthFilter;
@@ -184,8 +185,10 @@ public class ThirdEyeDashboardApplication
     env.jersey().register(new CustomizedEventResource(DAO_REGISTRY.getEventDAO()));
     env.jersey().register(new TimeSeriesResource());
     env.jersey().register(new UserDashboardResource(
-        DAO_REGISTRY.getMergedAnomalyResultDAO(), DAO_REGISTRY.getAnomalyFunctionDAO(),
-        DAO_REGISTRY.getMetricConfigDAO(), DAO_REGISTRY.getDatasetConfigDAO(), DAO_REGISTRY.getAlertConfigDAO(),
+        DAO_REGISTRY.getMergedAnomalyResultDAO(), DAO_REGISTRY.getMetricConfigDAO(), DAO_REGISTRY.getDatasetConfigDAO(),
+        DAO_REGISTRY.getDetectionConfigManager(), DAO_REGISTRY.getDetectionAlertConfigManager()));
+    env.jersey().register(new ApplicationResource(
+        DAO_REGISTRY.getApplicationDAO(), DAO_REGISTRY.getMergedAnomalyResultDAO(),
         DAO_REGISTRY.getDetectionConfigManager(), DAO_REGISTRY.getDetectionAlertConfigManager()));
     env.jersey().register(new DetectionOnboardResource(
         DAO_REGISTRY.getTaskDAO(), DAO_REGISTRY.getAnomalyFunctionDAO()));

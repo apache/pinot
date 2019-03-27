@@ -26,13 +26,17 @@ import org.apache.helix.task.TaskState;
 import org.apache.pinot.common.config.PinotTaskConfig;
 import org.apache.pinot.common.data.Segment;
 import org.apache.pinot.controller.helix.core.minion.ClusterInfoProvider;
+import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.core.common.MinionConstants;
 
 
 public class TaskGeneratorUtils {
+  private static final long ONE_DAY_IN_MILLIS = 24 * 60 * 60 * 1000L;
 
   /**
-   * Returns all the segments that have been scheduled but not finished
+   * Returns all the segments that have been scheduled in one day but not finished.
+   * <p>
+   * NOTE: we consider tasks not finished in one day as stuck and don't count the segments in them
    *
    * @param taskType Task type
    * @param clusterInfoProvider Cluster info provider
@@ -43,13 +47,23 @@ public class TaskGeneratorUtils {
     Set<Segment> runningSegments = new HashSet<>();
     Map<String, TaskState> taskStates = clusterInfoProvider.getTaskStates(taskType);
     for (Map.Entry<String, TaskState> entry : taskStates.entrySet()) {
-      TaskState taskState = entry.getValue();
-      if (taskState == TaskState.NOT_STARTED || taskState == TaskState.IN_PROGRESS || taskState == TaskState.STOPPED) {
-        for (PinotTaskConfig pinotTaskConfig : clusterInfoProvider.getTaskConfigs(entry.getKey())) {
-          Map<String, String> configs = pinotTaskConfig.getConfigs();
-          runningSegments.add(
-              new Segment(configs.get(MinionConstants.TABLE_NAME_KEY), configs.get(MinionConstants.SEGMENT_NAME_KEY)));
-        }
+      // Skip COMPLETED tasks
+      if (entry.getValue() == TaskState.COMPLETED) {
+        continue;
+      }
+
+      // Skip tasks scheduled for more than one day
+      String taskName = entry.getKey();
+      long scheduleTimeMs = Long.parseLong(
+          taskName.substring(taskName.lastIndexOf(PinotHelixTaskResourceManager.TASK_NAME_SEPARATOR) + 1));
+      if (System.currentTimeMillis() - scheduleTimeMs > ONE_DAY_IN_MILLIS) {
+        continue;
+      }
+
+      for (PinotTaskConfig pinotTaskConfig : clusterInfoProvider.getTaskConfigs(entry.getKey())) {
+        Map<String, String> configs = pinotTaskConfig.getConfigs();
+        runningSegments.add(
+            new Segment(configs.get(MinionConstants.TABLE_NAME_KEY), configs.get(MinionConstants.SEGMENT_NAME_KEY)));
       }
     }
     return runningSegments;

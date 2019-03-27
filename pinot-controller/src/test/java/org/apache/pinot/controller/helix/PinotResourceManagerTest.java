@@ -22,7 +22,6 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import org.apache.helix.HelixAdmin;
 import org.apache.helix.manager.zk.ZkClient;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.config.TableConfig;
@@ -30,7 +29,6 @@ import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.ZkStarter;
-import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -38,14 +36,11 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-public class PinotResourceManagerTest {
-  private final static String HELIX_CLUSTER_NAME = "testCluster";
+public class PinotResourceManagerTest extends ControllerTest {
   private final static String TABLE_NAME = "testTable";
 
   private ZkStarter.ZookeeperInstance _zookeeperInstance;
   private ZkClient _zkClient;
-  private PinotHelixResourceManager _pinotHelixResourceManager;
-  private HelixAdmin _helixAdmin;
 
   @BeforeClass
   public void setUp()
@@ -53,27 +48,22 @@ public class PinotResourceManagerTest {
     _zookeeperInstance = ZkStarter.startLocalZkServer();
     _zkClient = new ZkClient(ZkStarter.DEFAULT_ZK_STR);
 
-    final String instanceId = "localhost_helixController";
-    _pinotHelixResourceManager =
-        new PinotHelixResourceManager(ZkStarter.DEFAULT_ZK_STR, HELIX_CLUSTER_NAME, instanceId, null, 10000L, true,
-            /*isUpdateStateModel=*/ false, true);
-    _pinotHelixResourceManager.start();
-    _helixAdmin = _pinotHelixResourceManager.getHelixAdmin();
+    startController();
 
     ControllerRequestBuilderUtil
-        .addFakeDataInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZkStarter.DEFAULT_ZK_STR, 1, true);
+        .addFakeDataInstancesToAutoJoinHelixCluster(getHelixClusterName(), ZkStarter.DEFAULT_ZK_STR, 1, true);
     ControllerRequestBuilderUtil
-        .addFakeBrokerInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZkStarter.DEFAULT_ZK_STR, 1, true);
-    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "DefaultTenant_BROKER").size(), 1);
+        .addFakeBrokerInstancesToAutoJoinHelixCluster(getHelixClusterName(), ZkStarter.DEFAULT_ZK_STR, 1, true);
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_BROKER").size(), 1);
     Assert
-        .assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "DefaultTenant_OFFLINE").size(), 1);
+        .assertEquals(_helixAdmin.getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_OFFLINE").size(), 1);
     Assert
-        .assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "DefaultTenant_REALTIME").size(), 1);
+        .assertEquals(_helixAdmin.getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_REALTIME").size(), 1);
 
     // Adding table
     TableConfig tableConfig =
         new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(TABLE_NAME).build();
-    _pinotHelixResourceManager.addTable(tableConfig);
+    _helixResourceManager.addTable(tableConfig);
   }
 
   @Test
@@ -83,18 +73,18 @@ public class PinotResourceManagerTest {
     segmentZKMetadata.setSegmentName("testSegment");
 
     // Segment ZK metadata does not exist
-    Assert.assertFalse(_pinotHelixResourceManager.updateZkMetadata(segmentZKMetadata, 0));
+    Assert.assertFalse(_helixResourceManager.updateZkMetadata(segmentZKMetadata, 0));
 
     // Set segment ZK metadata
-    Assert.assertTrue(_pinotHelixResourceManager.updateZkMetadata(segmentZKMetadata));
+    Assert.assertTrue(_helixResourceManager.updateZkMetadata(segmentZKMetadata));
 
     // Update ZK metadata
     Assert.assertEquals(
-        _pinotHelixResourceManager.getSegmentMetadataZnRecord("testTable_OFFLINE", "testSegment").getVersion(), 0);
-    Assert.assertTrue(_pinotHelixResourceManager.updateZkMetadata(segmentZKMetadata, 0));
+        _helixResourceManager.getSegmentMetadataZnRecord("testTable_OFFLINE", "testSegment").getVersion(), 0);
+    Assert.assertTrue(_helixResourceManager.updateZkMetadata(segmentZKMetadata, 0));
     Assert.assertEquals(
-        _pinotHelixResourceManager.getSegmentMetadataZnRecord("testTable_OFFLINE", "testSegment").getVersion(), 1);
-    Assert.assertFalse(_pinotHelixResourceManager.updateZkMetadata(segmentZKMetadata, 0));
+        _helixResourceManager.getSegmentMetadataZnRecord("testTable_OFFLINE", "testSegment").getVersion(), 1);
+    Assert.assertFalse(_helixResourceManager.updateZkMetadata(segmentZKMetadata, 0));
   }
 
   /**
@@ -112,16 +102,16 @@ public class PinotResourceManagerTest {
 
     // Basic add/delete case
     for (int i = 1; i <= 2; i++) {
-      _pinotHelixResourceManager.addNewSegment(SegmentMetadataMockUtils.mockSegmentMetadata(TABLE_NAME), "downloadUrl");
+      _helixResourceManager.addNewSegment(SegmentMetadataMockUtils.mockSegmentMetadata(TABLE_NAME), "downloadUrl");
     }
-    IdealState idealState = _helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, offlineTableName);
+    IdealState idealState = _helixAdmin.getResourceIdealState(getHelixClusterName(), offlineTableName);
     Set<String> segments = idealState.getPartitionSet();
     Assert.assertEquals(segments.size(), 2);
 
     for (String segmentName : segments) {
-      _pinotHelixResourceManager.deleteSegment(offlineTableName, segmentName);
+      _helixResourceManager.deleteSegment(offlineTableName, segmentName);
     }
-    idealState = _helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, offlineTableName);
+    idealState = _helixAdmin.getResourceIdealState(getHelixClusterName(), offlineTableName);
     Assert.assertEquals(idealState.getPartitionSet().size(), 0);
 
     // Concurrent segment deletion
@@ -131,7 +121,7 @@ public class PinotResourceManagerTest {
         @Override
         public void run() {
           for (int i = 0; i < 10; i++) {
-            _pinotHelixResourceManager
+            _helixResourceManager
                 .addNewSegment(SegmentMetadataMockUtils.mockSegmentMetadata(TABLE_NAME), "downloadUrl");
           }
         }
@@ -140,7 +130,7 @@ public class PinotResourceManagerTest {
     addSegmentExecutor.shutdown();
     addSegmentExecutor.awaitTermination(1, TimeUnit.MINUTES);
 
-    idealState = _helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, offlineTableName);
+    idealState = _helixAdmin.getResourceIdealState(getHelixClusterName(), offlineTableName);
     Assert.assertEquals(idealState.getPartitionSet().size(), 30);
 
     ExecutorService deleteSegmentExecutor = Executors.newFixedThreadPool(3);
@@ -148,20 +138,20 @@ public class PinotResourceManagerTest {
       deleteSegmentExecutor.execute(new Runnable() {
         @Override
         public void run() {
-          _pinotHelixResourceManager.deleteSegment(offlineTableName, segmentName);
+          _helixResourceManager.deleteSegment(offlineTableName, segmentName);
         }
       });
     }
     deleteSegmentExecutor.shutdown();
     deleteSegmentExecutor.awaitTermination(1, TimeUnit.MINUTES);
 
-    idealState = _helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, offlineTableName);
+    idealState = _helixAdmin.getResourceIdealState(getHelixClusterName(), offlineTableName);
     Assert.assertEquals(idealState.getPartitionSet().size(), 0);
   }
 
   @AfterClass
   public void tearDown() {
-    _pinotHelixResourceManager.stop();
+    _helixResourceManager.stop();
     _zkClient.close();
     ZkStarter.stopLocalZkServer(_zookeeperInstance);
   }

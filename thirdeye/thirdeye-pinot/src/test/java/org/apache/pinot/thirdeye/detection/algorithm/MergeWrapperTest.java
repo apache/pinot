@@ -16,14 +16,6 @@
 
 package org.apache.pinot.thirdeye.detection.algorithm;
 
-import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
-import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import org.apache.pinot.thirdeye.detection.DataProvider;
-import org.apache.pinot.thirdeye.detection.DetectionPipelineResult;
-import org.apache.pinot.thirdeye.detection.MockDataProvider;
-import org.apache.pinot.thirdeye.detection.MockPipeline;
-import org.apache.pinot.thirdeye.detection.MockPipelineLoader;
-import org.apache.pinot.thirdeye.detection.MockPipelineOutput;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -32,6 +24,14 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.detection.DataProvider;
+import org.apache.pinot.thirdeye.detection.DetectionPipelineResult;
+import org.apache.pinot.thirdeye.detection.MockDataProvider;
+import org.apache.pinot.thirdeye.detection.MockPipeline;
+import org.apache.pinot.thirdeye.detection.MockPipelineLoader;
+import org.apache.pinot.thirdeye.detection.MockPipelineOutput;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -111,13 +111,12 @@ public class MergeWrapperTest {
 
   @Test
   public void testMergerPassthru() throws Exception {
-    this.config.getProperties().put(PROP_MAX_DURATION, 0);
-
+    this.config.getProperties().put(PROP_MAX_GAP, 0);
     this.wrapper = new MergeWrapper(this.provider, this.config, 1000, 3000);
     DetectionPipelineResult output = this.wrapper.run();
 
-    Assert.assertEquals(output.getAnomalies().size(), 6);
-    Assert.assertEquals(output.getLastTimestamp(), 2900);
+    Assert.assertEquals(output.getAnomalies().size(), 5);
+    Assert.assertEquals(output.getLastTimestamp(), 3000);
   }
 
   @Test
@@ -128,7 +127,7 @@ public class MergeWrapperTest {
     DetectionPipelineResult output = this.wrapper.run();
 
     Assert.assertEquals(output.getAnomalies().size(), 3);
-    Assert.assertEquals(output.getLastTimestamp(), 2900);
+    Assert.assertEquals(output.getLastTimestamp(), 3000);
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(0, 1250)));
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(1500, 2000)));
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(2200, 2800)));
@@ -143,7 +142,7 @@ public class MergeWrapperTest {
     DetectionPipelineResult output = this.wrapper.run();
 
     Assert.assertEquals(output.getAnomalies().size(), 3);
-    Assert.assertEquals(output.getLastTimestamp(), 2900);
+    Assert.assertEquals(output.getLastTimestamp(), 3000);
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(0, 1250)));
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(1500, 2300)));
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(2400, 2800)));
@@ -169,7 +168,7 @@ public class MergeWrapperTest {
     DetectionPipelineResult output = this.wrapper.run();
 
     Assert.assertEquals(output.getAnomalies().size(), 4);
-    Assert.assertEquals(output.getLastTimestamp(), 2900);
+    Assert.assertEquals(output.getLastTimestamp(), 3700);
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(0, 1250)));
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(1500, 2300)));
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(2400, 3650)));
@@ -196,12 +195,43 @@ public class MergeWrapperTest {
     DetectionPipelineResult output = this.wrapper.run();
 
     Assert.assertEquals(output.getAnomalies().size(), 4);
-    Assert.assertEquals(output.getLastTimestamp(), 2900);
+    Assert.assertEquals(output.getLastTimestamp(), 3700);
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(0, 1250)));
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(1500, 2300)));
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(2400, 3650)));
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(3650, 3800)));
   }
+
+  @Test
+  public void testMergerMaxDurationEnforce() throws Exception {
+    this.config.getProperties().put(PROP_MAX_DURATION, 500);
+
+    this.outputs.add(new MockPipelineOutput(Arrays.asList(
+        makeAnomaly(2800, 3800),
+        makeAnomaly(3500, 3600)
+    ), 3700));
+
+    Map<String, Object> nestedProperties = new HashMap<>();
+    nestedProperties.put(PROP_CLASS_NAME, "none");
+    nestedProperties.put(PROP_METRIC_URN, "thirdeye:metric:3");
+
+    this.nestedProperties.add(nestedProperties);
+
+    this.wrapper = new MergeWrapper(this.provider, this.config, 1000, 4000);
+    DetectionPipelineResult output = this.wrapper.run();
+
+    Assert.assertEquals(output.getAnomalies().size(), 8);
+    Assert.assertEquals(output.getLastTimestamp(), 3700);
+    Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(0, 500)));
+    Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(500, 1000)));
+    Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(1100, 1250)));
+    Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(1500, 2000)));
+    Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(2200, 2300)));
+    Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(2400, 2900)));
+    Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(2900, 3400)));
+    Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(3400, 3800)));
+  }
+
 
   @Test
   public void testMergerExecution() throws Exception {
@@ -258,7 +288,7 @@ public class MergeWrapperTest {
     DetectionPipelineResult output = this.wrapper.run();
 
     Assert.assertEquals(output.getAnomalies().size(), 6);
-    Assert.assertEquals(output.getLastTimestamp(), 2900);
+    Assert.assertEquals(output.getLastTimestamp(), 3000);
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(0, 1250)));
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(1500, 2300)));
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(2400, 2800)));

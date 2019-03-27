@@ -302,7 +302,7 @@ public abstract class ClusterTest extends ControllerTest {
             invertedIndexColumns, bloomFilterColumns, taskConfig);
 
     if (!isUsingNewConfigFormat()) {
-      sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJSONConfigString());
+      sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJsonConfigString());
     } else {
       _offlineTableConfig = tableConfig;
     }
@@ -317,7 +317,7 @@ public abstract class ClusterTest extends ControllerTest {
             invertedIndexColumns, bloomFilterColumns, taskConfig);
 
     if (!isUsingNewConfigFormat()) {
-      sendPutRequest(_controllerRequestURLBuilder.forUpdateTableConfig(tableName), tableConfig.toJSONConfigString());
+      sendPutRequest(_controllerRequestURLBuilder.forUpdateTableConfig(tableName), tableConfig.toJsonConfigString());
     } else {
       _offlineTableConfig = tableConfig;
     }
@@ -325,8 +325,7 @@ public abstract class ClusterTest extends ControllerTest {
 
   private static TableConfig getOfflineTableConfig(String tableName, String timeColumnName, String timeType,
       String brokerTenant, String serverTenant, String loadMode, SegmentVersion segmentVersion,
-      List<String> invertedIndexColumns, List<String> bloomFilterColumns, TableTaskConfig taskConfig)
-      throws Exception {
+      List<String> invertedIndexColumns, List<String> bloomFilterColumns, TableTaskConfig taskConfig) {
     return new TableConfig.Builder(Helix.TableType.OFFLINE).setTableName(tableName).setTimeColumnName(timeColumnName)
         .setTimeType(timeType).setNumReplicas(3).setBrokerTenant(brokerTenant).setServerTenant(serverTenant)
         .setLoadMode(loadMode).setSegmentVersion(segmentVersion.toString())
@@ -430,7 +429,7 @@ public abstract class ClusterTest extends ControllerTest {
     _realtimeTableConfig = tableConfig;
 
     if (!isUsingNewConfigFormat()) {
-      sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJSONConfigString());
+      sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJsonConfigString());
     }
   }
 
@@ -443,7 +442,7 @@ public abstract class ClusterTest extends ControllerTest {
     config.setBloomFilterColumns(bloomFilterCols);
 
     sendPutRequest(_controllerRequestURLBuilder.forUpdateTableConfig(tablename),
-        _realtimeTableConfig.toJSONConfigString());
+        _realtimeTableConfig.toJsonConfigString());
   }
 
   protected void dropRealtimeTable(String tableName)

@@ -45,6 +45,8 @@ public interface InstanceDataManagerConfig {
 
   boolean isEnableSplitCommit();
 
+  boolean isEnableSplitCommitEndWithMetadata();
+
   boolean isRealtimeOffHeapAllocation();
 
   boolean isDirectRealtimeOffheapAllocation();

@@ -21,6 +21,8 @@ package org.apache.pinot.thirdeye.detection.wrapper;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Collections2;
+import java.util.HashMap;
+import java.util.stream.Collectors;
 import org.apache.pinot.thirdeye.dataframe.DoubleSeries;
 import org.apache.pinot.thirdeye.dataframe.Series;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
@@ -63,11 +65,12 @@ public class BaselineFillingMergeWrapper extends MergeWrapper {
   private static final String PROP_DETECTOR_COMPONENT_NAME = "detectorComponentName";
   private static final String DEFAULT_WOW_BASELINE_PROVIDER_NAME = "DEFAULT_WOW";
 
-  private BaselineProvider baselineValueProvider; // optionally configure a baseline value loader
-  private BaselineProvider currentValueProvider;
-  private String baselineProviderComponentName;
+  private final BaselineProvider baselineValueProvider; // optionally configure a baseline value loader
+  private final BaselineProvider currentValueProvider;
+  private final String baselineProviderComponentName;
   private String detectorComponentName;
   private String metricUrn;
+  private final Map<Long, MergedAnomalyResultDTO> existingAnomalies; // from id to anomalies
 
   public BaselineFillingMergeWrapper(DataProvider provider, DetectionConfigDTO config, long startTime, long endTime)
   {
@@ -88,7 +91,7 @@ public class BaselineFillingMergeWrapper extends MergeWrapper {
     }
 
     if (config.getProperties().containsKey(PROP_CURRENT_PROVIDER)) {
-      String detectorReferenceKey = DetectionUtils.getComponentName(MapUtils.getString(config.getProperties(), currentValueProvider));
+      String detectorReferenceKey = DetectionUtils.getComponentName(MapUtils.getString(config.getProperties(), PROP_CURRENT_PROVIDER));
       Preconditions.checkArgument(this.config.getComponents().containsKey(detectorReferenceKey));
       this.currentValueProvider = (BaselineProvider) this.config.getComponents().get(detectorReferenceKey);
     } else {
@@ -117,11 +120,18 @@ public class BaselineFillingMergeWrapper extends MergeWrapper {
         properties.put(PROP_METRIC_URN, nestedUrn);
       }
     }
+    this.existingAnomalies = new HashMap<>();
   }
 
   @Override
   protected List<MergedAnomalyResultDTO> merge(Collection<MergedAnomalyResultDTO> anomalies) {
-    return this.fillCurrentAndBaselineValue(super.merge(anomalies));
+    List<MergedAnomalyResultDTO> mergedAnomalies = super.merge(anomalies);
+
+    // skip current & baseline filling if the anomaly is not merged
+    this.fillCurrentAndBaselineValue(mergedAnomalies.stream()
+        .filter(mergedAnomaly -> !isExistingAnomaly(this.existingAnomalies, mergedAnomaly)).collect(Collectors.toList()));
+
+    return mergedAnomalies;
   }
 
   @Override
@@ -141,6 +151,9 @@ public class BaselineFillingMergeWrapper extends MergeWrapper {
                     // merge if only the anomaly is in the same dimension
                 this.metricUrn.equals(mergedAnomaly.getMetricUrn())
         );
+    for (MergedAnomalyResultDTO anomaly : anomalies) {
+      if(anomaly.getId() != null) this.existingAnomalies.put(anomaly.getId(), copyAnomalyInfo(anomaly, new MergedAnomalyResultDTO()));
+    }
     return new ArrayList<>(anomalies);
   }
 
@@ -179,6 +192,15 @@ public class BaselineFillingMergeWrapper extends MergeWrapper {
       }
     }
     return mergedAnomalies;
+  }
+
+  // check if an anomaly is a existing anomaly and the duration is not modified
+  protected boolean isExistingAnomaly(Map<Long, MergedAnomalyResultDTO> existingAnomalies, MergedAnomalyResultDTO anomaly) {
+    if (!existingAnomalies.containsKey(anomaly.getId())) {
+      return false;
+    }
+    MergedAnomalyResultDTO previousAnomaly = existingAnomalies.get(anomaly.getId());
+    return anomaly.getStartTime() == previousAnomaly.getStartTime() && anomaly.getEndTime() == previousAnomaly.getEndTime();
   }
 
   private double calculateWeight(MergedAnomalyResultDTO anomaly) {

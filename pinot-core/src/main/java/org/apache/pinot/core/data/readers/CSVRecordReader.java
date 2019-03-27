@@ -21,6 +21,7 @@ package org.apache.pinot.core.data.readers;
 import java.io.File;
 import java.io.IOException;
 import java.util.Iterator;
+import java.util.List;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
@@ -28,6 +29,7 @@ import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.core.data.GenericRow;
+import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 
 
 /**
@@ -36,6 +38,7 @@ import org.apache.pinot.core.data.GenericRow;
 public class CSVRecordReader implements RecordReader {
   private final File _dataFile;
   private final Schema _schema;
+  private final List<FieldSpec> _fieldSpecs;
   private final CSVFormat _format;
   private final char _multiValueDelimiter;
 
@@ -46,6 +49,7 @@ public class CSVRecordReader implements RecordReader {
       throws IOException {
     _dataFile = dataFile;
     _schema = schema;
+    _fieldSpecs = RecordReaderUtils.extractFieldSpecs(schema);
 
     if (config == null) {
       _format = CSVFormat.DEFAULT.withDelimiter(CSVRecordReaderConfig.DEFAULT_DELIMITER).withHeader();
@@ -89,9 +93,14 @@ public class CSVRecordReader implements RecordReader {
     init();
   }
 
+  @Override
+  public void init(SegmentGeneratorConfig segmentGeneratorConfig) {
+
+  }
+
   private void init()
       throws IOException {
-    _parser = _format.parse(RecordReaderUtils.getFileReader(_dataFile));
+    _parser = _format.parse(RecordReaderUtils.getBufferedReader(_dataFile));
     _iterator = _parser.iterator();
   }
 
@@ -108,22 +117,19 @@ public class CSVRecordReader implements RecordReader {
   @Override
   public GenericRow next(GenericRow reuse) {
     CSVRecord record = _iterator.next();
-
-    for (FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
-      String column = fieldSpec.getName();
-      String token = record.isSet(column) ? record.get(column) : null;
-
-      Object value;
+    for (FieldSpec fieldSpec : _fieldSpecs) {
+      String fieldName = fieldSpec.getName();
+      String value = record.isSet(fieldName) ? record.get(fieldName) : null;
       if (fieldSpec.isSingleValueField()) {
-        value = RecordReaderUtils.convertToDataType(token, fieldSpec);
+        // Allow default value for non-time columns
+        if (value != null || fieldSpec.getFieldType() != FieldSpec.FieldType.TIME) {
+          reuse.putField(fieldName, RecordReaderUtils.convertSingleValue(fieldSpec, value));
+        }
       } else {
-        String[] tokens = token != null ? StringUtils.split(token, _multiValueDelimiter) : null;
-        value = RecordReaderUtils.convertToDataTypeArray(tokens, fieldSpec);
+        String[] values = value != null ? StringUtils.split(value, _multiValueDelimiter) : null;
+        reuse.putField(fieldName, RecordReaderUtils.convertMultiValue(fieldSpec, values));
       }
-
-      reuse.putField(column, value);
     }
-
     return reuse;
   }
 

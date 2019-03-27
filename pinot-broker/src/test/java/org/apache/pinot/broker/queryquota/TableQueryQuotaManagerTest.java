@@ -77,7 +77,7 @@ public class TableQueryQuotaManagerTest {
       super(clusterName, instanceName, instanceType, zkAddress);
       super._zkclient = new ZkClient(StringUtil.join("/", StringUtils.chomp(ZkStarter.DEFAULT_ZK_STR, "/")),
           ZkClient.DEFAULT_SESSION_TIMEOUT, ZkClient.DEFAULT_CONNECTION_TIMEOUT, new ZNRecordSerializer());
-      _zkclient.deleteRecursive("/" + clusterName + "/PROPERTYSTORE");
+      _zkclient.deleteRecursively("/" + clusterName + "/PROPERTYSTORE");
       _zkclient.createPersistent("/" + clusterName + "/PROPERTYSTORE", true);
       setPropertyStore(clusterName);
     }
@@ -146,7 +146,7 @@ public class TableQueryQuotaManagerTest {
             .setRetentionTimeUnit("DAYS").setRetentionTimeValue("1").setSegmentPushType("APPEND")
             .setBrokerTenant("testBroker").setServerTenant("testServer").build();
     ZKMetadataProvider
-        .setRealtimeTableConfig(_testPropertyStore, REALTIME_TABLE_NAME, TableConfig.toZnRecord(realtimeTableConfig));
+        .setRealtimeTableConfig(_testPropertyStore, REALTIME_TABLE_NAME, realtimeTableConfig.toZNRecord());
 
     ExternalView brokerResource = generateBrokerResource(OFFLINE_TABLE_NAME);
     TableConfig tableConfig = generateDefaultTableConfig(OFFLINE_TABLE_NAME);
@@ -169,7 +169,7 @@ public class TableQueryQuotaManagerTest {
             .setRetentionTimeUnit("DAYS").setRetentionTimeValue("1").setSegmentPushType("APPEND")
             .setBrokerTenant("testBroker").setServerTenant("testServer").build();
     ZKMetadataProvider
-        .setRealtimeTableConfig(_testPropertyStore, REALTIME_TABLE_NAME, TableConfig.toZnRecord(realtimeTableConfig));
+        .setRealtimeTableConfig(_testPropertyStore, REALTIME_TABLE_NAME, realtimeTableConfig.toZNRecord());
 
     ExternalView brokerResource = generateBrokerResource(REALTIME_TABLE_NAME);
     TableConfig tableConfig = generateDefaultTableConfig(OFFLINE_TABLE_NAME);
@@ -205,9 +205,8 @@ public class TableQueryQuotaManagerTest {
             .setBrokerTenant("testBroker").setServerTenant("testServer").build();
 
     ZKMetadataProvider
-        .setRealtimeTableConfig(_testPropertyStore, REALTIME_TABLE_NAME, TableConfig.toZnRecord(realtimeTableConfig));
-    ZKMetadataProvider
-        .setOfflineTableConfig(_testPropertyStore, OFFLINE_TABLE_NAME, TableConfig.toZnRecord(offlineTableConfig));
+        .setRealtimeTableConfig(_testPropertyStore, REALTIME_TABLE_NAME, realtimeTableConfig.toZNRecord());
+    ZKMetadataProvider.setOfflineTableConfig(_testPropertyStore, OFFLINE_TABLE_NAME, offlineTableConfig.toZNRecord());
 
     // Since each table has 2 online brokers, per broker rate becomes 100.0 / 2 = 50.0
     _tableQueryQuotaManager.initTableQueryQuota(offlineTableConfig, brokerResource);
@@ -261,8 +260,7 @@ public class TableQueryQuotaManagerTest {
         new TableConfig.Builder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setQuotaConfig(quotaConfig)
             .setRetentionTimeUnit("DAYS").setRetentionTimeValue("1").setSegmentPushType("APPEND")
             .setBrokerTenant("testBroker").setServerTenant("testServer").build();
-    ZKMetadataProvider
-        .setOfflineTableConfig(_testPropertyStore, OFFLINE_TABLE_NAME, TableConfig.toZnRecord(offlineTableConfig));
+    ZKMetadataProvider.setOfflineTableConfig(_testPropertyStore, OFFLINE_TABLE_NAME, offlineTableConfig.toZNRecord());
 
     ExternalView brokerResource = generateBrokerResource(REALTIME_TABLE_NAME);
     TableConfig tableConfig = generateDefaultTableConfig(REALTIME_TABLE_NAME);
@@ -280,8 +278,7 @@ public class TableQueryQuotaManagerTest {
         new TableConfig.Builder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setQuotaConfig(quotaConfig)
             .setRetentionTimeUnit("DAYS").setRetentionTimeValue("1").setSegmentPushType("APPEND")
             .setBrokerTenant("testBroker").setServerTenant("testServer").build();
-    ZKMetadataProvider
-        .setOfflineTableConfig(_testPropertyStore, OFFLINE_TABLE_NAME, TableConfig.toZnRecord(offlineTableConfig));
+    ZKMetadataProvider.setOfflineTableConfig(_testPropertyStore, OFFLINE_TABLE_NAME, offlineTableConfig.toZNRecord());
 
     ExternalView brokerResource = generateBrokerResource(OFFLINE_TABLE_NAME);
     TableConfig tableConfig = generateDefaultTableConfig(REALTIME_TABLE_NAME);
