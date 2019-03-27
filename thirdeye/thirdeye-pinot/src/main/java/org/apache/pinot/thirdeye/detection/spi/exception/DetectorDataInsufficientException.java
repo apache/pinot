@@ -23,9 +23,22 @@ package org.apache.pinot.thirdeye.detection.spi.exception;
  * Data is insufficient to run detection.
  */
 public class DetectorDataInsufficientException extends DetectorException {
-  public DetectorDataInsufficientException(Exception ex) {
-    super(ex);
+  public DetectorDataInsufficientException(Throwable cause) {
+    super(cause);
   }
+
+  public DetectorDataInsufficientException() {
+    super();
+  }
+
+  public DetectorDataInsufficientException(String message) {
+    super(message);
+  }
+
+  public DetectorDataInsufficientException(String message, Throwable cause) {
+    super(message, cause);
+  }
+
 
   @Override
   public String toString() {
