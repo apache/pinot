@@ -36,6 +36,7 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.thirdeye.detection.spec.ThresholdRuleDetectorSpec;
 import org.apache.pinot.thirdeye.detection.spi.components.AnomalyDetector;
+import org.apache.pinot.thirdeye.detection.spi.exception.DetectorException;
 import org.joda.time.Interval;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
@@ -160,7 +161,7 @@ public class PercentageChangeRuleDetectorTest {
   }
 
   @Test
-  public void testMonthlyDetectionPercentage() {
+  public void testMonthlyDetectionPercentage() throws DetectorException {
     AnomalyDetector percentageRule = new PercentageChangeRuleDetector();
     PercentageChangeRuleDetectorSpec spec = new PercentageChangeRuleDetectorSpec();
     spec.setOffset("mo1m");
@@ -174,7 +175,7 @@ public class PercentageChangeRuleDetectorTest {
   }
 
   @Test
-  public void testZeroDivide() {
+  public void testZeroDivide() throws DetectorException {
     AnomalyDetector percentageRule = new PercentageChangeRuleDetector();
     PercentageChangeRuleDetectorSpec spec = new PercentageChangeRuleDetectorSpec();
     spec.setOffset("wo1w");
