@@ -17,7 +17,6 @@
 package org.apache.pinot.thirdeye.alert.commons;
 
 import org.apache.pinot.thirdeye.alert.content.EmailContentFormatter;
-import org.apache.pinot.thirdeye.alert.content.HierarchicalAnomaliesEmailContentFormatter;
 import org.apache.pinot.thirdeye.alert.content.MultipleAnomaliesEmailContentFormatter;
 import org.junit.Assert;
 import org.testng.annotations.Test;
@@ -31,9 +30,5 @@ public class TestEmailContentFormatterFactory {
     emailContentFormatter = EmailContentFormatterFactory.fromClassName("MultipleAnomaliesEmailContentFormatter");
     Assert.assertNotNull(emailContentFormatter);
     Assert.assertTrue(emailContentFormatter instanceof MultipleAnomaliesEmailContentFormatter);
-
-    emailContentFormatter = EmailContentFormatterFactory.fromClassName("HierarchicalAnomaliesEmailContentFormatter");
-    Assert.assertNotNull(emailContentFormatter);
-    Assert.assertTrue(emailContentFormatter instanceof HierarchicalAnomaliesEmailContentFormatter);
   }
 }
