@@ -67,6 +67,7 @@ import org.apache.pinot.core.realtime.stream.StreamConsumerFactory;
 import org.apache.pinot.core.realtime.stream.StreamConsumerFactoryProvider;
 import org.apache.pinot.core.realtime.stream.StreamDecoderProvider;
 import org.apache.pinot.core.realtime.stream.StreamMessageDecoder;
+import org.apache.pinot.core.realtime.stream.StreamMessageMetadata;
 import org.apache.pinot.core.realtime.stream.StreamMetadataProvider;
 import org.apache.pinot.core.realtime.stream.TransientConsumerException;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
@@ -408,6 +409,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     int streamMessageCount = 0;
     boolean canTakeMore = true;
     GenericRow decodedRow = null;
+    StreamMessageMetadata msgMetadata = new StreamMessageMetadata();
+
     for (int index = 0; index < messagesAndOffsets.getMessageCount(); index++) {
       if (_shouldStop || endCriteriaReached()) {
         break;
@@ -435,10 +438,10 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
       // Index each message
       decodedRow = GenericRow.createOrReuseRow(decodedRow);
-
+      msgMetadata.setIngestionTimestamp(null);
       decodedRow = _messageDecoder
           .decode(messagesAndOffsets.getMessageAtIndex(index), messagesAndOffsets.getMessageOffsetAtIndex(index),
-              messagesAndOffsets.getMessageLengthAtIndex(index), decodedRow);
+              messagesAndOffsets.getMessageLengthAtIndex(index), decodedRow, msgMetadata);
 
       if (decodedRow != null) {
         try {

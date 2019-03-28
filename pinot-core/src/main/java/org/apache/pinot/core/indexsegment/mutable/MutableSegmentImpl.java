@@ -42,6 +42,7 @@ import org.apache.pinot.core.realtime.impl.RealtimeSegmentStatsHistory;
 import org.apache.pinot.core.realtime.impl.dictionary.MutableDictionary;
 import org.apache.pinot.core.realtime.impl.dictionary.MutableDictionaryFactory;
 import org.apache.pinot.core.realtime.impl.invertedindex.RealtimeInvertedIndexReader;
+import org.apache.pinot.core.realtime.stream.StreamMessageMetadata;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.index.data.source.ColumnDataSource;
@@ -93,6 +94,11 @@ public class MutableSegmentImpl implements MutableSegment {
   private volatile long _minTime = Long.MAX_VALUE;
   private volatile long _maxTime = Long.MIN_VALUE;
   private final int _numKeyColumns;
+
+  // default message metadata
+  private static final StreamMessageMetadata _defaultMetadata = new StreamMessageMetadata();
+  private long _lastIndexedTimestamp = Long.MIN_VALUE;
+  private long _latestIngestionTimestamp = Long.MIN_VALUE;
 
   public MutableSegmentImpl(RealtimeSegmentConfig config) {
     _segmentName = config.getSegmentName();
@@ -194,8 +200,14 @@ public class MutableSegmentImpl implements MutableSegment {
     return _maxTime;
   }
 
+
   @Override
   public boolean index(GenericRow row) {
+    return index(row, _defaultMetadata);
+  }
+
+  @Override
+  public boolean index(GenericRow row, StreamMessageMetadata msgMetadata) {
     // Update dictionary first
     Map<String, Object> dictIdMap = updateDictionary(row);
 
@@ -210,6 +222,11 @@ public class MutableSegmentImpl implements MutableSegment {
       // Add forward and inverted indices for new document.
       addForwardIndex(row, docId, dictIdMap);
       addInvertedIndex(docId, dictIdMap);
+
+      _lastIndexedTimestamp = System.currentTimeMillis();
+      if (msgMetadata != null && msgMetadata.getIngestionTimestamp() != null) {
+        _latestIngestionTimestamp = Math.max(_latestIngestionTimestamp, msgMetadata.getIngestionTimestamp());
+      }
       // Update number of document indexed at last to make the latest record queryable
       return _numDocsIndexed++ < _capacity;
     } else {
@@ -359,6 +376,16 @@ public class MutableSegmentImpl implements MutableSegment {
   @Override
   public int getNumDocsIndexed() {
     return _numDocsIndexed;
+  }
+
+  @Override
+  public Long getLastIndexedTimestamp() {
+    return _lastIndexedTimestamp;
+  }
+
+  @Override
+  public Long getLatestIngestionTimestamp() {
+    return _latestIngestionTimestamp;
   }
 
   @Override

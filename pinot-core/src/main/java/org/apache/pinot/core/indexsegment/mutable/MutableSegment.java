@@ -20,6 +20,7 @@ package org.apache.pinot.core.indexsegment.mutable;
 
 import org.apache.pinot.core.data.GenericRow;
 import org.apache.pinot.core.indexsegment.IndexSegment;
+import org.apache.pinot.core.realtime.stream.StreamMessageMetadata;
 
 
 public interface MutableSegment extends IndexSegment {
@@ -33,9 +34,39 @@ public interface MutableSegment extends IndexSegment {
   boolean index(GenericRow row);
 
   /**
+   * Indexes a record into the segment with optionally provided metadata.
+   *
+   * @param row Record represented as a {@link GenericRow}
+   * @param msgMetadata the metadata associated with the message
+   * @return Whether the segment is full (i.e. cannot index more record into it)
+   */
+  default boolean index(GenericRow row, StreamMessageMetadata msgMetadata) {
+    // by default call the non-metadata based method for backward compatibility
+    return index(row);
+  }
+
+  /**
    * Returns the number of records already indexed into the segment.
    *
    * @return The number of records indexed
    */
   int getNumDocsIndexed();
+
+  /**
+   * Returns the latest indexed timestamp for the segment.
+   *
+   * @return the timestamp of last message indexed
+   */
+  default Long getLastIndexedTimestamp() {
+    return null;
+  }
+
+  /**
+   * Returns the ingestion timestamp for the latest message in the segment.
+   *
+   * @return the ingestion timestamp of last message indexed
+   */
+  default Long getLatestIngestionTimestamp() {
+    return null;
+  }
 }
