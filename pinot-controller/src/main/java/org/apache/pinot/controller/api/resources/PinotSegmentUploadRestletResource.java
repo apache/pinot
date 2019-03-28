@@ -33,6 +33,7 @@ import java.net.InetAddress;
 import java.net.URI;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
+import java.nio.file.Files;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
@@ -54,10 +55,10 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.StreamingOutput;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
-import org.apache.helix.ZNRecord;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.metrics.ControllerMeter;
@@ -98,6 +99,7 @@ public class PinotSegmentUploadRestletResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotSegmentUploadRestletResource.class);
   private static final String TMP_DIR_PREFIX = "tmp-";
   private static final String ENCRYPTED_SUFFIX = "_encrypted";
+  private static final String URL_ENCODING_SCHEME = "UTF-8";
 
   @Inject
   PinotHelixResourceManager _pinotHelixResourceManager;
@@ -184,27 +186,32 @@ public class PinotSegmentUploadRestletResource {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
     }
     try {
-      segmentName = URLDecoder.decode(segmentName, "UTF-8");
+      segmentName = URLDecoder.decode(segmentName, URL_ENCODING_SCHEME);
     } catch (UnsupportedEncodingException e) {
       String errStr = "Could not decode segment name '" + segmentName + "'";
       throw new ControllerApplicationException(LOGGER, errStr, Response.Status.BAD_REQUEST);
     }
 
     final java.net.URI segmentFileURI =
-            ControllerConf.getUriFromPath(StringUtil.join("/", provider.getBaseDataDirURI().toString(),
-                    tableName, segmentName));
+        ControllerConf.getUriFromPath(StringUtil.join("/", provider.getBaseDataDirURI().toString(),
+            tableName, URLEncoder.encode(segmentName, URL_ENCODING_SCHEME)));
     PinotFS pinotFS = PinotFSFactory.create(provider.getBaseDataDirURI().getScheme());
 
     if (!pinotFS.exists(segmentFileURI)) {
       throw new ControllerApplicationException(LOGGER,
           "Segment " + segmentName + " or table " + tableName + " not found in " + segmentFileURI.toString(), Response.Status.NOT_FOUND);
     }
-    File tmpSegmentFile = new File(StringUtil.join("/",
-            _controllerConf.getLocalTempDir(),
-            tableName, StringUtil.join("_", segmentName, String.valueOf(System.currentTimeMillis()))));
+    File tmpSegmentFile = new File(StringUtil.join("/", _controllerConf.getLocalTempDir(), tableName,
+        StringUtil.join("_", segmentName, String.valueOf(System.nanoTime()))));
     pinotFS.copyToLocalFile(segmentFileURI, tmpSegmentFile);
-    tmpSegmentFile.deleteOnExit();
-    Response.ResponseBuilder builder = Response.ok(tmpSegmentFile);
+    // Streaming in the tmp file and delete it afterward.
+    Response.ResponseBuilder builder = Response.ok().entity((StreamingOutput) output -> {
+      try {
+        Files.copy(tmpSegmentFile.toPath(), output);
+      } finally {
+        FileUtils.deleteQuietly(tmpSegmentFile);
+      }
+    });
     builder.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + tmpSegmentFile.getName());
     builder.header(HttpHeaders.CONTENT_LENGTH, tmpSegmentFile.length());
     return builder.build();

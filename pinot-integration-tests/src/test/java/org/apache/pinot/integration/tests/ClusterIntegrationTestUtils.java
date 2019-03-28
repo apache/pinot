@@ -250,7 +250,8 @@ public class ClusterIntegrationTestUtils {
           SegmentGeneratorConfig segmentGeneratorConfig =
               SegmentTestUtils.getSegmentGeneratorConfig(avroFile, outputDir, TimeUnit.DAYS, tableName, pinotSchema);
 
-          segmentGeneratorConfig.setSegmentNamePostfix(String.valueOf(segmentIndex));
+          // Test segment with space and special character in the file name
+          segmentGeneratorConfig.setSegmentNamePostfix(String.valueOf(segmentIndex) + " %");
 
           // Cannot build star-tree V1 and V2 at same time
           if (starTreeV2BuilderConfigs != null) {
