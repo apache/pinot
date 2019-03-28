@@ -10,6 +10,7 @@ import { inject as service } from '@ember/service';
 import yamljs from 'yamljs';
 import moment from 'moment';
 import { toastOptions } from 'thirdeye-frontend/utils/constants';
+import { formatYamlFilter } from 'thirdeye-frontend/utils/utils';
 
 export default Route.extend({
   notifications: service('toast'),
@@ -39,8 +40,8 @@ export default Route.extend({
             createdBy: detection_json.createdBy,
             updatedBy: detection_json.updatedBy,
             exploreDimensions: detection_json.dimensions,
-            filters: this._formatYamlFilter(detectionInfo.filters),
-            dimensionExploration: this._formatYamlFilter(detectionInfo.dimensionExploration),
+            filters: formatYamlFilter(detectionInfo.filters),
+            dimensionExploration: formatYamlFilter(detectionInfo.dimensionExploration),
             lastDetectionTime: lastDetection.toDateString() + ", " +  lastDetection.toLocaleTimeString() + " (" + moment().tz(moment.tz.guess()).format('z') + ")"
           });
 
@@ -94,37 +95,5 @@ export default Route.extend({
     });
   },
 
-  /**
-   * The yaml filters formatter. Convert filters in the yaml file in to a legacy filters string
-   * For example, filters = {
-   *   "country": ["us", "cn"],
-   *   "browser": ["chrome"]
-   * }
-   * will be convert into "country=us;country=cn;browser=chrome"
-   *
-   * @method _formatYamlFilter
-   * @param {Map} filters multimap of filters
-   * @return {String} - formatted filters string
-   */
-  _formatYamlFilter(filters) {
-    if (filters){
-      const filterStrings = [];
-      Object.keys(filters).forEach(
-        function(filterKey) {
-          const filter = filters[filterKey];
-          if (filter && typeof filter === 'object') {
-            filter.forEach(
-              function (filterValue) {
-                filterStrings.push(filterKey + '=' + filterValue);
-              }
-            );
-          } else {
-            filterStrings.push(filterKey + '=' + filter);
-          }
-        }
-      );
-      return filterStrings.join(';');
-    }
-    return '';
-  }
+
 });
