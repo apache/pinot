@@ -106,7 +106,7 @@ Pinot provides libraries to create Pinot segments out of input files in AVRO, JS
 the constructed segments to the controlers via REST APIs.
 
 When an Offline segment is ingested, the controller looks up the table's configuration and assigns the segment
-to the servers that host the table. It may assign multiple servers for each servers depending on the number of replicas
+to the servers that host the table. It may assign multiple servers for each segment depending on the number of replicas
 configured for that table.
 
 Pinot supports different segment assignment strategies that are optimized for various use cases.
@@ -120,7 +120,7 @@ start include the new
 segments for queries. Brokers support different routing strategies depending on the type of table, the segment assignment
 strategy and the use case.
 
-Data in offline segments are immmutable (Rows cannot be added, deleted, or modified). However, segments may be replaced modified data.
+Data in offline segments are immmutable (Rows cannot be added, deleted, or modified). However, segments may be replaced with modified data.
 
 Ingesting Realtime Data
 ^^^^^^^^^^^^^^^^^^^^^^^
@@ -154,8 +154,8 @@ Pinot uses dictionary encoding to store values as a dictionary ID. Columns may b
 case raw values are stored. Dictionary IDs are encoded using minimum number of bits for efficient storage (_e.g._ a column with cardinality
 of 3 will use only 3 bits for each dictionary ID).
 
-There is a forward index for each column compressed appropriately for efficient memory use.  In addition, optional inverted indices can be
-configured for any set of columns. Inverted indices, while taking up more storage, offer better query performance.
+There is a forward index built for each column and compressed appropriately for efficient memory use.  In addition, optional inverted indices can be
+configured for any set of columns. Inverted indices, while take up more storage, offer better query performance.
 
 Specialized indexes like StartTree index is also supported.
 
