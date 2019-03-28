@@ -164,6 +164,7 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
   private static final String DEFAULT_BASELINE_PROVIDER_YAML_TYPE = "RULE_BASELINE";
   private static final String PROP_BUCKET_PERIOD = "bucketPeriod";
   private static final String PROP_MAX_DURATION = "maxDuration";
+  private static final String PROP_CACHE_PERIOD_LOOKBACK = "cachingPeriodLookback";
 
   private static final DetectionRegistry DETECTION_REGISTRY = DetectionRegistry.getInstance();
   static {
@@ -266,7 +267,7 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
     nestedProperties.put(PROP_CLASS_NAME, AnomalyDetectorWrapper.class.getName());
     String detectorKey = makeComponentKey(detectorType, name);
 
-    fillInWindowSizeAndUnit(nestedProperties, yamlConfig, detectorType);
+    fillInDetectorWrapperProperties(nestedProperties, yamlConfig, detectorType);
 
     buildComponentSpec(yamlConfig, detectorType, detectorKey);
 
@@ -286,7 +287,7 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
   }
 
   // fill in window size and unit if detector requires this
-  private void fillInWindowSizeAndUnit(Map<String, Object> properties, Map<String, Object> yamlConfig, String detectorType) {
+  private void fillInDetectorWrapperProperties(Map<String, Object> properties, Map<String, Object> yamlConfig, String detectorType) {
     if (MOVING_WINDOW_DETECTOR_TYPES.contains(detectorType)) {
       properties.put(PROP_MOVING_WINDOW_DETECTION, true);
       switch (this.datasetConfig.bucketTimeGranularity().getUnit()) {
@@ -328,6 +329,9 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
       }
       if (yamlConfig.containsKey(PROP_BUCKET_PERIOD)){
         properties.put(PROP_BUCKET_PERIOD, MapUtils.getString(yamlConfig, PROP_BUCKET_PERIOD));
+      }
+      if (yamlConfig.containsKey(PROP_CACHE_PERIOD_LOOKBACK)) {
+        properties.put(PROP_CACHE_PERIOD_LOOKBACK, MapUtils.getString(yamlConfig, PROP_CACHE_PERIOD_LOOKBACK));
       }
     }
   }

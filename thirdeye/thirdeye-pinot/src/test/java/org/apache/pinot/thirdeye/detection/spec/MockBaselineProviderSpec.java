@@ -23,7 +23,7 @@ import java.util.Map;
 
 public class MockBaselineProviderSpec extends AbstractSpec {
   private Map<MetricSlice, TimeSeries> baselineTimeseries;
-  private Map<MetricSlice, Double> aggregates;
+  private Map<MetricSlice, Double> baselineAggregates;
 
   public Map<MetricSlice, TimeSeries> getBaselineTimeseries() {
     return baselineTimeseries;
@@ -33,11 +33,11 @@ public class MockBaselineProviderSpec extends AbstractSpec {
     this.baselineTimeseries = baselineTimeseries;
   }
 
-  public Map<MetricSlice, Double> getAggregates() {
-    return aggregates;
+  public Map<MetricSlice, Double> getBaselineAggregates() {
+    return baselineAggregates;
   }
 
-  public void setAggregates(Map<MetricSlice, Double> aggregates) {
-    this.aggregates = aggregates;
+  public void setBaselineAggregates(Map<MetricSlice, Double> baselineAggregates) {
+    this.baselineAggregates = baselineAggregates;
   }
 }
