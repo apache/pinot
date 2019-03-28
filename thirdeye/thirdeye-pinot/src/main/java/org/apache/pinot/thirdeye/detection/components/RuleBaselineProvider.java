@@ -49,18 +49,6 @@ public class RuleBaselineProvider implements BaselineProvider<RuleBaselineProvid
   }
 
   @Override
-  public Double computePredictedAggregates(MetricSlice slice, Series.DoubleFunction aggregateFunction) {
-    InputData data = this.dataFetcher.fetchData(new InputDataSpec().withAggregateSlices(this.baseline.scatter(slice)));
-    double value;
-    try {
-      value = this.baseline.gather(slice, data.getAggregates()).getDouble(COL_VALUE, 0);
-    } catch (Exception e) {
-      value = Double.NaN;
-    }
-    return value;
-  }
-
-  @Override
   public void init(RuleBaselineProviderSpec spec, InputDataFetcher dataFetcher) {
     this.offset = spec.getOffset();
     this.timezone = spec.getTimezone();
