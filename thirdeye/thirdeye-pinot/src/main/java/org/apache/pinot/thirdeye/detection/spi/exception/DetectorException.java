@@ -23,7 +23,20 @@ package org.apache.pinot.thirdeye.detection.spi.exception;
  * Base detector exception class.
  */
 public class DetectorException extends Exception {
-  public DetectorException(Exception ex) {
-    super(ex);
+  public DetectorException(Throwable cause) {
+    super(cause);
   }
+
+  public DetectorException() {
+    super();
+  }
+
+  public DetectorException(String message) {
+    super(message);
+  }
+
+  public DetectorException(String message, Throwable cause) {
+    super(message, cause);
+  }
+
 }
