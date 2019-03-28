@@ -59,6 +59,13 @@ public final class Schema {
   private static final Logger LOGGER = LoggerFactory.getLogger(Schema.class);
 
   private String _schemaName;
+
+  private String _primaryKey;
+
+  private String _offsetKey;
+
+  private String _updateSemantic;
+
   private final List<DimensionFieldSpec> _dimensionFieldSpecs = new ArrayList<>();
   private final List<MetricFieldSpec> _metricFieldSpecs = new ArrayList<>();
   private TimeFieldSpec _timeFieldSpec;
@@ -66,6 +73,7 @@ public final class Schema {
 
   // Json ignored fields
   private transient final Map<String, FieldSpec> _fieldSpecMap = new HashMap<>();
+  private transient final Map<String, FieldSpec> _physicalFieldSpecMap = new HashMap<>();
   private transient final List<String> _dimensionNames = new ArrayList<>();
   private transient final List<String> _metricNames = new ArrayList<>();
   private transient final List<String> _dateTimeNames = new ArrayList<>();
@@ -96,6 +104,71 @@ public final class Schema {
     _schemaName = schemaName;
   }
 
+
+  public String getPrimaryKey() {
+    return _primaryKey;
+  }
+
+  public void setPrimaryKey(@Nonnull String primaryKey) {
+    _primaryKey = primaryKey;
+  }
+
+  public String getOffsetKey() {
+    return _offsetKey;
+  }
+
+  public void setOffsetKey(@Nonnull String offsetKey) {
+    _offsetKey = offsetKey;
+  }
+
+  public String getUpdateSemantic() {
+    return _updateSemantic;
+  }
+
+  public void setUpdateSemantic(@Nonnull String updateSemantic) {
+    _updateSemantic = updateSemantic;
+  }
+
+  public boolean isTableForUpsert() {
+    return UPSERT_TABLE_CONFIG.equalsIgnoreCase(_updateSemantic);
+  }
+
+  public DimensionFieldSpec getPrimaryKeyFieldSpec() {
+    if (_primaryKeyFieldSpec == null) {
+      Preconditions.checkState(_dimensionFieldSpecs.size() > 0, "should have more than 1 dimensions");
+      Preconditions.checkState(StringUtils.isNotEmpty(_primaryKey), "primary key should not be empty");
+      for (DimensionFieldSpec dimensionFieldSpec : _dimensionFieldSpecs) {
+        if (dimensionFieldSpec._name.equals(_primaryKey)) {
+          _primaryKeyFieldSpec = dimensionFieldSpec;
+        }
+      }
+    }
+    if (_primaryKeyFieldSpec == null) {
+      throw new RuntimeException("no dimension matches primary key name");
+    }
+    return _primaryKeyFieldSpec;
+  }
+
+  public DimensionFieldSpec getOffsetKeyFieldSpec() {
+    if (_offsetKeyFieldSpec == null) {
+      Preconditions.checkState(_dimensionFieldSpecs.size() > 0, "should have more than 1 dimensions");
+      Preconditions.checkState(StringUtils.isNotEmpty(_offsetKey), "offset key should not be empty");
+      for (DimensionFieldSpec dimensionFieldSpec : _dimensionFieldSpecs) {
+        if (dimensionFieldSpec._name.equals(_offsetKey)) {
+          _offsetKeyFieldSpec = dimensionFieldSpec;
+          Preconditions.checkState(_offsetKeyFieldSpec.isSingleValueField(), "offset key should be single value");
+          Preconditions.checkState(_offsetKeyFieldSpec.getDataType() == DataType.LONG, "offset key should be long type");
+        }
+      }
+    }
+    if (_offsetKeyFieldSpec == null) {
+      throw new RuntimeException("no dimension matches primary key name");
+    }
+    return _offsetKeyFieldSpec;
+  }
+
+
+  @Nonnull
   public List<DimensionFieldSpec> getDimensionFieldSpecs() {
     return _dimensionFieldSpecs;
   }
@@ -191,6 +264,9 @@ public final class Schema {
     }
 
     _fieldSpecMap.put(columnName, fieldSpec);
+    if (!fieldSpec.isVirtualColumnField()) {
+      _physicalFieldSpecMap.put(columnName, fieldSpec);
+    }
   }
 
   @Deprecated
@@ -201,6 +277,9 @@ public final class Schema {
 
   public boolean removeField(String columnName) {
     FieldSpec existingFieldSpec = _fieldSpecMap.remove(columnName);
+    if (_physicalFieldSpecMap.containsKey(columnName)) {
+      _physicalFieldSpecMap.remove(columnName);
+    }
     if (existingFieldSpec != null) {
       FieldType fieldType = existingFieldSpec.getFieldType();
       switch (fieldType) {
@@ -259,6 +338,12 @@ public final class Schema {
   @JsonIgnore
   public Collection<FieldSpec> getAllFieldSpecs() {
     return _fieldSpecMap.values();
+  }
+
+  @JsonIgnore
+  @Nonnull
+  public Collection<FieldSpec> getAllPhysicalFieldSpecs() {
+    return _physicalFieldSpecMap.values();
   }
 
   public int size() {
@@ -358,6 +443,12 @@ public final class Schema {
       jsonObject.set("dateTimeFieldSpecs", jsonArray);
     }
     return jsonObject;
+    jsonSchema.addProperty("updateSemantic", _updateSemantic);
+    if (UPSERT_TABLE_CONFIG.equalsIgnoreCase(_updateSemantic)) {
+      jsonSchema.addProperty("primaryKey", _primaryKey);
+      jsonSchema.addProperty("offsetKey", _offsetKey);
+    }
+    return new GsonBuilder().setPrettyPrinting().create().toJson(jsonSchema);
   }
 
   /**
