@@ -24,6 +24,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.commons.math3.util.Pair;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
@@ -50,6 +51,8 @@ public class ServiceStatus {
 
   public static String STATUS_DESCRIPTION_NONE = "None";
   public static String STATUS_DESCRIPTION_INIT = "Init";
+
+  private static int MAX_RESOURCE_NAMES_TO_LOG = 5;
 
   /**
    * Callback that returns the status of the service.
@@ -171,7 +174,7 @@ public class ServiceStatus {
       _minResourcesStartCount = (int)Math.round(Math.ceil(minResourcesStartPercent * _numTotalResourcesToMonitor/100));
 
       LOGGER.info("Monitoring {} resources: {} for start up of instance {}", _numTotalResourcesToMonitor,
-          _resourcesToMonitor, _instanceName);
+          getResourceListAsString(), _instanceName);
     }
 
     public IdealStateMatchServiceStatusCallback(HelixManager helixManager, String clusterName, String instanceName,
@@ -186,7 +189,7 @@ public class ServiceStatus {
 
       _minResourcesStartCount = (int)Math.round(Math.ceil(minResourcesStartPercent * _numTotalResourcesToMonitor/100));
       LOGGER.info("Monitoring {} resources: {} for start up of instance {}", _numTotalResourcesToMonitor,
-          _resourcesToMonitor, _instanceName);
+          getResourceListAsString(), _instanceName);
     }
 
     protected abstract T getState(String resourceName);
@@ -227,70 +230,98 @@ public class ServiceStatus {
     @Override
     public synchronized Status getServiceStatus() {
 
+      String descriptionSuffix = "";
       while (!isDone()) {
         String resourceName;
         if (_resourceIterator == null || !_resourceIterator.hasNext()) {
           _resourceIterator = _resourcesToMonitor.iterator();
         }
         resourceName = _resourceIterator.next();
-        IdealState idealState = getResourceIdealState(resourceName);
+        descriptionSuffix = String
+            .format("waitingFor=%s, resource=%s, numResourcesLeft=%d, numTotalResources=%d, minStartCount=%d,", getMatchName(),
+                resourceName, _resourcesToMonitor.size(), _numTotalResourcesToMonitor, _minResourcesStartCount);
 
-        // If the resource has been removed or disabled, ignore it
-        if (idealState == null || !idealState.isEnabled()) {
-          _resourceIterator.remove();
-          continue;
-        }
-
-        String descriptionSuffix = String
-            .format("waitingFor=%s, resource=%s, numResourcesLeft=%d, numTotalResources=%d", getMatchName(),
-                resourceName, _resourcesToMonitor.size(), _numTotalResourcesToMonitor);
-        T helixState = getState(resourceName);
-        if (helixState == null) {
-          _statusDescription = "Helix state does not exist: " + descriptionSuffix;
-          return Status.STARTING;
-        }
-
-        // Check that all partitions that are supposed to be in any state other than OFFLINE have the same status in the
-        // external view or went to ERROR state (which means that we tried to load the segments/resources but failed for
-        // some reason)
-        Map<String, String> partitionStateMap = getPartitionStateMap(helixState);
-        for (String partitionName : idealState.getPartitionSet()) {
-          String idealStateStatus = idealState.getInstanceStateMap(partitionName).get(_instanceName);
-
-          // Skip this partition if it is not assigned to this instance or if the instance should be offline
-          if (idealStateStatus == null || "OFFLINE".equals(idealStateStatus)) {
-            continue;
-          }
-
-          // If the instance state is not ERROR and is not the same as what's expected from the ideal state, then it
-          // hasn't finished starting up
-          String currentStateStatus = partitionStateMap.get(partitionName);
-          if (!idealStateStatus.equals(currentStateStatus)) {
-            if ("ERROR".equals(currentStateStatus)) {
-              LOGGER.error(String.format("Resource: %s, partition: %s is in ERROR state", resourceName, partitionName));
-            } else {
-              _statusDescription = String
-                  .format("partition=%s, expected=%s, found=%s, %s", partitionName,
-                      idealStateStatus, currentStateStatus, descriptionSuffix);
-              return Status.STARTING;
-            }
-          }
-        }
+        Pair<Status, String> statusPair = evaluateResourceStatus(resourceName, descriptionSuffix);
 
         // Resource is done starting up, remove it from the set
-        _resourceIterator.remove();
+        _statusDescription = statusPair.getSecond();
+        Status status = statusPair.getFirst();
+        if (status == Status.GOOD) {
+          _resourceIterator.remove();
+        } else {
+          return status;
+        }
       }
 
       if (_resourcesToMonitor.isEmpty()) {
         _statusDescription = STATUS_DESCRIPTION_NONE;
         LOGGER.info("Instance {} has finished starting up", _instanceName);
       } else {
-        _statusDescription = String.format("waitingFor=%s, numResourcesLeft=%d, numTotalResources=%d, minStartCount=%d",
-            getMatchName(), _resourcesToMonitor.size(), _numTotalResourcesToMonitor, _minResourcesStartCount);
-        LOGGER.info("Instance {} returning GOOD because {}", _statusDescription);
+        _statusDescription = String.format("waitingFor=%s, numResourcesLeft=%d, numTotalResources=%d, minStartCount=%d,"
+                + " resourceList=%s", getMatchName(), _resourcesToMonitor.size(), _numTotalResourcesToMonitor,
+            _minResourcesStartCount, getResourceListAsString());
+        LOGGER.info("Instance {} returning GOOD because {}", _instanceName, _statusDescription);
+
+        int logCount = MAX_RESOURCE_NAMES_TO_LOG;
+        for (String resource : _resourcesToMonitor) {
+          Pair<Status, String> statusPair = evaluateResourceStatus(resource, "");
+          LOGGER.info("Resource: {}, StatusDescription: {}", resource, statusPair.getSecond());
+          if (--logCount <= 0) {
+            break;
+          }
+        }
       }
 
       return Status.GOOD;
+    }
+
+    private Pair<Status, String> evaluateResourceStatus(String resourceName, String descriptionSuffix) {
+      IdealState idealState = getResourceIdealState(resourceName);
+      // If the resource has been removed or disabled, ignore it
+      if (idealState == null || !idealState.isEnabled()) {
+        return new Pair(Status.GOOD, STATUS_DESCRIPTION_NONE);
+      }
+
+      T helixState = getState(resourceName);
+      if (helixState == null) {
+        String description = String.format("Helix state does not exist: %s", descriptionSuffix);
+        return new Pair(Status.STARTING, description);
+      }
+
+      // Check that all partitions that are supposed to be in any state other than OFFLINE have the same status in the
+      // external view or went to ERROR state (which means that we tried to load the segments/resources but failed for
+      // some reason)
+      Map<String, String> partitionStateMap = getPartitionStateMap(helixState);
+      for (String partitionName : idealState.getPartitionSet()) {
+        String idealStateStatus = idealState.getInstanceStateMap(partitionName).get(_instanceName);
+
+        // Skip this partition if it is not assigned to this instance or if the instance should be offline
+        if (idealStateStatus == null || "OFFLINE".equals(idealStateStatus)) {
+          continue;
+        }
+
+        // If the instance state is not ERROR and is not the same as what's expected from the ideal state, then it
+        // hasn't finished starting up
+        String currentStateStatus = partitionStateMap.get(partitionName);
+        if (!idealStateStatus.equals(currentStateStatus)) {
+          if ("ERROR".equals(currentStateStatus)) {
+            LOGGER.error(String.format("Resource: %s, partition: %s is in ERROR state", resourceName, partitionName));
+          } else {
+            String description = String
+                .format("partition=%s, expected=%s, found=%s, %s", partitionName,
+                    idealStateStatus, currentStateStatus, descriptionSuffix);
+            return new Pair(Status.STARTING, description);
+          }
+        }
+      }
+      return new Pair(Status.GOOD, STATUS_DESCRIPTION_NONE);
+    }
+
+    private String getResourceListAsString() {
+      if (_resourcesToMonitor.size() <= MAX_RESOURCE_NAMES_TO_LOG) {
+        return _resourcesToMonitor.toString();
+      }
+      return "[" + _resourcesToMonitor.iterator().next() + ",...]";
     }
 
     @Override
