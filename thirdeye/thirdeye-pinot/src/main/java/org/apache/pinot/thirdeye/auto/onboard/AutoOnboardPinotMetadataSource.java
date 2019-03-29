@@ -22,6 +22,24 @@ package org.apache.pinot.thirdeye.auto.onboard;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.collect.Collections2;
 import com.google.common.collect.Lists;
+import java.io.IOException;
+import java.security.KeyManagementException;
+import java.security.KeyStoreException;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections.MapUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.data.MetricFieldSpec;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.data.TimeGranularitySpec;
@@ -37,23 +55,6 @@ import org.apache.pinot.thirdeye.datalayer.util.Predicate;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.apache.pinot.thirdeye.datasource.MetadataSourceConfig;
 import org.apache.pinot.thirdeye.datasource.pinot.PinotThirdEyeDataSource;
-import java.io.IOException;
-import java.security.KeyManagementException;
-import java.security.KeyStoreException;
-import java.security.NoSuchAlgorithmException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import javax.annotation.Nullable;
-import org.apache.commons.collections.CollectionUtils;
-import org.apache.commons.collections.MapUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -336,6 +337,9 @@ public class AutoOnboardPinotMetadataSource extends AutoOnboard {
 
   private void checkTimeFieldChanges(DatasetConfigDTO datasetConfig, Schema schema) {
     TimeGranularitySpec timeSpec = schema.getTimeFieldSpec().getOutgoingGranularitySpec();
+    if (timeSpec.getTimeType().equals(TimeUnit.MILLISECONDS)){
+      timeSpec.setTimeType(TimeUnit.MINUTES);
+    }
     if (!datasetConfig.getTimeColumn().equals(timeSpec.getName())
         || !datasetConfig.getTimeFormat().equals(timeSpec.getTimeFormat())
         || datasetConfig.bucketTimeGranularity().getUnit() != timeSpec.getTimeType()
