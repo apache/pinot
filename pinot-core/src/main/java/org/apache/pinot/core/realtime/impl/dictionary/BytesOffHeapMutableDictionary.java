@@ -21,6 +21,9 @@ package org.apache.pinot.core.realtime.impl.dictionary;
 import java.io.IOException;
 import java.util.Arrays;
 import javax.annotation.Nonnull;
+import org.apache.commons.codec.DecoderException;
+import org.apache.commons.codec.binary.Hex;
+import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.utils.primitive.ByteArray;
 import org.apache.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import org.apache.pinot.core.io.writer.impl.MutableOffHeapByteArrayStore;
@@ -30,6 +33,7 @@ import org.apache.pinot.core.io.writer.impl.MutableOffHeapByteArrayStore;
  * OffHeap mutable dictionary for Bytes data type.
  */
 public class BytesOffHeapMutableDictionary extends BaseOffHeapMutableDictionary {
+
   private final MutableOffHeapByteArrayStore _byteStore;
 
   private ByteArray _min = null;
@@ -47,13 +51,24 @@ public class BytesOffHeapMutableDictionary extends BaseOffHeapMutableDictionary 
   public BytesOffHeapMutableDictionary(int estimatedCardinality, int maxOverflowHashSize,
       PinotDataBufferMemoryManager memoryManager, String allocationContext, int avgLength) {
     super(estimatedCardinality, maxOverflowHashSize, memoryManager, allocationContext);
-    _byteStore = new MutableOffHeapByteArrayStore(memoryManager, allocationContext, estimatedCardinality, avgLength);
+    _byteStore = new MutableOffHeapByteArrayStore(memoryManager, allocationContext,
+        estimatedCardinality, avgLength);
   }
 
   @Override
   public int indexOf(Object rawValue) {
     assert rawValue instanceof byte[];
-    byte[] bytes = (byte[]) rawValue;
+    byte[] bytes = null;
+    // Convert hex string to byte[].
+    if (rawValue instanceof String) {
+      try {
+        bytes = Hex.decodeHex(((String) rawValue).toCharArray());
+      } catch (DecoderException e) {
+        Utils.rethrowException(e);
+      }
+    } else {
+      bytes = (byte[]) rawValue;
+    }
     return getDictId(new ByteArray(bytes), bytes);
   }
 
@@ -81,14 +96,25 @@ public class BytesOffHeapMutableDictionary extends BaseOffHeapMutableDictionary 
   @Override
   public void index(@Nonnull Object rawValue) {
     assert rawValue instanceof byte[];
-    byte[] bytes = (byte[]) rawValue;
+    byte[] bytes = null;
+    // Convert hex string to byte[].
+    if (rawValue instanceof String) {
+      try {
+        bytes = Hex.decodeHex(((String) rawValue).toCharArray());
+      } catch (DecoderException e) {
+        Utils.rethrowException(e);
+      }
+    } else {
+      bytes = (byte[]) rawValue;
+    }
     ByteArray byteArray = new ByteArray(bytes);
     indexValue(byteArray, bytes);
     updateMinMax(byteArray);
   }
 
   @Override
-  public boolean inRange(@Nonnull String lower, @Nonnull String upper, int dictIdToCompare, boolean includeLower,
+  public boolean inRange(@Nonnull String lower, @Nonnull String upper, int dictIdToCompare,
+      boolean includeLower,
       boolean includeUpper) {
     throw new UnsupportedOperationException("In-range not supported for Bytes data type.");
   }
