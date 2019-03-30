@@ -57,7 +57,6 @@ public class BytesOffHeapMutableDictionary extends BaseOffHeapMutableDictionary 
 
   @Override
   public int indexOf(Object rawValue) {
-    assert rawValue instanceof byte[];
     byte[] bytes = null;
     // Convert hex string to byte[].
     if (rawValue instanceof String) {
@@ -67,6 +66,7 @@ public class BytesOffHeapMutableDictionary extends BaseOffHeapMutableDictionary 
         Utils.rethrowException(e);
       }
     } else {
+      assert rawValue instanceof byte[];
       bytes = (byte[]) rawValue;
     }
     return getDictId(new ByteArray(bytes), bytes);
@@ -95,7 +95,6 @@ public class BytesOffHeapMutableDictionary extends BaseOffHeapMutableDictionary 
 
   @Override
   public void index(@Nonnull Object rawValue) {
-    assert rawValue instanceof byte[];
     byte[] bytes = null;
     // Convert hex string to byte[].
     if (rawValue instanceof String) {
@@ -105,6 +104,7 @@ public class BytesOffHeapMutableDictionary extends BaseOffHeapMutableDictionary 
         Utils.rethrowException(e);
       }
     } else {
+      assert rawValue instanceof byte[];
       bytes = (byte[]) rawValue;
     }
     ByteArray byteArray = new ByteArray(bytes);
