@@ -52,6 +52,8 @@ public class ServiceStatus {
   public static String STATUS_DESCRIPTION_NONE = "None";
   public static String STATUS_DESCRIPTION_INIT = "Init";
 
+  private static String _noHelixState = "Helix state does not exist";
+
   private static int MAX_RESOURCE_NAMES_TO_LOG = 5;
 
   /**
@@ -230,25 +232,24 @@ public class ServiceStatus {
     @Override
     public synchronized Status getServiceStatus() {
 
-      String descriptionSuffix = "";
       while (!isDone()) {
         String resourceName;
         if (_resourceIterator == null || !_resourceIterator.hasNext()) {
           _resourceIterator = _resourcesToMonitor.iterator();
         }
         resourceName = _resourceIterator.next();
-        descriptionSuffix = String
-            .format("waitingFor=%s, resource=%s, numResourcesLeft=%d, numTotalResources=%d, minStartCount=%d,", getMatchName(),
-                resourceName, _resourcesToMonitor.size(), _numTotalResourcesToMonitor, _minResourcesStartCount);
+        Pair<Status, String> statusPair = evaluateResourceStatus(resourceName);
 
-        Pair<Status, String> statusPair = evaluateResourceStatus(resourceName, descriptionSuffix);
-
-        // Resource is done starting up, remove it from the set
-        _statusDescription = statusPair.getSecond();
         Status status = statusPair.getFirst();
         if (status == Status.GOOD) {
+          // Resource is done starting up, remove it from the set
           _resourceIterator.remove();
         } else {
+          _statusDescription = String
+              .format("%s, waitingFor=%s, resource=%s, numResourcesLeft=%d, numTotalResources=%d, minStartCount=%d,",
+                  statusPair.getSecond(), getMatchName(), resourceName, _resourcesToMonitor.size(),
+                  _numTotalResourcesToMonitor, _minResourcesStartCount);
+
           return status;
         }
       }
@@ -264,7 +265,7 @@ public class ServiceStatus {
 
         int logCount = MAX_RESOURCE_NAMES_TO_LOG;
         for (String resource : _resourcesToMonitor) {
-          Pair<Status, String> statusPair = evaluateResourceStatus(resource, "");
+          Pair<Status, String> statusPair = evaluateResourceStatus(resource);
           LOGGER.info("Resource: {}, StatusDescription: {}", resource, statusPair.getSecond());
           if (--logCount <= 0) {
             break;
@@ -275,7 +276,7 @@ public class ServiceStatus {
       return Status.GOOD;
     }
 
-    private Pair<Status, String> evaluateResourceStatus(String resourceName, String descriptionSuffix) {
+    private Pair<Status, String> evaluateResourceStatus(String resourceName) {
       IdealState idealState = getResourceIdealState(resourceName);
       // If the resource has been removed or disabled, ignore it
       if (idealState == null || !idealState.isEnabled()) {
@@ -284,8 +285,7 @@ public class ServiceStatus {
 
       T helixState = getState(resourceName);
       if (helixState == null) {
-        String description = String.format("Helix state does not exist: %s", descriptionSuffix);
-        return new Pair(Status.STARTING, description);
+        return new Pair(Status.STARTING, _noHelixState);
       }
 
       // Check that all partitions that are supposed to be in any state other than OFFLINE have the same status in the
@@ -307,9 +307,8 @@ public class ServiceStatus {
           if ("ERROR".equals(currentStateStatus)) {
             LOGGER.error(String.format("Resource: %s, partition: %s is in ERROR state", resourceName, partitionName));
           } else {
-            String description = String
-                .format("partition=%s, expected=%s, found=%s, %s", partitionName,
-                    idealStateStatus, currentStateStatus, descriptionSuffix);
+            String description = String.format("partition=%s, expected=%s, found=%s", partitionName,
+                idealStateStatus, currentStateStatus);
             return new Pair(Status.STARTING, description);
           }
         }
