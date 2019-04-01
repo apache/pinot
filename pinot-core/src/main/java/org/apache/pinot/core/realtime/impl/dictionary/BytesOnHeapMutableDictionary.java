@@ -38,7 +38,9 @@ public class BytesOnHeapMutableDictionary extends BaseOnHeapMutableDictionary {
   public int indexOf(Object rawValue) {
     byte[] bytes = null;
     // Convert hex string to byte[].
-    if (rawValue instanceof String) {
+    if (rawValue instanceof byte[]) {
+      bytes = (byte[]) rawValue;
+    } else if (rawValue instanceof String) {
       try {
         bytes = Hex.decodeHex(((String) rawValue).toCharArray());
       } catch (DecoderException e) {
@@ -46,7 +48,6 @@ public class BytesOnHeapMutableDictionary extends BaseOnHeapMutableDictionary {
       }
     } else {
       assert rawValue instanceof byte[];
-      bytes = (byte[]) rawValue;
     }
     return getDictId(new ByteArray(bytes));
   }
@@ -81,8 +82,7 @@ public class BytesOnHeapMutableDictionary extends BaseOnHeapMutableDictionary {
   }
 
   @Override
-  public boolean inRange(@Nonnull String lower, @Nonnull String upper, int dictIdToCompare,
-      boolean includeLower,
+  public boolean inRange(@Nonnull String lower, @Nonnull String upper, int dictIdToCompare, boolean includeLower,
       boolean includeUpper) {
     throw new UnsupportedOperationException("In-range not supported for Bytes data type.");
   }
