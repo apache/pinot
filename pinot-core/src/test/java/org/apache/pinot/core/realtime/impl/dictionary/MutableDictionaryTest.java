@@ -30,6 +30,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.stream.Collectors;
+import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.lang.RandomStringUtils;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.utils.primitive.ByteArray;
@@ -174,7 +175,8 @@ public class MutableDictionaryTest {
       Comparable value =
           (i == 0 && dataType == FieldSpec.DataType.INT) ? Integer.MIN_VALUE : makeRandomObjectOfType(dataType);
 
-      Object rawValue = dataType == FieldSpec.DataType.BYTES ? ((ByteArray) value).getBytes() : value;
+      Object rawValue = dataType == FieldSpec.DataType.BYTES ? ((i % 2 == 0) ? ((ByteArray) value).getBytes()
+          : Hex.encodeHexString(((ByteArray) value).getBytes())) : value;
       if (valueToDictId.containsKey(value)) {
         Assert.assertEquals(dictionary.indexOf(rawValue), (int) valueToDictId.get(value));
       } else {
