@@ -37,8 +37,16 @@ public class CommonConstants {
 
     public static final String SERVER_INSTANCE_TYPE = "server";
     public static final String BROKER_INSTANCE_TYPE = "broker";
+    public static final String CONTROLLER_INSTANCE_TYPE = "controller";
 
     public static final String BROKER_RESOURCE_INSTANCE = "brokerResource";
+    public static final String LEAD_CONTROLLER_RESOURCE_NAME = "leadControllerResource";
+
+    // This is for specifying the number of partitions in leadControllerResource.
+    // In most of the cases there won't be more than 17 controllers in one single cluster.
+    // Hard code the number of partitions to 17 since it's rarely changed and for less changes of hash collision.
+    public static final int DEFAULT_NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE = 17;
+    public static final int DEFAULT_NUMBER_OF_CONTROLLER_REPLICAS = 1;
 
     public static final String UNTAGGED_SERVER_INSTANCE = "server_untagged";
     public static final String UNTAGGED_BROKER_INSTANCE = "broker_untagged";

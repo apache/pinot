@@ -19,6 +19,7 @@
 package org.apache.pinot.common.config;
 
 import org.apache.pinot.common.exception.InvalidConfigException;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.ServerType;
 import org.apache.pinot.common.utils.TenantRole;
 
@@ -45,8 +46,18 @@ public class TagNameUtils {
     return false;
   }
 
-  public static TenantRole getTenantRoleFromTag(String tagName)
+  public static boolean isServerTag(String tagName)
       throws InvalidConfigException {
+    return TenantRole.SERVER == getTenantRoleFromTag(tagName);
+  }
+
+  public static boolean isBrokerTags(String tagName)
+      throws InvalidConfigException {
+    return TenantRole.BROKER == getTenantRoleFromTag(tagName);
+  }
+
+  // Make this method private to avoid exposing null out of this class.
+  private static TenantRole getTenantRoleFromTag(String tagName) throws InvalidConfigException {
     if (tagName.endsWith(ServerType.REALTIME.toString())) {
       return TenantRole.SERVER;
     }
@@ -55,6 +66,11 @@ public class TagNameUtils {
     }
     if (tagName.endsWith(TenantRole.BROKER.toString())) {
       return TenantRole.BROKER;
+    }
+    // Helix uses this tag to support full-auto.
+    // Return null if the tag is controller, which isn't a type of tenant in Pinot.
+    if (tagName.equalsIgnoreCase(CommonConstants.Helix.CONTROLLER_INSTANCE_TYPE)) {
+      return null;
     }
     throw new InvalidConfigException("Cannot identify tenant type from tag name : " + tagName);
   }

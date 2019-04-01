@@ -20,12 +20,14 @@ package org.apache.pinot.controller.helix.core;
 
 import com.google.common.collect.BiMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import org.I0Itec.zkclient.ZkClient;
 import org.apache.helix.PropertyPathBuilder;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.manager.zk.ZNRecordSerializer;
+import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.config.TableConfig;
@@ -51,6 +53,7 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.common.utils.CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME;
 import static org.apache.pinot.controller.helix.core.PinotHelixResourceManager.*;
 
 
@@ -87,6 +90,8 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
         new Tenant.TenantBuilder(SERVER_TENANT_NAME).setRole(TenantRole.SERVER).setOfflineInstances(NUM_INSTANCES)
             .build();
     _helixResourceManager.createServerTenant(serverTenant);
+
+    _helixAdmin.enableResource(getHelixClusterName(), LEAD_CONTROLLER_RESOURCE_NAME, true);
   }
 
   @Test
@@ -455,6 +460,30 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
       _helixAdmin
           .removeInstanceTag(_helixClusterName, brokerInstance, TagNameUtils.getBrokerTagForTenant(brokerTag));
       _helixAdmin.addInstanceTag(_helixClusterName, brokerInstance, CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE);
+    }
+  }
+
+  @Test
+  public void testLeadControllerResource() {
+    IdealState leadControllerResourceIdealState = _helixResourceManager.getLeadControllerResourceIdealState();
+    Assert.assertTrue(leadControllerResourceIdealState.isValid());
+    Assert.assertTrue(leadControllerResourceIdealState.isEnabled());
+    Assert.assertEquals(leadControllerResourceIdealState.getInstanceGroupTag(),
+        CommonConstants.Helix.CONTROLLER_INSTANCE_TYPE);
+    Assert.assertEquals(leadControllerResourceIdealState.getNumPartitions(),
+        CommonConstants.Helix.DEFAULT_NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE);
+    Assert.assertEquals(leadControllerResourceIdealState.getReplicas(), "1");
+    Assert.assertEquals(leadControllerResourceIdealState.getRebalanceMode(), IdealState.RebalanceMode.FULL_AUTO);
+    Assert.assertTrue(leadControllerResourceIdealState
+        .getInstanceSet(leadControllerResourceIdealState.getPartitionSet().iterator().next()).isEmpty());
+
+    ExternalView leadControllerResourceExternalView = _helixResourceManager.getLeadControllerResourceExternalView();
+    for (String partition : leadControllerResourceExternalView.getPartitionSet()) {
+      Map<String, String> stateMap = leadControllerResourceExternalView.getStateMap(partition);
+      Assert.assertEquals(stateMap.size(), 1);
+      Map.Entry<String, String> entry = stateMap.entrySet().iterator().next();
+      Assert.assertEquals(entry.getKey(), CommonConstants.Helix.PREFIX_OF_CONTROLLER_INSTANCE + "localhost_8998");
+      Assert.assertEquals(entry.getValue(), "MASTER");
     }
   }
 
