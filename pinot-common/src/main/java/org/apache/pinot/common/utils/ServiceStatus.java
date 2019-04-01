@@ -254,23 +254,41 @@ public class ServiceStatus {
         }
       }
 
+      // At this point, one of the following conditions hold:
+      // 1. We entered the loop above, and all the remaining resources ended up in GOOOD state.
+      //    In that case _resourcesToMonitor would be empty.
+      // 2. We entered the loop above and cleared most of the remaining resources, but some small
+      //    number are still not converged. In that case, we exited the loop because we have met
+      //    the threshold of resources that need to be GOOD. We will then scan the remaining and
+      //    print some details of the ones that are remaining (upto a limit of MAX_RESOURCE_NAMES_TO_LOG)
+      //    and are still not in converged state. We walk through the remaining ones (and may clear
+      //    mores resources from _resourcesToMonitor that are GOOD state)
+      // 3. We did not execute the loop at all (the percentage threshold satisfied right away). We will do
+      //    the same action as for (2) above.
+      // In all three cases above, we need to return Status.GOOD
+
       if (_resourcesToMonitor.isEmpty()) {
         _statusDescription = STATUS_DESCRIPTION_NONE;
         LOGGER.info("Instance {} has finished starting up", _instanceName);
       } else {
+        int logCount = MAX_RESOURCE_NAMES_TO_LOG;
+        _resourceIterator = _resourcesToMonitor.iterator();
+        while (_resourceIterator.hasNext()) {
+          String resource = _resourceIterator.next();
+          Pair<Status, String> statusPair = evaluateResourceStatus(resource);
+          if (statusPair.getFirst() == Status.GOOD) {
+            _resourceIterator.remove();
+          } else {
+            LOGGER.info("Resource: {}, StatusDescription: {}", resource, statusPair.getSecond());
+            if (--logCount <= 0) {
+              break;
+            }
+          }
+        }
         _statusDescription = String.format("waitingFor=%s, numResourcesLeft=%d, numTotalResources=%d, minStartCount=%d,"
                 + " resourceList=%s", getMatchName(), _resourcesToMonitor.size(), _numTotalResourcesToMonitor,
             _minResourcesStartCount, getResourceListAsString());
         LOGGER.info("Instance {} returning GOOD because {}", _instanceName, _statusDescription);
-
-        int logCount = MAX_RESOURCE_NAMES_TO_LOG;
-        for (String resource : _resourcesToMonitor) {
-          Pair<Status, String> statusPair = evaluateResourceStatus(resource);
-          LOGGER.info("Resource: {}, StatusDescription: {}", resource, statusPair.getSecond());
-          if (--logCount <= 0) {
-            break;
-          }
-        }
       }
 
       return Status.GOOD;
