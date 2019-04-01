@@ -124,7 +124,9 @@ public class TaskDriver {
                 }
 
               } finally {
-                ThirdeyeMetricsUtil.taskDurationCounter.inc(System.nanoTime() - tStart);
+                long elapsedTime = System.nanoTime() - tStart;
+                LOG.info("Thread {} : Took {} nano seconds", Thread.currentThread().getId(), elapsedTime);
+                ThirdeyeMetricsUtil.taskDurationCounter.inc(elapsedTime);
               }
             }
           }
