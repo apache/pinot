@@ -95,7 +95,7 @@ public class TaskDriver {
               ThirdeyeMetricsUtil.taskCounter.inc();
 
               try {
-                LOG.info("Thread {} : Executing task: {} {}", Thread.currentThread().getId(), anomalyTaskSpec.getId(),
+                LOG.info("Thread {} : Executing task: {} {}", Thread.currentThread().getId(), anomalyTaskSpec.getJobName(),
                     anomalyTaskSpec.getTaskInfo());
 
                 // execute the selected task
@@ -104,7 +104,6 @@ public class TaskDriver {
                 TaskInfo taskInfo = TaskInfoFactory.getTaskInfoFromTaskType(taskType, anomalyTaskSpec.getTaskInfo());
 
                 updateTaskStartTime(anomalyTaskSpec.getId());
-                LOG.info("Thread {} : Task Info {}", Thread.currentThread().getId(), taskInfo);
                 List<TaskResult> taskResults = taskRunner.execute(taskInfo, taskContext);
                 LOG.info("Thread {} : DONE Executing task: {}", Thread.currentThread().getId(), anomalyTaskSpec.getId());
                 // update status to COMPLETED
@@ -125,7 +124,8 @@ public class TaskDriver {
 
               } finally {
                 long elapsedTime = System.nanoTime() - tStart;
-                LOG.info("Thread {} : Took {} nano seconds", Thread.currentThread().getId(), elapsedTime);
+                LOG.info("Thread {} : Task {} took {} nano seconds", Thread.currentThread().getId(),
+                    anomalyTaskSpec.getId(), elapsedTime);
                 ThirdeyeMetricsUtil.taskDurationCounter.inc(elapsedTime);
               }
             }

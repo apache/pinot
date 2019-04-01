@@ -71,8 +71,8 @@ active: true
 
 # The below links will appear in the email alerts. This will help alert recipients to quickly refer and act on.
 referenceLinks:
-- "Oncall Runbook": "http://go/oncall"
-- "Thirdeye FAQs": "http://go/thirdeyefaqs"
+  "Oncall Runbook": "http://go/oncall"
+  "Thirdeye FAQs": "http://go/thirdeyefaqs"
 
 `;
 

@@ -53,12 +53,12 @@ public class DetectionAlertJob implements Job {
 
   @Override
   public void execute(JobExecutionContext jobExecutionContext) throws JobExecutionException {
-    LOG.info("Running " + jobExecutionContext.getJobDetail().getKey().toString());
+    LOG.debug("Running " + jobExecutionContext.getJobDetail().getKey().getName());
     String jobKey = jobExecutionContext.getJobDetail().getKey().getName();
     long detectionAlertConfigId = getIdFromJobKey(jobKey);
     DetectionAlertConfigDTO configDTO = alertConfigDAO.findById(detectionAlertConfigId);
     if (configDTO == null) {
-      LOG.error("Alert config with id {} does not exist", detectionAlertConfigId);
+      LOG.error("Subscription config {} does not exist", detectionAlertConfigId);
     }
 
     DetectionAlertTaskInfo taskInfo = new DetectionAlertTaskInfo(detectionAlertConfigId);
@@ -72,12 +72,12 @@ public class DetectionAlertJob implements Job {
             Predicate.EQ("status", TaskConstants.TaskStatus.WAITING.toString())
         ))
     );
-
     if (!scheduledTasks.isEmpty()){
       // if a task is pending and not time out yet, don't schedule more
-      LOG.info("Skip scheduling detection alerter task for {}. Task is already in the queue.", jobName);
+      LOG.info("Skip scheduling subscription task {}. Already queued.", jobName);
       return;
     }
+
     String taskInfoJson = null;
     try {
       taskInfoJson = OBJECT_MAPPER.writeValueAsString(taskInfo);
@@ -92,7 +92,7 @@ public class DetectionAlertJob implements Job {
     taskDTO.setTaskInfo(taskInfoJson);
 
     long taskId = taskDAO.save(taskDTO);
-    LOG.info("Created detection pipeline task {} with taskId {}", taskDTO, taskId);
+    LOG.info("Created subscription task {} with settings {}", taskId, taskDTO);
   }
 
   private Long getIdFromJobKey(String jobKey) {
