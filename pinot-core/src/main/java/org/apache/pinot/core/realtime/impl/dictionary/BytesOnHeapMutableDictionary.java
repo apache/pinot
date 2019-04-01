@@ -20,6 +20,9 @@ package org.apache.pinot.core.realtime.impl.dictionary;
 
 import java.util.Arrays;
 import javax.annotation.Nonnull;
+import org.apache.commons.codec.DecoderException;
+import org.apache.commons.codec.binary.Hex;
+import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.utils.primitive.ByteArray;
 
 
@@ -27,13 +30,26 @@ import org.apache.pinot.common.utils.primitive.ByteArray;
  * OnHeap mutable dictionary of Bytes type.
  */
 public class BytesOnHeapMutableDictionary extends BaseOnHeapMutableDictionary {
+
   private ByteArray _min = null;
   private ByteArray _max = null;
 
   @Override
   public int indexOf(Object rawValue) {
-    assert rawValue instanceof byte[];
-    return getDictId(new ByteArray((byte[]) rawValue));
+    byte[] bytes = null;
+    // Convert hex string to byte[].
+    if (rawValue instanceof byte[]) {
+      bytes = (byte[]) rawValue;
+    } else if (rawValue instanceof String) {
+      try {
+        bytes = Hex.decodeHex(((String) rawValue).toCharArray());
+      } catch (DecoderException e) {
+        Utils.rethrowException(e);
+      }
+    } else {
+      assert rawValue instanceof byte[];
+    }
+    return getDictId(new ByteArray(bytes));
   }
 
   @Override
@@ -48,8 +64,19 @@ public class BytesOnHeapMutableDictionary extends BaseOnHeapMutableDictionary {
 
   @Override
   public void index(@Nonnull Object rawValue) {
-    assert rawValue instanceof byte[];
-    ByteArray byteArray = new ByteArray((byte[]) rawValue);
+    byte[] bytes = null;
+    // Convert hex string to byte[].
+    if (rawValue instanceof String) {
+      try {
+        bytes = Hex.decodeHex(((String) rawValue).toCharArray());
+      } catch (DecoderException e) {
+        Utils.rethrowException(e);
+      }
+    } else {
+      assert rawValue instanceof byte[];
+      bytes = (byte[]) rawValue;
+    }
+    ByteArray byteArray = new ByteArray(bytes);
     indexValue(byteArray);
     updateMinMax(byteArray);
   }
