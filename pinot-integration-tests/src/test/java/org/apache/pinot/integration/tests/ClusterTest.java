@@ -243,7 +243,7 @@ public abstract class ClusterTest extends ControllerTest {
       try {
         minionStarter.stop();
       } catch (Exception e) {
-        LOGGER.error("Encountered exception while stopping server {}", e.getMessage());
+        LOGGER.error("Encountered exception while stopping minion {}", e.getMessage());
       }
     }
     FileUtils.deleteQuietly(new File(Minion.DEFAULT_INSTANCE_BASE_DIR));
