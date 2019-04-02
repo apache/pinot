@@ -161,9 +161,12 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
     List<MergedAnomalyResultDTO> anomalies = new ArrayList<>();
     int totalWindows = monitoringWindows.size();
     int successWindows = 0;
-    Exception lastException = null;
     for (int i = 0; i < totalWindows; i++) {
-      earlyTerminate(i, successWindows, totalWindows, lastException);
+      if (i == EARLY_TERMINATE_WINDOW && successWindows == 0) {
+        LOG.error("Successive first {}/{} detection windows failed for config {} metricUrn {}. Discard remaining windows",
+            EARLY_TERMINATE_WINDOW, totalWindows, config.getId(), metricUrn);
+        break;
+      }
 
       // run detection
       Interval window = monitoringWindows.get(i);
@@ -179,20 +182,12 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
         successWindows++;
       }
       catch (DetectorDataInsufficientException e) {
-        lastException = e;
         LOG.warn("[DetectionConfigID{}] Insufficient data ro run detection for window {} to {}.", this.config.getId(), window.getStart(), window.getEnd());
       }
       catch (Exception e) {
-        lastException = e;
         LOG.warn("[DetectionConfigID{}] detecting anomalies for window {} to {} failed.", this.config.getId(), window.getStart(), window.getEnd(), e);
       }
       anomalies.addAll(anomaliesForOneWindow);
-    }
-
-    // throw exception if all windows failed
-    if (successWindows == 0 && totalWindows > 0) {
-      LOG.error("All {} detection windows failed for config {} metricUrn {}.", totalWindows, config.getId(), metricUrn);
-      throw new DetectorException("All " + totalWindows + " detection windows failed.", lastException);
     }
 
     for (MergedAnomalyResultDTO anomaly : anomalies) {
@@ -206,16 +201,6 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
     long lastTimeStamp = this.getLastTimeStamp();
     return new DetectionPipelineResult(anomalies.stream().filter(anomaly -> anomaly.getEndTime() <= lastTimeStamp).collect(
         Collectors.toList()), lastTimeStamp);
-  }
-
-  private void earlyTerminate(int currentWindows, int successWindows, int totalWindows, Exception lastException)
-      throws DetectorException {
-    // early termination if first of the EARLY_TERMINATE_WINDOW all failed
-    if (currentWindows == EARLY_TERMINATE_WINDOW && successWindows == 0) {
-      LOG.error("Successive first {} detection windows failed for config {} metricUrn {}.", EARLY_TERMINATE_WINDOW, config.getId(), metricUrn);
-      throw new DetectorException(String.format("Successive first %d/%d detection windows failed.", EARLY_TERMINATE_WINDOW, totalWindows),
-          lastException);
-    }
   }
 
   // guess-timate next time stamp
