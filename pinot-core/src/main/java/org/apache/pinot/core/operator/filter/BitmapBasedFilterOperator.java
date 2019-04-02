@@ -19,8 +19,6 @@
 package org.apache.pinot.core.operator.filter;
 
 import com.google.common.base.Preconditions;
-import java.util.ArrayList;
-import java.util.List;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
@@ -78,27 +76,14 @@ public class BitmapBasedFilterOperator extends BaseFilterOperator {
 
     int[] dictIds = _exclusive ? _predicateEvaluator.getNonMatchingDictIds() : _predicateEvaluator.getMatchingDictIds();
 
-    // For realtime use case, it is possible that inverted index has not yet generated for the given dict id, so we
-    // filter out null bitmaps
     InvertedIndexReader invertedIndex = _dataSource.getInvertedIndex();
     int length = dictIds.length;
-    List<ImmutableRoaringBitmap> bitmaps = new ArrayList<>(length);
-    for (int dictId : dictIds) {
-      ImmutableRoaringBitmap bitmap = (ImmutableRoaringBitmap) invertedIndex.getDocIds(dictId);
-      if (bitmap != null) {
-        bitmaps.add(bitmap);
-      }
+    ImmutableRoaringBitmap[] bitmaps = new ImmutableRoaringBitmap[length];
+    for (int i = 0; i < length; i++) {
+      bitmaps[i] = (ImmutableRoaringBitmap) invertedIndex.getDocIds(dictIds[i]);
     }
 
-    // Log size diff to verify the fix
-    int numBitmaps = bitmaps.size();
-    if (numBitmaps != length) {
-      LOGGER.info("Not all inverted indexes are generated, numDictIds: {}, numBitmaps: {}", length, numBitmaps);
-    }
-
-    return new FilterBlock(
-        new BitmapDocIdSet(bitmaps.toArray(new ImmutableRoaringBitmap[numBitmaps]), _startDocId, _endDocId,
-            _exclusive));
+    return new FilterBlock(new BitmapDocIdSet(bitmaps, _startDocId, _endDocId, _exclusive));
   }
 
   @Override

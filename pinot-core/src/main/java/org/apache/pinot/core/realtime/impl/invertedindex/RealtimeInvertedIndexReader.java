@@ -60,6 +60,13 @@ public class RealtimeInvertedIndexReader implements InvertedIndexReader<MutableR
     ThreadSafeMutableRoaringBitmap bitmap;
     try {
       _readLock.lock();
+      // NOTE: the given dict Id might not be added to the inverted index yet. We first add the value to the dictionary.
+      // Before the value is added to the inverted index, the query might have a predicate which matches the newly added
+      // value. In that case, the given dictionary Id does not exist in the inverted index, and we return an empty
+      // bitmap.
+      if (_bitmaps.size() == dictId) {
+        return new MutableRoaringBitmap();
+      }
       bitmap = _bitmaps.get(dictId);
     } finally {
       _readLock.unlock();
