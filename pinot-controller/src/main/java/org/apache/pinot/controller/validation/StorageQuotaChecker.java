@@ -48,13 +48,16 @@ public class StorageQuotaChecker {
   private final TableConfig _tableConfig;
   private final ControllerMetrics _controllerMetrics;
   private final PinotHelixResourceManager _pinotHelixResourceManager;
+  private final ControllerLeadershipManager _controllerLeadershipManager;
 
   public StorageQuotaChecker(TableConfig tableConfig, TableSizeReader tableSizeReader,
-      ControllerMetrics controllerMetrics, PinotHelixResourceManager pinotHelixResourceManager) {
+      ControllerMetrics controllerMetrics, PinotHelixResourceManager pinotHelixResourceManager,
+      ControllerLeadershipManager controllerLeadershipManager) {
     _tableConfig = tableConfig;
     _tableSizeReader = tableSizeReader;
     _controllerMetrics = controllerMetrics;
     _pinotHelixResourceManager = pinotHelixResourceManager;
+    _controllerLeadershipManager = controllerLeadershipManager;
   }
 
   public static class QuotaCheckerResponse {
@@ -213,6 +216,6 @@ public class StorageQuotaChecker {
   }
 
   protected boolean isLeader() {
-    return ControllerLeadershipManager.getInstance().isLeader();
+    return _controllerLeadershipManager.isLeader();
   }
 }
