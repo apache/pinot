@@ -122,6 +122,23 @@ export default Component.extend({
     }),
 
   /**
+   * Separate time range for anomalies in preview mode
+   * @type {Array}
+   */
+  anomaliesRange: computed(
+    'analysisRange',
+    function() {
+      const analysisRange = get(this, 'analysisRange');
+      let range = [];
+      range.push(analysisRange[0]);
+      // set end to now if the end time is in the future
+      const end = Math.min(moment().valueOf(), analysisRange[1]);
+      range.push(end)
+      return range;
+    }
+  ),
+
+  /**
    * Whether the alert has multiple dimensions
    * @type {Boolean}
    */
@@ -493,19 +510,22 @@ export default Component.extend({
     let anomalyMapping = {};
     const {
       analysisRange,
+      anomaliesRange,
       notifications,
       isPreviewMode,
       alertId
-    } = this.getProperties('analysisRange', 'notifications', 'isPreviewMode', 'alertId');
+    } = this.getProperties('analysisRange', 'anomaliesRange', 'notifications', 'isPreviewMode', 'alertId');
     //detection alert fetch
     const start = analysisRange[0];
     const end = analysisRange[1];
+    const startAnomalies = anomaliesRange[0];
+    const endAnomalies = anomaliesRange[1];
     let anomalies;
     let applicationAnomalies;
     let metricUrnList;
     try {
       if(isPreviewMode){
-        applicationAnomalies = yield getYamlPreviewAnomalies(alertYaml, start, end, alertId);
+        applicationAnomalies = yield getYamlPreviewAnomalies(alertYaml, startAnomalies, endAnomalies, alertId);
         if (applicationAnomalies && applicationAnomalies.diagnostics && applicationAnomalies.diagnostics['0']) {
           metricUrnList = Object.keys(applicationAnomalies.diagnostics['0']);
           set(this, 'metricUrnList', metricUrnList);
