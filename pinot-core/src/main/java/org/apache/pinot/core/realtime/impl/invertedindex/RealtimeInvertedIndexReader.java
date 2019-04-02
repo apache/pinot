@@ -25,6 +25,10 @@ import org.apache.pinot.core.segment.index.readers.InvertedIndexReader;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
+/**
+ * Real-time bitmap based inverted index reader which allows adding values on the fly.
+ * <p>This class is thread-safe for single writer multiple readers.
+ */
 public class RealtimeInvertedIndexReader implements InvertedIndexReader<MutableRoaringBitmap> {
   private final List<ThreadSafeMutableRoaringBitmap> _bitmaps = new ArrayList<>();
   private final ReentrantReadWriteLock.ReadLock _readLock;
@@ -37,7 +41,7 @@ public class RealtimeInvertedIndexReader implements InvertedIndexReader<MutableR
   }
 
   /**
-   * Add the document id to the bitmap for the given dictionary id.
+   * Adds the doc Id to the given dict Id's bitmap.
    */
   public void add(int dictId, int docId) {
     if (_bitmaps.size() == dictId) {
@@ -61,10 +65,10 @@ public class RealtimeInvertedIndexReader implements InvertedIndexReader<MutableR
     try {
       _readLock.lock();
       // NOTE: the given dict Id might not be added to the inverted index yet. We first add the value to the dictionary.
-      // Before the value is added to the inverted index, the query might have a predicate which matches the newly added
+      // Before the value is added to the inverted index, the query might have predicates that match the newly added
       // value. In that case, the given dictionary Id does not exist in the inverted index, and we return an empty
-      // bitmap.
-      if (_bitmaps.size() == dictId) {
+      // bitmap. For multi-valued column, the dict Id might be larger than the bitmap size (not equal).
+      if (_bitmaps.size() <= dictId) {
         return new MutableRoaringBitmap();
       }
       bitmap = _bitmaps.get(dictId);
