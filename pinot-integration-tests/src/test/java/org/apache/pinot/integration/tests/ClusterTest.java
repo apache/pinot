@@ -81,6 +81,7 @@ import org.testng.Assert;
  * Base class for integration tests that involve a complete Pinot cluster.
  */
 public abstract class ClusterTest extends ControllerTest {
+  private static final Logger LOGGER = LoggerFactory.getLogger(ClusterTest.class);
   private static final Random RANDOM = new Random();
   private static final int DEFAULT_BROKER_PORT = 18099;
 
@@ -218,20 +219,32 @@ public abstract class ClusterTest extends ControllerTest {
 
   protected void stopBroker() {
     for (HelixBrokerStarter brokerStarter : _brokerStarters) {
-      BrokerTestUtils.stopBroker(brokerStarter);
+      try {
+        BrokerTestUtils.stopBroker(brokerStarter);
+      } catch (Exception e) {
+        LOGGER.error("Encountered exception while stopping broker {}", e.getMessage());
+      }
     }
   }
 
   protected void stopServer() {
     for (HelixServerStarter helixServerStarter : _serverStarters) {
-      helixServerStarter.stop();
+      try {
+        helixServerStarter.stop();
+      } catch (Exception e) {
+        LOGGER.error("Encountered exception while stopping server {}", e.getMessage());
+      }
     }
     FileUtils.deleteQuietly(new File(Server.DEFAULT_INSTANCE_BASE_DIR));
   }
 
   protected void stopMinion() {
     for (MinionStarter minionStarter : _minionStarters) {
-      minionStarter.stop();
+      try {
+        minionStarter.stop();
+      } catch (Exception e) {
+        LOGGER.error("Encountered exception while stopping minion {}", e.getMessage());
+      }
     }
     FileUtils.deleteQuietly(new File(Minion.DEFAULT_INSTANCE_BASE_DIR));
   }
