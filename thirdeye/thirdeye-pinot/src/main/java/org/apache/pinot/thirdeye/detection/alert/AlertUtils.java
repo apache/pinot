@@ -24,6 +24,7 @@ import com.google.common.base.Predicate;
 import com.google.common.collect.Collections2;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -34,8 +35,6 @@ import javax.annotation.Nullable;
 import javax.mail.internet.InternetAddress;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
-import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-
 
 public class AlertUtils {
   private AlertUtils() {

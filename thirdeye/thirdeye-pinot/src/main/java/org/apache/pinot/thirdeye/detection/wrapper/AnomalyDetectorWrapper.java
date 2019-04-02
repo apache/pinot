@@ -84,7 +84,6 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
   // fail detection job if it failed successively for the first 5 windows
   private static final long EARLY_TERMINATE_WINDOW = 5;
 
-
   private static final Logger LOG = LoggerFactory.getLogger(AnomalyDetectorWrapper.class);
 
   private final String metricUrn;
