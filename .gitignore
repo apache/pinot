@@ -25,3 +25,4 @@ pinot-dashboard/pinotui.egg-info
 docs/_build
 *.ipr
 *.iws
+.*.swp
