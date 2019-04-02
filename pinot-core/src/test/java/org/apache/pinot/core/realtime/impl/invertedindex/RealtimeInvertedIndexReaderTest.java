@@ -32,7 +32,7 @@ public class RealtimeInvertedIndexReaderTest {
   public void testRealtimeInvertedIndexReader() {
     RealtimeInvertedIndexReader realtimeInvertedIndexReader = new RealtimeInvertedIndexReader();
 
-    // Add dict Id 0, doc Id 0 to the inverted index (single-value dict Id not added yet)
+    // Add dictionary id 0, document id 0 to the inverted index (single-value dictionary id not added yet)
     // Before adding
     MutableRoaringBitmap docIds = realtimeInvertedIndexReader.getDocIds(0);
     assertNotNull(docIds);
@@ -45,7 +45,7 @@ public class RealtimeInvertedIndexReaderTest {
     assertTrue(docIds.contains(0));
     assertFalse(docIds.contains(1));
 
-    // Add dict Id 0, doc Id 1 to the inverted index (single-value dict Id already added)
+    // Add dictionary id 0, document id 1 to the inverted index (single-value dictionary id already added)
     // Before adding
     docIds = realtimeInvertedIndexReader.getDocIds(1);
     assertNotNull(docIds);
@@ -58,15 +58,15 @@ public class RealtimeInvertedIndexReaderTest {
     assertTrue(docIds.contains(0));
     assertTrue(docIds.contains(1));
 
-    // Add dict Id 1 and 2, doc Id 2 to the inverted index (multi-value dict Ids not added yet)
-    // Before adding dict Id 1
+    // Add dictionary id 1 and 2, document id 2 to the inverted index (multi-value dictionary ids not added yet)
+    // Before adding dictionary id 1
     docIds = realtimeInvertedIndexReader.getDocIds(1);
     assertNotNull(docIds);
     assertTrue(docIds.isEmpty());
     docIds = realtimeInvertedIndexReader.getDocIds(2);
     assertNotNull(docIds);
     assertTrue(docIds.isEmpty());
-    // After adding dict Id 1 but before adding dict Id 2
+    // After adding dictionary id 1 but before adding dictionary id 2
     realtimeInvertedIndexReader.add(1, 2);
     docIds = realtimeInvertedIndexReader.getDocIds(0);
     assertNotNull(docIds);
@@ -83,7 +83,7 @@ public class RealtimeInvertedIndexReaderTest {
     docIds = realtimeInvertedIndexReader.getDocIds(2);
     assertNotNull(docIds);
     assertTrue(docIds.isEmpty());
-    // After adding dict Id 2
+    // After adding dictionary id 2
     realtimeInvertedIndexReader.add(2, 2);
     docIds = realtimeInvertedIndexReader.getDocIds(0);
     assertNotNull(docIds);
