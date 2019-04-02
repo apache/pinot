@@ -26,7 +26,6 @@ import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
 import org.apache.pinot.thirdeye.constant.AnomalyFeedbackType;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.mysql.jdbc.StringUtils;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
