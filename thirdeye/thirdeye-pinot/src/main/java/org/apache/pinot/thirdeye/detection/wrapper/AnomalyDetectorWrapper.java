@@ -81,8 +81,8 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
   private static final long CACHING_PERIOD_LOOKBACK_HOURLY = TimeUnit.DAYS.toMillis(60);
   // disable minute level cache warm up
   private static final long CACHING_PERIOD_LOOKBACK_MINUTELY = -1;
-  // fail detection job if it failed successively for the first 10 windows
-  private static final long EARLY_TERMINATE_WINDOW = 10;
+  // fail detection job if it failed successively for the first 5 windows
+  private static final long EARLY_TERMINATE_WINDOW = 5;
 
 
   private static final Logger LOG = LoggerFactory.getLogger(AnomalyDetectorWrapper.class);
@@ -92,18 +92,18 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
 
   private final int windowDelay;
   private final TimeUnit windowDelayUnit;
-  private final int windowSize;
-  private final TimeUnit windowUnit;
+  private int windowSize;
+  private TimeUnit windowUnit;
   private final MetricConfigDTO metric;
   private final MetricEntity metricEntity;
   private final boolean isMovingWindowDetection;
   // need to specify run frequency for minute level detection. Used for moving monitoring window alignment, default to be 15 minutes.
   private final TimeGranularity functionFrequency;
   private final String detectorName;
-  private final long windowSizeMillis;
+  private long windowSizeMillis;
   private final DatasetConfigDTO dataset;
   private final DateTimeZone dateTimeZone;
-  private final Period bucketPeriod;
+  private Period bucketPeriod;
   private final long cachingPeriodLookback;
 
   public AnomalyDetectorWrapper(DataProvider provider, DetectionConfigDTO config, long startTime, long endTime) {
@@ -142,6 +142,8 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
     this.bucketPeriod = bucketStr == null ? this.getBucketSizePeriodForDataset() : Period.parse(bucketStr);
     this.cachingPeriodLookback = config.getProperties().containsKey(PROP_CACHE_PERIOD_LOOKBACK) ?
         MapUtils.getLong(config.getProperties(), PROP_CACHE_PERIOD_LOOKBACK) : getCachingPeriodLookback(this.dataset.bucketTimeGranularity());
+
+    speedUpMinuteLevelDetection();
   }
 
   @Override
@@ -168,12 +170,13 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
       Interval window = monitoringWindows.get(i);
       List<MergedAnomalyResultDTO> anomaliesForOneWindow = new ArrayList<>();
       try {
-        LOG.info("[Pipeline] running detection for config {} metricUrn {} window ({}/{}) - start {} end {}",
-            config.getId(), metricUrn, i, monitoringWindows.size(), window.getStart(), window.getEnd());
+        LOG.info("[Pipeline] start detection for config {} metricUrn {} window ({}/{}) - start {} end {}",
+            config.getId(), metricUrn, i + 1, monitoringWindows.size(), window.getStart(), window.getEnd());
         long ts = System.currentTimeMillis();
         anomaliesForOneWindow = anomalyDetector.runDetection(window, this.metricUrn);
-        LOG.info("[Pipeline] run anomaly detection for window ({}/{}) - start {} end {}  used {} milliseconds, detected {} anomalies",
-            i, monitoringWindows.size(), window.getStart(), window.getEnd(), System.currentTimeMillis() - ts, anomaliesForOneWindow.size());
+        LOG.info("[Pipeline] end detection for config {} metricUrn {} window ({}/{}) - start {} end {} used {} milliseconds, detected {} anomalies",
+            config.getId(), metricUrn, i + 1, monitoringWindows.size(), window.getStart(), window.getEnd(),
+            System.currentTimeMillis() - ts, anomaliesForOneWindow.size());
         successWindows++;
       }
       catch (DetectorDataInsufficientException e) {
@@ -255,13 +258,6 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
         }
         for (Interval window : monitoringWindows){
           LOG.info("Will run detection in window {}", window);
-        }
-        // pre cache the time series for the whole detection time period instead of fetching for each window
-        if (this.cachingPeriodLookback >= 0) {
-          MetricSlice cacheSlice =
-              MetricSlice.from(this.metricEntity.getId(), startTime - cachingPeriodLookback, endTime,
-                  this.metricEntity.getFilters(), toTimeGranularity(this.bucketPeriod));
-          this.provider.fetchTimeseries(Collections.singleton(cacheSlice));
         }
         return monitoringWindows;
       } catch (Exception e) {
@@ -369,6 +365,25 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
       return new TimeGranularity(period.getMinutes(), TimeUnit.MINUTES);
     } else {
       return new TimeGranularity(period.getMillis(), TimeUnit.MILLISECONDS);
+    }
+  }
+
+  /**
+   * Speed up minute level detection.
+   *
+   * It will generate lots of small windows if the bucket size smaller than 15 minutes and detection window larger than 1 day.
+   * This optimization is to change the bucket period, window size and window unit to 1 day.
+   * Please note we need to change all the three parameters together since the detection window is:
+   * [bucketPeriod_end - windowSize * windowUnit, bucketPeriod_end]
+   *
+   * It is possible to have bucketPeriod as 5 minutes but windowSize is 6 hours.
+   */
+  private void speedUpMinuteLevelDetection() {
+    if (bucketPeriod.getMinutes() <= 15 && endTime - startTime >= Period.days(1).getMillis()) {
+      bucketPeriod = Period.days(1);
+      windowSize = 1;
+      windowUnit = TimeUnit.DAYS;
+      windowSizeMillis = TimeUnit.MILLISECONDS.convert(windowSize, windowUnit);
     }
   }
 }
