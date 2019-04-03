@@ -21,10 +21,10 @@ addons:
   firefox: latest
 
 install:
-  - ./.travis_install.sh
+  - travis_wait 30 ./.travis_install.sh
 
 script:
-  - ./.travis_test.sh
+  - travis_wait 30 ./.travis_test.sh
 
 branches:
   only:
