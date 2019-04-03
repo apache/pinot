@@ -99,6 +99,7 @@ public class MutableSegmentImpl implements MutableSegment {
   private static final StreamMessageMetadata _defaultMetadata = new StreamMessageMetadata();
   private long _lastIndexedTimestamp = Long.MIN_VALUE;
   private long _latestIngestionTimestamp = Long.MIN_VALUE;
+  private int _indexingErrors = 0;
 
   public MutableSegmentImpl(RealtimeSegmentConfig config) {
     _segmentName = config.getSegmentName();
@@ -114,6 +115,16 @@ public class MutableSegmentImpl implements MutableSegment {
       public int getTotalRawDocs() {
         // In realtime total docs and total raw docs are the same currently.
         return _numDocsIndexed;
+      }
+
+      @Override
+      public long getLastIndexedTimestamp() {
+        return _lastIndexedTimestamp;
+      }
+
+      @Override
+      public long getLatestIngestionTimestamp() {
+        return _latestIngestionTimestamp;
       }
     };
 
@@ -377,16 +388,6 @@ public class MutableSegmentImpl implements MutableSegment {
   @Override
   public int getNumDocsIndexed() {
     return _numDocsIndexed;
-  }
-
-  @Override
-  public Long getLastIndexedTimestamp() {
-    return _lastIndexedTimestamp;
-  }
-
-  @Override
-  public Long getLatestIngestionTimestamp() {
-    return _latestIngestionTimestamp;
   }
 
   @Override

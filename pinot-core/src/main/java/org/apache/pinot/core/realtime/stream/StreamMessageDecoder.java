@@ -56,7 +56,7 @@ public interface StreamMessageDecoder<T> {
   GenericRow decode(T payload, int offset, int length, GenericRow destination);
 
   /**
-   * Decodes the payload received into a generic row and optionally returns any metadata associated
+   * Decodes the payload received into a generic row and optionally populates any metadata associated
    * with the message.
    *
    * This is an interface default method is provided for backward compatibility and should be
@@ -73,7 +73,7 @@ public interface StreamMessageDecoder<T> {
   }
 
   /**
-   * Decodes the payload received into a generic row and optionally returns any metadata associated
+   * Decodes the payload received into a generic row and optionally populates any metadata associated
    * with the message.
    *
    * This is an interface default method is provided for backward compatibility and should be

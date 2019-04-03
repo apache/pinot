@@ -73,6 +73,23 @@ public interface SegmentMetadata {
    */
   long getRefreshTime();
 
+  // methods specific to realtime segments
+  /**
+   * Return the last time a record was indexed in this segment. Applicable for MutableSegments.
+   *
+   * @return time when the last record was indexed
+   */
+  long getLastIndexedTimestamp();
+
+  /**
+   * Return the latest ingestion timestamp associated with the records indexed in this segment.
+   * Applicable for MutableSegments.
+   *
+   * @return latest timestamp associated with indexed records
+   *         <code>Long.MIN_VALUE</code> if the stream doesn't provide a timestamp
+   */
+  long getLatestIngestionTimestamp();
+
   boolean hasDictionary(String columnName);
 
   boolean hasStarTree();

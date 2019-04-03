@@ -459,21 +459,13 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   }
 
   @Override
-  public long getLastIndexedTime() {
+  public long getLastIndexedTimestamp() {
     return _lastIndexedTime;
   }
 
   @Override
   public long getLatestIngestionTimestamp() {
     return _latestIngestionTime;
-  }
-
-  public void setLastIndexedTime(long timestamp) {
-    _lastIndexedTime = timestamp;
-  }
-
-  public void setLatestIngestionTime(long timestamp) {
-    _latestIngestionTime = timestamp;
   }
 
   @Override

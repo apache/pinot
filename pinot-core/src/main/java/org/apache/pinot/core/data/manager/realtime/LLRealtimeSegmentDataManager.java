@@ -459,7 +459,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
                     realtimeRowsDroppedMeter);
           }
 
-          canTakeMore = _realtimeSegment.index(transformedRow);
+          canTakeMore = _realtimeSegment.index(transformedRow, msgMetadata);
         } catch (Exception e) {
           segmentLogger.error("Caught exception while transforming the record: {}", decodedRow, e);
           _numRowsErrored++;
