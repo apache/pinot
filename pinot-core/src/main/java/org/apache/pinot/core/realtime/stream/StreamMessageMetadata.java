@@ -24,17 +24,17 @@ package org.apache.pinot.core.realtime.stream;
  */
 public class StreamMessageMetadata {
 
-  private Long _ingestionTimestamp;
+  private long _ingestionTimestamp;
 
   public StreamMessageMetadata() {
 
   }
 
-  public Long getIngestionTimestamp() {
+  public long getIngestionTimestamp() {
     return _ingestionTimestamp;
   }
 
-  public void setIngestionTimestamp(Long timestamp) {
+  public void setIngestionTimestamp(long timestamp) {
     _ingestionTimestamp = timestamp;
   }
 }

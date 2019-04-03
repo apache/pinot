@@ -438,7 +438,9 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
       // Index each message
       decodedRow = GenericRow.createOrReuseRow(decodedRow);
-      msgMetadata.setIngestionTimestamp(null);
+      // retrieve the timestamp from the message batch if available
+      // this can be overridden by the decoder if there is a better indicator in the message payload
+      msgMetadata.setIngestionTimestamp(messagesAndOffsets.getTimestampAtIndex(index));
       decodedRow = _messageDecoder
           .decode(messagesAndOffsets.getMessageAtIndex(index), messagesAndOffsets.getMessageOffsetAtIndex(index),
               messagesAndOffsets.getMessageLengthAtIndex(index), decodedRow, msgMetadata);

@@ -224,7 +224,8 @@ public class MutableSegmentImpl implements MutableSegment {
       addInvertedIndex(docId, dictIdMap);
 
       _lastIndexedTimestamp = System.currentTimeMillis();
-      if (msgMetadata != null && msgMetadata.getIngestionTimestamp() != null) {
+
+      if (msgMetadata != null) {
         _latestIngestionTimestamp = Math.max(_latestIngestionTimestamp, msgMetadata.getIngestionTimestamp());
       }
       // Update number of document indexed at last to make the latest record queryable

@@ -52,6 +52,17 @@ public interface MessageBatch<T> {
   int getMessageLengthAtIndex(int index);
 
   /**
+   * Returns the timestamp associated with the message at a particular index. This is typicall the timestamp
+   * when the message was ingested by the upstream stream-provider.
+   *
+   * @return the timestamp associated with the message
+   *         Long.MIN_VALUE if its not supported by the stream
+   */
+  default long getTimestampAtIndex(int index) {
+    return Long.MIN_VALUE;
+  }
+
+  /**
    * Returns the offset of the next message.
    * @param index
    * @return

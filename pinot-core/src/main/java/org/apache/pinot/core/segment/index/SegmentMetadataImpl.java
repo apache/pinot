@@ -83,6 +83,10 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   private Duration _timeGranularity;
   private long _pushTime = Long.MIN_VALUE;
   private long _refreshTime = Long.MIN_VALUE;
+
+  private long _lastIndexedTime = Long.MIN_VALUE;
+  private long _latestIngestionTime = Long.MIN_VALUE;
+
   private SegmentVersion _segmentVersion;
   private boolean _hasStarTree;
   private StarTreeMetadata _starTreeMetadata;
@@ -452,6 +456,24 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   @Override
   public long getRefreshTime() {
     return _refreshTime;
+  }
+
+  @Override
+  public long getLastIndexedTime() {
+    return _lastIndexedTime;
+  }
+
+  @Override
+  public long getLatestIngestionTimestamp() {
+    return _latestIngestionTime;
+  }
+
+  public void setLastIndexedTime(long timestamp) {
+    _lastIndexedTime = timestamp;
+  }
+
+  public void setLatestIngestionTime(long timestamp) {
+    _latestIngestionTime = timestamp;
   }
 
   @Override
