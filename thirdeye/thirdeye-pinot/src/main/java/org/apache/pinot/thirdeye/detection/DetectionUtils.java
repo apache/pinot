@@ -26,6 +26,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import org.apache.pinot.thirdeye.common.dimension.DimensionMap;
 import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.dataframe.BooleanSeries;
@@ -42,6 +43,7 @@ import org.apache.pinot.thirdeye.detection.spi.components.BaselineProvider;
 import org.apache.pinot.thirdeye.detection.spi.model.TimeSeries;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
+import org.joda.time.Duration;
 import org.joda.time.Period;
 import org.joda.time.PeriodType;
 
@@ -219,4 +221,20 @@ public class DetectionUtils {
     return TimeGranularity.fromString(monitoringGranularity).toPeriod();
   }
 
+  public static Period periodFromTimeUnit(int size, TimeUnit unit) {
+    switch (unit) {
+      case DAYS:
+        return Period.days(size);
+      case HOURS:
+        return Period.hours(size);
+      case MILLISECONDS:
+        return Period.millis(size);
+      case MINUTES:
+        return Period.minutes(size);
+      case SECONDS:
+        return Period.seconds(size);
+      default:
+        return new Period(TimeUnit.MILLISECONDS.convert(size, unit));
+    }
+  }
 }

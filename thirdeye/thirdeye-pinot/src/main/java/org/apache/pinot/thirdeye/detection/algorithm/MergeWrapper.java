@@ -20,6 +20,7 @@
 package org.apache.pinot.thirdeye.detection.algorithm;
 
 import com.google.common.base.Preconditions;
+import java.time.Period;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
