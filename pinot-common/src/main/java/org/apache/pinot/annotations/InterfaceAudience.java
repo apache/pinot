@@ -27,7 +27,6 @@ import java.lang.annotation.Documented;
  * Currently the audience can be {@link org.apache.pinot.annotations.InterfaceAudience.Public},
  * {@link org.apache.pinot.annotations.InterfaceAudience.LimitedPrivate} or
  * {@link org.apache.pinot.annotations.InterfaceAudience.Private}. <br>
- *
  * <ul>
  * <li>Public classes that are not marked with this annotation must be
  * considered by default as {@link org.apache.pinot.annotations.InterfaceAudience.Private}.</li>
