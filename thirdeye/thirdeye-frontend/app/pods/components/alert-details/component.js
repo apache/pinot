@@ -389,7 +389,7 @@ export default Component.extend({
 
       if (anomalies) {
         anomalies.forEach(a => {
-          const change = (a.avgBaselineVal !== 0 && a.avgBaselineVal !== "Infinity" && a.avgCurrentVal !== "Infinity") ? (a.avgCurrentVal/a.avgBaselineVal - 1.0) * 100.0 : 0;
+          const change = (a.avgBaselineVal !== 0 && a.avgBaselineVal !== "Infinity" && a.avgCurrentVal !== "Infinity") ? (a.avgCurrentVal/a.avgBaselineVal - 1.0) * 100.0 : 'N/A';
           let tableRow = {
             anomalyId: a.id,
             metricUrn: a.metricUrn,
@@ -397,10 +397,10 @@ export default Component.extend({
             end: a.endTime,
             startDateStr: this._formatAnomaly(a),
             durationStr: getFormattedDuration(a.startTime, a.endTime),
-            shownCurrent: a.avgCurrentVal === "Infinity" ? 0 : humanizeFloat(a.avgCurrentVal),
-            shownBaseline: a.avgBaselineVal === "Infinity" ? 0 : humanizeFloat(a.avgBaselineVal),
+            shownCurrent: a.avgCurrentVal === "Infinity" ? '-' : humanizeFloat(a.avgCurrentVal),
+            shownBaseline: a.avgBaselineVal === "Infinity" ? '-' : humanizeFloat(a.avgBaselineVal),
             change: change,
-            shownChangeRate: humanizeFloat(change),
+            shownChangeRate: change === 'N/A' ? change : humanizeFloat(change),
             anomalyFeedback: a.feedback ? a.feedback.feedbackType : a.statusClassification,
             dimensionList: Object.keys(a.dimensions),
             dimensions: a.dimensions,
