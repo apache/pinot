@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -31,6 +32,7 @@ import javax.annotation.Nullable;
 import org.apache.avro.Schema.Field;
 import org.apache.avro.SchemaBuilder;
 import org.apache.avro.file.DataFileStream;
+import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.pinot.common.data.DimensionFieldSpec;
@@ -38,9 +40,14 @@ import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.MetricFieldSpec;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.data.TimeFieldSpec;
+import org.apache.pinot.core.data.GenericRow;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class AvroUtils {
+  private static final Logger LOGGER = LoggerFactory.getLogger(AvroUtils.class);
+
   private AvroUtils() {
   }
 
@@ -266,6 +273,35 @@ public class AvroUtils {
       return extractSupportedSchema(recordFields.get(0).schema());
     } else {
       return fieldSchema;
+    }
+  }
+
+  /**
+   * Valid table schema with avro schema
+   */
+  public static void validateSchema(Schema schema, org.apache.avro.Schema avroSchema) {
+    for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
+      String fieldName = fieldSpec.getName();
+      Field avroField = avroSchema.getField(fieldName);
+      if (avroField == null) {
+        LOGGER.warn("Pinot field: {} does not exist in Avro Schema", fieldName);
+      } else {
+        boolean isPinotFieldSingleValue = fieldSpec.isSingleValueField();
+        boolean isAvroFieldSingleValue = AvroUtils.isSingleValueField(avroField);
+        if (isPinotFieldSingleValue != isAvroFieldSingleValue) {
+          String errorMessage = "Pinot field: " + fieldName + " is " + (isPinotFieldSingleValue ? "Single" : "Multi")
+                  + "-valued in Pinot schema but not in Avro schema";
+          LOGGER.error(errorMessage);
+          throw new IllegalStateException(errorMessage);
+        }
+
+        FieldSpec.DataType pinotFieldDataType = fieldSpec.getDataType();
+        FieldSpec.DataType avroFieldDataType = AvroUtils.extractFieldDataType(avroField);
+        if (pinotFieldDataType != avroFieldDataType) {
+          LOGGER.warn("Pinot field: {} of type: {} mismatches with corresponding field in Avro Schema of type: {}",
+                  fieldName, pinotFieldDataType, avroFieldDataType);
+        }
+      }
     }
   }
 }
