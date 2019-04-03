@@ -74,7 +74,7 @@ public class YamlDetectionAlertConfigTranslatorTest {
     Assert.assertEquals(alertConfig.getFrom(), "thirdeye@thirdeye");
     Assert.assertEquals(alertConfig.getCronExpression(), "0 0/5 * * * ? *");
     Assert.assertEquals(alertConfig.getSubjectType(), AlertConfigBean.SubjectType.METRICS);
-    Assert.assertEquals(alertConfig.getReferenceLinks().size(), 3);
+    Assert.assertEquals(alertConfig.getReferenceLinks().size(), 1);
     Assert.assertEquals(alertConfig.getReferenceLinks().get("Test Link"), "test_url");
 
     Assert.assertEquals(alertConfig.getAlertSchemes().size(), 1);
