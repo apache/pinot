@@ -31,10 +31,21 @@ export function getAnomaliesByAlertIdUrl(alertId, startTime, endTime) {
   return `/detection/${alertId}/anomalies?start=${startTime}&end=${endTime}`;
 }
 
+/**
+ * Returns the url for getting anomaly ids of all anomalies over the specified time range
+ * @param {Number} startTime - beginning of time range of interest
+ * @param {Number} endTime - end of time range of interest
+ * @example getAnomalyIdsByTimeRangeUrl(1508472700000, 1508472800000) // yields => /anomalies/search/time/1508472700000/1508472800000/1?filterOnly=true
+ */
+export function getAnomalyIdsByTimeRangeUrl(startTime, endTime) {
+  return `/anomalies/search/time/${startTime}/${endTime}/1?filterOnly=true`;
+}
+
 export const anomalyApiUrls = {
   getAnomalyDataUrl,
   getAnomaliesForYamlPreviewUrl,
-  getAnomaliesByAlertIdUrl
+  getAnomaliesByAlertIdUrl,
+  getAnomalyIdsByTimeRangeUrl
 };
 
 export default {

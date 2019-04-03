@@ -18,6 +18,7 @@ Router.map(function() {
     this.route('share-dashboard');
   });
 
+  this.route('anomalies');
 
   this.route('manage', function() {
     this.route('alert', { path: 'alert/:alert_id' }, function() {
