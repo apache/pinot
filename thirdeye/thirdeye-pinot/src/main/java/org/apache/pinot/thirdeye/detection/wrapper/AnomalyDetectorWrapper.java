@@ -363,7 +363,8 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
    * It is possible to have bucketPeriod as 5 minutes but windowSize is 6 hours.
    */
   private void speedUpMinuteLevelDetection() {
-    if (bucketPeriod.getMinutes() <= 15 && endTime - startTime >= Period.days(1).getMillis()) {
+    long millis = new Period(0, 0, 0, 0, 0, 15, 0, 0).toStandardDuration().getMillis();
+    if (bucketPeriod.toStandardDuration().getMillis() <= millis && endTime - startTime >= Period.days(1).getMillis()) {
       bucketPeriod = Period.days(1);
       windowSize = 1;
       windowUnit = TimeUnit.DAYS;
