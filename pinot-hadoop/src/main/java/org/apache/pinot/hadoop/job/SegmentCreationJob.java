@@ -109,7 +109,7 @@ public class SegmentCreationJob extends BaseSegmentJob {
       return true;
     }
     return fileName.endsWith(".avro") || fileName.endsWith(".csv") || fileName.endsWith(".json") || fileName
-        .endsWith(".thrift") || fileName.endsWith(".parquet");
+        .endsWith(".thrift");
   }
 
   public void run()

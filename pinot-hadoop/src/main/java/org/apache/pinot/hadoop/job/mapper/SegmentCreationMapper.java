@@ -276,9 +276,6 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
     if (fileName.endsWith(".thrift")) {
       return FileFormat.THRIFT;
     }
-    if (fileName.endsWith(".parquet")) {
-      return FileFormat.PARQUET;
-    }
     throw new IllegalArgumentException("Unsupported file format: {}" + fileName);
   }
 
