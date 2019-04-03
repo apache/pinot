@@ -27,13 +27,14 @@ import java.lang.annotation.Documented;
  * Currently the audience can be {@link org.apache.pinot.annotations.InterfaceAudience.Public},
  * {@link org.apache.pinot.annotations.InterfaceAudience.LimitedPrivate} or
  * {@link org.apache.pinot.annotations.InterfaceAudience.Private}. <br>
- * It is recommended that public classes are annotated with InterfaceAudience annotation. <br>
+ *
  * <ul>
  * <li>Public classes that are not marked with this annotation must be
  * considered by default as {@link org.apache.pinot.annotations.InterfaceAudience.Private}.</li>
  *
- * <li>External applications must only use classes that are marked
- * {@link org.apache.pinot.annotations.InterfaceAudience.Public}. Do not depend on non-public classes as these classes
+ * <li>External application developers depending on Pinot must only use classes that are marked
+ * {@link org.apache.pinot.annotations.InterfaceAudience.Public}. Do not depend on classes without an
+ * explicit InterfaceAudience.Public annotation as these classes
  * could be removed or change in incompatible ways.</li>
  *
  * <li> Methods may have a different annotation that it is more restrictive

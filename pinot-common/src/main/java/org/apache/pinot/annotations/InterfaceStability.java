@@ -26,11 +26,11 @@ import java.lang.annotation.Documented;
  * {@link org.apache.pinot.annotations.InterfaceStability.Evolving} or
  * {@link org.apache.pinot.annotations.InterfaceStability.Unstable}. <br>
  *
- * <ul><li>All classes that are annotated with {@link org.apache.pinot.annotations.InterfaceAudience.Public} or
- * {@link org.apache.pinot.annotations.InterfaceAudience.LimitedPrivate} must have InterfaceStability annotation. </li>
+ * <ul><li>All classes that are annotated with {@link org.apache.pinot.annotations.InterfaceAudience.Public} must have
+ * InterfaceStability annotation. </li>
  * <li>Classes that are {@link org.apache.pinot.annotations.InterfaceAudience.Private} are to be considered unstable unless
  * a different InterfaceStability annotation states otherwise.</li>
- * <li>Incompatible changes must not be made to classes marked as stable.</li>
+ * <li>Pinot contributors should NOT make incompatible changes to classes marked as stable.</li>
  * </ul>
  *
  * Note: the definitions are borrowed from a similar annotation from Apache Hadoop project.
