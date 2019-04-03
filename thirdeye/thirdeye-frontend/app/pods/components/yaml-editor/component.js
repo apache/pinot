@@ -453,7 +453,7 @@ export default Component.extend({
         const alert_json = await alert_result.json();
         if (alert_status !== 200) {
           set(this, 'errorMsg', get(alert_json, 'message'));
-          notifications.error('Failed to save the detection configuration.', 'Error', toastOptions);
+          notifications.error(`Failed to save the detection configuration due to: ${alert_json.message}.`, 'Error', toastOptions);
         } else {
           notifications.success('Detection configuration saved successfully', 'Done', toastOptions);
         }
@@ -473,12 +473,12 @@ export default Component.extend({
         const settings_json = await settings_result.json();
         if (settings_status !== 200) {
           set(this, 'errorMsg', get(settings_json, 'message'));
-          notifications.error('Failed to save the subscription configuration.', 'Error', toastOptions);
+          notifications.error(`Failed to save the subscription configuration due to: ${settings_json.message}.`, 'Error', toastOptions);
         } else {
           notifications.success('Subscription configuration saved successfully', 'Done', toastOptions);
         }
       } catch (error) {
-        notifications.error('Error while saving subscription config', error, toastOptions);
+        notifications.error('Error while saving subscription config.', error, toastOptions);
       }
     }
   }
