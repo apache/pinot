@@ -84,7 +84,7 @@ public class SegmentPreProcessor implements AutoCloseable {
 
     try (SegmentDirectory.Writer segmentWriter = _segmentDirectory.createWriter()) {
       // Update default columns according to the schema.
-      if (_indexLoadingConfig.isEnableDefaultColumns() && (_schema != null)) {
+      if (_schema != null) {
         DefaultColumnHandler defaultColumnHandler =
             DefaultColumnHandlerFactory.getDefaultColumnHandler(_indexDir, _schema, _segmentMetadata, segmentWriter);
         defaultColumnHandler.updateDefaultColumns();

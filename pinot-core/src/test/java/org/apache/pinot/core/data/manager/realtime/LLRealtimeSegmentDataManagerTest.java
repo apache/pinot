@@ -654,7 +654,6 @@ public class LLRealtimeSegmentDataManagerTest {
       when(dataManagerConfig.getReadMode()).thenReturn(null);
       when(dataManagerConfig.getAvgMultiValueCount()).thenReturn(null);
       when(dataManagerConfig.getSegmentFormatVersion()).thenReturn(null);
-      when(dataManagerConfig.isEnableDefaultColumns()).thenReturn(false);
       when(dataManagerConfig.isEnableSplitCommit()).thenReturn(false);
       when(dataManagerConfig.isRealtimeOffHeapAllocation()).thenReturn(false);
       return dataManagerConfig;
