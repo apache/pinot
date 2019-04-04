@@ -26,6 +26,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
+import java.util.stream.Collectors;
 import javax.annotation.Nonnegative;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -47,6 +48,8 @@ import org.slf4j.LoggerFactory;
  */
 public class TableSizeReader {
   private static final Logger LOGGER = LoggerFactory.getLogger(TableSizeReader.class);
+
+  private static final int MAX_MISSING_SEGMENTS_TO_LIST = 5;
   private final Executor _executor;
   private final HttpConnectionManager _connectionManager;
   private final PinotHelixResourceManager _helixResourceManager;
@@ -225,14 +228,13 @@ public class TableSizeReader {
           .setValueOfTableGauge(tableNameWithType, ControllerGauge.TABLE_STORAGE_EST_MISSING_SEGMENT_PERCENT,
               missingPercent);
       if (subTypeSizeDetails.missingSegments == numSegments) {
-        LOGGER.warn("Failed to get size report for all {} segments: {} for table: {}", numSegments, missingSegments,
-            tableNameWithType);
+        LOGGER.warn("Failed to get size report for all {} segments of table: {}", numSegments, tableNameWithType);
         subTypeSizeDetails.reportedSizeInBytes = -1;
         subTypeSizeDetails.estimatedSizeInBytes = -1;
       } else {
-        LOGGER
-            .warn("Missing size report for {} out of {} segments: {} for table {}", subTypeSizeDetails.missingSegments,
-                numSegments, missingSegments, tableNameWithType);
+        LOGGER.warn("Missing size report for {} out of {} segments for table {}. Listing {} segments: {}",
+            subTypeSizeDetails.missingSegments, numSegments, tableNameWithType, MAX_MISSING_SEGMENTS_TO_LIST,
+            missingSegments.stream().limit(MAX_MISSING_SEGMENTS_TO_LIST).collect(Collectors.toList()));
       }
     } else {
       _controllerMetrics

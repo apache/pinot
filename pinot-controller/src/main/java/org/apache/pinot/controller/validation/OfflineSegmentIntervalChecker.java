@@ -46,6 +46,8 @@ import org.slf4j.LoggerFactory;
 public class OfflineSegmentIntervalChecker extends ControllerPeriodicTask<Void> {
   private static final Logger LOGGER = LoggerFactory.getLogger(OfflineSegmentIntervalChecker.class);
 
+  private static final int MAX_SEGMENTS_WITH_INVALID_INTERVALS_TO_LOG = 5;
+
   private final ValidationMetrics _validationMetrics;
 
   public OfflineSegmentIntervalChecker(ControllerConf config, PinotHelixResourceManager pinotHelixResourceManager,
@@ -81,18 +83,23 @@ public class OfflineSegmentIntervalChecker extends ControllerPeriodicTask<Void> 
     SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
     if (numSegments >= 2 && StringUtils.isNotEmpty(validationConfig.getTimeColumnName())) {
       List<Interval> segmentIntervals = new ArrayList<>(numSegments);
-      List<String> segmentsWithInvalidInterval = new ArrayList<>();
+      List<String> segmentsWithInvalidInterval = new ArrayList<>(MAX_SEGMENTS_WITH_INVALID_INTERVALS_TO_LOG);
+      int numSegmentsWithInvalidIntervals = 0;
       for (OfflineSegmentZKMetadata offlineSegmentZKMetadata : offlineSegmentZKMetadataList) {
         Interval timeInterval = offlineSegmentZKMetadata.getTimeInterval();
         if (timeInterval != null && TimeUtils.timeValueInValidRange(timeInterval.getStartMillis()) && TimeUtils
             .timeValueInValidRange(timeInterval.getEndMillis())) {
           segmentIntervals.add(timeInterval);
         } else {
-          segmentsWithInvalidInterval.add(offlineSegmentZKMetadata.getSegmentName());
+          numSegmentsWithInvalidIntervals ++;
+          if (segmentsWithInvalidInterval.size() < MAX_SEGMENTS_WITH_INVALID_INTERVALS_TO_LOG) {
+            segmentsWithInvalidInterval.add(offlineSegmentZKMetadata.getSegmentName());
+          }
         }
       }
       if (!segmentsWithInvalidInterval.isEmpty()) {
-        LOGGER.warn("Table: {} has segments with invalid interval: {}", offlineTableName, segmentsWithInvalidInterval);
+        LOGGER.warn("Table: {} has segments with invalid interval. Listing {} of {}: {}", offlineTableName,
+            MAX_SEGMENTS_WITH_INVALID_INTERVALS_TO_LOG, numSegmentsWithInvalidIntervals, segmentsWithInvalidInterval);
       }
       Duration frequency = convertToDuration(validationConfig.getSegmentPushFrequency());
       numMissingSegments = computeNumMissingSegments(segmentIntervals, frequency);
