@@ -52,6 +52,7 @@ public class ChaosMonkeyIntegrationTest {
 
   private Process runAdministratorCommand(String[] args) {
     String classpath = System.getProperty("java.class.path");
+    System.getProperties().setProperty("pinot.admin.system.exit", "false");
     List<String> completeArgs = new ArrayList<>();
     completeArgs.add("java");
     completeArgs.add("-Xms4G");
