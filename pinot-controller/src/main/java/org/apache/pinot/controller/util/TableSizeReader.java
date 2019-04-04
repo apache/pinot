@@ -232,7 +232,7 @@ public class TableSizeReader {
         subTypeSizeDetails.reportedSizeInBytes = -1;
         subTypeSizeDetails.estimatedSizeInBytes = -1;
       } else {
-        LOGGER.warn("Missing size report for {} out of {} segments for table {}. Listing {} segments: {}",
+        LOGGER.warn("Missing size report for {} out of {} segments for table {}. Listing up to {} segments: {}",
             subTypeSizeDetails.missingSegments, numSegments, tableNameWithType, MAX_MISSING_SEGMENTS_TO_LIST,
             missingSegments.stream().limit(MAX_MISSING_SEGMENTS_TO_LIST).collect(Collectors.toList()));
       }

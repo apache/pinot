@@ -98,8 +98,8 @@ public class OfflineSegmentIntervalChecker extends ControllerPeriodicTask<Void> 
         }
       }
       if (!segmentsWithInvalidInterval.isEmpty()) {
-        LOGGER.warn("Table: {} has segments with invalid interval. Listing {} of {}: {}", offlineTableName,
-            MAX_SEGMENTS_WITH_INVALID_INTERVALS_TO_LOG, numSegmentsWithInvalidIntervals, segmentsWithInvalidInterval);
+        LOGGER.warn("Table: {} has {} segments with invalid interval. Listing up to {}: {}", offlineTableName,
+            numSegmentsWithInvalidIntervals, MAX_SEGMENTS_WITH_INVALID_INTERVALS_TO_LOG, segmentsWithInvalidInterval);
       }
       Duration frequency = convertToDuration(validationConfig.getSegmentPushFrequency());
       numMissingSegments = computeNumMissingSegments(segmentIntervals, frequency);
