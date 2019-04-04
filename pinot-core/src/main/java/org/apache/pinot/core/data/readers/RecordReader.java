@@ -36,7 +36,8 @@ public interface RecordReader extends Closeable {
   /**
    * Initializes the record reader when needed
    */
-  void init(SegmentGeneratorConfig segmentGeneratorConfig);
+  void init(SegmentGeneratorConfig segmentGeneratorConfig)
+      throws IOException;
 
   /**
    * Return <code>true</code> if more records remain to be read.

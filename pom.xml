@@ -55,6 +55,7 @@
     <module>pinot-hadoop-filesystem</module>
     <module>pinot-azure-filesystem</module>
     <module>pinot-orc</module>
+    <module>pinot-parquet</module>
   </modules>
 
   <licenses>
@@ -398,6 +399,11 @@
         <groupId>org.apache.avro</groupId>
         <artifactId>avro</artifactId>
         <version>${avro.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.parquet</groupId>
+        <artifactId>parquet-avro</artifactId>
+        <version>${parquet.version}</version>
       </dependency>
       <dependency>
         <groupId>org.xerial.snappy</groupId>

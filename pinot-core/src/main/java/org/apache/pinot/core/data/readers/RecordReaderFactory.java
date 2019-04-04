@@ -46,10 +46,10 @@ public class RecordReaderFactory {
     // If this is set, this will override the file format
     if (recordReaderPath != null) {
       if (fileFormat != FileFormat.OTHER) {
-        // We currently have default file format set to AVRO inside segment generator config,
-        // do not want to break this behavior for clients.
-        LOGGER.warn("Using recordReaderPath {} to read segment, ignoring fileformat {}",
-            recordReaderPath, fileFormat.toString());
+        // NOTE: we currently have default file format set to AVRO inside segment generator config, do not want to break
+        // this behavior for clients.
+        LOGGER
+            .warn("Using class: {} to read segment, ignoring configured file format: {}", recordReaderPath, fileFormat);
       }
       RecordReader recordReader = (RecordReader) Class.forName(recordReaderPath).newInstance();
       recordReader.init(segmentGeneratorConfig);
@@ -70,8 +70,6 @@ public class RecordReaderFactory {
       // NOTE: PinotSegmentRecordReader does not support time conversion (field spec must match)
       case PINOT:
         return new PinotSegmentRecordReader(dataFile, schema, segmentGeneratorConfig.getColumnSortOrder());
-      case PARQUET:
-        return new ParquetRecordReader(dataFile, schema);
       default:
         throw new UnsupportedOperationException("Unsupported input file format: " + fileFormat);
     }
