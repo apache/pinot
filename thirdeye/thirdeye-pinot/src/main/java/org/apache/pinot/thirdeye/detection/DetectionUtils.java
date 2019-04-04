@@ -227,12 +227,12 @@ public class DetectionUtils {
         return Period.days(size);
       case HOURS:
         return Period.hours(size);
-      case MILLISECONDS:
-        return Period.millis(size);
       case MINUTES:
         return Period.minutes(size);
       case SECONDS:
         return Period.seconds(size);
+      case MILLISECONDS:
+        return Period.millis(size);
       default:
         return new Period(TimeUnit.MILLISECONDS.convert(size, unit));
     }
