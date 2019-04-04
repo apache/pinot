@@ -309,30 +309,30 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
           properties.put(PROP_WINDOW_SIZE, 6);
           properties.put(PROP_WINDOW_UNIT, TimeUnit.HOURS);
       }
-      // override from yaml
-      if (yamlConfig.containsKey(PROP_WINDOW_SIZE)) {
-        properties.put(PROP_MOVING_WINDOW_DETECTION, true);
-        properties.put(PROP_WINDOW_SIZE, MapUtils.getString(yamlConfig, PROP_WINDOW_SIZE));
-      }
-      if (yamlConfig.containsKey(PROP_WINDOW_UNIT)) {
-        properties.put(PROP_MOVING_WINDOW_DETECTION, true);
-        properties.put(PROP_WINDOW_UNIT, MapUtils.getString(yamlConfig, PROP_WINDOW_UNIT));
-      }
-      if (yamlConfig.containsKey(PROP_WINDOW_DELAY)) {
-        properties.put(PROP_WINDOW_DELAY, MapUtils.getString(yamlConfig, PROP_WINDOW_DELAY));
-      }
-      if (yamlConfig.containsKey(PROP_WINDOW_DELAY_UNIT)) {
-        properties.put(PROP_WINDOW_DELAY_UNIT, MapUtils.getString(yamlConfig, PROP_WINDOW_DELAY_UNIT));
-      }
-      if (yamlConfig.containsKey(PROP_TIMEZONE)){
-        properties.put(PROP_TIMEZONE, MapUtils.getString(yamlConfig, PROP_TIMEZONE));
-      }
-      if (yamlConfig.containsKey(PROP_BUCKET_PERIOD)){
-        properties.put(PROP_BUCKET_PERIOD, MapUtils.getString(yamlConfig, PROP_BUCKET_PERIOD));
-      }
-      if (yamlConfig.containsKey(PROP_CACHE_PERIOD_LOOKBACK)) {
-        properties.put(PROP_CACHE_PERIOD_LOOKBACK, MapUtils.getString(yamlConfig, PROP_CACHE_PERIOD_LOOKBACK));
-      }
+    }
+    // override from yaml
+    if (yamlConfig.containsKey(PROP_WINDOW_SIZE)) {
+      properties.put(PROP_MOVING_WINDOW_DETECTION, true);
+      properties.put(PROP_WINDOW_SIZE, MapUtils.getString(yamlConfig, PROP_WINDOW_SIZE));
+    }
+    if (yamlConfig.containsKey(PROP_WINDOW_UNIT)) {
+      properties.put(PROP_MOVING_WINDOW_DETECTION, true);
+      properties.put(PROP_WINDOW_UNIT, MapUtils.getString(yamlConfig, PROP_WINDOW_UNIT));
+    }
+    if (yamlConfig.containsKey(PROP_WINDOW_DELAY)) {
+      properties.put(PROP_WINDOW_DELAY, MapUtils.getString(yamlConfig, PROP_WINDOW_DELAY));
+    }
+    if (yamlConfig.containsKey(PROP_WINDOW_DELAY_UNIT)) {
+      properties.put(PROP_WINDOW_DELAY_UNIT, MapUtils.getString(yamlConfig, PROP_WINDOW_DELAY_UNIT));
+    }
+    if (yamlConfig.containsKey(PROP_TIMEZONE)){
+      properties.put(PROP_TIMEZONE, MapUtils.getString(yamlConfig, PROP_TIMEZONE));
+    }
+    if (yamlConfig.containsKey(PROP_BUCKET_PERIOD)){
+      properties.put(PROP_BUCKET_PERIOD, MapUtils.getString(yamlConfig, PROP_BUCKET_PERIOD));
+    }
+    if (yamlConfig.containsKey(PROP_CACHE_PERIOD_LOOKBACK)) {
+      properties.put(PROP_CACHE_PERIOD_LOOKBACK, MapUtils.getString(yamlConfig, PROP_CACHE_PERIOD_LOOKBACK));
     }
   }
 

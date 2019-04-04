@@ -43,7 +43,6 @@ import org.apache.pinot.thirdeye.detection.DetectionPipelineResult;
 import org.apache.pinot.thirdeye.detection.DetectionUtils;
 import org.apache.pinot.thirdeye.detection.spi.components.AnomalyDetector;
 import org.apache.pinot.thirdeye.detection.spi.exception.DetectorDataInsufficientException;
-import org.apache.pinot.thirdeye.detection.spi.exception.DetectorException;
 import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
 import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
 import org.joda.time.DateTime;
@@ -76,7 +75,7 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
   private static final String PROP_TIMEZONE = "timezone";
   private static final String PROP_BUCKET_PERIOD = "bucketPeriod";
   private static final String PROP_CACHE_PERIOD_LOOKBACK = "cachingPeriodLookback";
-  private static final long DEFAULT_CACHING_PERIOD_LOOKBACK = TimeUnit.DAYS.toMillis(-1);
+  private static final long DEFAULT_CACHING_PERIOD_LOOKBACK = -1;
   private static final long CACHING_PERIOD_LOOKBACK_DAILY = TimeUnit.DAYS.toMillis(90);
   private static final long CACHING_PERIOD_LOOKBACK_HOURLY = TimeUnit.DAYS.toMillis(60);
   // disable minute level cache warm up
@@ -99,7 +98,6 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
   // need to specify run frequency for minute level detection. Used for moving monitoring window alignment, default to be 15 minutes.
   private final TimeGranularity functionFrequency;
   private final String detectorName;
-  private long windowSizeMillis;
   private final DatasetConfigDTO dataset;
   private final DateTimeZone dateTimeZone;
   private Period bucketPeriod;
@@ -125,8 +123,8 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
     this.windowDelayUnit = TimeUnit.valueOf(MapUtils.getString(config.getProperties(), PROP_WINDOW_DELAY_UNIT, "DAYS"));
     // detection window size
     this.windowSize = MapUtils.getIntValue(config.getProperties(), PROP_WINDOW_SIZE, 1);
+    // detection window unit
     this.windowUnit = TimeUnit.valueOf(MapUtils.getString(config.getProperties(), PROP_WINDOW_UNIT, "DAYS"));
-    this.windowSizeMillis = TimeUnit.MILLISECONDS.convert(windowSize, windowUnit);
     // run frequency, used to determine moving windows for minute-level detection
     Map<String, Object> frequency = MapUtils.getMap(config.getProperties(), PROP_FREQUENCY, Collections.emptyMap());
     this.functionFrequency = new TimeGranularity(MapUtils.getIntValue(frequency, "size", 15), TimeUnit.valueOf(MapUtils.getString(frequency, "unit", "MINUTES")));
@@ -151,7 +149,7 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
     // 1. get the last time stamp for the time series.
     // 2. to calculate current values and  baseline values for the anomalies detected
     // 3. anomaly detection current and baseline time series value
-    if( this.cachingPeriodLookback > 0) {
+    if (this.cachingPeriodLookback >= 0) {
       MetricSlice cacheSlice = MetricSlice.from(this.metricEntity.getId(), startTime - cachingPeriodLookback, endTime,
           this.metricEntity.getFilters());
       this.provider.fetchTimeseries(Collections.singleton(cacheSlice));
@@ -233,12 +231,14 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
   List<Interval> getMonitoringWindows() {
     if (this.isMovingWindowDetection) {
       try{
+        Period windowDelayPeriod = DetectionUtils.periodFromTimeUnit(windowDelay, windowDelayUnit);
+        Period windowSizePeriod = DetectionUtils.periodFromTimeUnit(windowSize, windowUnit);
         List<Interval> monitoringWindows = new ArrayList<>();
-        List<Long> monitoringWindowEndTimes = getMonitoringWindowEndTimes();
-        for (long monitoringEndTime : monitoringWindowEndTimes) {
-          long endTime = monitoringEndTime - TimeUnit.MILLISECONDS.convert(windowDelay, windowDelayUnit);
-          long startTime = endTime - this.windowSizeMillis;
-          monitoringWindows.add(new Interval(startTime, endTime, dateTimeZone));
+        List<DateTime> monitoringWindowEndTimes = getMonitoringWindowEndTimes();
+        for (DateTime monitoringEndTime : monitoringWindowEndTimes) {
+          DateTime endTime = monitoringEndTime.minus(windowDelayPeriod);
+          DateTime startTime = endTime.minus(windowSizePeriod);
+          monitoringWindows.add(new Interval(startTime, endTime));
         }
         for (Interval window : monitoringWindows){
           LOG.info("Will run detection in window {}", window);
@@ -270,8 +270,8 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
   }
 
   // get the list of monitoring window end times
-  private List<Long> getMonitoringWindowEndTimes() {
-    List<Long> endTimes = new ArrayList<>();
+  private List<DateTime> getMonitoringWindowEndTimes() {
+    List<DateTime> endTimes = new ArrayList<>();
 
     // get current hour/day, depending on granularity of dataset,
     DateTime currentEndTime = new DateTime(getBoundaryAlignedTimeForDataset(new DateTime(endTime, dateTimeZone)), dateTimeZone);
@@ -279,7 +279,7 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
     DateTime lastDateTime = new DateTime(getBoundaryAlignedTimeForDataset(new DateTime(startTime, dateTimeZone)), dateTimeZone);
     while (lastDateTime.isBefore(currentEndTime)) {
       lastDateTime = lastDateTime.plus(this.bucketPeriod);
-      endTimes.add(lastDateTime.getMillis());
+      endTimes.add(lastDateTime);
     }
     return endTimes;
   }
@@ -368,7 +368,6 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
       bucketPeriod = Period.days(1);
       windowSize = 1;
       windowUnit = TimeUnit.DAYS;
-      windowSizeMillis = TimeUnit.MILLISECONDS.convert(windowSize, windowUnit);
     }
   }
 }
