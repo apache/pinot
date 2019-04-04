@@ -219,6 +219,8 @@ public class MutableSegmentImpl implements MutableSegment {
 
   @Override
   public boolean index(GenericRow row, StreamMessageMetadata msgMetadata) {
+
+    boolean canTakeMore = false;
     // Update dictionary first
     Map<String, Object> dictIdMap = updateDictionary(row);
 
@@ -234,19 +236,22 @@ public class MutableSegmentImpl implements MutableSegment {
       addForwardIndex(row, docId, dictIdMap);
       addInvertedIndex(docId, dictIdMap);
 
-      _lastIndexedTimestamp = System.currentTimeMillis();
-
-      if (msgMetadata != null) {
-        _latestIngestionTimestamp = Math.max(_latestIngestionTimestamp, msgMetadata.getIngestionTimestamp());
-      }
       // Update number of document indexed at last to make the latest record queryable
-      return _numDocsIndexed++ < _capacity;
+      canTakeMore = _numDocsIndexed++ < _capacity;
     } else {
       Preconditions
           .checkState(_aggregateMetrics, "Invalid document-id during indexing: " + docId + " expected: " + numDocs);
       // Update metrics for existing document.
-      return aggregateMetrics(row, docId);
+      canTakeMore = aggregateMetrics(row, docId);
     }
+
+    _lastIndexedTimestamp = System.currentTimeMillis();
+
+    if (msgMetadata != null) {
+      _latestIngestionTimestamp = Math.max(_latestIngestionTimestamp, msgMetadata.getIngestionTimestamp());
+    }
+
+    return canTakeMore;
   }
 
   private Map<String, Object> updateDictionary(GenericRow row) {
