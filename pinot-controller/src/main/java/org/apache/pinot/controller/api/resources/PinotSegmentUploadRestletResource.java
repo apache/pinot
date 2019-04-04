@@ -192,7 +192,7 @@ public class PinotSegmentUploadRestletResource {
       throw new ControllerApplicationException(LOGGER, errStr, Response.Status.BAD_REQUEST);
     }
 
-    final java.net.URI segmentFileURI =
+    final URI segmentFileURI =
         ControllerConf.getUriFromPath(StringUtil.join("/", provider.getBaseDataDirURI().toString(),
             tableName, URLEncoder.encode(segmentName, URL_ENCODING_SCHEME)));
     PinotFS pinotFS = PinotFSFactory.create(provider.getBaseDataDirURI().getScheme());
