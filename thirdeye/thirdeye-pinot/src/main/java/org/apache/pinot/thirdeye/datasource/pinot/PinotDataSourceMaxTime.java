@@ -87,7 +87,7 @@ public class PinotDataSourceMaxTime {
       }
 
       if (resultSetGroup.size() == 0 || resultSetGroup.get(0).getRowCount() == 0) {
-        LOGGER.error("Failed to get latest max time for dataset {} with PQL: {}", tableName, maxTimePinotQuery.getPql());
+        LOGGER.error("Failed to get latest max time for dataset {} with PQL: {}", tableName, maxTimePinotQuery.getQuery());
         this.collectionToPrevMaxDataTimeMap.remove(dataset);
       } else {
         DateTimeZone timeZone = Utils.getDataTimeZone(dataset);

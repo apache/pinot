@@ -32,11 +32,11 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 import org.apache.commons.collections.MapUtils;
 import org.joda.time.Period;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
 
 
 /**
@@ -61,16 +61,6 @@ public class AutoOnboardMockDataSource extends AutoOnboard {
 
   @Override
   public void run() {
-    if (!this.datasetDAO.findAll().isEmpty()) {
-      LOG.info("Found existing data set configs. Skipping.");
-      return;
-    }
-
-    if (!this.metricDAO.findAll().isEmpty()) {
-      LOG.info("Found existing metric configs. Skipping.");
-      return;
-    }
-
     MetadataSourceConfig config = this.getMetadataSourceConfig();
 
     List<DatasetConfigDTO> datasetConfigs = new ArrayList<>();
@@ -93,8 +83,8 @@ public class AutoOnboardMockDataSource extends AutoOnboard {
       datasetConfig.setDataSource(MockThirdEyeDataSource.class.getSimpleName());
       datasetConfig.setDimensions(sortedDimensions);
       datasetConfig.setTimezone(MapUtils.getString(dataset, "timezone", "America/Los_Angeles"));
-      datasetConfig.setTimeDuration(getTimeDuration(granularity));
-      datasetConfig.setTimeUnit(getTimeUnit(granularity));
+      datasetConfig.setTimeDuration(ThirdEyeUtils.getTimeDuration(granularity));
+      datasetConfig.setTimeUnit(ThirdEyeUtils.getTimeUnit(granularity));
 
       datasetConfigs.add(datasetConfig);
 
@@ -138,47 +128,5 @@ public class AutoOnboardMockDataSource extends AutoOnboard {
     this.run();
   }
 
-  /**
-   * Guess time duration from period.
-   *
-   * @param granularity dataset granularity
-   * @return
-   */
-  private static int getTimeDuration(Period granularity) {
-    if (granularity.getDays() > 0) {
-      return granularity.getDays();
-    }
-    if (granularity.getHours() > 0) {
-      return granularity.getHours();
-    }
-    if (granularity.getMinutes() > 0) {
-      return granularity.getMinutes();
-    }
-    if (granularity.getSeconds() > 0) {
-      return granularity.getSeconds();
-    }
-    return granularity.getMillis();
-  }
 
-  /**
-   * Guess time unit from period.
-   *
-   * @param granularity dataset granularity
-   * @return
-   */
-  private static TimeUnit getTimeUnit(Period granularity) {
-    if (granularity.getDays() > 0) {
-      return TimeUnit.DAYS;
-    }
-    if (granularity.getHours() > 0) {
-      return TimeUnit.HOURS;
-    }
-    if (granularity.getMinutes() > 0) {
-      return TimeUnit.MINUTES;
-    }
-    if (granularity.getSeconds() > 0) {
-      return TimeUnit.SECONDS;
-    }
-    return TimeUnit.MILLISECONDS;
-  }
 }

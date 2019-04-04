@@ -17,9 +17,10 @@
  * under the License.
  */
 
-package org.apache.pinot.thirdeye.datasource.pinot;
+package org.apache.pinot.thirdeye.datasource;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -31,12 +32,12 @@ import org.apache.pinot.thirdeye.datasource.MetricFunction;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeRequest;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeResponseRow;
 
-public class PinotThirdEyeResponse extends BaseThirdEyeResponse {
+public class RelationalThirdEyeResponse extends BaseThirdEyeResponse {
   private final Map<MetricFunction, Integer> metricFuncToIdMapping;
   private List<ThirdEyeResponseRow> responseRows;
   private List<String[]> rows;
 
-  public PinotThirdEyeResponse(ThirdEyeRequest request, List<String[]> rows, TimeSpec dataTimeSpec) {
+  public RelationalThirdEyeResponse(ThirdEyeRequest request, List<String[]> rows, TimeSpec dataTimeSpec) {
     super(request, dataTimeSpec);
     this.rows = rows;
     this.responseRows = new ArrayList<>(rows.size());

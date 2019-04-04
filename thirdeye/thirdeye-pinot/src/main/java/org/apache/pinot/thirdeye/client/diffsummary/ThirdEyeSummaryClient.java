@@ -52,11 +52,11 @@ import org.slf4j.LoggerFactory;
  * timeline (baseline or current) are located together. Then, the requests belong to the same GroupBy dimension are
  * located together.
  */
-public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
-  private static final Logger LOG = LoggerFactory.getLogger(PinotThirdEyeSummaryClient.class);
+public class ThirdEyeSummaryClient implements OLAPDataBaseClient {
+  private static final Logger LOG = LoggerFactory.getLogger(ThirdEyeSummaryClient.class);
 
   private final static DateTime NULL_DATETIME = new DateTime();
-  private final static int TIME_OUT_VALUE = 120;
+  private final static int TIME_OUT_VALUE = 1200;
   private final static TimeUnit TIME_OUT_UNIT = TimeUnit.SECONDS;
 
   private QueryCache queryCache;
@@ -70,7 +70,7 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
   private List<MetricFunction> metricFunctions;
   private MetricExpressionsContext context;
 
-  public PinotThirdEyeSummaryClient(QueryCache queryCache) {
+  public ThirdEyeSummaryClient(QueryCache queryCache) {
     this.queryCache = queryCache;
   }
 
