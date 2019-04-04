@@ -101,8 +101,7 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
     if (readerConfigFile != null) {
       _readerConfigFile = new Path(readerConfigFile);
     }
-
-    _recordReaderPath = _jobConf.get(JobConfigConstants.RECORD_READER_PATH, null);
+    _recordReaderPath = _jobConf.get(JobConfigConstants.RECORD_READER_PATH);
 
     // Set up segment name generator
     String segmentNameGeneratorType =
@@ -207,8 +206,8 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
     segmentGeneratorConfig.setOutDir(_localSegmentDir.getPath());
     segmentGeneratorConfig.setSegmentNameGenerator(_segmentNameGenerator);
     segmentGeneratorConfig.setSequenceId(sequenceId);
-    segmentGeneratorConfig.setRecordReaderPath(_recordReaderPath);
     if (_recordReaderPath != null) {
+      segmentGeneratorConfig.setRecordReaderPath(_recordReaderPath);
       segmentGeneratorConfig.setFormat(FileFormat.OTHER);
     } else {
       FileFormat fileFormat = getFileFormat(inputFileName);
@@ -275,9 +274,6 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
     }
     if (fileName.endsWith(".thrift")) {
       return FileFormat.THRIFT;
-    }
-    if (fileName.endsWith(".parquet")) {
-      return FileFormat.PARQUET;
     }
     throw new IllegalArgumentException("Unsupported file format: {}" + fileName);
   }

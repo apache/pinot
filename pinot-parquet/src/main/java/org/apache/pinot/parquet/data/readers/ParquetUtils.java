@@ -16,8 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.utils;
+package org.apache.pinot.parquet.data.readers;
 
+import java.io.IOException;
+import java.util.Map;
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericRecord;
@@ -26,65 +28,51 @@ import org.apache.hadoop.fs.Path;
 import org.apache.parquet.avro.AvroParquetReader;
 import org.apache.parquet.avro.AvroParquetWriter;
 import org.apache.parquet.avro.AvroSchemaConverter;
+import org.apache.parquet.format.converter.ParquetMetadataConverter;
 import org.apache.parquet.hadoop.ParquetFileReader;
 import org.apache.parquet.hadoop.ParquetReader;
 import org.apache.parquet.hadoop.ParquetWriter;
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
-
-import java.io.IOException;
 
 
 public class ParquetUtils {
   public static final String DEFAULT_FS = "file:///";
 
   /**
-   * Get a ParquetReader with the given file.
-   * @param fileName the parquet file to read
-   * @return a ParquetReader
-   * @throws IOException
+   * Returns a ParquetReader with the given path.
    */
-  public static ParquetReader<GenericRecord> getParquetReader(String fileName)
+  public static ParquetReader<GenericRecord> getParquetReader(Path path)
       throws IOException {
-    Path dataFsPath = new Path(fileName);
-    return AvroParquetReader.<GenericRecord>builder(dataFsPath).disableCompatibility().withDataModel(GenericData.get())
+    //noinspection unchecked
+    return AvroParquetReader.<GenericRecord>builder(path).disableCompatibility().withDataModel(GenericData.get())
         .withConf(getConfiguration()).build();
   }
 
   /**
-   * Read the parquet file schema
-   * @param fileName
-   * @return the parquet file schema
-   * @throws IOException
+   * Returns a ParquetWriter with the given path and schema.
    */
-  public static Schema getParquetSchema(String fileName)
+  public static ParquetWriter<GenericRecord> getParquetWriter(Path path, Schema schema)
       throws IOException {
-    Path dataFsPath = new Path(fileName);
-    ParquetMetadata footer = ParquetFileReader.readFooter(getConfiguration(), dataFsPath);
+    return AvroParquetWriter.<GenericRecord>builder(path).withSchema(schema).withConf(getConfiguration()).build();
+  }
 
-    String schemaString = footer.getFileMetaData().getKeyValueMetaData().get("parquet.avro.schema");
+  /**
+   * Returns the schema for the given Parquet file path.
+   */
+  public static Schema getParquetSchema(Path path)
+      throws IOException {
+    ParquetMetadata footer = ParquetFileReader.readFooter(getConfiguration(), path, ParquetMetadataConverter.NO_FILTER);
+    Map<String, String> metaData = footer.getFileMetaData().getKeyValueMetaData();
+    String schemaString = metaData.get("parquet.avro.schema");
     if (schemaString == null) {
-      // try the older property
-      schemaString = footer.getFileMetaData().getKeyValueMetaData().get("avro.schema");
+      // Try the older property
+      schemaString = metaData.get("avro.schema");
     }
-
     if (schemaString != null) {
       return new Schema.Parser().parse(schemaString);
     } else {
       return new AvroSchemaConverter().convert(footer.getFileMetaData().getSchema());
     }
-  }
-
-  /**
-   * Get a ParquetWriter with the given file
-   * @param fileName
-   * @param schema
-   * @return a ParquetWriter
-   * @throws IOException
-   */
-  public static ParquetWriter<GenericRecord> getParquetWriter(String fileName, Schema schema)
-      throws IOException {
-    Path dataFsPath = new Path(fileName);
-    return AvroParquetWriter.<GenericRecord>builder(dataFsPath).withSchema(schema).withConf(getConfiguration()).build();
   }
 
   private static Configuration getConfiguration() {

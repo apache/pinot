@@ -16,54 +16,47 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.data.readers;
+package org.apache.pinot.parquet.data.readers;
 
+import java.io.IOException;
 import java.util.List;
 import org.apache.avro.generic.GenericRecord;
+import org.apache.hadoop.fs.Path;
 import org.apache.parquet.hadoop.ParquetReader;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.Schema;
-import org.apache.pinot.common.utils.ParquetUtils;
 import org.apache.pinot.core.data.GenericRow;
+import org.apache.pinot.core.data.readers.RecordReader;
+import org.apache.pinot.core.data.readers.RecordReaderUtils;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.util.AvroUtils;
-
-import java.io.File;
-import java.io.IOException;
 
 
 /**
  * Record reader for Parquet file.
  */
 public class ParquetRecordReader implements RecordReader {
-  private final String _dataFilePath;
-  private final Schema _schema;
-  private final List<FieldSpec> _fieldSpecs;
-
+  private Path _dataFilePath;
+  private Schema _schema;
+  private List<FieldSpec> _fieldSpecs;
   private ParquetReader<GenericRecord> _reader;
-  private GenericRecord _next;
-  private boolean _hasNext;
-
-  public ParquetRecordReader(File dataFile, Schema schema)
-      throws IOException {
-    _dataFilePath = dataFile.getAbsolutePath();
-    _schema = schema;
-    _fieldSpecs = RecordReaderUtils.extractFieldSpecs(schema);
-
-    _reader = ParquetUtils.getParquetReader(_dataFilePath);
-    advanceToNext();
-
-    AvroUtils.validateSchema(_schema, ParquetUtils.getParquetSchema(_dataFilePath));
-  }
+  private GenericRecord _nextRecord;
 
   @Override
-  public void init(SegmentGeneratorConfig segmentGeneratorConfig) {
+  public void init(SegmentGeneratorConfig segmentGeneratorConfig)
+      throws IOException {
+    _dataFilePath = new Path(segmentGeneratorConfig.getInputFilePath());
+    _schema = segmentGeneratorConfig.getSchema();
+    AvroUtils.validateSchema(_schema, ParquetUtils.getParquetSchema(_dataFilePath));
 
+    _fieldSpecs = RecordReaderUtils.extractFieldSpecs(_schema);
+    _reader = ParquetUtils.getParquetReader(_dataFilePath);
+    _nextRecord = _reader.read();
   }
 
   @Override
   public boolean hasNext() {
-    return _hasNext;
+    return _nextRecord != null;
   }
 
   @Override
@@ -72,18 +65,20 @@ public class ParquetRecordReader implements RecordReader {
     return next(new GenericRow());
   }
 
+  // NOTE: hard to extract common code further
+  @SuppressWarnings("Duplicates")
   @Override
   public GenericRow next(GenericRow reuse)
       throws IOException {
     for (FieldSpec fieldSpec : _fieldSpecs) {
       String fieldName = fieldSpec.getName();
-      Object value = _next.get(fieldName);
+      Object value = _nextRecord.get(fieldName);
       // Allow default value for non-time columns
       if (value != null || fieldSpec.getFieldType() != FieldSpec.FieldType.TIME) {
         reuse.putField(fieldName, RecordReaderUtils.convert(fieldSpec, value));
       }
     }
-    advanceToNext();
+    _nextRecord = _reader.read();
     return reuse;
   }
 
@@ -91,7 +86,7 @@ public class ParquetRecordReader implements RecordReader {
   public void rewind()
       throws IOException {
     _reader = ParquetUtils.getParquetReader(_dataFilePath);
-    advanceToNext();
+    _nextRecord = _reader.read();
   }
 
   @Override
@@ -103,14 +98,5 @@ public class ParquetRecordReader implements RecordReader {
   public void close()
       throws IOException {
     _reader.close();
-  }
-
-  private void advanceToNext() {
-    try {
-      _next = _reader.read();
-      _hasNext = (_next != null);
-    } catch (IOException e) {
-      throw new RuntimeException("Failed while reading parquet file: " + _dataFilePath, e);
-    }
   }
 }

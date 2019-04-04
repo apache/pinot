@@ -28,16 +28,12 @@ import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.core.data.GenericRow;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.util.AvroUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
  * Record reader for AVRO file.
  */
 public class AvroRecordReader implements RecordReader {
-  private static final Logger LOGGER = LoggerFactory.getLogger(AvroRecordReader.class);
-
   private final File _dataFile;
   private final Schema _schema;
   private final List<FieldSpec> _fieldSpecs;

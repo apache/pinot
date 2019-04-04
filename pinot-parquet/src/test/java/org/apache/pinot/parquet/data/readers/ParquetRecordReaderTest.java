@@ -16,18 +16,19 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.data.readers;
+package org.apache.pinot.parquet.data.readers;
 
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
-
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.commons.io.FileUtils;
+import org.apache.hadoop.fs.Path;
 import org.apache.parquet.hadoop.ParquetWriter;
-import org.apache.pinot.common.utils.ParquetUtils;
+import org.apache.pinot.core.data.readers.RecordReaderTest;
+import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -36,7 +37,6 @@ import org.testng.annotations.Test;
 public class ParquetRecordReaderTest extends RecordReaderTest {
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "ParquetRecordReaderTest");
   private static final File DATA_FILE = new File(TEMP_DIR, "data.parquet");
-  private static final String DATA_FILE_PATH = DATA_FILE.getAbsolutePath();
 
   @BeforeClass
   public void setUp()
@@ -70,20 +70,23 @@ public class ParquetRecordReaderTest extends RecordReaderTest {
       records.add(record);
     }
 
-    ParquetWriter<GenericRecord> writer = ParquetUtils.getParquetWriter(DATA_FILE_PATH, schema);
-    try {
-      for (GenericRecord r : records) {
-        writer.write(r);
+    try (ParquetWriter<GenericRecord> writer = ParquetUtils
+        .getParquetWriter(new Path(DATA_FILE.getAbsolutePath()), schema)) {
+      for (GenericRecord record : records) {
+        writer.write(record);
       }
-    } finally {
-      writer.close();
     }
   }
 
   @Test
   public void testParquetRecordReader()
       throws Exception {
-    try (ParquetRecordReader recordReader = new ParquetRecordReader(DATA_FILE, SCHEMA)) {
+    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig();
+    segmentGeneratorConfig.setInputFilePath(DATA_FILE.getAbsolutePath());
+    segmentGeneratorConfig.setSchema(SCHEMA);
+
+    try (ParquetRecordReader recordReader = new ParquetRecordReader()) {
+      recordReader.init(segmentGeneratorConfig);
       checkValue(recordReader);
       recordReader.rewind();
       checkValue(recordReader);
