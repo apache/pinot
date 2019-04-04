@@ -28,8 +28,12 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.UnsupportedEncodingException;
 import java.net.InetAddress;
 import java.net.URI;
+import java.net.URLDecoder;
+import java.net.URLEncoder;
+import java.nio.file.Files;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
@@ -52,6 +56,7 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.StreamingOutput;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
@@ -64,13 +69,14 @@ import org.apache.pinot.common.segment.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.JsonUtils;
-import org.apache.pinot.common.utils.URIUtils;
+import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.api.access.AccessControl;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.api.upload.SegmentValidator;
+import org.apache.pinot.controller.api.upload.SegmentValidatorResponse;
 import org.apache.pinot.controller.api.upload.ZKOperator;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
@@ -79,6 +85,8 @@ import org.apache.pinot.core.crypt.PinotCrypter;
 import org.apache.pinot.core.crypt.PinotCrypterFactory;
 import org.apache.pinot.core.metadata.DefaultMetadataExtractor;
 import org.apache.pinot.core.metadata.MetadataExtractorFactory;
+import org.apache.pinot.filesystem.PinotFS;
+import org.apache.pinot.filesystem.PinotFSFactory;
 import org.glassfish.grizzly.http.server.Request;
 import org.glassfish.jersey.media.multipart.FormDataBodyPart;
 import org.glassfish.jersey.media.multipart.FormDataMultiPart;
@@ -93,6 +101,7 @@ public class PinotSegmentUploadRestletResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotSegmentUploadRestletResource.class);
   private static final String TMP_DIR_PREFIX = "tmp-";
   private static final String ENCRYPTED_SUFFIX = "_encrypted";
+  private static final String URL_ENCODING_SCHEME = "UTF-8";
 
   @Inject
   PinotHelixResourceManager _pinotHelixResourceManager;
@@ -160,7 +169,7 @@ public class PinotSegmentUploadRestletResource {
   public Response downloadSegment(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
-      @Context HttpHeaders httpHeaders) {
+      @Context HttpHeaders httpHeaders) throws Exception {
     // Validate data access
     boolean hasDataAccess;
     try {
@@ -181,15 +190,35 @@ public class PinotSegmentUploadRestletResource {
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
     }
-    segmentName = URIUtils.decode(segmentName);
-    File dataFile = new File(provider.getBaseDataDir(), String.join(File.separator, tableName, segmentName));
-    if (!dataFile.exists()) {
-      throw new ControllerApplicationException(LOGGER,
-          "Segment " + segmentName + " or table " + tableName + " not found", Response.Status.NOT_FOUND);
+    try {
+      segmentName = URLDecoder.decode(segmentName, URL_ENCODING_SCHEME);
+    } catch (UnsupportedEncodingException e) {
+      String errStr = "Could not decode segment name '" + segmentName + "'";
+      throw new ControllerApplicationException(LOGGER, errStr, Response.Status.BAD_REQUEST);
     }
-    Response.ResponseBuilder builder = Response.ok(dataFile);
-    builder.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + dataFile.getName());
-    builder.header(HttpHeaders.CONTENT_LENGTH, dataFile.length());
+
+    final URI segmentFileURI =
+        ControllerConf.getUriFromPath(StringUtil.join("/", provider.getBaseDataDirURI().toString(),
+            tableName, URLEncoder.encode(segmentName, URL_ENCODING_SCHEME)));
+    PinotFS pinotFS = PinotFSFactory.create(provider.getBaseDataDirURI().getScheme());
+
+    if (!pinotFS.exists(segmentFileURI)) {
+      throw new ControllerApplicationException(LOGGER,
+          "Segment " + segmentName + " or table " + tableName + " not found in " + segmentFileURI.toString(), Response.Status.NOT_FOUND);
+    }
+    File tmpSegmentFile = new File(StringUtil.join("/", _controllerConf.getLocalTempDir(), tableName,
+        StringUtil.join("_", segmentName, String.valueOf(System.nanoTime()))));
+    pinotFS.copyToLocalFile(segmentFileURI, tmpSegmentFile);
+    // Streaming in the tmp file and delete it afterward.
+    Response.ResponseBuilder builder = Response.ok().entity((StreamingOutput) output -> {
+      try {
+        Files.copy(tmpSegmentFile.toPath(), output);
+      } finally {
+        FileUtils.deleteQuietly(tmpSegmentFile);
+      }
+    });
+    builder.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + tmpSegmentFile.getName());
+    builder.header(HttpHeaders.CONTENT_LENGTH, tmpSegmentFile.length());
     return builder.build();
   }
 
