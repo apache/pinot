@@ -19,11 +19,15 @@
 package org.apache.pinot.core.realtime.stream;
 
 import java.io.Closeable;
+import org.apache.pinot.annotations.InterfaceAudience;
+import org.apache.pinot.annotations.InterfaceStability;
 
 
 /**
  * Interface for a consumer which fetches messages at the partition level of a stream, for given offsets
  */
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public interface PartitionLevelConsumer extends Closeable {
 
   /**

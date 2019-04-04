@@ -19,6 +19,8 @@
 package org.apache.pinot.core.realtime.stream;
 
 import java.util.Map;
+import org.apache.pinot.annotations.InterfaceAudience;
+import org.apache.pinot.annotations.InterfaceStability;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.core.data.GenericRow;
 
@@ -27,6 +29,8 @@ import org.apache.pinot.core.data.GenericRow;
  * Interface for a decoder of messages fetched from the stream
  * @param <T>
  */
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public interface StreamMessageDecoder<T> {
 
   /**

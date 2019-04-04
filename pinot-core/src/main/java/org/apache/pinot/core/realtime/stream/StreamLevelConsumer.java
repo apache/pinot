@@ -18,12 +18,16 @@
  */
 package org.apache.pinot.core.realtime.stream;
 
+import org.apache.pinot.annotations.InterfaceAudience;
+import org.apache.pinot.annotations.InterfaceStability;
 import org.apache.pinot.core.data.GenericRow;
 
 
 /**
  * Interface for a consumer that consumes at stream level and is unaware of any partitions of the stream
  */
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public interface StreamLevelConsumer {
 
   /**
