@@ -75,7 +75,17 @@
       <legend class="te-form__section-title">{{alertSettingsTitle}}</legend>
     </div>
     <div class="col-xs-4">
-      <label class="te-label te-label--small">Add this alert to a subscription group</label>
+      {{#if isEditMode}}
+        <label class="te-label te-label--small">
+          {{#if noExistingSubscriptionGroup}}
+            Create a subscription group for this alert
+          {{else}}
+            Edit a subscription group already subscribed to this alert
+          {{/if}}</label>
+      {{else}}
+        <label class="te-label te-label--small">Add this alert to a subscription group</label>
+      {{/if}}
+
       {{!--  subscription group --}}
       {{#power-select
         placeholder="Create a new subscription group"
