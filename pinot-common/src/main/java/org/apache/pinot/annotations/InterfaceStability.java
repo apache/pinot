@@ -26,11 +26,21 @@ import java.lang.annotation.Documented;
  * {@link org.apache.pinot.annotations.InterfaceStability.Evolving} or
  * {@link org.apache.pinot.annotations.InterfaceStability.Unstable}. <br>
  *
- * <ul><li>All classes that are annotated with {@link org.apache.pinot.annotations.InterfaceAudience.Public} must have
- * InterfaceStability annotation. </li>
- * <li>Classes that are {@link org.apache.pinot.annotations.InterfaceAudience.Private} are to be considered unstable unless
- * a different InterfaceStability annotation states otherwise.</li>
- * <li>Pinot contributors should NOT make incompatible changes to classes marked as stable.</li>
+ * <ul>
+ *   <li>All classes that are annotated with {@link org.apache.pinot.annotations.InterfaceAudience.Public} must have
+ *       InterfaceStability annotation. </li>
+ *   <li>Classes that are {@link org.apache.pinot.annotations.InterfaceAudience.Private} are to be considered unstable
+ *       unless a different InterfaceStability annotation states otherwise.</li>
+ *   <li>Pinot contributors should NOT make incompatible changes to classes marked as stable.
+ *       Some things to watch out for classes marked as stable:
+ *       <ul>
+ *         <li> Method(s) cannot be removed from classes/interfaces marked as stable during minor version releases.
+ *              Deprecate the method(s) first and remove the method in a major release.</li>
+ *         <li> Similar to earlier point, method signature cannot change.</li>
+ *         <li> New methods cannot be added to interfaces without providing default implementation for minor version
+ *              releases.</li></ul>
+ *       </ul>
+ *    </li>
  * </ul>
  *
  * Note: the definitions are borrowed from a similar annotation from Apache Hadoop project.

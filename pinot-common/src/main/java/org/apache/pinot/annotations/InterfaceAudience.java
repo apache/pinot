@@ -56,7 +56,7 @@ public class InterfaceAudience {
 
   /**
    * Intended only for the project(s) specified in the annotation.
-   * No specific uses for this exist currently.
+   * Reserved for future use.
    */
   @Documented
   public @interface LimitedPrivate {
