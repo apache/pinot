@@ -26,7 +26,9 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.config.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.data.Schema;
@@ -238,14 +240,15 @@ public class SegmentMergeCommand extends AbstractBaseAdminCommand implements Com
     String tableName = tableConfig.getTableName();
 
     // Fetch time related configurations from schema and table config.
-    String pushFrequency = tableConfig.getValidationConfig().getSegmentPushFrequency();
-    String timeType = tableConfig.getValidationConfig().getTimeType();
-    String pushType = tableConfig.getValidationConfig().getSegmentPushType();
+    SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
+    String pushFrequency = validationConfig.getSegmentPushFrequency();
+    TimeUnit timeType = validationConfig.getTimeType();
+    String pushType = validationConfig.getSegmentPushType();
     String timeFormat = schema.getTimeFieldSpec().getOutgoingGranularitySpec().getTimeFormat();
 
     // Generate the final segment name using segment name generator
     NormalizedDateSegmentNameGenerator segmentNameGenerator =
-        new NormalizedDateSegmentNameGenerator(tableName, null, null, pushType, pushFrequency, timeType, timeFormat);
+        new NormalizedDateSegmentNameGenerator(tableName, null, false, pushType, pushFrequency, timeType, timeFormat);
 
     return segmentNameGenerator.generateSegmentName(DEFAULT_SEQUENCE_ID, minStartTime, maxEndTime);
   }
