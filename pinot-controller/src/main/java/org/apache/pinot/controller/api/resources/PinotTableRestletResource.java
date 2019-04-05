@@ -28,6 +28,7 @@ import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
@@ -442,9 +443,9 @@ public class PinotTableRestletResource {
               existingTimeColumnName, newTimeColumnName));
     }
 
-    String newTimeColumnType = newSegmentConfig.getTimeType();
-    String existingTimeColumnType = SegmentConfigToCompare.getTimeType();
-    if (!existingTimeColumnType.equalsIgnoreCase(newTimeColumnType)) {
+    TimeUnit existingTimeColumnType = SegmentConfigToCompare.getTimeType();
+    TimeUnit newTimeColumnType = newSegmentConfig.getTimeType();
+    if (existingTimeColumnType != newTimeColumnType) {
       throw new PinotHelixResourceManager.InvalidTableConfigException(String
           .format("Time column types are different! Existing time column type: %s. New time column type: %s",
               existingTimeColumnType, newTimeColumnType));
