@@ -817,8 +817,15 @@ public class PinotHelixResourceManager {
             .equals(CommonConstants.Minion.UNTAGGED_INSTANCE)) {
           continue;
         }
-        if (TagNameUtils.getTenantRoleFromTag(tag) == TenantRole.BROKER) {
-          tenantSet.add(TagNameUtils.getTenantNameFromTag(tag));
+        TenantRole tenantRole;
+        try {
+          tenantRole = TagNameUtils.getTenantRoleFromTag(tag);
+          if (tenantRole == TenantRole.BROKER) {
+            tenantSet.add(TagNameUtils.getTenantNameFromTag(tag));
+          }
+        } catch (InvalidConfigException e) {
+          LOGGER.warn("Instance {} contains an invalid tag: {}", instanceName, tag);
+          continue;
         }
       }
     }
@@ -836,8 +843,15 @@ public class PinotHelixResourceManager {
             .equals(CommonConstants.Minion.UNTAGGED_INSTANCE)) {
           continue;
         }
-        if (TagNameUtils.getTenantRoleFromTag(tag) == TenantRole.SERVER) {
-          tenantSet.add(TagNameUtils.getTenantNameFromTag(tag));
+        TenantRole tenantRole;
+        try {
+          tenantRole = TagNameUtils.getTenantRoleFromTag(tag);
+          if (tenantRole == TenantRole.SERVER) {
+            tenantSet.add(TagNameUtils.getTenantNameFromTag(tag));
+          }
+        } catch (InvalidConfigException e) {
+          LOGGER.warn("Instance {} contains an invalid tag: {}", instanceName, tag);
+          continue;
         }
       }
     }

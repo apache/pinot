@@ -44,6 +44,7 @@ import org.apache.pinot.controller.helix.ControllerRequestBuilderUtil;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
+import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -217,13 +218,6 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
     idealState = _helixAdmin.getResourceIdealState(_helixClusterName, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
     Assert.assertEquals(idealState.getInstanceStateMap(OFFLINE_TABLE_NAME).size(), 5);
 
-    // Untag all Brokers for other tests
-    for (String brokerInstance : _helixResourceManager.getAllInstancesForBrokerTenant(BROKER_TENANT_NAME)) {
-      _helixAdmin
-          .removeInstanceTag(_helixClusterName, brokerInstance, TagNameUtils.getBrokerTagForTenant(BROKER_TENANT_NAME));
-      _helixAdmin.addInstanceTag(_helixClusterName, brokerInstance, CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE);
-    }
-
     // Delete the table
     _helixResourceManager.deleteOfflineTable(TABLE_NAME);
   }
@@ -261,6 +255,52 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
       Assert.assertEquals(retrievedMetadata.getTableName(), REALTIME_TABLE_NAME);
       Assert.assertEquals(retrievedMetadata.getSegmentName(), segmentName);
       Assert.assertEquals(realtimeMetadata.getStatus(), CommonConstants.Segment.Realtime.Status.DONE);
+    }
+  }
+
+  @Test void testRetrieveTenantNames() {
+    // Create broker tenant on 1 Broker
+    Tenant brokerTenant =
+        new Tenant.TenantBuilder(BROKER_TENANT_NAME).setRole(TenantRole.BROKER).setTotalInstances(1).build();
+    _helixResourceManager.createBrokerTenant(brokerTenant);
+
+    Set<String> brokerTenantNames = _helixResourceManager.getAllBrokerTenantNames();
+    Assert.assertEquals(brokerTenantNames.size(), 1);
+    Assert.assertEquals(brokerTenantNames.iterator().next(), BROKER_TENANT_NAME);
+
+    String testBrokerInstance =
+        _helixResourceManager.getAllInstancesForBrokerTenant(BROKER_TENANT_NAME).iterator().next();
+    _helixAdmin.addInstanceTag(_helixClusterName, testBrokerInstance, "wrong_tag");
+
+    brokerTenantNames = _helixResourceManager.getAllBrokerTenantNames();
+    Assert.assertEquals(brokerTenantNames.size(), 1);
+    Assert.assertEquals(brokerTenantNames.iterator().next(), BROKER_TENANT_NAME);
+
+    _helixAdmin.removeInstanceTag(_helixClusterName, testBrokerInstance, "wrong_tag");
+
+    // Server tenant is already created during setup.
+    Set<String> serverTenantNames = _helixResourceManager.getAllServerTenantNames();
+    Assert.assertEquals(serverTenantNames.size(), 1);
+    Assert.assertEquals(serverTenantNames.iterator().next(), SERVER_TENANT_NAME);
+
+    String testServerInstance =
+        _helixResourceManager.getAllInstancesForServerTenant(SERVER_TENANT_NAME).iterator().next();
+    _helixAdmin.addInstanceTag(_helixClusterName, testServerInstance, "wrong_tag");
+
+    serverTenantNames = _helixResourceManager.getAllServerTenantNames();
+    Assert.assertEquals(serverTenantNames.size(), 1);
+    Assert.assertEquals(serverTenantNames.iterator().next(), SERVER_TENANT_NAME);
+
+    _helixAdmin.removeInstanceTag(_helixClusterName, testServerInstance, "wrong_tag");
+  }
+
+  @AfterMethod
+  public void cleanUpBrokerTags() {
+    // Untag all Brokers for other tests
+    for (String brokerInstance : _helixResourceManager.getAllInstancesForBrokerTenant(BROKER_TENANT_NAME)) {
+      _helixAdmin
+          .removeInstanceTag(_helixClusterName, brokerInstance, TagNameUtils.getBrokerTagForTenant(BROKER_TENANT_NAME));
+      _helixAdmin.addInstanceTag(_helixClusterName, brokerInstance, CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE);
     }
   }
 
