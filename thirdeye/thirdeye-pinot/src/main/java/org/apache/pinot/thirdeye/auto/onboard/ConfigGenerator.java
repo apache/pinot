@@ -57,7 +57,9 @@ public class ConfigGenerator {
       Map<String, String> customConfigs) {
     List<String> dimensions = schema.getDimensionNames();
     TimeGranularitySpec timeSpec = schema.getTimeFieldSpec().getOutgoingGranularitySpec();
-
+    if (timeSpec.getTimeType().equals(TimeUnit.MILLISECONDS)){
+      timeSpec.setTimeType(TimeUnit.MINUTES);
+    }
     // Create DatasetConfig
     DatasetConfigDTO datasetConfigDTO = new DatasetConfigDTO();
     datasetConfigDTO.setDataset(dataset);

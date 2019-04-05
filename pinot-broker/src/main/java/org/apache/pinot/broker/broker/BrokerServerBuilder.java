@@ -46,8 +46,9 @@ public class BrokerServerBuilder {
   public static final String METRICS_CONFIG_PREFIX = "pinot.broker.metrics";
   public static final String TABLE_LEVEL_METRICS_CONFIG = "pinot.broker.enableTableLevelMetrics";
   public static final String REQUEST_HANDLER_TYPE_CONFIG = "pinot.broker.requestHandlerType";
-  public static final String DEFAULT_REQUEST_HANDLER_TYPE = "connectionPool";
   public static final String SINGLE_CONNECTION_REQUEST_HANDLER_TYPE = "singleConnection";
+  public static final String CONNECTION_POOL_REQUEST_HANDLER_TYPE = "connectionPool";
+  public static final String DEFAULT_REQUEST_HANDLER_TYPE = SINGLE_CONNECTION_REQUEST_HANDLER_TYPE;
 
   public enum State {
     INIT, STARTING, RUNNING, SHUTTING_DOWN, SHUTDOWN
@@ -89,14 +90,14 @@ public class BrokerServerBuilder {
 
   private BrokerRequestHandler buildRequestHandler() {
     String requestHandlerType = _config.getString(REQUEST_HANDLER_TYPE_CONFIG, DEFAULT_REQUEST_HANDLER_TYPE);
-    if (requestHandlerType.equalsIgnoreCase(SINGLE_CONNECTION_REQUEST_HANDLER_TYPE)) {
-      LOGGER.info("Using SingleConnectionBrokerRequestHandler");
-      return new SingleConnectionBrokerRequestHandler(_config, _routingTable, _timeBoundaryService,
-          _accessControlFactory, _tableQueryQuotaManager, _brokerMetrics);
-    } else {
+    if (requestHandlerType.equalsIgnoreCase(CONNECTION_POOL_REQUEST_HANDLER_TYPE)) {
       LOGGER.info("Using ConnectionPoolBrokerRequestHandler");
       return new ConnectionPoolBrokerRequestHandler(_config, _routingTable, _timeBoundaryService, _accessControlFactory,
           _tableQueryQuotaManager, _brokerMetrics, _liveInstanceChangeHandler, _metricsRegistry);
+    } else {
+      LOGGER.info("Using SingleConnectionBrokerRequestHandler");
+      return new SingleConnectionBrokerRequestHandler(_config, _routingTable, _timeBoundaryService,
+          _accessControlFactory, _tableQueryQuotaManager, _brokerMetrics);
     }
   }
 

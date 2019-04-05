@@ -41,6 +41,8 @@ import org.apache.pinot.thirdeye.detection.DetectionPipeline;
 import org.apache.pinot.thirdeye.detection.DetectionPipelineResult;
 import org.apache.pinot.thirdeye.detection.DetectionUtils;
 import org.apache.pinot.thirdeye.detection.spi.model.AnomalySlice;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -53,6 +55,7 @@ public class MergeWrapper extends DetectionPipeline {
   private static final String PROP_MERGE_KEY = "mergeKey";
   private static final String PROP_DETECTOR_COMPONENT_NAME = "detectorComponentName";
   private static final int NUMBER_OF_SPLITED_ANOMALIES_LIMIT = 1000;
+  private static final Logger LOG = LoggerFactory.getLogger(MergeWrapper.class);
 
   protected static final Comparator<MergedAnomalyResultDTO> COMPARATOR = new Comparator<MergedAnomalyResultDTO>() {
     @Override
@@ -212,6 +215,7 @@ public class MergeWrapper extends DetectionPipeline {
     int anomalyCountAfterSplit = (int) Math.ceil((anomaly.getEndTime() - anomaly.getStartTime()) / (double) maxDuration);
     if (anomalyCountAfterSplit > NUMBER_OF_SPLITED_ANOMALIES_LIMIT) {
       // if the number of anomalies after split is more than the limit, don't split
+      LOG.warn("Exceeded max number of split count. maxDuration = {}, anomaly split count = {}", maxDuration, anomalyCountAfterSplit);
       return Collections.singleton(anomaly);
     }
     Set<MergedAnomalyResultDTO> result = new HashSet<>();

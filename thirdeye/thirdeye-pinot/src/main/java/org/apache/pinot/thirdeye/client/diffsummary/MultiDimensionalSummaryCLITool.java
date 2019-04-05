@@ -223,7 +223,7 @@ public class MultiDimensionalSummaryCLITool {
 
       // Initialize ThirdEye's environment
       ThirdEyeUtils.initLightWeightThirdEyeEnvironment(argList.get(0));
-      OLAPDataBaseClient olapClient = new PinotThirdEyeSummaryClient(CACHE_REGISTRY_INSTANCE.getQueryCache());
+      OLAPDataBaseClient olapClient = new ThirdEyeSummaryClient(CACHE_REGISTRY_INSTANCE.getQueryCache());
 
       // Convert JSON string to Objects
       Dimensions dimensions;

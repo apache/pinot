@@ -190,8 +190,8 @@ public class MultipleAnomaliesEmailContentFormatter extends BaseEmailContentForm
     templateData.put("anomalyDetails", anomalyDetails);
     templateData.put("anomalyIds", Joiner.on(",").join(anomalyIds));
     templateData.put("holidays", holidays);
-    templateData.put("functionAnomalyDetails", functionAnomalyReports.asMap());
-    templateData.put("metricAnomalyDetails", metricAnomalyReports.asMap());
+    templateData.put("detectionToAnomalyDetailsMap", functionAnomalyReports.asMap());
+    templateData.put("metricToAnomalyDetailsMap", metricAnomalyReports.asMap());
     templateData.put("functionToId", functionToId);
   }
 }

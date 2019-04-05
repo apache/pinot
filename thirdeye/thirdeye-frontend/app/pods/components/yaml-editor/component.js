@@ -99,6 +99,22 @@ export default Component.extend({
   ),
 
   /**
+   * Flag to trigger special case of no existing subscription groups for an alert
+   * @method noExistingSubscriptionGroup
+   * @return {Boolean}
+   */
+  noExistingSubscriptionGroup: computed(
+    'subscriptionGroupNames',
+    function() {
+      const subscriptionGroupNames = get(this, 'subscriptionGroupNames');
+      if (subscriptionGroupNames && Array.isArray(subscriptionGroupNames) && subscriptionGroupNames.length > 0) {
+        return false;
+      }
+      return true;
+    }
+  ),
+
+  /**
    * sets Yaml value displayed to contents of detectionYaml or yamlAlertProps
    * @method currentYamlAlert
    * @return {String}
@@ -272,6 +288,54 @@ export default Component.extend({
       }
     }
     return defaultReturn;
+  },
+
+  // Method for handling subscription group, whether there are any or not
+  async _handleSubscriptionGroup(subscriptionYaml, notifications, subscriptionGroupId) {
+    const noExistingSubscriptionGroup = get(this, 'noExistingSubscriptionGroup');
+    if (noExistingSubscriptionGroup) {
+      //PUT settings
+      const setting_url = '/yaml/subscription';
+      const settingsPostProps = {
+        method: 'POST',
+        body: subscriptionYaml,
+        headers: { 'content-type': 'text/plain' }
+      };
+      try {
+        const settings_result = await fetch(setting_url, settingsPostProps);
+        const settings_status  = get(settings_result, 'status');
+        const settings_json = await settings_result.json();
+        if (settings_status !== 200) {
+          set(this, 'errorMsg', get(settings_json, 'message'));
+          notifications.error(`Failed to save the subscription configuration due to: ${settings_json.message}.`, 'Error', toastOptions);
+        } else {
+          notifications.success('Subscription configuration saved successfully', 'Done', toastOptions);
+        }
+      } catch (error) {
+        notifications.error('Error while saving subscription config.', error, toastOptions);
+      }
+    } else {
+      //PUT settings
+      const setting_url = `/yaml/subscription/${subscriptionGroupId}`;
+      const settingsPostProps = {
+        method: 'PUT',
+        body: subscriptionYaml,
+        headers: { 'content-type': 'text/plain' }
+      };
+      try {
+        const settings_result = await fetch(setting_url, settingsPostProps);
+        const settings_status  = get(settings_result, 'status');
+        const settings_json = await settings_result.json();
+        if (settings_status !== 200) {
+          set(this, 'errorMsg', get(settings_json, 'message'));
+          notifications.error(`Failed to save the subscription configuration due to: ${settings_json.message}.`, 'Error', toastOptions);
+        } else {
+          notifications.success('Subscription configuration saved successfully', 'Done', toastOptions);
+        }
+      } catch (error) {
+        notifications.error('Error while saving subscription config.', error, toastOptions);
+      }
+    }
   },
 
   actions: {
@@ -453,33 +517,15 @@ export default Component.extend({
         const alert_json = await alert_result.json();
         if (alert_status !== 200) {
           set(this, 'errorMsg', get(alert_json, 'message'));
-          notifications.error('Failed to save the detection configuration.', 'Error', toastOptions);
+          notifications.error(`Failed to save the detection configuration due to: ${alert_json.message}.`, 'Error', toastOptions);
         } else {
           notifications.success('Detection configuration saved successfully', 'Done', toastOptions);
         }
       } catch (error) {
         notifications.error('Error while saving detection config.', error, toastOptions);
       }
-      //PUT settings
-      const setting_url = `/yaml/subscription/${subscriptionGroupId}`;
-      const settingsPostProps = {
-        method: 'PUT',
-        body: subscriptionYaml,
-        headers: { 'content-type': 'text/plain' }
-      };
-      try {
-        const settings_result = await fetch(setting_url, settingsPostProps);
-        const settings_status  = get(settings_result, 'status');
-        const settings_json = await settings_result.json();
-        if (settings_status !== 200) {
-          set(this, 'errorMsg', get(settings_json, 'message'));
-          notifications.error('Failed to save the subscription configuration.', 'Error', toastOptions);
-        } else {
-          notifications.success('Subscription configuration saved successfully', 'Done', toastOptions);
-        }
-      } catch (error) {
-        notifications.error('Error while saving subscription config', error, toastOptions);
-      }
+      // If there is no existing subscription group, this method will handle it
+      this._handleSubscriptionGroup(subscriptionYaml, notifications, subscriptionGroupId);
     }
   }
 });

@@ -111,7 +111,9 @@ public class BaselineFillingMergeWrapperTest {
         Collections.singletonList(new MockPipelineOutput(Collections.singletonList(anomaly), -1L))))
         .setAnomalies(Collections.emptyList())
         .setMetrics(Collections.singletonList(metric))
-        .setTimeseries(timeseries);
+        .setTimeseries(timeseries)
+        .setAggregates(ImmutableMap.of(MetricSlice.from(1, 3000, 3600),
+            DataFrame.builder(COL_TIME + ":LONG", COL_VALUE + ":DOUBLE").append(3000, 100).build()));
 
     // set up detection config properties
     this.config.getProperties().put(PROP_MAX_GAP, 100);
@@ -121,7 +123,7 @@ public class BaselineFillingMergeWrapperTest {
     // initialize the baseline provider
     BaselineProvider baselineProvider = new MockBaselineProvider();
     MockBaselineProviderSpec spec = new MockBaselineProviderSpec();
-    spec.setAggregates(ImmutableMap.of(MetricSlice.from(1, 3000, 3600), 100.0));
+    spec.setBaselineAggregates(ImmutableMap.of(MetricSlice.from(1, 3000, 3600), 100.0));
     spec.setBaselineTimeseries(ImmutableMap.of(MetricSlice.from(1, 3000, 3600), TimeSeries.fromDataFrame(
         DataFrame.builder(COL_TIME + ":LONG", COL_VALUE + ":DOUBLE").append(3000, 100).build())));
     InputDataFetcher dataFetcher = new DefaultInputDataFetcher(provider, this.config.getId());
@@ -161,7 +163,7 @@ public class BaselineFillingMergeWrapperTest {
     this.config.getProperties().put("detector", "$testDetector");
     BaselineProvider baselineProvider = new MockBaselineProvider();
     MockBaselineProviderSpec spec = new MockBaselineProviderSpec();
-    spec.setAggregates(ImmutableMap.of(MetricSlice.from(1, 3000, 3600), 100.0));
+    spec.setBaselineAggregates(ImmutableMap.of(MetricSlice.from(1, 3000, 3600), 100.0));
     spec.setBaselineTimeseries(ImmutableMap.of(MetricSlice.from(1, 3000, 3600), TimeSeries.fromDataFrame(
         DataFrame.builder(COL_TIME + ":LONG", COL_VALUE + ":DOUBLE").append(3000, 100).build())));
     InputDataFetcher dataFetcher = new DefaultInputDataFetcher(provider, this.config.getId());

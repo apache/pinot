@@ -18,11 +18,17 @@
  */
 package org.apache.pinot.core.realtime.stream;
 
+import org.apache.pinot.annotations.InterfaceAudience;
+import org.apache.pinot.annotations.InterfaceStability;
+
+
 /**
  * Interface wrapping stream consumer. Throws IndexOutOfBoundsException when trying to access a message at an
  * invalid index.
  * @param <T>
  */
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public interface MessageBatch<T> {
   /**
    *

@@ -122,6 +122,23 @@ export default Component.extend({
     }),
 
   /**
+   * Separate time range for anomalies in preview mode
+   * @type {Array}
+   */
+  anomaliesRange: computed(
+    'analysisRange',
+    function() {
+      const analysisRange = get(this, 'analysisRange');
+      let range = [];
+      range.push(analysisRange[0]);
+      // set end to now if the end time is in the future
+      const end = Math.min(moment().valueOf(), analysisRange[1]);
+      range.push(end)
+      return range;
+    }
+  ),
+
+  /**
    * Whether the alert has multiple dimensions
    * @type {Boolean}
    */
@@ -372,7 +389,7 @@ export default Component.extend({
 
       if (anomalies) {
         anomalies.forEach(a => {
-          const change = (a.avgBaselineVal !== 0) ? (a.avgCurrentVal/a.avgBaselineVal - 1.0) * 100.0 : 0;
+          const change = (a.avgBaselineVal !== 0 && a.avgBaselineVal !== "Infinity" && a.avgCurrentVal !== "Infinity") ? (a.avgCurrentVal/a.avgBaselineVal - 1.0) * 100.0 : 'N/A';
           let tableRow = {
             anomalyId: a.id,
             metricUrn: a.metricUrn,
@@ -380,10 +397,10 @@ export default Component.extend({
             end: a.endTime,
             startDateStr: this._formatAnomaly(a),
             durationStr: getFormattedDuration(a.startTime, a.endTime),
-            shownCurrent: humanizeFloat(a.avgCurrentVal),
-            shownBaseline: humanizeFloat(a.avgBaselineVal),
+            shownCurrent: a.avgCurrentVal === "Infinity" ? '-' : humanizeFloat(a.avgCurrentVal),
+            shownBaseline: a.avgBaselineVal === "Infinity" ? '-' : humanizeFloat(a.avgBaselineVal),
             change: change,
-            shownChangeRate: humanizeFloat(change),
+            shownChangeRate: change === 'N/A' ? change : humanizeFloat(change),
             anomalyFeedback: a.feedback ? a.feedback.feedbackType : a.statusClassification,
             dimensionList: Object.keys(a.dimensions),
             dimensions: a.dimensions,
@@ -493,19 +510,22 @@ export default Component.extend({
     let anomalyMapping = {};
     const {
       analysisRange,
+      anomaliesRange,
       notifications,
       isPreviewMode,
       alertId
-    } = this.getProperties('analysisRange', 'notifications', 'isPreviewMode', 'alertId');
+    } = this.getProperties('analysisRange', 'anomaliesRange', 'notifications', 'isPreviewMode', 'alertId');
     //detection alert fetch
     const start = analysisRange[0];
     const end = analysisRange[1];
+    const startAnomalies = anomaliesRange[0];
+    const endAnomalies = anomaliesRange[1];
     let anomalies;
     let applicationAnomalies;
     let metricUrnList;
     try {
       if(isPreviewMode){
-        applicationAnomalies = yield getYamlPreviewAnomalies(alertYaml, start, end, alertId);
+        applicationAnomalies = yield getYamlPreviewAnomalies(alertYaml, startAnomalies, endAnomalies, alertId);
         if (applicationAnomalies && applicationAnomalies.diagnostics && applicationAnomalies.diagnostics['0']) {
           metricUrnList = Object.keys(applicationAnomalies.diagnostics['0']);
           set(this, 'metricUrnList', metricUrnList);

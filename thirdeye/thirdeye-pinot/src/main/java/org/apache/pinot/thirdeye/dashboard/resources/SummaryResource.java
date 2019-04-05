@@ -28,7 +28,7 @@ import org.apache.pinot.thirdeye.client.diffsummary.Dimensions;
 import org.apache.pinot.thirdeye.client.diffsummary.MultiDimensionalSummary;
 import org.apache.pinot.thirdeye.client.diffsummary.MultiDimensionalSummaryCLITool;
 import org.apache.pinot.thirdeye.client.diffsummary.OLAPDataBaseClient;
-import org.apache.pinot.thirdeye.client.diffsummary.PinotThirdEyeSummaryClient;
+import org.apache.pinot.thirdeye.client.diffsummary.ThirdEyeSummaryClient;
 import org.apache.pinot.thirdeye.client.diffsummary.costfunctions.BalancedCostFunction;
 import org.apache.pinot.thirdeye.client.diffsummary.costfunctions.CostFunction;
 import org.apache.pinot.thirdeye.dashboard.Utils;
@@ -113,7 +113,7 @@ public class SummaryResource {
 
       CostFunction costFunction = new BalancedCostFunction();
       DateTimeZone dateTimeZone = DateTimeZone.forID(timeZone);
-      OLAPDataBaseClient olapClient = new PinotThirdEyeSummaryClient(CACHE_REGISTRY_INSTANCE.getQueryCache());
+      OLAPDataBaseClient olapClient = new ThirdEyeSummaryClient(CACHE_REGISTRY_INSTANCE.getQueryCache());
       MultiDimensionalSummary mdSummary = new MultiDimensionalSummary(olapClient, costFunction, dateTimeZone);
 
       response = mdSummary
@@ -166,7 +166,7 @@ public class SummaryResource {
 
       CostFunction costFunction = new BalancedCostFunction();
       DateTimeZone dateTimeZone = DateTimeZone.forID(timeZone);
-      OLAPDataBaseClient olapClient = new PinotThirdEyeSummaryClient(CACHE_REGISTRY_INSTANCE.getQueryCache());
+      OLAPDataBaseClient olapClient = new ThirdEyeSummaryClient(CACHE_REGISTRY_INSTANCE.getQueryCache());
       MultiDimensionalSummary mdSummary = new MultiDimensionalSummary(olapClient, costFunction, dateTimeZone);
 
       response = mdSummary

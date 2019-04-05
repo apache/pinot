@@ -81,8 +81,7 @@ public class PinotAdministrator {
     return _status;
   }
 
-  public void execute(String[] args)
-      throws Exception {
+  public void execute(String[] args) {
     try {
       CmdLineParser parser = new CmdLineParser(this);
       parser.parseArgument(args);
@@ -102,10 +101,12 @@ public class PinotAdministrator {
     }
   }
 
-  public static void main(String[] args)
-      throws Exception {
+  public static void main(String[] args) {
     PinotAdministrator pinotAdministrator = new PinotAdministrator();
     pinotAdministrator.execute(args);
+    if (!System.getProperties().getProperty("pinot.admin.system.exit", "true").equalsIgnoreCase("false")) {
+      System.exit(pinotAdministrator.getStatus() ? 0 : 1);
+    }
   }
 
   public void printUsage() {

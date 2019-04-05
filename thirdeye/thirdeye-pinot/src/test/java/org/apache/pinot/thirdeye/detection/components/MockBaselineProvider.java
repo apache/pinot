@@ -18,7 +18,6 @@ package org.apache.pinot.thirdeye.detection.components;
 
 import org.apache.pinot.thirdeye.dataframe.Series;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
-import org.apache.pinot.thirdeye.detection.DefaultInputDataFetcher;
 import org.apache.pinot.thirdeye.detection.InputDataFetcher;
 import org.apache.pinot.thirdeye.detection.spec.MockBaselineProviderSpec;
 import org.apache.pinot.thirdeye.detection.spi.components.BaselineProvider;
@@ -40,6 +39,6 @@ public class MockBaselineProvider implements BaselineProvider<MockBaselineProvid
 
   @Override
   public Double computePredictedAggregates(MetricSlice slice, Series.DoubleFunction aggregateFunction) {
-    return this.mockSpec.getAggregates().get(slice);
+    return this.mockSpec.getBaselineAggregates().get(slice);
   }
 }

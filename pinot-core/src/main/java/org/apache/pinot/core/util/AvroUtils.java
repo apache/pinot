@@ -38,9 +38,13 @@ import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.MetricFieldSpec;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.data.TimeFieldSpec;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class AvroUtils {
+  private static final Logger LOGGER = LoggerFactory.getLogger(AvroUtils.class);
+
   private AvroUtils() {
   }
 
@@ -51,7 +55,6 @@ public class AvroUtils {
    * @param fieldTypeMap Map from column to field type
    * @param timeUnit Time unit
    * @return Pinot schema
-   * @throws IOException
    */
   public static Schema getPinotSchemaFromAvroSchema(@Nonnull org.apache.avro.Schema avroSchema,
       @Nullable Map<String, FieldSpec.FieldType> fieldTypeMap, @Nullable TimeUnit timeUnit) {
@@ -96,7 +99,6 @@ public class AvroUtils {
    * @param fieldTypeMap Map from column to field type
    * @param timeUnit Time unit
    * @return Pinot schema
-   * @throws IOException
    */
   public static Schema getPinotSchemaFromAvroDataFile(@Nonnull File avroDataFile,
       @Nullable Map<String, FieldSpec.FieldType> fieldTypeMap, @Nullable TimeUnit timeUnit)
@@ -113,7 +115,6 @@ public class AvroUtils {
    *
    * @param avroDataFile Avro data file
    * @return Pinot schema
-   * @throws IOException
    */
   public static Schema getPinotSchemaFromAvroDataFile(@Nonnull File avroDataFile)
       throws IOException {
@@ -127,7 +128,6 @@ public class AvroUtils {
    * @param fieldTypeMap Map from column to field type
    * @param timeUnit Time unit
    * @return Pinot schema
-   * @throws IOException
    */
   public static Schema getPinotSchemaFromAvroSchemaFile(@Nonnull File avroSchemaFile,
       @Nullable Map<String, FieldSpec.FieldType> fieldTypeMap, @Nullable TimeUnit timeUnit)
@@ -197,15 +197,43 @@ public class AvroUtils {
   }
 
   /**
+   * Validates Pinot schema against the given Avro schema.
+   */
+  public static void validateSchema(Schema schema, org.apache.avro.Schema avroSchema) {
+    for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
+      String fieldName = fieldSpec.getName();
+      Field avroField = avroSchema.getField(fieldName);
+      if (avroField == null) {
+        LOGGER.warn("Pinot field: {} does not exist in Avro Schema", fieldName);
+      } else {
+        boolean isPinotFieldSingleValue = fieldSpec.isSingleValueField();
+        boolean isAvroFieldSingleValue = AvroUtils.isSingleValueField(avroField);
+        if (isPinotFieldSingleValue != isAvroFieldSingleValue) {
+          String errorMessage = "Pinot field: " + fieldName + " is " + (isPinotFieldSingleValue ? "Single" : "Multi")
+              + "-valued in Pinot schema but not in Avro schema";
+          LOGGER.error(errorMessage);
+          throw new IllegalStateException(errorMessage);
+        }
+
+        FieldSpec.DataType pinotFieldDataType = fieldSpec.getDataType();
+        FieldSpec.DataType avroFieldDataType = AvroUtils.extractFieldDataType(avroField);
+        if (pinotFieldDataType != avroFieldDataType) {
+          LOGGER.warn("Pinot field: {} of type: {} mismatches with corresponding field in Avro Schema of type: {}",
+              fieldName, pinotFieldDataType, avroFieldDataType);
+        }
+      }
+    }
+  }
+
+  /**
    * Get the Avro file reader for the given file.
    */
   public static DataFileStream<GenericRecord> getAvroReader(File avroFile)
       throws IOException {
     if (avroFile.getName().endsWith(".gz")) {
-      return new DataFileStream<>(new GZIPInputStream(new FileInputStream(avroFile)),
-          new GenericDatumReader<GenericRecord>());
+      return new DataFileStream<>(new GZIPInputStream(new FileInputStream(avroFile)), new GenericDatumReader<>());
     } else {
-      return new DataFileStream<>(new FileInputStream(avroFile), new GenericDatumReader<GenericRecord>());
+      return new DataFileStream<>(new FileInputStream(avroFile), new GenericDatumReader<>());
     }
   }
 

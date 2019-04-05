@@ -21,25 +21,19 @@ package org.apache.pinot.core.data.readers;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
-import org.apache.avro.Schema.Field;
 import org.apache.avro.file.DataFileStream;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.pinot.common.data.FieldSpec;
-import org.apache.pinot.common.data.FieldSpec.DataType;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.core.data.GenericRow;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.util.AvroUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
  * Record reader for AVRO file.
  */
 public class AvroRecordReader implements RecordReader {
-  private static final Logger LOGGER = LoggerFactory.getLogger(AvroRecordReader.class);
-
   private final File _dataFile;
   private final Schema _schema;
   private final List<FieldSpec> _fieldSpecs;
@@ -54,7 +48,7 @@ public class AvroRecordReader implements RecordReader {
     _fieldSpecs = RecordReaderUtils.extractFieldSpecs(schema);
     _avroReader = AvroUtils.getAvroReader(dataFile);
     try {
-      validateSchema();
+      AvroUtils.validateSchema(_schema, _avroReader.getSchema());
     } catch (Exception e) {
       _avroReader.close();
       throw e;
@@ -64,33 +58,6 @@ public class AvroRecordReader implements RecordReader {
   @Override
   public void init(SegmentGeneratorConfig segmentGeneratorConfig) {
 
-  }
-
-  private void validateSchema() {
-    org.apache.avro.Schema avroSchema = _avroReader.getSchema();
-    for (FieldSpec fieldSpec : _fieldSpecs) {
-      String fieldName = fieldSpec.getName();
-      Field avroField = avroSchema.getField(fieldName);
-      if (avroField == null) {
-        LOGGER.warn("Pinot field: {} does not exist in Avro Schema", fieldName);
-      } else {
-        boolean isPinotFieldSingleValue = fieldSpec.isSingleValueField();
-        boolean isAvroFieldSingleValue = AvroUtils.isSingleValueField(avroField);
-        if (isPinotFieldSingleValue != isAvroFieldSingleValue) {
-          String errorMessage = "Pinot field: " + fieldName + " is " + (isPinotFieldSingleValue ? "Single" : "Multi")
-              + "-valued in Pinot schema but not in Avro schema";
-          LOGGER.error(errorMessage);
-          throw new IllegalStateException(errorMessage);
-        }
-
-        DataType pinotFieldDataType = fieldSpec.getDataType();
-        DataType avroFieldDataType = AvroUtils.extractFieldDataType(avroField);
-        if (pinotFieldDataType != avroFieldDataType) {
-          LOGGER.warn("Pinot field: {} of type: {} mismatches with corresponding field in Avro Schema of type: {}",
-              fieldName, pinotFieldDataType, avroFieldDataType);
-        }
-      }
-    }
   }
 
   @Override

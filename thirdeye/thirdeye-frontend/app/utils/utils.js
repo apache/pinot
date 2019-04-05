@@ -176,6 +176,40 @@ export function toIso(dateStr) {
   return moment(Number(dateStr)).toISOString();
 }
 
+/**
+ * The yaml filters formatter. Convert filters in the yaml file in to a legacy filters string
+ * For example, filters = {
+ *   "country": ["us", "cn"],
+ *   "browser": ["chrome"]
+ * }
+ * will be convert into "country=us;country=cn;browser=chrome"
+ *
+ * @method _formatYamlFilter
+ * @param {Map} filters multimap of filters
+ * @return {String} - formatted filters string
+ */
+export function formatYamlFilter(filters) {
+  if (filters){
+    const filterStrings = [];
+    Object.keys(filters).forEach(
+      function(filterKey) {
+        const filter = filters[filterKey];
+        if (filter && Array.isArray(filter)) {
+          filter.forEach(
+            function (filterValue) {
+              filterStrings.push(filterKey + '=' + filterValue);
+            }
+          );
+        } else {
+          filterStrings.push(filterKey + '=' + filter);
+        }
+      }
+    );
+    return filterStrings.join(';');
+  }
+  return '';
+}
+
 export default {
   checkStatus,
   humanizeFloat,
@@ -185,5 +219,6 @@ export default {
   parseProps,
   postProps,
   toIso,
-  postYamlProps
+  postYamlProps,
+  formatYamlFilter
 };
