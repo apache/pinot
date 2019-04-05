@@ -36,7 +36,7 @@ export default Component.extend({
   //
   // external (optional)
   //
-  analysisRangeMax: makeTime().startOf('day'),
+  analysisRangeMax: makeTime().add(1, 'day').startOf('day'),
 
   analysisRangePredefined: {
     'Today': [makeTime(), makeTime().startOf('day').add(1, 'days')],
@@ -112,6 +112,8 @@ export default Component.extend({
     },
 
     onAnalysisRange(start, end) {
+      end = makeTime(end).startOf('day').valueOf();
+      start = makeTime(start).valueOf();
       setProperties(this, { analysisRangeStart: start, analysisRangeEnd: end });
       this.send('onContext');
     },
