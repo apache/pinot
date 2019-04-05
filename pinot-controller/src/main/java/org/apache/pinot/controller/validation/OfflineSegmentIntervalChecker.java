@@ -81,18 +81,19 @@ public class OfflineSegmentIntervalChecker extends ControllerPeriodicTask<Void> 
     SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
     if (numSegments >= 2 && StringUtils.isNotEmpty(validationConfig.getTimeColumnName())) {
       List<Interval> segmentIntervals = new ArrayList<>(numSegments);
-      List<String> segmentsWithInvalidInterval = new ArrayList<>();
+      int numSegmentsWithInvalidIntervals = 0;
       for (OfflineSegmentZKMetadata offlineSegmentZKMetadata : offlineSegmentZKMetadataList) {
         Interval timeInterval = offlineSegmentZKMetadata.getTimeInterval();
         if (timeInterval != null && TimeUtils.timeValueInValidRange(timeInterval.getStartMillis()) && TimeUtils
             .timeValueInValidRange(timeInterval.getEndMillis())) {
           segmentIntervals.add(timeInterval);
         } else {
-          segmentsWithInvalidInterval.add(offlineSegmentZKMetadata.getSegmentName());
+          numSegmentsWithInvalidIntervals ++;
         }
       }
-      if (!segmentsWithInvalidInterval.isEmpty()) {
-        LOGGER.warn("Table: {} has segments with invalid interval: {}", offlineTableName, segmentsWithInvalidInterval);
+      if (numSegmentsWithInvalidIntervals > 0) {
+        LOGGER.warn("Table: {} has {} segments with invalid interval", offlineTableName,
+            numSegmentsWithInvalidIntervals);
       }
       Duration frequency = convertToDuration(validationConfig.getSegmentPushFrequency());
       numMissingSegments = computeNumMissingSegments(segmentIntervals, frequency);

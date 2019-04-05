@@ -118,7 +118,7 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
       }
     }
     if (!segmentsToDelete.isEmpty()) {
-      LOGGER.info("Deleting segments: {} from table: {}", segmentsToDelete, offlineTableName);
+      LOGGER.info("Deleting {} segments from table: {}", segmentsToDelete.size(), offlineTableName);
       _pinotHelixResourceManager.deleteSegments(offlineTableName, segmentsToDelete);
     }
   }
@@ -147,7 +147,7 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
       }
     }
     if (!segmentsToDelete.isEmpty()) {
-      LOGGER.info("Deleting segments: {} from table: {}", segmentsToDelete, realtimeTableName);
+      LOGGER.info("Deleting {} segments from table: {}", segmentsToDelete.size(), realtimeTableName);
       _pinotHelixResourceManager.deleteSegments(realtimeTableName, segmentsToDelete);
     }
   }
