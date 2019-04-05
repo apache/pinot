@@ -18,10 +18,16 @@
  */
 package org.apache.pinot.core.realtime.stream;
 
+import org.apache.pinot.annotations.InterfaceAudience;
+import org.apache.pinot.annotations.InterfaceStability;
+
+
 /**
  * A class that provides metadata associated with the message of a stream, for e.g.,
  * ingestion-timestamp of the message.
  */
+@InterfaceAudience.Public
+@InterfaceStability.Evolving
 public class StreamMessageMetadata {
 
   private long _ingestionTimestamp;
@@ -36,5 +42,9 @@ public class StreamMessageMetadata {
 
   public void setIngestionTimestamp(long timestamp) {
     _ingestionTimestamp = timestamp;
+  }
+
+  public void reset() {
+    _ingestionTimestamp = Long.MIN_VALUE;
   }
 }
