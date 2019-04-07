@@ -93,7 +93,7 @@ public class SegmentsValidationAndRetentionConfig {
   }
 
   public void setTimeType(String timeType) {
-    _timeType = timeType != null ? TimeUtils.timeUnitFromString(timeType) : null;
+    _timeType = TimeUtils.timeUnitFromString(timeType);
   }
 
   public String getRetentionTimeUnit() {
