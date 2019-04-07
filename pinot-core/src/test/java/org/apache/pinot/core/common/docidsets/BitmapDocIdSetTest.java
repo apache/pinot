@@ -54,14 +54,12 @@ public class BitmapDocIdSetTest {
         originalSet.add(docId);
         mutableRoaringBitmap.add(docId);
       }
-      ByteArrayOutputStream bos = new ByteArrayOutputStream();
-      DataOutputStream dos = new DataOutputStream(bos);
-      // could call "rr1.runOptimize()" and "rr2.runOptimize" if there
+      // could call "rr1.runOptimize()" and "rr2.runOptimize" if
       // there were runs to compress
-      mutableRoaringBitmap.serialize(dos);
-      dos.close();
-      ByteBuffer bb = ByteBuffer.wrap(bos.toByteArray());
-      ImmutableRoaringBitmap immutableRoaringBitmap = new ImmutableRoaringBitmap(bb);
+      final ByteBuffer buffer = ByteBuffer.allocate(mutableRoaringBitmap.serializedSizeInBytes());
+      mutableRoaringBitmap.serialize(buffer);
+      buffer.flip();
+      ImmutableRoaringBitmap immutableRoaringBitmap = new ImmutableRoaringBitmap(buffer);
       list.add(immutableRoaringBitmap);
     }
     ImmutableRoaringBitmap[] bitmaps = new ImmutableRoaringBitmap[list.size()];

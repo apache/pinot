@@ -40,10 +40,7 @@ public class BitmapDocIdSet implements FilterBlockDocIdSet {
       _bitmap = orBitmap;
     } else if (numBitmaps == 1) {
       if (exclusive) {
-        // NOTE: cannot use ImmutableRoaringBitmap.flip() because the library has a bug in that method
-        // TODO: the bug has been fixed in the latest version of ImmutableRoaringBitmap, update the version
-        MutableRoaringBitmap bitmap = bitmaps[0].toMutableRoaringBitmap();
-        bitmap.flip(startDocId, endDocId + 1);
+        MutableRoaringBitmap bitmap = ImmutableRoaringBitmap.flip(bitmaps[0], startDocId, endDocId + 1);
         _bitmap = bitmap;
       } else {
         _bitmap = bitmaps[0];
