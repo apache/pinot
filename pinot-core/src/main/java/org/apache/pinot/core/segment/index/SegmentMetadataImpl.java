@@ -180,6 +180,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
         .containsKey(SEGMENT_END_TIME) && segmentMetadataPropertiesConfiguration.containsKey(TIME_UNIT)) {
       try {
         _timeUnit = TimeUtils.timeUnitFromString(segmentMetadataPropertiesConfiguration.getString(TIME_UNIT));
+        assert _timeUnit != null;
         _timeGranularity = new Duration(_timeUnit.toMillis(1));
         String startTimeString = segmentMetadataPropertiesConfiguration.getString(SEGMENT_START_TIME);
         String endTimeString = segmentMetadataPropertiesConfiguration.getString(SEGMENT_END_TIME);

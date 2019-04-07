@@ -21,6 +21,7 @@ package org.apache.pinot.common.utils.time;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.Duration;
@@ -47,7 +48,8 @@ public class TimeUtils {
   private static final long VALID_MAX_TIME_MILLIS = new DateTime(2071, 1, 1, 0, 0, 0, 0, DateTimeZone.UTC).getMillis();
 
   /**
-   * Converts a time unit string into {@link TimeUnit}, ignoring case.
+   * Converts a time unit string into {@link TimeUnit}, ignoring case. For {@code null} or empty time unit string,
+   * returns {@code null}.
    * <p>Supports the following legacy time unit strings:
    * <ul>
    *   <li>"daysSinceEpoch" -> DAYS</li>
@@ -59,7 +61,12 @@ public class TimeUtils {
    * @param timeUnitString The time unit string to convert, e.g. "DAYS" or "SECONDS"
    * @return The corresponding {@link TimeUnit}
    */
-  public static TimeUnit timeUnitFromString(String timeUnitString) {
+  @Nullable
+  public static TimeUnit timeUnitFromString(@Nullable String timeUnitString) {
+    // NOTE: for backward-compatibility, return null if time unit string is null or empty
+    if (timeUnitString == null || timeUnitString.isEmpty()) {
+      return null;
+    }
     String upperCaseTimeUnitString = timeUnitString.toUpperCase();
     TimeUnit timeUnit = TIME_UNIT_MAP.get(upperCaseTimeUnitString);
     if (timeUnit != null) {

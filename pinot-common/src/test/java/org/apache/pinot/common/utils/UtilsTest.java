@@ -25,6 +25,8 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNull;
+import static org.testng.Assert.fail;
 
 
 /**
@@ -49,6 +51,14 @@ public class UtilsTest {
     assertEquals(TimeUtils.timeUnitFromString("HOURSSINCEEPOCH"), TimeUnit.HOURS);
     assertEquals(TimeUtils.timeUnitFromString("MinutesSinceEpoch"), TimeUnit.MINUTES);
     assertEquals(TimeUtils.timeUnitFromString("SeCoNdSsInCeEpOcH"), TimeUnit.SECONDS);
+    assertNull(TimeUtils.timeUnitFromString(null));
+    assertNull(TimeUtils.timeUnitFromString(""));
+    try {
+      TimeUtils.timeUnitFromString("unknown");
+      fail();
+    } catch (Exception e) {
+      // Expected
+    }
   }
 
   @Test
