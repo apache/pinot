@@ -16,6 +16,7 @@ import { isPresent } from '@ember/utils';
 import Controller from '@ember/controller';
 import { reads } from '@ember/object/computed';
 import { setUpTimeRangeOptions, powerSort } from 'thirdeye-frontend/utils/manage-alert-utils';
+import {  anomalyResponseObjNew } from 'thirdeye-frontend/utils/anomaly';
 import moment from 'moment';
 
 const TIME_PICKER_INCREMENT = 5; // tells date picker hours field how granularly to display time
@@ -295,6 +296,17 @@ export default Controller.extend({
           filterKeys = [...filterKeys, ...group];
         });
         Object.assign(filter, { filterKeys });
+      } else if (filter.name === "statusFilterMap"){
+        let anomalyPropertyArray = Object.keys(anomaliesById.searchFilters[filter.name]);
+        anomalyPropertyArray = anomalyPropertyArray.map(prop => {
+          // get the right object
+          const mapping = anomalyResponseObjNew.filter(e => (e.status === prop));
+          // map the status to name
+          return mapping.length > 0 ? mapping[0].name : prop;
+        });
+        const filterKeys = [ ...new Set(powerSort(anomalyPropertyArray, null))];
+        // Add filterKeys prop to each facet or filter block
+        Object.assign(filter, { filterKeys });
       } else {
         const anomalyPropertyArray = Object.keys(anomaliesById.searchFilters[filter.name]);
         const filterKeys = [ ...new Set(powerSort(anomalyPropertyArray, null))];
@@ -319,6 +331,18 @@ export default Controller.extend({
       selectedFilters.forEach(filter => {
         const [type, dimension] = filter.split('::');
         addedIds = [...addedIds, ...anomaliesById.searchFilters.dimensionFilterMap[type][dimension]];
+      });
+      return addedIds;
+    } else if (filterType === 'statusFilterMap'){
+      let addedIds = [];
+      const translatedFilters = selectedFilters.map(f => {
+        // get the right object
+        const mapping = anomalyResponseObjNew.filter(e => (e.name === f));
+        // map the name to status
+        return mapping.length > 0 ? mapping[0].status : f;
+      });
+      translatedFilters.forEach(filter => {
+        addedIds = [...addedIds, ...anomaliesById.searchFilters[filterType][filter]];
       });
       return addedIds;
     } else {

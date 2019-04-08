@@ -138,7 +138,7 @@ export default Component.extend({
           timestamps: current.timestamp,
           values: current.value,
           type: 'line',
-          color: toColor(anomalyData.metricUrn)
+          color: 'blue'
         };
       }
 
@@ -147,7 +147,7 @@ export default Component.extend({
           timestamps: predicted.timestamp,
           values: predicted.value,
           type: 'line',
-          color: 'light-' + toColor(anomalyData.metricUrn)
+          color: 'orange'
         };
       }
       return series;
