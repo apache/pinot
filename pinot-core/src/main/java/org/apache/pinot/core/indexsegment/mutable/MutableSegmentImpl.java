@@ -99,7 +99,6 @@ public class MutableSegmentImpl implements MutableSegment {
   private static final StreamMessageMetadata _defaultMetadata = new StreamMessageMetadata();
   private long _lastIndexedTimestamp = Long.MIN_VALUE;
   private long _latestIngestionTimestamp = Long.MIN_VALUE;
-  private int _indexingErrors = 0;
 
   public MutableSegmentImpl(RealtimeSegmentConfig config) {
     _segmentName = config.getSegmentName();

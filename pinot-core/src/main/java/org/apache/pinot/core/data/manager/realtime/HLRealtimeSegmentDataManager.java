@@ -216,7 +216,7 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         do {
           try {
             consumedRow = GenericRow.createOrReuseRow(consumedRow);
-            messageMetadata.setIngestionTimestamp(Long.MIN_VALUE);
+            messageMetadata.reset();
             consumedRow = _streamLevelConsumer.next(consumedRow, messageMetadata);
 
             if (consumedRow != null) {
