@@ -3,7 +3,7 @@ import Route from '@ember/routing/route';
 import moment from 'moment';
 import { inject as service } from '@ember/service';
 import { powerSort } from 'thirdeye-frontend/utils/manage-alert-utils';
-import {  getAnomalyIdsByTimeRange } from 'thirdeye-frontend/utils/anomaly';
+import {  getAnomalyIdsByTimeRange, anomalyResponseObjNew } from 'thirdeye-frontend/utils/anomaly';
 
 const start = moment().subtract(1, 'day').valueOf();
 const end = moment().valueOf();
@@ -27,14 +27,14 @@ export default Route.extend({
     const filterBlocksLocal = [
       {
         name: 'statusFilterMap',
-        title: 'Anomaly Status',
+        title: 'Feedback Status',
         type: 'select',
         matchWidth: true,
         filterKeys: []
       },
       {
         name: 'functionFilterMap',
-        title: 'Functions',
+        title: 'Alert Names',
         type: 'select',
         filterKeys: []
       },
@@ -70,6 +70,17 @@ export default Route.extend({
           filterKeys = [...filterKeys, ...group];
         });
         Object.assign(filter, { filterKeys });
+      } else if (filter.name === "statusFilterMap"){
+        let anomalyPropertyArray = Object.keys(model.anomaliesById.searchFilters[filter.name]);
+        anomalyPropertyArray = anomalyPropertyArray.map(prop => {
+          // get the right object
+          const mapping = anomalyResponseObjNew.filter(e => (e.status === prop));
+          // map the status to name
+          return mapping.length > 0 ? mapping[0].name : prop;
+        });
+        const filterKeys = [ ...new Set(powerSort(anomalyPropertyArray, null))];
+        // Add filterKeys prop to each facet or filter block
+        Object.assign(filter, { filterKeys });
       } else {
         const anomalyPropertyArray = Object.keys(model.anomaliesById.searchFilters[filter.name]);
         const filterKeys = [ ...new Set(powerSort(anomalyPropertyArray, null))];
@@ -82,7 +93,6 @@ export default Route.extend({
     Object.assign(model, {
       initialFiltersLocal: filterBlocksLocal
     });
-
     // Send filters to controller
     controller.setProperties({
       model,

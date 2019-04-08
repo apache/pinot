@@ -57,7 +57,7 @@ export const anomalyResponseObjNew = [
   },
   { name: 'Expected permanent change',
     value: 'ANOMALY_NEW_TREND',
-    status: 'Confirmed - New Trend'
+    status: 'New Trend'
   },
   { name: 'No change observed',
     value: 'NOT_ANOMALY',
