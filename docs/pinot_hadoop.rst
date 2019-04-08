@@ -136,18 +136,19 @@ Sample Schema:
      "schemaName": "flights",
      "dimensionFieldSpecs": [
        {
-         "name": "name",
-         "dataType": "STRING"
+         "name": "flightNumber",
+         "dataType": "LONG"
        },
        {
-         "name": "age",
-         "dataType": "INT"
+         "name": "tags",
+         "dataType": "STRING",
+         "singleValueField": false
        }
      ],
      "metricFieldSpecs": [
        {
-         "name": "percent",
-         "dataType": "FLOAT"
+         "name": "price",
+         "dataType": "DOUBLE"
        }
      ],
      "timeFieldSpec": {
@@ -202,7 +203,9 @@ to consume from, using a table definition such as this one:
      },
      "tableIndexConfig": {
        "invertedIndexColumns": [
-         "name"
+         "flightNumber",
+         "tags",
+         "daysSinceEpoch"
        ],
        "loadMode": "MMAP",
        "streamConfigs": {
