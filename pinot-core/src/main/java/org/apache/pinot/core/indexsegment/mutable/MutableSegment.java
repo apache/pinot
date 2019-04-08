@@ -26,21 +26,13 @@ import org.apache.pinot.core.realtime.stream.StreamMessageMetadata;
 public interface MutableSegment extends IndexSegment {
 
   /**
-   * Indexes a record into the segment.
-   *
-   * @param row Record represented as a {@link GenericRow}
-   * @return Whether the segment is full (i.e. cannot index more record into it)
-   */
-  boolean index(GenericRow row);
-
-  /**
    * Indexes a record into the segment with optionally provided metadata.
    *
    * @param row Record represented as a {@link GenericRow}
    * @param msgMetadata the metadata associated with the message
    * @return Whether the segment is full (i.e. cannot index more record into it)
    */
-   boolean index(GenericRow row, StreamMessageMetadata msgMetadata); 
+   boolean index(GenericRow row, StreamMessageMetadata msgMetadata);
 
   /**
    * Returns the number of records already indexed into the segment.

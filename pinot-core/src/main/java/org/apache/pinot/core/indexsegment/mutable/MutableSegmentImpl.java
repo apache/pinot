@@ -210,12 +210,6 @@ public class MutableSegmentImpl implements MutableSegment {
     return _maxTime;
   }
 
-
-  @Override
-  public boolean index(GenericRow row) {
-    return index(row, _defaultMetadata);
-  }
-
   @Override
   public boolean index(GenericRow row, StreamMessageMetadata msgMetadata) {
 

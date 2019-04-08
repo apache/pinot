@@ -36,6 +36,7 @@ import org.apache.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
 import org.apache.pinot.core.io.writer.impl.DirectMemoryManager;
 import org.apache.pinot.core.realtime.impl.RealtimeSegmentConfig;
 import org.apache.pinot.core.realtime.impl.RealtimeSegmentStatsHistory;
+import org.apache.pinot.core.realtime.stream.StreamMessageMetadata;
 import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
 
 
@@ -128,12 +129,15 @@ public class MemoryEstimator {
     // create mutable segment impl
     MutableSegmentImpl mutableSegmentImpl = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build());
 
+    StreamMessageMetadata messageMetadata = new StreamMessageMetadata();
     // read all rows and index them
     try (PinotSegmentRecordReader segmentRecordReader = new PinotSegmentRecordReader(_sampleCompletedSegment);) {
       GenericRow row = new GenericRow();
       while (segmentRecordReader.hasNext()) {
+        messageMetadata.reset();
+
         segmentRecordReader.next(row);
-        mutableSegmentImpl.index(row);
+        mutableSegmentImpl.index(row, messageMetadata);
         row.clear();
       }
     } catch (Exception e) {
