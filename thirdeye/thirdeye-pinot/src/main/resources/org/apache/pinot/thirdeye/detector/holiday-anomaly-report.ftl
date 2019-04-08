@@ -79,7 +79,7 @@
               <#if newTable>
                 <p>
                   <span style="color: #1D1D1D; font-size: 16px; font-weight: bold; display:inline-block; vertical-align: middle;">Alert:&nbsp;</span>
-                  <span style="color: #606060; font-size: 16px; text-decoration: none; display:inline-block; vertical-align: middle; width: 70%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${detectionName}</span>
+                  <span style="color: #606060; font-size: 16px; text-decoration: none; display:inline-block; vertical-align: middle; width: 77%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${detectionName}</span>
                   <a href="${dashboardHost}/app/#/manage/explore/${functionToId[detectionName]?string.computer}" target="blank" style="text-decoration: none; color: #0B5EA1; display:inline-block; vertical-align: middle;">(Edit Settings)</a>
                 </p>
               </#if>
