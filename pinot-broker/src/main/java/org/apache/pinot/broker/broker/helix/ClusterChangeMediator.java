@@ -120,15 +120,18 @@ public class ClusterChangeMediator implements ExternalViewChangeListener, Instan
   private void processClusterChange(ChangeType changeType, List<ClusterChangeHandler> changeHandlers) {
     long startTime = System.currentTimeMillis();
     LOGGER.info("Start processing {} change", changeType);
-    long handlerStartTime = startTime;
     for (ClusterChangeHandler changeHandler : changeHandlers) {
-      changeHandler.processClusterChange(changeType);
-      long handlerEndTime = System.currentTimeMillis();
-      LOGGER.info("Finish handling {} change for handler: {} in {}ms", changeType, changeHandler.getClass().getName(),
-          handlerEndTime - handlerStartTime);
-      handlerStartTime = handlerEndTime;
+      try {
+        long handlerStartTime = System.currentTimeMillis();
+        changeHandler.processClusterChange(changeType);
+        LOGGER.info("Finish handling {} change for handler: {} in {}ms", changeType, changeHandler.getClass().getName(),
+            System.currentTimeMillis() - handlerStartTime);
+      } catch (Exception e) {
+        LOGGER.error("Caught exception while handling {} change for handler: {}", changeType,
+            changeHandler.getClass().getName(), e);
+      }
     }
-    long endTime = handlerStartTime;
+    long endTime = System.currentTimeMillis();
     LOGGER.info("Finish processing {} change in {}ms", changeType, endTime - startTime);
     _lastProcessTimeMap.put(changeType, endTime);
   }
