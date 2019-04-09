@@ -37,7 +37,7 @@ export default Controller.extend({
     this.metrics = [];
     this.databaseOptions = [];
 
-    const databaseUrl = 'http://localhost:1426/sql-data-source/databases';
+    const databaseUrl = '/sql-data-source/databases';
     fetch(databaseUrl).then((res) => {
       var result = res.json();
       result.then((ret) => {
@@ -124,7 +124,7 @@ export default Controller.extend({
         body: JSON.stringify(importObj),
         headers: { 'content-type': 'Application/Json' }
       };
-      const url = 'http://localhost:1426/sql-data-source/onboard';
+      const url = '/sql-data-source/onboard';
       fetch(url, postProps).then((res) => {
         if (res.status == 200) {
           this.set('response', 'Import success! However, it does not validate the database for your entries.');
