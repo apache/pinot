@@ -340,18 +340,6 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
     return bucketSizePeriod;
   }
 
-  public static TimeGranularity toTimeGranularity(Period period) {
-    if (period.getDays() > 0) {
-      return new TimeGranularity(period.getDays(), TimeUnit.DAYS);
-    } else if (period.getHours() > 0) {
-      return new TimeGranularity(period.getHours(), TimeUnit.HOURS);
-    } else if (period.getMinutes() > 0)  {
-      return new TimeGranularity(period.getMinutes(), TimeUnit.MINUTES);
-    } else {
-      return new TimeGranularity(period.getMillis(), TimeUnit.MILLISECONDS);
-    }
-  }
-
   /**
    * Speed up minute level detection.
    *

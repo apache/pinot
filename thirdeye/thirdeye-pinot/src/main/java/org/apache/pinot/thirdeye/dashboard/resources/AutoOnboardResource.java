@@ -19,6 +19,9 @@
 
 package org.apache.pinot.thirdeye.dashboard.resources;
 
+import com.wordnik.swagger.annotations.Api;
+import com.wordnik.swagger.annotations.ApiOperation;
+import org.apache.pinot.thirdeye.api.Constants;
 import org.apache.pinot.thirdeye.auto.onboard.AutoOnboard;
 import org.apache.pinot.thirdeye.auto.onboard.AutoOnboardUtility;
 import org.apache.pinot.thirdeye.common.ThirdEyeConfiguration;
@@ -49,6 +52,7 @@ import org.slf4j.LoggerFactory;
  */
 @Path(value = "/autoOnboard")
 @Produces(MediaType.APPLICATION_JSON)
+@Api(tags = {Constants.DASHBOARD_TAG})
 public class AutoOnboardResource {
 
   private Map<String, List<AutoOnboard>> dataSourceToOnboardMap;
@@ -59,6 +63,7 @@ public class AutoOnboardResource {
 
   @POST
   @Path("/runAdhoc/{datasource}")
+  @ApiOperation("run auto onboard for a data source")
   public Response runAdhocOnboard(@PathParam("datasource") String datasource) {
     if (!dataSourceToOnboardMap.containsKey(datasource)) {
       return Response.status(Status.INTERNAL_SERVER_ERROR)

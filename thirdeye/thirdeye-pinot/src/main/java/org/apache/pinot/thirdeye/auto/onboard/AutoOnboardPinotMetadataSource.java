@@ -337,9 +337,6 @@ public class AutoOnboardPinotMetadataSource extends AutoOnboard {
 
   private void checkTimeFieldChanges(DatasetConfigDTO datasetConfig, Schema schema) {
     TimeGranularitySpec timeSpec = schema.getTimeFieldSpec().getOutgoingGranularitySpec();
-    if (timeSpec.getTimeType().equals(TimeUnit.MILLISECONDS)){
-      timeSpec.setTimeType(TimeUnit.MINUTES);
-    }
     if (!datasetConfig.getTimeColumn().equals(timeSpec.getName())
         || !datasetConfig.getTimeFormat().equals(timeSpec.getTimeFormat())
         || datasetConfig.bucketTimeGranularity().getUnit() != timeSpec.getTimeType()
