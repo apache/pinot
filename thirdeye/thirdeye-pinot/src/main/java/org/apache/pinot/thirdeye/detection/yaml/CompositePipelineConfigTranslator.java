@@ -171,10 +171,8 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
     // do not tune for alerts migrated from legacy anomaly function.
     DetectionRegistry.registerComponent("com.linkedin.thirdeye.detection.components.AdLibAlertFilter",
         "MIGRATED_ALGORITHM_FILTER");
-    DetectionRegistry.registerComponent("com.linkedin.thirdeye.detection.components.AdLibAnomalyDetector",
+    DetectionRegistry.registerComponent("com.linkedin.thirdeye.detection.components.AdLibAnomalyDetectorAndBaselineProvider",
         "MIGRATED_ALGORITHM");
-    DetectionRegistry.registerComponent("com.linkedin.thirdeye.detection.components.AdLibBaselineProvider",
-        "MIGRATED_ALGORITHM_BASELINE");
   }
   private static final Set<String> TUNING_OFF_COMPONENTS =
       ImmutableSet.of("MIGRATED_ALGORITHM_FILTER", "MIGRATED_ALGORITHM", "MIGRATED_ALGORITHM_BASELINE");
@@ -275,14 +273,21 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
     Map<String, Object> properties = new HashMap<>();
     properties.put(PROP_CLASS_NAME, BaselineFillingMergeWrapper.class.getName());
     properties.put(PROP_NESTED, Collections.singletonList(nestedProperties));
-    String baselineProviderType = DEFAULT_BASELINE_PROVIDER_YAML_TYPE;
-    if (DETECTOR_TO_BASELINE.containsKey(detectorType)) {
-      baselineProviderType = DETECTOR_TO_BASELINE.get(detectorType);
-    }
-    String baselineProviderKey = makeComponentKey(baselineProviderType, name);
-    properties.put(PROP_BASELINE_PROVIDER, baselineProviderKey);
     properties.put(PROP_DETECTOR, detectorKey);
-    buildComponentSpec(yamlConfig, baselineProviderType, baselineProviderKey);
+
+    // fill in baseline provider properties
+    if (DETECTION_REGISTRY.isBaselineProvider(detectorType)) {
+      // if the detector implements the baseline provider interface, use it to generate baseline
+      properties.put(PROP_BASELINE_PROVIDER, detectorKey);
+    } else {
+      String baselineProviderType = DEFAULT_BASELINE_PROVIDER_YAML_TYPE;
+      if (DETECTOR_TO_BASELINE.containsKey(detectorType)) {
+        baselineProviderType = DETECTOR_TO_BASELINE.get(detectorType);
+      }
+      String baselineProviderKey = makeComponentKey(baselineProviderType, name);
+      buildComponentSpec(yamlConfig, baselineProviderType, baselineProviderKey);
+      properties.put(PROP_BASELINE_PROVIDER, baselineProviderKey);
+    }
     properties.putAll(this.mergerProperties);
     return properties;
   }
