@@ -18,9 +18,11 @@
  */
 package org.apache.pinot.broker.broker.helix;
 
+import com.google.common.base.Preconditions;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.helix.HelixConstants;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
 import org.apache.helix.PropertyKey;
@@ -58,7 +60,10 @@ public class LiveInstanceChangeHandler implements ClusterChangeHandler {
   }
 
   @Override
-  public void processClusterChange() {
+  public void processClusterChange(HelixConstants.ChangeType changeType) {
+    Preconditions
+        .checkState(changeType == HelixConstants.ChangeType.LIVE_INSTANCE, "Illegal change type: " + changeType);
+
     // Skip processing live instance change for single-connection routing
     if (_connectionPool == null) {
       return;
