@@ -51,6 +51,7 @@ import org.apache.pinot.core.realtime.stream.StreamConfig;
 import org.apache.pinot.core.realtime.stream.StreamConsumerFactory;
 import org.apache.pinot.core.realtime.stream.StreamConsumerFactoryProvider;
 import org.apache.pinot.core.realtime.stream.StreamLevelConsumer;
+import org.apache.pinot.core.realtime.stream.StreamMessageMetadata;
 import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
@@ -211,15 +212,17 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
         int numRowsErrored = 0;
         GenericRow consumedRow = null;
+        StreamMessageMetadata messageMetadata = new StreamMessageMetadata();
         do {
           try {
             consumedRow = GenericRow.createOrReuseRow(consumedRow);
-            consumedRow = _streamLevelConsumer.next(consumedRow);
+            messageMetadata.reset();
+            consumedRow = _streamLevelConsumer.next(consumedRow, messageMetadata);
 
             if (consumedRow != null) {
               GenericRow transformedRow = _recordTransformer.transform(consumedRow);
               if (transformedRow != null) {
-                notFull = realtimeSegment.index(transformedRow);
+                notFull = realtimeSegment.index(transformedRow, messageMetadata);
                 exceptionSleepMillis = 50L;
               }
             }

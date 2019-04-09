@@ -36,6 +36,7 @@ import org.apache.pinot.core.data.readers.RecordReader;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
+import org.apache.pinot.core.realtime.stream.StreamMessageMetadata;
 import org.apache.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
@@ -73,10 +74,11 @@ public class MutableSegmentImplTest {
     _schema = config.getSchema();
     _mutableSegmentImpl = MutableSegmentImplTestUtils
         .createMutableSegmentImpl(_schema, Collections.emptySet(), Collections.emptySet(), false);
+    StreamMessageMetadata defaultMetadata = new StreamMessageMetadata();
     try (RecordReader recordReader = new AvroRecordReader(avroFile, _schema)) {
       GenericRow reuse = new GenericRow();
       while (recordReader.hasNext()) {
-        _mutableSegmentImpl.index(recordReader.next(reuse));
+        _mutableSegmentImpl.index(recordReader.next(reuse), defaultMetadata);
       }
     }
   }

@@ -58,4 +58,40 @@ public interface StreamMessageDecoder<T> {
    * @return A new row decoded from the buffer
    */
   GenericRow decode(T payload, int offset, int length, GenericRow destination);
+
+  /**
+   * Decodes the payload received into a generic row and optionally populates any metadata associated
+   * with the message.
+   *
+   * This is an interface default method is provided for backward compatibility and should be
+   * overridden by implementations that can provide meaningful metadata.
+   *
+   * @param payload the message payload
+   * @param destination The {@link GenericRow} to write the decoded row into
+   * @param metadata The {@link StreamMessageMetadata} associated with the message
+   * @return A new row decoded from the buffer
+   */
+  default GenericRow decode(T payload, GenericRow destination, StreamMessageMetadata metadata) {
+    // by default, invoke the non-metadata based method for backwards compatibility
+    return decode(payload, destination);
+  }
+
+  /**
+   * Decodes the payload received into a generic row and optionally populates any metadata associated
+   * with the message.
+   *
+   * This is an interface default method is provided for backward compatibility and should be
+   * overridden by implementations that can provide meaningful metadata.
+   *
+   * @param payload the message payload
+   * @param offset The offset into the array from which the row contents starts
+   * @param length The length of the row contents in bytes
+   * @param destination The {@link GenericRow} to write the decoded row into
+   * @param metadata The {@link StreamMessageMetadata} associated with the message
+   * @return A new row decoded from the buffer
+   */
+  default GenericRow decode(T payload, int offset, int length, GenericRow destination, StreamMessageMetadata metadata) {
+    // by default, invoke the non-metadata based method for backwards compatibility
+    return decode(payload, offset, length, destination);
+  }
 }

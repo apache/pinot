@@ -58,6 +58,16 @@ public interface MessageBatch<T> {
   int getMessageLengthAtIndex(int index);
 
   /**
+   * Returns the metadata associated with the message at a particular index. This typically includes the timestamp
+   * when the message was ingested by the upstream stream-provider and other relevant metadata.
+   *
+   */
+  default void getMetadataAtIndex(int index, StreamMessageMetadata metadata) {
+    // update metadata as required - default implementation does nothing
+    return;
+  }
+
+  /**
    * Returns the offset of the next message.
    * @param index
    * @return

@@ -45,6 +45,16 @@ public interface StreamLevelConsumer {
   GenericRow next(GenericRow destination);
 
   /**
+   * Get next row from the stream and decode it into a generic row
+   * @param destination the decoded generic row
+   * @param metadata the metadata associated with the decoded stream if any
+   * @return the decoded generic row
+   */
+  default GenericRow next(GenericRow destination, StreamMessageMetadata metadata) {
+    return next(destination);
+  }
+
+  /**
    * Commit the offsets consumed so far
    * The next call to consume should exclude all events consumed before the commit was called, and start from newer events not yet consumed
    */

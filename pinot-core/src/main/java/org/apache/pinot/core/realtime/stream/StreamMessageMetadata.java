@@ -16,28 +16,35 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.indexsegment.mutable;
+package org.apache.pinot.core.realtime.stream;
 
-import org.apache.pinot.core.data.GenericRow;
-import org.apache.pinot.core.indexsegment.IndexSegment;
-import org.apache.pinot.core.realtime.stream.StreamMessageMetadata;
+import org.apache.pinot.annotations.InterfaceAudience;
+import org.apache.pinot.annotations.InterfaceStability;
 
 
-public interface MutableSegment extends IndexSegment {
+/**
+ * A class that provides metadata associated with the message of a stream, for e.g.,
+ * ingestion-timestamp of the message.
+ */
+@InterfaceAudience.Public
+@InterfaceStability.Evolving
+public class StreamMessageMetadata {
 
-  /**
-   * Indexes a record into the segment with optionally provided metadata.
-   *
-   * @param row Record represented as a {@link GenericRow}
-   * @param msgMetadata the metadata associated with the message
-   * @return Whether the segment is full (i.e. cannot index more record into it)
-   */
-   boolean index(GenericRow row, StreamMessageMetadata msgMetadata);
+  private long _ingestionTimestamp = Long.MIN_VALUE;
 
-  /**
-   * Returns the number of records already indexed into the segment.
-   *
-   * @return The number of records indexed
-   */
-  int getNumDocsIndexed();
+  public StreamMessageMetadata() {
+
+  }
+
+  public long getIngestionTimestamp() {
+    return _ingestionTimestamp;
+  }
+
+  public void setIngestionTimestamp(long timestamp) {
+    _ingestionTimestamp = timestamp;
+  }
+
+  public void reset() {
+    _ingestionTimestamp = Long.MIN_VALUE;
+  }
 }

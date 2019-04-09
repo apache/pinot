@@ -30,6 +30,7 @@ import org.apache.pinot.core.realtime.stream.StreamConfig;
 import org.apache.pinot.core.realtime.stream.StreamDecoderProvider;
 import org.apache.pinot.core.realtime.stream.StreamLevelConsumer;
 import org.apache.pinot.core.realtime.stream.StreamMessageDecoder;
+import org.apache.pinot.core.realtime.stream.StreamMessageMetadata;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -83,9 +84,14 @@ public class KafkaStreamLevelConsumer implements StreamLevelConsumer {
 
   @Override
   public GenericRow next(GenericRow destination) {
+    return next(destination, null);
+  }
+
+  @Override
+  public GenericRow next(GenericRow destination, StreamMessageMetadata metadata) {
     if (kafkaIterator.hasNext()) {
       try {
-        destination = _messageDecoder.decode(kafkaIterator.next().message(), destination);
+        destination = _messageDecoder.decode(kafkaIterator.next().message(), destination, metadata);
         tableAndStreamRowsConsumed = _serverMetrics
             .addMeteredTableValue(_tableAndStreamName, ServerMeter.REALTIME_ROWS_CONSUMED, 1L,
                 tableAndStreamRowsConsumed);
