@@ -22,6 +22,7 @@ import java.util.HashSet;
 import java.util.Set;
 import org.apache.pinot.common.config.ColumnPartitionConfig;
 import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.common.utils.primitive.ByteArray;
 import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.BlockMultiValIterator;
 import org.apache.pinot.core.data.partition.PartitionFunction;
@@ -150,17 +151,24 @@ public class RealtimeColumnStatistics implements ColumnStatistics {
 
     int docIdIndex = _sortedDocIdIterationOrder != null ? _sortedDocIdIterationOrder[0] : 0;
     int dictionaryId = singleValueReader.getInt(docIdIndex);
-    Comparable previousValue = (Comparable) _dictionaryReader.get(dictionaryId);
+    Object previousValue = _dictionaryReader.get(dictionaryId);
     for (int i = 1; i < blockLength; i++) {
       docIdIndex = _sortedDocIdIterationOrder != null ? _sortedDocIdIterationOrder[i] : i;
       dictionaryId = singleValueReader.getInt(docIdIndex);
-      Comparable currentValue = (Comparable) _dictionaryReader.get(dictionaryId);
+      Object currentValue = _dictionaryReader.get(dictionaryId);
       // If previousValue is greater than currentValue
-      if (0 < previousValue.compareTo(currentValue)) {
-        return false;
-      } else {
-        previousValue = currentValue;
+      switch (_block.getMetadata().getDataType().getStoredType()) {
+        case BYTES:
+          if (0 < ByteArray.compare((byte[]) previousValue, (byte[]) currentValue)) {
+            return false;
+          }
+          break;
+        default:
+          if (0 < ((Comparable) previousValue).compareTo(currentValue)) {
+            return false;
+          }
       }
+      previousValue = currentValue;
     }
 
     return true;

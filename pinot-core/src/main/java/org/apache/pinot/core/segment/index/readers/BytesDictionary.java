@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.core.segment.index.readers;
 
+import java.nio.ByteBuffer;
+import org.apache.commons.codec.DecoderException;
+import org.apache.commons.codec.binary.Hex;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 
 
@@ -38,7 +41,21 @@ public class BytesDictionary extends ImmutableDictionaryReader {
 
   @Override
   public int insertionIndexOf(Object rawValue) {
-    return binarySearch((byte[]) rawValue);
+    byte[] value;
+    if (rawValue instanceof byte[]) {
+      value = (byte[]) rawValue;
+    } else if (rawValue instanceof String) {
+      try {
+        value = Hex.decodeHex(((String) rawValue).toCharArray());
+      } catch (DecoderException e) {
+        throw new ClassCastException(String.format("Faield to convert Hex String value: %s to byte[] type.", rawValue));
+      }
+    } else if (rawValue instanceof ByteBuffer) {
+      value = ((ByteBuffer) rawValue).array();
+    } else {
+      throw new UnsupportedOperationException(String.format("Faield to convert Object: %s to byte[] type.", rawValue));
+    }
+    return binarySearch(value);
   }
 
   @Override

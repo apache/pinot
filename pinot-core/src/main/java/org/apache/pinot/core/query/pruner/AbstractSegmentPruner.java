@@ -21,8 +21,12 @@ package org.apache.pinot.core.query.pruner;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nonnull;
+
+import org.apache.commons.codec.DecoderException;
+import org.apache.commons.codec.binary.Hex;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.request.FilterOperator;
+import org.apache.pinot.common.utils.primitive.ByteArray;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
 import org.apache.pinot.core.query.exception.BadQueryRequestException;
 import org.apache.pinot.core.segment.index.ColumnMetadata;
@@ -103,10 +107,12 @@ public abstract class AbstractSegmentPruner implements SegmentPruner {
           return Double.valueOf(input);
         case STRING:
           return input;
+        case BYTES:
+          return new ByteArray(Hex.decodeHex(input.toCharArray()));
         default:
           throw new IllegalStateException("Unsupported data type: " + dataType);
       }
-    } catch (NumberFormatException e) {
+    } catch (NumberFormatException | DecoderException e) {
       throw new BadQueryRequestException(e);
     }
   }
