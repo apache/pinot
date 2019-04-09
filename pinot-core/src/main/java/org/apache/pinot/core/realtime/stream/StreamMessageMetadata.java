@@ -30,7 +30,7 @@ import org.apache.pinot.annotations.InterfaceStability;
 @InterfaceStability.Evolving
 public class StreamMessageMetadata {
 
-  private long _ingestionTimestamp;
+  private long _ingestionTimestamp = Long.MIN_VALUE;
 
   public StreamMessageMetadata() {
 

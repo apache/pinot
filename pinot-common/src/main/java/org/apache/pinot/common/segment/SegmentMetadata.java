@@ -73,7 +73,6 @@ public interface SegmentMetadata {
    */
   long getRefreshTime();
 
-  // methods specific to realtime segments
   /**
    * Return the last time a record was indexed in this segment. Applicable for MutableSegments.
    *
