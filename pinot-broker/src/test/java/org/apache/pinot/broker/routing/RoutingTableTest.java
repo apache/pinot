@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.commons.lang.mutable.MutableBoolean;
+import org.apache.helix.HelixManager;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.broker.routing.builder.HighLevelConsumerBasedRoutingTableBuilder;
@@ -41,6 +42,7 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
 import org.apache.pinot.common.utils.HLCSegmentName;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -51,7 +53,8 @@ public class RoutingTableTest {
   @Test
   public void testHelixExternalViewBasedRoutingTable()
       throws Exception {
-    HelixExternalViewBasedRouting routingTable = new HelixExternalViewBasedRouting(null, null, new BaseConfiguration());
+    HelixExternalViewBasedRouting routingTable = new HelixExternalViewBasedRouting(new BaseConfiguration());
+    routingTable.init(Mockito.mock(HelixManager.class));
 
     ExternalView externalView = new ExternalView("testResource0_OFFLINE");
     externalView.setState("segment0", "dataServer_instance_0", "ONLINE");
@@ -113,20 +116,22 @@ public class RoutingTableTest {
 
     final MutableBoolean timeBoundaryUpdated = new MutableBoolean(false);
 
-    HelixExternalViewBasedRouting routingTable =
-        new HelixExternalViewBasedRouting(propertyStore, null, new BaseConfiguration()) {
-          @Override
-          protected ExternalView fetchExternalView(String table) {
-            return offlineExternalView;
-          }
+    HelixExternalViewBasedRouting routingTable = new HelixExternalViewBasedRouting(new BaseConfiguration()) {
+      @Override
+      protected ExternalView fetchExternalView(String table) {
+        return offlineExternalView;
+      }
 
-          @Override
-          protected void updateTimeBoundary(String tableName, ExternalView externalView) {
-            if (tableName.equals("myTable_OFFLINE")) {
-              timeBoundaryUpdated.setValue(true);
-            }
-          }
-        };
+      @Override
+      protected void updateTimeBoundary(String tableName, ExternalView externalView) {
+        if (tableName.equals("myTable_OFFLINE")) {
+          timeBoundaryUpdated.setValue(true);
+        }
+      }
+    };
+    HelixManager helixManager = Mockito.mock(HelixManager.class);
+    Mockito.when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
+    routingTable.init(helixManager);
     routingTable.setBrokerMetrics(new BrokerMetrics(new MetricsRegistry()));
 
     Assert.assertFalse(timeBoundaryUpdated.booleanValue());
@@ -166,7 +171,8 @@ public class RoutingTableTest {
 
     final LLCSegmentName llcSegmentName = new LLCSegmentName("testResource0", 2, 65, System.currentTimeMillis());
 
-    HelixExternalViewBasedRouting routingTable = new HelixExternalViewBasedRouting(null, null, new BaseConfiguration());
+    HelixExternalViewBasedRouting routingTable = new HelixExternalViewBasedRouting(new BaseConfiguration());
+    routingTable.init(Mockito.mock(HelixManager.class));
 
     Field realtimeRTBField = HelixExternalViewBasedRouting.class.getDeclaredField("_realtimeHLCRoutingTableBuilder");
     realtimeRTBField.setAccessible(true);

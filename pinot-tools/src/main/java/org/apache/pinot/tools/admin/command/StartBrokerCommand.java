@@ -41,7 +41,6 @@ public class StartBrokerCommand extends AbstractBaseAdminCommand implements Comm
 
   @Option(name = "-brokerPort", required = false, metaVar = "<int>", usage = "Broker port number to use for query.")
   private int _brokerPort = CommonConstants.Helix.DEFAULT_BROKER_QUERY_PORT;
-  ;
 
   @Option(name = "-zkAddress", required = false, metaVar = "<http>", usage = "HTTP address of Zookeeper.")
   private String _zkAddress = DEFAULT_ZK_ADDRESS;
@@ -59,6 +58,8 @@ public class StartBrokerCommand extends AbstractBaseAdminCommand implements Comm
     return _help;
   }
 
+  private HelixBrokerStarter _brokerStarter;
+
   @Override
   public String getName() {
     return "StartBroker";
@@ -75,7 +76,9 @@ public class StartBrokerCommand extends AbstractBaseAdminCommand implements Comm
 
   @Override
   public void cleanup() {
-
+    if (_brokerStarter != null) {
+      _brokerStarter.shutdown();
+    }
   }
 
   @Override
@@ -119,7 +122,8 @@ public class StartBrokerCommand extends AbstractBaseAdminCommand implements Comm
       }
 
       LOGGER.info("Executing command: " + toString());
-      new HelixBrokerStarter(_brokerHost, _clusterName, _zkAddress, brokerConf);
+      _brokerStarter = new HelixBrokerStarter(brokerConf, _clusterName, _zkAddress, _brokerHost);
+      _brokerStarter.start();
 
       String pidFile = ".pinotAdminBroker-" + System.currentTimeMillis() + ".pid";
       savePID(System.getProperty("java.io.tmpdir") + File.separator + pidFile);

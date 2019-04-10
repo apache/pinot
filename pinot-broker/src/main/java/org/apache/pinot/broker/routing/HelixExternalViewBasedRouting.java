@@ -69,34 +69,46 @@ import org.slf4j.LoggerFactory;
  */
 public class HelixExternalViewBasedRouting implements ClusterChangeHandler, RoutingTable {
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixExternalViewBasedRouting.class);
+  private static final int INVALID_EXTERNAL_VIEW_VERSION = Integer.MIN_VALUE;
 
-  private final Map<String, RoutingTableBuilder> _routingTableBuilderMap;
-
+  private final Map<String, RoutingTableBuilder> _routingTableBuilderMap = new ConcurrentHashMap<>();
   private final Map<String, Integer> _lastKnownExternalViewVersionMap = new ConcurrentHashMap<>();
   private final Map<String, Map<String, InstanceConfig>> _lastKnownInstanceConfigsForTable = new ConcurrentHashMap<>();
   private final Map<String, InstanceConfig> _lastKnownInstanceConfigs = new ConcurrentHashMap<>();
   private final Map<String, Set<String>> _tablesForInstance = new ConcurrentHashMap<>();
   private final Map<String, SegmentSelector> _segmentSelectorMap = new ConcurrentHashMap<>();
 
-  private final HelixExternalViewBasedTimeBoundaryService _timeBoundaryService;
-  private final HelixManager _helixManager;
-  private static final int INVALID_EXTERNAL_VIEW_VERSION = Integer.MIN_VALUE;
+  private final Configuration _configuration;
 
-  private BrokerMetrics _brokerMetrics;
-
-  private Configuration _configuration;
-
+  private HelixManager _helixManager;
+  private HelixExternalViewBasedTimeBoundaryService _timeBoundaryService;
   private RoutingTableBuilderFactory _routingTableBuilderFactory;
   private SegmentSelectorProvider _segmentSelectorProvider;
+  private BrokerMetrics _brokerMetrics;
 
-  public HelixExternalViewBasedRouting(ZkHelixPropertyStore<ZNRecord> propertyStore, HelixManager helixManager,
-      Configuration configuration) {
+  public HelixExternalViewBasedRouting(Configuration configuration) {
     _configuration = configuration;
-    _timeBoundaryService = new HelixExternalViewBasedTimeBoundaryService(propertyStore);
-    _routingTableBuilderMap = new HashMap<>();
+  }
+
+  @Override
+  public void init(HelixManager helixManager) {
+    Preconditions.checkState(_helixManager == null, "HelixExternalViewBasedRouting is already initialized");
     _helixManager = helixManager;
+    ZkHelixPropertyStore<ZNRecord> propertyStore = _helixManager.getHelixPropertyStore();
+    _timeBoundaryService = new HelixExternalViewBasedTimeBoundaryService(propertyStore);
     _routingTableBuilderFactory = new RoutingTableBuilderFactory(_configuration, propertyStore);
     _segmentSelectorProvider = new SegmentSelectorProvider(propertyStore);
+  }
+
+  @Override
+  public void processClusterChange(HelixConstants.ChangeType changeType) {
+    Preconditions.checkState(changeType == HelixConstants.ChangeType.EXTERNAL_VIEW
+        || changeType == HelixConstants.ChangeType.INSTANCE_CONFIG, "Illegal change type: " + changeType);
+    if (changeType == HelixConstants.ChangeType.EXTERNAL_VIEW) {
+      processExternalViewChange();
+    } else {
+      processInstanceConfigChange();
+    }
   }
 
   @Override
@@ -600,16 +612,5 @@ public class HelixExternalViewBasedRouting implements ClusterChangeHandler, Rout
     ret.put("host", NetUtil.getHostnameOrAddress());
 
     return JsonUtils.objectToPrettyString(ret);
-  }
-
-  @Override
-  public void processClusterChange(HelixConstants.ChangeType changeType) {
-    Preconditions.checkState(changeType == HelixConstants.ChangeType.EXTERNAL_VIEW
-        || changeType == HelixConstants.ChangeType.INSTANCE_CONFIG, "Illegal change type: " + changeType);
-    if (changeType == HelixConstants.ChangeType.EXTERNAL_VIEW) {
-      processExternalViewChange();
-    } else {
-      processInstanceConfigChange();
-    }
   }
 }

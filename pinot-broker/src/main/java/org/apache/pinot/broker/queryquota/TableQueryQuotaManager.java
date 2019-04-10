@@ -48,17 +48,25 @@ import static org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
 
 public class TableQueryQuotaManager implements ClusterChangeHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(TableQueryQuotaManager.class);
-
-  private BrokerMetrics _brokerMetrics;
-  private final HelixManager _helixManager;
-  private final AtomicInteger _lastKnownBrokerResourceVersion;
-  private final Map<String, QueryQuotaConfig> _rateLimiterMap;
   private static final int TIME_RANGE_IN_SECOND = 1;
 
-  public TableQueryQuotaManager(HelixManager helixManager) {
+  private final AtomicInteger _lastKnownBrokerResourceVersion = new AtomicInteger(-1);
+  private final Map<String, QueryQuotaConfig> _rateLimiterMap = new ConcurrentHashMap<>();
+
+  private HelixManager _helixManager;
+  private BrokerMetrics _brokerMetrics;
+
+  @Override
+  public void init(HelixManager helixManager) {
+    Preconditions.checkState(_helixManager == null, "TableQueryQuotaManager is already initialized");
     _helixManager = helixManager;
-    _rateLimiterMap = new ConcurrentHashMap<>();
-    _lastKnownBrokerResourceVersion = new AtomicInteger();
+  }
+
+  @Override
+  public void processClusterChange(HelixConstants.ChangeType changeType) {
+    Preconditions
+        .checkState(changeType == HelixConstants.ChangeType.EXTERNAL_VIEW, "Illegal change type: " + changeType);
+    processQueryQuotaChange();
   }
 
   /**
@@ -329,12 +337,5 @@ public class TableQueryQuotaManager implements ClusterChangeHandler {
     LOGGER
         .info("Processed query quota change in {}ms, {} out of {} query quota configs rebuilt.", (endTime - startTime),
             numRebuilt, _rateLimiterMap.size());
-  }
-
-  @Override
-  public void processClusterChange(HelixConstants.ChangeType changeType) {
-    Preconditions
-        .checkState(changeType == HelixConstants.ChangeType.EXTERNAL_VIEW, "Illegal change type: " + changeType);
-    processQueryQuotaChange();
   }
 }
