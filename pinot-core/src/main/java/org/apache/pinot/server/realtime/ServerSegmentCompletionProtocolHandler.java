@@ -20,6 +20,7 @@ package org.apache.pinot.server.realtime;
 
 import java.io.File;
 import java.net.URI;
+import java.util.Map;
 import javax.net.ssl.SSLContext;
 import org.apache.commons.configuration.Configuration;
 import org.apache.pinot.common.metrics.ServerMeter;
@@ -95,6 +96,8 @@ public class ServerSegmentCompletionProtocolHandler {
     return uploadSegment(url, params.getSegmentName(), segmentTarFile);
   }
 
+  // Replaced by segmentCommitEndWithMetadata().
+  @Deprecated
   public SegmentCompletionProtocol.Response segmentCommitEnd(SegmentCompletionProtocol.Request.Params params) {
     SegmentCompletionProtocol.SegmentCommitEndRequest request =
         new SegmentCompletionProtocol.SegmentCommitEndRequest(params);
@@ -103,6 +106,17 @@ public class ServerSegmentCompletionProtocolHandler {
       return SegmentCompletionProtocol.RESP_NOT_SENT;
     }
     return sendRequest(url);
+  }
+
+  public SegmentCompletionProtocol.Response segmentCommitEndWithMetadata(
+      SegmentCompletionProtocol.Request.Params params, final Map<String, File> metadataFiles) {
+    SegmentCompletionProtocol.SegmentCommitEndWithMetadataRequest request =
+        new SegmentCompletionProtocol.SegmentCommitEndWithMetadataRequest(params);
+    String url = createSegmentCompletionUrl(request);
+    if (url == null) {
+      return SegmentCompletionProtocol.RESP_NOT_SENT;
+    }
+    return sendCommitEndWithMetadataFiles(url, metadataFiles);
   }
 
   public SegmentCompletionProtocol.Response segmentCommit(SegmentCompletionProtocol.Request.Params params,
@@ -165,6 +179,29 @@ public class ServerSegmentCompletionProtocolHandler {
       String responseStr =
           _fileUploadDownloadClient.sendSegmentCompletionProtocolRequest(new URI(url), OTHER_REQUESTS_TIMEOUT)
               .getResponse();
+      response = SegmentCompletionProtocol.Response.fromJsonString(responseStr);
+      LOGGER.info("Controller response {} for {}", response.toJsonString(), url);
+      if (response.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.NOT_LEADER)) {
+        ControllerLeaderLocator.getInstance().invalidateCachedControllerLeader();
+      }
+    } catch (Exception e) {
+      // Catch all exceptions, we want the protocol to handle the case assuming the request was never sent.
+      response = SegmentCompletionProtocol.RESP_NOT_SENT;
+      LOGGER.error("Could not send request {}", url, e);
+      // Invalidate controller leader cache, as exception could be because of leader being down (deployment/failure) and hence unable to send {@link SegmentCompletionProtocol.ControllerResponseStatus.NOT_LEADER}
+      // If cache is not invalidated, we will not recover from exceptions until the controller comes back up
+      ControllerLeaderLocator.getInstance().invalidateCachedControllerLeader();
+    }
+    raiseSegmentCompletionProtocolResponseMetric(response);
+    return response;
+  }
+
+  private SegmentCompletionProtocol.Response sendCommitEndWithMetadataFiles(String url,
+      Map<String, File> metadataFiles) {
+    SegmentCompletionProtocol.Response response;
+    try {
+      String responseStr = _fileUploadDownloadClient
+          .uploadSegmentMetadataFiles(new URI(url), metadataFiles, SEGMENT_UPLOAD_REQUEST_TIMEOUT_MS).getResponse();
       response = SegmentCompletionProtocol.Response.fromJsonString(responseStr);
       LOGGER.info("Controller response {} for {}", response.toJsonString(), url);
       if (response.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.NOT_LEADER)) {

@@ -23,6 +23,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.List;
 import org.apache.commons.configuration.Configuration;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
@@ -90,11 +91,8 @@ public class HadoopPinotFS extends PinotFS {
   }
 
   @Override
-  public boolean move(URI srcUri, URI dstUri, boolean overwrite)
+  protected boolean doMove(URI srcUri, URI dstUri)
       throws IOException {
-    if (exists(dstUri) && !overwrite) {
-      return false;
-    }
     return _hadoopFS.rename(new Path(srcUri), new Path(dstUri));
   }
 
@@ -138,10 +136,10 @@ public class HadoopPinotFS extends PinotFS {
     ArrayList<String> filePathStrings = new ArrayList<>();
     Path path = new Path(fileUri);
     if (_hadoopFS.exists(path)) {
-      RemoteIterator<LocatedFileStatus> fileListItr = _hadoopFS.listFiles(path, recursive);
-      while (fileListItr != null && fileListItr.hasNext()) {
-        LocatedFileStatus file = fileListItr.next();
-        filePathStrings.add(file.getPath().toUri().toString());
+      // _hadoopFS.listFiles(path, false) will not return directories as files, thus use listStatus(path) here.
+      List<FileStatus> files = listStatus(path, recursive);
+      for (FileStatus file : files) {
+        filePathStrings.add(file.getPath().toUri().getRawPath());
       }
     } else {
       throw new IllegalArgumentException("segmentUri is not valid");
@@ -149,6 +147,19 @@ public class HadoopPinotFS extends PinotFS {
     String[] retArray = new String[filePathStrings.size()];
     filePathStrings.toArray(retArray);
     return retArray;
+  }
+
+  private List<FileStatus> listStatus(Path path, boolean recursive) throws IOException {
+    List<FileStatus> fileStatuses = new ArrayList<>();
+    FileStatus[] files = _hadoopFS.listStatus(path);
+    for (FileStatus file : files) {
+      fileStatuses.add(file);
+      if (file.isDirectory() && recursive) {
+        List<FileStatus> subFiles =listStatus(file.getPath(), true);
+        fileStatuses.addAll(subFiles);
+      }
+    }
+    return fileStatuses;
   }
 
   @Override

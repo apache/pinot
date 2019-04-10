@@ -26,7 +26,9 @@ import org.apache.pinot.common.Utils;
  *
  */
 public enum BrokerTimer implements AbstractMetrics.Timer {
-  ROUTING_TABLE_UPDATE_TIME(true), ROUTING_TABLE_UPDATE_QUEUE_TIME(true);
+  ROUTING_TABLE_UPDATE_TIME(true),
+  CLUSTER_CHANGE_QUEUE_TIME(true);
+
   private final String timerName;
   private final boolean global;
 

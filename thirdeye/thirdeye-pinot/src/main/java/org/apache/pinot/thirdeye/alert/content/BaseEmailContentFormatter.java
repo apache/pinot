@@ -586,6 +586,7 @@ public abstract class BaseEmailContentFormatter implements EmailContentFormatter
     List<String> dimensions;
     String swi;
     String function;
+    String funcDescription;
     String duration;
     String startTime;
     String endTime;
@@ -596,7 +597,7 @@ public abstract class BaseEmailContentFormatter implements EmailContentFormatter
     private static String PERCENTAGE_FORMAT = "%.2f %%";
 
     public AnomalyReportEntity(String anomalyId, String anomalyURL, String baselineVal, String currentVal, Double swi,
-        List<String> dimensions, String duration, String feedback, String function,
+        List<String> dimensions, String duration, String feedback, String function, String funcDescription,
         String metric, String startTime, String endTime, String timezone, String issueType) {
       this.anomalyId = anomalyId;
       this.anomalyURL = anomalyURL;
@@ -606,6 +607,7 @@ public abstract class BaseEmailContentFormatter implements EmailContentFormatter
       this.duration = duration;
       this.feedback = feedback;
       this.function = function;
+      this.funcDescription = funcDescription;
       this.swi = "";
       if (swi != null) {
         this.swi = String.format(PERCENTAGE_FORMAT, swi * 100);
@@ -694,6 +696,15 @@ public abstract class BaseEmailContentFormatter implements EmailContentFormatter
     public void setFunction(String function) {
       this.function = function;
     }
+
+    public String getFuncDescription() {
+      return funcDescription;
+    }
+
+    public void setFuncDescription(String funcDescription) {
+      this.funcDescription = funcDescription;
+    }
+
     public String getAnomalyId() {
       return anomalyId;
     }

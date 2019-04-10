@@ -46,6 +46,7 @@ import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.TaskDTO;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
+import org.apache.pinot.thirdeye.datasource.RelationalThirdEyeResponse;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeDataSource;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeRequest;
@@ -53,7 +54,6 @@ import org.apache.pinot.thirdeye.datasource.ThirdEyeResponse;
 import org.apache.pinot.thirdeye.datasource.cache.MetricDataset;
 import org.apache.pinot.thirdeye.datasource.cache.QueryCache;
 import org.apache.pinot.thirdeye.datasource.pinot.PinotThirdEyeDataSource;
-import org.apache.pinot.thirdeye.datasource.pinot.PinotThirdEyeResponse;
 import org.apache.pinot.thirdeye.detector.email.filter.AlertFilterFactory;
 import org.apache.pinot.thirdeye.detector.function.AnomalyFunctionFactory;
 import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
@@ -246,7 +246,7 @@ public class AnomalyApplicationEndToEndTest {
       rows.add(row);
       start = start.plusHours(1);
     }
-    response = new PinotThirdEyeResponse(request, rows, dataTimeSpec);
+    response = new RelationalThirdEyeResponse(request, rows, dataTimeSpec);
     return response;
   }
 

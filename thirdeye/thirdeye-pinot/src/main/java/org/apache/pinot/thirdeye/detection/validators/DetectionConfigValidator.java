@@ -33,6 +33,7 @@ import org.apache.pinot.thirdeye.datasource.loader.TimeSeriesLoader;
 import org.apache.pinot.thirdeye.detection.DataProvider;
 import org.apache.pinot.thirdeye.detection.DefaultDataProvider;
 import org.apache.pinot.thirdeye.detection.DetectionPipelineLoader;
+import org.quartz.CronExpression;
 
 
 public class DetectionConfigValidator implements ConfigValidator<DetectionConfigDTO> {
@@ -84,6 +85,12 @@ public class DetectionConfigValidator implements ConfigValidator<DetectionConfig
    */
   @Override
   public void validateConfig(DetectionConfigDTO detectionConfig) throws ValidationException {
+    // Cron Validator
+    if (!CronExpression.isValidExpression(detectionConfig.getCron())) {
+      throw new ValidationException("The detection cron specified is incorrect. Please verify your cron expression"
+          + " using online cron makers.");
+    }
+
     semanticValidation(detectionConfig);
   }
 

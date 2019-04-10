@@ -45,6 +45,9 @@
         <!-- Do not include temp files created by maven-release-plugin -->
         <exclude>**/*.releaseBackup</exclude>
         <exclude>release.properties</exclude>
+
+        <!-- Do not include build files from docs -->
+        <exclude>docs/_build/**</exclude>
       </excludes>
     </fileSet>
   </fileSets>

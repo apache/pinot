@@ -7,15 +7,12 @@ import RSVP from 'rsvp';
 import fetch from 'fetch';
 import moment from 'moment';
 import Route from '@ember/routing/route';
-import { isArray } from '@ember/array';
 import { later } from '@ember/runloop';
 import { task, timeout } from 'ember-concurrency';
 import { inject as service } from '@ember/service';
 import {
-  set,
   get,
-  setProperties,
-  getWithDefault
+  setProperties
 } from '@ember/object';
 import { isPresent, isNone, isBlank } from '@ember/utils';
 import {
@@ -45,7 +42,6 @@ import { getAnomalyDataUrl } from 'thirdeye-frontend/utils/api/anomaly';
 /**
  * Shorthand for setting date defaults
  */
-const dateFormat = 'YYYY-MM-DD';
 const displayDateFormat = 'YYYY-MM-DD HH:mm';
 
 /**
@@ -327,7 +323,6 @@ export default Route.extend({
       baselineOptionsLoading: anomalyIds && anomalyIds.length > 0,
       responseOptions: anomalyResponseObj.map(response => response.name)
     });
-
     // Kick off controller defaults and replay status check
     controller.initialize();
 
@@ -603,7 +598,7 @@ export default Route.extend({
      * https://www.emberjs.com/api/ember/2.16/classes/Route/events/error?anchor=error
      * https://guides.emberjs.com/v2.18.0/routing/loading-and-error-substates/#toc_the-code-error-code-event
      */
-    error(error) {
+    error() {
       return true;
     }
   }

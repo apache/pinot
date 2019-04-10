@@ -42,6 +42,7 @@ import org.apache.pinot.core.realtime.impl.RealtimeSegmentStatsHistory;
 import org.apache.pinot.core.realtime.impl.dictionary.MutableDictionary;
 import org.apache.pinot.core.realtime.impl.dictionary.MutableDictionaryFactory;
 import org.apache.pinot.core.realtime.impl.invertedindex.RealtimeInvertedIndexReader;
+import org.apache.pinot.core.realtime.stream.StreamMessageMetadata;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
 import org.apache.pinot.core.segment.index.data.source.ColumnDataSource;
@@ -94,6 +95,11 @@ public class MutableSegmentImpl implements MutableSegment {
   private volatile long _maxTime = Long.MIN_VALUE;
   private final int _numKeyColumns;
 
+  // default message metadata
+  private static final StreamMessageMetadata _defaultMetadata = new StreamMessageMetadata();
+  private long _lastIndexedTimestamp = Long.MIN_VALUE;
+  private long _latestIngestionTimestamp = Long.MIN_VALUE;
+
   public MutableSegmentImpl(RealtimeSegmentConfig config) {
     _segmentName = config.getSegmentName();
     _schema = config.getSchema();
@@ -108,6 +114,16 @@ public class MutableSegmentImpl implements MutableSegment {
       public int getTotalRawDocs() {
         // In realtime total docs and total raw docs are the same currently.
         return _numDocsIndexed;
+      }
+
+      @Override
+      public long getLastIndexedTimestamp() {
+        return _lastIndexedTimestamp;
+      }
+
+      @Override
+      public long getLatestIngestionTimestamp() {
+        return _latestIngestionTimestamp;
       }
     };
 
@@ -195,7 +211,9 @@ public class MutableSegmentImpl implements MutableSegment {
   }
 
   @Override
-  public boolean index(GenericRow row) {
+  public boolean index(GenericRow row, StreamMessageMetadata msgMetadata) {
+
+    boolean canTakeMore = false;
     // Update dictionary first
     Map<String, Object> dictIdMap = updateDictionary(row);
 
@@ -210,14 +228,23 @@ public class MutableSegmentImpl implements MutableSegment {
       // Add forward and inverted indices for new document.
       addForwardIndex(row, docId, dictIdMap);
       addInvertedIndex(docId, dictIdMap);
+
       // Update number of document indexed at last to make the latest record queryable
-      return _numDocsIndexed++ < _capacity;
+      canTakeMore = _numDocsIndexed++ < _capacity;
     } else {
       Preconditions
           .checkState(_aggregateMetrics, "Invalid document-id during indexing: " + docId + " expected: " + numDocs);
       // Update metrics for existing document.
-      return aggregateMetrics(row, docId);
+      canTakeMore = aggregateMetrics(row, docId);
     }
+
+    _lastIndexedTimestamp = System.currentTimeMillis();
+
+    if (msgMetadata != null) {
+      _latestIngestionTimestamp = Math.max(_latestIngestionTimestamp, msgMetadata.getIngestionTimestamp());
+    }
+
+    return canTakeMore;
   }
 
   private Map<String, Object> updateDictionary(GenericRow row) {
@@ -333,6 +360,8 @@ public class MutableSegmentImpl implements MutableSegment {
           (FixedByteSingleColumnSingleValueReaderWriter) _indexReaderWriterMap.get(column);
       Preconditions.checkState(_dictionaryMap.get(column) == null, "Updating metrics not supported with dictionary.");
       FieldSpec.DataType dataType = metricSpec.getDataType();
+
+      // FIXME: this breaks for multi value metrics. https://github.com/apache/incubator-pinot/issues/3867
       switch (dataType) {
         case INT:
           indexReaderWriter.setInt(docId, (Integer) value + indexReaderWriter.getInt(docId));
@@ -668,6 +697,7 @@ public class MutableSegmentImpl implements MutableSegment {
     int i = 0;
     int[] dictIds = new int[_numKeyColumns]; // dimensions + time column.
 
+    // FIXME: this for loop breaks for multi value dimensions. https://github.com/apache/incubator-pinot/issues/3867
     for (String column : _schema.getDimensionNames()) {
       dictIds[i++] = (Integer) dictIdMap.get(column);
     }
@@ -705,6 +735,7 @@ public class MutableSegmentImpl implements MutableSegment {
     }
 
     // All metric columns should have no-dictionary index.
+    // All metric columns must be single value
     for (String metric : schema.getMetricNames()) {
       if (!noDictionaryColumns.contains(metric)) {
         _logger
@@ -712,13 +743,28 @@ public class MutableSegmentImpl implements MutableSegment {
         _aggregateMetrics = false;
         break;
       }
+      // https://github.com/apache/incubator-pinot/issues/3867
+      if (!schema.getMetricSpec(metric).isSingleValueField()) {
+        _logger
+            .warn("Metrics aggregation cannot be turned ON in presence of multi-value metric columns, eg: {}", metric);
+        _aggregateMetrics = false;
+        break;
+      }
     }
 
     // All dimension columns should be dictionary encoded.
+    // All dimension columns must be single value
     for (String dimension : schema.getDimensionNames()) {
       if (noDictionaryColumns.contains(dimension)) {
         _logger
             .warn("Metrics aggregation cannot be turned ON in presence of no-dictionary dimensions, eg: {}", dimension);
+        _aggregateMetrics = false;
+        break;
+      }
+      // https://github.com/apache/incubator-pinot/issues/3867
+      if (!schema.getDimensionSpec(dimension).isSingleValueField()) {
+        _logger
+            .warn("Metrics aggregation cannot be turned ON in presence of multi-value dimension columns, eg: {}", dimension);
         _aggregateMetrics = false;
         break;
       }

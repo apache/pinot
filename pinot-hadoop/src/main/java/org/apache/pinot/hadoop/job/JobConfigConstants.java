@@ -49,4 +49,7 @@ public class JobConfigConstants {
   public static final String PUSH_TO_PORT = "push.to.port";
 
   public static final String DEFAULT_PERMISSIONS_MASK = "fs.permissions.umask-mode";
+
+  // The path to the record reader to be configured
+  public static final String RECORD_READER_PATH = "record.reader.path";
 }

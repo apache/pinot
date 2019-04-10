@@ -26,6 +26,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.common.utils.DataSize;
 import org.apache.pinot.common.utils.time.TimeUtils;
 import org.apache.pinot.tools.Command;
 import org.apache.pinot.tools.realtime.provisioning.MemoryEstimator;
@@ -72,6 +73,9 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
   @Option(name = "-periodSampleSegmentConsumed", required = true, metaVar = "<String>", usage = "Period for which the sample segment was consuming in format 4h, 5h30m, 40m etc")
   private String _periodSampleSegmentConsumed;
 
+  @Option(name = "-maxUsableHostMemory", required = false, metaVar = "<String>", usage = "Maximum memory per host that can be used for pinot data (e.g. 250G, 100M). Default 48g")
+  private String _maxUsableHostMemory = "48G";
+
   @Option(name = "-help", help = true, aliases = {"-h", "--h", "--help"})
   private boolean _help = false;
 
@@ -95,6 +99,11 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
     return this;
   }
 
+  public RealtimeProvisioningHelperCommand setMaxUsableHostMemory(String maxUsableHostMemory) {
+    _maxUsableHostMemory = maxUsableHostMemory;
+    return this;
+  }
+
   public RealtimeProvisioningHelperCommand setNumHours(String numHours) {
     _numHours = numHours;
     return this;
@@ -115,7 +124,7 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
     return ("RealtimeProvisioningHelperCommand -tableConfigFile " + _tableConfigFile + " -numPartitions "
         + _numPartitions + " -retentionHours " + _retentionHours + " -numHosts " + _numHosts + " -numHours " + _numHours
         + " -sampleCompletedSegmentDir " + _sampleCompletedSegmentDir + " -periodSampleSegmentConsumed "
-        + _periodSampleSegmentConsumed);
+        + _periodSampleSegmentConsumed + "-maxUsableMemory " + _maxUsableHostMemory);
   }
 
   @Override
@@ -170,8 +179,10 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
     long sampleSegmentConsumedSeconds =
         TimeUnit.SECONDS.convert(TimeUtils.convertPeriodToMillis(_periodSampleSegmentConsumed), TimeUnit.MILLISECONDS);
 
+    long maxUsableHostMemBytes = DataSize.toBytes(_maxUsableHostMemory);
+
     MemoryEstimator memoryEstimator =
-        new MemoryEstimator(tableConfig, sampleCompletedSegmentFile, sampleSegmentConsumedSeconds);
+        new MemoryEstimator(tableConfig, sampleCompletedSegmentFile, sampleSegmentConsumedSeconds, maxUsableHostMemBytes);
     File sampleStatsHistory = memoryEstimator.initializeStatsHistory();
     memoryEstimator
         .estimateMemoryUsed(sampleStatsHistory, numHosts, numHours, totalConsumingPartitions, _retentionHours);

@@ -104,6 +104,10 @@ public class SegmentCreationJob extends BaseSegmentJob {
 
   @Override
   protected boolean isDataFile(String fileName) {
+    // For custom record reader, treat all files as data file
+    if (_properties.getProperty(JobConfigConstants.RECORD_READER_PATH) != null) {
+      return true;
+    }
     return fileName.endsWith(".avro") || fileName.endsWith(".csv") || fileName.endsWith(".json") || fileName
         .endsWith(".thrift");
   }
@@ -153,7 +157,7 @@ public class SegmentCreationJob extends BaseSegmentJob {
     TableConfig tableConfig = getTableConfig();
     if (tableConfig != null) {
       validateTableConfig(tableConfig);
-      jobConf.set(JobConfigConstants.TABLE_CONFIG, tableConfig.toJSONConfigString());
+      jobConf.set(JobConfigConstants.TABLE_CONFIG, tableConfig.toJsonConfigString());
     }
     jobConf.set(JobConfigConstants.SCHEMA, getSchema().toSingleLineJsonString());
 

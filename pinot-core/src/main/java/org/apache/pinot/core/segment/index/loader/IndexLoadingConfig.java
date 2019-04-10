@@ -50,13 +50,12 @@ public class IndexLoadingConfig {
   private Set<String> _bloomFilterColumns = new HashSet<>();
 
   private SegmentVersion _segmentVersion;
-  // This value will remain true only when the empty constructor is invoked.
-  private boolean _enableDefaultColumns = true;
   private ColumnMinMaxValueGeneratorMode _columnMinMaxValueGeneratorMode = ColumnMinMaxValueGeneratorMode.DEFAULT_MODE;
   private int _realtimeAvgMultiValueCount = DEFAULT_REALTIME_AVG_MULTI_VALUE_COUNT;
   private boolean _enableSplitCommit;
   private boolean _isRealtimeOffheapAllocation;
   private boolean _isDirectRealtimeOffheapAllocation;
+  private boolean _enableSplitCommitEndWithMetadata;
 
   public IndexLoadingConfig(@Nonnull InstanceDataManagerConfig instanceDataManagerConfig,
       @Nonnull TableConfig tableConfig) {
@@ -124,8 +123,6 @@ public class IndexLoadingConfig {
       _segmentVersion = SegmentVersion.valueOf(instanceSegmentVersion.toLowerCase());
     }
 
-    _enableDefaultColumns = instanceDataManagerConfig.isEnableDefaultColumns();
-
     _enableSplitCommit = instanceDataManagerConfig.isEnableSplitCommit();
 
     _isRealtimeOffheapAllocation = instanceDataManagerConfig.isRealtimeOffHeapAllocation();
@@ -135,6 +132,7 @@ public class IndexLoadingConfig {
     if (avgMultiValueCount != null) {
       _realtimeAvgMultiValueCount = Integer.valueOf(avgMultiValueCount);
     }
+    _enableSplitCommitEndWithMetadata = instanceDataManagerConfig.isEnableSplitCommitEndWithMetadata();
   }
 
   /**
@@ -214,12 +212,12 @@ public class IndexLoadingConfig {
     _segmentVersion = segmentVersion;
   }
 
-  public boolean isEnableDefaultColumns() {
-    return _enableDefaultColumns;
-  }
-
   public boolean isEnableSplitCommit() {
     return _enableSplitCommit;
+  }
+
+  public boolean isEnableSplitCommitEndWithMetadata() {
+    return _enableSplitCommitEndWithMetadata;
   }
 
   public boolean isRealtimeOffheapAllocation() {

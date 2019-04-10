@@ -2,11 +2,12 @@
   <div class="container">
     {{#self-serve-alert-yaml-details
       alertData=model.alertData
+      subscribedGroups=model.subscribedGroups
       isLoadError=isLoadError
     }}
     <div class="te-search-results__cta">
-      {{#link-to "manage.explore-new" model.alertId}}
-        <button class="te-button te-button--outline">Alert Overview</button>
+      {{#link-to "manage.explore" model.alertId}}
+        <button class="te-button te-button--outline">Back to Overview</button>
       {{/link-to}}
     </div>
     {{/self-serve-alert-yaml-details}}
@@ -24,12 +25,10 @@
     {{else}}
       {{yaml-editor
         alertId=model.alertId
-        subscriptionGroupId=model.subscriptionGroupId
         isEditMode=true
         showSettings=true
         subscriptionGroupNames=model.subscriptionGroups
-        alertYaml=model.detectionYaml
-        detectionSettingsYaml=model.subscriptionGroupYamlDisplay
+        detectionYaml=model.detectionYaml
       }}
     {{/if}}
   </div>

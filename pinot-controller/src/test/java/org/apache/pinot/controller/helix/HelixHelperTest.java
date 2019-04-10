@@ -35,11 +35,19 @@ import org.testng.annotations.Test;
 public class HelixHelperTest extends ControllerTest {
   public static final String RESOURCE_NAME = "potato_OFFLINE";
   public static final String INSTANCE_NAME = "Server_1.2.3.4_1234";
+  private String helixClusterName;
 
   @BeforeClass
   public void setUp() {
     startZk();
     startController();
+
+    IdealState idealState = new IdealState(RESOURCE_NAME);
+    idealState.setStateModelDefRef("OnlineOffline");
+    idealState.setRebalanceMode(IdealState.RebalanceMode.CUSTOMIZED);
+    idealState.setReplicas("0");
+    helixClusterName = getHelixClusterName();
+    _helixAdmin.addResource(helixClusterName, RESOURCE_NAME, idealState);
   }
 
   /**
@@ -48,13 +56,6 @@ public class HelixHelperTest extends ControllerTest {
   @Test
   public void testWriteLargeIdealState() {
     final int numSegments = 20000;
-
-    IdealState idealState = new IdealState(RESOURCE_NAME);
-    idealState.setStateModelDefRef("OnlineOffline");
-    idealState.setRebalanceMode(IdealState.RebalanceMode.CUSTOMIZED);
-    idealState.setReplicas("0");
-    String helixClusterName = getHelixClusterName();
-    _helixAdmin.addResource(helixClusterName, RESOURCE_NAME, idealState);
 
     HelixHelper.updateIdealState(_helixManager, RESOURCE_NAME, new Function<IdealState, IdealState>() {
       @Override
@@ -71,6 +72,34 @@ public class HelixHelperTest extends ControllerTest {
     for (int i = 0; i < numSegments; i++) {
       Assert.assertEquals(resourceIdealState.getInstanceStateMap("segment_" + i).get(INSTANCE_NAME), "ONLINE");
     }
+  }
+
+  @Test
+  public void testPermanentIdealStateUpdaterException() {
+    Assert.assertTrue(catchExceptionInISUpdate(null));
+    Assert.assertFalse(catchExceptionInISUpdate("TestSegment"));
+  }
+
+  private boolean catchExceptionInISUpdate(String testSegment) {
+    boolean caughtException = false;
+    try {
+      aMethodWhichThrowsExceptionInUpdater(testSegment);
+    } catch (Exception e) {
+      caughtException = true;
+    }
+    return caughtException;
+  }
+
+  private void aMethodWhichThrowsExceptionInUpdater(String testSegment) {
+    HelixHelper.updateIdealState(_helixManager, RESOURCE_NAME, new Function<IdealState, IdealState>() {
+      @Override
+      public IdealState apply(@Nullable IdealState idealState) {
+        if (testSegment == null) {
+          throw new HelixHelper.PermanentUpdaterException("Throwing test exception for " + testSegment);
+        }
+        return idealState;
+      }
+    }, RetryPolicies.noDelayRetryPolicy(5));
   }
 
   @AfterClass

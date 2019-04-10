@@ -1,4 +1,4 @@
-<h1 class="te-title">Create Alert
+<h1 class="te-title">Create Alert <a class="thirdeye-link-secondary" target="_blank" href="{{helpDocLink}}">click here for a step-by-step guide</a>
   {{#if (eq debug "show")}}
     {{#x-toggle
       value=isForm
@@ -29,7 +29,11 @@
         <label for="select-metric" class="control-label te-label te-label--taller required">Search for a metric, or
           {{#link-to "self-serve.import-metric" class="thirdeye-link-secondary thirdeye-link-secondary--inside"}}
             Import a Metric From InGraphs
-          {{/link-to}}
+          {{/link-to}} 
+          {{!-- or
+          {{#link-to "self-serve.import-sql-metric" class="thirdeye-link-secondary thirdeye-link-secondary--inside"}}
+            Import a Metric From Presto or MySQL
+          {{/link-to}} --}}
         </label>
         <div class="te-form__sub-label te-form__sub-label--raised">
           Please contact <a class="thirdeye-link-secondary" target="_blank" href="{{metricHelpMailto}}">ask_thirdeye</a>

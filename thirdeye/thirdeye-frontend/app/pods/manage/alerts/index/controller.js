@@ -333,8 +333,8 @@ export default Controller.extend({
       const concatStatus = filters.status.length ? filters.status.join().toLowerCase() : 'active';
       const requireAll = filters.status.includes('Active') && filters.status.includes('Inactive');
       const alertsByState = {
-        active: filteredAlerts.filter(alert => alert.isActive),
-        inactive: filteredAlerts.filter(alert => !alert.isActive)
+        active: filteredAlerts.filter(alert => alert.active),
+        inactive: filteredAlerts.filter(alert => !alert.active)
       };
       filteredAlerts = requireAll ? [ ...alertsByState.active, ...alertsByState.inactive ] : alertsByState[concatStatus];
     }
@@ -394,7 +394,7 @@ export default Controller.extend({
     Object.assign(alertFilters, { primary: 'none' });
 
     // Set correct status on current alert
-    const alertStatus = alert.isActive ? 'Active' : 'Inactive';
+    const alertStatus = alert.active ? 'Active' : 'Inactive';
     newFilterBlocksLocal.find(filter => filter.name === 'status').selected = [ alertStatus ];
 
     // Reset local (secondary) filters, and set select fields to 'disabled'
@@ -428,6 +428,8 @@ export default Controller.extend({
           resetFiltersLocal: moment().valueOf()
         });
       }
+      // Reset current page
+      set(this, 'currentPage', 1);
     },
 
     /**
@@ -463,10 +465,18 @@ export default Controller.extend({
 
       switch (page) {
         case 'previous':
-          newPage = --currentPage;
+          if (currentPage > 1) {
+            newPage = --currentPage;
+          } else {
+            newPage = currentPage;
+          }
           break;
         case 'next':
-          newPage = ++currentPage;
+          if (currentPage < this.get('pagesNum')) {
+            newPage = ++currentPage;
+          } else {
+            newPage = currentPage;
+          }
           break;
       }
 

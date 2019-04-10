@@ -70,6 +70,7 @@ export default Controller.extend({
     snippet: ''
   }],
   metricHelpMailto: `mailto:${config.email}?subject=Metric Onboarding Request (non-additive UMP or derived)`,
+  helpDocLink: config.docs ? config.docs.createAlert : null,
 
   /**
    * Component property initial settings
@@ -78,7 +79,7 @@ export default Controller.extend({
   graphConfig: {},
   selectedFilters: JSON.stringify({}),
   selectedWeeklyEffect: true,
-  isForm: true,
+  isForm: false,
 
   /**
    * Object to cover basic ield 'presence' validation

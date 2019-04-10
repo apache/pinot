@@ -22,13 +22,14 @@ import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.utils.JsonUtils;
 import org.apache.pinot.core.data.GenericRow;
+import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 
 
 /**
@@ -38,27 +39,35 @@ public class JSONRecordReader implements RecordReader {
   private final JsonFactory _factory = new JsonFactory();
   private final File _dataFile;
   private final Schema _schema;
+  private final List<FieldSpec> _fieldSpecs;
 
   private JsonParser _parser;
   private Iterator<Map> _iterator;
+
 
   public JSONRecordReader(File dataFile, Schema schema)
       throws IOException {
     _dataFile = dataFile;
     _schema = schema;
+    _fieldSpecs = RecordReaderUtils.extractFieldSpecs(schema);
 
     init();
   }
 
   private void init()
       throws IOException {
-    _parser = _factory.createParser(RecordReaderUtils.getFileReader(_dataFile));
+    _parser = _factory.createParser(RecordReaderUtils.getBufferedReader(_dataFile));
     try {
       _iterator = JsonUtils.DEFAULT_MAPPER.readValues(_parser, Map.class);
     } catch (Exception e) {
       _parser.close();
       throw e;
     }
+  }
+
+  @Override
+  public void init(SegmentGeneratorConfig segmentGeneratorConfig) {
+
   }
 
   @Override
@@ -71,25 +80,19 @@ public class JSONRecordReader implements RecordReader {
     return next(new GenericRow());
   }
 
+  // NOTE: hard to extract common code further
+  @SuppressWarnings("Duplicates")
   @Override
   public GenericRow next(GenericRow reuse) {
     Map record = _iterator.next();
-
-    for (FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
+    for (FieldSpec fieldSpec : _fieldSpecs) {
       String fieldName = fieldSpec.getName();
-      Object jsonValue = record.get(fieldName);
-
-      Object value;
-      if (fieldSpec.isSingleValueField()) {
-        String token = jsonValue != null ? jsonValue.toString() : null;
-        value = RecordReaderUtils.convertToDataType(token, fieldSpec);
-      } else {
-        value = RecordReaderUtils.convertToDataTypeArray((ArrayList) jsonValue, fieldSpec);
+      Object value = record.get(fieldName);
+      // Allow default value for non-time columns
+      if (value != null || fieldSpec.getFieldType() != FieldSpec.FieldType.TIME) {
+        reuse.putField(fieldName, RecordReaderUtils.convert(fieldSpec, value));
       }
-
-      reuse.putField(fieldName, value);
     }
-
     return reuse;
   }
 

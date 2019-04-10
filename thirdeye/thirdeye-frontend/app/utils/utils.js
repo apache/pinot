@@ -24,6 +24,14 @@ export function checkStatus(response, mode = 'get', recoverBlank = false, isYaml
       return (mode === 'get' || isYamlPreview) ? response.json() : JSON.parse(JSON.stringify(response));
     }
   } else {
+    if (isYamlPreview) {
+      return response.json()
+        .then(data => {
+          const error = new Error(data);
+          error.body= data;
+          throw error;
+        });
+    }
     const error = new Error(response.statusText);
     error.response = response;
     if (recoverBlank) {
@@ -168,6 +176,40 @@ export function toIso(dateStr) {
   return moment(Number(dateStr)).toISOString();
 }
 
+/**
+ * The yaml filters formatter. Convert filters in the yaml file in to a legacy filters string
+ * For example, filters = {
+ *   "country": ["us", "cn"],
+ *   "browser": ["chrome"]
+ * }
+ * will be convert into "country=us;country=cn;browser=chrome"
+ *
+ * @method _formatYamlFilter
+ * @param {Map} filters multimap of filters
+ * @return {String} - formatted filters string
+ */
+export function formatYamlFilter(filters) {
+  if (filters){
+    const filterStrings = [];
+    Object.keys(filters).forEach(
+      function(filterKey) {
+        const filter = filters[filterKey];
+        if (filter && Array.isArray(filter)) {
+          filter.forEach(
+            function (filterValue) {
+              filterStrings.push(filterKey + '=' + filterValue);
+            }
+          );
+        } else {
+          filterStrings.push(filterKey + '=' + filter);
+        }
+      }
+    );
+    return filterStrings.join(';');
+  }
+  return '';
+}
+
 export default {
   checkStatus,
   humanizeFloat,
@@ -177,5 +219,6 @@ export default {
   parseProps,
   postProps,
   toIso,
-  postYamlProps
+  postYamlProps,
+  formatYamlFilter
 };

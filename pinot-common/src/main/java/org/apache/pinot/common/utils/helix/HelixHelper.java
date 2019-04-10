@@ -92,6 +92,9 @@ public class HelixHelper {
           IdealState updatedIdealState;
           try {
             updatedIdealState = updater.apply(idealStateCopy);
+          } catch (PermanentUpdaterException e) {
+            LOGGER.error("Caught permanent exception while updating ideal state for resource: {}", resourceName, e);
+            throw e;
           } catch (Exception e) {
             LOGGER.error("Caught exception while updating ideal state for resource: {}", resourceName, e);
             return false;
@@ -137,6 +140,20 @@ public class HelixHelper {
       });
     } catch (Exception e) {
       throw new RuntimeException("Caught exception while updating ideal state for resource: " + resourceName, e);
+    }
+  }
+
+  /**
+   * Exception to be thrown by updater function to exit from retry in {@link HelixHelper::updatedIdealState}
+   */
+  public static class PermanentUpdaterException extends RuntimeException {
+
+    public PermanentUpdaterException(String message) {
+      super(message);
+    }
+
+    public PermanentUpdaterException(Throwable cause) {
+      super(cause);
     }
   }
 

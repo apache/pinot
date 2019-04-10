@@ -80,6 +80,21 @@ public interface TableDataManager {
   void removeSegment(@Nonnull String segmentName);
 
   /**
+   * Track a deleted segment.
+   */
+  void notifySegmentDeleted(@Nonnull String segmentName);
+
+  /**
+   * Track addition of a segment
+   */
+  void notifySegmentAdded(@Nonnull String segmentName);
+
+  /**
+   * Check if a segment is recently deleted.
+   */
+  boolean isRecentlyDeleted(@Nonnull String segmentName);
+
+  /**
    * Acquires all segments of the table.
    * <p>It is the caller's responsibility to return the segments by calling {@link #releaseSegment(SegmentDataManager)}.
    *

@@ -373,10 +373,8 @@ export default Route.extend(AuthenticatedRouteMixin, {
         const anomalyMetricUrn = appendFilters(anomalyMetricUrnRaw, anomalyFilters);
 
         const anomalyFunctionUrns = [];
-        if (!_.isEmpty(anomalyEntity.attributes['functionId'])) {
-          const anomalyFunctionUrnRaw = `frontend:anomalyfunction:${anomalyEntity.attributes['functionId'][0]}`;
-          anomalyFunctionUrns.pushObject(appendFilters(anomalyFunctionUrnRaw, anomalyFilters));
-        }
+        const anomalyFunctionUrnRaw = `thirdeye:event:anomaly:${anomalyId}`;
+        anomalyFunctionUrns.pushObject(appendFilters(anomalyFunctionUrnRaw, anomalyFilters));
 
         context = {
           urns: new Set([anomalyMetricUrn]),

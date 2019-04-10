@@ -98,12 +98,8 @@ public class AzurePinotFS extends PinotFS {
   }
 
   @Override
-  public boolean move(URI srcUri, URI dstUri, boolean overwrite)
+  protected boolean doMove(URI srcUri, URI dstUri)
       throws IOException {
-    if (exists(dstUri) && !overwrite) {
-      return false;
-    }
-    //rename the file
     return _adlStoreClient.rename(srcUri.getPath(), dstUri.getPath());
   }
 

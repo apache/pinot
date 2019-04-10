@@ -3,7 +3,7 @@
   <div class="pull-right">
     {{#if isPreviewMode}}
       {{bs-button
-        defaultText=(if showDetails "Refresh Preview" "Preview Alert")
+        defaultText=(if showDetails "Rerun Preview" "Preview Alert")
         disabled=disablePreviewButton
         type="outline-primary"
         buttonType="refresh"
@@ -15,66 +15,150 @@
   {{#unless errorAnomalies}}
     {{#if showDetails}}
       {{#if isLoading}}
-        {{ember-spinner scale=0.5 rotate=10 speed='1.1' color='#3498DB'}}Please wait while we compile the data.
+        {{ember-spinner scale=0.5 rotate=10 speed='1.1' color='#3498DB'}}
+        <p>Running detection between <strong>{{pill.activeRangeStart}}</strong> and <strong>{{pill.activeRangeEnd}}</strong>.</p>
       {{else}}
-        {{#if dataIsCurrent}}
-         <div class="te-content-block">
-          {{range-pill-selectors
-            title="Showing"
-            uiDateFormat=pill.uiDateFormat
-            activeRangeEnd=pill.activeRangeEnd
-            activeRangeStart=pill.activeRangeStart
-            timeRangeOptions=pill.timeRangeOptions
-            timePickerIncrement=pill.timePickerIncrement
-            predefinedRanges=pill.predefinedRanges
-            selectAction=(action "onRangeSelection")
-          }}
-          <div class="te-horizontal-cards te-content-block">
-            <h4 class="te-self-serve__block-title">
-              <label for="select-dimension" class="control-label te-label">
-                Alert Performance
-                <span>
-                  <i class="glyphicon glyphicon-question-sign"></i>
-                  {{#tooltip-on-element class="te-tooltip"}}
-                    All estimated performance numbers are based on reviewed anomalies.
-                  {{/tooltip-on-element}}
-                </span>
-              </label>
-            </h4>
-            <div class="te-horizontal-cards__container">
-              {{!-- Alert anomaly stats cards --}}
-              {{stats-cards stats=stats}}
-            </div>
-
-            {{#if repRunStatus}}
-              <p class="te-self-serve__block-subtext te-self-serve__block-subtext--normal">Replay in progress. Please check back later...</p>
-            {{/if}}
+        {{#if isPreviewMode}}
+          <div class="diffcurrent-alert alert alert-warning fade in">
+            <h4><i class="glyphicon glyphicon-exclamation-sign"></i> Use with caution!</h4>
+            <p>Preview can take a long time to run. We recommend previewing for less than a week on
+              daily metrics and less than a day on hourly/minutely metrics.</p>
+            <p>Click on the "Rerun Preview" option if you updated the time window.</p>
           </div>
-          {{timeseries-chart
-            series=series
-            colorMapping=colorMapping
-            axis=axis
-            zoom=zoom
-            legend=legend
+        {{/if}}
+        {{#if dataIsCurrent}}
+        {{range-pill-selectors
+          title="Showing"
+          uiDateFormat=pill.uiDateFormat
+          activeRangeEnd=pill.activeRangeEnd
+          activeRangeStart=pill.activeRangeStart
+          timeRangeOptions=pill.timeRangeOptions
+          timePickerIncrement=pill.timePickerIncrement
+          predefinedRanges=pill.predefinedRanges
+          selectAction=(action "onRangeSelection")
+        }}
+        <div class="te-horizontal-cards te-content-block">
+          <h4 class="te-self-serve__block-title">
+            <label for="select-dimension" class="control-label te-label">
+              Alert Performance
+              <span>
+                <i class="glyphicon glyphicon-question-sign"></i>
+                {{#tooltip-on-element class="te-tooltip"}}
+                  All estimated performance numbers are based on reviewed anomalies.
+                {{/tooltip-on-element}}
+              </span>
+            </label>
+          </h4>
+          {{!-- Alert anomaly stats cards --}}
+          {{stats-cards stats=stats}}
+
+          {{#if repRunStatus}}
+            <p class="te-self-serve__block-subtext te-self-serve__block-subtext--normal">Replay in progress. Please check back later...</p>
+          {{/if}}
+        </div>
+
+        {{#if isReportSuccess}}
+          {{#bs-alert type="success" class="te-form__banner te-form__banner--success"}}
+            <strong>Success:</strong> Anomaly reported for dates <strong>{{reportedRange}}</strong>. Refresh page to see new anomalies...
+          {{/bs-alert}}
+        {{/if}}
+
+        {{#if isReportFailure}}
+          {{#bs-alert type="danger" class="te-form__banner te-form__banner--failure"}}
+            <strong>Error:</strong> Failed to save reported anomaly.
+          {{/bs-alert}}
+        {{/if}}
+
+        <div class="te-content-block">
+          {{#if alertHasDimensions}}
+            <h4 class="te-self-serve__block-title">Anomalies over time for dimension {{selectedDimension}}</h4>
+          {{else}}
+            <h4 class="te-self-serve__block-title">Anomalies over time </h4>
+          {{/if}}
+
+          {{#unless isPreviewMode}}
+            <a class="te-self-serve__side-link te-self-serve__side-link--high" {{action "onClickReportAnomaly" this}}>Report missing anomaly</a>
+          {{/unless}}
+
+          {{!-- Dimension selector --}}
+          {{#if alertHasDimensions}}
+            <div class="te-form__select te-form__select--wider col-md-3">
+              {{#power-select
+                triggerId="select-dimension"
+                triggerClass="te-form__select"
+                options=dimensionOptions
+                searchEnabled=true
+                searchPlaceholder="Type to filter..."
+                matchTriggerWidth=true
+                matchContentWidth=true
+                selected=selectedDimension
+                onchange=(action "onSelectDimension")
+                as |dimension|
+              }}
+                {{dimension}}
+              {{/power-select}}
+            </div>
+          {{/if}}
+
+          {{!-- Missing anomaly modal --}}
+          {{#te-modal
+            cancelButtonText="Cancel"
+            submitButtonText="Report"
+            submitAction=(action "onSave")
+            cancelAction=(action "onCancel")
+            isShowingModal=openReportModal
+            headerText="Report Undetected Anomaly"
           }}
-          {{#if anomalies}}
-            {{!-- Baseline type selector --}}
-            {{range-pill-selectors
-              title="Baseline"
-              timeRangeOptions=baselineOptions
-              selectAction=(action "onBaselineOptionClick")
+            {{#if renderModalContent}}
+              {{alert-report-modal
+                series=series
+                colorMapping=colorMapping
+                axis=axis
+                zoom=zoom
+                legend=legend
+                metricName=alertData.metric
+                alertName=alertData.detectionName
+                predefinedRanges=predefinedRanges
+                dimensionOptions=dimensionOptions
+                selectedDimension=selectedDimension
+                alertHasDimensions=alertHasDimensions
+                isMetricDataLoading=isMetricDataLoading
+                isMetricDataInvalid=isMetricDataInvalid
+                inputAction=(action "onInputMissingAnomaly")
+              }}
+            {{else}}
+              {{ember-spinner}}
+            {{/if}}
+          {{/te-modal}}
+
+          <div class="col-xs-12 te-graph-container">
+            {{timeseries-chart
+              series=series
+              colorMapping=colorMapping
+              axis=axis
+              zoom=zoom
+              legend=legend
             }}
+            {{#unless isPreviewMode}}
+              <div class="te-form__note">
+                NOTE: If you find the metric shown above is inconsistent, please email <a class="thirdeye-link-secondary" target="_blank" href="{{graphMailtoLink}}">ask_thirdeye</a>.
+              </div>
+            {{/unless}}
+        </div>
+        {{!-- Baseline type selector --}}
+        {{range-pill-selectors
+          title="Baseline"
+          timeRangeOptions=baselineOptions
+          selectAction=(action "onBaselineOptionClick")
+        }}
+          {{#if anomalies}}
+
             {{!-- Alert anomaly table --}}
             <div class="te-block-container">
               <table class="te-anomaly-table">
                 {{#if anomalies}}
                   <thead>
                     <tr class="te-anomaly-table__row te-anomaly-table__head">
-                      <th class="te-anomaly-table__cell-head te-anomaly-table__cell-head--left">
-                        <a class="te-anomaly-table__cell-link" {{action "toggleSortDirection" "number"}}>#
-                          <i class="te-anomaly-table__icon glyphicon {{if sortColumnNumberUp "glyphicon-menu-down" "glyphicon-menu-up"}}"></i>
-                        </a>
-                      </th>
                       <th class="te-anomaly-table__cell-head te-anomaly-table__cell-head--left">
                         <a class="te-anomaly-table__cell-link" {{action "toggleSortDirection" "start"}}>
                           Start/Duration (PDT)
@@ -90,7 +174,7 @@
                           <i class="te-anomaly-table__icon glyphicon {{if sortColumnChangeUp "glyphicon-menu-up" "glyphicon-menu-down"}}"></i>
                         </a>
                       </th>
-                      {{#if notPreview}}
+                      {{#unless isPreviewMode}}
                         <th class="te-anomaly-table__cell-head">
                           <a class="te-anomaly-table__cell-link" {{action "toggleSortDirection" "feedback"}}>
                             Feedback
@@ -98,14 +182,13 @@
                           </a>
                         </th>
                         <th class="te-anomaly-table__cell-head"></th>
-                      {{/if}}
+                      {{/unless}}
                     </tr>
                   </thead>
                 {{/if}}
                 <tbody>
                   {{#each paginatedFilteredAnomalies as |anomaly|}}
                     <tr class="te-anomaly-table__row">
-                       <td class="te-anomaly-table__cell te-anomaly-table__cell--index">{{anomaly.number}}</td>
                        <td class="te-anomaly-table__cell">
                         <ul class="te-anomaly-table__list te-anomaly-table__list--left">
                           <li class="te-anomaly-table__list-item te-anomaly-table__list-item--stronger">
@@ -125,7 +208,7 @@
                           <ul class="te-anomaly-table__list">
                            {{#each anomaly.dimensionList as |dimension|}}
                               <li class="te-anomaly-table__list-item te-anomaly-table__list-item--smaller" title="{{dimension.dimensionVal}}">
-                                {{dimension.dimensionKey}}: <span class="stronger">{{dimension.dimensionVal}}</span>
+                                {{dimension}}: <span class="stronger">{{get anomaly.dimensions dimension}}</span>
                               </li>
                            {{else}}
                               -
@@ -145,7 +228,7 @@
                           </li>
                         </ul>
                        </td>
-                       {{#if notPreview}}
+                       {{#unless isPreviewMode}}
                          <td class="te-anomaly-table__cell">
                             {{#if renderStatusIcon}}
                               {{#if anomaly.showResponseSaved}}
@@ -168,10 +251,10 @@
                               {{#power-select
                                 triggerId=anomaly.anomalyId
                                 triggerClass="te-anomaly-table__select"
-                                options=responseOptions
+                                options=feedbackOptions
                                 searchEnabled=false
                                 selected=(get labelMap anomaly.anomalyFeedback)
-                                onchange=(action "onChangeAnomalyResponse" anomaly)
+                                onchange=(action "onChangeAnomalyFeedback" anomaly)
                                 as |response|
                               }}
                                 {{response}}
@@ -185,7 +268,7 @@
                               {{/link-to}}
                             </div>
                          </td>
-                       {{/if}}
+                       {{/unless}}
                     </tr>
                   {{/each}}
                 </tbody>
@@ -231,9 +314,9 @@
         {{/if}}
       {{/if}}
     {{else}}
-        {{#if disablePreviewButton}}
-          <p>Enter YAML configuration to enable preview.</p>
-        {{/if}}
+      {{#if disablePreviewButton}}
+        <p>Enter YAML configuration to enable preview.</p>
+      {{/if}}
     {{/if}}
   {{/unless}}
   <p>{{errorAnomalies}}</p>

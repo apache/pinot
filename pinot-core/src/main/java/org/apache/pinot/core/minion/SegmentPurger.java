@@ -151,6 +151,11 @@ public class SegmentPurger {
     }
 
     @Override
+    public void init(SegmentGeneratorConfig segmentGeneratorConfig) {
+
+    }
+
+    @Override
     public boolean hasNext() {
       if (_recordPurger == null) {
         return _recordReader.hasNext();

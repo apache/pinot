@@ -27,6 +27,7 @@ import org.apache.pinot.core.data.GenericRow;
 import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
 import org.apache.pinot.core.data.readers.RecordReader;
 import org.apache.pinot.core.data.readers.RecordReaderUtils;
+import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 
 
 /**
@@ -48,6 +49,11 @@ public class ReducerRecordReader implements RecordReader {
     _recordReader = new PinotSegmentRecordReader(indexDir, null, groupByColumns);
     _recordAggregator = recordAggregator;
     _groupByColumns = groupByColumns;
+  }
+
+  @Override
+  public void init(SegmentGeneratorConfig segmentGeneratorConfig) {
+
   }
 
   @Override

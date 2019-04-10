@@ -28,7 +28,7 @@ module('Integration | Component | rootcause-anomaly', function(hooks) {
             metric : [ 'metric' ],
             function : [ 'function' ],
             comment : [ '' ],
-            metricGranularity : [ '5_MINUTES' ],
+            metricGranularity : [ '1_DAYS' ],
             dataset : [ 'my_dataset' ],
             status : [ 'NO_FEEDBACK' ]
           },
@@ -79,7 +79,7 @@ module('Integration | Component | rootcause-anomaly', function(hooks) {
               metric : [ 'metric' ],
               function : [ 'function' ],
               comment : [ '' ],
-              metricGranularity : [ '5_MINUTES' ],
+              metricGranularity : [ '1_DAYS' ],
               dataset : [ 'my_dataset' ],
               status : [ 'NO_FEEDBACK' ]
             },
@@ -130,7 +130,7 @@ module('Integration | Component | rootcause-anomaly', function(hooks) {
               metric : [ 'metric' ],
               function : [ 'function' ],
               comment : [ '' ],
-              metricGranularity : [ '5_MINUTES' ],
+              metricGranularity : [ '1_DAYS' ],
               dataset : [ 'my_dataset' ],
               status : [ 'NO_FEEDBACK' ]
             },

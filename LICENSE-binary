@@ -257,8 +257,6 @@ org.apache.httpcomponents:httpcore
 org.apache.httpcomponents:httpmime
 org.apache.kafka:kafka_2.10
 org.apache.kafka:kafka-clients
-org.apache.pinot:pinot-common
-org.apache.pinot:pinot-core
 org.apache.thrift:libthrift
 org.apache.yetus:audience-annotations
 org.apache.zookeeper:zookeeper

@@ -79,6 +79,20 @@ public interface InstanceDataManager {
       throws Exception;
 
   /**
+   * Handles addition of a segment from the table.
+   *
+   * This method performs book keeping of added segments, especially if the deleted-cache needs to be invalidated
+   */
+  void notifySegmentAdded(@Nonnull String tableNameWithType, @Nonnull String segmentName);
+
+  /**
+   * Handles deletion of a segment from the table.
+   *
+   * This method performs book keeping of deleted segments.
+   */
+  void notifySegmentDeleted(@Nonnull String tableNameWithType, @Nonnull String segmentName);
+
+  /**
    * Reloads a segment in a table.
    */
   void reloadSegment(@Nonnull String tableNameWithType, @Nonnull String segmentName)

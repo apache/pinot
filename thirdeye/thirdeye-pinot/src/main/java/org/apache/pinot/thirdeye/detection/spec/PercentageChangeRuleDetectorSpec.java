@@ -19,11 +19,23 @@
 
 package org.apache.pinot.thirdeye.detection.spec;
 
+import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
+
+
 public class PercentageChangeRuleDetectorSpec extends AbstractSpec {
   private double percentageChange = Double.NaN;
   private String offset = "wo1w";
   private String timezone = "UTC";
   private String pattern = "UP_OR_DOWN";
+  private String monitoringGranularity = MetricSlice.NATIVE_GRANULARITY.toAggregationGranularityString(); // use native granularity by default
+
+  public String getMonitoringGranularity() {
+    return monitoringGranularity;
+  }
+
+  public void setMonitoringGranularity(String monitoringGranularity) {
+    this.monitoringGranularity = monitoringGranularity;
+  }
 
   public String getPattern() {
     return pattern;

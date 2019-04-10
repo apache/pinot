@@ -19,21 +19,21 @@
 
 package org.apache.pinot.thirdeye.auto.onboard;
 
-import org.apache.pinot.thirdeye.datalayer.pojo.MetricConfigBean;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-
 import org.apache.pinot.common.data.MetricFieldSpec;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.data.TimeGranularitySpec;
 import org.apache.pinot.common.data.TimeGranularitySpec.TimeFormat;
 import org.apache.pinot.thirdeye.common.metric.MetricType;
 import org.apache.pinot.thirdeye.common.time.TimeGranularity;
+import org.apache.pinot.thirdeye.common.time.TimeSpec;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.pojo.DatasetConfigBean;
+import org.apache.pinot.thirdeye.datalayer.pojo.MetricConfigBean;
 import org.apache.pinot.thirdeye.datasource.pinot.PinotThirdEyeDataSource;
 import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
 
@@ -48,8 +48,15 @@ public class ConfigGenerator {
     datasetConfigDTO.setTimeUnit(timeSpec.getTimeType());
     datasetConfigDTO.setTimeFormat(timeSpec.getTimeFormat());
     datasetConfigDTO.setExpectedDelay(getExpectedDelayFromTimeunit(timeSpec.getTimeType()));
-    if (timeSpec.getTimeFormat().startsWith(TimeFormat.SIMPLE_DATE_FORMAT.toString())) {
+    if (timeSpec.getTimeFormat().startsWith(TimeFormat.SIMPLE_DATE_FORMAT.toString()) || timeSpec.getTimeFormat().equals(TimeSpec.SINCE_EPOCH_FORMAT)) {
       datasetConfigDTO.setTimezone(PDT_TIMEZONE);
+    }
+    // set the data granularity of epoch timestamp dataset to minute-level
+    if (datasetConfigDTO.getTimeFormat().equals(TimeSpec.SINCE_EPOCH_FORMAT) && datasetConfigDTO.getTimeUnit()
+        .equals(TimeUnit.MILLISECONDS) && (datasetConfigDTO.getNonAdditiveBucketSize() == null
+        || datasetConfigDTO.getNonAdditiveBucketUnit() == null)) {
+      datasetConfigDTO.setNonAdditiveBucketUnit(TimeUnit.MINUTES);
+      datasetConfigDTO.setNonAdditiveBucketSize(5);
     }
   }
 
@@ -57,7 +64,6 @@ public class ConfigGenerator {
       Map<String, String> customConfigs) {
     List<String> dimensions = schema.getDimensionNames();
     TimeGranularitySpec timeSpec = schema.getTimeFieldSpec().getOutgoingGranularitySpec();
-
     // Create DatasetConfig
     DatasetConfigDTO datasetConfigDTO = new DatasetConfigDTO();
     datasetConfigDTO.setDataset(dataset);

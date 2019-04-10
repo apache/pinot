@@ -19,12 +19,18 @@
 package org.apache.pinot.common.utils;
 
 import com.google.common.collect.ImmutableList;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Random;
 import org.apache.helix.HelixManager;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.mockito.Mockito;
+import org.testng.Assert;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -72,6 +78,17 @@ public class ServiceStatusTest {
 
   public static final String TABLE_NAME = "myTable_OFFLINE";
   public static final String INSTANCE_NAME = "Server_1.2.3.4_1234";
+
+  private static final String CHARS_IN_RANDOM_TABLE_NAME = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  private static Random random;
+
+  @BeforeClass
+  public void setUp() {
+    long seed = System.currentTimeMillis();
+    random = new Random(seed);
+    // Printing to sysout so that we can re-generate failure cases.
+    System.out.println(ServiceStatusTest.class.getSimpleName() + ":Using random number seed " + seed);
+  }
 
   @Test
   public void testMultipleServiceStatusCallback() {
@@ -188,13 +205,101 @@ public class ServiceStatusTest {
         Collections.singletonList(TABLE_NAME));
   }
 
+  private String generateRandomString(int len) {
+    final int numChars = CHARS_IN_RANDOM_TABLE_NAME.length();
+    StringBuilder builder = new StringBuilder();
+    for (int i = 0; i < len; i++) {
+      builder.append(CHARS_IN_RANDOM_TABLE_NAME.charAt(random.nextInt(numChars)));
+    }
+    return builder.toString();
+  }
+
+  // Create a ServiceStatus object that monitors about 2500 tables
+  // and returns
+  @Test
+  public void testMultipleResourcesAndPercent() throws Exception {
+    testMultipleResourcesAndPercent(98.6);
+    testMultipleResourcesAndPercent(99.3);
+    testMultipleResourcesAndPercent(99.5);
+    testMultipleResourcesAndPercent(99.7);
+    testMultipleResourcesAndPercent(99.95);
+  }
+
+  private void testMultipleResourcesAndPercent(double percentReady) {
+    final long now = System.currentTimeMillis();
+    random = new Random(now);
+    final String clusterName = "noSuchCluster";
+    final List<String> tables = new ArrayList<>();
+    final int tableCount = 2500 + random.nextInt(100);
+    int readyTables = 0;
+    Map<String, IdealState> idealStates = new HashMap<>();
+    Map<String, ExternalView> externalViews = new HashMap<>();
+
+    for (int i = 1; i <= tableCount; i++) {
+      final String tableName = generateRandomString(10) + String.valueOf(i);
+      tables.add(tableName);
+      final String segmentName = "segment1";
+      String evState;
+      if (random.nextDouble() *100  < percentReady) {
+        evState = "ONLINE";
+        readyTables++;
+      } else {
+        evState = "OFFLINE";
+      }
+      IdealState idealState = new IdealState(tableName);
+      idealState.setRebalanceMode(IdealState.RebalanceMode.CUSTOMIZED);
+      idealState.setPartitionState(segmentName, INSTANCE_NAME, "ONLINE");
+      ExternalView externalView = new ExternalView(tableName);
+      externalView.setState(segmentName, INSTANCE_NAME, evState);
+      idealStates.put(tableName, idealState);
+      externalViews.put(tableName, externalView);
+    }
+
+    final double actualReadyPercent = (double)readyTables * 100 / tableCount;
+    double lowestReadyPercent = (int) Math.round(actualReadyPercent);
+    lowestReadyPercent = lowestReadyPercent > 2 ? lowestReadyPercent - 2: 1;  // Should be 2 below  percentReady
+
+    // Create ServiceCallback objects with minReadyPercent set to values between lowestReadyPercent and 100.
+    // Call getServiceStatus() enough number of times so that we are only left with the tables
+    // that are not ready yet. We need to call getServiceStatus() at most tableCount times.
+    for (double minReadyPercent = lowestReadyPercent; minReadyPercent <= 100; minReadyPercent += 0.1) {
+      TestMultiResourceISAndEVMatchCB callback = new TestMultiResourceISAndEVMatchCB(clusterName, INSTANCE_NAME, tables,
+          minReadyPercent);
+      callback.setIdealStates(idealStates);
+      callback.setExternalViews(externalViews);
+
+      ServiceStatus.Status status = callback.getServiceStatus();
+      // we need to call getServiceStatus() at most the number of bad tables plus 1,
+      // to get a STARTED condition if we can. After that, the return value should
+      // never change.
+      final int nBadTables = tableCount - readyTables;
+      for (int i = 0; i <= nBadTables; i++) {
+        status = callback.getServiceStatus();
+      }
+
+      ServiceStatus.Status expected = minReadyPercent > actualReadyPercent ?
+          ServiceStatus.Status.STARTING : ServiceStatus.Status.GOOD;
+      String errorMsg = "Mismatch at " + minReadyPercent + "%, tableCount=" + tableCount +
+          ", percentTablesReady=" + actualReadyPercent + ":" + callback.getStatusDescription();
+      Assert.assertEquals(status, expected, errorMsg);
+
+      // The status should never change going forward from here.
+      for (int i = nBadTables + 1; i < tableCount; i++) {
+        ServiceStatus.Status laterStatus = callback.getServiceStatus();
+        String msg = "Mismatch at " + minReadyPercent + "%, tableCount=" + tableCount +
+            ", percentTablesReady=" + actualReadyPercent + ", i=" + i + ":" + callback.getStatusDescription();
+        Assert.assertEquals(laterStatus, status, msg);
+      }
+    }
+  }
+
   private static class TestIdealStateAndExternalViewMatchServiceStatusCallback extends ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback {
     private IdealState _idealState;
     private ExternalView _externalView;
 
     public TestIdealStateAndExternalViewMatchServiceStatusCallback(String clusterName, String instanceName,
         List<String> resourcesToMonitor) {
-      super(Mockito.mock(HelixManager.class), clusterName, instanceName, resourcesToMonitor);
+      super(Mockito.mock(HelixManager.class), clusterName, instanceName, resourcesToMonitor, 100.0);
     }
 
     @Override
@@ -213,6 +318,34 @@ public class ServiceStatusTest {
 
     public void setExternalView(ExternalView externalView) {
       _externalView = externalView;
+    }
+  }
+
+  private static class TestMultiResourceISAndEVMatchCB extends ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback {
+    public Map<String, IdealState> _idealStates = new HashMap<>();
+    public Map<String, ExternalView> _externalViews = new HashMap<>();
+
+    public TestMultiResourceISAndEVMatchCB(String clusterName, String instanceName,
+        List<String> resourcesToMonitor, double minResourcesPercent) {
+      super(Mockito.mock(HelixManager.class), clusterName, instanceName, resourcesToMonitor, minResourcesPercent);
+    }
+
+    @Override
+    public IdealState getResourceIdealState(String resourceName) {
+      return _idealStates.get(resourceName);
+    }
+
+    @Override
+    public ExternalView getState(String resourceName) {
+      return _externalViews.get(resourceName);
+    }
+
+    public void setIdealStates(Map<String, IdealState> idealStates) {
+      _idealStates = idealStates;
+    }
+
+    public void setExternalViews(Map<String, ExternalView> externalViews) {
+      _externalViews = externalViews;
     }
   }
 }

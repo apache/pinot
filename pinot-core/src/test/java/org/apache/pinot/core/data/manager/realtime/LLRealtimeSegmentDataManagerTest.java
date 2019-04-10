@@ -654,7 +654,6 @@ public class LLRealtimeSegmentDataManagerTest {
       when(dataManagerConfig.getReadMode()).thenReturn(null);
       when(dataManagerConfig.getAvgMultiValueCount()).thenReturn(null);
       when(dataManagerConfig.getSegmentFormatVersion()).thenReturn(null);
-      when(dataManagerConfig.isEnableDefaultColumns()).thenReturn(false);
       when(dataManagerConfig.isEnableSplitCommit()).thenReturn(false);
       when(dataManagerConfig.isRealtimeOffHeapAllocation()).thenReturn(false);
       return dataManagerConfig;
@@ -766,7 +765,7 @@ public class LLRealtimeSegmentDataManagerTest {
         return null;
       }
       if (!forCommit) {
-        return new SegmentBuildDescriptor(null, getCurrentOffset(), _segmentDir, 0, 0, -1);
+        return new SegmentBuildDescriptor(null, null, getCurrentOffset(), _segmentDir, 0, 0, -1);
       }
       final String segTarFileName = _segmentDir + "/" + "segmentFile";
       File segmentTgzFile = new File(segTarFileName);
@@ -775,7 +774,7 @@ public class LLRealtimeSegmentDataManagerTest {
       } catch (IOException e) {
         Assert.fail("Could not create file " + segmentTgzFile);
       }
-      return new SegmentBuildDescriptor(segTarFileName, getCurrentOffset(), null, 0, 0, -1);
+      return new SegmentBuildDescriptor(segTarFileName, null, getCurrentOffset(), null, 0, 0, -1);
     }
 
     @Override

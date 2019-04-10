@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.core.data.GenericRow;
+import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 
 
 /**
@@ -38,6 +39,11 @@ public class GenericRowRecordReader implements RecordReader {
     _rows = rows;
     _numRows = rows.size();
     _schema = schema;
+  }
+
+  @Override
+  public void init(SegmentGeneratorConfig segmentGeneratorConfig) {
+
   }
 
   @Override

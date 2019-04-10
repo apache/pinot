@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -68,6 +69,7 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
 
   // Optional
   protected TableConfig _tableConfig;
+  protected String _recordReaderPath;
   protected Path _readerConfigFile;
 
   // HDFS segment tar directory
@@ -85,9 +87,7 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
   public void setup(Context context)
       throws IOException, InterruptedException {
     _jobConf = context.getConfiguration();
-    _logger.info("*********************************************************************");
-    _logger.info("Job Configurations: {}", _jobConf);
-    _logger.info("*********************************************************************");
+    logConfigurations();
 
     _rawTableName = Preconditions.checkNotNull(_jobConf.get(JobConfigConstants.SEGMENT_TABLE_NAME));
     _schema = Schema.fromString(_jobConf.get(JobConfigConstants.SCHEMA));
@@ -101,6 +101,7 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
     if (readerConfigFile != null) {
       _readerConfigFile = new Path(readerConfigFile);
     }
+    _recordReaderPath = _jobConf.get(JobConfigConstants.RECORD_READER_PATH);
 
     // Set up segment name generator
     String segmentNameGeneratorType =
@@ -121,8 +122,9 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
         }
         _segmentNameGenerator =
             new NormalizedDateSegmentNameGenerator(_rawTableName, _jobConf.get(JobConfigConstants.SEGMENT_NAME_PREFIX),
-                _jobConf.get(JobConfigConstants.EXCLUDE_SEQUENCE_ID), validationConfig.getSegmentPushType(),
-                validationConfig.getSegmentPushFrequency(), validationConfig.getTimeType(), timeFormat);
+                _jobConf.getBoolean(JobConfigConstants.EXCLUDE_SEQUENCE_ID, false),
+                validationConfig.getSegmentPushType(), validationConfig.getSegmentPushFrequency(),
+                validationConfig.getTimeType(), timeFormat);
         break;
       default:
         throw new UnsupportedOperationException("Unsupported segment name generator type: " + segmentNameGeneratorType);
@@ -162,6 +164,28 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
     _logger.info("*********************************************************************");
   }
 
+  protected void logConfigurations() {
+    StringBuilder stringBuilder = new StringBuilder();
+    stringBuilder.append('{');
+    boolean firstEntry = true;
+    for (Map.Entry<String, String> entry : _jobConf) {
+      if (!firstEntry) {
+        stringBuilder.append(", ");
+      } else {
+        firstEntry = false;
+      }
+
+      stringBuilder.append(entry.getKey());
+      stringBuilder.append('=');
+      stringBuilder.append(entry.getValue());
+    }
+    stringBuilder.append('}');
+
+    _logger.info("*********************************************************************");
+    _logger.info("Job Configurations: {}", stringBuilder.toString());
+    _logger.info("*********************************************************************");
+  }
+
   @Override
   protected void map(LongWritable key, Text value, Context context)
       throws IOException, InterruptedException {
@@ -183,9 +207,14 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
     segmentGeneratorConfig.setOutDir(_localSegmentDir.getPath());
     segmentGeneratorConfig.setSegmentNameGenerator(_segmentNameGenerator);
     segmentGeneratorConfig.setSequenceId(sequenceId);
-    FileFormat fileFormat = getFileFormat(inputFileName);
-    segmentGeneratorConfig.setFormat(fileFormat);
-    segmentGeneratorConfig.setReaderConfig(getReaderConfig(fileFormat));
+    if (_recordReaderPath != null) {
+      segmentGeneratorConfig.setRecordReaderPath(_recordReaderPath);
+      segmentGeneratorConfig.setFormat(FileFormat.OTHER);
+    } else {
+      FileFormat fileFormat = getFileFormat(inputFileName);
+      segmentGeneratorConfig.setFormat(fileFormat);
+      segmentGeneratorConfig.setReaderConfig(getReaderConfig(fileFormat));
+    }
     segmentGeneratorConfig.setOnHeap(true);
 
     addAdditionalSegmentGeneratorConfigs(segmentGeneratorConfig, hdfsInputFile, sequenceId);

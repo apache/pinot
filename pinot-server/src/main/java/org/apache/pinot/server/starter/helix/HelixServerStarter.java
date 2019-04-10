@@ -178,11 +178,13 @@ public class HelixServerStarter {
         .addPreConnectCallback(() -> serverMetrics.addMeteredGlobalValue(ServerMeter.HELIX_ZOOKEEPER_RECONNECTS, 1L));
 
     // Register the service status handler
+    final double minResourcePercentForStartup = _helixServerConfig.getDouble(CommonConstants.Server.CONFIG_OF_SERVER_MIN_RESOURCE_PERCENT_FOR_START,
+        CommonConstants.Server.DEFAULT_SERVER_MIN_RESOURCE_PERCENT_FOR_START);
     ServiceStatus.setServiceStatusCallback(new ServiceStatus.MultipleCallbackServiceStatusCallback(ImmutableList
         .of(new ServiceStatus.IdealStateAndCurrentStateMatchServiceStatusCallback(_helixManager, _helixClusterName,
-                _instanceId),
+                _instanceId, minResourcePercentForStartup),
             new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(_helixManager, _helixClusterName,
-                _instanceId))));
+                _instanceId, minResourcePercentForStartup))));
 
     ControllerLeaderLocator.create(_helixManager);
 

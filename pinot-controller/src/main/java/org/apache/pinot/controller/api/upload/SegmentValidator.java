@@ -20,10 +20,12 @@ package org.apache.pinot.controller.api.upload;
 
 import java.io.File;
 import java.util.Date;
+import java.util.List;
 import java.util.concurrent.Executor;
 import javax.annotation.Nonnull;
 import javax.ws.rs.core.Response;
 import org.apache.commons.httpclient.HttpConnectionManager;
+import org.apache.helix.ZNRecord;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.exception.InvalidConfigException;
@@ -32,6 +34,7 @@ import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.segment.SegmentMetadata;
 import org.apache.pinot.common.utils.time.TimeUtils;
 import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.controller.ControllerLeadershipManager;
 import org.apache.pinot.controller.api.resources.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.util.TableSizeReader;
@@ -52,17 +55,20 @@ public class SegmentValidator {
   private final Executor _executor;
   private final HttpConnectionManager _connectionManager;
   private final ControllerMetrics _controllerMetrics;
+  private final ControllerLeadershipManager _controllerLeadershipManager;
 
   public SegmentValidator(PinotHelixResourceManager pinotHelixResourceManager, ControllerConf controllerConf,
-      Executor executor, HttpConnectionManager connectionManager, ControllerMetrics controllerMetrics) {
+      Executor executor, HttpConnectionManager connectionManager, ControllerMetrics controllerMetrics,
+      ControllerLeadershipManager controllerLeadershipManager) {
     _pinotHelixResourceManager = pinotHelixResourceManager;
     _controllerConf = controllerConf;
     _executor = executor;
     _connectionManager = connectionManager;
     _controllerMetrics = controllerMetrics;
+    _controllerLeadershipManager = controllerLeadershipManager;
   }
 
-  public void validateSegment(SegmentMetadata segmentMetadata, File tempSegmentDir) {
+  public SegmentValidatorResponse validateSegment(SegmentMetadata segmentMetadata, File tempSegmentDir) {
     String rawTableName = segmentMetadata.getTableName();
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
     String segmentName = segmentMetadata.getName();
@@ -72,6 +78,19 @@ public class SegmentValidator {
     if (offlineTableConfig == null) {
       throw new ControllerApplicationException(LOGGER, "Failed to find table config for table: " + offlineTableName,
           Response.Status.NOT_FOUND);
+    }
+
+    // Verifies whether there's server assigned to this segment when uploading a new segment.
+    List<String> assignedInstances = null;
+    ZNRecord segmentMetadataZnRecord =
+        _pinotHelixResourceManager.getSegmentMetadataZnRecord(offlineTableName, segmentName);
+    // Checks whether it's a new segment or an existing one.
+    if (segmentMetadataZnRecord == null) {
+      assignedInstances = _pinotHelixResourceManager.getAssignedInstancesForSegment(segmentMetadata);
+      if (assignedInstances.isEmpty()) {
+        throw new ControllerApplicationException(LOGGER, "No assigned Instances for Segment: " + segmentName
+            + ". Please check whether the table config is misconfigured.", Response.Status.INTERNAL_SERVER_ERROR);
+      }
     }
 
     StorageQuotaChecker.QuotaCheckerResponse quotaResponse;
@@ -95,6 +114,8 @@ public class SegmentValidator {
           "Invalid segment start/end time for segment: " + segmentName + " of table: " + offlineTableName,
           Response.Status.NOT_ACCEPTABLE);
     }
+
+    return new SegmentValidatorResponse(offlineTableConfig, segmentMetadataZnRecord, assignedInstances, quotaResponse);
   }
 
   /**
@@ -113,7 +134,8 @@ public class SegmentValidator {
     TableSizeReader tableSizeReader =
         new TableSizeReader(_executor, _connectionManager, _controllerMetrics, _pinotHelixResourceManager);
     StorageQuotaChecker quotaChecker =
-        new StorageQuotaChecker(offlineTableConfig, tableSizeReader, _controllerMetrics, _pinotHelixResourceManager);
+        new StorageQuotaChecker(offlineTableConfig, tableSizeReader, _controllerMetrics, _pinotHelixResourceManager,
+            _controllerLeadershipManager);
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(metadata.getTableName());
     return quotaChecker.isSegmentStorageWithinQuota(segmentFile, offlineTableName, metadata.getName(),
         _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);

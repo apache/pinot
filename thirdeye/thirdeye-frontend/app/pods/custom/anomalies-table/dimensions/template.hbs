@@ -1,7 +1,7 @@
 <ul class="te-anomaly-table__list">
   <li class="te-anomaly-table__list-item" title="{{record.anomaly.functionName}}">
     {{#if record.anomaly.detectionConfigId}}
-      {{#link-to "manage.yaml" record.anomaly.detectionConfigId class="te-anomaly-table__link"}}
+      {{#link-to "manage.explore" record.anomaly.detectionConfigId class="te-anomaly-table__link"}}
         {{record.anomaly.functionName}}
       {{/link-to}}
     {{else}}

@@ -19,7 +19,7 @@
 package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.google.common.base.Function;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.io.IOException;
@@ -31,8 +31,8 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.JsonUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
@@ -59,7 +59,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   private static final String TEST_UPDATED_INVERTED_INDEX_QUERY =
       "SELECT COUNT(*) FROM mytable WHERE DivActualElapsedTime = 305";
 
-  private static final List<String> UPDATED_BLOOM_FLITER_COLUMNS = Arrays.asList("Carrier");
+  private static final List<String> UPDATED_BLOOM_FILTER_COLUMNS = Collections.singletonList("Carrier");
   private static final String TEST_UPDATED_BLOOM_FILTER_QUERY = "SELECT COUNT(*) FROM mytable WHERE Carrier = 'CA'";
 
   // For default columns test
@@ -93,23 +93,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     startBrokers(getNumBrokers());
     startServers(getNumServers());
 
-    // Set up service status callbacks
-    List<String> instances = _helixAdmin.getInstancesInCluster(_clusterName);
-    for (String instance : instances) {
-      if (instance.startsWith(CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE)) {
-        _serviceStatusCallbacks.add(
-            new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(_helixManager, _clusterName, instance,
-                Collections.singletonList(CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)));
-      }
-      if (instance.startsWith(CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE)) {
-        _serviceStatusCallbacks.add(new ServiceStatus.MultipleCallbackServiceStatusCallback(ImmutableList
-            .of(new ServiceStatus.IdealStateAndCurrentStateMatchServiceStatusCallback(_helixManager, _clusterName,
-                    instance),
-                new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(_helixManager, _clusterName,
-                    instance))));
-      }
-    }
-
     // Unpack the Avro files
     List<File> avroFiles = unpackAvroData(_tempDir);
 
@@ -138,6 +121,21 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // Upload all segments
     uploadSegments(_tarDir);
 
+    // Set up service status callbacks
+    // NOTE: put this step after creating the table and uploading all segments so that brokers and servers can find the
+    // resources to monitor
+    List<String> instances = _helixAdmin.getInstancesInCluster(_clusterName);
+    for (String instance : instances) {
+      if (instance.startsWith(CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE) || instance
+          .startsWith(CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE)) {
+        _serviceStatusCallbacks.add(new ServiceStatus.MultipleCallbackServiceStatusCallback(ImmutableList
+            .of(new ServiceStatus.IdealStateAndCurrentStateMatchServiceStatusCallback(_helixManager, _clusterName,
+                    instance, 100.0),
+                new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(_helixManager, _clusterName,
+                    instance, 100.0))));
+      }
+    }
+
     // Wait for all documents loaded
     waitForAllDocsLoaded(600_000L);
   }
@@ -147,6 +145,22 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(_serviceStatusCallbacks.size(), getNumBrokers() + getNumServers());
     for (ServiceStatus.ServiceStatusCallback serviceStatusCallback : _serviceStatusCallbacks) {
       assertEquals(serviceStatusCallback.getServiceStatus(), ServiceStatus.Status.GOOD);
+    }
+  }
+
+  @Test
+  public void testInvalidTableConfig() {
+    TableConfig tableConfig =
+        new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName("badTable").build();
+    ObjectNode jsonConfig = tableConfig.toJsonConfig();
+    // Remove a mandatory field
+    jsonConfig.remove(TableConfig.VALIDATION_CONFIG_KEY);
+    try {
+      sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), jsonConfig.toString());
+      fail();
+    } catch (IOException e) {
+      // Should get response code 400 (BAD_REQUEST)
+      assertTrue(e.getMessage().startsWith("Server returned HTTP response code: 400"));
     }
   }
 
@@ -166,17 +180,14 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     sendPostRequest(_controllerBaseApiUrl + "/tables/mytable/segments/reload?type=offline", null);
 
-    TestUtils.waitForCondition(new Function<Void, Boolean>() {
-      @Override
-      public Boolean apply(@Nullable Void aVoid) {
-        try {
-          JsonNode queryResponse = postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY);
-          // Total docs should not change during reload
-          assertEquals(queryResponse.get("totalDocs").asLong(), numTotalDocs);
-          return queryResponse.get("numEntriesScannedInFilter").asLong() == 0L;
-        } catch (Exception e) {
-          throw new RuntimeException(e);
-        }
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        JsonNode queryResponse1 = postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY);
+        // Total docs should not change during reload
+        assertEquals(queryResponse1.get("totalDocs").asLong(), numTotalDocs);
+        return queryResponse1.get("numEntriesScannedInFilter").asLong() == 0L;
+      } catch (Exception e) {
+        throw new RuntimeException(e);
       }
     }, 600_000L, "Failed to generate inverted index");
   }
@@ -190,23 +201,20 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     // Update table config and trigger reload
     updateOfflineTable(getTableName(), null, null, null, null, getLoadMode(), SegmentVersion.v1, null,
-        UPDATED_BLOOM_FLITER_COLUMNS, getTaskConfig());
+        UPDATED_BLOOM_FILTER_COLUMNS, getTaskConfig());
 
     updateTableConfiguration();
 
     sendPostRequest(_controllerBaseApiUrl + "/tables/mytable/segments/reload?type=offline", null);
 
-    TestUtils.waitForCondition(new Function<Void, Boolean>() {
-      @Override
-      public Boolean apply(@Nullable Void aVoid) {
-        try {
-          JsonNode queryResponse = postQuery(TEST_UPDATED_BLOOM_FILTER_QUERY);
-          // Total docs should not change during reload
-          assertEquals(queryResponse.get("totalDocs").asLong(), numTotalDocs);
-          return queryResponse.get("numSegmentsProcessed").asLong() == 0L;
-        } catch (Exception e) {
-          throw new RuntimeException(e);
-        }
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        JsonNode queryResponse1 = postQuery(TEST_UPDATED_BLOOM_FILTER_QUERY);
+        // Total docs should not change during reload
+        assertEquals(queryResponse1.get("totalDocs").asLong(), numTotalDocs);
+        return queryResponse1.get("numSegmentsProcessed").asLong() == 0L;
+      } catch (Exception e) {
+        throw new RuntimeException(e);
       }
     }, 600_000L, "Failed to generate inverted index");
   }
@@ -267,22 +275,19 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       errorMessage = "Failed to remove default columns";
     }
 
-    TestUtils.waitForCondition(new Function<Void, Boolean>() {
-      @Override
-      public Boolean apply(@Nullable Void aVoid) {
-        try {
-          JsonNode queryResponse = postQuery(TEST_DEFAULT_COLUMNS_QUERY);
-          // Total docs should not change during reload
-          assertEquals(queryResponse.get("totalDocs").asLong(), numTotalDocs);
-          long count = queryResponse.get("aggregationResults").get(0).get("value").asLong();
-          if (withExtraColumns) {
-            return count == numTotalDocs;
-          } else {
-            return count == 0;
-          }
-        } catch (Exception e) {
-          throw new RuntimeException(e);
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        JsonNode queryResponse = postQuery(TEST_DEFAULT_COLUMNS_QUERY);
+        // Total docs should not change during reload
+        assertEquals(queryResponse.get("totalDocs").asLong(), numTotalDocs);
+        long count = queryResponse.get("aggregationResults").get(0).get("value").asLong();
+        if (withExtraColumns) {
+          return count == numTotalDocs;
+        } else {
+          return count == 0;
         }
+      } catch (Exception e) {
+        throw new RuntimeException(e);
       }
     }, 600_000L, errorMessage);
   }
@@ -498,7 +503,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     JsonNode response = JsonUtils.stringToJsonNode(sendGetRequest(_controllerRequestURLBuilder.forInstanceList()));
     JsonNode instanceList = response.get("instances");
     int numInstances = instanceList.size();
-    assertEquals(numInstances, getNumBrokers() + getNumServers());
+    // The total number of instances is equal to the sum of num brokers, num servers and 1 controller.
+    assertEquals(numInstances, getNumBrokers() + getNumServers() + 1);
 
     // Try to delete a server that does not exist
     String deleteInstanceRequest = _controllerRequestURLBuilder.forInstanceDelete("potato");

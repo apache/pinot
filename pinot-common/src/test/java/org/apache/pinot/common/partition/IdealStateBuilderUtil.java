@@ -45,6 +45,12 @@ public class IdealStateBuilderUtil {
     _idealState = new IdealState(tableNameWithType);
   }
 
+  public IdealStateBuilderUtil(IdealState idealState, String tableNameWithType) {
+    _tableName = tableNameWithType;
+    _rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+    _idealState = idealState;
+  }
+
   public IdealState build() {
     return _idealState;
   }

@@ -5,8 +5,8 @@
  * @returns {String} the complete anomaly data url
  * @example getAnomalyDataUrl(1491804013000, 1491890413000) // yields => /anomalies/search/anomalyIds/1491804013000/1491890413000/1?anomalyIds=
  */
-export function getAnomalyDataUrl(startStamp = 0, endStamp = 0) {
-  return `/anomalies/search/anomalyIds/${startStamp}/${endStamp}/1?anomalyIds=`;
+export function getAnomalyDataUrl(anomalyId) {
+  return `/dashboard/anomalies/view/${anomalyId}`;
 }
 
 /**
@@ -16,8 +16,8 @@ export function getAnomalyDataUrl(startStamp = 0, endStamp = 0) {
  * @returns {String} the complete yaml/preview url
  * @example getAnomaliesForYamlPreview(1508472700000, 1508472800000) // yields => /yaml/preview?start=1508472700000&end=1508472800000&tuningStart=0&tuningEnd=0
  */
-export function getAnomaliesForYamlPreviewUrl(startTime, endTime) {
-  return `/yaml/preview?start=${startTime}&end=${endTime}&tuningStart=0&tuningEnd=0`;
+export function getAnomaliesForYamlPreviewUrl(startTime, endTime, alertId) {
+  return `/yaml/preview${alertId ? `/${alertId}` : ''}?start=${startTime}&end=${endTime}&tuningStart=0&tuningEnd=0`;
 }
 
 /**
@@ -31,10 +31,21 @@ export function getAnomaliesByAlertIdUrl(alertId, startTime, endTime) {
   return `/detection/${alertId}/anomalies?start=${startTime}&end=${endTime}`;
 }
 
+/**
+ * Returns the url for getting anomaly ids of all anomalies over the specified time range
+ * @param {Number} startTime - beginning of time range of interest
+ * @param {Number} endTime - end of time range of interest
+ * @example getAnomalyIdsByTimeRangeUrl(1508472700000, 1508472800000) // yields => /anomalies/search/time/1508472700000/1508472800000/1?filterOnly=true
+ */
+export function getAnomalyIdsByTimeRangeUrl(startTime, endTime) {
+  return `/anomalies/search/time/${startTime}/${endTime}/1?filterOnly=true`;
+}
+
 export const anomalyApiUrls = {
   getAnomalyDataUrl,
   getAnomaliesForYamlPreviewUrl,
-  getAnomaliesByAlertIdUrl
+  getAnomaliesByAlertIdUrl,
+  getAnomalyIdsByTimeRangeUrl
 };
 
 export default {

@@ -9,7 +9,7 @@ import * as anomalyUtil from 'thirdeye-frontend/utils/anomaly';
 import { inject as service } from '@ember/service';
 
 const TIME_PICKER_INCREMENT = 5; // tells date picker hours field how granularly to display time
-const DEFAULT_ACTIVE_DURATION = '1d'; // setting this date range selection as default (Last 24 Hours)
+const DEFAULT_ACTIVE_DURATION = 'today'; // setting this date range selection default as Today
 const UI_DATE_FORMAT = 'MMM D, YYYY hh:mm a'; // format for date picker to use (usually varies by route or metric)
 const DISPLAY_DATE_FORMAT = 'YYYY-MM-DD HH:mm'; // format used consistently across app to display custom date range
 const TIME_RANGE_OPTIONS = ['today', '1d', '2d', '1w'];
@@ -44,8 +44,6 @@ export default Controller.extend({
   sortedApplications: computed(
     'model.applications',
     function() {
-      let model = get(this, 'model');
-
       // Iterate through each anomaly
       let applications =  this.get('store').peekAll('application').sortBy('application');
       return applications;
@@ -92,9 +90,9 @@ export default Controller.extend({
       const endDate = Number(get(this, 'model.endDate'));
       const duration = get(this, 'model.duration') || DEFAULT_ACTIVE_DURATION;
       const predefinedRanges = {
-        'Today': [moment().startOf('day'), moment()],
+        'Today': [moment().startOf('day'), moment().startOf('day').add(1, 'day')],
         'Last 24 hours': [moment().subtract(1, 'day'), moment()],
-        'Yesterday': [moment().subtract(1, 'day').startOf('day'), moment().subtract(1, 'days').endOf('day')],
+        'Yesterday': [moment().subtract(1, 'day').startOf('day'), moment().startOf('day')],
         'Last Week': [moment().subtract(1, 'week'), moment()]
       };
 

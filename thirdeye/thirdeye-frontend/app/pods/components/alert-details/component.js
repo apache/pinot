@@ -16,9 +16,17 @@
 import Component from '@ember/component';
 import { computed, observer, set, get, getProperties } from '@ember/object';
 import { later } from '@ember/runloop';
-import { checkStatus, humanizeFloat } from 'thirdeye-frontend/utils/utils';
-import { colorMapping, toColor, makeTime } from 'thirdeye-frontend/utils/rca-utils';
-import { getYamlPreviewAnomalies, getAnomaliesByAlertId, getFormattedDuration } from 'thirdeye-frontend/utils/anomaly';
+import { checkStatus, humanizeFloat, postProps } from 'thirdeye-frontend/utils/utils';
+import { toastOptions } from 'thirdeye-frontend/utils/constants';
+import { colorMapping, toColor, makeTime, toMetricLabel, extractTail } from 'thirdeye-frontend/utils/rca-utils';
+import { getYamlPreviewAnomalies,
+  getAnomaliesByAlertId,
+  getFormattedDuration,
+  anomalyResponseMapNew,
+  anomalyResponseObj,
+  anomalyResponseObjNew,
+  updateAnomalyFeedback,
+  verifyAnomalyFeedback  } from 'thirdeye-frontend/utils/anomaly';
 import { inject as service } from '@ember/service';
 import { task } from 'ember-concurrency';
 import floatToPercent from 'thirdeye-frontend/utils/float-to-percent';
@@ -32,7 +40,8 @@ const TIME_PICKER_INCREMENT = 5; // tells date picker hours field how granularly
 const DEFAULT_ACTIVE_DURATION = '1m'; // setting this date range selection as default (Last 24 Hours)
 const UI_DATE_FORMAT = 'MMM D, YYYY hh:mm a'; // format for date picker to use (usually varies by route or metric)
 const DISPLAY_DATE_FORMAT = 'YYYY-MM-DD HH:mm'; // format used consistently across app to display custom date range
-const TIME_RANGE_OPTIONS = ['1m', '3m'];
+const TIME_RANGE_OPTIONS = ['1d', '1w', '1m', '3m'];
+const ANOMALY_LEGEND_THRESHOLD = 20; // If number of anomalies is larger than this threshold, don't show the legend
 
 export default Component.extend({
   anomaliesApiService: service('services/api/anomalies'),
@@ -40,7 +49,7 @@ export default Component.extend({
   anomalyMapping: {},
   timeseries: null,
   isLoading: false,
-  analysisRange: [moment().subtract(1, 'week').startOf('hour').valueOf(), moment().startOf('hour').valueOf()],
+  analysisRange: [moment().subtract(1, 'day').startOf('day').valueOf(), moment().add(1, 'day').startOf('day').valueOf()],
   isPendingData: false,
   colorMapping: colorMapping,
   zoom: {
@@ -54,6 +63,7 @@ export default Component.extend({
   },
   errorTimeseries: null,
   metricUrn: null,
+  metricUrnList: [],
   errorBaseline: null,
   compareMode: 'wo1w',
   baseline: null,
@@ -72,24 +82,89 @@ export default Component.extend({
     { name: 'max4w', isActive: false},
     { name: 'none', isActive: false}
   ],
-  sortColumnStartUp: false,
+  sortColumnStartUp: true,
   sortColumnChangeUp: false,
-  sortColumnNumberUp: true,
   sortColumnFeedbackUp: false,
-  selectedSortMode: '',
+  selectedSortMode: 'start:down',
   selectedBaseline: 'wo1w',
   pageSize: 10,
   currentPage: 1,
   isPreviewMode: false,
   alertId: null,
+  alertData: null,
+  feedbackOptions: ['Not reviewed yet', 'Yes - unexpected', 'Expected temporary change', 'Expected permanent change', 'No change observed'],
+  labelMap: anomalyResponseMapNew,
+  labelResponse: {},
+  selectedDimension: null,
+  isReportSuccess: false,
+  isReportFailure: false,
+  openReportModal: false,
+  missingAnomalyProps: {},
 
 
-  updateVisuals: observer('analysisRange', function() {
-    const isPreviewMode = get(this, 'isPreviewMode');
-    if(!isPreviewMode) {
-      this._fetchAnomalies();
+
+  updateVisuals: observer(
+    'analysisRange',
+    'metricUrn',
+    function() {
+      const {
+        isPreviewMode,
+        metricUrn
+      } = this.getProperties('isPreviewMode', 'metricUrn');
+      if(metricUrn) {
+        if(!isPreviewMode) {
+          this._fetchAnomalies();
+        } else {
+          this._fetchTimeseries();
+        }
+      }
+
+    }),
+
+  /**
+   * Separate time range for anomalies in preview mode
+   * @type {Array}
+   */
+  anomaliesRange: computed(
+    'analysisRange',
+    function() {
+      const analysisRange = get(this, 'analysisRange');
+      let range = [];
+      range.push(analysisRange[0]);
+      // set end to now if the end time is in the future
+      const end = Math.min(moment().valueOf(), analysisRange[1]);
+      range.push(end)
+      return range;
     }
-  }),
+  ),
+
+  /**
+   * Whether the alert has multiple dimensions
+   * @type {Boolean}
+   */
+  dimensionOptions: computed(
+    'metricUrnList',
+    function() {
+      const metricUrnList = get(this, 'metricUrnList');
+      let options = [];
+      metricUrnList.forEach(urn => {
+        options.push(toMetricLabel(extractTail(decodeURIComponent(urn))));
+      });
+      return options;
+    }
+  ),
+
+  /**
+   * Whether the alert has multiple dimensions
+   * @type {Boolean}
+   */
+  alertHasDimensions: computed(
+    'metricUrnList',
+    function() {
+      const metricUrnList = get(this, 'metricUrnList');
+      return (metricUrnList.length > 1);
+    }
+  ),
 
   /**
    * Table pagination: number of pages to display
@@ -117,6 +192,24 @@ export default Component.extend({
       return Math.ceil(anomalyCount/pageSize);
     }
   ),
+
+  /**
+   * date-time-picker: indicates the date format to be used based on granularity
+   * @type {String}
+   */
+  uiDateFormat: computed('alertData.windowUnit', function() {
+    const rawGranularity = this.get('alertData.bucketUnit');
+    const granularity = rawGranularity ? rawGranularity.toLowerCase() : '';
+
+    switch(granularity) {
+      case 'days':
+        return 'MMM D, YYYY';
+      case 'hours':
+        return 'MMM D, YYYY h a';
+      default:
+        return 'MMM D, YYYY hh:mm a';
+    }
+  }),
 
   /**
    * Table pagination: creates the page Array for view
@@ -183,7 +276,7 @@ export default Component.extend({
   axis: computed(
     'analysisRange',
     function () {
-      const analysisRange = getProperties(this, 'analysisRange');
+      const analysisRange = get(this, 'analysisRange');
 
       return {
         y: {
@@ -224,30 +317,40 @@ export default Component.extend({
     'analysisRange',
     function () {
       const {
-        metricUrn, anomalies, timeseries, baseline, analysisRange
+        metricUrn, anomalies, timeseries, baseline
       } = getProperties(this, 'metricUrn', 'anomalies', 'timeseries',
-        'baseline', 'analysisRange');
+        'baseline');
 
       const series = {};
 
       if (!_.isEmpty(anomalies)) {
 
-          anomalies
-            .filter(anomaly => anomaly.metricUrn === metricUrn)
-            .forEach(anomaly => {
-              const key = this._formatAnomaly(anomaly);
-              series[key] = {
-                timestamps: [anomaly.startTime, anomaly.endTime],
-                values: [1, 1],
-                type: 'line',
-                color: 'teal',
-                axis: 'y2'
-              };
-              series[key + '-region'] = Object.assign({}, series[key], {
-                type: 'region',
-                color: 'orange'
-              });
-            });
+        const anomaliesInGraph = anomalies.filter(anomaly => anomaly.metricUrn === metricUrn);
+        if (anomaliesInGraph.length > ANOMALY_LEGEND_THRESHOLD) {
+          set(this, 'legend', {
+            show: false,
+            position: 'right'
+          });
+        } else {
+          set(this, 'legend', {
+            show: true,
+            position: 'right'
+          });
+        }
+        anomaliesInGraph.forEach(anomaly => {
+          const key = this._formatAnomaly(anomaly);
+          series[key] = {
+            timestamps: [anomaly.startTime, anomaly.endTime],
+            values: [1, 1],
+            type: 'line',
+            color: 'teal',
+            axis: 'y2'
+          };
+          series[key + '-region'] = Object.assign({}, series[key], {
+            type: 'region',
+            color: 'orange'
+          });
+        });
       }
 
       if (timeseries && !_.isEmpty(timeseries.value)) {
@@ -267,7 +370,6 @@ export default Component.extend({
           color: 'light-' + toColor(metricUrn)
         };
       }
-
       return series;
     }
   ),
@@ -279,26 +381,35 @@ export default Component.extend({
    */
   tableAnomalies: computed(
     'anomalies',
+    'labelResponse',
     function() {
       const anomalies = get(this, 'anomalies');
+      const labelResponse = get(this, 'labelResponse');
       let tableData = [];
-      let i = 1;
 
-      anomalies.forEach(a => {
-        let tableRow = {
-          number: i,
-          anomalyId: a.id,
-          start: a.startTime,
-          startDateStr: this._formatAnomaly(a),
-          durationStr: getFormattedDuration(a.startTime, a.endTime),
-          shownCurrent: humanizeFloat(a.avgCurrentVal),
-          shownBaseline: humanizeFloat(a.avgBaselineVal),
-          change: ((a.avgCurrentVal/a.avgBaselineVal - 1.0) * 100.0),
-          shownChangeRate: humanizeFloat(((a.avgCurrentVal/a.avgBaselineVal - 1.0) * 100.0))
-        };
-        tableData.push(tableRow);
-        i++;
-      });
+      if (anomalies) {
+        anomalies.forEach(a => {
+          const change = (a.avgBaselineVal !== 0 && a.avgBaselineVal !== "Infinity" && a.avgCurrentVal !== "Infinity") ? (a.avgCurrentVal/a.avgBaselineVal - 1.0) * 100.0 : 'N/A';
+          let tableRow = {
+            anomalyId: a.id,
+            metricUrn: a.metricUrn,
+            start: a.startTime,
+            end: a.endTime,
+            startDateStr: this._formatAnomaly(a),
+            durationStr: getFormattedDuration(a.startTime, a.endTime),
+            shownCurrent: a.avgCurrentVal === "Infinity" ? '-' : humanizeFloat(a.avgCurrentVal),
+            shownBaseline: a.avgBaselineVal === "Infinity" ? '-' : humanizeFloat(a.avgBaselineVal),
+            change: change,
+            shownChangeRate: change === 'N/A' ? change : humanizeFloat(change),
+            anomalyFeedback: a.feedback ? a.feedback.feedbackType : a.statusClassification,
+            dimensionList: Object.keys(a.dimensions),
+            dimensions: a.dimensions,
+            showResponseSaved: (labelResponse.anomalyId === a.id) ? labelResponse.showResponseSaved : false,
+            showResponseFailed: (labelResponse.anomalyId === a.id) ? labelResponse.showResponseFailed: false
+          };
+          tableData.push(tableRow);
+        });
+      }
       return tableData;
     }
   ),
@@ -374,14 +485,14 @@ export default Component.extend({
     'analysisRange', 'startDate', 'endDate', 'duration',
     function() {
       const analysisRange = get(this, 'analysisRange');
-      const startDate = Number(analysisRange[0]) || Number(get(this, 'startDate'));
-      const endDate = Number(analysisRange[1]) || Number(get(this, 'endDate'));
+      const startDate = Number(analysisRange[0]);
+      const endDate = Number(analysisRange[1]);
       const duration = get(this, 'duration') || DEFAULT_ACTIVE_DURATION;
       const predefinedRanges = {
-        'Today': [moment().startOf('day'), moment()],
+        'Today': [moment().startOf('day'), moment().startOf('day').add(1, 'days')],
         'Last 24 hours': [moment().subtract(1, 'day'), moment()],
-        'Yesterday': [moment().subtract(1, 'day').startOf('day'), moment().subtract(1, 'days').endOf('day')],
-        'Last Week': [moment().subtract(1, 'week'), moment()]
+        'Yesterday': [moment().subtract(1, 'day').startOf('day'), moment().startOf('day')],
+        'Last Week': [moment().subtract(1, 'week').startOf('day'), moment().startOf('day')]
       };
 
       return {
@@ -399,24 +510,41 @@ export default Component.extend({
     let anomalyMapping = {};
     const {
       analysisRange,
+      anomaliesRange,
       notifications,
       isPreviewMode,
-      alertId,
-      metricUrn,
-    } = this.getProperties('analysisRange', 'notifications', 'isPreviewMode', 'alertId', 'metricUrn');
-
+      alertId
+    } = this.getProperties('analysisRange', 'anomaliesRange', 'notifications', 'isPreviewMode', 'alertId');
     //detection alert fetch
     const start = analysisRange[0];
     const end = analysisRange[1];
+    const startAnomalies = anomaliesRange[0];
+    const endAnomalies = anomaliesRange[1];
     let anomalies;
     let applicationAnomalies;
+    let metricUrnList;
     try {
       if(isPreviewMode){
-        applicationAnomalies = yield getYamlPreviewAnomalies(alertYaml, start, end);
-        set(this, 'metricUrn', Object.keys(applicationAnomalies.diagnostics['0'])[0]);
+        applicationAnomalies = yield getYamlPreviewAnomalies(alertYaml, startAnomalies, endAnomalies, alertId);
+        if (applicationAnomalies && applicationAnomalies.diagnostics && applicationAnomalies.diagnostics['0']) {
+          metricUrnList = Object.keys(applicationAnomalies.diagnostics['0']);
+          set(this, 'metricUrnList', metricUrnList);
+          set(this, 'selectedDimension', toMetricLabel(extractTail(decodeURIComponent(metricUrnList[0]))));
+          set(this, 'metricUrn', metricUrnList[0]);
+        }
         anomalies = applicationAnomalies.anomalies;
       } else {
         applicationAnomalies = yield getAnomaliesByAlertId(alertId, start, end);
+        const metricUrnObj = {};
+        if (applicationAnomalies) {
+          applicationAnomalies.forEach(anomaly => {
+            metricUrnObj[anomaly.metricUrn] = 1;
+          });
+          metricUrnList = Object.keys(metricUrnObj);
+          if (metricUrnList.length > 0) {
+            set(this, 'metricUrnList', metricUrnList);
+          }
+        }
         anomalies = applicationAnomalies;
       }
 
@@ -439,7 +567,7 @@ export default Component.extend({
         });
       }
     } catch (error) {
-      notifications.error('Preview alert failed', error);
+      notifications.error(error.body.message, toastOptions);
     }
 
     return {
@@ -452,8 +580,12 @@ export default Component.extend({
     this._super(...arguments);
     const isPreviewMode = get(this, 'isPreviewMode');
     if (!isPreviewMode) {
-      set(this, 'analysisRange', [moment().subtract(1, 'month').startOf('hour').valueOf(), moment().startOf('hour').valueOf()])
+      set(this, 'analysisRange', [moment().add(1, 'day').subtract(1, 'month').startOf('day').valueOf(), moment().add(1, 'day').startOf('day').valueOf()]);
+      set(this, 'duration', '1m');
+      set(this, 'selectedDimension', 'Choose a dimension');
       this._fetchAnomalies();
+    } else {
+      set(this, 'duration', '1d');
     }
   },
 
@@ -511,12 +643,11 @@ export default Component.extend({
       analysisRange,
       selectedBaseline
     } = this.getProperties('metricUrn', 'analysisRange', 'selectedBaseline');
-    const granularity = '15_MINUTES';
-    const timezone = moment.tz.guess();
 
     set(this, 'errorTimeseries', null);
 
-    const urlCurrent = `/rootcause/metric/timeseries?urn=${metricUrn}&start=${analysisRange[0]}&end=${analysisRange[1]}&offset=current&granularity=${granularity}&timezone=${timezone}`;
+    const timeZone = 'America/Los_Angeles';
+    const urlCurrent = `/rootcause/metric/timeseries?urn=${metricUrn}&start=${analysisRange[0]}&end=${analysisRange[1]}&offset=current&timezone=${timeZone}`;
     fetch(urlCurrent)
       .then(checkStatus)
       .then(res => {
@@ -528,7 +659,7 @@ export default Component.extend({
 
     set(this, 'errorBaseline', null);
 
-    const urlBaseline = `/rootcause/metric/timeseries?urn=${metricUrn}&start=${analysisRange[0]}&end=${analysisRange[1]}&offset=${selectedBaseline}&granularity=${granularity}&timezone=${timezone}`;
+    const urlBaseline = `/rootcause/metric/timeseries?urn=${metricUrn}&start=${analysisRange[0]}&end=${analysisRange[1]}&offset=${selectedBaseline}&timezone=${timeZone}`;
     fetch(urlBaseline)
       .then(checkStatus)
       .then(res => set(this, 'baseline', res));
@@ -540,51 +671,224 @@ export default Component.extend({
     try {
       const content = get(this, 'alertYaml');
       this.get('_getAnomalyMapping').perform(content)
-      .then(results => {
-        this.setProperties({
-          anomalyMapping: results.anomalyMapping,
-          anomalies: results.anomalies,
-          isLoading: false
+        .then(results => {
+          this.setProperties({
+            anomalyMapping: results.anomalyMapping,
+            anomalies: results.anomalies,
+            isLoading: false
+          });
+          if (get(this, 'metricUrn')) {
+            this._fetchTimeseries();
+          } else {
+            throw new Error('Unable to get MetricUrn from response');
+          }
         });
-        if (get(this, 'metricUrn')) {
-          this._fetchTimeseries();
-        } else {
-          throw new Error('Unable to get MetricUrn from response');
-        }
-      });
     } catch (error) {
       set(this, 'isLoading', false);
       throw new Error(`Unable to retrieve anomaly data. ${error}`);
     }
   },
 
+  /**
+   * Send a POST request to the report anomaly API (2-step process)
+   * http://go/te-ss-alert-flow-api
+   * @method reportAnomaly
+   * @param {String} id - The alert id
+   * @param {Object} data - The input values from 'report new anomaly' modal
+   * @return {Promise}
+   */
+  _reportAnomaly(id, metricUrn, data) {
+    const reportUrl = `/detection/report-anomaly/${id}?metricUrn=${metricUrn}`;
+    const requiredProps = ['startTime', 'endTime', 'feedbackType'];
+    let missingData = false;
+    requiredProps.forEach(prop => {
+      if (!data[prop]) {
+        missingData = true;
+      }
+    });
+    let queryStringUrl = reportUrl;
+
+    if (missingData) {
+      return Promise.reject(new Error('missing data'));
+    } else {
+      Object.entries(data).forEach(([key, value]) => {
+        queryStringUrl += `&${encodeURIComponent(key)}=${encodeURIComponent(value)}`;
+      });
+      // Step 1: Report the anomaly
+      return fetch(queryStringUrl, postProps('')).then((res) => checkStatus(res, 'post'));
+    }
+  },
+
+  /**
+   * Modal opener for "report missing anomaly".
+   * @method _triggerOpenReportModal
+   * @return {undefined}
+   */
+  _triggerOpenReportModal() {
+    this.setProperties({
+      isReportSuccess: false,
+      isReportFailure: false,
+      openReportModal: true
+    });
+    // We need the C3/D3 graph to render after its containing parent elements are rendered
+    // in order to avoid strange overflow effects.
+    later(() => {
+      this.set('renderModalContent', true);
+    });
+  },
+
   actions: {
+    /**
+     * Handle dynamically saving anomaly feedback responses
+     * @method onChangeAnomalyResponse
+     * @param {Object} anomalyRecord - the anomaly being responded to
+     * @param {String} selectedResponse - user-selected anomaly feedback option
+     * @param {Object} inputObj - the selection object
+     */
+    onChangeAnomalyFeedback: async function(anomalyRecord, selectedResponse) {
+      const anomalies = get(this, 'anomalies');
+      // Reset status icon
+      set(this, 'renderStatusIcon', false);
+      const responseObj = anomalyResponseObj.find(res => res.name === selectedResponse);
+      // get the response object from anomalyResponseObjNew
+      const newFeedbackValue = anomalyResponseObjNew.find(res => res.name === selectedResponse).value;
+      try {
+        // Save anomaly feedback
+        await updateAnomalyFeedback(anomalyRecord.anomalyId, responseObj.value);
+        // We make a call to ensure our new response got saved
+        const anomaly = await verifyAnomalyFeedback(anomalyRecord.anomalyId);
+
+        if (anomaly.feedback && responseObj.value === anomaly.feedback.feedbackType) {
+          this.set('labelResponse', {
+            anomalyId: anomalyRecord.anomalyId,
+            showResponseSaved: true,
+            showResponseFailed: false
+          });
+
+          // replace anomaly feedback with selectedFeedback
+          let i = 0;
+          let found = false;
+          while (i < anomalies.length && !found) {
+            if (anomalies[i].id === anomalyRecord.anomalyId) {
+              if (anomalies[i].feedback) {
+                anomalies[i].feedback.feedbackType = newFeedbackValue;
+              } else {
+                anomalies[i].feedback = {
+                  feedbackType: newFeedbackValue
+                };
+              }
+              found = true;
+            }
+            i++;
+          }
+          set(this, 'anomalies', anomalies);
+        } else {
+          throw 'Response not saved';
+        }
+      } catch (err) {
+        this.set('labelResponse', {
+          anomalyId: anomalyRecord.anomalyId,
+          showResponseSaved: false,
+          showResponseFailed: true
+        });
+      }
+      // Force status icon to refresh
+      set(this, 'renderStatusIcon', true);
+    },
+
+    /**
+     * Handle missing anomaly modal cancel
+     */
+    onCancel() {
+      this.setProperties({
+        isReportSuccess: false,
+        isReportFailure: false,
+        openReportModal: false,
+        renderModalContent: false
+      });
+    },
+
+    /**
+     * Open modal for missing anomalies
+     */
+    onClickReportAnomaly() {
+      this._triggerOpenReportModal();
+    },
+
+    /**
+     * Received bubbled-up action from modal
+     * @param {Object} all input field values
+     */
+    onInputMissingAnomaly(inputObj) {
+      this.set('missingAnomalyProps', inputObj);
+    },
+
+    /**
+     * Handle submission of missing anomaly form from alert-report-modal
+     */
+    onSave() {
+      const { alertId, missingAnomalyProps, metricUrn } = this.getProperties('alertId', 'missingAnomalyProps', 'metricUrn');
+      this._reportAnomaly(alertId, metricUrn, missingAnomalyProps)
+        .then(() => {
+          const rangeFormat = 'YYYY-MM-DD HH:mm';
+          const startStr = moment(missingAnomalyProps.startTime).format(rangeFormat);
+          const endStr = moment(missingAnomalyProps.endTime).format(rangeFormat);
+          this.setProperties({
+            isReportSuccess: true,
+            isReportFailure: false,
+            openReportModal: false,
+            reportedRange: `${startStr} - ${endStr}`
+          });
+        })
+        // If failure, leave modal open and report
+        .catch(() => {
+          this.setProperties({
+            missingAnomalyProps: {},
+            isReportFailure: true,
+            isReportSuccess: false
+          });
+        });
+    },
+
+    onSelectDimension(selected) {
+      const metricUrnList = get(this, 'metricUrnList');
+      const newMetricUrn = metricUrnList.find(urn => {
+        if (toMetricLabel(extractTail(decodeURIComponent(urn))) === selected) {
+          return urn;
+        }
+      });
+      this.setProperties({
+        metricUrn: newMetricUrn,
+        selectedDimension: toMetricLabel(extractTail(decodeURIComponent(newMetricUrn)))
+      });
+    },
+
     /**
       * Action handler for page clicks
       * @param {Number|String} page
       */
-     onPaginationClick(page) {
-       let newPage = page;
-       let currentPage = this.get('currentPage');
+    onPaginationClick(page) {
+      let newPage = page;
+      let currentPage = this.get('currentPage');
 
-       switch (page) {
-         case 'previous':
-           if (currentPage > 1) {
-             newPage = --currentPage;
-           } else {
-             newPage = currentPage;
-           }
-           break;
-         case 'next':
-         if (currentPage < this.get('pagesNum')) {
-           newPage = ++currentPage;
-         } else {
-           newPage = currentPage;
-         }
-           break;
-       }
-       this.set('currentPage', newPage);
-     },
+      switch (page) {
+        case 'previous':
+          if (currentPage > 1) {
+            newPage = --currentPage;
+          } else {
+            newPage = currentPage;
+          }
+          break;
+        case 'next':
+          if (currentPage < this.get('pagesNum')) {
+            newPage = ++currentPage;
+          } else {
+            newPage = currentPage;
+          }
+          break;
+      }
+      this.set('currentPage', newPage);
+    },
 
     /**
      * Sets the new custom date range for anomaly coverage
@@ -654,6 +958,6 @@ export default Component.extend({
 
       //On sort, set table to first pagination page
       this.set('currentPage', 1);
-    },
+    }
   }
 });

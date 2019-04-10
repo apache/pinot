@@ -20,7 +20,7 @@
 Executing queries via REST API on the Broker
 ============================================
 
-The Pinot REST API can be accessed by invoking ``POST`` operation witha a JSON body containing the parameter ``pql``
+The Pinot REST API can be accessed by invoking ``POST`` operation with a JSON body containing the parameter ``pql``
 to the ``/query`` URI endpoint on a broker. Depending on the type of query, the results can take different shapes.
 The examples below use curl.
 
@@ -157,8 +157,10 @@ Selection
   }
 
 
-Java
-----
+.. _java-client:
+
+Executing queries via Java Client API
+=====================================
 
 The Pinot client API is similar to JDBC, although there are some differences, due to how Pinot behaves. For example, a query with multiple aggregation function will return one result set per aggregation function, as they are computed in parallel.
 

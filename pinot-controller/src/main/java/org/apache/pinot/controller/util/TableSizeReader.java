@@ -47,6 +47,7 @@ import org.slf4j.LoggerFactory;
  */
 public class TableSizeReader {
   private static final Logger LOGGER = LoggerFactory.getLogger(TableSizeReader.class);
+
   private final Executor _executor;
   private final HttpConnectionManager _connectionManager;
   private final PinotHelixResourceManager _helixResourceManager;
@@ -225,14 +226,12 @@ public class TableSizeReader {
           .setValueOfTableGauge(tableNameWithType, ControllerGauge.TABLE_STORAGE_EST_MISSING_SEGMENT_PERCENT,
               missingPercent);
       if (subTypeSizeDetails.missingSegments == numSegments) {
-        LOGGER.warn("Failed to get size report for all {} segments: {} for table: {}", numSegments, missingSegments,
-            tableNameWithType);
+        LOGGER.warn("Failed to get size report for all {} segments of table: {}", numSegments, tableNameWithType);
         subTypeSizeDetails.reportedSizeInBytes = -1;
         subTypeSizeDetails.estimatedSizeInBytes = -1;
       } else {
-        LOGGER
-            .warn("Missing size report for {} out of {} segments: {} for table {}", subTypeSizeDetails.missingSegments,
-                numSegments, missingSegments, tableNameWithType);
+        LOGGER.warn("Missing size report for {} out of {} segments for table {}", subTypeSizeDetails.missingSegments,
+            numSegments, tableNameWithType);
       }
     } else {
       _controllerMetrics

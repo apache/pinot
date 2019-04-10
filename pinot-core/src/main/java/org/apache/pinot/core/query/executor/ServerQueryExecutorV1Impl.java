@@ -19,6 +19,7 @@
 package org.apache.pinot.core.query.executor;
 
 import com.google.common.base.Preconditions;
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -124,7 +125,24 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
     TableDataManager tableDataManager = _instanceDataManager.getTableDataManager(tableNameWithType);
     Preconditions.checkState(tableDataManager != null, "Failed to find data manager for table: " + tableNameWithType);
-    List<SegmentDataManager> segmentDataManagers = tableDataManager.acquireSegments(queryRequest.getSegmentsToQuery());
+
+    // acquire the segments
+    int missingSegments = 0;
+    List<String> segmentsToQuery = queryRequest.getSegmentsToQuery();
+    List<SegmentDataManager> segmentDataManagers = new ArrayList<>();
+    for (String segmentName : segmentsToQuery) {
+      SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segmentName);
+      if (segmentDataManager != null) {
+        segmentDataManagers.add(segmentDataManager);
+      } else {
+        if (!tableDataManager.isRecentlyDeleted(segmentName)) {
+          LOGGER.error("Could not find segment {} for table {} for requestId {}", segmentName, tableNameWithType,
+              requestId);
+          missingSegments++;
+        }
+      }
+    }
+
     int numSegmentsQueried = segmentDataManagers.size();
     boolean enableTrace = queryRequest.isEnableTrace();
     if (enableTrace) {
@@ -195,6 +213,19 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     long queryProcessingTime = queryProcessingTimer.getDurationMs();
     dataTable.getMetadata().put(DataTable.NUM_SEGMENTS_QUERIED, Integer.toString(numSegmentsQueried));
     dataTable.getMetadata().put(DataTable.TIME_USED_MS_METADATA_KEY, Long.toString(queryProcessingTime));
+
+    if (missingSegments > 0) {
+      // TODO: add this exception to the datatable after verfying the metrics
+      // Currently, given the deleted segments cache is in-memory only, a server restart will reset it
+      // We might end up sending partial-response metadata in such cases. It appears that the likelihood of
+      // this occurence is low; ie, segment has to be retained out and the server must be restarted while the
+      // broker view is still behind. We would however like to validate that and/or conf control this based on 
+      // data.
+      /*dataTable.addException(QueryException.getException(QueryException.SEGMENTS_MISSING_ERROR,
+          "Could not find " + missingSegments + " segments on the server"));*/
+      _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_MISSING_SEGMENTS, missingSegments);
+    }
+
     LOGGER.debug("Query processing time for request Id - {}: {}", requestId, queryProcessingTime);
     LOGGER.debug("InstanceResponse for request Id - {}: {}", requestId, dataTable);
     return dataTable;

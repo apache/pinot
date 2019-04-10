@@ -85,7 +85,7 @@ public class PinotFSFactoryTest {
     }
 
     @Override
-    public boolean move(URI srcUri, URI dstUri, boolean overwrite)
+    public boolean doMove(URI srcUri, URI dstUri)
         throws IOException {
       return true;
     }

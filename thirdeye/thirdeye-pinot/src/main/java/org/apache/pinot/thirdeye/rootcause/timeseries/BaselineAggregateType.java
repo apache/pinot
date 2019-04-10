@@ -32,6 +32,8 @@ public enum BaselineAggregateType {
   SUM(DoubleSeries.SUM),
   PRODUCT(DoubleSeries.PRODUCT),
   MEAN(DoubleSeries.MEAN),
+  AVG(DoubleSeries.MEAN),
+  COUNT(DoubleSeries.SUM),
   MEDIAN(DoubleSeries.MEDIAN),
   MIN(DoubleSeries.MIN),
   MAX(DoubleSeries.MAX),

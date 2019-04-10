@@ -41,7 +41,6 @@ public class AnomalySummary {
   private String metricUrn;
   private long metricId;
   private String functionName;
-  private long functionId;
   private String dataset;
   private AnomalyClassificationType classification;
   private AnomalyResultSource source;
@@ -145,14 +144,6 @@ public class AnomalySummary {
 
   public void setMetricUrn(String metricUrn) {
     this.metricUrn = metricUrn;
-  }
-
-  public long getFunctionId() {
-    return functionId;
-  }
-
-  public void setFunctionId(long functionId) {
-    this.functionId = functionId;
   }
 
   public String getDataset() {

@@ -57,9 +57,6 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   // Key of the segment format this server can read
   public static final String SEGMENT_FORMAT_VERSION = "segment.format.version";
 
-  // Key of whether to enable default columns
-  private static final String ENABLE_DEFAULT_COLUMNS = "enable.default.columns";
-
   // Key of how many parallel realtime segments can be built.
   // A value of <= 0 indicates unlimited.
   // Unlimited parallel builds can cause high GC pauses during segment builds, causing
@@ -68,6 +65,8 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
 
   // Key of whether to enable split commit
   private static final String ENABLE_SPLIT_COMMIT = "enable.split.commit";
+  // Key of whether to enable split commit end with segment metadata files.
+  private static final String ENABLE_SPLIT_COMMIT_END_WITH_METADATA = "enable.commitend.metadata";
 
   // Whether memory for realtime consuming segments should be allocated off-heap.
   private static final String REALTIME_OFFHEAP_ALLOCATION = "realtime.alloc.offheap";
@@ -154,13 +153,13 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   }
 
   @Override
-  public boolean isEnableDefaultColumns() {
-    return _instanceDataManagerConfiguration.getBoolean(ENABLE_DEFAULT_COLUMNS, false);
+  public boolean isEnableSplitCommit() {
+    return _instanceDataManagerConfiguration.getBoolean(ENABLE_SPLIT_COMMIT, false);
   }
 
   @Override
-  public boolean isEnableSplitCommit() {
-    return _instanceDataManagerConfiguration.getBoolean(ENABLE_SPLIT_COMMIT, false);
+  public boolean isEnableSplitCommitEndWithMetadata() {
+    return _instanceDataManagerConfiguration.getBoolean(ENABLE_SPLIT_COMMIT_END_WITH_METADATA, true);
   }
 
   @Override

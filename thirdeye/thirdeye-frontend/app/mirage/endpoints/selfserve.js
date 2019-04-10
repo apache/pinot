@@ -76,7 +76,7 @@ export default function (server) {
   /**
    * Returns the email config by id
    */
-  server.get('/thirdeye/email/function/:id', (schema, request) => {
+  server.get('/thirdeye/email/function/:id', () => {
     return [alertConfig[1]];
   });
 
@@ -160,7 +160,7 @@ export default function (server) {
   /**
    * Mocks a list of alerts, displayed in the /manage/alerts page
    */
-  server.get('/thirdeye/entity/ANOMALY_FUNCTION', (schema) => {
+  server.get('/yaml/list', (schema) => {
     return schema.alerts.all().models;
   });
 
@@ -215,9 +215,16 @@ export default function (server) {
   });
 
   /**
-   * get request for list yaml configs
+   * get request for detection config
    */
-  server.get('/yaml/list', () => {
+  server.get('/detection/:id', () => {
     return [];
-  })
+  });
+
+  /**
+   * get request for subscription groups of given alert
+   */
+  server.get('/detection/subscription-groups/:id', () => {
+    return [];
+  });
 }

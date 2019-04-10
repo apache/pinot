@@ -55,6 +55,7 @@ public class ControllerPeriodicTaskStarterTest extends ControllerTest {
     _mockControllerStarter = new MockControllerStarter(config);
     _mockControllerStarter.start();
     _helixResourceManager = _mockControllerStarter.getHelixResourceManager();
+    _helixManager = _mockControllerStarter.getHelixControllerManager();
   }
 
   @Override
@@ -65,7 +66,12 @@ public class ControllerPeriodicTaskStarterTest extends ControllerTest {
     _mockControllerStarter = null;
   }
 
-  private class MockControllerStarter extends ControllerStarter {
+  @Override
+  protected ControllerStarter getControllerStarter() {
+    return _mockControllerStarter;
+  }
+
+  private class MockControllerStarter extends TestOnlyControllerStarter {
 
     private static final int NUM_PERIODIC_TASKS = 7;
 

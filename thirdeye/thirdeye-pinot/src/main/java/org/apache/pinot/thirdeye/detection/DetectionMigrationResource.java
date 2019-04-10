@@ -20,7 +20,9 @@
 package org.apache.pinot.thirdeye.detection;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Multimap;
 import com.wordnik.swagger.annotations.Api;
 import com.wordnik.swagger.annotations.ApiOperation;
 import java.util.ArrayList;
@@ -45,6 +47,7 @@ import javax.xml.bind.ValidationException;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.thirdeye.anomaly.detection.AnomalyDetectionInputContextBuilder;
 import org.apache.pinot.thirdeye.api.Constants;
+import org.apache.pinot.thirdeye.common.dimension.DimensionMap;
 import org.apache.pinot.thirdeye.datalayer.bao.AlertConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import org.apache.pinot.thirdeye.datalayer.bao.ApplicationManager;
@@ -65,8 +68,8 @@ import org.apache.pinot.thirdeye.datalayer.util.Predicate;
 import org.apache.pinot.thirdeye.detection.alert.filter.ToAllRecipientsDetectionAlertFilter;
 import org.apache.pinot.thirdeye.detection.yaml.YamlDetectionAlertConfigTranslator;
 import org.apache.pinot.thirdeye.detection.yaml.YamlResource;
+import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
 import org.joda.time.Period;
-import org.omg.CORBA.OBJ_ADAPTER;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.DumperOptions;
@@ -129,7 +132,7 @@ public class DetectionMigrationResource {
   private Map<String, Object> translateAnomalyFunctionToYaml(AnomalyFunctionDTO anomalyFunctionDTO) {
     Map<String, Object> yamlConfigs = new LinkedHashMap<>();
     yamlConfigs.put("detectionName", anomalyFunctionDTO.getFunctionName());
-    yamlConfigs.put("description", "<Please edit and provide a description for this alert>");
+    yamlConfigs.put("description", "Please update description - If this alert fires then it means so-and-so and check so-and-so for irregularities");
     yamlConfigs.put("metric", anomalyFunctionDTO.getMetric());
     yamlConfigs.put("active", anomalyFunctionDTO.getIsActive());
     yamlConfigs.put("dataset", anomalyFunctionDTO.getCollection());
@@ -268,6 +271,9 @@ public class DetectionMigrationResource {
   }
 
   private String getBucketPeriod(AnomalyFunctionDTO functionDTO) {
+    if (functionDTO.getBucketUnit().equals(TimeUnit.DAYS)){
+      return Period.days(functionDTO.getBucketSize()).toString();
+    }
     return new Period(TimeUnit.MILLISECONDS.convert(functionDTO.getBucketSize(), functionDTO.getBucketUnit())).toString();
   }
 
@@ -364,6 +370,7 @@ public class DetectionMigrationResource {
       if (anomaly.getProperties() != null) {
         anomaly.getProperties().remove("anomalyTimelinesView");
       }
+      anomaly.setMetricUrn(buildMetricUrn(anomaly));
       anomaly.setDetectionConfigId(detectionConfig.getId());
       int affectedRows = mergedAnomalyResultDAO.update(anomaly);
       if (affectedRows == 0) {
@@ -386,6 +393,21 @@ public class DetectionMigrationResource {
         anomalyFunctionDTO.getFunctionName()));
     return detectionConfig.getId();
   }
+
+  private String buildMetricUrn(MergedAnomalyResultDTO anomaly) {
+    try {
+      DimensionMap dimensionMap = anomaly.getDimensions();
+      Multimap<String, String> filters = ArrayListMultimap.create();
+      for (DimensionMap.Entry<String, String> entry : dimensionMap.entrySet()) {
+        filters.put(entry.getKey(), entry.getValue());
+      }
+      MetricEntity me = MetricEntity.fromMetric(1.0, metricConfigDAO.findByMetricAndDataset(anomaly.getMetric(), anomaly.getCollection()).getId(), filters);
+      return me.getUrn();
+    } catch (Exception e) {
+      throw new RuntimeException("Resolve metric urn failed for anomaly " + anomaly.getId(), e);
+    }
+  }
+
 
   private void migrateLegacyNotification(AlertConfigDTO alertConfigDTO) {
     int anomalyFailureCount = 0;
@@ -525,6 +547,7 @@ public class DetectionMigrationResource {
   @GET
   @Produces(MediaType.TEXT_PLAIN)
   @Consumes(MediaType.APPLICATION_JSON)
+  @ApiOperation("migrate a function")
   @Path("/legacy-anomaly-function-to-yaml/{id}")
   public Response getYamlFromLegacyAnomalyFunction(@PathParam("id") long anomalyFunctionID) {
     AnomalyFunctionDTO anomalyFunctionDTO = this.anomalyFunctionDAO.findById(anomalyFunctionID);

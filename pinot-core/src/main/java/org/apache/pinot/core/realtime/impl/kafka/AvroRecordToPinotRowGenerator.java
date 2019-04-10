@@ -19,21 +19,19 @@
 package org.apache.pinot.core.realtime.impl.kafka;
 
 import com.google.common.base.Preconditions;
-import javax.annotation.Nonnull;
 import org.apache.avro.generic.GenericData;
-import org.apache.avro.generic.GenericData.Array;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.data.TimeFieldSpec;
 import org.apache.pinot.core.data.GenericRow;
-import org.apache.pinot.core.util.AvroUtils;
+import org.apache.pinot.core.data.readers.RecordReaderUtils;
 
 
 public class AvroRecordToPinotRowGenerator {
   private final Schema _schema;
   private final FieldSpec _incomingTimeFieldSpec;
 
-  public AvroRecordToPinotRowGenerator(@Nonnull Schema schema) {
+  public AvroRecordToPinotRowGenerator(Schema schema) {
     _schema = schema;
 
     // For time field, we use the incoming time field spec
@@ -42,20 +40,13 @@ public class AvroRecordToPinotRowGenerator {
     _incomingTimeFieldSpec = new TimeFieldSpec(timeFieldSpec.getIncomingGranularitySpec());
   }
 
-  @Nonnull
-  public GenericRow transform(@Nonnull GenericData.Record from, @Nonnull GenericRow to) {
+  public GenericRow transform(GenericData.Record from, GenericRow to) {
     for (FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
       FieldSpec incomingFieldSpec =
           fieldSpec.getFieldType() == FieldSpec.FieldType.TIME ? _incomingTimeFieldSpec : fieldSpec;
       String fieldName = incomingFieldSpec.getName();
-      Object avroValue = from.get(fieldName);
-      if (incomingFieldSpec.isSingleValueField()) {
-        to.putField(fieldName, AvroUtils.transformAvroValueToObject(avroValue, incomingFieldSpec));
-      } else {
-        to.putField(fieldName, AvroUtils.transformAvroArrayToObjectArray((Array) avroValue, incomingFieldSpec));
-      }
+      to.putField(fieldName, RecordReaderUtils.convert(incomingFieldSpec, from.get(fieldName)));
     }
-
     return to;
   }
 }

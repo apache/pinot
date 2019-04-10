@@ -27,6 +27,7 @@ import org.apache.pinot.core.data.GenericRow;
 import org.apache.pinot.core.data.readers.MultiplePinotSegmentRecordReader;
 import org.apache.pinot.core.data.readers.RecordReader;
 import org.apache.pinot.core.data.readers.RecordReaderUtils;
+import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 
 
 /**
@@ -51,6 +52,11 @@ public class MapperRecordReader implements RecordReader {
     _recordTransformer = recordTransformer;
     _totalNumPartition = totalNumPartition;
     _currentPartition = currentPartition;
+  }
+
+  @Override
+  public void init(SegmentGeneratorConfig segmentGeneratorConfig) {
+
   }
 
   @Override

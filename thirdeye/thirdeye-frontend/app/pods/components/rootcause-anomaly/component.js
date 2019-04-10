@@ -88,7 +88,6 @@ export default Component.extend({
     'anomalyRange',
     'anomaly',
     function () {
-      const anomaly = get(this, 'anomaly');
       const anomalyRange = get(this, 'anomalyRange');
       const start = get(this, 'anomaly').start;
       const end = get(this, 'anomaly').end;
@@ -186,6 +185,12 @@ export default Component.extend({
    * @type {float}
    */
   aggregateMultiplier: reads('anomaly.attributes.aggregateMultiplier.firstObject'),
+
+  /**
+   * Anomaly granularity
+   * @type {string}
+   */
+  metricGranularity: reads('anomaly.attributes.metricGranularity.firstObject'),
 
   /**
    * Anomaly unique identifier
@@ -353,23 +358,29 @@ export default Component.extend({
    * Checks if value at anomaly detection time and present differ by 1% or more
    * @type {Boolean}
    */
-  isWarning: computed('anomalyInfo', 'isRangeChanged', function () {
-    if(!get(this, 'isRangeChanged')) {
-      const oldCurrent = parseFloat(get(this, 'current'));
-      let newCurrent = this._getAggregate('current');
-      const aggregateMultiplier = parseFloat(get(this, 'aggregateMultiplier'));
-      if (newCurrent && oldCurrent && aggregateMultiplier){
-        newCurrent = newCurrent * aggregateMultiplier;
-        const diffCurrent = Math.abs((newCurrent-oldCurrent)/newCurrent);
-        if (diffCurrent > 0.01) {
-          set(this, 'warningValue', true);
-        } else {
-          set(this, 'warningValue', false);
+  isWarning: computed('anomalyInfo', 'isRangeChanged', 'metricGranularity',
+    function () {
+      // Don't show warning when granularity is 1 or 5 minutes, regardless of discrepancy
+      const metricGranularity = get(this, 'metricGranularity');
+      if (metricGranularity !== '1_DAYS') {
+        return false;
+      }
+      if(!get(this, 'isRangeChanged')) {
+        const oldCurrent = parseFloat(get(this, 'current'));
+        let newCurrent = this._getAggregate('current');
+        const aggregateMultiplier = parseFloat(get(this, 'aggregateMultiplier'));
+        if (newCurrent && oldCurrent && aggregateMultiplier){
+          newCurrent = newCurrent * aggregateMultiplier;
+          const diffCurrent = Math.abs((newCurrent-oldCurrent)/newCurrent);
+          if (diffCurrent > 0.01) {
+            set(this, 'warningValue', true);
+          } else {
+            set(this, 'warningValue', false);
+          }
         }
       }
-    }
-    return get(this, 'warningValue');
-  }),
+      return get(this, 'warningValue');
+    }),
 
   /**
    * grabs value of new current only when warningValue is toggled

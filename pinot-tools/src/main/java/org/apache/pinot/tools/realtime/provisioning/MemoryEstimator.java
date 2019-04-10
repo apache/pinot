@@ -36,6 +36,7 @@ import org.apache.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
 import org.apache.pinot.core.io.writer.impl.DirectMemoryManager;
 import org.apache.pinot.core.realtime.impl.RealtimeSegmentConfig;
 import org.apache.pinot.core.realtime.impl.RealtimeSegmentStatsHistory;
+import org.apache.pinot.core.realtime.stream.StreamMessageMetadata;
 import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
 
 
@@ -44,15 +45,15 @@ import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
  */
 public class MemoryEstimator {
 
-  private static final long MAX_MEMORY_BYTES = DataSize.toBytes("48G");
   private static final String NOT_APPLICABLE = "NA";
   private static final String TMP_DIR = System.getProperty("java.io.tmpdir") + File.separator;
   private static final String STATS_FILE_NAME = "stats.ser";
   private static final String STATS_FILE_COPY_NAME = "stats.copy.ser";
 
-  private TableConfig _tableConfig;
-  private File _sampleCompletedSegment;
-  private long _sampleSegmentConsumedSeconds;
+  private final TableConfig _tableConfig;
+  private final File _sampleCompletedSegment;
+  private final long _sampleSegmentConsumedSeconds;
+  private final long _maxUsableHostMemory;
 
   private SegmentMetadataImpl _segmentMetadata;
   private long _sampleCompletedSegmentSizeBytes;
@@ -65,7 +66,8 @@ public class MemoryEstimator {
   private String[][] _optimalSegmentSize;
   private String[][] _consumingMemoryPerHost;
 
-  public MemoryEstimator(TableConfig tableConfig, File sampleCompletedSegment, long sampleSegmentConsumedSeconds) {
+  public MemoryEstimator(TableConfig tableConfig, File sampleCompletedSegment, long sampleSegmentConsumedSeconds, long maxUsableHostMemory) {
+    _maxUsableHostMemory = maxUsableHostMemory;
     _tableConfig = tableConfig;
     _sampleCompletedSegment = sampleCompletedSegment;
     _sampleSegmentConsumedSeconds = sampleSegmentConsumedSeconds;
@@ -127,12 +129,15 @@ public class MemoryEstimator {
     // create mutable segment impl
     MutableSegmentImpl mutableSegmentImpl = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build());
 
+    StreamMessageMetadata messageMetadata = new StreamMessageMetadata();
     // read all rows and index them
     try (PinotSegmentRecordReader segmentRecordReader = new PinotSegmentRecordReader(_sampleCompletedSegment);) {
       GenericRow row = new GenericRow();
       while (segmentRecordReader.hasNext()) {
+        messageMetadata.reset();
+
         segmentRecordReader.next(row);
-        mutableSegmentImpl.index(row);
+        mutableSegmentImpl.index(row, messageMetadata);
         row.clear();
       }
     } catch (Exception e) {
@@ -242,7 +247,7 @@ public class MemoryEstimator {
             memoryForConsumingSegmentPerPartition * totalConsumingPartitionsPerHost;
         long totalMemoryPerHostBytes = totalMemoryForCompletedSegmentsPerHost + totalMemoryForConsumingSegmentsPerHost;
 
-        if (totalMemoryPerHostBytes > MAX_MEMORY_BYTES) {
+        if (totalMemoryPerHostBytes > _maxUsableHostMemory) {
           _totalMemoryPerHost[i][j] = NOT_APPLICABLE;
           _consumingMemoryPerHost[i][j] = NOT_APPLICABLE;
           _optimalSegmentSize[i][j] = NOT_APPLICABLE;

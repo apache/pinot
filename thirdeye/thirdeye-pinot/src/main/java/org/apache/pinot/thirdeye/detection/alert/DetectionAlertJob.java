@@ -21,11 +21,13 @@ package org.apache.pinot.thirdeye.detection.alert;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.List;
 import org.apache.pinot.thirdeye.anomaly.task.TaskConstants;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionAlertConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.TaskManager;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.TaskDTO;
+import org.apache.pinot.thirdeye.datalayer.util.Predicate;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.quartz.Job;
 import org.quartz.JobExecutionContext;
@@ -51,15 +53,30 @@ public class DetectionAlertJob implements Job {
 
   @Override
   public void execute(JobExecutionContext jobExecutionContext) throws JobExecutionException {
-    LOG.info("Running " + jobExecutionContext.getJobDetail().getKey().toString());
+    LOG.debug("Running " + jobExecutionContext.getJobDetail().getKey().getName());
     String jobKey = jobExecutionContext.getJobDetail().getKey().getName();
     long detectionAlertConfigId = getIdFromJobKey(jobKey);
     DetectionAlertConfigDTO configDTO = alertConfigDAO.findById(detectionAlertConfigId);
     if (configDTO == null) {
-      LOG.error("Alert config with id {} does not exist", detectionAlertConfigId);
+      LOG.error("Subscription config {} does not exist", detectionAlertConfigId);
     }
 
     DetectionAlertTaskInfo taskInfo = new DetectionAlertTaskInfo(detectionAlertConfigId);
+
+    // check if a task for this detection alerter is already scheduled
+    String jobName = String.format("%s_%d", TaskConstants.TaskType.DETECTION_ALERT, detectionAlertConfigId);
+    List<TaskDTO> scheduledTasks = taskDAO.findByPredicate(Predicate.AND(
+        Predicate.EQ("name", jobName),
+        Predicate.OR(
+            Predicate.EQ("status", TaskConstants.TaskStatus.RUNNING.toString()),
+            Predicate.EQ("status", TaskConstants.TaskStatus.WAITING.toString())
+        ))
+    );
+    if (!scheduledTasks.isEmpty()){
+      // if a task is pending and not time out yet, don't schedule more
+      LOG.info("Skip scheduling subscription task {}. Already queued.", jobName);
+      return;
+    }
 
     String taskInfoJson = null;
     try {
@@ -70,12 +87,12 @@ public class DetectionAlertJob implements Job {
 
     TaskDTO taskDTO = new TaskDTO();
     taskDTO.setTaskType(TaskConstants.TaskType.DETECTION_ALERT);
-    taskDTO.setJobName(String.format("%s_%d", TaskConstants.TaskType.DETECTION_ALERT, detectionAlertConfigId));
+    taskDTO.setJobName(jobName);
     taskDTO.setStatus(TaskConstants.TaskStatus.WAITING);
     taskDTO.setTaskInfo(taskInfoJson);
 
     long taskId = taskDAO.save(taskDTO);
-    LOG.info("Created detection pipeline task {} with taskId {}", taskDTO, taskId);
+    LOG.info("Created subscription task {} with settings {}", taskId, taskDTO);
   }
 
   private Long getIdFromJobKey(String jobKey) {

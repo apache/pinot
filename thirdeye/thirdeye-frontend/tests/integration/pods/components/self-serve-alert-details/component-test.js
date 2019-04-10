@@ -9,7 +9,7 @@ module('Integration | Component | self serve alert details', function(hooks) {
 
   test('it renders', async function(assert) {
     this.set('alerts', [server.createList('alert', 1)[0].attrs][0]);
-    const actualPropNames = ["Metric", "Dataset", "Granularity", "Application", "Alert Owner", "Data Filter", "Dimensions", "Detection Type", "Subscription Group"];
+    const actualPropNames = ["Metric", "Dataset", "Granularity", "Application", "Created By", "Filtered By", "Breakdown By", "Detection Type", "Subscription Group"];
     const headerSel = '.te-search-results__header .te-search-results__tag';
     const propTitleSel = '.te-search-results__row .te-search-results__option';
     const titleSel = '.te-search-results__title span';

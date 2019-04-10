@@ -22,14 +22,25 @@ import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
+import java.nio.file.Paths;
 import org.apache.commons.configuration.Configuration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
- * The PinotFS is intended to be a thin wrapper on top of different filesystems. This interface is intended for internal
- * Pinot use only. This class will be implemented for each pluggable storage type.
+ * PinotFS is a restricted FS API that exposes functionality that is required for Pinot to use
+ * different FS implementations. The restrictions are in place due to 2 driving factors:
+ * 1. Prevent unexpected performance hit when a broader API is implemented - especially, we would like
+ *    to reduce calls to remote filesystems that might be needed for a broader API,
+ *    but not necessarily required by Pinot (see the documentation for move() method below).
+ * 2. Provide an interface that is simple to be implemented across different FS types.
+ *    The contract that developers have to adhere to will be simpler.
+ * Please read the method level docs carefully to note the exceptions while using the APIs.
  */
 public abstract class PinotFS implements Closeable {
+  private static final Logger LOGGER = LoggerFactory.getLogger(PinotFS.class);
+
   /**
    * Initializes the configurations specific to that filesystem. For instance, any security related parameters can be
    * initialized here and will not be logged.
@@ -58,31 +69,54 @@ public abstract class PinotFS implements Closeable {
   /**
    * Moves the file or directory from the src to dst. Does not keep the original file. If the dst has parent directories
    * that haven't been created, this method will create all the necessary parent directories.
-   * If both src and dst are files, dst will be overwritten.
-   * If src is a file and dst is a directory, src file will get moved under dst directory.
-   * If both src and dst are directories, src directory will get moved under dst directory.
-   * If src is a directory and dst is a file, operation will fail.
+   * Note: In Pinot we recommend the full paths of both src and dst be specified.
    * For example, if a file /a/b/c is moved to a file /x/y/z, in the case of overwrite, the directory /a/b still exists,
    * but will not contain the file 'c'. Instead, /x/y/z will contain the contents of 'c'.
-   * If a file /a is moved to a directory /x/y, all the original files under /x/y will be kept.
+   * If src is a directory /a/b which contains two files /a/b/c and /a/b/d, and the dst is /x/y, the result would be
+   * that the directory /a/b under /a gets removed and dst directory contains two files which is /x/y/c and /x/y/d.
+   * If src is a directory /a/b needs to be moved under another directory /x/y, please specify the dst to /x/y/b.
    * @param srcUri URI of the original file
    * @param dstUri URI of the final file location
    * @param overwrite true if we want to overwrite the dstURI, false otherwise
    * @return true if move is successful
    * @throws IOException on IO failure
    */
-  public abstract boolean move(URI srcUri, URI dstUri, boolean overwrite)
+  public boolean move(URI srcUri, URI dstUri, boolean overwrite)
+      throws IOException {
+    if (!exists(srcUri)) {
+      LOGGER.warn("Source {} does not exist", srcUri);
+      return false;
+    }
+    if (exists(dstUri)) {
+      if (overwrite) {
+        delete(dstUri, true);
+      } else {
+        // dst file exists, returning
+        LOGGER.warn("Cannot move {} to {}. Destination exists and overwrite flag set to false.", srcUri, dstUri);
+        return false;
+      }
+    } else {
+      // ensures the parent path of dst exists.
+      URI parentUri = Paths.get(dstUri).getParent().toUri();
+      mkdir(parentUri);
+    }
+    return doMove(srcUri, dstUri);
+  }
+
+  /**
+   * Does the actual behavior of move in each FS.
+   */
+  protected abstract boolean doMove(URI srcUri, URI dstUri)
       throws IOException;
 
   /**
    * Copies the file or directory from the src to dst. The original file is retained. If the dst has parent directories
    * that haven't been created, this method will create all the necessary parent directories.
-   * If both src and dst are files, dst will be overwritten.
-   * If src is a file and dst is a directory, src file will get copied under dst directory.
-   * If both src and dst are directories, src directory will get copied under dst directory.
-   * If src is a directory and dst is a file, operation will fail.
-   * For example, if a file /x/y/z is copied to /a/b/c, /x/y/z will be retained and /x/y/z will also be present as /a/b/c;
-   * if a file /a is copied to a directory /x/y, all the original files under /x/y will be kept.
+   * Note: In Pinot we recommend the full paths of both src and dst be specified.
+   * For example, if a file /a/b/c is copied to a file /x/y/z, the directory /a/b still exists containing the file 'c'.
+   * The dst file /x/y/z will contain the contents of 'c'.
+   * If a directory /a/b is copied to another directory /x/y, the directory /x/y will contain the content of /a/b.
+   * If a directory /a/b is copied under the directory /x/y, the dst needs to be specify as /x/y/b.
    * @param srcUri URI of the original file
    * @param dstUri URI of the final file location
    * @return true if copy is successful

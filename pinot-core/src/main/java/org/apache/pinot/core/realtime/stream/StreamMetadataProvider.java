@@ -20,11 +20,15 @@ package org.apache.pinot.core.realtime.stream;
 
 import java.io.Closeable;
 import javax.annotation.Nonnull;
+import org.apache.pinot.annotations.InterfaceAudience;
+import org.apache.pinot.annotations.InterfaceStability;
 
 
 /**
  * Interface for provider of stream metadata such as partition count, partition offsets
  */
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public interface StreamMetadataProvider extends Closeable {
   /**
    * Fetches the number of partitions for a topic given the stream configs

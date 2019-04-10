@@ -28,6 +28,7 @@ import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
@@ -130,7 +131,7 @@ public class PinotTableRestletResource {
       } else if (e instanceof PinotHelixResourceManager.TableAlreadyExistsException) {
         throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.CONFLICT, e);
       } else {
-        throw e;
+        throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
       }
     }
   }
@@ -172,14 +173,14 @@ public class PinotTableRestletResource {
           && _pinotHelixResourceManager.hasOfflineTable(tableName)) {
         TableConfig tableConfig = _pinotHelixResourceManager.getOfflineTableConfig(tableName);
         Preconditions.checkNotNull(tableConfig);
-        ret.set(CommonConstants.Helix.TableType.OFFLINE.name(), TableConfig.toJSONConfig(tableConfig));
+        ret.set(CommonConstants.Helix.TableType.OFFLINE.name(), tableConfig.toJsonConfig());
       }
 
       if ((tableTypeStr == null || CommonConstants.Helix.TableType.REALTIME.name().equalsIgnoreCase(tableTypeStr))
           && _pinotHelixResourceManager.hasRealtimeTable(tableName)) {
         TableConfig tableConfig = _pinotHelixResourceManager.getRealtimeTableConfig(tableName);
         Preconditions.checkNotNull(tableConfig);
-        ret.set(CommonConstants.Helix.TableType.REALTIME.name(), TableConfig.toJSONConfig(tableConfig));
+        ret.set(CommonConstants.Helix.TableType.REALTIME.name(), tableConfig.toJsonConfig());
       }
       return ret.toString();
     } catch (Exception e) {
@@ -325,11 +326,9 @@ public class PinotTableRestletResource {
       ObjectNode tableConfigValidateStr = JsonUtils.newObjectNode();
       TableConfig tableConfig = TableConfig.fromJsonString(tableConfigStr);
       if (tableConfig.getTableType() == CommonConstants.Helix.TableType.OFFLINE) {
-        tableConfigValidateStr
-            .set(CommonConstants.Helix.TableType.OFFLINE.name(), TableConfig.toJSONConfig(tableConfig));
+        tableConfigValidateStr.set(CommonConstants.Helix.TableType.OFFLINE.name(), tableConfig.toJsonConfig());
       } else {
-        tableConfigValidateStr
-            .set(CommonConstants.Helix.TableType.REALTIME.name(), TableConfig.toJSONConfig(tableConfig));
+        tableConfigValidateStr.set(CommonConstants.Helix.TableType.REALTIME.name(), tableConfig.toJsonConfig());
       }
       return tableConfigValidateStr.toString();
     } catch (Exception e) {
@@ -444,9 +443,9 @@ public class PinotTableRestletResource {
               existingTimeColumnName, newTimeColumnName));
     }
 
-    String newTimeColumnType = newSegmentConfig.getTimeType();
-    String existingTimeColumnType = SegmentConfigToCompare.getTimeType();
-    if (!existingTimeColumnType.equalsIgnoreCase(newTimeColumnType)) {
+    TimeUnit existingTimeColumnType = SegmentConfigToCompare.getTimeType();
+    TimeUnit newTimeColumnType = newSegmentConfig.getTimeType();
+    if (existingTimeColumnType != newTimeColumnType) {
       throw new PinotHelixResourceManager.InvalidTableConfigException(String
           .format("Time column types are different! Existing time column type: %s. New time column type: %s",
               existingTimeColumnType, newTimeColumnType));

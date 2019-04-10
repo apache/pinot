@@ -66,7 +66,7 @@ import org.slf4j.LoggerFactory;
 public class MetricAnalysisPipeline extends Pipeline {
   private static final Logger LOG = LoggerFactory.getLogger(MetricAnalysisPipeline.class);
 
-  private static final long TIMEOUT = 60000;
+  private static final long TIMEOUT = 1200000;
 
   private static final long TRAINING_OFFSET = TimeUnit.DAYS.toMillis(7);
 

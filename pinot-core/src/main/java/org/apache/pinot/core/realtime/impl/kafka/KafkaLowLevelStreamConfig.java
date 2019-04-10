@@ -30,10 +30,12 @@ import org.apache.pinot.core.realtime.stream.StreamConfig;
  */
 public class KafkaLowLevelStreamConfig {
 
-  private String _kafkaTopicName;
-  private String _bootstrapHosts;
-  private int _kafkaBufferSize;
-  private int _kafkaSocketTimeout;
+  private final String _kafkaTopicName;
+  private final String _bootstrapHosts;
+  private final int _kafkaBufferSize;
+  private final int _kafkaSocketTimeout;
+  private final int _kafkaFetcherSizeBytes;
+  private final int _kafkaFetcherMinBytes;
 
   /**
    * Builds a wrapper around {@link StreamConfig} to fetch kafka partition level consumer related configs
@@ -50,11 +52,18 @@ public class KafkaLowLevelStreamConfig {
         .constructStreamProperty(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_BUFFER_SIZE);
     String llcTimeoutKey = KafkaStreamConfigProperties
         .constructStreamProperty(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_SOCKET_TIMEOUT);
+    String fetcherSizeKey = KafkaStreamConfigProperties
+        .constructStreamProperty(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_FETCHER_SIZE_BYTES);
+    String fetcherMinBytesKey = KafkaStreamConfigProperties
+        .constructStreamProperty(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_FETCHER_MIN_BYTES);
     _bootstrapHosts = streamConfigMap.get(llcBrokerListKey);
     _kafkaBufferSize = getIntConfigWithDefault(streamConfigMap, llcBufferKey,
         KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_BUFFER_SIZE_DEFAULT);
     _kafkaSocketTimeout = getIntConfigWithDefault(streamConfigMap, llcTimeoutKey,
         KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_SOCKET_TIMEOUT_DEFAULT);
+    _kafkaFetcherSizeBytes = getIntConfigWithDefault(streamConfigMap, fetcherSizeKey, _kafkaBufferSize);
+    _kafkaFetcherMinBytes = getIntConfigWithDefault(streamConfigMap, fetcherMinBytesKey,
+        KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_FETCHER_MIN_BYTES_DEFAULT);
     Preconditions.checkNotNull(_bootstrapHosts,
         "Must specify kafka brokers list " + llcBrokerListKey + " in case of low level kafka consumer");
   }
@@ -75,6 +84,14 @@ public class KafkaLowLevelStreamConfig {
     return _kafkaSocketTimeout;
   }
 
+  public int getKafkaFetcherSizeBytes() {
+    return _kafkaFetcherSizeBytes;
+  }
+
+  public int getKafkaFetcherMinBytes() {
+    return _kafkaFetcherMinBytes;
+  }
+
   private int getIntConfigWithDefault(Map<String, String> configMap, String key, int defaultValue) {
     String stringValue = configMap.get(key);
     try {
@@ -91,7 +108,8 @@ public class KafkaLowLevelStreamConfig {
   public String toString() {
     return "KafkaLowLevelStreamConfig{" + "_kafkaTopicName='" + _kafkaTopicName + '\'' + ", _bootstrapHosts='"
         + _bootstrapHosts + '\'' + ", _kafkaBufferSize='" + _kafkaBufferSize + '\'' + ", _kafkaSocketTimeout='"
-        + _kafkaSocketTimeout + '\'' + '}';
+        + _kafkaSocketTimeout + '\'' + ", _kafkaFetcherSizeBytes='" + _kafkaFetcherSizeBytes + '\'' + ", _kafkaFetcherMinBytes='"
+        + _kafkaFetcherMinBytes + '\'' + '}';
   }
 
   @Override
@@ -109,7 +127,9 @@ public class KafkaLowLevelStreamConfig {
     return EqualityUtils.isEqual(_kafkaTopicName, that._kafkaTopicName) && EqualityUtils
         .isEqual(_bootstrapHosts, that._bootstrapHosts) && EqualityUtils
         .isEqual(_kafkaBufferSize, that._kafkaBufferSize) && EqualityUtils
-        .isEqual(_kafkaSocketTimeout, that._kafkaSocketTimeout);
+        .isEqual(_kafkaSocketTimeout, that._kafkaSocketTimeout) && EqualityUtils
+        .isEqual(_kafkaFetcherSizeBytes, that._kafkaFetcherSizeBytes) && EqualityUtils
+        .isEqual(_kafkaFetcherMinBytes, that._kafkaFetcherMinBytes);
   }
 
   @Override
@@ -118,6 +138,8 @@ public class KafkaLowLevelStreamConfig {
     result = EqualityUtils.hashCodeOf(result, _bootstrapHosts);
     result = EqualityUtils.hashCodeOf(result, _kafkaBufferSize);
     result = EqualityUtils.hashCodeOf(result, _kafkaSocketTimeout);
+    result = EqualityUtils.hashCodeOf(result, _kafkaFetcherSizeBytes);
+    result = EqualityUtils.hashCodeOf(result, _kafkaFetcherMinBytes);
     return result;
   }
 }

@@ -27,14 +27,10 @@ import com.wordnik.swagger.annotations.ApiParam;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
@@ -45,18 +41,13 @@ import javax.ws.rs.core.MediaType;
 import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.thirdeye.api.Constants;
 import org.apache.pinot.thirdeye.constant.AnomalyFeedbackType;
-import org.apache.pinot.thirdeye.constant.AnomalyResultSource;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.ResourceUtils;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.pojo.AnomalySummary;
-import org.apache.pinot.thirdeye.datalayer.bao.AlertConfigManager;
-import org.apache.pinot.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionAlertConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
-import org.apache.pinot.thirdeye.datalayer.dto.AlertConfigDTO;
-import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
@@ -64,13 +55,10 @@ import org.apache.pinot.thirdeye.datalayer.util.Predicate;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
 import org.apache.pinot.thirdeye.datasource.loader.AggregationLoader;
 import org.apache.pinot.thirdeye.datasource.loader.DefaultAggregationLoader;
-import org.apache.pinot.thirdeye.detection.ConfigUtils;
 import org.apache.pinot.thirdeye.detection.CurrentAndBaselineLoader;
 import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.pinot.thirdeye.detection.yaml.YamlDetectionAlertConfigTranslator.*;
 
 
 /**
@@ -85,31 +73,20 @@ public class UserDashboardResource {
   private static final int ANOMALIES_LIMIT_DEFAULT = 500;
 
   private final MergedAnomalyResultManager anomalyDAO;
-  private final AnomalyFunctionManager functionDAO;
-  private final AlertConfigManager alertDAO;
   private final MetricConfigManager metricDAO;
   private final DatasetConfigManager datasetDAO;
   private final DetectionConfigManager detectionDAO;
   private final DetectionAlertConfigManager detectionAlertDAO;
-  private final AggregationLoader aggregationLoader;
-  private final CurrentAndBaselineLoader currentAndBaselineLoader;
 
 
-  public UserDashboardResource(MergedAnomalyResultManager anomalyDAO, AnomalyFunctionManager functionDAO,
-      MetricConfigManager metricDAO, DatasetConfigManager datasetDAO, AlertConfigManager alertDAO,
-      DetectionConfigManager detectionDAO, DetectionAlertConfigManager detectionAlertDAO) {
+  public UserDashboardResource(MergedAnomalyResultManager anomalyDAO, MetricConfigManager metricDAO,
+      DatasetConfigManager datasetDAO, DetectionConfigManager detectionDAO,
+      DetectionAlertConfigManager detectionAlertDAO) {
     this.anomalyDAO = anomalyDAO;
-    this.functionDAO = functionDAO;
     this.metricDAO = metricDAO;
     this.datasetDAO = datasetDAO;
-    this.alertDAO = alertDAO;
     this.detectionDAO = detectionDAO;
     this.detectionAlertDAO = detectionAlertDAO;
-
-    this.aggregationLoader =
-        new DefaultAggregationLoader(this.metricDAO, this.datasetDAO, ThirdEyeCacheRegistry.getInstance().getQueryCache(),
-            ThirdEyeCacheRegistry.getInstance().getDatasetMaxDataTimeCache());
-    this.currentAndBaselineLoader = new CurrentAndBaselineLoader(this.metricDAO, this.datasetDAO, this.aggregationLoader);
   }
 
   /**
@@ -142,7 +119,6 @@ public class UserDashboardResource {
    *
    * @param start window start time
    * @param end window end time (optional)
-   * @param owner anomaly function owner only (optional)
    * @param application anomaly function for application alert groups only (optional)
    *
    * @return List of AnomalySummary
@@ -155,8 +131,6 @@ public class UserDashboardResource {
       @QueryParam("start") Long start,
       @ApiParam(value = "end time of anomaly retrieval window")
       @QueryParam("end") Long end,
-      @ApiParam(value = "alert owner")
-      @QueryParam("owner") String owner,
       @ApiParam(value = "alert application/product/team")
       @QueryParam("application") String application,
       @ApiParam(value = "subscription group")
@@ -170,7 +144,7 @@ public class UserDashboardResource {
       @ApiParam(value = "max number of results")
       @QueryParam("limit") Integer limit) throws Exception {
     LOG.info("[USER DASHBOARD] Fetching anomalies with filters. Start: " + start + " end: " + end + " metric: "
-        + metric + " dataset: " + dataset + " owner: " + owner + " application: " + application + " group: " + group
+        + metric + " dataset: " + dataset + " application: " + application + " group: " + group
         + " fetchTrueAnomaly: " + fetchTrueAnomaly + " limit: " + limit);
 
     // Safety conditions
@@ -187,7 +161,6 @@ public class UserDashboardResource {
 
     // TODO: Prefer to have intersection of anomalies rather than union
     List<MergedAnomalyResultDTO> anomalies = new ArrayList<>();
-    anomalies.addAll(fetchLegacyAnomaliesByFunctionId(start, end, group, application, owner));
     // Fetch anomalies by group
     anomalies.addAll(fetchAnomaliesBySubsGroup(start, end, group));
     // Fetch anomalies by application
@@ -196,12 +169,7 @@ public class UserDashboardResource {
     anomalies.addAll(fetchAnomaliesByMetricDataset(start, end, metric, dataset));
 
     // sort descending by start time
-    Collections.sort(anomalies, new Comparator<MergedAnomalyResultDTO>() {
-      @Override
-      public int compare(MergedAnomalyResultDTO o1, MergedAnomalyResultDTO o2) {
-        return -1 * Long.compare(o1.getStartTime(), o2.getStartTime());
-      }
-    });
+    Collections.sort(anomalies, (o1, o2) -> -1 * Long.compare(o1.getStartTime(), o2.getStartTime()));
 
     if (fetchTrueAnomaly) {
       // Filter and retain only true anomalies
@@ -213,7 +181,8 @@ public class UserDashboardResource {
       }
       anomalies = trueAnomalies;
     }
-
+    // filter child anomalies
+    anomalies = anomalies.stream().filter(anomaly -> !anomaly.isChild()).collect(Collectors.toList());
     // limit result size
     anomalies = anomalies.subList(0, Math.min(anomalies.size(), limit));
 
@@ -226,19 +195,6 @@ public class UserDashboardResource {
   private List<AnomalySummary> getAnomalyFormattedOutput(List<MergedAnomalyResultDTO> anomalies) {
     List<AnomalySummary> output = new ArrayList<>();
 
-    // fetch functions & build function id to function object mapping
-    Set<Long> anomalyFunctionIds = new HashSet<>();
-    for (MergedAnomalyResultDTO anomaly : anomalies) {
-      if (anomaly.getFunctionId() != null) {
-        anomalyFunctionIds.add(anomaly.getFunctionId());
-      }
-    }
-    List<AnomalyFunctionDTO> functions = this.functionDAO.findByPredicate(Predicate.IN("baseId", anomalyFunctionIds.toArray()));
-    Map<Long, AnomalyFunctionDTO> id2function = new HashMap<>();
-    for (AnomalyFunctionDTO function : functions) {
-      id2function.put(function.getId(), function);
-    }
-
     for (MergedAnomalyResultDTO anomaly : anomalies) {
       long metricId = this.getMetricId(anomaly);
 
@@ -248,14 +204,6 @@ public class UserDashboardResource {
       summary.setEnd(anomaly.getEndTime());
       summary.setCurrent(anomaly.getAvgCurrentVal());
       summary.setBaseline(anomaly.getAvgBaselineVal());
-
-      summary.setFunctionId(-1);
-      if (anomaly.getFunctionId() != null) {
-        summary.setFunctionId(anomaly.getFunctionId());
-        if (id2function.get(anomaly.getFunctionId()) != null) {
-          summary.setFunctionName(id2function.get(anomaly.getFunctionId()).getFunctionName());
-        }
-      }
 
       summary.setDetectionConfigId(-1);
       if (anomaly.getDetectionConfigId() != null) {
@@ -292,95 +240,6 @@ public class UserDashboardResource {
     }
 
     return output;
-  }
-
-  @Deprecated
-  private Collection<MergedAnomalyResultDTO> fetchLegacyAnomaliesByFunctionId(Long start, Long end, String group, String application, String owner) {
-    // Find functionIds which belong to application, subscription group and owner.
-    List<Predicate> predicates = new ArrayList<>();
-    Set<Long> functionIds = new HashSet<>();
-
-    // application (indirect)
-    if (StringUtils.isNotBlank(application)) {
-      List<AnomalyFunctionDTO> functions = this.functionDAO.findAllByApplication(application);
-      for (AnomalyFunctionDTO function : functions) {
-        if (function.getIsActive()) {
-          functionIds.add(function.getId());
-        }
-      }
-    }
-    // Support for partially migrated alerts.
-    List<DetectionAlertConfigDTO> notifications = detectionAlertDAO.findByPredicate(Predicate.EQ("application", application));
-    for (DetectionAlertConfigDTO notification : notifications) {
-      for (long id : ConfigUtils.getLongs(notification.getProperties().get(PROP_DETECTION_CONFIG_IDS))) {
-        AnomalyFunctionDTO function = this.functionDAO.findById(id);
-        if (function != null && function.getIsActive()) {
-          functionIds.add(id);
-        }
-      }
-    }
-
-    // group (indirect)
-    Set<Long> groupFunctionIds = new HashSet<>();
-    if (StringUtils.isNotBlank(group)) {
-      AlertConfigDTO alert = this.alertDAO.findWhereNameEquals(group);
-      if (alert != null) {
-        for (long id : alert.getEmailConfig().getFunctionIds()) {
-          AnomalyFunctionDTO function = this.functionDAO.findById(id);
-          if (function != null && function.getIsActive()) {
-            groupFunctionIds.add(id);
-          }
-        }
-      }
-    }
-    if (!groupFunctionIds.isEmpty()) {
-      if (functionIds.isEmpty()) {
-        functionIds = groupFunctionIds;
-      } else {
-        functionIds.retainAll(groupFunctionIds);
-      }
-    }
-
-    // owner (indirect)
-    Set<Long> ownerFunctionIds = new HashSet<>();
-    if (StringUtils.isNotBlank(owner)) {
-      // TODO: replace database scan with targeted select
-      List<AnomalyFunctionDTO> functions = this.functionDAO.findAll();
-      for (AnomalyFunctionDTO function : functions) {
-        if (function.getIsActive() && Objects.equals(function.getCreatedBy(), owner)) {
-          ownerFunctionIds.add(function.getId());
-        }
-      }
-    }
-    if (!ownerFunctionIds.isEmpty()) {
-      if (functionIds.isEmpty()) {
-        functionIds = ownerFunctionIds;
-      } else {
-        functionIds.retainAll(ownerFunctionIds);
-      }
-    }
-
-    // Predicate on start time end time and function Id.
-    predicates.add(Predicate.IN("functionId", functionIds.toArray()));
-    predicates.add(Predicate.GE("endTime", start));
-    if (end != null) {
-      predicates.add(Predicate.LT("startTime", end));
-    }
-
-    // Fetch legacy anomalies via predicates
-    List<MergedAnomalyResultDTO> anomalies = this.anomalyDAO.findByPredicate(Predicate.AND(predicates.toArray(new Predicate[predicates.size()])));
-    // filter (un-notified && non-user-reported) anomalies
-    // TODO remove once index select on user-reported anomalies available
-    Iterator<MergedAnomalyResultDTO> itAnomaly = anomalies.iterator();
-    while (itAnomaly.hasNext()) {
-      MergedAnomalyResultDTO anomaly = itAnomaly.next();
-      if (!anomaly.isNotified() &&
-          !AnomalyResultSource.USER_LABELED_ANOMALY.equals(anomaly.getAnomalyResultSource())) {
-        itAnomaly.remove();
-      }
-    }
-
-    return anomalies;
   }
 
   private Collection<MergedAnomalyResultDTO> fetchAnomaliesByMetricDataset(Long start, Long end, String metric, String dataset) {
@@ -464,8 +323,6 @@ public class UserDashboardResource {
         return !mergedAnomalyResultDTO.isChild();
       }
     });
-
-    this.currentAndBaselineLoader.fillInCurrentAndBaselineValue(anomalies);
 
     return anomalies;
   }

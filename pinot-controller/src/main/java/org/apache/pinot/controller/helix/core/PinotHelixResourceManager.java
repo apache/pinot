@@ -46,6 +46,7 @@ import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixException;
 import org.apache.helix.HelixManager;
+import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.InstanceType;
 import org.apache.helix.PropertyKey;
 import org.apache.helix.PropertyKey.Builder;
@@ -103,7 +104,6 @@ import org.apache.pinot.controller.helix.core.rebalance.RebalanceSegmentStrategy
 import org.apache.pinot.controller.helix.core.sharding.SegmentAssignmentStrategy;
 import org.apache.pinot.controller.helix.core.sharding.SegmentAssignmentStrategyEnum;
 import org.apache.pinot.controller.helix.core.sharding.SegmentAssignmentStrategyFactory;
-import org.apache.pinot.controller.helix.core.util.HelixSetupUtils;
 import org.apache.pinot.controller.helix.core.util.ZKMetadataUtils;
 import org.apache.pinot.controller.helix.starter.HelixConfig;
 import org.apache.pinot.core.realtime.stream.StreamConfig;
@@ -128,7 +128,6 @@ public class PinotHelixResourceManager {
   private final String _dataDir;
   private final long _externalViewOnlineToOfflineTimeoutMillis;
   private final boolean _isSingleTenantCluster;
-  private final boolean _isUpdateStateModel;
   private final boolean _enableBatchMessageMode;
 
   private HelixManager _helixZkManager;
@@ -142,37 +141,34 @@ public class PinotHelixResourceManager {
 
   public PinotHelixResourceManager(@Nonnull String zkURL, @Nonnull String helixClusterName,
       @Nonnull String controllerInstanceId, String dataDir, long externalViewOnlineToOfflineTimeoutMillis,
-      boolean isSingleTenantCluster, boolean isUpdateStateModel, boolean enableBatchMessageMode) {
+      boolean isSingleTenantCluster, boolean enableBatchMessageMode) {
     _helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(zkURL);
     _helixClusterName = helixClusterName;
     _instanceId = controllerInstanceId;
     _dataDir = dataDir;
     _externalViewOnlineToOfflineTimeoutMillis = externalViewOnlineToOfflineTimeoutMillis;
     _isSingleTenantCluster = isSingleTenantCluster;
-    _isUpdateStateModel = isUpdateStateModel;
     _enableBatchMessageMode = enableBatchMessageMode;
   }
 
   public PinotHelixResourceManager(@Nonnull String zkURL, @Nonnull String helixClusterName,
       @Nonnull String controllerInstanceId, @Nonnull String dataDir) {
     this(zkURL, helixClusterName, controllerInstanceId, dataDir, DEFAULT_EXTERNAL_VIEW_UPDATE_TIMEOUT_MILLIS, false,
-        false, true);
+        true);
   }
 
   public PinotHelixResourceManager(@Nonnull ControllerConf controllerConf) {
     this(controllerConf.getZkStr(), controllerConf.getHelixClusterName(),
         controllerConf.getControllerHost() + "_" + controllerConf.getControllerPort(), controllerConf.getDataDir(),
         controllerConf.getExternalViewOnlineToOfflineTimeout(), controllerConf.tenantIsolationEnabled(),
-        controllerConf.isUpdateSegmentStateModel(), controllerConf.getEnableBatchMessageMode());
+        controllerConf.getEnableBatchMessageMode());
   }
 
   /**
    * Create Helix cluster if needed, and then start a Pinot controller instance.
    */
   public synchronized void start() {
-    _helixZkManager = HelixSetupUtils
-        .setup(_helixClusterName, _helixZkURL, _instanceId, _isUpdateStateModel, _enableBatchMessageMode);
-    Preconditions.checkNotNull(_helixZkManager);
+    _helixZkManager = registerAndConnectAsHelixParticipant();
     _helixAdmin = _helixZkManager.getClusterManagmentTool();
     _propertyStore = _helixZkManager.getHelixPropertyStore();
     _helixDataAccessor = _helixZkManager.getHelixDataAccessor();
@@ -251,6 +247,24 @@ public class PinotHelixResourceManager {
    */
   public ZkHelixPropertyStore<ZNRecord> getPropertyStore() {
     return _propertyStore;
+  }
+
+  /**
+   * Register and connect to Helix cluster as PARTICIPANT role.
+   */
+  private HelixManager registerAndConnectAsHelixParticipant() {
+    HelixManager helixManager = HelixManagerFactory
+        .getZKHelixManager(_helixClusterName, CommonConstants.Helix.PREFIX_OF_CONTROLLER_INSTANCE + _instanceId,
+            InstanceType.PARTICIPANT, _helixZkURL);
+    try {
+      helixManager.connect();
+      return helixManager;
+    } catch (Exception e) {
+      String errorMsg =
+          String.format("Exception when connecting the instance %s as Participant to Helix.", _instanceId);
+      LOGGER.error(errorMsg, e);
+      throw new RuntimeException(errorMsg);
+    }
   }
 
   /**
@@ -803,8 +817,15 @@ public class PinotHelixResourceManager {
             .equals(CommonConstants.Minion.UNTAGGED_INSTANCE)) {
           continue;
         }
-        if (TagNameUtils.getTenantRoleFromTag(tag) == TenantRole.BROKER) {
-          tenantSet.add(TagNameUtils.getTenantNameFromTag(tag));
+        TenantRole tenantRole;
+        try {
+          tenantRole = TagNameUtils.getTenantRoleFromTag(tag);
+          if (tenantRole == TenantRole.BROKER) {
+            tenantSet.add(TagNameUtils.getTenantNameFromTag(tag));
+          }
+        } catch (InvalidConfigException e) {
+          LOGGER.warn("Instance {} contains an invalid tag: {}", instanceName, tag);
+          continue;
         }
       }
     }
@@ -822,8 +843,15 @@ public class PinotHelixResourceManager {
             .equals(CommonConstants.Minion.UNTAGGED_INSTANCE)) {
           continue;
         }
-        if (TagNameUtils.getTenantRoleFromTag(tag) == TenantRole.SERVER) {
-          tenantSet.add(TagNameUtils.getTenantNameFromTag(tag));
+        TenantRole tenantRole;
+        try {
+          tenantRole = TagNameUtils.getTenantRoleFromTag(tag);
+          if (tenantRole == TenantRole.SERVER) {
+            tenantSet.add(TagNameUtils.getTenantNameFromTag(tag));
+          }
+        } catch (InvalidConfigException e) {
+          LOGGER.warn("Instance {} contains an invalid tag: {}", instanceName, tag);
+          continue;
         }
       }
     }
@@ -1009,7 +1037,8 @@ public class PinotHelixResourceManager {
    * @throws InvalidTableConfigException
    * @throws TableAlreadyExistsException for offline tables only if the table already exists
    */
-  public void addTable(@Nonnull TableConfig tableConfig) {
+  public void addTable(@Nonnull TableConfig tableConfig)
+      throws IOException {
     final String tableNameWithType = tableConfig.getTableName();
 
     TenantConfig tenantConfig;
@@ -1086,8 +1115,7 @@ public class PinotHelixResourceManager {
         LOGGER.info("successfully added the table : " + tableNameWithType + " to the cluster");
 
         // lets add table configs
-        ZKMetadataProvider
-            .setOfflineTableConfig(_propertyStore, tableNameWithType, TableConfig.toZnRecord(tableConfig));
+        ZKMetadataProvider.setOfflineTableConfig(_propertyStore, tableNameWithType, tableConfig.toZNRecord());
 
         _propertyStore.create(ZKMetadataProvider.constructPropertyStorePathForResource(tableNameWithType),
             new ZNRecord(tableNameWithType), AccessOption.PERSISTENT);
@@ -1109,8 +1137,7 @@ public class PinotHelixResourceManager {
         }
 
         // lets add table configs
-        ZKMetadataProvider
-            .setRealtimeTableConfig(_propertyStore, tableNameWithType, TableConfig.toZnRecord(tableConfig));
+        ZKMetadataProvider.setRealtimeTableConfig(_propertyStore, tableNameWithType, tableConfig.toZNRecord());
 
         /*
          * PinotRealtimeSegmentManager sets up watches on table and segment path. When a table gets created,
@@ -1248,13 +1275,13 @@ public class PinotHelixResourceManager {
   public void setExistingTableConfig(TableConfig config, String tableNameWithType, TableType type)
       throws IOException {
     if (type == TableType.REALTIME) {
-      ZKMetadataProvider.setRealtimeTableConfig(_propertyStore, tableNameWithType, TableConfig.toZnRecord(config));
+      ZKMetadataProvider.setRealtimeTableConfig(_propertyStore, tableNameWithType, config.toZNRecord());
       ensureRealtimeClusterIsSetUp(config, tableNameWithType, config.getIndexingConfig());
     } else if (type == TableType.OFFLINE) {
       // Update replica group partition assignment to the property store if applicable
       updateReplicaGroupPartitionAssignment(config);
 
-      ZKMetadataProvider.setOfflineTableConfig(_propertyStore, tableNameWithType, TableConfig.toZnRecord(config));
+      ZKMetadataProvider.setOfflineTableConfig(_propertyStore, tableNameWithType, config.toZNRecord());
       IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableNameWithType);
       final String configReplication = config.getValidationConfig().getReplication();
       if (configReplication != null && !config.getValidationConfig().getReplication()
@@ -1461,10 +1488,13 @@ public class PinotHelixResourceManager {
   }
 
   public void addNewSegment(@Nonnull SegmentMetadata segmentMetadata, @Nonnull String downloadUrl) {
-    addNewSegment(segmentMetadata, downloadUrl, null);
+    List<String> assignedInstances = getAssignedInstancesForSegment(segmentMetadata);
+    addNewSegment(segmentMetadata, downloadUrl, null, assignedInstances);
   }
 
-  public void addNewSegment(@Nonnull SegmentMetadata segmentMetadata, @Nonnull String downloadUrl, String crypter) {
+  public void addNewSegment(@Nonnull SegmentMetadata segmentMetadata, @Nonnull String downloadUrl, String crypter,
+      @Nonnull List<String> assignedInstances) {
+    Preconditions.checkNotNull(assignedInstances, "Assigned Instances should not be null!");
     String segmentName = segmentMetadata.getName();
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(segmentMetadata.getTableName());
 
@@ -1481,7 +1511,7 @@ public class PinotHelixResourceManager {
     }
     LOGGER.info("Added segment: {} of table: {} to property store", segmentName, offlineTableName);
 
-    addNewOfflineSegment(segmentMetadata);
+    addNewOfflineSegment(segmentMetadata, assignedInstances);
     LOGGER.info("Added segment: {} of table: {} to ideal state", segmentName, offlineTableName);
   }
 
@@ -1687,6 +1717,24 @@ public class PinotHelixResourceManager {
   }
 
   /**
+   * Gets assigned instances for uploading new segment.
+   * @param segmentMetadata segment metadata
+   * @return a list of assigned instances.
+   */
+  public List<String> getAssignedInstancesForSegment(SegmentMetadata segmentMetadata) {
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(segmentMetadata.getTableName());
+    TableConfig offlineTableConfig = ZKMetadataProvider.getOfflineTableConfig(_propertyStore, offlineTableName);
+    Preconditions.checkNotNull(offlineTableConfig);
+    int numReplicas = Integer.parseInt(offlineTableConfig.getValidationConfig().getReplication());
+    String serverTenant = TagNameUtils.getOfflineTagForTenant(offlineTableConfig.getTenantConfig().getServer());
+    SegmentAssignmentStrategy segmentAssignmentStrategy = SegmentAssignmentStrategyFactory
+        .getSegmentAssignmentStrategy(offlineTableConfig.getValidationConfig().getSegmentAssignmentStrategy());
+    return segmentAssignmentStrategy
+        .getAssignedInstances(_helixZkManager, _helixAdmin, _propertyStore, _helixClusterName, segmentMetadata,
+            numReplicas, serverTenant);
+  }
+
+  /**
    * Helper method to add the passed in offline segment to the helix cluster.
    * - Gets the segment name and the table name from the passed in segment meta-data.
    * - Identifies the instance set onto which the segment needs to be added, based on
@@ -1697,21 +1745,11 @@ public class PinotHelixResourceManager {
    * @param segmentMetadata Meta-data for the segment, used to access segmentName and tableName.
    */
   // NOTE: method should be thread-safe
-  private void addNewOfflineSegment(SegmentMetadata segmentMetadata) {
+  private void addNewOfflineSegment(SegmentMetadata segmentMetadata, List<String> assignedInstances) {
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(segmentMetadata.getTableName());
     String segmentName = segmentMetadata.getName();
 
     // Assign new segment to instances
-    TableConfig offlineTableConfig = ZKMetadataProvider.getOfflineTableConfig(_propertyStore, offlineTableName);
-    Preconditions.checkNotNull(offlineTableConfig);
-    int numReplicas = Integer.parseInt(offlineTableConfig.getValidationConfig().getReplication());
-    String serverTenant = TagNameUtils.getOfflineTagForTenant(offlineTableConfig.getTenantConfig().getServer());
-    SegmentAssignmentStrategy segmentAssignmentStrategy = SegmentAssignmentStrategyFactory
-        .getSegmentAssignmentStrategy(offlineTableConfig.getValidationConfig().getSegmentAssignmentStrategy());
-    List<String> assignedInstances = segmentAssignmentStrategy
-        .getAssignedInstances(_helixZkManager, _helixAdmin, _propertyStore, _helixClusterName, segmentMetadata,
-            numReplicas, serverTenant);
-
     HelixHelper.addSegmentToIdealState(_helixZkManager, offlineTableName, segmentName, assignedInstances);
   }
 

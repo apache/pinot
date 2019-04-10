@@ -34,6 +34,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.LongAccumulator;
 import javax.annotation.Nonnull;
+import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -65,6 +66,7 @@ import static org.mockito.Mockito.when;
 public class ScheduledRequestHandlerTest {
   private static final BrokerRequest DUMMY_BROKER_REQUEST =
       new Pql2Compiler().compileToBrokerRequest("SELECT * FROM myTable_OFFLINE");
+  private static final Configuration DEFAULT_SCHEDULER_CONFIG = new PropertiesConfiguration();
 
   private ServerMetrics serverMetrics;
   private ChannelHandlerContext channelHandlerContext;
@@ -119,8 +121,8 @@ public class ScheduledRequestHandlerTest {
   @Test
   public void testQueryProcessingException()
       throws Exception {
-    ScheduledRequestHandler handler =
-        new ScheduledRequestHandler(new QueryScheduler(queryExecutor, resourceManager, serverMetrics, latestQueryTime) {
+    ScheduledRequestHandler handler = new ScheduledRequestHandler(
+        new QueryScheduler(DEFAULT_SCHEDULER_CONFIG, queryExecutor, resourceManager, serverMetrics, latestQueryTime) {
           @Nonnull
           @Override
           public ListenableFuture<byte[]> submit(@Nonnull ServerQueryRequest queryRequest) {
@@ -159,8 +161,8 @@ public class ScheduledRequestHandlerTest {
   @Test
   public void testValidQueryResponse()
       throws InterruptedException, ExecutionException, TimeoutException, IOException {
-    ScheduledRequestHandler handler =
-        new ScheduledRequestHandler(new QueryScheduler(queryExecutor, resourceManager, serverMetrics, latestQueryTime) {
+    ScheduledRequestHandler handler = new ScheduledRequestHandler(
+        new QueryScheduler(DEFAULT_SCHEDULER_CONFIG, queryExecutor, resourceManager, serverMetrics, latestQueryTime) {
           @Nonnull
           @Override
           public ListenableFuture<byte[]> submit(@Nonnull ServerQueryRequest queryRequest) {

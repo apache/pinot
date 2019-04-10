@@ -64,6 +64,7 @@ public class SegmentCompletionManager {
     ABORTED,      // state machine is aborted. we will start a fresh one when the next segmentConsumed comes in.
   }
 
+  // TODO: fix the misuse of singleton.
   private static SegmentCompletionManager _instance = null;
 
   private final HelixManager _helixManager;
@@ -72,6 +73,7 @@ public class SegmentCompletionManager {
   private final Map<String, Long> _commitTimeMap = new ConcurrentHashMap<>();
   private final PinotLLCRealtimeSegmentManager _segmentManager;
   private final ControllerMetrics _controllerMetrics;
+  private final ControllerLeadershipManager _controllerLeadershipManager;
 
   // Half hour max commit time for all segments
   private static final int MAX_COMMIT_TIME_FOR_ALL_SEGMENTS_SECONDS = 1800;
@@ -83,10 +85,11 @@ public class SegmentCompletionManager {
   // TODO keep some history of past committed segments so that we can avoid looking up PROPERTYSTORE if some server comes in late.
 
   protected SegmentCompletionManager(HelixManager helixManager, PinotLLCRealtimeSegmentManager segmentManager,
-      ControllerMetrics controllerMetrics) {
+      ControllerMetrics controllerMetrics, ControllerLeadershipManager controllerLeadershipManager) {
     _helixManager = helixManager;
     _segmentManager = segmentManager;
     _controllerMetrics = controllerMetrics;
+    _controllerLeadershipManager = controllerLeadershipManager;
   }
 
   public boolean isSplitCommitEnabled() {
@@ -99,11 +102,11 @@ public class SegmentCompletionManager {
 
   public static SegmentCompletionManager create(HelixManager helixManager,
       PinotLLCRealtimeSegmentManager segmentManager, ControllerConf controllerConf,
-      ControllerMetrics controllerMetrics) {
+      ControllerMetrics controllerMetrics, ControllerLeadershipManager controllerLeadershipManager) {
     if (_instance != null) {
       throw new RuntimeException("Cannot create multiple instances");
     }
-    _instance = new SegmentCompletionManager(helixManager, segmentManager, controllerMetrics);
+    _instance = new SegmentCompletionManager(helixManager, segmentManager, controllerMetrics, controllerLeadershipManager);
     SegmentCompletionProtocol.setMaxSegmentCommitTimeMs(
         TimeUnit.MILLISECONDS.convert(controllerConf.getSegmentCommitTimeoutSeconds(), TimeUnit.SECONDS));
     return _instance;
@@ -290,7 +293,7 @@ public class SegmentCompletionManager {
    * @return
    */
   public SegmentCompletionProtocol.Response segmentCommitEnd(SegmentCompletionProtocol.Request.Params reqParams,
-      boolean success, boolean isSplitCommit) {
+      boolean success, boolean isSplitCommit, CommittingSegmentDescriptor committingSegmentDescriptor) {
     if (!isLeader() || !_helixManager.isConnected()) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_NOT_LEADER, 1L);
       return SegmentCompletionProtocol.RESP_NOT_LEADER;
@@ -301,7 +304,7 @@ public class SegmentCompletionManager {
     SegmentCompletionProtocol.Response response = SegmentCompletionProtocol.RESP_FAILED;
     try {
       fsm = lookupOrCreateFsm(segmentName, SegmentCompletionProtocol.MSG_TYPE_COMMIT);
-      response = fsm.segmentCommitEnd(reqParams, success, isSplitCommit);
+      response = fsm.segmentCommitEnd(reqParams, success, isSplitCommit, committingSegmentDescriptor);
     } catch (Exception e) {
       LOGGER.error("Caught exception in segmentCommitEnd for segment {}", segmentNameStr, e);
     }
@@ -605,7 +608,7 @@ public class SegmentCompletionManager {
      * the _winner.
      */
     public SegmentCompletionProtocol.Response segmentCommitEnd(SegmentCompletionProtocol.Request.Params reqParams,
-        boolean success, boolean isSplitCommit) {
+        boolean success, boolean isSplitCommit, CommittingSegmentDescriptor committingSegmentDescriptor) {
       String instanceId = reqParams.getInstanceId();
       long offset = reqParams.getOffset();
       synchronized (this) {
@@ -624,7 +627,7 @@ public class SegmentCompletionManager {
           LOGGER.error("Segment upload failed");
           return abortAndReturnFailed();
         }
-        SegmentCompletionProtocol.Response response = commitSegment(reqParams, isSplitCommit);
+        SegmentCompletionProtocol.Response response = commitSegment(reqParams, isSplitCommit, committingSegmentDescriptor);
         if (!response.equals(SegmentCompletionProtocol.RESP_COMMIT_SUCCESS)) {
           return abortAndReturnFailed();
         } else {
@@ -1005,7 +1008,8 @@ public class SegmentCompletionManager {
     }
 
     private SegmentCompletionProtocol.Response commitSegment(SegmentCompletionProtocol.Request.Params reqParams,
-        boolean isSplitCommit) {
+                                                             boolean isSplitCommit,
+                                                             CommittingSegmentDescriptor committingSegmentDescriptor) {
       boolean success;
       String instanceId = reqParams.getInstanceId();
       long offset = reqParams.getOffset();
@@ -1019,8 +1023,6 @@ public class SegmentCompletionManager {
       _state = State.COMMITTING;
       // In case of splitCommit, the segment is uploaded to a unique file name indicated by segmentLocation,
       // so we need to move the segment file to its permanent location first before committing the metadata.
-      CommittingSegmentDescriptor committingSegmentDescriptor =
-          CommittingSegmentDescriptor.fromSegmentCompletionReqParams(reqParams);
       if (isSplitCommit) {
         if (!_segmentManager.commitSegmentFile(_segmentName.getTableName(), committingSegmentDescriptor)) {
           return SegmentCompletionProtocol.RESP_FAILED;
@@ -1116,8 +1118,12 @@ public class SegmentCompletionManager {
     }
   }
 
+  public static void stop() {
+    _instance = null;
+  }
+
   @VisibleForTesting
   protected boolean isLeader() {
-    return ControllerLeadershipManager.getInstance().isLeader();
+    return _controllerLeadershipManager.isLeader();
   }
 }

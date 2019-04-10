@@ -5,11 +5,6 @@ export const deleteProps = {
   credentials: 'include'
 };
 
-export default {
-  deleteProps
-};
-
-
 export const yamlAlertProps = `# Below is a sample template for setting up a WoW percentage rule. You may refer the documentation for more examples and update the fields accordingly.
 
 # Give a name for this anomaly detection pipeline (should be unique)
@@ -51,7 +46,7 @@ application: thirdeye-internal
 # The default notification type. See additional settings for details and exploring other notification types like dimension alerter.
 type: DEFAULT_ALERTER_PIPELINE
 
-# List of detection names that you want to subscribe. Copy-paste the detection name from the above anomaly detection config here. 
+# List of detection names that you want to subscribe. Copy-paste the detection name from the above anomaly detection config here.
 subscribedDetections:
   - name_of_the_detection_above
 
@@ -76,7 +71,18 @@ active: true
 
 # The below links will appear in the email alerts. This will help alert recipients to quickly refer and act on.
 referenceLinks:
-- "Oncall Runbook": "http://go/oncall",
-- "Thirdeye FAQs": "http://go/thirdeyefaqs"
+  "Oncall Runbook": "http://go/oncall"
+  "Thirdeye FAQs": "http://go/thirdeyefaqs"
 
 `;
+
+export const toastOptions = {
+  timeOut: 10000
+};
+
+export default {
+  deleteProps,
+  yamlAlertProps,
+  yamlAlertSettings,
+  toastOptions
+};

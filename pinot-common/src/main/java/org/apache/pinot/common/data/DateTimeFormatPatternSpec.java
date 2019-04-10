@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.data;
 
+import java.util.Locale;
 import java.util.TimeZone;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -36,6 +37,7 @@ public class DateTimeFormatPatternSpec {
   private static final int SDF_PATTERN_GROUP = 1;
   private static final int TIMEZONE_GROUP = 3;
   public static final DateTimeZone DEFAULT_DATETIMEZONE = DateTimeZone.UTC;
+  public static final Locale DEFAULT_LOCALE = Locale.ENGLISH;
 
   private TimeFormat _timeFormat;
   private String _sdfPattern = null;
@@ -52,7 +54,7 @@ public class DateTimeFormatPatternSpec {
         String timezoneString = m.group(TIMEZONE_GROUP).trim();
         _dateTimeZone = DateTimeZone.forTimeZone(TimeZone.getTimeZone(timezoneString));
       }
-      _dateTimeFormatter = DateTimeFormat.forPattern(_sdfPattern).withZone(_dateTimeZone);
+      _dateTimeFormatter = DateTimeFormat.forPattern(_sdfPattern).withZone(_dateTimeZone).withLocale(DEFAULT_LOCALE);
     }
   }
 

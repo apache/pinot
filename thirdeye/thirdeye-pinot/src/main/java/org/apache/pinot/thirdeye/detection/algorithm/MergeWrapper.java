@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.collections.MapUtils;
 import org.apache.pinot.thirdeye.common.dimension.DimensionMap;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
@@ -40,6 +41,8 @@ import org.apache.pinot.thirdeye.detection.DetectionPipeline;
 import org.apache.pinot.thirdeye.detection.DetectionPipelineResult;
 import org.apache.pinot.thirdeye.detection.DetectionUtils;
 import org.apache.pinot.thirdeye.detection.spi.model.AnomalySlice;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -51,6 +54,8 @@ public class MergeWrapper extends DetectionPipeline {
   private static final String PROP_CLASS_NAME = "className";
   private static final String PROP_MERGE_KEY = "mergeKey";
   private static final String PROP_DETECTOR_COMPONENT_NAME = "detectorComponentName";
+  private static final int NUMBER_OF_SPLITED_ANOMALIES_LIMIT = 1000;
+  private static final Logger LOG = LoggerFactory.getLogger(MergeWrapper.class);
 
   protected static final Comparator<MergedAnomalyResultDTO> COMPARATOR = new Comparator<MergedAnomalyResultDTO>() {
     @Override
@@ -84,8 +89,9 @@ public class MergeWrapper extends DetectionPipeline {
   public MergeWrapper(DataProvider provider, DetectionConfigDTO config, long startTime, long endTime) {
     super(provider, config, startTime, endTime);
 
-    this.maxGap = MapUtils.getLongValue(config.getProperties(), "maxGap", 0);
-    this.maxDuration = MapUtils.getLongValue(config.getProperties(), "maxDuration", Long.MAX_VALUE);
+    this.maxGap = MapUtils.getLongValue(config.getProperties(), "maxGap", TimeUnit.HOURS.toMillis(2));
+    this.maxDuration = MapUtils.getLongValue(config.getProperties(), "maxDuration", TimeUnit.DAYS.toMillis(7));
+    Preconditions.checkArgument(this.maxDuration > 0 , "Max duration must be a positive number");
     this.slice = new AnomalySlice().withStart(startTime).withEnd(endTime);
     this.nestedProperties = new ArrayList<>();
     List<Map<String, Object>> nested = ConfigUtils.getList(config.getProperties().get(PROP_NESTED));
@@ -142,7 +148,7 @@ public class MergeWrapper extends DetectionPipeline {
 
   // logic to do time-based merging.
   protected List<MergedAnomalyResultDTO> merge(Collection<MergedAnomalyResultDTO> anomalies) {
-    List<MergedAnomalyResultDTO> input = new ArrayList<>(anomalies);
+    List<MergedAnomalyResultDTO> input = new ArrayList<>(enforceMaxDuration(anomalies));
     Collections.sort(input, COMPARATOR);
 
     List<MergedAnomalyResultDTO> output = new ArrayList<>();
@@ -187,6 +193,45 @@ public class MergeWrapper extends DetectionPipeline {
     return output;
   }
 
+  /*
+    Make sure that the anomalies generated from detector is shorter than maxDuration. Otherwise, split the anomaly
+   */
+  private Collection<MergedAnomalyResultDTO> enforceMaxDuration(Collection<MergedAnomalyResultDTO> anomalies) {
+    Set<MergedAnomalyResultDTO> result = new HashSet<>();
+    for (MergedAnomalyResultDTO anomaly : anomalies) {
+      if (anomaly.getEndTime() - anomaly.getStartTime() > this.maxDuration) {
+        result.addAll(splitAnomaly(anomaly, this.maxDuration));
+      } else {
+        result.add(anomaly);
+      }
+    }
+    return result;
+  }
+
+  /*
+    Split the anomaly into multiple consecutive anomalies with duration less than the max allowed duration.
+  */
+  private Collection<MergedAnomalyResultDTO> splitAnomaly(MergedAnomalyResultDTO anomaly, long maxDuration) {
+    int anomalyCountAfterSplit = (int) Math.ceil((anomaly.getEndTime() - anomaly.getStartTime()) / (double) maxDuration);
+    if (anomalyCountAfterSplit > NUMBER_OF_SPLITED_ANOMALIES_LIMIT) {
+      // if the number of anomalies after split is more than the limit, don't split
+      LOG.warn("Exceeded max number of split count. maxDuration = {}, anomaly split count = {}", maxDuration, anomalyCountAfterSplit);
+      return Collections.singleton(anomaly);
+    }
+    Set<MergedAnomalyResultDTO> result = new HashSet<>();
+
+    long nextStartTime = anomaly.getStartTime();
+    for (int i = 0; i < anomalyCountAfterSplit; i++) {
+      MergedAnomalyResultDTO splitedAnomaly = copyAnomalyInfo(anomaly, new MergedAnomalyResultDTO());
+      splitedAnomaly.setStartTime(nextStartTime);
+      splitedAnomaly.setEndTime(Math.min(nextStartTime + maxDuration, anomaly.getEndTime()));
+      nextStartTime = splitedAnomaly.getEndTime();
+      result.add(splitedAnomaly);
+    }
+    return result;
+  }
+
+
   protected long getStartTime(Iterable<MergedAnomalyResultDTO> anomalies) {
     long time = this.startTime;
     for (MergedAnomalyResultDTO anomaly : anomalies) {
@@ -201,6 +246,26 @@ public class MergeWrapper extends DetectionPipeline {
       time = Math.max(anomaly.getEndTime(), time);
     }
     return time;
+  }
+
+
+  protected MergedAnomalyResultDTO copyAnomalyInfo(MergedAnomalyResultDTO from, MergedAnomalyResultDTO to) {
+    to.setStartTime(from.getStartTime());
+    to.setEndTime(from.getEndTime());
+    to.setMetric(from.getMetric());
+    to.setMetricUrn(from.getMetricUrn());
+    to.setCollection(from.getCollection());
+    to.setDimensions(from.getDimensions());
+    to.setDetectionConfigId(from.getDetectionConfigId());
+    to.setAnomalyResultSource(from.getAnomalyResultSource());
+    to.setAvgBaselineVal(from.getAvgBaselineVal());
+    to.setAvgCurrentVal(from.getAvgCurrentVal());
+    to.setFeedback(from.getFeedback());
+    to.setAnomalyFeedbackId(from.getAnomalyFeedbackId());
+    to.setScore(from.getScore());
+    to.setWeight(from.getWeight());
+    to.setProperties(from.getProperties());
+    return to;
   }
 
   protected static class AnomalyKey {

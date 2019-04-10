@@ -141,7 +141,7 @@ public class LocalPinotFSTest {
     Assert.assertEquals(_newTmpDir.listFiles().length, files);
     Assert.assertFalse(dstFile.exists());
 
-    // Check that a moving a file a non-existent destination folder will work
+    // Check that a moving a file to a non-existent destination folder will work
     FileUtils.deleteQuietly(_nonExistentTmpFolder);
     Assert.assertFalse(_nonExistentTmpFolder.exists());
     File srcFile = new File(_absoluteTmpDirPath, "srcFile");
@@ -153,7 +153,7 @@ public class LocalPinotFSTest {
     Assert.assertFalse(srcFile.exists());
     Assert.assertTrue(dstFile.exists());
 
-    //Check that moving a folder to a non-existent destination folder works
+    // Check that moving a folder to a non-existent destination folder works
     FileUtils.deleteQuietly(_nonExistentTmpFolder);
     Assert.assertFalse(_nonExistentTmpFolder.exists());
     srcFile = new File(_absoluteTmpDirPath, "srcFile");
@@ -209,6 +209,15 @@ public class LocalPinotFSTest {
 
     localPinotFS.copy(firstTempDir.toURI(), secondTempDir.toURI());
     Assert.assertEquals(localPinotFS.listFiles(secondTempDir.toURI(), true).length, 1);
+
+    // Copying directory with files under another directory.
+    File firstTempDirUnderSecondTempDir = new File(secondTempDir, firstTempDir.getName());
+    localPinotFS.copy(firstTempDir.toURI(), firstTempDirUnderSecondTempDir.toURI());
+    Assert.assertTrue(localPinotFS.exists(firstTempDirUnderSecondTempDir.toURI()));
+    // There're two files/directories under secondTempDir.
+    Assert.assertEquals(localPinotFS.listFiles(secondTempDir.toURI(), false).length, 2);
+    // The file under src directory also got copied under dst directory.
+    Assert.assertEquals(localPinotFS.listFiles(firstTempDirUnderSecondTempDir.toURI(), true).length, 1);
 
     // len of dir = exception
     try {

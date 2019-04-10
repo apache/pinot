@@ -81,6 +81,7 @@ import org.testng.Assert;
  * Base class for integration tests that involve a complete Pinot cluster.
  */
 public abstract class ClusterTest extends ControllerTest {
+  private static final Logger LOGGER = LoggerFactory.getLogger(ClusterTest.class);
   private static final Random RANDOM = new Random();
   private static final int DEFAULT_BROKER_PORT = 18099;
 
@@ -218,20 +219,32 @@ public abstract class ClusterTest extends ControllerTest {
 
   protected void stopBroker() {
     for (HelixBrokerStarter brokerStarter : _brokerStarters) {
-      BrokerTestUtils.stopBroker(brokerStarter);
+      try {
+        BrokerTestUtils.stopBroker(brokerStarter);
+      } catch (Exception e) {
+        LOGGER.error("Encountered exception while stopping broker {}", e.getMessage());
+      }
     }
   }
 
   protected void stopServer() {
     for (HelixServerStarter helixServerStarter : _serverStarters) {
-      helixServerStarter.stop();
+      try {
+        helixServerStarter.stop();
+      } catch (Exception e) {
+        LOGGER.error("Encountered exception while stopping server {}", e.getMessage());
+      }
     }
     FileUtils.deleteQuietly(new File(Server.DEFAULT_INSTANCE_BASE_DIR));
   }
 
   protected void stopMinion() {
     for (MinionStarter minionStarter : _minionStarters) {
-      minionStarter.stop();
+      try {
+        minionStarter.stop();
+      } catch (Exception e) {
+        LOGGER.error("Encountered exception while stopping minion {}", e.getMessage());
+      }
     }
     FileUtils.deleteQuietly(new File(Minion.DEFAULT_INSTANCE_BASE_DIR));
   }
@@ -302,7 +315,7 @@ public abstract class ClusterTest extends ControllerTest {
             invertedIndexColumns, bloomFilterColumns, taskConfig);
 
     if (!isUsingNewConfigFormat()) {
-      sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJSONConfigString());
+      sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJsonConfigString());
     } else {
       _offlineTableConfig = tableConfig;
     }
@@ -317,7 +330,7 @@ public abstract class ClusterTest extends ControllerTest {
             invertedIndexColumns, bloomFilterColumns, taskConfig);
 
     if (!isUsingNewConfigFormat()) {
-      sendPutRequest(_controllerRequestURLBuilder.forUpdateTableConfig(tableName), tableConfig.toJSONConfigString());
+      sendPutRequest(_controllerRequestURLBuilder.forUpdateTableConfig(tableName), tableConfig.toJsonConfigString());
     } else {
       _offlineTableConfig = tableConfig;
     }
@@ -325,8 +338,7 @@ public abstract class ClusterTest extends ControllerTest {
 
   private static TableConfig getOfflineTableConfig(String tableName, String timeColumnName, String timeType,
       String brokerTenant, String serverTenant, String loadMode, SegmentVersion segmentVersion,
-      List<String> invertedIndexColumns, List<String> bloomFilterColumns, TableTaskConfig taskConfig)
-      throws Exception {
+      List<String> invertedIndexColumns, List<String> bloomFilterColumns, TableTaskConfig taskConfig) {
     return new TableConfig.Builder(Helix.TableType.OFFLINE).setTableName(tableName).setTimeColumnName(timeColumnName)
         .setTimeType(timeType).setNumReplicas(3).setBrokerTenant(brokerTenant).setServerTenant(serverTenant)
         .setLoadMode(loadMode).setSegmentVersion(segmentVersion.toString())
@@ -430,7 +442,7 @@ public abstract class ClusterTest extends ControllerTest {
     _realtimeTableConfig = tableConfig;
 
     if (!isUsingNewConfigFormat()) {
-      sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJSONConfigString());
+      sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJsonConfigString());
     }
   }
 
@@ -443,7 +455,7 @@ public abstract class ClusterTest extends ControllerTest {
     config.setBloomFilterColumns(bloomFilterCols);
 
     sendPutRequest(_controllerRequestURLBuilder.forUpdateTableConfig(tablename),
-        _realtimeTableConfig.toJSONConfigString());
+        _realtimeTableConfig.toJsonConfigString());
   }
 
   protected void dropRealtimeTable(String tableName)

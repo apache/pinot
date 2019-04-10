@@ -52,7 +52,7 @@ Having separate set of hardware for every client means we cannot use the hardwar
 Multi tenancy in Pinot 2.0
 --------------------------
 
-.. figure:: image2015-4-14-194451.png
+.. figure:: img/image2015-4-14-194451.png
 
 In Pinot 2.0, we designed the system assuming that it will be Multi tenant from day 1\. We will have only one cluster for all tenants. Helix will be used to drive the multi tenancy in Pinot. The key ideas here are
 
@@ -99,7 +99,7 @@ Pinot Cluster creation
 
 When the cluster is created the Zookeeper ZNode layout looks as follows.
 
-.. figure:: znode_layout.png
+.. figure:: img/znode_layout.png
 
 Adding Nodes to cluster
 -----------------------

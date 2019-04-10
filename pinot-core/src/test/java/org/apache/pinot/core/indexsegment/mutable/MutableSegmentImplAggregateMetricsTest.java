@@ -28,6 +28,7 @@ import org.apache.commons.lang.RandomStringUtils;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.core.data.GenericRow;
+import org.apache.pinot.core.realtime.stream.StreamMessageMetadata;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -62,6 +63,7 @@ public class MutableSegmentImplAggregateMetricsTest {
     }
 
     Map<String, Long> expectedValues = new HashMap<>();
+    StreamMessageMetadata defaultMetadata = new StreamMessageMetadata();
     Random random = new Random();
     for (int i = 0; i < NUM_ROWS; i++) {
       GenericRow row = new GenericRow();
@@ -71,7 +73,7 @@ public class MutableSegmentImplAggregateMetricsTest {
       long metricValue = random.nextInt();
       row.putField(METRIC, metricValue);
 
-      _mutableSegmentImpl.index(row);
+      _mutableSegmentImpl.index(row, defaultMetadata);
 
       // Update expected values
       String key = buildKey(row);

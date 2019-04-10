@@ -36,7 +36,7 @@ import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.configuration.Configuration;
 import org.apache.pinot.broker.api.RequestStatistics;
 import org.apache.pinot.broker.broker.AccessControlFactory;
-import org.apache.pinot.broker.broker.helix.LiveInstancesChangeListenerImpl;
+import org.apache.pinot.broker.broker.helix.LiveInstanceChangeHandler;
 import org.apache.pinot.broker.queryquota.TableQueryQuotaManager;
 import org.apache.pinot.broker.routing.RoutingTable;
 import org.apache.pinot.broker.routing.TimeBoundaryService;
@@ -51,7 +51,6 @@ import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.response.ServerInstance;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.datatable.DataTableFactory;
 import org.apache.pinot.serde.SerDe;
@@ -80,7 +79,7 @@ public class ConnectionPoolBrokerRequestHandler extends BaseBrokerRequestHandler
   private static final Logger LOGGER = LoggerFactory.getLogger(ConnectionPoolBrokerRequestHandler.class);
   private static final String TRANSPORT_CONFIG_PREFIX = "pinot.broker.transport";
 
-  private final LiveInstancesChangeListenerImpl _liveInstanceChangeListener;
+  private final LiveInstanceChangeHandler _liveInstanceChangeHandler;
   private final EventLoopGroup _eventLoopGroup;
   private final ScheduledThreadPoolExecutor _poolTimeoutExecutor;
   private final ExecutorService _requestSenderPool;
@@ -90,9 +89,9 @@ public class ConnectionPoolBrokerRequestHandler extends BaseBrokerRequestHandler
   public ConnectionPoolBrokerRequestHandler(Configuration config, RoutingTable routingTable,
       TimeBoundaryService timeBoundaryService, AccessControlFactory accessControlFactory,
       TableQueryQuotaManager tableQueryQuotaManager, BrokerMetrics brokerMetrics,
-      LiveInstancesChangeListenerImpl liveInstanceChangeListener, MetricsRegistry metricsRegistry) {
+      LiveInstanceChangeHandler liveInstanceChangeHandler, MetricsRegistry metricsRegistry) {
     super(config, routingTable, timeBoundaryService, accessControlFactory, tableQueryQuotaManager, brokerMetrics);
-    _liveInstanceChangeListener = liveInstanceChangeListener;
+    _liveInstanceChangeHandler = liveInstanceChangeHandler;
 
     TransportClientConf transportClientConf = new TransportClientConf();
     transportClientConf.init(_config.subset(TRANSPORT_CONFIG_PREFIX));
@@ -120,7 +119,7 @@ public class ConnectionPoolBrokerRequestHandler extends BaseBrokerRequestHandler
   @Override
   public synchronized void start() {
     _connPool.start();
-    _liveInstanceChangeListener.init(_connPool, CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS);
+    _liveInstanceChangeHandler.init(_connPool);
   }
 
   @Override

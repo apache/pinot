@@ -18,20 +18,94 @@
  */
 package org.apache.pinot.common.config;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
-import org.apache.helix.ZNRecord;
 import org.apache.pinot.common.data.StarTreeIndexSpec;
 import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
 import org.apache.pinot.startree.hll.HllConfig;
-import org.testng.Assert;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.*;
 
 
 public class TableConfigTest {
+
+  @Test
+  public void testSerializeMandatoryFields()
+      throws Exception {
+    TableConfig tableConfig = new TableConfig.Builder(TableType.OFFLINE).setTableName("myTable").build();
+    tableConfig.setTableName(null);
+    testSerializeMandatoryFields(tableConfig, "Table name");
+
+    tableConfig = new TableConfig.Builder(TableType.OFFLINE).setTableName("myTable").build();
+    tableConfig.setTableType(null);
+    testSerializeMandatoryFields(tableConfig, "Table type");
+
+    tableConfig = new TableConfig.Builder(TableType.OFFLINE).setTableName("myTable").build();
+    tableConfig.setValidationConfig(null);
+    testSerializeMandatoryFields(tableConfig, "Validation config");
+
+    tableConfig = new TableConfig.Builder(TableType.OFFLINE).setTableName("myTable").build();
+    tableConfig.setTenantConfig(null);
+    testSerializeMandatoryFields(tableConfig, "Tenant config");
+
+    tableConfig = new TableConfig.Builder(TableType.OFFLINE).setTableName("myTable").build();
+    tableConfig.setIndexingConfig(null);
+    testSerializeMandatoryFields(tableConfig, "Indexing config");
+
+    tableConfig = new TableConfig.Builder(TableType.OFFLINE).setTableName("myTable").build();
+    tableConfig.setCustomConfig(null);
+    testSerializeMandatoryFields(tableConfig, "Custom config");
+  }
+
+  private void testSerializeMandatoryFields(TableConfig tableConfig, String expectedMessage)
+      throws Exception {
+    try {
+      tableConfig.toJsonConfig();
+      fail();
+    } catch (IllegalStateException e) {
+      assertTrue(e.getMessage().contains(expectedMessage));
+    }
+    try {
+      tableConfig.toZNRecord();
+      fail();
+    } catch (IllegalStateException e) {
+      assertTrue(e.getMessage().contains(expectedMessage));
+    }
+  }
+
+  @Test
+  public void testDeserializeMandatoryFields()
+      throws Exception {
+    TableConfig tableConfig = new TableConfig.Builder(TableType.OFFLINE).setTableName("myTable").build();
+    ObjectNode jsonTableConfig = tableConfig.toJsonConfig();
+    TableConfig.fromJsonConfig(jsonTableConfig);
+
+    testDeserializeMandatoryFields(jsonTableConfig.deepCopy(), TableConfig.TABLE_TYPE_KEY);
+
+    testDeserializeMandatoryFields(jsonTableConfig.deepCopy(), TableConfig.TABLE_NAME_KEY);
+
+    testDeserializeMandatoryFields(jsonTableConfig.deepCopy(), TableConfig.VALIDATION_CONFIG_KEY);
+
+    testDeserializeMandatoryFields(jsonTableConfig.deepCopy(), TableConfig.TENANT_CONFIG_KEY);
+
+    testDeserializeMandatoryFields(jsonTableConfig.deepCopy(), TableConfig.INDEXING_CONFIG_KEY);
+
+    testDeserializeMandatoryFields(jsonTableConfig.deepCopy(), TableConfig.CUSTOM_CONFIG_KEY);
+  }
+
+  private void testDeserializeMandatoryFields(ObjectNode jsonTableConfig, String mandatoryFieldKey)
+      throws Exception {
+    jsonTableConfig.remove(mandatoryFieldKey);
+    try {
+      TableConfig.fromJsonConfig(jsonTableConfig);
+      fail();
+    } catch (IllegalStateException e) {
+      assertTrue(e.getMessage().contains(mandatoryFieldKey));
+    }
+  }
 
   @Test
   public void testSerializeDeserialize()
@@ -41,32 +115,31 @@ public class TableConfigTest {
       // No quota config
       TableConfig tableConfig = tableConfigBuilder.build();
 
-      Assert.assertEquals(tableConfig.getTableName(), "myTable_OFFLINE");
-      Assert.assertEquals(tableConfig.getTableType(), TableType.OFFLINE);
-      Assert.assertEquals(tableConfig.getIndexingConfig().getLoadMode(), "HEAP");
-      Assert.assertNull(tableConfig.getQuotaConfig());
+      assertEquals(tableConfig.getTableName(), "myTable_OFFLINE");
+      assertEquals(tableConfig.getTableType(), TableType.OFFLINE);
+      assertEquals(tableConfig.getIndexingConfig().getLoadMode(), "HEAP");
+      assertNull(tableConfig.getQuotaConfig());
 
       // Serialize
-      JsonNode jsonTableConfig = TableConfig.toJSONConfig(tableConfig);
+      ObjectNode jsonTableConfig = tableConfig.toJsonConfig();
       // All nested configs should be json objects instead of serialized strings
-      Assert.assertTrue(jsonTableConfig.get(TableConfig.VALIDATION_CONFIG_KEY) instanceof ObjectNode);
-      Assert.assertTrue(jsonTableConfig.get(TableConfig.TENANT_CONFIG_KEY) instanceof ObjectNode);
-      Assert.assertTrue(jsonTableConfig.get(TableConfig.INDEXING_CONFIG_KEY) instanceof ObjectNode);
-      Assert.assertTrue(jsonTableConfig.get(TableConfig.CUSTOM_CONFIG_KEY) instanceof ObjectNode);
+      assertTrue(jsonTableConfig.get(TableConfig.VALIDATION_CONFIG_KEY) instanceof ObjectNode);
+      assertTrue(jsonTableConfig.get(TableConfig.TENANT_CONFIG_KEY) instanceof ObjectNode);
+      assertTrue(jsonTableConfig.get(TableConfig.INDEXING_CONFIG_KEY) instanceof ObjectNode);
+      assertTrue(jsonTableConfig.get(TableConfig.CUSTOM_CONFIG_KEY) instanceof ObjectNode);
 
       // De-serialize
-      TableConfig tableConfigToCompare = TableConfig.fromJSONConfig(jsonTableConfig);
-      Assert.assertEquals(tableConfigToCompare.getTableName(), tableConfig.getTableName());
-      Assert.assertNull(tableConfigToCompare.getQuotaConfig());
-      Assert.assertNull(tableConfigToCompare.getValidationConfig().getReplicaGroupStrategyConfig());
-      Assert.assertNull(tableConfigToCompare.getValidationConfig().getHllConfig());
+      TableConfig tableConfigToCompare = TableConfig.fromJsonConfig(jsonTableConfig);
+      assertEquals(tableConfigToCompare.getTableName(), tableConfig.getTableName());
+      assertNull(tableConfigToCompare.getQuotaConfig());
+      assertNull(tableConfigToCompare.getValidationConfig().getReplicaGroupStrategyConfig());
+      assertNull(tableConfigToCompare.getValidationConfig().getHllConfig());
 
-      ZNRecord znRecord = TableConfig.toZnRecord(tableConfig);
-      tableConfigToCompare = TableConfig.fromZnRecord(znRecord);
-      Assert.assertEquals(tableConfigToCompare.getTableName(), tableConfig.getTableName());
-      Assert.assertNull(tableConfigToCompare.getQuotaConfig());
-      Assert.assertNull(tableConfig.getValidationConfig().getReplicaGroupStrategyConfig());
-      Assert.assertNull(tableConfigToCompare.getValidationConfig().getHllConfig());
+      tableConfigToCompare = TableConfig.fromZnRecord(tableConfig.toZNRecord());
+      assertEquals(tableConfigToCompare.getTableName(), tableConfig.getTableName());
+      assertNull(tableConfigToCompare.getQuotaConfig());
+      assertNull(tableConfig.getValidationConfig().getReplicaGroupStrategyConfig());
+      assertNull(tableConfigToCompare.getValidationConfig().getHllConfig());
     }
     {
       // With quota config
@@ -74,103 +147,90 @@ public class TableConfigTest {
       quotaConfig.setStorage("30G");
       TableConfig tableConfig = tableConfigBuilder.setQuotaConfig(quotaConfig).build();
 
-      Assert.assertEquals(tableConfig.getTableName(), "myTable_OFFLINE");
-      Assert.assertEquals(tableConfig.getTableType(), TableType.OFFLINE);
-      Assert.assertEquals(tableConfig.getIndexingConfig().getLoadMode(), "HEAP");
-      Assert.assertNotNull(tableConfig.getQuotaConfig());
-      Assert.assertEquals(tableConfig.getQuotaConfig().getStorage(), "30G");
-      Assert.assertNull(tableConfig.getQuotaConfig().getMaxQueriesPerSecond());
+      assertEquals(tableConfig.getTableName(), "myTable_OFFLINE");
+      assertEquals(tableConfig.getTableType(), TableType.OFFLINE);
+      assertEquals(tableConfig.getIndexingConfig().getLoadMode(), "HEAP");
+      assertNotNull(tableConfig.getQuotaConfig());
+      assertEquals(tableConfig.getQuotaConfig().getStorage(), "30G");
+      assertNull(tableConfig.getQuotaConfig().getMaxQueriesPerSecond());
 
       // With qps quota
       quotaConfig.setMaxQueriesPerSecond("100.00");
       tableConfig = tableConfigBuilder.setQuotaConfig(quotaConfig).build();
-      Assert.assertNotNull(tableConfig.getQuotaConfig());
-      Assert.assertNotNull(tableConfig.getQuotaConfig().getMaxQueriesPerSecond());
-      Assert.assertEquals(tableConfig.getQuotaConfig().getMaxQueriesPerSecond(), "100.00");
+      assertNotNull(tableConfig.getQuotaConfig());
+      assertNotNull(tableConfig.getQuotaConfig().getMaxQueriesPerSecond());
+      assertEquals(tableConfig.getQuotaConfig().getMaxQueriesPerSecond(), "100.00");
 
       // Serialize then de-serialize
-      TableConfig tableConfigToCompare = TableConfig.fromJSONConfig(TableConfig.toJSONConfig(tableConfig));
-      Assert.assertEquals(tableConfigToCompare.getTableName(), tableConfig.getTableName());
-      Assert.assertNotNull(tableConfigToCompare.getQuotaConfig());
-      Assert
-          .assertEquals(tableConfigToCompare.getQuotaConfig().getStorage(), tableConfig.getQuotaConfig().getStorage());
+      TableConfig tableConfigToCompare = TableConfig.fromJsonConfig(tableConfig.toJsonConfig());
+      assertEquals(tableConfigToCompare.getTableName(), tableConfig.getTableName());
+      assertNotNull(tableConfigToCompare.getQuotaConfig());
+      assertEquals(tableConfigToCompare.getQuotaConfig().getStorage(), tableConfig.getQuotaConfig().getStorage());
 
-      ZNRecord znRecord = TableConfig.toZnRecord(tableConfig);
-      tableConfigToCompare = TableConfig.fromZnRecord(znRecord);
-      Assert.assertEquals(tableConfigToCompare.getTableName(), tableConfig.getTableName());
-      Assert.assertNotNull(tableConfigToCompare.getQuotaConfig());
-      Assert
-          .assertEquals(tableConfigToCompare.getQuotaConfig().getStorage(), tableConfig.getQuotaConfig().getStorage());
+      tableConfigToCompare = TableConfig.fromZnRecord(tableConfig.toZNRecord());
+      assertEquals(tableConfigToCompare.getTableName(), tableConfig.getTableName());
+      assertNotNull(tableConfigToCompare.getQuotaConfig());
+      assertEquals(tableConfigToCompare.getQuotaConfig().getStorage(), tableConfig.getQuotaConfig().getStorage());
     }
     {
       // With tenant config
       TableConfig tableConfig =
           tableConfigBuilder.setServerTenant("aServerTenant").setBrokerTenant("aBrokerTenant").build();
 
-      Assert.assertEquals(tableConfig.getTableName(), "myTable_OFFLINE");
-      Assert.assertEquals(tableConfig.getTableType(), TableType.OFFLINE);
-      Assert.assertEquals(tableConfig.getIndexingConfig().getLoadMode(), "HEAP");
-      Assert.assertNotNull(tableConfig.getTenantConfig());
-      Assert.assertEquals(tableConfig.getTenantConfig().getServer(), "aServerTenant");
-      Assert.assertEquals(tableConfig.getTenantConfig().getBroker(), "aBrokerTenant");
-      Assert.assertNull(tableConfig.getTenantConfig().getTagOverrideConfig());
+      assertEquals(tableConfig.getTableName(), "myTable_OFFLINE");
+      assertEquals(tableConfig.getTableType(), TableType.OFFLINE);
+      assertEquals(tableConfig.getIndexingConfig().getLoadMode(), "HEAP");
+      assertNotNull(tableConfig.getTenantConfig());
+      assertEquals(tableConfig.getTenantConfig().getServer(), "aServerTenant");
+      assertEquals(tableConfig.getTenantConfig().getBroker(), "aBrokerTenant");
+      assertNull(tableConfig.getTenantConfig().getTagOverrideConfig());
 
       // Serialize then de-serialize
-      TableConfig tableConfigToCompare = TableConfig.fromJSONConfig(TableConfig.toJSONConfig(tableConfig));
-      Assert.assertEquals(tableConfigToCompare.getTableName(), tableConfig.getTableName());
-      Assert.assertNotNull(tableConfigToCompare.getTenantConfig());
-      Assert
-          .assertEquals(tableConfigToCompare.getTenantConfig().getServer(), tableConfig.getTenantConfig().getServer());
-      Assert
-          .assertEquals(tableConfigToCompare.getTenantConfig().getBroker(), tableConfig.getTenantConfig().getBroker());
-      Assert.assertNull(tableConfig.getTenantConfig().getTagOverrideConfig());
+      TableConfig tableConfigToCompare = TableConfig.fromJsonConfig(tableConfig.toJsonConfig());
+      assertEquals(tableConfigToCompare.getTableName(), tableConfig.getTableName());
+      assertNotNull(tableConfigToCompare.getTenantConfig());
+      assertEquals(tableConfigToCompare.getTenantConfig().getServer(), tableConfig.getTenantConfig().getServer());
+      assertEquals(tableConfigToCompare.getTenantConfig().getBroker(), tableConfig.getTenantConfig().getBroker());
+      assertNull(tableConfig.getTenantConfig().getTagOverrideConfig());
 
-      ZNRecord znRecord = TableConfig.toZnRecord(tableConfig);
-      tableConfigToCompare = TableConfig.fromZnRecord(znRecord);
-      Assert.assertEquals(tableConfigToCompare.getTableName(), tableConfig.getTableName());
-      Assert.assertNotNull(tableConfigToCompare.getTenantConfig());
-      Assert
-          .assertEquals(tableConfigToCompare.getTenantConfig().getServer(), tableConfig.getTenantConfig().getServer());
-      Assert
-          .assertEquals(tableConfigToCompare.getTenantConfig().getBroker(), tableConfig.getTenantConfig().getBroker());
-      Assert.assertNull(tableConfig.getTenantConfig().getTagOverrideConfig());
+      tableConfigToCompare = TableConfig.fromZnRecord(tableConfig.toZNRecord());
+      assertEquals(tableConfigToCompare.getTableName(), tableConfig.getTableName());
+      assertNotNull(tableConfigToCompare.getTenantConfig());
+      assertEquals(tableConfigToCompare.getTenantConfig().getServer(), tableConfig.getTenantConfig().getServer());
+      assertEquals(tableConfigToCompare.getTenantConfig().getBroker(), tableConfig.getTenantConfig().getBroker());
+      assertNull(tableConfig.getTenantConfig().getTagOverrideConfig());
 
       TagOverrideConfig tagOverrideConfig = new TagOverrideConfig();
       tagOverrideConfig.setRealtimeConsuming("aRTConsumingTag_REALTIME");
       tableConfig = tableConfigBuilder.setTagOverrideConfig(tagOverrideConfig).build();
 
-      Assert.assertEquals(tableConfig.getTableName(), "myTable_OFFLINE");
-      Assert.assertEquals(tableConfig.getTableType(), TableType.OFFLINE);
-      Assert.assertNotNull(tableConfig.getTenantConfig());
-      Assert.assertEquals(tableConfig.getTenantConfig().getServer(), "aServerTenant");
-      Assert.assertEquals(tableConfig.getTenantConfig().getBroker(), "aBrokerTenant");
-      Assert.assertNotNull(tableConfig.getTenantConfig().getTagOverrideConfig());
-      Assert.assertEquals(tableConfig.getTenantConfig().getTagOverrideConfig().getRealtimeConsuming(),
+      assertEquals(tableConfig.getTableName(), "myTable_OFFLINE");
+      assertEquals(tableConfig.getTableType(), TableType.OFFLINE);
+      assertNotNull(tableConfig.getTenantConfig());
+      assertEquals(tableConfig.getTenantConfig().getServer(), "aServerTenant");
+      assertEquals(tableConfig.getTenantConfig().getBroker(), "aBrokerTenant");
+      assertNotNull(tableConfig.getTenantConfig().getTagOverrideConfig());
+      assertEquals(tableConfig.getTenantConfig().getTagOverrideConfig().getRealtimeConsuming(),
           "aRTConsumingTag_REALTIME");
-      Assert.assertNull(tableConfig.getTenantConfig().getTagOverrideConfig().getRealtimeCompleted());
+      assertNull(tableConfig.getTenantConfig().getTagOverrideConfig().getRealtimeCompleted());
 
       // Serialize then de-serialize
-      tableConfigToCompare = TableConfig.fromJSONConfig(TableConfig.toJSONConfig(tableConfig));
-      Assert.assertEquals(tableConfigToCompare.getTableName(), tableConfig.getTableName());
-      Assert.assertNotNull(tableConfigToCompare.getTenantConfig());
-      Assert
-          .assertEquals(tableConfigToCompare.getTenantConfig().getServer(), tableConfig.getTenantConfig().getServer());
-      Assert
-          .assertEquals(tableConfigToCompare.getTenantConfig().getBroker(), tableConfig.getTenantConfig().getBroker());
-      Assert.assertNotNull(tableConfigToCompare.getTenantConfig().getTagOverrideConfig());
-      Assert.assertEquals(tableConfig.getTenantConfig().getTagOverrideConfig(),
+      tableConfigToCompare = TableConfig.fromJsonConfig(tableConfig.toJsonConfig());
+      assertEquals(tableConfigToCompare.getTableName(), tableConfig.getTableName());
+      assertNotNull(tableConfigToCompare.getTenantConfig());
+      assertEquals(tableConfigToCompare.getTenantConfig().getServer(), tableConfig.getTenantConfig().getServer());
+      assertEquals(tableConfigToCompare.getTenantConfig().getBroker(), tableConfig.getTenantConfig().getBroker());
+      assertNotNull(tableConfigToCompare.getTenantConfig().getTagOverrideConfig());
+      assertEquals(tableConfig.getTenantConfig().getTagOverrideConfig(),
           tableConfigToCompare.getTenantConfig().getTagOverrideConfig());
 
-      znRecord = TableConfig.toZnRecord(tableConfig);
-      tableConfigToCompare = TableConfig.fromZnRecord(znRecord);
-      Assert.assertEquals(tableConfigToCompare.getTableName(), tableConfig.getTableName());
-      Assert.assertNotNull(tableConfigToCompare.getTenantConfig());
-      Assert
-          .assertEquals(tableConfigToCompare.getTenantConfig().getServer(), tableConfig.getTenantConfig().getServer());
-      Assert
-          .assertEquals(tableConfigToCompare.getTenantConfig().getBroker(), tableConfig.getTenantConfig().getBroker());
-      Assert.assertNotNull(tableConfigToCompare.getTenantConfig().getTagOverrideConfig());
-      Assert.assertEquals(tableConfig.getTenantConfig().getTagOverrideConfig(),
+      tableConfigToCompare = TableConfig.fromZnRecord(tableConfig.toZNRecord());
+      assertEquals(tableConfigToCompare.getTableName(), tableConfig.getTableName());
+      assertNotNull(tableConfigToCompare.getTenantConfig());
+      assertEquals(tableConfigToCompare.getTenantConfig().getServer(), tableConfig.getTenantConfig().getServer());
+      assertEquals(tableConfigToCompare.getTenantConfig().getBroker(), tableConfig.getTenantConfig().getBroker());
+      assertNotNull(tableConfigToCompare.getTenantConfig().getTagOverrideConfig());
+      assertEquals(tableConfig.getTenantConfig().getTagOverrideConfig(),
           tableConfigToCompare.getTenantConfig().getTagOverrideConfig());
     }
     {
@@ -185,36 +245,32 @@ public class TableConfigTest {
       tableConfig.getValidationConfig().setReplicaGroupStrategyConfig(replicaGroupConfig);
 
       // Serialize then de-serialize
-      TableConfig tableConfigToCompare = TableConfig.fromJSONConfig(TableConfig.toJSONConfig(tableConfig));
+      TableConfig tableConfigToCompare = TableConfig.fromJsonConfig(tableConfig.toJsonConfig());
       checkTableConfigWithAssignmentConfig(tableConfig, tableConfigToCompare);
 
-      ZNRecord znRecord = TableConfig.toZnRecord(tableConfig);
-      tableConfigToCompare = TableConfig.fromZnRecord(znRecord);
+      tableConfigToCompare = TableConfig.fromZnRecord(tableConfig.toZNRecord());
       checkTableConfigWithAssignmentConfig(tableConfig, tableConfigToCompare);
     }
     {
       // With default StreamConsumptionConfig
       TableConfig tableConfig = tableConfigBuilder.build();
-      Assert.assertEquals(
-          tableConfig.getIndexingConfig().getStreamConsumptionConfig().getStreamPartitionAssignmentStrategy(),
+      assertEquals(tableConfig.getIndexingConfig().getStreamConsumptionConfig().getStreamPartitionAssignmentStrategy(),
           "UniformStreamPartitionAssignment");
 
       // with streamConsumptionConfig set
       tableConfig =
           tableConfigBuilder.setStreamPartitionAssignmentStrategy("BalancedStreamPartitionAssignment").build();
-      Assert.assertEquals(
-          tableConfig.getIndexingConfig().getStreamConsumptionConfig().getStreamPartitionAssignmentStrategy(),
+      assertEquals(tableConfig.getIndexingConfig().getStreamConsumptionConfig().getStreamPartitionAssignmentStrategy(),
           "BalancedStreamPartitionAssignment");
 
       // Serialize then de-serialize
-      TableConfig tableConfigToCompare = TableConfig.fromJSONConfig(TableConfig.toJSONConfig(tableConfig));
-      Assert.assertEquals(
+      TableConfig tableConfigToCompare = TableConfig.fromJsonConfig(tableConfig.toJsonConfig());
+      assertEquals(
           tableConfigToCompare.getIndexingConfig().getStreamConsumptionConfig().getStreamPartitionAssignmentStrategy(),
           "BalancedStreamPartitionAssignment");
 
-      ZNRecord znRecord = TableConfig.toZnRecord(tableConfig);
-      tableConfigToCompare = TableConfig.fromZnRecord(znRecord);
-      Assert.assertEquals(
+      tableConfigToCompare = TableConfig.fromZnRecord(tableConfig.toZNRecord());
+      assertEquals(
           tableConfigToCompare.getIndexingConfig().getStreamConsumptionConfig().getStreamPartitionAssignmentStrategy(),
           "BalancedStreamPartitionAssignment");
     }
@@ -233,11 +289,10 @@ public class TableConfigTest {
       tableConfig.getIndexingConfig().setStarTreeIndexSpec(starTreeIndexSpec);
 
       // Serialize then de-serialize
-      TableConfig tableConfigToCompare = TableConfig.fromJSONConfig(TableConfig.toJSONConfig(tableConfig));
+      TableConfig tableConfigToCompare = TableConfig.fromJsonConfig(tableConfig.toJsonConfig());
       checkTableConfigWithStarTreeConfig(tableConfig, tableConfigToCompare);
 
-      ZNRecord znRecord = TableConfig.toZnRecord(tableConfig);
-      tableConfigToCompare = TableConfig.fromZnRecord(znRecord);
+      tableConfigToCompare = TableConfig.fromZnRecord(tableConfig.toZNRecord());
       checkTableConfigWithStarTreeConfig(tableConfig, tableConfigToCompare);
     }
     {
@@ -253,43 +308,42 @@ public class TableConfigTest {
 
       String hllConfigJson = hllConfig.toJsonString();
       HllConfig newHllConfig = HllConfig.fromJsonString(hllConfigJson);
-      Assert.assertEquals(hllConfig.getColumnsToDeriveHllFields(), newHllConfig.getColumnsToDeriveHllFields());
-      Assert.assertEquals(hllConfig.getHllLog2m(), newHllConfig.getHllLog2m());
-      Assert.assertEquals(hllConfig.getHllDeriveColumnSuffix(), newHllConfig.getHllDeriveColumnSuffix());
+      assertEquals(hllConfig.getColumnsToDeriveHllFields(), newHllConfig.getColumnsToDeriveHllFields());
+      assertEquals(hllConfig.getHllLog2m(), newHllConfig.getHllLog2m());
+      assertEquals(hllConfig.getHllDeriveColumnSuffix(), newHllConfig.getHllDeriveColumnSuffix());
 
       TableConfig tableConfig = tableConfigBuilder.build();
       tableConfig.getValidationConfig().setHllConfig(hllConfig);
 
       // Serialize then de-serialize
-      TableConfig tableConfigToCompare = TableConfig.fromJSONConfig(TableConfig.toJSONConfig(tableConfig));
+      TableConfig tableConfigToCompare = TableConfig.fromJsonConfig(tableConfig.toJsonConfig());
       checkTableConfigWithHllConfig(tableConfig, tableConfigToCompare);
 
-      ZNRecord znRecord = TableConfig.toZnRecord(tableConfig);
-      tableConfigToCompare = TableConfig.fromZnRecord(znRecord);
+      tableConfigToCompare = TableConfig.fromZnRecord(tableConfig.toZNRecord());
       checkTableConfigWithHllConfig(tableConfig, tableConfigToCompare);
     }
   }
 
   private void checkTableConfigWithAssignmentConfig(TableConfig tableConfig, TableConfig tableConfigToCompare) {
     // Check that the segment assignment configuration does exist.
-    Assert.assertEquals(tableConfigToCompare.getTableName(), tableConfig.getTableName());
-    Assert.assertNotNull(tableConfigToCompare.getValidationConfig().getReplicaGroupStrategyConfig());
-    Assert.assertEquals(tableConfigToCompare.getValidationConfig().getReplicaGroupStrategyConfig(),
+    assertEquals(tableConfigToCompare.getTableName(), tableConfig.getTableName());
+    assertNotNull(tableConfigToCompare.getValidationConfig().getReplicaGroupStrategyConfig());
+    assertEquals(tableConfigToCompare.getValidationConfig().getReplicaGroupStrategyConfig(),
         tableConfig.getValidationConfig().getReplicaGroupStrategyConfig());
 
     // Check that the configurations are correct.
     ReplicaGroupStrategyConfig strategyConfig =
         tableConfigToCompare.getValidationConfig().getReplicaGroupStrategyConfig();
-    Assert.assertTrue(strategyConfig.getMirrorAssignmentAcrossReplicaGroups());
-    Assert.assertEquals(strategyConfig.getNumInstancesPerPartition(), 5);
-    Assert.assertEquals(strategyConfig.getPartitionColumn(), "memberId");
+    assertTrue(strategyConfig.getMirrorAssignmentAcrossReplicaGroups());
+    assertEquals(strategyConfig.getNumInstancesPerPartition(), 5);
+    assertEquals(strategyConfig.getPartitionColumn(), "memberId");
   }
 
   private void checkTableConfigWithStarTreeConfig(TableConfig tableConfig, TableConfig tableConfigToCompare)
       throws Exception {
     // Check that the segment assignment configuration does exist.
-    Assert.assertEquals(tableConfigToCompare.getTableName(), tableConfig.getTableName());
-    Assert.assertNotNull(tableConfigToCompare.getIndexingConfig().getStarTreeIndexSpec());
+    assertEquals(tableConfigToCompare.getTableName(), tableConfig.getTableName());
+    assertNotNull(tableConfigToCompare.getIndexingConfig().getStarTreeIndexSpec());
 
     // Check that the configurations are correct.
     StarTreeIndexSpec starTreeIndexSpec = tableConfigToCompare.getIndexingConfig().getStarTreeIndexSpec();
@@ -297,24 +351,24 @@ public class TableConfigTest {
     Set<String> dims = new HashSet<>();
     dims.add("dims");
 
-    Assert.assertEquals(starTreeIndexSpec.getDimensionsSplitOrder(), Collections.singletonList("dim"));
-    Assert.assertEquals(starTreeIndexSpec.getMaxLeafRecords(), 5);
-    Assert.assertEquals(starTreeIndexSpec.getSkipMaterializationCardinalityThreshold(), 1);
-    Assert.assertEquals(starTreeIndexSpec.getSkipMaterializationForDimensions(), dims);
-    Assert.assertEquals(starTreeIndexSpec.getSkipStarNodeCreationForDimensions(), dims);
+    assertEquals(starTreeIndexSpec.getDimensionsSplitOrder(), Collections.singletonList("dim"));
+    assertEquals(starTreeIndexSpec.getMaxLeafRecords(), 5);
+    assertEquals(starTreeIndexSpec.getSkipMaterializationCardinalityThreshold(), 1);
+    assertEquals(starTreeIndexSpec.getSkipMaterializationForDimensions(), dims);
+    assertEquals(starTreeIndexSpec.getSkipStarNodeCreationForDimensions(), dims);
 
     starTreeIndexSpec = StarTreeIndexSpec.fromJsonString(starTreeIndexSpec.toJsonString());
-    Assert.assertEquals(starTreeIndexSpec.getDimensionsSplitOrder(), Collections.singletonList("dim"));
-    Assert.assertEquals(starTreeIndexSpec.getMaxLeafRecords(), 5);
-    Assert.assertEquals(starTreeIndexSpec.getSkipMaterializationCardinalityThreshold(), 1);
-    Assert.assertEquals(starTreeIndexSpec.getSkipMaterializationForDimensions(), dims);
-    Assert.assertEquals(starTreeIndexSpec.getSkipStarNodeCreationForDimensions(), dims);
+    assertEquals(starTreeIndexSpec.getDimensionsSplitOrder(), Collections.singletonList("dim"));
+    assertEquals(starTreeIndexSpec.getMaxLeafRecords(), 5);
+    assertEquals(starTreeIndexSpec.getSkipMaterializationCardinalityThreshold(), 1);
+    assertEquals(starTreeIndexSpec.getSkipMaterializationForDimensions(), dims);
+    assertEquals(starTreeIndexSpec.getSkipStarNodeCreationForDimensions(), dims);
   }
 
   private void checkTableConfigWithHllConfig(TableConfig tableConfig, TableConfig tableConfigToCompare) {
     // Check that the segment assignment configuration does exist.
-    Assert.assertEquals(tableConfigToCompare.getTableName(), tableConfig.getTableName());
-    Assert.assertNotNull(tableConfigToCompare.getValidationConfig().getHllConfig());
+    assertEquals(tableConfigToCompare.getTableName(), tableConfig.getTableName());
+    assertNotNull(tableConfigToCompare.getValidationConfig().getHllConfig());
 
     // Check that the configurations are correct.
     HllConfig hllConfig = tableConfigToCompare.getValidationConfig().getHllConfig();
@@ -323,8 +377,8 @@ public class TableConfigTest {
     columns.add("column");
     columns.add("column2");
 
-    Assert.assertEquals(hllConfig.getColumnsToDeriveHllFields(), columns);
-    Assert.assertEquals(hllConfig.getHllLog2m(), 9);
-    Assert.assertEquals(hllConfig.getHllDeriveColumnSuffix(), "suffix");
+    assertEquals(hllConfig.getColumnsToDeriveHllFields(), columns);
+    assertEquals(hllConfig.getHllLog2m(), 9);
+    assertEquals(hllConfig.getHllDeriveColumnSuffix(), "suffix");
   }
 }

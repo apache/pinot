@@ -6,35 +6,34 @@
  * @property {boolean} isEditMode - to activate the edit mode
  * @property {boolean} showSettings - to show the subscriber groups yaml editor
  * @property {Object} subscriptionGroupNames - the list of subscription groups
- * @property {Object} alertYaml - the alert yaml to display
- * @property {Object} detectionSettingsYaml - the subscription group yaml to display
+ * @property {Object} detectionYaml - the detection yaml to display
+ * @property {Object} subscriptionYaml - the subscription group yaml to display
  * @example
    {{yaml-editor
      alertId=model.alertId
      subscriptionGroupId=model.subscriptionGroupId
      isEditMode=true
      showSettings=true
-     subscriptionGroupNames=model.detectionSettingsYaml
-     alertYaml=model.detectionYaml
-     detectionSettingsYaml=model.detectionSettingsYaml
+     subscriptionGroupNames=model.subscriptionGroupNames
+     detectionYaml=model.detectionYaml
+     subscriptionYaml=model.subscriptionYaml
    }}
  * @author lohuynh
  */
 
 import Component from '@ember/component';
-import { computed, set, get, getProperties, setProperties } from '@ember/object';
-import { checkStatus } from 'thirdeye-frontend/utils/utils';
-import { yamlAlertProps, yamlAlertSettings } from 'thirdeye-frontend/utils/constants';
+import {computed, set, get, getProperties, setProperties} from '@ember/object';
+import {checkStatus} from 'thirdeye-frontend/utils/utils';
+import {yamlAlertProps, yamlAlertSettings, toastOptions} from 'thirdeye-frontend/utils/constants';
 import yamljs from 'yamljs';
 import RSVP from "rsvp";
 import fetch from 'fetch';
 import {
-  selfServeApiGraph,
-  selfServeApiCommon
+  selfServeApiGraph, selfServeApiCommon
 } from 'thirdeye-frontend/utils/api/self-serve';
-import { inject as service } from '@ember/service';
-import { task } from 'ember-concurrency';
-
+import {inject as service} from '@ember/service';
+import {task} from 'ember-concurrency';
+import config from 'thirdeye-frontend/config/environment';
 
 export default Component.extend({
   classNames: ['yaml-editor'],
@@ -44,15 +43,15 @@ export default Component.extend({
    */
   currentMetric: null,
   isYamlParseable: true,
-  alertTitle: 'Define anomaly detection in YAML',
-  alertSettingsTitle: 'Define notification settings',
+  alertTitle: 'Define detection configuration',
+  alertSettingsTitle: 'Define subscription configuration',
   isEditMode: false,
   showSettings: true,
   disableYamlSave: true,
   detectionMsg: '',                   //General alert failures
   subscriptionMsg: '',                //General subscription failures
-  alertYaml: null,                // The YAML for the anomaly alert detection
-  detectionSettingsYaml:  null,   // The YAML for the subscription group
+  detectionYaml: null,                // The YAML for the anomaly detection
+  subscriptionYaml:  null,            // The YAML for the subscription group
   yamlAlertProps: yamlAlertProps,
   yamlAlertSettings: yamlAlertSettings,
   showAnomalyModal: false,
@@ -60,53 +59,84 @@ export default Component.extend({
   currentYamlAlertOriginal: '',
   currentYamlSettingsOriginal: '',
   toggleCollapsed: true,
+  alertDataIsCurrent: true,
 
 
 
   init() {
     this._super(...arguments);
-    if(get(this, 'isEditMode')) {
-      set(this, 'currentYamlAlertOriginal', get(this, 'alertYaml') || get(this, 'yamlAlertProps'));
-      set(this, 'currentYamlSettingsOriginal', get(this, 'detectionSettingsYaml') || get(this, 'yamlAlertSettings'));
+    // In edit mode, sets subscription group to an existing group by default and sets default yamls
+    if (get(this, 'isEditMode')) {
+      const subscriptionGroupNames = get(this, 'subscriptionGroupNames');
+      // Checks to make sure there is a subscription group array with at least one subscription group
+      if (subscriptionGroupNames && Array.isArray(subscriptionGroupNames) && subscriptionGroupNames.length > 0) {
+        const firstGroup = subscriptionGroupNames[0];
+        set(this, 'subscriptionYaml', firstGroup.yaml);
+        set(this, 'groupName', firstGroup);
+        set(this, 'subscriptionGroupId', firstGroup.id);
+      }
+      // Sets default yamls after checking for and setting default subscription group
+      set(this, 'currentYamlAlertOriginal', get(this, 'detectionYaml') || get(this, 'yamlAlertProps'));
+      set(this, 'currentYamlSettingsOriginal', get(this, 'subscriptionYaml') || get(this, 'yamlAlertSettings'));
     }
   },
 
   /**
-   * sets Yaml value displayed to contents of alertYaml or yamlAlertProps
-   * @method currentYamlAlert
-   * @return {String}
+   * populates subscription group dropdown with options from fetch or model
+   * @method subscriptionGroupNamesDisplay
+   * @return {Object}
    */
   subscriptionGroupNamesDisplay: computed(
     'subscriptionGroupNames',
     async function() {
+      const isEditMode = get(this, 'isEditMode');
+      if (isEditMode) {
+        return get(this, 'subscriptionGroupNames');
+      }
       const subscriptionGroups = await get(this, '_fetchSubscriptionGroups').perform();
       return get(this, 'subscriptionGroupNames') || subscriptionGroups;
     }
   ),
 
   /**
-   * sets Yaml value displayed to contents of alertYaml or yamlAlertProps
+   * Flag to trigger special case of no existing subscription groups for an alert
+   * @method noExistingSubscriptionGroup
+   * @return {Boolean}
+   */
+  noExistingSubscriptionGroup: computed(
+    'subscriptionGroupNames',
+    function() {
+      const subscriptionGroupNames = get(this, 'subscriptionGroupNames');
+      if (subscriptionGroupNames && Array.isArray(subscriptionGroupNames) && subscriptionGroupNames.length > 0) {
+        return false;
+      }
+      return true;
+    }
+  ),
+
+  /**
+   * sets Yaml value displayed to contents of detectionYaml or yamlAlertProps
    * @method currentYamlAlert
    * @return {String}
    */
   currentYamlAlert: computed(
-    'alertYaml',
+    'detectionYaml',
     function() {
-      const inputYaml = get(this, 'alertYaml');
+      const inputYaml = get(this, 'detectionYaml');
       return inputYaml || get(this, 'yamlAlertProps');
     }
   ),
 
   /**
-   * sets Yaml value displayed to contents of detectionSettingsYaml or yamlAlertSettings
+   * sets Yaml value displayed to contents of subscriptionYaml or yamlAlertSettings
    * @method currentYamlAlert
    * @return {String}
    */
-  currentYamlSettings: computed(
-    'detectionSettingsYaml',
+  currentSubscriptionYaml: computed(
+    'subscriptionYaml',
     function() {
-      const detectionSettingsYaml = get(this, 'detectionSettingsYaml');
-      return detectionSettingsYaml || get(this, 'yamlAlertSettings');
+      const subscriptionYaml = get(this, 'subscriptionYaml');
+      return subscriptionYaml || get(this, 'yamlAlertSettings');
     }
   ),
 
@@ -141,7 +171,7 @@ export default Component.extend({
       const json = yield response.json();
       return json.filterBy('yaml');
     } catch (error) {
-      notifications.error('Failed to retrieve subscription groups.', 'Error');
+      notifications.error('Failed to retrieve subscription groups.', 'Error', toastOptions);
     }
   }).drop(),
 
@@ -260,6 +290,54 @@ export default Component.extend({
     return defaultReturn;
   },
 
+  // Method for handling subscription group, whether there are any or not
+  async _handleSubscriptionGroup(subscriptionYaml, notifications, subscriptionGroupId) {
+    const noExistingSubscriptionGroup = get(this, 'noExistingSubscriptionGroup');
+    if (noExistingSubscriptionGroup) {
+      //PUT settings
+      const setting_url = '/yaml/subscription';
+      const settingsPostProps = {
+        method: 'POST',
+        body: subscriptionYaml,
+        headers: { 'content-type': 'text/plain' }
+      };
+      try {
+        const settings_result = await fetch(setting_url, settingsPostProps);
+        const settings_status  = get(settings_result, 'status');
+        const settings_json = await settings_result.json();
+        if (settings_status !== 200) {
+          set(this, 'errorMsg', get(settings_json, 'message'));
+          notifications.error(`Failed to save the subscription configuration due to: ${settings_json.message}.`, 'Error', toastOptions);
+        } else {
+          notifications.success('Subscription configuration saved successfully', 'Done', toastOptions);
+        }
+      } catch (error) {
+        notifications.error('Error while saving subscription config.', error, toastOptions);
+      }
+    } else {
+      //PUT settings
+      const setting_url = `/yaml/subscription/${subscriptionGroupId}`;
+      const settingsPostProps = {
+        method: 'PUT',
+        body: subscriptionYaml,
+        headers: { 'content-type': 'text/plain' }
+      };
+      try {
+        const settings_result = await fetch(setting_url, settingsPostProps);
+        const settings_status  = get(settings_result, 'status');
+        const settings_json = await settings_result.json();
+        if (settings_status !== 200) {
+          set(this, 'errorMsg', get(settings_json, 'message'));
+          notifications.error(`Failed to save the subscription configuration due to: ${settings_json.message}.`, 'Error', toastOptions);
+        } else {
+          notifications.success('Subscription configuration saved successfully', 'Done', toastOptions);
+        }
+      } catch (error) {
+        notifications.error('Error while saving subscription config.', error, toastOptions);
+      }
+    }
+  },
+
   actions: {
     changeAccordion() {
       set(this, 'toggleCollapsed', !get(this, 'toggleCollapsed'));
@@ -272,17 +350,17 @@ export default Component.extend({
       const isEditMode = get(this, 'isEditMode');
       if (field === 'anomaly') {
         if(isEditMode) {
-          set(this, 'alertYaml', get(this, 'currentYamlAlertOriginal'));
+          set(this, 'detectionYaml', get(this, 'currentYamlAlertOriginal'));
         } else {
           const yamlAlertProps = get(this, 'yamlAlertProps');
-          set(this, 'alertYaml', yamlAlertProps);
+          set(this, 'detectionYaml', yamlAlertProps);
         }
       } else if (field === 'subscription') {
         if(isEditMode) {
-          set(this, 'detectionSettingsYaml', get(this, 'currentYamlSettingsOriginal'));
+          set(this, 'subscriptionYaml', get(this, 'currentYamlSettingsOriginal'));
         } else {
           const yamlAlertSettings = get(this, 'yamlAlertSettings');
-          set(this, 'detectionSettingsYaml', yamlAlertSettings);
+          set(this, 'subscriptionYaml', yamlAlertSettings);
         }
       }
     },
@@ -292,19 +370,9 @@ export default Component.extend({
      */
     triggerDoc(field) {
       if (field === 'Anomaly') {
-        window.open('https://iwww.corp.linkedin.com/wiki/cf/display/ENGS/ThirdEye+Alert+Configuration+Reference#ThirdEyeAlertConfigurationReference-2.WriteAnomaly-Function/DetectionConfiguration');
+        window.open(config.docs.detectionConfig);
       } else {
-        window.open('https://iwww.corp.linkedin.com/wiki/cf/display/ENGS/ThirdEye+Alert+Configuration+Reference#ThirdEyeAlertConfigurationReference-3.WriteSubscription-Group/NotificationConfiguration');
-      }
-    },
-
-    /**
-     * Updates the subscription settings yaml with user section
-     */
-    onYAMLGroupSelectionAction(value) {
-      if(value.yaml) {
-        set(this, 'currentYamlSettings', value.yaml);
-        set(this, 'groupName', value);
+        window.open(config.docs.subscriptionConfig);
       }
     },
 
@@ -313,12 +381,12 @@ export default Component.extend({
      */
     yamlSuggestions(editor, session, position, prefix) {
       const {
-        alertYaml,
+        detectionYaml,
         noResultsArray
-      } = getProperties(this, 'alertYaml', 'noResultsArray');
+      } = getProperties(this, 'detectionYaml', 'noResultsArray');
       let yamlAsObject = {};
       try {
-        yamlAsObject = yamljs.parse(alertYaml);
+        yamlAsObject = yamljs.parse(detectionYaml);
         set(this, 'isYamlParseable', true);
       }
       catch(err){
@@ -354,25 +422,37 @@ export default Component.extend({
     },
 
     /**
-     * Activates 'Create changes' button and stores YAML content in alertYaml
+     * Activates 'Create changes' button and stores YAML content in detectionYaml
      */
-    onYMLSelectorAction(value) {
+    onEditingDetectionYamlAction(value) {
       setProperties(this, {
         disableYamlSave: false,
-        alertYaml: value,
+        detectionYaml: value,
         detectionMsg: '',
-        subscriptionMsg: ''
+        subscriptionMsg: '',
+        alertDataIsCurrent: false
       });
     },
 
     /**
-     * Activates 'Create changes' button and stores YAML content in detectionSettingsYaml
+     * Activates 'Create changes' button and stores YAML content in subscriptionYaml
      */
-    onYMLSettingsSelectorAction(value) {
+    onEditingSubscriptionYamlAction(value) {
       setProperties(this, {
         disableYamlSave: false,
-        detectionSettingsYaml: value
+        subscriptionYaml: value
       });
+    },
+
+    /**
+     * Updates the subscription settings yaml with user section
+     */
+    onSubscriptionGroupSelectionAction(value) {
+      if(value.yaml) {
+        set(this, 'subscriptionYaml', value.yaml);
+        set(this, 'groupName', value);
+        set(this, 'subscriptionGroupId', value.id);
+      }
     },
 
     /**
@@ -381,8 +461,8 @@ export default Component.extend({
      */
     createAlertYamlAction() {
       const content = {
-        detection: get(this, 'alertYaml'),
-        subscription: get(this, 'detectionSettingsYaml')
+        detection: get(this, 'detectionYaml'),
+        subscription: get(this, 'subscriptionYaml')
       };
       const url = '/yaml/create-alert';
       const postProps = {
@@ -402,12 +482,12 @@ export default Component.extend({
               set(this, 'subscriptionMsg', result.subscriptionMsg);
             }
             if (result.detectionAlertConfigId && result.detectionConfigId) {
-              notifications.success('Created alert successfully.', 'Created');
+              notifications.success('Created alert successfully.', 'Created', toastOptions);
             }
           }
         });
       }).catch((error) => {
-        notifications.error('Create alert failed.', error);
+        notifications.error('Create alert failed.', error, toastOptions);
       });
     },
 
@@ -417,18 +497,18 @@ export default Component.extend({
      */
     async saveEditYamlAction() {
       const {
-        alertYaml,
-        detectionSettingsYaml,
+        detectionYaml,
+        subscriptionYaml,
         notifications,
         alertId,
         subscriptionGroupId
-      } = getProperties(this, 'alertYaml', 'detectionSettingsYaml', 'notifications', 'alertId', 'subscriptionGroupId');
+      } = getProperties(this, 'detectionYaml', 'subscriptionYaml', 'notifications', 'alertId', 'subscriptionGroupId');
 
       //PUT alert
       const alert_url = `/yaml/${alertId}`;
       const alertPostProps = {
         method: 'PUT',
-        body: alertYaml,
+        body: detectionYaml,
         headers: { 'content-type': 'text/plain' }
       };
       try {
@@ -437,34 +517,15 @@ export default Component.extend({
         const alert_json = await alert_result.json();
         if (alert_status !== 200) {
           set(this, 'errorMsg', get(alert_json, 'message'));
-          notifications.error('Save alert yaml file failed.', 'Error');
+          notifications.error(`Failed to save the detection configuration due to: ${alert_json.message}.`, 'Error', toastOptions);
         } else {
-          notifications.success('Alert saved successfully', 'Done', alert_json);
+          notifications.success('Detection configuration saved successfully', 'Done', toastOptions);
         }
       } catch (error) {
-        notifications.error('Save alert yaml file failed.', error);
+        notifications.error('Error while saving detection config.', error, toastOptions);
       }
-
-      //PUT settings
-      const setting_url = `/yaml/subscription/${subscriptionGroupId}`;
-      const settingsPostProps = {
-        method: 'PUT',
-        body: detectionSettingsYaml,
-        headers: { 'content-type': 'text/plain' }
-      };
-      try {
-        const settings_result = await fetch(setting_url, settingsPostProps);
-        const settings_status  = get(settings_result, 'status');
-        const settings_json = await settings_result.json();
-        if (settings_status !== 200) {
-          set(this, 'errorMsg', get(settings_json, 'message'));
-          notifications.error('Save settings yaml file failed.', 'Error');
-        } else {
-          notifications.success('Settings saved successfully', 'Done', settings_json);
-        }
-      } catch (error) {
-        notifications.error('Save settings yaml file failed.', error);
-      }
+      // If there is no existing subscription group, this method will handle it
+      this._handleSubscriptionGroup(subscriptionYaml, notifications, subscriptionGroupId);
     }
   }
 });

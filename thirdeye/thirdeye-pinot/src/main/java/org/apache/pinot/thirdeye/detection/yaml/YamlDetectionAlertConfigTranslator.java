@@ -182,8 +182,10 @@ public class YamlDetectionAlertConfigTranslator {
       refLinks = new HashMap<>();
       yamlAlertConfig.put(PROP_REFERENCE_LINKS, refLinks);
     }
-    refLinks.put("ThirdEye User Guide", "https://go/thirdeyeuserguide");
-    refLinks.put("Add Reference Links", "https://go/thirdeyealertreflink");
+    if (refLinks.isEmpty()) {
+      refLinks.put("ThirdEye User Guide", "https://go/thirdeyeuserguide");
+      refLinks.put("Add Reference Links", "https://go/thirdeyealertreflink");
+    }
     alertConfigDTO.setReferenceLinks(MapUtils.getMap(yamlAlertConfig, PROP_REFERENCE_LINKS));
 
     alertConfigDTO.setAlertSchemes(buildAlertSchemes(yamlAlertConfig));

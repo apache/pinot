@@ -56,6 +56,7 @@ import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.controller.ControllerLeadershipManager;
 import org.apache.pinot.controller.api.resources.LLCSegmentCompletionHandlers;
 import org.apache.pinot.controller.helix.core.PinotTableIdealStateBuilder;
 import org.apache.pinot.controller.helix.core.realtime.segment.CommittingSegmentDescriptor;
@@ -347,11 +348,11 @@ public class PinotLLCRealtimeSegmentManagerTest {
     String tableName = tableConfig.getTableName();
     String rawTableName = TableNameBuilder.extractRawTableName(tableName);
     LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
-    segmentManager.updateOldSegmentMetadataZNRecord(tableName, llcSegmentName, nextOffset);
     LLCSegmentName newLlcSegmentName =
         new LLCSegmentName(rawTableName, partition, nextSeqNum, System.currentTimeMillis());
     CommittingSegmentDescriptor committingSegmentDescriptor =
         new CommittingSegmentDescriptor(segmentName, nextOffset, 0);
+    segmentManager.updateOldSegmentMetadataZNRecord(tableName, llcSegmentName, nextOffset, committingSegmentDescriptor);
     segmentManager.createNewSegmentMetadataZNRecord(tableConfig, llcSegmentName, newLlcSegmentName, partitionAssignment,
         committingSegmentDescriptor, false);
     segmentManager.updateIdealStateOnSegmentCompletion(idealState, segmentName, newLlcSegmentName.getSegmentName(),
@@ -552,13 +553,14 @@ public class PinotLLCRealtimeSegmentManagerTest {
           LLCSegmentName latestSegment = partitionToLatestSegments.get(String.valueOf(randomlySelectedPartition));
           LLCRealtimeSegmentZKMetadata latestMetadata =
               segmentManager.getRealtimeSegmentZKMetadata(tableName, latestSegment.getSegmentName(), null);
-          segmentManager
-              .updateOldSegmentMetadataZNRecord(tableName, latestSegment, latestMetadata.getStartOffset() + 100);
           LLCSegmentName newLlcSegmentName =
               new LLCSegmentName(rawTableName, randomlySelectedPartition, latestSegment.getSequenceNumber() + 1,
                   System.currentTimeMillis());
           CommittingSegmentDescriptor committingSegmentDescriptor =
               new CommittingSegmentDescriptor(latestSegment.getSegmentName(), latestMetadata.getStartOffset() + 100, 0);
+          segmentManager
+              .updateOldSegmentMetadataZNRecord(tableName, latestSegment, latestMetadata.getStartOffset() + 100,
+                  committingSegmentDescriptor);
           segmentManager.createNewSegmentMetadataZNRecord(tableConfig, latestSegment, newLlcSegmentName,
               expectedPartitionAssignment, committingSegmentDescriptor, false);
 
@@ -632,7 +634,9 @@ public class PinotLLCRealtimeSegmentManagerTest {
             LLCRealtimeSegmentZKMetadata latestMetadata =
                 segmentManager.getRealtimeSegmentZKMetadata(tableName, latestSegment.getSegmentName(), null);
             segmentManager
-                .updateOldSegmentMetadataZNRecord(tableName, latestSegment, latestMetadata.getStartOffset() + 100);
+                .updateOldSegmentMetadataZNRecord(tableName, latestSegment, latestMetadata.getStartOffset() + 100,
+                    new CommittingSegmentDescriptor(latestSegment.getSegmentName(),
+                        latestMetadata.getStartOffset() + 100, 0));
             idealState = idealStateBuilder.setSegmentState(latestSegment.getSegmentName(), "ONLINE").build();
 
             // get old state
@@ -666,7 +670,9 @@ public class PinotLLCRealtimeSegmentManagerTest {
               LLCRealtimeSegmentZKMetadata latestMetadata =
                   segmentManager.getRealtimeSegmentZKMetadata(tableName, latestSegment.getSegmentName(), null);
               segmentManager
-                  .updateOldSegmentMetadataZNRecord(tableName, latestSegment, latestMetadata.getStartOffset() + 100);
+                  .updateOldSegmentMetadataZNRecord(tableName, latestSegment, latestMetadata.getStartOffset() + 100,
+                      new CommittingSegmentDescriptor(latestSegment.getSegmentName(),
+                          latestMetadata.getStartOffset() + 100, 0));
 
               // get old state
               nPartitions = expectedPartitionAssignment.getNumPartitions();
@@ -893,8 +899,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
     segmentManager._records.clear();
     segmentManager.IS_CONNECTED = false;
     reqParams.withSegmentName(committingSegmentMetadata.getSegmentName()).withOffset(nextOffset);
-    CommittingSegmentDescriptor committingSegmentDescriptor =
-        CommittingSegmentDescriptor.fromSegmentCompletionReqParams(reqParams);
+    CommittingSegmentDescriptor committingSegmentDescriptor = CommittingSegmentDescriptor
+        .fromSegmentCompletionReqParamsAndMetadata(reqParams, segmentManager.newMockSegmentMetadata());
     boolean status = segmentManager.commitSegmentMetadata(rawTableName, committingSegmentDescriptor);
     Assert.assertFalse(status);
     Assert.assertEquals(segmentManager._nCallsToUpdateHelix, 0);  // Idealstate not updated
@@ -949,8 +955,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
     segmentManager._records.clear();
     Set<String> prevInstances = idealState.getInstanceSet(committingSegmentMetadata.getSegmentName());
     reqParams.withSegmentName(committingSegmentMetadata.getSegmentName()).withOffset(nextOffset);
-    CommittingSegmentDescriptor committingSegmentDescriptor =
-        CommittingSegmentDescriptor.fromSegmentCompletionReqParams(reqParams);
+    CommittingSegmentDescriptor committingSegmentDescriptor = CommittingSegmentDescriptor
+        .fromSegmentCompletionReqParamsAndMetadata(reqParams, segmentManager.newMockSegmentMetadata());
     boolean status = segmentManager.commitSegmentMetadata(rawTableName, committingSegmentDescriptor);
     segmentManager.verifyMetadataInteractions();
     Assert.assertTrue(status);
@@ -973,7 +979,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
     segmentManager._records.clear();
     prevInstances = idealState.getInstanceSet(committingSegmentMetadata.getSegmentName());
     reqParams.withSegmentName(committingSegmentMetadata.getSegmentName()).withOffset(nextOffset);
-    committingSegmentDescriptor = CommittingSegmentDescriptor.fromSegmentCompletionReqParams(reqParams);
+    committingSegmentDescriptor = CommittingSegmentDescriptor
+        .fromSegmentCompletionReqParamsAndMetadata(reqParams, segmentManager.newMockSegmentMetadata());
     status = segmentManager.commitSegmentMetadata(rawTableName, committingSegmentDescriptor);
     segmentManager.verifyMetadataInteractions();
     Assert.assertTrue(status);
@@ -991,7 +998,9 @@ public class PinotLLCRealtimeSegmentManagerTest {
     segmentManager._paths.clear();
     segmentManager._records.clear();
     reqParams.withSegmentName(committingSegmentMetadata.getSegmentName()).withOffset(nextOffset);
-    committingSegmentDescriptor = CommittingSegmentDescriptor.fromSegmentCompletionReqParams(reqParams);
+    // We do not expect the segment metadata to be used. Thus reuse the current metadata.
+    committingSegmentDescriptor = CommittingSegmentDescriptor
+        .fromSegmentCompletionReqParamsAndMetadata(reqParams, segmentManager.getMockSegmentMetadata());
     status = segmentManager.commitSegmentMetadata(rawTableName, committingSegmentDescriptor);
     segmentManager.verifyMetadataInteractions();
     Assert.assertFalse(status);
@@ -1006,7 +1015,9 @@ public class PinotLLCRealtimeSegmentManagerTest {
     segmentManager._paths.clear();
     segmentManager._records.clear();
     reqParams.withSegmentName(committingSegmentMetadata.getSegmentName()).withOffset(nextOffset);
-    committingSegmentDescriptor = CommittingSegmentDescriptor.fromSegmentCompletionReqParams(reqParams);
+    // We do not expect the segment metadata to be used. Thus reuse the current metadata.
+    committingSegmentDescriptor = CommittingSegmentDescriptor
+        .fromSegmentCompletionReqParamsAndMetadata(reqParams, segmentManager.getMockSegmentMetadata());
     status = segmentManager.commitSegmentMetadata(rawTableName, committingSegmentDescriptor);
     segmentManager.verifyMetadataInteractions();
     Assert.assertFalse(status);
@@ -1021,7 +1032,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
     committingSegmentMetadata = new LLCRealtimeSegmentZKMetadata(newZnRec);
     prevInstances = idealState.getInstanceSet(committingSegmentMetadata.getSegmentName());
     reqParams.withSegmentName(committingSegmentMetadata.getSegmentName()).withOffset(nextOffset);
-    committingSegmentDescriptor = CommittingSegmentDescriptor.fromSegmentCompletionReqParams(reqParams);
+    committingSegmentDescriptor = CommittingSegmentDescriptor
+        .fromSegmentCompletionReqParamsAndMetadata(reqParams, segmentManager.newMockSegmentMetadata());
     status = segmentManager.commitSegmentMetadata(rawTableName, committingSegmentDescriptor);
     segmentManager.verifyMetadataInteractions();
     Assert.assertTrue(status);
@@ -1090,8 +1102,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
         new LLCRealtimeSegmentZKMetadata(segmentManager2._records.get(committingPartition));
 
     reqParams.withSegmentName(committingSegmentMetadata.getSegmentName()).withOffset(nextOffset);
-    CommittingSegmentDescriptor committingSegmentDescriptor =
-        CommittingSegmentDescriptor.fromSegmentCompletionReqParams(reqParams);
+    CommittingSegmentDescriptor committingSegmentDescriptor = CommittingSegmentDescriptor
+        .fromSegmentCompletionReqParamsAndMetadata(reqParams, segmentManager1.newMockSegmentMetadata());
     boolean status = segmentManager1.commitSegmentMetadata(rawTableName, committingSegmentDescriptor);
     Assert.assertTrue(status);  // Committing segment metadata succeeded.
 
@@ -1100,6 +1112,72 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     status = segmentManager3.commitSegmentMetadata(rawTableName, committingSegmentDescriptor);
     Assert.assertFalse(status); // Committing segment metadata failed.
+  }
+
+  /**
+   * Tests the scenario where ideal state for new segment, was already updated by some external thread, after step 2 and before step 3 of segment commit.
+   * This can happen if step 3 (ideal state update) took longer than {@link PinotLLCRealtimeSegmentManager::MAX_SEGMENT_COMPLETION_TIME_MILLIS},
+   * making the segment eligible for repairs by {@link org.apache.pinot.controller.validation.RealtimeSegmentValidationManager}
+   * @throws InvalidConfigException
+   */
+  @Test
+  public void testIdealStateAlreadyUpdated()
+      throws InvalidConfigException {
+    FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager(null);
+    String tableNameWithType = "tableName_REALTIME";
+    String rawTableName = "tableName";
+    int nPartitions = 4;
+    int nReplicas = 2;
+    int nInstances = 3;
+    setupSegmentManager(segmentManager, tableNameWithType, nPartitions, nReplicas, nInstances);
+
+    IdealState idealState = segmentManager._tableIdealState;
+    TableConfig tableConfig = segmentManager._tableConfigStore.getTableConfig(tableNameWithType);
+    PartitionAssignment partitionAssignment = segmentManager._partitionAssignmentGenerator
+        .getStreamPartitionAssignmentFromIdealState(tableConfig, idealState);
+    int partitionId = 0;
+    int seq = 0;
+    IdealStateBuilderUtil idealStateBuilderUtil = new IdealStateBuilderUtil(idealState, tableNameWithType);
+    String currentSegmentId = idealStateBuilderUtil.getSegment(partitionId, seq);
+    LLCSegmentName newSegment = new LLCSegmentName(rawTableName, partitionId, ++seq, System.currentTimeMillis());
+    String newSegmentId = newSegment.getSegmentName();
+    ZNRecordSerializer znRecordSerializer = new ZNRecordSerializer();
+    IdealState idealStateCopy =
+        new IdealState((ZNRecord) znRecordSerializer.deserialize(znRecordSerializer.serialize(idealState.getRecord())));
+    segmentManager.updateIdealStateOnSegmentCompletion(idealState, currentSegmentId, newSegmentId, partitionAssignment);
+
+    // check ideal state updates
+    Assert.assertNotEquals(idealState, idealStateCopy);
+
+    // progress ideal state, but send update for old. Should not update
+    currentSegmentId = newSegmentId;
+    List<String> instances = idealStateBuilderUtil.getInstances(partitionId, seq);
+    idealStateBuilderUtil.setSegmentState(partitionId, seq, "ONLINE");
+    idealStateBuilderUtil.addConsumingSegment(partitionId, ++seq, nReplicas, instances);
+    newSegmentId = idealStateBuilderUtil.getSegment(partitionId, seq);
+    idealStateBuilderUtil.setSegmentState(partitionId, seq, "ONLINE");
+    idealStateBuilderUtil.addConsumingSegment(partitionId, ++seq, nReplicas, instances);
+    idealState = idealStateBuilderUtil.build();
+    idealStateCopy =
+        new IdealState((ZNRecord) znRecordSerializer.deserialize(znRecordSerializer.serialize(idealState.getRecord())));
+
+    segmentManager.updateIdealStateOnSegmentCompletion(idealState, currentSegmentId, newSegmentId, partitionAssignment);
+
+    // check no change
+    Assert.assertEquals(idealState, idealStateCopy);
+  }
+
+  private void setupSegmentManager(FakePinotLLCRealtimeSegmentManager segmentManager, String rtTableName,
+      int nPartitions, int nReplicas, int nInstances)
+      throws InvalidConfigException {
+
+    List<String> instances = getInstanceList(nInstances);
+    TableConfig tableConfig = makeTableConfig(rtTableName, nReplicas, DUMMY_HOST, DEFAULT_SERVER_TENANT);
+    IdealState idealState = PinotTableIdealStateBuilder.buildEmptyRealtimeIdealStateFor(rtTableName, nReplicas, true);
+
+    segmentManager.addTableToStore(rtTableName, tableConfig, nPartitions);
+    segmentManager._partitionAssignmentGenerator.setConsumingInstances(instances);
+    segmentManager.setupNewTable(tableConfig, idealState);
   }
 
   private void setupSegmentManager(FakePinotLLCRealtimeSegmentManager segmentManager, String rtTableName)
@@ -1263,9 +1341,9 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     private TableConfigStore _tableConfigStore;
 
-    protected FakePinotLLCRealtimeSegmentManager(List<String> existingLLCSegments) {
-
-      super(null, clusterName, null, null, null, CONTROLLER_CONF, new ControllerMetrics(new MetricsRegistry()));
+    protected FakePinotLLCRealtimeSegmentManager(List<String> existingLLCSegments, HelixManager helixManager) {
+      super(null, clusterName, helixManager, null, null, CONTROLLER_CONF, new ControllerMetrics(new MetricsRegistry()),
+          new ControllerLeadershipManager(helixManager));
       try {
         TableConfigCache mockCache = mock(TableConfigCache.class);
         TableConfig mockTableConfig = mock(TableConfig.class);
@@ -1298,6 +1376,23 @@ public class PinotLLCRealtimeSegmentManagerTest {
       _version = 0;
 
       _tableConfigStore = new TableConfigStore();
+    }
+
+    protected FakePinotLLCRealtimeSegmentManager(List<String> existingLLCSegments) {
+      this(existingLLCSegments, mock(HelixManager.class));
+    }
+
+    private SegmentMetadataImpl newMockSegmentMetadata() {
+      segmentMetadata = mock(SegmentMetadataImpl.class);
+      when(segmentMetadata.getCrc()).thenReturn(FakePinotLLCRealtimeSegmentManager.CRC);
+      when(segmentMetadata.getTimeInterval()).thenReturn(FakePinotLLCRealtimeSegmentManager.INTERVAL);
+      when(segmentMetadata.getVersion()).thenReturn(FakePinotLLCRealtimeSegmentManager.SEGMENT_VERSION);
+      when(segmentMetadata.getTotalRawDocs()).thenReturn(FakePinotLLCRealtimeSegmentManager.NUM_DOCS);
+      return segmentMetadata;
+    }
+
+    private SegmentMetadataImpl getMockSegmentMetadata() {
+      return segmentMetadata;
     }
 
     void addTableToStore(String tableName, TableConfig tableConfig, int nStreamPartitions) {
@@ -1393,12 +1488,6 @@ public class PinotLLCRealtimeSegmentManagerTest {
     }
 
     @Override
-    protected boolean updateOldSegmentMetadataZNRecord(String realtimeTableName,
-        LLCSegmentName committingLLCSegmentName, long nextOffset) {
-      return super.updateOldSegmentMetadataZNRecord(realtimeTableName, committingLLCSegmentName, nextOffset);
-    }
-
-    @Override
     public LLCRealtimeSegmentZKMetadata getRealtimeSegmentZKMetadata(String realtimeTableName, String segmentName,
         Stat stat) {
       if (_metadataMap.containsKey(segmentName)) {
@@ -1415,16 +1504,6 @@ public class PinotLLCRealtimeSegmentManagerTest {
       LLCRealtimeSegmentZKMetadata metadata = new LLCRealtimeSegmentZKMetadata();
       metadata.setSegmentName(segmentName);
       return metadata;
-    }
-
-    @Override
-    protected SegmentMetadataImpl extractSegmentMetadata(final String rawTableName, final String segmentNameStr) {
-      segmentMetadata = mock(SegmentMetadataImpl.class);
-      when(segmentMetadata.getCrc()).thenReturn(CRC);
-      when(segmentMetadata.getTimeInterval()).thenReturn(INTERVAL);
-      when(segmentMetadata.getVersion()).thenReturn(SEGMENT_VERSION);
-      when(segmentMetadata.getTotalRawDocs()).thenReturn(NUM_DOCS);
-      return segmentMetadata;
     }
 
     public void verifyMetadataInteractions() {

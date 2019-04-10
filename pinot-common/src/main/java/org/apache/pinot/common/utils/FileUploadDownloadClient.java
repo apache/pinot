@@ -29,6 +29,7 @@ import java.io.OutputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.List;
+import java.util.Map;
 import javax.annotation.Nullable;
 import javax.net.ssl.SSLContext;
 import org.apache.commons.io.IOUtils;
@@ -229,6 +230,22 @@ public class FileUploadDownloadClient implements Closeable {
         parameters, socketTimeoutMs);
   }
 
+  private static HttpUriRequest getUploadSegmentMetadataFilesRequest(URI uri, Map<String, File> metadataFiles,
+      int segmentUploadRequestTimeoutMs) {
+    MultipartEntityBuilder multipartEntityBuilder = MultipartEntityBuilder.create().
+        setMode(HttpMultipartMode.BROWSER_COMPATIBLE);
+    for (Map.Entry<String, File> entry : metadataFiles.entrySet()) {
+      multipartEntityBuilder.addPart(entry.getKey(), getContentBody(entry.getKey(), entry.getValue()));
+    }
+    HttpEntity entity = multipartEntityBuilder.build();
+
+    // Build the POST request.
+    RequestBuilder requestBuilder =
+        RequestBuilder.create(HttpPost.METHOD_NAME).setVersion(HttpVersion.HTTP_1_1).setUri(uri).setEntity(entity);
+    setTimeout(requestBuilder, segmentUploadRequestTimeoutMs);
+    return requestBuilder.build();
+  }
+
   private static HttpUriRequest getSendSegmentUriRequest(URI uri, String downloadUri, @Nullable List<Header> headers,
       @Nullable List<NameValuePair> parameters, int socketTimeoutMs) {
     RequestBuilder requestBuilder = RequestBuilder.post(uri).setVersion(HttpVersion.HTTP_1_1)
@@ -386,6 +403,13 @@ public class FileUploadDownloadClient implements Closeable {
       throws IOException, HttpErrorStatusException {
     return sendRequest(
         getUploadSegmentMetadataRequest(uri, segmentName, segmentMetadataFile, headers, parameters, socketTimeoutMs));
+  }
+
+  // Upload a set of segment metadata files (e.g., meta.properties and creation.meta) to controllers.
+  public SimpleHttpResponse uploadSegmentMetadataFiles(URI uri, Map<String, File> metadataFiles,
+      int segmentUploadRequestTimeoutMs)
+      throws IOException, HttpErrorStatusException {
+    return sendRequest(getUploadSegmentMetadataFilesRequest(uri, metadataFiles, segmentUploadRequestTimeoutMs));
   }
 
   /**

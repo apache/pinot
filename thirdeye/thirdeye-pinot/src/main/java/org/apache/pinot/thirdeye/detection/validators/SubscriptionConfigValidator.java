@@ -26,6 +26,7 @@ import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.apache.pinot.thirdeye.detection.ConfigUtils;
+import org.quartz.CronExpression;
 
 import static org.apache.pinot.thirdeye.detection.yaml.YamlDetectionAlertConfigTranslator.*;
 
@@ -80,8 +81,13 @@ public class SubscriptionConfigValidator implements ConfigValidator<DetectionAle
           + " application name. You may search for registered applications from the ThirdEye dashboard or reach out"
           + " to ask_thirdeye if you wish to setup a new application.");
     }
+    // Cron Validator
+    if (!CronExpression.isValidExpression(alertConfig.getCronExpression())) {
+      throw new ValidationException("The subscription cron specified is incorrect. Please verify your cron expression"
+          + " using online cron makers.");
+    }
 
-    // TODO add more checks like cron validity, email validity, alert type check, scheme type check etc.
+    // TODO add more checks like email validity, alert type check, scheme type check etc.
   }
 
   /**

@@ -20,12 +20,14 @@ package org.apache.pinot.broker.requesthandler;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Splitter;
+import com.google.common.util.concurrent.RateLimiter;
 import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
@@ -82,6 +84,10 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   protected final int _queryResponseLimit;
   protected final int _queryLogLength;
 
+  private final RateLimiter _queryLogRateLimiter;
+  private final RateLimiter _numDroppedLogRateLimiter;
+  private final AtomicInteger _numDroppedLog;
+
   public BaseBrokerRequestHandler(Configuration config, RoutingTable routingTable,
       TimeBoundaryService timeBoundaryService, AccessControlFactory accessControlFactory,
       TableQueryQuotaManager tableQueryQuotaManager, BrokerMetrics brokerMetrics) {
@@ -96,9 +102,15 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     _brokerTimeoutMs = config.getLong(CONFIG_OF_BROKER_TIMEOUT_MS, DEFAULT_BROKER_TIMEOUT_MS);
     _queryResponseLimit = config.getInt(CONFIG_OF_BROKER_QUERY_RESPONSE_LIMIT, DEFAULT_BROKER_QUERY_RESPONSE_LIMIT);
     _queryLogLength = config.getInt(CONFIG_OF_BROKER_QUERY_LOG_LENGTH, DEFAULT_BROKER_QUERY_LOG_LENGTH);
+    _queryLogRateLimiter = RateLimiter.create(
+        config.getDouble(CONFIG_OF_BROKER_QUERY_LOG_MAX_RATE_PER_SECOND, DEFAULT_BROKER_QUERY_LOG_MAX_RATE_PER_SECOND));
 
-    LOGGER.info("Broker Id: {}, timeout: {}ms, query response limit: {}, query log length: {}", _brokerId,
-        _brokerTimeoutMs, _queryResponseLimit, _queryLogLength);
+    _numDroppedLog = new AtomicInteger(0);
+    _numDroppedLogRateLimiter = RateLimiter.create(1.0);
+
+    LOGGER.info(
+        "Broker Id: {}, timeout: {}ms, query response limit: {}, query log length: {}, query log max rate: {}qps",
+        _brokerId, _brokerTimeoutMs, _queryResponseLimit, _queryLogLength, _queryLogRateLimiter.getRate());
   }
 
   private String getDefaultBrokerId() {
@@ -110,6 +122,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     }
   }
 
+  @SuppressWarnings("Duplicates")
   @Override
   public BrokerResponse handleRequest(JsonNode request, @Nullable RequesterIdentity requesterIdentity,
       RequestStatistics requestStatistics)
@@ -292,19 +305,58 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
     LOGGER.debug("Broker Response: {}", brokerResponse);
 
-    // Table name might have been changed (with suffix _OFFLINE/_REALTIME appended)
-    LOGGER.info(
-        "RequestId:{}, table:{}, timeMs:{}, docs:{}/{}, entries:{}/{}, segments(queried/processed/matched):{}/{}/{} "
-            + "servers:{}/{}, groupLimitReached:{}, exceptions:{}, serverStats:{}, query:{}", requestId,
-        brokerRequest.getQuerySource().getTableName(), totalTimeMs, brokerResponse.getNumDocsScanned(),
-        brokerResponse.getTotalDocs(), brokerResponse.getNumEntriesScannedInFilter(),
-        brokerResponse.getNumEntriesScannedPostFilter(), brokerResponse.getNumSegmentsQueried(),
-        brokerResponse.getNumSegmentsProcessed(), brokerResponse.getNumSegmentsMatched(),
-        brokerResponse.getNumServersResponded(), brokerResponse.getNumServersQueried(),
-        brokerResponse.isNumGroupsLimitReached(), brokerResponse.getExceptionsSize(), serverStats.getServerStats(),
-        StringUtils.substring(query, 0, _queryLogLength));
+    if(_queryLogRateLimiter.tryAcquire() || forceLog(brokerResponse, totalTimeMs)) {
+      // Table name might have been changed (with suffix _OFFLINE/_REALTIME appended)
+      LOGGER.info(
+          "RequestId:{}, table:{}, timeMs:{}, docs:{}/{}, entries:{}/{}, segments(queried/processed/matched):{}/{}/{} "
+              + "servers:{}/{}, groupLimitReached:{}, exceptions:{}, serverStats:{}, query:{}", requestId,
+          brokerRequest.getQuerySource().getTableName(), totalTimeMs, brokerResponse.getNumDocsScanned(),
+          brokerResponse.getTotalDocs(), brokerResponse.getNumEntriesScannedInFilter(),
+          brokerResponse.getNumEntriesScannedPostFilter(), brokerResponse.getNumSegmentsQueried(),
+          brokerResponse.getNumSegmentsProcessed(), brokerResponse.getNumSegmentsMatched(),
+          brokerResponse.getNumServersResponded(), brokerResponse.getNumServersQueried(),
+          brokerResponse.isNumGroupsLimitReached(), brokerResponse.getExceptionsSize(), serverStats.getServerStats(),
+          StringUtils.substring(query, 0, _queryLogLength));
 
+      // Limit the dropping log message at most once per second.
+      if (_numDroppedLogRateLimiter.tryAcquire()) {
+        // NOTE: the reported number may not be accurate since we will be missing some increments happened between
+        // get() and set().
+        int numDroppedLog = _numDroppedLog.get();
+        if (numDroppedLog > 0) {
+          LOGGER.info("{} logs were dropped. (log max rate per second: {})", numDroppedLog,
+              _queryLogRateLimiter.getRate());
+          _numDroppedLog.set(0);
+        }
+      }
+    } else {
+      // Increment the count for dropped log
+      _numDroppedLog.incrementAndGet();
+    }
     return brokerResponse;
+  }
+
+  /**
+   * Helper function to decide whether to force the log
+   *
+   * TODO: come up with other criteria for forcing a log and come up with better numbers
+   *
+   */
+  private boolean forceLog(BrokerResponse brokerResponse, long totalTimeMs) {
+    if (brokerResponse.isNumGroupsLimitReached()) {
+      return true;
+    }
+
+    if (brokerResponse.getExceptionsSize() > 0) {
+      return true;
+    }
+
+    // If response time is more than 1 sec, force the log
+    if (totalTimeMs > 1000L) {
+      return true;
+    }
+
+    return false;
   }
 
   /**

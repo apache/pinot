@@ -30,6 +30,7 @@ import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.controller.ControllerLeadershipManager;
 import org.apache.pinot.controller.helix.core.realtime.segment.CommittingSegmentDescriptor;
 import org.apache.zookeeper.data.Stat;
 import org.testng.Assert;
@@ -64,7 +65,8 @@ public class SegmentCompletionTest {
 
   public void testCaseSetup(boolean isLeader, boolean isConnected)
       throws Exception {
-    segmentManager = new MockPinotLLCRealtimeSegmentManager();
+    segmentManager = new MockPinotLLCRealtimeSegmentManager(isLeader, isConnected);
+    ControllerLeadershipManager controllerLeadershipManager = segmentManager.getControllerLeadershipManager();
     final int partitionId = 23;
     final int seqId = 12;
     final long now = System.currentTimeMillis();
@@ -76,7 +78,8 @@ public class SegmentCompletionTest {
     metadata.setNumReplicas(3);
     segmentManager._segmentMetadata = metadata;
 
-    segmentCompletionMgr = new MockSegmentCompletionManager(segmentManager, isLeader, isConnected);
+    segmentCompletionMgr =
+        new MockSegmentCompletionManager(segmentManager, isLeader, isConnected);
     segmentManager._segmentCompletionMgr = segmentCompletionMgr;
 
     Field fsmMapField = SegmentCompletionManager.class.getDeclaredField("_fsmMap");
@@ -151,7 +154,8 @@ public class SegmentCompletionTest {
 
     segmentCompletionMgr._secconds += 5;
     params = new Request.Params().withInstanceId(s2).withOffset(s2Offset).withSegmentName(segmentNameStr);
-    response = segmentCompletionMgr.segmentCommitEnd(params, true, false);
+    response = segmentCompletionMgr
+        .segmentCommitEnd(params, true, false, CommittingSegmentDescriptor.fromSegmentCompletionReqParams(params));
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS);
 
     // Now the FSM should have disappeared from the map
@@ -220,7 +224,8 @@ public class SegmentCompletionTest {
 
     segmentCompletionMgr._secconds += 5;
     params = new Request.Params().withInstanceId(s2).withOffset(s2Offset).withSegmentName(segmentNameStr);
-    response = segmentCompletionMgr.segmentCommitEnd(params, true, false);
+    response = segmentCompletionMgr
+        .segmentCommitEnd(params, true, false, CommittingSegmentDescriptor.fromSegmentCompletionReqParams(params));
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS);
 
     // Now the FSM should have disappeared from the map
@@ -330,7 +335,8 @@ public class SegmentCompletionTest {
     segmentCompletionMgr._secconds += 5;
     params = new Request.Params().withInstanceId(s2).withOffset(s2Offset).withSegmentName(segmentNameStr)
         .withSegmentLocation("doNotCommitMe");
-    response = segmentCompletionMgr.segmentCommitEnd(params, true, true);
+    response = segmentCompletionMgr
+        .segmentCommitEnd(params, true, true, CommittingSegmentDescriptor.fromSegmentCompletionReqParams(params));
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.FAILED);
 
     // Now the FSM should have aborted
@@ -363,7 +369,8 @@ public class SegmentCompletionTest {
     segmentCompletionMgr._secconds += 5;
     params = new Request.Params().withInstanceId(s3).withOffset(s2Offset).withSegmentName(segmentNameStr)
         .withSegmentLocation("location");
-    response = segmentCompletionMgr.segmentCommitEnd(params, true, true);
+    response = segmentCompletionMgr
+        .segmentCommitEnd(params, true, true, CommittingSegmentDescriptor.fromSegmentCompletionReqParams(params));
     Assert.assertEquals(response.getStatus(), ControllerResponseStatus.COMMIT_SUCCESS);
     // And the FSM should be removed.
     Assert.assertFalse(fsmMap.containsKey(segmentNameStr));
@@ -415,7 +422,8 @@ public class SegmentCompletionTest {
     segmentCompletionMgr._secconds += 5;
     params = new Request.Params().withInstanceId(s2).withOffset(s2Offset).withSegmentName(segmentNameStr)
         .withSegmentLocation("location");
-    response = segmentCompletionMgr.segmentCommitEnd(params, true, true);
+    response = segmentCompletionMgr
+        .segmentCommitEnd(params, true, true, CommittingSegmentDescriptor.fromSegmentCompletionReqParams(params));
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS);
 
     // Now the FSM should have disappeared from the map
@@ -464,7 +472,8 @@ public class SegmentCompletionTest {
     segmentCompletionMgr._secconds += 5;
     params = new Request.Params().withInstanceId(s3).withOffset(s3Offset).withSegmentName(segmentNameStr)
         .withSegmentLocation("location");
-    response = segmentCompletionMgr.segmentCommitEnd(params, true, true);
+    response = segmentCompletionMgr
+        .segmentCommitEnd(params, true, true, CommittingSegmentDescriptor.fromSegmentCompletionReqParams(params));
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.FAILED);
 
     // Now the FSM should have disappeared from the map
@@ -523,7 +532,8 @@ public class SegmentCompletionTest {
 
     segmentCompletionMgr._secconds += 5;
     params = new Request.Params().withInstanceId(s2).withOffset(s2Offset).withSegmentName(segmentNameStr);
-    response = segmentCompletionMgr.segmentCommitEnd(params, true, false);
+    response = segmentCompletionMgr
+        .segmentCommitEnd(params, true, false, CommittingSegmentDescriptor.fromSegmentCompletionReqParams(params));
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS);
 
     // Now the FSM should have disappeared from the map
@@ -595,7 +605,8 @@ public class SegmentCompletionTest {
 
     segmentCompletionMgr._secconds += 5;
     params = new Request.Params().withInstanceId(s1).withOffset(s1Offset).withSegmentName(segmentNameStr);
-    response = segmentCompletionMgr.segmentCommitEnd(params, true, false);
+    response = segmentCompletionMgr
+        .segmentCommitEnd(params, true, false, CommittingSegmentDescriptor.fromSegmentCompletionReqParams(params));
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS);
     // We ask S2 to keep the segment
     params = new Request.Params().withInstanceId(s2).withOffset(s1Offset).withSegmentName(segmentNameStr)
@@ -661,7 +672,8 @@ public class SegmentCompletionTest {
     segmentCompletionMgr._secconds += 5;
     params = new Request.Params().withInstanceId(s2).withOffset(s2Offset).withSegmentName(segmentNameStr)
         .withSegmentLocation("location");
-    response = segmentCompletionMgr.segmentCommitEnd(params, true, isSplitCommit);
+    response = segmentCompletionMgr.segmentCommitEnd(params, true, isSplitCommit,
+        CommittingSegmentDescriptor.fromSegmentCompletionReqParams(params));
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS);
     // Now the FSM should have disappeared from the map
     Assert.assertFalse(fsmMap.containsKey(segmentNameStr));
@@ -855,7 +867,8 @@ public class SegmentCompletionTest {
     long commitTimeMs = (segmentCompletionMgr._secconds - startTime) * 1000;
     Assert.assertEquals(commitTimeMap.get(tableName).longValue(), commitTimeMs);
     segmentCompletionMgr._secconds += 55;
-    response = segmentCompletionMgr.segmentCommitEnd(params, true, false);
+    response = segmentCompletionMgr
+        .segmentCommitEnd(params, true, false, CommittingSegmentDescriptor.fromSegmentCompletionReqParams(params));
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS);
     // now FSM should be out of the map.
     Assert.assertFalse((fsmMap.containsKey(segmentNameStr)));
@@ -1127,9 +1140,11 @@ public class SegmentCompletionTest {
     private static final ControllerConf CONTROLLER_CONF = new ControllerConf();
     public LLCSegmentName _stoppedSegmentName;
     public String _stoppedInstance;
+    public HelixManager _helixManager = mock(HelixManager.class);
 
-    protected MockPinotLLCRealtimeSegmentManager() {
-      super(null, clusterName, null, null, null, CONTROLLER_CONF, new ControllerMetrics(new MetricsRegistry()));
+    protected MockPinotLLCRealtimeSegmentManager(boolean isLeader, boolean isConnected) {
+      super(null, clusterName, null, null, null, CONTROLLER_CONF, new ControllerMetrics(new MetricsRegistry()),
+          new ControllerLeadershipManager(createMockHelixManager(isLeader, isConnected)));
     }
 
     @Override
@@ -1176,8 +1191,18 @@ public class SegmentCompletionTest {
 
     protected MockSegmentCompletionManager(PinotLLCRealtimeSegmentManager segmentManager, boolean isLeader,
         boolean isConnected) {
-      super(createMockHelixManager(isLeader, isConnected), segmentManager,
-          new ControllerMetrics(new MetricsRegistry()));
+      this(createMockHelixManager(isLeader, isConnected), segmentManager, isLeader, isConnected);
+    }
+
+    protected MockSegmentCompletionManager(HelixManager helixManager, PinotLLCRealtimeSegmentManager segmentManager, boolean isLeader,
+        boolean isConnected) {
+      this(helixManager, segmentManager, isLeader, isConnected, new ControllerLeadershipManager(helixManager));
+    }
+
+    protected MockSegmentCompletionManager(HelixManager helixManager, PinotLLCRealtimeSegmentManager segmentManager,
+        boolean isLeader, boolean isConnected, ControllerLeadershipManager controllerLeadershipManager) {
+      super(helixManager, segmentManager, new ControllerMetrics(new MetricsRegistry()),
+          controllerLeadershipManager);
       _isLeader = isLeader;
     }
 

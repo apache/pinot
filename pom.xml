@@ -19,7 +19,8 @@
     under the License.
 
 -->
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
@@ -30,7 +31,7 @@
 
   <groupId>org.apache.pinot</groupId>
   <artifactId>pinot</artifactId>
-  <version>0.1.2-SNAPSHOT</version>
+  <version>0.2.0-SNAPSHOT</version>
   <packaging>pom</packaging>
   <name>Pinot</name>
   <description>A realtime distributed OLAP datastore</description>
@@ -53,6 +54,8 @@
     <module>pinot-filesystem</module>
     <module>pinot-hadoop-filesystem</module>
     <module>pinot-azure-filesystem</module>
+    <module>pinot-orc</module>
+    <module>pinot-parquet</module>
   </modules>
 
   <licenses>
@@ -123,6 +126,7 @@
     <SKIP_INTEGRATION_TESTS>true</SKIP_INTEGRATION_TESTS>
     <!-- Configuration for unit/integration tests section 1 of 3 (properties) ENDS HERE.-->
     <avro.version>1.7.6</avro.version>
+    <parquet.version>1.8.0</parquet.version>
     <helix.version>0.8.2</helix.version>
     <!-- jfim: for Kafka 0.9.0.0, use zkclient 0.7 -->
     <kafka.version>0.9.0.1</kafka.version>
@@ -295,6 +299,11 @@
       </dependency>
       <dependency>
         <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-orc</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
         <artifactId>pinot-transport</artifactId>
         <version>${project.version}</version>
       </dependency>
@@ -399,6 +408,11 @@
         <groupId>org.apache.avro</groupId>
         <artifactId>avro</artifactId>
         <version>${avro.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.parquet</groupId>
+        <artifactId>parquet-avro</artifactId>
+        <version>${parquet.version}</version>
       </dependency>
       <dependency>
         <groupId>org.xerial.snappy</groupId>
@@ -598,6 +612,16 @@
             <artifactId>jersey-json</artifactId>
           </exclusion>
         </exclusions>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.orc</groupId>
+        <artifactId>orc-core</artifactId>
+        <version>1.5.2</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.orc</groupId>
+        <artifactId>orc-mapreduce</artifactId>
+        <version>1.5.2</version>
       </dependency>
       <dependency>
         <groupId>org.codehaus.jackson</groupId>
@@ -939,7 +963,7 @@
           </executions>
           <configuration>
             <rules>
-              <dependencyConvergence />
+              <dependencyConvergence/>
             </rules>
           </configuration>
         </plugin>
@@ -1072,7 +1096,14 @@
         <version>2.8</version>
         <configuration>
           <header>${pinot.root}/HEADER</header>
+          <headerDefinitions>
+            <headerDefinition>${pinot.root}/rstheaderdefinition.xml</headerDefinition>
+          </headerDefinitions>
           <excludes>
+            <!-- Exclude build files for docs -->
+            <exclude>docs/_build/**</exclude>
+            <exlude>docs/Makefile</exlude>
+
             <!-- Text and log files -->
             <exclude>**/*.txt</exclude>
             <exclude>**/*.log</exclude>
@@ -1121,6 +1152,7 @@
           <mapping>
             <thrift>JAVADOC_STYLE</thrift>
             <g4>JAVADOC_STYLE</g4>
+            <rst>RST_STYLE</rst>
           </mapping>
         </configuration>
         <executions>
@@ -1147,6 +1179,9 @@
           <excludes>
             <!-- Sphynx auto generated makefile -->
             <exclude>docs/Makefile</exclude>
+
+            <!-- Exclude build files for docs -->
+            <exclude>docs/_build/**</exclude>
 
             <!-- Exclude license copies -->
             <exclude>licenses/**</exclude>
@@ -1209,8 +1244,10 @@
         <configuration>
           <shadedArtifactAttached>true</shadedArtifactAttached>
           <transformers>
-            <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer" />
-            <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+            <transformer
+                implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+            <transformer
+                implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
               <mainClass>${mainClass}</mainClass>
             </transformer>
           </transformers>

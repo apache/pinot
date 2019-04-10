@@ -49,8 +49,8 @@ public class HighLevelConsumerRoutingTableBuilderTest {
 
     Random random = new Random();
 
-    TableConfig tableConfig = new TableConfig();
-    tableConfig.setTableName("tableName");
+    TableConfig tableConfig =
+        new TableConfig.Builder(CommonConstants.Helix.TableType.REALTIME).setTableName("tableName").build();
     HighLevelConsumerBasedRoutingTableBuilder routingTableBuilder = new HighLevelConsumerBasedRoutingTableBuilder();
     routingTableBuilder.init(new BaseConfiguration(), tableConfig, null, null);
 

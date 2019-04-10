@@ -49,7 +49,7 @@ public class RuleBaselineProviderTest {
     MetricSlice slice2Wow = MetricSlice.from(1L, 1537920000000L, 1538006400000L);
     Map<MetricSlice, DataFrame> aggregates = new HashMap<>();
     aggregates.put(slice1Wow, DataFrame.builder(COL_TIME + ":LONG", COL_VALUE + ":DOUBLE")
-        .append(-1, 100)
+        .append(-1, 150)
         .build()
         .setIndex(COL_TIME));
     aggregates.put(slice2Wow, DataFrame.builder(COL_TIME + ":LONG", COL_VALUE + ":DOUBLE")

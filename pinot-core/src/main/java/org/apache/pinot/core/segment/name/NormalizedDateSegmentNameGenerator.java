@@ -33,8 +33,8 @@ import org.apache.pinot.common.data.TimeGranularitySpec.TimeFormat;
  */
 public class NormalizedDateSegmentNameGenerator implements SegmentNameGenerator {
   private final String _segmentNamePrefix;
-  private final boolean _appendPushType;
   private final boolean _excludeSequenceId;
+  private final boolean _appendPushType;
 
   // For APPEND tables
   private final SimpleDateFormat _outputSDF;
@@ -44,11 +44,11 @@ public class NormalizedDateSegmentNameGenerator implements SegmentNameGenerator 
   private final SimpleDateFormat _inputSDF;
 
   public NormalizedDateSegmentNameGenerator(String tableName, @Nullable String segmentNamePrefix,
-      @Nullable String excludeSequenceId, @Nullable String pushType, @Nullable String pushFrequency,
-      @Nullable String timeType, @Nullable String timeFormat) {
+      boolean excludeSequenceId, @Nullable String pushType, @Nullable String pushFrequency, @Nullable TimeUnit timeType,
+      @Nullable String timeFormat) {
     _segmentNamePrefix = segmentNamePrefix != null ? segmentNamePrefix.trim() : tableName;
+    _excludeSequenceId = excludeSequenceId;
     _appendPushType = "APPEND".equalsIgnoreCase(pushType);
-    _excludeSequenceId = Boolean.parseBoolean(excludeSequenceId);
 
     // Include time info for APPEND push type
     if (_appendPushType) {
@@ -62,7 +62,7 @@ public class NormalizedDateSegmentNameGenerator implements SegmentNameGenerator 
 
       // Parse input time format: 'EPOCH' or 'SIMPLE_DATE_FORMAT:<pattern>'
       if (Preconditions.checkNotNull(timeFormat).equals(TimeFormat.EPOCH.toString())) {
-        _inputTimeUnit = TimeUnit.valueOf(timeType);
+        _inputTimeUnit = timeType;
         _inputSDF = null;
       } else {
         Preconditions.checkArgument(timeFormat.startsWith(TimeFormat.SIMPLE_DATE_FORMAT.toString()),
@@ -82,11 +82,13 @@ public class NormalizedDateSegmentNameGenerator implements SegmentNameGenerator 
   @Override
   public String generateSegmentName(int sequenceId, @Nullable Object minTimeValue, @Nullable Object maxTimeValue) {
     Integer sequenceIdInSegmentName = !_excludeSequenceId && sequenceId >= 0 ? sequenceId : null;
-    if (!_appendPushType) {
-      return JOINER.join(_segmentNamePrefix, sequenceIdInSegmentName);
-    } else {
+
+    // Include time value for APPEND push type
+    if (_appendPushType) {
       return JOINER.join(_segmentNamePrefix, getNormalizedDate(Preconditions.checkNotNull(minTimeValue)),
           getNormalizedDate(Preconditions.checkNotNull(maxTimeValue)), sequenceIdInSegmentName);
+    } else {
+      return JOINER.join(_segmentNamePrefix, sequenceIdInSegmentName);
     }
   }
 

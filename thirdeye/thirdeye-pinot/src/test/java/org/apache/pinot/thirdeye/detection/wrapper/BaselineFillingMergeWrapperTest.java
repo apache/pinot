@@ -17,6 +17,11 @@
 package org.apache.pinot.thirdeye.detection.wrapper;
 
 import com.google.common.collect.ImmutableMap;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import org.apache.pinot.thirdeye.constant.MetricAggFunction;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
@@ -35,11 +40,6 @@ import org.apache.pinot.thirdeye.detection.algorithm.MergeWrapper;
 import org.apache.pinot.thirdeye.detection.components.MockBaselineProvider;
 import org.apache.pinot.thirdeye.detection.spec.MockBaselineProviderSpec;
 import org.apache.pinot.thirdeye.detection.spi.components.BaselineProvider;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 import org.apache.pinot.thirdeye.detection.spi.model.TimeSeries;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
@@ -60,7 +60,6 @@ public class BaselineFillingMergeWrapperTest {
 
   private static final Long PROP_ID_VALUE = 1000L;
   private static final String PROP_NAME_VALUE = "myName";
-
   private static final String PROP_CLASS_NAME = "className";
   private static final String PROP_METRIC_URN = "metricUrn";
   private static final String PROP_PROPERTIES = "properties";
@@ -79,13 +78,8 @@ public class BaselineFillingMergeWrapperTest {
     nestedPropertiesOne.put(PROP_CLASS_NAME, "none");
     nestedPropertiesOne.put(PROP_METRIC_URN, "thirdeye:metric:1");
 
-    Map<String, Object> nestedPropertiesTwo = new HashMap<>();
-    nestedPropertiesTwo.put(PROP_CLASS_NAME, "none");
-    nestedPropertiesTwo.put(PROP_METRIC_URN, "thirdeye:metric:2");
-
     this.nestedProperties = new ArrayList<>();
     this.nestedProperties.add(nestedPropertiesOne);
-    this.nestedProperties.add(nestedPropertiesTwo);
 
     this.properties.put(PROP_NESTED, this.nestedProperties);
 
@@ -97,34 +91,46 @@ public class BaselineFillingMergeWrapperTest {
 
   @Test
   public void testMergerCurrentAndBaselineLoading() throws Exception {
+    // mock anomaly
     MergedAnomalyResultDTO anomaly = makeAnomaly(3000, 3600);
     Map<String, String> anomalyProperties = new HashMap<>();
     anomalyProperties.put("detectorComponentName", "testDetector");
     anomaly.setProperties(anomalyProperties);
     anomaly.setMetricUrn("thirdeye:metric:1");
 
-    Map<MetricSlice, DataFrame> aggregates = new HashMap<>();
-    aggregates.put(MetricSlice.from(1, 3000, 3600), DataFrame.builder(COL_TIME + ":LONG", COL_VALUE + ":DOUBLE").append(-1, 100).build());
+    // mock time series
     Map<MetricSlice, DataFrame> timeseries = new HashMap<>();
-    timeseries.put(MetricSlice.from(1, 3000, 3600), DataFrame.builder(COL_TIME + ":LONG", COL_VALUE + ":DOUBLE").append(3000, 100).build());
+    timeseries.put(MetricSlice.from(1, 3000, 3600),
+        DataFrame.builder(COL_TIME + ":LONG", COL_VALUE + ":DOUBLE").append(3000, 100).build());
 
+    // mock metric
     MetricConfigDTO metric = new MetricConfigDTO();
     metric.setId(1L);
     metric.setDefaultAggFunction(MetricAggFunction.SUM);
-    DataProvider
-        provider = new MockDataProvider().setLoader(new MockPipelineLoader(this.runs, Collections.<MockPipelineOutput>emptyList())).setAnomalies(Collections.singletonList(anomaly)).setAggregates(aggregates)
-        .setMetrics(Collections.singletonList(metric)).setTimeseries(timeseries);
+    DataProvider provider = new MockDataProvider().setLoader(new MockPipelineLoader(this.runs,
+        Collections.singletonList(new MockPipelineOutput(Collections.singletonList(anomaly), -1L))))
+        .setAnomalies(Collections.emptyList())
+        .setMetrics(Collections.singletonList(metric))
+        .setTimeseries(timeseries)
+        .setAggregates(ImmutableMap.of(MetricSlice.from(1, 3000, 3600),
+            DataFrame.builder(COL_TIME + ":LONG", COL_VALUE + ":DOUBLE").append(3000, 100).build()));
 
+    // set up detection config properties
     this.config.getProperties().put(PROP_MAX_GAP, 100);
     this.config.getProperties().put(PROP_BASELINE_PROVIDER, "$baseline");
     this.config.getProperties().put("detector", "$testDetector");
+
+    // initialize the baseline provider
     BaselineProvider baselineProvider = new MockBaselineProvider();
     MockBaselineProviderSpec spec = new MockBaselineProviderSpec();
-    spec.setAggregates(ImmutableMap.of(MetricSlice.from(1, 3000, 3600), 100.0));
-    spec.setBaselineTimeseries(ImmutableMap.of(MetricSlice.from(1, 3000, 3600), TimeSeries.fromDataFrame(DataFrame.builder(COL_TIME + ":LONG", COL_VALUE + ":DOUBLE").append(3000, 100).build())));
+    spec.setBaselineAggregates(ImmutableMap.of(MetricSlice.from(1, 3000, 3600), 100.0));
+    spec.setBaselineTimeseries(ImmutableMap.of(MetricSlice.from(1, 3000, 3600), TimeSeries.fromDataFrame(
+        DataFrame.builder(COL_TIME + ":LONG", COL_VALUE + ":DOUBLE").append(3000, 100).build())));
     InputDataFetcher dataFetcher = new DefaultInputDataFetcher(provider, this.config.getId());
     baselineProvider.init(spec, dataFetcher);
     this.config.setComponents(ImmutableMap.of("baseline", baselineProvider));
+
+    // run baseline filling merge wrapper
     this.wrapper = new BaselineFillingMergeWrapper(provider, this.config, 2900, 3600);
     DetectionPipelineResult output = this.wrapper.run();
 
@@ -137,4 +143,41 @@ public class BaselineFillingMergeWrapperTest {
     Assert.assertEquals(anomalyResults.get(0).getProperties().get("baselineProviderComponentName"), "baseline");
   }
 
+  @Test
+  public void testMergerCurrentAndBaselineLoadingSkipExisting() throws Exception {
+    MergedAnomalyResultDTO anomaly = makeAnomaly(3000, 3600);
+    Map<String, String> anomalyProperties = new HashMap<>();
+    anomalyProperties.put("detectorComponentName", "testDetector");
+    anomalyProperties.put("baselineProviderComponentName", "someBaseline");
+    anomaly.setProperties(anomalyProperties);
+    anomaly.setMetricUrn("thirdeye:metric:1");
+    anomaly.setId(1000L);
+    anomaly.setAvgCurrentVal(999.0);
+    anomaly.setAvgBaselineVal(998.0);
+
+    DataProvider provider = new MockDataProvider().setLoader(new MockPipelineLoader(this.runs, Collections.emptyList()))
+        .setAnomalies(Collections.singletonList(anomaly));
+
+    this.config.getProperties().put(PROP_MAX_GAP, 100);
+    this.config.getProperties().put(PROP_BASELINE_PROVIDER, "$baseline");
+    this.config.getProperties().put("detector", "$testDetector");
+    BaselineProvider baselineProvider = new MockBaselineProvider();
+    MockBaselineProviderSpec spec = new MockBaselineProviderSpec();
+    spec.setBaselineAggregates(ImmutableMap.of(MetricSlice.from(1, 3000, 3600), 100.0));
+    spec.setBaselineTimeseries(ImmutableMap.of(MetricSlice.from(1, 3000, 3600), TimeSeries.fromDataFrame(
+        DataFrame.builder(COL_TIME + ":LONG", COL_VALUE + ":DOUBLE").append(3000, 100).build())));
+    InputDataFetcher dataFetcher = new DefaultInputDataFetcher(provider, this.config.getId());
+    baselineProvider.init(spec, dataFetcher);
+    this.config.setComponents(ImmutableMap.of("baseline", baselineProvider));
+    this.wrapper = new BaselineFillingMergeWrapper(provider, this.config, 2900, 3600);
+    DetectionPipelineResult output = this.wrapper.run();
+
+    List<MergedAnomalyResultDTO> anomalyResults = output.getAnomalies();
+    Assert.assertEquals(anomalyResults.size(), 1);
+    Assert.assertTrue(anomalyResults.contains(anomaly));
+    Assert.assertEquals(anomalyResults.get(0).getAvgBaselineVal(), 998.0);
+    Assert.assertEquals(anomalyResults.get(0).getAvgCurrentVal(), 999.0);
+    Assert.assertEquals(anomalyResults.get(0).getProperties().get("detectorComponentName"), "testDetector");
+    Assert.assertEquals(anomalyResults.get(0).getProperties().get("baselineProviderComponentName"), "someBaseline");
+  }
 }

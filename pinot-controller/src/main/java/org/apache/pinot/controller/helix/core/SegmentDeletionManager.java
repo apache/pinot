@@ -188,12 +188,16 @@ public class SegmentDeletionManager {
       try {
         if (pinotFS.exists(fileToMoveURI)) {
           // Overwrites the file if it already exists in the target directory.
-          pinotFS.move(fileToMoveURI, deletedSegmentDestURI, true);
-          // Updates last modified.
-          // Touch is needed here so that removeAgedDeletedSegments() works correctly.
-          pinotFS.touch(deletedSegmentDestURI);
-          LOGGER.info("Moved segment {} from {} to {}", segmentId, fileToMoveURI.toString(),
-              deletedSegmentDestURI.toString());
+          if (pinotFS.move(fileToMoveURI, deletedSegmentDestURI, true)) {
+            // Updates last modified.
+            // Touch is needed here so that removeAgedDeletedSegments() works correctly.
+            pinotFS.touch(deletedSegmentDestURI);
+            LOGGER.info("Moved segment {} from {} to {}", segmentId, fileToMoveURI.toString(),
+                deletedSegmentDestURI.toString());
+          } else {
+            LOGGER.warn("Failed to move segment {} from {} to {}", segmentId, fileToMoveURI.toString(),
+                deletedSegmentDestURI.toString());
+          }
         } else {
           if (!SegmentName.isHighLevelConsumerSegmentName(segmentId)) {
             LOGGER.warn("Not found local segment file for segment {}" + fileToMoveURI.toString());

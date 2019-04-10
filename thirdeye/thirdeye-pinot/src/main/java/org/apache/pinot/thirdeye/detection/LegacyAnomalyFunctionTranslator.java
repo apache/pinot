@@ -86,7 +86,7 @@ public class LegacyAnomalyFunctionTranslator {
 
     DetectionConfigDTO config = new DetectionConfigDTO();
     config.setName(anomalyFunctionDTO.getFunctionName());
-    config.setDescription("<Please edit and provide a description for this alert>");
+    config.setDescription("Please update description - If this alert fires then it means so-and-so and check so-and-so for irregularities");
     config.setCron(anomalyFunctionDTO.getCron());
     config.setProperties(properties);
     config.setActive(false);

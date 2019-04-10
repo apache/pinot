@@ -18,6 +18,7 @@ Router.map(function() {
     this.route('share-dashboard');
   });
 
+  this.route('anomalies');
 
   this.route('manage', function() {
     this.route('alert', { path: 'alert/:alert_id' }, function() {
@@ -28,13 +29,14 @@ Router.map(function() {
     this.route('alerts', function() {
       this.route('performance');
     });
-    this.route('explore-new', { path: 'explore-new/:alert_id'});
+    this.route('explore', { path: 'explore/:alert_id'});
     this.route('yaml', { path: 'yaml/:alert_id' });
   });
 
   this.route('self-serve', function() {
     this.route('create-alert');
     this.route('import-metric');
+    this.route('import-sql-metric');
   });
 
   this.route('screenshot', { path: 'screenshot/:anomaly_id' });

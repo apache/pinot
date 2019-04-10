@@ -57,6 +57,7 @@ import javax.ws.rs.core.Response;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
+import org.apache.helix.ZNRecord;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.metrics.ControllerMeter;
@@ -69,9 +70,11 @@ import org.apache.pinot.common.utils.JsonUtils;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.controller.ControllerLeadershipManager;
 import org.apache.pinot.controller.api.access.AccessControl;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.api.upload.SegmentValidator;
+import org.apache.pinot.controller.api.upload.SegmentValidatorResponse;
 import org.apache.pinot.controller.api.upload.ZKOperator;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
@@ -112,6 +115,9 @@ public class PinotSegmentUploadRestletResource {
 
   @Inject
   AccessControlFactory _accessControlFactory;
+
+  @Inject
+  ControllerLeadershipManager _controllerLeadershipManager;
 
   @GET
   @Produces(MediaType.APPLICATION_JSON)
@@ -315,12 +321,13 @@ public class PinotSegmentUploadRestletResource {
               clientAddress);
 
       // Validate segment
-      new SegmentValidator(_pinotHelixResourceManager, _controllerConf, _executor, _connectionManager,
-          _controllerMetrics).validateSegment(segmentMetadata, tempSegmentDir);
+      SegmentValidatorResponse segmentValidatorResponse =
+          new SegmentValidator(_pinotHelixResourceManager, _controllerConf, _executor, _connectionManager,
+              _controllerMetrics, _controllerLeadershipManager).validateSegment(segmentMetadata, tempSegmentDir);
 
       // Zk operations
       completeZkOperations(enableParallelPushProtection, headers, tempEncryptedFile, provider, segmentMetadata,
-          segmentName, zkDownloadUri, moveSegmentToFinalLocation);
+          segmentName, zkDownloadUri, moveSegmentToFinalLocation, segmentValidatorResponse);
 
       return new SuccessResponse(
           "Successfully uploaded segment: " + segmentMetadata.getName() + " of table: " + segmentMetadata
@@ -380,7 +387,7 @@ public class PinotSegmentUploadRestletResource {
 
   private void completeZkOperations(boolean enableParallelPushProtection, HttpHeaders headers, File tempDecryptedFile,
       FileUploadPathProvider provider, SegmentMetadata segmentMetadata, String segmentName, String zkDownloadURI,
-      boolean moveSegmentToFinalLocation)
+      boolean moveSegmentToFinalLocation, SegmentValidatorResponse segmentValidatorResponse)
       throws Exception {
     String finalSegmentPath = StringUtil
         .join("/", provider.getBaseDataDirURI().toString(), segmentMetadata.getTableName(),
@@ -388,7 +395,7 @@ public class PinotSegmentUploadRestletResource {
     URI finalSegmentLocationURI = new URI(finalSegmentPath);
     ZKOperator zkOperator = new ZKOperator(_pinotHelixResourceManager, _controllerConf, _controllerMetrics);
     zkOperator.completeSegmentOperations(segmentMetadata, finalSegmentLocationURI, tempDecryptedFile,
-        enableParallelPushProtection, headers, zkDownloadURI, moveSegmentToFinalLocation);
+        enableParallelPushProtection, headers, zkDownloadURI, moveSegmentToFinalLocation, segmentValidatorResponse);
   }
 
   private void decryptFile(String crypterClassHeader, File tempEncryptedFile, File tempDecryptedFile) {

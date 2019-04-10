@@ -20,16 +20,16 @@
 package org.apache.pinot.thirdeye.detection.wrapper;
 
 import com.google.common.collect.Collections2;
-import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
-import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import org.apache.pinot.thirdeye.detection.DataProvider;
-import org.apache.pinot.thirdeye.detection.algorithm.MergeWrapper;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.detection.DataProvider;
+import org.apache.pinot.thirdeye.detection.algorithm.MergeWrapper;
 
 
 /**
@@ -39,8 +39,7 @@ import java.util.Map;
  * Merge anomalies regardless of anomaly merge key.
  */
 public class ChildKeepingMergeWrapper extends BaselineFillingMergeWrapper {
-  public ChildKeepingMergeWrapper(DataProvider provider, DetectionConfigDTO config, long startTime, long endTime)
-  {
+  public ChildKeepingMergeWrapper(DataProvider provider, DetectionConfigDTO config, long startTime, long endTime) {
     super(provider, config, startTime, endTime);
   }
 
@@ -53,6 +52,13 @@ public class ChildKeepingMergeWrapper extends BaselineFillingMergeWrapper {
   @Override
   protected List<MergedAnomalyResultDTO> merge(Collection<MergedAnomalyResultDTO> anomalies) {
     List<MergedAnomalyResultDTO> input = new ArrayList<>(anomalies);
+    Map<Long, MergedAnomalyResultDTO> existingParentAnomalies = new HashMap<>();
+    for (MergedAnomalyResultDTO anomaly : input) {
+      if (anomaly.getId() != null && !anomaly.getChildren().isEmpty()) {
+        existingParentAnomalies.put(anomaly.getId(), anomaly);
+      }
+    }
+
     Collections.sort(input, MergeWrapper.COMPARATOR);
 
     List<MergedAnomalyResultDTO> output = new ArrayList<>();
@@ -63,8 +69,8 @@ public class ChildKeepingMergeWrapper extends BaselineFillingMergeWrapper {
         continue;
       }
 
-      MergeWrapper.AnomalyKey
-          key = new MergeWrapper.AnomalyKey(anomaly.getMetric(), anomaly.getCollection(), anomaly.getDimensions(), "", "");
+      MergeWrapper.AnomalyKey key =
+          new MergeWrapper.AnomalyKey(anomaly.getMetric(), anomaly.getCollection(), anomaly.getDimensions(), "", "");
       MergedAnomalyResultDTO parent = parents.get(key);
 
       if (parent == null || anomaly.getStartTime() - parent.getEndTime() > this.maxGap) {
@@ -74,7 +80,7 @@ public class ChildKeepingMergeWrapper extends BaselineFillingMergeWrapper {
       } else if (anomaly.getEndTime() <= parent.getEndTime()
           || anomaly.getEndTime() - parent.getStartTime() <= this.maxDuration) {
         // fully merge into existing
-        if (parent.getChildren().isEmpty()){
+        if (parent.getChildren().isEmpty()) {
           parent.getChildren().add(copyAnomalyInfo(parent, new MergedAnomalyResultDTO()));
         }
         parent.setEndTime(Math.max(parent.getEndTime(), anomaly.getEndTime()));
@@ -91,28 +97,11 @@ public class ChildKeepingMergeWrapper extends BaselineFillingMergeWrapper {
       }
     }
 
-    // refill current and baseline values for parent anomalies
-    Collection<MergedAnomalyResultDTO> parentAnomalies =
-        Collections2.filter(output, mergedAnomaly -> mergedAnomaly != null && !mergedAnomaly.getChildren().isEmpty());
+    // refill current and baseline values for qualified parent anomalies
+    Collection<MergedAnomalyResultDTO> parentAnomalies = Collections2.filter(output,
+        mergedAnomaly -> mergedAnomaly != null && !mergedAnomaly.getChildren().isEmpty() && !isExistingAnomaly(
+            existingParentAnomalies, mergedAnomaly));
     super.fillCurrentAndBaselineValue(new ArrayList<>(parentAnomalies));
     return output;
-  }
-
-  private MergedAnomalyResultDTO copyAnomalyInfo(MergedAnomalyResultDTO anomaly, MergedAnomalyResultDTO newAnomaly) {
-    newAnomaly.setStartTime(anomaly.getStartTime());
-    newAnomaly.setEndTime(anomaly.getEndTime());
-    newAnomaly.setMetric(anomaly.getMetric());
-    newAnomaly.setMetricUrn(anomaly.getMetricUrn());
-    newAnomaly.setCollection(anomaly.getCollection());
-    newAnomaly.setDimensions(anomaly.getDimensions());
-    newAnomaly.setDetectionConfigId(anomaly.getDetectionConfigId());
-    newAnomaly.setAnomalyResultSource(anomaly.getAnomalyResultSource());
-    newAnomaly.setAvgBaselineVal(anomaly.getAvgBaselineVal());
-    newAnomaly.setAvgCurrentVal(anomaly.getAvgCurrentVal());
-    newAnomaly.setFeedback(anomaly.getFeedback());
-    newAnomaly.setAnomalyFeedbackId(anomaly.getAnomalyFeedbackId());
-    newAnomaly.setScore(anomaly.getScore());
-    newAnomaly.setWeight(anomaly.getWeight());
-    return newAnomaly;
   }
 }

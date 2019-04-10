@@ -34,6 +34,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.thirdeye.detection.spec.ThresholdRuleDetectorSpec;
+import org.apache.pinot.thirdeye.detection.spi.components.AnomalyDetector;
+import org.apache.pinot.thirdeye.detection.spi.exception.DetectorException;
 import org.joda.time.Interval;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
@@ -70,6 +73,15 @@ public class PercentageChangeRuleDetectorTest {
     timeseries.put(MetricSlice.from(1L, 604800000L, 1209600000L), this.data);
     timeseries.put(MetricSlice.from(1L, 1209600000L, 1814400000L), this.data);
     timeseries.put(MetricSlice.from(1L, 1814400000L, 2419200000L), this.data);
+    timeseries.put(MetricSlice.from(1L, 1546214400000L, 1551312000000L),
+        new DataFrame().addSeries(COL_TIME, 1546214400000L, 1548892800000L).addSeries(COL_VALUE, 100, 200));
+    timeseries.put(MetricSlice.from(1L, 1543536000000L, 1548633600000L),
+        new DataFrame().addSeries(COL_TIME, 1543536000000L, 1546214400000L)
+            .addSeries(COL_VALUE, 100, 100));
+    timeseries.put(MetricSlice.from(1L, 1551398400000L, 1551571200000L),
+        new DataFrame().addSeries(COL_TIME, 1551398400000L, 1551484800000L).addSeries(COL_VALUE, 0, 200));
+    timeseries.put(MetricSlice.from(1L, 1550793600000L, 1550966400000L),
+        new DataFrame().addSeries(COL_TIME, 1550793600000L, 1550880000000L).addSeries(COL_VALUE, 0, 0));
 
     this.provider = new MockDataProvider()
         .setTimeseries(timeseries)
@@ -148,4 +160,31 @@ public class PercentageChangeRuleDetectorTest {
     Assert.assertEquals(anomalies.get(4).getEndTime(), 2325600000L);
   }
 
+  @Test
+  public void testMonthlyDetectionPercentage() throws DetectorException {
+    AnomalyDetector percentageRule = new PercentageChangeRuleDetector();
+    PercentageChangeRuleDetectorSpec spec = new PercentageChangeRuleDetectorSpec();
+    spec.setOffset("mo1m");
+    spec.setPercentageChange(0.4);
+    spec.setMonitoringGranularity("1_MONTHS");
+    percentageRule.init(spec, new DefaultInputDataFetcher(this.provider, -1));
+    List<MergedAnomalyResultDTO> anomalies = percentageRule.runDetection(new Interval(1546214400000L, 1551312000000L), "thirdeye:metric:1");
+    Assert.assertEquals(anomalies.size(), 1);
+    Assert.assertEquals(anomalies.get(0).getStartTime(), 1548892800000L);
+    Assert.assertEquals(anomalies.get(0).getEndTime(), 1551312000000L);
+  }
+
+  @Test
+  public void testZeroDivide() throws DetectorException {
+    AnomalyDetector percentageRule = new PercentageChangeRuleDetector();
+    PercentageChangeRuleDetectorSpec spec = new PercentageChangeRuleDetectorSpec();
+    spec.setOffset("wo1w");
+    spec.setPercentageChange(0.1);
+    percentageRule.init(spec, new DefaultInputDataFetcher(this.provider, -1));
+    List<MergedAnomalyResultDTO> anomalies = percentageRule.runDetection(new Interval(1551398400000L, 1551571200000L), "thirdeye:metric:1");
+    Assert.assertEquals(anomalies.size(), 1);
+    Assert.assertEquals(anomalies.get(0).getStartTime(), 1551484800000L);
+    Assert.assertEquals(anomalies.get(0).getEndTime(), 1551488400000L);
+
+  }
 }

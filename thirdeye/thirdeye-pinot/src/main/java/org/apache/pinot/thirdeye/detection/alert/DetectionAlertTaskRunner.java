@@ -52,7 +52,6 @@ public class DetectionAlertTaskRunner implements TaskRunner {
   private static final Logger LOG = LoggerFactory.getLogger(DetectionAlertTaskRunner.class);
 
   private final DetectionAlertTaskFactory detAlertTaskFactory;
-  private CurrentAndBaselineLoader currentAndBaselineLoader;
   private DetectionAlertConfigManager alertConfigDAO;
   private MergedAnomalyResultManager mergedAnomalyDAO;
 
@@ -66,7 +65,6 @@ public class DetectionAlertTaskRunner implements TaskRunner {
     AggregationLoader aggregationLoader =
         new DefaultAggregationLoader(metricDAO, datasetDAO, ThirdEyeCacheRegistry.getInstance().getQueryCache(),
             ThirdEyeCacheRegistry.getInstance().getDatasetMaxDataTimeCache());
-    this.currentAndBaselineLoader = new CurrentAndBaselineLoader(metricDAO, datasetDAO, aggregationLoader);
   }
 
   private DetectionAlertConfigDTO loadDetectionAlertConfig(long detectionAlertConfigId) {
@@ -93,7 +91,7 @@ public class DetectionAlertTaskRunner implements TaskRunner {
         AlertUtils.makeVectorClock(result.getAllAnomalies()))
     );
 
-    LOG.info("Saving watermarks for alertConfigDAO : {}", alertConfig.toString());
+    LOG.info("Updating watermarks for alertConfigDAO : {}", alertConfig.getId());
     this.alertConfigDAO.save(alertConfig);
   }
 
@@ -121,10 +119,6 @@ public class DetectionAlertTaskRunner implements TaskRunner {
       for (DetectionAlertSuppressor alertSuppressor : alertSuppressors) {
         result = alertSuppressor.run(result);
       }
-
-      // TODO: Cleanup currentAndBaselineLoader
-      // In the new design, we have decided to move this function back to the detection pipeline.
-      this.currentAndBaselineLoader.fillInCurrentAndBaselineValue(result.getAllAnomalies());
 
       // Send out alert notifications (email and/or iris)
       Set<DetectionAlertScheme> alertSchemes =
