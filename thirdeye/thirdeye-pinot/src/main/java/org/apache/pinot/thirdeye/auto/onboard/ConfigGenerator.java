@@ -48,7 +48,7 @@ public class ConfigGenerator {
     datasetConfigDTO.setTimeUnit(timeSpec.getTimeType());
     datasetConfigDTO.setTimeFormat(timeSpec.getTimeFormat());
     datasetConfigDTO.setExpectedDelay(getExpectedDelayFromTimeunit(timeSpec.getTimeType()));
-    if (timeSpec.getTimeFormat().startsWith(TimeFormat.SIMPLE_DATE_FORMAT.toString())) {
+    if (timeSpec.getTimeFormat().startsWith(TimeFormat.SIMPLE_DATE_FORMAT.toString()) || timeSpec.getTimeFormat().equals(TimeSpec.SINCE_EPOCH_FORMAT)) {
       datasetConfigDTO.setTimezone(PDT_TIMEZONE);
     }
     // set the data granularity of epoch timestamp dataset to minute-level
