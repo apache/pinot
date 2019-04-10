@@ -80,9 +80,11 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
   private final PinotHelixResourceManager _pinotHelixResourceManager;
   private ZkClient _zkClient;
   private ControllerMetrics _controllerMetrics;
+  private final ControllerLeadershipManager _controllerLeadershipManager;
 
-  public PinotRealtimeSegmentManager(PinotHelixResourceManager pinotManager) {
+  public PinotRealtimeSegmentManager(PinotHelixResourceManager pinotManager, ControllerLeadershipManager controllerLeadershipManager) {
     _pinotHelixResourceManager = pinotManager;
+    _controllerLeadershipManager = controllerLeadershipManager;
     String clusterName = _pinotHelixResourceManager.getHelixClusterName();
     _propertyStorePath = PropertyPathConfig.getPath(PropertyType.PROPERTYSTORE, clusterName);
     _tableConfigPath = _propertyStorePath + TABLE_CONFIG;
@@ -102,7 +104,7 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
     _zkClient.subscribeDataChanges(_tableConfigPath, this);
 
     // Subscribe to leadership changes
-    ControllerLeadershipManager.getInstance().subscribe(PinotLLCRealtimeSegmentManager.class.getName(), this);
+    _controllerLeadershipManager.subscribe(PinotLLCRealtimeSegmentManager.class.getName(), this);
 
     // Setup change listeners for already existing tables, if any.
     processPropertyStoreChange(_tableConfigPath);
@@ -271,7 +273,7 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
   }
 
   private boolean isLeader() {
-    return ControllerLeadershipManager.getInstance().isLeader();
+    return _controllerLeadershipManager.isLeader();
   }
 
   @Override

@@ -70,6 +70,7 @@ import org.apache.pinot.common.utils.JsonUtils;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.controller.ControllerLeadershipManager;
 import org.apache.pinot.controller.api.access.AccessControl;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.api.upload.SegmentValidator;
@@ -114,6 +115,9 @@ public class PinotSegmentUploadRestletResource {
 
   @Inject
   AccessControlFactory _accessControlFactory;
+
+  @Inject
+  ControllerLeadershipManager _controllerLeadershipManager;
 
   @GET
   @Produces(MediaType.APPLICATION_JSON)
@@ -319,7 +323,7 @@ public class PinotSegmentUploadRestletResource {
       // Validate segment
       SegmentValidatorResponse segmentValidatorResponse =
           new SegmentValidator(_pinotHelixResourceManager, _controllerConf, _executor, _connectionManager,
-              _controllerMetrics).validateSegment(segmentMetadata, tempSegmentDir);
+              _controllerMetrics, _controllerLeadershipManager).validateSegment(segmentMetadata, tempSegmentDir);
 
       // Zk operations
       completeZkOperations(enableParallelPushProtection, headers, tempEncryptedFile, provider, segmentMetadata,

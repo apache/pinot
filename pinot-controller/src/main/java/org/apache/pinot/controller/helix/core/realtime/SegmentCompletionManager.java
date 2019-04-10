@@ -73,6 +73,7 @@ public class SegmentCompletionManager {
   private final Map<String, Long> _commitTimeMap = new ConcurrentHashMap<>();
   private final PinotLLCRealtimeSegmentManager _segmentManager;
   private final ControllerMetrics _controllerMetrics;
+  private final ControllerLeadershipManager _controllerLeadershipManager;
 
   // Half hour max commit time for all segments
   private static final int MAX_COMMIT_TIME_FOR_ALL_SEGMENTS_SECONDS = 1800;
@@ -84,10 +85,11 @@ public class SegmentCompletionManager {
   // TODO keep some history of past committed segments so that we can avoid looking up PROPERTYSTORE if some server comes in late.
 
   protected SegmentCompletionManager(HelixManager helixManager, PinotLLCRealtimeSegmentManager segmentManager,
-      ControllerMetrics controllerMetrics) {
+      ControllerMetrics controllerMetrics, ControllerLeadershipManager controllerLeadershipManager) {
     _helixManager = helixManager;
     _segmentManager = segmentManager;
     _controllerMetrics = controllerMetrics;
+    _controllerLeadershipManager = controllerLeadershipManager;
   }
 
   public boolean isSplitCommitEnabled() {
@@ -100,11 +102,11 @@ public class SegmentCompletionManager {
 
   public static SegmentCompletionManager create(HelixManager helixManager,
       PinotLLCRealtimeSegmentManager segmentManager, ControllerConf controllerConf,
-      ControllerMetrics controllerMetrics) {
+      ControllerMetrics controllerMetrics, ControllerLeadershipManager controllerLeadershipManager) {
     if (_instance != null) {
       throw new RuntimeException("Cannot create multiple instances");
     }
-    _instance = new SegmentCompletionManager(helixManager, segmentManager, controllerMetrics);
+    _instance = new SegmentCompletionManager(helixManager, segmentManager, controllerMetrics, controllerLeadershipManager);
     SegmentCompletionProtocol.setMaxSegmentCommitTimeMs(
         TimeUnit.MILLISECONDS.convert(controllerConf.getSegmentCommitTimeoutSeconds(), TimeUnit.SECONDS));
     return _instance;
@@ -1122,6 +1124,6 @@ public class SegmentCompletionManager {
 
   @VisibleForTesting
   protected boolean isLeader() {
-    return ControllerLeadershipManager.getInstance().isLeader();
+    return _controllerLeadershipManager.isLeader();
   }
 }

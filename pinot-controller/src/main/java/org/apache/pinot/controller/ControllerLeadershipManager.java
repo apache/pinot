@@ -42,31 +42,9 @@ public class ControllerLeadershipManager {
 
   private Map<String, LeadershipChangeSubscriber> _subscribers = new ConcurrentHashMap<>();
 
-  private ControllerLeadershipManager(HelixManager helixManager) {
+  public ControllerLeadershipManager(HelixManager helixManager) {
     _helixManager = helixManager;
     _helixManager.addControllerListener((ControllerChangeListener) notificationContext -> onControllerChange());
-  }
-
-  /**
-   * Create an instance of ControllerLeadershipManager
-   * @param helixManager
-   */
-  public static synchronized void init(HelixManager helixManager) {
-    if (INSTANCE != null) {
-      throw new RuntimeException("Instance of ControllerLeadershipManager already created");
-    }
-    INSTANCE = new ControllerLeadershipManager(helixManager);
-  }
-
-  /**
-   * Get the instance of ControllerLeadershipManager
-   * @return
-   */
-  public static synchronized ControllerLeadershipManager getInstance() {
-    if (INSTANCE == null) {
-      throw new RuntimeException("Instance of ControllerLeadershipManager not yet created");
-    }
-    return INSTANCE;
   }
 
   /**
