@@ -82,7 +82,7 @@ public class AutoOnboardPinotMetricsServiceTest {
     Assert.assertEquals(datasetConfig.bucketTimeGranularity().getUnit(), timeGranularitySpec.getTimeType());
     Assert.assertEquals(datasetConfig.bucketTimeGranularity().getSize(), timeGranularitySpec.getTimeUnitSize());
     Assert.assertEquals(datasetConfig.getTimeFormat(), timeGranularitySpec.getTimeFormat());
-    Assert.assertEquals(datasetConfig.getTimezone(), "UTC");
+    Assert.assertEquals(datasetConfig.getTimezone(), "US/Pacific");
     Assert.assertEquals(datasetConfig.getExpectedDelay().getUnit(), TimeUnit.HOURS);
 
     List<MetricConfigDTO> metricConfigs = metricConfigDAO.findByDataset(dataset);
@@ -149,10 +149,12 @@ public class AutoOnboardPinotMetricsServiceTest {
     Assert.assertEquals(datasetConfigDAO.findAll().size(), 1);
     datasetConfig = datasetConfigDAO.findByDataset(dataset);
     TimeGranularitySpec timeGranularitySpec = schema.getTimeFieldSpec().getOutgoingGranularitySpec();
-    Assert.assertEquals(datasetConfig.bucketTimeGranularity().getUnit(), timeGranularitySpec.getTimeType());
-    Assert.assertEquals(datasetConfig.bucketTimeGranularity().getSize(), timeGranularitySpec.getTimeUnitSize());
+    Assert.assertEquals(datasetConfig.bucketTimeGranularity().getUnit(), TimeUnit.MINUTES);
+    Assert.assertEquals(datasetConfig.bucketTimeGranularity().getSize(), 5);
+    Assert.assertEquals(datasetConfig.getTimeUnit(), timeGranularitySpec.getTimeType());
+    Assert.assertEquals(datasetConfig.getTimeDuration().intValue(), timeGranularitySpec.getTimeUnitSize());
     Assert.assertEquals(datasetConfig.getTimeFormat(), timeGranularitySpec.getTimeFormat());
-    Assert.assertEquals(datasetConfig.getTimezone(), "UTC");
+    Assert.assertEquals(datasetConfig.getTimezone(), "US/Pacific");
     Assert.assertEquals(datasetConfig.getExpectedDelay().getUnit(), TimeUnit.HOURS);
   }
 
