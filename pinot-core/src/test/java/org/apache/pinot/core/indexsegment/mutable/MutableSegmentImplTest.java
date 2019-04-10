@@ -94,7 +94,7 @@ public class MutableSegmentImplTest {
     Assert.assertEquals(actualSegmentMetadata.getTotalDocs(), expectedSegmentMetadata.getTotalDocs());
 
     // assert that the last indexed timestamp is close to what we expect
-    long actualTs = _mutableSegmentImpl.getLastIndexedTimestamp();
+    long actualTs = _mutableSegmentImpl.getSegmentMetadata().getLastIndexedTimestamp();
     Assert.assertTrue(actualTs >= _startTimeMs);
     Assert.assertTrue(actualTs <= _lastIndexedTs);
 

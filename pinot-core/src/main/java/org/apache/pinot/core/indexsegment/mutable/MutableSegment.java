@@ -40,9 +40,4 @@ public interface MutableSegment extends IndexSegment {
    * @return The number of records indexed
    */
   int getNumDocsIndexed();
-
-  /**
-   * Returns the time (in milliseconds) when the last row was indexed.
-   */
-  long getLastIndexedTimestamp();
 }

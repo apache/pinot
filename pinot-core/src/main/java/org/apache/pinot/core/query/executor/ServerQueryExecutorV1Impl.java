@@ -33,6 +33,7 @@ import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerQueryPhase;
 import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.segment.SegmentMetadata;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
@@ -41,7 +42,6 @@ import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.SegmentDataManager;
 import org.apache.pinot.core.data.manager.TableDataManager;
 import org.apache.pinot.core.indexsegment.IndexSegment;
-import org.apache.pinot.core.indexsegment.mutable.MutableSegment;
 import org.apache.pinot.core.plan.Plan;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.core.plan.maker.PlanMaker;
@@ -150,25 +150,31 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       TraceContext.register(requestId);
     }
 
-    Integer numConsuming = 0;
-    Long minIndexTime = Long.MAX_VALUE;
+    int numConsuming = 0;
+    long minIndexTime = Long.MAX_VALUE;
+    long minIngestionTime = Long.MAX_VALUE;
     // gather stats for realtime consuming segments
     for (SegmentDataManager segmentMgr : segmentDataManagers) {
       if (segmentMgr.getSegment().getType() == IndexSegment.IndexSegmentType.MUTABLE) {
         numConsuming += 1;
-        MutableSegment segment = (MutableSegment) segmentMgr.getSegment();
-        if (segment.getLastIndexedTimestamp() < minIndexTime) {
-          minIndexTime = segment.getLastIndexedTimestamp();
+        SegmentMetadata metadata = segmentMgr.getSegment().getSegmentMetadata();
+        long indexedTime = metadata.getLastIndexedTimestamp();
+        if (indexedTime != Long.MIN_VALUE && indexedTime < minIndexTime) {
+          minIndexTime = metadata.getLastIndexedTimestamp();
+        }
+        long ingestionTime = metadata.getLatestIngestionTimestamp();
+        if (ingestionTime != Long.MIN_VALUE && ingestionTime < minIngestionTime) {
+          minIngestionTime = ingestionTime;
         }
       }
     }
 
     if (numConsuming > 0) {
-      if (minIndexTime == Long.MAX_VALUE) {
-        LOGGER.error("Did not find valid lastIndexedTimestamp across consuming segments!");
-        minIndexTime = 0L;
+      if (minIngestionTime == Long.MIN_VALUE) {
+        LOGGER.error("Did not find valid ingestionTimestamp across consuming segments! Using indexTime instead");
+        minIngestionTime = minIndexTime;
       }
-      LOGGER.info("Querying {} consuming segments with min lastIndexedTime {}", numConsuming, minIndexTime);
+      LOGGER.info("Querying {} consuming segments with min lastIngestionTimestamp {}", numConsuming, minIngestionTime);
     }
 
     DataTable dataTable = null;
@@ -249,8 +255,8 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     }
 
     if (numConsuming > 0) {
-      dataTable.getMetadata().put(DataTable.NUM_CONSUMING_SEGMENTS_QUERIED, numConsuming.toString());
-      dataTable.getMetadata().put(DataTable.MIN_CONSUMING_INDEX_TIMESTAMP, minIndexTime.toString());
+      dataTable.getMetadata().put(DataTable.NUM_CONSUMING_SEGMENTS_QUERIED, Integer.toString(numConsuming));
+      dataTable.getMetadata().put(DataTable.MIN_CONSUMING_TIMESTAMP, Long.toString(minIngestionTime));
     }
 
     LOGGER.debug("Query processing time for request Id - {}: {}", requestId, queryProcessingTime);

@@ -143,7 +143,7 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
         numConsumingQueried += Long.parseLong(numConsumingString);
       }
 
-      String minConsumingIndexTsString = metadata.get(DataTable.MIN_CONSUMING_INDEX_TIMESTAMP);
+      String minConsumingIndexTsString = metadata.get(DataTable.MIN_CONSUMING_TIMESTAMP);
       if (minConsumingIndexTsString != null) {
         minConsumingIndexTs = Math.min(Long.parseLong(minConsumingIndexTsString), minConsumingIndexTs);
       }

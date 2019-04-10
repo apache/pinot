@@ -388,11 +388,6 @@ public class MutableSegmentImpl implements MutableSegment {
   }
 
   @Override
-  public long getLastIndexedTimestamp() {
-    return _lastIndexedTimestamp;
-  }
-
-  @Override
   public IndexSegmentType getType() {
     return IndexSegmentType.MUTABLE;
   }
