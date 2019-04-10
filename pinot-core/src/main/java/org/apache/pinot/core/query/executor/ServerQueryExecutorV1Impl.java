@@ -170,11 +170,11 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     }
 
     if (numConsuming > 0) {
-      if (minIngestionTime == Long.MIN_VALUE) {
-        LOGGER.error("Did not find valid ingestionTimestamp across consuming segments! Using indexTime instead");
+      if (minIngestionTime == Long.MAX_VALUE) {
+        LOGGER.debug("Did not find valid ingestionTimestamp across consuming segments! Using indexTime instead");
         minIngestionTime = minIndexTime;
       }
-      LOGGER.info("Querying {} consuming segments with min lastIngestionTimestamp {}", numConsuming, minIngestionTime);
+      LOGGER.debug("Querying {} consuming segments with min lastIngestionTimestamp {}", numConsuming, minIngestionTime);
     }
 
     DataTable dataTable = null;
@@ -256,7 +256,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
     if (numConsuming > 0) {
       dataTable.getMetadata().put(DataTable.NUM_CONSUMING_SEGMENTS_QUERIED, Integer.toString(numConsuming));
-      dataTable.getMetadata().put(DataTable.MIN_CONSUMING_TIMESTAMP, Long.toString(minIngestionTime));
+      dataTable.getMetadata().put(DataTable.MIN_CONSUMING_FRESHNESS_TIMESTAMP, Long.toString(minIngestionTime));
     }
 
     LOGGER.debug("Query processing time for request Id - {}: {}", requestId, queryProcessingTime);

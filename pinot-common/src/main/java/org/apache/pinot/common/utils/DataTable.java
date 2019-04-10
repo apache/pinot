@@ -36,7 +36,7 @@ public interface DataTable {
   String NUM_SEGMENTS_PROCESSED = "numSegmentsProcessed";
   String NUM_SEGMENTS_MATCHED = "numSegmentsMatched";
   String NUM_CONSUMING_SEGMENTS_QUERIED = "numConsumingQueried";
-  String MIN_CONSUMING_TIMESTAMP = "minConsumingTs";
+  String MIN_CONSUMING_FRESHNESS_TIMESTAMP = "minConsumingFreshnessTs";
   String TOTAL_DOCS_METADATA_KEY = "totalDocs";
   String NUM_GROUPS_LIMIT_REACHED_KEY = "numGroupsLimitReached";
   String TIME_USED_MS_METADATA_KEY = "timeUsedMs";
