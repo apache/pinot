@@ -19,6 +19,8 @@
 package org.apache.pinot.core.indexsegment.mutable;
 
 import com.google.common.base.Preconditions;
+import it.unimi.dsi.fastutil.ints.IntArrays;
+import it.unimi.dsi.fastutil.ints.IntComparator;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -489,141 +491,6 @@ public class MutableSegmentImpl implements MutableSegment {
     }
   }
 
-  private IntIterator[] getSortedBitmapIntIteratorsForIntColumn(String column) {
-    MutableDictionary dictionary = _dictionaryMap.get(column);
-    int numValues = dictionary.length();
-    IntIterator[] intIterators = new IntIterator[numValues];
-    RealtimeInvertedIndexReader invertedIndex = _invertedIndexMap.get(column);
-
-    int[] values = new int[numValues];
-    for (int i = 0; i < numValues; i++) {
-      values[i] = (Integer) dictionary.get(i);
-    }
-
-    long start = System.currentTimeMillis();
-    Arrays.sort(values);
-    _logger.info("Spent {}ms sorting int column: {} with cardinality: {}", System.currentTimeMillis() - start, column,
-        numValues);
-
-    for (int i = 0; i < numValues; i++) {
-      intIterators[i] = invertedIndex.getDocIds(dictionary.indexOf(values[i])).getIntIterator();
-    }
-    return intIterators;
-  }
-
-  private IntIterator[] getSortedBitmapIntIteratorsForLongColumn(String column) {
-    MutableDictionary dictionary = _dictionaryMap.get(column);
-    int numValues = dictionary.length();
-    IntIterator[] intIterators = new IntIterator[numValues];
-    RealtimeInvertedIndexReader invertedIndex = _invertedIndexMap.get(column);
-
-    long[] values = new long[numValues];
-    for (int i = 0; i < numValues; i++) {
-      values[i] = (Long) dictionary.get(i);
-    }
-
-    long start = System.currentTimeMillis();
-    Arrays.sort(values);
-    _logger.info("Spent {}ms sorting long column: {} with cardinality: {}", System.currentTimeMillis() - start, column,
-        numValues);
-
-    for (int i = 0; i < numValues; i++) {
-      intIterators[i] = invertedIndex.getDocIds(dictionary.indexOf(values[i])).getIntIterator();
-    }
-    return intIterators;
-  }
-
-  private IntIterator[] getSortedBitmapIntIteratorsForFloatColumn(String column) {
-    MutableDictionary dictionary = _dictionaryMap.get(column);
-    int numValues = dictionary.length();
-    IntIterator[] intIterators = new IntIterator[numValues];
-    RealtimeInvertedIndexReader invertedIndex = _invertedIndexMap.get(column);
-
-    float[] values = new float[numValues];
-    for (int i = 0; i < numValues; i++) {
-      values[i] = (Float) dictionary.get(i);
-    }
-
-    long start = System.currentTimeMillis();
-    Arrays.sort(values);
-    _logger.info("Spent {}ms sorting float column: {} with cardinality: {}", System.currentTimeMillis() - start, column,
-        numValues);
-
-    for (int i = 0; i < numValues; i++) {
-      intIterators[i] = invertedIndex.getDocIds(dictionary.indexOf(values[i])).getIntIterator();
-    }
-    return intIterators;
-  }
-
-  private IntIterator[] getSortedBitmapIntIteratorsForDoubleColumn(String column) {
-    MutableDictionary dictionary = _dictionaryMap.get(column);
-    int numValues = dictionary.length();
-    IntIterator[] intIterators = new IntIterator[numValues];
-    RealtimeInvertedIndexReader invertedIndex = _invertedIndexMap.get(column);
-
-    double[] values = new double[numValues];
-    for (int i = 0; i < numValues; i++) {
-      values[i] = (Double) dictionary.get(i);
-    }
-
-    long start = System.currentTimeMillis();
-    Arrays.sort(values);
-    _logger
-        .info("Spent {}ms sorting double column: {} with cardinality: {}", System.currentTimeMillis() - start, column,
-            numValues);
-
-    for (int i = 0; i < numValues; i++) {
-      intIterators[i] = invertedIndex.getDocIds(dictionary.indexOf(values[i])).getIntIterator();
-    }
-    return intIterators;
-  }
-
-  private IntIterator[] getSortedBitmapIntIteratorsForStringColumn(String column) {
-    MutableDictionary dictionary = _dictionaryMap.get(column);
-    int numValues = dictionary.length();
-    IntIterator[] intIterators = new IntIterator[numValues];
-    RealtimeInvertedIndexReader invertedIndex = _invertedIndexMap.get(column);
-
-    String[] values = new String[numValues];
-    for (int i = 0; i < numValues; i++) {
-      values[i] = (String) dictionary.get(i);
-    }
-
-    long start = System.currentTimeMillis();
-    Arrays.sort(values);
-    _logger
-        .info("Spent {}ms sorting string column: {} with cardinality: {}", System.currentTimeMillis() - start, column,
-            numValues);
-
-    for (int i = 0; i < numValues; i++) {
-      intIterators[i] = invertedIndex.getDocIds(dictionary.indexOf(values[i])).getIntIterator();
-    }
-    return intIterators;
-  }
-
-  private IntIterator[] getSortedBitmapIntIteratorsForBytesColumn(String column) {
-    MutableDictionary dictionary = _dictionaryMap.get(column);
-    int numValues = dictionary.length();
-    IntIterator[] intIterators = new IntIterator[numValues];
-    RealtimeInvertedIndexReader invertedIndex = _invertedIndexMap.get(column);
-
-    ByteArray[] values = new ByteArray[numValues];
-    for (int i = 0; i < numValues; i++) {
-      values[i] = new ByteArray((byte[]) dictionary.get(i));
-    }
-
-    long start = System.currentTimeMillis();
-    Arrays.sort(values);
-    _logger
-        .info("Spent {}ms sorting bytes column: {} with cardinality: {}", System.currentTimeMillis() - start, column,
-            numValues);
-
-    for (int i = 0; i < numValues; i++) {
-      intIterators[i] = invertedIndex.getDocIds(dictionary.indexOf(values[i].getBytes())).getIntIterator();
-    }
-    return intIterators;
-  }
-
   /**
    * Returns the docIds to use for iteration when the data is sorted by the given column.
    * <p>Called only by realtime record reader.
@@ -632,45 +499,70 @@ public class MutableSegmentImpl implements MutableSegment {
    * @return The docIds to use for iteration
    */
   public int[] getSortedDocIdIterationOrderWithSortedColumn(String column) {
-    int[] docIds = new int[_numDocsIndexed];
 
-    // Get docId iterators that iterate in order on the data
-    IntIterator[] iterators;
+    //pick the right comparator based on datatype.
+    IntComparator comparator;
     FieldSpec.DataType dataType = _schema.getFieldSpecFor(column).getDataType();
+    MutableDictionary dictionary = _dictionaryMap.get(column);
+    int[] dictIds = new int[dictionary.length()];
+    for (int i = 0; i < dictIds.length; i++) {
+      dictIds[i] = i;
+    }
     switch (dataType) {
       case INT:
-        iterators = getSortedBitmapIntIteratorsForIntColumn(column);
-        break;
       case LONG:
-        iterators = getSortedBitmapIntIteratorsForLongColumn(column);
-        break;
       case FLOAT:
-        iterators = getSortedBitmapIntIteratorsForFloatColumn(column);
-        break;
       case DOUBLE:
-        iterators = getSortedBitmapIntIteratorsForDoubleColumn(column);
-        break;
       case STRING:
-        iterators = getSortedBitmapIntIteratorsForStringColumn(column);
+        comparator = new IntComparator() {
+          @Override
+          public int compare(int dictId1, int dictId2) {
+            Comparable value1 = (Comparable) _dictionaryMap.get(column).get(dictId1);
+            Comparable value2 = (Comparable) _dictionaryMap.get(column).get(dictId2);
+            return value1.compareTo(value2);
+          }
+
+          @Override
+          public int compare(Integer o1, Integer o2) {
+            return 0;
+          }
+        };
         break;
       case BYTES:
-        iterators = getSortedBitmapIntIteratorsForBytesColumn(column);
+        comparator = new IntComparator() {
+          @Override
+          public int compare(int dictId1, int dictId2) {
+            byte[] bytes1 = _dictionaryMap.get(column).getBytesValue(dictId1);
+            byte[] bytes2 = _dictionaryMap.get(column).getBytesValue(dictId2);
+            return ByteArray.compare(bytes1, bytes2);
+          }
+
+          @Override
+          public int compare(Integer o1, Integer o2) {
+            return 0;
+          }
+        };
         break;
       default:
-        throw new UnsupportedOperationException("Unsupported data type: " + dataType + " for sorted column: " + column);
+        throw new UnsupportedOperationException(
+            "Unsupported data type: " + dataType + " for sorted column: " + column);
     }
 
-    // Drain the iterators into the docIds array
-    int i = 0;
-    for (IntIterator iterator : iterators) {
-      while (iterator.hasNext()) {
-        docIds[i++] = iterator.next();
+    IntArrays.quickSort(dictIds, comparator);
+    RealtimeInvertedIndexReader invertedIndex = _invertedIndexMap.get(column);
+    int[] docIds = new int[_numDocsIndexed];
+    int docIdIndex = 0;
+    for (int dictId : dictIds) {
+      IntIterator intIterator = invertedIndex.getDocIds(dictId).getIntIterator();
+      while (intIterator.hasNext()) {
+        docIds[docIdIndex++] = intIterator.next();
       }
     }
 
     // Sanity check
-    Preconditions.checkState(_numDocsIndexed == i,
-        "The number of docs indexed: %s is not equal to the number of sorted documents: %s", _numDocsIndexed, i);
+    Preconditions.checkState(_numDocsIndexed == docIdIndex,
+        "The number of docs indexed: %s is not equal to the number of sorted documents: %s",
+        _numDocsIndexed, docIdIndex);
 
     return docIds;
   }
