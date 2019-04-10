@@ -64,9 +64,6 @@ public class SegmentCompletionManager {
     ABORTED,      // state machine is aborted. we will start a fresh one when the next segmentConsumed comes in.
   }
 
-  // TODO: fix the misuse of singleton.
-  private static SegmentCompletionManager _instance = null;
-
   private final HelixManager _helixManager;
   // A map that holds the FSM for each segment.
   private final Map<String, SegmentCompletionFSM> _fsmMap = new ConcurrentHashMap<>();
@@ -84,12 +81,15 @@ public class SegmentCompletionManager {
 
   // TODO keep some history of past committed segments so that we can avoid looking up PROPERTYSTORE if some server comes in late.
 
-  protected SegmentCompletionManager(HelixManager helixManager, PinotLLCRealtimeSegmentManager segmentManager,
-      ControllerMetrics controllerMetrics, ControllerLeadershipManager controllerLeadershipManager) {
+  public SegmentCompletionManager(HelixManager helixManager, PinotLLCRealtimeSegmentManager segmentManager,
+      ControllerMetrics controllerMetrics, ControllerLeadershipManager controllerLeadershipManager,
+      int segmentCommitTimeoutSeconds) {
     _helixManager = helixManager;
     _segmentManager = segmentManager;
     _controllerMetrics = controllerMetrics;
     _controllerLeadershipManager = controllerLeadershipManager;
+    SegmentCompletionProtocol
+        .setMaxSegmentCommitTimeMs(TimeUnit.MILLISECONDS.convert(segmentCommitTimeoutSeconds, TimeUnit.SECONDS));
   }
 
   public boolean isSplitCommitEnabled() {
@@ -98,25 +98,6 @@ public class SegmentCompletionManager {
 
   public String getControllerVipUrl() {
     return _segmentManager.getControllerVipUrl();
-  }
-
-  public static SegmentCompletionManager create(HelixManager helixManager,
-      PinotLLCRealtimeSegmentManager segmentManager, ControllerConf controllerConf,
-      ControllerMetrics controllerMetrics, ControllerLeadershipManager controllerLeadershipManager) {
-    if (_instance != null) {
-      throw new RuntimeException("Cannot create multiple instances");
-    }
-    _instance = new SegmentCompletionManager(helixManager, segmentManager, controllerMetrics, controllerLeadershipManager);
-    SegmentCompletionProtocol.setMaxSegmentCommitTimeMs(
-        TimeUnit.MILLISECONDS.convert(controllerConf.getSegmentCommitTimeoutSeconds(), TimeUnit.SECONDS));
-    return _instance;
-  }
-
-  public static SegmentCompletionManager getInstance() {
-    if (_instance == null) {
-      throw new RuntimeException("Not yet created");
-    }
-    return _instance;
   }
 
   protected long getCurrentTimeMs() {
@@ -1116,10 +1097,6 @@ public class SegmentCompletionManager {
       }
       return false;
     }
-  }
-
-  public static void stop() {
-    _instance = null;
   }
 
   @VisibleForTesting
