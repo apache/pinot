@@ -189,6 +189,13 @@ export default Controller.extend({
     }
   ),
 
+  noAnomalies: computed(
+    'totalAnomalies',
+    function() {
+      return (get(this, 'totalAnomalies') === 0);
+    }
+  ),
+
   paginatedSelectedAnomalies: computed(
     'selectedAnomalies.@each',
     'filtersTriggered',
