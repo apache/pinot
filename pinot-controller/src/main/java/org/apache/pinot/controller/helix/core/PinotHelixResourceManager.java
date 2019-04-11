@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.helix.core;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
@@ -332,6 +333,13 @@ public class PinotHelixResourceManager {
       }
     }
     return HelixHelper.getInstancesWithTag(_helixZkManager, TagNameUtils.getBrokerTagForTenant(brokerTenantName));
+  }
+
+  /**
+   * Get all instances with the given tag
+   */
+  public List<String> getInstancesWithTag(String tag) {
+    return HelixHelper.getInstancesWithTag(_helixZkManager, tag);
   }
 
   /**
@@ -1120,7 +1128,12 @@ public class PinotHelixResourceManager {
   /**
    * Validates the tenant config for the table
    */
-  private void validateTableTenantConfig(TableConfig tableConfig, String tableNameWithType, TableType tableType) {
+  @VisibleForTesting
+  protected void validateTableTenantConfig(TableConfig tableConfig, String tableNameWithType, TableType tableType) {
+    if (tableConfig == null) {
+      throw new PinotHelixResourceManager.InvalidTableConfigException(
+          "Table config is null for table: " + tableNameWithType);
+    }
     TenantConfig tenantConfig = tableConfig.getTenantConfig();
     if (tenantConfig == null || tenantConfig.getBroker() == null || tenantConfig.getServer() == null) {
       throw new PinotHelixResourceManager.InvalidTableConfigException(
@@ -1128,14 +1141,14 @@ public class PinotHelixResourceManager {
     }
     // Check if tenant exists before creating the table
     String brokerTenantName = TagNameUtils.getBrokerTagForTenant(tenantConfig.getBroker());
-    List<String> brokersForTenant = HelixHelper.getInstancesWithTag(_helixZkManager, brokerTenantName);
+    List<String> brokersForTenant = getInstancesWithTag(brokerTenantName);
     if (brokersForTenant.isEmpty()) {
       throw new PinotHelixResourceManager.InvalidTableConfigException(
           "Broker tenant: " + brokerTenantName + " does not exist for table: " + tableNameWithType);
     }
     String serverTenantName =
         TagNameUtils.getTagFromTenantAndServerType(tenantConfig.getServer(), tableType.getServerType());
-    if (HelixHelper.getInstancesWithTag(_helixZkManager, serverTenantName).isEmpty()) {
+    if (getInstancesWithTag(serverTenantName).isEmpty()) {
       throw new PinotHelixResourceManager.InvalidTableConfigException(
           "Server tenant: " + serverTenantName + " does not exist for table: " + tableNameWithType);
     }
@@ -1148,7 +1161,7 @@ public class PinotHelixResourceManager {
               "Invalid realtime consuming tag: " + realtimeConsumingTag + " for table " + tableNameWithType
                   + ". Must have suffix _REALTIME or _OFFLINE");
         }
-        if (HelixHelper.getInstancesWithTag(_helixZkManager, realtimeConsumingTag).isEmpty()) {
+        if (getInstancesWithTag(realtimeConsumingTag).isEmpty()) {
           throw new PinotHelixResourceManager.InvalidTableConfigException(
               "No instances found with overridden realtime consuming tag: " + realtimeConsumingTag + " for table: "
                   + tableNameWithType);
@@ -1162,7 +1175,7 @@ public class PinotHelixResourceManager {
               "Invalid realtime completed tag: " + realtimeCompletedTag + " for table " + tableNameWithType
                   + ". Must have suffix _REALTIME or _OFFLINE");
         }
-        if (HelixHelper.getInstancesWithTag(_helixZkManager, realtimeCompletedTag).isEmpty()) {
+        if (getInstancesWithTag(realtimeCompletedTag).isEmpty()) {
           throw new PinotHelixResourceManager.InvalidTableConfigException(
               "No instances found with overridden realtime completed tag: " + realtimeCompletedTag + " for table: "
                   + tableNameWithType);
