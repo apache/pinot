@@ -24,7 +24,7 @@
   <parent>
     <artifactId>pinot</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>0.2.1</version>
+    <version>0.2.2-SNAPSHOT</version>
   </parent>
   <artifactId>pinot-azure-filesystem</artifactId>
   <name>Pinot Azure Filesystem</name>
@@ -50,7 +50,7 @@
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-filesystem</artifactId>
-      <version>0.2.1</version>
+      <version>0.2.2-SNAPSHOT</version>
       <scope>compile</scope>
     </dependency>
     <dependency>
