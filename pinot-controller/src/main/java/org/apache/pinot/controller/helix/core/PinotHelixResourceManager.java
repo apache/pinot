@@ -1145,7 +1145,8 @@ public class PinotHelixResourceManager {
       if (realtimeConsumingTag != null) {
         if (!TagNameUtils.hasValidServerTagSuffix(realtimeConsumingTag)) {
           throw new PinotHelixResourceManager.InvalidTableConfigException(
-              "Invalid realtime consuming tag: " + realtimeConsumingTag + ". Must have suffix _REALTIME or _OFFLINE");
+              "Invalid realtime consuming tag: " + realtimeConsumingTag + " for table " + tableNameWithType
+                  + ". Must have suffix _REALTIME or _OFFLINE");
         }
         if (HelixHelper.getInstancesWithTag(_helixZkManager, realtimeConsumingTag).isEmpty()) {
           throw new PinotHelixResourceManager.InvalidTableConfigException(
@@ -1158,7 +1159,8 @@ public class PinotHelixResourceManager {
       if (realtimeCompletedTag != null) {
         if (!TagNameUtils.hasValidServerTagSuffix(realtimeCompletedTag)) {
           throw new PinotHelixResourceManager.InvalidTableConfigException(
-              "Invalid realtime completed tag: " + realtimeCompletedTag + ". Must have suffix _REALTIME or _OFFLINE");
+              "Invalid realtime completed tag: " + realtimeCompletedTag + " for table " + tableNameWithType
+                  + ". Must have suffix _REALTIME or _OFFLINE");
         }
         if (HelixHelper.getInstancesWithTag(_helixZkManager, realtimeCompletedTag).isEmpty()) {
           throw new PinotHelixResourceManager.InvalidTableConfigException(
