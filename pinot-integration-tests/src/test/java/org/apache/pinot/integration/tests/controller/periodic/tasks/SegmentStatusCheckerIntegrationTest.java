@@ -174,7 +174,7 @@ public class SegmentStatusCheckerIntegrationTest extends BaseClusterIntegrationT
   public void testSegmentStatusChecker() {
     ControllerMetrics controllerMetrics = _controllerStarter.getControllerMetrics();
 
-    long millisToWait = TimeUnit.MILLISECONDS.convert(2, TimeUnit.MINUTES);
+    long millisToWait = TimeUnit.MILLISECONDS.convert(3, TimeUnit.MINUTES);
     while (controllerMetrics.getValueOfGlobalGauge(ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED,
         "SegmentStatusChecker") < NUM_TABLES && millisToWait > 0) {
       try {
@@ -243,16 +243,6 @@ public class SegmentStatusCheckerIntegrationTest extends BaseClusterIntegrationT
     Assert.assertEquals(
         controllerMetrics.getValueOfTableGauge(errorOfflineTable, ControllerGauge.PERCENT_SEGMENTS_AVAILABLE), 100);
 
-    // additional 30 seconds wait, to ensure realtime table setup has also completed
-    millisToWait = TimeUnit.MILLISECONDS.convert(30, TimeUnit.SECONDS);
-    while (controllerMetrics.getValueOfGlobalGauge(ControllerGauge.REALTIME_TABLE_COUNT) < 1 && millisToWait > 0) {
-      try {
-        Thread.sleep(1000);
-        millisToWait -= 1000;
-      } catch (InterruptedException e) {
-        LOGGER.info("Interrupted while waiting for realtime table run in SegmentStatusChecker");
-      }
-    }
     // error segments - table5_REALTIME
     // no replicas available, all segments in error state
     idealState = _helixResourceManager.getTableIdealState(realtimeTableErrorState);
