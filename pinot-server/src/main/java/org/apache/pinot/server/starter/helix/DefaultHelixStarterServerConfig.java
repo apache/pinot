@@ -64,9 +64,6 @@ public class DefaultHelixStarterServerConfig {
     serverConf.addProperty("pinot.server.query.executor.pruner.ValidSegmentPruner.id", "2");
     serverConf.addProperty("pinot.server.query.executor.pruner.PartitionSegmentPruner.id", "3");
 
-    serverConf.addProperty(CommonConstants.Helix.CONFIG_OF_HELIX_FLAPPING_TIMEWINDOW_MS,
-        CommonConstants.Helix.DEFAULT_HELIX_FLAPPING_TIMEWINDOW_MS);
-
     // request handler factory parameters
     serverConf.addProperty(CommonConstants.Server.CONFIG_OF_REQUEST_HANDLER_FACTORY_CLASS,
         CommonConstants.Server.DEFAULT_REQUEST_HANDLER_FACTORY_CLASS);
