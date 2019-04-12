@@ -1131,25 +1131,25 @@ public class PinotHelixResourceManager {
   @VisibleForTesting
   protected void validateTableTenantConfig(TableConfig tableConfig, String tableNameWithType, TableType tableType) {
     if (tableConfig == null) {
-      throw new PinotHelixResourceManager.InvalidTableConfigException(
+      throw new InvalidTableConfigException(
           "Table config is null for table: " + tableNameWithType);
     }
     TenantConfig tenantConfig = tableConfig.getTenantConfig();
     if (tenantConfig == null || tenantConfig.getBroker() == null || tenantConfig.getServer() == null) {
-      throw new PinotHelixResourceManager.InvalidTableConfigException(
+      throw new InvalidTableConfigException(
           "Tenant is not configured for table: " + tableNameWithType);
     }
     // Check if tenant exists before creating the table
     String brokerTenantName = TagNameUtils.getBrokerTagForTenant(tenantConfig.getBroker());
     List<String> brokersForTenant = getInstancesWithTag(brokerTenantName);
     if (brokersForTenant.isEmpty()) {
-      throw new PinotHelixResourceManager.InvalidTableConfigException(
+      throw new InvalidTableConfigException(
           "Broker tenant: " + brokerTenantName + " does not exist for table: " + tableNameWithType);
     }
     String serverTenantName =
         TagNameUtils.getTagFromTenantAndServerType(tenantConfig.getServer(), tableType.getServerType());
     if (getInstancesWithTag(serverTenantName).isEmpty()) {
-      throw new PinotHelixResourceManager.InvalidTableConfigException(
+      throw new InvalidTableConfigException(
           "Server tenant: " + serverTenantName + " does not exist for table: " + tableNameWithType);
     }
     TagOverrideConfig tagOverrideConfig = tenantConfig.getTagOverrideConfig();
@@ -1157,12 +1157,12 @@ public class PinotHelixResourceManager {
       String realtimeConsumingTag = tagOverrideConfig.getRealtimeConsuming();
       if (realtimeConsumingTag != null) {
         if (!TagNameUtils.hasValidServerTagSuffix(realtimeConsumingTag)) {
-          throw new PinotHelixResourceManager.InvalidTableConfigException(
+          throw new InvalidTableConfigException(
               "Invalid realtime consuming tag: " + realtimeConsumingTag + " for table " + tableNameWithType
                   + ". Must have suffix _REALTIME or _OFFLINE");
         }
         if (getInstancesWithTag(realtimeConsumingTag).isEmpty()) {
-          throw new PinotHelixResourceManager.InvalidTableConfigException(
+          throw new InvalidTableConfigException(
               "No instances found with overridden realtime consuming tag: " + realtimeConsumingTag + " for table: "
                   + tableNameWithType);
         }
@@ -1171,12 +1171,12 @@ public class PinotHelixResourceManager {
       String realtimeCompletedTag = tagOverrideConfig.getRealtimeCompleted();
       if (realtimeCompletedTag != null) {
         if (!TagNameUtils.hasValidServerTagSuffix(realtimeCompletedTag)) {
-          throw new PinotHelixResourceManager.InvalidTableConfigException(
+          throw new InvalidTableConfigException(
               "Invalid realtime completed tag: " + realtimeCompletedTag + " for table " + tableNameWithType
                   + ". Must have suffix _REALTIME or _OFFLINE");
         }
         if (getInstancesWithTag(realtimeCompletedTag).isEmpty()) {
-          throw new PinotHelixResourceManager.InvalidTableConfigException(
+          throw new InvalidTableConfigException(
               "No instances found with overridden realtime completed tag: " + realtimeCompletedTag + " for table: "
                   + tableNameWithType);
         }
