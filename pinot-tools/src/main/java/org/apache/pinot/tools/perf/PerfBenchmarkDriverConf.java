@@ -158,7 +158,7 @@ public class PerfBenchmarkDriverConf {
     this.brokerHost = brokerHost;
   }
 
-  public boolean isStartBroker() {
+  public boolean shouldStartBroker() {
     return startBroker;
   }
 
@@ -194,16 +194,8 @@ public class PerfBenchmarkDriverConf {
     return resultsOutputDirectory;
   }
 
-  public boolean isStartServer() {
-    return startServer;
-  }
-
   public void setStartServer(boolean startServer) {
     this.startServer = startServer;
-  }
-
-  public boolean isStartController() {
-    return startController;
   }
 
   public void setStartController(boolean startController) {
