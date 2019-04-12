@@ -104,7 +104,7 @@ public class PinotAdministrator {
   public static void main(String[] args) {
     PinotAdministrator pinotAdministrator = new PinotAdministrator();
     pinotAdministrator.execute(args);
-    if (!System.getProperties().getProperty("pinot.admin.system.exit", "true").equalsIgnoreCase("false")) {
+    if (System.getProperties().getProperty("pinot.admin.system.exit", "false").equalsIgnoreCase("true")) {
       System.exit(pinotAdministrator.getStatus() ? 0 : 1);
     }
   }
