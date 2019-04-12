@@ -19,8 +19,8 @@
 package org.apache.pinot.tools.admin.command;
 
 import java.io.File;
+import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.commons.configuration.Configuration;
-import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.pinot.broker.broker.helix.HelixBrokerStarter;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.tools.Command;
@@ -107,23 +107,21 @@ public class StartBrokerCommand extends AbstractBaseAdminCommand implements Comm
   public boolean execute()
       throws Exception {
     try {
-      Configuration configuration = readConfigFromFile(_configFileName);
-      if (configuration == null) {
+      Configuration brokerConf = readConfigFromFile(_configFileName);
+      if (brokerConf == null) {
         if (_configFileName != null) {
           LOGGER.error("Error: Unable to find file {}.", _configFileName);
           return false;
         }
 
-        configuration = new PropertiesConfiguration();
-        configuration.addProperty(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT, _brokerPort);
-        configuration.setProperty("pinot.broker.routing.table.builder.class", "random");
+        brokerConf = new BaseConfiguration();
+        brokerConf.addProperty(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT, _brokerPort);
       }
 
       LOGGER.info("Executing command: " + toString());
-      final HelixBrokerStarter pinotHelixBrokerStarter =
-          new HelixBrokerStarter(_brokerHost, _clusterName, _zkAddress, configuration);
+      new HelixBrokerStarter(_brokerHost, _clusterName, _zkAddress, brokerConf);
 
-      String pidFile = ".pinotAdminBroker-" + String.valueOf(System.currentTimeMillis()) + ".pid";
+      String pidFile = ".pinotAdminBroker-" + System.currentTimeMillis() + ".pid";
       savePID(System.getProperty("java.io.tmpdir") + File.separator + pidFile);
       return true;
     } catch (Exception e) {

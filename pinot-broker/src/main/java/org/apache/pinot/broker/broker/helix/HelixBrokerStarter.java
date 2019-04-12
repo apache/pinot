@@ -25,9 +25,9 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
+import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.commons.configuration.Configuration;
-import org.apache.commons.configuration.PropertiesConfiguration;
-import org.apache.commons.lang.StringUtils;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixConstants.ChangeType;
 import org.apache.helix.HelixDataAccessor;
@@ -51,7 +51,6 @@ import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.common.utils.ServiceStatus;
-import org.apache.pinot.common.utils.StringUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -62,14 +61,15 @@ import org.slf4j.LoggerFactory;
  *
  */
 public class HelixBrokerStarter {
-  private static final String PROPERTY_STORE = "PROPERTYSTORE";
+  private static final Logger LOGGER = LoggerFactory.getLogger(HelixBrokerStarter.class);
+  private static final String ROUTING_TABLE_PARAMS_SUBSET_KEY = "pinot.broker.routing.table";
 
   // Spectator Helix manager handles the custom change listeners, properties read/write
   private final HelixManager _spectatorHelixManager;
   // Participant Helix manager handles Helix functionality such as state transitions and messages
   private final HelixManager _participantHelixManager;
 
-  private final Configuration _pinotHelixProperties;
+  private final Configuration _brokerConf;
   private final HelixAdmin _helixAdmin;
   private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private final HelixDataAccessor _helixDataAccessor;
@@ -84,31 +84,27 @@ public class HelixBrokerStarter {
   // Set after broker is started, which is actually in the constructor.
   private AccessControlFactory _accessControlFactory;
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(HelixBrokerStarter.class);
-
-  private static final String ROUTING_TABLE_PARAMS_SUBSET_KEY = "pinot.broker.routing.table";
-
-  public HelixBrokerStarter(String helixClusterName, String zkServer, Configuration pinotHelixProperties)
+  public HelixBrokerStarter(String helixClusterName, String zkServer, Configuration brokerConf)
       throws Exception {
-    this(null, helixClusterName, zkServer, pinotHelixProperties);
+    this(null, helixClusterName, zkServer, brokerConf);
   }
 
-  public HelixBrokerStarter(String brokerHost, String helixClusterName, String zkServer,
-      Configuration pinotHelixProperties)
+  public HelixBrokerStarter(@Nullable String brokerHost, String helixClusterName, String zkServer,
+      Configuration brokerConf)
       throws Exception {
     LOGGER.info("Starting Pinot broker");
 
-    _pinotHelixProperties = DefaultHelixBrokerConfig.getDefaultBrokerConf(pinotHelixProperties);
+    _brokerConf = brokerConf;
 
     if (brokerHost == null) {
       brokerHost = NetUtil.getHostAddress();
     }
 
-    final String brokerId = _pinotHelixProperties.getString(CommonConstants.Helix.Instance.INSTANCE_ID_KEY,
-        CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE + brokerHost + "_" + _pinotHelixProperties
+    String brokerId = _brokerConf.getString(CommonConstants.Helix.Instance.INSTANCE_ID_KEY,
+        CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE + brokerHost + "_" + _brokerConf
             .getInt(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT, CommonConstants.Helix.DEFAULT_BROKER_QUERY_PORT));
 
-    _pinotHelixProperties.addProperty(CommonConstants.Broker.CONFIG_OF_BROKER_ID, brokerId);
+    _brokerConf.addProperty(CommonConstants.Broker.CONFIG_OF_BROKER_ID, brokerId);
     setupHelixSystemProperties();
 
     // Remove all white-spaces from the list of zkServers (if any).
@@ -123,10 +119,10 @@ public class HelixBrokerStarter {
     _propertyStore = _spectatorHelixManager.getHelixPropertyStore();
     _helixDataAccessor = _spectatorHelixManager.getHelixDataAccessor();
     _helixExternalViewBasedRouting = new HelixExternalViewBasedRouting(_propertyStore, _spectatorHelixManager,
-        pinotHelixProperties.subset(ROUTING_TABLE_PARAMS_SUBSET_KEY));
+        brokerConf.subset(ROUTING_TABLE_PARAMS_SUBSET_KEY));
     _tableQueryQuotaManager = new TableQueryQuotaManager(_spectatorHelixManager);
     _liveInstanceChangeHandler = new LiveInstanceChangeHandler(_spectatorHelixManager);
-    _brokerServerBuilder = startBroker(_pinotHelixProperties);
+    _brokerServerBuilder = startBroker(_brokerConf);
     _metricsRegistry = _brokerServerBuilder.getMetricsRegistry();
 
     // Initialize cluster change mediator
@@ -160,8 +156,8 @@ public class HelixBrokerStarter {
     stateMachineEngine
         .registerStateModelFactory(BrokerResourceOnlineOfflineStateModelFactory.getStateModelDef(), stateModelFactory);
     _participantHelixManager.connect();
-    _tbiMessageHandler = new TimeboundaryRefreshMessageHandlerFactory(_helixExternalViewBasedRouting,
-        _pinotHelixProperties.getLong(CommonConstants.Broker.CONFIG_OF_BROKER_REFRESH_TIMEBOUNDARY_INFO_SLEEP_INTERVAL,
+    _tbiMessageHandler = new TimeboundaryRefreshMessageHandlerFactory(_helixExternalViewBasedRouting, _brokerConf
+        .getLong(CommonConstants.Broker.CONFIG_OF_BROKER_REFRESH_TIMEBOUNDARY_INFO_SLEEP_INTERVAL,
             CommonConstants.Broker.DEFAULT_BROKER_REFRESH_TIMEBOUNDARY_INFO_SLEEP_INTERVAL_MS));
     _participantHelixManager.getMessagingService()
         .registerMessageHandlerFactory(Message.MessageType.USER_DEFINE_MSG.toString(), _tbiMessageHandler);
@@ -169,7 +165,7 @@ public class HelixBrokerStarter {
     addInstanceTagIfNeeded(helixClusterName, brokerId);
 
     // Register the service status handler
-    double minResourcePercentForStartup = _pinotHelixProperties
+    double minResourcePercentForStartup = _brokerConf
         .getDouble(CommonConstants.Broker.CONFIG_OF_BROKER_MIN_RESOURCE_PERCENT_FOR_START,
             CommonConstants.Broker.DEFAULT_BROKER_MIN_RESOURCE_PERCENT_FOR_START);
     ServiceStatus.setServiceStatusCallback(new ServiceStatus.MultipleCallbackServiceStatusCallback(ImmutableList
@@ -189,7 +185,7 @@ public class HelixBrokerStarter {
     // NOTE: Helix will disconnect the manager and disable the instance if it detects flapping (too frequent disconnect
     // from ZooKeeper). Setting flapping time window to a small value can avoid this from happening. Helix ignores the
     // non-positive value, so set the default value as 1.
-    System.setProperty(SystemPropertyKeys.FLAPPING_TIME_WINDOW, _pinotHelixProperties
+    System.setProperty(SystemPropertyKeys.FLAPPING_TIME_WINDOW, _brokerConf
         .getString(CommonConstants.Helix.CONFIG_OF_BROKER_FLAPPING_TIME_WINDOW_MS,
             CommonConstants.Helix.DEFAULT_FLAPPING_TIME_WINDOW_MS));
   }
@@ -209,9 +205,6 @@ public class HelixBrokerStarter {
   }
 
   private BrokerServerBuilder startBroker(Configuration config) {
-    if (config == null) {
-      config = DefaultHelixBrokerConfig.getDefaultBrokerConf();
-    }
     BrokerServerBuilder brokerServerBuilder = new BrokerServerBuilder(config, _helixExternalViewBasedRouting,
         _helixExternalViewBasedRouting.getTimeBoundaryService(), _liveInstanceChangeHandler, _tableQueryQuotaManager);
     _accessControlFactory = brokerServerBuilder.getAccessControlFactory();
@@ -278,32 +271,6 @@ public class HelixBrokerStarter {
     return _accessControlFactory;
   }
 
-  /**
-   * The zk string format should be 127.0.0.1:3000,127.0.0.1:3001/app/a which applies
-   * the /helixClusterName/PROPERTY_STORE after chroot to all servers.
-   * Expected output for this method is:
-   * 127.0.0.1:3000/app/a/helixClusterName/PROPERTY_STORE,127.0.0.1:3001/app/a/helixClusterName/PROPERTY_STORE
-   *
-   * @param zkServers
-   * @param helixClusterName
-   * @return the full property store path
-   *
-   * @see org.apache.zookeeper.ZooKeeper#ZooKeeper(String, int, org.apache.zookeeper.Watcher)
-   */
-  public static String getZkAddressForBroker(String zkServers, String helixClusterName) {
-    List tokens = new ArrayList<String>();
-    String[] zkSplit = zkServers.split("/", 2);
-    String zkHosts = zkSplit[0];
-    String zkPathSuffix = StringUtil.join("/", helixClusterName, PROPERTY_STORE);
-    if (zkSplit.length > 1) {
-      zkPathSuffix = zkSplit[1] + "/" + zkPathSuffix;
-    }
-    for (String token : zkHosts.split(",")) {
-      tokens.add(StringUtil.join("/", StringUtils.chomp(token, "/"), zkPathSuffix));
-    }
-    return StringUtils.join(tokens, ",");
-  }
-
   public HelixManager getSpectatorHelixManager() {
     return _spectatorHelixManager;
   }
@@ -318,14 +285,11 @@ public class HelixBrokerStarter {
 
   public static HelixBrokerStarter startDefault()
       throws Exception {
-    Configuration configuration = new PropertiesConfiguration();
+    Configuration brokerConf = new BaseConfiguration();
     int port = 5001;
-    configuration.addProperty(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT, port);
-    configuration.addProperty("pinot.broker.timeoutMs", 500 * 1000L);
-
-    final HelixBrokerStarter pinotHelixBrokerStarter =
-        new HelixBrokerStarter(null, "quickstart", "localhost:2122", configuration);
-    return pinotHelixBrokerStarter;
+    brokerConf.addProperty(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT, port);
+    brokerConf.addProperty(CommonConstants.Broker.CONFIG_OF_BROKER_TIMEOUT_MS, 60 * 1000L);
+    return new HelixBrokerStarter(null, "quickstart", "localhost:2122", brokerConf);
   }
 
   public void shutdown() {
