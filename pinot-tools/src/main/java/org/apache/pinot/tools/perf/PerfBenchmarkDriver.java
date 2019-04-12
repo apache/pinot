@@ -71,6 +71,7 @@ public class PerfBenchmarkDriver {
   private final String _segmentFormatVersion;
   private final boolean _verbose;
 
+  private ControllerStarter _controllerStarter;
   private String _controllerHost;
   private int _controllerPort;
   private String _controllerAddress;
@@ -88,6 +89,10 @@ public class PerfBenchmarkDriver {
   private final String _brokerTenantName = "DefaultTenant";
   private final String _serverTenantName = "DefaultTenant";
 
+  // Used for creating tables and tenants, and uploading segments. Since uncompressed segments are already available
+  // for PerfBenchmarkDriver, servers can directly load the segments. PinotHelixResourceManager.addNewSegment(), which
+  // updates ZKSegmentMetadata only, is not exposed from controller API so we need to update segments directly via
+  // PinotHelixResourceManager.
   private PinotHelixResourceManager _helixResourceManager;
 
   public PerfBenchmarkDriver(PerfBenchmarkDriverConf conf) {
@@ -187,7 +192,8 @@ public class PerfBenchmarkDriver {
     }
     ControllerConf conf = getControllerConf();
     LOGGER.info("Starting controller at {}", _controllerAddress);
-    new ControllerStarter(conf).start();
+    _controllerStarter = new ControllerStarter(conf);
+    _controllerStarter.start();
   }
 
   private ControllerConf getControllerConf() {
@@ -205,7 +211,7 @@ public class PerfBenchmarkDriver {
 
   private void startBroker()
       throws Exception {
-    if (!_conf.isStartBroker()) {
+    if (!_conf.shouldStartBroker()) {
       LOGGER.info("Skipping start broker step. Assumes broker is already started.");
       return;
     }
@@ -237,18 +243,31 @@ public class PerfBenchmarkDriver {
 
   private void startHelixResourceManager()
       throws Exception {
-    _helixResourceManager = new PinotHelixResourceManager(getControllerConf());
-    _helixResourceManager.start();
+    if (_conf.shouldStartController()) {
+      // helix resource manager is already available at this time if controller is started
+      _helixResourceManager = _controllerStarter.getHelixResourceManager();
+    } else {
+      // When starting server only, we need to change the controller port to avoid registering controller helix
+      // participant with the same host and port.
+      ControllerConf controllerConf = getControllerConf();
+      controllerConf.setControllerPort(Integer.toString(_conf.getControllerPort() + 1));
+      _helixResourceManager = new PinotHelixResourceManager(controllerConf);
+      _helixResourceManager.start();
+    }
 
-    // Create broker tenant.
-    Tenant brokerTenant = new TenantBuilder(_brokerTenantName).setRole(TenantRole.BROKER).setTotalInstances(1).build();
-    _helixResourceManager.createBrokerTenant(brokerTenant);
+    // Create server tenants if required
+    if (_conf.shouldStartServer()) {
+      Tenant serverTenant =
+          new TenantBuilder(_serverTenantName).setRole(TenantRole.SERVER).setTotalInstances(1).setOfflineInstances(1)
+              .build();
+      _helixResourceManager.createServerTenant(serverTenant);
+    }
 
-    // Create server tenant.
-    Tenant serverTenant =
-        new TenantBuilder(_serverTenantName).setRole(TenantRole.SERVER).setTotalInstances(1).setOfflineInstances(1)
-            .build();
-    _helixResourceManager.createServerTenant(serverTenant);
+    // Create broker tenant if required
+    if (_conf.shouldStartBroker()) {
+      Tenant brokerTenant = new TenantBuilder(_brokerTenantName).setRole(TenantRole.BROKER).setTotalInstances(1).build();
+      _helixResourceManager.createBrokerTenant(brokerTenant);
+    }
   }
 
   private void configureResources()
