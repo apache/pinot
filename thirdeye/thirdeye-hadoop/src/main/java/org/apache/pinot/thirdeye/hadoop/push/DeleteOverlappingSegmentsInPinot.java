@@ -79,7 +79,7 @@ public class DeleteOverlappingSegmentsInPinot {
       }
     }
     LOG.info("HOURLY segments that can be deleted: {}", hourlySegmentsToDelete.size());
-    LOG.info("Hourly segments to delete {}", hourlySegmentsToDelete.toString().replaceAll(",", "\n"));
+    LOG.info("Hourly segments to delete {}", hourlySegmentsToDelete.toString().replace(",", "\n"));
     IdealState newIdealState = new IdealState(is.getRecord());
     for (String hourlySegmentToDelete : hourlySegmentsToDelete) {
       newIdealState.getRecord().getMapFields().remove(hourlySegmentToDelete);
