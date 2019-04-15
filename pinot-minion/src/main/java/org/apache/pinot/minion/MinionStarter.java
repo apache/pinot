@@ -28,6 +28,7 @@ import org.apache.commons.configuration.Configuration;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.InstanceType;
+import org.apache.helix.SystemPropertyKeys;
 import org.apache.helix.manager.zk.ZKHelixManager;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.task.TaskStateModelFactory;
@@ -77,9 +78,19 @@ public class MinionStarter {
     _instanceId = config.getString(CommonConstants.Helix.Instance.INSTANCE_ID_KEY,
         CommonConstants.Minion.INSTANCE_PREFIX + NetUtil.getHostAddress() + "_"
             + CommonConstants.Minion.DEFAULT_HELIX_PORT);
+    setupHelixSystemProperties();
     _helixManager = new ZKHelixManager(_helixClusterName, _instanceId, InstanceType.PARTICIPANT, zkAddress);
     _taskExecutorFactoryRegistry = new TaskExecutorFactoryRegistry();
     _eventObserverFactoryRegistry = new EventObserverFactoryRegistry();
+  }
+
+  private void setupHelixSystemProperties() {
+    // NOTE: Helix will disconnect the manager and disable the instance if it detects flapping (too frequent disconnect
+    // from ZooKeeper). Setting flapping time window to a small value can avoid this from happening. Helix ignores the
+    // non-positive value, so set the default value as 1.
+    System.setProperty(SystemPropertyKeys.FLAPPING_TIME_WINDOW, _config
+        .getString(CommonConstants.Helix.CONFIG_OF_MINION_FLAPPING_TIME_WINDOW_MS,
+            CommonConstants.Helix.DEFAULT_FLAPPING_TIME_WINDOW_MS));
   }
 
   /**
