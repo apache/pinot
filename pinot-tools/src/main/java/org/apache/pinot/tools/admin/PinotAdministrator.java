@@ -63,6 +63,16 @@ import org.slf4j.LoggerFactory;
 /**
  * Class to implement Pinot Administrator, that provides the following commands:
  *
+ * System property: `pinot.admin.system.exit`(default to false) is used to decide if System.exit(...) will be called with exit code.
+ *
+ * Sample Usage in Commandline:
+ *  JAVA_OPTS="-Xms4G -Xmx4G -Dpinot.admin.system.exit=true" \
+ *  bin/pinot-admin.sh AddSchema \
+ *    -schemaFile /my/path/to/schema/schema.json \
+ *    -controllerHost localhost \
+ *    -controllerPort 9000 \
+ *    -exec
+ *
  */
 public class PinotAdministrator {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotAdministrator.class);
