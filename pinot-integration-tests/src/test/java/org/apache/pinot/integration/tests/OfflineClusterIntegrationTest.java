@@ -33,6 +33,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.JsonUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
@@ -161,6 +162,34 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     } catch (IOException e) {
       // Should get response code 400 (BAD_REQUEST)
       assertTrue(e.getMessage().startsWith("Server returned HTTP response code: 400"));
+    }
+  }
+
+  @Test
+  public void testUploadSameSegments()
+      throws Exception {
+    OfflineSegmentZKMetadata segmentZKMetadata = _helixResourceManager.getOfflineSegmentMetadata(getTableName()).get(0);
+    String segmentName = segmentZKMetadata.getSegmentName();
+    long crc = segmentZKMetadata.getCrc();
+    // Creation time is when the segment gets created
+    long creationTime = segmentZKMetadata.getCreationTime();
+    // Push time is when the segment gets first pushed (new segment)
+    long pushTime = segmentZKMetadata.getPushTime();
+    // Refresh time is when the segment gets refreshed (existing segment)
+    long refreshTime = segmentZKMetadata.getRefreshTime();
+
+    uploadSegments(_tarDir);
+    for (OfflineSegmentZKMetadata segmentZKMetadataAfterUpload : _helixResourceManager
+        .getOfflineSegmentMetadata(getTableName())) {
+      // Only check one segment
+      if (segmentZKMetadataAfterUpload.getSegmentName().equals(segmentName)) {
+        assertEquals(segmentZKMetadataAfterUpload.getCrc(), crc);
+        assertEquals(segmentZKMetadataAfterUpload.getCreationTime(), creationTime);
+        assertEquals(segmentZKMetadataAfterUpload.getPushTime(), pushTime);
+        // Refresh time should change
+        assertTrue(segmentZKMetadataAfterUpload.getRefreshTime() > refreshTime);
+        return;
+      }
     }
   }
 
