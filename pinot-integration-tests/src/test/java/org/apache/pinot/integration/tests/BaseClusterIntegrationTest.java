@@ -31,6 +31,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.client.ConnectionFactory;
 import org.apache.pinot.common.config.TableTaskConfig;
+import org.apache.pinot.common.config.TagNameUtils;
 import org.apache.pinot.common.utils.KafkaStarterUtils;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.common.utils.ZkStarter;
@@ -173,6 +174,16 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   @Nullable
   protected TableTaskConfig getTaskConfig() {
     return null;
+  }
+
+  @Nullable
+  protected  String getServerTenant() {
+    return TagNameUtils.DEFAULT_TENANT_NAME;
+  }
+
+  @Nullable
+  protected String getBrokerTenant() {
+    return TagNameUtils.DEFAULT_TENANT_NAME;
   }
 
   /**

@@ -100,9 +100,10 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTestSe
     String timeType = outgoingTimeUnit.toString();
 
     addRealtimeTable(getTableName(), useLlc(), KafkaStarterUtils.DEFAULT_KAFKA_BROKER, KafkaStarterUtils.DEFAULT_ZK_STR,
-        getKafkaTopic(), getRealtimeSegmentFlushSize(), avroFile, timeColumnName, timeType, schemaName, null, null,
-        getLoadMode(), getSortedColumn(), getInvertedIndexColumns(), getBloomFilterIndexColumns(), getRawIndexColumns(),
-        getTaskConfig(), getStreamConsumerFactoryClassName());
+        getKafkaTopic(), getRealtimeSegmentFlushSize(), avroFile, timeColumnName, timeType, schemaName,
+        getBrokerTenant(), getServerTenant(), getLoadMode(), getSortedColumn(),
+        getInvertedIndexColumns(), getBloomFilterIndexColumns(), getRawIndexColumns(), getTaskConfig(),
+        getStreamConsumerFactoryClassName());
 
     completeTableConfiguration();
   }

@@ -102,6 +102,11 @@ public class PinotTableRestletResource {
   @Inject
   ExecutorService _executorService;
 
+  /**
+   * API to create a table. Before adding, validations will be done (min number of replicas,
+   * checking offline and realtime table configs match, checking for tenants existing)
+   * @param tableConfigStr
+   */
   @POST
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables")
@@ -302,7 +307,7 @@ public class PinotTableRestletResource {
 
       ensureMinReplicas(tableConfig);
       verifyTableConfigs(tableConfig);
-      _pinotHelixResourceManager.setExistingTableConfig(tableConfig, tableNameWithType, tableType);
+      _pinotHelixResourceManager.updateTableConfig(tableConfig, tableNameWithType, tableType);
     } catch (PinotHelixResourceManager.InvalidTableConfigException e) {
       String errStr = String.format("Failed to update configuration for %s due to: %s", tableName, e.getMessage());
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_UPDATE_ERROR, 1L);
