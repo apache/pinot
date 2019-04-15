@@ -23,6 +23,7 @@ import it.unimi.dsi.fastutil.floats.FloatOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import java.io.File;
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Random;
@@ -251,6 +252,15 @@ public class ImmutableDictionaryReaderTest {
         .mapReadOnlyBigEndianFile(new File(TEMP_DIR, STRING_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)), NUM_VALUES,
         _numBytesPerStringValue, (byte) 0)) {
       testStringDictionary(onHeapStringDictionary);
+    }
+  }
+
+  @Test
+  public void testOnHeapTrieBasedStringDictionary()
+      throws IOException {
+    try (OnHeapTrieBasedDictionary onHeapTrieBasedStringDictionary = new OnHeapTrieBasedStringDictionary(PinotDataBuffer.mapReadOnlyBigEndianFile(new File(TEMP_DIR, STRING_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)), NUM_VALUES,
+        _numBytesPerStringValue, (byte) 0)) {
+      testStringDictionary(onHeapTrieBasedStringDictionary);
     }
   }
 

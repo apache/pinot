@@ -44,6 +44,7 @@ import org.apache.pinot.core.segment.index.readers.OnHeapFloatDictionary;
 import org.apache.pinot.core.segment.index.readers.OnHeapIntDictionary;
 import org.apache.pinot.core.segment.index.readers.OnHeapLongDictionary;
 import org.apache.pinot.core.segment.index.readers.OnHeapStringDictionary;
+import org.apache.pinot.core.segment.index.readers.OnHeapTrieBasedStringDictionary;
 import org.apache.pinot.core.segment.index.readers.StringDictionary;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.apache.pinot.core.segment.store.ColumnIndexType;
@@ -66,10 +67,12 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
     String columnName = metadata.getColumnName();
     boolean loadInvertedIndex = false;
     boolean loadOnHeapDictionary = false;
+    boolean loadOnHeapTrieBasedDictionary = false;
     boolean loadBloomFilter = false;
     if (indexLoadingConfig != null) {
       loadInvertedIndex = indexLoadingConfig.getInvertedIndexColumns().contains(columnName);
       loadOnHeapDictionary = indexLoadingConfig.getOnHeapDictionaryColumns().contains(columnName);
+      loadOnHeapTrieBasedDictionary = indexLoadingConfig.getOnHeapTrieBasedDictionaryColumns().contains(columnName);
       loadBloomFilter = indexLoadingConfig.getBloomFilterColumns().contains(columnName);
     }
     PinotDataBuffer fwdIndexBuffer = segmentReader.getIndexFor(columnName, ColumnIndexType.FORWARD_INDEX);
@@ -84,7 +87,7 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
       }
       // Dictionary-based index
       _dictionary = loadDictionary(segmentReader.getIndexFor(columnName, ColumnIndexType.DICTIONARY), metadata,
-          loadOnHeapDictionary);
+          loadOnHeapDictionary, loadOnHeapTrieBasedDictionary);
       if (metadata.isSingleValue()) {
         // Single-value
         if (metadata.isSorted()) {
@@ -141,7 +144,7 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
   }
 
   private static ImmutableDictionaryReader loadDictionary(PinotDataBuffer dictionaryBuffer, ColumnMetadata metadata,
-      boolean loadOnHeap) {
+      boolean loadOnHeap, boolean loadOnHeapTrieBasedDictionary) {
     FieldSpec.DataType dataType = metadata.getDataType();
     if (loadOnHeap) {
       String columnName = metadata.getColumnName();
@@ -169,8 +172,13 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
       case STRING:
         int numBytesPerValue = metadata.getColumnMaxLength();
         byte paddingByte = (byte) metadata.getPaddingCharacter();
-        return loadOnHeap ? new OnHeapStringDictionary(dictionaryBuffer, length, numBytesPerValue, paddingByte)
-            : new StringDictionary(dictionaryBuffer, length, numBytesPerValue, paddingByte);
+        if (loadOnHeapTrieBasedDictionary) {
+          return new OnHeapTrieBasedStringDictionary(dictionaryBuffer, length, numBytesPerValue, paddingByte);
+        } else if (loadOnHeap) {
+          return new OnHeapStringDictionary(dictionaryBuffer, length, numBytesPerValue, paddingByte);
+        } else {
+          return new StringDictionary(dictionaryBuffer, length, numBytesPerValue, paddingByte);
+        }
 
       case BYTES:
         numBytesPerValue = metadata.getColumnMaxLength();

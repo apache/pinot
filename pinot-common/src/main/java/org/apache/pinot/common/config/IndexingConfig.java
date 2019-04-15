@@ -75,6 +75,9 @@ public class IndexingConfig {
   @ConfigKey("onHeapDictionaryColumns")
   private List<String> _onHeapDictionaryColumns;
 
+  @ConfigKey("onHeapDictionaryColumns")
+  private List<String> _onHeapTrieBasedDictionaryColumns;
+
   @ConfigKey("starTreeIndexSpec")
   private StarTreeIndexSpec _starTreeIndexSpec;
 
@@ -179,6 +182,10 @@ public class IndexingConfig {
     return _onHeapDictionaryColumns;
   }
 
+  public List<String> getOnHeapTrieBasedDictionaryColumns() {
+    return _onHeapTrieBasedDictionaryColumns;
+  }
+
   public void setNoDictionaryColumns(List<String> noDictionaryColumns) {
     _noDictionaryColumns = noDictionaryColumns;
   }
@@ -189,6 +196,10 @@ public class IndexingConfig {
 
   public void setOnHeapDictionaryColumns(List<String> onHeapDictionaryColumns) {
     _onHeapDictionaryColumns = onHeapDictionaryColumns;
+  }
+
+  public void setOnHeapTrieBasedDictionaryColumns(List<String> onHeapTrieBasedDictionaryColumns) {
+    _onHeapTrieBasedDictionaryColumns = onHeapTrieBasedDictionaryColumns;
   }
 
   public void setStarTreeIndexSpec(StarTreeIndexSpec starTreeIndexSpec) {
@@ -277,6 +288,7 @@ public class IndexingConfig {
         .isEqual(_noDictionaryColumns, that._noDictionaryColumns) && EqualityUtils
         .isEqual(_noDictionaryConfig, that._noDictionaryConfig) && EqualityUtils
         .isEqual(_onHeapDictionaryColumns, that._onHeapDictionaryColumns) && EqualityUtils
+        .isEqual(_onHeapTrieBasedDictionaryColumns, that._onHeapTrieBasedDictionaryColumns) && EqualityUtils
         .isEqual(_starTreeIndexSpec, that._starTreeIndexSpec) && EqualityUtils
         .isEqual(_segmentPartitionConfig, that._segmentPartitionConfig) && EqualityUtils
         .isEqual(_bloomFilterColumns, that._bloomFilterColumns);
@@ -295,6 +307,7 @@ public class IndexingConfig {
     result = EqualityUtils.hashCodeOf(result, _noDictionaryColumns);
     result = EqualityUtils.hashCodeOf(result, _noDictionaryConfig);
     result = EqualityUtils.hashCodeOf(result, _onHeapDictionaryColumns);
+    result = EqualityUtils.hashCodeOf(result, _onHeapTrieBasedDictionaryColumns);
     result = EqualityUtils.hashCodeOf(result, _starTreeIndexSpec);
     result = EqualityUtils.hashCodeOf(result, _segmentPartitionConfig);
     result = EqualityUtils.hashCodeOf(result, _bloomFilterColumns);

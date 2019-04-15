@@ -22,6 +22,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -84,6 +85,7 @@ public class OnHeapDictionariesTest {
 
     loadingConfig.setOnHeapDictionaryColumns(new HashSet<>(
         Arrays.asList(new String[]{INT_COLUMN, LONG_COLUMN, FLOAT_COLUMN, DOUBLE_COLUMN, STRING_COLUMN})));
+    loadingConfig.setOnHeapTrieBasedDictionaryColumns(new HashSet<>(Collections.singletonList(STRING_COLUMN)));
 
     _onHeapSegment = ImmutableSegmentLoader.load(new File(SEGMENT_DIR_NAME, SEGMENT_NAME), loadingConfig);
   }
