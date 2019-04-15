@@ -102,6 +102,11 @@ public class PinotTableRestletResource {
   @Inject
   ExecutorService _executorService;
 
+  /**
+   * API to create a table. Before adding, validations will be done (min number of replicas,
+   * checking offline and realtime table configs match, checking for tenants existing)
+   * @param tableConfigStr
+   */
   @POST
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables")
