@@ -48,6 +48,8 @@ public class IndexingConfigTest {
     indexingConfig.setSortedColumn(sortedColumn);
     List<String> onHeapDictionaryColumns = Arrays.asList("x", "y", "z");
     indexingConfig.setOnHeapDictionaryColumns(onHeapDictionaryColumns);
+    List<String> onHeapTrieBasedDictionaryColumns = Arrays.asList("x", "y");
+    indexingConfig.setOnHeapTrieBasedDictionaryColumns(onHeapTrieBasedDictionaryColumns);
     List<String> bloomFilterColumns = Arrays.asList("a", "b");
     indexingConfig.setBloomFilterColumns(bloomFilterColumns);
     Map<String, String> noDictionaryConfig = new HashMap<>();

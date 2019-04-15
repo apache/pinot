@@ -47,6 +47,7 @@ public class IndexLoadingConfig {
   private Set<String> _noDictionaryColumns = new HashSet<>(); // TODO: replace this by _noDictionaryConfig.
   private Map<String, String> _noDictionaryConfig = new HashMap<>();
   private Set<String> _onHeapDictionaryColumns = new HashSet<>();
+  private Set<String> _onHeapTrieBasedDictionaryColumns = new HashSet<>();
   private Set<String> _bloomFilterColumns = new HashSet<>();
 
   private SegmentVersion _segmentVersion;
@@ -98,6 +99,11 @@ public class IndexLoadingConfig {
     List<String> onHeapDictionaryColumns = indexingConfig.getOnHeapDictionaryColumns();
     if (onHeapDictionaryColumns != null) {
       _onHeapDictionaryColumns.addAll(onHeapDictionaryColumns);
+    }
+
+    List<String> onHeapTrieBasedDictionaryColumns = indexingConfig.getOnHeapTrieBasedDictionaryColumns();
+    if (onHeapTrieBasedDictionaryColumns != null) {
+      _onHeapTrieBasedDictionaryColumns.addAll(onHeapTrieBasedDictionaryColumns);
     }
 
     String tableSegmentVersion = indexingConfig.getSegmentFormatVersion();
@@ -181,6 +187,11 @@ public class IndexLoadingConfig {
     _onHeapDictionaryColumns = onHeapDictionaryColumns;
   }
 
+  @VisibleForTesting
+  public void setOnHeapTrieBasedDictionaryColumns(@Nonnull Set<String> onHeapTrieBasedDictionaryColumns) {
+    _onHeapTrieBasedDictionaryColumns = onHeapTrieBasedDictionaryColumns;
+  }
+
   @Nonnull
   public Set<String> getNoDictionaryColumns() {
     return _noDictionaryColumns;
@@ -194,6 +205,11 @@ public class IndexLoadingConfig {
   @Nonnull
   public Set<String> getOnHeapDictionaryColumns() {
     return _onHeapDictionaryColumns;
+  }
+
+  @Nonnull
+  public Set<String> getOnHeapTrieBasedDictionaryColumns() {
+    return _onHeapTrieBasedDictionaryColumns;
   }
 
   public Set<String> getBloomFilterColumns() {

@@ -448,6 +448,7 @@ public class TableConfig {
     private List<String> _invertedIndexColumns;
     private List<String> _noDictionaryColumns;
     private List<String> _onHeapDictionaryColumns;
+    private List<String> _onHeapTrieBasedDictionaryColumns;
     private List<String> _bloomFilterColumns;
     private Map<String, String> _streamConfigs;
     private String _streamPartitionAssignmentStrategy = DEFAULT_STREAM_PARTITION_ASSIGNMENT_STRATEGY;
@@ -575,6 +576,11 @@ public class TableConfig {
 
     public Builder setOnHeapDictionaryColumns(List<String> onHeapDictionaryColumns) {
       _onHeapDictionaryColumns = onHeapDictionaryColumns;
+      return this;
+    }
+
+    public Builder setOnHeapTrieBasedDictionaryColumns(List<String> onHeapTrieBasedDictionaryColumns) {
+      _onHeapTrieBasedDictionaryColumns = onHeapTrieBasedDictionaryColumns;
       return this;
     }
 

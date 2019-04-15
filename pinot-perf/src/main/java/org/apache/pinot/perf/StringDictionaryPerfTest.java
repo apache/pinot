@@ -38,6 +38,7 @@ import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
 
 
@@ -104,9 +105,11 @@ public class StringDictionaryPerfTest {
       rows.add(genericRow);
     }
 
+    long startTime = System.currentTimeMillis();
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
     driver.init(config, new GenericRowRecordReader(rows, schema));
     driver.build();
+    System.out.println("Time to take for building segments: " + (System.currentTimeMillis() - startTime));
   }
 
   /**
@@ -116,16 +119,25 @@ public class StringDictionaryPerfTest {
    * @param numLookups Number of lookups to perform
    * @throws Exception
    */
-  public void perfTestLookups(int numLookups)
+  public void perfTestLookups(int numLookups, boolean trieBased)
       throws Exception {
-    ImmutableSegment immutableSegment = ImmutableSegmentLoader.load(_indexDir, ReadMode.heap);
+    IndexLoadingConfig defaultIndexLoadingConfig = new IndexLoadingConfig();
+    defaultIndexLoadingConfig.setReadMode(ReadMode.heap);
+    Set<String> indexedColumnNames = new HashSet<>();
+    indexedColumnNames.add(COLUMN_NAME);
+    if (trieBased) {
+      defaultIndexLoadingConfig.setOnHeapTrieBasedDictionaryColumns(indexedColumnNames);
+    } else {
+      defaultIndexLoadingConfig.setOnHeapDictionaryColumns(indexedColumnNames);
+    }
+    ImmutableSegment immutableSegment = ImmutableSegmentLoader.load(_indexDir, defaultIndexLoadingConfig);
     Dictionary dictionary = immutableSegment.getDictionary(COLUMN_NAME);
 
     Random random = new Random(System.nanoTime());
     long start = System.currentTimeMillis();
 
     for (int i = 0; i < numLookups; i++) {
-      int index = 1 + random.nextInt(_dictLength);
+      int index = random.nextInt(_dictLength);
       dictionary.indexOf(_inputStrings[index]);
     }
 
@@ -141,9 +153,10 @@ public class StringDictionaryPerfTest {
 
     int dictLength = Integer.valueOf(args[0]);
     int numLookups = Integer.valueOf(args[1]);
+    boolean trieBased = Boolean.parseBoolean(args[2]);
 
     StringDictionaryPerfTest test = new StringDictionaryPerfTest();
     test.buildSegment(dictLength);
-    test.perfTestLookups(numLookups);
+    test.perfTestLookups(numLookups, trieBased);
   }
 }
