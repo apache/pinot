@@ -89,7 +89,6 @@ public class SqlThirdEyeDataSource implements ThirdEyeDataSource {
     } catch (Exception e) {
       throw e;
     }
-
   }
 
   /**
