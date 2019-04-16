@@ -198,7 +198,8 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
         metricFunctionToResultSetList.put(metricFunction, resultSetGroup.getResultSets());
       }
 
-      List<String[]> resultRows = ThirdEyeResultSetUtils.parseResultSets(request, metricFunctionToResultSetList, "Pinot");
+      List<String[]> resultRows = ThirdEyeResultSetUtils.parseResultSets(request, metricFunctionToResultSetList,
+          "Pinot");
       return new RelationalThirdEyeResponse(request, resultRows, timeSpec);
 
     } catch (Exception e) {

@@ -45,9 +45,12 @@ import org.slf4j.LoggerFactory;
 
 public class ThirdEyeResultSetUtils {
   private static final Logger LOG = LoggerFactory.getLogger(ThirdEyeResultSetUtils.class);
+  private static final String MYSQL = "MySQL";
+  private static final String H2 = "H2";
 
   public static List<String[]> parseResultSets(ThirdEyeRequest request,
-      Map<MetricFunction, List<ThirdEyeResultSet>> metricFunctionToResultSetList, String sourceName) throws ExecutionException {
+      Map<MetricFunction, List<ThirdEyeResultSet>> metricFunctionToResultSetList,
+      String sourceName) throws ExecutionException {
 
     int numGroupByKeys = 0;
     boolean hasGroupBy = false;
@@ -85,10 +88,14 @@ public class ThirdEyeResultSetUtils {
       dataGranularity = dataTimeSpec.getDataGranularity();
       boolean isISOFormat = false;
       DateTimeFormatter inputDataDateTimeFormatter = null;
+      DateTimeFormatter serverDataDateTimeFormatter = null;
       String timeFormat = dataTimeSpec.getFormat();
       if (timeFormat != null && !timeFormat.equals(TimeSpec.SINCE_EPOCH_FORMAT)) {
         isISOFormat = true;
         inputDataDateTimeFormatter = DateTimeFormat.forPattern(timeFormat).withZone(dateTimeZone);
+      }
+      if (sourceName.equals(MYSQL) || sourceName.equals(H2) ) {
+        serverDataDateTimeFormatter = DateTimeFormat.forPattern(timeFormat).withZone(DateTimeZone.getDefault());
       }
 
       List<ThirdEyeResultSet> resultSets = entry.getValue();
@@ -116,7 +123,11 @@ public class ThirdEyeResultSetUtils {
                 if (!isISOFormat) {
                   millis = dataGranularity.toMillis(Double.valueOf(groupKeyVal).longValue());
                 } else {
-                  millis = DateTime.parse(groupKeyVal, inputDataDateTimeFormatter).getMillis();
+                  if (sourceName.equals(MYSQL) || sourceName.equals(H2)) {
+                    millis = DateTime.parse(groupKeyVal, serverDataDateTimeFormatter).getMillis();
+                  } else {
+                    millis = DateTime.parse(groupKeyVal, inputDataDateTimeFormatter).getMillis();
+                  }
                 }
                 if (millis < startTime) {
                   LOG.error("Data point earlier than requested start time {}: {}", new Date(startTime), new Date(millis));
@@ -181,7 +192,7 @@ public class ThirdEyeResultSetUtils {
       return Math.max(aggregate, value);
     } else if (aggFunction.equals(MetricAggFunction.COUNT) && sourceName.equals("Pinot")) {
       return aggregate + 1;
-    } else if (aggFunction.equals(MetricAggFunction.COUNT) && sourceName.equals("SQL")) {
+    } else if (aggFunction.equals(MetricAggFunction.COUNT)) { // For all other COUNT cases
       return aggregate + value;
     } else {
       throw new IllegalArgumentException(String.format("Unknown aggregation function '%s'", aggFunction));

@@ -45,9 +45,6 @@ public class SqlThirdEyeDataSource implements ThirdEyeDataSource {
   private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
   protected LoadingCache<RelationalQuery, ThirdEyeResultSetGroup> sqlResponseCache;
   private SqlResponseCacheLoader sqlResponseCacheLoader;
-  public static final String DATA_SOURCE_NAME = SqlThirdEyeDataSource.class.getSimpleName();
-
-
 
   public SqlThirdEyeDataSource(Map<String, Object> properties) throws Exception {
     sqlResponseCacheLoader = new SqlResponseCacheLoader(properties);
@@ -62,8 +59,8 @@ public class SqlThirdEyeDataSource implements ThirdEyeDataSource {
   @Override
   public ThirdEyeResponse execute(ThirdEyeRequest request) throws Exception {
     LinkedHashMap<MetricFunction, List<ThirdEyeResultSet>> metricFunctionToResultSetList = new LinkedHashMap<>();
-
     TimeSpec timeSpec = null;
+    String sourceName = "";
     try {
       for (MetricFunction metricFunction : request.getMetricFunctions()) {
         String dataset = metricFunction.getDataset();
@@ -75,7 +72,7 @@ public class SqlThirdEyeDataSource implements ThirdEyeDataSource {
         }
 
         String[] tableComponents = dataset.split("\\.");
-        String sourceName = tableComponents[0];
+        sourceName = tableComponents[0];
         String dbName = tableComponents[1];
 
         String sqlQuery = SqlUtils.getSql(request, metricFunction, request.getFilterSet(), dataTimeSpec, sourceName);
@@ -85,7 +82,8 @@ public class SqlThirdEyeDataSource implements ThirdEyeDataSource {
         metricFunctionToResultSetList.put(metricFunction, thirdEyeResultSetGroup.getResultSets());
 
       }
-      List<String[]> resultRows = ThirdEyeResultSetUtils.parseResultSets(request, metricFunctionToResultSetList, "SQL");
+      List<String[]> resultRows = ThirdEyeResultSetUtils.parseResultSets(request, metricFunctionToResultSetList,
+          sourceName);
 
       return new RelationalThirdEyeResponse(request, resultRows, timeSpec);
     } catch (Exception e) {
