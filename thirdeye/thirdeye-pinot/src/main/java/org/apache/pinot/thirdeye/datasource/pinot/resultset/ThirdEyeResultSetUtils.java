@@ -47,6 +47,7 @@ public class ThirdEyeResultSetUtils {
   private static final Logger LOG = LoggerFactory.getLogger(ThirdEyeResultSetUtils.class);
   private static final String MYSQL = "MySQL";
   private static final String H2 = "H2";
+  private static final String PINOT = "Pinot";
 
   public static List<String[]> parseResultSets(ThirdEyeRequest request,
       Map<MetricFunction, List<ThirdEyeResultSet>> metricFunctionToResultSetList,
@@ -111,9 +112,6 @@ public class ThirdEyeResultSetUtils {
               String groupKeyVal = "";
               try {
                 groupKeyVal = resultSet.getGroupKeyColumnValue(r, grpKeyIdx);
-                if (groupKeyVal.indexOf('.') > 0) {
-                  groupKeyVal = groupKeyVal.substring(0, groupKeyVal.indexOf('.'));
-                }
               } catch (Exception e) {
                 // IGNORE FOR NOW, workaround for Pinot Bug
               }
@@ -190,7 +188,7 @@ public class ThirdEyeResultSetUtils {
       return (aggregate * prevCount + value) / (prevCount + 1);
     } else if (aggFunction.equals(MetricAggFunction.MAX)) {
       return Math.max(aggregate, value);
-    } else if (aggFunction.equals(MetricAggFunction.COUNT) && sourceName.equals("Pinot")) {
+    } else if (aggFunction.equals(MetricAggFunction.COUNT) && sourceName.equals(PINOT)) {
       return aggregate + 1;
     } else if (aggFunction.equals(MetricAggFunction.COUNT)) { // For all other COUNT cases
       return aggregate + value;

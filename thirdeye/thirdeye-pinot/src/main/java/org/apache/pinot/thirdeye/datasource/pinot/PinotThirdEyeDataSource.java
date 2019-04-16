@@ -62,6 +62,7 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
   private static final Logger LOG = LoggerFactory.getLogger(PinotThirdEyeDataSource.class);
   private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
   public static final String DATA_SOURCE_NAME = PinotThirdEyeDataSource.class.getSimpleName();
+  private static final String PINOT = "Pinot";
 
   private static final long CONNECTION_TIMEOUT = 60000;
 
@@ -199,7 +200,7 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
       }
 
       List<String[]> resultRows = ThirdEyeResultSetUtils.parseResultSets(request, metricFunctionToResultSetList,
-          "Pinot");
+          PINOT);
       return new RelationalThirdEyeResponse(request, resultRows, timeSpec);
 
     } catch (Exception e) {
