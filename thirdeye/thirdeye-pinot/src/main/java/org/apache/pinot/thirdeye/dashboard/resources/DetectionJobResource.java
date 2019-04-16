@@ -92,6 +92,7 @@ import static org.apache.pinot.thirdeye.datalayer.dto.AnomalyFunctionDTO.*;
 @Path("/detection-job")
 @Api(tags = {Constants.DASHBOARD_TAG} )
 @Produces(MediaType.APPLICATION_JSON)
+@Deprecated
 public class DetectionJobResource {
   private final DetectionJobScheduler detectionJobScheduler;
   private final AnomalyFunctionManager anomalyFunctionDAO;
