@@ -40,7 +40,6 @@ public class DetectionAlertConfigBean extends AbstractBean {
   String cronExpression;
   String application;
   String yaml;
-  boolean onlyFetchLegacyAnomalies;
 
   Map<String, Map<String, Object>> alertSchemes;
   Map<String, Map<String, Object>> alertSuppressors;
@@ -52,14 +51,6 @@ public class DetectionAlertConfigBean extends AbstractBean {
   Map<String, Object> properties;
 
   Map<String, String> refLinks;
-
-  public boolean isOnlyFetchLegacyAnomalies() {
-    return onlyFetchLegacyAnomalies;
-  }
-
-  public void setOnlyFetchLegacyAnomalies(boolean onlyFetchLegacyAnomalies) {
-    this.onlyFetchLegacyAnomalies = onlyFetchLegacyAnomalies;
-  }
 
   public boolean isActive() {
     return active;
@@ -179,13 +170,12 @@ public class DetectionAlertConfigBean extends AbstractBean {
         && subjectType == that.subjectType && Objects.equals(vectorClocks, that.vectorClocks) && Objects.equals(
         highWaterMark, that.highWaterMark) && Objects.equals(properties, that.properties)
         && Objects.equals(alertSchemes, that.alertSchemes) && Objects.equals(alertSuppressors, that.alertSuppressors)
-        && Objects.equals(refLinks, that.refLinks) && onlyFetchLegacyAnomalies == that.onlyFetchLegacyAnomalies
-        && Objects.equals(yaml, that.yaml);
+        && Objects.equals(refLinks, that.refLinks) && Objects.equals(yaml, that.yaml);
   }
 
   @Override
   public int hashCode() {
     return Objects.hash(active, name, from, cronExpression, application, subjectType, vectorClocks,
-        highWaterMark, properties, alertSchemes, alertSuppressors, refLinks, onlyFetchLegacyAnomalies, yaml);
+        highWaterMark, properties, alertSchemes, alertSuppressors, refLinks, yaml);
   }
 }

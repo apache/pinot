@@ -471,7 +471,6 @@ public class YamlResource {
     oldAlertConfig.setActive(newAlertConfig.isActive());
     oldAlertConfig.setAlertSchemes(newAlertConfig.getAlertSchemes());
     oldAlertConfig.setAlertSuppressors(newAlertConfig.getAlertSuppressors());
-    oldAlertConfig.setOnlyFetchLegacyAnomalies(newAlertConfig.isOnlyFetchLegacyAnomalies());
     oldAlertConfig.setProperties(newAlertConfig.getProperties());
 
     return oldAlertConfig;

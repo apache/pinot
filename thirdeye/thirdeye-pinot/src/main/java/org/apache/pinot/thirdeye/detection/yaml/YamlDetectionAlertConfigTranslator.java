@@ -171,9 +171,6 @@ public class YamlDetectionAlertConfigTranslator {
     alertConfigDTO.setCronExpression(MapUtils.getString(yamlAlertConfig, PROP_CRON, CRON_SCHEDULE_DEFAULT));
     alertConfigDTO.setActive(MapUtils.getBooleanValue(yamlAlertConfig, PROP_ACTIVE, true));
 
-    // TODO: Remove all references to onlyFetchLegacyAnomalies after migration
-    alertConfigDTO.setOnlyFetchLegacyAnomalies(MapUtils.getBooleanValue(yamlAlertConfig, PROP_ONLY_FETCH_LEGACY_ANOMALIES, false));
-
     alertConfigDTO.setSubjectType(AlertConfigBean.SubjectType.valueOf(
         (String) MapUtils.getObject(yamlAlertConfig, PROP_EMAIL_SUBJECT_TYPE, AlertConfigBean.SubjectType.METRICS.name())));
 

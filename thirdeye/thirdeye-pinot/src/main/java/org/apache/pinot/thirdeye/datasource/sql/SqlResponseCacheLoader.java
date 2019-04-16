@@ -19,7 +19,7 @@
 
 package org.apache.pinot.thirdeye.datasource.sql;
 
-import com.facebook.presto.jdbc.internal.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.cache.CacheLoader;
 import java.io.File;
 import java.sql.Connection;
