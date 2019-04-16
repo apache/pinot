@@ -47,7 +47,7 @@ module('Integration | Component | yaml-editor', function(hooks) {
 
   test(`displays default yaml file of alert configuration in create mode`, async function(assert) {
 
-    const defaultText = '# Below is a sample template for setting up a WoW percentage rule. You may refer the documentation for more examples and update the fields accordingly.';
+    const defaultText = '# Below is a sample template. You may refer the documentation for more examples and update the fields accordingly.';
     await render(hbs`
       {{yaml-editor
         isEditMode=false
