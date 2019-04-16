@@ -61,6 +61,7 @@ import org.slf4j.LoggerFactory;
 import static org.apache.pinot.thirdeye.anomaly.utils.ThirdeyeMetricsUtil.*;
 
 
+@Deprecated
 public class DetectionTaskRunner implements TaskRunner {
 
   private static final Logger LOG = LoggerFactory.getLogger(DetectionTaskRunner.class);

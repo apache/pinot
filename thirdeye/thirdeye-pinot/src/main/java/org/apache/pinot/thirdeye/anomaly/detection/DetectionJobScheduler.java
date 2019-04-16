@@ -66,6 +66,7 @@ import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
 /**
  * Scheduler for anomaly detection jobs
  */
+@Deprecated
 public class DetectionJobScheduler implements Runnable {
 
   private static final Logger LOG = LoggerFactory.getLogger(DetectionJobScheduler.class);

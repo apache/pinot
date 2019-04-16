@@ -23,6 +23,7 @@ import org.apache.pinot.thirdeye.anomaly.task.TaskInfo;
 import java.util.Map;
 
 
+@Deprecated
 public class ReplayTaskInfo implements TaskInfo {
   private String jobName;
   private Map<String, String> properties;
