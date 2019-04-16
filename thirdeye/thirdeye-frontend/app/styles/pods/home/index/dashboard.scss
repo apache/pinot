@@ -45,12 +45,16 @@
   }
 
   &__application-header {
-    display: flex;
-    justify-content: space-between;
+    display: inline-flex;
     align-items: baseline;
+    width: 100%;
+    position: relative;
 
     &-dropdown {
-      width: 200px;
+      width: 225px;
+      position: absolute;
+      right: 0px;
+      top: 20px;
     }
   }
 
