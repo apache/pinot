@@ -39,7 +39,6 @@ import org.testng.annotations.Test;
  * Integration test that creates a Kafka broker, creates a Pinot cluster that consumes from Kafka and queries Pinot.
  */
 public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTestSet {
-  private List<KafkaServerStartable> _kafkaStarters;
 
   @BeforeClass
   public void setUp()
@@ -77,13 +76,6 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTestSe
 
     // Wait for all documents loaded
     waitForAllDocsLoaded(600_000L);
-  }
-
-  protected void startKafka() {
-    _kafkaStarters = KafkaStarterUtils
-        .startServers(getNumKafkaBrokers(), KafkaStarterUtils.DEFAULT_KAFKA_PORT, KafkaStarterUtils.DEFAULT_ZK_STR,
-            KafkaStarterUtils.getDefaultKafkaConfiguration());
-    KafkaStarterUtils.createTopic(getKafkaTopic(), KafkaStarterUtils.DEFAULT_ZK_STR, getNumKafkaPartitions());
   }
 
   protected void setUpTable(File avroFile)
