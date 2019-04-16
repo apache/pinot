@@ -567,7 +567,7 @@ export default Component.extend({
         });
       }
     } catch (error) {
-      notifications.error(error.body.message, toastOptions);
+      notifications.error(error.body.message, 'Error', toastOptions);
     }
 
     return {
