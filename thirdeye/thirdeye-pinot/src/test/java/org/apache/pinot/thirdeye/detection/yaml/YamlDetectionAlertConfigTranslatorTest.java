@@ -68,7 +68,6 @@ public class YamlDetectionAlertConfigTranslatorTest {
     DetectionAlertConfigDTO alertConfig = new YamlDetectionAlertConfigTranslator(this.detectionConfigManager).translate(alertYamlConfigs);
 
     Assert.assertTrue(alertConfig.isActive());
-    Assert.assertFalse(alertConfig.isOnlyFetchLegacyAnomalies());
     Assert.assertEquals(alertConfig.getName(), "test_group_name");
     Assert.assertEquals(alertConfig.getApplication(), "test_application");
     Assert.assertEquals(alertConfig.getFrom(), "thirdeye@thirdeye");

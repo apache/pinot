@@ -82,7 +82,6 @@ public class ToAllRecipientsDetectionAlertFilterTest {
 
     this.alertConfig = createDetectionAlertConfig();
     this.alertConfigForLegacyAnomalies = createDetectionAlertConfig();
-    this.alertConfigForLegacyAnomalies.setOnlyFetchLegacyAnomalies(true);
   }
 
   private DetectionAlertConfigDTO createDetectionAlertConfig() {
@@ -110,15 +109,6 @@ public class ToAllRecipientsDetectionAlertFilterTest {
 
     DetectionAlertFilterResult result = this.alertFilter.run();
     Assert.assertEquals(result.getResult().get(RECIPIENTS), new HashSet<>(this.detectedAnomalies.subList(0, 4)));
-  }
-
-  @Test
-  public void testGetAlertFilterResultForLegacyAnomalies() throws Exception {
-    this.alertFilter = new ToAllRecipientsDetectionAlertFilter(this.provider, this.alertConfigForLegacyAnomalies,2500L);
-
-    DetectionAlertFilterResult result = this.alertFilter.run();
-    Assert.assertEquals(result.getResult().get(RECIPIENTS).size(), 2);
-    Assert.assertEquals(result.getResult().get(RECIPIENTS), new HashSet<>(this.detectedAnomalies.subList(7, 9)));
   }
 
   @Test

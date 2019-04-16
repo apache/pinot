@@ -57,11 +57,7 @@ public abstract class StatefulDetectionAlertFilter extends DetectionAlertFilter 
 
       AnomalySlice slice = new AnomalySlice().withStart(startTime).withEnd(this.endTime);
       Collection<MergedAnomalyResultDTO> candidates;
-      if (this.config.isOnlyFetchLegacyAnomalies()) {
-        candidates = this.provider.fetchLegacyAnomalies(Collections.singletonList(slice), functionId).get(slice);
-      } else {
-        candidates = this.provider.fetchAnomalies(Collections.singletonList(slice), functionId).get(slice);
-      }
+      candidates = this.provider.fetchAnomalies(Collections.singletonList(slice), functionId).get(slice);
 
       Collection<MergedAnomalyResultDTO> anomalies =
           Collections2.filter(candidates, new Predicate<MergedAnomalyResultDTO>() {
