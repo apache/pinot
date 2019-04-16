@@ -33,7 +33,6 @@ rules:                            # Can configure multiple rules with "OR" relat
       params:
         pattern: UP_OR_DOWN       # Other patterns: "UP","DOWN".
         threshold: 0.05           # Filter out all changes less than 5% compared to baseline.
-
 `;
 
 export const yamlAlertSettings = `# Below is a sample subscription group template. You may refer the documentation and update accordingly.

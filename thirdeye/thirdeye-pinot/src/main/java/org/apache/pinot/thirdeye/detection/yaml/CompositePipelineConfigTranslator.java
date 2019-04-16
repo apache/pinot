@@ -196,7 +196,6 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
     this.yaml = new org.yaml.snakeyaml.Yaml();
     this.metricConfig = this.dataProvider.fetchMetric(MapUtils.getString(yamlConfig, PROP_METRIC),
         MapUtils.getString(yamlConfig, PROP_DATASET));
-
     Preconditions.checkNotNull(this.metricConfig, "metric not found");
 
     this.datasetConfig = this.dataProvider.fetchDatasets(Collections.singletonList(metricConfig.getDataset()))
