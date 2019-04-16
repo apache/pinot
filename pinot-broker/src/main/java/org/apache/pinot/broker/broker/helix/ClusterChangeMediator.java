@@ -77,9 +77,12 @@ public class ClusterChangeMediator implements ExternalViewChangeListener, Instan
     _clusterChangeHandlingThread = new Thread("ClusterChangeHandlingThread") {
       @Override
       public void run() {
-        while (!_stopped) {
+        while (true) {
           try {
             for (Map.Entry<ChangeType, List<ClusterChangeHandler>> entry : _changeHandlersMap.entrySet()) {
+              if (_stopped) {
+                return;
+              }
               ChangeType changeType = entry.getKey();
               List<ClusterChangeHandler> changeHandlers = entry.getValue();
               long currentTime = System.currentTimeMillis();
@@ -101,6 +104,9 @@ public class ClusterChangeMediator implements ExternalViewChangeListener, Instan
               }
             }
             synchronized (_lastChangeTimeMap) {
+              if (_stopped) {
+                return;
+              }
               // Wait for at most 1/10 of proactive change check interval if no new event received. This can guarantee
               // that the proactive change check will not be delayed for more than 1/10 of the interval. In case of
               // spurious wakeup, execute the while loop again for the proactive change check.
