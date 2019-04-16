@@ -25,6 +25,7 @@ import com.google.common.collect.ImmutableMap;
 import com.wordnik.swagger.annotations.Api;
 import com.wordnik.swagger.annotations.ApiOperation;
 import com.wordnik.swagger.annotations.ApiParam;
+import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -576,6 +577,9 @@ public class YamlResource {
     } catch (ValidationException e) {
       LOG.warn("Validation error while running preview with payload  " + payload, e);
       responseMessage.put("message", "Validation Error! " + e.getMessage());
+      return Response.serverError().entity(responseMessage).build();
+    } catch (InvocationTargetException e) {
+      responseMessage.put("message", "Failed to run the preview due to " + e.getTargetException().getMessage());
       return Response.serverError().entity(responseMessage).build();
     } catch (Exception e) {
       LOG.error("Error running preview with payload " + payload, e);
