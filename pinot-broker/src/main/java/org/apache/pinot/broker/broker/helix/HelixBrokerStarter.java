@@ -223,7 +223,8 @@ public class HelixBrokerStarter {
     _participantHelixManager.getMessagingService()
         .registerMessageHandlerFactory(Message.MessageType.USER_DEFINE_MSG.toString(), _tbiMessageHandler);
     addInstanceTagIfNeeded();
-    brokerMetrics.addCallbackGauge("helix.connected", () -> _participantHelixManager.isConnected() ? 1L : 0L);
+    brokerMetrics.addCallbackGauge(CommonConstants.Helix.INSTANCE_CONNECTED_METRIC_NAME,
+        () -> _participantHelixManager.isConnected() ? 1L : 0L);
     _participantHelixManager
         .addPreConnectCallback(() -> brokerMetrics.addMeteredGlobalValue(BrokerMeter.HELIX_ZOOKEEPER_RECONNECTS, 1L));
 

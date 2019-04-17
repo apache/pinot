@@ -29,6 +29,8 @@ public class CommonConstants {
   public static class Helix {
     public static final String IS_SHUTDOWN_IN_PROGRESS = "shutdownInProgress";
 
+    public static final String INSTANCE_CONNECTED_METRIC_NAME = "helix.connected";
+
     public static final String PREFIX_OF_SERVER_INSTANCE = "Server_";
     public static final String PREFIX_OF_BROKER_INSTANCE = "Broker_";
     public static final String PREFIX_OF_CONTROLLER_INSTANCE = "Controller_";
