@@ -119,6 +119,10 @@ public abstract class FieldSpec implements Comparable<FieldSpec> {
     return _isSingleValueField;
   }
 
+  public boolean isVirtualColumnField() {
+    return _virtualColumnProvider != null;
+  }
+
   // Required by JSON de-serializer. DO NOT REMOVE.
   public void setSingleValueField(boolean isSingleValueField) {
     _isSingleValueField = isSingleValueField;
@@ -254,6 +258,9 @@ public abstract class FieldSpec implements Comparable<FieldSpec> {
     jsonObject.put("dataType", _dataType.name());
     if (!_isSingleValueField) {
       jsonObject.put("singleValueField", false);
+    }
+    if (StringUtils.isNotEmpty(_virtualColumnProvider)) {
+      jsonObject.put("virtualColumnProvider", _virtualColumnProvider);
     }
     if (_maxLength != DEFAULT_MAX_LENGTH) {
       jsonObject.put("maxLength", _maxLength);

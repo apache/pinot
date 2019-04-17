@@ -37,6 +37,7 @@ import org.apache.pinot.common.assignment.InstancePartitionsType;
 import org.apache.pinot.common.config.instance.InstanceAssignmentConfig;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
+import org.apache.pinot.common.utils.CommonConstants.UpdateSemantic;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
@@ -44,6 +45,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
 public class TableConfig extends BaseJsonConfig {
   public static final String TABLE_NAME_KEY = "tableName";
   public static final String TABLE_TYPE_KEY = "tableType";
+  private static final String UPDATE_SEMANTIC_CONFIG_KEY = "updateSemantic";
   public static final String VALIDATION_CONFIG_KEY = "segmentsConfig";
   public static final String TENANT_CONFIG_KEY = "tenants";
   public static final String INDEXING_CONFIG_KEY = "tableIndexConfig";
@@ -89,7 +91,7 @@ public class TableConfig extends BaseJsonConfig {
       @Nonnull IndexingConfig indexingConfig, @Nonnull TableCustomConfig customConfig,
       @Nullable QuotaConfig quotaConfig, @Nullable TableTaskConfig taskConfig, @Nullable RoutingConfig routingConfig,
       Map<InstancePartitionsType, InstanceAssignmentConfig> instanceAssignmentConfigMap,
-      @Nullable CommonConstants.UpdateSemantic updateSemantic) {
+      @Nullable UpdateSemantic updateSemantic) {
     _tableName = TableNameBuilder.forType(tableType).tableNameWithType(tableName);
     _tableType = tableType;
     _validationConfig = validationConfig;
@@ -150,6 +152,7 @@ public class TableConfig extends BaseJsonConfig {
             });
 
     CommonConstants.UpdateSemantic updateSemantic = CommonConstants.UpdateSemantic.DEFAULT_SEMANTIC;
+    UpdateSemantic updateSemantic = UpdateSemantic.DEFAULT_SEMANTIC;
     if (jsonConfig.has(UPDATE_SEMANTIC_CONFIG_KEY)) {
       updateSemantic = CommonConstants.UpdateSemantic.getUpdateSemantic(jsonConfig.getString(UPDATE_SEMANTIC_CONFIG_KEY));
     }
@@ -216,7 +219,7 @@ public class TableConfig extends BaseJsonConfig {
     if (_taskConfig != null) {
       jsonConfig.set(TASK_CONFIG_KEY, JsonUtils.objectToJsonNode(_taskConfig));
     }
-    jsonConfig.put(UPDATE_SEMANTIC_CONFIG_KEY, tableConfig._updateSemantic.toString());
+    jsonConfig.put(UPDATE_SEMANTIC_CONFIG_KEY, _updateSemantic.toString());
     if (_routingConfig != null) {
       jsonConfig.set(ROUTING_CONFIG_KEY, JsonUtils.objectToJsonNode(_routingConfig));
     }
@@ -327,7 +330,7 @@ public class TableConfig extends BaseJsonConfig {
     if (_instanceAssignmentConfigMap != null) {
       simpleFields.put(INSTANCE_ASSIGNMENT_CONFIG_MAP_KEY, JsonUtils.objectToString(_instanceAssignmentConfigMap));
     }
-    simpleFields.put(UPDATE_SEMANTIC_CONFIG_KEY, tableConfig._updateSemantic.toString());
+    simpleFields.put(UPDATE_SEMANTIC_CONFIG_KEY, _updateSemantic.toString());
 
     ZNRecord znRecord = new ZNRecord(_tableName);
     znRecord.setSimpleFields(simpleFields);
@@ -431,14 +434,14 @@ public class TableConfig extends BaseJsonConfig {
     return _updateSemantic;
   }
 
-  public void setUpdateSemantic(CommonConstants.UpdateSemantic updateSemantic) {
+  public void setUpdateSemantic(UpdateSemantic updateSemantic) {
     _updateSemantic = updateSemantic;
   }
 
   @Nonnull
   public String toJSONConfigString()
       throws IOException, JSONException {
-    return toJSONConfig(this).toString();
+    return toJsonConfig().toString();
   }
 
   @Override
@@ -702,7 +705,7 @@ public class TableConfig extends BaseJsonConfig {
       }
 
       if (_updateSemantic == null) {
-        _updateSemantic = CommonConstants.UpdateSemantic.DEFAULT_SEMANTIC;
+        _updateSemantic = UpdateSemantic.DEFAULT_SEMANTIC;
       }
 
       return new TableConfig(_tableName, _tableType, validationConfig, tenantConfig, indexingConfig, _customConfig,

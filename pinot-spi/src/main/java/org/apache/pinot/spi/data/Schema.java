@@ -27,6 +27,8 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -57,6 +59,11 @@ import org.slf4j.LoggerFactory;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public final class Schema {
   private static final Logger LOGGER = LoggerFactory.getLogger(Schema.class);
+  private static final ObjectMapper MAPPER = new ObjectMapper();
+
+  private static final String UPSERT_TABLE_CONFIG = "upsert";
+  private DimensionFieldSpec _primaryKeyFieldSpec = null;
+  private DimensionFieldSpec _offsetKeyFieldSpec = null;
 
   private String _schemaName;
 
@@ -442,13 +449,12 @@ public final class Schema {
       }
       jsonObject.set("dateTimeFieldSpecs", jsonArray);
     }
-    return jsonObject;
-    jsonSchema.addProperty("updateSemantic", _updateSemantic);
+    jsonObject.put("updateSemantic", _updateSemantic);
     if (UPSERT_TABLE_CONFIG.equalsIgnoreCase(_updateSemantic)) {
-      jsonSchema.addProperty("primaryKey", _primaryKey);
-      jsonSchema.addProperty("offsetKey", _offsetKey);
+      jsonObject.put("primaryKey", _primaryKey);
+      jsonObject.put("offsetKey", _offsetKey);
     }
-    return new GsonBuilder().setPrettyPrinting().create().toJson(jsonSchema);
+    return jsonObject;
   }
 
   /**
@@ -639,9 +645,10 @@ public final class Schema {
       return this;
     }
 
-    public SchemaBuilder addTime(String incomingName, int incomingTimeUnitSize, TimeUnit incomingTimeUnit,
-        DataType incomingDataType, String outgoingName, int outgoingTimeUnitSize, TimeUnit outgoingTimeUnit,
-        DataType outgoingDataType, Object defaultNullValue) {
+    public SchemaBuilder addTime(@Nonnull String incomingName, int incomingTimeUnitSize,
+        @Nonnull TimeUnit incomingTimeUnit, @Nonnull DataType incomingDataType, @Nonnull String outgoingName,
+        int outgoingTimeUnitSize, @Nonnull TimeUnit outgoingTimeUnit, @Nonnull DataType outgoingDataType,
+        @Nonnull Object defaultNullValue) {
       _schema.addField(
           new TimeFieldSpec(incomingName, incomingDataType, incomingTimeUnitSize, incomingTimeUnit, outgoingName,
               outgoingDataType, outgoingTimeUnitSize, outgoingTimeUnit, defaultNullValue));
@@ -716,5 +723,51 @@ public final class Schema {
     result = EqualityUtils.hashCodeOf(result, _timeFieldSpec);
     result = EqualityUtils.hashCodeOf(result, _dateTimeFieldSpecs);
     return result;
+  }
+
+  public boolean isVirtualColumn(String columnName) {
+    return columnName.startsWith("$") || (getFieldSpecFor(columnName).getVirtualColumnProvider() != null
+        && !getFieldSpecFor(columnName).getVirtualColumnProvider().isEmpty());
+  }
+
+
+  @JsonIgnore
+  public static byte[] getByteArrayFromField(Object value, DimensionFieldSpec fieldSpec) {
+    switch (fieldSpec.getDataType()) {
+      case INT:
+        return ByteBuffer.allocate(4).putInt((int)value).array();
+      case LONG:
+        return ByteBuffer.allocate(8).putLong((long)value).array();
+      case FLOAT:
+        return ByteBuffer.allocate(4).putFloat((float)value).array();
+      case DOUBLE:
+        return ByteBuffer.allocate(8).putDouble((double)value).array();
+      case STRING:
+        return ((String) value).getBytes(StandardCharsets.UTF_8);
+      case BYTES:
+        return (byte[]) value;
+      default:
+        throw new RuntimeException("unrecognized field spec format" + fieldSpec.getDataType());
+    }
+  }
+
+  @JsonIgnore
+  public static Object getValueFromBytes(byte[] bytes, DimensionFieldSpec fieldSpec) {
+    switch (fieldSpec.getDataType()) {
+      case INT:
+        return ByteBuffer.wrap(bytes).asIntBuffer().get();
+      case LONG:
+        return ByteBuffer.wrap(bytes).asLongBuffer().get();
+      case FLOAT:
+        return ByteBuffer.wrap(bytes).asFloatBuffer().get();
+      case DOUBLE:
+        return ByteBuffer.wrap(bytes).asDoubleBuffer().get();
+      case STRING:
+        return new String(bytes, StandardCharsets.UTF_8);
+      case BYTES:
+        return bytes;
+      default:
+        throw new RuntimeException("unrecognized field spec format" + fieldSpec.getDataType());
+    }
   }
 }
