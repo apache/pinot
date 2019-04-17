@@ -68,7 +68,7 @@ public class OfflineSegmentIntervalCheckerCommand extends AbstractBaseAdminComma
 
   @Override
   public String toString() {
-    return ("OfflineSegmentIntervalChecker");
+    return "OfflineSegmentIntervalChecker";
   }
 
   @Override
