@@ -109,11 +109,12 @@ public class BrokerServerBuilder {
     _state.set(State.STARTING);
 
     _brokerRequestHandler.start();
-    _brokerAdminApplication.start(_config
-        .getInt(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT, CommonConstants.Helix.DEFAULT_BROKER_QUERY_PORT));
+    int brokerQueryPort =
+        _config.getInt(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT, CommonConstants.Helix.DEFAULT_BROKER_QUERY_PORT);
+    _brokerAdminApplication.start(brokerQueryPort);
 
     _state.set(State.RUNNING);
-    LOGGER.info("Pinot Broker started");
+    LOGGER.info("Pinot Broker is started and listening on port {} for API requests", brokerQueryPort);
   }
 
   public void stop() {

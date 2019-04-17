@@ -74,7 +74,8 @@ public class HelixBrokerStarterTest extends ControllerTest {
 
     _brokerConf.addProperty(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT, 8943);
     _brokerConf.addProperty(CommonConstants.Broker.CONFIG_OF_BROKER_REFRESH_TIMEBOUNDARY_INFO_SLEEP_INTERVAL, 100L);
-    _helixBrokerStarter = new HelixBrokerStarter(getHelixClusterName(), ZkStarter.DEFAULT_ZK_STR, _brokerConf);
+    _helixBrokerStarter = new HelixBrokerStarter(_brokerConf, getHelixClusterName(), ZkStarter.DEFAULT_ZK_STR);
+    _helixBrokerStarter.start();
 
     ControllerRequestBuilderUtil
         .addFakeBrokerInstancesToAutoJoinHelixCluster(getHelixClusterName(), ZkStarter.DEFAULT_ZK_STR, 5, true);

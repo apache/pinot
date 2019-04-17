@@ -62,7 +62,8 @@ public class TableQueryQuotaManagerTest {
     _helixManager = initHelixManager(helixClusterName);
     _testPropertyStore = _helixManager.getHelixPropertyStore();
 
-    _tableQueryQuotaManager = new TableQueryQuotaManager(_helixManager);
+    _tableQueryQuotaManager = new TableQueryQuotaManager();
+    _tableQueryQuotaManager.init(_helixManager);
   }
 
   private HelixManager initHelixManager(String helixClusterName) {

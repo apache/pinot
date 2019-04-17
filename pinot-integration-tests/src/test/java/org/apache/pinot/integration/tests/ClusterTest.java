@@ -127,7 +127,9 @@ public abstract class ClusterTest extends ControllerTest {
             BrokerServerBuilder.SINGLE_CONNECTION_REQUEST_HANDLER_TYPE);
       }
       overrideBrokerConf(brokerConf);
-      _brokerStarters.add(new HelixBrokerStarter(_clusterName, zkStr, brokerConf));
+      HelixBrokerStarter brokerStarter = new HelixBrokerStarter(brokerConf, _clusterName, zkStr);
+      brokerStarter.start();
+      _brokerStarters.add(brokerStarter);
     }
   }
 
@@ -225,8 +227,7 @@ public abstract class ClusterTest extends ControllerTest {
   protected void stopBroker() {
     for (HelixBrokerStarter brokerStarter : _brokerStarters) {
       try {
-        // TODO: replace with brokerStarter.shutdown() once they are hooked up
-        brokerStarter.getBrokerServerBuilder().stop();
+        brokerStarter.shutdown();
       } catch (Exception e) {
         LOGGER.error("Encountered exception while stopping broker {}", e.getMessage());
       }

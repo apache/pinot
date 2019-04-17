@@ -174,7 +174,8 @@ public class HelixServerStarter {
     _helixManager.getMessagingService()
         .registerMessageHandlerFactory(Message.MessageType.USER_DEFINE_MSG.toString(), messageHandlerFactory);
 
-    serverMetrics.addCallbackGauge("helix.connected", () -> _helixManager.isConnected() ? 1L : 0L);
+    serverMetrics.addCallbackGauge(CommonConstants.Helix.INSTANCE_CONNECTED_METRIC_NAME,
+        () -> _helixManager.isConnected() ? 1L : 0L);
     _helixManager
         .addPreConnectCallback(() -> serverMetrics.addMeteredGlobalValue(ServerMeter.HELIX_ZOOKEEPER_RECONNECTS, 1L));
 
