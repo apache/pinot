@@ -147,5 +147,4 @@ public class OfflineSegmentIntervalCheckerCommand extends AbstractBaseAdminComma
     }
     return segmentsWithInvalidIntervals;
   }
-
 }
