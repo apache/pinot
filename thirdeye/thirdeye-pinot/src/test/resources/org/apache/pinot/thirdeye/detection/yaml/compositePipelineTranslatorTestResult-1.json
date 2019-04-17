@@ -17,6 +17,7 @@
             "className" : "org.apache.pinot.thirdeye.detection.wrapper.BaselineFillingMergeWrapper",
             "maxGap" : 0,
             "nested" : [ {
+              "bucketPeriod":"P1D",
               "className" : "org.apache.pinot.thirdeye.detection.wrapper.AnomalyDetectorWrapper"
             } ],
             "detector" : "$maxThreshold_1:THRESHOLD",
@@ -31,6 +32,7 @@
           "className" : "org.apache.pinot.thirdeye.detection.wrapper.BaselineFillingMergeWrapper",
           "maxGap" : 0,
           "nested" : [ {
+            "bucketPeriod":"P1D",
             "className" : "org.apache.pinot.thirdeye.detection.wrapper.AnomalyDetectorWrapper"
           } ],
           "detector" : "$maxThreshold_2:THRESHOLD",
