@@ -12,9 +12,12 @@ import {
   setProperties,
   observer
 } from '@ember/object';
-import { isPresent } from '@ember/utils';
+import { inject as service } from '@ember/service';
+import { isPresent, isEmpty } from '@ember/utils';
 import Controller from '@ember/controller';
+import yamljs from 'yamljs';
 import { reads } from '@ember/object/computed';
+import { toastOptions } from 'thirdeye-frontend/utils/constants';
 import { setUpTimeRangeOptions, powerSort } from 'thirdeye-frontend/utils/manage-alert-utils';
 import {  anomalyResponseObjNew } from 'thirdeye-frontend/utils/anomaly';
 import moment from 'moment';
@@ -28,6 +31,9 @@ const TIME_RANGE_OPTIONS = ['1d', '1w', '1m', '3m'];
 export default Controller.extend({
 
   queryParams: ['testMode'],
+  store: service('store'),
+
+  notifications: service('toast'),
 
   /**
    * One-way CP to store all sub groups
@@ -167,15 +173,13 @@ export default Controller.extend({
         // no filter applied, just return all
         return anomalyIds;
       }
-      let selectedAnomalies = [];
+      let selectedAnomalies = anomalyIds;
       filterMaps.forEach(map => {
-        if (anomalyFilters[map]) {
+        const selectedFilters = anomalyFilters[map];
+        // When a filter gets deleted, it leaves an empty array behind.  We need to treat null and empty array the same here
+        if (!isEmpty(selectedFilters)) {
           // a filter is selected, grab relevant anomalyIds
-          if (selectedAnomalies.length === 0) {
-            selectedAnomalies = this._unionOfArrays(anomaliesById, map, anomalyFilters[map]);
-          } else {
-            selectedAnomalies = this._intersectOfArrays(selectedAnomalies, this._unionOfArrays(anomaliesById, map, anomalyFilters[map]));
-          }
+          selectedAnomalies = this._intersectOfArrays(selectedAnomalies, this._unionOfArrays(anomaliesById, map, anomalyFilters[map]));
         }
       });
       return selectedAnomalies;
@@ -303,6 +307,14 @@ export default Controller.extend({
           filterKeys = [...filterKeys, ...group];
         });
         Object.assign(filter, { filterKeys });
+      } else if (filter.name === "subscriptionFilterMap"){
+        const filterKeys = this.get('store')
+          .peekAll('subscription-groups')
+          .sortBy('name')
+          .filter(group => (group.get('active') && group.get('yaml')))
+          .map(group => group.get('name'));
+        // Add filterKeys prop to each facet or filter block
+        Object.assign(filter, { filterKeys });
       } else if (filter.name === "statusFilterMap"){
         let anomalyPropertyArray = Object.keys(anomaliesById.searchFilters[filter.name]);
         anomalyPropertyArray = anomalyPropertyArray.map(prop => {
@@ -355,7 +367,10 @@ export default Controller.extend({
     } else {
       let addedIds = [];
       selectedFilters.forEach(filter => {
-        addedIds = [...addedIds, ...anomaliesById.searchFilters[filterType][filter]];
+        // If there are no anomalies from the time range with these filters, then the result will be null, so we handle that here
+        // It can happen for functionFilterMap only, because we are using subscription groups to map to alert names (function filters)
+        const anomalyIdsInResponse = anomaliesById.searchFilters[filterType][filter];
+        addedIds = anomalyIdsInResponse ? [...addedIds, ...anomaliesById.searchFilters[filterType][filter]] : addedIds;
       });
       return addedIds;
     }
@@ -367,10 +382,57 @@ export default Controller.extend({
     return existingArray.filter(anomalyId => incomingArray.includes(anomalyId));
   },
 
+  /**
+   * This will retrieve the subscription groups from Ember Data and extract yaml configs
+   * The yaml configs are used to extract alert names and apply them as filters
+   * @method _subscriptionGroupFilter
+   * @param {Object} filterObj
+   * @returns {Object}
+   * @private
+   */
+  _subscriptionGroupFilter(filterObj) {
+    // get selected subscription groups, if any
+    const notifications = get(this, 'notifications');
+    const selectedSubGroups = filterObj['subscriptionFilterMap'];
+    if (Array.isArray(selectedSubGroups) && selectedSubGroups.length > 0) {
+      // extract selected subscription groups from Ember Data
+      const selectedSubGroupObjects = this.get('store')
+        .peekAll('subscription-groups')
+        .filter(group => {
+          return selectedSubGroups.includes(group.get('name'));
+        });
+      let additionalAlertNames = [];
+      // for each group, grab yaml, extract alert names for adding to filterObj
+      selectedSubGroupObjects.forEach(group => {
+        try {
+          const yamlAsObject = yamljs.parse(group.get('yaml'));
+          if (Array.isArray(yamlAsObject.subscribedDetections)) {
+            additionalAlertNames = [ ...additionalAlertNames, ...yamlAsObject.subscribedDetections];
+          }
+        }
+        catch(error){
+          notifications.error(`Failed to retrieve alert names for subscription group: ${group.get('name')}`, 'Error', toastOptions);
+        }
+      });
+      // add the alert names extracted from groups to any that are already present
+      let updatedFunctionFilterMap = Array.isArray(filterObj['functionFilterMap']) ? [ ...filterObj['functionFilterMap'], ...additionalAlertNames] : additionalAlertNames;
+      updatedFunctionFilterMap = [ ...new Set(powerSort(updatedFunctionFilterMap, null))];
+      set(filterObj, 'functionFilterMap', updatedFunctionFilterMap);
+    }
+    return filterObj;
+  },
+
   actions: {
+    // Clears all selected filters at once
+    clearFilters() {
+      this._resetLocalFilters();
+    },
+
     // Handles filter selections (receives array of filter options)
     userDidSelectFilter(filterObj) {
       const filterBlocksLocal = get(this, 'filterBlocksLocal');
+      // handle special case of subscription groups
+      filterObj = this._subscriptionGroupFilter(filterObj);
       filterBlocksLocal.forEach(block => {
         block.selected = filterObj[block.name];
       });
