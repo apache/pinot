@@ -806,9 +806,9 @@
         <version>0.9.2</version>
       </dependency>
       <dependency>
-        <groupId>org.apache.commons</groupId>
-        <artifactId>commons-collections4</artifactId>
-        <version>4.3</version>
+        <groupId>com.ning</groupId>
+        <artifactId>tr13</artifactId>
+        <version>0.3.0</version>
       </dependency>
     </dependencies>
 

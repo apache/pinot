@@ -173,7 +173,11 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
         int numBytesPerValue = metadata.getColumnMaxLength();
         byte paddingByte = (byte) metadata.getPaddingCharacter();
         if (loadOnHeapTrieBasedDictionary) {
-          return new OnHeapTrieBasedStringDictionary(dictionaryBuffer, length, numBytesPerValue, paddingByte);
+          try {
+            return new OnHeapTrieBasedStringDictionary(dictionaryBuffer, length, numBytesPerValue, paddingByte);
+          } catch (IOException e) {
+            throw new RuntimeException(e.toString());
+          }
         } else if (loadOnHeap) {
           return new OnHeapStringDictionary(dictionaryBuffer, length, numBytesPerValue, paddingByte);
         } else {
