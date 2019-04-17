@@ -51,7 +51,6 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
   private static final int NUM_OFFLINE_SEGMENTS = 8;
   private static final int NUM_REALTIME_SEGMENTS = 6;
 
-  private KafkaServerStartable _kafkaStarter;
   private Schema _schema;
 
   protected int getNumOfflineSegments() {
@@ -296,7 +295,9 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
     stopServer();
     stopBroker();
     stopController();
-    KafkaStarterUtils.stopServer(_kafkaStarter);
+    for (KafkaServerStartable kafkaStarter : _kafkaStarters) {
+      KafkaStarterUtils.stopServer(kafkaStarter);
+    }
     stopZk();
     cleanup();
   }
