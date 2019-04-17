@@ -55,6 +55,18 @@ export default Controller.extend({
   ),
 
   /**
+   * Flag for showing share button
+   * @type {Boolean}
+   */
+  appOrSubGroup: computed(
+    'appName',
+    'subGroup',
+    function() {
+      return (get(this, 'appName') || get(this, 'subGroup'));
+    }
+  ),
+
+  /**
    * Grabs Ember Data objects from the application collection - peekAll will look at what's in the store without requesting from the backend
    * Sorts the array of application objects by the field "application" and returns it
    * @type {Array}
