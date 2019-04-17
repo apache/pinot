@@ -295,9 +295,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
     stopServer();
     stopBroker();
     stopController();
-    for (KafkaServerStartable kafkaStarter : _kafkaStarters) {
-      KafkaStarterUtils.stopServer(kafkaStarter);
-    }
+    stopKafka();
     stopZk();
     cleanup();
   }

@@ -320,6 +320,12 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     KafkaStarterUtils.createTopic(getKafkaTopic(), KafkaStarterUtils.DEFAULT_ZK_STR, getNumKafkaPartitions());
   }
 
+  protected void stopKafka() {
+    for (KafkaServerStartable kafkaStarter : _kafkaStarters) {
+      KafkaStarterUtils.stopServer(kafkaStarter);
+    }
+  }
+
   /**
    * Get current result for "SELECT COUNT(*)".
    *

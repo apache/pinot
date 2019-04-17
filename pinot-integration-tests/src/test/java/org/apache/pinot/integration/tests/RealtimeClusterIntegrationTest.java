@@ -171,9 +171,7 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTestSe
     stopServer();
     stopBroker();
     stopController();
-    for (KafkaServerStartable kafkaStarter : _kafkaStarters) {
-      KafkaStarterUtils.stopServer(kafkaStarter);
-    }
+    stopKafka();
     stopZk();
     FileUtils.deleteDirectory(_tempDir);
   }

@@ -415,9 +415,7 @@ public class ControllerPeriodicTasksIntegrationTests extends BaseClusterIntegrat
     stopServer();
     stopBroker();
     stopController();
-    for (KafkaServerStartable kafkaStarter : _kafkaStarters) {
-      KafkaStarterUtils.stopServer(kafkaStarter);
-    }
+    stopKafka();
     stopZk();
     FileUtils.deleteDirectory(_tempDir);
   }
