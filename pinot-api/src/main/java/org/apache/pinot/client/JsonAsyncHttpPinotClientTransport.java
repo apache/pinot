@@ -113,7 +113,7 @@ class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
               "Pinot returned HTTP status " + httpResponse.getStatusCode() + ", expected 200");
         }
 
-        String responseBody = httpResponse.getResponseBody();
+        String responseBody = httpResponse.getResponseBody("UTF-8");
         return BrokerResponse.fromJson(OBJECT_READER.readTree(responseBody));
       } catch (Exception e) {
         throw new ExecutionException(e);
