@@ -58,7 +58,9 @@ class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
 
       final String url = "http://" + brokerAddress + "/query";
 
-      final Future<Response> response = _httpClient.preparePost(url).setBody(json.toString()).execute();
+      final Future<Response> response = _httpClient.preparePost(url)
+          .addHeader("Content-Type", "application/json; charset=utf-8")
+          .setBody(json.toString()).execute();
 
       return new BrokerResponseFuture(response, query, url);
     } catch (Exception e) {
