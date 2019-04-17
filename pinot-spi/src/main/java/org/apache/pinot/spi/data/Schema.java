@@ -145,15 +145,11 @@ public final class Schema {
   public DimensionFieldSpec getPrimaryKeyFieldSpec() {
     if (_primaryKeyFieldSpec == null) {
       Preconditions.checkState(_dimensionFieldSpecs.size() > 0, "should have more than 1 dimensions");
-      Preconditions.checkState(StringUtils.isNotEmpty(_primaryKey), "primary key should not be empty");
       for (DimensionFieldSpec dimensionFieldSpec : _dimensionFieldSpecs) {
         if (dimensionFieldSpec._name.equals(_primaryKey)) {
           _primaryKeyFieldSpec = dimensionFieldSpec;
         }
       }
-    }
-    if (_primaryKeyFieldSpec == null) {
-      throw new RuntimeException("no dimension matches primary key name");
     }
     return _primaryKeyFieldSpec;
   }
@@ -162,7 +158,6 @@ public final class Schema {
   public DimensionFieldSpec getOffsetKeyFieldSpec() {
     if (_offsetKeyFieldSpec == null) {
       Preconditions.checkState(_dimensionFieldSpecs.size() > 0, "should have more than 1 dimensions");
-      Preconditions.checkState(StringUtils.isNotEmpty(_offsetKey), "offset key should not be empty");
       for (DimensionFieldSpec dimensionFieldSpec : _dimensionFieldSpecs) {
         if (dimensionFieldSpec._name.equals(_offsetKey)) {
           _offsetKeyFieldSpec = dimensionFieldSpec;
@@ -170,9 +165,6 @@ public final class Schema {
           Preconditions.checkState(_offsetKeyFieldSpec.getDataType() == DataType.LONG, "offset key should be long type");
         }
       }
-    }
-    if (_offsetKeyFieldSpec == null) {
-      throw new RuntimeException("no dimension matches primary key name");
     }
     return _offsetKeyFieldSpec;
   }
