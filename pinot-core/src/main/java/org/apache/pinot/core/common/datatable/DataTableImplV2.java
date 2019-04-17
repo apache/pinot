@@ -50,6 +50,11 @@ public class DataTableImplV2 implements DataTable {
   // VARIABLE_SIZE_DATA (START|SIZE)
   private static final int HEADER_SIZE = Integer.BYTES * 13;
 
+  private static final int OFFSET_BYTE_SIZE = 4;
+  private static final int SIZE_OF_BYTE_ARRAY_BYTE_SIZE = 4;
+  // denotes version, number of rows and columns.
+  private static final int MANDATORY_INFO_BYTE_SIZE = 3 * 4;
+
   private final int _numRows;
   private final int _numColumns;
   private final DataSchema _dataSchema;
@@ -232,74 +237,83 @@ public class DataTableImplV2 implements DataTable {
   @Override
   public byte[] toBytes()
       throws IOException {
-    ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-    DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
-    dataOutputStream.writeInt(VERSION);
-    dataOutputStream.writeInt(_numRows);
-    dataOutputStream.writeInt(_numColumns);
-    int dataOffset = HEADER_SIZE;
+    byte[] metadataBytes = serializeMetadata();
 
-    // Write dictionary.
-    dataOutputStream.writeInt(dataOffset);
     byte[] dictionaryMapBytes = null;
     if (_dictionaryMap != null) {
       dictionaryMapBytes = serializeDictionaryMap();
-      dataOutputStream.writeInt(dictionaryMapBytes.length);
-      dataOffset += dictionaryMapBytes.length;
-    } else {
-      dataOutputStream.writeInt(0);
     }
 
-    // Write metadata.
-    dataOutputStream.writeInt(dataOffset);
-    byte[] metadataBytes = serializeMetadata();
-    dataOutputStream.writeInt(metadataBytes.length);
-    dataOffset += metadataBytes.length;
-
-    // Write data schema.
-    dataOutputStream.writeInt(dataOffset);
     byte[] dataSchemaBytes = null;
     if (_dataSchema != null) {
       dataSchemaBytes = _dataSchema.toBytes();
-      dataOutputStream.writeInt(dataSchemaBytes.length);
+    }
+
+    int totalByteArraySize = getTotalByteArraySize(metadataBytes, dictionaryMapBytes, dataSchemaBytes);
+    byte[] byteArray = new byte[totalByteArraySize];
+    ByteBuffer byteBuffer = ByteBuffer.wrap(byteArray);
+
+    byteBuffer.putInt(VERSION);
+    byteBuffer.putInt(_numRows);
+    byteBuffer.putInt(_numColumns);
+    int dataOffset = HEADER_SIZE;
+
+    // Write dictionary.
+    byteBuffer.putInt(dataOffset);
+    if (_dictionaryMap != null) {
+      byteBuffer.putInt(dictionaryMapBytes.length);
+      dataOffset += dictionaryMapBytes.length;
+    } else {
+      byteBuffer.putInt(0);
+    }
+
+    // Write metadata.
+    byteBuffer.putInt(dataOffset);
+    byteBuffer.putInt(metadataBytes.length);
+    dataOffset += metadataBytes.length;
+
+    // Write data schema.
+    byteBuffer.putInt(dataOffset);
+    if (_dataSchema != null) {
+      byteBuffer.putInt(dataSchemaBytes.length);
       dataOffset += dataSchemaBytes.length;
     } else {
-      dataOutputStream.writeInt(0);
+      byteBuffer.putInt(0);
     }
 
     // Write fixed size data.
-    dataOutputStream.writeInt(dataOffset);
+    byteBuffer.putInt(dataOffset);
     if (_fixedSizeDataBytes != null) {
-      dataOutputStream.writeInt(_fixedSizeDataBytes.length);
+      byteBuffer.putInt(_fixedSizeDataBytes.length);
       dataOffset += _fixedSizeDataBytes.length;
     } else {
-      dataOutputStream.writeInt(0);
+      byteBuffer.putInt(0);
     }
 
     // Write variable size data.
-    dataOutputStream.writeInt(dataOffset);
+    byteBuffer.putInt(dataOffset);
     if (_variableSizeDataBytes != null) {
-      dataOutputStream.writeInt(_variableSizeDataBytes.length);
+      byteBuffer.putInt(_variableSizeDataBytes.length);
     } else {
-      dataOutputStream.writeInt(0);
+      byteBuffer.putInt(0);
     }
 
     // Write actual data.
     if (dictionaryMapBytes != null) {
-      dataOutputStream.write(dictionaryMapBytes);
+      byteBuffer.put(dictionaryMapBytes);
     }
-    dataOutputStream.write(metadataBytes);
+    byteBuffer.put(metadataBytes);
     if (dataSchemaBytes != null) {
-      dataOutputStream.write(dataSchemaBytes);
+      byteBuffer.put(dataSchemaBytes);
     }
     if (_fixedSizeDataBytes != null) {
-      dataOutputStream.write(_fixedSizeDataBytes);
+      byteBuffer.put(_fixedSizeDataBytes);
     }
     if (_variableSizeDataBytes != null) {
-      dataOutputStream.write(_variableSizeDataBytes);
+      byteBuffer.put(_variableSizeDataBytes);
     }
 
-    return byteArrayOutputStream.toByteArray();
+    return byteArray;
   }
 
   private byte[] serializeDictionaryMap()
@@ -344,6 +358,21 @@ public class DataTableImplV2 implements DataTable {
     }
 
     return byteArrayOutputStream.toByteArray();
+  }
+
+  private int getTotalByteArraySize(byte[] metadataBytes, byte[] dictionaryMapBytes, byte[] dataSchemaBytes) {
+    int metadataSize = metadataBytes.length + SIZE_OF_BYTE_ARRAY_BYTE_SIZE + OFFSET_BYTE_SIZE;
+    int dictionarySize =
+        (dictionaryMapBytes != null ? dictionaryMapBytes.length : 0) + SIZE_OF_BYTE_ARRAY_BYTE_SIZE + OFFSET_BYTE_SIZE;
+    int dataSchemaSize = (dataSchemaBytes != null ? dataSchemaBytes.length : 0) + SIZE_OF_BYTE_ARRAY_BYTE_SIZE + OFFSET_BYTE_SIZE;
+    int fixedSizeDataSize =
+        (_fixedSizeDataBytes != null ? _fixedSizeDataBytes.length : 0) + SIZE_OF_BYTE_ARRAY_BYTE_SIZE + OFFSET_BYTE_SIZE;
+    int variableSizeDataSize =
+        (_variableSizeDataBytes != null ? _variableSizeDataBytes.length : 0) + SIZE_OF_BYTE_ARRAY_BYTE_SIZE + OFFSET_BYTE_SIZE;
+
+    // total size that byte array needs
+    return MANDATORY_INFO_BYTE_SIZE + metadataSize + dictionarySize + dataSchemaSize + fixedSizeDataSize
+        + variableSizeDataSize;
   }
 
   @Nonnull
