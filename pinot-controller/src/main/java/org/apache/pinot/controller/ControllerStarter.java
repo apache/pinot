@@ -180,6 +180,10 @@ public class ControllerStarter {
     return _taskManager;
   }
 
+  public ControllerLeadershipManager getControllerLeadershipManager() {
+    return _controllerLeadershipManager;
+  }
+
   public void start() {
     LOGGER.info("Starting Pinot controller in mode: {}.", _controllerMode.name());
     Utils.logVersions();
