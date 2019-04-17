@@ -11,3 +11,4 @@ test-output/
 *.iws
 *.log
 *.swp
+docs/_build
