@@ -229,6 +229,66 @@ public class PartitionAwareOfflineRoutingTableBuilderTest {
     Assert.assertEquals(servers.size(), 2);
   }
 
+  @Test
+  public void testRoutingAfterOneServerDown() throws Exception {
+    NUM_REPLICA = 3;
+    NUM_PARTITION = 1;
+    NUM_SERVERS = 3;
+    NUM_SEGMENTS = 20;
+
+    // Create the fake property store
+    FakePropertyStore fakePropertyStore = new FakePropertyStore();
+
+    // Create the table config, partition mapping,
+    TableConfig tableConfig = buildOfflineTableConfig();
+
+    // Create the replica group id to server mapping
+    Map<Integer, List<String>> replicaToServerMapping = buildReplicaGroupMapping();
+
+    // Update segment zk metadata.
+    for (int i = 0; i < NUM_SEGMENTS; i++) {
+      String segmentName = "segment" + i;
+      int partition = i % NUM_PARTITION;
+      SegmentZKMetadata metadata = buildOfflineSegmentZKMetadata(segmentName, partition);
+      fakePropertyStore
+          .setContents(ZKMetadataProvider.constructPropertyStorePathForSegment(OFFLINE_TABLE_NAME, segmentName),
+              metadata.toZNRecord());
+    }
+
+    // Update replica group mapping zk metadata
+    updateReplicaGroupPartitionAssignment(OFFLINE_TABLE_NAME, fakePropertyStore);
+
+    // Create instance Configs
+    List<InstanceConfig> instanceConfigs = new ArrayList<>();
+    for (int serverId = 0; serverId < NUM_SERVERS; serverId++) {
+      String serverName = "Server_localhost_" + serverId;
+      instanceConfigs.add(new InstanceConfig(serverName));
+    }
+
+    // Pick a server that is going to be down
+    Random random = new Random();
+    String downServer = instanceConfigs.get(random.nextInt(instanceConfigs.size())).getInstanceName();
+
+    // Create the fake external view with a down server
+    ExternalView externalView = buildExternalViewWithDownServer(OFFLINE_TABLE_NAME, replicaToServerMapping, downServer);
+
+    // Create the partition aware offline routing table builder
+    RoutingTableBuilder routingTableBuilder =
+        buildPartitionAwareOfflineRoutingTableBuilder(fakePropertyStore, tableConfig, externalView, instanceConfigs);
+
+    Set<String> servers = new HashSet<>();
+    for (int i = 0; i < 100; i++) {
+      String countStarQuery = "select count(*) from " + OFFLINE_TABLE_NAME;
+      Map<String, List<String>> routingTable =
+          routingTableBuilder.getRoutingTable(buildRoutingTableLookupRequest(countStarQuery), null);
+      Assert.assertEquals(routingTable.keySet().size(), 1);
+      servers.add(routingTable.keySet().iterator().next());
+    }
+
+    // Check if the other two available servers are getting picked
+    Assert.assertEquals(servers.size(), 2);
+  }
+
   private void updateReplicaGroupPartitionAssignment(String tableNameWithType, FakePropertyStore propertyStore) {
     // Create partition assignment mapping table.
     ReplicaGroupPartitionAssignment replicaGroupPartitionAssignment =
@@ -266,6 +326,25 @@ public class PartitionAwareOfflineRoutingTableBuilderTest {
       int serverIndex = i % (NUM_SERVERS / NUM_REPLICA);
       for (List<String> serversInReplicaGroup : replicaGroupServers.values()) {
         externalView.setState(segmentName, serversInReplicaGroup.get(serverIndex), "ONLINE");
+      }
+    }
+    return externalView;
+  }
+
+  private ExternalView buildExternalViewWithDownServer(String tableName, Map<Integer, List<String>> replicaGroupServers,
+      String downServer) throws Exception {
+    // Create External View
+    ExternalView externalView = new ExternalView(tableName);
+    for (int i = 0; i < NUM_SEGMENTS; i++) {
+      String segmentName = "segment" + i;
+      int serverIndex = i % (NUM_SERVERS / NUM_REPLICA);
+      for (List<String> serversInReplicaGroup : replicaGroupServers.values()) {
+        String serverName = serversInReplicaGroup.get(serverIndex);
+        if (serverName.equals(downServer)) {
+          externalView.setState(segmentName, serversInReplicaGroup.get(serverIndex), "OFFLINE");
+        } else {
+          externalView.setState(segmentName, serversInReplicaGroup.get(serverIndex), "ONLINE");
+        }
       }
     }
     return externalView;
