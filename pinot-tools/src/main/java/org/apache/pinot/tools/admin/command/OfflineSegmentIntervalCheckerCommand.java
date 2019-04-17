@@ -107,6 +107,8 @@ public class OfflineSegmentIntervalCheckerCommand extends AbstractBaseAdminComma
       for (String tableName : _tableNames.split(",")) {
         if (ZKMetadataProvider.getOfflineTableConfig(_propertyStore, tableName) != null) {
           offlineTables.add(tableName);
+        } else {
+          LOGGER.warn("Table config not found for table {}. Skipping", tableName);
         }
       }
     }
