@@ -9,6 +9,7 @@
         "baselineValueProvider" : "$rule1:RULE_BASELINE",
         "className" : "org.apache.pinot.thirdeye.detection.wrapper.BaselineFillingMergeWrapper",
         "nested" : [ {
+          "bucketPeriod":"P1D",
           "className" : "org.apache.pinot.thirdeye.detection.wrapper.AnomalyDetectorWrapper"
         } ],
         "detector" : "$rule1:THRESHOLD"

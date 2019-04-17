@@ -197,7 +197,7 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
     this.yaml = new org.yaml.snakeyaml.Yaml();
     this.metricConfig = this.dataProvider.fetchMetric(MapUtils.getString(yamlConfig, PROP_METRIC),
         MapUtils.getString(yamlConfig, PROP_DATASET));
-    Preconditions.checkNotNull(this.metricConfig, "Metric not found");
+    Preconditions.checkNotNull(this.metricConfig, "metric not found");
 
     this.datasetConfig = this.dataProvider.fetchDatasets(Collections.singletonList(metricConfig.getDataset()))
         .get(metricConfig.getDataset());
@@ -311,6 +311,8 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
           properties.put(PROP_WINDOW_UNIT, TimeUnit.HOURS);
       }
     }
+    // set default bucketPeriod
+    properties.put(PROP_BUCKET_PERIOD, this.datasetConfig.bucketTimeGranularity().toPeriod().toString());
     // override from yaml
     if (yamlConfig.containsKey(PROP_WINDOW_SIZE)) {
       properties.put(PROP_MOVING_WINDOW_DETECTION, true);
