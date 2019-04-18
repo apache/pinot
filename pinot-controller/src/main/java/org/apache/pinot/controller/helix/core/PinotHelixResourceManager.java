@@ -138,6 +138,8 @@ public class PinotHelixResourceManager {
   private ZkCacheBaseDataAccessor<ZNRecord> _cacheInstanceConfigsDataAccessor;
   private Builder _keyBuilder;
   private SegmentDeletionManager _segmentDeletionManager;
+  private PinotLLCRealtimeSegmentManager _pinotLLCRealtimeSegmentManager;
+  private RebalanceSegmentStrategyFactory _rebalanceSegmentStrategyFactory;
   private TableRebalancer _tableRebalancer;
 
   public PinotHelixResourceManager(@Nonnull String zkURL, @Nonnull String helixClusterName,
@@ -1131,13 +1133,11 @@ public class PinotHelixResourceManager {
   @VisibleForTesting
   protected void validateTableTenantConfig(TableConfig tableConfig, String tableNameWithType, TableType tableType) {
     if (tableConfig == null) {
-      throw new InvalidTableConfigException(
-          "Table config is null for table: " + tableNameWithType);
+      throw new InvalidTableConfigException("Table config is null for table: " + tableNameWithType);
     }
     TenantConfig tenantConfig = tableConfig.getTenantConfig();
     if (tenantConfig == null || tenantConfig.getBroker() == null || tenantConfig.getServer() == null) {
-      throw new InvalidTableConfigException(
-          "Tenant is not configured for table: " + tableNameWithType);
+      throw new InvalidTableConfigException("Tenant is not configured for table: " + tableNameWithType);
     }
     // Check if tenant exists before creating the table
     String brokerTenantName = TagNameUtils.getBrokerTagForTenant(tenantConfig.getBroker());
@@ -1236,6 +1236,14 @@ public class PinotHelixResourceManager {
     }
   }
 
+  public void registerPinotLLCRealtimeSegmentManager(PinotLLCRealtimeSegmentManager pinotLLCRealtimeSegmentManager) {
+    _pinotLLCRealtimeSegmentManager = pinotLLCRealtimeSegmentManager;
+  }
+
+  public void registerRebalanceSegmentStrategyFactory(RebalanceSegmentStrategyFactory rebalanceSegmentStrategyFactory) {
+    _rebalanceSegmentStrategyFactory = rebalanceSegmentStrategyFactory;
+  }
+
   private void ensureRealtimeClusterIsSetUp(TableConfig config, String realtimeTableName,
       IndexingConfig indexingConfig) {
     StreamConfig streamConfig = new StreamConfig(indexingConfig.getStreamConfigs());
@@ -1255,7 +1263,7 @@ public class PinotHelixResourceManager {
         // Only high-level consumer specified in the config.
         createHelixEntriesForHighLevelConsumer(config, realtimeTableName, idealState);
         // Clean up any LLC table if they are present
-        PinotLLCRealtimeSegmentManager.getInstance().cleanupLLC(realtimeTableName);
+        _pinotLLCRealtimeSegmentManager.cleanupLLC(realtimeTableName);
       }
     }
 
@@ -1265,7 +1273,8 @@ public class PinotHelixResourceManager {
       // (unless there are low-level segments already present)
       if (ZKMetadataProvider.getLLCRealtimeSegments(_propertyStore, realtimeTableName).isEmpty()) {
         PinotTableIdealStateBuilder
-            .buildLowLevelRealtimeIdealStateFor(realtimeTableName, config, idealState, _enableBatchMessageMode);
+            .buildLowLevelRealtimeIdealStateFor(_pinotLLCRealtimeSegmentManager, realtimeTableName, config, idealState,
+                _enableBatchMessageMode);
         LOGGER.info("Successfully added Helix entries for low-level consumers for {} ", realtimeTableName);
       } else {
         LOGGER.info("LLC is already set up for table {}, not configuring again", realtimeTableName);
@@ -2234,7 +2243,7 @@ public class PinotHelixResourceManager {
     RebalanceResult result;
     try {
       RebalanceSegmentStrategy rebalanceSegmentsStrategy =
-          RebalanceSegmentStrategyFactory.getInstance().getRebalanceSegmentsStrategy(tableConfig);
+          _rebalanceSegmentStrategyFactory.getRebalanceSegmentsStrategy(tableConfig);
       result = _tableRebalancer.rebalance(tableConfig, rebalanceSegmentsStrategy, rebalanceUserConfig);
     } catch (InvalidConfigException e) {
       LOGGER.error("Exception in rebalancing config for table {}", tableNameWithType, e);

@@ -58,6 +58,7 @@ import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.ControllerLeadershipManager;
 import org.apache.pinot.controller.api.resources.LLCSegmentCompletionHandlers;
+import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotTableIdealStateBuilder;
 import org.apache.pinot.controller.helix.core.realtime.segment.CommittingSegmentDescriptor;
 import org.apache.pinot.controller.util.SegmentCompletionUtils;
@@ -89,6 +90,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
   private static File baseDir;
   private Random random;
 
+  private PinotHelixResourceManager _mockPinotHelixResourceManager;
+
   private enum ExternalChange {
     N_INSTANCES_CHANGED, N_PARTITIONS_INCREASED, N_INSTANCES_CHANGED_AND_PARTITIONS_INCREASED
   }
@@ -119,6 +122,10 @@ public class PinotLLCRealtimeSegmentManagerTest {
     }
     FakePinotLLCRealtimeSegmentManager.IS_CONNECTED = true;
     FakePinotLLCRealtimeSegmentManager.IS_LEADER = true;
+
+    _mockPinotHelixResourceManager = mock(PinotHelixResourceManager.class);
+    HelixManager mockHelixManager = mock(HelixManager.class);
+    when(_mockPinotHelixResourceManager.getHelixZkManager()).thenReturn(mockHelixManager);
   }
 
   @AfterTest
@@ -193,7 +200,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
   private void testSetupNewTable(TableConfig tableConfig, IdealState idealState, int nPartitions, int nReplicas,
       List<String> instances, boolean invalidConfig, boolean badStream) {
-    FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager(null);
+    FakePinotLLCRealtimeSegmentManager segmentManager =
+        new FakePinotLLCRealtimeSegmentManager(_mockPinotHelixResourceManager, null);
     segmentManager._partitionAssignmentGenerator.setConsumingInstances(instances);
     segmentManager.addTableToStore(tableConfig.getTableName(), tableConfig, nPartitions);
 
@@ -281,7 +289,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
   @Test
   public void testValidateLLCPartitionIncrease() {
 
-    FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager(null);
+    FakePinotLLCRealtimeSegmentManager segmentManager =
+        new FakePinotLLCRealtimeSegmentManager(_mockPinotHelixResourceManager, null);
     String tableName = "validateThisTable_REALTIME";
     int nReplicas = 2;
     IdealStateBuilderUtil idealStateBuilder = new IdealStateBuilderUtil(tableName);
@@ -470,7 +479,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
   public void testValidateLLCRepair()
       throws InvalidConfigException {
 
-    FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager(null);
+    FakePinotLLCRealtimeSegmentManager segmentManager =
+        new FakePinotLLCRealtimeSegmentManager(_mockPinotHelixResourceManager, null);
     String tableName = "repairThisTable_REALTIME";
     String rawTableName = TableNameBuilder.extractRawTableName(tableName);
     int nReplicas = 2;
@@ -855,7 +865,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     LLCSegmentName existingSegmentName = new LLCSegmentName("someTable", 1, 31, 12355L);
     String[] existingSegs = {existingSegmentName.getSegmentName()};
     FakePinotLLCRealtimeSegmentManager segmentManager =
-        new FakePinotLLCRealtimeSegmentManager(Arrays.asList(existingSegs));
+        new FakePinotLLCRealtimeSegmentManager(_mockPinotHelixResourceManager, Arrays.asList(existingSegs));
 
     final String rtTableName = "testPreExistingLLCSegments_REALTIME";
 
@@ -874,7 +884,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
   @Test
   public void testCommittingSegmentIfDisconnected()
       throws InvalidConfigException {
-    FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager(null);
+    FakePinotLLCRealtimeSegmentManager segmentManager =
+        new FakePinotLLCRealtimeSegmentManager(_mockPinotHelixResourceManager, null);
 
     final String tableName = "table_REALTIME";
     final String rawTableName = TableNameBuilder.extractRawTableName(tableName);
@@ -926,7 +937,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
   @Test
   public void testCommittingSegment()
       throws InvalidConfigException {
-    FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager(null);
+    FakePinotLLCRealtimeSegmentManager segmentManager =
+        new FakePinotLLCRealtimeSegmentManager(_mockPinotHelixResourceManager, null);
 
     final String rtTableName = "table_REALTIME";
     final String rawTableName = TableNameBuilder.extractRawTableName(rtTableName);
@@ -1083,11 +1095,14 @@ public class PinotLLCRealtimeSegmentManagerTest {
   public void testCommitSegmentWhenControllerWentThroughGC()
       throws InvalidConfigException {
 
-    FakePinotLLCRealtimeSegmentManager segmentManager1 = new FakePinotLLCRealtimeSegmentManager(null);
-    FakePinotLLCRealtimeSegmentManager segmentManager2 = new FakePinotLLCRealtimeSegmentManagerII(null,
-        FakePinotLLCRealtimeSegmentManagerII.SCENARIO_1_ZK_VERSION_NUM_HAS_CHANGE);
-    FakePinotLLCRealtimeSegmentManager segmentManager3 = new FakePinotLLCRealtimeSegmentManagerII(null,
-        FakePinotLLCRealtimeSegmentManagerII.SCENARIO_2_METADATA_STATUS_HAS_CHANGE);
+    FakePinotLLCRealtimeSegmentManager segmentManager1 =
+        new FakePinotLLCRealtimeSegmentManager(_mockPinotHelixResourceManager, null);
+    FakePinotLLCRealtimeSegmentManager segmentManager2 =
+        new FakePinotLLCRealtimeSegmentManagerII(_mockPinotHelixResourceManager, null,
+            FakePinotLLCRealtimeSegmentManagerII.SCENARIO_1_ZK_VERSION_NUM_HAS_CHANGE);
+    FakePinotLLCRealtimeSegmentManager segmentManager3 =
+        new FakePinotLLCRealtimeSegmentManagerII(_mockPinotHelixResourceManager, null,
+            FakePinotLLCRealtimeSegmentManagerII.SCENARIO_2_METADATA_STATUS_HAS_CHANGE);
 
     final String rtTableName = "table_REALTIME";
     final String rawTableName = TableNameBuilder.extractRawTableName(rtTableName);
@@ -1123,7 +1138,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
   @Test
   public void testIdealStateAlreadyUpdated()
       throws InvalidConfigException {
-    FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager(null);
+    FakePinotLLCRealtimeSegmentManager segmentManager =
+        new FakePinotLLCRealtimeSegmentManager(_mockPinotHelixResourceManager, null);
     String tableNameWithType = "tableName_REALTIME";
     String rawTableName = "tableName";
     int nPartitions = 4;
@@ -1199,7 +1215,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
       throws Exception {
     PinotFSFactory.init(new PropertiesConfiguration());
     PinotLLCRealtimeSegmentManager realtimeSegmentManager =
-        new FakePinotLLCRealtimeSegmentManager(Collections.<String>emptyList());
+        new FakePinotLLCRealtimeSegmentManager(_mockPinotHelixResourceManager, Collections.<String>emptyList());
     String tableName = "fakeTable_REALTIME";
     String segmentName = "segment";
     String temporarySegmentLocation = SegmentCompletionUtils.generateSegmentFileName(segmentName);
@@ -1219,7 +1235,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
       throws Exception {
     PinotFSFactory.init(new PropertiesConfiguration());
     PinotLLCRealtimeSegmentManager realtimeSegmentManager =
-        new FakePinotLLCRealtimeSegmentManager(Collections.<String>emptyList());
+        new FakePinotLLCRealtimeSegmentManager(_mockPinotHelixResourceManager, Collections.<String>emptyList());
     String tableName = "fakeTable_REALTIME";
     String segmentName = "segment";
 
@@ -1341,9 +1357,11 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     private TableConfigStore _tableConfigStore;
 
-    protected FakePinotLLCRealtimeSegmentManager(List<String> existingLLCSegments, HelixManager helixManager) {
-      super(null, clusterName, helixManager, null, null, CONTROLLER_CONF, new ControllerMetrics(new MetricsRegistry()),
-          new ControllerLeadershipManager(helixManager));
+    protected FakePinotLLCRealtimeSegmentManager(PinotHelixResourceManager pinotHelixResourceManager,
+        List<String> existingLLCSegments) {
+      super(pinotHelixResourceManager, CONTROLLER_CONF, new ControllerMetrics(new MetricsRegistry()),
+          new ControllerLeadershipManager(pinotHelixResourceManager.getHelixZkManager()));
+
       try {
         TableConfigCache mockCache = mock(TableConfigCache.class);
         TableConfig mockTableConfig = mock(TableConfig.class);
@@ -1376,10 +1394,6 @@ public class PinotLLCRealtimeSegmentManagerTest {
       _version = 0;
 
       _tableConfigStore = new TableConfigStore();
-    }
-
-    protected FakePinotLLCRealtimeSegmentManager(List<String> existingLLCSegments) {
-      this(existingLLCSegments, mock(HelixManager.class));
     }
 
     private SegmentMetadataImpl newMockSegmentMetadata() {
@@ -1574,8 +1588,9 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     private int _scenario;
 
-    FakePinotLLCRealtimeSegmentManagerII(List<String> existingLLCSegments, int scenario) {
-      super(existingLLCSegments);
+    FakePinotLLCRealtimeSegmentManagerII(PinotHelixResourceManager pinotHelixResourceManager,
+        List<String> existingLLCSegments, int scenario) {
+      super(pinotHelixResourceManager, existingLLCSegments);
       _scenario = scenario;
     }
 

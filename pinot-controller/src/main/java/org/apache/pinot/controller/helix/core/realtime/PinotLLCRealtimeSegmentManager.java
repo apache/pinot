@@ -111,9 +111,6 @@ public class PinotLLCRealtimeSegmentManager {
    */
   private static int MAX_SEGMENT_COMPLETION_TIME_MILLIS = 300_000; // 5 MINUTES
 
-  // TODO: fix the misuse of singleton.
-  private static PinotLLCRealtimeSegmentManager INSTANCE = null;
-
   private final HelixAdmin _helixAdmin;
   private final HelixManager _helixManager;
   private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
@@ -131,31 +128,33 @@ public class PinotLLCRealtimeSegmentManager {
   private volatile boolean _isStopping = false;
   private AtomicInteger _numCompletingSegments = new AtomicInteger(0);
 
+  public PinotLLCRealtimeSegmentManager(PinotHelixResourceManager helixResourceManager, ControllerConf controllerConf,
+      ControllerMetrics controllerMetrics, ControllerLeadershipManager controllerLeadershipManager) {
+    _helixAdmin = helixResourceManager.getHelixAdmin();
+    _helixManager = helixResourceManager.getHelixZkManager();
+    _propertyStore = helixResourceManager.getPropertyStore();
+    _helixResourceManager = helixResourceManager;
+    _clusterName = helixResourceManager.getHelixClusterName();
+    _controllerConf = controllerConf;
+    _controllerMetrics = controllerMetrics;
+    _numIdealStateUpdateLocks = controllerConf.getRealtimeSegmentMetadataCommitNumLocks();
+    _idealstateUpdateLocks = new Lock[_numIdealStateUpdateLocks];
+    for (int i = 0; i < _numIdealStateUpdateLocks; i++) {
+      _idealstateUpdateLocks[i] = new ReentrantLock();
+    }
+    _tableConfigCache = new TableConfigCache(_propertyStore);
+    _streamPartitionAssignmentGenerator = new StreamPartitionAssignmentGenerator(_helixManager);
+    _flushThresholdUpdateManager = new FlushThresholdUpdateManager();
+    _controllerLeadershipManager = controllerLeadershipManager;
+  }
+
+
   public boolean getIsSplitCommitEnabled() {
     return _controllerConf.getAcceptSplitCommit();
   }
 
   public String getControllerVipUrl() {
     return _controllerConf.generateVipUrl();
-  }
-
-  public static synchronized void create(PinotHelixResourceManager helixResourceManager, ControllerConf controllerConf,
-      ControllerMetrics controllerMetrics, ControllerLeadershipManager controllerLeadershipManager) {
-    create(helixResourceManager.getHelixAdmin(), helixResourceManager.getHelixClusterName(),
-        helixResourceManager.getHelixZkManager(), helixResourceManager.getPropertyStore(), helixResourceManager,
-        controllerConf, controllerMetrics, controllerLeadershipManager);
-  }
-
-  private static synchronized void create(HelixAdmin helixAdmin, String clusterName, HelixManager helixManager,
-      ZkHelixPropertyStore propertyStore, PinotHelixResourceManager helixResourceManager, ControllerConf controllerConf,
-      ControllerMetrics controllerMetrics, ControllerLeadershipManager controllerLeadershipManager) {
-    if (INSTANCE != null) {
-      throw new RuntimeException("Instance already created");
-    }
-    INSTANCE =
-        new PinotLLCRealtimeSegmentManager(helixAdmin, clusterName, helixManager, propertyStore, helixResourceManager,
-            controllerConf, controllerMetrics, controllerLeadershipManager);
-    SegmentCompletionManager.create(helixManager, INSTANCE, controllerConf, controllerMetrics, controllerLeadershipManager);
   }
 
   public void stop() {
@@ -181,36 +180,6 @@ public class PinotLLCRealtimeSegmentManager {
       }
     }
     LOGGER.info("Wait completed: Number of completing segments = {}", _numCompletingSegments.get());
-    INSTANCE = null;
-    SegmentCompletionManager.stop();
-  }
-
-  protected PinotLLCRealtimeSegmentManager(HelixAdmin helixAdmin, String clusterName, HelixManager helixManager,
-      ZkHelixPropertyStore propertyStore, PinotHelixResourceManager helixResourceManager, ControllerConf controllerConf,
-      ControllerMetrics controllerMetrics, ControllerLeadershipManager controllerLeadershipManager) {
-    _helixAdmin = helixAdmin;
-    _helixManager = helixManager;
-    _propertyStore = propertyStore;
-    _helixResourceManager = helixResourceManager;
-    _clusterName = clusterName;
-    _controllerConf = controllerConf;
-    _controllerMetrics = controllerMetrics;
-    _numIdealStateUpdateLocks = controllerConf.getRealtimeSegmentMetadataCommitNumLocks();
-    _idealstateUpdateLocks = new Lock[_numIdealStateUpdateLocks];
-    for (int i = 0; i < _numIdealStateUpdateLocks; i++) {
-      _idealstateUpdateLocks[i] = new ReentrantLock();
-    }
-    _tableConfigCache = new TableConfigCache(_propertyStore);
-    _streamPartitionAssignmentGenerator = new StreamPartitionAssignmentGenerator(_helixManager);
-    _flushThresholdUpdateManager = new FlushThresholdUpdateManager();
-    _controllerLeadershipManager = controllerLeadershipManager;
-  }
-
-  public static PinotLLCRealtimeSegmentManager getInstance() {
-    if (INSTANCE == null) {
-      throw new RuntimeException("Not yet created");
-    }
-    return INSTANCE;
   }
 
   protected boolean isLeader() {
