@@ -10,7 +10,7 @@
       predefinedRanges=pill.predefinedRanges
       selectAction=(action "onRangeSelection")
     }}
-    {{#if appName}}
+    {{#if appOrSubGroup}}
       {{#link-to "home.share-dashboard" (query-params appName=appName duration=duration startDate=startDate endDate=endDate feedbackType=feedbackType shareId=null) tagName="button" type="button" class="pull-right te-button te-button--outline"}}
         Share
       {{/link-to}}

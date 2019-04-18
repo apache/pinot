@@ -501,6 +501,9 @@ export default Controller.extend({
       if(get(this, 'model.appName')){
         currentUrl = currentUrl.concat(`appName=${get(this, 'model.appName')}`);
       }
+      if(get(this, 'model.subGroup')){
+        currentUrl = currentUrl.concat(`subGroup=${get(this, 'model.subGroup')}`);
+      }
       if(get(this, 'model.startDate')){
         currentUrl = currentUrl.concat(`&startDate=${get(this, 'model.startDate')}`);
       }
@@ -518,8 +521,8 @@ export default Controller.extend({
         set(this, 'showSharedTooltip', true);
         set(this, 'shareUrl', currentUrl);
         //update the route's params
-        const { appName, duration, startDate, endDate } = get(this, 'model');
-        this.transitionToRoute({ queryParams: { appName, duration, startDate, endDate, shareId: hashKey }});
+        const { appName, subGroup, duration, startDate, endDate } = get(this, 'model');
+        this.transitionToRoute({ queryParams: { appName, subGroup, duration, startDate, endDate, shareId: hashKey }});
       });
       //has to be here to tie user event with the copy action (vs in the promise return above)
       this._copyFromDummyInput(currentUrl);

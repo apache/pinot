@@ -42,7 +42,7 @@
 </style>
 <div class="container share-dashboard-container">
   <header>
-    {{#link-to "home" (query-params appName=model.appName feedbackType=model.feedbackType duration=model.duration startDate=model.startDate endDate=model.endDate) class="te-anomaly-table__link"}}
+    {{#link-to "home" (query-params subGroup=model.subGroup appName=model.appName feedbackType=model.feedbackType duration=model.duration startDate=model.startDate endDate=model.endDate) class="te-anomaly-table__link"}}
       Back to Dashboard
     {{/link-to}}
   </header>
@@ -139,7 +139,11 @@
           </div>
           <div style="color: #FFF;">
             <div style="padding: 20px; background-color: #0073b1;text-align: left;">
+              {{#if appNameDisplay}}
               <h3 style="line-height: 20px;margin-bottom: 25x;">Application:<span  style="padding-left:10px;">{{appNameDisplay}}</span></h3>
+              {{else}}
+              <h3 style="line-height: 20px;margin-bottom: 25x;">Subscription Group:<span  style="padding-left:10px;">{{subGroupDisplay}}</span></h3>
+              {{/if}}
               <h4 style="line-height: 20px;">{{anomaliesFilteredCount}} anomalies were detected from {{startDateDisplay}} to {{endDateDisplay}}</h4>
               {{#if dashboard_summary_comment}}
                 <div id="div_dashboard_summary">
