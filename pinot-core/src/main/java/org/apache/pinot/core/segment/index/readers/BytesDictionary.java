@@ -75,4 +75,9 @@ public class BytesDictionary extends ImmutableDictionaryReader {
       outValues[outStartPos++] = getBytes(dictIds[i], getBuffer());
     }
   }
+
+  @Override
+  public String getStringValue(int dictId) {
+    return Hex.encodeHexString(get(dictId));
+  }
 }

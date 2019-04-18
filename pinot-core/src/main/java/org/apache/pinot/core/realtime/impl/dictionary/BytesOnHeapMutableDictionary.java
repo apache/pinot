@@ -126,4 +126,9 @@ public class BytesOnHeapMutableDictionary extends BaseOnHeapMutableDictionary {
       }
     }
   }
+
+  @Override
+  public String getStringValue(int dictId) {
+    return Hex.encodeHexString(get(dictId));
+  }
 }

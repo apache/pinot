@@ -421,15 +421,15 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
   private String getGroupKey(int rawKey) {
     // Specialize single group-by column case
     if (_numGroupByExpressions == 1) {
-      return _dictionaries[0].get(rawKey).toString();
+      return _dictionaries[0].getStringValue(rawKey);
     } else {
       int cardinality = _cardinalities[0];
-      StringBuilder groupKeyBuilder = new StringBuilder(_dictionaries[0].get(rawKey % cardinality).toString());
+      StringBuilder groupKeyBuilder = new StringBuilder(_dictionaries[0].getStringValue(rawKey % cardinality));
       rawKey /= cardinality;
       for (int i = 1; i < _numGroupByExpressions; i++) {
         groupKeyBuilder.append(AggregationGroupByTrimmingService.GROUP_KEY_DELIMITER);
         cardinality = _cardinalities[i];
-        groupKeyBuilder.append(_dictionaries[i].get(rawKey % cardinality));
+        groupKeyBuilder.append(_dictionaries[i].getStringValue(rawKey % cardinality));
         rawKey /= cardinality;
       }
       return groupKeyBuilder.toString();

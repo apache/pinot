@@ -174,4 +174,9 @@ public class BytesOffHeapMutableDictionary extends BaseOffHeapMutableDictionary 
   public int getAvgValueSize() {
     return (int) _byteStore.getAvgValueSize();
   }
+
+  @Override
+  public String getStringValue(int dictId) {
+    return Hex.encodeHexString(get(dictId));
+  }
 }
