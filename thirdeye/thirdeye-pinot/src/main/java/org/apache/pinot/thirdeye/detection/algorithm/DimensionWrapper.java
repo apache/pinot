@@ -69,6 +69,7 @@ public class DimensionWrapper extends DetectionPipeline {
   private static final String PROP_NESTED_METRIC_URNS = "nestedMetricUrns";
 
   private static final String PROP_CLASS_NAME = "className";
+  private static final int EARLY_STOP_THRESHOLD = 10;
 
   private final String metricUrn;
   private final int k;
@@ -198,19 +199,29 @@ public class DimensionWrapper extends DetectionPipeline {
     List<MergedAnomalyResultDTO> anomalies = new ArrayList<>();
     Map<String, Object> diagnostics = new HashMap<>();
     Set<Long> lastTimeStamps = new HashSet<>();
-    LOG.info("exploring {} metrics", nestedMetrics.size());
-    for (MetricEntity metric : nestedMetrics) {
-      for (Map<String, Object> properties : this.nestedProperties) {
-        LOG.info("running detection for {}", metric.toString());
-        try {
+    long totalNestedMetrics = nestedMetrics.size();
+    long successCount = 0; // record the number of successfully explored dimensions
+    LOG.info("exploring {} metrics", totalNestedMetrics);
+    for (int i = 0; i < totalNestedMetrics; i++) {
+      if (i == EARLY_STOP_THRESHOLD && successCount == 0) {
+        // if for the first certain number of dimensions all failed, throw the exception
+        throw new RuntimeException(String.format("Detection failed for first %d out of %d metric dimensions, stop dimension explore.", i + 1,
+            totalNestedMetrics));
+      }
+      MetricEntity metric = nestedMetrics.get(i);
+      try {
+        LOG.info("running detection for metric urn {}. {}/{}", metric.getUrn(), i + 1, totalNestedMetrics);
+        for (Map<String, Object> properties : this.nestedProperties) {
           DetectionPipelineResult intermediate = this.runNested(metric, properties);
           lastTimeStamps.add(intermediate.getLastTimestamp());
           anomalies.addAll(intermediate.getAnomalies());
           diagnostics.put(metric.getUrn(), intermediate.getDiagnostics());
-        } catch (Exception e) {
-          LOG.warn("[DetectionConfigID{}] detecting anomalies for window {} to {} failed for metric urn {}.", this.config.getId(), this.start, this.end, metric.getUrn(), e);
         }
+      } catch (Exception e) {
+        LOG.warn("[DetectionConfigID{}] detecting anomalies for window {} to {} failed for metric urn {}.",
+            this.config.getId(), this.start, this.end, metric.getUrn(), e);
       }
+      successCount++;
     }
 
     return new DetectionPipelineResult(anomalies, DetectionUtils.consolidateNestedLastTimeStamps(lastTimeStamps))
