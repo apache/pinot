@@ -358,8 +358,15 @@ public class Deserializer {
               destinationValue = Boolean.parseBoolean(stringValue);
             } else if (Enum.class.isAssignableFrom(fieldType)) {
               destinationValue = Enum.valueOf(fieldType.asSubclass(Enum.class), stringValue.toUpperCase());
+            } else if (Float.class.isAssignableFrom(fieldType)){
+              destinationValue = Float.parseFloat(stringValue);
+            } else if (Double.class.isAssignableFrom(fieldType)){
+              destinationValue = Double.parseDouble(stringValue);
+            } else if (Short.class.isAssignableFrom(fieldType)){
+              destinationValue = Short.parseShort(stringValue);
+            } else if (Character.class.isAssignableFrom(fieldType)){
+              destinationValue = stringValue.charAt(0);
             } else {
-              // TODO Add float/double/short/char
               throw new RuntimeException("Unsupported conversion from " + objectType + " -> " + fieldType);
             }
           } catch (Exception e) {
