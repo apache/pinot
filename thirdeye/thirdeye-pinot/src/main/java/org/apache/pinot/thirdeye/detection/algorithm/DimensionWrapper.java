@@ -202,10 +202,14 @@ public class DimensionWrapper extends DetectionPipeline {
     for (MetricEntity metric : nestedMetrics) {
       for (Map<String, Object> properties : this.nestedProperties) {
         LOG.info("running detection for {}", metric.toString());
-        DetectionPipelineResult intermediate = this.runNested(metric, properties);
-        lastTimeStamps.add(intermediate.getLastTimestamp());
-        anomalies.addAll(intermediate.getAnomalies());
-        diagnostics.put(metric.getUrn(), intermediate.getDiagnostics());
+        try {
+          DetectionPipelineResult intermediate = this.runNested(metric, properties);
+          lastTimeStamps.add(intermediate.getLastTimestamp());
+          anomalies.addAll(intermediate.getAnomalies());
+          diagnostics.put(metric.getUrn(), intermediate.getDiagnostics());
+        } catch (Exception e) {
+          LOG.warn("[DetectionConfigID{}] detecting anomalies for window {} to {} failed for metric urn {}.", this.config.getId(), this.start, this.end, metric.getUrn(), e);
+        }
       }
     }
 
