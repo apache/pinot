@@ -51,7 +51,6 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
   private static final int NUM_OFFLINE_SEGMENTS = 8;
   private static final int NUM_REALTIME_SEGMENTS = 6;
 
-  private KafkaServerStartable _kafkaStarter;
   private Schema _schema;
 
   protected int getNumOfflineSegments() {
@@ -109,12 +108,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
       throws Exception {
     // Start Zk and Kafka
     startZk();
-    _kafkaStarter = KafkaStarterUtils
-        .startServer(KafkaStarterUtils.DEFAULT_KAFKA_PORT, KafkaStarterUtils.DEFAULT_BROKER_ID,
-            KafkaStarterUtils.DEFAULT_ZK_STR, KafkaStarterUtils.getDefaultKafkaConfiguration());
-
-    // Create Kafka topic
-    KafkaStarterUtils.createTopic(getKafkaTopic(), KafkaStarterUtils.DEFAULT_ZK_STR, getNumKafkaPartitions());
+    startKafka();
 
     // Start the Pinot cluster
     ControllerConf config = getDefaultControllerConfiguration();
@@ -301,7 +295,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
     stopServer();
     stopBroker();
     stopController();
-    KafkaStarterUtils.stopServer(_kafkaStarter);
+    stopKafka();
     stopZk();
     cleanup();
   }

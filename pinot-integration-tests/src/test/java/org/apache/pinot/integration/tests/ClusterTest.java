@@ -50,6 +50,7 @@ import org.apache.pinot.common.config.IndexingConfig;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.config.TableTaskConfig;
+import org.apache.pinot.common.config.TenantConfig;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.utils.CommonConstants.Broker;
 import org.apache.pinot.common.utils.CommonConstants.Helix;
@@ -126,7 +127,9 @@ public abstract class ClusterTest extends ControllerTest {
             BrokerServerBuilder.SINGLE_CONNECTION_REQUEST_HANDLER_TYPE);
       }
       overrideBrokerConf(brokerConf);
-      _brokerStarters.add(new HelixBrokerStarter(_clusterName, zkStr, brokerConf));
+      HelixBrokerStarter brokerStarter = new HelixBrokerStarter(brokerConf, _clusterName, zkStr);
+      brokerStarter.start();
+      _brokerStarters.add(brokerStarter);
     }
   }
 
@@ -224,8 +227,7 @@ public abstract class ClusterTest extends ControllerTest {
   protected void stopBroker() {
     for (HelixBrokerStarter brokerStarter : _brokerStarters) {
       try {
-        // TODO: replace with brokerStarter.shutdown() once they are hooked up
-        brokerStarter.getBrokerServerBuilder().stop();
+        brokerStarter.shutdown();
       } catch (Exception e) {
         LOGGER.error("Encountered exception while stopping broker {}", e.getMessage());
       }
@@ -460,6 +462,15 @@ public abstract class ClusterTest extends ControllerTest {
     config.setBloomFilterColumns(bloomFilterCols);
 
     sendPutRequest(_controllerRequestURLBuilder.forUpdateTableConfig(tablename),
+        _realtimeTableConfig.toJsonConfigString());
+  }
+
+  protected void updateRealtimeTableTenant(String tableName, TenantConfig tenantConfig)
+      throws Exception {
+
+    _realtimeTableConfig.setTenantConfig(tenantConfig);
+
+    sendPutRequest(_controllerRequestURLBuilder.forUpdateTableConfig(tableName),
         _realtimeTableConfig.toJsonConfigString());
   }
 

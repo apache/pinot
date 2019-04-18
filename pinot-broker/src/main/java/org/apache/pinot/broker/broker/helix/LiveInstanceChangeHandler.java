@@ -43,15 +43,17 @@ public class LiveInstanceChangeHandler implements ClusterChangeHandler {
 
   private static final boolean DO_NOT_RECREATE = false;
 
-  private final HelixDataAccessor _helixDataAccessor;
-  private final PropertyKey _liveInstancesKey;
+  private HelixDataAccessor _helixDataAccessor;
+  private PropertyKey _liveInstancesKey;
 
   private KeyedPool<PooledNettyClientResourceManager.PooledClientConnection> _connectionPool;
   private Map<String, String> _liveInstanceToSessionIdMap;
 
-  public LiveInstanceChangeHandler(HelixManager helixManager) {
+  @Override
+  public void init(HelixManager helixManager) {
+    Preconditions.checkState(_helixDataAccessor == null, "LiveInstanceChangeHandler is already initialized");
     _helixDataAccessor = helixManager.getHelixDataAccessor();
-    _liveInstancesKey = new PropertyKey.Builder(helixManager.getClusterName()).liveInstances();
+    _liveInstancesKey = _helixDataAccessor.keyBuilder().liveInstances();
   }
 
   public void init(KeyedPool<PooledNettyClientResourceManager.PooledClientConnection> connectionPool) {

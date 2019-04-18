@@ -221,7 +221,7 @@ public class PerfBenchmarkDriver {
     brokerConf.setProperty(CommonConstants.Helix.Instance.INSTANCE_ID_KEY, brokerInstanceName);
     brokerConf.setProperty(CommonConstants.Broker.CONFIG_OF_BROKER_TIMEOUT_MS, BROKER_TIMEOUT_MS);
     LOGGER.info("Starting broker instance: {}", brokerInstanceName);
-    new HelixBrokerStarter(_clusterName, _zkAddress, brokerConf);
+    new HelixBrokerStarter(brokerConf, _clusterName, _zkAddress).start();
   }
 
   private void startServer()

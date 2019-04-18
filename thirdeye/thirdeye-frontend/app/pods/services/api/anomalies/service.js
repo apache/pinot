@@ -126,21 +126,84 @@ export default Service.extend({
   },
 
   /**
-   * @summary Fetch all anomalies by application name and start time
+   * @summary Fetch all subscription group names. We can use it to list in the select box.
+   * @method querySubscriptionGroups
+   * @return {Ember.RSVP.Promise}
+   * @example: /detection/subscription-groups
+     usage: `this.get('anomaliesApiService').querySubscriptionGroups();`
+   */
+  async querySubscriptionGroups() {
+    const queryCache = this.get('queryCache');
+    const modelName = 'subscription-groups';
+    const cacheKey = queryCache.urlForQueryKey(modelName, {});
+    const groups = await queryCache.query(modelName, {}, { reload: false, cacheKey });
+    return groups;
+  },
+
+  /**
+   * @summary Fetch all anomalies by application name and time range
    * @method queryAnomaliesByAppName
    * @param {String} appName - the application name
-   * @param {Number} startStamp - the anomaly iso start time
+   * @param {Number} start - the anomaly iso start time
+   * @param {Number} end - the anomaly iso end time
    * @return {Ember.RSVP.Promise}
    * @example: for call `/userdashboard/anomalies?application={someAppName}&start={1508472800000}`
-     usage: `this.get('anomaliesApiService').queryAnomaliesByAppName(this.get('appName'), this.get('startDate'));`
+     usage: `this.get('anomaliesApiService').queryAnomaliesByAppName(this.get('appName'), this.get('startDate'), this.get('endDate'));`
    */
   async queryAnomaliesByAppName(appName, start, end) {
-    assert('you must pass appName param as an required argument.', appName);
-    assert('you must pass start param as an required argument.', start);
+    assert('you must pass appName param as a required argument.', appName);
+    assert('you must pass start param as a required argument.', start);
+    assert('you must pass end param as a required argument.', end);
 
     const queryCache = this.get('queryCache');
     const modelName = 'anomalies';
     const query = { application: appName, start, end };
+    const anomalies = await queryCache.query(modelName, query, { reload: false, cacheKey: queryCache.urlForQueryKey(modelName, query) });
+    return anomalies;
+  },
+
+  /**
+   * @summary Fetch all anomalies by subscription group name and time range
+   * @method queryAnomaliesBySubGroup
+   * @param {String} subGroup - the subscription group name
+   * @param {Number} start - the anomaly iso start time
+   * @param {Number} end - the anomaly iso end time
+   * @return {Ember.RSVP.Promise}
+   * @example: for call `/userdashboard/anomalies?group={someSubGroup}&start={1508472800000}&end={1508472800000}`
+     usage: `this.get('anomaliesApiService').queryAnomaliesBySubGroup(this.get('subGroup'), this.get('startDate'), this.get('endDate'));`
+   */
+  async queryAnomaliesBySubGroup(subGroup, start, end) {
+    assert('you must pass subGroup param as a required argument.', subGroup);
+    assert('you must pass start param as a required argument.', start);
+    assert('you must pass end param as a required argument.', end);
+
+    const queryCache = this.get('queryCache');
+    const modelName = 'anomalies';
+    const query = { group: subGroup, start, end };
+    const anomalies = await queryCache.query(modelName, query, { reload: false, cacheKey: queryCache.urlForQueryKey(modelName, query) });
+    return anomalies;
+  },
+
+  /**
+   * @summary Fetch all anomalies by application name, subscription group name, and time range
+   * @method queryAnomaliesByJoin
+   * @param {String} appName - the application name
+   * @param {String} subGroup - the subscription group name
+   * @param {Number} start - the anomaly iso start time
+   * @param {Number} end - the anomaly iso end time
+   * @return {Ember.RSVP.Promise}
+   * @example: for call `/userdashboard/anomalies?appName={someAppName}group={someSubGroup}&start={1508472800000}&end={1508472800000}`
+     usage: `this.get('anomaliesApiService').queryAnomaliesByIntersection(this.get('appName'), this.get('subGroup'), this.get('startDate'), this.get('endDate'));`
+   */
+  async queryAnomaliesByJoin(appName, subGroup, start, end) {
+    assert('you must pass appName param as a required argument.', appName);
+    assert('you must pass subGroup param as a required argument.', subGroup);
+    assert('you must pass start param as a required argument.', start);
+    assert('you must pass end param as a required argument.', end);
+
+    const queryCache = this.get('queryCache');
+    const modelName = 'anomalies';
+    const query = { application: appName, group: subGroup, start, end };
     const anomalies = await queryCache.query(modelName, query, { reload: false, cacheKey: queryCache.urlForQueryKey(modelName, query) });
     return anomalies;
   }

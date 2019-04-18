@@ -180,6 +180,10 @@ public class ControllerStarter {
     return _taskManager;
   }
 
+  public ControllerLeadershipManager getControllerLeadershipManager() {
+    return _controllerLeadershipManager;
+  }
+
   public void start() {
     LOGGER.info("Starting Pinot controller in mode: {}.", _controllerMode.name());
     Utils.logVersions();
@@ -215,7 +219,8 @@ public class ControllerStarter {
         .setup(_helixClusterName, _helixZkURL, _instanceId, _isUpdateStateModel, _enableBatchMessageMode);
 
     // Emit helix controller metrics
-    _controllerMetrics.addCallbackGauge("helix.connected", () -> _helixControllerManager.isConnected() ? 1L : 0L);
+    _controllerMetrics.addCallbackGauge(CommonConstants.Helix.INSTANCE_CONNECTED_METRIC_NAME,
+        () -> _helixControllerManager.isConnected() ? 1L : 0L);
     _controllerMetrics.addCallbackGauge("helix.leader", () -> _helixControllerManager.isLeader() ? 1L : 0L);
     _helixControllerManager.addPreConnectCallback(
         () -> _controllerMetrics.addMeteredGlobalValue(ControllerMeter.HELIX_ZOOKEEPER_RECONNECTS, 1L));
