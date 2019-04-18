@@ -43,7 +43,8 @@ public class NewConfigApplyIntegrationTest extends BaseClusterIntegrationTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(NewConfigApplyIntegrationTest.class);
 
   @BeforeClass
-  public void setUp() {
+  public void setUp()
+      throws Exception {
     // Start an empty cluster
     startZk();
     startController();

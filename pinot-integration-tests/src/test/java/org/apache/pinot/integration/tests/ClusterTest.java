@@ -39,18 +39,20 @@ import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.io.DatumReader;
 import org.apache.avro.io.DecoderFactory;
+import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.http.HttpStatus;
 import org.apache.pinot.broker.broker.BrokerServerBuilder;
-import org.apache.pinot.broker.broker.BrokerTestUtils;
 import org.apache.pinot.broker.broker.helix.HelixBrokerStarter;
 import org.apache.pinot.common.config.IndexingConfig;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.config.TableTaskConfig;
+import org.apache.pinot.common.config.TenantConfig;
 import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.common.utils.CommonConstants.Broker;
 import org.apache.pinot.common.utils.CommonConstants.Helix;
 import org.apache.pinot.common.utils.CommonConstants.Minion;
 import org.apache.pinot.common.utils.CommonConstants.Server;
@@ -81,6 +83,7 @@ import org.testng.Assert;
  * Base class for integration tests that involve a complete Pinot cluster.
  */
 public abstract class ClusterTest extends ControllerTest {
+  private static final Logger LOGGER = LoggerFactory.getLogger(ClusterTest.class);
   private static final Random RANDOM = new Random();
   private static final int DEFAULT_BROKER_PORT = 18099;
 
@@ -95,33 +98,38 @@ public abstract class ClusterTest extends ControllerTest {
   protected TableConfig _offlineTableConfig;
   protected TableConfig _realtimeTableConfig;
 
-  protected void startBroker() {
+  protected void startBroker()
+      throws Exception {
     startBrokers(1);
   }
 
-  protected void startBroker(int basePort, String zkStr) {
+  protected void startBroker(int basePort, String zkStr)
+      throws Exception {
     startBrokers(1, basePort, zkStr);
   }
 
-  protected void startBrokers(int numBrokers) {
+  protected void startBrokers(int numBrokers)
+      throws Exception {
     startBrokers(numBrokers, DEFAULT_BROKER_PORT, ZkStarter.DEFAULT_ZK_STR);
   }
 
-  protected void startBrokers(int numBrokers, int basePort, String zkStr) {
+  protected void startBrokers(int numBrokers, int basePort, String zkStr)
+      throws Exception {
     _brokerBaseApiUrl = "http://localhost:" + basePort;
     for (int i = 0; i < numBrokers; i++) {
-      Configuration configuration = BrokerTestUtils.getDefaultBrokerConfiguration();
-      configuration.setProperty("pinot.broker.timeoutMs", 100 * 1000L);
-      configuration.setProperty("pinot.broker.client.queryPort", Integer.toString(basePort + i));
-      configuration.setProperty("pinot.broker.routing.table.builder.class", "random");
-      configuration.setProperty(BrokerServerBuilder.DELAY_SHUTDOWN_TIME_MS_CONFIG, 0);
+      Configuration brokerConf = new BaseConfiguration();
+      brokerConf.setProperty(Broker.CONFIG_OF_BROKER_TIMEOUT_MS, 60 * 1000L);
+      brokerConf.setProperty(Helix.KEY_OF_BROKER_QUERY_PORT, Integer.toString(basePort + i));
+      brokerConf.setProperty(BrokerServerBuilder.DELAY_SHUTDOWN_TIME_MS_CONFIG, 0);
       // Randomly choose to use connection-pool or single-connection request handler
       if (RANDOM.nextBoolean()) {
-        configuration.setProperty(BrokerServerBuilder.REQUEST_HANDLER_TYPE_CONFIG,
+        brokerConf.setProperty(BrokerServerBuilder.REQUEST_HANDLER_TYPE_CONFIG,
             BrokerServerBuilder.SINGLE_CONNECTION_REQUEST_HANDLER_TYPE);
       }
-      overrideBrokerConf(configuration);
-      _brokerStarters.add(BrokerTestUtils.startBroker(_clusterName, zkStr, configuration));
+      overrideBrokerConf(brokerConf);
+      HelixBrokerStarter brokerStarter = new HelixBrokerStarter(brokerConf, _clusterName, zkStr);
+      brokerStarter.start();
+      _brokerStarters.add(brokerStarter);
     }
   }
 
@@ -212,26 +220,38 @@ public abstract class ClusterTest extends ControllerTest {
     // Do nothing, to be overridden by tests if they need something specific
   }
 
-  protected void overrideBrokerConf(Configuration configuration) {
+  protected void overrideBrokerConf(Configuration brokerConf) {
     // Do nothing, to be overridden by tests if they need something specific
   }
 
   protected void stopBroker() {
     for (HelixBrokerStarter brokerStarter : _brokerStarters) {
-      BrokerTestUtils.stopBroker(brokerStarter);
+      try {
+        brokerStarter.shutdown();
+      } catch (Exception e) {
+        LOGGER.error("Encountered exception while stopping broker {}", e.getMessage());
+      }
     }
   }
 
   protected void stopServer() {
     for (HelixServerStarter helixServerStarter : _serverStarters) {
-      helixServerStarter.stop();
+      try {
+        helixServerStarter.stop();
+      } catch (Exception e) {
+        LOGGER.error("Encountered exception while stopping server {}", e.getMessage());
+      }
     }
     FileUtils.deleteQuietly(new File(Server.DEFAULT_INSTANCE_BASE_DIR));
   }
 
   protected void stopMinion() {
     for (MinionStarter minionStarter : _minionStarters) {
-      minionStarter.stop();
+      try {
+        minionStarter.stop();
+      } catch (Exception e) {
+        LOGGER.error("Encountered exception while stopping minion {}", e.getMessage());
+      }
     }
     FileUtils.deleteQuietly(new File(Minion.DEFAULT_INSTANCE_BASE_DIR));
   }
@@ -442,6 +462,15 @@ public abstract class ClusterTest extends ControllerTest {
     config.setBloomFilterColumns(bloomFilterCols);
 
     sendPutRequest(_controllerRequestURLBuilder.forUpdateTableConfig(tablename),
+        _realtimeTableConfig.toJsonConfigString());
+  }
+
+  protected void updateRealtimeTableTenant(String tableName, TenantConfig tenantConfig)
+      throws Exception {
+
+    _realtimeTableConfig.setTenantConfig(tenantConfig);
+
+    sendPutRequest(_controllerRequestURLBuilder.forUpdateTableConfig(tableName),
         _realtimeTableConfig.toJsonConfigString());
   }
 

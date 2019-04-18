@@ -36,6 +36,7 @@ import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixManager;
+import org.apache.helix.SystemPropertyKeys;
 import org.apache.helix.task.TaskDriver;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.metrics.ControllerMeter;
@@ -107,10 +108,13 @@ public class ControllerStarter {
   private ControllerPeriodicTaskScheduler _controllerPeriodicTaskScheduler;
   private PinotHelixTaskResourceManager _helixTaskResourceManager;
   private PinotRealtimeSegmentManager _realtimeSegmentsManager;
+  private ControllerLeadershipManager _controllerLeadershipManager;
   private List<ServiceStatus.ServiceStatusCallback> _serviceStatusCallbackList;
 
   public ControllerStarter(ControllerConf conf) {
     _config = conf;
+    setupHelixSystemProperties();
+
     _controllerMode = conf.getControllerMode();
     // Helix related settings.
     _helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(_config.getZkStr());
@@ -134,6 +138,15 @@ public class ControllerStarter {
       _executorService =
           Executors.newCachedThreadPool(new ThreadFactoryBuilder().setNameFormat("restapi-multiget-thread-%d").build());
     }
+  }
+
+  private void setupHelixSystemProperties() {
+    // NOTE: Helix will disconnect the manager and disable the instance if it detects flapping (too frequent disconnect
+    // from ZooKeeper). Setting flapping time window to a small value can avoid this from happening. Helix ignores the
+    // non-positive value, so set the default value as 1.
+    System.setProperty(SystemPropertyKeys.FLAPPING_TIME_WINDOW, _config
+        .getString(CommonConstants.Helix.CONFIG_OF_CONTROLLER_FLAPPING_TIME_WINDOW_MS,
+            CommonConstants.Helix.DEFAULT_FLAPPING_TIME_WINDOW_MS));
   }
 
   public PinotHelixResourceManager getHelixResourceManager() {
@@ -167,6 +180,10 @@ public class ControllerStarter {
     return _taskManager;
   }
 
+  public ControllerLeadershipManager getControllerLeadershipManager() {
+    return _controllerLeadershipManager;
+  }
+
   public void start() {
     LOGGER.info("Starting Pinot controller in mode: {}.", _controllerMode.name());
     Utils.logVersions();
@@ -190,7 +207,8 @@ public class ControllerStarter {
         LOGGER.error("Invalid mode: " + _controllerMode);
     }
 
-    ServiceStatus.setServiceStatusCallback(new ServiceStatus.MultipleCallbackServiceStatusCallback(_serviceStatusCallbackList));
+    ServiceStatus
+        .setServiceStatusCallback(new ServiceStatus.MultipleCallbackServiceStatusCallback(_serviceStatusCallbackList));
     _controllerMetrics.initializeGlobalMeters();
   }
 
@@ -201,7 +219,8 @@ public class ControllerStarter {
         .setup(_helixClusterName, _helixZkURL, _instanceId, _isUpdateStateModel, _enableBatchMessageMode);
 
     // Emit helix controller metrics
-    _controllerMetrics.addCallbackGauge("helix.connected", () -> _helixControllerManager.isConnected() ? 1L : 0L);
+    _controllerMetrics.addCallbackGauge(CommonConstants.Helix.INSTANCE_CONNECTED_METRIC_NAME,
+        () -> _helixControllerManager.isConnected() ? 1L : 0L);
     _controllerMetrics.addCallbackGauge("helix.leader", () -> _helixControllerManager.isLeader() ? 1L : 0L);
     _helixControllerManager.addPreConnectCallback(
         () -> _controllerMetrics.addMeteredGlobalValue(ControllerMeter.HELIX_ZOOKEEPER_RECONNECTS, 1L));
@@ -230,9 +249,9 @@ public class ControllerStarter {
     // Note: Currently leadership depends on helix controller, thus assign helixControllerManager to ControllerLeadershipManager.
     // TODO: In the future when Helix separation is completed, leadership only depends on the master in leadControllerResource, and ControllerLeadershipManager will be removed.
     if (_helixControllerManager != null) {
-      ControllerLeadershipManager.init(_helixControllerManager);
+      _controllerLeadershipManager = new ControllerLeadershipManager(_helixControllerManager);
     } else {
-      ControllerLeadershipManager.init(helixParticipantManager);
+      _controllerLeadershipManager = new ControllerLeadershipManager(helixParticipantManager);
     }
 
     LOGGER.info("Starting task resource manager");
@@ -240,15 +259,16 @@ public class ControllerStarter {
 
     // Helix resource manager must be started in order to create PinotLLCRealtimeSegmentManager
     LOGGER.info("Starting realtime segment manager");
-    PinotLLCRealtimeSegmentManager.create(_helixResourceManager, _config, _controllerMetrics);
-    _realtimeSegmentsManager = new PinotRealtimeSegmentManager(_helixResourceManager);
+    PinotLLCRealtimeSegmentManager
+        .create(_helixResourceManager, _config, _controllerMetrics, _controllerLeadershipManager);
+    _realtimeSegmentsManager = new PinotRealtimeSegmentManager(_helixResourceManager, _controllerLeadershipManager);
     _realtimeSegmentsManager.start(_controllerMetrics);
 
     // Setting up periodic tasks
     List<PeriodicTask> controllerPeriodicTasks = setupControllerPeriodicTasks();
     LOGGER.info("Init controller periodic tasks scheduler");
     _controllerPeriodicTaskScheduler = new ControllerPeriodicTaskScheduler();
-    _controllerPeriodicTaskScheduler.init(controllerPeriodicTasks);
+    _controllerPeriodicTaskScheduler.init(controllerPeriodicTasks, _controllerLeadershipManager);
 
     LOGGER.info("Creating rebalance segments factory");
     RebalanceSegmentStrategyFactory.createInstance(helixParticipantManager);
@@ -284,6 +304,7 @@ public class ControllerStarter {
         bind(_controllerMetrics).to(ControllerMetrics.class);
         bind(accessControlFactory).to(AccessControlFactory.class);
         bind(metadataEventNotifierFactory).to(MetadataEventNotifierFactory.class);
+        bind(_controllerLeadershipManager).to(ControllerLeadershipManager.class);
       }
     });
 
@@ -412,18 +433,18 @@ public class ControllerStarter {
   }
 
   public void stop() {
-      switch (_controllerMode) {
-        case DUAL:
-          stopPinotController();
-          stopHelixController();
-          break;
-        case PINOT_ONLY:
-          stopPinotController();
-          break;
-        case HELIX_ONLY:
-          stopHelixController();
-          break;
-      }
+    switch (_controllerMode) {
+      case DUAL:
+        stopPinotController();
+        stopHelixController();
+        break;
+      case PINOT_ONLY:
+        stopPinotController();
+        break;
+      case HELIX_ONLY:
+        stopHelixController();
+        break;
+    }
   }
 
   private void stopHelixController() {
@@ -435,7 +456,7 @@ public class ControllerStarter {
     try {
       // Stopping ControllerLeadershipManager has to be done before stopping HelixResourceManager.
       LOGGER.info("Stopping controller leadership manager");
-      ControllerLeadershipManager.getInstance().stop();
+      _controllerLeadershipManager.stop();
 
       // Stop PinotLLCSegmentManager before stopping Jersey API. It is possible that stopping Jersey API
       // may interrupt the handlers waiting on an I/O.

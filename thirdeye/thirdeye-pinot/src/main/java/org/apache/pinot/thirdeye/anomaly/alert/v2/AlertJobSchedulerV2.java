@@ -52,6 +52,7 @@ import org.quartz.impl.matchers.GroupMatcher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+@Deprecated
 public class AlertJobSchedulerV2 implements JobScheduler, Runnable {
 
   private static final Logger LOG = LoggerFactory.getLogger(AlertJobSchedulerV2.class);

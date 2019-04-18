@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.config;
 
+import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.utils.ServerType;
 import org.apache.pinot.common.utils.TenantRole;
 
@@ -44,7 +45,7 @@ public class TagNameUtils {
     return false;
   }
 
-  public static TenantRole getTenantRoleFromTag(String tagName) {
+  public static TenantRole getTenantRoleFromTag(String tagName) throws InvalidConfigException {
     if (tagName.endsWith(ServerType.REALTIME.toString())) {
       return TenantRole.SERVER;
     }
@@ -54,7 +55,7 @@ public class TagNameUtils {
     if (tagName.endsWith(TenantRole.BROKER.toString())) {
       return TenantRole.BROKER;
     }
-    throw new RuntimeException("Cannot identify tenant type from tag name : " + tagName);
+    throw new InvalidConfigException("Cannot identify tenant type from tag name : " + tagName);
   }
 
   public static String getTagFromTenantAndServerType(String tenantName, ServerType type) {

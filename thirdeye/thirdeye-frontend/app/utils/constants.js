@@ -5,34 +5,34 @@ export const deleteProps = {
   credentials: 'include'
 };
 
-export const yamlAlertProps = `# Below is a sample template for setting up a WoW percentage rule. You may refer the documentation for more examples and update the fields accordingly.
+export const yamlAlertProps = `# Below is a sample template. You may refer the documentation for more examples and update the fields accordingly.
 
-# Give a name for this anomaly detection pipeline (should be unique)
+# Give a name for this anomaly detection pipeline (should be unique).
 detectionName: name_of_the_detection
 
-# Tell the alert recipients what it means if this alert is fired
+# Tell the alert recipients what it means if this alert is fired.
 description: If this alert fires then it means so-and-so and check so-and-so for irregularities
 
-# The metric you want to do anomaly detection on. You may type a few characters and look ahead (ctrl + space) to auto-fill
+# The metric you want to do anomaly detection on. You may type a few characters and look ahead (ctrl + space) to auto-fill.
 metric: metric_name
 
-# The dataset or UMP table name to which the metric belongs. Look ahead should auto populate this field
+# The dataset or UMP table name to which the metric belongs. Look ahead should auto populate this field.
 dataset: dataset_name
 
-# ThirdEye pipeline type. Only "Composite" is supported now.
-pipelineType: Composite
-
-# Configure multiple rules. ThirdEye supports single or a list of rules combined together with "OR" relationship
-rules:
-- detection:                      # Eg. Detect anomalies if the week over week change of this metric is more than 10%
-    - name: detection_rule_1      # Give a unique name for this detection rule.
-      type: PERCENTAGE_RULE       # Configure the detection type here. See doc for more details.
+rules:                            # Can configure multiple rules with "OR" relationship.
+- detection:
+    - name: detection_rule_1
+      type: ALGORITHM             # Configure the detection type here. See doc for more details.
       params:                     # The parameters for this rule. Different rules have different params.
-        offset: wo1w              # Compare current value with last week. (Values supported - wo1w, wo2w, median3w etc)
-        percentageChange: 0.1     # The threshold above which you want to be alerted.
-        pattern: UP_OR_DOWN       # Alert when value goes up or down by the configured threshold. (Values supported - UP, DOWN, UP_OR_DOWN)
-
-# Refer to examples and documentation for exploring other types of detection rules, algorithms and filters with more detailed settings.
+        configuration:
+          bucketPeriod: P1D       # Use PT1H for hourly and PT5M for minute level (ingraph metrics) data.
+          pValueThreshold: 0.05   # Higher value means more sensitive to small changes.
+  filter:                         # Filter out anomalies detected by rules to reduce noise.
+    - name: filter_rule_1
+      type: PERCENTAGE_CHANGE_FILTER
+      params:
+        pattern: UP_OR_DOWN       # Other patterns: "UP","DOWN".
+        threshold: 0.05           # Filter out all changes less than 5% compared to baseline.
 `;
 
 export const yamlAlertSettings = `# Below is a sample subscription group template. You may refer the documentation and update accordingly.
@@ -71,8 +71,8 @@ active: true
 
 # The below links will appear in the email alerts. This will help alert recipients to quickly refer and act on.
 referenceLinks:
-- "Oncall Runbook": "http://go/oncall"
-- "Thirdeye FAQs": "http://go/thirdeyefaqs"
+  "Oncall Runbook": "http://go/oncall"
+  "Thirdeye FAQs": "http://go/thirdeyefaqs"
 
 `;
 

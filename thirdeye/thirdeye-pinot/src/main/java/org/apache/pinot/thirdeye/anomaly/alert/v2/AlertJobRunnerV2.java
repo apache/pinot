@@ -45,6 +45,7 @@ import org.quartz.JobExecutionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+@Deprecated
 public class AlertJobRunnerV2 implements Job {
 
   private static final Logger LOG = LoggerFactory.getLogger(AlertJobRunnerV2.class);

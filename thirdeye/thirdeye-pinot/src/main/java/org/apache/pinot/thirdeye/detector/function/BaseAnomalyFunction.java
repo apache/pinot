@@ -171,10 +171,6 @@ public abstract class BaseAnomalyFunction implements AnomalyFunction {
         preOffsetPeriod = DEFAULT_VIEW_OFFSET_FOR_HOURLY.toPeriod();
         postOffsetPeriod = DEFAULT_VIEW_OFFSET_FOR_HOURLY.toPeriod();
         break;
-      case MINUTES:
-        preOffsetPeriod = DEFAULT_VIEW_OFFSET_FOR_MINUTE.toPeriod();
-        postOffsetPeriod = DEFAULT_VIEW_OFFSET_FOR_MINUTE.toPeriod();
-        break;
       default:
         preOffsetPeriod = new Period();
         postOffsetPeriod = new Period();

@@ -18,6 +18,7 @@ Router.map(function() {
     this.route('share-dashboard');
   });
 
+  this.route('anomalies');
 
   this.route('manage', function() {
     this.route('alert', { path: 'alert/:alert_id' }, function() {
@@ -35,6 +36,7 @@ Router.map(function() {
   this.route('self-serve', function() {
     this.route('create-alert');
     this.route('import-metric');
+    this.route('import-sql-metric');
   });
 
   this.route('screenshot', { path: 'screenshot/:anomaly_id' });

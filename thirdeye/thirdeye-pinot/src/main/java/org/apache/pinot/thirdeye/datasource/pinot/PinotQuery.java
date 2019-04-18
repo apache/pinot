@@ -19,22 +19,21 @@
 
 package org.apache.pinot.thirdeye.datasource.pinot;
 
-public class PinotQuery {
+import org.apache.pinot.thirdeye.datasource.RelationalQuery;
 
-  private String pql;
+
+public class PinotQuery extends RelationalQuery {
+
   private String tableName;
 
   public PinotQuery(String pql, String tableName) {
-    this.pql = pql;
+    super(pql);
     this.tableName = tableName;
   }
 
+  // TODO: Remove thirdeye-external's dependency on this method to getQuery() instead
   public String getPql() {
-    return pql;
-  }
-
-  public void setPql(String pql) {
-    this.pql = pql;
+    return query;
   }
 
   public String getTableName() {
@@ -46,20 +45,9 @@ public class PinotQuery {
   }
 
   @Override
-  public int hashCode() {
-    return pql.hashCode();
-  }
-
-  @Override
-  public boolean equals(Object obj) {
-    PinotQuery that = (PinotQuery) obj;
-    return this.pql.equals(that.pql);
-  }
-
-  @Override
   public String toString() {
     final StringBuilder sb = new StringBuilder("PinotQuery{");
-    sb.append("pql='").append(pql).append('\'');
+    sb.append("pql='").append(query).append('\'');
     sb.append(", tableName='").append(tableName).append('\'');
     sb.append('}');
     return sb.toString();

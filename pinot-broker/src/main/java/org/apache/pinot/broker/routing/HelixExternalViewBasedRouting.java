@@ -20,6 +20,7 @@ package org.apache.pinot.broker.routing;
 
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Sets;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -32,6 +33,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.configuration.Configuration;
 import org.apache.helix.AccessOption;
+import org.apache.helix.HelixConstants;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
 import org.apache.helix.PropertyKey;
@@ -39,6 +41,7 @@ import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.pinot.broker.broker.helix.ClusterChangeHandler;
 import org.apache.pinot.broker.routing.builder.RoutingTableBuilder;
 import org.apache.pinot.broker.routing.selector.SegmentSelector;
 import org.apache.pinot.broker.routing.selector.SegmentSelectorProvider;
@@ -64,36 +67,48 @@ import org.slf4j.LoggerFactory;
  * of an offline routing table and a realtime routing table, with the realtime routing table being aware of the
  * fact that there is both an hlc and llc one.
  */
-public class HelixExternalViewBasedRouting implements RoutingTable {
+public class HelixExternalViewBasedRouting implements ClusterChangeHandler, RoutingTable {
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixExternalViewBasedRouting.class);
+  private static final int INVALID_EXTERNAL_VIEW_VERSION = Integer.MIN_VALUE;
 
-  private final Map<String, RoutingTableBuilder> _routingTableBuilderMap;
-
+  private final Map<String, RoutingTableBuilder> _routingTableBuilderMap = new ConcurrentHashMap<>();
   private final Map<String, Integer> _lastKnownExternalViewVersionMap = new ConcurrentHashMap<>();
   private final Map<String, Map<String, InstanceConfig>> _lastKnownInstanceConfigsForTable = new ConcurrentHashMap<>();
   private final Map<String, InstanceConfig> _lastKnownInstanceConfigs = new ConcurrentHashMap<>();
   private final Map<String, Set<String>> _tablesForInstance = new ConcurrentHashMap<>();
   private final Map<String, SegmentSelector> _segmentSelectorMap = new ConcurrentHashMap<>();
 
-  private final HelixExternalViewBasedTimeBoundaryService _timeBoundaryService;
-  private final HelixManager _helixManager;
-  private static final int INVALID_EXTERNAL_VIEW_VERSION = Integer.MIN_VALUE;
+  private final Configuration _configuration;
 
-  private BrokerMetrics _brokerMetrics;
-
-  private Configuration _configuration;
-
+  private HelixManager _helixManager;
+  private HelixExternalViewBasedTimeBoundaryService _timeBoundaryService;
   private RoutingTableBuilderFactory _routingTableBuilderFactory;
   private SegmentSelectorProvider _segmentSelectorProvider;
+  private BrokerMetrics _brokerMetrics;
 
-  public HelixExternalViewBasedRouting(ZkHelixPropertyStore<ZNRecord> propertyStore, HelixManager helixManager,
-      Configuration configuration) {
+  public HelixExternalViewBasedRouting(Configuration configuration) {
     _configuration = configuration;
-    _timeBoundaryService = new HelixExternalViewBasedTimeBoundaryService(propertyStore);
-    _routingTableBuilderMap = new HashMap<>();
+  }
+
+  @Override
+  public void init(HelixManager helixManager) {
+    Preconditions.checkState(_helixManager == null, "HelixExternalViewBasedRouting is already initialized");
     _helixManager = helixManager;
+    ZkHelixPropertyStore<ZNRecord> propertyStore = _helixManager.getHelixPropertyStore();
+    _timeBoundaryService = new HelixExternalViewBasedTimeBoundaryService(propertyStore);
     _routingTableBuilderFactory = new RoutingTableBuilderFactory(_configuration, propertyStore);
     _segmentSelectorProvider = new SegmentSelectorProvider(propertyStore);
+  }
+
+  @Override
+  public void processClusterChange(HelixConstants.ChangeType changeType) {
+    Preconditions.checkState(changeType == HelixConstants.ChangeType.EXTERNAL_VIEW
+        || changeType == HelixConstants.ChangeType.INSTANCE_CONFIG, "Illegal change type: " + changeType);
+    if (changeType == HelixConstants.ChangeType.EXTERNAL_VIEW) {
+      processExternalViewChange();
+    } else {
+      processInstanceConfigChange();
+    }
   }
 
   @Override

@@ -83,6 +83,10 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   private Duration _timeGranularity;
   private long _pushTime = Long.MIN_VALUE;
   private long _refreshTime = Long.MIN_VALUE;
+
+  private long _lastIndexedTime = Long.MIN_VALUE;
+  private long _latestIngestionTime = Long.MIN_VALUE;
+
   private SegmentVersion _segmentVersion;
   private boolean _hasStarTree;
   private StarTreeMetadata _starTreeMetadata;
@@ -180,6 +184,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
         .containsKey(SEGMENT_END_TIME) && segmentMetadataPropertiesConfiguration.containsKey(TIME_UNIT)) {
       try {
         _timeUnit = TimeUtils.timeUnitFromString(segmentMetadataPropertiesConfiguration.getString(TIME_UNIT));
+        assert _timeUnit != null;
         _timeGranularity = new Duration(_timeUnit.toMillis(1));
         String startTimeString = segmentMetadataPropertiesConfiguration.getString(SEGMENT_START_TIME);
         String endTimeString = segmentMetadataPropertiesConfiguration.getString(SEGMENT_END_TIME);
@@ -452,6 +457,16 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   @Override
   public long getRefreshTime() {
     return _refreshTime;
+  }
+
+  @Override
+  public long getLastIndexedTimestamp() {
+    return _lastIndexedTime;
+  }
+
+  @Override
+  public long getLatestIngestionTimestamp() {
+    return _latestIngestionTime;
   }
 
   @Override

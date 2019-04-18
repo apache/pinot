@@ -21,6 +21,7 @@ package org.apache.pinot.common.utils.time;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.Duration;
@@ -30,10 +31,12 @@ import org.joda.time.format.PeriodFormatterBuilder;
 
 
 public class TimeUtils {
-  private static final Map<String, TimeUnit> TIME_UNIT_MAP = new HashMap<>();
+  private static final String UPPER_CASE_DAYS_SINCE_EPOCH = "DAYSSINCEEPOCH";
+  private static final String UPPER_CASE_HOURS_SINCE_EPOCH = "HOURSSINCEEPOCH";
+  private static final String UPPER_CASE_MINUTES_SINCE_EPOCH = "MINUTESSINCEEPOCH";
+  private static final String UPPER_CASE_SECONDS_SINCE_EPOCH = "SECONDSSINCEEPOCH";
 
-  private static final long VALID_MIN_TIME_MILLIS = new DateTime(1971, 1, 1, 0, 0, 0, 0, DateTimeZone.UTC).getMillis();
-  private static final long VALID_MAX_TIME_MILLIS = new DateTime(2071, 1, 1, 0, 0, 0, 0, DateTimeZone.UTC).getMillis();
+  private static final Map<String, TimeUnit> TIME_UNIT_MAP = new HashMap<>();
 
   static {
     for (TimeUnit timeUnit : TimeUnit.values()) {
@@ -41,29 +44,45 @@ public class TimeUtils {
     }
   }
 
-  /**
-   * Converts timeValue in timeUnitString to milliseconds
-   * @param timeUnitString the time unit string to convert, such as DAYS or SECONDS
-   * @param timeValue the time value to convert to milliseconds
-   * @return corresponding value in milliseconds or LONG.MIN_VALUE if timeUnitString is invalid
-   *         Returning LONG.MIN_VALUE gives consistent beahvior with the java library
-   */
-  public static long toMillis(String timeUnitString, String timeValue) {
-    TimeUnit timeUnit = timeUnitFromString(timeUnitString);
-    return (timeUnit == null) ? Long.MIN_VALUE : timeUnit.toMillis(Long.parseLong(timeValue));
-  }
+  private static final long VALID_MIN_TIME_MILLIS = new DateTime(1971, 1, 1, 0, 0, 0, 0, DateTimeZone.UTC).getMillis();
+  private static final long VALID_MAX_TIME_MILLIS = new DateTime(2071, 1, 1, 0, 0, 0, 0, DateTimeZone.UTC).getMillis();
 
   /**
-   * Turns a time unit string into a TimeUnit, ignoring case.
+   * Converts a time unit string into {@link TimeUnit}, ignoring case. For {@code null} or empty time unit string,
+   * returns {@code null}.
+   * <p>Supports the following legacy time unit strings:
+   * <ul>
+   *   <li>"daysSinceEpoch" -> DAYS</li>
+   *   <li>"hoursSinceEpoch" -> HOURS</li>
+   *   <li>"minutesSinceEpoch" -> MINUTES</li>
+   *   <li>"secondsSinceEpoch" -> SECONDS</li>
+   * </ul>
    *
-   * @param timeUnitString The time unit string to convert, such as DAYS or SECONDS.
-   * @return The corresponding time unit or null if it doesn't exist
+   * @param timeUnitString The time unit string to convert, e.g. "DAYS" or "SECONDS"
+   * @return The corresponding {@link TimeUnit}
    */
-  public static TimeUnit timeUnitFromString(String timeUnitString) {
-    if (timeUnitString == null) {
+  @Nullable
+  public static TimeUnit timeUnitFromString(@Nullable String timeUnitString) {
+    // NOTE: for backward-compatibility, return null if time unit string is null or empty
+    if (timeUnitString == null || timeUnitString.isEmpty()) {
       return null;
-    } else {
-      return TIME_UNIT_MAP.get(timeUnitString.toUpperCase());
+    }
+    String upperCaseTimeUnitString = timeUnitString.toUpperCase();
+    TimeUnit timeUnit = TIME_UNIT_MAP.get(upperCaseTimeUnitString);
+    if (timeUnit != null) {
+      return timeUnit;
+    }
+    switch (upperCaseTimeUnitString) {
+      case UPPER_CASE_DAYS_SINCE_EPOCH:
+        return TimeUnit.DAYS;
+      case UPPER_CASE_HOURS_SINCE_EPOCH:
+        return TimeUnit.HOURS;
+      case UPPER_CASE_MINUTES_SINCE_EPOCH:
+        return TimeUnit.MINUTES;
+      case UPPER_CASE_SECONDS_SINCE_EPOCH:
+        return TimeUnit.SECONDS;
+      default:
+        throw new IllegalArgumentException("Unsupported time unit: " + timeUnitString);
     }
   }
 

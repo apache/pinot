@@ -53,6 +53,7 @@ import static org.apache.pinot.thirdeye.anomaly.SmtpConfiguration.SMTP_CONFIG_KE
 /**
  * Traditional ThirdEye task runner wrapping an onboarding framework job
  */
+@Deprecated
 public class ReplayTaskRunner implements TaskRunner {
   private static final Logger LOG = LoggerFactory.getLogger(ReplayTaskRunner.class);
 

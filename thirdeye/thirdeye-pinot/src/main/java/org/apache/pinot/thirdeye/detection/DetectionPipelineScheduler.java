@@ -82,7 +82,7 @@ public class DetectionPipelineScheduler implements Runnable {
 
         try {
           if (scheduler.checkExists(key)) {
-            LOG.info("Detection config  " + key + " is already scheduled.");
+            LOG.info("Detection config  " + key.getName() + " is already scheduled");
             if (jobUpdated(config, key)) {
               // restart job
               stopJob(key);

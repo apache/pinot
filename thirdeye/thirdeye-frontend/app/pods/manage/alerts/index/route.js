@@ -66,7 +66,6 @@ export default Route.extend({
         }
       }
     }
-
     // Perform initial filters for our 'primary' filter types and add counts
     const user = getWithDefault(get(this, 'session'), 'data.authenticated.name', null);
     const myAlertIds = user ? this._findAlertIdsByUserGroup(user, model.detectionAlertConfig) : [];
@@ -138,7 +137,20 @@ export default Route.extend({
 
     // Fill in select options for these filters ('filterKeys') based on alert properties from model.alerts
     filterBlocksLocal.filter(block => block.type === 'select').forEach((filter) => {
-      const alertPropertyArray = model.alerts.map(alert => alert[filterToPropertyMap[filter.name]]);
+      let alertPropertyArray = [];
+      // Make sure subscription groups are not bundled for filter parameters
+      if (filter.name === 'subscription') {
+        model.alerts.forEach(alert => {
+          let groups = alert[filterToPropertyMap[filter.name]];
+          if (groups) {
+            groups.split(", ").forEach(g => {
+              alertPropertyArray.push(g);
+            });
+          }
+        });
+      } else {
+        alertPropertyArray = model.alerts.map(alert => alert[filterToPropertyMap[filter.name]]);
+      }
       const filterKeys = [ ...new Set(powerSort(alertPropertyArray, null))];
       // Add filterKeys prop to each facet or filter block
       Object.assign(filter, { filterKeys });
@@ -174,40 +186,6 @@ export default Route.extend({
     }
     return yamlAlert.pipelineType;
   },
-
-  /**
-   * The yaml filters formatter. Convert filters in the yaml file in to a legacy filters string
-   * For example, filters = {
-   *   "country": ["us", "cn"],
-   *   "browser": ["chrome"]
-   * }
-   * will be convert into "country=us;country=cn;browser=chrome"
-   *
-   * @method _formatYamlFilter
-   * @param {Map} filters multimap of filters
-   * @return {String} - formatted filters string
-   */
-   _formatYamlFilter(filters) {
-     if (filters){
-       const filterStrings = [];
-       Object.keys(filters).forEach(
-         function(filterKey) {
-           const filter = filters[filterKey];
-           if (filter && Array.isArray(filter)) {
-             filter.forEach(
-               function (filterValue) {
-                 filterStrings.push(filterKey + '=' + filterValue);
-               }
-             );
-           } else {
-             filterStrings.push(filterKey + '=' + filter);
-           }
-         }
-       );
-       return filterStrings.join(';');
-     }
-     return '';
-   },
 
   /**
    * A local helper to find "Alerts I subscribe to"

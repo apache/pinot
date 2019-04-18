@@ -19,15 +19,18 @@
 package org.apache.pinot.broker.queryquota;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.util.concurrent.RateLimiter;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.helix.HelixConstants;
 import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.pinot.broker.broker.helix.ClusterChangeHandler;
 import org.apache.pinot.common.config.QuotaConfig;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.config.TableNameBuilder;
@@ -43,19 +46,27 @@ import static org.apache.pinot.common.utils.CommonConstants.Helix.BROKER_RESOURC
 import static org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
 
 
-public class TableQueryQuotaManager {
+public class TableQueryQuotaManager implements ClusterChangeHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(TableQueryQuotaManager.class);
-
-  private BrokerMetrics _brokerMetrics;
-  private final HelixManager _helixManager;
-  private final AtomicInteger _lastKnownBrokerResourceVersion;
-  private final Map<String, QueryQuotaConfig> _rateLimiterMap;
   private static final int TIME_RANGE_IN_SECOND = 1;
 
-  public TableQueryQuotaManager(HelixManager helixManager) {
+  private final AtomicInteger _lastKnownBrokerResourceVersion = new AtomicInteger(-1);
+  private final Map<String, QueryQuotaConfig> _rateLimiterMap = new ConcurrentHashMap<>();
+
+  private HelixManager _helixManager;
+  private BrokerMetrics _brokerMetrics;
+
+  @Override
+  public void init(HelixManager helixManager) {
+    Preconditions.checkState(_helixManager == null, "TableQueryQuotaManager is already initialized");
     _helixManager = helixManager;
-    _rateLimiterMap = new ConcurrentHashMap<>();
-    _lastKnownBrokerResourceVersion = new AtomicInteger();
+  }
+
+  @Override
+  public void processClusterChange(HelixConstants.ChangeType changeType) {
+    Preconditions
+        .checkState(changeType == HelixConstants.ChangeType.EXTERNAL_VIEW, "Illegal change type: " + changeType);
+    processQueryQuotaChange();
   }
 
   /**

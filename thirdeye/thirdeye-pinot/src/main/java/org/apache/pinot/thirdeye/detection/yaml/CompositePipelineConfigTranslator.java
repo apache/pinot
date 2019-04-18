@@ -179,7 +179,8 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
   private static final Set<String> TUNING_OFF_COMPONENTS =
       ImmutableSet.of("MIGRATED_ALGORITHM_FILTER", "MIGRATED_ALGORITHM", "MIGRATED_ALGORITHM_BASELINE");
   private static final Map<String, String> DETECTOR_TO_BASELINE =
-      ImmutableMap.of("ALGORITHM", "ALGORITHM_BASELINE", "MIGRATED_ALGORITHM", "MIGRATED_ALGORITHM_BASELINE");
+      ImmutableMap.of("ALGORITHM", "ALGORITHM_BASELINE", "MIGRATED_ALGORITHM", "MIGRATED_ALGORITHM_BASELINE",
+          "HOLT_WINTERS_RULE", "HOLT_WINTERS_RULE");
   private static final Set<String> MOVING_WINDOW_DETECTOR_TYPES = ImmutableSet.of("ALGORITHM", "MIGRATED_ALGORITHM");
 
   private final Map<String, Object> components = new HashMap<>();
@@ -196,7 +197,7 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
     this.yaml = new org.yaml.snakeyaml.Yaml();
     this.metricConfig = this.dataProvider.fetchMetric(MapUtils.getString(yamlConfig, PROP_METRIC),
         MapUtils.getString(yamlConfig, PROP_DATASET));
-    Preconditions.checkNotNull(this.metricConfig, "Metric not found");
+    Preconditions.checkNotNull(this.metricConfig, "metric not found");
 
     this.datasetConfig = this.dataProvider.fetchDatasets(Collections.singletonList(metricConfig.getDataset()))
         .get(metricConfig.getDataset());
@@ -309,30 +310,32 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
           properties.put(PROP_WINDOW_SIZE, 6);
           properties.put(PROP_WINDOW_UNIT, TimeUnit.HOURS);
       }
-      // override from yaml
-      if (yamlConfig.containsKey(PROP_WINDOW_SIZE)) {
-        properties.put(PROP_MOVING_WINDOW_DETECTION, true);
-        properties.put(PROP_WINDOW_SIZE, MapUtils.getString(yamlConfig, PROP_WINDOW_SIZE));
-      }
-      if (yamlConfig.containsKey(PROP_WINDOW_UNIT)) {
-        properties.put(PROP_MOVING_WINDOW_DETECTION, true);
-        properties.put(PROP_WINDOW_UNIT, MapUtils.getString(yamlConfig, PROP_WINDOW_UNIT));
-      }
-      if (yamlConfig.containsKey(PROP_WINDOW_DELAY)) {
-        properties.put(PROP_WINDOW_DELAY, MapUtils.getString(yamlConfig, PROP_WINDOW_DELAY));
-      }
-      if (yamlConfig.containsKey(PROP_WINDOW_DELAY_UNIT)) {
-        properties.put(PROP_WINDOW_DELAY_UNIT, MapUtils.getString(yamlConfig, PROP_WINDOW_DELAY_UNIT));
-      }
-      if (yamlConfig.containsKey(PROP_TIMEZONE)){
-        properties.put(PROP_TIMEZONE, MapUtils.getString(yamlConfig, PROP_TIMEZONE));
-      }
-      if (yamlConfig.containsKey(PROP_BUCKET_PERIOD)){
-        properties.put(PROP_BUCKET_PERIOD, MapUtils.getString(yamlConfig, PROP_BUCKET_PERIOD));
-      }
-      if (yamlConfig.containsKey(PROP_CACHE_PERIOD_LOOKBACK)) {
-        properties.put(PROP_CACHE_PERIOD_LOOKBACK, MapUtils.getString(yamlConfig, PROP_CACHE_PERIOD_LOOKBACK));
-      }
+    }
+    // set default bucketPeriod
+    properties.put(PROP_BUCKET_PERIOD, this.datasetConfig.bucketTimeGranularity().toPeriod().toString());
+    // override from yaml
+    if (yamlConfig.containsKey(PROP_WINDOW_SIZE)) {
+      properties.put(PROP_MOVING_WINDOW_DETECTION, true);
+      properties.put(PROP_WINDOW_SIZE, MapUtils.getString(yamlConfig, PROP_WINDOW_SIZE));
+    }
+    if (yamlConfig.containsKey(PROP_WINDOW_UNIT)) {
+      properties.put(PROP_MOVING_WINDOW_DETECTION, true);
+      properties.put(PROP_WINDOW_UNIT, MapUtils.getString(yamlConfig, PROP_WINDOW_UNIT));
+    }
+    if (yamlConfig.containsKey(PROP_WINDOW_DELAY)) {
+      properties.put(PROP_WINDOW_DELAY, MapUtils.getString(yamlConfig, PROP_WINDOW_DELAY));
+    }
+    if (yamlConfig.containsKey(PROP_WINDOW_DELAY_UNIT)) {
+      properties.put(PROP_WINDOW_DELAY_UNIT, MapUtils.getString(yamlConfig, PROP_WINDOW_DELAY_UNIT));
+    }
+    if (yamlConfig.containsKey(PROP_TIMEZONE)){
+      properties.put(PROP_TIMEZONE, MapUtils.getString(yamlConfig, PROP_TIMEZONE));
+    }
+    if (yamlConfig.containsKey(PROP_BUCKET_PERIOD)){
+      properties.put(PROP_BUCKET_PERIOD, MapUtils.getString(yamlConfig, PROP_BUCKET_PERIOD));
+    }
+    if (yamlConfig.containsKey(PROP_CACHE_PERIOD_LOOKBACK)) {
+      properties.put(PROP_CACHE_PERIOD_LOOKBACK, MapUtils.getString(yamlConfig, PROP_CACHE_PERIOD_LOOKBACK));
     }
   }
 

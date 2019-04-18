@@ -18,12 +18,16 @@
  */
 package org.apache.pinot.core.realtime.stream;
 
+import org.apache.pinot.annotations.InterfaceAudience;
+import org.apache.pinot.annotations.InterfaceStability;
 import org.apache.pinot.core.data.GenericRow;
 
 
 /**
  * Interface for a consumer that consumes at stream level and is unaware of any partitions of the stream
  */
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public interface StreamLevelConsumer {
 
   /**
@@ -39,6 +43,16 @@ public interface StreamLevelConsumer {
    * @return
    */
   GenericRow next(GenericRow destination);
+
+  /**
+   * Get next row from the stream and decode it into a generic row
+   * @param destination the decoded generic row
+   * @param metadata the metadata associated with the decoded stream if any
+   * @return the decoded generic row
+   */
+  default GenericRow next(GenericRow destination, StreamMessageMetadata metadata) {
+    return next(destination);
+  }
 
   /**
    * Commit the offsets consumed so far

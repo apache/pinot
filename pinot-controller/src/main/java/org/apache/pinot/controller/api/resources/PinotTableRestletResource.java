@@ -28,6 +28,7 @@ import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
@@ -101,6 +102,11 @@ public class PinotTableRestletResource {
   @Inject
   ExecutorService _executorService;
 
+  /**
+   * API to create a table. Before adding, validations will be done (min number of replicas,
+   * checking offline and realtime table configs match, checking for tenants existing)
+   * @param tableConfigStr
+   */
   @POST
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables")
@@ -301,7 +307,7 @@ public class PinotTableRestletResource {
 
       ensureMinReplicas(tableConfig);
       verifyTableConfigs(tableConfig);
-      _pinotHelixResourceManager.setExistingTableConfig(tableConfig, tableNameWithType, tableType);
+      _pinotHelixResourceManager.updateTableConfig(tableConfig, tableNameWithType, tableType);
     } catch (PinotHelixResourceManager.InvalidTableConfigException e) {
       String errStr = String.format("Failed to update configuration for %s due to: %s", tableName, e.getMessage());
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_UPDATE_ERROR, 1L);
@@ -442,9 +448,9 @@ public class PinotTableRestletResource {
               existingTimeColumnName, newTimeColumnName));
     }
 
-    String newTimeColumnType = newSegmentConfig.getTimeType();
-    String existingTimeColumnType = SegmentConfigToCompare.getTimeType();
-    if (!existingTimeColumnType.equalsIgnoreCase(newTimeColumnType)) {
+    TimeUnit existingTimeColumnType = SegmentConfigToCompare.getTimeType();
+    TimeUnit newTimeColumnType = newSegmentConfig.getTimeType();
+    if (existingTimeColumnType != newTimeColumnType) {
       throw new PinotHelixResourceManager.InvalidTableConfigException(String
           .format("Time column types are different! Existing time column type: %s. New time column type: %s",
               existingTimeColumnType, newTimeColumnType));

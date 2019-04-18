@@ -24,48 +24,63 @@ import org.apache.pinot.common.utils.time.TimeUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNull;
+import static org.testng.Assert.fail;
+
 
 /**
- * Tests for the Utils class.
- *
+ * Tests for the Utils classes.
  */
 public class UtilsTest {
+
   @Test
   public void testToCamelCase() {
-    Assert.assertEquals(Utils.toCamelCase("Hello world!"), "HelloWorld");
-    Assert.assertEquals(Utils.toCamelCase("blah blah blah"), "blahBlahBlah");
-    Assert.assertEquals(Utils.toCamelCase("the quick __--???!!! brown   fox?"), "theQuickBrownFox");
+    assertEquals(Utils.toCamelCase("Hello world!"), "HelloWorld");
+    assertEquals(Utils.toCamelCase("blah blah blah"), "blahBlahBlah");
+    assertEquals(Utils.toCamelCase("the quick __--???!!! brown   fox?"), "theQuickBrownFox");
   }
 
   @Test
   public void testTimeUtils() {
-    Assert.assertEquals(TimeUtils.timeUnitFromString("days"), TimeUnit.DAYS);
-    Assert.assertEquals(TimeUtils.timeUnitFromString("MINUTES"), TimeUnit.MINUTES);
-    Assert.assertNull(TimeUtils.timeUnitFromString("daysSinceEpoch"));
-    Assert.assertNull(TimeUtils.timeUnitFromString(null));
+    assertEquals(TimeUtils.timeUnitFromString("days"), TimeUnit.DAYS);
+    assertEquals(TimeUtils.timeUnitFromString("HOURS"), TimeUnit.HOURS);
+    assertEquals(TimeUtils.timeUnitFromString("Minutes"), TimeUnit.MINUTES);
+    assertEquals(TimeUtils.timeUnitFromString("SeCoNdS"), TimeUnit.SECONDS);
+    assertEquals(TimeUtils.timeUnitFromString("daysSinceEpoch"), TimeUnit.DAYS);
+    assertEquals(TimeUtils.timeUnitFromString("HOURSSINCEEPOCH"), TimeUnit.HOURS);
+    assertEquals(TimeUtils.timeUnitFromString("MinutesSinceEpoch"), TimeUnit.MINUTES);
+    assertEquals(TimeUtils.timeUnitFromString("SeCoNdSsInCeEpOcH"), TimeUnit.SECONDS);
+    assertNull(TimeUtils.timeUnitFromString(null));
+    assertNull(TimeUtils.timeUnitFromString(""));
+    try {
+      TimeUtils.timeUnitFromString("unknown");
+      fail();
+    } catch (Exception e) {
+      // Expected
+    }
   }
 
   @Test
   public void testFlushThresholdTimeConversion() {
-
     Long millis = TimeUtils.convertPeriodToMillis("8d");
-    Assert.assertEquals(millis.longValue(), 8 * 24 * 60 * 60 * 1000L);
+    assertEquals(millis.longValue(), 8 * 24 * 60 * 60 * 1000L);
     millis = TimeUtils.convertPeriodToMillis("8d6h");
-    Assert.assertEquals(millis.longValue(), 8 * 24 * 60 * 60 * 1000L + 6 * 60 * 60 * 1000L);
+    assertEquals(millis.longValue(), 8 * 24 * 60 * 60 * 1000L + 6 * 60 * 60 * 1000L);
     millis = TimeUtils.convertPeriodToMillis("8d10m");
-    Assert.assertEquals(millis.longValue(), 8 * 24 * 60 * 60 * 1000L + 10 * 60 * 1000L);
+    assertEquals(millis.longValue(), 8 * 24 * 60 * 60 * 1000L + 10 * 60 * 1000L);
     millis = TimeUtils.convertPeriodToMillis("6h");
-    Assert.assertEquals(millis.longValue(), 6 * 60 * 60 * 1000L);
+    assertEquals(millis.longValue(), 6 * 60 * 60 * 1000L);
     millis = TimeUtils.convertPeriodToMillis("6h30m");
-    Assert.assertEquals(millis.longValue(), 6 * 60 * 60 * 1000L + 30 * 60 * 1000);
+    assertEquals(millis.longValue(), 6 * 60 * 60 * 1000L + 30 * 60 * 1000);
     millis = TimeUtils.convertPeriodToMillis("50m");
-    Assert.assertEquals(millis.longValue(), 50 * 60 * 1000L);
+    assertEquals(millis.longValue(), 50 * 60 * 1000L);
     millis = TimeUtils.convertPeriodToMillis("10s");
-    Assert.assertEquals(millis.longValue(), 10 * 1000L);
+    assertEquals(millis.longValue(), 10 * 1000L);
     millis = TimeUtils.convertPeriodToMillis(null);
-    Assert.assertEquals(millis.longValue(), 0);
+    assertEquals(millis.longValue(), 0);
     millis = TimeUtils.convertPeriodToMillis("-1d");
-    Assert.assertEquals(millis.longValue(), -86400000L);
+    assertEquals(millis.longValue(), -86400000L);
     try {
       millis = TimeUtils.convertPeriodToMillis("hhh");
       Assert.fail("Expected exception to be thrown while converting an invalid input string");
@@ -74,20 +89,20 @@ public class UtilsTest {
     }
 
     String periodStr = TimeUtils.convertMillisToPeriod(10 * 1000L);
-    Assert.assertEquals(periodStr, "10s");
+    assertEquals(periodStr, "10s");
     periodStr = TimeUtils.convertMillisToPeriod(50 * 60 * 1000L);
-    Assert.assertEquals(periodStr, "50m");
+    assertEquals(periodStr, "50m");
     periodStr = TimeUtils.convertMillisToPeriod(50 * 60 * 1000L + 30 * 1000);
-    Assert.assertEquals(periodStr, "50m30s");
+    assertEquals(periodStr, "50m30s");
     periodStr = TimeUtils.convertMillisToPeriod(6 * 60 * 60 * 1000L);
-    Assert.assertEquals(periodStr, "6h");
+    assertEquals(periodStr, "6h");
     periodStr = TimeUtils.convertMillisToPeriod(6 * 60 * 60 * 1000L + 20 * 60 * 1000 + 10 * 1000);
-    Assert.assertEquals(periodStr, "6h20m10s");
+    assertEquals(periodStr, "6h20m10s");
     periodStr = TimeUtils.convertMillisToPeriod(0L);
-    Assert.assertEquals(periodStr, "0s");
+    assertEquals(periodStr, "0s");
     periodStr = TimeUtils.convertMillisToPeriod(-1L);
-    Assert.assertEquals(periodStr, "");
+    assertEquals(periodStr, "");
     periodStr = TimeUtils.convertMillisToPeriod(null);
-    Assert.assertEquals(periodStr, null);
+    assertEquals(periodStr, null);
   }
 }

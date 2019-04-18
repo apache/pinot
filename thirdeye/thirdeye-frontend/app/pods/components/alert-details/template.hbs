@@ -3,7 +3,7 @@
   <div class="pull-right">
     {{#if isPreviewMode}}
       {{bs-button
-        defaultText=(if showDetails "Refresh Preview" "Preview Alert")
+        defaultText=(if showDetails "Rerun Preview" "Preview Alert")
         disabled=disablePreviewButton
         type="outline-primary"
         buttonType="refresh"
@@ -15,9 +15,17 @@
   {{#unless errorAnomalies}}
     {{#if showDetails}}
       {{#if isLoading}}
-        {{ember-spinner scale=0.5 rotate=10 speed='1.1' color='#3498DB'}}Preview may take a long time if it is more than one week (for daily metrics) or one day (for hourly/minute metrics).
-        Please click "Refresh Preview" if you changed time window.
+        {{ember-spinner scale=0.5 rotate=10 speed='1.1' color='#3498DB'}}
+        <p>Running detection between <strong>{{pill.activeRangeStart}}</strong> and <strong>{{pill.activeRangeEnd}}</strong>.</p>
       {{else}}
+        {{#if isPreviewMode}}
+          <div class="diffcurrent-alert alert alert-warning fade in">
+            <h4><i class="glyphicon glyphicon-exclamation-sign"></i> Use with caution!</h4>
+            <p>Preview can take a long time to run. We recommend previewing for less than a week on
+              daily metrics and less than a day on hourly/minutely metrics.</p>
+            <p>Click on the "Rerun Preview" option if you updated the time window.</p>
+          </div>
+        {{/if}}
         {{#if dataIsCurrent}}
         {{range-pill-selectors
           title="Showing"
@@ -162,7 +170,7 @@
                       {{/if}}
                       <th class="te-anomaly-table__cell-head">
                         <a class="te-anomaly-table__cell-link" {{action "toggleSortDirection" "change"}}>
-                          Average Current / Average Predicted
+                          Current / Predicted
                           <i class="te-anomaly-table__icon glyphicon {{if sortColumnChangeUp "glyphicon-menu-up" "glyphicon-menu-down"}}"></i>
                         </a>
                       </th>
@@ -306,9 +314,9 @@
         {{/if}}
       {{/if}}
     {{else}}
-        {{#if disablePreviewButton}}
-          <p>Enter YAML configuration to enable preview.</p>
-        {{/if}}
+      {{#if disablePreviewButton}}
+        <p>Enter YAML configuration to enable preview.</p>
+      {{/if}}
     {{/if}}
   {{/unless}}
   <p>{{errorAnomalies}}</p>

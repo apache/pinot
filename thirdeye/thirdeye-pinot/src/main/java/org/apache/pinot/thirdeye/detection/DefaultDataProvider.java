@@ -247,11 +247,6 @@ public class DefaultDataProvider implements DataProvider {
   }
 
   @Override
-  public Multimap<AnomalySlice, MergedAnomalyResultDTO> fetchLegacyAnomalies(Collection<AnomalySlice> slices, long configId) {
-    return fetchAnomalies(slices, configId, true);
-  }
-
-  @Override
   public Multimap<AnomalySlice, MergedAnomalyResultDTO> fetchAnomalies(Collection<AnomalySlice> slices, long configId) {
     return fetchAnomalies(slices, configId, false);
   }

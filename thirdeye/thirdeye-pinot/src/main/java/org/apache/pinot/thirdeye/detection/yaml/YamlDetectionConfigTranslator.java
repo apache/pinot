@@ -38,6 +38,7 @@ import org.yaml.snakeyaml.Yaml;
 public abstract class YamlDetectionConfigTranslator {
   protected static final Logger LOG = LoggerFactory.getLogger(YamlDetectionConfigTranslator.class);
   private static final String PROP_NAME = "detectionName";
+  private static final String PROP_FILTER = "filter";
   private static final String PROP_DESC_NAME = "description";
   private static final String PROP_ACTIVE = "active";
 
@@ -108,6 +109,24 @@ public abstract class YamlDetectionConfigTranslator {
    * @param yamlConfig yamlConfiguration to be checked
    */
   protected void validateYAML(Map<String, Object> yamlConfig) {
-    Preconditions.checkArgument(yamlConfig.containsKey(PROP_NAME), "Property missing " + PROP_NAME);
+    validatePropertyExists(PROP_NAME);
+    validateFilter();
+  }
+
+  /**
+   * Validate property name exists.
+   * @param propName The property name to validate.
+   */
+  private void validatePropertyExists(String propName) {
+    Preconditions.checkArgument(yamlConfig.containsKey(propName), "Property missing " + propName);
+  }
+
+  /**
+   * Validate filter is set in correct level.
+   */
+  private void validateFilter() {
+    if (yamlConfig.containsKey(PROP_FILTER)) {
+      throw new IllegalArgumentException("Filter should be set under rules");
+    }
   }
 }

@@ -104,6 +104,7 @@ import org.slf4j.LoggerFactory;
 import static org.apache.pinot.thirdeye.anomaly.SmtpConfiguration.SMTP_CONFIG_KEY;
 
 
+@Deprecated
 public class AlertTaskRunnerV2 implements TaskRunner {
 
   private static final Logger LOG = LoggerFactory.getLogger(AlertTaskRunnerV2.class);

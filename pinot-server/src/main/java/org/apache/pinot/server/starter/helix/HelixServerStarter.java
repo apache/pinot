@@ -38,6 +38,7 @@ import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.InstanceType;
 import org.apache.helix.PropertyKey;
 import org.apache.helix.PropertyKey.Builder;
+import org.apache.helix.SystemPropertyKeys;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.CurrentState;
 import org.apache.helix.model.ExternalView;
@@ -129,7 +130,7 @@ public class HelixServerStarter {
     }
 
     LOGGER.info("Connecting Helix components");
-    setupHelixSystemProperties(_helixServerConfig);
+    setupHelixSystemProperties();
     // Replace all white-spaces from list of zkServers.
     _zkServers = zkServer.replaceAll("\\s+", "");
     _helixManager =
@@ -173,13 +174,15 @@ public class HelixServerStarter {
     _helixManager.getMessagingService()
         .registerMessageHandlerFactory(Message.MessageType.USER_DEFINE_MSG.toString(), messageHandlerFactory);
 
-    serverMetrics.addCallbackGauge("helix.connected", () -> _helixManager.isConnected() ? 1L : 0L);
+    serverMetrics.addCallbackGauge(CommonConstants.Helix.INSTANCE_CONNECTED_METRIC_NAME,
+        () -> _helixManager.isConnected() ? 1L : 0L);
     _helixManager
         .addPreConnectCallback(() -> serverMetrics.addMeteredGlobalValue(ServerMeter.HELIX_ZOOKEEPER_RECONNECTS, 1L));
 
     // Register the service status handler
-    final double minResourcePercentForStartup = _helixServerConfig.getDouble(CommonConstants.Server.CONFIG_OF_SERVER_MIN_RESOURCE_PERCENT_FOR_START,
-        CommonConstants.Server.DEFAULT_SERVER_MIN_RESOURCE_PERCENT_FOR_START);
+    double minResourcePercentForStartup = _helixServerConfig
+        .getDouble(CommonConstants.Server.CONFIG_OF_SERVER_MIN_RESOURCE_PERCENT_FOR_START,
+            CommonConstants.Server.DEFAULT_SERVER_MIN_RESOURCE_PERCENT_FOR_START);
     ServiceStatus.setServiceStatusCallback(new ServiceStatus.MultipleCallbackServiceStatusCallback(ImmutableList
         .of(new ServiceStatus.IdealStateAndCurrentStateMatchServiceStatusCallback(_helixManager, _helixClusterName,
                 _instanceId, minResourcePercentForStartup),
@@ -330,19 +333,13 @@ public class HelixServerStarter {
     }
   }
 
-  private void setupHelixSystemProperties(Configuration conf) {
-    // [PINOT-2435] [PINOT-3927] Disable helix detection of flapping connection
-    // Helix will shutdown and effectively remove the instance from cluster if
-    // it detects flapping while the process continues to run
-    // Helix ignores the value if it is <= 0. Hence, setting time window to small value
-    // and number of connection failures within that window to high value
-    System.setProperty(CommonConstants.Helix.HELIX_MANAGER_FLAPPING_TIME_WINDOW_KEY,
-        conf.getString(CommonConstants.Helix.CONFIG_OF_HELIX_FLAPPING_TIMEWINDOW_MS,
-            CommonConstants.Helix.DEFAULT_HELIX_FLAPPING_TIMEWINDOW_MS));
-
-    System.setProperty(CommonConstants.Helix.HELIX_MANAGER_MAX_DISCONNECT_THRESHOLD_KEY,
-        conf.getString(CommonConstants.Helix.CONFIG_OF_HELIX_MAX_DISCONNECT_THRESHOLD,
-            CommonConstants.Helix.DEFAULT_HELIX_FLAPPING_MAX_DISCONNECT_THRESHOLD));
+  private void setupHelixSystemProperties() {
+    // NOTE: Helix will disconnect the manager and disable the instance if it detects flapping (too frequent disconnect
+    // from ZooKeeper). Setting flapping time window to a small value can avoid this from happening. Helix ignores the
+    // non-positive value, so set the default value as 1.
+    System.setProperty(SystemPropertyKeys.FLAPPING_TIME_WINDOW, _helixServerConfig
+        .getString(CommonConstants.Helix.CONFIG_OF_SERVER_FLAPPING_TIME_WINDOW_MS,
+            CommonConstants.Helix.DEFAULT_FLAPPING_TIME_WINDOW_MS));
   }
 
   public void stop() {

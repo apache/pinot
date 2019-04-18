@@ -1,5 +1,3 @@
-package org.apache.pinot.orc.data.readers;
-
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -18,6 +16,7 @@ package org.apache.pinot.orc.data.readers;
  * specific language governing permissions and limitations
  * under the License.
  */
+package org.apache.pinot.orc.data.readers;
 
 import com.google.common.collect.ImmutableList;
 import java.io.IOException;
@@ -59,43 +58,32 @@ import org.slf4j.LoggerFactory;
  * primitives or multivalue columns in Pinot, which is similar to other record readers.
  */
 public class ORCRecordReader implements RecordReader {
+  private static final Logger LOGGER = LoggerFactory.getLogger(ORCRecordReader.class);
+  private static final String LOCAL_FS_PREFIX = "file://";
 
   private Schema _pinotSchema;
   private TypeDescription _orcSchema;
-  Reader _reader;
-  org.apache.orc.RecordReader _recordReader;
-  VectorizedRowBatch _reusableVectorizedRowBatch;
+  private Reader _reader;
+  private org.apache.orc.RecordReader _recordReader;
+  private VectorizedRowBatch _reusableVectorizedRowBatch;
 
-  public static final String LOCAL_FS_PREFIX = "file://";
-
-  private static final Logger LOGGER = LoggerFactory.getLogger(ORCRecordReader.class);
-
-  private void init(String inputPath, Schema schema) {
-    Configuration conf = new Configuration();
-    LOGGER.info("Creating segment for {}", inputPath);
-    try {
-      Path orcReaderPath = new Path(LOCAL_FS_PREFIX + inputPath);
-      LOGGER.info("orc reader path is {}", orcReaderPath);
-      _reader = OrcFile.createReader(orcReaderPath, OrcFile.readerOptions(conf));
-      _orcSchema = _reader.getSchema();
-      LOGGER.info("ORC schema is {}", _orcSchema.toJson());
-
-      _pinotSchema = schema;
-      if (_pinotSchema == null) {
-        LOGGER.warn("Pinot schema is not set in segment generator config");
-      }
-      _recordReader = _reader.rows(_reader.options().schema(_orcSchema));
-    } catch (Exception e) {
-      LOGGER.error("Caught exception initializing record reader at path {}", inputPath);
-      throw new RuntimeException(e);
-    }
+  private void init(String inputPath, Schema schema)
+      throws IOException {
+    _pinotSchema = schema;
+    Path dataFilePath = new Path(LOCAL_FS_PREFIX + inputPath);
+    LOGGER.info("Creating segment from path: {}", dataFilePath);
+    _reader = OrcFile.createReader(dataFilePath, OrcFile.readerOptions(new Configuration()));
+    _orcSchema = _reader.getSchema();
+    LOGGER.info("ORC schema: {}", _orcSchema.toJson());
+    _recordReader = _reader.rows(_reader.options().schema(_orcSchema));
 
     // Create a row batch with max size 1
     _reusableVectorizedRowBatch = _orcSchema.createRowBatch(1);
   }
 
   @Override
-  public void init(SegmentGeneratorConfig segmentGeneratorConfig) {
+  public void init(SegmentGeneratorConfig segmentGeneratorConfig)
+      throws IOException {
     init(segmentGeneratorConfig.getInputFilePath(), segmentGeneratorConfig.getSchema());
   }
 
@@ -124,6 +112,8 @@ public class ORCRecordReader implements RecordReader {
   }
 
   private void fillGenericRow(GenericRow genericRow, VectorizedRowBatch rowBatch) {
+    // TODO: use Pinot schema to fill the values to handle missing column and default values properly
+
     // ORC's TypeDescription is the equivalent of a schema. The way we will support ORC in Pinot
     // will be to get the top level struct that contains all our fields and look through its
     // children to determine the fields in our schemas.

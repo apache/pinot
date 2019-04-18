@@ -10,7 +10,8 @@ import fetch from 'fetch';
 import {
   anomalyApiUrls,
   getAnomaliesForYamlPreviewUrl,
-  getAnomaliesByAlertIdUrl
+  getAnomaliesByAlertIdUrl,
+  getAnomalyIdsByTimeRangeUrl
 } from 'thirdeye-frontend/utils/api/anomaly';
 
 /**
@@ -56,7 +57,7 @@ export const anomalyResponseObjNew = [
   },
   { name: 'Expected permanent change',
     value: 'ANOMALY_NEW_TREND',
-    status: 'Confirmed - New Trend'
+    status: 'New Trend'
   },
   { name: 'No change observed',
     value: 'NOT_ANOMALY',
@@ -117,6 +118,18 @@ export function getYamlPreviewAnomalies(yamlString, startTime, endTime, alertId)
  */
 export function getAnomaliesByAlertId(alertId, startTime, endTime) {
   const url = getAnomaliesByAlertIdUrl(alertId, startTime, endTime);
+  return fetch(url).then(checkStatus);
+}
+
+/**
+ * Get anomaly ids over a specified time range
+ * @method getAnomalyIdsByTimeRange
+ * @param {Number} startTime - start time of query range
+ * @param {Number} endTime - end time of query range
+ * @return {Ember.RSVP.Promise}
+ */
+export function getAnomalyIdsByTimeRange(startTime, endTime) {
+  const url = getAnomalyIdsByTimeRangeUrl(startTime, endTime);
   return fetch(url).then(checkStatus);
 }
 

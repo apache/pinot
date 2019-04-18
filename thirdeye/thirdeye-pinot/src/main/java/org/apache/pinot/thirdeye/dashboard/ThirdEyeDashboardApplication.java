@@ -70,7 +70,7 @@ import org.apache.pinot.thirdeye.datasource.loader.AggregationLoader;
 import org.apache.pinot.thirdeye.datasource.loader.DefaultAggregationLoader;
 import org.apache.pinot.thirdeye.datasource.loader.DefaultTimeSeriesLoader;
 import org.apache.pinot.thirdeye.datasource.loader.TimeSeriesLoader;
-import org.apache.pinot.thirdeye.detection.DetectionMigrationResource;
+import org.apache.pinot.thirdeye.datasource.sql.resources.SqlDataSourceResource;
 import org.apache.pinot.thirdeye.detection.DetectionResource;
 import org.apache.pinot.thirdeye.detection.annotation.DetectionConfigurationResource;
 import org.apache.pinot.thirdeye.detection.yaml.YamlResource;
@@ -172,11 +172,6 @@ public class ThirdEyeDashboardApplication
     env.jersey().register(new ThirdEyeResource());
     env.jersey().register(new DataResource(anomalyFunctionFactory, alertFilterFactory));
     env.jersey().register(new AnomaliesResource(anomalyFunctionFactory, alertFilterFactory));
-    env.jersey().register(new DetectionMigrationResource(
-        DAO_REGISTRY.getAnomalyFunctionDAO(), DAO_REGISTRY.getAlertConfigDAO(), DAO_REGISTRY.getApplicationDAO(),
-        DAO_REGISTRY.getMetricConfigDAO(), DAO_REGISTRY.getDetectionConfigManager(),
-        DAO_REGISTRY.getDetectionAlertConfigManager(), DAO_REGISTRY.getDatasetConfigDAO(),
-        DAO_REGISTRY.getMergedAnomalyResultDAO()));
     env.jersey().register(new OnboardResource(config));
     env.jersey().register(new EntityMappingResource());
     env.jersey().register(new OnboardDatasetMetricResource());
@@ -195,6 +190,7 @@ public class ThirdEyeDashboardApplication
     env.jersey().register(new DetectionResource());
     env.jersey().register(new DetectionAlertResource(DAO_REGISTRY.getDetectionAlertConfigManager()));
     env.jersey().register(new YamlResource());
+    env.jersey().register(new SqlDataSourceResource());
 
     TimeSeriesLoader timeSeriesLoader = new DefaultTimeSeriesLoader(
         DAO_REGISTRY.getMetricConfigDAO(), DAO_REGISTRY.getDatasetConfigDAO(),

@@ -32,7 +32,6 @@ import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
-import org.apache.pinot.common.utils.time.TimeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -40,11 +39,6 @@ import org.slf4j.LoggerFactory;
 @ThreadSafe
 public class HelixExternalViewBasedTimeBoundaryService implements TimeBoundaryService {
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixExternalViewBasedTimeBoundaryService.class);
-
-  private static final String DAYS_SINCE_EPOCH = "daysSinceEpoch";
-  private static final String HOURS_SINCE_EPOCH = "hoursSinceEpoch";
-  private static final String MINUTES_SINCE_EPOCH = "minutesSinceEpoch";
-  private static final String SECONDS_SINCE_EPOCH = "secondsSinceEpoch";
 
   private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private final Map<String, TimeBoundaryInfo> _timeBoundaryInfoMap = new ConcurrentHashMap<>();
@@ -71,11 +65,9 @@ public class HelixExternalViewBasedTimeBoundaryService implements TimeBoundarySe
 
     TableConfig offlineTableConfig = ZKMetadataProvider.getOfflineTableConfig(_propertyStore, tableName);
     assert offlineTableConfig != null;
-    String timeType = offlineTableConfig.getValidationConfig().getTimeType();
-    TimeUnit tableTimeUnit = getTimeUnitFromString(timeType);
+    TimeUnit tableTimeUnit = offlineTableConfig.getValidationConfig().getTimeType();
     if (tableTimeUnit == null) {
-      LOGGER.info("Skipping updating time boundary service for table '{}' with null timeUnit, config time type: {}.",
-          tableName, timeType);
+      LOGGER.info("Skipping updating time boundary service for table '{}' because time unit is not set", tableName);
       return;
     }
 
@@ -118,36 +110,6 @@ public class HelixExternalViewBasedTimeBoundaryService implements TimeBoundarySe
       maxTimeValue = Math.max(maxTimeValue, endTime);
     }
     return maxTimeValue;
-  }
-
-  private TimeUnit getTimeUnitFromString(String timeTypeString) {
-    // If input data does not have a time column, no need to fire an exception.
-    if ((timeTypeString == null) || timeTypeString.isEmpty()) {
-      return null;
-    }
-
-    TimeUnit timeUnit = TimeUtils.timeUnitFromString(timeTypeString);
-
-    // Check legacy time formats
-    if (timeUnit == null) {
-      if (timeTypeString.equalsIgnoreCase(DAYS_SINCE_EPOCH)) {
-        timeUnit = TimeUnit.DAYS;
-      }
-      if (timeTypeString.equalsIgnoreCase(HOURS_SINCE_EPOCH)) {
-        timeUnit = TimeUnit.HOURS;
-      }
-      if (timeTypeString.equalsIgnoreCase(MINUTES_SINCE_EPOCH)) {
-        timeUnit = TimeUnit.MINUTES;
-      }
-      if (timeTypeString.equalsIgnoreCase(SECONDS_SINCE_EPOCH)) {
-        timeUnit = TimeUnit.SECONDS;
-      }
-    }
-
-    if (timeUnit == null) {
-      throw new RuntimeException("Not supported time type for: " + timeTypeString);
-    }
-    return timeUnit;
   }
 
   @Override

@@ -104,7 +104,7 @@ public class SegmentCreationJob extends BaseSegmentJob {
 
   @Override
   protected boolean isDataFile(String fileName) {
-    // Other files may have different extensions, eg: orc can have no extension
+    // For custom record reader, treat all files as data file
     if (_properties.getProperty(JobConfigConstants.RECORD_READER_PATH) != null) {
       return true;
     }

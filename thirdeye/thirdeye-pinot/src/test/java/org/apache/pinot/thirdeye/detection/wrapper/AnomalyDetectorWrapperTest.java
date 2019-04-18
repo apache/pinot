@@ -125,6 +125,31 @@ public class AnomalyDetectorWrapperTest {
   }
 
   @Test
+  public void testMovingMonitoringWindowDayLightSaving() {
+    DateTimeZone timeZone = DateTimeZone.forID("America/Los_Angeles");
+    this.properties.put(PROP_MOVING_WINDOW_DETECTION, true);
+    this.properties.put(PROP_TIMEZONE, timeZone.toString());
+    AnomalyDetectorWrapper detectionPipeline =
+        new AnomalyDetectorWrapper(this.provider, this.config, 1552118400000L, 1552287600000L);
+    List<Interval> monitoringWindows = detectionPipeline.getMonitoringWindows();
+    Assert.assertEquals(monitoringWindows,
+        Arrays.asList(new Interval(1552118400000L, 1552204800000L, timeZone), new Interval(1552204800000L, 1552287600000L, timeZone)));
+  }
+
+  @Test
+  public void testMovingMonitoringWindowDayLightSaving2() {
+    DateTimeZone timeZone = DateTimeZone.forID("America/Los_Angeles");
+    this.properties.put(PROP_MOVING_WINDOW_DETECTION, true);
+    this.properties.put(PROP_TIMEZONE, timeZone.toString());
+    AnomalyDetectorWrapper detectionPipeline =
+        new AnomalyDetectorWrapper(this.provider, this.config, 1541228400000L, 1541404800000L);
+    List<Interval> monitoringWindows = detectionPipeline.getMonitoringWindows();
+    Assert.assertEquals(monitoringWindows,
+        Arrays.asList(new Interval(1541228400000L, 1541314800000L, timeZone), new Interval(1541314800000L, 1541404800000L, timeZone)));
+  }
+
+
+  @Test
   public void testGetLastTimestampWithEstimate() {
     AnomalyDetectorWrapper detectionPipeline =
         new AnomalyDetectorWrapper(this.provider, this.config, 1546300800000L, 1546560000000L);

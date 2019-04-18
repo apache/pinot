@@ -21,7 +21,16 @@
 
 package org.apache.pinot.thirdeye.util;
 
+import com.google.common.base.Preconditions;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
+import com.google.common.cache.RemovalListener;
+import com.google.common.cache.RemovalNotification;
+import com.google.common.cache.Weigher;
 import com.google.common.collect.HashMultimap;
+import java.util.concurrent.TimeUnit;
+import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.data.TimeGranularitySpec.TimeFormat;
 import org.apache.pinot.thirdeye.common.dimension.DimensionMap;
 
@@ -47,6 +56,9 @@ import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang.exception.ExceptionUtils;
+import org.apache.pinot.thirdeye.datasource.RelationalQuery;
+import org.apache.pinot.thirdeye.datasource.pinot.resultset.ThirdEyeResultSet;
+import org.apache.pinot.thirdeye.datasource.pinot.resultset.ThirdEyeResultSetGroup;
 import org.joda.time.Period;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -81,6 +93,10 @@ public abstract class ThirdEyeUtils {
   private static final String TWO_DECIMALS_FORMAT = "##.##";
   private static final String MAX_DECIMALS_FORMAT = "##.#####";
   private static final String DECIMALS_FORMAT_TOKEN = "#";
+
+  private static final int DEFAULT_HEAP_PERCENTAGE_FOR_RESULTSETGROUP_CACHE = 50;
+  private static final int DEFAULT_LOWER_BOUND_OF_RESULTSETGROUP_CACHE_SIZE_IN_MB = 100;
+  private static final int DEFAULT_UPPER_BOUND_OF_RESULTSETGROUP_CACHE_SIZE_IN_MB = 8192;
 
   private ThirdEyeUtils () {
 
@@ -519,5 +535,105 @@ public abstract class ThirdEyeUtils {
       LOG.error("Exception while loading caches:", e);
       throw new RuntimeException(e);
     }
+  }
+
+  /**
+   * Guess time duration from period.
+   *
+   * @param granularity dataset granularity
+   * @return
+   */
+  public static int getTimeDuration(Period granularity) {
+    if (granularity.getDays() > 0) {
+      return granularity.getDays();
+    }
+    if (granularity.getHours() > 0) {
+      return granularity.getHours();
+    }
+    if (granularity.getMinutes() > 0) {
+      return granularity.getMinutes();
+    }
+    if (granularity.getSeconds() > 0) {
+      return granularity.getSeconds();
+    }
+    return granularity.getMillis();
+  }
+
+  /**
+   * Guess time unit from period.
+   *
+   * @param granularity dataset granularity
+   * @return
+   */
+  public static TimeUnit getTimeUnit(Period granularity) {
+    if (granularity.getDays() > 0) {
+      return TimeUnit.DAYS;
+    }
+    if (granularity.getHours() > 0) {
+      return TimeUnit.HOURS;
+    }
+    if (granularity.getMinutes() > 0) {
+      return TimeUnit.MINUTES;
+    }
+    if (granularity.getSeconds() > 0) {
+      return TimeUnit.SECONDS;
+    }
+    return TimeUnit.MILLISECONDS;
+  }
+
+  public static LoadingCache<RelationalQuery, ThirdEyeResultSetGroup> buildResponseCache(
+      CacheLoader cacheLoader) throws Exception {
+    Preconditions.checkNotNull(cacheLoader, "A cache loader is required.");
+
+    // Initializes listener that prints expired entries in debuggin mode.
+    RemovalListener<RelationalQuery, ThirdEyeResultSet> listener;
+    if (LOG.isDebugEnabled()) {
+      listener = new RemovalListener<RelationalQuery, ThirdEyeResultSet>() {
+        @Override
+        public void onRemoval(RemovalNotification<RelationalQuery, ThirdEyeResultSet> notification) {
+          LOG.debug("Expired {}", notification.getKey().getQuery());
+        }
+      };
+    } else {
+      listener = new RemovalListener<RelationalQuery, ThirdEyeResultSet>() {
+        @Override public void onRemoval(RemovalNotification<RelationalQuery, ThirdEyeResultSet> notification) { }
+      };
+    }
+
+    // ResultSetGroup Cache. The size of this cache is limited by the total number of buckets in all ResultSetGroup.
+    // We estimate that 1 bucket (including overhead) consumes 1KB and this cache is allowed to use up to 50% of max
+    // heap space.
+    long maxBucketNumber = getApproximateMaxBucketNumber(DEFAULT_HEAP_PERCENTAGE_FOR_RESULTSETGROUP_CACHE);
+    LOG.debug("Max bucket number for {}'s cache is set to {}", cacheLoader.toString(), maxBucketNumber);
+
+    return CacheBuilder.newBuilder()
+        .removalListener(listener)
+        .expireAfterWrite(15, TimeUnit.MINUTES)
+        .maximumWeight(maxBucketNumber)
+        .weigher(new Weigher<RelationalQuery, ThirdEyeResultSetGroup>() {
+          @Override public int weigh(RelationalQuery relationalQuery, ThirdEyeResultSetGroup resultSetGroup) {
+            int resultSetCount = resultSetGroup.size();
+            int weight = 0;
+            for (int idx = 0; idx < resultSetCount; ++idx) {
+              ThirdEyeResultSet resultSet = resultSetGroup.get(idx);
+              weight += ((resultSet.getColumnCount() + resultSet.getGroupKeyLength()) * resultSet.getRowCount());
+            }
+            return weight;
+          }
+        })
+        .build(cacheLoader);
+  }
+
+  private static long getApproximateMaxBucketNumber(int percentage) {
+    long jvmMaxMemoryInBytes = Runtime.getRuntime().maxMemory();
+    if (jvmMaxMemoryInBytes == Long.MAX_VALUE) { // Check upper bound
+      jvmMaxMemoryInBytes = DEFAULT_UPPER_BOUND_OF_RESULTSETGROUP_CACHE_SIZE_IN_MB * FileUtils.ONE_MB; // MB to Bytes
+    } else { // Check lower bound
+      long lowerBoundInBytes = DEFAULT_LOWER_BOUND_OF_RESULTSETGROUP_CACHE_SIZE_IN_MB * FileUtils.ONE_MB; // MB to Bytes
+      if (jvmMaxMemoryInBytes < lowerBoundInBytes) {
+        jvmMaxMemoryInBytes = lowerBoundInBytes;
+      }
+    }
+    return (jvmMaxMemoryInBytes / 102400) * percentage;
   }
 }

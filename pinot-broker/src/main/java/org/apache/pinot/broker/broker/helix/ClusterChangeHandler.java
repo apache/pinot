@@ -18,10 +18,26 @@
  */
 package org.apache.pinot.broker.broker.helix;
 
+import org.apache.helix.HelixConstants;
+import org.apache.helix.HelixManager;
+import org.apache.pinot.annotations.InterfaceAudience;
+import org.apache.pinot.annotations.InterfaceStability;
+
+
 /**
  * Handles cluster changes such as external view changes, instance config changes, live instance changes etc.
  */
+@InterfaceAudience.Public
+@InterfaceStability.Evolving
 public interface ClusterChangeHandler {
 
-  void processClusterChange();
+  /**
+   * Initializes the cluster change handler with the given connected Helix manager.
+   */
+  void init(HelixManager helixManager);
+
+  /**
+   * Processes the cluster change of the given type (e.g. EXTERNAL_VIEW, INSTANCE_CONFIG, LIVE_INSTANCE).
+   */
+  void processClusterChange(HelixConstants.ChangeType changeType);
 }

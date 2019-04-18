@@ -21,14 +21,16 @@ export default Route.extend(AuthenticatedRouteMixin, {
     startDate: queryParamsConfig,
     endDate: queryParamsConfig,
     duration: queryParamsConfig,
-    feedbackType: queryParamsConfig
+    feedbackType: queryParamsConfig,
+    subGroup: queryParamsConfig
   },
-  applicationAnomalies: null,
+  anomalies: null,
   appName: null,
   startDate: moment().startOf('day').utc().valueOf(), //set default to 0:00 for data consistency
   endDate: moment().startOf('day').add(1, 'day').utc().valueOf(), //set default to 0:00 for data consistency
   duration: 'today', //set default to today
   feedbackType: 'All Resolutions',
+  subGroup: null,
 
   /**
    * Returns a mapping of anomalies by metric and functionName (aka alert), performance stats for anomalies by
@@ -47,8 +49,9 @@ export default Route.extend(AuthenticatedRouteMixin, {
    * }
    */
   async model(params) {
-    const { appName, startDate, endDate, duration, feedbackType } = params;//check params
+    const { appName, startDate, endDate, duration, feedbackType, subGroup } = params;//check params
     const applications = await this.get('anomaliesApiService').queryApplications(appName, startDate);// Get all applicatons available
+    const subscriptionGroups = await this.get('anomaliesApiService').querySubscriptionGroups(); // Get all subscription groups available
 
     return hash({
       appName,
@@ -56,7 +59,9 @@ export default Route.extend(AuthenticatedRouteMixin, {
       endDate,
       duration,
       applications,
-      feedbackType
+      subscriptionGroups,
+      feedbackType,
+      subGroup
     });
   },
 
@@ -67,19 +72,21 @@ export default Route.extend(AuthenticatedRouteMixin, {
     const endDate = Number(model.endDate) || this.get('endDate');
     const duration = model.duration || this.get('duration');
     const feedbackType = model.feedbackType || this.get('feedbackType');
+    const subGroup = model.subGroup || null;
     // Update props
     this.setProperties({
       appName,
       startDate,
       endDate,
       duration,
-      feedbackType
+      feedbackType,
+      subGroup
     });
 
     return new RSVP.Promise(async (resolve, reject) => {
       try {
-        const anomalyMapping = appName ? await this.get('_getAnomalyMapping').perform(model) : [];
-        const alertsByMetric = appName ? this.getAlertsByMetric() : [];
+        const anomalyMapping = (appName || subGroup) ? await this.get('_getAnomalyMapping').perform(model) : [];
+        const alertsByMetric = (appName || subGroup) ? this.getAlertsByMetric() : [];
         const defaultParams = {
           anomalyMapping,
           appName,
@@ -87,7 +94,8 @@ export default Route.extend(AuthenticatedRouteMixin, {
           endDate,
           duration,
           feedbackType,
-          alertsByMetric
+          alertsByMetric,
+          subGroup
         };
         // Update model
         resolve(Object.assign(model, { ...defaultParams }));
@@ -99,16 +107,24 @@ export default Route.extend(AuthenticatedRouteMixin, {
 
   _getAnomalyMapping: task (function * () {//TODO: need to add to anomaly util - LH
     let anomalyMapping = {};
+    let anomalies;
     //fetch the anomalies from the onion wrapper cache.
-    const applicationAnomalies = yield this.get('anomaliesApiService').queryAnomaliesByAppName(this.get('appName'), this.get('startDate'), this.get('endDate'));
+    if (this.get('appName') && this.get('subGroup')) {
+      //this functionality is not provided in the UI, but the user can manually type the params into URL simultaneously
+      anomalies = yield this.get('anomaliesApiService').queryAnomaliesByJoin(this.get('appName'), this.get('subGroup'), this.get('startDate'), this.get('endDate'));
+    } else if (this.get('appName')) {
+      anomalies = yield this.get('anomaliesApiService').queryAnomaliesByAppName(this.get('appName'), this.get('startDate'), this.get('endDate'));
+    } else {
+      anomalies = yield this.get('anomaliesApiService').queryAnomaliesBySubGroup(this.get('subGroup'), this.get('startDate'), this.get('endDate'));
+    }
     const humanizedObject = {
       queryDuration: this.get('duration'),
       queryStart: this.get('startDate'),
       queryEnd: this.get('endDate')
     };
-    this.set('applicationAnomalies', applicationAnomalies);
+    this.set('anomalies', anomalies);
 
-    applicationAnomalies.forEach(anomaly => {
+    anomalies.forEach(anomaly => {
       const metricName = anomaly.get('metricName');
       //Grouping the anomalies of the same metric name
       if (!anomalyMapping[metricName]) {
@@ -128,7 +144,7 @@ export default Route.extend(AuthenticatedRouteMixin, {
    */
   getAlertsByMetric() {
     const metricsObj = {};
-    this.get('applicationAnomalies').forEach(anomaly => {
+    this.get('anomalies').forEach(anomaly => {
       let functionName = anomaly.get('functionName');
       let functionId = anomaly.get('functionId');
       let metricName = anomaly.get('metricName');
@@ -154,7 +170,10 @@ export default Route.extend(AuthenticatedRouteMixin, {
       columns,
       appNameSelected: model.applications.findBy('application', this.get('appName')),
       appName: this.get('appName'),
-      anomaliesCount: this.get('applicationAnomalies.content') ? this.get('applicationAnomalies.content').length : 0
+      anomaliesCount: this.get('anomalies.content') ? this.get('anomalies.content').length : 0,
+      subGroupSelected: model.subscriptionGroups.findBy('name', this.get('subGroup')),
+      subGroup: this.get('subGroup'),
+      subscriptionGroups: model.subscriptionGroups
     });
   },
 

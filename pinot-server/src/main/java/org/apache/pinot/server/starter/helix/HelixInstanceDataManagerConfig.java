@@ -57,9 +57,6 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   // Key of the segment format this server can read
   public static final String SEGMENT_FORMAT_VERSION = "segment.format.version";
 
-  // Key of whether to enable default columns
-  private static final String ENABLE_DEFAULT_COLUMNS = "enable.default.columns";
-
   // Key of how many parallel realtime segments can be built.
   // A value of <= 0 indicates unlimited.
   // Unlimited parallel builds can cause high GC pauses during segment builds, causing
@@ -153,11 +150,6 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   @Override
   public String getSegmentFormatVersion() {
     return _instanceDataManagerConfiguration.getString(SEGMENT_FORMAT_VERSION);
-  }
-
-  @Override
-  public boolean isEnableDefaultColumns() {
-    return _instanceDataManagerConfiguration.getBoolean(ENABLE_DEFAULT_COLUMNS, false);
   }
 
   @Override

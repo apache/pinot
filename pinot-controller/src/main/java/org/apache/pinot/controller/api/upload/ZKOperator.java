@@ -152,8 +152,12 @@ public class ZKOperator {
       long newCrc = Long.valueOf(segmentMetadata.getCrc());
       if (newCrc == existingCrc) {
         LOGGER.info(
-            "New segment crc {} is same as existing segment crc {} for segment {}. Updating ZK metadata without refreshing the segment {}",
-            newCrc, existingCrc, segmentName);
+            "New segment crc '{}' is the same as existing segment crc for segment '{}'. Updating ZK metadata without refreshing the segment.",
+            newCrc, segmentName);
+        // NOTE: even though we don't need to refresh the segment, we should still update creation time and refresh time
+        // (creation time is not included in the crc)
+        existingSegmentZKMetadata.setCreationTime(segmentMetadata.getIndexCreationTime());
+        existingSegmentZKMetadata.setRefreshTime(System.currentTimeMillis());
         if (!_pinotHelixResourceManager.updateZkMetadata(existingSegmentZKMetadata)) {
           throw new RuntimeException(
               "Failed to update ZK metadata for segment: " + segmentName + " of table: " + offlineTableName);

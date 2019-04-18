@@ -39,7 +39,6 @@ import org.testng.annotations.Test;
  * Integration test that creates a Kafka broker, creates a Pinot cluster that consumes from Kafka and queries Pinot.
  */
 public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTestSet {
-  private List<KafkaServerStartable> _kafkaStarters;
 
   @BeforeClass
   public void setUp()
@@ -79,13 +78,6 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTestSe
     waitForAllDocsLoaded(600_000L);
   }
 
-  protected void startKafka() {
-    _kafkaStarters = KafkaStarterUtils
-        .startServers(getNumKafkaBrokers(), KafkaStarterUtils.DEFAULT_KAFKA_PORT, KafkaStarterUtils.DEFAULT_ZK_STR,
-            KafkaStarterUtils.getDefaultKafkaConfiguration());
-    KafkaStarterUtils.createTopic(getKafkaTopic(), KafkaStarterUtils.DEFAULT_ZK_STR, getNumKafkaPartitions());
-  }
-
   protected void setUpTable(File avroFile)
       throws Exception {
     File schemaFile = getSchemaFile();
@@ -100,9 +92,10 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTestSe
     String timeType = outgoingTimeUnit.toString();
 
     addRealtimeTable(getTableName(), useLlc(), KafkaStarterUtils.DEFAULT_KAFKA_BROKER, KafkaStarterUtils.DEFAULT_ZK_STR,
-        getKafkaTopic(), getRealtimeSegmentFlushSize(), avroFile, timeColumnName, timeType, schemaName, null, null,
-        getLoadMode(), getSortedColumn(), getInvertedIndexColumns(), getBloomFilterIndexColumns(), getRawIndexColumns(),
-        getTaskConfig(), getStreamConsumerFactoryClassName());
+        getKafkaTopic(), getRealtimeSegmentFlushSize(), avroFile, timeColumnName, timeType, schemaName,
+        getBrokerTenant(), getServerTenant(), getLoadMode(), getSortedColumn(),
+        getInvertedIndexColumns(), getBloomFilterIndexColumns(), getRawIndexColumns(), getTaskConfig(),
+        getStreamConsumerFactoryClassName());
 
     completeTableConfiguration();
   }
@@ -178,9 +171,7 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTestSe
     stopServer();
     stopBroker();
     stopController();
-    for (KafkaServerStartable kafkaStarter : _kafkaStarters) {
-      KafkaStarterUtils.stopServer(kafkaStarter);
-    }
+    stopKafka();
     stopZk();
     FileUtils.deleteDirectory(_tempDir);
   }

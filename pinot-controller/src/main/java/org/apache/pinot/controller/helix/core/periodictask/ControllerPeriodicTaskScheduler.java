@@ -39,10 +39,11 @@ public class ControllerPeriodicTaskScheduler extends PeriodicTaskScheduler imple
    * Initialize the {@link ControllerPeriodicTaskScheduler} with the list of {@link ControllerPeriodicTask} created at startup
    * This is called only once during controller startup
    * @param controllerPeriodicTasks
+   * @param controllerLeadershipManager
    */
-  public void init(List<PeriodicTask> controllerPeriodicTasks) {
+  public void init(List<PeriodicTask> controllerPeriodicTasks, ControllerLeadershipManager controllerLeadershipManager) {
     super.init(controllerPeriodicTasks);
-    ControllerLeadershipManager.getInstance().subscribe(ControllerPeriodicTaskScheduler.class.getName(), this);
+    controllerLeadershipManager.subscribe(ControllerPeriodicTaskScheduler.class.getName(), this);
   }
 
   @Override

@@ -67,6 +67,7 @@ import org.apache.pinot.core.realtime.stream.StreamConsumerFactory;
 import org.apache.pinot.core.realtime.stream.StreamConsumerFactoryProvider;
 import org.apache.pinot.core.realtime.stream.StreamDecoderProvider;
 import org.apache.pinot.core.realtime.stream.StreamMessageDecoder;
+import org.apache.pinot.core.realtime.stream.StreamMessageMetadata;
 import org.apache.pinot.core.realtime.stream.StreamMetadataProvider;
 import org.apache.pinot.core.realtime.stream.TransientConsumerException;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
@@ -408,6 +409,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     int streamMessageCount = 0;
     boolean canTakeMore = true;
     GenericRow decodedRow = null;
+    StreamMessageMetadata msgMetadata = new StreamMessageMetadata();
+
     for (int index = 0; index < messagesAndOffsets.getMessageCount(); index++) {
       if (_shouldStop || endCriteriaReached()) {
         break;
@@ -435,10 +438,14 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
       // Index each message
       decodedRow = GenericRow.createOrReuseRow(decodedRow);
+      msgMetadata.reset();
+      // retrieve metadata from the message batch if available
+      // this can be overridden by the decoder if there is a better indicator in the message payload
+      messagesAndOffsets.getMetadataAtIndex(index, msgMetadata);
 
       decodedRow = _messageDecoder
           .decode(messagesAndOffsets.getMessageAtIndex(index), messagesAndOffsets.getMessageOffsetAtIndex(index),
-              messagesAndOffsets.getMessageLengthAtIndex(index), decodedRow);
+              messagesAndOffsets.getMessageLengthAtIndex(index), decodedRow, msgMetadata);
 
       if (decodedRow != null) {
         try {
@@ -454,7 +461,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
                     realtimeRowsDroppedMeter);
           }
 
-          canTakeMore = _realtimeSegment.index(transformedRow);
+          canTakeMore = _realtimeSegment.index(transformedRow, msgMetadata);
         } catch (Exception e) {
           segmentLogger.error("Caught exception while transforming the record: {}", decodedRow, e);
           _numRowsErrored++;

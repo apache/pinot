@@ -7,32 +7,46 @@
 <body style="background-color: #EDF0F3;">
 <table border="0" cellpadding="0" cellspacing="0" style="width:100%; font-family: 'Proxima Nova','Arial','Helvetica Neue',Helvetica,sans-serif; font-size:14px; margin:0 auto; max-width: 50%; min-width: 700px; background-color: #F3F6F8;">
   <tr>
-    <td align="left" style="padding: 12px 24px;">
-      <img width="35" height="35" alt="logo" src="https://static.licdn-ei.com/scds/common/u/images/email/logos/logo_shift_inbug_82x82_v1.png"
-           style="vertical-align: middle; display: inline-block; background: white;">
-      <span style="color: rgba(0,0,0,0.75);font-size: 18px; font-weight: bold; letter-spacing: 2px; display: inline-block;vertical-align: middle;">THIRDEYE ALERT</span>
+    <td align="center" style="padding: 6px 24px;">
+      <span style="color: red; font-size: 35px; vertical-align: middle;">&nbsp;&#9888;&nbsp;</span>
+      <span style="color: rgba(0,0,0,0.75); font-size: 18px; font-weight: bold; letter-spacing: 2px; vertical-align: middle;">ACTION REQUIRED ON THIRDEYE ALERT</span>
+    </td>
+  </tr>
+
+  <tr>
+    <td style="font-size: 16px; padding: 12px; background-color: #0073B1; color: #FFF; text-align: center;">
+      <#if anomalyCount == 1>
+        <p>
+          We have detected <strong>an anomaly</strong> on the metric
+          <#list metricsMap?keys as id>
+            <strong>${metricsMap[id].name}</strong>
+          </#list>
+        </p>
+      <#else>
+        <p>
+          <strong>${anomalyCount} anomalies</strong> were detected on the metrics listed below
+        </p>
+      </#if>
+
+      <p>
+        between <strong>${startTime}</strong> and <strong>${endTime}</strong> (${timeZone})
+      </p>
+
+      <#if anomalyCount == 1>
+        <p>
+          <a style="padding: 6px 12px; border-radius: 2px; border: 1px solid #FFF; font-size: 16px; font-weight: bold; color: white; text-decoration: none; line-height: 32px;" href="${dashboardHost}/thirdeye#anomalies?anomaliesSearchMode=id&anomalyIds=${anomalyIds}">View anomaly on ThirdEye</a>
+        </p>
+      <#else>
+        <p>
+          <a style="padding: 6px 12px; border-radius: 2px; border: 1px solid #FFF; font-size: 16px; font-weight: bold; color: white; text-decoration: none; line-height: 32px;" href="${dashboardHost}/thirdeye#anomalies?anomaliesSearchMode=id&anomalyIds=${anomalyIds}">View all anomalies on ThirdEye</a>
+        </p>
+      </#if>
     </td>
   </tr>
 
   <tr>
     <td>
       <table border="0" cellpadding="0" cellspacing="0" style="border:1px solid #E9E9E9; border-radius: 2px; width: 100%;">
-        <tr>
-          <td style="font-size: 16px; padding: 12px; background-color: #0073B1; color: #FFF; text-align: center;">
-            <#if anomalyCount == 1>
-              <p>
-                <strong>An anomaly</strong> was detected between <strong>${startTime}</strong> and <strong>${endTime}</strong> (${timeZone}) on the metric listed below
-              </p>
-            <#else>
-              <p>
-                <strong>${anomalyCount} anomalies</strong> were detected between <strong>${startTime}</strong> and <strong>${endTime}</strong> (${timeZone}) on the metrics listed below
-              </p>
-            </#if>
-            <p>
-              <a style="padding: 6px 12px; border-radius: 2px; border: 1px solid #FFF; font-size: 16px; font-weight: bold; color: white; text-decoration: none; line-height: 32px;" href="${dashboardHost}/thirdeye#anomalies?anomaliesSearchMode=id&anomalyIds=${anomalyIds}">View on ThirdEye</a>
-            </p>
-          </td>
-        </tr>
 
         <#if cid?has_content>
           <tr>
@@ -48,8 +62,8 @@
         <#list metricToAnomalyDetailsMap?keys as metric>
           <@utils.addBlock title="" align="left">
             <p>
-              <span style="color: #606060; font-size: 20px;">Metric</span>
-              <span style="color: #1D1D1D; font-size: 20px; font-weight: bold;">${metric}</span>
+              <span style="color: #1D1D1D; font-size: 20px; font-weight: bold; display:inline-block; vertical-align: middle;">Metric:&nbsp;</span>
+              <span style="color: #606060; font-size: 20px; text-decoration: none; display:inline-block; vertical-align: middle; width: 70%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${metric}</span>
             </p>
 
             <!-- List down all the alerts for the given metric -->
@@ -64,9 +78,9 @@
 
               <#if newTable>
                 <p>
-                  <span style="color: #606060;">Alert</span>
-                  <span style="color: #1D1D1D; text-decoration: none; font-weight: bold;">${detectionName}</span>
-                  <a href="${dashboardHost}/app/#/manage/explore/${functionToId[detectionName]?string.computer}" target="blank" style="text-decoration: none; color: #0B5EA1; font-weight: bold;">(Edit Settings)</a>
+                  <span style="color: #1D1D1D; font-size: 16px; font-weight: bold; display:inline-block; vertical-align: middle;">Alert:&nbsp;</span>
+                  <span style="color: #606060; font-size: 16px; text-decoration: none; display:inline-block; vertical-align: middle; width: 77%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${detectionName}</span>
+                  <a href="${dashboardHost}/app/#/manage/explore/${functionToId[detectionName]?string.computer}" target="blank" style="text-decoration: none; color: #0B5EA1; display:inline-block; vertical-align: middle;">(Edit Settings)</a>
                 </p>
               </#if>
 
@@ -85,9 +99,10 @@
                     <#assign newTable = false>
                     <tr style="border-bottom: 1px solid #C7D1D8;">
                       <td style="padding: 6px 12px;white-space: nowrap;">
+                        <div style="color: rgba(0,0,0,0.9); font-size:14px; line-height:20px;">${anomaly.startDateTime} ${anomaly.timezone}</div>
+                        <span style="color: rgba(0,0,0,0.6); font-size:12px; line-height:16px;">${anomaly.duration}</span>
                         <a style="font-weight: bold; text-decoration: none; font-size:14px; line-height:20px; color: #0073B1;" href="${anomaly.anomalyURL}${anomaly.anomalyId}"
-                           target="_blank">${anomaly.startDateTime} ${anomaly.timezone}</a>
-                        <div style="color: rgba(0,0,0,0.6); font-size:12px; line-height:16px;">${anomaly.duration}</div>
+                           target="_blank">(view)</a>
                       </td>
                       <td style="word-break: break-all; width: 200px; padding-right:4px 20px 4px 0">
                         <#list anomaly.dimensions as dimension>
@@ -150,19 +165,20 @@
             </table>
           </@utils.addBlock>
         </#if>
-
-        <tr>
-          <td style="text-align: center; background-color: #EDF0F3; font-size: 12px; font-family:'Proxima Nova','Arial', 'Helvetica Neue',Helvetica, sans-serif; color: #737373; padding: 12px;">
-            <p style="margin-top:0;"> You are receiving this email because you have subscribed to ThirdEye Alert Service for
-              <strong>${alertConfigName}</strong>.</p>
-            <p>
-              If you have any questions regarding this report, please email
-              <a style="color: #33aada;" href="mailto:ask_thirdeye@linkedin.com" target="_top">ask_thirdeye@linkedin.com</a>
-            </p>
-          </td>
-        </tr>
       </table>
     </td>
   </tr>
+
+  <tr>
+    <td style="text-align: center; background-color: #EDF0F3; font-size: 12px; font-family:'Proxima Nova','Arial', 'Helvetica Neue',Helvetica, sans-serif; color: #737373; padding: 12px;">
+      <p style="margin-top:0;"> You are receiving this email because you have subscribed to ThirdEye Alert Service for
+        <strong>${alertConfigName}</strong>.</p>
+      <p>
+        If you have any questions regarding this report, please email
+        <a style="color: #33aada;" href="mailto:ask_thirdeye@linkedin.com" target="_top">ask_thirdeye@linkedin.com</a>
+      </p>
+    </td>
+  </tr>
+
 </table>
 </body>
