@@ -18,20 +18,26 @@
  */
 package org.apache.pinot.client;
 
-import org.testng.annotations.Test;
-
-
 /**
  *  Tests for resp body java client api coding utf-8
  */
 public class QueryClientTest {
-  @Test
-  public void ClientRespCoding() {
-    Connection connection =
-        ConnectionFactory.fromHostList("10.85.126.103:8099", "10.85.126.104:8099", "10.85.126.105:8099");
-    ResultSetGroup resultSetGroup =
-        connection.execute("select city, country, province, manufacturer, play_count from video-qoe "
-            + "where uid='5305426956' limit 10");
+  /**
+   * QueryClientTest <broker_URL> <sql>
+   * @param args
+   */
+  public static void main(String[] args) {
+    if (args.length != 2) {
+      System.err.println("USAGE QueryClientTest <broker_URL> <sql>");
+      System.exit(1);
+    }
+    //127.0.0.1:8099
+    String brokerUrl = args[0];
+    Connection connection = ConnectionFactory.fromHostList(brokerUrl);
+
+    //select city, country, province, manufacturer, play_count from video-qoe where uid='5305426956' limit 10
+    String sql = args[1];
+    ResultSetGroup resultSetGroup = connection.execute(sql);
     System.out.println(resultSetGroup);
 
     /*
