@@ -171,14 +171,11 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
     // do not tune for alerts migrated from legacy anomaly function.
     DetectionRegistry.registerComponent("com.linkedin.thirdeye.detection.components.AdLibAlertFilter",
         "MIGRATED_ALGORITHM_FILTER");
-    DetectionRegistry.registerComponent("com.linkedin.thirdeye.detection.components.AdLibAnomalyDetectorAndBaselineProvider",
+    DetectionRegistry.registerComponent("com.linkedin.thirdeye.detection.components.AdLibAnomalyDetector",
         "MIGRATED_ALGORITHM");
   }
   private static final Set<String> TUNING_OFF_COMPONENTS =
       ImmutableSet.of("MIGRATED_ALGORITHM_FILTER", "MIGRATED_ALGORITHM", "MIGRATED_ALGORITHM_BASELINE");
-  private static final Map<String, String> DETECTOR_TO_BASELINE =
-      ImmutableMap.of("ALGORITHM", "ALGORITHM_BASELINE", "MIGRATED_ALGORITHM", "MIGRATED_ALGORITHM_BASELINE",
-          "HOLT_WINTERS_RULE", "HOLT_WINTERS_RULE");
   private static final Set<String> MOVING_WINDOW_DETECTOR_TYPES = ImmutableSet.of("ALGORITHM", "MIGRATED_ALGORITHM");
 
   private final Map<String, Object> components = new HashMap<>();
@@ -281,9 +278,6 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
       properties.put(PROP_BASELINE_PROVIDER, detectorKey);
     } else {
       String baselineProviderType = DEFAULT_BASELINE_PROVIDER_YAML_TYPE;
-      if (DETECTOR_TO_BASELINE.containsKey(detectorType)) {
-        baselineProviderType = DETECTOR_TO_BASELINE.get(detectorType);
-      }
       String baselineProviderKey = makeComponentKey(baselineProviderType, name);
       buildComponentSpec(yamlConfig, baselineProviderType, baselineProviderKey);
       properties.put(PROP_BASELINE_PROVIDER, baselineProviderKey);
