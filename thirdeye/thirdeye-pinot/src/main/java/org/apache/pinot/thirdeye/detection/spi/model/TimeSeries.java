@@ -37,49 +37,47 @@ public class TimeSeries {
     this.df = new DataFrame();
   }
 
-  /**
-   * Add the time stamps into the timeseries
-   * @param timestamps
-   */
-  public void addTimeStamps(LongSeries timestamps) {
+  public TimeSeries(LongSeries timestamps, DoubleSeries baselineValues) {
     this.df.addSeries(COL_TIME, timestamps).setIndex(COL_TIME);
-  }
-
-  /**
-   * Add the predicted baseline into the timeseries
-   * @param baselineValues predicted baseline values
-   */
-  public void addPredictedBaseline(DoubleSeries baselineValues) {
     this.df.addSeries(DataFrameUtils.COL_VALUE, baselineValues);
   }
 
-  /**
-   * Add the predicted upper bound into the timeseries
-   * @param upperBoundValues predicted upper bound values
-   */
-  public void addPredictedUpperBound(DoubleSeries upperBoundValues) {
+  public TimeSeries(LongSeries timestamps, DoubleSeries baselineValues, DoubleSeries currentValues,
+      DoubleSeries upperBoundValues, DoubleSeries lowerBoundValues) {
+    this(timestamps, baselineValues);
+    this.df.addSeries(DataFrameUtils.COL_CURRENT, currentValues);
     this.df.addSeries(DataFrameUtils.COL_UPPER_BOUND, upperBoundValues);
-  }
-
-  /**
-   * Add the predicted lower bound into the timeseries
-   * @param lowerBoundValues predicted lower bound values
-   */
-  public void addPredictedLowerBound(DoubleSeries lowerBoundValues) {
     this.df.addSeries(DataFrameUtils.COL_LOWER_BOUND, lowerBoundValues);
   }
 
+  /**
+   * Add the series into TimeSeries if it exists in the DataFrame.
+   * @param df The source DataFrame.
+   * @param name The series name.
+   */
+  private static void addSeries(TimeSeries ts, DataFrame df, String name) {
+    if (df.contains(name)) {
+      ts.df.addSeries(name, df.get(name));
+    }
+  }
+
+  /**
+   * Add DataFrame into TimeSeries.
+   * @param df The source DataFrame.
+   * @return TimeSeries that contains the predicted values.
+   */
   public static TimeSeries fromDataFrame(DataFrame df) {
     TimeSeries ts = new TimeSeries();
     ts.df.addSeries(COL_TIME, df.get(COL_TIME)).setIndex(COL_TIME);
-    ts.df.addSeries(DataFrameUtils.COL_VALUE, df.get(DataFrameUtils.COL_VALUE));
-    if (df.contains(DataFrameUtils.COL_UPPER_BOUND)) {
-      ts.df.addSeries(DataFrameUtils.COL_UPPER_BOUND, df.get(DataFrameUtils.COL_UPPER_BOUND));
-    }
-    if (df.contains(DataFrameUtils.COL_LOWER_BOUND)) {
-      ts.df.addSeries(DataFrameUtils.COL_LOWER_BOUND, df.get(DataFrameUtils.COL_LOWER_BOUND));
-    }
+    addSeries(ts, df, COL_VALUE);
+    addSeries(ts, df, COL_CURRENT);
+    addSeries(ts, df, COL_UPPER_BOUND);
+    addSeries(ts, df, COL_LOWER_BOUND);
     return ts;
+  }
+
+  public DoubleSeries getCurrent() {
+    return this.df.getDoubles(DataFrameUtils.COL_CURRENT);
   }
 
   public DoubleSeries getPredictedBaseline() {
