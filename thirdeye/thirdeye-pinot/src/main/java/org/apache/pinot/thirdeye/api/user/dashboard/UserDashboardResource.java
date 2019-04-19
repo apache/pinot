@@ -25,10 +25,13 @@ import com.wordnik.swagger.annotations.Api;
 import com.wordnik.swagger.annotations.ApiOperation;
 import com.wordnik.swagger.annotations.ApiParam;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
@@ -38,6 +41,7 @@ import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
 import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.thirdeye.api.Constants;
 import org.apache.pinot.thirdeye.constant.AnomalyFeedbackType;
@@ -85,6 +89,65 @@ public class UserDashboardResource {
     this.detectionAlertDAO = detectionAlertDAO;
   }
 
+  List<AnomalySummary> queryAnomalies(Long start, Long end, String application, String group, String metric,
+      String dataset, List<MetricDatasetPair> metricDatasetPairs, boolean fetchTrueAnomaly, Integer limit) {
+    if (limit == null) {
+      LOG.warn("No upper limit specified while fetching anomalies. Defaulting to " + ANOMALIES_LIMIT_DEFAULT);
+      limit = ANOMALIES_LIMIT_DEFAULT;
+    }
+    Preconditions.checkNotNull(start, "Please specify the start time of the anomaly retrieval window");
+
+    // TODO: Prefer to have intersection of anomalies rather than union
+    List<MergedAnomalyResultDTO> anomalies = new ArrayList<>();
+    // Fetch anomalies by group
+    anomalies.addAll(fetchAnomaliesBySubsGroup(start, end, group));
+    // Fetch anomalies by application
+    anomalies.addAll(fetchAnomaliesByApplication(start, end, application));
+    // Fetch anomalies by metric and/or dataset
+    anomalies.addAll(fetchAnomaliesByMetricDataset(start, end, metric, dataset));
+    // Fetch anomalies by metric dataset pairs
+    anomalies.addAll(fetchAnomaliesByMetricDatasetPairs(start, end, metricDatasetPairs));
+
+    // sort descending by start time
+    Collections.sort(anomalies, (o1, o2) -> -1 * Long.compare(o1.getStartTime(), o2.getStartTime()));
+
+    if (fetchTrueAnomaly) {
+      // Filter and retain only true anomalies
+      List<MergedAnomalyResultDTO> trueAnomalies = new ArrayList<>();
+      for (MergedAnomalyResultDTO anomaly : anomalies) {
+        if (anomaly.getFeedback() != null && anomaly.getFeedback().getFeedbackType().isAnomaly()) {
+          trueAnomalies.add(anomaly);
+        }
+      }
+      anomalies = trueAnomalies;
+    }
+    // filter child anomalies
+    anomalies = anomalies.stream().filter(anomaly -> !anomaly.isChild()).collect(Collectors.toList());
+    // limit result size
+    anomalies = anomalies.subList(0, Math.min(anomalies.size(), limit));
+
+    return getAnomalyFormattedOutput(anomalies);
+  }
+
+  protected static class MetricDatasetPair {
+    String datasetName;
+    String metricName;
+
+    MetricDatasetPair(String dataset, String metric) {
+      this.datasetName = dataset;
+      this.metricName = metric;
+    }
+
+    public static MetricDatasetPair fromString(String metricDatasetPair){
+      String[] metricDataset = metricDatasetPair.trim().split("::");
+      if (metricDataset.length != 2) {
+        throw new RuntimeException("Unable to parse dataset::metric pair " + metricDatasetPair);
+      }
+
+      return new MetricDatasetPair(metricDataset[0], metricDataset[1]);
+    }
+  }
+
   /**
    * Returns a list of AnomalySummary for a set of query parameters. Anomalies are
    * sorted by start time (descending).
@@ -122,7 +185,7 @@ public class UserDashboardResource {
   @GET
   @Path("/anomalies")
   @ApiOperation(value = "Query anomalies")
-  public List<AnomalySummary> queryAnomalies(
+  public Response fetchAnomalies(
       @ApiParam(value = "start time of anomaly retrieval window")
       @QueryParam("start") Long start,
       @ApiParam(value = "end time of anomaly retrieval window")
@@ -135,57 +198,25 @@ public class UserDashboardResource {
       @QueryParam("metric") String metric,
       @ApiParam(value = "The name of the pinot table to which this metric belongs")
       @QueryParam("dataset") String dataset,
+      @ApiParam(value = "Specify multiple dataset::metric pairs")
+      @QueryParam("metricAlias") List<MetricDatasetPair> metricDatasetPairs,
       @ApiParam(value = "Specify if you want to only fetch true anomalies")
       @QueryParam("fetchTrueAnomaly") @DefaultValue("false") boolean fetchTrueAnomaly,
       @ApiParam(value = "max number of results")
-      @QueryParam("limit") Integer limit) throws Exception {
-    LOG.info("[USER DASHBOARD] Fetching anomalies with filters. Start: " + start + " end: " + end + " metric: "
-        + metric + " dataset: " + dataset + " application: " + application + " group: " + group
-        + " fetchTrueAnomaly: " + fetchTrueAnomaly + " limit: " + limit);
-
-    // Safety conditions
-    if (limit == null) {
-      LOG.warn("No upper limit specified while fetching anomalies. Defaulting to " + ANOMALIES_LIMIT_DEFAULT);
-      limit = ANOMALIES_LIMIT_DEFAULT;
+      @QueryParam("limit") Integer limit) {
+    Map<String, String> responseMessage = new HashMap<>();
+    List<AnomalySummary> output;
+    try {
+      output = queryAnomalies(start, end, application, group, metric, dataset, metricDatasetPairs, fetchTrueAnomaly, limit);
+    } catch (Exception e) {
+      LOG.warn("Error while fetching anomalies.", e.getMessage());
+      responseMessage.put("message", "Failed to fetch all the anomalies.");
+      responseMessage.put("more-info", "Error = " + e.getMessage());
+      return Response.serverError().entity(responseMessage).build();
     }
-    Preconditions.checkNotNull(start, "Please specify the start time of the anomaly retrieval window");
-
-    // TODO support index select on user-reported anomalies
-//    predicates.add(Predicate.OR(
-//        Predicate.EQ("notified", true),
-//        Predicate.EQ("anomalyResultSource", AnomalyResultSource.USER_LABELED_ANOMALY)));
-
-    // TODO: Prefer to have intersection of anomalies rather than union
-    List<MergedAnomalyResultDTO> anomalies = new ArrayList<>();
-    // Fetch anomalies by group
-    anomalies.addAll(fetchAnomaliesBySubsGroup(start, end, group));
-    // Fetch anomalies by application
-    anomalies.addAll(fetchAnomaliesByApplication(start, end, application));
-    // Fetch anomalies by metric and/or dataset
-    anomalies.addAll(fetchAnomaliesByMetricDataset(start, end, metric, dataset));
-
-    // sort descending by start time
-    Collections.sort(anomalies, (o1, o2) -> -1 * Long.compare(o1.getStartTime(), o2.getStartTime()));
-
-    if (fetchTrueAnomaly) {
-      // Filter and retain only true anomalies
-      List<MergedAnomalyResultDTO> trueAnomalies = new ArrayList<>();
-      for (MergedAnomalyResultDTO anomaly : anomalies) {
-        if (anomaly.getFeedback() != null && anomaly.getFeedback().getFeedbackType().isAnomaly()) {
-          trueAnomalies.add(anomaly);
-        }
-      }
-      anomalies = trueAnomalies;
-    }
-    // filter child anomalies
-    anomalies = anomalies.stream().filter(anomaly -> !anomaly.isChild()).collect(Collectors.toList());
-    // limit result size
-    anomalies = anomalies.subList(0, Math.min(anomalies.size(), limit));
-
-    List<AnomalySummary> output = getAnomalyFormattedOutput(anomalies);
 
     LOG.info("Successfully returned " + output.size() + " anomalies.");
-    return output;
+    return Response.ok(output).build();
   }
 
   private List<AnomalySummary> getAnomalyFormattedOutput(List<MergedAnomalyResultDTO> anomalies) {
@@ -238,6 +269,30 @@ public class UserDashboardResource {
     return output;
   }
 
+  private Collection<MergedAnomalyResultDTO> fetchAnomaliesByMetricDatasetPairs(Long start, Long end, List<MetricDatasetPair> metricsRef) {
+    List<MergedAnomalyResultDTO> anomalies = new ArrayList<>();
+
+    if (metricsRef == null) {
+      return Collections.emptyList();
+    }
+
+    List<Predicate> predicates = new ArrayList<>();
+    predicates.add(Predicate.GE("endTime", start));
+    if (end != null) {
+      predicates.add(Predicate.LT("startTime", end));
+    }
+
+    for (MetricDatasetPair metricDatasetPair : metricsRef) {
+      List<Predicate> metricDatasetPred = new ArrayList<>(predicates);
+
+      metricDatasetPred.add(Predicate.EQ("collection", metricDatasetPair.datasetName));
+      metricDatasetPred.add(Predicate.EQ("metric", metricDatasetPair.metricName));
+      anomalies.addAll(this.anomalyDAO.findByPredicate(Predicate.AND(metricDatasetPred.toArray(new Predicate[0]))));
+    }
+
+    return anomalies;
+  }
+
   private Collection<MergedAnomalyResultDTO> fetchAnomaliesByMetricDataset(Long start, Long end, String metric, String dataset) {
     if (StringUtils.isBlank(metric) && StringUtils.isBlank(dataset)) {
       return Collections.emptyList();
@@ -260,7 +315,7 @@ public class UserDashboardResource {
     return this.anomalyDAO.findByPredicate(Predicate.AND(predicates.toArray(new Predicate[predicates.size()])));
   }
 
-  private Collection<MergedAnomalyResultDTO> fetchAnomaliesByApplication(Long start, Long end, String application) throws Exception {
+  private Collection<MergedAnomalyResultDTO> fetchAnomaliesByApplication(Long start, Long end, String application) {
     if (StringUtils.isBlank(application)) {
       return Collections.emptyList();
     }
@@ -276,7 +331,7 @@ public class UserDashboardResource {
     return fetchAnomaliesByConfigIds(start, end, detectionConfigIds);
   }
 
-  private Collection<MergedAnomalyResultDTO> fetchAnomaliesBySubsGroup(Long start, Long end, String group) throws Exception {
+  private Collection<MergedAnomalyResultDTO> fetchAnomaliesBySubsGroup(Long start, Long end, String group) {
     if (StringUtils.isBlank(group)) {
       return Collections.emptyList();
     }
@@ -292,7 +347,7 @@ public class UserDashboardResource {
     return fetchAnomaliesByConfigIds(start, end, detectionConfigIds);
   }
 
-  private Collection<MergedAnomalyResultDTO> fetchAnomaliesByConfigIds(Long start, Long end, Set<Long> detectionConfigIds) throws Exception {
+  private Collection<MergedAnomalyResultDTO> fetchAnomaliesByConfigIds(Long start, Long end, Set<Long> detectionConfigIds) {
     if (detectionConfigIds.isEmpty()) {
       return Collections.emptyList();
     }

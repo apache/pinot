@@ -1,23 +1,38 @@
-package org.apache.pinot.thirdeye.dashboard.resource.v2;
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
+package org.apache.pinot.thirdeye.api.user.dashboard;
 
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.pinot.thirdeye.api.user.dashboard.UserDashboardResource;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.pojo.AnomalySummary;
-import org.apache.pinot.thirdeye.datalayer.bao.AlertConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.DAOTestBase;
 import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionAlertConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
-import org.apache.pinot.thirdeye.datalayer.dto.AlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
-import org.apache.pinot.thirdeye.datalayer.pojo.AlertConfigBean;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -72,7 +87,6 @@ public class UserDashboardResourceTest {
 
     // anomalies
     this.anomalyDAO = DAORegistry.getInstance().getMergedAnomalyResultDAO();
-    this.anomalyDAO = DAORegistry.getInstance().getMergedAnomalyResultDAO();
     this.anomalyIds = new ArrayList<>();
     this.anomalyIds.add(this.anomalyDAO.save(makeAnomaly(100, 500, this.detectionIds.get(0), "test_metric", "test_dataset"))); // myDetectionA
     this.anomalyIds.add(this.anomalyDAO.save(makeAnomaly(800, 1200, this.detectionIds.get(0), "test_metric", "test_dataset"))); // myDetectionA
@@ -110,47 +124,65 @@ public class UserDashboardResourceTest {
 
   @Test
   public void testAnomaliesByApplication() throws Exception {
-    List<AnomalySummary> anomalies = this.resource.queryAnomalies(1000L, null, "myApplicationA", null, null, null, false, null);
+    List<AnomalySummary> anomalies = this.resource.queryAnomalies(1000L, null, "myApplicationA", null, null, null, null, false, null);
     Assert.assertEquals(anomalies.size(), 2);
     Assert.assertEquals(extractIds(anomalies), makeSet(this.anomalyIds.get(1), this.anomalyIds.get(2)));
   }
 
   @Test
   public void testAnomaliesByApplicationInvalid() throws Exception {
-    List<AnomalySummary> anomalies = this.resource.queryAnomalies(1000L, null, "Invalid", null, null, null, false, null);
+    List<AnomalySummary> anomalies = this.resource.queryAnomalies(1000L, null, "Invalid", null, null, null, null, false, null);
     Assert.assertEquals(anomalies.size(), 0);
   }
 
   @Test
   public void testAnomaliesByGroup() throws Exception {
-    List<AnomalySummary> anomalies = this.resource.queryAnomalies(1000L, null, null, "myAlertB", null, null, false, null);
+    List<AnomalySummary> anomalies = this.resource.queryAnomalies(1000L, null, null, "myAlertB", null, null, null, false, null);
     Assert.assertEquals(anomalies.size(), 2);
     Assert.assertEquals(extractIds(anomalies), makeSet(this.anomalyIds.get(3), this.anomalyIds.get(4)));
   }
 
   @Test
   public void testAnomaliesByGroupInvalid() throws Exception {
-    List<AnomalySummary> anomalies = this.resource.queryAnomalies(1000L, null, null, "Invalid", null, null, false, null);
+    List<AnomalySummary> anomalies = this.resource.queryAnomalies(1000L, null, null, "Invalid", null, null, null, false, null);
     Assert.assertEquals(anomalies.size(), 0);
   }
 
   @Test
   public void testAnomaliesLimit() throws Exception {
-    List<AnomalySummary> anomalies = this.resource.queryAnomalies(1000L, null, "myApplicationA", null, null, null, false, 1);
+    List<AnomalySummary> anomalies = this.resource.queryAnomalies(1000L, null, "myApplicationA", null, null, null, null, false, 1);
     Assert.assertEquals(anomalies.size(), 1);
     Assert.assertEquals(extractIds(anomalies), makeSet(this.anomalyIds.get(1)));
   }
 
   @Test
   public void testAnomaliesByMetric() throws Exception {
-    List<AnomalySummary> anomalies = this.resource.queryAnomalies(1000L, null, null, null, "test_metric", "test_dataset", false, null);
+    List<AnomalySummary> anomalies = this.resource.queryAnomalies(1000L, null, null, null, "test_metric", "test_dataset", null, false, null);
     Assert.assertEquals(anomalies.size(), 3);
     Assert.assertEquals(extractIds(anomalies), makeSet(this.anomalyIds.get(1), this.anomalyIds.get(2), this.anomalyIds.get(3)));
   }
 
   @Test
   public void testAnomaliesByDataset() throws Exception {
-    List<AnomalySummary> anomalies = this.resource.queryAnomalies(1000L, null, null, null, null, "test_dataset", false, null);
+    List<AnomalySummary> anomalies = this.resource.queryAnomalies(1000L, null, null, null, null, "test_dataset", null, false, null);
+    Assert.assertEquals(anomalies.size(), 4);
+    Assert.assertEquals(extractIds(anomalies), makeSet(this.anomalyIds.get(1), this.anomalyIds.get(2), this.anomalyIds.get(3), this.anomalyIds.get(4)));
+  }
+
+  @Test
+  public void testAnomaliesByMetricDatasetPairs() throws Exception {
+    List<AnomalySummary> anomalies = this.resource.queryAnomalies(1000L, null, null, null, null, null,
+        Collections.singletonList(new UserDashboardResource.MetricDatasetPair("test_dataset", "test_metric")), false, null);
+    Assert.assertEquals(anomalies.size(), 3);
+    Assert.assertEquals(extractIds(anomalies), makeSet(this.anomalyIds.get(1), this.anomalyIds.get(2), this.anomalyIds.get(3)));
+  }
+
+  @Test
+  public void testAnomaliesByMultipleMetricDatasetPairs() throws Exception {
+    List<UserDashboardResource.MetricDatasetPair> metricPairs = new ArrayList<>();
+    metricPairs.add(new UserDashboardResource.MetricDatasetPair("test_dataset", "test_metric"));
+    metricPairs.add(new UserDashboardResource.MetricDatasetPair("test_dataset", "test_metric_2"));
+    List<AnomalySummary> anomalies = this.resource.queryAnomalies(1000L, null, null, null, null, null, metricPairs, false, null);
     Assert.assertEquals(anomalies.size(), 4);
     Assert.assertEquals(extractIds(anomalies), makeSet(this.anomalyIds.get(1), this.anomalyIds.get(2), this.anomalyIds.get(3), this.anomalyIds.get(4)));
   }
