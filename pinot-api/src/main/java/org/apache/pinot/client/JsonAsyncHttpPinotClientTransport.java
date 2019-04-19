@@ -58,7 +58,9 @@ class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
 
       final String url = "http://" + brokerAddress + "/query";
 
-      final Future<Response> response = _httpClient.preparePost(url).setBody(json.toString()).execute();
+      final Future<Response> response = _httpClient.preparePost(url)
+          .addHeader("Content-Type", "application/json; charset=utf-8")
+          .setBody(json.toString()).execute();
 
       return new BrokerResponseFuture(response, query, url);
     } catch (Exception e) {
@@ -113,7 +115,7 @@ class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
               "Pinot returned HTTP status " + httpResponse.getStatusCode() + ", expected 200");
         }
 
-        String responseBody = httpResponse.getResponseBody();
+        String responseBody = httpResponse.getResponseBody("UTF-8");
         return BrokerResponse.fromJson(OBJECT_READER.readTree(responseBody));
       } catch (Exception e) {
         throw new ExecutionException(e);
