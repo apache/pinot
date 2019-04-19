@@ -53,15 +53,45 @@ public class TimeSeries {
     this.df.addSeries(DataFrameUtils.COL_VALUE, baselineValues);
   }
 
+  /**
+   * Add the predicted upper bound into the timeseries
+   * @param upperBoundValues predicted upper bound values
+   */
+  public void addPredictedUpperBound(DoubleSeries upperBoundValues) {
+    this.df.addSeries(DataFrameUtils.COL_UPPER_BOUND, upperBoundValues);
+  }
+
+  /**
+   * Add the predicted lower bound into the timeseries
+   * @param lowerBoundValues predicted lower bound values
+   */
+  public void addPredictedLowerBound(DoubleSeries lowerBoundValues) {
+    this.df.addSeries(DataFrameUtils.COL_LOWER_BOUND, lowerBoundValues);
+  }
+
   public static TimeSeries fromDataFrame(DataFrame df) {
     TimeSeries ts = new TimeSeries();
     ts.df.addSeries(COL_TIME, df.get(COL_TIME)).setIndex(COL_TIME);
     ts.df.addSeries(DataFrameUtils.COL_VALUE, df.get(DataFrameUtils.COL_VALUE));
+    if (df.contains(DataFrameUtils.COL_UPPER_BOUND)) {
+      ts.df.addSeries(DataFrameUtils.COL_UPPER_BOUND, df.get(DataFrameUtils.COL_UPPER_BOUND));
+    }
+    if (df.contains(DataFrameUtils.COL_LOWER_BOUND)) {
+      ts.df.addSeries(DataFrameUtils.COL_LOWER_BOUND, df.get(DataFrameUtils.COL_LOWER_BOUND));
+    }
     return ts;
   }
 
   public DoubleSeries getPredictedBaseline() {
     return this.df.getDoubles(DataFrameUtils.COL_VALUE);
+  }
+
+  public DoubleSeries getPredictedUpperBound() {
+    return this.df.getDoubles(DataFrameUtils.COL_UPPER_BOUND);
+  }
+
+  public DoubleSeries getPredictedLowerBound() {
+    return this.df.getDoubles(DataFrameUtils.COL_LOWER_BOUND);
   }
 
   public DataFrame getDataFrame() {

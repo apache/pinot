@@ -62,6 +62,8 @@ import org.joda.time.PeriodType;
 public class DataFrameUtils {
   public static final String COL_TIME = "timestamp";
   public static final String COL_VALUE = "value";
+  public static final String COL_UPPER_BOUND = "upper_bound";
+  public static final String COL_LOWER_BOUND = "lower_bound";
 
   /**
    * Returns a Thirdeye response parsed as a DataFrame. The method stores the time values in
