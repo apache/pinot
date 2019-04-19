@@ -12,12 +12,17 @@ export default Route.extend({
 
   // Make duration service accessible
   durationCache: service('services/duration'),
+  anomaliesApiService: service('services/api/anomalies'),
   session: service(),
+  store: service('store'),
 
-  model() {
+  async model() {
+    const anomaliesById = await getAnomalyIdsByTimeRange(start, end);
+    const subscriptionGroups = await this.get('anomaliesApiService').querySubscriptionGroups(); // Get all subscription groups available
     return hash({
       updateAnomalies:  getAnomalyIdsByTimeRange,
-      anomaliesById: getAnomalyIdsByTimeRange(start, end)
+      anomaliesById,
+      subscriptionGroups
     });
   },
 
@@ -56,6 +61,12 @@ export default Route.extend({
         type: 'select',
         matchWidth: true,
         filterKeys: []
+      },
+      {
+        name: 'subscriptionFilterMap',
+        title: 'Subscription Groups',
+        type: 'select',
+        filterKeys: []
       }
     ];
 
@@ -81,6 +92,14 @@ export default Route.extend({
         const filterKeys = [ ...new Set(powerSort(anomalyPropertyArray, null))];
         // Add filterKeys prop to each facet or filter block
         Object.assign(filter, { filterKeys });
+      } else if (filter.name === "subscriptionFilterMap"){
+        const filterKeys = this.get('store')
+          .peekAll('subscription-groups')
+          .sortBy('name')
+          .filter(group => (group.get('active') && group.get('yaml')))
+          .map(group => group.get('name'));
+        // Add filterKeys prop to each facet or filter block
+        Object.assign(filter, { filterKeys });
       } else {
         const anomalyPropertyArray = Object.keys(model.anomaliesById.searchFilters[filter.name]);
         const filterKeys = [ ...new Set(powerSort(anomalyPropertyArray, null))];
@@ -101,7 +120,8 @@ export default Route.extend({
       updateAnomalies: model.updateAnomalies,  //requires start and end time in epoch ex updateAnomalies(start, end)
       filterBlocksLocal,
       anomalyIds: model.anomaliesById.anomalyIds,
-      anomaliesRange: [start, end]
+      anomaliesRange: [start, end],
+      subscriptionGroups: model.subscriptionGroups
     });
   },
 
