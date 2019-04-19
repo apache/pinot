@@ -125,7 +125,8 @@ public class BaselineFillingMergeWrapperTest {
     MockBaselineProviderSpec spec = new MockBaselineProviderSpec();
     spec.setBaselineAggregates(ImmutableMap.of(MetricSlice.from(1, 3000, 3600), 100.0));
     spec.setBaselineTimeseries(ImmutableMap.of(MetricSlice.from(1, 3000, 3600), TimeSeries.fromDataFrame(
-        DataFrame.builder(COL_TIME + ":LONG", COL_VALUE + ":DOUBLE").append(3000, 100).build())));
+        DataFrame.builder(COL_TIME + ":LONG", COL_VALUE + ":DOUBLE" , COL_UPPER_BOUND + ":DOUBLE", COL_LOWER_BOUND + ":DOUBLE")
+            .append(3000, 100, 200, 50).build())));
     InputDataFetcher dataFetcher = new DefaultInputDataFetcher(provider, this.config.getId());
     baselineProvider.init(spec, dataFetcher);
     this.config.setComponents(ImmutableMap.of("baseline", baselineProvider));
@@ -138,9 +139,15 @@ public class BaselineFillingMergeWrapperTest {
     Assert.assertEquals(anomalyResults.size(), 1);
     Assert.assertTrue(anomalyResults.contains(anomaly));
     Assert.assertEquals(anomalyResults.get(0).getAvgBaselineVal(), 100.0);
+    Assert.assertEquals(anomalyResults.get(0).getAvgBaselineVal(), 100.0);
     Assert.assertEquals(anomalyResults.get(0).getAvgCurrentVal(), 100.0);
     Assert.assertEquals(anomalyResults.get(0).getProperties().get("detectorComponentName"), "testDetector");
     Assert.assertEquals(anomalyResults.get(0).getProperties().get("baselineProviderComponentName"), "baseline");
+
+    TimeSeries ts = baselineProvider.computePredictedTimeSeries(MetricSlice.from(1, 3000, 3600));
+    Assert.assertEquals(ts.getPredictedBaseline().get(0), 100.0);
+    Assert.assertEquals(ts.getPredictedUpperBound().get(0), 200.0);
+    Assert.assertEquals(ts.getPredictedLowerBound().get(0), 50.0);
   }
 
   @Test
@@ -165,7 +172,8 @@ public class BaselineFillingMergeWrapperTest {
     MockBaselineProviderSpec spec = new MockBaselineProviderSpec();
     spec.setBaselineAggregates(ImmutableMap.of(MetricSlice.from(1, 3000, 3600), 100.0));
     spec.setBaselineTimeseries(ImmutableMap.of(MetricSlice.from(1, 3000, 3600), TimeSeries.fromDataFrame(
-        DataFrame.builder(COL_TIME + ":LONG", COL_VALUE + ":DOUBLE").append(3000, 100).build())));
+        DataFrame.builder(COL_TIME + ":LONG", COL_VALUE + ":DOUBLE", COL_UPPER_BOUND + ":DOUBLE", COL_LOWER_BOUND + ":DOUBLE")
+            .append(3000, 100, 200, 50).build())));
     InputDataFetcher dataFetcher = new DefaultInputDataFetcher(provider, this.config.getId());
     baselineProvider.init(spec, dataFetcher);
     this.config.setComponents(ImmutableMap.of("baseline", baselineProvider));
@@ -179,5 +187,10 @@ public class BaselineFillingMergeWrapperTest {
     Assert.assertEquals(anomalyResults.get(0).getAvgCurrentVal(), 999.0);
     Assert.assertEquals(anomalyResults.get(0).getProperties().get("detectorComponentName"), "testDetector");
     Assert.assertEquals(anomalyResults.get(0).getProperties().get("baselineProviderComponentName"), "someBaseline");
+
+    TimeSeries ts = baselineProvider.computePredictedTimeSeries(MetricSlice.from(1, 3000, 3600));
+    Assert.assertEquals(ts.getPredictedBaseline().get(0), 100.0);
+    Assert.assertEquals(ts.getPredictedUpperBound().get(0), 200.0);
+    Assert.assertEquals(ts.getPredictedLowerBound().get(0), 50.0);
   }
 }
