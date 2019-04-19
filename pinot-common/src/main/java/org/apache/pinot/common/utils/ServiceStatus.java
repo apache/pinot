@@ -199,24 +199,18 @@ public class ServiceStatus {
     protected abstract String getMatchName();
 
     private boolean isDone() {
-      if (_resourcesToMonitor.isEmpty() || _numTotalResourcesToMonitor <= 0) {
-        return true;
-      }
-      if (_numTotalResourcesToMonitor - _resourcesToMonitor.size() >= _minResourcesStartCount) {
-        return true;
-      }
-      return false;
+      return _numTotalResourcesToMonitor - _resourcesToMonitor.size() >= _minResourcesStartCount;
     }
 
-    // Each time getServiceStatus is called, we move on to the next resource that needs to be examined. If we
+    // Each time getServiceStatus() is called, we move on to the next resource that needs to be examined. If we
     // reach the end, we set the iterator back to the beginning, starting again on the resource we left off
     // a while ago.
-    // We do so until minResourcesStartPercent percent of resources have converged their externalview (or currentstate)
-    // to the idealstate. If any resource has not converged (and we have still not reached the threshold percent) then
+    // We do so until minResourcesStartPercent percent of resources have converged their ExternalView (or CurrentState)
+    // to the IdealState. If any resource has not converged (and we have still not reached the threshold percent) then
     // we return immediately.
     // This allows us to move forward with resources that have converged as opposed to getting stuck with those that
     // have not.
-    // In large installations with 1000s of resources, some resources may be stuck in transitions due to zookpeer
+    // In large installations with 1000s of resources, some resources may be stuck in transitions due to zookeeper
     // connection issues in helix. In such cases, setting a percentage threshold to be (say) 99.9% allows us to move
     // past and declare the server as having STARTED as opposed to waiting for the one resource that may never converge.
     // Note:
@@ -250,9 +244,10 @@ public class ServiceStatus {
           return statusDescriptionPair._status;
         }
       }
+      _resourceIterator = null;
 
       // At this point, one of the following conditions hold:
-      // 1. We entered the loop above, and all the remaining resources ended up in GOOOD state.
+      // 1. We entered the loop above, and all the remaining resources ended up in GOOD state.
       //    In that case _resourcesToMonitor would be empty.
       // 2. We entered the loop above and cleared most of the remaining resources, but some small
       //    number are still not converged. In that case, we exited the loop because we have met
@@ -264,26 +259,25 @@ public class ServiceStatus {
       //    the same action as for (2) above.
       // In all three cases above, we need to return Status.GOOD
 
+      int logCount = MAX_RESOURCE_NAMES_TO_LOG;
+      Iterator<String> resourceIterator = _resourcesToMonitor.iterator();
+      while (resourceIterator.hasNext()) {
+        String resource = resourceIterator.next();
+        StatusDescriptionPair statusDescriptionPair = evaluateResourceStatus(resource);
+        if (statusDescriptionPair._status == Status.GOOD) {
+          resourceIterator.remove();
+        } else {
+          if (logCount-- <= 0) {
+            break;
+          }
+          LOGGER.info("Resource: {}, StatusDescription: {}", resource, statusDescriptionPair._description);
+        }
+      }
       if (_resourcesToMonitor.isEmpty()) {
         _statusDescription = STATUS_DESCRIPTION_NONE;
-        LOGGER.info("Instance {} has finished starting up", _instanceName);
       } else {
-        int logCount = MAX_RESOURCE_NAMES_TO_LOG;
-        _resourceIterator = _resourcesToMonitor.iterator();
-        while (_resourceIterator.hasNext()) {
-          String resource = _resourceIterator.next();
-          StatusDescriptionPair statusDescriptionPair = evaluateResourceStatus(resource);
-          if (statusDescriptionPair._status == Status.GOOD) {
-            _resourceIterator.remove();
-          } else {
-            LOGGER.info("Resource: {}, StatusDescription: {}", resource, statusDescriptionPair._description);
-            if (--logCount <= 0) {
-              break;
-            }
-          }
-        }
         _statusDescription = String
-            .format("waitingFor=%s, numResourcesLeft=%d, numTotalResources=%d, minStartCount=%d," + " resourceList=%s",
+            .format("waitingFor=%s, numResourcesLeft=%d, numTotalResources=%d, minStartCount=%d, resourceList=%s",
                 getMatchName(), _resourcesToMonitor.size(), _numTotalResourcesToMonitor, _minResourcesStartCount,
                 getResourceListAsString());
         LOGGER.info("Instance {} returning GOOD because {}", _instanceName, _statusDescription);
@@ -336,7 +330,12 @@ public class ServiceStatus {
       if (_resourcesToMonitor.size() <= MAX_RESOURCE_NAMES_TO_LOG) {
         return _resourcesToMonitor.toString();
       }
-      return "[" + _resourcesToMonitor.iterator().next() + ",...]";
+      StringBuilder stringBuilder = new StringBuilder("[");
+      Iterator<String> resourceIterator = _resourcesToMonitor.iterator();
+      for (int i = 0; i < MAX_RESOURCE_NAMES_TO_LOG; i++) {
+        stringBuilder.append(resourceIterator.next()).append(", ");
+      }
+      return stringBuilder.append("...]").toString();
     }
 
     @Override
