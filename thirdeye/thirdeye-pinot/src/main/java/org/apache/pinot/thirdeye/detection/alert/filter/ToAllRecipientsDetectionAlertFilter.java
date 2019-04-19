@@ -19,6 +19,7 @@
 
 package org.apache.pinot.thirdeye.detection.alert.filter;
 
+import java.util.stream.Collectors;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.detection.ConfigUtils;
@@ -69,13 +70,29 @@ public class ToAllRecipientsDetectionAlertFilter extends StatefulDetectionAlertF
 
     final long minId = getMinId(highWaterMark);
 
+    to = cleanupRecipients(this.recipients.get(PROP_TO));
+    cc = cleanupRecipients(this.recipients.get(PROP_CC));
+    bcc = cleanupRecipients(this.recipients.get(PROP_BCC));
+
+    // Early termination if there are no recipients in the "to" field
+    if (to.isEmpty()) {
+      return result;
+    }
+
+    // Fetch all the anomalies to be notified to the recipients
     Set<MergedAnomalyResultDTO> anomalies = this.filter(this.makeVectorClocks(this.detectionConfigIds), minId);
 
-    to = (this.recipients.get(PROP_TO) == null) ? Collections.emptySet() : new HashSet<>(this.recipients.get(PROP_TO));
-    cc = (this.recipients.get(PROP_CC) == null) ? Collections.emptySet() : new HashSet<>(this.recipients.get(PROP_CC));
-    bcc = (this.recipients.get(PROP_BCC) == null) ? Collections.emptySet() : new HashSet<>(this.recipients.get(PROP_BCC));
-
     return result.addMapping(new DetectionAlertFilterRecipients(to, cc, bcc), anomalies);
+  }
+
+  private Set<String> cleanupRecipients(Set<String> recipient) {
+    Set<String> filteredRecipients = new HashSet<>();
+    if (recipient != null) {
+      filteredRecipients.addAll(recipient);
+      filteredRecipients = filteredRecipients.stream().map(String::trim).collect(Collectors.toSet());
+      filteredRecipients.removeIf(rec -> rec == null || "".equals(rec));
+    }
+    return filteredRecipients;
   }
 
   private long getMinId(long highWaterMark) {

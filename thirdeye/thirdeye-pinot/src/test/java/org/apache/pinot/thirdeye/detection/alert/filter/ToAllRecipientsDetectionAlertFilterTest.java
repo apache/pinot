@@ -20,6 +20,7 @@ import org.apache.pinot.thirdeye.constant.AnomalyFeedbackType;
 import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.detection.ConfigUtils;
 import org.apache.pinot.thirdeye.detection.MockDataProvider;
 import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilter;
 import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterRecipients;
@@ -45,6 +46,7 @@ public class ToAllRecipientsDetectionAlertFilterTest {
   private static final String PROP_TO = "to";
   private static final String PROP_CC = "cc";
   private static final String PROP_BCC = "bcc";
+  private static final Set<String> PROP_EMPTY_TO_VALUE = new HashSet<>();
   private static final Set<String> PROP_TO_VALUE = new HashSet<>(Arrays.asList("test@test.com", "test@test.org"));
   private static final Set<String> PROP_CC_VALUE = new HashSet<>(Arrays.asList("cctest@test.com", "cctest@test.org"));
   private static final Set<String> PROP_BCC_VALUE = new HashSet<>(Arrays.asList("bcctest@test.com", "bcctest@test.org"));
@@ -60,7 +62,6 @@ public class ToAllRecipientsDetectionAlertFilterTest {
 
   private MockDataProvider provider;
   private DetectionAlertConfigDTO alertConfig;
-  private DetectionAlertConfigDTO alertConfigForLegacyAnomalies;
 
   @BeforeMethod
   public void beforeMethod() {
@@ -81,7 +82,6 @@ public class ToAllRecipientsDetectionAlertFilterTest {
         .setAnomalies(this.detectedAnomalies);
 
     this.alertConfig = createDetectionAlertConfig();
-    this.alertConfigForLegacyAnomalies = createDetectionAlertConfig();
   }
 
   private DetectionAlertConfigDTO createDetectionAlertConfig() {
@@ -196,5 +196,16 @@ public class ToAllRecipientsDetectionAlertFilterTest {
     Assert.assertEquals(result.getResult().get(RECIPIENTS).size(), 2);
     Assert.assertTrue(result.getResult().get(RECIPIENTS).contains(existingNew));
     Assert.assertTrue(result.getResult().get(RECIPIENTS).contains(existingFuture));
+  }
+
+  @Test
+  public void testGetAlertFilterResultWhenNoRecipient() throws Exception {
+    Map<String, Object> properties = ConfigUtils.getMap(this.alertConfig.getProperties().get(PROP_RECIPIENTS));
+    properties.put(PROP_TO, PROP_EMPTY_TO_VALUE);
+    this.alertConfig.setProperties(properties);
+    this.alertFilter = new ToAllRecipientsDetectionAlertFilter(this.provider, this.alertConfig,2500L);
+
+    DetectionAlertFilterResult result = this.alertFilter.run();
+    Assert.assertEquals(result.getResult().size(), 0);
   }
 }
