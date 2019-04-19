@@ -21,9 +21,11 @@ package org.apache.pinot.thirdeye.detection.spec;
 
 public class PercentageChangeRuleAnomalyFilterSpec extends AbstractSpec {
   private String timezone = "UTC";
-  private double threshold = Double.NaN;
   private String offset;
   private String pattern= "UP_OR_DOWN";
+  private double threshold = 0.0; // by default set threshold to 0 to pass all anomalies
+  private double upThreshold = Double.NaN;
+  private double downThreshold = Double.NaN;
 
   public String getTimezone() {
     return timezone;
@@ -55,5 +57,21 @@ public class PercentageChangeRuleAnomalyFilterSpec extends AbstractSpec {
 
   public void setPattern(String pattern) {
     this.pattern = pattern;
+  }
+
+  public double getUpThreshold() {
+    return upThreshold;
+  }
+
+  public void setUpThreshold(double upThreshold) {
+    this.upThreshold = upThreshold;
+  }
+
+  public double getDownThreshold() {
+    return downThreshold;
+  }
+
+  public void setDownThreshold(double downThreshold) {
+    this.downThreshold = downThreshold;
   }
 }
