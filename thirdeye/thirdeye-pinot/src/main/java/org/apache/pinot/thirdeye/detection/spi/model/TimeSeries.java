@@ -38,6 +38,7 @@ public class TimeSeries {
   }
 
   public TimeSeries(LongSeries timestamps, DoubleSeries baselineValues) {
+    this.df = new DataFrame();
     this.df.addSeries(COL_TIME, timestamps).setIndex(COL_TIME);
     this.df.addSeries(DataFrameUtils.COL_VALUE, baselineValues);
   }
