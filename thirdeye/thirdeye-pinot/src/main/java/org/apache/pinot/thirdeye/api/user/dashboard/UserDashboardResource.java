@@ -25,6 +25,7 @@ import com.wordnik.swagger.annotations.Api;
 import com.wordnik.swagger.annotations.ApiOperation;
 import com.wordnik.swagger.annotations.ApiParam;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -55,10 +56,6 @@ import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.datalayer.util.Predicate;
-import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
-import org.apache.pinot.thirdeye.datasource.loader.AggregationLoader;
-import org.apache.pinot.thirdeye.datasource.loader.DefaultAggregationLoader;
-import org.apache.pinot.thirdeye.detection.CurrentAndBaselineLoader;
 import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -94,11 +91,6 @@ public class UserDashboardResource {
 
   List<AnomalySummary> queryAnomalies(Long start, Long end, String application, String group, String metric,
       String dataset, List<MetricDatasetPair> metricDatasetPairs, boolean fetchTrueAnomaly, Integer limit) {
-    LOG.info("Fetching anomalies with filters. Start: " + start + " end: " + end + " metric: "
-        + metric + " dataset: " + dataset + " metricDatasetPairs: " + metricDatasetPairs + " application: "
-        + application + " group: " + group + " fetchTrueAnomaly: " + fetchTrueAnomaly + " limit: " + limit);
-
-    // Safety conditions
     if (limit == null) {
       LOG.warn("No upper limit specified while fetching anomalies. Defaulting to " + ANOMALIES_LIMIT_DEFAULT);
       limit = ANOMALIES_LIMIT_DEFAULT;
@@ -146,7 +138,7 @@ public class UserDashboardResource {
       this.metricName = metric;
     }
 
-    public static MetricDatasetPair valueOf(String metricDatasetPair){
+    public static MetricDatasetPair fromString(String metricDatasetPair){
       String[] metricDataset = metricDatasetPair.trim().split("::");
       if (metricDataset.length != 2) {
         throw new RuntimeException("Unable to parse dataset::metric pair " + metricDatasetPair);
@@ -206,8 +198,8 @@ public class UserDashboardResource {
       @QueryParam("metric") String metric,
       @ApiParam(value = "The name of the pinot table to which this metric belongs")
       @QueryParam("dataset") String dataset,
-      @ApiParam(value = "Comma separated list of dataset.metric E.g., D1::M1,D1::M2,D2::M3")
-      @QueryParam("metricDatasetPairs") List<MetricDatasetPair> metricDatasetPairs,
+      @ApiParam(value = "Specify multiple dataset::metric pairs")
+      @QueryParam("metricAlias") List<MetricDatasetPair> metricDatasetPairs,
       @ApiParam(value = "Specify if you want to only fetch true anomalies")
       @QueryParam("fetchTrueAnomaly") @DefaultValue("false") boolean fetchTrueAnomaly,
       @ApiParam(value = "max number of results")
