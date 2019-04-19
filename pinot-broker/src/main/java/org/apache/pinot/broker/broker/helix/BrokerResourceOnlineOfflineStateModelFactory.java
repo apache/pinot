@@ -27,7 +27,7 @@ import org.apache.helix.participant.statemachine.StateModelFactory;
 import org.apache.helix.participant.statemachine.StateModelInfo;
 import org.apache.helix.participant.statemachine.Transition;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.apache.pinot.broker.queryquota.TableQueryQuotaManager;
+import org.apache.pinot.broker.queryquota.HelixExternalViewBasedQueryQuotaManager;
 import org.apache.pinot.broker.routing.HelixExternalViewBasedRouting;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.config.TableConfig;
@@ -50,15 +50,15 @@ public class BrokerResourceOnlineOfflineStateModelFactory extends StateModelFact
   private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private final HelixDataAccessor _helixDataAccessor;
   private final HelixExternalViewBasedRouting _helixExternalViewBasedRouting;
-  private final TableQueryQuotaManager _tableQueryQuotaManager;
+  private final HelixExternalViewBasedQueryQuotaManager _helixExternalViewBasedQueryQuotaManager;
 
   public BrokerResourceOnlineOfflineStateModelFactory(ZkHelixPropertyStore<ZNRecord> propertyStore,
       HelixDataAccessor helixDataAccessor, HelixExternalViewBasedRouting helixExternalViewBasedRouting,
-      TableQueryQuotaManager tableQueryQuotaManager) {
+      HelixExternalViewBasedQueryQuotaManager helixExternalViewBasedQueryQuotaManager) {
     _helixDataAccessor = helixDataAccessor;
     _propertyStore = propertyStore;
     _helixExternalViewBasedRouting = helixExternalViewBasedRouting;
-    _tableQueryQuotaManager = tableQueryQuotaManager;
+    _helixExternalViewBasedQueryQuotaManager = helixExternalViewBasedQueryQuotaManager;
   }
 
   public static String getStateModelDef() {
@@ -83,7 +83,7 @@ public class BrokerResourceOnlineOfflineStateModelFactory extends StateModelFact
         _helixExternalViewBasedRouting.markDataResourceOnline(tableConfig,
             _helixDataAccessor.getProperty(_helixDataAccessor.keyBuilder().externalView(tableName)),
             _helixDataAccessor.getChildValues(_helixDataAccessor.keyBuilder().instanceConfigs()));
-        _tableQueryQuotaManager.initTableQueryQuota(tableConfig,
+        _helixExternalViewBasedQueryQuotaManager.initTableQueryQuota(tableConfig,
             _helixDataAccessor.getProperty(_helixDataAccessor.keyBuilder().externalView(BROKER_RESOURCE_INSTANCE)));
       } catch (Exception e) {
         LOGGER.error("Caught exception during OFFLINE -> ONLINE transition", e);
@@ -98,7 +98,7 @@ public class BrokerResourceOnlineOfflineStateModelFactory extends StateModelFact
         LOGGER.info("BrokerResourceOnlineOfflineStateModel.onBecomeOfflineFromOnline() : " + message);
         String tableName = message.getPartitionName();
         _helixExternalViewBasedRouting.markDataResourceOffline(tableName);
-        _tableQueryQuotaManager.dropTableQueryQuota(tableName);
+        _helixExternalViewBasedQueryQuotaManager.dropTableQueryQuota(tableName);
       } catch (Exception e) {
         LOGGER.error("Caught exception during ONLINE -> OFFLINE transition", e);
         Utils.rethrowException(e);
@@ -112,7 +112,7 @@ public class BrokerResourceOnlineOfflineStateModelFactory extends StateModelFact
         LOGGER.info("BrokerResourceOnlineOfflineStateModel.onBecomeDroppedFromOffline() : " + message);
         String tableName = message.getPartitionName();
         _helixExternalViewBasedRouting.markDataResourceOffline(tableName);
-        _tableQueryQuotaManager.dropTableQueryQuota(tableName);
+        _helixExternalViewBasedQueryQuotaManager.dropTableQueryQuota(tableName);
       } catch (Exception e) {
         LOGGER.error("Caught exception during OFFLINE -> DROPPED transition", e);
         Utils.rethrowException(e);
@@ -126,7 +126,7 @@ public class BrokerResourceOnlineOfflineStateModelFactory extends StateModelFact
         LOGGER.info("BrokerResourceOnlineOfflineStateModel.onBecomeDroppedFromOnline() : " + message);
         String tableName = message.getPartitionName();
         _helixExternalViewBasedRouting.markDataResourceOffline(tableName);
-        _tableQueryQuotaManager.dropTableQueryQuota(tableName);
+        _helixExternalViewBasedQueryQuotaManager.dropTableQueryQuota(tableName);
       } catch (Exception e) {
         LOGGER.error("Caught exception during ONLINE -> DROPPED transition", e);
         Utils.rethrowException(e);

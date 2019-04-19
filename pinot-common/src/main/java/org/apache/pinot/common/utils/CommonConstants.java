@@ -111,6 +111,18 @@ public class CommonConstants {
   }
 
   public static class Broker {
+    public static final String ROUTING_TABLE_CONFIG_PREFIX = "pinot.broker.routing.table";
+    public static final String ACCESS_CONTROL_CONFIG_PREFIX = "pinot.broker.access.control";
+    public static final String METRICS_CONFIG_PREFIX = "pinot.broker.metrics";
+
+    public static final String CONFIG_OF_DELAY_SHUTDOWN_TIME_MS = "pinot.broker.delayShutdownTimeMs";
+    public static final long DEFAULT_DELAY_SHUTDOWN_TIME_MS = 10_000L;
+    public static final String CONFIG_OF_ENABLE_TABLE_LEVEL_METRICS = "pinot.broker.enableTableLevelMetrics";
+    public static final String CONFIG_OF_REQUEST_HANDLER_TYPE = "pinot.broker.requestHandlerType";
+    public static final String SINGLE_CONNECTION_REQUEST_HANDLER_TYPE = "singleConnection";
+    public static final String CONNECTION_POOL_REQUEST_HANDLER_TYPE = "connectionPool";
+    public static final String DEFAULT_REQUEST_HANDLER_TYPE = SINGLE_CONNECTION_REQUEST_HANDLER_TYPE;
+
     public static final String CONFIG_OF_BROKER_QUERY_RESPONSE_LIMIT = "pinot.broker.query.response.limit";
     public static final int DEFAULT_BROKER_QUERY_RESPONSE_LIMIT = Integer.MAX_VALUE;
     public static final String CONFIG_OF_BROKER_QUERY_LOG_LENGTH = "pinot.broker.query.log.length";

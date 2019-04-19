@@ -46,8 +46,8 @@ import static org.apache.pinot.common.utils.CommonConstants.Helix.BROKER_RESOURC
 import static org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
 
 
-public class TableQueryQuotaManager implements ClusterChangeHandler {
-  private static final Logger LOGGER = LoggerFactory.getLogger(TableQueryQuotaManager.class);
+public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHandler, QueryQuotaManager {
+  private static final Logger LOGGER = LoggerFactory.getLogger(HelixExternalViewBasedQueryQuotaManager.class);
   private static final int TIME_RANGE_IN_SECOND = 1;
 
   private final AtomicInteger _lastKnownBrokerResourceVersion = new AtomicInteger(-1);
@@ -58,7 +58,7 @@ public class TableQueryQuotaManager implements ClusterChangeHandler {
 
   @Override
   public void init(HelixManager helixManager) {
-    Preconditions.checkState(_helixManager == null, "TableQueryQuotaManager is already initialized");
+    Preconditions.checkState(_helixManager == null, "HelixExternalViewBasedQueryQuotaManager is already initialized");
     _helixManager = helixManager;
   }
 
@@ -190,10 +190,12 @@ public class TableQueryQuotaManager implements ClusterChangeHandler {
   }
 
   /**
-   * Acquire a token from rate limiter based on the table name.
-   * @param tableName original table name which could be raw.
+   * {@inheritDoc}
+   * <p>Acquires a token from rate limiter based on the table name.
+   *
    * @return true if there is no query quota specified for the table or a token can be acquired, otherwise return false.
    */
+  @Override
   public boolean acquire(String tableName) {
     LOGGER.debug("Trying to acquire token for table: {}", tableName);
     String offlineTableName = null;
