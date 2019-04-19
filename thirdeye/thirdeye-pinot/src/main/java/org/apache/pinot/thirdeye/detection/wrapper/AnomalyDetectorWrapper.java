@@ -161,9 +161,9 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
     int successWindows = 0;
     for (int i = 0; i < totalWindows; i++) {
       if (i == EARLY_TERMINATE_WINDOW && successWindows == 0) {
-        LOG.error("Successive first {}/{} detection windows failed for config {} metricUrn {}. Discard remaining windows",
-            EARLY_TERMINATE_WINDOW, totalWindows, config.getId(), metricUrn);
-        break;
+        throw new RuntimeException(String.format(
+            "Successive first %d/%d detection windows failed for config %d metricUrn %s for monitoring window %d to %d. Discard remaining windows",
+            EARLY_TERMINATE_WINDOW, totalWindows, config.getId(), metricUrn, this.getStartTime(), this.getEndTime()));
       }
 
       // run detection
@@ -186,6 +186,12 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
         LOG.warn("[DetectionConfigID{}] detecting anomalies for window {} to {} failed.", this.config.getId(), window.getStart(), window.getEnd(), e);
       }
       anomalies.addAll(anomaliesForOneWindow);
+    }
+
+    if (successWindows == 0) {
+      throw new RuntimeException(String.format(
+          "Detection failed for all windows for detection config id %d detector %s for monitoring window %d to %d.",
+          this.config.getId(), this.detectorName, this.getStartTime(), this.getEndTime()));
     }
 
     for (MergedAnomalyResultDTO anomaly : anomalies) {

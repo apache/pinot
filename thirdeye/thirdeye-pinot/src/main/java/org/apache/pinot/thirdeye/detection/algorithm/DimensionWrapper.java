@@ -205,8 +205,9 @@ public class DimensionWrapper extends DetectionPipeline {
     for (int i = 0; i < totalNestedMetrics; i++) {
       if (i == EARLY_STOP_THRESHOLD && successCount == 0) {
         // if for the first certain number of dimensions all failed, throw the exception
-        throw new RuntimeException(String.format("Detection failed for first %d out of %d metric dimensions, stop dimension explore.", i + 1,
-            totalNestedMetrics));
+        throw new RuntimeException(String.format(
+            "Detection failed for first %d out of %d metric dimensions for monitoring window %d to %d, stop dimension explore.",
+            i, totalNestedMetrics, this.getStartTime(), this.getEndTime()));
       }
       MetricEntity metric = nestedMetrics.get(i);
       try {
@@ -222,6 +223,12 @@ public class DimensionWrapper extends DetectionPipeline {
             this.config.getId(), this.start, this.end, metric.getUrn(), e);
       }
       successCount++;
+    }
+
+    if (successCount == 0) {
+      throw new RuntimeException(String.format(
+          "Detection failed for all nested dimensions for detection config id %d for monitoring window %d to %d, stop dimension explore.",
+          this.config.getId(), this.getStartTime(), this.getEndTime()));
     }
 
     return new DetectionPipelineResult(anomalies, DetectionUtils.consolidateNestedLastTimeStamps(lastTimeStamps))
