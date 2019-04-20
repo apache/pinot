@@ -385,7 +385,10 @@ public class HoltWintersDetector implements BaselineProvider<HoltWintersDetector
     }, COL_TIME).dropNull();
 
     int size = forecastDF.size();
-    double[] resultArray = new double[size];
+    double[] baselineArray = new double[size];
+    double[] currentArray = new double[size];
+    double[] upperBoundArray = new double[size];
+    double[] lowerBoundArray = new double[size];
     long[] resultTimeArray = new long[size];
     double[] errorArray = new double[size];
 
@@ -416,14 +419,22 @@ public class HoltWintersDetector implements BaselineProvider<HoltWintersDetector
       lastGamma = params.getGamma();
 
       ForecastResults result = forecast(y, params.getAlpha(), params.getBeta(), params.getGamma());
+      double predicted = result.getPredictedValue();
+      double error = result.getErrorBound();;
 
-      resultArray[k] = result.getPredictedValue();
-      errorArray[k] = result.getErrorBound();
+      currentArray[k] = y[k];
+      baselineArray[k] = predicted;
+      errorArray[k] = error;
+      upperBoundArray[k] = predicted + error;
+      lowerBoundArray[k] = predicted - error;
     }
 
     resultDF.addSeries(COL_TIME, LongSeries.buildFrom(resultTimeArray));
     resultDF.setIndex(COL_TIME);
-    resultDF.addSeries(COL_VALUE, DoubleSeries.buildFrom(resultArray));
+    resultDF.addSeries(COL_VALUE, DoubleSeries.buildFrom(baselineArray));
+    resultDF.addSeries(COL_CURR, DoubleSeries.buildFrom(currentArray));
+    resultDF.addSeries(COL_UPPER_BOUND, DoubleSeries.buildFrom(upperBoundArray));
+    resultDF.addSeries(COL_LOWER_BOUND, DoubleSeries.buildFrom(lowerBoundArray));
     resultDF.addSeries(COL_ERROR, DoubleSeries.buildFrom(errorArray));
     return resultDF;
   }
