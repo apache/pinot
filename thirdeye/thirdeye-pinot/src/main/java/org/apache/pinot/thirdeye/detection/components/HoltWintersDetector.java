@@ -420,7 +420,7 @@ public class HoltWintersDetector implements BaselineProvider<HoltWintersDetector
 
       ForecastResults result = forecast(y, params.getAlpha(), params.getBeta(), params.getGamma());
       double predicted = result.getPredictedValue();
-      double error = result.getErrorBound();;
+      double error = result.getErrorBound();
 
       currentArray[k] = y[k];
       baselineArray[k] = predicted;
@@ -429,8 +429,7 @@ public class HoltWintersDetector implements BaselineProvider<HoltWintersDetector
       lowerBoundArray[k] = predicted - error;
     }
 
-    resultDF.addSeries(COL_TIME, LongSeries.buildFrom(resultTimeArray));
-    resultDF.setIndex(COL_TIME);
+    resultDF.addSeries(COL_TIME, LongSeries.buildFrom(resultTimeArray)).setIndex(COL_TIME);
     resultDF.addSeries(COL_VALUE, DoubleSeries.buildFrom(baselineArray));
     resultDF.addSeries(COL_CURR, DoubleSeries.buildFrom(currentArray));
     resultDF.addSeries(COL_UPPER_BOUND, DoubleSeries.buildFrom(upperBoundArray));
