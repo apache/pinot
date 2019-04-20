@@ -289,8 +289,18 @@ public class PinotHelixResourceManager {
    */
   public List<InstanceConfig> getAllHelixInstanceConfigs() {
     List<ZNRecord> znRecords = _cacheInstanceConfigsDataAccessor.getChildren("/", null, AccessOption.PERSISTENT);
-    List<InstanceConfig> instanceConfigs = new ArrayList<>(znRecords.size());
-    znRecords.forEach(znRecord -> instanceConfigs.add(new InstanceConfig(znRecord)));
+    int numZNRecords = znRecords.size();
+    List<InstanceConfig> instanceConfigs = new ArrayList<>(numZNRecords);
+    for (ZNRecord znRecord : znRecords) {
+      // NOTE: it is possible that znRecord is null if the record gets removed while calling this method
+      if (znRecord != null) {
+        instanceConfigs.add(new InstanceConfig(znRecord));
+      }
+    }
+    int numNullZNRecords = numZNRecords - instanceConfigs.size();
+    if (numNullZNRecords > 0) {
+      LOGGER.warn("Failed to read {}/{} instance configs", numZNRecords - numNullZNRecords, numZNRecords);
+    }
     return instanceConfigs;
   }
 
