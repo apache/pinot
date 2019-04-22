@@ -163,6 +163,10 @@ public class HoltWintersDetector implements BaselineProvider<HoltWintersDetector
     DataFrame dfCurr = new DataFrame(dfInput).renameSeries(COL_VALUE, COL_CURR);
     DataFrame dfBase = computePredictionInterval(dfInput, window.getStartMillis(), datasetConfig.getTimezone())
         .renameSeries(COL_VALUE, COL_BASE);
+    // remove COL_CURR from baseline to use the smoothed value
+    if (dfBase.contains(COL_CURR)) {
+      dfBase.dropSeries(COL_CURR);
+    }
     DataFrame df = new DataFrame(dfCurr).addSeries(dfBase);
     df.addSeries(COL_DIFF, df.getDoubles(COL_CURR).subtract(df.get(COL_BASE)));
     df.addSeries(COL_ANOMALY, BooleanSeries.fillValues(df.size(), false));
@@ -422,7 +426,12 @@ public class HoltWintersDetector implements BaselineProvider<HoltWintersDetector
       double predicted = result.getPredictedValue();
       double error = result.getErrorBound();
 
-      currentArray[k] = y[k];
+      // if current value doesn't have data then impute with 0
+      if (k < y.length) {
+        currentArray[k] = y[k];
+      } else {
+        currentArray[k] = 0;
+      }
       baselineArray[k] = predicted;
       errorArray[k] = error;
       upperBoundArray[k] = predicted + error;
