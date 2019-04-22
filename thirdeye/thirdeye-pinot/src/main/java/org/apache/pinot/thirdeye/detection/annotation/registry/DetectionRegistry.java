@@ -24,6 +24,7 @@ import com.google.common.collect.ImmutableMap;
 import org.apache.pinot.thirdeye.detection.annotation.Components;
 import org.apache.pinot.thirdeye.detection.annotation.Tune;
 import org.apache.pinot.thirdeye.detection.annotation.Yaml;
+import org.apache.pinot.thirdeye.detection.spec.AbstractSpec;
 import org.apache.pinot.thirdeye.detection.spi.components.BaseComponent;
 import org.apache.pinot.thirdeye.detection.spi.components.BaselineProvider;
 import org.apache.pinot.thirdeye.detection.yaml.YamlDetectionConfigTranslator;
@@ -77,7 +78,7 @@ public class DetectionRegistry {
       Reflections reflections = new Reflections();
       // register components
       Set<Class<? extends BaseComponent>> classes = reflections.getSubTypesOf(BaseComponent.class);
-      for (Class clazz : classes) {
+      for (Class<? extends BaseComponent> clazz : classes) {
         String className = clazz.getName();
         for (Annotation annotation : clazz.getAnnotations()) {
           if (annotation instanceof Components) {
@@ -95,7 +96,7 @@ public class DetectionRegistry {
       // register yaml translators
       Set<Class<? extends YamlDetectionConfigTranslator>> yamlConverterClasses =
           reflections.getSubTypesOf(YamlDetectionConfigTranslator.class);
-      for (Class clazz : yamlConverterClasses) {
+      for (Class<? extends YamlDetectionConfigTranslator> clazz : yamlConverterClasses) {
         for (Annotation annotation : clazz.getAnnotations()) {
           if (annotation instanceof Yaml) {
             YAML_MAP.put(((Yaml) annotation).pipelineType(), clazz.getName());
@@ -108,13 +109,12 @@ public class DetectionRegistry {
   }
 
   public static void registerComponent(String className, String type) {
-    Class clazz = null;
     try {
-      clazz = Class.forName(className);
-    } catch (ClassNotFoundException e) {
-      LOG.warn("Class not found when registering component {}", className);
+      Class<? extends BaseComponent> clazz = (Class<? extends BaseComponent>) Class.forName(className);
+      REGISTRY_MAP.put(type, ImmutableMap.of(KEY_CLASS_NAME, className, KEY_IS_BASELINE_PROVIDER, isBaselineProvider(clazz)));
+    } catch (Exception e) {
+      LOG.warn("Encountered exception when registering component {}", className, e);
     }
-    REGISTRY_MAP.put(type, ImmutableMap.of(KEY_CLASS_NAME, className, KEY_IS_BASELINE_PROVIDER, isBaselineProvider(clazz)));
   }
 
   public static void registerYamlConvertor(String className, String type) {
@@ -177,7 +177,7 @@ public class DetectionRegistry {
     return String.join(", ", YAML_MAP.keySet());
   }
 
-  private static boolean isBaselineProvider(Class clazz) {
+  private static boolean isBaselineProvider(Class<? extends BaseComponent> clazz) {
     return BaselineProvider.class.isAssignableFrom(clazz);
   }
 }

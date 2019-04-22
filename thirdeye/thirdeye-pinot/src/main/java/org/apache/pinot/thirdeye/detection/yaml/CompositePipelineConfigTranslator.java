@@ -197,7 +197,7 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
     this.datasetConfig = this.dataProvider.fetchDatasets(Collections.singletonList(metricConfig.getDataset()))
         .get(metricConfig.getDataset());
     Preconditions.checkNotNull(this.datasetConfig, "dataset not found");
-    this.mergerProperties = MapUtils.getMap(yamlConfig, PROP_MERGER, new HashMap());
+    this.mergerProperties = MapUtils.getMap(yamlConfig, PROP_MERGER, new HashMap<String, Object>());
     this.filterMaps = MapUtils.getMap(yamlConfig, PROP_FILTERS);
     this.metricUrn = buildMetricUrn(filterMaps, this.metricConfig.getId());
   }
