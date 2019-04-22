@@ -162,7 +162,7 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
     int successWindows = 0;
     for (int i = 0; i < totalWindows; i++) {
       if (i == EARLY_TERMINATE_WINDOW && successWindows == 0) {
-        throw new RuntimeException(String.format(
+        throw new DetectionException(String.format(
             "Successive first %d/%d detection windows failed for config %d metricUrn %s for monitoring window %d to %d. Discard remaining windows",
             EARLY_TERMINATE_WINDOW, totalWindows, config.getId(), metricUrn, this.getStartTime(), this.getEndTime()));
       }
