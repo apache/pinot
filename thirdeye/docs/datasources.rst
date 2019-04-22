@@ -27,3 +27,4 @@ Data Sources Setup
     mysql
     presto
     import_sql_metric
+    contribute_datasource

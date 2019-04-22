@@ -70,8 +70,8 @@ Note: These metrics are regenerated randomly every time you launch ThirdEye in d
 
 We also have 2 real world metric with seasonality in H2 database, for detection experimentation:
 
-* H2::daily (data from 1/1/2011 to 12/31/2012)
-* H2::hourly (data from 1/1/2011 to 8/1/2018)
+* H2::daily (From: https://www.kaggle.com/marklvl/bike-sharing-dataset)
+* H2::hourly (From: https://www.kaggle.com/robikscube/hourly-energy-consumption)
 
 **6: Run detection preview**
 
@@ -97,10 +97,9 @@ Copy the following into the detection configuration:
           params:
             sensitivity: 8
 
-Click ``Run Preview`` button. Nothing will be showing because the daily data only have data from 1/1/2011 to 12/31/2012.
-Adjust the time window from the ``Custom`` date selector to any time between that. Click ``Rerun Preview``, and you will be able to see the anomalies.
+Click ``Run Preview`` button, the anomalies will be detected. Then you can play around with different time frames.
 
-If you want to preview the hourly data, just change ``dataset: H2.H2.daily`` to ``dataset: H2.H2.hourly``. Change time range to any time between 1/1/2011 to 8/1/2018, and rerun the preview.
+If you want to preview the hourly data, just change ``dataset: H2.H2.daily`` to ``dataset: H2.H2.hourly``, and rerun the preview.
 
 If you want to setup and run real anomaly detection rules, you need to see :ref:`production` and :ref:`alert-setup`.
 

@@ -29,3 +29,4 @@ Alert Setup
     advanced_config
     templates
     appendix
+    contribute_detection

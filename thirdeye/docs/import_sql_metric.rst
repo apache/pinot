@@ -26,6 +26,8 @@ Import metric from Presto/MySQL
 
 Run through step 1-2 in :ref:`presto`. or :ref:`mysql`.
 
+**1: Import Metric on Front End**
+
 Click `Create Alert` on top right of the page, click `Import a Metric from SQL` link under `Define detection configuration`.
 Fill in the form which includes the following fields, and click Import Metrics.
  
@@ -47,3 +49,11 @@ Hourly data should choose 1HOURS.
 For example:
 
 .. image:: https://user-images.githubusercontent.com/11586489/56252038-cb974880-606a-11e9-9213-a06bfa533826.png
+
+**2: Done!**
+
+The data set name will be ``[source name].[db name].[table name]``. For example, a ThirdEye monitoring metric data set may be named ``MySQL.te.merged_anomaly_index_result``.
+And the metric name is just the metric name you set.
+
+Note that this page does not validate that your entry is correct. Try on the Root Cause Analysis page whether you can see the
+metric showing up. If not, please retry entering the form again and the previous entry will be overwritten.

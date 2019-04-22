@@ -126,7 +126,7 @@ with duration filters and percentage filters.
         - name: detection_rule_1
           type: HOLT_WINTERS_RULE
           params:
-            sensitivity: 6 # Detection sensitivity scale from 0 - 10, mapping z-score from 1 to 4.
+            sensitivity: 6 # Detection sensitivity scale from 0 - 10, mapping z-score from 1 to 3.
             pattern: UP_OR_DOWN # Alert when value goes up or down by the configured threshold. (Values supported - UP, DOWN, UP_OR_DOWN)
 
 **Optional Parameters:**
@@ -134,7 +134,7 @@ with duration filters and percentage filters.
 +-------------------+------------------------------------------------------------------------------------------------------+----------------------------------------------------------------------------------------------+------------------------+
 | **param**         | **description**                                                                                      | **default value**                                                                            | **supported values**   |
 +===================+======================================================================================================+==============================================================================================+========================+
-| sensitivity       | Detection sensitivity scale from 0 - 10, mapping z-score from 1 to 4.                                | 5                                                                                            | any double in [0, 10]  |
+| sensitivity       | Detection sensitivity scale from 0 - 10, mapping z-score from 1 to 3.                                | 5                                                                                            | any double in [0, 10]  |
 +-------------------+------------------------------------------------------------------------------------------------------+----------------------------------------------------------------------------------------------+------------------------+
 | pattern           | Detect as an anomaly if the metric drop, rise or both directions.                                    | UP_OR_DOWN                                                                                   | UP, DOWN, UP_OR_DOWN   |
 +-------------------+------------------------------------------------------------------------------------------------------+----------------------------------------------------------------------------------------------+------------------------+
@@ -147,7 +147,7 @@ with duration filters and percentage filters.
 | period            | seasonality period, default 7 for daily, hourly and minutely data. For monthly data, set it to 12.   | 7                                                                                            | Any positive interger  |
 |                   | For non-seasonal data, set it to 1.                                                                  |                                                                                              |                        |
 +-------------------+------------------------------------------------------------------------------------------------------+----------------------------------------------------------------------------------------------+------------------------+
-| kernelSmoothing   | For smoothing of hourly and minutely data to reduce noise                                            | true                                                                                         | true or false          |
+| smoothing        | For smoothing of hourly and minutely data to reduce noise                                            | true                                                                                         | true or false          |
 +-------------------+------------------------------------------------------------------------------------------------------+----------------------------------------------------------------------------------------------+------------------------+
 
 .. _rule-absolutechange:
