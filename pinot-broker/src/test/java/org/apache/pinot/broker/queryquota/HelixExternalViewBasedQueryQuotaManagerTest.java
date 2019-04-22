@@ -44,10 +44,10 @@ import static org.apache.pinot.common.utils.CommonConstants.Helix.BROKER_RESOURC
 import static org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
 
 
-public class TableQueryQuotaManagerTest {
+public class HelixExternalViewBasedQueryQuotaManagerTest {
   private ZkHelixPropertyStore<ZNRecord> _testPropertyStore;
   private HelixManager _helixManager;
-  private TableQueryQuotaManager _tableQueryQuotaManager;
+  private HelixExternalViewBasedQueryQuotaManager _queryQuotaManager;
   private ZkStarter.ZookeeperInstance _zookeeperInstance;
   private static String RAW_TABLE_NAME = "testTable";
   private static String OFFLINE_TABLE_NAME = RAW_TABLE_NAME + "_OFFLINE";
@@ -62,8 +62,8 @@ public class TableQueryQuotaManagerTest {
     _helixManager = initHelixManager(helixClusterName);
     _testPropertyStore = _helixManager.getHelixPropertyStore();
 
-    _tableQueryQuotaManager = new TableQueryQuotaManager();
-    _tableQueryQuotaManager.init(_helixManager);
+    _queryQuotaManager = new HelixExternalViewBasedQueryQuotaManager();
+    _queryQuotaManager.init(_helixManager);
   }
 
   private HelixManager initHelixManager(String helixClusterName) {
@@ -101,7 +101,7 @@ public class TableQueryQuotaManagerTest {
       ZKMetadataProvider.removeResourceConfigFromPropertyStore(_testPropertyStore, OFFLINE_TABLE_NAME);
       ZKMetadataProvider.removeResourceConfigFromPropertyStore(_testPropertyStore, REALTIME_TABLE_NAME);
     }
-    _tableQueryQuotaManager.cleanUpRateLimiterMap();
+    _queryQuotaManager.cleanUpRateLimiterMap();
   }
 
   @AfterTest
@@ -118,14 +118,14 @@ public class TableQueryQuotaManagerTest {
     ExternalView brokerResource = generateBrokerResource(OFFLINE_TABLE_NAME);
     TableConfig tableConfig = generateDefaultTableConfig(OFFLINE_TABLE_NAME);
     setQps(tableConfig);
-    _tableQueryQuotaManager.initTableQueryQuota(tableConfig, brokerResource);
-    Assert.assertEquals(_tableQueryQuotaManager.getRateLimiterMapSize(), 1);
+    _queryQuotaManager.initTableQueryQuota(tableConfig, brokerResource);
+    Assert.assertEquals(_queryQuotaManager.getRateLimiterMapSize(), 1);
 
     // All the request should be passed.
     runQueries(70, 10);
 
-    _tableQueryQuotaManager.dropTableQueryQuota(OFFLINE_TABLE_NAME);
-    Assert.assertEquals(_tableQueryQuotaManager.getRateLimiterMapSize(), 0);
+    _queryQuotaManager.dropTableQueryQuota(OFFLINE_TABLE_NAME);
+    Assert.assertEquals(_queryQuotaManager.getRateLimiterMapSize(), 0);
   }
 
   @Test
@@ -133,8 +133,8 @@ public class TableQueryQuotaManagerTest {
       throws Exception {
     ExternalView brokerResource = generateBrokerResource(OFFLINE_TABLE_NAME);
     TableConfig tableConfig = generateDefaultTableConfig(OFFLINE_TABLE_NAME);
-    _tableQueryQuotaManager.initTableQueryQuota(tableConfig, brokerResource);
-    Assert.assertEquals(_tableQueryQuotaManager.getRateLimiterMapSize(), 0);
+    _queryQuotaManager.initTableQueryQuota(tableConfig, brokerResource);
+    Assert.assertEquals(_queryQuotaManager.getRateLimiterMapSize(), 0);
   }
 
   @Test
@@ -151,12 +151,12 @@ public class TableQueryQuotaManagerTest {
 
     ExternalView brokerResource = generateBrokerResource(OFFLINE_TABLE_NAME);
     TableConfig tableConfig = generateDefaultTableConfig(OFFLINE_TABLE_NAME);
-    _tableQueryQuotaManager.initTableQueryQuota(tableConfig, brokerResource);
-    Assert.assertEquals(_tableQueryQuotaManager.getRateLimiterMapSize(), 0);
+    _queryQuotaManager.initTableQueryQuota(tableConfig, brokerResource);
+    Assert.assertEquals(_queryQuotaManager.getRateLimiterMapSize(), 0);
 
     // Nothing happened since it doesn't have qps quota.
-    _tableQueryQuotaManager.dropTableQueryQuota(OFFLINE_TABLE_NAME);
-    Assert.assertEquals(_tableQueryQuotaManager.getRateLimiterMapSize(), 0);
+    _queryQuotaManager.dropTableQueryQuota(OFFLINE_TABLE_NAME);
+    Assert.assertEquals(_queryQuotaManager.getRateLimiterMapSize(), 0);
   }
 
   @Test
@@ -174,12 +174,12 @@ public class TableQueryQuotaManagerTest {
 
     ExternalView brokerResource = generateBrokerResource(REALTIME_TABLE_NAME);
     TableConfig tableConfig = generateDefaultTableConfig(OFFLINE_TABLE_NAME);
-    _tableQueryQuotaManager.initTableQueryQuota(tableConfig, brokerResource);
-    Assert.assertEquals(_tableQueryQuotaManager.getRateLimiterMapSize(), 0);
+    _queryQuotaManager.initTableQueryQuota(tableConfig, brokerResource);
+    Assert.assertEquals(_queryQuotaManager.getRateLimiterMapSize(), 0);
 
     // Drop the offline table won't have any affect since it is table type specific.
-    _tableQueryQuotaManager.dropTableQueryQuota(OFFLINE_TABLE_NAME);
-    Assert.assertEquals(_tableQueryQuotaManager.getRateLimiterMapSize(), 0);
+    _queryQuotaManager.dropTableQueryQuota(OFFLINE_TABLE_NAME);
+    Assert.assertEquals(_queryQuotaManager.getRateLimiterMapSize(), 0);
   }
 
   @Test
@@ -210,22 +210,22 @@ public class TableQueryQuotaManagerTest {
     ZKMetadataProvider.setOfflineTableConfig(_testPropertyStore, OFFLINE_TABLE_NAME, offlineTableConfig.toZNRecord());
 
     // Since each table has 2 online brokers, per broker rate becomes 100.0 / 2 = 50.0
-    _tableQueryQuotaManager.initTableQueryQuota(offlineTableConfig, brokerResource);
-    Assert.assertEquals(_tableQueryQuotaManager.getRateLimiterMapSize(), 1);
-    _tableQueryQuotaManager.initTableQueryQuota(realtimeTableConfig, brokerResource);
+    _queryQuotaManager.initTableQueryQuota(offlineTableConfig, brokerResource);
+    Assert.assertEquals(_queryQuotaManager.getRateLimiterMapSize(), 1);
+    _queryQuotaManager.initTableQueryQuota(realtimeTableConfig, brokerResource);
     // The hash map now contains 2 entries for both of the tables.
-    Assert.assertEquals(_tableQueryQuotaManager.getRateLimiterMapSize(), 2);
+    Assert.assertEquals(_queryQuotaManager.getRateLimiterMapSize(), 2);
 
     // Rate limiter generates 1 token every 10 milliseconds, have to make it sleep for a while.
     runQueries(70, 10L);
 
-    _tableQueryQuotaManager.dropTableQueryQuota(OFFLINE_TABLE_NAME);
+    _queryQuotaManager.dropTableQueryQuota(OFFLINE_TABLE_NAME);
     // Since real-time table still has the qps quota, the size of the hash map becomes 1.
-    Assert.assertEquals(_tableQueryQuotaManager.getRateLimiterMapSize(), 1);
+    Assert.assertEquals(_queryQuotaManager.getRateLimiterMapSize(), 1);
 
-    _tableQueryQuotaManager.dropTableQueryQuota(REALTIME_TABLE_NAME);
+    _queryQuotaManager.dropTableQueryQuota(REALTIME_TABLE_NAME);
     // Since the only 1 table which has qps quota has been dropped, the size of the hash map becomes 0.
-    Assert.assertEquals(_tableQueryQuotaManager.getRateLimiterMapSize(), 0);
+    Assert.assertEquals(_queryQuotaManager.getRateLimiterMapSize(), 0);
   }
 
   @Test
@@ -234,13 +234,13 @@ public class TableQueryQuotaManagerTest {
     ExternalView brokerResource = generateBrokerResource(REALTIME_TABLE_NAME);
     TableConfig tableConfig = generateDefaultTableConfig(REALTIME_TABLE_NAME);
     setQps(tableConfig);
-    _tableQueryQuotaManager.initTableQueryQuota(tableConfig, brokerResource);
-    Assert.assertEquals(_tableQueryQuotaManager.getRateLimiterMapSize(), 1);
+    _queryQuotaManager.initTableQueryQuota(tableConfig, brokerResource);
+    Assert.assertEquals(_queryQuotaManager.getRateLimiterMapSize(), 1);
 
     runQueries(70, 10L);
 
-    _tableQueryQuotaManager.dropTableQueryQuota(REALTIME_TABLE_NAME);
-    Assert.assertEquals(_tableQueryQuotaManager.getRateLimiterMapSize(), 0);
+    _queryQuotaManager.dropTableQueryQuota(REALTIME_TABLE_NAME);
+    Assert.assertEquals(_queryQuotaManager.getRateLimiterMapSize(), 0);
   }
 
   @Test
@@ -248,8 +248,8 @@ public class TableQueryQuotaManagerTest {
       throws Exception {
     ExternalView brokerResource = generateBrokerResource(REALTIME_TABLE_NAME);
     TableConfig tableConfig = generateDefaultTableConfig(REALTIME_TABLE_NAME);
-    _tableQueryQuotaManager.initTableQueryQuota(tableConfig, brokerResource);
-    Assert.assertEquals(_tableQueryQuotaManager.getRateLimiterMapSize(), 0);
+    _queryQuotaManager.initTableQueryQuota(tableConfig, brokerResource);
+    Assert.assertEquals(_queryQuotaManager.getRateLimiterMapSize(), 0);
   }
 
   @Test
@@ -265,8 +265,8 @@ public class TableQueryQuotaManagerTest {
 
     ExternalView brokerResource = generateBrokerResource(REALTIME_TABLE_NAME);
     TableConfig tableConfig = generateDefaultTableConfig(REALTIME_TABLE_NAME);
-    _tableQueryQuotaManager.initTableQueryQuota(tableConfig, brokerResource);
-    Assert.assertEquals(_tableQueryQuotaManager.getRateLimiterMapSize(), 0);
+    _queryQuotaManager.initTableQueryQuota(tableConfig, brokerResource);
+    Assert.assertEquals(_queryQuotaManager.getRateLimiterMapSize(), 0);
   }
 
   @Test
@@ -283,8 +283,8 @@ public class TableQueryQuotaManagerTest {
 
     ExternalView brokerResource = generateBrokerResource(OFFLINE_TABLE_NAME);
     TableConfig tableConfig = generateDefaultTableConfig(REALTIME_TABLE_NAME);
-    _tableQueryQuotaManager.initTableQueryQuota(tableConfig, brokerResource);
-    Assert.assertEquals(_tableQueryQuotaManager.getRateLimiterMapSize(), 0);
+    _queryQuotaManager.initTableQueryQuota(tableConfig, brokerResource);
+    Assert.assertEquals(_queryQuotaManager.getRateLimiterMapSize(), 0);
   }
 
   @Test
@@ -296,8 +296,8 @@ public class TableQueryQuotaManagerTest {
     QuotaConfig quotaConfig = new QuotaConfig();
     quotaConfig.setMaxQueriesPerSecond("InvalidQpsQuota");
     tableConfig.setQuotaConfig(quotaConfig);
-    _tableQueryQuotaManager.initTableQueryQuota(tableConfig, brokerResource);
-    Assert.assertEquals(_tableQueryQuotaManager.getRateLimiterMapSize(), 0);
+    _queryQuotaManager.initTableQueryQuota(tableConfig, brokerResource);
+    Assert.assertEquals(_queryQuotaManager.getRateLimiterMapSize(), 0);
   }
 
   @Test
@@ -309,8 +309,8 @@ public class TableQueryQuotaManagerTest {
     QuotaConfig quotaConfig = new QuotaConfig();
     quotaConfig.setMaxQueriesPerSecond("-1.0");
     tableConfig.setQuotaConfig(quotaConfig);
-    _tableQueryQuotaManager.initTableQueryQuota(tableConfig, brokerResource);
-    Assert.assertEquals(_tableQueryQuotaManager.getRateLimiterMapSize(), 0);
+    _queryQuotaManager.initTableQueryQuota(tableConfig, brokerResource);
+    Assert.assertEquals(_queryQuotaManager.getRateLimiterMapSize(), 0);
   }
 
   @Test
@@ -318,8 +318,8 @@ public class TableQueryQuotaManagerTest {
       throws Exception {
     TableConfig tableConfig = generateDefaultTableConfig(OFFLINE_TABLE_NAME);
     setQps(tableConfig);
-    _tableQueryQuotaManager.initTableQueryQuota(tableConfig, null);
-    Assert.assertEquals(_tableQueryQuotaManager.getRateLimiterMapSize(), 0);
+    _queryQuotaManager.initTableQueryQuota(tableConfig, null);
+    Assert.assertEquals(_queryQuotaManager.getRateLimiterMapSize(), 0);
   }
 
   @Test
@@ -328,8 +328,8 @@ public class TableQueryQuotaManagerTest {
     ExternalView brokerResource = new ExternalView(BROKER_RESOURCE_INSTANCE);
     TableConfig tableConfig = generateDefaultTableConfig(OFFLINE_TABLE_NAME);
     setQps(tableConfig);
-    _tableQueryQuotaManager.initTableQueryQuota(tableConfig, brokerResource);
-    Assert.assertEquals(_tableQueryQuotaManager.getRateLimiterMapSize(), 1);
+    _queryQuotaManager.initTableQueryQuota(tableConfig, brokerResource);
+    Assert.assertEquals(_queryQuotaManager.getRateLimiterMapSize(), 1);
   }
 
   @Test
@@ -339,11 +339,11 @@ public class TableQueryQuotaManagerTest {
     brokerResource.setState(OFFLINE_TABLE_NAME, "broker_instance_2", "OFFLINE");
     TableConfig tableConfig = generateDefaultTableConfig(OFFLINE_TABLE_NAME);
     setQps(tableConfig);
-    _tableQueryQuotaManager.initTableQueryQuota(tableConfig, brokerResource);
+    _queryQuotaManager.initTableQueryQuota(tableConfig, brokerResource);
 
     // For the 1st version we don't check the number of online brokers.
     // Thus the expected size now is 1. It'll be 0 when we bring dynamic rate back.
-    Assert.assertEquals(_tableQueryQuotaManager.getRateLimiterMapSize(), 1);
+    Assert.assertEquals(_queryQuotaManager.getRateLimiterMapSize(), 1);
   }
 
   private TableConfig generateDefaultTableConfig(String tableName) {
@@ -370,7 +370,7 @@ public class TableQueryQuotaManagerTest {
       throws InterruptedException {
     int count = 0;
     for (int i = 0; i < numOfTimesToRun; i++) {
-      Assert.assertTrue(_tableQueryQuotaManager.acquire(RAW_TABLE_NAME));
+      Assert.assertTrue(_queryQuotaManager.acquire(RAW_TABLE_NAME));
       count++;
       Thread.sleep(millis);
     }
@@ -380,7 +380,7 @@ public class TableQueryQuotaManagerTest {
     count = 0;
     millis /= 2;
     for (int i = 0; i < numOfTimesToRun; i++) {
-      if (!_tableQueryQuotaManager.acquire(RAW_TABLE_NAME)) {
+      if (!_queryQuotaManager.acquire(RAW_TABLE_NAME)) {
         count++;
       }
       Thread.sleep(millis);

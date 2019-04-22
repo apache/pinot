@@ -22,17 +22,16 @@ import com.google.common.base.Preconditions;
 import com.yammer.metrics.core.MetricsRegistry;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.configuration.Configuration;
-import org.apache.pinot.broker.broker.helix.LiveInstanceChangeHandler;
-import org.apache.pinot.broker.queryquota.TableQueryQuotaManager;
+import org.apache.pinot.broker.queryquota.QueryQuotaManager;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
 import org.apache.pinot.broker.requesthandler.ConnectionPoolBrokerRequestHandler;
 import org.apache.pinot.broker.requesthandler.SingleConnectionBrokerRequestHandler;
 import org.apache.pinot.broker.routing.RoutingTable;
 import org.apache.pinot.broker.routing.TimeBoundaryService;
-import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.MetricsHelper;
-import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.CommonConstants.Broker;
+import org.apache.pinot.common.utils.CommonConstants.Helix;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -40,29 +39,18 @@ import org.slf4j.LoggerFactory;
 public class BrokerServerBuilder {
   private static final Logger LOGGER = LoggerFactory.getLogger(BrokerServerBuilder.class);
 
-  public static final String DELAY_SHUTDOWN_TIME_MS_CONFIG = "pinot.broker.delayShutdownTimeMs";
-  public static final long DEFAULT_DELAY_SHUTDOWN_TIME_MS = 10_000;
-  public static final String ACCESS_CONTROL_PREFIX = "pinot.broker.access.control";
-  public static final String METRICS_CONFIG_PREFIX = "pinot.broker.metrics";
-  public static final String TABLE_LEVEL_METRICS_CONFIG = "pinot.broker.enableTableLevelMetrics";
-  public static final String REQUEST_HANDLER_TYPE_CONFIG = "pinot.broker.requestHandlerType";
-  public static final String SINGLE_CONNECTION_REQUEST_HANDLER_TYPE = "singleConnection";
-  public static final String CONNECTION_POOL_REQUEST_HANDLER_TYPE = "connectionPool";
-  public static final String DEFAULT_REQUEST_HANDLER_TYPE = SINGLE_CONNECTION_REQUEST_HANDLER_TYPE;
-
   public enum State {
     INIT, STARTING, RUNNING, SHUTTING_DOWN, SHUTDOWN
   }
 
   // Running State Of broker
-  private final AtomicReference<State> _state = new AtomicReference<>();
+  private final AtomicReference<State> _state = new AtomicReference<>(State.INIT);
 
   private final Configuration _config;
   private final long _delayedShutdownTimeMs;
   private final RoutingTable _routingTable;
   private final TimeBoundaryService _timeBoundaryService;
-  private final LiveInstanceChangeHandler _liveInstanceChangeHandler;
-  private final TableQueryQuotaManager _tableQueryQuotaManager;
+  private final QueryQuotaManager _queryQuotaManager;
   private final AccessControlFactory _accessControlFactory;
   private final MetricsRegistry _metricsRegistry;
   private final BrokerMetrics _brokerMetrics;
@@ -70,47 +58,46 @@ public class BrokerServerBuilder {
   private final BrokerAdminApiApplication _brokerAdminApplication;
 
   public BrokerServerBuilder(Configuration config, RoutingTable routingTable, TimeBoundaryService timeBoundaryService,
-      LiveInstanceChangeHandler liveInstanceChangeHandler, TableQueryQuotaManager tableQueryQuotaManager) {
-    _state.set(State.INIT);
+      QueryQuotaManager queryQuotaManager) {
     _config = config;
-    _delayedShutdownTimeMs = config.getLong(DELAY_SHUTDOWN_TIME_MS_CONFIG, DEFAULT_DELAY_SHUTDOWN_TIME_MS);
+    _delayedShutdownTimeMs =
+        config.getLong(Broker.CONFIG_OF_DELAY_SHUTDOWN_TIME_MS, Broker.DEFAULT_DELAY_SHUTDOWN_TIME_MS);
     _routingTable = routingTable;
     _timeBoundaryService = timeBoundaryService;
-    _liveInstanceChangeHandler = liveInstanceChangeHandler;
-    _tableQueryQuotaManager = tableQueryQuotaManager;
-    _accessControlFactory = AccessControlFactory.loadFactory(_config.subset(ACCESS_CONTROL_PREFIX));
+    _queryQuotaManager = queryQuotaManager;
+    _accessControlFactory = AccessControlFactory.loadFactory(_config.subset(Broker.ACCESS_CONTROL_CONFIG_PREFIX));
     _metricsRegistry = new MetricsRegistry();
-    MetricsHelper.initializeMetrics(config.subset(METRICS_CONFIG_PREFIX));
+    MetricsHelper.initializeMetrics(config.subset(Broker.METRICS_CONFIG_PREFIX));
     MetricsHelper.registerMetricsRegistry(_metricsRegistry);
-    _brokerMetrics = new BrokerMetrics(_metricsRegistry, !_config.getBoolean(TABLE_LEVEL_METRICS_CONFIG, true));
+    _brokerMetrics =
+        new BrokerMetrics(_metricsRegistry, !_config.getBoolean(Broker.CONFIG_OF_ENABLE_TABLE_LEVEL_METRICS, true));
     _brokerMetrics.initializeGlobalMeters();
     _brokerRequestHandler = buildRequestHandler();
     _brokerAdminApplication = new BrokerAdminApiApplication(this);
   }
 
   private BrokerRequestHandler buildRequestHandler() {
-    String requestHandlerType = _config.getString(REQUEST_HANDLER_TYPE_CONFIG, DEFAULT_REQUEST_HANDLER_TYPE);
-    if (requestHandlerType.equalsIgnoreCase(CONNECTION_POOL_REQUEST_HANDLER_TYPE)) {
+    String requestHandlerType =
+        _config.getString(Broker.CONFIG_OF_REQUEST_HANDLER_TYPE, Broker.DEFAULT_REQUEST_HANDLER_TYPE);
+    if (requestHandlerType.equalsIgnoreCase(Broker.CONNECTION_POOL_REQUEST_HANDLER_TYPE)) {
       LOGGER.info("Using ConnectionPoolBrokerRequestHandler");
       return new ConnectionPoolBrokerRequestHandler(_config, _routingTable, _timeBoundaryService, _accessControlFactory,
-          _tableQueryQuotaManager, _brokerMetrics, _liveInstanceChangeHandler, _metricsRegistry);
+          _queryQuotaManager, _brokerMetrics, _metricsRegistry);
     } else {
       LOGGER.info("Using SingleConnectionBrokerRequestHandler");
       return new SingleConnectionBrokerRequestHandler(_config, _routingTable, _timeBoundaryService,
-          _accessControlFactory, _tableQueryQuotaManager, _brokerMetrics);
+          _accessControlFactory, _queryQuotaManager, _brokerMetrics);
     }
   }
 
   public void start() {
     LOGGER.info("Starting Pinot Broker");
-    Utils.logVersions();
 
     Preconditions.checkState(_state.get() == State.INIT);
     _state.set(State.STARTING);
 
     _brokerRequestHandler.start();
-    int brokerQueryPort =
-        _config.getInt(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT, CommonConstants.Helix.DEFAULT_BROKER_QUERY_PORT);
+    int brokerQueryPort = _config.getInt(Helix.KEY_OF_BROKER_QUERY_PORT, Helix.DEFAULT_BROKER_QUERY_PORT);
     _brokerAdminApplication.start(brokerQueryPort);
 
     _state.set(State.RUNNING);

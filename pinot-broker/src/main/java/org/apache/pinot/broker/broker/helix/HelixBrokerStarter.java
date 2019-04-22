@@ -42,13 +42,17 @@ import org.apache.helix.participant.statemachine.StateModelFactory;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.broker.BrokerServerBuilder;
-import org.apache.pinot.broker.queryquota.TableQueryQuotaManager;
+import org.apache.pinot.broker.queryquota.HelixExternalViewBasedQueryQuotaManager;
+import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
+import org.apache.pinot.broker.requesthandler.ConnectionPoolBrokerRequestHandler;
 import org.apache.pinot.broker.routing.HelixExternalViewBasedRouting;
+import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.config.TagNameUtils;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
-import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.CommonConstants.Broker;
+import org.apache.pinot.common.utils.CommonConstants.Helix;
 import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.slf4j.Logger;
@@ -58,7 +62,6 @@ import org.slf4j.LoggerFactory;
 @SuppressWarnings("unused")
 public class HelixBrokerStarter {
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixBrokerStarter.class);
-  private static final String ROUTING_TABLE_PARAMS_SUBSET_KEY = "pinot.broker.routing.table";
 
   private final Configuration _brokerConf;
   private final String _clusterName;
@@ -77,13 +80,11 @@ public class HelixBrokerStarter {
 
   // Cluster change handlers
   private HelixExternalViewBasedRouting _helixExternalViewBasedRouting;
-  private TableQueryQuotaManager _tableQueryQuotaManager;
+  private HelixExternalViewBasedQueryQuotaManager _helixExternalViewBasedQueryQuotaManager;
   private LiveInstanceChangeHandler _liveInstanceChangeHandler;
   private ClusterChangeMediator _clusterChangeMediator;
 
   private BrokerServerBuilder _brokerServerBuilder;
-  private AccessControlFactory _accessControlFactory;
-  private MetricsRegistry _metricsRegistry;
 
   // Participant Helix manager handles Helix functionality such as state transitions and messages
   private HelixManager _participantHelixManager;
@@ -107,19 +108,18 @@ public class HelixBrokerStarter {
     if (brokerHost == null) {
       brokerHost = NetUtil.getHostAddress();
     }
-    _brokerId = _brokerConf.getString(CommonConstants.Helix.Instance.INSTANCE_ID_KEY,
-        CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE + brokerHost + "_" + _brokerConf
-            .getInt(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT, CommonConstants.Helix.DEFAULT_BROKER_QUERY_PORT));
-    _brokerConf.addProperty(CommonConstants.Broker.CONFIG_OF_BROKER_ID, _brokerId);
+    _brokerId = _brokerConf.getString(Helix.Instance.INSTANCE_ID_KEY,
+        Helix.PREFIX_OF_BROKER_INSTANCE + brokerHost + "_" + _brokerConf
+            .getInt(Helix.KEY_OF_BROKER_QUERY_PORT, Helix.DEFAULT_BROKER_QUERY_PORT));
+    _brokerConf.addProperty(Broker.CONFIG_OF_BROKER_ID, _brokerId);
   }
 
   private void setupHelixSystemProperties() {
     // NOTE: Helix will disconnect the manager and disable the instance if it detects flapping (too frequent disconnect
     // from ZooKeeper). Setting flapping time window to a small value can avoid this from happening. Helix ignores the
     // non-positive value, so set the default value as 1.
-    System.setProperty(SystemPropertyKeys.FLAPPING_TIME_WINDOW, _brokerConf
-        .getString(CommonConstants.Helix.CONFIG_OF_BROKER_FLAPPING_TIME_WINDOW_MS,
-            CommonConstants.Helix.DEFAULT_FLAPPING_TIME_WINDOW_MS));
+    System.setProperty(SystemPropertyKeys.FLAPPING_TIME_WINDOW,
+        _brokerConf.getString(Helix.CONFIG_OF_BROKER_FLAPPING_TIME_WINDOW_MS, Helix.DEFAULT_FLAPPING_TIME_WINDOW_MS));
   }
 
   /**
@@ -149,10 +149,10 @@ public class HelixBrokerStarter {
     _liveInstanceChangeHandlers.add(liveInstanceChangeHandler);
   }
 
-  // TODO: refactor this logic into BrokerServerBuilder
   public void start()
       throws Exception {
     LOGGER.info("Starting Pinot broker");
+    Utils.logVersions();
 
     // Connect the spectator Helix manager
     LOGGER.info("Connecting spectator Helix manager");
@@ -162,23 +162,25 @@ public class HelixBrokerStarter {
     _helixAdmin = _spectatorHelixManager.getClusterManagmentTool();
     _propertyStore = _spectatorHelixManager.getHelixPropertyStore();
     _helixDataAccessor = _spectatorHelixManager.getHelixDataAccessor();
-    _helixExternalViewBasedRouting =
-        new HelixExternalViewBasedRouting(_brokerConf.subset(ROUTING_TABLE_PARAMS_SUBSET_KEY));
-    _helixExternalViewBasedRouting.init(_spectatorHelixManager);
-    _tableQueryQuotaManager = new TableQueryQuotaManager();
-    _tableQueryQuotaManager.init(_spectatorHelixManager);
-    _liveInstanceChangeHandler = new LiveInstanceChangeHandler();
-    _liveInstanceChangeHandler.init(_spectatorHelixManager);
 
     // Set up the broker server builder
     LOGGER.info("Setting up broker server builder");
+    _helixExternalViewBasedRouting =
+        new HelixExternalViewBasedRouting(_brokerConf.subset(Broker.ROUTING_TABLE_CONFIG_PREFIX));
+    _helixExternalViewBasedRouting.init(_spectatorHelixManager);
+    _helixExternalViewBasedQueryQuotaManager = new HelixExternalViewBasedQueryQuotaManager();
+    _helixExternalViewBasedQueryQuotaManager.init(_spectatorHelixManager);
     _brokerServerBuilder = new BrokerServerBuilder(_brokerConf, _helixExternalViewBasedRouting,
-        _helixExternalViewBasedRouting.getTimeBoundaryService(), _liveInstanceChangeHandler, _tableQueryQuotaManager);
-    _accessControlFactory = _brokerServerBuilder.getAccessControlFactory();
-    _metricsRegistry = _brokerServerBuilder.getMetricsRegistry();
+        _helixExternalViewBasedRouting.getTimeBoundaryService(), _helixExternalViewBasedQueryQuotaManager);
+    BrokerRequestHandler brokerRequestHandler = _brokerServerBuilder.getBrokerRequestHandler();
+    if (brokerRequestHandler instanceof ConnectionPoolBrokerRequestHandler) {
+      _liveInstanceChangeHandler = new LiveInstanceChangeHandler();
+      _liveInstanceChangeHandler.init(_spectatorHelixManager);
+      _liveInstanceChangeHandler.init(((ConnectionPoolBrokerRequestHandler) brokerRequestHandler).getConnPool());
+    }
     BrokerMetrics brokerMetrics = _brokerServerBuilder.getBrokerMetrics();
     _helixExternalViewBasedRouting.setBrokerMetrics(brokerMetrics);
-    _tableQueryQuotaManager.setBrokerMetrics(brokerMetrics);
+    _helixExternalViewBasedQueryQuotaManager.setBrokerMetrics(brokerMetrics);
     _brokerServerBuilder.start();
 
     // Initialize the cluster change mediator
@@ -187,7 +189,7 @@ public class HelixBrokerStarter {
       externalViewChangeHandler.init(_spectatorHelixManager);
     }
     _externalViewChangeHandlers.add(_helixExternalViewBasedRouting);
-    _externalViewChangeHandlers.add(_tableQueryQuotaManager);
+    _externalViewChangeHandlers.add(_helixExternalViewBasedQueryQuotaManager);
     for (ClusterChangeHandler instanceConfigChangeHandler : _instanceConfigChangeHandlers) {
       instanceConfigChangeHandler.init(_spectatorHelixManager);
     }
@@ -195,16 +197,22 @@ public class HelixBrokerStarter {
     for (ClusterChangeHandler liveInstanceChangeHandler : _liveInstanceChangeHandlers) {
       liveInstanceChangeHandler.init(_spectatorHelixManager);
     }
-    _liveInstanceChangeHandlers.add(_liveInstanceChangeHandler);
+    if (_liveInstanceChangeHandler != null) {
+      _liveInstanceChangeHandlers.add(_liveInstanceChangeHandler);
+    }
     Map<ChangeType, List<ClusterChangeHandler>> clusterChangeHandlersMap = new HashMap<>();
     clusterChangeHandlersMap.put(ChangeType.EXTERNAL_VIEW, _externalViewChangeHandlers);
     clusterChangeHandlersMap.put(ChangeType.INSTANCE_CONFIG, _instanceConfigChangeHandlers);
-    clusterChangeHandlersMap.put(ChangeType.LIVE_INSTANCE, _liveInstanceChangeHandlers);
+    if (!_liveInstanceChangeHandlers.isEmpty()) {
+      clusterChangeHandlersMap.put(ChangeType.LIVE_INSTANCE, _liveInstanceChangeHandlers);
+    }
     _clusterChangeMediator = new ClusterChangeMediator(clusterChangeHandlersMap, brokerMetrics);
     _clusterChangeMediator.start();
     _spectatorHelixManager.addExternalViewChangeListener(_clusterChangeMediator);
     _spectatorHelixManager.addInstanceConfigChangeListener(_clusterChangeMediator);
-    _spectatorHelixManager.addLiveInstanceChangeListener(_clusterChangeMediator);
+    if (!_liveInstanceChangeHandlers.isEmpty()) {
+      _spectatorHelixManager.addLiveInstanceChangeListener(_clusterChangeMediator);
+    }
 
     // Connect the participant Helix manager
     LOGGER.info("Connecting participant Helix manager");
@@ -213,26 +221,25 @@ public class HelixBrokerStarter {
     StateMachineEngine stateMachineEngine = _participantHelixManager.getStateMachineEngine();
     StateModelFactory<?> stateModelFactory =
         new BrokerResourceOnlineOfflineStateModelFactory(_propertyStore, _helixDataAccessor,
-            _helixExternalViewBasedRouting, _tableQueryQuotaManager);
+            _helixExternalViewBasedRouting, _helixExternalViewBasedQueryQuotaManager);
     stateMachineEngine
         .registerStateModelFactory(BrokerResourceOnlineOfflineStateModelFactory.getStateModelDef(), stateModelFactory);
     _participantHelixManager.connect();
     _tbiMessageHandler = new TimeboundaryRefreshMessageHandlerFactory(_helixExternalViewBasedRouting, _brokerConf
-        .getLong(CommonConstants.Broker.CONFIG_OF_BROKER_REFRESH_TIMEBOUNDARY_INFO_SLEEP_INTERVAL,
-            CommonConstants.Broker.DEFAULT_BROKER_REFRESH_TIMEBOUNDARY_INFO_SLEEP_INTERVAL_MS));
+        .getLong(Broker.CONFIG_OF_BROKER_REFRESH_TIMEBOUNDARY_INFO_SLEEP_INTERVAL,
+            Broker.DEFAULT_BROKER_REFRESH_TIMEBOUNDARY_INFO_SLEEP_INTERVAL_MS));
     _participantHelixManager.getMessagingService()
         .registerMessageHandlerFactory(Message.MessageType.USER_DEFINE_MSG.toString(), _tbiMessageHandler);
     addInstanceTagIfNeeded();
-    brokerMetrics.addCallbackGauge(CommonConstants.Helix.INSTANCE_CONNECTED_METRIC_NAME,
-        () -> _participantHelixManager.isConnected() ? 1L : 0L);
+    brokerMetrics
+        .addCallbackGauge(Helix.INSTANCE_CONNECTED_METRIC_NAME, () -> _participantHelixManager.isConnected() ? 1L : 0L);
     _participantHelixManager
         .addPreConnectCallback(() -> brokerMetrics.addMeteredGlobalValue(BrokerMeter.HELIX_ZOOKEEPER_RECONNECTS, 1L));
 
     // Register the service status handler
     LOGGER.info("Registering service status handler");
-    double minResourcePercentForStartup = _brokerConf
-        .getDouble(CommonConstants.Broker.CONFIG_OF_BROKER_MIN_RESOURCE_PERCENT_FOR_START,
-            CommonConstants.Broker.DEFAULT_BROKER_MIN_RESOURCE_PERCENT_FOR_START);
+    double minResourcePercentForStartup = _brokerConf.getDouble(Broker.CONFIG_OF_BROKER_MIN_RESOURCE_PERCENT_FOR_START,
+        Broker.DEFAULT_BROKER_MIN_RESOURCE_PERCENT_FOR_START);
     ServiceStatus.setServiceStatusCallback(new ServiceStatus.MultipleCallbackServiceStatusCallback(ImmutableList
         .of(new ServiceStatus.IdealStateAndCurrentStateMatchServiceStatusCallback(_participantHelixManager,
                 _clusterName, _brokerId, minResourcePercentForStartup),
@@ -251,7 +258,7 @@ public class HelixBrokerStarter {
         _helixAdmin.addInstanceTag(_clusterName, _brokerId,
             TagNameUtils.getBrokerTagForTenant(TagNameUtils.DEFAULT_TENANT_NAME));
       } else {
-        _helixAdmin.addInstanceTag(_clusterName, _brokerId, CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE);
+        _helixAdmin.addInstanceTag(_clusterName, _brokerId, Helix.UNTAGGED_BROKER_INSTANCE);
       }
     }
   }
@@ -288,7 +295,7 @@ public class HelixBrokerStarter {
   }
 
   public AccessControlFactory getAccessControlFactory() {
-    return _accessControlFactory;
+    return _brokerServerBuilder.getAccessControlFactory();
   }
 
   public HelixManager getSpectatorHelixManager() {
@@ -304,15 +311,15 @@ public class HelixBrokerStarter {
   }
 
   public MetricsRegistry getMetricsRegistry() {
-    return _metricsRegistry;
+    return _brokerServerBuilder.getMetricsRegistry();
   }
 
   public static HelixBrokerStarter getDefault()
       throws Exception {
     Configuration brokerConf = new BaseConfiguration();
     int port = 5001;
-    brokerConf.addProperty(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT, port);
-    brokerConf.addProperty(CommonConstants.Broker.CONFIG_OF_BROKER_TIMEOUT_MS, 60 * 1000L);
+    brokerConf.addProperty(Helix.KEY_OF_BROKER_QUERY_PORT, port);
+    brokerConf.addProperty(Broker.CONFIG_OF_BROKER_TIMEOUT_MS, 60 * 1000L);
     return new HelixBrokerStarter(brokerConf, "quickstart", "localhost:2122");
   }
 
