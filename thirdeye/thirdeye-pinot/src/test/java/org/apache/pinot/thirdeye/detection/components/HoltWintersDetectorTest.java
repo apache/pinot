@@ -119,7 +119,7 @@ public class HoltWintersDetectorTest {
   public void testRunDetectionDaily() {
     HoltWintersDetector detector = new HoltWintersDetector();
     HoltWintersDetectorSpec spec = new HoltWintersDetectorSpec();
-    spec.setSensitivity(8);
+    spec.setSensitivity(10);
     detector.init(spec, new DefaultInputDataFetcher(this.provider, -1));
     Interval window = new Interval(1306627200000L, 1309219200000L);
     String metricUrn = "thirdeye:metric:1";
@@ -148,12 +148,12 @@ public class HoltWintersDetectorTest {
   public void testRunDetectionHourly() {
     HoltWintersDetector detector = new HoltWintersDetector();
     HoltWintersDetectorSpec spec = new HoltWintersDetectorSpec();
-    spec.setSensitivity(8);
+    spec.setSensitivity(9);
     detector.init(spec, new DefaultInputDataFetcher(this.provider, -1));
     Interval window = new Interval(1322773200000L, 1323378000000L);
     String metricUrn = "thirdeye:metric:123";
     List<MergedAnomalyResultDTO> anomalies = detector.runDetection(window, metricUrn);
 
-    Assert.assertEquals(anomalies.size(), 3);
+    Assert.assertEquals(anomalies.size(), 2);
   }
 }
