@@ -151,7 +151,7 @@ public class HoltWintersDetectorTest {
     spec.setSensitivity(9);
     detector.init(spec, new DefaultInputDataFetcher(this.provider, -1));
     Interval window = new Interval(1322773200000L, 1323378000000L);
-    String metricUrn = "thirdeye:metric:123"; 
+    String metricUrn = "thirdeye:metric:123";
     List<MergedAnomalyResultDTO> anomalies = detector.runDetection(window, metricUrn);
 
     Assert.assertEquals(anomalies.size(), 2);
