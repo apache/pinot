@@ -30,6 +30,7 @@ import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.detection.ConfigUtils;
 import org.apache.pinot.thirdeye.detection.DataProvider;
+import org.apache.pinot.thirdeye.detection.DetectionException;
 import org.apache.pinot.thirdeye.detection.DetectionPipeline;
 import org.apache.pinot.thirdeye.detection.DetectionPipelineResult;
 import org.apache.pinot.thirdeye.detection.DetectionUtils;
@@ -200,10 +201,10 @@ public class DimensionWrapper extends DetectionPipeline {
     Map<String, Object> diagnostics = new HashMap<>();
     Set<Long> lastTimeStamps = new HashSet<>();
     long totalNestedMetrics = nestedMetrics.size();
-    long successCount = 0; // record the number of successfully explored dimensions
+    long successNestedMetrics = 0; // record the number of successfully explored dimensions
     LOG.info("exploring {} metrics", totalNestedMetrics);
     for (int i = 0; i < totalNestedMetrics; i++) {
-      if (i == EARLY_STOP_THRESHOLD && successCount == 0) {
+      if (i == EARLY_STOP_THRESHOLD && successNestedMetrics == 0) {
         // if for the first certain number of dimensions all failed, throw the exception
         throw new RuntimeException(String.format(
             "Detection failed for first %d out of %d metric dimensions for monitoring window %d to %d, stop dimension explore.",
@@ -218,21 +219,26 @@ public class DimensionWrapper extends DetectionPipeline {
           anomalies.addAll(intermediate.getAnomalies());
           diagnostics.put(metric.getUrn(), intermediate.getDiagnostics());
         }
+        successNestedMetrics++;
       } catch (Exception e) {
         LOG.warn("[DetectionConfigID{}] detecting anomalies for window {} to {} failed for metric urn {}.",
             this.config.getId(), this.start, this.end, metric.getUrn(), e);
       }
-      successCount++;
     }
 
-    if (successCount == 0) {
-      throw new RuntimeException(String.format(
+    checkDimensionExploreStatus(totalNestedMetrics, successNestedMetrics);
+    return new DetectionPipelineResult(anomalies, DetectionUtils.consolidateNestedLastTimeStamps(lastTimeStamps))
+        .setDiagnostics(diagnostics);
+  }
+
+  private void checkDimensionExploreStatus(long totalNestedMetrics, long successNestedMetrics)
+      throws DetectionException {
+    // if all dimension explore failed, throw an exception
+    if (successNestedMetrics == 0 && totalNestedMetrics > 0) {
+      throw new DetectionException(String.format(
           "Detection failed for all nested dimensions for detection config id %d for monitoring window %d to %d, stop dimension explore.",
           this.config.getId(), this.getStartTime(), this.getEndTime()));
     }
-
-    return new DetectionPipelineResult(anomalies, DetectionUtils.consolidateNestedLastTimeStamps(lastTimeStamps))
-        .setDiagnostics(diagnostics);
   }
 
   private boolean checkMinLiveZone(MetricEntity me) {

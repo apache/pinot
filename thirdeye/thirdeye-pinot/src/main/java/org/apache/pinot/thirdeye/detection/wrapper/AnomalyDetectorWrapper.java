@@ -38,6 +38,7 @@ import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
 import org.apache.pinot.thirdeye.detection.DataProvider;
+import org.apache.pinot.thirdeye.detection.DetectionException;
 import org.apache.pinot.thirdeye.detection.DetectionPipeline;
 import org.apache.pinot.thirdeye.detection.DetectionPipelineResult;
 import org.apache.pinot.thirdeye.detection.DetectionUtils;
@@ -188,11 +189,7 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
       anomalies.addAll(anomaliesForOneWindow);
     }
 
-    if (successWindows == 0) {
-      throw new RuntimeException(String.format(
-          "Detection failed for all windows for detection config id %d detector %s for monitoring window %d to %d.",
-          this.config.getId(), this.detectorName, this.getStartTime(), this.getEndTime()));
-    }
+    checkMovingWindowDetectionStatus(totalWindows, successWindows);
 
     for (MergedAnomalyResultDTO anomaly : anomalies) {
       anomaly.setDetectionConfigId(this.config.getId());
@@ -205,6 +202,15 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
     long lastTimeStamp = this.getLastTimeStamp();
     return new DetectionPipelineResult(anomalies.stream().filter(anomaly -> anomaly.getEndTime() <= lastTimeStamp).collect(
         Collectors.toList()), lastTimeStamp);
+  }
+
+  private void checkMovingWindowDetectionStatus(int totalWindows, int successWindows) throws DetectionException {
+    // if all moving window detection failed, throw an exception
+    if (successWindows == 0 && totalWindows > 0) {
+      throw new DetectionException(String.format(
+          "Detection failed for all windows for detection config id %d detector %s for monitoring window %d to %d.",
+          this.config.getId(), this.detectorName, this.getStartTime(), this.getEndTime()));
+    }
   }
 
   // guess-timate next time stamp
