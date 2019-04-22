@@ -359,7 +359,7 @@ public class HoltWintersDetector implements BaselineProvider<HoltWintersDetector
     for (int i = 0; i < y.length; i++) {
       if (forecast[i] != 0) {
         sse += Math.pow(y[i] - forecast[i], 2);
-        diff.add(Math.abs(forecast[i] - y[i]));
+        diff.add(forecast[i] - y[i]);
       }
     }
 
@@ -499,7 +499,7 @@ public class HoltWintersDetector implements BaselineProvider<HoltWintersDetector
   }
 
   /**
-   * Mapping of sensitivity to zscore on range of 1 - 4
+   * Mapping of sensitivity to zscore on range of 1 - 3
    * @param sensitivity double from 0 to 10
    * @return zscore
    */
@@ -510,7 +510,7 @@ public class HoltWintersDetector implements BaselineProvider<HoltWintersDetector
     } else if (sensitivity > 10) {
       sensitivity = 10;
     }
-    double z = 1 + 0.3 * (10 - sensitivity);
+    double z = 1 + 0.2 * (10 - sensitivity);
     return z;
   }
 
