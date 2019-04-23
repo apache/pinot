@@ -10,6 +10,7 @@ dataSourceConfigs:
             timeColumn: "date"
             granularity: "1DAYS"
             timeFormat: "yyyy-MM-dd"
+            timezone: "UTC"
             metrics:
               value: "SUM"
             dataFile: "daily.csv"
@@ -17,6 +18,7 @@ dataSourceConfigs:
             timeColumn: "datetime"
             granularity: "1HOURS"
             timeFormat: "yyyy-MM-dd HH:mm:ss"
+            timezone: "UTC"
             metrics:
               value: "SUM"
             dataFile: "hourly.csv"

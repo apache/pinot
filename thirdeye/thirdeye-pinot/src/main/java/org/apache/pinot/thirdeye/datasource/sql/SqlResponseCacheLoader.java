@@ -31,6 +31,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.thirdeye.common.time.TimeSpec;
 import org.apache.pinot.thirdeye.dashboard.Utils;
@@ -64,6 +65,7 @@ public class SqlResponseCacheLoader extends CacheLoader<SqlQuery, ThirdEyeResult
   private static final String USER = "user";
   private static final String DB = "db";
   private static final String PASSWORD = "password";
+  private static final DateTime MIN_DATETIME = DateTime.parse("1970-01-01");
   private static final int ABANDONED_TIMEOUT = 60000;
 
   private Map<String, DataSource> prestoDBNameToDataSourceMap = new HashMap<>();
@@ -164,6 +166,10 @@ public class SqlResponseCacheLoader extends CacheLoader<SqlQuery, ThirdEyeResult
             SqlUtils.createTable(h2DataSource, tableName, dataset.getTimeColumn(), metrics, dataset.getDimensions());
             SqlUtils.onBoardSqlDataset(dataset);
 
+            List<H2Row> h2Rows = new ArrayList<>();
+            DateTime maxDateTime = MIN_DATETIME;
+            DateTimeFormatter fmt = DateTimeFormat.forPattern(dataset.getTimeFormat()).withZone(DateTimeZone.forID(dataset.getTimezone()));
+
             if (dataset.getDataFile().length() > 0) {
               String thirdEyeConfigDir = System.getProperty("dw.rootDir");
               String fileURI = thirdEyeConfigDir + "/data/" + dataset.getDataFile();
@@ -172,7 +178,20 @@ public class SqlResponseCacheLoader extends CacheLoader<SqlQuery, ThirdEyeResult
                 String columnNames = scanner.nextLine();
                 while (scanner.hasNextLine()) {
                   String line = scanner.nextLine();
-                  SqlUtils.insertCSVRow(h2DataSource, tableName, columnNames, line);
+                  String[] items = line.split(",");
+                  DateTime dateTime = DateTime.parse(items[0], fmt);
+                  if (dateTime.isAfter(maxDateTime)) {
+                    maxDateTime = dateTime;
+                  }
+                  h2Rows.add(new H2Row(dateTime, items[1]));
+                }
+                // Calculate the day difference between today and the last day of data point
+                int days = (int) ((DateTime.now().getMillis() - maxDateTime.getMillis()) / TimeUnit.DAYS.toMillis(1));
+                for (H2Row h2Row: h2Rows) {
+                  String[] items = new String[2];
+                  items[0] = fmt.print(h2Row.getDateTime().plusDays(days));
+                  items[1] = h2Row.getVal();
+                  SqlUtils.insertCSVRow(h2DataSource, tableName, columnNames, items);
                 }
               }
             }
@@ -325,6 +344,25 @@ public class SqlResponseCacheLoader extends CacheLoader<SqlQuery, ThirdEyeResult
       return mysqlDBNameToDataSourceMap.get(dbName);
     } else {
       return h2DataSource;
+    }
+  }
+
+  // Container class for one row in H2 CSV
+  final static class H2Row {
+    DateTime dateTime;
+    String val;
+
+    H2Row(DateTime dateTime, String val) {
+      this.dateTime = dateTime;
+      this.val = val;
+    }
+
+    public DateTime getDateTime() {
+      return dateTime;
+    }
+
+    public String getVal() {
+      return val;
     }
   }
 }

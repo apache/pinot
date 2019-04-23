@@ -121,7 +121,7 @@ public class ThirdEyeResultSetUtils {
                 if (!isISOFormat) {
                   millis = dataGranularity.toMillis(Double.valueOf(groupKeyVal).longValue());
                 } else {
-                  if (sourceName.equals(MYSQL) || sourceName.equals(H2)) {
+                  if (sourceName.equals(MYSQL)) {
                     millis = DateTime.parse(groupKeyVal, serverDataDateTimeFormatter).getMillis();
                   } else {
                     millis = DateTime.parse(groupKeyVal, inputDataDateTimeFormatter).getMillis();
