@@ -54,7 +54,7 @@ public class DetectionRegistry {
   private static final Logger LOG = LoggerFactory.getLogger(DetectionRegistry.class);
   private static final String KEY_CLASS_NAME = "className";
   private static final String KEY_ANNOTATION = "annotation";
-  private static final String KEY_IS_BASELINE_PROVIDER = "isBaseline";
+  private static final String KEY_IS_BASELINE_PROVIDER = "isBaselineProvider";
 
   private static DetectionRegistry INSTANCE;
 
