@@ -185,6 +185,10 @@ public class HoltWintersDetector implements BaselineProvider<HoltWintersDetector
     DataFrame dfCurr = new DataFrame(dfInput).renameSeries(COL_VALUE, COL_CURR);
     DataFrame dfBase = computePredictionInterval(dfInput, window.getStartMillis(), datasetConfig.getTimezone())
         .renameSeries(COL_VALUE, COL_BASE);
+    // remove COL_CURR from baseline to use the smoothed value
+    if (dfBase.contains(COL_CURR)) {
+      dfBase.dropSeries(COL_CURR);
+    }
     DataFrame df = new DataFrame(dfCurr).addSeries(dfBase);
     df.addSeries(COL_DIFF, df.getDoubles(COL_CURR).subtract(df.get(COL_BASE)));
     df.addSeries(COL_ANOMALY, BooleanSeries.fillValues(df.size(), false));
@@ -425,7 +429,10 @@ public class HoltWintersDetector implements BaselineProvider<HoltWintersDetector
     }, COL_TIME).dropNull();
 
     int size = forecastDF.size();
-    double[] resultArray = new double[size];
+    double[] baselineArray = new double[size];
+    double[] currentArray = new double[size];
+    double[] upperBoundArray = new double[size];
+    double[] lowerBoundArray = new double[size];
     long[] resultTimeArray = new long[size];
     double[] errorArray = new double[size];
 
@@ -461,14 +468,26 @@ public class HoltWintersDetector implements BaselineProvider<HoltWintersDetector
       lastGamma = params.getGamma();
 
       ForecastResults result = forecast(y, params.getAlpha(), params.getBeta(), params.getGamma());
+      double predicted = result.getPredictedValue();
+      double error = result.getErrorBound();
 
-      resultArray[k] = result.getPredictedValue();
-      errorArray[k] = result.getErrorBound();
+      // if current value doesn't have data then impute with NaN
+      if (k < y.length) {
+        currentArray[k] = y[k];
+      } else {
+        currentArray[k] = Double.NaN;
+      }
+      baselineArray[k] = predicted;
+      errorArray[k] = error;
+      upperBoundArray[k] = predicted + error;
+      lowerBoundArray[k] = predicted - error;
     }
 
-    resultDF.addSeries(COL_TIME, LongSeries.buildFrom(resultTimeArray));
-    resultDF.setIndex(COL_TIME);
-    resultDF.addSeries(COL_VALUE, DoubleSeries.buildFrom(resultArray));
+    resultDF.addSeries(COL_TIME, LongSeries.buildFrom(resultTimeArray)).setIndex(COL_TIME);
+    resultDF.addSeries(COL_VALUE, DoubleSeries.buildFrom(baselineArray));
+    resultDF.addSeries(COL_CURR, DoubleSeries.buildFrom(currentArray));
+    resultDF.addSeries(COL_UPPER_BOUND, DoubleSeries.buildFrom(upperBoundArray));
+    resultDF.addSeries(COL_LOWER_BOUND, DoubleSeries.buildFrom(lowerBoundArray));
     resultDF.addSeries(COL_ERROR, DoubleSeries.buildFrom(errorArray));
     return resultDF;
   }
