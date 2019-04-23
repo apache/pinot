@@ -56,10 +56,10 @@ public class SitewideImpactRuleAnomalyFilterTest {
     MetricSlice baselineSlice2 = this.baseline.scatter(slice2).get(0);
 
     Map<MetricSlice, DataFrame> aggregates = new HashMap<>();
-    aggregates.put(slice1, new DataFrame().addSeries(COL_VALUE, 150));
-    aggregates.put(baselineSlice1, new DataFrame().addSeries(COL_VALUE, 200));
-    aggregates.put(slice2, new DataFrame().addSeries(COL_VALUE, 500));
-    aggregates.put(baselineSlice2, new DataFrame().addSeries(COL_VALUE, 1000));
+    aggregates.put(slice1, new DataFrame().addSeries(COL_VALUE, 150).addSeries(COL_TIME, slice1.getStart()).setIndex(COL_TIME));
+    aggregates.put(baselineSlice1, new DataFrame().addSeries(COL_VALUE, 200).addSeries(COL_TIME, baselineSlice1.getStart()).setIndex(COL_TIME));
+    aggregates.put(slice2, new DataFrame().addSeries(COL_VALUE, 500).addSeries(COL_TIME, slice2.getStart()).setIndex(COL_TIME));
+    aggregates.put(baselineSlice2, new DataFrame().addSeries(COL_VALUE, 1000).addSeries(COL_TIME, baselineSlice2.getStart()).setIndex(COL_TIME));
 
     this.testDataProvider = new MockDataProvider().setAggregates(aggregates);
   }

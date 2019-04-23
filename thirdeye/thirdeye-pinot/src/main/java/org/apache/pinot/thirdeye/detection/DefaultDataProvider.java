@@ -42,6 +42,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
+import org.apache.pinot.thirdeye.dataframe.LongSeries;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
 import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.EventManager;
@@ -194,7 +195,10 @@ public class DefaultDataProvider implements DataProvider {
       final long deadline = System.currentTimeMillis() + TIMEOUT;
       Map<MetricSlice, DataFrame> output = new HashMap<>();
       for (MetricSlice slice : slices) {
-        output.put(slice, futures.get(slice).get(makeTimeout(deadline), TimeUnit.MILLISECONDS));
+        DataFrame result = futures.get(slice).get(makeTimeout(deadline), TimeUnit.MILLISECONDS);
+        // fill in time stamps
+        result.dropSeries(COL_TIME).addSeries(COL_TIME, LongSeries.fillValues(result.size(), slice.getStart())).setIndex(COL_TIME);
+        output.put(slice, result);
       }
       return output;
 
