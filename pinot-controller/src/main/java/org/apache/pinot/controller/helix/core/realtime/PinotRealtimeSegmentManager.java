@@ -82,7 +82,8 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
   private ControllerMetrics _controllerMetrics;
   private final ControllerLeadershipManager _controllerLeadershipManager;
 
-  public PinotRealtimeSegmentManager(PinotHelixResourceManager pinotManager, ControllerLeadershipManager controllerLeadershipManager) {
+  public PinotRealtimeSegmentManager(PinotHelixResourceManager pinotManager,
+      ControllerLeadershipManager controllerLeadershipManager) {
     _pinotHelixResourceManager = pinotManager;
     _controllerLeadershipManager = controllerLeadershipManager;
     String clusterName = _pinotHelixResourceManager.getHelixClusterName();
@@ -331,6 +332,10 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
     }
 
     for (ZNRecord tableConfigZnRecord : tableConfigs) {
+      // NOTE: it is possible that znRecord is null if the record gets removed while calling this method
+      if (tableConfigZnRecord == null) {
+        continue;
+      }
       try {
         String znRecordId = tableConfigZnRecord.getId();
         if (TableNameBuilder.getTableTypeFromTableName(znRecordId) == TableType.REALTIME) {
@@ -374,13 +379,8 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
       } catch (Exception e) {
         // we want to continue setting watches for other tables for any kind of exception here so that
         // errors with one table don't impact others
-        if (tableConfigZnRecord == null) {
-          // Can happen if the table config zn record failed to parse.
-          LOGGER.error("Got null ZN record for table config", e);
-        } else {
-          LOGGER.error("Caught exception while processing ZNRecord id: {}. Skipping node to continue setting watches",
-              tableConfigZnRecord.getId(), e);
-        }
+        LOGGER.error("Caught exception while processing ZNRecord id: {}. Skipping node to continue setting watches",
+            tableConfigZnRecord.getId(), e);
       }
     }
   }
