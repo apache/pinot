@@ -426,11 +426,11 @@ public class HoltWintersDetector implements BaselineProvider<HoltWintersDetector
       double predicted = result.getPredictedValue();
       double error = result.getErrorBound();
 
-      // if current value doesn't have data then impute with 0
+      // if current value doesn't have data then impute with NaN
       if (k < y.length) {
         currentArray[k] = y[k];
       } else {
-        currentArray[k] = 0;
+        currentArray[k] = Double.NaN;
       }
       baselineArray[k] = predicted;
       errorArray[k] = error;
