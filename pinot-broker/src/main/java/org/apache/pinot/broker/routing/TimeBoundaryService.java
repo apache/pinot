@@ -30,17 +30,24 @@ public interface TimeBoundaryService {
    * @param table
    * @return
    */
+  // TODO: pass in raw table name instead of offline table name
   TimeBoundaryInfo getTimeBoundaryInfoFor(String table);
 
   /**
    * Remove a table from TimeBoundaryService
    * @param tableName
    */
+  // TODO: pass in raw table name instead of offline table name
   void remove(String tableName);
 
   class TimeBoundaryInfo {
     private String _timeColumn;
     private String _timeValue;
+
+    public TimeBoundaryInfo(String timeColumn, String timeValue) {
+      _timeColumn = timeColumn;
+      _timeValue = timeValue;
+    }
 
     public String getTimeColumn() {
       return _timeColumn;
@@ -48,14 +55,6 @@ public interface TimeBoundaryService {
 
     public String getTimeValue() {
       return _timeValue;
-    }
-
-    public void setTimeColumn(String timeColumn) {
-      _timeColumn = timeColumn;
-    }
-
-    public void setTimeValue(String timeValue) {
-      _timeValue = timeValue;
     }
 
     public String toJsonString()
