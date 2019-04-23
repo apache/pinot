@@ -38,6 +38,7 @@ import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
 import org.apache.pinot.thirdeye.detection.DataProvider;
+import org.apache.pinot.thirdeye.detection.DetectionPipelineException;
 import org.apache.pinot.thirdeye.detection.DetectionPipeline;
 import org.apache.pinot.thirdeye.detection.DetectionPipelineResult;
 import org.apache.pinot.thirdeye.detection.DetectionUtils;
@@ -160,11 +161,7 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
     int totalWindows = monitoringWindows.size();
     int successWindows = 0;
     for (int i = 0; i < totalWindows; i++) {
-      if (i == EARLY_TERMINATE_WINDOW && successWindows == 0) {
-        LOG.error("Successive first {}/{} detection windows failed for config {} metricUrn {}. Discard remaining windows",
-            EARLY_TERMINATE_WINDOW, totalWindows, config.getId(), metricUrn);
-        break;
-      }
+      checkEarlyStop(totalWindows, successWindows, i);
 
       // run detection
       Interval window = monitoringWindows.get(i);
@@ -188,6 +185,8 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
       anomalies.addAll(anomaliesForOneWindow);
     }
 
+    checkMovingWindowDetectionStatus(totalWindows, successWindows);
+
     for (MergedAnomalyResultDTO anomaly : anomalies) {
       anomaly.setDetectionConfigId(this.config.getId());
       anomaly.setMetricUrn(this.metricUrn);
@@ -199,6 +198,24 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
     long lastTimeStamp = this.getLastTimeStamp();
     return new DetectionPipelineResult(anomalies.stream().filter(anomaly -> anomaly.getEndTime() <= lastTimeStamp).collect(
         Collectors.toList()), lastTimeStamp);
+  }
+
+  private void checkEarlyStop(int totalWindows, int successWindows, int i) throws DetectionPipelineException {
+    // if the first certain number of windows all failed, throw an exception
+    if (i == EARLY_TERMINATE_WINDOW && successWindows == 0) {
+      throw new DetectionPipelineException(String.format(
+          "Successive first %d/%d detection windows failed for config %d metricUrn %s for monitoring window %d to %d. Discard remaining windows",
+          EARLY_TERMINATE_WINDOW, totalWindows, config.getId(), metricUrn, this.getStartTime(), this.getEndTime()));
+    }
+  }
+
+  private void checkMovingWindowDetectionStatus(int totalWindows, int successWindows) throws DetectionPipelineException {
+    // if all moving window detection failed, throw an exception
+    if (successWindows == 0 && totalWindows > 0) {
+      throw new DetectionPipelineException(String.format(
+          "Detection failed for all windows for detection config id %d detector %s for monitoring window %d to %d.",
+          this.config.getId(), this.detectorName, this.getStartTime(), this.getEndTime()));
+    }
   }
 
   // guess-timate next time stamp

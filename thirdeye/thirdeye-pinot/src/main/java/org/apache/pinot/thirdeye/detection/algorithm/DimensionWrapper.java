@@ -30,6 +30,7 @@ import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.detection.ConfigUtils;
 import org.apache.pinot.thirdeye.detection.DataProvider;
+import org.apache.pinot.thirdeye.detection.DetectionPipelineException;
 import org.apache.pinot.thirdeye.detection.DetectionPipeline;
 import org.apache.pinot.thirdeye.detection.DetectionPipelineResult;
 import org.apache.pinot.thirdeye.detection.DetectionUtils;
@@ -69,6 +70,7 @@ public class DimensionWrapper extends DetectionPipeline {
   private static final String PROP_NESTED_METRIC_URNS = "nestedMetricUrns";
 
   private static final String PROP_CLASS_NAME = "className";
+  private static final int EARLY_STOP_THRESHOLD = 10;
 
   private final String metricUrn;
   private final int k;
@@ -198,19 +200,49 @@ public class DimensionWrapper extends DetectionPipeline {
     List<MergedAnomalyResultDTO> anomalies = new ArrayList<>();
     Map<String, Object> diagnostics = new HashMap<>();
     Set<Long> lastTimeStamps = new HashSet<>();
-    LOG.info("exploring {} metrics", nestedMetrics.size());
-    for (MetricEntity metric : nestedMetrics) {
-      for (Map<String, Object> properties : this.nestedProperties) {
-        LOG.info("running detection for {}", metric.toString());
-        DetectionPipelineResult intermediate = this.runNested(metric, properties);
-        lastTimeStamps.add(intermediate.getLastTimestamp());
-        anomalies.addAll(intermediate.getAnomalies());
-        diagnostics.put(metric.getUrn(), intermediate.getDiagnostics());
+    long totalNestedMetrics = nestedMetrics.size();
+    long successNestedMetrics = 0; // record the number of successfully explored dimensions
+    LOG.info("exploring {} metrics", totalNestedMetrics);
+    for (int i = 0; i < totalNestedMetrics; i++) {
+      checkEarlyStop(totalNestedMetrics, successNestedMetrics, i);
+      MetricEntity metric = nestedMetrics.get(i);
+      try {
+        LOG.info("running detection for metric urn {}. {}/{}", metric.getUrn(), i + 1, totalNestedMetrics);
+        for (Map<String, Object> properties : this.nestedProperties) {
+          DetectionPipelineResult intermediate = this.runNested(metric, properties);
+          lastTimeStamps.add(intermediate.getLastTimestamp());
+          anomalies.addAll(intermediate.getAnomalies());
+          diagnostics.put(metric.getUrn(), intermediate.getDiagnostics());
+        }
+        successNestedMetrics++;
+      } catch (Exception e) {
+        LOG.warn("[DetectionConfigID{}] detecting anomalies for window {} to {} failed for metric urn {}.",
+            this.config.getId(), this.start, this.end, metric.getUrn(), e);
       }
     }
 
+    checkDimensionExploreStatus(totalNestedMetrics, successNestedMetrics);
     return new DetectionPipelineResult(anomalies, DetectionUtils.consolidateNestedLastTimeStamps(lastTimeStamps))
         .setDiagnostics(diagnostics);
+  }
+
+  private void checkEarlyStop(long totalNestedMetrics, long successNestedMetrics, int i) throws DetectionPipelineException {
+    // if the first certain number of dimensions all failed, throw an exception
+    if (i == EARLY_STOP_THRESHOLD && successNestedMetrics == 0) {
+      throw new DetectionPipelineException(String.format(
+          "Detection failed for first %d out of %d metric dimensions for monitoring window %d to %d, stop dimension explore.",
+          i, totalNestedMetrics, this.getStartTime(), this.getEndTime()));
+    }
+  }
+
+  private void checkDimensionExploreStatus(long totalNestedMetrics, long successNestedMetrics)
+      throws DetectionPipelineException {
+    // if all dimension explore failed, throw an exception
+    if (successNestedMetrics == 0 && totalNestedMetrics > 0) {
+      throw new DetectionPipelineException(String.format(
+          "Detection failed for all nested dimensions for detection config id %d for monitoring window %d to %d, stop dimension explore.",
+          this.config.getId(), this.getStartTime(), this.getEndTime()));
+    }
   }
 
   private boolean checkMinLiveZone(MetricEntity me) {
