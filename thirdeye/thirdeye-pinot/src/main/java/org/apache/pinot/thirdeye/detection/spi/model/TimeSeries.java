@@ -81,6 +81,10 @@ public class TimeSeries {
     return this.df.getDoubles(DataFrameUtils.COL_CURRENT);
   }
 
+  public LongSeries getTime() {
+    return this.df.getLongs(DataFrameUtils.COL_TIME);
+  }
+
   public DoubleSeries getPredictedBaseline() {
     return this.df.getDoubles(DataFrameUtils.COL_VALUE);
   }
