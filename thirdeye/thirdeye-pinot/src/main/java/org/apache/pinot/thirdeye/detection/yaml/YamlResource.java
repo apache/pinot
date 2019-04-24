@@ -31,8 +31,11 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+import javax.validation.constraints.NotNull;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
@@ -48,6 +51,7 @@ import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.thirdeye.anomaly.task.TaskConstants;
 import org.apache.pinot.thirdeye.api.Constants;
+import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
 import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionAlertConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
@@ -72,12 +76,16 @@ import org.apache.pinot.thirdeye.detection.DetectionPipeline;
 import org.apache.pinot.thirdeye.detection.DetectionPipelineLoader;
 import org.apache.pinot.thirdeye.detection.DetectionPipelineResult;
 import org.apache.pinot.thirdeye.detection.onboard.YamlOnboardingTaskInfo;
+import org.apache.pinot.thirdeye.detection.spi.components.BaselineProvider;
+import org.apache.pinot.thirdeye.detection.spi.model.TimeSeries;
 import org.apache.pinot.thirdeye.detection.validators.DetectionConfigValidator;
 import org.apache.pinot.thirdeye.detection.validators.SubscriptionConfigValidator;
+import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
 
+import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
 import static org.apache.pinot.thirdeye.detection.yaml.YamlDetectionAlertConfigTranslator.*;
 
 
@@ -628,6 +636,91 @@ public class YamlResource {
     }
     LOG.info("Preview successful, used {} milliseconds", System.currentTimeMillis() - ts);
     return Response.ok(result).build();
+  }
+
+  @POST
+  @Path("/preview/baseline")
+  @Produces(MediaType.APPLICATION_JSON)
+  @Consumes(MediaType.TEXT_PLAIN)
+  @ApiOperation("Get baseline from YAML configuration")
+  /* TODO: Will return baseline from yamlPreviewApi together with detection in the future. */
+  public Response yamlPreviewBaselineApi(
+      @QueryParam("start") long start,
+      @QueryParam("end") long end,
+      @QueryParam("urn") @NotNull String urn,
+      @QueryParam("tuningStart") long tuningStart,
+      @QueryParam("tuningEnd") long tuningEnd,
+      @ApiParam("jsonPayload") String payload,
+      @QueryParam("ruleName") String ruleName) {
+    try {
+      Preconditions.checkArgument(StringUtils.isNotBlank(payload), "The Yaml Payload in the request is empty.");
+
+      // Translate config from YAML to detection config (JSON)
+      Map<String, Object> newDetectionConfigMap = new HashMap<>(ConfigUtils.getMap(this.yaml.load(payload)));
+      DetectionConfigDTO detectionConfig = buildDetectionConfigFromYaml(tuningStart, tuningEnd, newDetectionConfigMap, null);
+      Preconditions.checkNotNull(detectionConfig);
+      detectionConfig.setId(Long.MAX_VALUE);
+
+      // There is a side effect to update detectionConfig when loading the pipeline.
+      this.loader.from(this.provider, detectionConfig, start, end);
+      TimeSeries baseline = getBaseline(detectionConfig, start, end, urn, ruleName);
+
+      return Response.ok(makeTimeSeriesMap(baseline)).build();
+    } catch (Exception e) {
+      LOG.error("Error getting baseline with payload " + payload, e);
+    }
+    return Response.ok().build();
+  }
+
+  /**
+   * Returns a map of time/baseline/current/upper/lower time series derived from the TimeSeries.
+   *
+   * @param baseline Baseline values.
+   * @return map of time/baseline/current/upper/lower time series.
+   */
+  private static Map<String, List<? extends Number>> makeTimeSeriesMap(TimeSeries baseline) {
+    Map<String, List<? extends Number>> output = new HashMap<>();
+    // time and baseline are mandatory
+    output.put(COL_TIME, baseline.getTime().toList());
+    output.put(COL_VALUE, baseline.getPredictedBaseline().toList());
+    if (baseline.getDataFrame().contains(COL_CURRENT)) {
+      output.put(COL_CURRENT, baseline.getCurrent().toList());
+    }
+    if (baseline.getDataFrame().contains(COL_UPPER_BOUND)) {
+      output.put(COL_UPPER_BOUND, baseline.getPredictedUpperBound().toList());
+    }
+    if (baseline.getDataFrame().contains(COL_LOWER_BOUND)) {
+      output.put(COL_LOWER_BOUND, baseline.getPredictedLowerBound().toList());
+    }
+    return output;
+  }
+
+  /**
+   * Get the baselines for metric urn.
+   * If there are multiple rules return the first rule's baseline.
+   * TODO: The baseline should be calculated together with detection in the future.
+   *
+   * @param detectionConfig The detection configuration.
+   * @param start Start time for baseline calculation.
+   * @param end End time for baseline calculation.
+   * @param urn The metric urn.
+   * @param rule The rule name. If not provided then find the first rule.
+   * @return The baseline for the urn.
+   */
+  private TimeSeries getBaseline(DetectionConfigDTO detectionConfig, long start, long end, String urn, String rule) {
+    MetricEntity metric = MetricEntity.fromURN(urn);
+    MetricSlice slice = MetricSlice.from(metric.getId(), start, end, metric.getFilters(), MetricSlice.NATIVE_GRANULARITY);
+
+    Optional<BaselineProvider> provider =  detectionConfig.getComponents().entrySet().stream()
+        .filter(x -> x.getValue() instanceof BaselineProvider && (rule.isEmpty() || x.getKey().startsWith(rule)))
+        .map(x -> (BaselineProvider) x.getValue())
+        .findFirst();
+
+    if (provider.isPresent()) {
+      return provider.get().computePredictedTimeSeries(slice);
+    }
+
+    return new TimeSeries();
   }
 
   /**
