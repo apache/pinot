@@ -11,7 +11,7 @@
       selectAction=(action "onRangeSelection")
     }}
     {{#if appOrSubGroup}}
-      {{#link-to "home.share-dashboard" (query-params appName=appName duration=duration startDate=startDate endDate=endDate feedbackType=feedbackType shareId=null) tagName="button" type="button" class="pull-right te-button te-button--outline"}}
+      {{#link-to "home.share-dashboard" (query-params appName=appName subGroup=subGroup duration=duration startDate=startDate endDate=endDate feedbackType=feedbackType shareId=null) tagName="button" type="button" class="pull-right te-button te-button--outline"}}
         Share
       {{/link-to}}
     {{/if}}
