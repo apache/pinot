@@ -1133,11 +1133,11 @@ public class AnomaliesResource {
     DataFrame dfBaseline = DetectionUtils.getBaselineTimeseries(anomaly, filters, metric.getId(), config, sliceViewCurrent.getStart(), sliceViewCurrent.getEnd(), this.loader, this.provider).getDataFrame();
     DataFrame dfAligned;
     if (dfBaseline.contains(COL_CURRENT)) {
-      // if baseline provider returns both current values and baseline values
+      // if baseline provider returns both current values and baseline values, using them as the result
       dfAligned = dfBaseline;
       dfAligned.renameSeries(COL_VALUE, COL_BASELINE);
     } else {
-      // otherwise fetch current values and join the time series
+      // otherwise fetch current values and join the time series to generate the result
       DataFrame dfCurrent = this.timeSeriesLoader.load(sliceViewCurrent);
       dfAligned = dfCurrent.renameSeries(COL_VALUE, COL_CURRENT).joinOuter(dfBaseline.renameSeries(COL_VALUE, COL_BASELINE));
     }
