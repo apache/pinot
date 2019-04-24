@@ -1130,10 +1130,17 @@ public class AnomaliesResource {
         .withStart(new DateTime(sliceAnomalyCurrent.getStart(), dataTimeZone).minus(offsets.getPreOffsetPeriod()).getMillis())
         .withEnd(new DateTime(sliceAnomalyCurrent.getEnd(), dataTimeZone).plus(offsets.getPostOffsetPeriod()).getMillis());
 
-    DataFrame dfCurrent = this.timeSeriesLoader.load(sliceViewCurrent);
     DataFrame dfBaseline = DetectionUtils.getBaselineTimeseries(anomaly, filters, metric.getId(), config, sliceViewCurrent.getStart(), sliceViewCurrent.getEnd(), this.loader, this.provider).getDataFrame();
-    DataFrame dfAligned = dfCurrent.renameSeries(COL_VALUE, COL_CURRENT).joinOuter(
-        dfBaseline.renameSeries(COL_VALUE, COL_BASELINE));
+    DataFrame dfAligned;
+    if (dfBaseline.contains(COL_CURRENT)) {
+      // if baseline provider returns both current values and baseline values
+      dfAligned = dfBaseline;
+      dfAligned.renameSeries(COL_VALUE, COL_BASELINE);
+    } else {
+      // otherwise fetch current values and join the time series
+      DataFrame dfCurrent = this.timeSeriesLoader.load(sliceViewCurrent);
+      dfAligned = dfCurrent.renameSeries(COL_VALUE, COL_CURRENT).joinOuter(dfBaseline.renameSeries(COL_VALUE, COL_BASELINE));
+    }
 
     details.setDates(makeStringDates(dfAligned.getLongs(COL_TIME)));
     details.setCurrentValues(makeStringValues(dfAligned.getDoubles(COL_CURRENT)));
