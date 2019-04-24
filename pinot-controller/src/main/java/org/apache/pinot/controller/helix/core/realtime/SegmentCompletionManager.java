@@ -96,7 +96,9 @@ public class SegmentCompletionManager {
     SegmentCompletionProtocol
         .setMaxSegmentCommitTimeMs(TimeUnit.MILLISECONDS.convert(segmentCommitTimeoutSeconds, TimeUnit.SECONDS));
     _fsmLocks = new Lock[NUM_FSM_LOCKS];
-    Arrays.fill(_fsmLocks, new ReentrantLock());
+    for (int i = 0; i < NUM_FSM_LOCKS; i ++) {
+      _fsmLocks[i] = new ReentrantLock();
+    }
   }
 
   public boolean isSplitCommitEnabled() {
