@@ -51,7 +51,6 @@
     <module>pinot-integration-tests</module>
     <module>pinot-distribution</module>
     <module>pinot-minion</module>
-    <module>pinot-filesystem</module>
     <module>pinot-hadoop-filesystem</module>
     <module>pinot-azure-filesystem</module>
     <module>pinot-orc</module>
