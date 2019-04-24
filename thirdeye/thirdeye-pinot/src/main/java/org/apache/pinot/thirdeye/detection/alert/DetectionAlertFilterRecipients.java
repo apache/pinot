@@ -20,13 +20,11 @@
 package org.apache.pinot.thirdeye.detection.alert;
 
 import com.google.common.base.MoreObjects;
-import com.google.common.base.Preconditions;
-import com.google.common.collect.Sets;
 import java.util.Arrays;
-import java.util.Collections;
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.Objects;
 import java.util.Set;
-import javax.validation.constraints.NotNull;
 
 
 /**
@@ -37,10 +35,10 @@ public class DetectionAlertFilterRecipients {
   Set<String> cc;
   Set<String> bcc;
 
-  public DetectionAlertFilterRecipients(Set<String> to, Set<String> cc, Set<String> bcc) {
-    this.to = to;
-    this.cc = cc;
-    this.bcc = bcc;
+  public DetectionAlertFilterRecipients(Collection<String> to, Collection<String> cc, Collection<String> bcc) {
+    this.to = new HashSet<>(to);
+    this.cc = new HashSet<>(cc);
+    this.bcc = new HashSet<>(bcc);
   }
 
   public DetectionAlertFilterRecipients(Set<String> to) {
