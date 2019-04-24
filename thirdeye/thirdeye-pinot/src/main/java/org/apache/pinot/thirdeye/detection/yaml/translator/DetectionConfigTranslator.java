@@ -28,7 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import org.apache.commons.collections.MapUtils;
+import org.apache.commons.collections4.MapUtils;
 import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
@@ -181,7 +181,7 @@ public class DetectionConfigTranslator extends ConfigTranslator<DetectionConfigD
 
   @Override
   DetectionConfigDTO translateConfig(Map<String, Object> yamlConfigMap) throws IllegalArgumentException {
-    Map<String, Collection<String>> dimensionFiltersMap = MapUtils.getMap(yamlConfigMap, PROP_FILTERS);
+    Map<String, Collection<String>> dimensionFiltersMap = ConfigUtils.getMap(yamlConfigMap.get(PROP_FILTERS));
 
     MetricConfigDTO metricConfig = this.dataProvider.fetchMetric(MapUtils.getString(yamlConfigMap, PROP_METRIC),
         MapUtils.getString(yamlConfigMap, PROP_DATASET));
@@ -191,7 +191,7 @@ public class DetectionConfigTranslator extends ConfigTranslator<DetectionConfigD
 
     String detectionCronInYaml = MapUtils.getString(yamlConfigMap, PROP_CRON);
     String cron = (detectionCronInYaml == null) ? buildCron(datasetConfig.bucketTimeGranularity()) : detectionCronInYaml;
-    Map<String, Object> mergerProperties = MapUtils.getMap(yamlConfigMap, PROP_MERGER, new HashMap<String, Object>());
+    Map<String, Object> mergerProperties = ConfigUtils.getMap(yamlConfigMap.get(PROP_MERGER));
 
     List<Map<String, Object>> ruleYamls = getList(yamlConfigMap.get(PROP_RULES));
     List<Map<String, Object>> nestedPipelines = new ArrayList<>();
@@ -230,7 +230,7 @@ public class DetectionConfigTranslator extends ConfigTranslator<DetectionConfigD
     Map<String, Object> dimensionWrapperProperties = new HashMap<>();
     dimensionWrapperProperties.put(PROP_NESTED_METRIC_URNS, Collections.singletonList(metricUrn));
     if (yamlConfigMap.containsKey(PROP_DIMENSION_EXPLORATION)) {
-      Map<String, Object> dimensionExploreYaml = MapUtils.getMap(yamlConfigMap, PROP_DIMENSION_EXPLORATION);
+      Map<String, Object> dimensionExploreYaml = ConfigUtils.getMap(yamlConfigMap.get(PROP_DIMENSION_EXPLORATION));
       dimensionWrapperProperties.putAll(dimensionExploreYaml);
       if (dimensionExploreYaml.containsKey(PROP_DIMENSION_FILTER_METRIC)){
         MetricConfigDTO dimensionExploreMetric = this.dataProvider.fetchMetric(MapUtils.getString(dimensionExploreYaml, PROP_DIMENSION_FILTER_METRIC), datasetName);
@@ -413,10 +413,7 @@ public class DetectionConfigTranslator extends ConfigTranslator<DetectionConfigD
     String componentClassName = DETECTION_REGISTRY.lookup(type);
     componentSpecs.put(PROP_CLASS_NAME, componentClassName);
 
-    Map<String, Object> params = new HashMap<>();
-    if (yamlConfig.containsKey(PROP_PARAMS)){
-      params = MapUtils.getMap(yamlConfig, PROP_PARAMS);
-    }
+    Map<String, Object> params = ConfigUtils.getMap(yamlConfig.get(PROP_PARAMS));
 
     // For tunable components, the model params are computed from user supplied yaml params and previous model params.
     // We store the yaml params under a separate key, PROP_YAML_PARAMS, to distinguish from model params.

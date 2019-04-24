@@ -27,8 +27,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.apache.commons.collections.MapUtils;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.collections4.MapUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
@@ -202,7 +202,7 @@ public class DetectionConfigValidator implements ConfigValidator<DetectionConfig
     }
 
     // Safety condition: Validate if maxDuration is greater than 15 minutes
-    Map<String, Object> mergerProperties = MapUtils.getMap(detectionYaml, PROP_MERGER, new HashMap());
+    Map<String, Object> mergerProperties = ConfigUtils.getMap(detectionYaml.get(PROP_MERGER));
     if (mergerProperties.get(PROP_MAX_DURATION) != null) {
       Preconditions.checkArgument(
           MapUtils.getLong(mergerProperties, PROP_MAX_DURATION) >= datasetConfig.bucketTimeGranularity().toMillis(),

@@ -31,7 +31,7 @@ import org.apache.pinot.thirdeye.detector.email.filter.AlertFilterFactory;
 import java.io.IOException;
 import java.util.List;
 import javax.ws.rs.core.Response;
-import org.apache.commons.configuration.Configuration;
+import org.apache.commons.configuration2.Configuration;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.joda.time.DateTime;
 import org.slf4j.Logger;

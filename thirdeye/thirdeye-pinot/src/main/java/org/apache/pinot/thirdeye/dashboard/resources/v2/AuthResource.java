@@ -19,7 +19,7 @@
 
 package org.apache.pinot.thirdeye.dashboard.resources.v2;
 
-import com.google.common.base.Optional;
+import java.util.Optional;
 import org.apache.pinot.thirdeye.auth.Credentials;
 import org.apache.pinot.thirdeye.auth.ThirdEyeAuthFilter;
 import org.apache.pinot.thirdeye.auth.ThirdEyePrincipal;

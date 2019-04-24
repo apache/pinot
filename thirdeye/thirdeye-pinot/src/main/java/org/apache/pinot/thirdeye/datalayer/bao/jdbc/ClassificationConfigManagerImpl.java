@@ -25,7 +25,7 @@ import org.apache.pinot.thirdeye.datalayer.dto.ClassificationConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.pojo.ClassificationConfigBean;
 import org.apache.pinot.thirdeye.datalayer.util.Predicate;
 import java.util.List;
-import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections4.CollectionUtils;
 
 @Singleton
 public class ClassificationConfigManagerImpl extends AbstractManagerImpl<ClassificationConfigDTO>

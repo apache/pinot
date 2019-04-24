@@ -21,7 +21,7 @@ package org.apache.pinot.thirdeye.detection.annotation;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.pinot.thirdeye.detection.annotation.registry.DetectionRegistry;
-import com.wordnik.swagger.annotations.ApiParam;
+import io.swagger.annotations.ApiParam;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.core.Response;

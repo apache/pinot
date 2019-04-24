@@ -21,7 +21,7 @@ package org.apache.pinot.thirdeye.anomaly.alert.grouping;
 
 import java.util.Collections;
 import java.util.Map;
-import org.apache.commons.collections.MapUtils;
+import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 
 public class AlertGrouperFactory {

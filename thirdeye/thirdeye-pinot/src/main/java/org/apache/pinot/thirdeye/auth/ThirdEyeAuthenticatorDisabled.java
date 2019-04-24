@@ -19,13 +19,9 @@
 
 package org.apache.pinot.thirdeye.auth;
 
-import com.google.common.base.Optional;
 import io.dropwizard.auth.AuthenticationException;
 import io.dropwizard.auth.Authenticator;
-import java.util.Hashtable;
-import javax.naming.Context;
-import javax.naming.NamingException;
-import javax.naming.directory.InitialDirContext;
+import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

@@ -21,9 +21,9 @@ package org.apache.pinot.thirdeye.detection;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.Multimaps;
-import com.wordnik.swagger.annotations.Api;
-import com.wordnik.swagger.annotations.ApiOperation;
-import com.wordnik.swagger.annotations.ApiParam;
+import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiOperation;
+import io.swagger.annotations.ApiParam;
 import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -46,7 +46,7 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.apache.commons.collections.MapUtils;
+import org.apache.commons.collections4.MapUtils;
 import org.apache.pinot.thirdeye.api.Constants;
 import org.apache.pinot.thirdeye.constant.AnomalyFeedbackType;
 import org.apache.pinot.thirdeye.constant.AnomalyResultSource;
@@ -206,8 +206,8 @@ public class DetectionResource {
     config.setId(Long.MAX_VALUE);
     config.setName("preview");
     config.setDescription("previewing the detection");
-    config.setProperties(MapUtils.getMap(properties, "properties"));
-    config.setComponentSpecs(MapUtils.getMap(properties, "componentSpecs"));
+    config.setProperties(ConfigUtils.getMap(properties.get("properties")));
+    config.setComponentSpecs(ConfigUtils.getMap(properties.get("componentSpecs")));
 
     DetectionPipeline pipeline = this.loader.from(this.provider, config, start, end);
     DetectionPipelineResult result = pipeline.run();

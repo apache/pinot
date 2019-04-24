@@ -32,8 +32,8 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.commons.configuration.Configuration;
-import org.apache.commons.configuration.MapConfiguration;
+import org.apache.commons.configuration2.Configuration;
+import org.apache.commons.configuration2.MapConfiguration;
 
 
 /**
@@ -293,11 +293,8 @@ public class DefaultDetectionOnboardJob extends BaseDetectionOnboardJob {
     taskConfigs.put (taskPrefix + PHANTON_JS_PATH, this.properties.get(PHANTON_JS_PATH));
     taskConfigs.put (taskPrefix + ROOT_DIR, this.properties.get(ROOT_DIR));
 
-    /*
-    Set the DelimiterParsingDisabled to be true to avoid configuration automatically parse property with comma to list
-     */
+    // By default list splitting is disabled which means the comma separated values will be retained.
     MapConfiguration mapConfiguration =  new MapConfiguration(taskConfigs);
-    mapConfiguration.setDelimiterParsingDisabled(true);
     return mapConfiguration;
   }
 

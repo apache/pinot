@@ -87,7 +87,7 @@ public class HandlebarsViewRenderer implements ViewRenderer {
 
     @Override
     public void render(View view, Locale locale, OutputStream output) throws IOException, WebApplicationException {
-        try (Writer writer = new OutputStreamWriter(output, view.getCharset().or(Charsets.UTF_8))) {
+        try (Writer writer = new OutputStreamWriter(output, view.getCharset().orElse(Charsets.UTF_8))) {
             compilationCache.get(view.getTemplateName()).apply(view, writer);
         } catch (FileNotFoundException | ExecutionException e) {
             throw new FileNotFoundException("Template " + view.getTemplateName() + " not found.");
@@ -101,9 +101,7 @@ public class HandlebarsViewRenderer implements ViewRenderer {
     }
 
     @Override
-    public String getSuffix() {
-      // TODO Auto-generated method stub
-      // jteoh - new method required as part of dropwizard upgrade to 0.8.2
-      return HANDLEBARS_FILE_SUFFIX;
+    public String getConfigurationKey() {
+        return "handlebars";
     }
 }

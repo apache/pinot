@@ -22,7 +22,7 @@ package org.apache.pinot.thirdeye.anomaly.onboard.framework;
 import com.google.common.base.Preconditions;
 import org.apache.pinot.thirdeye.anomaly.task.TaskConstants;
 import java.util.concurrent.Callable;
-import org.apache.commons.lang.exception.ExceptionUtils;
+import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

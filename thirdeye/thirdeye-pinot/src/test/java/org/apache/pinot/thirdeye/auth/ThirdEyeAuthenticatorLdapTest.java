@@ -16,11 +16,11 @@
 
 package org.apache.pinot.thirdeye.auth;
 
-import com.google.common.base.Optional;
 import io.dropwizard.auth.AuthenticationException;
 import java.util.Arrays;
 import java.util.Hashtable;
 import java.util.List;
+import java.util.Optional;
 import javax.naming.Context;
 import javax.naming.NamingException;
 import javax.naming.directory.DirContext;

@@ -35,7 +35,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.apache.commons.collections.MapUtils;
+import org.apache.commons.collections4.MapUtils;
 import org.apache.pinot.thirdeye.detection.validators.SubscriptionConfigValidator;
 import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.Yaml;
@@ -176,7 +176,7 @@ public class SubscriptionConfigTranslator extends ConfigTranslator<DetectionAler
     alertConfigDTO.setSubjectType(AlertConfigBean.SubjectType.valueOf(
         (String) MapUtils.getObject(yamlConfigMap, PROP_EMAIL_SUBJECT_TYPE, AlertConfigBean.SubjectType.METRICS.name())));
 
-    Map<String, String> refLinks = MapUtils.getMap(yamlConfigMap, PROP_REFERENCE_LINKS);
+    Map<String, String> refLinks = ConfigUtils.getMap(yamlConfigMap.get(PROP_REFERENCE_LINKS));
     if (refLinks == null) {
       refLinks = new HashMap<>();
       yamlConfigMap.put(PROP_REFERENCE_LINKS, refLinks);
@@ -185,7 +185,7 @@ public class SubscriptionConfigTranslator extends ConfigTranslator<DetectionAler
       refLinks.put("ThirdEye User Guide", "https://go/thirdeyeuserguide");
       refLinks.put("Add Reference Links", "https://go/thirdeyealertreflink");
     }
-    alertConfigDTO.setReferenceLinks(MapUtils.getMap(yamlConfigMap, PROP_REFERENCE_LINKS));
+    alertConfigDTO.setReferenceLinks(ConfigUtils.getMap(yamlConfigMap.get(PROP_REFERENCE_LINKS)));
 
     alertConfigDTO.setAlertSchemes(buildAlertSchemes(yamlConfigMap));
     alertConfigDTO.setAlertSuppressors(buildAlertSuppressors(yamlConfigMap));
