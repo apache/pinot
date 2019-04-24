@@ -166,7 +166,6 @@ public class HybridQuickstart {
 
   public static void main(String[] args)
       throws Exception {
-    Quickstart.logOnlyErrors();
     new HybridQuickstart().execute();
   }
 }

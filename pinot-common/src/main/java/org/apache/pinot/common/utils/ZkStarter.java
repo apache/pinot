@@ -52,6 +52,10 @@ public class ZkStarter {
     @Override
     public void initializeAndRun(String[] args)
         throws QuorumPeerConfig.ConfigException, IOException {
+      // org.apache.log4j.jmx.* is not compatible under log4j-1.2-api, which provides the backward compatibility for
+      // log4j 1.* api for log4j2. In order to avoid 'class not found error', the following line disables log4j jmx
+      // bean registration for local zookeeper instance
+      System.setProperty("zookeeper.jmx.log4j.disable", "true");
       super.initializeAndRun(args);
     }
 
