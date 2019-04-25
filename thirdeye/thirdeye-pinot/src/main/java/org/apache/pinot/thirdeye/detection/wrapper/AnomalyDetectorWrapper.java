@@ -50,6 +50,7 @@ import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.Interval;
 import org.joda.time.Period;
+import org.omg.SendingContext.RunTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -160,6 +161,8 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
     List<MergedAnomalyResultDTO> anomalies = new ArrayList<>();
     int totalWindows = monitoringWindows.size();
     int successWindows = 0;
+    // The last exception of the detection windows. It will be thrown out to upper level.
+    Exception lastException = null;
     for (int i = 0; i < totalWindows; i++) {
       checkEarlyStop(totalWindows, successWindows, i);
 
@@ -178,14 +181,16 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
       }
       catch (DetectorDataInsufficientException e) {
         LOG.warn("[DetectionConfigID{}] Insufficient data ro run detection for window {} to {}.", this.config.getId(), window.getStart(), window.getEnd());
+        lastException = e;
       }
       catch (Exception e) {
         LOG.warn("[DetectionConfigID{}] detecting anomalies for window {} to {} failed.", this.config.getId(), window.getStart(), window.getEnd(), e);
+        lastException = e;
       }
       anomalies.addAll(anomaliesForOneWindow);
     }
 
-    checkMovingWindowDetectionStatus(totalWindows, successWindows);
+    checkMovingWindowDetectionStatus(totalWindows, successWindows, lastException);
 
     for (MergedAnomalyResultDTO anomaly : anomalies) {
       anomaly.setDetectionConfigId(this.config.getId());
@@ -209,12 +214,12 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
     }
   }
 
-  private void checkMovingWindowDetectionStatus(int totalWindows, int successWindows) throws DetectionPipelineException {
+  private void checkMovingWindowDetectionStatus(int totalWindows, int successWindows, Exception lastException) throws DetectionPipelineException {
     // if all moving window detection failed, throw an exception
     if (successWindows == 0 && totalWindows > 0) {
       throw new DetectionPipelineException(String.format(
           "Detection failed for all windows for detection config id %d detector %s for monitoring window %d to %d.",
-          this.config.getId(), this.detectorName, this.getStartTime(), this.getEndTime()));
+          this.config.getId(), this.detectorName, this.getStartTime(), this.getEndTime()), lastException);
     }
   }
 
