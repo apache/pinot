@@ -24,10 +24,14 @@ import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Paths;
 import org.apache.commons.configuration.Configuration;
+import org.apache.pinot.annotations.InterfaceAudience;
+import org.apache.pinot.annotations.InterfaceStability;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 /**
  * PinotFS is a restricted FS API that exposes functionality that is required for Pinot to use
  * different FS implementations. The restrictions are in place due to 2 driving factors:

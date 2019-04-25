@@ -23,10 +23,14 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import org.apache.commons.configuration.Configuration;
+import org.apache.pinot.annotations.InterfaceAudience;
+import org.apache.pinot.annotations.InterfaceStability;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 /**
  * This factory class initializes the PinotFS class. It creates a PinotFS object based on the URI found.
  */
