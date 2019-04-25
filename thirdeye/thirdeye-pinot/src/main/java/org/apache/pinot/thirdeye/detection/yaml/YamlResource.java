@@ -576,7 +576,7 @@ public class YamlResource {
       Map<String, Object> newDetectionConfigMap = new HashMap<>(ConfigUtils.getMap(this.yaml.load(payload)));
       DetectionConfigDTO detectionConfig = buildDetectionConfigFromYaml(tuningStart, tuningEnd, newDetectionConfigMap, null);
       Preconditions.checkNotNull(detectionConfig);
-      detectionConfig.setId(Long.MAX_VALUE);
+      detectionConfig.setId(0L);
 
       DetectionPipeline pipeline = this.loader.from(this.provider, detectionConfig, start, end);
       result = pipeline.run();
@@ -590,11 +590,22 @@ public class YamlResource {
       return Response.serverError().entity(responseMessage).build();
     } catch (Exception e) {
       LOG.error("Error running preview with payload " + payload, e);
-      responseMessage.put("message", "Failed to run the preview due to " + e.getMessage());
+      StringBuilder sb = new StringBuilder();
+      // show more stack message to frontend for debugging
+      getErrorMessage(0, 5, e, sb);
+      responseMessage.put("message", "Failed to run the preview. Error stack: " + sb.toString());
       return Response.serverError().entity(responseMessage).build();
     }
     LOG.info("Preview successful, used {} milliseconds", System.currentTimeMillis() - ts);
     return Response.ok(result).build();
+  }
+
+  private void getErrorMessage(int curLevel, int totalLevel, Throwable e, StringBuilder sb) {
+    if (curLevel <= totalLevel && e != null) {
+      sb.append("==");
+      sb.append(e.getMessage());
+      getErrorMessage(curLevel + 1, totalLevel, e.getCause(), sb);
+    }
   }
 
   @POST
