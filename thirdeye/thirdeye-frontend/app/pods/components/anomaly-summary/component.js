@@ -10,7 +10,7 @@ import {
   computed,
   getProperties
 } from '@ember/object';
-import { colorMapping, toColor, makeTime } from 'thirdeye-frontend/utils/rca-utils';
+import { colorMapping, makeTime } from 'thirdeye-frontend/utils/rca-utils';
 import { getFormattedDuration,
   anomalyResponseMapNew,
   verifyAnomalyFeedback,
@@ -61,9 +61,13 @@ export default Component.extend({
     rescale: true
   },
 
+  // legend and point are for the graph
   legend: {
     show: true,
     position: 'right'
+  },
+  point: {
+    show: false
   },
   isLoading: false,
   feedbackOptions: ['Not reviewed yet', 'Yes - unexpected', 'Expected temporary change', 'Expected permanent change', 'No change observed'],
@@ -216,7 +220,7 @@ export default Component.extend({
         set(this, 'predicted', res.predicted);
         set(this, 'isLoading', false);
       })
-      .catch(err => {
+      .catch(() => {
         set(this, 'isLoading', false);
       });
   },
