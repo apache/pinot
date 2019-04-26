@@ -186,7 +186,7 @@ public class AnomalyApplicationEndToEndTest {
     monitorConfiguration.setDefaultRetentionDays(MonitorConstants.DEFAULT_RETENTION_DAYS);
     monitorConfiguration.setCompletedJobRetentionDays(MonitorConstants.DEFAULT_COMPLETED_JOB_RETENTION_DAYS);
     monitorConfiguration.setDetectionStatusRetentionDays(MonitorConstants.DEFAULT_DETECTION_STATUS_RETENTION_DAYS);
-    monitorConfiguration.setRawAnomalyRetentionDays(MonitorConstants.DEFAULT_RAW_ANOMALY_RETENTION_DAYS);
+    monitorConfiguration.setMergedAnomalyCleanupDays(MonitorConstants.DEFAULT_MERGED_ANOMALY_CLEANUP_DAYS);
     monitorConfiguration.setMonitorFrequency(new TimeGranularity(3, TimeUnit.SECONDS));
     thirdeyeAnomalyConfig.setMonitorConfiguration(monitorConfiguration);
     // Task config

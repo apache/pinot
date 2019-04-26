@@ -19,16 +19,6 @@
 
 package org.apache.pinot.thirdeye.anomaly.monitor;
 
-import org.apache.pinot.thirdeye.anomaly.job.JobConstants.JobStatus;
-import org.apache.pinot.thirdeye.anomaly.monitor.MonitorConstants.MonitorType;
-import org.apache.pinot.thirdeye.anomaly.task.TaskConstants.TaskStatus;
-import org.apache.pinot.thirdeye.anomaly.task.TaskContext;
-import org.apache.pinot.thirdeye.anomaly.task.TaskInfo;
-import org.apache.pinot.thirdeye.anomaly.task.TaskResult;
-import org.apache.pinot.thirdeye.anomaly.task.TaskRunner;
-import org.apache.pinot.thirdeye.datalayer.dto.JobDTO;
-import org.apache.pinot.thirdeye.datalayer.dto.TaskDTO;
-import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -37,6 +27,18 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.pinot.thirdeye.anomaly.job.JobConstants.JobStatus;
+import org.apache.pinot.thirdeye.anomaly.monitor.MonitorConstants.MonitorType;
+import org.apache.pinot.thirdeye.anomaly.task.TaskConstants.TaskStatus;
+import org.apache.pinot.thirdeye.anomaly.task.TaskContext;
+import org.apache.pinot.thirdeye.anomaly.task.TaskInfo;
+import org.apache.pinot.thirdeye.anomaly.task.TaskResult;
+import org.apache.pinot.thirdeye.anomaly.task.TaskRunner;
+import org.apache.pinot.thirdeye.datalayer.dto.JobDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.TaskDTO;
+import org.apache.pinot.thirdeye.datasource.DAORegistry;
+import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,6 +48,7 @@ public class MonitorTaskRunner implements TaskRunner {
   private static final long MAX_TASK_TIME = TimeUnit.MINUTES.toMillis(30);
 
   private DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
+  private static final String ANOMALY_TIMELINES_VIEW = "anomalyTimelinesView";
 
   @Override
   public List<TaskResult> execute(TaskInfo taskInfo, TaskContext taskContext) {
@@ -108,6 +111,28 @@ public class MonitorTaskRunner implements TaskRunner {
     }
   }
 
+  private int cleanUpMergedAnomalies(int cleanUpDays) {
+    DateTime cleanupStartDate = new DateTime().withTimeAtStartOfDay().minusDays(cleanUpDays);
+    DateTime cleanupEndDate = cleanupStartDate.plusDays(1);
+    List<MergedAnomalyResultDTO> mergedAnomalies =
+        DAO_REGISTRY.getMergedAnomalyResultDAO().findByTime(cleanupStartDate.getMillis(), cleanupEndDate.getMillis());
+
+    int cleanedAnomalyCount = 0;
+    List<MergedAnomalyResultDTO> updatedAnomalies = new ArrayList<>();
+    for (MergedAnomalyResultDTO mergedAnomaly : mergedAnomalies) {
+      if (mergedAnomaly.getProperties() != null && mergedAnomaly.getProperties().containsKey(ANOMALY_TIMELINES_VIEW)) {
+        Map<String, String> properties = mergedAnomaly.getProperties();
+        properties.remove(ANOMALY_TIMELINES_VIEW);
+        mergedAnomaly.setProperties(properties);
+        updatedAnomalies.add(mergedAnomaly);
+        cleanedAnomalyCount++;
+      }
+    }
+
+    DAO_REGISTRY.getMergedAnomalyResultDAO().update(updatedAnomalies);
+    return cleanedAnomalyCount;
+  }
+
   private void executeMonitorExpire(MonitorTaskInfo monitorTaskInfo) {
     LOG.info("Execute monitor expire {}", monitorTaskInfo);
 
@@ -157,14 +182,12 @@ public class MonitorTaskRunner implements TaskRunner {
       LOG.error("Exception when expiring data completeness entries.", e);
     }
 
-    // Delete expired raw anomalies (30 days by default)
     try {
-      int deletedRawAnomalies = DAO_REGISTRY.getRawAnomalyResultDAO()
-          .deleteRecordsOlderThanDays(monitorTaskInfo.getRawAnomalyRetentionDays());
-      LOG.info("Deleted {} raw anomalies that are older than {} days.", deletedRawAnomalies,
-          monitorTaskInfo.getRawAnomalyRetentionDays());
+      int cleanupDays = monitorTaskInfo.getMergedAnomalyCleanupDays();
+      int cleanedUpAnomalies = cleanUpMergedAnomalies(cleanupDays);
+      LOG.info("Cleaned up {} raw anomalies that are older than {} days.", cleanedUpAnomalies, cleanupDays);
     } catch (Exception e) {
-      LOG.error("Exception when expiring raw anomalies.", e);
+      LOG.error("Exception when cleaning up merged anomalies.", e);
     }
   }
 

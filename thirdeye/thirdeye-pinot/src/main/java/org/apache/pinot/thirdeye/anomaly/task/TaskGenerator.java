@@ -96,7 +96,7 @@ public class TaskGenerator {
     updateTaskInfo.setCompletedJobRetentionDays(monitorConfiguration.getCompletedJobRetentionDays());
     updateTaskInfo.setDefaultRetentionDays(monitorConfiguration.getDefaultRetentionDays());
     updateTaskInfo.setDetectionStatusRetentionDays(monitorConfiguration.getDetectionStatusRetentionDays());
-    updateTaskInfo.setRawAnomalyRetentionDays(monitorConfiguration.getRawAnomalyRetentionDays());
+    updateTaskInfo.setMergedAnomalyCleanupDays(monitorConfiguration.getMergedAnomalyCleanupDays());
     tasks.add(updateTaskInfo);
 
     // Generates the task to expire (delete) old jobs and tasks in DB
@@ -105,7 +105,7 @@ public class TaskGenerator {
     expireTaskInfo.setCompletedJobRetentionDays(monitorConfiguration.getCompletedJobRetentionDays());
     expireTaskInfo.setDefaultRetentionDays(monitorConfiguration.getDefaultRetentionDays());
     expireTaskInfo.setDetectionStatusRetentionDays(monitorConfiguration.getDetectionStatusRetentionDays());
-    expireTaskInfo.setRawAnomalyRetentionDays(monitorConfiguration.getRawAnomalyRetentionDays());
+    expireTaskInfo.setMergedAnomalyCleanupDays(monitorConfiguration.getMergedAnomalyCleanupDays());
     tasks.add(expireTaskInfo);
 
     return tasks;

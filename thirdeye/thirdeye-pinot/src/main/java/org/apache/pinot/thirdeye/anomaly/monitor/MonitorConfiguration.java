@@ -26,7 +26,7 @@ public class MonitorConfiguration {
   private int defaultRetentionDays = MonitorConstants.DEFAULT_RETENTION_DAYS;
   private int completedJobRetentionDays = MonitorConstants.DEFAULT_COMPLETED_JOB_RETENTION_DAYS;
   private int detectionStatusRetentionDays = MonitorConstants.DEFAULT_DETECTION_STATUS_RETENTION_DAYS;
-  private int rawAnomalyRetentionDays = MonitorConstants.DEFAULT_RAW_ANOMALY_RETENTION_DAYS;
+  private int mergedAnomalyCleanupDays = MonitorConstants.DEFAULT_MERGED_ANOMALY_CLEANUP_DAYS;
   private TimeGranularity monitorFrequency = MonitorConstants.DEFAULT_MONITOR_FREQUENCY;
 
   public int getCompletedJobRetentionDays() {
@@ -53,12 +53,12 @@ public class MonitorConfiguration {
     this.detectionStatusRetentionDays = detectionStatusRetentionDays;
   }
 
-  public int getRawAnomalyRetentionDays() {
-    return rawAnomalyRetentionDays;
+  public int getMergedAnomalyCleanupDays() {
+    return mergedAnomalyCleanupDays;
   }
 
-  public void setRawAnomalyRetentionDays(int rawAnomalyRetentionDays) {
-    this.rawAnomalyRetentionDays = rawAnomalyRetentionDays;
+  public void setMergedAnomalyCleanupDays(int mergedAnomalyCleanupDays) {
+    this.mergedAnomalyCleanupDays = mergedAnomalyCleanupDays;
   }
 
   public TimeGranularity getMonitorFrequency() {

@@ -31,7 +31,7 @@ public class MonitorTaskInfo implements TaskInfo {
   private int defaultRetentionDays;
   private int completedJobRetentionDays;
   private int detectionStatusRetentionDays;
-  private int rawAnomalyRetentionDays;
+  private int mergedAnomalyCleanupDays;
 
   public MonitorTaskInfo() {
 
@@ -69,12 +69,12 @@ public class MonitorTaskInfo implements TaskInfo {
     this.detectionStatusRetentionDays = detectionStatusRetentionDays;
   }
 
-  public int getRawAnomalyRetentionDays() {
-    return rawAnomalyRetentionDays;
+  public int getMergedAnomalyCleanupDays() {
+    return mergedAnomalyCleanupDays;
   }
 
-  public void setRawAnomalyRetentionDays(int rawAnomalyRetentionDays) {
-    this.rawAnomalyRetentionDays = rawAnomalyRetentionDays;
+  public void setMergedAnomalyCleanupDays(int mergedAnomalyCleanupDays) {
+    this.mergedAnomalyCleanupDays = mergedAnomalyCleanupDays;
   }
 
   @Override
@@ -89,13 +89,13 @@ public class MonitorTaskInfo implements TaskInfo {
     return completedJobRetentionDays == that.completedJobRetentionDays
         && defaultRetentionDays == that.defaultRetentionDays
         && detectionStatusRetentionDays == that.detectionStatusRetentionDays
-        && rawAnomalyRetentionDays == that.rawAnomalyRetentionDays && monitorType == that.monitorType;
+        && mergedAnomalyCleanupDays == that.mergedAnomalyCleanupDays && monitorType == that.monitorType;
   }
 
   @Override
   public int hashCode() {
     return Objects.hash(monitorType, completedJobRetentionDays, defaultRetentionDays, detectionStatusRetentionDays,
-        rawAnomalyRetentionDays);
+        mergedAnomalyCleanupDays);
   }
 
   @Override
@@ -105,7 +105,7 @@ public class MonitorTaskInfo implements TaskInfo {
         .add("completedJobRetentionDays", completedJobRetentionDays)
         .add("defaultRetentionDays", defaultRetentionDays)
         .add("detectionStatusRetentionDays", detectionStatusRetentionDays)
-        .add("rawAnomalyRetentionDays", rawAnomalyRetentionDays)
+        .add("mergedAnomalyCleanupDays", mergedAnomalyCleanupDays)
         .toString();
   }
 }
