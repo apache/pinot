@@ -576,7 +576,7 @@ public class YamlResource {
       Map<String, Object> newDetectionConfigMap = new HashMap<>(ConfigUtils.getMap(this.yaml.load(payload)));
       DetectionConfigDTO detectionConfig = buildDetectionConfigFromYaml(tuningStart, tuningEnd, newDetectionConfigMap, null);
       Preconditions.checkNotNull(detectionConfig);
-      detectionConfig.setId(0L);
+      detectionConfig.setId(Long.MAX_VALUE);
 
       DetectionPipeline pipeline = this.loader.from(this.provider, detectionConfig, start, end);
       result = pipeline.run();
