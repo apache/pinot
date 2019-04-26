@@ -61,6 +61,9 @@ export default Component.extend({
     show: true,
     position: 'right'
   },
+  point: {
+    show: false
+  },
   errorTimeseries: null,
   metricUrn: null,
   metricUrnList: [],
@@ -72,7 +75,8 @@ export default Component.extend({
   componentId: 'timeseries-chart',
   anomalies: null,
   baselineOptions: [
-    { name: 'wo1w', isActive: true},
+    { name: 'predicted', isActive: true},
+    { name: 'wo1w', isActive: false},
     { name: 'wo2w', isActive: false},
     { name: 'wo3w', isActive: false},
     { name: 'wo4w', isActive: false},
@@ -86,7 +90,7 @@ export default Component.extend({
   sortColumnChangeUp: false,
   sortColumnFeedbackUp: false,
   selectedSortMode: 'start:down',
-  selectedBaseline: 'wo1w',
+  selectedBaseline: 'predicted',
   pageSize: 10,
   currentPage: 1,
   isPreviewMode: false,
@@ -118,7 +122,6 @@ export default Component.extend({
           this._fetchTimeseries();
         }
       }
-
     }),
 
   /**
@@ -133,7 +136,7 @@ export default Component.extend({
       range.push(analysisRange[0]);
       // set end to now if the end time is in the future
       const end = Math.min(moment().valueOf(), analysisRange[1]);
-      range.push(end)
+      range.push(end);
       return range;
     }
   ),
@@ -318,8 +321,7 @@ export default Component.extend({
     function () {
       const {
         metricUrn, anomalies, timeseries, baseline
-      } = getProperties(this, 'metricUrn', 'anomalies', 'timeseries',
-        'baseline');
+      } = getProperties(this, 'metricUrn', 'anomalies', 'timeseries', 'baseline');
 
       const series = {};
 
@@ -368,6 +370,24 @@ export default Component.extend({
           values: baseline.value,
           type: 'line',
           color: 'light-' + toColor(metricUrn)
+        };
+      }
+
+      if (baseline && !_.isEmpty(baseline.upper_bound)) {
+        series['upperBound'] = {
+          timestamps: baseline.timestamp,
+          values: baseline.upper_bound,
+          type: 'line',
+          color: 'light-blue'
+        };
+      }
+
+      if (baseline && !_.isEmpty(baseline.lower_bound)) {
+        series['lowerBound'] = {
+          timestamps: baseline.timestamp,
+          values: baseline.lower_bound,
+          type: 'line',
+          color: 'light-blue'
         };
       }
       return series;
@@ -659,10 +679,12 @@ export default Component.extend({
 
     set(this, 'errorBaseline', null);
 
-    const urlBaseline = `/rootcause/metric/timeseries?urn=${metricUrn}&start=${analysisRange[0]}&end=${analysisRange[1]}&offset=${selectedBaseline}&timezone=${timeZone}`;
-    fetch(urlBaseline)
-      .then(checkStatus)
-      .then(res => set(this, 'baseline', res));
+    if (selectedBaseline !== "predicted") {
+      const urlBaseline = `/rootcause/metric/timeseries?urn=${metricUrn}&start=${analysisRange[0]}&end=${analysisRange[1]}&offset=${selectedBaseline}&timezone=${timeZone}`;
+      fetch(urlBaseline)
+        .then(checkStatus)
+        .then(res => set(this, 'baseline', res));
+    }
   },
 
   _fetchAnomalies() {
@@ -679,6 +701,7 @@ export default Component.extend({
           });
           if (get(this, 'metricUrn')) {
             this._fetchTimeseries();
+            this._fetchPreviewBaseline();
           } else {
             throw new Error('Unable to get MetricUrn from response');
           }
@@ -687,6 +710,26 @@ export default Component.extend({
       set(this, 'isLoading', false);
       throw new Error(`Unable to retrieve anomaly data. ${error}`);
     }
+  },
+
+  _fetchPreviewBaseline() {
+    const {
+      metricUrn,
+      analysisRange
+    } = this.getProperties('metricUrn', 'analysisRange');
+    const content = get(this, 'alertYaml');
+    const postProps = {
+      method: 'post',
+      body: content,
+      headers: { 'content-type': 'text/plain' }
+    };
+
+    const url = `/yaml/preview/baseline?urn=${metricUrn}&start=${analysisRange[0]}&end=${analysisRange[1]}`;
+    fetch(url, postProps)
+      .then(checkStatus)
+      .then(res => {
+        set(this, 'baseline', res);
+      });
   },
 
   /**

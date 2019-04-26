@@ -712,7 +712,7 @@ public class YamlResource {
     MetricSlice slice = MetricSlice.from(metric.getId(), start, end, metric.getFilters(), MetricSlice.NATIVE_GRANULARITY);
 
     Optional<BaselineProvider> provider =  detectionConfig.getComponents().entrySet().stream()
-        .filter(x -> x.getValue() instanceof BaselineProvider && (rule.isEmpty() || x.getKey().startsWith(rule)))
+        .filter(x -> x.getValue() instanceof BaselineProvider && (rule == null || rule.isEmpty() || x.getKey().startsWith(rule)))
         .map(x -> (BaselineProvider) x.getValue())
         .findFirst();
 
