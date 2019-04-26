@@ -11,7 +11,8 @@ import {
   anomalyApiUrls,
   getAnomaliesForYamlPreviewUrl,
   getAnomaliesByAlertIdUrl,
-  getAnomalyIdsByTimeRangeUrl
+  getAnomalyFiltersByTimeRangeUrl,
+  getAnomalyFiltersByAnomalyIdUrl
 } from 'thirdeye-frontend/utils/api/anomaly';
 
 /**
@@ -122,14 +123,27 @@ export function getAnomaliesByAlertId(alertId, startTime, endTime) {
 }
 
 /**
- * Get anomaly ids over a specified time range
- * @method getAnomalyIdsByTimeRange
+ * Get anomaly filters over a specified time range
+ * @method getAnomalyFiltersByTimeRange
  * @param {Number} startTime - start time of query range
  * @param {Number} endTime - end time of query range
  * @return {Ember.RSVP.Promise}
  */
-export function getAnomalyIdsByTimeRange(startTime, endTime) {
-  const url = getAnomalyIdsByTimeRangeUrl(startTime, endTime);
+export function getAnomalyFiltersByTimeRange(startTime, endTime) {
+  const url = getAnomalyFiltersByTimeRangeUrl(startTime, endTime);
+  return fetch(url).then(checkStatus);
+}
+
+/**
+ * Get anomaly filters for specified anomaly ids
+ * @method getAnomalyFiltersByAnomalyId
+ * @param {Number} startTime - start time of query range
+ * @param {Number} endTime - end time of query range
+ * @param {String} anomalyIds - string of comma delimited anomaly ids
+ * @return {Ember.RSVP.Promise}
+ */
+export function getAnomalyFiltersByAnomalyId(startTime, endTime, anomalyIds) {
+  const url = getAnomalyFiltersByAnomalyIdUrl(startTime, endTime, anomalyIds);
   return fetch(url).then(checkStatus);
 }
 
