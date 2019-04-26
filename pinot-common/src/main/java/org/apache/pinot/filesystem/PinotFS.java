@@ -30,8 +30,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-@InterfaceAudience.Public
-@InterfaceStability.Stable
 /**
  * PinotFS is a restricted FS API that exposes functionality that is required for Pinot to use
  * different FS implementations. The restrictions are in place due to 2 driving factors:
@@ -42,6 +40,8 @@ import org.slf4j.LoggerFactory;
  *    The contract that developers have to adhere to will be simpler.
  * Please read the method level docs carefully to note the exceptions while using the APIs.
  */
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public abstract class PinotFS implements Closeable {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotFS.class);
 
