@@ -111,9 +111,10 @@ public class MonitorTaskRunner implements TaskRunner {
     }
   }
 
-  private int cleanUpMergedAnomalies(int cleanUpDays) {
-    DateTime cleanupStartDate = new DateTime().withTimeAtStartOfDay().minusDays(cleanUpDays);
-    DateTime cleanupEndDate = cleanupStartDate.plusDays(1);
+  private int cleanupMergedAnomalies(int cleanupDays, int cleanupWindow) {
+    // will clean up anomalies with (cleanupDays - cleanupWindow, cleanupDays)
+    DateTime cleanupEndDate = new DateTime().withTimeAtStartOfDay().minusDays(cleanupDays);
+    DateTime cleanupStartDate = cleanupEndDate.minusDays(cleanupWindow);
     List<MergedAnomalyResultDTO> mergedAnomalies =
         DAO_REGISTRY.getMergedAnomalyResultDAO().findByTime(cleanupStartDate.getMillis(), cleanupEndDate.getMillis());
 
@@ -184,8 +185,9 @@ public class MonitorTaskRunner implements TaskRunner {
 
     try {
       int cleanupDays = monitorTaskInfo.getMergedAnomalyCleanupDays();
-      int cleanedUpAnomalies = cleanUpMergedAnomalies(cleanupDays);
-      LOG.info("Cleaned up {} raw anomalies that are older than {} days.", cleanedUpAnomalies, cleanupDays);
+      int cleanupWindow = 3;
+      int cleanedUpAnomalies = cleanupMergedAnomalies(cleanupDays, cleanupWindow);
+      LOG.info("Cleaned up {} raw anomalies that are between {} and {} days.", cleanedUpAnomalies, cleanupDays, cleanupDays + cleanupWindow);
     } catch (Exception e) {
       LOG.error("Exception when cleaning up merged anomalies.", e);
     }
