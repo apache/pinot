@@ -511,7 +511,7 @@ public class SegmentCompletionManager {
         return SegmentCompletionProtocol.RESP_FAILED;
       }
       synchronized (this) {
-        LOGGER.info("Processing segmentCommit({}, {})", instanceId, offset);
+        LOGGER.info("Processing segmentCommitStart({}, {})", instanceId, offset);
         switch (_state) {
           case PARTIAL_CONSUMING:
             return PARTIAL_CONSUMING__commit(instanceId, offset, now);
@@ -614,7 +614,7 @@ public class SegmentCompletionManager {
           LOGGER.warn("Not accepting commitEnd from {} since it had stoppd consuming", instanceId);
           return abortAndReturnFailed();
         }
-        LOGGER.info("Processing segmentCommit({}, {})", instanceId, offset);
+        LOGGER.info("Processing segmentCommitEnd({}, {})", instanceId, offset);
         if (!_state.equals(State.COMMITTER_UPLOADING) || !instanceId.equals(_winner) || offset != _winningOffset) {
           // State changed while we were out of sync. return a failed commit.
           LOGGER.warn("State change during upload: state={} segment={} winner={} winningOffset={}", _state,
