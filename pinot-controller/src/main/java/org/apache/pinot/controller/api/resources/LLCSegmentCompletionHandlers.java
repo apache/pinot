@@ -135,7 +135,7 @@ public class LLCSegmentCompletionHandlers {
 
     SegmentCompletionProtocol.Response response = _segmentCompletionManager.segmentConsumed(requestParams);
     final String responseStr = response.toJsonString();
-    LOGGER.info("Response to segmentConsumed for segment {} is :{}", segmentName, responseStr);
+    LOGGER.info("Response to segmentConsumed for segment:{} is :{}", segmentName, responseStr);
     return responseStr;
   }
 
@@ -158,7 +158,7 @@ public class LLCSegmentCompletionHandlers {
     SegmentCompletionProtocol.Response response =
         _segmentCompletionManager.segmentStoppedConsuming(requestParams);
     final String responseStr = response.toJsonString();
-    LOGGER.info("Response to segmentStoppedConsuming for segment {} is:{}", segmentName, responseStr);
+    LOGGER.info("Response to segmentStoppedConsuming for segment:{} is:{}", segmentName, responseStr);
     return responseStr;
   }
 
@@ -188,7 +188,7 @@ public class LLCSegmentCompletionHandlers {
     SegmentCompletionProtocol.Response response =
         _segmentCompletionManager.segmentCommitStart(requestParams);
     final String responseStr = response.toJsonString();
-    LOGGER.info("Response to segmentCommitStart for segment {} is :{}", segmentName, responseStr);
+    LOGGER.info("Response to segmentCommitStart for segment:{} is:{}", segmentName, responseStr);
     return responseStr;
   }
 
@@ -236,7 +236,7 @@ public class LLCSegmentCompletionHandlers {
     SegmentCompletionProtocol.Response response = _segmentCompletionManager
         .segmentCommitEnd(requestParams, isSuccess, isSplitCommit, committingSegmentDescriptor);
     final String responseStr = response.toJsonString();
-    LOGGER.info("Response to segmentCommitEnd for segment {} is:{}", segmentName, responseStr);
+    LOGGER.info("Response to segmentCommitEnd for segment:{} is:{}", segmentName, responseStr);
     return responseStr;
   }
 
@@ -362,7 +362,7 @@ public class LLCSegmentCompletionHandlers {
 
       String response = new SegmentCompletionProtocol.Response(responseParams).toJsonString();
 
-      LOGGER.info("Response to segmentUpload for segment {} is:{}", segmentName, response);
+      LOGGER.info("Response to segmentUpload for segment:{} is:{}", segmentName, response);
 
       return response;
     } catch (Exception e) {
@@ -399,7 +399,7 @@ public class LLCSegmentCompletionHandlers {
         .withSegmentLocation(segmentLocation).withSegmentSizeBytes(segmentSizeBytes)
         .withBuildTimeMillis(buildTimeMillis).withWaitTimeMillis(waitTimeMillis).withNumRows(numRows)
         .withMemoryUsedBytes(memoryUsedBytes);
-    LOGGER.info("Processing segmentCommitEnd:{}", requestParams.toString());
+    LOGGER.info("Processing segmentCommitEndWithMetadata:{}", requestParams.toString());
 
     final boolean isSuccess = true;
     final boolean isSplitCommit = true;
@@ -413,7 +413,7 @@ public class LLCSegmentCompletionHandlers {
         .segmentCommitEnd(requestParams, isSuccess, isSplitCommit,
             CommittingSegmentDescriptor.fromSegmentCompletionReqParamsAndMetadata(requestParams, segmentMetadata));
     final String responseStr = response.toJsonString();
-    LOGGER.info("Response to segmentCommitEnd for segment {} is:{}", segmentName, responseStr);
+    LOGGER.info("Response to segmentCommitEndWithMetadata for segment:{} is:{}", segmentName, responseStr);
     return responseStr;
   }
 

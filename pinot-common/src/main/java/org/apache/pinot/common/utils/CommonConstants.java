@@ -214,11 +214,21 @@ public class CommonConstants {
     public static final String DEFAULT_REQUEST_HANDLER_FACTORY_CLASS =
         "org.apache.pinot.server.request.SimpleRequestHandlerFactory";
     public static final String PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY = "pinot.server.segment.fetcher";
-    public static final String PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER = "pinot.server.segment.uploader";
     public static final String DEFAULT_STAR_TREE_FORMAT_VERSION = "OFF_HEAP";
     public static final String DEFAULT_COLUMN_MIN_MAX_VALUE_GENERATOR_MODE = "TIME";
     public static final long DEFAULT_MAX_SHUTDOWN_WAIT_TIME_MS = 600_000L;
     public static final long DEFAULT_CHECK_INTERVAL_TIME_MS = 60_000L;
+
+    public static class SegmentCompletionProtocol {
+      public static final String PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER = "pinot.server.segment.uploader";
+
+      public static final String CONFIG_OF_CONTROLLER_HTTPS_ENABLED = "enabled";
+      public static final String CONFIG_OF_CONTROLLER_HTTPS_PORT = "controller.port";
+      public static final String CONFIG_OF_SEGMENT_UPLOAD_REQUEST_TIMEOUT_MS = "upload.request.timeout.ms";
+
+      public static final int DEFAULT_SEGMENT_UPLOAD_REQUEST_TIMEOUT_MS = 300_000;
+      public static final int DEFAULT_OTHER_REQUESTS_TIMEOUT = 10_000;
+    }
   }
 
   public static class Controller {

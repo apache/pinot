@@ -33,6 +33,8 @@ import org.apache.pinot.core.query.utils.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.pinot.common.utils.CommonConstants.Server.SegmentCompletionProtocol.*;
+
 
 /**
  * A class that handles sending segment completion protocol requests to the controller and getting
@@ -40,14 +42,8 @@ import org.slf4j.LoggerFactory;
  */
 public class ServerSegmentCompletionProtocolHandler {
   private static Logger LOGGER = LoggerFactory.getLogger(ServerSegmentCompletionProtocolHandler.class);
-  private static final int DEFAULT_SEGMENT_UPLOAD_REQUEST_TIMEOUT_MS = 300_000;
-  private static final String CONFIG_OF_SEGMENT_UPLOAD_REQUEST_TIMEOUT_MS = "upload.request.timeout.ms";
-  private static final int OTHER_REQUESTS_TIMEOUT = 10_000;
   private static final String HTTPS_PROTOCOL = "https";
   private static final String HTTP_PROTOCOL = "http";
-
-  private static final String CONFIG_OF_CONTROLLER_HTTPS_ENABLED = "enabled";
-  private static final String CONFIG_OF_CONTROLLER_HTTPS_PORT = "controller.port";
 
   private static SSLContext _sslContext;
   private static Integer _controllerHttpsPort;
@@ -181,7 +177,7 @@ public class ServerSegmentCompletionProtocolHandler {
     SegmentCompletionProtocol.Response response;
     try {
       String responseStr =
-          _fileUploadDownloadClient.sendSegmentCompletionProtocolRequest(new URI(url), OTHER_REQUESTS_TIMEOUT)
+          _fileUploadDownloadClient.sendSegmentCompletionProtocolRequest(new URI(url), DEFAULT_OTHER_REQUESTS_TIMEOUT)
               .getResponse();
       response = SegmentCompletionProtocol.Response.fromJsonString(responseStr);
       LOGGER.info("Controller response {} for {}", response.toJsonString(), url);

@@ -145,8 +145,8 @@ public class HelixServerStarter {
     Utils.logVersions();
     ServerConf serverInstanceConfig = DefaultHelixStarterServerConfig.getDefaultHelixServerConfig(_helixServerConfig);
     // Need to do this before we start receiving state transitions.
-    ServerSegmentCompletionProtocolHandler
-        .init(_helixServerConfig.subset(CommonConstants.Server.PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER));
+    ServerSegmentCompletionProtocolHandler.init(_helixServerConfig.subset(
+        CommonConstants.Server.SegmentCompletionProtocol.PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER));
     _serverInstance = new ServerInstance();
     _serverInstance.init(serverInstanceConfig, propertyStore);
     _serverInstance.start();
