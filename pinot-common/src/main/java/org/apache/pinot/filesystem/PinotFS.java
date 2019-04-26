@@ -24,6 +24,8 @@ import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Paths;
 import org.apache.commons.configuration.Configuration;
+import org.apache.pinot.annotations.InterfaceAudience;
+import org.apache.pinot.annotations.InterfaceStability;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,6 +40,8 @@ import org.slf4j.LoggerFactory;
  *    The contract that developers have to adhere to will be simpler.
  * Please read the method level docs carefully to note the exceptions while using the APIs.
  */
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public abstract class PinotFS implements Closeable {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotFS.class);
 
