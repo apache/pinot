@@ -84,7 +84,6 @@ public class HoltWintersDetector implements BaselineProvider<HoltWintersDetector
   private static final Logger LOG = LoggerFactory.getLogger(HoltWintersDetector.class);
   private InputDataFetcher dataFetcher;
   private static final String COL_CURR = "current";
-  private static final String COL_BASE = "baseline";
   private static final String COL_ANOMALY = "anomaly";
   private static final String COL_PATTERN = "pattern";
   private static final String COL_DIFF = "diff";
@@ -184,14 +183,9 @@ public class HoltWintersDetector implements BaselineProvider<HoltWintersDetector
     }
 
     DataFrame dfCurr = new DataFrame(dfInput).renameSeries(COL_VALUE, COL_CURR);
-    DataFrame dfBase = computePredictionInterval(dfInput, window.getStartMillis(), datasetConfig.getTimezone())
-        .renameSeries(COL_VALUE, COL_BASE);
-    // remove COL_CURR from baseline to use the smoothed value
-    if (dfBase.contains(COL_CURR)) {
-      dfBase.dropSeries(COL_CURR);
-    }
-    DataFrame df = new DataFrame(dfCurr).addSeries(dfBase);
-    df.addSeries(COL_DIFF, df.getDoubles(COL_CURR).subtract(df.get(COL_BASE)));
+    DataFrame dfBase = computePredictionInterval(dfInput, window.getStartMillis(), datasetConfig.getTimezone());
+    DataFrame df = new DataFrame(dfCurr).addSeries(dfBase, COL_VALUE, COL_ERROR);
+    df.addSeries(COL_DIFF, df.getDoubles(COL_CURR).subtract(df.get(COL_VALUE)));
     df.addSeries(COL_ANOMALY, BooleanSeries.fillValues(df.size(), false));
 
     // Filter pattern
@@ -210,7 +204,7 @@ public class HoltWintersDetector implements BaselineProvider<HoltWintersDetector
         DetectionUtils.getMonitoringGranularityPeriod(timeGranularity.toAggregationGranularityString(),
             datasetConfig), datasetConfig);
 
-    return DetectionResult.from(anomalyResults);
+    return DetectionResult.from(anomalyResults, TimeSeries.fromDataFrame(dfBase));
   }
 
   /**
