@@ -119,18 +119,16 @@ public class MonitorTaskRunner implements TaskRunner {
         DAO_REGISTRY.getMergedAnomalyResultDAO().findByTime(cleanupStartDate.getMillis(), cleanupEndDate.getMillis());
 
     int cleanedAnomalyCount = 0;
-    List<MergedAnomalyResultDTO> updatedAnomalies = new ArrayList<>();
     for (MergedAnomalyResultDTO mergedAnomaly : mergedAnomalies) {
       if (mergedAnomaly.getProperties() != null && mergedAnomaly.getProperties().containsKey(ANOMALY_TIMELINES_VIEW)) {
         Map<String, String> properties = mergedAnomaly.getProperties();
         properties.remove(ANOMALY_TIMELINES_VIEW);
         mergedAnomaly.setProperties(properties);
-        updatedAnomalies.add(mergedAnomaly);
+        DAO_REGISTRY.getMergedAnomalyResultDAO().update(mergedAnomaly);
         cleanedAnomalyCount++;
       }
     }
 
-    DAO_REGISTRY.getMergedAnomalyResultDAO().update(updatedAnomalies);
     return cleanedAnomalyCount;
   }
 
