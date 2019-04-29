@@ -46,7 +46,8 @@ import org.slf4j.LoggerFactory;
  */
 public class PinotHelixTaskResourceManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotHelixTaskResourceManager.class);
-
+  // 3 minutes, which is the same as the one for monitoring workflow or job state in Helix code.
+  private final static int DEFAULT_TIMEOUT = 3 * 60 * 1000;
   // Do not change this because Helix uses the same separator
   public static final String TASK_NAME_SEPARATOR = "_";
 
@@ -139,11 +140,18 @@ public class PinotHelixTaskResourceManager {
    *
    * @param taskType Task type
    */
-  public synchronized void deleteTaskQueue(@Nonnull String taskType) {
+  public synchronized void deleteTaskQueue(@Nonnull String taskType)
+      throws InterruptedException {
     String helixJobQueueName = getHelixJobQueueName(taskType);
     LOGGER.info("Deleting task queue: {} for task type: {}", helixJobQueueName, taskType);
-    // NOTE: set force delete to true to remove the task queue from ZooKeeper immediately
-    _taskDriver.delete(helixJobQueueName, true);
+    // NOTE: using force delete may cause a race condition where helix controller might write a deleted workflow back to ZK because it's still caching it.
+    // Thus, changing the logic here to delete and wait for completion.
+    try {
+      _taskDriver.deleteAndWaitForCompletion(helixJobQueueName, DEFAULT_TIMEOUT);
+    } catch (Exception e) {
+      LOGGER.error("Failed to delete task queue: {} for task type: {}", helixJobQueueName, taskType, e);
+      throw e;
+    }
   }
 
   /**
