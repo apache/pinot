@@ -115,17 +115,17 @@ public class PercentageChangeRuleDetector implements AnomalyDetector<PercentageC
     DatasetConfigDTO datasetConfig = data.getDatasetForMetricId().get(me.getId());
     List<MergedAnomalyResultDTO> anomalies = DetectionUtils.makeAnomalies(slice, df, COL_ANOMALY, window.getEndMillis(),
         DetectionUtils.getMonitoringGranularityPeriod(monitoringGranularity, datasetConfig), datasetConfig);
-    return DetectionResult.from(anomalies, TimeSeries.fromDataFrame(generateBoundaries(df)));
+    return DetectionResult.from(anomalies, TimeSeries.fromDataFrame(constructPercentageChangeBoundaries(df)));
   }
 
   @Override
   public TimeSeries computePredictedTimeSeries(MetricSlice slice) {
     InputData data = this.dataFetcher.fetchData(new InputDataSpec().withTimeseriesSlices(this.baseline.scatter(slice)));
     DataFrame dfBase = this.baseline.gather(slice, data.getTimeseries());
-    return TimeSeries.fromDataFrame(generateBoundaries(dfBase));
+    return TimeSeries.fromDataFrame(constructPercentageChangeBoundaries(dfBase));
   }
 
-  private DataFrame generateBoundaries(DataFrame dfBase) {
+  private DataFrame constructPercentageChangeBoundaries(DataFrame dfBase) {
     if (!Double.isNaN(this.percentageChange)) {
       switch (this.pattern) {
         case UP:

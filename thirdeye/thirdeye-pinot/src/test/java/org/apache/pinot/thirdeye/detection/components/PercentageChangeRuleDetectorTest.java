@@ -107,8 +107,9 @@ public class PercentageChangeRuleDetectorTest {
     Assert.assertEquals(anomalies.get(0).getEndTime(), 2376000000L);
     Assert.assertEquals(anomalies.get(1).getStartTime(), 2379600000L);
     Assert.assertEquals(anomalies.get(1).getEndTime(), 2383200000L);
-    checkPercentageUpperBounds(detectionResult.getTimeseries(), percentageChange);
-    Assert.assertEquals(detectionResult.getTimeseries().getPredictedLowerBound(), DoubleSeries.zeros(detectionResult.getTimeseries().size()));
+    TimeSeries ts = detectionResult.getTimeseries();
+    checkPercentageUpperBounds(ts, percentageChange);
+    Assert.assertEquals(ts.getPredictedLowerBound(), DoubleSeries.zeros(ts.size()));
   }
 
   @Test
@@ -131,8 +132,9 @@ public class PercentageChangeRuleDetectorTest {
     Assert.assertEquals(anomalies.get(2).getEndTime(), 2156400000L);
     Assert.assertEquals(anomalies.get(3).getStartTime(), 2322000000L);
     Assert.assertEquals(anomalies.get(3).getEndTime(), 2325600000L);
-    checkPercentageUpperBounds(detectionResult.getTimeseries(), percentageChange);
-    Assert.assertEquals(detectionResult.getTimeseries().getPredictedLowerBound(), DoubleSeries.zeros(detectionResult.getTimeseries().size()));
+    TimeSeries ts = detectionResult.getTimeseries();
+    checkPercentageUpperBounds(ts, percentageChange);
+    Assert.assertEquals(ts.getPredictedLowerBound(), DoubleSeries.zeros(ts.size()));
   }
 
   @Test
@@ -149,8 +151,9 @@ public class PercentageChangeRuleDetectorTest {
     Assert.assertEquals(anomalies.size(), 1);
     Assert.assertEquals(anomalies.get(0).getStartTime(), 2181600000L);
     Assert.assertEquals(anomalies.get(0).getEndTime(), 2185200000L);
-    checkPercentageLowerBounds(result.getTimeseries(), percentageChange);
-    Assert.assertEquals(result.getTimeseries().getPredictedUpperBound(), DoubleSeries.fillValues(result.getTimeseries().size(), Double.POSITIVE_INFINITY));
+    TimeSeries ts = result.getTimeseries();
+    checkPercentageLowerBounds(ts, percentageChange);
+    Assert.assertEquals(ts.getPredictedUpperBound(), DoubleSeries.fillValues(ts.size(), Double.POSITIVE_INFINITY));
   }
 
   @Test
@@ -217,5 +220,4 @@ public class PercentageChangeRuleDetectorTest {
       Assert.assertEquals(ts.getPredictedLowerBound().get(i), ts.getPredictedBaseline().get(i) * (1 - percentageChange));
     }
   }
-
 }

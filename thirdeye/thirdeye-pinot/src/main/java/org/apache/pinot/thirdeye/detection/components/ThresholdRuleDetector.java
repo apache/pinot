@@ -24,6 +24,7 @@ import java.util.List;
 import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.dataframe.BooleanSeries;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
+import org.apache.pinot.thirdeye.dataframe.DoubleSeries;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
@@ -35,9 +36,11 @@ import org.apache.pinot.thirdeye.detection.annotation.Param;
 import org.apache.pinot.thirdeye.detection.annotation.PresentationOption;
 import org.apache.pinot.thirdeye.detection.spec.ThresholdRuleDetectorSpec;
 import org.apache.pinot.thirdeye.detection.spi.components.AnomalyDetector;
+import org.apache.pinot.thirdeye.detection.spi.components.BaselineProvider;
 import org.apache.pinot.thirdeye.detection.spi.model.DetectionResult;
 import org.apache.pinot.thirdeye.detection.spi.model.InputData;
 import org.apache.pinot.thirdeye.detection.spi.model.InputDataSpec;
+import org.apache.pinot.thirdeye.detection.spi.model.TimeSeries;
 import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
 import org.joda.time.Interval;
 import org.joda.time.Period;
@@ -49,7 +52,7 @@ import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
     DetectionTag.RULE_DETECTION}, description = "Simple threshold rule algorithm with (optional) upper and lower bounds on a metric value.", presentation = {
     @PresentationOption(name = "absolute value", template = "is lower than ${min} or higher than ${max}")}, params = {
     @Param(name = "min", placeholder = "value"), @Param(name = "max", placeholder = "value")})
-public class ThresholdRuleDetector implements AnomalyDetector<ThresholdRuleDetectorSpec> {
+public class ThresholdRuleDetector implements AnomalyDetector<ThresholdRuleDetectorSpec>, BaselineProvider<ThresholdRuleDetectorSpec> {
   private final String COL_TOO_HIGH = "tooHigh";
   private final String COL_TOO_LOW = "tooLow";
   private final String COL_ANOMALY = "anomaly";
@@ -88,8 +91,38 @@ public class ThresholdRuleDetector implements AnomalyDetector<ThresholdRuleDetec
     df.mapInPlace(BooleanSeries.HAS_TRUE, COL_ANOMALY, COL_TOO_HIGH, COL_TOO_LOW);
 
     DatasetConfigDTO datasetConfig = data.getDatasetForMetricId().get(me.getId());
-    return DetectionResult.from(DetectionUtils.makeAnomalies(slice, df, COL_ANOMALY, endTime,
-        DetectionUtils.getMonitoringGranularityPeriod(monitoringGranularity, datasetConfig), datasetConfig));
+    List<MergedAnomalyResultDTO> anomalies = DetectionUtils.makeAnomalies(slice, df, COL_ANOMALY, endTime,
+        DetectionUtils.getMonitoringGranularityPeriod(monitoringGranularity, datasetConfig), datasetConfig);
+    return DetectionResult.from(anomalies, TimeSeries.fromDataFrame(constructThresholdBoundaries(df)));
+  }
+
+  @Override
+  public TimeSeries computePredictedTimeSeries(MetricSlice slice) {
+    InputData data =
+        this.dataFetcher.fetchData(new InputDataSpec().withTimeseriesSlices(Collections.singletonList(slice)));
+    DataFrame df = data.getTimeseries().get(slice);
+    return TimeSeries.fromDataFrame(constructThresholdBoundaries(df));
+  }
+
+  private DataFrame constructThresholdBoundaries(DataFrame df) {
+    if (!Double.isNaN(this.min)) {
+      df.addSeries(COL_LOWER_BOUND, DoubleSeries.fillValues(df.size(), this.min));
+    }
+    if (!Double.isNaN(this.max)) {
+      df.addSeries(COL_UPPER_BOUND, DoubleSeries.fillValues(df.size(), this.max));
+    }
+    df.addSeries(COL_VALUE, DoubleSeries.fillValues(df.size(), predictedValue()));
+    return df;
+  }
+
+  private double predictedValue() {
+    if (Double.isNaN(this.max) && !Double.isNaN(this.min)) {
+      return this.min;
+    }
+    if (Double.isNaN(this.min) && !Double.isNaN(this.max)) {
+      return this.max;
+    }
+    return (this.max + this.min) / 2;
   }
 
   @Override
@@ -103,6 +136,5 @@ public class ThresholdRuleDetector implements AnomalyDetector<ThresholdRuleDetec
     } else {
       this.timeGranularity = TimeGranularity.fromString(spec.getMonitoringGranularity());
     }
-
   }
 }
