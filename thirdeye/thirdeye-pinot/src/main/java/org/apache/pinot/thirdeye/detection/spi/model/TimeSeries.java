@@ -40,7 +40,7 @@ public class TimeSeries {
 
   public TimeSeries(LongSeries timestamps, DoubleSeries baselineValues) {
     this.df = new DataFrame();
-    this.df.addSeries(COL_TIME, timestamps);
+    this.df.addSeries(COL_TIME, timestamps).setIndex(COL_TIME);
     this.df.addSeries(DataFrameUtils.COL_VALUE, baselineValues);
   }
 
@@ -52,6 +52,10 @@ public class TimeSeries {
     this.df.addSeries(DataFrameUtils.COL_LOWER_BOUND, lowerBoundValues);
   }
 
+  /**
+   * the size of the time series
+   * @return the size of the time series (number of data points)
+   */
   public int size() {
     return this.df.size();
   }

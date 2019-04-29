@@ -27,8 +27,8 @@ import org.joda.time.Interval;
 
 public interface AnomalyDetector<T extends AbstractSpec> extends BaseComponent<T> {
   /**
-   * Run detection in the specified time range and return a list of anomalies
-   * @return the detection result
+   * Run detection in the specified time range and return the detection result
+   * @return the detection result which contains anomalies and current, predicted baselines.
    */
   DetectionResult runDetection(Interval window, String metricUrn) throws DetectorException;
 }
