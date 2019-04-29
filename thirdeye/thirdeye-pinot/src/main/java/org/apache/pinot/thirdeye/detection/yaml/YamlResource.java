@@ -34,7 +34,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 import javax.validation.constraints.NotNull;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.GET;
@@ -566,18 +565,46 @@ public class YamlResource {
       @QueryParam("tuningStart") long tuningStart,
       @QueryParam("tuningEnd") long tuningEnd,
       @ApiParam("jsonPayload") String payload) {
+    Preconditions.checkArgument(StringUtils.isNotBlank(payload), "The Yaml Payload in the request is empty.");
+    return runPreview(start, end, tuningStart, tuningEnd, payload, null);
+  }
+
+  @POST
+  @Path("/preview/{id}")
+  @Produces(MediaType.APPLICATION_JSON)
+  @Consumes(MediaType.TEXT_PLAIN)
+  @ApiOperation("Preview the anomaly detection result of a YAML configuration, with an existing config and historical anomalies")
+  public Response yamlPreviewWithHistoricalAnomalies(
+      @PathParam("id") long id,
+      @QueryParam("start") long start,
+      @QueryParam("end") long end,
+      @QueryParam("tuningStart") long tuningStart,
+      @QueryParam("tuningEnd") long tuningEnd,
+      @ApiParam("jsonPayload") String payload) {
+    Preconditions.checkArgument(StringUtils.isNotBlank(payload), "The Yaml Payload in the request is empty.");
+    DetectionConfigDTO existingConfig = this.detectionConfigDAO.findById(id);
+    Preconditions.checkNotNull(existingConfig, "can not find existing detection config " + id);
+    return runPreview(start, end, tuningStart, tuningEnd, payload, existingConfig);
+  }
+
+  private Response runPreview(long start, long end,
+      long tuningStart, long tuningEnd, String payload, DetectionConfigDTO existingConfig) {
+    long ts = System.currentTimeMillis();
     Map<String, String> responseMessage = new HashMap<>();
     DetectionPipelineResult result;
-    long ts = System.currentTimeMillis();
     try {
-      Preconditions.checkArgument(StringUtils.isNotBlank(payload), "The Yaml Payload in the request is empty.");
-
       // Translate config from YAML to detection config (JSON)
       Map<String, Object> newDetectionConfigMap = new HashMap<>(ConfigUtils.getMap(this.yaml.load(payload)));
-      DetectionConfigDTO detectionConfig = buildDetectionConfigFromYaml(tuningStart, tuningEnd, newDetectionConfigMap, null);
-      Preconditions.checkNotNull(detectionConfig);
-      detectionConfig.setId(Long.MAX_VALUE);
+      DetectionConfigDTO detectionConfig;
 
+      if (existingConfig == null) {
+        detectionConfig = buildDetectionConfigFromYaml(tuningStart, tuningEnd, newDetectionConfigMap, null);
+        detectionConfig.setId(Long.MAX_VALUE);
+      } else {
+        detectionConfig = buildDetectionConfigFromYaml(tuningStart, tuningEnd, newDetectionConfigMap, existingConfig);
+      }
+
+      Preconditions.checkNotNull(detectionConfig);
       DetectionPipeline pipeline = this.loader.from(this.provider, detectionConfig, start, end);
       result = pipeline.run();
 
@@ -603,50 +630,11 @@ public class YamlResource {
   private void getErrorMessage(int curLevel, int totalLevel, Throwable e, StringBuilder sb) {
     if (curLevel <= totalLevel && e != null) {
       sb.append("==");
-      sb.append(e.getMessage());
+      if (e.getMessage() != null) {
+        sb.append(e.getMessage());
+      }
       getErrorMessage(curLevel + 1, totalLevel, e.getCause(), sb);
     }
-  }
-
-  @POST
-  @Path("/preview/{id}")
-  @Produces(MediaType.APPLICATION_JSON)
-  @Consumes(MediaType.TEXT_PLAIN)
-  @ApiOperation("Preview the anomaly detection result of a YAML configuration, with an existing config and historical anomalies")
-  public Response yamlPreviewWithHistoricalAnomalies(
-      @PathParam("id") long id,
-      @QueryParam("start") long start,
-      @QueryParam("end") long end,
-      @QueryParam("tuningStart") long tuningStart,
-      @QueryParam("tuningEnd") long tuningEnd,
-      @ApiParam("jsonPayload") String payload) {
-    Map<String, String> responseMessage = new HashMap<>();
-    DetectionPipelineResult result;
-    long ts = System.currentTimeMillis();
-    try {
-      Preconditions.checkArgument(StringUtils.isNotBlank(payload), "The Yaml Payload in the request is empty.");
-      DetectionConfigDTO existingConfig = this.detectionConfigDAO.findById(id);
-      Preconditions.checkNotNull(existingConfig, "can not find existing detection config " + id);
-
-      // Translate config from YAML to detection config (JSON)
-      Map<String, Object> newDetectionConfigMap = new HashMap<>(ConfigUtils.getMap(this.yaml.load(payload)));
-      DetectionConfigDTO detectionConfig = buildDetectionConfigFromYaml(tuningStart, tuningEnd, newDetectionConfigMap, existingConfig);
-      Preconditions.checkNotNull(detectionConfig);
-
-      DetectionPipeline pipeline = this.loader.from(this.provider, detectionConfig, start, end);
-      result = pipeline.run();
-
-    } catch (ValidationException e) {
-      LOG.warn("Validation error while running preview with payload  " + payload, e);
-      responseMessage.put("message", "Validation Error! " + e.getMessage());
-      return Response.serverError().entity(responseMessage).build();
-    } catch (Exception e) {
-      LOG.error("Error running preview with payload " + payload, e);
-      responseMessage.put("message", "Failed to run the preview due to " + e.getMessage());
-      return Response.serverError().entity(responseMessage).build();
-    }
-    LOG.info("Preview successful, used {} milliseconds", System.currentTimeMillis() - ts);
-    return Response.ok(result).build();
   }
 
   @POST
