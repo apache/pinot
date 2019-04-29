@@ -35,6 +35,7 @@ import org.apache.pinot.thirdeye.detection.annotation.Param;
 import org.apache.pinot.thirdeye.detection.annotation.PresentationOption;
 import org.apache.pinot.thirdeye.detection.spec.ThresholdRuleDetectorSpec;
 import org.apache.pinot.thirdeye.detection.spi.components.AnomalyDetector;
+import org.apache.pinot.thirdeye.detection.spi.model.DetectionResult;
 import org.apache.pinot.thirdeye.detection.spi.model.InputData;
 import org.apache.pinot.thirdeye.detection.spi.model.InputDataSpec;
 import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
@@ -60,7 +61,7 @@ public class ThresholdRuleDetector implements AnomalyDetector<ThresholdRuleDetec
   private TimeGranularity timeGranularity;
 
   @Override
-  public List<MergedAnomalyResultDTO> runDetection(Interval window, String metricUrn) {
+  public DetectionResult runDetection(Interval window, String metricUrn) {
     MetricEntity me = MetricEntity.fromURN(metricUrn);
     Long endTime = window.getEndMillis();
     MetricSlice slice = MetricSlice.from(me.getId(), window.getStartMillis(), endTime, me.getFilters(), timeGranularity);
@@ -87,8 +88,8 @@ public class ThresholdRuleDetector implements AnomalyDetector<ThresholdRuleDetec
     df.mapInPlace(BooleanSeries.HAS_TRUE, COL_ANOMALY, COL_TOO_HIGH, COL_TOO_LOW);
 
     DatasetConfigDTO datasetConfig = data.getDatasetForMetricId().get(me.getId());
-    return DetectionUtils.makeAnomalies(slice, df, COL_ANOMALY, endTime,
-        DetectionUtils.getMonitoringGranularityPeriod(monitoringGranularity, datasetConfig), datasetConfig);
+    return DetectionResult.from(DetectionUtils.makeAnomalies(slice, df, COL_ANOMALY, endTime,
+        DetectionUtils.getMonitoringGranularityPeriod(monitoringGranularity, datasetConfig), datasetConfig));
   }
 
   @Override

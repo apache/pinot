@@ -38,19 +38,19 @@ import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
 import org.apache.pinot.thirdeye.detection.DataProvider;
-import org.apache.pinot.thirdeye.detection.DetectionPipelineException;
 import org.apache.pinot.thirdeye.detection.DetectionPipeline;
+import org.apache.pinot.thirdeye.detection.DetectionPipelineException;
 import org.apache.pinot.thirdeye.detection.DetectionPipelineResult;
 import org.apache.pinot.thirdeye.detection.DetectionUtils;
 import org.apache.pinot.thirdeye.detection.spi.components.AnomalyDetector;
 import org.apache.pinot.thirdeye.detection.spi.exception.DetectorDataInsufficientException;
+import org.apache.pinot.thirdeye.detection.spi.model.DetectionResult;
 import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
 import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.Interval;
 import org.joda.time.Period;
-import org.omg.SendingContext.RunTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -168,15 +168,15 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
 
       // run detection
       Interval window = monitoringWindows.get(i);
-      List<MergedAnomalyResultDTO> anomaliesForOneWindow = new ArrayList<>();
+      DetectionResult detectionResult = DetectionResult.from(Collections.emptyList());
       try {
         LOG.info("[Pipeline] start detection for config {} metricUrn {} window ({}/{}) - start {} end {}",
             config.getId(), metricUrn, i + 1, monitoringWindows.size(), window.getStart(), window.getEnd());
         long ts = System.currentTimeMillis();
-        anomaliesForOneWindow = anomalyDetector.runDetection(window, this.metricUrn);
+        detectionResult = anomalyDetector.runDetection(window, this.metricUrn);
         LOG.info("[Pipeline] end detection for config {} metricUrn {} window ({}/{}) - start {} end {} used {} milliseconds, detected {} anomalies",
             config.getId(), metricUrn, i + 1, monitoringWindows.size(), window.getStart(), window.getEnd(),
-            System.currentTimeMillis() - ts, anomaliesForOneWindow.size());
+            System.currentTimeMillis() - ts, detectionResult.getAnomalies().size());
         successWindows++;
       }
       catch (DetectorDataInsufficientException e) {
@@ -187,7 +187,7 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
         LOG.warn("[DetectionConfigID{}] detecting anomalies for window {} to {} failed.", this.config.getId(), window.getStart(), window.getEnd(), e);
         lastException = e;
       }
-      anomalies.addAll(anomaliesForOneWindow);
+      anomalies.addAll(detectionResult.getAnomalies());
     }
 
     checkMovingWindowDetectionStatus(totalWindows, successWindows, lastException);

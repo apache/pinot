@@ -19,6 +19,7 @@
 
 package org.apache.pinot.thirdeye.detection.spi.model;
 
+import com.google.common.base.Preconditions;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
 import org.apache.pinot.thirdeye.dataframe.DoubleSeries;
 import org.apache.pinot.thirdeye.dataframe.LongSeries;
@@ -34,7 +35,7 @@ public class TimeSeries {
   private DataFrame df;
 
   public TimeSeries() {
-    this.df = new DataFrame();
+    this.df = new DataFrame().addSeries(COL_TIME, LongSeries.empty()).addSeries(COL_VALUE, DoubleSeries.empty());
   }
 
   public TimeSeries(LongSeries timestamps, DoubleSeries baselineValues) {
@@ -68,11 +69,18 @@ public class TimeSeries {
    * @return TimeSeries that contains the predicted values.
    */
   public static TimeSeries fromDataFrame(DataFrame df) {
+    Preconditions.checkArgument(df.contains(COL_TIME));
+    Preconditions.checkArgument(df.contains(COL_VALUE));
     TimeSeries ts = new TimeSeries();
+    // time stamp
     ts.df.addSeries(COL_TIME, df.get(COL_TIME)).setIndex(COL_TIME);
+    // predicted baseline values
     addSeries(ts, df, COL_VALUE);
+    // current values
     addSeries(ts, df, COL_CURRENT);
+    // upper bound
     addSeries(ts, df, COL_UPPER_BOUND);
+    // lower bound
     addSeries(ts, df, COL_LOWER_BOUND);
     return ts;
   }
@@ -99,5 +107,10 @@ public class TimeSeries {
 
   public DataFrame getDataFrame() {
     return df;
+  }
+
+  @Override
+  public String toString() {
+    return "TimeSeries{" + "df=" + df + '}';
   }
 }

@@ -96,7 +96,7 @@ public class PercentageChangeRuleDetectorTest {
     spec.setPattern("up");
     spec.setPercentageChange(0.4);
     detector.init(spec, new DefaultInputDataFetcher(this.provider, -1));
-    List<MergedAnomalyResultDTO> anomalies = detector.runDetection(new Interval(1814400000L, 2419200000L), "thirdeye:metric:1");
+    List<MergedAnomalyResultDTO> anomalies = detector.runDetection(new Interval(1814400000L, 2419200000L), "thirdeye:metric:1").getAnomalies();
     Assert.assertEquals(anomalies.size(), 2);
     Assert.assertEquals(anomalies.get(0).getStartTime(), 2372400000L);
     Assert.assertEquals(anomalies.get(0).getEndTime(), 2376000000L);
@@ -112,7 +112,7 @@ public class PercentageChangeRuleDetectorTest {
     spec.setOffset("median3w");
     spec.setPattern("up");
     detector.init(spec, new DefaultInputDataFetcher(this.provider, -1));
-    List<MergedAnomalyResultDTO> anomalies = detector.runDetection(new Interval(1814400000L, 2419200000L), "thirdeye:metric:1");
+    List<MergedAnomalyResultDTO> anomalies = detector.runDetection(new Interval(1814400000L, 2419200000L), "thirdeye:metric:1").getAnomalies();
     Assert.assertEquals(anomalies.size(), 4);
     Assert.assertEquals(anomalies.get(0).getStartTime(), 2005200000L);
     Assert.assertEquals(anomalies.get(0).getEndTime(), 2008800000L);
@@ -132,7 +132,7 @@ public class PercentageChangeRuleDetectorTest {
     spec.setOffset("median3w");
     spec.setPattern("down");
     detector.init(spec, new DefaultInputDataFetcher(this.provider, -1));
-    List<MergedAnomalyResultDTO> anomalies = detector.runDetection(new Interval(1814400000L, 2419200000L), "thirdeye:metric:1");
+    List<MergedAnomalyResultDTO> anomalies = detector.runDetection(new Interval(1814400000L, 2419200000L), "thirdeye:metric:1").getAnomalies();
     Assert.assertEquals(anomalies.size(), 1);
     Assert.assertEquals(anomalies.get(0).getStartTime(), 2181600000L);
     Assert.assertEquals(anomalies.get(0).getEndTime(), 2185200000L);
@@ -146,7 +146,7 @@ public class PercentageChangeRuleDetectorTest {
     spec.setOffset("median3w");
     spec.setPattern("up_or_down");
     detector.init(spec, new DefaultInputDataFetcher(this.provider, -1));
-    List<MergedAnomalyResultDTO> anomalies = detector.runDetection(new Interval(1814400000L, 2419200000L), "thirdeye:metric:1");
+    List<MergedAnomalyResultDTO> anomalies = detector.runDetection(new Interval(1814400000L, 2419200000L), "thirdeye:metric:1").getAnomalies();
     Assert.assertEquals(anomalies.size(), 5);
     Assert.assertEquals(anomalies.get(0).getStartTime(), 2005200000L);
     Assert.assertEquals(anomalies.get(0).getEndTime(), 2008800000L);
@@ -168,7 +168,7 @@ public class PercentageChangeRuleDetectorTest {
     spec.setPercentageChange(0.4);
     spec.setMonitoringGranularity("1_MONTHS");
     percentageRule.init(spec, new DefaultInputDataFetcher(this.provider, -1));
-    List<MergedAnomalyResultDTO> anomalies = percentageRule.runDetection(new Interval(1546214400000L, 1551312000000L), "thirdeye:metric:1");
+    List<MergedAnomalyResultDTO> anomalies = percentageRule.runDetection(new Interval(1546214400000L, 1551312000000L), "thirdeye:metric:1").getAnomalies();
     Assert.assertEquals(anomalies.size(), 1);
     Assert.assertEquals(anomalies.get(0).getStartTime(), 1548892800000L);
     Assert.assertEquals(anomalies.get(0).getEndTime(), 1551312000000L);
@@ -181,7 +181,7 @@ public class PercentageChangeRuleDetectorTest {
     spec.setOffset("wo1w");
     spec.setPercentageChange(0.1);
     percentageRule.init(spec, new DefaultInputDataFetcher(this.provider, -1));
-    List<MergedAnomalyResultDTO> anomalies = percentageRule.runDetection(new Interval(1551398400000L, 1551571200000L), "thirdeye:metric:1");
+    List<MergedAnomalyResultDTO> anomalies = percentageRule.runDetection(new Interval(1551398400000L, 1551571200000L), "thirdeye:metric:1").getAnomalies();
     Assert.assertEquals(anomalies.size(), 1);
     Assert.assertEquals(anomalies.get(0).getStartTime(), 1551484800000L);
     Assert.assertEquals(anomalies.get(0).getEndTime(), 1551488400000L);

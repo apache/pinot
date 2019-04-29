@@ -19,13 +19,15 @@
 
 package org.apache.pinot.thirdeye.detection.components;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.BaselineParsingUtils;
 import org.apache.pinot.thirdeye.dataframe.BooleanSeries;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
-import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.detection.DetectionUtils;
 import org.apache.pinot.thirdeye.detection.InputDataFetcher;
 import org.apache.pinot.thirdeye.detection.Pattern;
@@ -35,15 +37,14 @@ import org.apache.pinot.thirdeye.detection.annotation.Param;
 import org.apache.pinot.thirdeye.detection.annotation.PresentationOption;
 import org.apache.pinot.thirdeye.detection.spec.AbsoluteChangeRuleDetectorSpec;
 import org.apache.pinot.thirdeye.detection.spi.components.AnomalyDetector;
+import org.apache.pinot.thirdeye.detection.spi.components.BaselineProvider;
+import org.apache.pinot.thirdeye.detection.spi.model.DetectionResult;
 import org.apache.pinot.thirdeye.detection.spi.model.InputData;
 import org.apache.pinot.thirdeye.detection.spi.model.InputDataSpec;
+import org.apache.pinot.thirdeye.detection.spi.model.TimeSeries;
 import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
 import org.apache.pinot.thirdeye.rootcause.timeseries.Baseline;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
 import org.joda.time.Interval;
-import org.joda.time.Period;
 
 import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
 
@@ -59,7 +60,8 @@ import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
         @Param(name = "change", placeholder = "value"),
         @Param(name = "pattern", allowableValues = {"up", "down"})
     })
-public class AbsoluteChangeRuleDetector implements AnomalyDetector<AbsoluteChangeRuleDetectorSpec> {
+public class AbsoluteChangeRuleDetector implements AnomalyDetector<AbsoluteChangeRuleDetectorSpec>,
+                                                   BaselineProvider<AbsoluteChangeRuleDetectorSpec> {
   private double absoluteChange;
   private InputDataFetcher dataFetcher;
   private Baseline baseline;
@@ -75,7 +77,7 @@ public class AbsoluteChangeRuleDetector implements AnomalyDetector<AbsoluteChang
   private static final String COL_DIFF_VIOLATION = "diff_violation";
 
   @Override
-  public List<MergedAnomalyResultDTO> runDetection(Interval window, String metricUrn) {
+  public DetectionResult runDetection(Interval window, String metricUrn) {
     MetricEntity me = MetricEntity.fromURN(metricUrn);
     MetricSlice slice = MetricSlice.from(me.getId(), window.getStartMillis(), window.getEndMillis(), me.getFilters(), timeGranularity);
     List<MetricSlice> slices = new ArrayList<>(this.baseline.scatter(slice));
@@ -105,8 +107,13 @@ public class AbsoluteChangeRuleDetector implements AnomalyDetector<AbsoluteChang
 
     // make anomalies
     DatasetConfigDTO datasetConfig = data.getDatasetForMetricId().get(me.getId());
-    return DetectionUtils.makeAnomalies(slice, df, COL_ANOMALY, window.getEndMillis(),
-        DetectionUtils.getMonitoringGranularityPeriod(monitoringGranularity, datasetConfig), datasetConfig);
+    return DetectionResult.from(DetectionUtils.makeAnomalies(slice, df, COL_ANOMALY, window.getEndMillis(),
+        DetectionUtils.getMonitoringGranularityPeriod(monitoringGranularity, datasetConfig), datasetConfig));
+  }
+
+  @Override
+  public TimeSeries computePredictedTimeSeries(MetricSlice slice) {
+    return null;
   }
 
   @Override

@@ -89,7 +89,7 @@ public class ThresholdRuleDetectorTest {
     spec.setMin(100);
     spec.setMax(500);
     thresholdAlgorithm.init(spec, new DefaultInputDataFetcher(testDataProvider, -1));
-    List<MergedAnomalyResultDTO> anomalies = thresholdAlgorithm.runDetection(new Interval(0, 10), "thirdeye:metric:123");
+    List<MergedAnomalyResultDTO> anomalies = thresholdAlgorithm.runDetection(new Interval(0, 10), "thirdeye:metric:123").getAnomalies();
     Assert.assertEquals(anomalies.size(), 2);
     Assert.assertEquals(anomalies.get(0).getStartTime(), 0);
     Assert.assertEquals(anomalies.get(0).getEndTime(), 2);
@@ -104,7 +104,7 @@ public class ThresholdRuleDetectorTest {
     spec.setMin(200);
     spec.setMonitoringGranularity("1_MONTHS");
     thresholdRule.init(spec, new DefaultInputDataFetcher(testDataProvider, -1));
-    List<MergedAnomalyResultDTO> anomalies = thresholdRule.runDetection(new Interval(1546214400000L, 1551398400000L), "thirdeye:metric:123");
+    List<MergedAnomalyResultDTO> anomalies = thresholdRule.runDetection(new Interval(1546214400000L, 1551398400000L), "thirdeye:metric:123").getAnomalies();
     Assert.assertEquals(anomalies.size(), 1);
     Assert.assertEquals(anomalies.get(0).getStartTime(), 1546214400000L);
     Assert.assertEquals(anomalies.get(0).getEndTime(), 1548892800000L);
@@ -117,7 +117,7 @@ public class ThresholdRuleDetectorTest {
     spec.setMax(200);
     spec.setMonitoringGranularity("1_MONTHS");
     thresholdRule.init(spec, new DefaultInputDataFetcher(testDataProvider, -1));
-    List<MergedAnomalyResultDTO> anomalies = thresholdRule.runDetection(new Interval(1546214400000L, 1551398400000L), "thirdeye:metric:123");
+    List<MergedAnomalyResultDTO> anomalies = thresholdRule.runDetection(new Interval(1546214400000L, 1551398400000L), "thirdeye:metric:123").getAnomalies();
     Assert.assertEquals(anomalies.size(), 1);
     Assert.assertEquals(anomalies.get(0).getStartTime(), 1551312000000L);
     Assert.assertEquals(anomalies.get(0).getEndTime(), 1551398400000L);

@@ -43,6 +43,7 @@ import org.apache.pinot.thirdeye.detection.annotation.Param;
 import org.apache.pinot.thirdeye.detection.spec.HoltWintersDetectorSpec;
 import org.apache.pinot.thirdeye.detection.spi.components.AnomalyDetector;
 import org.apache.pinot.thirdeye.detection.spi.components.BaselineProvider;
+import org.apache.pinot.thirdeye.detection.spi.model.DetectionResult;
 import org.apache.pinot.thirdeye.detection.spi.model.InputData;
 import org.apache.pinot.thirdeye.detection.spi.model.InputDataSpec;
 import org.apache.pinot.thirdeye.detection.spi.model.TimeSeries;
@@ -150,7 +151,7 @@ public class HoltWintersDetector implements BaselineProvider<HoltWintersDetector
   }
 
   @Override
-  public List<MergedAnomalyResultDTO> runDetection(Interval window, String metricUrn) {
+  public DetectionResult runDetection(Interval window, String metricUrn) {
     MetricEntity metricEntity = MetricEntity.fromURN(metricUrn);
     DateTime trainStart;
     if (isMultiDayGranularity()) {
@@ -204,12 +205,12 @@ public class HoltWintersDetector implements BaselineProvider<HoltWintersDetector
     df.mapInPlace(BooleanSeries.ALL_TRUE, COL_ANOMALY, COL_PATTERN, COL_DIFF_VIOLATION);
 
     // Anomalies
-    List<MergedAnomalyResultDTO> results = DetectionUtils.makeAnomalies(sliceData, df, COL_ANOMALY,
+    List<MergedAnomalyResultDTO> anomalyResults = DetectionUtils.makeAnomalies(sliceData, df, COL_ANOMALY,
         window.getEndMillis(),
         DetectionUtils.getMonitoringGranularityPeriod(timeGranularity.toAggregationGranularityString(),
             datasetConfig), datasetConfig);
 
-    return results;
+    return DetectionResult.from(anomalyResults);
   }
 
   /**
