@@ -28,7 +28,7 @@ public class DetectorDataInsufficientException extends DetectorException {
   }
 
   public DetectorDataInsufficientException() {
-    super();
+    this("Data is insufficient to run detection");
   }
 
   public DetectorDataInsufficientException(String message) {
