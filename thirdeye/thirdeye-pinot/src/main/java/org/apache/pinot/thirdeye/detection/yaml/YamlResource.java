@@ -720,7 +720,7 @@ public class YamlResource {
       return provider.get().computePredictedTimeSeries(slice);
     }
 
-    return new TimeSeries();
+    return TimeSeries.empty();
   }
 
   /**

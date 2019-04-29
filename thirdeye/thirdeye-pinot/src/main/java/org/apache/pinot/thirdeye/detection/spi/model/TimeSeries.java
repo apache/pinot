@@ -34,13 +34,13 @@ import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
 public class TimeSeries {
   private DataFrame df;
 
-  public TimeSeries() {
-    this.df = new DataFrame().addSeries(COL_TIME, LongSeries.empty()).addSeries(COL_VALUE, DoubleSeries.empty());
+  private TimeSeries() {
+    this.df = new DataFrame();
   }
 
   public TimeSeries(LongSeries timestamps, DoubleSeries baselineValues) {
     this.df = new DataFrame();
-    this.df.addSeries(COL_TIME, timestamps).setIndex(COL_TIME);
+    this.df.addSeries(COL_TIME, timestamps);
     this.df.addSeries(DataFrameUtils.COL_VALUE, baselineValues);
   }
 
@@ -52,6 +52,10 @@ public class TimeSeries {
     this.df.addSeries(DataFrameUtils.COL_LOWER_BOUND, lowerBoundValues);
   }
 
+  public int size() {
+    return this.df.size();
+  }
+
   /**
    * Add the series into TimeSeries if it exists in the DataFrame.
    * @param df The source DataFrame.
@@ -61,6 +65,16 @@ public class TimeSeries {
     if (df.contains(name)) {
       ts.df.addSeries(name, df.get(name));
     }
+  }
+
+  /**
+   * return a empty time series
+   * @return a empty time series
+   */
+  public static TimeSeries empty(){
+    TimeSeries ts = new TimeSeries();
+    ts.df.addSeries(COL_TIME, LongSeries.empty()).addSeries(COL_VALUE, DoubleSeries.empty()).setIndex(COL_TIME);
+    return ts;
   }
 
   /**

@@ -168,7 +168,7 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
 
       // run detection
       Interval window = monitoringWindows.get(i);
-      DetectionResult detectionResult = DetectionResult.from(Collections.emptyList());
+      DetectionResult detectionResult = DetectionResult.empty();
       try {
         LOG.info("[Pipeline] start detection for config {} metricUrn {} window ({}/{}) - start {} end {}",
             config.getId(), metricUrn, i + 1, monitoringWindows.size(), window.getStart(), window.getEnd());

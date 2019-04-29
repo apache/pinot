@@ -1,5 +1,6 @@
 package org.apache.pinot.thirdeye.detection.spi.model;
 
+import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 
@@ -25,12 +26,20 @@ public class DetectionResult {
   }
 
   /**
+   * Create a empty detection result
+   * @return the empty detection result
+   */
+  public static DetectionResult empty() {
+    return new DetectionResult(Collections.emptyList(), TimeSeries.empty());
+  }
+
+  /**
    * Create a detection result from a list of anomalies
    * @param anomalies the list of anomalies generated
    * @return the detection result contains the list of anomalies
    */
   public static DetectionResult from(List<MergedAnomalyResultDTO> anomalies) {
-    return new DetectionResult(anomalies, new TimeSeries());
+    return new DetectionResult(anomalies, TimeSeries.empty());
   }
 
   /**

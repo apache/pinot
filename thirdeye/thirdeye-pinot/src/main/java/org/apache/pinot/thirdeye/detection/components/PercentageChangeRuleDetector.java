@@ -21,13 +21,12 @@ package org.apache.pinot.thirdeye.detection.components;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.EnumSet;
 import java.util.List;
-import javax.xml.crypto.Data;
 import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.BaselineParsingUtils;
 import org.apache.pinot.thirdeye.dataframe.BooleanSeries;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
+import org.apache.pinot.thirdeye.dataframe.DoubleSeries;
 import org.apache.pinot.thirdeye.dataframe.Series;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
@@ -78,8 +77,7 @@ public class PercentageChangeRuleDetector implements AnomalyDetector<PercentageC
   @Override
   public DetectionResult runDetection(Interval window, String metricUrn) {
     MetricEntity me = MetricEntity.fromURN(metricUrn);
-    MetricSlice slice =
-        MetricSlice.from(me.getId(), window.getStartMillis(), window.getEndMillis(), me.getFilters(), timeGranularity);
+    MetricSlice slice = MetricSlice.from(me.getId(), window.getStartMillis(), window.getEndMillis(), me.getFilters(), timeGranularity);
     List<MetricSlice> slices = new ArrayList<>(this.baseline.scatter(slice));
     slices.add(slice);
 
@@ -128,15 +126,29 @@ public class PercentageChangeRuleDetector implements AnomalyDetector<PercentageC
   }
 
   private DataFrame generateBoundaries(DataFrame dfBase) {
-    if (!Double.isNaN(this.percentageChange)){
-      if (EnumSet.of(Pattern.UP, Pattern.UP_OR_DOWN).contains(this.pattern)) {
-        dfBase.addSeries(COL_UPPER_BOUND, map((DoubleFunction) values ->values[0] * (1 + this.percentageChange), dfBase.getDoubles(COL_VALUE)));
-      }
-      if (EnumSet.of(Pattern.DOWN, Pattern.UP_OR_DOWN).contains(this.pattern)) {
-        dfBase.addSeries(COL_LOWER_BOUND, map((DoubleFunction) values ->values[0] * (1 - this.percentageChange), dfBase.getDoubles(COL_VALUE)));
+    if (!Double.isNaN(this.percentageChange)) {
+      switch (this.pattern) {
+        case UP:
+          fillPercentageChangeBound(dfBase, COL_UPPER_BOUND, 1 + this.percentageChange);
+          dfBase.addSeries(COL_LOWER_BOUND, DoubleSeries.zeros(dfBase.size()));
+          break;
+        case DOWN:
+          dfBase.addSeries(COL_UPPER_BOUND, DoubleSeries.fillValues(dfBase.size(), POSITIVE_INFINITY));
+          fillPercentageChangeBound(dfBase, COL_LOWER_BOUND, 1 - this.percentageChange);
+          break;
+        case UP_OR_DOWN:
+          fillPercentageChangeBound(dfBase, COL_UPPER_BOUND, 1 + this.percentageChange);
+          fillPercentageChangeBound(dfBase, COL_LOWER_BOUND, 1 - this.percentageChange);
+          break;
+        default:
+          throw new IllegalArgumentException();
       }
     }
     return dfBase;
+  }
+
+  private void fillPercentageChangeBound(DataFrame dfBase, String colBound, double multiplier) {
+    dfBase.addSeries(colBound, map((DoubleFunction) values -> values[0] * multiplier, dfBase.getDoubles(COL_VALUE)));
   }
 
   @Override
