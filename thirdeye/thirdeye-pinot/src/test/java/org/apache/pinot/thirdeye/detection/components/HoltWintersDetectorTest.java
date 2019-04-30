@@ -123,7 +123,7 @@ public class HoltWintersDetectorTest {
     detector.init(spec, new DefaultInputDataFetcher(this.provider, -1));
     Interval window = new Interval(1306627200000L, 1309219200000L);
     String metricUrn = "thirdeye:metric:1";
-    List<MergedAnomalyResultDTO> anomalies = detector.runDetection(window, metricUrn);
+    List<MergedAnomalyResultDTO> anomalies = detector.runDetection(window, metricUrn).getAnomalies();
 
     Assert.assertEquals(anomalies.size(), 6);
   }
@@ -152,7 +152,7 @@ public class HoltWintersDetectorTest {
     detector.init(spec, new DefaultInputDataFetcher(this.provider, -1));
     Interval window = new Interval(1322773200000L, 1323378000000L);
     String metricUrn = "thirdeye:metric:123";
-    List<MergedAnomalyResultDTO> anomalies = detector.runDetection(window, metricUrn);
+    List<MergedAnomalyResultDTO> anomalies = detector.runDetection(window, metricUrn).getAnomalies();
 
     Assert.assertEquals(anomalies.size(), 2);
   }

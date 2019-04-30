@@ -19,6 +19,7 @@
 
 package org.apache.pinot.thirdeye.detection.spi.model;
 
+import com.google.common.base.Preconditions;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
 import org.apache.pinot.thirdeye.dataframe.DoubleSeries;
 import org.apache.pinot.thirdeye.dataframe.LongSeries;
@@ -33,7 +34,7 @@ import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
 public class TimeSeries {
   private DataFrame df;
 
-  public TimeSeries() {
+  private TimeSeries() {
     this.df = new DataFrame();
   }
 
@@ -52,6 +53,14 @@ public class TimeSeries {
   }
 
   /**
+   * the size of the time series
+   * @return the size of the time series (number of data points)
+   */
+  public int size() {
+    return this.df.size();
+  }
+
+  /**
    * Add the series into TimeSeries if it exists in the DataFrame.
    * @param df The source DataFrame.
    * @param name The series name.
@@ -63,16 +72,33 @@ public class TimeSeries {
   }
 
   /**
+   * return a empty time series
+   * @return a empty time series
+   */
+  public static TimeSeries empty(){
+    TimeSeries ts = new TimeSeries();
+    ts.df.addSeries(COL_TIME, LongSeries.empty()).addSeries(COL_VALUE, DoubleSeries.empty()).setIndex(COL_TIME);
+    return ts;
+  }
+
+  /**
    * Add DataFrame into TimeSeries.
    * @param df The source DataFrame.
    * @return TimeSeries that contains the predicted values.
    */
   public static TimeSeries fromDataFrame(DataFrame df) {
+    Preconditions.checkArgument(df.contains(COL_TIME));
+    Preconditions.checkArgument(df.contains(COL_VALUE));
     TimeSeries ts = new TimeSeries();
+    // time stamp
     ts.df.addSeries(COL_TIME, df.get(COL_TIME)).setIndex(COL_TIME);
+    // predicted baseline values
     addSeries(ts, df, COL_VALUE);
+    // current values
     addSeries(ts, df, COL_CURRENT);
+    // upper bound
     addSeries(ts, df, COL_UPPER_BOUND);
+    // lower bound
     addSeries(ts, df, COL_LOWER_BOUND);
     return ts;
   }
@@ -99,5 +125,10 @@ public class TimeSeries {
 
   public DataFrame getDataFrame() {
     return df;
+  }
+
+  @Override
+  public String toString() {
+    return "TimeSeries{" + "df=" + df + '}';
   }
 }

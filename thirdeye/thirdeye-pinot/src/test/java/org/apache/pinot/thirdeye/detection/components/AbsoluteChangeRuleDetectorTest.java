@@ -17,6 +17,7 @@
 package org.apache.pinot.thirdeye.detection.components;
 
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
+import org.apache.pinot.thirdeye.dataframe.DoubleSeries;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
@@ -35,6 +36,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.thirdeye.detection.spi.model.DetectionResult;
+import org.apache.pinot.thirdeye.detection.spi.model.TimeSeries;
 import org.joda.time.Interval;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
@@ -81,14 +84,24 @@ public class AbsoluteChangeRuleDetectorTest {
   public void testWeekOverWeekDifference() {
     AbsoluteChangeRuleDetector detector = new AbsoluteChangeRuleDetector();
     AbsoluteChangeRuleDetectorSpec spec = new AbsoluteChangeRuleDetectorSpec();
-    spec.setAbsoluteChange(400);
+    double absoluteChange = 400;
+    spec.setAbsoluteChange(absoluteChange);
     spec.setPattern("up");
     detector.init(spec, new DefaultInputDataFetcher(this.provider, -1));
-    List<MergedAnomalyResultDTO> anomalies = detector.runDetection(new Interval(1814400000L, 2419200000L), "thirdeye:metric:1");
+    DetectionResult result = detector.runDetection(new Interval(1814400000L, 2419200000L), "thirdeye:metric:1");
+    List<MergedAnomalyResultDTO> anomalies = result.getAnomalies();
 
     Assert.assertEquals(anomalies.size(), 1);
     Assert.assertEquals(anomalies.get(0).getStartTime(), 2372400000L);
     Assert.assertEquals(anomalies.get(0).getEndTime(), 2376000000L);
+    TimeSeries ts = result.getTimeseries();
+    checkAbsoluteUpperBounds(ts, absoluteChange);
+    Assert.assertEquals(ts.getPredictedLowerBound(), DoubleSeries.zeros(ts.size()));
   }
 
+  private void checkAbsoluteUpperBounds(TimeSeries ts, double absoluteChange) {
+    for (int i = 0; i < ts.getDataFrame().size(); i++) {
+      Assert.assertEquals(ts.getPredictedUpperBound().get(i), ts.getPredictedBaseline().get(i) + absoluteChange);
+    }
+  }
 }

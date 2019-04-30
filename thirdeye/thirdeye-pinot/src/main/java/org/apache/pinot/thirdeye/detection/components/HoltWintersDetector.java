@@ -43,6 +43,7 @@ import org.apache.pinot.thirdeye.detection.annotation.Param;
 import org.apache.pinot.thirdeye.detection.spec.HoltWintersDetectorSpec;
 import org.apache.pinot.thirdeye.detection.spi.components.AnomalyDetector;
 import org.apache.pinot.thirdeye.detection.spi.components.BaselineProvider;
+import org.apache.pinot.thirdeye.detection.spi.model.DetectionResult;
 import org.apache.pinot.thirdeye.detection.spi.model.InputData;
 import org.apache.pinot.thirdeye.detection.spi.model.InputDataSpec;
 import org.apache.pinot.thirdeye.detection.spi.model.TimeSeries;
@@ -83,7 +84,6 @@ public class HoltWintersDetector implements BaselineProvider<HoltWintersDetector
   private static final Logger LOG = LoggerFactory.getLogger(HoltWintersDetector.class);
   private InputDataFetcher dataFetcher;
   private static final String COL_CURR = "current";
-  private static final String COL_BASE = "baseline";
   private static final String COL_ANOMALY = "anomaly";
   private static final String COL_PATTERN = "pattern";
   private static final String COL_DIFF = "diff";
@@ -150,7 +150,7 @@ public class HoltWintersDetector implements BaselineProvider<HoltWintersDetector
   }
 
   @Override
-  public List<MergedAnomalyResultDTO> runDetection(Interval window, String metricUrn) {
+  public DetectionResult runDetection(Interval window, String metricUrn) {
     MetricEntity metricEntity = MetricEntity.fromURN(metricUrn);
     DateTime trainStart;
     if (isMultiDayGranularity()) {
@@ -183,14 +183,9 @@ public class HoltWintersDetector implements BaselineProvider<HoltWintersDetector
     }
 
     DataFrame dfCurr = new DataFrame(dfInput).renameSeries(COL_VALUE, COL_CURR);
-    DataFrame dfBase = computePredictionInterval(dfInput, window.getStartMillis(), datasetConfig.getTimezone())
-        .renameSeries(COL_VALUE, COL_BASE);
-    // remove COL_CURR from baseline to use the smoothed value
-    if (dfBase.contains(COL_CURR)) {
-      dfBase.dropSeries(COL_CURR);
-    }
-    DataFrame df = new DataFrame(dfCurr).addSeries(dfBase);
-    df.addSeries(COL_DIFF, df.getDoubles(COL_CURR).subtract(df.get(COL_BASE)));
+    DataFrame dfBase = computePredictionInterval(dfInput, window.getStartMillis(), datasetConfig.getTimezone());
+    DataFrame df = new DataFrame(dfCurr).addSeries(dfBase, COL_VALUE, COL_ERROR);
+    df.addSeries(COL_DIFF, df.getDoubles(COL_CURR).subtract(df.get(COL_VALUE)));
     df.addSeries(COL_ANOMALY, BooleanSeries.fillValues(df.size(), false));
 
     // Filter pattern
@@ -204,12 +199,12 @@ public class HoltWintersDetector implements BaselineProvider<HoltWintersDetector
     df.mapInPlace(BooleanSeries.ALL_TRUE, COL_ANOMALY, COL_PATTERN, COL_DIFF_VIOLATION);
 
     // Anomalies
-    List<MergedAnomalyResultDTO> results = DetectionUtils.makeAnomalies(sliceData, df, COL_ANOMALY,
+    List<MergedAnomalyResultDTO> anomalyResults = DetectionUtils.makeAnomalies(sliceData, df, COL_ANOMALY,
         window.getEndMillis(),
         DetectionUtils.getMonitoringGranularityPeriod(timeGranularity.toAggregationGranularityString(),
             datasetConfig), datasetConfig);
 
-    return results;
+    return DetectionResult.from(anomalyResults, TimeSeries.fromDataFrame(dfBase));
   }
 
   /**
