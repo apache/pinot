@@ -649,7 +649,7 @@ public class YamlResource {
       @QueryParam("urn") @NotNull String urn,
       @QueryParam("tuningStart") long tuningStart,
       @QueryParam("tuningEnd") long tuningEnd,
-      @ApiParam("jsonPayload") String payload,
+      @ApiParam("jsonPayload") @NotNull String payload,
       @QueryParam("ruleName") String ruleName) {
     try {
       Preconditions.checkArgument(StringUtils.isNotBlank(payload), "The Yaml Payload in the request is empty.");
@@ -711,7 +711,7 @@ public class YamlResource {
     MetricSlice slice = MetricSlice.from(metric.getId(), start, end, metric.getFilters(), MetricSlice.NATIVE_GRANULARITY);
 
     Optional<BaselineProvider> provider =  detectionConfig.getComponents().entrySet().stream()
-        .filter(x -> x.getValue() instanceof BaselineProvider && (rule.isEmpty() || x.getKey().startsWith(rule)))
+        .filter(x -> x.getValue() instanceof BaselineProvider && (rule == null || rule.isEmpty() || x.getKey().startsWith(rule)))
         .map(x -> (BaselineProvider) x.getValue())
         .findFirst();
 
