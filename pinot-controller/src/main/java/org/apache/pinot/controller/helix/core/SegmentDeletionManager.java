@@ -100,9 +100,10 @@ public class SegmentDeletionManager {
 
   protected synchronized void deleteSegmentFromPropertyStoreAndLocal(String tableName, Collection<String> segmentIds,
       long deletionDelay) {
-    // Check if segment got removed from ExternalView and IdealStates
-    if (_helixAdmin.getResourceExternalView(_helixClusterName, tableName) == null
-        || _helixAdmin.getResourceIdealState(_helixClusterName, tableName) == null) {
+    // Check if segment got removed from ExternalView or IdealState
+    ExternalView externalView = _helixAdmin.getResourceExternalView(_helixClusterName, tableName);
+    IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableName);
+    if (externalView == null || idealState == null) {
       LOGGER.warn("Resource: {} is not set up in idealState or ExternalView, won't do anything", tableName);
       return;
     }
@@ -111,9 +112,6 @@ public class SegmentDeletionManager {
     Set<String> segmentsToRetryLater = new HashSet<>(segmentIds.size());  // List of segments that we need to retry
 
     try {
-      ExternalView externalView = _helixAdmin.getResourceExternalView(_helixClusterName, tableName);
-      IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableName);
-
       for (String segmentId : segmentIds) {
         Map<String, String> segmentToInstancesMapFromExternalView = externalView.getStateMap(segmentId);
         Map<String, String> segmentToInstancesMapFromIdealStates = idealState.getInstanceStateMap(segmentId);
