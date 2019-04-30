@@ -33,7 +33,7 @@
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <pinot.version>0.2.0-SNAPSHOT</pinot.version>
+    <pinot.version>0.1.0</pinot.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <jdk.version>1.8</jdk.version>
     <dropwizard.version>0.9.2</dropwizard.version>
