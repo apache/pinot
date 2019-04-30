@@ -122,13 +122,10 @@ public class PartitionAwareOfflineRoutingTableBuilder extends BasePartitionAware
     for (Integer partitionId : partitionIds) {
       for (int replicaId = 0; replicaId < _numReplicas; replicaId++) {
         List<String> serversForPartitionAndReplica =
-            partitionAssignment.getInstancesfromReplicaGroup(partitionId, replicaId);
+            partitionAssignment.getInstancesFromReplicaGroup(partitionId, replicaId);
         for (String serverName : serversForPartitionAndReplica) {
-          Map<String, Integer> serverToReplicaMap = partitionToServerToReplicaMap.get(partitionId);
-          if (serverToReplicaMap == null) {
-            serverToReplicaMap = new HashMap<>();
-            partitionToServerToReplicaMap.put(partitionId, serverToReplicaMap);
-          }
+          Map<String, Integer> serverToReplicaMap =
+              partitionToServerToReplicaMap.computeIfAbsent(partitionId, k -> new HashMap<>());
           serverToReplicaMap.put(serverName, replicaId);
         }
       }

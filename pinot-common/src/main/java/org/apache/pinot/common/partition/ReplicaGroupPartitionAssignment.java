@@ -79,7 +79,7 @@ public class ReplicaGroupPartitionAssignment extends PartitionAssignment {
   public void addInstanceToReplicaGroup(int partition, int replicaGroup, String instanceName) {
     String key = createMappingKey(partition, replicaGroup);
     if (!getPartitionToInstances().containsKey(key)) {
-      addPartition(key, new ArrayList<String>());
+      addPartition(key, new ArrayList<>());
     }
     getInstancesListForPartition(key).add(instanceName);
   }
@@ -91,7 +91,7 @@ public class ReplicaGroupPartitionAssignment extends PartitionAssignment {
    * @param replicaGroup Replica group number
    * @return List of instances belongs to the given partition and replica group
    */
-  public List<String> getInstancesfromReplicaGroup(int partition, int replicaGroup) {
+  public List<String> getInstancesFromReplicaGroup(int partition, int replicaGroup) {
     String key = createMappingKey(partition, replicaGroup);
     if (!getPartitionToInstances().containsKey(key)) {
       throw new NoSuchElementException();
