@@ -1,78 +1,70 @@
 {
-  "properties" : {
-    "className" : "org.apache.pinot.thirdeye.detection.wrapper.ChildKeepingMergeWrapper",
-    "maxGap" : 0,
-    "nested" : [ {
-      "nestedMetricUrns" : [ "thirdeye:metric:1:D1%3Dv1:D1%3Dv2:D2%3Dv3" ],
-      "className" : "org.apache.pinot.thirdeye.detection.algorithm.DimensionWrapper",
-      "metricUrn" : "thirdeye:metric:1:D1%3Dv1:D1%3Dv2:D2%3Dv3",
-      "nested" : [ {
-        "filter" : "$thresholdFilter_2:THRESHOLD_RULE_FILTER",
-        "className" : "org.apache.pinot.thirdeye.detection.wrapper.AnomalyFilterWrapper",
-        "nested" : [ {
-          "filter" : "$thresholdFilter_1:THRESHOLD_RULE_FILTER",
-          "className" : "org.apache.pinot.thirdeye.detection.wrapper.AnomalyFilterWrapper",
-          "nested" : [ {
-            "baselineValueProvider" : "$maxThreshold_1:RULE_BASELINE",
-            "className" : "org.apache.pinot.thirdeye.detection.wrapper.BaselineFillingMergeWrapper",
-            "maxGap" : 0,
-            "nested" : [ {
-              "bucketPeriod":"P1D",
-              "className" : "org.apache.pinot.thirdeye.detection.wrapper.AnomalyDetectorWrapper"
-            } ],
-            "detector" : "$maxThreshold_1:THRESHOLD",
-            "maxDuration" : 100
-          } ]
-        } ]
+  "properties": {
+    "className": "org.apache.pinot.thirdeye.detection.wrapper.ChildKeepingMergeWrapper",
+    "maxGap": 0,
+    "nested": [{
+      "nestedMetricUrns": ["thirdeye:metric:1:D1%3Dv1:D1%3Dv2:D2%3Dv3"],
+      "className": "org.apache.pinot.thirdeye.detection.algorithm.DimensionWrapper",
+      "metricUrn": "thirdeye:metric:1:D1%3Dv1:D1%3Dv2:D2%3Dv3",
+      "nested": [{
+        "filter": "$thresholdFilter_2:THRESHOLD_RULE_FILTER",
+        "className": "org.apache.pinot.thirdeye.detection.wrapper.AnomalyFilterWrapper",
+        "nested": [{
+          "filter": "$thresholdFilter_1:THRESHOLD_RULE_FILTER",
+          "className": "org.apache.pinot.thirdeye.detection.wrapper.AnomalyFilterWrapper",
+          "nested": [{
+            "baselineValueProvider": "$maxThreshold_1:THRESHOLD",
+            "className": "org.apache.pinot.thirdeye.detection.wrapper.BaselineFillingMergeWrapper",
+            "maxGap": 0,
+            "nested": [{
+              "bucketPeriod": "P1D",
+              "className": "org.apache.pinot.thirdeye.detection.wrapper.AnomalyDetectorWrapper"
+            }],
+            "detector": "$maxThreshold_1:THRESHOLD",
+            "maxDuration": 100
+          }]
+        }]
       }, {
-        "filter" : "$thresholdFilter_3:THRESHOLD_RULE_FILTER",
-        "className" : "org.apache.pinot.thirdeye.detection.wrapper.AnomalyFilterWrapper",
-        "nested" : [ {
-          "baselineValueProvider" : "$maxThreshold_2:RULE_BASELINE",
-          "className" : "org.apache.pinot.thirdeye.detection.wrapper.BaselineFillingMergeWrapper",
-          "maxGap" : 0,
-          "nested" : [ {
-            "bucketPeriod":"P1D",
-            "className" : "org.apache.pinot.thirdeye.detection.wrapper.AnomalyDetectorWrapper"
-          } ],
-          "detector" : "$maxThreshold_2:THRESHOLD",
-          "maxDuration" : 100
-        } ]
-      } ],
-      "minContribution" : 0.05,
-      "dimensions" : [ "D1", "D2" ]
-    } ],
-    "maxDuration" : 100
+        "filter": "$thresholdFilter_3:THRESHOLD_RULE_FILTER",
+        "className": "org.apache.pinot.thirdeye.detection.wrapper.AnomalyFilterWrapper",
+        "nested": [{
+          "baselineValueProvider": "$maxThreshold_2:THRESHOLD",
+          "className": "org.apache.pinot.thirdeye.detection.wrapper.BaselineFillingMergeWrapper",
+          "maxGap": 0,
+          "nested": [{
+            "bucketPeriod": "P1D",
+            "className": "org.apache.pinot.thirdeye.detection.wrapper.AnomalyDetectorWrapper"
+          }],
+          "detector": "$maxThreshold_2:THRESHOLD",
+          "maxDuration": 100
+        }]
+      }],
+      "minContribution": 0.05,
+      "dimensions": ["D1", "D2"]
+    }],
+    "maxDuration": 100
   },
-  "components" : {
-    "maxThreshold_2:THRESHOLD" : {
-      "max" : 100,
-      "className" : "org.apache.pinot.thirdeye.detection.components.ThresholdRuleDetector"
+  "components": {
+    "maxThreshold_2:THRESHOLD": {
+      "max": 100,
+      "className": "org.apache.pinot.thirdeye.detection.components.ThresholdRuleDetector"
     },
-    "maxThreshold_1:THRESHOLD" : {
-      "max" : 100,
-      "className" : "org.apache.pinot.thirdeye.detection.components.ThresholdRuleDetector"
+    "thresholdFilter_2:THRESHOLD_RULE_FILTER": {
+      "min": 50,
+      "className": "org.apache.pinot.thirdeye.detection.components.ThresholdRuleAnomalyFilter"
     },
-    "maxThreshold_2:RULE_BASELINE" : {
-      "max" : 100,
-      "className" : "org.apache.pinot.thirdeye.detection.components.RuleBaselineProvider"
+    "thresholdFilter_1:THRESHOLD_RULE_FILTER": {
+      "min": 50,
+      "className": "org.apache.pinot.thirdeye.detection.components.ThresholdRuleAnomalyFilter"
     },
-    "thresholdFilter_1:THRESHOLD_RULE_FILTER" : {
-      "min" : 50,
-      "className" : "org.apache.pinot.thirdeye.detection.components.ThresholdRuleAnomalyFilter"
+    "maxThreshold_1:THRESHOLD": {
+      "max": 100,
+      "className": "org.apache.pinot.thirdeye.detection.components.ThresholdRuleDetector"
     },
-    "thresholdFilter_2:THRESHOLD_RULE_FILTER" : {
-      "min" : 50,
-      "className" : "org.apache.pinot.thirdeye.detection.components.ThresholdRuleAnomalyFilter"
-    },
-    "thresholdFilter_3:THRESHOLD_RULE_FILTER" : {
-      "min" : 50,
-      "className" : "org.apache.pinot.thirdeye.detection.components.ThresholdRuleAnomalyFilter"
-    },
-    "maxThreshold_1:RULE_BASELINE" : {
-      "max" : 100,
-      "className" : "org.apache.pinot.thirdeye.detection.components.RuleBaselineProvider"
+    "thresholdFilter_3:THRESHOLD_RULE_FILTER": {
+      "min": 50,
+      "className": "org.apache.pinot.thirdeye.detection.components.ThresholdRuleAnomalyFilter"
     }
   },
-  "cron" : "0 0 14 * * ? *"
+  "cron": "0 0 14 * * ? *"
 }

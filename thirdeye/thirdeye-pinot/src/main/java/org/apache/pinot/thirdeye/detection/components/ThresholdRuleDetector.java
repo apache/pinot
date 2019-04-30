@@ -72,7 +72,7 @@ public class ThresholdRuleDetector implements AnomalyDetector<ThresholdRuleDetec
     InputData data = this.dataFetcher.fetchData(
         new InputDataSpec().withTimeseriesSlices(Collections.singletonList(slice))
             .withMetricIdsForDataset(Collections.singletonList(me.getId())));
-    DataFrame df = data.getTimeseries().get(slice);
+    DataFrame df = data.getTimeseries().get(slice).renameSeries(COL_VALUE, COL_CURRENT);
 
     // defaults
     df.addSeries(COL_TOO_HIGH, BooleanSeries.fillValues(df.size(), false));
@@ -80,20 +80,21 @@ public class ThresholdRuleDetector implements AnomalyDetector<ThresholdRuleDetec
 
     // max
     if (!Double.isNaN(this.max)) {
-      df.addSeries(COL_TOO_HIGH, df.getDoubles(COL_VALUE).gt(this.max));
+      df.addSeries(COL_TOO_HIGH, df.getDoubles(COL_CURRENT).gt(this.max));
     }
 
     // min
     if (!Double.isNaN(this.min)) {
-      df.addSeries(COL_TOO_LOW, df.getDoubles(COL_VALUE).lt(this.min));
+      df.addSeries(COL_TOO_LOW, df.getDoubles(COL_CURRENT).lt(this.min));
     }
-
+    // predicted value is the same as the current value
+    df.addSeries(COL_VALUE, df.get(COL_CURRENT));
     df.mapInPlace(BooleanSeries.HAS_TRUE, COL_ANOMALY, COL_TOO_HIGH, COL_TOO_LOW);
-
     DatasetConfigDTO datasetConfig = data.getDatasetForMetricId().get(me.getId());
     List<MergedAnomalyResultDTO> anomalies = DetectionUtils.makeAnomalies(slice, df, COL_ANOMALY, endTime,
         DetectionUtils.getMonitoringGranularityPeriod(monitoringGranularity, datasetConfig), datasetConfig);
-    return DetectionResult.from(anomalies, TimeSeries.fromDataFrame(constructThresholdBoundaries(df)));
+    DataFrame baselineWithBoundaries = constructThresholdBoundaries(df);
+    return DetectionResult.from(anomalies, TimeSeries.fromDataFrame(baselineWithBoundaries));
   }
 
   @Override
@@ -111,18 +112,7 @@ public class ThresholdRuleDetector implements AnomalyDetector<ThresholdRuleDetec
     if (!Double.isNaN(this.max)) {
       df.addSeries(COL_UPPER_BOUND, DoubleSeries.fillValues(df.size(), this.max));
     }
-    df.addSeries(COL_VALUE, DoubleSeries.fillValues(df.size(), predictedValue()));
     return df;
-  }
-
-  private double predictedValue() {
-    if (Double.isNaN(this.max) && !Double.isNaN(this.min)) {
-      return this.min;
-    }
-    if (Double.isNaN(this.min) && !Double.isNaN(this.max)) {
-      return this.max;
-    }
-    return (this.max + this.min) / 2;
   }
 
   @Override

@@ -111,7 +111,8 @@ public class AbsoluteChangeRuleDetector implements AnomalyDetector<AbsoluteChang
     DatasetConfigDTO datasetConfig = data.getDatasetForMetricId().get(me.getId());
     List<MergedAnomalyResultDTO> anomalies = DetectionUtils.makeAnomalies(slice, df, COL_ANOMALY, window.getEndMillis(),
         DetectionUtils.getMonitoringGranularityPeriod(monitoringGranularity, datasetConfig), datasetConfig);
-    return DetectionResult.from(anomalies, TimeSeries.fromDataFrame(constructAbsoluteChangeBoundaries(df)));
+    DataFrame baselineWithBoundaries = constructAbsoluteChangeBoundaries(df);
+    return DetectionResult.from(anomalies, TimeSeries.fromDataFrame(baselineWithBoundaries));
   }
 
   @Override

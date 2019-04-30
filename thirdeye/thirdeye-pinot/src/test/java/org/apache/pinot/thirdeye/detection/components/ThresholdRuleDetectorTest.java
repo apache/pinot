@@ -102,7 +102,7 @@ public class ThresholdRuleDetectorTest {
     TimeSeries ts = result.getTimeseries();
     Assert.assertEquals(ts.getPredictedUpperBound(), DoubleSeries.fillValues(ts.size(), 500));
     Assert.assertEquals(ts.getPredictedLowerBound(), DoubleSeries.fillValues(ts.size(), 100));
-    Assert.assertEquals(ts.getPredictedBaseline(), DoubleSeries.fillValues(ts.size(), 300));
+    Assert.assertEquals(ts.getPredictedBaseline(), ts.getCurrent());
   }
 
   @Test

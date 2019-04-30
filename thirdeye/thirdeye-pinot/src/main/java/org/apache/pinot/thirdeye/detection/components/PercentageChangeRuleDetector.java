@@ -115,7 +115,8 @@ public class PercentageChangeRuleDetector implements AnomalyDetector<PercentageC
     DatasetConfigDTO datasetConfig = data.getDatasetForMetricId().get(me.getId());
     List<MergedAnomalyResultDTO> anomalies = DetectionUtils.makeAnomalies(slice, df, COL_ANOMALY, window.getEndMillis(),
         DetectionUtils.getMonitoringGranularityPeriod(monitoringGranularity, datasetConfig), datasetConfig);
-    return DetectionResult.from(anomalies, TimeSeries.fromDataFrame(constructPercentageChangeBoundaries(df)));
+    DataFrame baselineWithBoundaries = constructPercentageChangeBoundaries(df);
+    return DetectionResult.from(anomalies, TimeSeries.fromDataFrame(baselineWithBoundaries));
   }
 
   @Override
