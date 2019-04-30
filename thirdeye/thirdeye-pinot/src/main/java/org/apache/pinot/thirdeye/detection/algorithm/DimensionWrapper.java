@@ -230,7 +230,7 @@ public class DimensionWrapper extends DetectionPipeline {
     Exception lastException = null;
     LOG.info("Run detection for {} metrics", totalNestedMetrics);
     for (int i = 0; i < totalNestedMetrics; i++) {
-      checkEarlyStop(totalNestedMetrics, successNestedMetrics, i);
+      checkEarlyStop(totalNestedMetrics, successNestedMetrics, i, lastException);
       MetricEntity metric = nestedMetrics.get(i);
       try {
         LOG.info("running detection for metric urn {}. {}/{}", metric.getUrn(), i + 1, totalNestedMetrics);
@@ -253,12 +253,12 @@ public class DimensionWrapper extends DetectionPipeline {
         .setDiagnostics(diagnostics);
   }
 
-  private void checkEarlyStop(long totalNestedMetrics, long successNestedMetrics, int i) throws DetectionPipelineException {
+  private void checkEarlyStop(long totalNestedMetrics, long successNestedMetrics, int i, Exception lastException) throws DetectionPipelineException {
     // if the first certain number of dimensions all failed, throw an exception
     if (i == EARLY_STOP_THRESHOLD && successNestedMetrics == 0) {
       throw new DetectionPipelineException(String.format(
           "Detection failed for first %d out of %d metric dimensions for monitoring window %d to %d, stop processing.",
-          i, totalNestedMetrics, this.getStartTime(), this.getEndTime()));
+          i, totalNestedMetrics, this.getStartTime(), this.getEndTime()), lastException);
     }
   }
 

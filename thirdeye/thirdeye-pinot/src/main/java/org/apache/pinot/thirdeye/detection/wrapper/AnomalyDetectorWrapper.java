@@ -164,7 +164,7 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
     // The last exception of the detection windows. It will be thrown out to upper level.
     Exception lastException = null;
     for (int i = 0; i < totalWindows; i++) {
-      checkEarlyStop(totalWindows, successWindows, i);
+      checkEarlyStop(totalWindows, successWindows, i, lastException);
 
       // run detection
       Interval window = monitoringWindows.get(i);
@@ -205,12 +205,12 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
         Collectors.toList()), lastTimeStamp);
   }
 
-  private void checkEarlyStop(int totalWindows, int successWindows, int i) throws DetectionPipelineException {
+  private void checkEarlyStop(int totalWindows, int successWindows, int i, Exception lastException) throws DetectionPipelineException {
     // if the first certain number of windows all failed, throw an exception
     if (i == EARLY_TERMINATE_WINDOW && successWindows == 0) {
       throw new DetectionPipelineException(String.format(
           "Successive first %d/%d detection windows failed for config %d metricUrn %s for monitoring window %d to %d. Discard remaining windows",
-          EARLY_TERMINATE_WINDOW, totalWindows, config.getId(), metricUrn, this.getStartTime(), this.getEndTime()));
+          EARLY_TERMINATE_WINDOW, totalWindows, config.getId(), metricUrn, this.getStartTime(), this.getEndTime()), lastException);
     }
   }
 
