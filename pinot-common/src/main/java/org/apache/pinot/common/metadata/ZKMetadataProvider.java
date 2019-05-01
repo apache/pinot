@@ -240,6 +240,11 @@ public class ZKMetadataProvider {
     return getTableConfig(propertyStore, TableNameBuilder.REALTIME.tableNameWithType(tableName));
   }
 
+  public static void setSchema(ZkHelixPropertyStore<ZNRecord> propertyStore, Schema schema) {
+    propertyStore.set(constructPropertyStorePathForSchema(schema.getSchemaName()), SchemaUtils.toZNRecord(schema),
+        AccessOption.PERSISTENT);
+  }
+
   @Nullable
   public static Schema getSchema(@Nonnull ZkHelixPropertyStore<ZNRecord> propertyStore, @Nonnull String schemaName) {
     try {

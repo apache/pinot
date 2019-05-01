@@ -428,8 +428,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   private void attachTimeBoundary(String rawTableName, BrokerRequest brokerRequest, boolean isOfflineRequest) {
     TimeBoundaryService.TimeBoundaryInfo timeBoundaryInfo =
         _timeBoundaryService.getTimeBoundaryInfoFor(TableNameBuilder.OFFLINE.tableNameWithType(rawTableName));
-    if (timeBoundaryInfo == null || timeBoundaryInfo.getTimeColumn() == null
-        || timeBoundaryInfo.getTimeValue() == null) {
+    if (timeBoundaryInfo == null) {
       LOGGER.warn("Failed to find time boundary info for hybrid table: {}", rawTableName);
       return;
     }
@@ -440,7 +439,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     timeFilterQuery.setId(-1);
     timeFilterQuery.setColumn(timeBoundaryInfo.getTimeColumn());
     String timeValue = timeBoundaryInfo.getTimeValue();
-    String filterValue = isOfflineRequest ? "(*\t\t" + timeValue + ")" : "[" + timeValue + "\t\t*)";
+    String filterValue = isOfflineRequest ? "(*\t\t" + timeValue + "]" : "(" + timeValue + "\t\t*)";
     timeFilterQuery.setValue(Collections.singletonList(filterValue));
     timeFilterQuery.setOperator(FilterOperator.RANGE);
     timeFilterQuery.setNestedFilterQueryIds(Collections.emptyList());

@@ -39,6 +39,7 @@ import org.apache.pinot.broker.routing.TimeBoundaryService;
 import org.apache.pinot.broker.routing.builder.RoutingTableBuilder;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.config.TableNameBuilder;
+import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.utils.CommonConstants;
@@ -119,8 +120,8 @@ public class HelixBrokerStarterTest extends ControllerTest {
         new TableConfig.Builder(CommonConstants.Helix.TableType.REALTIME).setTableName(RAW_DINING_TABLE_NAME)
             .setTimeColumnName("timeColumn").setTimeType("DAYS").
             setStreamConfigs(streamConfigs).build();
-    Schema schema = new Schema();
-    schema.setSchemaName(RAW_DINING_TABLE_NAME);
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(RAW_DINING_TABLE_NAME)
+        .addTime("timeColumn", TimeUnit.DAYS, FieldSpec.DataType.INT).build();
     _helixResourceManager.addOrUpdateSchema(schema);
     _helixResourceManager.addTable(realtimeTimeConfig);
     _helixBrokerStarter.getHelixExternalViewBasedRouting()
@@ -258,7 +259,7 @@ public class HelixBrokerStarterTest extends ControllerTest {
     TimeBoundaryService.TimeBoundaryInfo tbi = _helixBrokerStarter.getHelixExternalViewBasedRouting().
         getTimeBoundaryService().getTimeBoundaryInfoFor(DINING_TABLE_NAME);
 
-    Assert.assertEquals(tbi.getTimeValue(), Long.toString(currentTimeBoundary));
+    Assert.assertEquals(tbi.getTimeValue(), Long.toString(currentTimeBoundary - 1));
 
     List<String> segmentNames = _helixResourceManager.getSegmentsFor(DINING_TABLE_NAME);
     long endTime = currentTimeBoundary + 10;
