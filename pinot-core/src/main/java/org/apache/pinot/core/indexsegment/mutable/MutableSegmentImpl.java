@@ -29,6 +29,7 @@ import java.util.Set;
 import org.apache.pinot.common.config.SegmentPartitionConfig;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.common.metadata.RowMetadata;
 import org.apache.pinot.common.segment.SegmentMetadata;
 import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.core.data.GenericRow;
@@ -211,7 +212,7 @@ public class MutableSegmentImpl implements MutableSegment {
   }
 
   @Override
-  public boolean index(GenericRow row, StreamMessageMetadata msgMetadata) {
+  public boolean index(GenericRow row, RowMetadata rowMetadata) {
 
     boolean canTakeMore;
     // Update dictionary first
@@ -240,8 +241,8 @@ public class MutableSegmentImpl implements MutableSegment {
 
     _lastIndexedTimestamp = System.currentTimeMillis();
 
-    if (msgMetadata != null) {
-      _latestIngestionTimestamp = Math.max(_latestIngestionTimestamp, msgMetadata.getIngestionTimestamp());
+    if (rowMetadata != null) {
+      _latestIngestionTimestamp = Math.max(_latestIngestionTimestamp, rowMetadata.getIngestionTimestamp());
     }
     return canTakeMore;
   }

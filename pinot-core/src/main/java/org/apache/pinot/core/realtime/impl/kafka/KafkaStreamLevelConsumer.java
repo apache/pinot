@@ -22,6 +22,7 @@ import com.yammer.metrics.core.Meter;
 import kafka.consumer.ConsumerIterator;
 import kafka.javaapi.consumer.ConsumerConnector;
 import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.common.metadata.RowMetadata;
 import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -87,11 +88,12 @@ public class KafkaStreamLevelConsumer implements StreamLevelConsumer {
     return next(destination, null);
   }
 
+  // NOTE: currently metadata is not updated as the simple consumer does not expose the relevant information
   @Override
-  public GenericRow next(GenericRow destination, StreamMessageMetadata metadata) {
+  public GenericRow next(GenericRow destination, RowMetadata metadata) {
     if (kafkaIterator.hasNext()) {
       try {
-        destination = _messageDecoder.decode(kafkaIterator.next().message(), destination, metadata);
+        destination = _messageDecoder.decode(kafkaIterator.next().message(), destination);
         tableAndStreamRowsConsumed = _serverMetrics
             .addMeteredTableValue(_tableAndStreamName, ServerMeter.REALTIME_ROWS_CONSUMED, 1L,
                 tableAndStreamRowsConsumed);

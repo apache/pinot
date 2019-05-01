@@ -20,6 +20,7 @@ package org.apache.pinot.core.realtime.stream;
 
 import org.apache.pinot.annotations.InterfaceAudience;
 import org.apache.pinot.annotations.InterfaceStability;
+import org.apache.pinot.common.metadata.RowMetadata;
 import org.apache.pinot.core.data.GenericRow;
 
 
@@ -47,10 +48,9 @@ public interface StreamLevelConsumer {
   /**
    * Get next row from the stream and decode it into a generic row
    * @param destination the decoded generic row
-   * @param metadata the metadata associated with the decoded stream if any
    * @return the decoded generic row
    */
-  default GenericRow next(GenericRow destination, StreamMessageMetadata metadata) {
+  default GenericRow next(GenericRow destination, RowMetadata metadata) {
     return next(destination);
   }
 

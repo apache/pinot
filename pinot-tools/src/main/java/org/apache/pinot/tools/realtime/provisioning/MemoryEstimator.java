@@ -134,7 +134,7 @@ public class MemoryEstimator {
     try (PinotSegmentRecordReader segmentRecordReader = new PinotSegmentRecordReader(_sampleCompletedSegment);) {
       GenericRow row = new GenericRow();
       while (segmentRecordReader.hasNext()) {
-        messageMetadata.reset();
+        messageMetadata.clear();
 
         segmentRecordReader.next(row);
         mutableSegmentImpl.index(row, messageMetadata);

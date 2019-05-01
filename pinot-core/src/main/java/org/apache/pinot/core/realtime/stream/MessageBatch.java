@@ -20,6 +20,7 @@ package org.apache.pinot.core.realtime.stream;
 
 import org.apache.pinot.annotations.InterfaceAudience;
 import org.apache.pinot.annotations.InterfaceStability;
+import org.apache.pinot.common.metadata.RowMetadata;
 
 
 /**
@@ -62,9 +63,9 @@ public interface MessageBatch<T> {
    * when the message was ingested by the upstream stream-provider and other relevant metadata.
    *
    */
-  default void getMetadataAtIndex(int index, StreamMessageMetadata metadata) {
+  default RowMetadata getMetadataAtIndex(int index) {
     // update metadata as required - default implementation does nothing
-    return;
+    return null;
   }
 
   /**

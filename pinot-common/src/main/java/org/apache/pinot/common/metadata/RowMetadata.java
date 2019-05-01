@@ -16,28 +16,21 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.indexsegment.mutable;
+package org.apache.pinot.common.metadata;
 
-import org.apache.pinot.common.metadata.RowMetadata;
-import org.apache.pinot.core.data.GenericRow;
-import org.apache.pinot.core.indexsegment.IndexSegment;
+import org.apache.pinot.annotations.InterfaceAudience;
 
 
-public interface MutableSegment extends IndexSegment {
-
-  /**
-   * Indexes a record into the segment with optionally provided metadata.
-   *
-   * @param row Record represented as a {@link GenericRow}
-   * @param rowMetadata the metadata associated with the message
-   * @return Whether the segment is full (i.e. cannot index more record into it)
-   */
-   boolean index(GenericRow row, RowMetadata rowMetadata);
+/**
+ * A class that provides relevant row-level metadata for rows ingested into a segment.
+ *
+ * Currently this is relevant for rows ingested into a mutable segment.
+ */
+@InterfaceAudience.Public
+public interface RowMetadata {
 
   /**
-   * Returns the number of records already indexed into the segment.
-   *
-   * @return The number of records indexed
+   * Return the ingestion timestamp of the row.
    */
-  int getNumDocsIndexed();
+  long getIngestionTimestamp();
 }
