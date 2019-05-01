@@ -73,7 +73,7 @@ public abstract class GeneratorBasedRoutingTableBuilder extends BaseRoutingTable
     return new ImmutablePair<>(routingTable, variance);
   }
 
-  Map<String, List<String>> generateRoutingTable(Map<String, List<String>> segmentToServersMap) {
+  private Map<String, List<String>> generateRoutingTable(Map<String, List<String>> segmentToServersMap) {
 
     Map<String, List<String>> routingTable = new HashMap<>();
 
@@ -86,11 +86,7 @@ public abstract class GeneratorBasedRoutingTableBuilder extends BaseRoutingTable
     for (Map.Entry<String, List<String>> entry : segmentToServersMap.entrySet()) {
       List<String> servers = entry.getValue();
       for (String serverName : servers) {
-        List<String> segmentsForServer = serverToSegmentsMap.get(serverName);
-        if (segmentsForServer == null) {
-          segmentsForServer = new ArrayList<>();
-          serverToSegmentsMap.put(serverName, segmentsForServer);
-        }
+        List<String> segmentsForServer = serverToSegmentsMap.computeIfAbsent(serverName, k -> new ArrayList<>());
         segmentsForServer.add(entry.getKey());
       }
     }
@@ -134,12 +130,7 @@ public abstract class GeneratorBasedRoutingTableBuilder extends BaseRoutingTable
 
     // Sort all the segments to be used during assignment in ascending order of replicas
     PriorityQueue<Pair<String, List<String>>> segmentToReplicaSetQueue =
-        new PriorityQueue<>(numSegments, new Comparator<Pair<String, List<String>>>() {
-          @Override
-          public int compare(Pair<String, List<String>> firstPair, Pair<String, List<String>> secondPair) {
-            return Integer.compare(firstPair.getRight().size(), secondPair.getRight().size());
-          }
-        });
+        new PriorityQueue<>(numSegments, Comparator.comparingInt(pair -> pair.getRight().size()));
 
     for (Map.Entry<String, List<String>> entry : segmentToServersMap.entrySet()) {
       // Servers for the segment is the intersection of all servers for this segment and the servers that we have in
@@ -157,11 +148,8 @@ public abstract class GeneratorBasedRoutingTableBuilder extends BaseRoutingTable
       List<String> serversForSegment = segmentServersPair.getRight();
 
       String serverWithLeastSegmentsAssigned = getServerWithLeastSegmentsAssigned(serversForSegment, routingTable);
-      List<String> segmentsAssignedToServer = routingTable.get(serverWithLeastSegmentsAssigned);
-      if (segmentsAssignedToServer == null) {
-        segmentsAssignedToServer = new ArrayList<>();
-        routingTable.put(serverWithLeastSegmentsAssigned, segmentsAssignedToServer);
-      }
+      List<String> segmentsAssignedToServer =
+          routingTable.computeIfAbsent(serverWithLeastSegmentsAssigned, k -> new ArrayList<>());
       segmentsAssignedToServer.add(segmentName);
     }
 

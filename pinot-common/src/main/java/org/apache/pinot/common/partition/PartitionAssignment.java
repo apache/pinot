@@ -32,8 +32,8 @@ import org.apache.pinot.common.utils.EqualityUtils;
  */
 public class PartitionAssignment {
 
-  protected String _tableName;
-  protected Map<String, List<String>> _partitionToInstances;
+  private String _tableName;
+  private Map<String, List<String>> _partitionToInstances;
 
   public PartitionAssignment(String tableName) {
     _tableName = tableName;

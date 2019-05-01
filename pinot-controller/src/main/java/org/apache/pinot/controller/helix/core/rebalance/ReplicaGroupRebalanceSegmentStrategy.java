@@ -206,7 +206,7 @@ public class ReplicaGroupRebalanceSegmentStrategy implements RebalanceSegmentStr
       int currentNewReplicaGroupId = 0;
       for (int groupId = 0; groupId < oldNumReplicaGroup; groupId++) {
         List<String> oldReplicaGroup =
-            oldReplicaGroupPartitionAssignment.getInstancesfromReplicaGroup(partitionId, groupId);
+            oldReplicaGroupPartitionAssignment.getInstancesFromReplicaGroup(partitionId, groupId);
         List<String> newReplicaGroup = new ArrayList<>();
         boolean removeGroup = false;
 
@@ -373,7 +373,7 @@ public class ReplicaGroupRebalanceSegmentStrategy implements RebalanceSegmentStr
       List<String> referenceReplicaGroup = new ArrayList<>();
       for (int replicaId = 0; replicaId < numReplicaGroups; replicaId++) {
         List<String> serversInReplicaGroup =
-            replicaGroupPartitionAssignment.getInstancesfromReplicaGroup(partitionId, replicaId);
+            replicaGroupPartitionAssignment.getInstancesFromReplicaGroup(partitionId, replicaId);
         if (replicaId == 0) {
           // We need to keep the first replica group in case of mirroring.
           referenceReplicaGroup.addAll(serversInReplicaGroup);
