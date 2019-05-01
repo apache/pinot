@@ -371,6 +371,13 @@
                       <arg value="java:beans" />
                       <arg value="-o" />
                       <arg value="target/generated-sources" />
+                      <arg value="src/thrift/query.thrift" />
+                    </exec>
+                    <exec executable="/usr/local/bin/thrift">
+                      <arg value="--gen" />
+                      <arg value="java:beans" />
+                      <arg value="-o" />
+                      <arg value="target/generated-sources" />
                       <arg value="src/thrift/request.thrift" />
                     </exec>
                     <exec executable="/usr/local/bin/thrift">
@@ -380,6 +387,7 @@
                       <arg value="target/generated-sources" />
                       <arg value="src/thrift/response.thrift" />
                     </exec>
+
                     <copy todir="src/main/java/">
                       <fileset dir="target/generated-sources/gen-javabean" />
                     </copy>
