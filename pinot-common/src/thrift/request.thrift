@@ -17,6 +17,7 @@
  * under the License.
  */
 namespace java org.apache.pinot.common.request
+include "query.thrift"
 
 /**
  * AUTO GENERATED: DO NOT EDIT
@@ -152,6 +153,7 @@ struct BrokerRequest {
  14: optional map<string, string> queryOptions;
  15: optional HavingFilterQuery havingFilterQuery;
  16: optional HavingFilterQueryMap havingFilterSubQueryMap;
+ 17: optional query.PinotQuery pinotQuery;
 }
 
 /**

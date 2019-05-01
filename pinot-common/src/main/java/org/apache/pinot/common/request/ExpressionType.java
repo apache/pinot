@@ -29,17 +29,14 @@ import java.util.Map;
 import java.util.HashMap;
 import org.apache.thrift.TEnum;
 
-/**
- * AUTO GENERATED: DO NOT EDIT
- * Filter Operator
- * 
- */
-public enum FilterOperator implements org.apache.thrift.TEnum {
-  AND(0), OR(1), EQUALITY(2), NOT(3), RANGE(4), REGEXP_LIKE(5), NOT_IN(6), IN(7);
+public enum ExpressionType implements org.apache.thrift.TEnum {
+  LITERAL(0),
+  IDENTIFIER(1),
+  FUNCTION(2);
 
   private final int value;
 
-  private FilterOperator(int value) {
+  private ExpressionType(int value) {
     this.value = value;
   }
 
@@ -54,24 +51,14 @@ public enum FilterOperator implements org.apache.thrift.TEnum {
    * Find a the enum type by its integer value, as defined in the Thrift IDL.
    * @return null if the value is not found.
    */
-  public static FilterOperator findByValue(int value) { 
+  public static ExpressionType findByValue(int value) { 
     switch (value) {
       case 0:
-        return AND;
+        return LITERAL;
       case 1:
-        return OR;
+        return IDENTIFIER;
       case 2:
-        return EQUALITY;
-      case 3:
-        return NOT;
-      case 4:
-        return RANGE;
-      case 5:
-        return REGEXP_LIKE;
-      case 6:
-        return NOT_IN;
-      case 7:
-        return IN;
+        return FUNCTION;
       default:
         return null;
     }
