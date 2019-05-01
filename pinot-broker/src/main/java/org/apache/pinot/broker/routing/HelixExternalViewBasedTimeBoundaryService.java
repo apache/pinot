@@ -66,26 +66,26 @@ public class HelixExternalViewBasedTimeBoundaryService implements TimeBoundarySe
     // TODO: when we start using dateTime, pick the time column from the retention config, and use the DateTimeFieldSpec
     //       from the schema to determine the time unit
     // TODO: support SDF
-    TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
-    assert tableConfig != null;
-    SegmentsValidationAndRetentionConfig retentionConfig = tableConfig.getValidationConfig();
-    String timeColumn = retentionConfig.getTimeColumnName();
-    TimeUnit tableTimeUnit = retentionConfig.getTimeType();
+    Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, tableNameWithType);
+    assert schema != null;
+    String timeColumn = schema.getTimeColumnName();
+    TimeUnit tableTimeUnit = schema.getOutgoingTimeUnit();
     if (timeColumn == null || tableTimeUnit == null) {
       LOGGER.error("Skipping updating time boundary for table: '{}' because time column/unit is not set",
           tableNameWithType);
       return;
     }
 
-    Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, tableNameWithType);
-    assert schema != null;
-    if (!timeColumn.equals(schema.getTimeColumnName())) {
-      LOGGER.error("Time column does not match in table config: '{}' and schema: '{}'", timeColumn,
-          schema.getTimeColumnName());
+    TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
+    assert tableConfig != null;
+    SegmentsValidationAndRetentionConfig retentionConfig = tableConfig.getValidationConfig();
+    if (!timeColumn.equals(retentionConfig.getTimeColumnName())) {
+      LOGGER.error("Time column does not match in schema: '{}' and table config: '{}'", timeColumn,
+          retentionConfig.getTimeColumnName());
     }
-    if (tableTimeUnit != schema.getOutgoingTimeUnit()) {
-      LOGGER.error("Time unit does not match in table config: '{}' and schema: '{}'", tableTimeUnit,
-          schema.getOutgoingTimeUnit());
+    if (tableTimeUnit != retentionConfig.getTimeType()) {
+      LOGGER.error("Time unit does not match in schema: '{}' and table config: '{}'", tableTimeUnit,
+          retentionConfig.getTimeType());
     }
 
     // Bulk reading all segment ZK metadata is more efficient than reading one at a time
@@ -103,15 +103,6 @@ public class HelixExternalViewBasedTimeBoundaryService implements TimeBoundarySe
         continue;
       }
 
-      // Check if time unit in segment ZK metadata matches table time unit
-      // NOTE: for now, time unit in segment ZK metadata should always match table time unit, but in the future we might
-      //       want to always use MILLISECONDS as the time unit in segment ZK metadata
-      TimeUnit segmentTimeUnit = segmentZKMetadata.getTimeUnit();
-      if (segmentTimeUnit != tableTimeUnit) {
-        LOGGER.warn("Time unit for table: '{}', segment: '{}' ZK metadata: {} does not match the table time unit: {}",
-            tableNameWithType, segmentName, segmentTimeUnit, tableTimeUnit);
-      }
-
       long segmentEndTime = segmentZKMetadata.getEndTime();
       if (segmentEndTime <= 0) {
         LOGGER
@@ -121,7 +112,9 @@ public class HelixExternalViewBasedTimeBoundaryService implements TimeBoundarySe
       }
 
       // Convert segment end time into table time unit
-      maxTimeValue = Math.max(maxTimeValue, tableTimeUnit.convert(segmentEndTime, segmentTimeUnit));
+      // NOTE: for now, time unit in segment ZK metadata should always match table time unit, but in the future we might
+      //       want to always use MILLISECONDS as the time unit in segment ZK metadata
+      maxTimeValue = Math.max(maxTimeValue, tableTimeUnit.convert(segmentEndTime, segmentZKMetadata.getTimeUnit()));
     }
 
     if (maxTimeValue == -1L) {

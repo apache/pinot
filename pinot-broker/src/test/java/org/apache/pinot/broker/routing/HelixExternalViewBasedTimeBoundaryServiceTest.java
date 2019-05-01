@@ -78,14 +78,16 @@ public class HelixExternalViewBasedTimeBoundaryServiceTest {
     HelixExternalViewBasedTimeBoundaryService timeBoundaryService =
         new HelixExternalViewBasedTimeBoundaryService(_propertyStore);
 
-    int tableIndex = 0;
+    int tableIndex = 1;
     for (TimeUnit timeUnit : TimeUnit.values()) {
       String rawTableName = "table" + tableIndex;
       String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
       String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(rawTableName);
       addTableConfig(rawTableName, timeUnit, "daily");
       addSchema(rawTableName, timeUnit);
-      addSegmentZKMetadata(rawTableName, 10 + tableIndex, timeUnit);
+
+      int endTimeInDays = tableIndex;
+      addSegmentZKMetadata(rawTableName, endTimeInDays, timeUnit);
 
       // Should skip real-time external view
       ExternalView externalView = constructRealtimeExternalView(realtimeTableName);
@@ -101,7 +103,7 @@ public class HelixExternalViewBasedTimeBoundaryServiceTest {
       TimeBoundaryInfo timeBoundaryInfo = timeBoundaryService.getTimeBoundaryInfoFor(offlineTableName);
       assertNotNull(timeBoundaryInfo);
       assertEquals(timeBoundaryInfo.getTimeColumn(), TIME_COLUMN);
-      assertEquals(Long.parseLong(timeBoundaryInfo.getTimeValue()), timeUnit.convert(9 + tableIndex, TimeUnit.DAYS));
+      assertEquals(Long.parseLong(timeBoundaryInfo.getTimeValue()), timeUnit.convert(endTimeInDays - 1, TimeUnit.DAYS));
 
       // Test HOURLY push frequency
       addTableConfig(rawTableName, timeUnit, "hourly");
@@ -113,10 +115,10 @@ public class HelixExternalViewBasedTimeBoundaryServiceTest {
       assertEquals(timeBoundaryInfo.getTimeColumn(), TIME_COLUMN);
       long timeValue = Long.parseLong(timeBoundaryInfo.getTimeValue());
       if (timeUnit == TimeUnit.DAYS) {
-        assertEquals(timeValue, timeUnit.convert(9 + tableIndex, TimeUnit.DAYS));
+        assertEquals(timeValue, timeUnit.convert(endTimeInDays - 1, TimeUnit.DAYS));
       } else {
         assertEquals(timeValue,
-            timeUnit.convert(TimeUnit.HOURS.convert(10 + tableIndex, TimeUnit.DAYS) - 1, TimeUnit.HOURS));
+            timeUnit.convert(TimeUnit.HOURS.convert(endTimeInDays, TimeUnit.DAYS) - 1, TimeUnit.HOURS));
       }
 
       tableIndex++;
@@ -137,8 +139,8 @@ public class HelixExternalViewBasedTimeBoundaryServiceTest {
             .build());
   }
 
-  private void addSegmentZKMetadata(String rawTableName, int numSegments, TimeUnit timeUnit) {
-    for (int i = 1; i <= numSegments; i++) {
+  private void addSegmentZKMetadata(String rawTableName, int endTimeInDays, TimeUnit timeUnit) {
+    for (int i = 1; i <= endTimeInDays; i++) {
       OfflineSegmentZKMetadata offlineSegmentZKMetadata = new OfflineSegmentZKMetadata();
       offlineSegmentZKMetadata.setTableName(rawTableName);
       offlineSegmentZKMetadata.setSegmentName(rawTableName + i);
