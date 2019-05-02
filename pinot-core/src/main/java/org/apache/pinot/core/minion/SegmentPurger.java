@@ -21,12 +21,14 @@ package org.apache.pinot.core.minion;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.data.StarTreeIndexSpec;
-import org.apache.pinot.common.segment.SegmentMetadata;
+import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.common.segment.StarTreeMetadata;
 import org.apache.pinot.core.data.GenericRow;
 import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
@@ -34,6 +36,8 @@ import org.apache.pinot.core.data.readers.RecordReader;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
+import org.apache.pinot.core.segment.store.ColumnIndexType;
+import org.apache.pinot.core.segment.store.SegmentDirectory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -65,7 +69,7 @@ public class SegmentPurger {
 
   public File purgeSegment()
       throws Exception {
-    SegmentMetadata segmentMetadata = new SegmentMetadataImpl(_originalIndexDir);
+    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(_originalIndexDir);
     String tableName = segmentMetadata.getTableName();
     String segmentName = segmentMetadata.getName();
     LOGGER.info("Start purging table: {}, segment: {}", tableName, segmentName);
@@ -81,7 +85,8 @@ public class SegmentPurger {
         return null;
       }
 
-      SegmentGeneratorConfig config = new SegmentGeneratorConfig(purgeRecordReader.getSchema());
+      Schema schema = purgeRecordReader.getSchema();
+      SegmentGeneratorConfig config = new SegmentGeneratorConfig(schema);
       config.setOutDir(_workingDir.getPath());
       config.setTableName(tableName);
       config.setSegmentName(segmentName);
@@ -100,13 +105,27 @@ public class SegmentPurger {
         config.setSegmentTimeUnit(segmentMetadata.getTimeUnit());
       }
 
+      // Generate inverted index if it exists in the original segment
+      // TODO: once the column metadata correctly reflects whether inverted index exists for the column, use that
+      //       instead of reading the segment
+      // TODO: uniform the behavior of Pinot Hadoop segment generation, segment converter and purger
+      List<String> invertedIndexCreationColumns = new ArrayList<>();
+      try (SegmentDirectory segmentDirectory = SegmentDirectory
+          .createFromLocalFS(_originalIndexDir, segmentMetadata, ReadMode.mmap);
+          SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
+        for (String column : schema.getColumnNames()) {
+          if (reader.hasIndexFor(column, ColumnIndexType.INVERTED_INDEX)) {
+            invertedIndexCreationColumns.add(column);
+          }
+        }
+      }
+      config.setInvertedIndexCreationColumns(invertedIndexCreationColumns);
+
       // Generate star-tree if it exists in the original segment
       StarTreeMetadata starTreeMetadata = segmentMetadata.getStarTreeMetadata();
       if (starTreeMetadata != null) {
         config.enableStarTreeIndex(StarTreeIndexSpec.fromStarTreeMetadata(starTreeMetadata));
       }
-
-      // TODO: currently we don't generate inverted index
 
       SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
       purgeRecordReader.rewind();
@@ -152,7 +171,6 @@ public class SegmentPurger {
 
     @Override
     public void init(SegmentGeneratorConfig segmentGeneratorConfig) {
-
     }
 
     @Override
