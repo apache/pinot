@@ -459,7 +459,7 @@ public class DetectionResource {
       return Response.serverError().entity(responseMessage).build();
     }
 
-    LOG.info("Replay detection pipeline {} generated {} anomalies.", detectionId, result.anomalies.size());
+    LOG.info("Replay detection pipeline {} generated {} anomalies.", detectionId, result.getAnomalies().size());
     return Response.ok(result).build();
   }
 

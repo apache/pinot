@@ -30,6 +30,7 @@ import org.apache.commons.collections.MapUtils;
 import org.apache.pinot.thirdeye.anomaly.detection.DetectionJobSchedulerUtils;
 import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.common.time.TimeSpec;
+import org.apache.pinot.thirdeye.dataframe.DataFrame;
 import org.apache.pinot.thirdeye.dataframe.DoubleSeries;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
 import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFunctionDTO;
@@ -42,9 +43,11 @@ import org.apache.pinot.thirdeye.detection.DetectionPipeline;
 import org.apache.pinot.thirdeye.detection.DetectionPipelineException;
 import org.apache.pinot.thirdeye.detection.DetectionPipelineResult;
 import org.apache.pinot.thirdeye.detection.DetectionUtils;
+import org.apache.pinot.thirdeye.detection.PredictionResult;
 import org.apache.pinot.thirdeye.detection.spi.components.AnomalyDetector;
 import org.apache.pinot.thirdeye.detection.spi.exception.DetectorDataInsufficientException;
 import org.apache.pinot.thirdeye.detection.spi.model.DetectionResult;
+import org.apache.pinot.thirdeye.detection.spi.model.TimeSeries;
 import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
 import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
 import org.joda.time.DateTime;
@@ -159,6 +162,7 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
 
     List<Interval> monitoringWindows = this.getMonitoringWindows();
     List<MergedAnomalyResultDTO> anomalies = new ArrayList<>();
+    TimeSeries predictedResult = TimeSeries.empty();
     int totalWindows = monitoringWindows.size();
     int successWindows = 0;
     // The last exception of the detection windows. It will be thrown out to upper level.
@@ -188,6 +192,7 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
         lastException = e;
       }
       anomalies.addAll(detectionResult.getAnomalies());
+      predictedResult = consolidateTimeSeries(predictedResult, detectionResult.getTimeseries());
     }
 
     checkMovingWindowDetectionStatus(totalWindows, successWindows, lastException);
@@ -202,7 +207,43 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
     }
     long lastTimeStamp = this.getLastTimeStamp();
     return new DetectionPipelineResult(anomalies.stream().filter(anomaly -> anomaly.getEndTime() <= lastTimeStamp).collect(
-        Collectors.toList()), lastTimeStamp);
+        Collectors.toList()), lastTimeStamp, Collections.singletonList(new PredictionResult(this.detectorName, this.metricUrn, predictedResult)));
+  }
+
+  TimeSeries consolidateTimeSeries(TimeSeries ts1, TimeSeries ts2) {
+    DataFrame df1 = ts1.getDataFrame();
+    DataFrame df2 = ts2.getDataFrame();
+    DataFrame joinedDf = df1.joinOuter(df2, COL_TIME);
+    consolidateJoinedDf(joinedDf, COL_VALUE);
+    consolidateJoinedDf(joinedDf, COL_CURRENT);
+    consolidateJoinedDf(joinedDf, COL_LOWER_BOUND);
+    consolidateJoinedDf(joinedDf, COL_UPPER_BOUND);
+    return TimeSeries.fromDataFrame(joinedDf);
+  }
+
+  private void consolidateJoinedDf(DataFrame joinedDf, String columnName) {
+    String columnNameLeft = columnName + DataFrame.COLUMN_JOIN_LEFT;
+    String columnNameRight = columnName + DataFrame.COLUMN_JOIN_RIGHT;
+    if (joinedDf.contains(columnNameLeft) && joinedDf.contains(columnNameRight)) {
+      joinedDf.addSeries(columnName, robustAverage(joinedDf.getDoubles(columnNameLeft), joinedDf.getDoubles(columnNameRight)));
+    }
+  }
+
+  private DoubleSeries robustAverage(DoubleSeries s1, DoubleSeries s2) {
+    Preconditions.checkArgument(s1.size() == s2.size());
+    double[] series = new double[s1.size()];
+    for (int i = 0 ; i < s1.size() ; i++) {
+      double num;
+      if (s1.isNull(i) && !s2.isNull(i)) {
+        num = s2.get(i);
+      } else if (!s1.isNull(i) && s2.isNull(i)) {
+        num = s1.get(i);
+      } else {
+        num = (s1.get(i) + s2.get(i)) / 2;
+      }
+      series[i] = num;
+    }
+    return DoubleSeries.buildFrom(series);
   }
 
   private void checkEarlyStop(int totalWindows, int successWindows, int i, Exception lastException) throws DetectionPipelineException {

@@ -19,6 +19,7 @@
 
 package org.apache.pinot.thirdeye.detection;
 
+import java.util.Collections;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import java.util.HashMap;
 import java.util.List;
@@ -29,38 +30,42 @@ public class DetectionPipelineResult {
   public static String DIAGNOSTICS_DATA = "data";
   public static String DIAGNOSTICS_CHANGE_POINTS = "changepoints";
 
-  Map<String, Object> diagnostics;
-  List<MergedAnomalyResultDTO> anomalies;
-  long lastTimestamp;
+  private final List<MergedAnomalyResultDTO> anomalies;
+  private final long lastTimestamp;
+  private final List<PredictionResult> predictedTimeSeries;
+  private Map<String, Object> diagnostics;
 
   public DetectionPipelineResult(List<MergedAnomalyResultDTO> anomalies) {
     this.anomalies = anomalies;
     this.lastTimestamp = getMaxTime(anomalies);
     this.diagnostics = new HashMap<>();
+    this.predictedTimeSeries = Collections.emptyList();
   }
 
   public DetectionPipelineResult(List<MergedAnomalyResultDTO> anomalies, long lastTimestamp) {
     this.anomalies = anomalies;
     this.lastTimestamp = lastTimestamp;
+    this.predictedTimeSeries = Collections.emptyList();
+    this.diagnostics = new HashMap<>();
+  }
+
+  public DetectionPipelineResult(List<MergedAnomalyResultDTO> anomalies, long lastTimestamp,
+      List<PredictionResult> predictedTimeSeries) {
+    this.anomalies = anomalies;
+    this.lastTimestamp = lastTimestamp;
+    this.predictedTimeSeries = predictedTimeSeries;
+    this.diagnostics = new HashMap<>();
   }
 
   public List<MergedAnomalyResultDTO> getAnomalies() {
     return anomalies;
   }
 
-  public DetectionPipelineResult setAnomalies(List<MergedAnomalyResultDTO> anomalies) {
-    this.anomalies = anomalies;
-    return this;
-  }
 
   public long getLastTimestamp() {
     return lastTimestamp;
   }
 
-  public DetectionPipelineResult setLastTimestamp(long lastTimestamp) {
-    this.lastTimestamp = lastTimestamp;
-    return this;
-  }
 
   public Map<String, Object> getDiagnostics() {
     return diagnostics;

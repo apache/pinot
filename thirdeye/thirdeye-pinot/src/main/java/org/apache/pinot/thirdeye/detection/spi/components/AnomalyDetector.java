@@ -19,6 +19,7 @@
 
 package org.apache.pinot.thirdeye.detection.spi.components;
 
+import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.detection.spec.AbstractSpec;
 import org.apache.pinot.thirdeye.detection.spi.exception.DetectorException;
 import org.apache.pinot.thirdeye.detection.spi.model.DetectionResult;
