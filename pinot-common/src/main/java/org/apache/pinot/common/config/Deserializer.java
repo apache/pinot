@@ -349,24 +349,26 @@ public class Deserializer {
         } else if (value instanceof String) {
           String stringValue = (String) value;
           try {
-            if (Integer.class.isAssignableFrom(fieldType) || int.class
-                .isAssignableFrom(fieldType)) { // field instanceof int/Integer
+            if (fieldType.isAssignableFrom(Integer.class) || fieldType.isAssignableFrom(int.class)){
               destinationValue = Integer.parseInt(stringValue);
-            } else if (Long.class.isAssignableFrom(fieldType)) { // field instanceof long/Long
+            } else if (fieldType.isAssignableFrom(Long.class) || fieldType.isAssignableFrom(long.class)){
               destinationValue = Long.parseLong(stringValue);
-            } else if (Boolean.class.isAssignableFrom(fieldType) || boolean.class.isAssignableFrom(fieldType)) {
+            } else if (fieldType.isAssignableFrom(Boolean.class) || fieldType.isAssignableFrom(boolean.class)){
               destinationValue = Boolean.parseBoolean(stringValue);
-            } else if (Enum.class.isAssignableFrom(fieldType)) {
+            } else if (fieldType.isAssignableFrom(Enum.class)){
               destinationValue = Enum.valueOf(fieldType.asSubclass(Enum.class), stringValue.toUpperCase());
-            } else if (Float.class.isAssignableFrom(fieldType)){
+            } else if (fieldType.isAssignableFrom(Float.class) || fieldType.isAssignableFrom(float.class)){
               destinationValue = Float.parseFloat(stringValue);
-            } else if (Double.class.isAssignableFrom(fieldType)){
+            } else if (fieldType.isAssignableFrom(Double.class) || fieldType.isAssignableFrom(double.class)){
               destinationValue = Double.parseDouble(stringValue);
-            } else if (Short.class.isAssignableFrom(fieldType)){
+            } else if (fieldType.isAssignableFrom(Short.class) || fieldType.isAssignableFrom(short.class)){
               destinationValue = Short.parseShort(stringValue);
-            } else if (Character.class.isAssignableFrom(fieldType)){
+            } else if (fieldType.isAssignableFrom(Byte.class) || fieldType.isAssignableFrom(byte.class)){
+              destinationValue = stringValue.getBytes()[0];
+            } else if (fieldType.isAssignableFrom(Character.class) || fieldType.isAssignableFrom(char.class)){
               destinationValue = stringValue.charAt(0);
-            } else {
+            }
+            else {
               throw new RuntimeException("Unsupported conversion from " + objectType + " -> " + fieldType);
             }
           } catch (Exception e) {
