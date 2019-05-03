@@ -32,6 +32,7 @@ public abstract class AbstractSpec {
   public static <T extends AbstractSpec> T fromProperties(Map<String, Object> properties, Class<T> specClass) {
     // don't reuse model mapper instance. It caches typeMaps and will result in unexpected mappings
     ModelMapper modelMapper = new ModelMapper();
+    // use strict mapping to ensure no mismatches or ambiguity occurs
     modelMapper.getConfiguration().setMatchingStrategy(MatchingStrategies.STRICT);
     return modelMapper.map(properties, specClass);
   }

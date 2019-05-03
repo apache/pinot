@@ -68,9 +68,10 @@ public class AbstractSpecTest {
 
   @Test
   public void testAbstractSpecMappingAmbiguityFalse() {
-    TestSpec spec = AbstractSpec.fromProperties(ImmutableMap.of("upThreshold", 0.1), TestSpec.class);
-    Assert.assertEquals(spec.getUpThreshold(), 0.1);
-    Assert.assertEquals(spec.getThreshold(), 0.2);
+    TestSpec spec = AbstractSpec.fromProperties(ImmutableMap.of("upThreshold", 0.2, "downThreshold", 0.3), TestSpec.class);
+    Assert.assertEquals(spec.getUpThreshold(), 0.2);
+    Assert.assertEquals(spec.getThreshold(), 0.1);
+    Assert.assertEquals(spec.getDownThreshold(), 0.3);
   }
 
 }
