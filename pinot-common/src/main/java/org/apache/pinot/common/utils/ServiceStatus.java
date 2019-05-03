@@ -318,10 +318,11 @@ public class ServiceStatus {
           if ("ERROR".equals(currentStateStatus)) {
             LOGGER.error(String.format("Resource: %s, partition: %s is in ERROR state", resourceName, partitionName));
           } else {
+            HelixProperty.Stat stat = helixState.getStat();
             String description = String
                 .format("partition=%s, expected=%s, found=%s, creationTime=%d, modifiedTime=%d, version=%d", partitionName,
-                    idealStateStatus, currentStateStatus, helixState.getStat().getCreationTime(),
-                    helixState.getStat().getModifiedTime(), helixState.getStat().getVersion());
+                    idealStateStatus, currentStateStatus, stat != null ? stat.getCreationTime() : -1,
+                    stat != null ? stat.getModifiedTime() : -1, stat != null ? stat.getVersion() : -1);
             return new StatusDescriptionPair(Status.STARTING, description);
           }
         }
