@@ -27,6 +27,7 @@ import java.util.Set;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
+import org.apache.helix.HelixProperty;
 import org.apache.helix.PropertyKey;
 import org.apache.helix.model.CurrentState;
 import org.apache.helix.model.ExternalView;
@@ -131,7 +132,7 @@ public class ServiceStatus {
    * Service status callback that compares ideal state with another Helix state. Used to share most of the logic between
    * the ideal state/external view comparison and ideal state/current state comparison.
    */
-  private static abstract class IdealStateMatchServiceStatusCallback<T> implements ServiceStatusCallback {
+  private static abstract class IdealStateMatchServiceStatusCallback<T extends HelixProperty> implements ServiceStatusCallback {
     protected final String _clusterName;
     protected final String _instanceName;
     protected final HelixAdmin _helixAdmin;
@@ -317,8 +318,11 @@ public class ServiceStatus {
           if ("ERROR".equals(currentStateStatus)) {
             LOGGER.error(String.format("Resource: %s, partition: %s is in ERROR state", resourceName, partitionName));
           } else {
+            HelixProperty.Stat stat = helixState.getStat();
             String description = String
-                .format("partition=%s, expected=%s, found=%s", partitionName, idealStateStatus, currentStateStatus);
+                .format("partition=%s, expected=%s, found=%s, creationTime=%d, modifiedTime=%d, version=%d", partitionName,
+                    idealStateStatus, currentStateStatus, stat != null ? stat.getCreationTime() : -1,
+                    stat != null ? stat.getModifiedTime() : -1, stat != null ? stat.getVersion() : -1);
             return new StatusDescriptionPair(Status.STARTING, description);
           }
         }
