@@ -19,9 +19,11 @@
 package org.apache.pinot.pql.parsers.pql2.ast;
 
 import java.util.Collections;
+import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.FilterOperator;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
 import org.apache.pinot.common.utils.request.HavingQueryTree;
+import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.pql.parsers.Pql2CompilationException;
 
 
@@ -149,6 +151,46 @@ public class ComparisonPredicateAstNode extends PredicateAstNode {
 
       if (_identifier != null) {
         return new FilterQueryTree(_identifier, Collections.singletonList(comparison), FilterOperator.RANGE, null);
+      } else {
+        throw new Pql2CompilationException("One column is needed for comparison.");
+      }
+    }
+  }
+
+  @Override
+  public Expression buildFilterExpression() {
+    if (_identifier == null) {
+      throw new Pql2CompilationException("Comparison predicate has no identifier");
+    }
+
+    if ("=".equals(_operand)) {
+      if (_identifier != null && _literal != null) {
+        Expression expr = RequestUtils.getFunctionExpression(FilterOperator.EQUALITY.name());
+        expr.getFunctionCall().addToOperands(RequestUtils.getIdentifierExpression(_identifier));
+        expr.getFunctionCall().addToOperands(RequestUtils.getLiteralExpression(_literal.getValueAsString()));
+        return expr;
+      } else {
+        throw new Pql2CompilationException("Comparison is not between a column and a constant");
+      }
+    } else if ("<>".equals(_operand) || "!=".equals(_operand)) {
+      if (_identifier != null && _literal != null) {
+        Expression expr = RequestUtils.getFunctionExpression(FilterOperator.NOT.name());
+        expr.getFunctionCall().addToOperands(RequestUtils.getIdentifierExpression(_identifier));
+        expr.getFunctionCall().addToOperands(RequestUtils.getLiteralExpression(_literal.getValueAsString()));
+        return expr;
+      } else {
+        throw new Pql2CompilationException("Comparison is not between a column and a constant");
+      }
+    } else {
+      String comparison = createRangeStringForComparison();
+      if (comparison == null) {
+        throw new Pql2CompilationException("The comparison operator is not valid/is not supported for HAVING query");
+      }
+      if (_identifier != null) {
+        Expression expr = RequestUtils.getFunctionExpression(FilterOperator.RANGE.name());
+        expr.getFunctionCall().addToOperands(RequestUtils.getIdentifierExpression(_identifier));
+        expr.getFunctionCall().addToOperands(RequestUtils.getLiteralExpression(comparison));
+        return expr;
       } else {
         throw new Pql2CompilationException("One column is needed for comparison.");
       }

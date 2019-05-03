@@ -20,6 +20,7 @@ package org.apache.pinot.pql.parsers.pql2.ast;
 
 import java.util.List;
 import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.request.PinotQuery;
 
 
 /**
@@ -42,7 +43,11 @@ public interface AstNode {
 
   void updateBrokerRequest(BrokerRequest brokerRequest);
 
+  void updatePinotQuery(PinotQuery pinotQuery);
+
   void sendBrokerRequestUpdateToChildren(BrokerRequest brokerRequest);
+
+  void sendPinotQueryUpdateToChildren(PinotQuery pinotQuery);
 
   String toString(int indent);
 }

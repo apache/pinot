@@ -19,6 +19,7 @@
 package org.apache.pinot.pql.parsers.pql2.ast;
 
 import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.request.PinotQuery;
 
 
 /**
@@ -43,5 +44,10 @@ public class OutputColumnListAstNode extends BaseAstNode {
   @Override
   public void updateBrokerRequest(BrokerRequest brokerRequest) {
     sendBrokerRequestUpdateToChildren(brokerRequest);
+  }
+
+  @Override
+  public void updatePinotQuery(PinotQuery pinotQuery) {
+    sendPinotQueryUpdateToChildren(pinotQuery);
   }
 }

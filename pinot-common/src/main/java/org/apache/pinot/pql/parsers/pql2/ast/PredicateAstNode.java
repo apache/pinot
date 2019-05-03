@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.pql.parsers.pql2.ast;
 
+import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
 import org.apache.pinot.common.utils.request.HavingQueryTree;
 
@@ -36,6 +37,14 @@ public abstract class PredicateAstNode extends BaseAstNode {
    *
    */
   public abstract FilterQueryTree buildFilterQueryTree();
+
+  /**
+   * Create the query expression tree for the where clause
+   *
+   * @return
+   *
+   */
+  public abstract Expression buildFilterExpression();
 
   /**
    * Create the query tree for the having clause

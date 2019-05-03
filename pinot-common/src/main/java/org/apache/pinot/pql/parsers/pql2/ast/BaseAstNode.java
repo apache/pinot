@@ -21,6 +21,7 @@ package org.apache.pinot.pql.parsers.pql2.ast;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.request.PinotQuery;
 
 
 /**
@@ -72,10 +73,23 @@ public abstract class BaseAstNode implements AstNode {
   }
 
   @Override
+  public void updatePinotQuery(PinotQuery pinotQuery) {
+  }
+
+  @Override
   public void sendBrokerRequestUpdateToChildren(BrokerRequest brokerRequest) {
     if (hasChildren()) {
       for (AstNode child : _children) {
         child.updateBrokerRequest(brokerRequest);
+      }
+    }
+  }
+
+  @Override
+  public void sendPinotQueryUpdateToChildren(PinotQuery pinotQuery) {
+    if (hasChildren()) {
+      for (AstNode child : _children) {
+        child.updatePinotQuery(pinotQuery);
       }
     }
   }
