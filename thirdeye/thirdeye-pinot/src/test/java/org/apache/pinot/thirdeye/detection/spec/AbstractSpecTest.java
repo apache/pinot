@@ -65,5 +65,13 @@ public class AbstractSpecTest {
     Assert.assertEquals(spec.getC(), "default");
     Assert.assertEquals(spec.getConfiguration(), ImmutableMap.of("k1", "v1", "k2", "v2"));
   }
+
+  @Test
+  public void testAbstractSpecMappingAmbiguityFalse() {
+    TestSpec spec = AbstractSpec.fromProperties(ImmutableMap.of("upThreshold", 0.1), TestSpec.class);
+    Assert.assertEquals(spec.getUpThreshold(), 0.1);
+    Assert.assertEquals(spec.getThreshold(), 0.2);
+  }
+
 }
 

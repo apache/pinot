@@ -26,6 +26,8 @@ public class TestSpec extends AbstractSpec{
   private String c = "default";
   private RuleBaselineProvider baselineProvider;
   private Map<String, String> configuration;
+  private double threshold = 0.2;
+  private double upThreshold;
 
   public Map<String, String> getConfiguration() {
     return configuration;
@@ -65,6 +67,22 @@ public class TestSpec extends AbstractSpec{
 
   public void setC(String c) {
     this.c = c;
+  }
+
+  public double getThreshold() {
+    return threshold;
+  }
+
+  public void setThreshold(double threshold) {
+    this.threshold = threshold;
+  }
+
+  public double getUpThreshold() {
+    return upThreshold;
+  }
+
+  public void setUpThreshold(double upThreshold) {
+    this.upThreshold = upThreshold;
   }
 }
 
