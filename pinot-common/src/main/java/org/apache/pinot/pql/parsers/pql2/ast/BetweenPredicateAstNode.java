@@ -19,9 +19,12 @@
 package org.apache.pinot.pql.parsers.pql2.ast;
 
 import java.util.Collections;
+import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.FilterOperator;
+import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
 import org.apache.pinot.common.utils.request.HavingQueryTree;
+import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.pql.parsers.Pql2CompilationException;
 
 
@@ -72,6 +75,32 @@ public class BetweenPredicateAstNode extends PredicateAstNode {
         return new FilterQueryTree(_identifier,
             Collections.singletonList("[" + left.getValueAsString() + "\t\t" + right.getValueAsString() + "]"),
             FilterOperator.RANGE, null);
+      } catch (ClassCastException e) {
+        throw new Pql2CompilationException(
+            "BETWEEN clause was expecting two literal AST nodes, got " + getChildren().get(0) + " and " + getChildren()
+                .get(1));
+      }
+    } else {
+      throw new Pql2CompilationException("BETWEEN clause does not have two children nodes");
+    }
+  }
+
+  @Override
+  public Expression buildFilterExpression() {
+    if (_identifier == null) {
+      throw new Pql2CompilationException("Between predicate has no identifier");
+    }
+    if (getChildren().size() == 2) {
+      try {
+        LiteralAstNode left = (LiteralAstNode) getChildren().get(0);
+        LiteralAstNode right = (LiteralAstNode) getChildren().get(1);
+
+        final Expression betweenExpr = RequestUtils.getFunctionExpression(FilterOperator.RANGE.name());
+        final Function rangeFuncCall = betweenExpr.getFunctionCall();
+        rangeFuncCall.addToOperands(RequestUtils.getIdentifierExpression(_identifier));
+        rangeFuncCall.addToOperands(RequestUtils.getLiteralExpression(left.getValueAsString()));
+        rangeFuncCall.addToOperands(RequestUtils.getLiteralExpression(right.getValueAsString()));
+        return betweenExpr;
       } catch (ClassCastException e) {
         throw new Pql2CompilationException(
             "BETWEEN clause was expecting two literal AST nodes, got " + getChildren().get(0) + " and " + getChildren()

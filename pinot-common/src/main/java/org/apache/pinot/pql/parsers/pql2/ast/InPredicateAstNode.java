@@ -23,10 +23,12 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.TreeSet;
+import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.FilterOperator;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
 import org.apache.pinot.common.utils.request.HavingQueryTree;
+import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.pql.parsers.Pql2CompilationException;
 
 
@@ -109,6 +111,28 @@ public class InPredicateAstNode extends PredicateAstNode {
     }
 
     return new FilterQueryTree(_identifier, new ArrayList<>(values), filterOperator, null);
+  }
+
+  @Override
+  public Expression buildFilterExpression() {
+    if (_identifier == null) {
+      throw new Pql2CompilationException("IN predicate has no identifier");
+    }
+    FilterOperator filterOperator;
+    if (_isNotInClause) {
+      filterOperator = FilterOperator.NOT_IN;
+    } else {
+      filterOperator = FilterOperator.IN;
+    }
+    Expression expr = RequestUtils.getFunctionExpression(filterOperator.name());
+    expr.getFunctionCall().addToOperands(RequestUtils.getIdentifierExpression(_identifier));
+    for (AstNode astNode : getChildren()) {
+      if (astNode instanceof LiteralAstNode) {
+        LiteralAstNode node = (LiteralAstNode) astNode;
+        expr.getFunctionCall().addToOperands(RequestUtils.getLiteralExpression(node.getValueAsString()));
+      }
+    }
+    return expr;
   }
 
   @Override

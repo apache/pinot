@@ -23,12 +23,16 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import javax.annotation.Nonnull;
+import org.apache.pinot.common.request.Expression;
+import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.utils.EqualityUtils;
+import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.apache.pinot.pql.parsers.pql2.ast.AstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.FunctionCallAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.IdentifierAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.LiteralAstNode;
+import org.apache.pinot.pql.parsers.pql2.ast.PredicateAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.StringLiteralAstNode;
 
 
@@ -42,6 +46,31 @@ import org.apache.pinot.pql.parsers.pql2.ast.StringLiteralAstNode;
  */
 public class TransformExpressionTree {
   private static final Pql2Compiler COMPILER = new Pql2Compiler();
+  private final ExpressionType _expressionType;
+  private final String _value;
+  private final List<TransformExpressionTree> _children;
+
+  public TransformExpressionTree(AstNode root) {
+    if (root instanceof FunctionCallAstNode) {
+      _expressionType = ExpressionType.FUNCTION;
+      _value = ((FunctionCallAstNode) root).getName().toLowerCase();
+      _children = new ArrayList<>();
+      for (AstNode child : root.getChildren()) {
+        _children.add(new TransformExpressionTree(child));
+      }
+    } else if (root instanceof IdentifierAstNode) {
+      _expressionType = ExpressionType.IDENTIFIER;
+      _value = ((IdentifierAstNode) root).getName();
+      _children = null;
+    } else if (root instanceof LiteralAstNode) {
+      _expressionType = ExpressionType.LITERAL;
+      _value = ((LiteralAstNode) root).getValueAsString();
+      _children = null;
+    } else {
+      throw new IllegalArgumentException(
+          "Illegal AstNode type for TransformExpressionTree: " + root.getClass().getName());
+    }
+  }
 
   public static TransformExpressionTree compileToExpressionTree(String expression) {
     return COMPILER.compileToExpressionTree(expression);
@@ -75,34 +104,27 @@ public class TransformExpressionTree {
     }
   }
 
-  // Enum for expression represented by the tree.
-  public enum ExpressionType {
-    FUNCTION, IDENTIFIER, LITERAL
-  }
-
-  private final ExpressionType _expressionType;
-  private final String _value;
-  private final List<TransformExpressionTree> _children;
-
-  public TransformExpressionTree(AstNode root) {
-    if (root instanceof FunctionCallAstNode) {
-      _expressionType = ExpressionType.FUNCTION;
-      _value = ((FunctionCallAstNode) root).getName().toLowerCase();
-      _children = new ArrayList<>();
-      for (AstNode child : root.getChildren()) {
-        _children.add(new TransformExpressionTree(child));
+  public static Expression getExpression(AstNode astNode) {
+    if (astNode instanceof IdentifierAstNode) {
+      // Column name
+      return RequestUtils.getIdentifierExpression(((IdentifierAstNode) astNode).getName());
+    } else if (astNode instanceof FunctionCallAstNode) {
+      // Function expression
+      Expression expression =
+          RequestUtils.getFunctionExpression(((FunctionCallAstNode) astNode).getName().toLowerCase());
+      Function func = expression.getFunctionCall();
+      if (astNode.getChildren() != null) {
+        for (AstNode child : astNode.getChildren()) {
+          func.addToOperands(getExpression(child));
+        }
       }
-    } else if (root instanceof IdentifierAstNode) {
-      _expressionType = ExpressionType.IDENTIFIER;
-      _value = ((IdentifierAstNode) root).getName();
-      _children = null;
-    } else if (root instanceof LiteralAstNode) {
-      _expressionType = ExpressionType.LITERAL;
-      _value = ((LiteralAstNode) root).getValueAsString();
-      _children = null;
+      return expression;
+    } else if (astNode instanceof LiteralAstNode) {
+      return RequestUtils.getLiteralExpression(((LiteralAstNode) astNode).getValueAsString());
+    } else if (astNode instanceof PredicateAstNode) {
+      return ((PredicateAstNode) astNode).buildFilterExpression();
     } else {
-      throw new IllegalArgumentException(
-          "Illegal AstNode type for TransformExpressionTree: " + root.getClass().getName());
+      throw new IllegalStateException("Cannot get standard expression from " + astNode.getClass().getSimpleName());
     }
   }
 
@@ -202,5 +224,10 @@ public class TransformExpressionTree {
       default:
         throw new IllegalStateException();
     }
+  }
+
+  // Enum for expression represented by the tree.
+  public enum ExpressionType {
+    FUNCTION, IDENTIFIER, LITERAL
   }
 }

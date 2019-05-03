@@ -20,9 +20,11 @@ package org.apache.pinot.pql.parsers.pql2.ast;
 
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.FilterOperator;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
 import org.apache.pinot.common.utils.request.HavingQueryTree;
+import org.apache.pinot.common.utils.request.RequestUtils;
 
 
 /**
@@ -68,7 +70,6 @@ public class PredicateListAstNode extends PredicateAstNode {
             filterQueryAndPredicates.add(predicate.buildFilterQueryTree());
             filterQueryOrPredicates.add(buildFilterPredicate(filterQueryAndPredicates, FilterOperator.AND));
             filterQueryAndPredicates = new ArrayList<>();
-            ;
           } else {
             filterQueryOrPredicates.add(predicate.buildFilterQueryTree());
           }
@@ -117,6 +118,70 @@ public class PredicateListAstNode extends PredicateAstNode {
     } else {
       return buildFilterPredicate(andPredicates, FilterOperator.AND);
     }
+  }
+
+  @Override
+  public Expression buildFilterExpression() {
+
+    List<Expression> filterQueryOrExpressions = new ArrayList<>();
+    List<Expression> filterQueryAndExpressions = new ArrayList<>();
+
+    int childrenCount = getChildren().size();
+    if (childrenCount == 1) {
+      return ((PredicateAstNode) getChildren().get(0)).buildFilterExpression();
+    }
+
+    for (int i = 0; i < childrenCount; i += 2) {
+      PredicateAstNode predicate = (PredicateAstNode) getChildren().get(i);
+      BooleanOperatorAstNode nextOperator = null;
+
+      if (i + 1 < childrenCount) {
+        nextOperator = (BooleanOperatorAstNode) getChildren().get(i + 1);
+      }
+      // 3 cases for the next operator:
+      // - No next operator: Add the predicate to the AND predicates or to the parent OR predicate
+      // - AND: Add the predicate to the AND predicates, creating it if necessary
+      // - OR:
+      //   1. Add the predicate to the AND predicates if it exists, then add it to the parent OR predicate
+      //   2. If there is no current AND predicate list, add the predicate directly
+      //   3. Clear the current AND predicates list
+      // Is it the last predicate?
+      if (nextOperator == null) {
+        if (!filterQueryAndExpressions.isEmpty()) {
+          filterQueryAndExpressions.add(predicate.buildFilterExpression());
+          if (!filterQueryOrExpressions.isEmpty()) {
+            filterQueryOrExpressions.add(buildFilterExpression(FilterOperator.AND, filterQueryAndExpressions));
+          }
+        } else {
+          // Previous predicate was OR, therefore add the predicate directly
+          filterQueryOrExpressions.add(predicate.buildFilterExpression());
+        }
+      } else if (nextOperator == BooleanOperatorAstNode.AND) {
+        filterQueryAndExpressions.add(predicate.buildFilterExpression());
+      } else {
+        if (!filterQueryAndExpressions.isEmpty()) {
+          filterQueryAndExpressions.add(predicate.buildFilterExpression());
+          filterQueryOrExpressions.add(buildFilterExpression(FilterOperator.AND, filterQueryAndExpressions));
+          filterQueryAndExpressions = new ArrayList<>();
+        } else {
+          filterQueryOrExpressions.add(predicate.buildFilterExpression());
+        }
+      }
+    }
+
+    if (!filterQueryOrExpressions.isEmpty()) {
+      return buildFilterExpression(FilterOperator.OR, filterQueryOrExpressions);
+    } else {
+      return buildFilterExpression(FilterOperator.AND, filterQueryAndExpressions);
+    }
+  }
+
+  public Expression buildFilterExpression(FilterOperator operator, List<Expression> children) {
+    final Expression expression = RequestUtils.getFunctionExpression(operator.name());
+    for (Expression child : children) {
+      expression.getFunctionCall().addToOperands(child);
+    }
+    return expression;
   }
 
   @Override

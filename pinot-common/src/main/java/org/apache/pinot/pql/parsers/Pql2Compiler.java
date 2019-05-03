@@ -39,6 +39,7 @@ import org.antlr.v4.runtime.tree.ParseTreeWalker;
 import org.apache.commons.lang.math.NumberUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.pql.parsers.pql2.ast.AstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.BaseAstNode;
@@ -102,7 +103,10 @@ public class Pql2Compiler implements AbstractCompiler {
       validateHavingClause(rootNode);
 
       BrokerRequest brokerRequest = new BrokerRequest();
+      PinotQuery pinotQuery = new PinotQuery();
+      brokerRequest.setPinotQuery(pinotQuery);
       rootNode.updateBrokerRequest(brokerRequest);
+      rootNode.updatePinotQuery(pinotQuery);
       return brokerRequest;
     } catch (Pql2CompilationException e) {
       throw e;

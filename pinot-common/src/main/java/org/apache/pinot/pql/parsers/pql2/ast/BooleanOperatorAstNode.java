@@ -20,6 +20,7 @@ package org.apache.pinot.pql.parsers.pql2.ast;
 
 import java.util.List;
 import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.request.PinotQuery;
 
 
 /**
@@ -67,7 +68,16 @@ public enum BooleanOperatorAstNode implements AstNode {
   }
 
   @Override
+  public void updatePinotQuery(PinotQuery pinotQuery) {
+  }
+
+  @Override
   public void sendBrokerRequestUpdateToChildren(BrokerRequest brokerRequest) {
+    throw new AssertionError("Should not happen");
+  }
+
+  @Override
+  public void sendPinotQueryUpdateToChildren(PinotQuery pinotQuery) {
     throw new AssertionError("Should not happen");
   }
 
