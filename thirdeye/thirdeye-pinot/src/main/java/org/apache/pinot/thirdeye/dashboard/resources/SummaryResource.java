@@ -24,17 +24,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Strings;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
-import org.apache.pinot.thirdeye.client.diffsummary.Dimensions;
-import org.apache.pinot.thirdeye.client.diffsummary.MultiDimensionalSummary;
-import org.apache.pinot.thirdeye.client.diffsummary.MultiDimensionalSummaryCLITool;
-import org.apache.pinot.thirdeye.client.diffsummary.OLAPDataBaseClient;
-import org.apache.pinot.thirdeye.client.diffsummary.ThirdEyeSummaryClient;
-import org.apache.pinot.thirdeye.client.diffsummary.costfunctions.BalancedCostFunction;
-import org.apache.pinot.thirdeye.client.diffsummary.costfunctions.CostFunction;
-import org.apache.pinot.thirdeye.dashboard.Utils;
-import org.apache.pinot.thirdeye.dashboard.views.diffsummary.SummaryResponse;
-import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
-import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
 import java.net.URLDecoder;
 import java.util.Arrays;
 import java.util.Collections;
@@ -46,6 +35,18 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import org.apache.commons.lang.StringUtils;
+import org.apache.pinot.thirdeye.cube.additive.AdditiveDBClient;
+import org.apache.pinot.thirdeye.cube.additive.AdditiveRow;
+import org.apache.pinot.thirdeye.cube.additive.MultiDimensionalSummary;
+import org.apache.pinot.thirdeye.cube.additive.MultiDimensionalSummaryCLITool;
+import org.apache.pinot.thirdeye.cube.cost.BalancedCostFunction;
+import org.apache.pinot.thirdeye.cube.cost.CostFunction;
+import org.apache.pinot.thirdeye.cube.data.dbclient.CubePinotClient;
+import org.apache.pinot.thirdeye.cube.data.dbrow.Dimensions;
+import org.apache.pinot.thirdeye.cube.summary.SummaryResponse;
+import org.apache.pinot.thirdeye.dashboard.Utils;
+import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
+import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
 import org.joda.time.DateTimeZone;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -113,8 +114,8 @@ public class SummaryResource {
 
       CostFunction costFunction = new BalancedCostFunction();
       DateTimeZone dateTimeZone = DateTimeZone.forID(timeZone);
-      OLAPDataBaseClient olapClient = new ThirdEyeSummaryClient(CACHE_REGISTRY_INSTANCE.getQueryCache());
-      MultiDimensionalSummary mdSummary = new MultiDimensionalSummary(olapClient, costFunction, dateTimeZone);
+      CubePinotClient<AdditiveRow> cubeDbClient = new AdditiveDBClient(CACHE_REGISTRY_INSTANCE.getQueryCache());
+      MultiDimensionalSummary mdSummary = new MultiDimensionalSummary(cubeDbClient, costFunction, dateTimeZone);
 
       response = mdSummary
           .buildSummary(dataset, metric, currentStartInclusive, currentEndExclusive, baselineStartInclusive,
@@ -166,8 +167,8 @@ public class SummaryResource {
 
       CostFunction costFunction = new BalancedCostFunction();
       DateTimeZone dateTimeZone = DateTimeZone.forID(timeZone);
-      OLAPDataBaseClient olapClient = new ThirdEyeSummaryClient(CACHE_REGISTRY_INSTANCE.getQueryCache());
-      MultiDimensionalSummary mdSummary = new MultiDimensionalSummary(olapClient, costFunction, dateTimeZone);
+      CubePinotClient<AdditiveRow> cubeDbClient = new AdditiveDBClient(CACHE_REGISTRY_INSTANCE.getQueryCache());
+      MultiDimensionalSummary mdSummary = new MultiDimensionalSummary(cubeDbClient, costFunction, dateTimeZone);
 
       response = mdSummary
           .buildSummary(dataset, metric, currentStartInclusive, currentEndExclusive, baselineStartInclusive,
