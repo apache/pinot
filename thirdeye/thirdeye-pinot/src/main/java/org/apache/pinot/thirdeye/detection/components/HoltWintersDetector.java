@@ -140,6 +140,7 @@ public class HoltWintersDetector implements BaselineProvider<HoltWintersDetector
 
     DataFrame inputDf = fetchData(metricEntity, trainStart.getMillis(), window.getEndMillis());
     DataFrame resultDF = computePredictionInterval(inputDf, window.getStartMillis(), datasetConfig.getTimezone());
+    resultDF = resultDF.joinLeft(inputDf.renameSeries(COL_VALUE, COL_CURR), COL_TIME);
 
     // Exclude the end because baseline calculation should not contain the end
     if (resultDF.size() > 1) {
@@ -425,7 +426,6 @@ public class HoltWintersDetector implements BaselineProvider<HoltWintersDetector
 
     int size = forecastDF.size();
     double[] baselineArray = new double[size];
-    double[] currentArray = new double[size];
     double[] upperBoundArray = new double[size];
     double[] lowerBoundArray = new double[size];
     long[] resultTimeArray = new long[size];
@@ -466,12 +466,6 @@ public class HoltWintersDetector implements BaselineProvider<HoltWintersDetector
       double predicted = result.getPredictedValue();
       double error = result.getErrorBound();
 
-      // if current value doesn't have data then impute with NaN
-      if (k < y.length) {
-        currentArray[k] = y[k];
-      } else {
-        currentArray[k] = Double.NaN;
-      }
       baselineArray[k] = predicted;
       errorArray[k] = error;
       upperBoundArray[k] = predicted + error;
@@ -480,7 +474,6 @@ public class HoltWintersDetector implements BaselineProvider<HoltWintersDetector
 
     resultDF.addSeries(COL_TIME, LongSeries.buildFrom(resultTimeArray)).setIndex(COL_TIME);
     resultDF.addSeries(COL_VALUE, DoubleSeries.buildFrom(baselineArray));
-    resultDF.addSeries(COL_CURR, DoubleSeries.buildFrom(currentArray));
     resultDF.addSeries(COL_UPPER_BOUND, DoubleSeries.buildFrom(upperBoundArray));
     resultDF.addSeries(COL_LOWER_BOUND, DoubleSeries.buildFrom(lowerBoundArray));
     resultDF.addSeries(COL_ERROR, DoubleSeries.buildFrom(errorArray));
