@@ -76,7 +76,7 @@ public class MutableSegmentImplTest {
     _schema = config.getSchema();
     _mutableSegmentImpl = MutableSegmentImplTestUtils
         .createMutableSegmentImpl(_schema, Collections.emptySet(), Collections.emptySet(), false);
-    StreamMessageMetadata defaultMetadata = new StreamMessageMetadata();
+    StreamMessageMetadata defaultMetadata = new StreamMessageMetadata(System.currentTimeMillis());
     _startTimeMs = System.currentTimeMillis();
     try (RecordReader recordReader = new AvroRecordReader(avroFile, _schema)) {
       GenericRow reuse = new GenericRow();

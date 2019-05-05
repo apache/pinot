@@ -85,12 +85,7 @@ public class KafkaStreamLevelConsumer implements StreamLevelConsumer {
 
   @Override
   public GenericRow next(GenericRow destination) {
-    return next(destination, null);
-  }
 
-  // NOTE: currently metadata is not updated as the simple consumer does not expose the relevant information
-  @Override
-  public GenericRow next(GenericRow destination, RowMetadata metadata) {
     if (kafkaIterator.hasNext()) {
       try {
         destination = _messageDecoder.decode(kafkaIterator.next().message(), destination);

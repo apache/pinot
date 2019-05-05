@@ -27,22 +27,15 @@ import org.apache.pinot.common.metadata.RowMetadata;
  */
 public class StreamMessageMetadata implements RowMetadata {
 
-  private long _ingestionTimestamp = Long.MIN_VALUE;
+  private final long _ingestionTimestamp;
 
-  public StreamMessageMetadata() {
-
+  public StreamMessageMetadata(long ingestionTimestamp) {
+    _ingestionTimestamp = ingestionTimestamp;
   }
 
   @Override
-  public long getIngestionTimestamp() {
+  public long getIngestionTimesMs() {
     return _ingestionTimestamp;
   }
 
-  public void setIngestionTimestamp(long timestamp) {
-    _ingestionTimestamp = timestamp;
-  }
-
-  public void clear() {
-    _ingestionTimestamp = Long.MIN_VALUE;
-  }
 }

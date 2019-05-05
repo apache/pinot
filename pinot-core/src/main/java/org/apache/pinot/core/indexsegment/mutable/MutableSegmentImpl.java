@@ -97,7 +97,7 @@ public class MutableSegmentImpl implements MutableSegment {
   private final int _numKeyColumns;
 
   // default message metadata
-  private static final StreamMessageMetadata _defaultMetadata = new StreamMessageMetadata();
+  private static final StreamMessageMetadata _defaultMetadata = new StreamMessageMetadata(System.currentTimeMillis());
   private volatile long _lastIndexedTimestamp = Long.MIN_VALUE;
   private volatile long _latestIngestionTimestamp = Long.MIN_VALUE;
 
@@ -242,7 +242,7 @@ public class MutableSegmentImpl implements MutableSegment {
     _lastIndexedTimestamp = System.currentTimeMillis();
 
     if (rowMetadata != null) {
-      _latestIngestionTimestamp = Math.max(_latestIngestionTimestamp, rowMetadata.getIngestionTimestamp());
+      _latestIngestionTimestamp = Math.max(_latestIngestionTimestamp, rowMetadata.getIngestionTimesMs());
     }
     return canTakeMore;
   }

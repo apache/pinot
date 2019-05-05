@@ -185,8 +185,8 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
         LOGGER.error("Invalid lastIndexedTimestamp across {} consuming segments", numConsumingQueried);
         minConsumingFreshnessTs = 0L;
       }
-      brokerResponseNative.setNumConsumingQueried(numConsumingQueried);
-      brokerResponseNative.setMinConsumingFreshnessTimeMs(minConsumingFreshnessTs);
+      brokerResponseNative.setNumConsumingSegmentsQueried(numConsumingQueried);
+      brokerResponseNative.setMinLastIngestionTimeMs(minConsumingFreshnessTs);
     }
 
     // Update broker metrics.
