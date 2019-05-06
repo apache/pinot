@@ -150,7 +150,7 @@ public class PredicateListAstNode extends PredicateAstNode {
         if (!filterQueryAndExpressions.isEmpty()) {
           filterQueryAndExpressions.add(predicate.buildFilterExpression());
           if (!filterQueryOrExpressions.isEmpty()) {
-            filterQueryOrExpressions.add(buildFilterExpression(FilterOperator.AND, filterQueryAndExpressions));
+            filterQueryOrExpressions.add(buildFilterExpression(FilterKind.AND, filterQueryAndExpressions));
           }
         } else {
           // Previous predicate was OR, therefore add the predicate directly
@@ -161,7 +161,7 @@ public class PredicateListAstNode extends PredicateAstNode {
       } else {
         if (!filterQueryAndExpressions.isEmpty()) {
           filterQueryAndExpressions.add(predicate.buildFilterExpression());
-          filterQueryOrExpressions.add(buildFilterExpression(FilterOperator.AND, filterQueryAndExpressions));
+          filterQueryOrExpressions.add(buildFilterExpression(FilterKind.AND, filterQueryAndExpressions));
           filterQueryAndExpressions = new ArrayList<>();
         } else {
           filterQueryOrExpressions.add(predicate.buildFilterExpression());
@@ -170,13 +170,13 @@ public class PredicateListAstNode extends PredicateAstNode {
     }
 
     if (!filterQueryOrExpressions.isEmpty()) {
-      return buildFilterExpression(FilterOperator.OR, filterQueryOrExpressions);
+      return buildFilterExpression(FilterKind.OR, filterQueryOrExpressions);
     } else {
-      return buildFilterExpression(FilterOperator.AND, filterQueryAndExpressions);
+      return buildFilterExpression(FilterKind.AND, filterQueryAndExpressions);
     }
   }
 
-  public Expression buildFilterExpression(FilterOperator operator, List<Expression> children) {
+  public Expression buildFilterExpression(FilterKind operator, List<Expression> children) {
     final Expression expression = RequestUtils.getFunctionExpression(operator.name());
     for (Expression child : children) {
       expression.getFunctionCall().addToOperands(child);

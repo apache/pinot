@@ -118,11 +118,11 @@ public class InPredicateAstNode extends PredicateAstNode {
     if (_identifier == null) {
       throw new Pql2CompilationException("IN predicate has no identifier");
     }
-    FilterOperator filterOperator;
+    FilterKind filterOperator;
     if (_isNotInClause) {
-      filterOperator = FilterOperator.NOT_IN;
+      filterOperator = FilterKind.NOT_IN;
     } else {
-      filterOperator = FilterOperator.IN;
+      filterOperator = FilterKind.IN;
     }
     Expression expr = RequestUtils.getFunctionExpression(filterOperator.name());
     expr.getFunctionCall().addToOperands(RequestUtils.getIdentifierExpression(_identifier));
