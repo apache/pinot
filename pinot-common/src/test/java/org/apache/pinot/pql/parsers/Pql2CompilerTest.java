@@ -24,8 +24,10 @@ import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.FilterOperator;
+import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.GroupBy;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
+import org.apache.pinot.pql.parsers.pql2.ast.FilterKind;
 import org.apache.pinot.pql.parsers.pql2.ast.TopAstNode;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -43,22 +45,84 @@ public class Pql2CompilerTest {
         COMPILER.compileToBrokerRequest("select * from vegetables where origin = 'Martha''s Vineyard'");
     Assert.assertEquals(brokerRequest.getFilterQuery().getValue().get(0), "Martha's Vineyard");
     // Test PinotQuery
-    Assert.assertEquals(brokerRequest.getPinotQuery().getFilterExpression().getFunctionCall().getOperands().get(1).getLiteral().getValue(), "Martha's Vineyard");
+    Assert.assertEquals(
+        brokerRequest.getPinotQuery().getFilterExpression().getFunctionCall().getOperands().get(1).getLiteral()
+            .getValue(), "Martha's Vineyard");
 
     brokerRequest = COMPILER.compileToBrokerRequest("select * from vegetables where origin = 'Martha\"\"s Vineyard'");
     Assert.assertEquals(brokerRequest.getFilterQuery().getValue().get(0), "Martha\"\"s Vineyard");
     // Test PinotQuery
-    Assert.assertEquals(brokerRequest.getPinotQuery().getFilterExpression().getFunctionCall().getOperands().get(1).getLiteral().getValue(), "Martha\"\"s Vineyard");
+    Assert.assertEquals(
+        brokerRequest.getPinotQuery().getFilterExpression().getFunctionCall().getOperands().get(1).getLiteral()
+            .getValue(), "Martha\"\"s Vineyard");
 
     brokerRequest = COMPILER.compileToBrokerRequest("select * from vegetables where origin = \"Martha\"\"s Vineyard\"");
     Assert.assertEquals(brokerRequest.getFilterQuery().getValue().get(0), "Martha\"s Vineyard");
     // Test PinotQuery
-    Assert.assertEquals(brokerRequest.getPinotQuery().getFilterExpression().getFunctionCall().getOperands().get(1).getLiteral().getValue(), "Martha\"s Vineyard");
+    Assert.assertEquals(
+        brokerRequest.getPinotQuery().getFilterExpression().getFunctionCall().getOperands().get(1).getLiteral()
+            .getValue(), "Martha\"s Vineyard");
 
     brokerRequest = COMPILER.compileToBrokerRequest("select * from vegetables where origin = \"Martha''s Vineyard\"");
     Assert.assertEquals(brokerRequest.getFilterQuery().getValue().get(0), "Martha''s Vineyard");
     // Test PinotQuery
-    Assert.assertEquals(brokerRequest.getPinotQuery().getFilterExpression().getFunctionCall().getOperands().get(1).getLiteral().getValue(), "Martha''s Vineyard");
+    Assert.assertEquals(
+        brokerRequest.getPinotQuery().getFilterExpression().getFunctionCall().getOperands().get(1).getLiteral()
+            .getValue(), "Martha''s Vineyard");
+  }
+
+  @Test
+  public void testFilterCaluses() {
+    BrokerRequest brokerRequest = COMPILER.compileToBrokerRequest("select * from vegetables where a > 1");
+    Assert.assertEquals(brokerRequest.getFilterQuery().getColumn(), "a");
+    Assert.assertEquals(brokerRequest.getFilterQuery().getOperator(), FilterOperator.RANGE);
+    Assert.assertEquals(brokerRequest.getFilterQuery().getValue().get(0), "(1\t\t*)");
+    // Test PinotQuery
+    Function func = brokerRequest.getPinotQuery().getFilterExpression().getFunctionCall();
+    Assert.assertEquals(func.getOperator(), FilterKind.GREATER_THAN.name());
+    Assert.assertEquals(func.getOperands().get(0).getIdentifier().getName(), "a");
+    Assert.assertEquals(func.getOperands().get(1).getLiteral().getValue(), "1");
+
+    brokerRequest = COMPILER.compileToBrokerRequest("select * from vegetables where b < 100");
+    Assert.assertEquals(brokerRequest.getFilterQuery().getColumn(), "b");
+    Assert.assertEquals(brokerRequest.getFilterQuery().getOperator(), FilterOperator.RANGE);
+    Assert.assertEquals(brokerRequest.getFilterQuery().getValue().get(0), "(*\t\t100)");
+    // Test PinotQuery
+    func = brokerRequest.getPinotQuery().getFilterExpression().getFunctionCall();
+    Assert.assertEquals(func.getOperator(), FilterKind.LESS_THAN.name());
+    Assert.assertEquals(func.getOperands().get(0).getIdentifier().getName(), "b");
+    Assert.assertEquals(func.getOperands().get(1).getLiteral().getValue(), "100");
+
+    brokerRequest = COMPILER.compileToBrokerRequest("select * from vegetables where c >= 10");
+    Assert.assertEquals(brokerRequest.getFilterQuery().getColumn(), "c");
+    Assert.assertEquals(brokerRequest.getFilterQuery().getOperator(), FilterOperator.RANGE);
+    Assert.assertEquals(brokerRequest.getFilterQuery().getValue().get(0), "[10\t\t*)");
+    // Test PinotQuery
+    func = brokerRequest.getPinotQuery().getFilterExpression().getFunctionCall();
+    Assert.assertEquals(func.getOperator(), FilterKind.GREATER_THAN_OR_EQUAL.name());
+    Assert.assertEquals(func.getOperands().get(0).getIdentifier().getName(), "c");
+    Assert.assertEquals(func.getOperands().get(1).getLiteral().getValue(), "10");
+
+    brokerRequest = COMPILER.compileToBrokerRequest("select * from vegetables where d <= 50");
+    Assert.assertEquals(brokerRequest.getFilterQuery().getColumn(), "d");
+    Assert.assertEquals(brokerRequest.getFilterQuery().getOperator(), FilterOperator.RANGE);
+    Assert.assertEquals(brokerRequest.getFilterQuery().getValue().get(0), "(*\t\t50]");
+    // Test PinotQuery
+    func = brokerRequest.getPinotQuery().getFilterExpression().getFunctionCall();
+    Assert.assertEquals(func.getOperator(), FilterKind.LESS_THAN_OR_EQUAL.name());
+    Assert.assertEquals(func.getOperands().get(0).getIdentifier().getName(), "d");
+    Assert.assertEquals(func.getOperands().get(1).getLiteral().getValue(), "50");
+
+    brokerRequest = COMPILER.compileToBrokerRequest("select * from vegetables where e BETWEEN 70 AND 80");
+    Assert.assertEquals(brokerRequest.getFilterQuery().getColumn(), "e");
+    Assert.assertEquals(brokerRequest.getFilterQuery().getOperator(), FilterOperator.RANGE);
+    Assert.assertEquals(brokerRequest.getFilterQuery().getValue().get(0), "[70\t\t80]");
+    // Test PinotQuery
+    func = brokerRequest.getPinotQuery().getFilterExpression().getFunctionCall();
+    Assert.assertEquals(func.getOperator(), FilterKind.BETWEEN.name());
+    Assert.assertEquals(func.getOperands().get(0).getIdentifier().getName(), "e");
+    Assert.assertEquals(func.getOperands().get(1).getLiteral().getValue(), "70");
+    Assert.assertEquals(func.getOperands().get(2).getLiteral().getValue(), "80");
   }
 
   @Test
@@ -146,8 +210,8 @@ public class Pql2CompilerTest {
         COMPILER.compileToBrokerRequest("select * from vegetables where name != 'Brussels sprouts'");
     Assert.assertEquals(brokerRequest.getFilterQuery().getOperator(), FilterOperator.NOT);
     // Test PinotQuery
-    Assert.assertEquals(brokerRequest.getPinotQuery().getFilterExpression().getFunctionCall().getOperator(), FilterOperator.NOT.name());
-
+    Assert.assertEquals(brokerRequest.getPinotQuery().getFilterExpression().getFunctionCall().getOperator(),
+        FilterKind.NOT_EQUALS.name());
   }
 
   @Test
@@ -247,9 +311,11 @@ public class Pql2CompilerTest {
         "attributes.age");
 
     // Test PinotQuery
-    Assert.assertEquals(brokerRequest.getPinotQuery().getSelectList().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(),
-        "attributes.age");
-    Assert.assertEquals(brokerRequest.getPinotQuery().getGroupByList().get(0).getIdentifier().getName(),"attributes.address_city");
+    Assert.assertEquals(
+        brokerRequest.getPinotQuery().getSelectList().get(0).getFunctionCall().getOperands().get(0).getIdentifier()
+            .getName(), "attributes.age");
+    Assert.assertEquals(brokerRequest.getPinotQuery().getGroupByList().get(0).getIdentifier().getName(),
+        "attributes.address_city");
   }
 
   @Test
@@ -272,8 +338,10 @@ public class Pql2CompilerTest {
     // Test PinotQuery
     List<Expression> selectFunctionList = brokerRequest.getPinotQuery().getSelectList();
     Assert.assertEquals(selectFunctionList.size(), 2);
-    Assert.assertEquals(selectFunctionList.get(0).getFunctionCall().getOperands().get(0).getLiteral().getValue(), "foo");
-    Assert.assertEquals(selectFunctionList.get(1).getFunctionCall().getOperands().get(0).getLiteral().getValue(), "bar");
+    Assert
+        .assertEquals(selectFunctionList.get(0).getFunctionCall().getOperands().get(0).getLiteral().getValue(), "foo");
+    Assert
+        .assertEquals(selectFunctionList.get(1).getFunctionCall().getOperands().get(0).getLiteral().getValue(), "bar");
     List<Expression> groupbyList = brokerRequest.getPinotQuery().getGroupByList();
     Assert.assertEquals(groupbyList.size(), 2);
     Assert.assertEquals(groupbyList.get(0).getLiteral().getValue(), "foo");
@@ -294,16 +362,22 @@ public class Pql2CompilerTest {
     Assert.assertEquals(selectFunctionList.size(), 1);
     Assert.assertEquals(selectFunctionList.get(0).getFunctionCall().getOperator(), "sum");
     Assert.assertEquals(selectFunctionList.get(0).getFunctionCall().getOperands().size(), 1);
-    Assert.assertEquals(selectFunctionList.get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperator(), "add");
-    Assert.assertEquals(selectFunctionList.get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().size(), 2);
-    Assert.assertEquals(selectFunctionList.get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "foo");
-    Assert.assertEquals(selectFunctionList.get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(1).getLiteral().getValue(), "bar");
+    Assert
+        .assertEquals(selectFunctionList.get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperator(),
+            "add");
+    Assert.assertEquals(
+        selectFunctionList.get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().size(), 2);
+    Assert.assertEquals(
+        selectFunctionList.get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0)
+            .getIdentifier().getName(), "foo");
+    Assert.assertEquals(
+        selectFunctionList.get(0).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(1)
+            .getLiteral().getValue(), "bar");
     groupbyList = brokerRequest.getPinotQuery().getGroupByList();
     Assert.assertEquals(groupbyList.size(), 1);
     Assert.assertEquals(groupbyList.get(0).getFunctionCall().getOperator(), "sub");
     Assert.assertEquals(groupbyList.get(0).getFunctionCall().getOperands().size(), 2);
     Assert.assertEquals(groupbyList.get(0).getFunctionCall().getOperands().get(0).getLiteral().getValue(), "foo");
     Assert.assertEquals(groupbyList.get(0).getFunctionCall().getOperands().get(1).getIdentifier().getName(), "bar");
-
   }
 }

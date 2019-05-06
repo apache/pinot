@@ -95,7 +95,7 @@ public class BetweenPredicateAstNode extends PredicateAstNode {
         LiteralAstNode left = (LiteralAstNode) getChildren().get(0);
         LiteralAstNode right = (LiteralAstNode) getChildren().get(1);
 
-        final Expression betweenExpr = RequestUtils.getFunctionExpression(FilterOperator.RANGE.name());
+        final Expression betweenExpr = RequestUtils.getFunctionExpression(FilterKind.BETWEEN.name());
         final Function rangeFuncCall = betweenExpr.getFunctionCall();
         rangeFuncCall.addToOperands(RequestUtils.getIdentifierExpression(_identifier));
         rangeFuncCall.addToOperands(RequestUtils.getLiteralExpression(left.getValueAsString()));
