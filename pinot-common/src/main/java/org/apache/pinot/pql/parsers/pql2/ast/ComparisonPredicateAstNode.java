@@ -165,7 +165,7 @@ public class ComparisonPredicateAstNode extends PredicateAstNode {
 
     if ("=".equals(_operand)) {
       if (_identifier != null && _literal != null) {
-        Expression expr = RequestUtils.getFunctionExpression(FilterOperator.EQUALITY.name());
+        Expression expr = RequestUtils.getFunctionExpression(FilterKind.EQUALS.name());
         expr.getFunctionCall().addToOperands(RequestUtils.getIdentifierExpression(_identifier));
         expr.getFunctionCall().addToOperands(RequestUtils.getLiteralExpression(_literal.getValueAsString()));
         return expr;
@@ -174,7 +174,7 @@ public class ComparisonPredicateAstNode extends PredicateAstNode {
       }
     } else if ("<>".equals(_operand) || "!=".equals(_operand)) {
       if (_identifier != null && _literal != null) {
-        Expression expr = RequestUtils.getFunctionExpression(FilterOperator.NOT.name());
+        Expression expr = RequestUtils.getFunctionExpression(FilterKind.NOT_EQUALS.name());
         expr.getFunctionCall().addToOperands(RequestUtils.getIdentifierExpression(_identifier));
         expr.getFunctionCall().addToOperands(RequestUtils.getLiteralExpression(_literal.getValueAsString()));
         return expr;
@@ -182,14 +182,42 @@ public class ComparisonPredicateAstNode extends PredicateAstNode {
         throw new Pql2CompilationException("Comparison is not between a column and a constant");
       }
     } else {
-      String comparison = createRangeStringForComparison();
-      if (comparison == null) {
-        throw new Pql2CompilationException("The comparison operator is not valid/is not supported for HAVING query");
-      }
       if (_identifier != null) {
-        Expression expr = RequestUtils.getFunctionExpression(FilterOperator.RANGE.name());
+        boolean identifierIsOnLeft = true;
+        if (getChildren().get(0) instanceof LiteralAstNode) {
+          identifierIsOnLeft = false;
+        }
+        Expression expr = null;
+        if ("<".equals(_operand)) {
+          if (identifierIsOnLeft) {
+            expr = RequestUtils.getFunctionExpression(FilterKind.LESS_THAN.name());
+          } else {
+            expr = RequestUtils.getFunctionExpression(FilterKind.GREATER_THAN.name());
+          }
+        } else if ("<=".equals(_operand)) {
+          if (identifierIsOnLeft) {
+            expr = RequestUtils.getFunctionExpression(FilterKind.LESS_THAN_OR_EQUAL.name());
+          } else {
+            expr = RequestUtils.getFunctionExpression(FilterKind.GREATER_THAN_OR_EQUAL.name());
+          }
+        } else if (">".equals(_operand)) {
+          if (identifierIsOnLeft) {
+            expr = RequestUtils.getFunctionExpression(FilterKind.GREATER_THAN.name());
+          } else {
+            expr = RequestUtils.getFunctionExpression(FilterKind.LESS_THAN.name());
+          }
+        } else if (">=".equals(_operand)) {
+          if (identifierIsOnLeft) {
+            expr = RequestUtils.getFunctionExpression(FilterKind.GREATER_THAN_OR_EQUAL.name());
+          } else {
+            expr = RequestUtils.getFunctionExpression(FilterKind.LESS_THAN_OR_EQUAL.name());
+          }
+        }
+        if (expr == null) {
+          throw new Pql2CompilationException("The comparison operator is not valid/is not supported for HAVING query");
+        }
         expr.getFunctionCall().addToOperands(RequestUtils.getIdentifierExpression(_identifier));
-        expr.getFunctionCall().addToOperands(RequestUtils.getLiteralExpression(comparison));
+        expr.getFunctionCall().addToOperands(RequestUtils.getLiteralExpression(_literal.getValueAsString()));
         return expr;
       } else {
         throw new Pql2CompilationException("One column is needed for comparison.");
