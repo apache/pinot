@@ -212,7 +212,13 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
     return new DetectionPipelineResult(anomalyResults, lastTimeStamp, Collections.singletonList(predictedTimeSeries));
   }
 
-  TimeSeries consolidateTimeSeries(TimeSeries ts1, TimeSeries ts2) {
+  /**
+   * Join two time series, including current, baseline, lower bound and upper bound. If two time series have overlapped region, take the average
+   * @param ts1 timeseries 1
+   * @param ts2 timeseries 2
+   * @return the consolidated time series
+   */
+  static TimeSeries consolidateTimeSeries(TimeSeries ts1, TimeSeries ts2) {
     DataFrame df1 = ts1.getDataFrame();
     DataFrame df2 = ts2.getDataFrame();
     DataFrame joinedDf = df1.joinOuter(df2, COL_TIME);
@@ -223,7 +229,7 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
     return TimeSeries.fromDataFrame(joinedDf);
   }
 
-  private void consolidateJoinedDf(DataFrame joinedDf, String columnName) {
+  private static void consolidateJoinedDf(DataFrame joinedDf, String columnName) {
     String columnNameLeft = columnName + DataFrame.COLUMN_JOIN_LEFT;
     String columnNameRight = columnName + DataFrame.COLUMN_JOIN_RIGHT;
     if (joinedDf.contains(columnNameLeft) && joinedDf.contains(columnNameRight)) {
@@ -231,7 +237,13 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
     }
   }
 
-  private DoubleSeries robustAverage(DoubleSeries s1, DoubleSeries s2) {
+  /**
+   * Calculate the average of two double time series. If the value in either one is missing, take the available value as the result
+   * @param s1 series 1
+   * @param s2 series 2
+   * @return the averaged time series
+   */
+  private static DoubleSeries robustAverage(DoubleSeries s1, DoubleSeries s2) {
     Preconditions.checkArgument(s1.size() == s2.size());
     double[] series = new double[s1.size()];
     for (int i = 0 ; i < s1.size() ; i++) {
