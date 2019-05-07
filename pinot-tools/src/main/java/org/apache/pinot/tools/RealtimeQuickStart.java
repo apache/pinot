@@ -133,7 +133,6 @@ public class RealtimeQuickStart {
 
   public static void main(String[] args)
       throws Exception {
-    Quickstart.logOnlyErrors();
     new RealtimeQuickStart().execute();
   }
 }

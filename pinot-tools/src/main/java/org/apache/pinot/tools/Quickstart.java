@@ -23,11 +23,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.net.URL;
-import java.util.Enumeration;
 import org.apache.commons.io.FileUtils;
-import org.apache.log4j.Category;
-import org.apache.log4j.Level;
-import org.apache.log4j.Logger;
 import org.apache.pinot.core.data.readers.FileFormat;
 import org.apache.pinot.tools.admin.command.QuickstartRunner;
 
@@ -116,16 +112,6 @@ public class Quickstart {
       }
     }
     return responseBuilder.toString();
-  }
-
-  public static void logOnlyErrors() {
-    Logger root = Logger.getRootLogger();
-    root.setLevel(Level.ERROR);
-    Enumeration allLoggers = root.getLoggerRepository().getCurrentCategories();
-    while (allLoggers.hasMoreElements()) {
-      Category tmpLogger = (Category) allLoggers.nextElement();
-      tmpLogger.setLevel(Level.ERROR);
-    }
   }
 
   public void execute()
@@ -220,7 +206,6 @@ public class Quickstart {
 
   public static void main(String[] args)
       throws Exception {
-    logOnlyErrors();
     new Quickstart().execute();
   }
 }
