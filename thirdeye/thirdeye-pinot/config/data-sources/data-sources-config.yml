@@ -205,7 +205,7 @@ dataSourceConfigs:
             dataFile: "daily.csv"
           - tableName: "H2.H2.hourly"
             timeColumn: "datetime"
-            granularity: "1HOURS"_
+            granularity: "1HOURS"
             timeFormat: "yyyy-MM-dd HH:mm:ss"
             timezone: "UTC"
             metrics:
