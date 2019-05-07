@@ -45,6 +45,7 @@ public class ControllerConf extends PropertiesConfiguration {
   private static final String CONTROLLER_VIP_PROTOCOL = "controller.vip.protocol";
   private static final String CONTROLLER_HOST = "controller.host";
   private static final String CONTROLLER_PORT = "controller.port";
+  private static final String ENABLE_DEFAULT_HOSTNAME = "controller.enable.default.hostname";
   private static final String DATA_DIR = "controller.data.dir";
   // Potentially same as data dir if local
   private static final String LOCAL_TEMP_DIR = "controller.local.temp.dir";
@@ -240,6 +241,10 @@ public class ControllerConf extends PropertiesConfiguration {
     setProperty(CONTROLLER_HOST, host);
   }
 
+  public void setEnableDefaultHostname(boolean enableDefaultHostname) {
+    setProperty(ENABLE_DEFAULT_HOSTNAME, enableDefaultHostname);
+  }
+
   public void setControllerVipHost(String vipHost) {
     setProperty(CONTROLLER_VIP_HOST, vipHost);
   }
@@ -276,6 +281,10 @@ public class ControllerConf extends PropertiesConfiguration {
   // but we turn it on to true when we are sure that jersey api has no backward compatibility problems.
   public boolean isJerseyAdminPrimary() {
     return getBoolean(JERSEY_ADMIN_IS_PRIMARY, true);
+  }
+
+  public boolean enableDefaultHostname() {
+    return getBoolean(ENABLE_DEFAULT_HOSTNAME, false);
   }
 
   public String getHelixClusterName() {

@@ -44,6 +44,7 @@ import org.apache.pinot.common.metrics.MetricsHelper;
 import org.apache.pinot.common.metrics.ValidationMetrics;
 import org.apache.pinot.common.segment.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.controller.api.ControllerAdminApiApplication;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
@@ -98,6 +99,7 @@ public class ControllerStarter {
 
   public ControllerStarter(ControllerConf conf) {
     _config = conf;
+    inferHostnameIfNeeded(_config);
     _adminApp =
         new ControllerAdminApiApplication(_config.getQueryConsoleWebappPath(), _config.getQueryConsoleUseHttps());
     // Do not use this before the invocation of {@link PinotHelixResourceManager::start()}, which happens in {@link ControllerStarter::start()}
@@ -342,6 +344,20 @@ public class ControllerStarter {
       _executorService.shutdownNow();
     } catch (final Exception e) {
       LOGGER.error("Caught exception while shutting down", e);
+    }
+  }
+
+  private void inferHostnameIfNeeded(ControllerConf config) {
+    if (config.getControllerHost() == null) {
+      if (config.enableDefaultHostname()) {
+        final String inferredHostname = NetUtil.getHostnameOrAddress();
+        if (inferredHostname != null) {
+          config.setControllerHost(inferredHostname);
+        } else {
+          throw new RuntimeException(
+              "Failed to infer controller hostname, please set controller instanceId explicitly in config file.");
+        }
+      }
     }
   }
 

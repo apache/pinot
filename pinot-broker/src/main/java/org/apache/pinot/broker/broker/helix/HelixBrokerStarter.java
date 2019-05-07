@@ -95,7 +95,11 @@ public class HelixBrokerStarter {
     _pinotHelixProperties = DefaultHelixBrokerConfig.getDefaultBrokerConf(pinotHelixProperties);
 
     if (brokerHost == null) {
-      brokerHost = NetUtil.getHostAddress();
+      if (_pinotHelixProperties.getBoolean(CommonConstants.Helix.PREFER_HOSTNAME_IN_DEFAULT_INSTANCD_ID_KEY, false)) {
+        brokerHost = NetUtil.getHostnameOrAddress();
+      } else {
+        brokerHost = NetUtil.getHostAddress();
+      }
     }
 
     final String brokerId = _pinotHelixProperties.getString(CommonConstants.Helix.Instance.INSTANCE_ID_KEY,

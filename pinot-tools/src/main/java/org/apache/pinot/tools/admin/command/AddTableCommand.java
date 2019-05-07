@@ -87,6 +87,11 @@ public class AddTableCommand extends AbstractBaseAdminCommand implements Command
     return this;
   }
 
+  public AddTableCommand setControllerHost(String controllerHost) {
+    _controllerHost = controllerHost;
+    return this;
+  }
+
   public AddTableCommand setControllerPort(String controllerPort) {
     _controllerPort = controllerPort;
     return this;
