@@ -32,20 +32,20 @@ public class DetectionPipelineResult {
 
   private final List<MergedAnomalyResultDTO> anomalies;
   private final long lastTimestamp;
-  private final List<PredictionResult> predictedTimeSeries;
+  private final List<PredictionResult> predictions;
   private Map<String, Object> diagnostics;
 
   public DetectionPipelineResult(List<MergedAnomalyResultDTO> anomalies) {
     this.anomalies = anomalies;
     this.lastTimestamp = getMaxTime(anomalies);
     this.diagnostics = new HashMap<>();
-    this.predictedTimeSeries = Collections.emptyList();
+    this.predictions = Collections.emptyList();
   }
 
   public DetectionPipelineResult(List<MergedAnomalyResultDTO> anomalies, long lastTimestamp) {
     this.anomalies = anomalies;
     this.lastTimestamp = lastTimestamp;
-    this.predictedTimeSeries = Collections.emptyList();
+    this.predictions = Collections.emptyList();
     this.diagnostics = new HashMap<>();
   }
 
@@ -53,8 +53,12 @@ public class DetectionPipelineResult {
       List<PredictionResult> predictedTimeSeries) {
     this.anomalies = anomalies;
     this.lastTimestamp = lastTimestamp;
-    this.predictedTimeSeries = predictedTimeSeries;
+    this.predictions = predictedTimeSeries;
     this.diagnostics = new HashMap<>();
+  }
+
+  public List<PredictionResult> getPredictions() {
+    return predictions;
   }
 
   public List<MergedAnomalyResultDTO> getAnomalies() {

@@ -40,6 +40,7 @@ import org.apache.pinot.thirdeye.detection.DataProvider;
 import org.apache.pinot.thirdeye.detection.DetectionPipeline;
 import org.apache.pinot.thirdeye.detection.DetectionPipelineResult;
 import org.apache.pinot.thirdeye.detection.DetectionUtils;
+import org.apache.pinot.thirdeye.detection.PredictionResult;
 import org.apache.pinot.thirdeye.detection.spi.model.AnomalySlice;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -106,7 +107,7 @@ public class MergeWrapper extends DetectionPipeline {
 
     // generate anomalies
     List<MergedAnomalyResultDTO> generated = new ArrayList<>();
-
+    List<PredictionResult> predictionResults = new ArrayList<>();
     int i = 0;
     Set<Long> lastTimeStamps = new HashSet<>();
     for (Map<String, Object> properties : this.nestedProperties) {
@@ -125,6 +126,7 @@ public class MergeWrapper extends DetectionPipeline {
       lastTimeStamps.add(intermediate.getLastTimestamp());
 
       generated.addAll(intermediate.getAnomalies());
+      predictionResults.addAll(intermediate.getPredictions());
       diagnostics.put(String.valueOf(i), intermediate.getDiagnostics());
 
       i++;
@@ -135,7 +137,7 @@ public class MergeWrapper extends DetectionPipeline {
     all.addAll(retrieveAnomaliesFromDatabase(generated));
     all.addAll(generated);
 
-    return new DetectionPipelineResult(this.merge(all), DetectionUtils.consolidateNestedLastTimeStamps(lastTimeStamps)).setDiagnostics(diagnostics);
+    return new DetectionPipelineResult(this.merge(all), DetectionUtils.consolidateNestedLastTimeStamps(lastTimeStamps), predictionResults).setDiagnostics(diagnostics);
   }
 
   protected List<MergedAnomalyResultDTO> retrieveAnomaliesFromDatabase(List<MergedAnomalyResultDTO> generated) {

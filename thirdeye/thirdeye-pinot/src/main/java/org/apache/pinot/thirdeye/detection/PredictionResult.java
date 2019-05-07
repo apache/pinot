@@ -22,7 +22,7 @@
 
 package org.apache.pinot.thirdeye.detection;
 
-import org.apache.pinot.thirdeye.detection.spi.model.TimeSeries;
+import org.apache.pinot.thirdeye.dataframe.DataFrame;
 
 
 /**
@@ -31,12 +31,18 @@ import org.apache.pinot.thirdeye.detection.spi.model.TimeSeries;
 public class PredictionResult {
   private final String detectorName;
   private final String metricUrn;
-  private final TimeSeries baselineTimeSeries;
+  private final DataFrame predictedTimeSeries;
 
-  public PredictionResult(String detectorName, String metricUrn, TimeSeries baselineTimeSeries) {
+  /**
+   * Construct a prediction result
+   * @param detectorName the name for the detector, for example "detection_rule_1:PERCENTAGE_RULE"
+   * @param metricUrn the metric urn
+   * @param predictedTimeSeries the predicted time series
+   */
+  public PredictionResult(String detectorName, String metricUrn, DataFrame predictedTimeSeries) {
     this.detectorName = detectorName;
     this.metricUrn = metricUrn;
-    this.baselineTimeSeries = baselineTimeSeries;
+    this.predictedTimeSeries = predictedTimeSeries;
   }
 
   public String getDetectorName() {
@@ -47,7 +53,13 @@ public class PredictionResult {
     return metricUrn;
   }
 
-  public TimeSeries getBaselineTimeSeries() {
-    return baselineTimeSeries;
+  public DataFrame getPredictedTimeSeries() {
+    return predictedTimeSeries;
+  }
+
+  @Override
+  public String toString() {
+    return "PredictionResult{" + "detectorName='" + detectorName + '\'' + ", metricUrn='" + metricUrn + '\''
+        + ", predictedTimeSeries=" + predictedTimeSeries + '}';
   }
 }
