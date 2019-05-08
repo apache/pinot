@@ -186,7 +186,7 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
         minConsumingFreshnessTs = 0L;
       }
       brokerResponseNative.setNumConsumingSegmentsQueried(numConsumingQueried);
-      brokerResponseNative.setMinLastIngestionTimeMs(minConsumingFreshnessTs);
+      brokerResponseNative.setMinConsumingFreshnessTimeMs(minConsumingFreshnessTs);
     }
 
     // Update broker metrics.

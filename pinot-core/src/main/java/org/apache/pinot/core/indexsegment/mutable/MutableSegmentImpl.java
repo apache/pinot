@@ -389,11 +389,6 @@ public class MutableSegmentImpl implements MutableSegment {
   }
 
   @Override
-  public IndexSegmentType getType() {
-    return IndexSegmentType.MUTABLE;
-  }
-
-  @Override
   public String getSegmentName() {
     return _segmentName;
   }

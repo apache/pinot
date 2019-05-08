@@ -39,7 +39,7 @@ import org.apache.pinot.common.utils.JsonUtils;
  *
  * Supports serialization via JSON.
  */
-@JsonPropertyOrder({"selectionResults", "aggregationResults", "exceptions", "numServersQueried", "numServersResponded", "numSegmentsQueried", "numSegmentsProcessed", "numSegmentsMatched", "numDocsScanned", "numEntriesScannedInFilter", "numEntriesScannedPostFilter", "numGroupsLimitReached", "totalDocs", "timeUsedMs", "segmentStatistics", "traceInfo"})
+@JsonPropertyOrder({"selectionResults", "aggregationResults", "exceptions", "numServersQueried", "numServersResponded", "numSegmentsQueried", "numSegmentsProcessed", "numSegmentsMatched", "numConsumingSegmentsQueried", "numDocsScanned", "numEntriesScannedInFilter", "numEntriesScannedPostFilter", "numGroupsLimitReached", "totalDocs", "timeUsedMs", "segmentStatistics", "traceInfo"})
 public class BrokerResponseNative implements BrokerResponse {
   public static final BrokerResponseNative EMPTY_RESULT = BrokerResponseNative.empty();
   public static final BrokerResponseNative NO_TABLE_RESULT =
@@ -54,7 +54,9 @@ public class BrokerResponseNative implements BrokerResponse {
   private long _numSegmentsProcessed = 0L;
   private long _numSegmentsMatched = 0L;
   private long _numConsumingSegmentsQueried = 0L;
-  private long _minLastIngestionTimeMs = 0L;
+  // the timestamp indicating the freshness of the data queried in consuming segments.
+  // This can be ingestion timestamp if provided by the stream, or the last index time
+  private long _minConsumingFreshnessTimeMs = 0L;
 
   private long _totalDocs = 0L;
   private boolean _numGroupsLimitReached = false;
@@ -205,24 +207,24 @@ public class BrokerResponseNative implements BrokerResponse {
     _numSegmentsMatched = numSegmentsMatched;
   }
 
-  @JsonProperty("numConsumingQueried")
+  @JsonProperty("numConsumingSegmentsQueried")
   public long getNumConsumingSegmentsQueried() {
     return _numConsumingSegmentsQueried;
   }
 
-  @JsonProperty("numConsumingQueried")
+  @JsonProperty("numConsumingSegmentsQueried")
   public void setNumConsumingSegmentsQueried(long queried) {
     _numConsumingSegmentsQueried = queried;
   }
 
   @JsonProperty("minConsumingFreshnessTimeMs")
-  public long getMinLastIngestionTimeMs() {
-    return _minLastIngestionTimeMs;
+  public long getMinConsumingFreshnessTimeMs() {
+    return _minConsumingFreshnessTimeMs;
   }
 
   @JsonProperty("minConsumingFreshnessTimeMs")
-  public void setMinLastIngestionTimeMs(long ts) {
-    _minLastIngestionTimeMs = ts;
+  public void setMinConsumingFreshnessTimeMs(long ts) {
+    _minConsumingFreshnessTimeMs = ts;
   }
 
 

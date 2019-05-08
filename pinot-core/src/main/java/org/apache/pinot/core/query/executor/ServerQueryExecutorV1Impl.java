@@ -42,6 +42,7 @@ import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.SegmentDataManager;
 import org.apache.pinot.core.data.manager.TableDataManager;
 import org.apache.pinot.core.indexsegment.IndexSegment;
+import org.apache.pinot.core.indexsegment.mutable.MutableSegment;
 import org.apache.pinot.core.plan.Plan;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.core.plan.maker.PlanMaker;
@@ -155,7 +156,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     long minIngestionTime = Long.MAX_VALUE;
     // gather stats for realtime consuming segments
     for (SegmentDataManager segmentMgr : segmentDataManagers) {
-      if (segmentMgr.getSegment().getType() == IndexSegment.IndexSegmentType.MUTABLE) {
+      if (segmentMgr.getSegment() instanceof MutableSegment) {
         numConsuming += 1;
         SegmentMetadata metadata = segmentMgr.getSegment().getSegmentMetadata();
         long indexedTime = metadata.getLastIndexedTimestamp();
