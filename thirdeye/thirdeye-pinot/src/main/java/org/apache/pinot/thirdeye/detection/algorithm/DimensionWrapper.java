@@ -34,6 +34,7 @@ import org.apache.pinot.thirdeye.detection.DetectionPipelineException;
 import org.apache.pinot.thirdeye.detection.DetectionPipeline;
 import org.apache.pinot.thirdeye.detection.DetectionPipelineResult;
 import org.apache.pinot.thirdeye.detection.DetectionUtils;
+import org.apache.pinot.thirdeye.detection.PredictionResult;
 import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -222,6 +223,7 @@ public class DimensionWrapper extends DetectionPipeline {
     }
 
     List<MergedAnomalyResultDTO> anomalies = new ArrayList<>();
+    List<PredictionResult> predictionResults = new ArrayList<>();
     Map<String, Object> diagnostics = new HashMap<>();
     Set<Long> lastTimeStamps = new HashSet<>();
 
@@ -239,6 +241,7 @@ public class DimensionWrapper extends DetectionPipeline {
           lastTimeStamps.add(intermediate.getLastTimestamp());
           anomalies.addAll(intermediate.getAnomalies());
           diagnostics.put(metric.getUrn(), intermediate.getDiagnostics());
+          predictionResults.addAll(intermediate.getPredictions());
         }
         successNestedMetrics++;
       } catch (Exception e) {
@@ -249,7 +252,7 @@ public class DimensionWrapper extends DetectionPipeline {
     }
 
     checkNestedMetricsStatus(totalNestedMetrics, successNestedMetrics, lastException);
-    return new DetectionPipelineResult(anomalies, DetectionUtils.consolidateNestedLastTimeStamps(lastTimeStamps))
+    return new DetectionPipelineResult(anomalies, DetectionUtils.consolidateNestedLastTimeStamps(lastTimeStamps), predictionResults)
         .setDiagnostics(diagnostics);
   }
 

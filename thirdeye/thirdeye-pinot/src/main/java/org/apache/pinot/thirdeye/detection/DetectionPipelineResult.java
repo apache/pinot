@@ -19,6 +19,7 @@
 
 package org.apache.pinot.thirdeye.detection;
 
+import java.util.Collections;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import java.util.HashMap;
 import java.util.List;
@@ -29,38 +30,45 @@ public class DetectionPipelineResult {
   public static String DIAGNOSTICS_DATA = "data";
   public static String DIAGNOSTICS_CHANGE_POINTS = "changepoints";
 
-  Map<String, Object> diagnostics;
-  List<MergedAnomalyResultDTO> anomalies;
-  long lastTimestamp;
+  private Map<String, Object> diagnostics;
+  // detected anomalies
+  private final List<MergedAnomalyResultDTO> anomalies;
+  // last time stamp, all data point before this time stamp has been inspected
+  private final long lastTimestamp;
+  // predicted baselines result
+  private final List<PredictionResult> predictions;
 
   public DetectionPipelineResult(List<MergedAnomalyResultDTO> anomalies) {
-    this.anomalies = anomalies;
-    this.lastTimestamp = getMaxTime(anomalies);
+    this(anomalies, getMaxTime(anomalies), Collections.emptyList());
     this.diagnostics = new HashMap<>();
   }
 
   public DetectionPipelineResult(List<MergedAnomalyResultDTO> anomalies, long lastTimestamp) {
+    this(anomalies, lastTimestamp, Collections.emptyList());
+    this.diagnostics = new HashMap<>();
+  }
+
+  public DetectionPipelineResult(List<MergedAnomalyResultDTO> anomalies, long lastTimestamp,
+      List<PredictionResult> predictedTimeSeries) {
     this.anomalies = anomalies;
     this.lastTimestamp = lastTimestamp;
+    this.predictions = predictedTimeSeries;
+    this.diagnostics = new HashMap<>();
+  }
+
+  public List<PredictionResult> getPredictions() {
+    return predictions;
   }
 
   public List<MergedAnomalyResultDTO> getAnomalies() {
     return anomalies;
   }
 
-  public DetectionPipelineResult setAnomalies(List<MergedAnomalyResultDTO> anomalies) {
-    this.anomalies = anomalies;
-    return this;
-  }
 
   public long getLastTimestamp() {
     return lastTimestamp;
   }
 
-  public DetectionPipelineResult setLastTimestamp(long lastTimestamp) {
-    this.lastTimestamp = lastTimestamp;
-    return this;
-  }
 
   public Map<String, Object> getDiagnostics() {
     return diagnostics;

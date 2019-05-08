@@ -21,6 +21,7 @@ package org.apache.pinot.thirdeye.detection.wrapper;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -30,6 +31,7 @@ import org.apache.commons.collections.MapUtils;
 import org.apache.pinot.thirdeye.anomaly.detection.DetectionJobSchedulerUtils;
 import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.common.time.TimeSpec;
+import org.apache.pinot.thirdeye.dataframe.DataFrame;
 import org.apache.pinot.thirdeye.dataframe.DoubleSeries;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
 import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFunctionDTO;
@@ -42,9 +44,11 @@ import org.apache.pinot.thirdeye.detection.DetectionPipeline;
 import org.apache.pinot.thirdeye.detection.DetectionPipelineException;
 import org.apache.pinot.thirdeye.detection.DetectionPipelineResult;
 import org.apache.pinot.thirdeye.detection.DetectionUtils;
+import org.apache.pinot.thirdeye.detection.PredictionResult;
 import org.apache.pinot.thirdeye.detection.spi.components.AnomalyDetector;
 import org.apache.pinot.thirdeye.detection.spi.exception.DetectorDataInsufficientException;
 import org.apache.pinot.thirdeye.detection.spi.model.DetectionResult;
+import org.apache.pinot.thirdeye.detection.spi.model.TimeSeries;
 import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
 import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
 import org.joda.time.DateTime;
@@ -84,7 +88,9 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
   private static final long CACHING_PERIOD_LOOKBACK_MINUTELY = -1;
   // fail detection job if it failed successively for the first 5 windows
   private static final long EARLY_TERMINATE_WINDOW = 5;
-
+  // expression to consolidate the time series
+  private static final String[] TIMESERIES_AGGREGATION_EXPRESSIONS =
+      {COL_VALUE + ":last", COL_CURRENT + ":last", COL_LOWER_BOUND + ":last", COL_UPPER_BOUND + ":last"};
   private static final Logger LOG = LoggerFactory.getLogger(AnomalyDetectorWrapper.class);
 
   private final String metricUrn;
@@ -159,6 +165,7 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
 
     List<Interval> monitoringWindows = this.getMonitoringWindows();
     List<MergedAnomalyResultDTO> anomalies = new ArrayList<>();
+    TimeSeries predictedResult = TimeSeries.empty();
     int totalWindows = monitoringWindows.size();
     int successWindows = 0;
     // The last exception of the detection windows. It will be thrown out to upper level.
@@ -188,6 +195,7 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
         lastException = e;
       }
       anomalies.addAll(detectionResult.getAnomalies());
+      predictedResult = consolidateTimeSeries(predictedResult, detectionResult.getTimeseries());
     }
 
     checkMovingWindowDetectionStatus(totalWindows, successWindows, lastException);
@@ -201,8 +209,26 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
       anomaly.getProperties().put(PROP_DETECTOR_COMPONENT_NAME, this.detectorName);
     }
     long lastTimeStamp = this.getLastTimeStamp();
-    return new DetectionPipelineResult(anomalies.stream().filter(anomaly -> anomaly.getEndTime() <= lastTimeStamp).collect(
-        Collectors.toList()), lastTimeStamp);
+    List<MergedAnomalyResultDTO> anomalyResults = anomalies.stream().filter(anomaly -> anomaly.getEndTime() <= lastTimeStamp).collect(
+        Collectors.toList());
+    PredictionResult predictedTimeSeries = new PredictionResult(this.detectorName, this.metricUrn, predictedResult.getDataFrame());
+    return new DetectionPipelineResult(anomalyResults, lastTimeStamp, Collections.singletonList(predictedTimeSeries));
+  }
+
+  /**
+   * Join two time series, including current, baseline, lower bound and upper bound.
+   * If two time series have overlapped region, take the value in the right time series
+   * @param leftTimeSeries timeseries 1
+   * @param rightTimeSeries timeseries 2
+   * @return the consolidated time series
+   */
+  static TimeSeries consolidateTimeSeries(TimeSeries leftTimeSeries, TimeSeries rightTimeSeries) {
+    DataFrame df1 = leftTimeSeries.getDataFrame();
+    DataFrame df2 = rightTimeSeries.getDataFrame();
+    DataFrame consolidatedDf = df1.append(df2)
+        .groupByValue(COL_TIME)
+        .aggregate(TIMESERIES_AGGREGATION_EXPRESSIONS);
+    return TimeSeries.fromDataFrame(consolidatedDf);
   }
 
   private void checkEarlyStop(int totalWindows, int successWindows, int i, Exception lastException) throws DetectionPipelineException {
