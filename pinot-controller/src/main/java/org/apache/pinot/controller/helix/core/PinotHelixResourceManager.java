@@ -1113,7 +1113,11 @@ public class PinotHelixResourceManager {
         ZKMetadataProvider.setRealtimeTableConfig(_propertyStore, tableNameWithType, tableConfig.toZNRecord());
 
         // Update replica group partition assignment to the property store if applicable
-        updateReplicaGroupPartitionAssignment(tableConfig);
+        IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+        StreamConfig streamConfig = new StreamConfig(indexingConfig.getStreamConfigs());
+        if (streamConfig.hasLowLevelConsumerType() && !streamConfig.hasHighLevelConsumerType()) {
+          updateReplicaGroupPartitionAssignment(tableConfig);
+        }
 
         /*
          * PinotRealtimeSegmentManager sets up watches on table and segment path. When a table gets created,
@@ -1127,7 +1131,6 @@ public class PinotHelixResourceManager {
          * We also need to support the case when a high-level consumer already exists for a table and we are adding
          * the low-level consumers.
          */
-        IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
         ensureRealtimeClusterIsSetUp(tableConfig, tableNameWithType, indexingConfig);
 
         LOGGER.info("Successfully added or updated the table {} ", tableNameWithType);
@@ -1340,13 +1343,18 @@ public class PinotHelixResourceManager {
   public void setExistingTableConfig(TableConfig tableConfig, String tableNameWithType, TableType tableType)
       throws IOException {
 
-    // Update replica group partition assignment to the property store if applicable
-    updateReplicaGroupPartitionAssignment(tableConfig);
-
     if (tableType == TableType.REALTIME) {
+      IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+      StreamConfig streamConfig = new StreamConfig(indexingConfig.getStreamConfigs());
+      if (streamConfig.hasLowLevelConsumerType() && !streamConfig.hasHighLevelConsumerType()) {
+        updateReplicaGroupPartitionAssignment(tableConfig);
+      }
       ZKMetadataProvider.setRealtimeTableConfig(_propertyStore, tableNameWithType, tableConfig.toZNRecord());
-      ensureRealtimeClusterIsSetUp(tableConfig, tableNameWithType, tableConfig.getIndexingConfig());
+      ensureRealtimeClusterIsSetUp(tableConfig, tableNameWithType, indexingConfig);
     } else if (tableType == TableType.OFFLINE) {
+      // Update replica group partition assignment to the property store if applicable
+      updateReplicaGroupPartitionAssignment(tableConfig);
+
       ZKMetadataProvider.setOfflineTableConfig(_propertyStore, tableNameWithType, tableConfig.toZNRecord());
       IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableNameWithType);
       final String configReplication = tableConfig.getValidationConfig().getReplication();
