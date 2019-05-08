@@ -26,10 +26,12 @@ import org.apache.pinot.thirdeye.anomaly.task.TaskRunner;
 import org.apache.pinot.thirdeye.anomaly.utils.ThirdeyeMetricsUtil;
 import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
+import org.apache.pinot.thirdeye.datalayer.bao.EvaluationManager;
 import org.apache.pinot.thirdeye.datalayer.bao.EventManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.EvaluationDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
@@ -47,6 +49,7 @@ public class DetectionPipelineTaskRunner implements TaskRunner {
   private static final Logger LOG = LoggerFactory.getLogger(DetectionPipelineTaskRunner.class);
   private final DetectionConfigManager detectionDAO;
   private final MergedAnomalyResultManager anomalyDAO;
+  private final EvaluationManager evaluationDAO;
   private final DetectionPipelineLoader loader;
   private final DataProvider provider;
 
@@ -61,7 +64,7 @@ public class DetectionPipelineTaskRunner implements TaskRunner {
     this.loader = new DetectionPipelineLoader();
     this.detectionDAO = DAORegistry.getInstance().getDetectionConfigManager();
     this.anomalyDAO = DAORegistry.getInstance().getMergedAnomalyResultDAO();
-
+    this.evaluationDAO = DAORegistry.getInstance().getEvaluationManager();
     MetricConfigManager metricDAO = DAORegistry.getInstance().getMetricConfigDAO();
     DatasetConfigManager datasetDAO = DAORegistry.getInstance().getDatasetConfigDAO();
     EventManager eventDAO = DAORegistry.getInstance().getEventDAO();
@@ -84,13 +87,15 @@ public class DetectionPipelineTaskRunner implements TaskRunner {
    *
    * @param detectionDAO detection config DAO
    * @param anomalyDAO merged anomaly DAO
+   * @param evaluationDAO the evaluation DAO
    * @param loader pipeline loader
    * @param provider pipeline data provider
    */
-  public DetectionPipelineTaskRunner(DetectionConfigManager detectionDAO, MergedAnomalyResultManager anomalyDAO,
-      DetectionPipelineLoader loader, DataProvider provider) {
+  DetectionPipelineTaskRunner(DetectionConfigManager detectionDAO, MergedAnomalyResultManager anomalyDAO,
+      EvaluationManager evaluationDAO, DetectionPipelineLoader loader, DataProvider provider) {
     this.detectionDAO = detectionDAO;
     this.anomalyDAO = anomalyDAO;
+    this.evaluationDAO = evaluationDAO;
     this.loader = loader;
     this.provider = provider;
   }
@@ -122,6 +127,10 @@ public class DetectionPipelineTaskRunner implements TaskRunner {
         if (mergedAnomalyResultDTO.getId() == null) {
           LOG.warn("Could not store anomaly:\n{}", mergedAnomalyResultDTO);
         }
+      }
+
+      for (EvaluationDTO evaluationDTO : result.getEvaluations()) {
+        this.evaluationDAO.save(evaluationDTO);
       }
 
       return Collections.emptyList();
