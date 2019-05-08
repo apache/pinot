@@ -19,7 +19,9 @@
 package org.apache.pinot.pql.parsers;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.Expression;
@@ -29,12 +31,18 @@ import org.apache.pinot.common.request.FilterQuery;
 import org.apache.pinot.common.request.FilterQueryMap;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.GroupBy;
+import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.request.QuerySource;
 import org.apache.pinot.common.request.QueryType;
 import org.apache.pinot.common.request.Selection;
+import org.apache.pinot.common.request.SelectionSort;
+import org.apache.pinot.pql.parsers.pql2.ast.FilterKind;
+
 
 public class PinotQuery2BrokerRequestConverter {
+
+  static Map<FilterKind, FilterOperator> filterOperatorMapping;
 
   public BrokerRequest convert(PinotQuery pinotQuery) {
     BrokerRequest brokerRequest = new BrokerRequest();
@@ -49,14 +57,16 @@ public class PinotQuery2BrokerRequestConverter {
     //Handle select list
     handleSelectList(pinotQuery, brokerRequest);
 
+    //Handle order by
+    handleOrderBy(pinotQuery, brokerRequest);
+
     //Handle group by
-    GroupBy groupBy = handleGroupBy(pinotQuery);
+    handleGroupBy(pinotQuery, brokerRequest);
 
     //Query Type
     QueryType queryType = new QueryType();
-    if (brokerRequest.getAggregationsInfo() != null
-        && brokerRequest.getAggregationsInfo().size() > 0) {
-      if (groupBy != null) {
+    if (brokerRequest.getAggregationsInfo() != null && brokerRequest.getAggregationsInfo().size() > 0) {
+      if (brokerRequest.getGroupBy() != null) {
         queryType.setHasGroup_by(true);
       } else {
         queryType.setHasAggregation(true);
@@ -64,31 +74,51 @@ public class PinotQuery2BrokerRequestConverter {
     } else {
       queryType.setHasSelection(true);
     }
-    brokerRequest.setQueryType(queryType);
+    // Commenting this out since the current code does not set it.
+    // brokerRequest.setQueryType(queryType);
 
     //TODO: these should not be part of the query?
     //brokerRequest.setEnableTrace();
     //brokerRequest.setDebugOptions();
-    //brokerRequest.setQueryOptions();
+    brokerRequest.setQueryOptions(pinotQuery.getQueryOptions());
     //brokerRequest.setBucketHashKey();
     //brokerRequest.setDuration();
 
     return brokerRequest;
   }
 
-  private GroupBy handleGroupBy(PinotQuery pinotQuery) {
-    GroupBy groupBy = null;
+  private void handleOrderBy(PinotQuery pinotQuery, BrokerRequest brokerRequest) {
+    if (brokerRequest.getSelections() == null || pinotQuery.getOrderByList() == null) {
+      return;
+    }
+    List<SelectionSort> sortSequenceList = new ArrayList<>();
+    final List<Expression> orderByList = pinotQuery.getOrderByList();
+    for (Expression orderByExpr : orderByList) {
+      SelectionSort selectionSort = new SelectionSort();
+      if (orderByExpr.getFunctionCall().getOperator().equalsIgnoreCase("ASC")) {
+        selectionSort.setIsAsc(true);
+      } else {
+        selectionSort.setIsAsc(false);
+      }
+      selectionSort.setColumn(orderByExpr.getFunctionCall().getOperands().get(0).getIdentifier().getName());
+      sortSequenceList.add(selectionSort);
+    }
+    if (!sortSequenceList.isEmpty()) {
+      brokerRequest.getSelections().setSelectionSortSequence(sortSequenceList);
+    }
+  }
+
+  private void handleGroupBy(PinotQuery pinotQuery, BrokerRequest brokerRequest) {
     List<Expression> groupByList = pinotQuery.getGroupByList();
     if (groupByList != null && groupByList.size() > 0) {
-
-      groupBy = new GroupBy();
+      GroupBy groupBy = new GroupBy();
       for (Expression expression : groupByList) {
-        String expressionStr = standardizeExpression(expression);
+        String expressionStr = standardizeExpression(expression, true);
         groupBy.addToExpressions(expressionStr);
       }
       groupBy.setTopN(pinotQuery.getLimit());
+      brokerRequest.setGroupBy(groupBy);
     }
-    return groupBy;
   }
 
   private void handleSelectList(PinotQuery pinotQuery, BrokerRequest brokerRequest) {
@@ -101,7 +131,7 @@ public class PinotQuery2BrokerRequestConverter {
           if (selection == null) {
             selection = new Selection();
           }
-          selection.addToSelectionColumns(expression.getLiteral().getValue());
+          selection.addToSelectionColumns(expression.getLiteral().getStringValue());
           break;
         case IDENTIFIER:
           if (selection == null) {
@@ -120,8 +150,12 @@ public class PinotQuery2BrokerRequestConverter {
     }
 
     if (selection != null) {
-      selection.setOffset(pinotQuery.getOffset());
-      selection.setSize(pinotQuery.getLimit());
+      if (pinotQuery.isSetOffset()) {
+        selection.setOffset(pinotQuery.getOffset());
+      }
+      if (pinotQuery.isSetLimit()) {
+        selection.setSize(pinotQuery.getLimit());
+      }
       brokerRequest.setSelections(selection);
     }
 
@@ -143,19 +177,36 @@ public class PinotQuery2BrokerRequestConverter {
     }
   }
 
-  private String standardizeExpression(Expression expression) {
+  private String standardizeExpression(Expression expression, boolean treatLiteralAsIdentifier) {
+    return standardizeExpression(expression, treatLiteralAsIdentifier, false);
+  }
+
+  private String standardizeExpression(Expression expression, boolean treatLiteralAsIdentifier,
+      boolean forceSingleQuoteOnNonStringLiteral) {
     switch (expression.getType()) {
       case LITERAL:
-        return expression.getLiteral().getValue();
+        Literal literal = expression.getLiteral();
+        // Force single quote on non-string literal inside a function.
+        if (forceSingleQuoteOnNonStringLiteral && !literal.isSetStringValue()) {
+          return "'" + literal.getFieldValue() + "'";
+        }
+        if (treatLiteralAsIdentifier || !literal.isSetStringValue()) {
+          return literal.getFieldValue().toString();
+        } else {
+          return "'" + literal.getFieldValue() + "'";
+        }
       case IDENTIFIER:
         return expression.getIdentifier().getName();
       case FUNCTION:
         Function functionCall = expression.getFunctionCall();
         StringBuilder sb = new StringBuilder();
-        sb.append(functionCall.getOperator());
+        sb.append(functionCall.getOperator().toLowerCase());
         sb.append("(");
+        String delim = "";
         for (Expression operand : functionCall.getOperands()) {
-          sb.append(standardizeExpression(operand));
+          sb.append(delim);
+          sb.append(standardizeExpression(operand, false, true));
+          delim = ",";
         }
         sb.append(")");
         return sb.toString();
@@ -168,9 +219,7 @@ public class PinotQuery2BrokerRequestConverter {
     List<Expression> operands = function.getOperands();
     if (operands == null || operands.size() != 1) {
       throw new Pql2CompilationException(
-          "Aggregation function" + function.getOperator() + " expects 1 argument. found: "
-              + operands);
-
+          "Aggregation function" + function.getOperator() + " expects 1 argument. found: " + operands);
     }
     String functionName = function.getOperator();
     String columnName;
@@ -181,15 +230,16 @@ public class PinotQuery2BrokerRequestConverter {
 
       switch (functionParam.getType()) {
         case LITERAL:
-          columnName = functionParam.getLiteral().getValue();
+          columnName = functionParam.getLiteral().getStringValue();
           break;
         case IDENTIFIER:
           columnName = functionParam.getIdentifier().getName();
           break;
         case FUNCTION:
+          columnName = standardizeExpression(functionParam, false, true);
+          break;
         default:
-          throw new UnsupportedOperationException(
-              "Aggregation function does not support functions as arguments");
+          throw new UnsupportedOperationException("Unrecognized functionParamType:" + functionParam.getType());
       }
     }
     AggregationInfo aggregationInfo = new AggregationInfo();
@@ -199,8 +249,7 @@ public class PinotQuery2BrokerRequestConverter {
     return aggregationInfo;
   }
 
-  private FilterQuery traverseFilterExpression(Expression filterExpression,
-      FilterQueryMap filterSubQueryMap) {
+  private FilterQuery traverseFilterExpression(Expression filterExpression, FilterQueryMap filterSubQueryMap) {
     FilterQuery filterQuery = new FilterQuery();
     int id = filterSubQueryMap.getFilterQueryMapSize();
     filterQuery.setId(id);
@@ -214,7 +263,8 @@ public class PinotQuery2BrokerRequestConverter {
       case FUNCTION:
         Function functionCall = filterExpression.getFunctionCall();
         String operator = functionCall.getOperator();
-        FilterOperator filterOperator = FilterOperator.valueOf(operator);
+        FilterKind filterKind = FilterKind.valueOf(operator);
+        FilterOperator filterOperator = filterOperatorMapping.get(filterKind);
         filterQuery.setOperator(filterOperator);
         List<Expression> operands = functionCall.getOperands();
         switch (filterOperator) {
@@ -227,7 +277,6 @@ public class PinotQuery2BrokerRequestConverter {
             break;
           case EQUALITY:
           case NOT:
-          case RANGE:
           case REGEXP_LIKE:
           case NOT_IN:
           case IN:
@@ -238,24 +287,76 @@ public class PinotQuery2BrokerRequestConverter {
             for (int i = 0; i < operands.size(); i++) {
               Expression operand = operands.get(i);
               if (i == 0) {
-                column = standardizeExpression(operand);
+                column = standardizeExpression(operand, false);
               } else {
-                valueList.add(standardizeExpression(operand));
+                valueList.add(standardizeExpression(operand, true));
               }
             }
             filterQuery.setColumn(column);
             filterQuery.setValue(valueList);
+            break;
+          case RANGE:
+            handleRange(filterQuery, filterKind, operands);
             break;
           default:
             throw new UnsupportedOperationException("Filter UDF not supported");
         }
         break;
     }
-    if (childFilterIds.size() > 0) {
-      filterQuery.setNestedFilterQueryIds(childFilterIds);
-    }
+    filterQuery.setNestedFilterQueryIds(childFilterIds);
     return filterQuery;
   }
 
+  private void handleRange(FilterQuery filterQuery, FilterKind filterKind, List<Expression> operands) {
 
+    filterQuery.setColumn(standardizeExpression(operands.get(0), false));
+
+    String rangeExpression;
+    //PQL does not quote the string literals when we create expression
+    boolean treatLiteralAsIdentifier = true;
+
+    if (FilterKind.LESS_THAN == filterKind) {
+
+      String value = standardizeExpression(operands.get(1), treatLiteralAsIdentifier);
+      rangeExpression = "(*\t\t" + value + ")";
+    } else if (FilterKind.LESS_THAN_OR_EQUAL == filterKind) {
+
+      String value = standardizeExpression(operands.get(1), treatLiteralAsIdentifier);
+      rangeExpression = "(*\t\t" + value + "]";
+    } else if (FilterKind.GREATER_THAN == filterKind) {
+
+      String value = standardizeExpression(operands.get(1), treatLiteralAsIdentifier);
+      rangeExpression = "(" + value + "\t\t*)";
+    } else if (FilterKind.GREATER_THAN_OR_EQUAL == filterKind) {
+
+      String value = standardizeExpression(operands.get(1), treatLiteralAsIdentifier);
+      rangeExpression = "[" + value + "\t\t*)";
+    } else if (FilterKind.BETWEEN == filterKind) {
+
+      String left = standardizeExpression(operands.get(1), treatLiteralAsIdentifier);
+      String right = standardizeExpression(operands.get(2), treatLiteralAsIdentifier);
+      rangeExpression = "[" + left + "\t\t" + right + "]";
+    } else {
+      throw new UnsupportedOperationException("Unknown Filter Kind:" + filterKind);
+    }
+    List<String> valueList = new ArrayList<>();
+    valueList.add(rangeExpression);
+    filterQuery.setValue(valueList);
+  }
+
+  static {
+    filterOperatorMapping = new HashMap<>();
+    filterOperatorMapping.put(FilterKind.AND, FilterOperator.AND);
+    filterOperatorMapping.put(FilterKind.OR, FilterOperator.OR);
+    filterOperatorMapping.put(FilterKind.EQUALS, FilterOperator.EQUALITY);
+    filterOperatorMapping.put(FilterKind.NOT_EQUALS, FilterOperator.NOT);
+    filterOperatorMapping.put(FilterKind.GREATER_THAN, FilterOperator.RANGE);
+    filterOperatorMapping.put(FilterKind.LESS_THAN, FilterOperator.RANGE);
+    filterOperatorMapping.put(FilterKind.GREATER_THAN_OR_EQUAL, FilterOperator.RANGE);
+    filterOperatorMapping.put(FilterKind.LESS_THAN_OR_EQUAL, FilterOperator.RANGE);
+    filterOperatorMapping.put(FilterKind.BETWEEN, FilterOperator.RANGE);
+    filterOperatorMapping.put(FilterKind.IN, FilterOperator.IN);
+    filterOperatorMapping.put(FilterKind.NOT_IN, FilterOperator.NOT_IN);
+    filterOperatorMapping.put(FilterKind.REGEXP_LIKE, FilterOperator.REGEXP_LIKE);
+  }
 }

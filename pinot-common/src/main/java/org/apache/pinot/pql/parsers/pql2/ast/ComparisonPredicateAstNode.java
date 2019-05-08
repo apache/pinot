@@ -167,7 +167,7 @@ public class ComparisonPredicateAstNode extends PredicateAstNode {
       if (_identifier != null && _literal != null) {
         Expression expr = RequestUtils.getFunctionExpression(FilterKind.EQUALS.name());
         expr.getFunctionCall().addToOperands(RequestUtils.getIdentifierExpression(_identifier));
-        expr.getFunctionCall().addToOperands(RequestUtils.getLiteralExpression(_literal.getValueAsString()));
+        expr.getFunctionCall().addToOperands(RequestUtils.getLiteralExpression(_literal));
         return expr;
       } else {
         throw new Pql2CompilationException("Comparison is not between a column and a constant");
@@ -176,7 +176,7 @@ public class ComparisonPredicateAstNode extends PredicateAstNode {
       if (_identifier != null && _literal != null) {
         Expression expr = RequestUtils.getFunctionExpression(FilterKind.NOT_EQUALS.name());
         expr.getFunctionCall().addToOperands(RequestUtils.getIdentifierExpression(_identifier));
-        expr.getFunctionCall().addToOperands(RequestUtils.getLiteralExpression(_literal.getValueAsString()));
+        expr.getFunctionCall().addToOperands(RequestUtils.getLiteralExpression(_literal));
         return expr;
       } else {
         throw new Pql2CompilationException("Comparison is not between a column and a constant");
@@ -217,7 +217,7 @@ public class ComparisonPredicateAstNode extends PredicateAstNode {
           throw new Pql2CompilationException("The comparison operator is not valid/is not supported for HAVING query");
         }
         expr.getFunctionCall().addToOperands(RequestUtils.getIdentifierExpression(_identifier));
-        expr.getFunctionCall().addToOperands(RequestUtils.getLiteralExpression(_literal.getValueAsString()));
+        expr.getFunctionCall().addToOperands(RequestUtils.getLiteralExpression(_literal));
         return expr;
       } else {
         throw new Pql2CompilationException("One column is needed for comparison.");

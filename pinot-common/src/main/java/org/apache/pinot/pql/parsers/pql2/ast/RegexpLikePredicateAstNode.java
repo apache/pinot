@@ -82,7 +82,7 @@ public class RegexpLikePredicateAstNode extends PredicateAstNode {
     if (_identifier == null) {
       throw new Pql2CompilationException("REGEXP_LIKE predicate has no identifier");
     }
-    final Expression expression = RequestUtils.getFunctionExpression(FilterKind.LIKE.name());
+    final Expression expression = RequestUtils.getFunctionExpression(FilterKind.REGEXP_LIKE.name());
     expression.getFunctionCall().addToOperands(RequestUtils.getIdentifierExpression(_identifier));
     for (AstNode astNode : getChildren()) {
       expression.getFunctionCall().addToOperands(TransformExpressionTree.getExpression(astNode));
