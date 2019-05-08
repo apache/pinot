@@ -26,6 +26,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.config.SegmentPartitionConfig;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.Schema;
@@ -98,8 +99,8 @@ public class MutableSegmentImpl implements MutableSegment {
 
   // default message metadata
   private static final StreamMessageMetadata _defaultMetadata = new StreamMessageMetadata(System.currentTimeMillis());
-  private volatile long _lastIndexedTimestamp = Long.MIN_VALUE;
-  private volatile long _latestIngestionTimestamp = Long.MIN_VALUE;
+  private volatile long _lastIndexedTimeMs = Long.MIN_VALUE;
+  private volatile long _latestIngestionTimeMs = Long.MIN_VALUE;
 
   public MutableSegmentImpl(RealtimeSegmentConfig config) {
     _segmentName = config.getSegmentName();
@@ -119,12 +120,12 @@ public class MutableSegmentImpl implements MutableSegment {
 
       @Override
       public long getLastIndexedTimestamp() {
-        return _lastIndexedTimestamp;
+        return _lastIndexedTimeMs;
       }
 
       @Override
       public long getLatestIngestionTimestamp() {
-        return _latestIngestionTimestamp;
+        return _latestIngestionTimeMs;
       }
     };
 
@@ -212,7 +213,7 @@ public class MutableSegmentImpl implements MutableSegment {
   }
 
   @Override
-  public boolean index(GenericRow row, RowMetadata rowMetadata) {
+  public boolean index(GenericRow row, @Nullable RowMetadata rowMetadata) {
 
     boolean canTakeMore;
     // Update dictionary first
@@ -239,10 +240,10 @@ public class MutableSegmentImpl implements MutableSegment {
       canTakeMore = aggregateMetrics(row, docId);
     }
 
-    _lastIndexedTimestamp = System.currentTimeMillis();
+    _lastIndexedTimeMs = System.currentTimeMillis();
 
     if (rowMetadata != null) {
-      _latestIngestionTimestamp = Math.max(_latestIngestionTimestamp, rowMetadata.getIngestionTimesMs());
+      _latestIngestionTimeMs = Math.max(_latestIngestionTimeMs, rowMetadata.getIngestionTimeMs());
     }
     return canTakeMore;
   }

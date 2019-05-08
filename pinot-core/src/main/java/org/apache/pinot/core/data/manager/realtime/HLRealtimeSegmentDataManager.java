@@ -221,7 +221,7 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
               GenericRow transformedRow = _recordTransformer.transform(consumedRow);
               if (transformedRow != null) {
                 // we currently do not get ingestion data through stream-consumer
-                notFull = realtimeSegment.index(transformedRow, new StreamMessageMetadata(System.currentTimeMillis()));
+                notFull = realtimeSegment.index(transformedRow, null);
                 exceptionSleepMillis = 50L;
               }
             }

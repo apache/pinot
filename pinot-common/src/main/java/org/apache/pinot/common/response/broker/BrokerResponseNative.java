@@ -213,8 +213,8 @@ public class BrokerResponseNative implements BrokerResponse {
   }
 
   @JsonProperty("numConsumingSegmentsQueried")
-  public void setNumConsumingSegmentsQueried(long queried) {
-    _numConsumingSegmentsQueried = queried;
+  public void setNumConsumingSegmentsQueried(long numConsumingSegmentsQueried) {
+    _numConsumingSegmentsQueried = numConsumingSegmentsQueried;
   }
 
   @JsonProperty("minConsumingFreshnessTimeMs")
@@ -223,8 +223,8 @@ public class BrokerResponseNative implements BrokerResponse {
   }
 
   @JsonProperty("minConsumingFreshnessTimeMs")
-  public void setMinConsumingFreshnessTimeMs(long ts) {
-    _minConsumingFreshnessTimeMs = ts;
+  public void setMinConsumingFreshnessTimeMs(long minConsumingFreshnessTimeMs) {
+    _minConsumingFreshnessTimeMs = minConsumingFreshnessTimeMs;
   }
 
 

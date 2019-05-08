@@ -82,8 +82,8 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
     long numSegmentsQueried = 0L;
     long numSegmentsProcessed = 0L;
     long numSegmentsMatched = 0L;
-    long numConsumingQueried = 0L;
-    long minConsumingFreshnessTs = Long.MAX_VALUE;
+    long numConsumingSegmentsQueried = 0L;
+    long minConsumingFreshnessTimeMs = Long.MAX_VALUE;
     long numTotalRawDocs = 0L;
     boolean numGroupsLimitReached = false;
 
@@ -140,12 +140,12 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
 
       String numConsumingString = metadata.get(DataTable.NUM_CONSUMING_SEGMENTS_QUERIED);
       if (numConsumingString != null) {
-        numConsumingQueried += Long.parseLong(numConsumingString);
+        numConsumingSegmentsQueried += Long.parseLong(numConsumingString);
       }
 
-      String minConsumingIndexTsString = metadata.get(DataTable.MIN_CONSUMING_FRESHNESS_TIMESTAMP);
+      String minConsumingIndexTsString = metadata.get(DataTable.MIN_CONSUMING_FRESHNESS_MS);
       if (minConsumingIndexTsString != null) {
-        minConsumingFreshnessTs = Math.min(Long.parseLong(minConsumingIndexTsString), minConsumingFreshnessTs);
+        minConsumingFreshnessTimeMs = Math.min(Long.parseLong(minConsumingIndexTsString), minConsumingFreshnessTimeMs);
       }
 
       String numTotalRawDocsString = metadata.get(DataTable.TOTAL_DOCS_METADATA_KEY);
@@ -180,13 +180,12 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
     brokerResponseNative.setNumSegmentsMatched(numSegmentsMatched);
     brokerResponseNative.setTotalDocs(numTotalRawDocs);
     brokerResponseNative.setNumGroupsLimitReached(numGroupsLimitReached);
-    if (numConsumingQueried > 0) {
-      if (minConsumingFreshnessTs == Long.MAX_VALUE) {
-        LOGGER.error("Invalid lastIndexedTimestamp across {} consuming segments", numConsumingQueried);
-        minConsumingFreshnessTs = 0L;
+    if (numConsumingSegmentsQueried > 0) {
+      if (minConsumingFreshnessTimeMs == Long.MAX_VALUE) {
+        LOGGER.error("Invalid lastIndexedTimestamp across {} consuming segments", numConsumingSegmentsQueried);
       }
-      brokerResponseNative.setNumConsumingSegmentsQueried(numConsumingQueried);
-      brokerResponseNative.setMinConsumingFreshnessTimeMs(minConsumingFreshnessTs);
+      brokerResponseNative.setNumConsumingSegmentsQueried(numConsumingSegmentsQueried);
+      brokerResponseNative.setMinConsumingFreshnessTimeMs(minConsumingFreshnessTimeMs);
     }
 
     // Update broker metrics.

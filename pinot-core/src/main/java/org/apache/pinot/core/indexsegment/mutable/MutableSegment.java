@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.indexsegment.mutable;
 
+import javax.annotation.Nullable;
 import org.apache.pinot.common.metadata.RowMetadata;
 import org.apache.pinot.core.data.GenericRow;
 import org.apache.pinot.core.indexsegment.IndexSegment;
@@ -32,7 +33,7 @@ public interface MutableSegment extends IndexSegment {
    * @param rowMetadata the metadata associated with the message
    * @return Whether the segment is full (i.e. cannot index more record into it)
    */
-   boolean index(GenericRow row, RowMetadata rowMetadata);
+   boolean index(GenericRow row, @Nullable RowMetadata rowMetadata);
 
   /**
    * Returns the number of records already indexed into the segment.

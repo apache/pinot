@@ -151,31 +151,32 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       TraceContext.register(requestId);
     }
 
-    int numConsuming = 0;
-    long minIndexTime = Long.MAX_VALUE;
-    long minIngestionTime = Long.MAX_VALUE;
+    int numConsumingSegmentsQueried = 0;
+    long minIndexTimeMs = Long.MAX_VALUE;
+    long minIngestionTimeMs = Long.MAX_VALUE;
     // gather stats for realtime consuming segments
     for (SegmentDataManager segmentMgr : segmentDataManagers) {
       if (segmentMgr.getSegment() instanceof MutableSegment) {
-        numConsuming += 1;
+        numConsumingSegmentsQueried += 1;
         SegmentMetadata metadata = segmentMgr.getSegment().getSegmentMetadata();
         long indexedTime = metadata.getLastIndexedTimestamp();
-        if (indexedTime != Long.MIN_VALUE && indexedTime < minIndexTime) {
-          minIndexTime = metadata.getLastIndexedTimestamp();
+        if (indexedTime != Long.MIN_VALUE && indexedTime < minIndexTimeMs) {
+          minIndexTimeMs = metadata.getLastIndexedTimestamp();
         }
         long ingestionTime = metadata.getLatestIngestionTimestamp();
-        if (ingestionTime != Long.MIN_VALUE && ingestionTime < minIngestionTime) {
-          minIngestionTime = ingestionTime;
+        if (ingestionTime != Long.MIN_VALUE && ingestionTime < minIngestionTimeMs) {
+          minIngestionTimeMs = ingestionTime;
         }
       }
     }
 
-    if (numConsuming > 0) {
-      if (minIngestionTime == Long.MAX_VALUE) {
+    long minConsumingFreshnessTimeMs = Long.MAX_VALUE;
+    if (numConsumingSegmentsQueried > 0) {
+      if (minIngestionTimeMs == Long.MAX_VALUE) {
         LOGGER.debug("Did not find valid ingestionTimestamp across consuming segments! Using indexTime instead");
-        minIngestionTime = minIndexTime;
+        minConsumingFreshnessTimeMs = minIndexTimeMs;
       }
-      LOGGER.debug("Querying {} consuming segments with min lastIngestionTimestamp {}", numConsuming, minIngestionTime);
+      LOGGER.debug("Querying {} consuming segments with min minConsumingFreshnessTimeMs {}", numConsumingSegmentsQueried, minConsumingFreshnessTimeMs);
     }
 
     DataTable dataTable = null;
@@ -255,9 +256,9 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_MISSING_SEGMENTS, missingSegments);
     }
 
-    if (numConsuming > 0) {
-      dataTable.getMetadata().put(DataTable.NUM_CONSUMING_SEGMENTS_QUERIED, Integer.toString(numConsuming));
-      dataTable.getMetadata().put(DataTable.MIN_CONSUMING_FRESHNESS_TIMESTAMP, Long.toString(minIngestionTime));
+    if (numConsumingSegmentsQueried > 0) {
+      dataTable.getMetadata().put(DataTable.NUM_CONSUMING_SEGMENTS_QUERIED, Integer.toString(numConsumingSegmentsQueried));
+      dataTable.getMetadata().put(DataTable.MIN_CONSUMING_FRESHNESS_MS, Long.toString(minConsumingFreshnessTimeMs));
     }
 
     LOGGER.debug("Query processing time for request Id - {}: {}", requestId, queryProcessingTime);

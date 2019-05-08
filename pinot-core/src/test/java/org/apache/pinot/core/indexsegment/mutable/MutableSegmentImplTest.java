@@ -55,6 +55,7 @@ public class MutableSegmentImplTest {
   private MutableSegmentImpl _mutableSegmentImpl;
   private ImmutableSegment _immutableSegment;
   private long _lastIndexedTs;
+  private long _lastIngestionTimeMs;
   private long _startTimeMs;
 
   @BeforeClass
@@ -76,7 +77,8 @@ public class MutableSegmentImplTest {
     _schema = config.getSchema();
     _mutableSegmentImpl = MutableSegmentImplTestUtils
         .createMutableSegmentImpl(_schema, Collections.emptySet(), Collections.emptySet(), false);
-    StreamMessageMetadata defaultMetadata = new StreamMessageMetadata(System.currentTimeMillis());
+    _lastIngestionTimeMs = System.currentTimeMillis();
+    StreamMessageMetadata defaultMetadata = new StreamMessageMetadata(_lastIngestionTimeMs);
     _startTimeMs = System.currentTimeMillis();
     try (RecordReader recordReader = new AvroRecordReader(avroFile, _schema)) {
       GenericRow reuse = new GenericRow();
@@ -97,6 +99,8 @@ public class MutableSegmentImplTest {
     long actualTs = _mutableSegmentImpl.getSegmentMetadata().getLastIndexedTimestamp();
     Assert.assertTrue(actualTs >= _startTimeMs);
     Assert.assertTrue(actualTs <= _lastIndexedTs);
+
+    Assert.assertEquals(_mutableSegmentImpl.getSegmentMetadata().getLatestIngestionTimestamp(), _lastIngestionTimeMs);
 
     for (FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
       String column = fieldSpec.getName();

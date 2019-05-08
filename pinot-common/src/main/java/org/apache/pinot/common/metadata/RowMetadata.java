@@ -34,5 +34,5 @@ public interface RowMetadata {
   /**
    * Return the ingestion timestamp of the row.
    */
-  long getIngestionTimesMs();
+  long getIngestionTimeMs();
 }
