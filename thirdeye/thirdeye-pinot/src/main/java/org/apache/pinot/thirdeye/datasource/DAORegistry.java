@@ -32,6 +32,7 @@ import org.apache.pinot.thirdeye.datalayer.bao.DetectionAlertConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionStatusManager;
 import org.apache.pinot.thirdeye.datalayer.bao.EntityToEntityMappingManager;
+import org.apache.pinot.thirdeye.datalayer.bao.EvaluationManager;
 import org.apache.pinot.thirdeye.datalayer.bao.EventManager;
 import org.apache.pinot.thirdeye.datalayer.bao.GroupedAnomalyResultsManager;
 import org.apache.pinot.thirdeye.datalayer.bao.JobManager;
@@ -56,6 +57,7 @@ import org.apache.pinot.thirdeye.datalayer.bao.jdbc.DetectionAlertConfigManagerI
 import org.apache.pinot.thirdeye.datalayer.bao.jdbc.DetectionConfigManagerImpl;
 import org.apache.pinot.thirdeye.datalayer.bao.jdbc.DetectionStatusManagerImpl;
 import org.apache.pinot.thirdeye.datalayer.bao.jdbc.EntityToEntityMappingManagerImpl;
+import org.apache.pinot.thirdeye.datalayer.bao.jdbc.EvaluationManagerImpl;
 import org.apache.pinot.thirdeye.datalayer.bao.jdbc.EventManagerImpl;
 import org.apache.pinot.thirdeye.datalayer.bao.jdbc.GroupedAnomalyResultsManagerImpl;
 import org.apache.pinot.thirdeye.datalayer.bao.jdbc.JobManagerImpl;
@@ -189,4 +191,9 @@ public class DAORegistry {
   public DetectionAlertConfigManager getDetectionAlertConfigManager() {
     return DaoProviderUtil.getInstance(DetectionAlertConfigManagerImpl.class);
   }
+
+  public EvaluationManager getEvaluationManager() {
+    return DaoProviderUtil.getInstance(EvaluationManagerImpl.class);
+  }
+
 }

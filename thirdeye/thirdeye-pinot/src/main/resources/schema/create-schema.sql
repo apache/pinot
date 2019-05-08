@@ -390,3 +390,19 @@ ALTER TABLE `detection_alert_config_index` ADD UNIQUE `detection_alert_config_un
 create index detection_alert_config_base_id_idx ON detection_alert_config_index(base_id);
 create index detection_alert_config_name_idx ON detection_alert_config_index(`name`);
 create index detection_alert_config_application_idx ON detection_alert_config_index(`application`);
+
+create table if not exists evaluation_index (
+    base_id bigint(20) not null,
+    detection_config_id bigint(20) not null,
+    start_time bigint(20) not null,
+    end_time bigint(20) not null,
+    detectorName VARCHAR(128),
+    mape double,
+    create_time timestamp,
+    update_time timestamp default current_timestamp,
+    version int(10)
+) ENGINE=InnoDB;
+ALTER TABLE `evaluation_index` ADD UNIQUE `evaluation_index`(`detection_config_id`, `start_time`, `end_time`);
+create index evaluation_base_id_idx ON evaluation_index(base_id);
+create index evaluation_detection_config_id_idx ON evaluation_index(detection_config_id);
+create index evaluation_detection_start_time_idx on evaluation_index(start_time);
