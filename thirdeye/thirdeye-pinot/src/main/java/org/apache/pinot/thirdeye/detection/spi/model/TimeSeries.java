@@ -75,9 +75,14 @@ public class TimeSeries {
    * return a empty time series
    * @return a empty time series
    */
-  public static TimeSeries empty(){
+  public static TimeSeries empty() {
     TimeSeries ts = new TimeSeries();
-    ts.df.addSeries(COL_TIME, LongSeries.empty()).addSeries(COL_VALUE, DoubleSeries.empty()).setIndex(COL_TIME);
+    ts.df.addSeries(COL_TIME, LongSeries.empty())
+        .addSeries(COL_VALUE, DoubleSeries.empty())
+        .addSeries(COL_CURRENT, DoubleSeries.empty())
+        .addSeries(COL_UPPER_BOUND, DoubleSeries.empty())
+        .addSeries(COL_LOWER_BOUND, DoubleSeries.empty())
+        .setIndex(COL_TIME);
     return ts;
   }
 

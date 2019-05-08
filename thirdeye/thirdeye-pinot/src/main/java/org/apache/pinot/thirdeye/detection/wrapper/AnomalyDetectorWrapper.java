@@ -21,6 +21,7 @@ package org.apache.pinot.thirdeye.detection.wrapper;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -87,7 +88,9 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
   private static final long CACHING_PERIOD_LOOKBACK_MINUTELY = -1;
   // fail detection job if it failed successively for the first 5 windows
   private static final long EARLY_TERMINATE_WINDOW = 5;
-
+  // expression to consolidate the time series
+  private static final String[] TIMESERIES_AGGREGATION_EXPRESSIONS =
+      {COL_VALUE + ":last", COL_CURRENT + ":last", COL_LOWER_BOUND + ":last", COL_UPPER_BOUND + ":last"};
   private static final Logger LOG = LoggerFactory.getLogger(AnomalyDetectorWrapper.class);
 
   private final String metricUrn;
@@ -213,7 +216,8 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
   }
 
   /**
-   * Join two time series, including current, baseline, lower bound and upper bound. If two time series have overlapped region, take the value in the right time series
+   * Join two time series, including current, baseline, lower bound and upper bound.
+   * If two time series have overlapped region, take the value in the right time series
    * @param leftTimeSeries timeseries 1
    * @param rightTimeSeries timeseries 2
    * @return the consolidated time series
@@ -221,43 +225,10 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
   static TimeSeries consolidateTimeSeries(TimeSeries leftTimeSeries, TimeSeries rightTimeSeries) {
     DataFrame df1 = leftTimeSeries.getDataFrame();
     DataFrame df2 = rightTimeSeries.getDataFrame();
-    DataFrame joinedDf = df1.joinOuter(df2, COL_TIME);
-    consolidateJoinedDf(joinedDf, COL_VALUE);
-    consolidateJoinedDf(joinedDf, COL_CURRENT);
-    consolidateJoinedDf(joinedDf, COL_LOWER_BOUND);
-    consolidateJoinedDf(joinedDf, COL_UPPER_BOUND);
-    return TimeSeries.fromDataFrame(joinedDf);
-  }
-
-  private static void consolidateJoinedDf(DataFrame joinedDf, String columnName) {
-    String columnNameLeft = columnName + DataFrame.COLUMN_JOIN_LEFT;
-    String columnNameRight = columnName + DataFrame.COLUMN_JOIN_RIGHT;
-    if (joinedDf.contains(columnNameLeft) && joinedDf.contains(columnNameRight)) {
-      joinedDf.addSeries(columnName, consolidateSeries(joinedDf.getDoubles(columnNameLeft), joinedDf.getDoubles(columnNameRight)));
-    }
-  }
-
-  /**
-   * Consolidate two double series into one. If the value in either one is missing, take the available value as the result. If both values exist, take the value in the right series.
-   * @param leftSeries series 1
-   * @param rightSeries series 2
-   * @return the consolidated series
-   */
-  private static DoubleSeries consolidateSeries(DoubleSeries leftSeries, DoubleSeries rightSeries) {
-    Preconditions.checkArgument(leftSeries.size() == rightSeries.size());
-    double[] series = new double[leftSeries.size()];
-    for (int i = 0 ; i < leftSeries.size() ; i++) {
-      double num;
-      if (leftSeries.isNull(i) && !rightSeries.isNull(i)) {
-        num = rightSeries.get(i);
-      } else if (!leftSeries.isNull(i) && rightSeries.isNull(i)) {
-        num = leftSeries.get(i);
-      } else {
-        num = rightSeries.get(i);
-      }
-      series[i] = num;
-    }
-    return DoubleSeries.buildFrom(series);
+    DataFrame consolidatedDf = df1.append(df2)
+        .groupByValue(COL_TIME)
+        .aggregate(TIMESERIES_AGGREGATION_EXPRESSIONS);
+    return TimeSeries.fromDataFrame(consolidatedDf);
   }
 
   private void checkEarlyStop(int totalWindows, int successWindows, int i, Exception lastException) throws DetectionPipelineException {
