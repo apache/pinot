@@ -213,14 +213,14 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
   }
 
   /**
-   * Join two time series, including current, baseline, lower bound and upper bound. If two time series have overlapped region, take the average
-   * @param ts1 timeseries 1
-   * @param ts2 timeseries 2
+   * Join two time series, including current, baseline, lower bound and upper bound. If two time series have overlapped region, take the value in the right time series
+   * @param leftTimeSeries timeseries 1
+   * @param rightTimeSeries timeseries 2
    * @return the consolidated time series
    */
-  static TimeSeries consolidateTimeSeries(TimeSeries ts1, TimeSeries ts2) {
-    DataFrame df1 = ts1.getDataFrame();
-    DataFrame df2 = ts2.getDataFrame();
+  static TimeSeries consolidateTimeSeries(TimeSeries leftTimeSeries, TimeSeries rightTimeSeries) {
+    DataFrame df1 = leftTimeSeries.getDataFrame();
+    DataFrame df2 = rightTimeSeries.getDataFrame();
     DataFrame joinedDf = df1.joinOuter(df2, COL_TIME);
     consolidateJoinedDf(joinedDf, COL_VALUE);
     consolidateJoinedDf(joinedDf, COL_CURRENT);
@@ -233,27 +233,27 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
     String columnNameLeft = columnName + DataFrame.COLUMN_JOIN_LEFT;
     String columnNameRight = columnName + DataFrame.COLUMN_JOIN_RIGHT;
     if (joinedDf.contains(columnNameLeft) && joinedDf.contains(columnNameRight)) {
-      joinedDf.addSeries(columnName, robustAverage(joinedDf.getDoubles(columnNameLeft), joinedDf.getDoubles(columnNameRight)));
+      joinedDf.addSeries(columnName, consolidateSeries(joinedDf.getDoubles(columnNameLeft), joinedDf.getDoubles(columnNameRight)));
     }
   }
 
   /**
-   * Calculate the average of two double time series. If the value in either one is missing, take the available value as the result
-   * @param s1 series 1
-   * @param s2 series 2
-   * @return the averaged time series
+   * Consolidate two double series into one. If the value in either one is missing, take the available value as the result. If both values exist, take the value in the right series.
+   * @param leftSeries series 1
+   * @param rightSeries series 2
+   * @return the consolidated series
    */
-  private static DoubleSeries robustAverage(DoubleSeries s1, DoubleSeries s2) {
-    Preconditions.checkArgument(s1.size() == s2.size());
-    double[] series = new double[s1.size()];
-    for (int i = 0 ; i < s1.size() ; i++) {
+  private static DoubleSeries consolidateSeries(DoubleSeries leftSeries, DoubleSeries rightSeries) {
+    Preconditions.checkArgument(leftSeries.size() == rightSeries.size());
+    double[] series = new double[leftSeries.size()];
+    for (int i = 0 ; i < leftSeries.size() ; i++) {
       double num;
-      if (s1.isNull(i) && !s2.isNull(i)) {
-        num = s2.get(i);
-      } else if (!s1.isNull(i) && s2.isNull(i)) {
-        num = s1.get(i);
+      if (leftSeries.isNull(i) && !rightSeries.isNull(i)) {
+        num = rightSeries.get(i);
+      } else if (!leftSeries.isNull(i) && rightSeries.isNull(i)) {
+        num = leftSeries.get(i);
       } else {
-        num = (s1.get(i) + s2.get(i)) / 2;
+        num = rightSeries.get(i);
       }
       series[i] = num;
     }

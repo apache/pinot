@@ -31,21 +31,20 @@ public class DetectionPipelineResult {
   public static String DIAGNOSTICS_CHANGE_POINTS = "changepoints";
 
   private Map<String, Object> diagnostics;
+  // detected anomalies
   private final List<MergedAnomalyResultDTO> anomalies;
+  // last time stamp, all data point before this time stamp has been inspected
   private final long lastTimestamp;
+  // predicted baselines result
   private final List<PredictionResult> predictions;
 
   public DetectionPipelineResult(List<MergedAnomalyResultDTO> anomalies) {
-    this.anomalies = anomalies;
-    this.lastTimestamp = getMaxTime(anomalies);
+    this(anomalies, getMaxTime(anomalies), Collections.emptyList());
     this.diagnostics = new HashMap<>();
-    this.predictions = Collections.emptyList();
   }
 
   public DetectionPipelineResult(List<MergedAnomalyResultDTO> anomalies, long lastTimestamp) {
-    this.anomalies = anomalies;
-    this.lastTimestamp = lastTimestamp;
-    this.predictions = Collections.emptyList();
+    this(anomalies, lastTimestamp, Collections.emptyList());
     this.diagnostics = new HashMap<>();
   }
 
