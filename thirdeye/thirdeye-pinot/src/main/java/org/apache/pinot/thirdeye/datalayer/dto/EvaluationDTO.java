@@ -22,8 +22,40 @@
 
 package org.apache.pinot.thirdeye.datalayer.dto;
 
+import com.google.common.base.Preconditions;
+import org.apache.pinot.thirdeye.dataframe.DataFrame;
+import org.apache.pinot.thirdeye.dataframe.Series;
 import org.apache.pinot.thirdeye.datalayer.pojo.EvaluationBean;
+import org.apache.pinot.thirdeye.detection.PredictionResult;
+
+import static org.apache.pinot.thirdeye.dataframe.DoubleSeries.*;
+import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
 
 
 public class EvaluationDTO extends EvaluationBean {
+  public static EvaluationDTO fromPredictionResult(PredictionResult predictionResult, long startTime, long endTime,
+      long detectionConfigId) {
+    EvaluationDTO evaluation = new EvaluationDTO();
+    evaluation.setDetectionConfigId(detectionConfigId);
+    evaluation.setStartTime(startTime);
+    evaluation.setEndTime(endTime);
+    evaluation.setDetectorName(predictionResult.getDetectorName());
+    evaluation.setMetricUrn(predictionResult.getMetricUrn());
+    evaluation.setMape(calculateMape(predictionResult.getPredictedTimeSeries()));
+
+    return evaluation;
+  }
+
+  private static double calculateMape(DataFrame predictedTimeSeires) {
+    Preconditions.checkArgument(predictedTimeSeires.contains(COL_TIME));
+    if (!predictedTimeSeires.contains(COL_CURRENT) || !predictedTimeSeires.contains(COL_VALUE)) {
+      return Double.NaN;
+    }
+
+    predictedTimeSeires.getDoubles(COL_VALUE).map((Series.DoubleFunction) values -> {
+
+    })
+        divide(predictedTimeSeires.getDoubles(COL_CURRENT)).abs();
+    return 0;
+  }
 }

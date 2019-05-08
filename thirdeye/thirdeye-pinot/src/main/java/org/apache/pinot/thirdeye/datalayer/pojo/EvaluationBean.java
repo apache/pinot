@@ -22,18 +22,20 @@
 
 package org.apache.pinot.thirdeye.datalayer.pojo;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.util.Objects;
-
 
 /**
  * The class for evaluation metrics.
  */
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class EvaluationBean extends AbstractBean {
   private long detectionConfigId; // the detection config id
   private long startTime; // the start time for the detection window being monitored
   private long endTime; // the end time for the detection window being monitored
   private String detectorName; // the name for the detector
   private double mape; //  the mean absolute percentage error (MAPE)
+  private String metricUrn; // the metric urn
 
   public long getDetectionConfigId() {
     return detectionConfigId;
@@ -75,6 +77,14 @@ public class EvaluationBean extends AbstractBean {
     this.mape = mape;
   }
 
+  public String getMetricUrn() {
+    return metricUrn;
+  }
+
+  public void setMetricUrn(String metricUrn) {
+    this.metricUrn = metricUrn;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -85,17 +95,19 @@ public class EvaluationBean extends AbstractBean {
     }
     EvaluationBean that = (EvaluationBean) o;
     return detectionConfigId == that.detectionConfigId && startTime == that.startTime && endTime == that.endTime
-        && Double.compare(that.mape, mape) == 0 && Objects.equals(detectorName, that.detectorName);
+        && Double.compare(that.mape, mape) == 0 && Objects.equals(detectorName, that.detectorName) && Objects.equals(
+        metricUrn, that.metricUrn);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(detectionConfigId, startTime, endTime, detectorName, mape);
+    return Objects.hash(detectionConfigId, startTime, endTime, detectorName, mape, metricUrn);
   }
 
   @Override
   public String toString() {
     return "EvaluationBean{" + "detectionConfigId=" + detectionConfigId + ", startTime=" + startTime + ", endTime="
-        + endTime + ", detectorName='" + detectorName + '\'' + ", mape=" + mape + '}';
+        + endTime + ", detectorName='" + detectorName + '\'' + ", mape=" + mape + ", metricUrn='" + metricUrn + '\''
+        + '}';
   }
 }

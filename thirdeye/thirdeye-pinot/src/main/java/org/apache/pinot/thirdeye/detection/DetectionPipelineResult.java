@@ -20,6 +20,7 @@
 package org.apache.pinot.thirdeye.detection;
 
 import java.util.Collections;
+import org.apache.pinot.thirdeye.datalayer.dto.EvaluationDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import java.util.HashMap;
 import java.util.List;
@@ -37,9 +38,11 @@ public class DetectionPipelineResult {
   private final long lastTimestamp;
   // predicted baselines result
   private final List<PredictionResult> predictions;
+  // evaluation metrics
+  private final List<EvaluationDTO> evaluations;
 
   public DetectionPipelineResult(List<MergedAnomalyResultDTO> anomalies) {
-    this(anomalies, getMaxTime(anomalies), Collections.emptyList());
+    this(anomalies, getMaxTime(anomalies));
     this.diagnostics = new HashMap<>();
   }
 
@@ -50,11 +53,18 @@ public class DetectionPipelineResult {
 
   public DetectionPipelineResult(List<MergedAnomalyResultDTO> anomalies, long lastTimestamp,
       List<PredictionResult> predictedTimeSeries) {
+    this(anomalies, lastTimestamp, predictedTimeSeries, Collections.emptyList());
+  }
+
+  public DetectionPipelineResult(List<MergedAnomalyResultDTO> anomalies, long lastTimestamp,
+      List<PredictionResult> predictedTimeSeries, List<EvaluationDTO> evaluations) {
     this.anomalies = anomalies;
     this.lastTimestamp = lastTimestamp;
     this.predictions = predictedTimeSeries;
+    this.evaluations = evaluations;
     this.diagnostics = new HashMap<>();
   }
+
 
   public List<PredictionResult> getPredictions() {
     return predictions;
@@ -69,6 +79,9 @@ public class DetectionPipelineResult {
     return lastTimestamp;
   }
 
+  public List<EvaluationDTO> getEvaluations() {
+    return evaluations;
+  }
 
   public Map<String, Object> getDiagnostics() {
     return diagnostics;
