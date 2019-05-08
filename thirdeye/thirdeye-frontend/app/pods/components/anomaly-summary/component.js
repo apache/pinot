@@ -25,7 +25,7 @@ import columns from 'thirdeye-frontend/shared/anomaliesTableColumns';
 import moment from 'moment';
 import _ from 'lodash';
 
-const TABLE_DATE_FORMAT = 'MMM DD, hh:mm A'; // format for anomaly table
+const TABLE_DATE_FORMAT = 'MMM DD, hh:mm A'; // format for anomaly table and legend
 
 export default Component.extend({
   /**
@@ -45,15 +45,15 @@ export default Component.extend({
    */
   anomalyData: {},
   /**
-   * Anomaly data, fetched using the anomalyId
+   * current time series
    */
   current: null,
   /**
-   * Anomaly data, fetched using the anomalyId
+   * predicted time series
    */
   predicted: null,
   /**
-   * List of associated classes
+   * imported color mapping for graph
    */
   colorMapping: colorMapping,
   zoom: {
