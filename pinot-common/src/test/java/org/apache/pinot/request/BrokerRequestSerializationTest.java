@@ -34,6 +34,7 @@ import org.apache.pinot.common.request.QueryType;
 import org.apache.pinot.common.request.Selection;
 import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.utils.request.RequestUtils;
+import org.apache.pinot.pql.parsers.pql2.ast.StringLiteralAstNode;
 import org.apache.thrift.TException;
 import org.apache.thrift.TSerializer;
 import org.apache.thrift.protocol.TCompactProtocol;
@@ -166,12 +167,12 @@ public class BrokerRequestSerializationTest {
 
     Expression filterExpr1 = RequestUtils.getFunctionExpression(FilterOperator.EQUALITY.name());
     filterExpr1.getFunctionCall().addToOperands(RequestUtils.getIdentifierExpression("dummy1"));
-    filterExpr1.getFunctionCall().addToOperands(RequestUtils.getLiteralExpression("dummy1"));
+    filterExpr1.getFunctionCall().addToOperands(RequestUtils.getLiteralExpression(new StringLiteralAstNode("dummy1")));
     filter.getFunctionCall().addToOperands(filterExpr1);
 
     Expression filterExpr2 = RequestUtils.getFunctionExpression(FilterOperator.EQUALITY.name());
     filterExpr2.getFunctionCall().addToOperands(RequestUtils.getIdentifierExpression("dummy2"));
-    filterExpr2.getFunctionCall().addToOperands(RequestUtils.getLiteralExpression("dummy2"));
+    filterExpr2.getFunctionCall().addToOperands(RequestUtils.getLiteralExpression(new StringLiteralAstNode("dummy2")));
     filter.getFunctionCall().addToOperands(filterExpr2);
 
     pinotQuery.setFilterExpression(filter);

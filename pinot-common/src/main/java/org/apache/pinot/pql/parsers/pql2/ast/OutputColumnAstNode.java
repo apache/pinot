@@ -62,7 +62,7 @@ public class OutputColumnAstNode extends BaseAstNode {
         Expression functionExpr;
         if (node.getName().equalsIgnoreCase("count")) {
           // COUNT aggregation function always works on '*'
-          functionExpr = RequestUtils.getFunctionExpression("count");
+          functionExpr = RequestUtils.getFunctionExpression(node.getName());
           functionExpr.getFunctionCall().addToOperands(RequestUtils.getIdentifierExpression("*"));
         } else {
           functionExpr = TransformExpressionTree.getExpression(astNode);

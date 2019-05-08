@@ -21,6 +21,7 @@ package org.apache.pinot.pql.parsers.pql2.ast;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
 import org.apache.pinot.common.request.Expression;
@@ -94,7 +95,7 @@ public class InPredicateAstNode extends PredicateAstNode {
       throw new Pql2CompilationException("IN predicate has no identifier");
     }
 
-    Set<String> values = new HashSet<>();
+    List<String> values = new ArrayList<>();
 
     for (AstNode astNode : getChildren()) {
       if (astNode instanceof LiteralAstNode) {
@@ -110,7 +111,7 @@ public class InPredicateAstNode extends PredicateAstNode {
       filterOperator = FilterOperator.IN;
     }
 
-    return new FilterQueryTree(_identifier, new ArrayList<>(values), filterOperator, null);
+    return new FilterQueryTree(_identifier, values, filterOperator, null);
   }
 
   @Override
@@ -129,7 +130,7 @@ public class InPredicateAstNode extends PredicateAstNode {
     for (AstNode astNode : getChildren()) {
       if (astNode instanceof LiteralAstNode) {
         LiteralAstNode node = (LiteralAstNode) astNode;
-        expr.getFunctionCall().addToOperands(RequestUtils.getLiteralExpression(node.getValueAsString()));
+        expr.getFunctionCall().addToOperands(RequestUtils.getLiteralExpression(node));
       }
     }
     return expr;

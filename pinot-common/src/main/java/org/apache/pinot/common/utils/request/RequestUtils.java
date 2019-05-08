@@ -42,7 +42,11 @@ import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.request.Selection;
 import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
+import org.apache.pinot.pql.parsers.pql2.ast.FloatingPointLiteralAstNode;
+import org.apache.pinot.pql.parsers.pql2.ast.IntegerLiteralAstNode;
+import org.apache.pinot.pql.parsers.pql2.ast.LiteralAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.PredicateAstNode;
+import org.apache.pinot.pql.parsers.pql2.ast.StringLiteralAstNode;
 
 
 public class RequestUtils {
@@ -73,9 +77,19 @@ public class RequestUtils {
     return expression;
   }
 
-  public static Expression getLiteralExpression(String literal) {
+  public static Expression getLiteralExpression(LiteralAstNode value) {
     Expression expression = new Expression(ExpressionType.LITERAL);
-    expression.setLiteral(new Literal(literal));
+    Literal literal = new Literal();
+    if(value instanceof StringLiteralAstNode) {
+      literal.setStringValue(((StringLiteralAstNode)value).getText());
+    }
+    if(value instanceof IntegerLiteralAstNode) {
+      literal.setLongValue(((IntegerLiteralAstNode)value).getValue());
+    }
+    if(value instanceof FloatingPointLiteralAstNode) {
+      literal.setDoubleValue(((FloatingPointLiteralAstNode)value).getValue());
+    }
+    expression.setLiteral(literal);
     return expression;
   }
 
@@ -84,27 +98,6 @@ public class RequestUtils {
     Function function = new Function(operator);
     expression.setFunctionCall(function);
     return expression;
-  }
-
-  private static Expression traverseFilterQuery(FilterQueryTree tree) {
-    Expression query = new Expression(ExpressionType.FUNCTION);
-    final Function operator = new Function(tree.getOperator().name());
-    if (null != tree.getChildren() && !tree.getChildren().isEmpty()) {
-      // Not leaf node
-      for (final FilterQueryTree c : tree.getChildren()) {
-        operator.addToOperands(traverseFilterQuery(c));
-      }
-    } else {
-      // Leaf node
-      Expression left = new Expression(ExpressionType.IDENTIFIER);
-      left.setIdentifier(new Identifier(tree.getColumn()));
-      operator.addToOperands(left);
-      Expression right = new Expression(ExpressionType.LITERAL);
-      right.setLiteral(new Literal(StringUtils.join(tree.getValue(), DELIMTER)));
-      operator.addToOperands(right);
-    }
-    query.setFunctionCall(operator);
-    return query;
   }
 
   public static void generateFilterFromTree(HavingQueryTree filterQueryTree, BrokerRequest request) {
@@ -126,11 +119,9 @@ public class RequestUtils {
     final List<Integer> f = new ArrayList<>();
     if (null != tree.getChildren()) {
       for (final FilterQueryTree c : tree.getChildren()) {
-        int childNodeId = currentId.intValue();
-        currentId.increment();
-
-        f.add(childNodeId);
         final FilterQuery q = traverseFilterQueryAndPopulateMap(c, filterQueryMap, currentId);
+        int childNodeId = q.getId();
+        f.add(childNodeId);
         filterQueryMap.put(childNodeId, q);
       }
     }

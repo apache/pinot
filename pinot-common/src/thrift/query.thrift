@@ -60,8 +60,14 @@ struct Identifier {
   1: required string name;
 }
 
-struct Literal {
-  1: required string value;
+union Literal {
+  1: optional bool boolValue;
+  2: optional byte byteValue;
+  3: optional i32 intValue;
+  4: optional i64 longValue;
+  5: optional double doubleValue;
+  6: optional string stringValue;
+  7: optional binary binaryValue;
 }
 
 struct Function {

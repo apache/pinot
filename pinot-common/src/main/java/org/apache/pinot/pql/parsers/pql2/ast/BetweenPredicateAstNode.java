@@ -98,8 +98,8 @@ public class BetweenPredicateAstNode extends PredicateAstNode {
         final Expression betweenExpr = RequestUtils.getFunctionExpression(FilterKind.BETWEEN.name());
         final Function rangeFuncCall = betweenExpr.getFunctionCall();
         rangeFuncCall.addToOperands(RequestUtils.getIdentifierExpression(_identifier));
-        rangeFuncCall.addToOperands(RequestUtils.getLiteralExpression(left.getValueAsString()));
-        rangeFuncCall.addToOperands(RequestUtils.getLiteralExpression(right.getValueAsString()));
+        rangeFuncCall.addToOperands(RequestUtils.getLiteralExpression(left));
+        rangeFuncCall.addToOperands(RequestUtils.getLiteralExpression(right));
         return betweenExpr;
       } catch (ClassCastException e) {
         throw new Pql2CompilationException(
