@@ -20,6 +20,7 @@ package org.apache.pinot.controller.helix.core.rebalance;
 
 import com.google.common.base.Function;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -454,6 +455,8 @@ public class ReplicaGroupRebalanceSegmentStrategy implements RebalanceSegmentStr
     // Remove segments from servers that has more segments
     for (String server : serversInReplicaGroup) {
       LinkedList<String> segmentsInServer = serverToSegments.get(server);
+      // randomize the segments to be moved
+      Collections.shuffle(segmentsInServer);
       int segmentToMove = numSegmentsPerServer - segmentsInServer.size();
       if (segmentToMove < 0) {
         // Server has more segments than needed, remove segments from this server
@@ -463,6 +466,8 @@ public class ReplicaGroupRebalanceSegmentStrategy implements RebalanceSegmentStr
       }
     }
 
+    // randomize the segments to be added
+    Collections.shuffle(segmentsToAdd);
     // Add segments to servers that has less segments than numSegmentsPerServer
     for (String server : serversInReplicaGroup) {
       LinkedList<String> segmentsInServer = serverToSegments.get(server);
