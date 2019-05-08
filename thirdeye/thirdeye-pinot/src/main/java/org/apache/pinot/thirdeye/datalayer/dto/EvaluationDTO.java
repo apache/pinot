@@ -22,13 +22,11 @@
 
 package org.apache.pinot.thirdeye.datalayer.dto;
 
-import com.google.common.base.Preconditions;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
-import org.apache.pinot.thirdeye.dataframe.Series;
 import org.apache.pinot.thirdeye.datalayer.pojo.EvaluationBean;
+import org.apache.pinot.thirdeye.detection.Evaluation;
 import org.apache.pinot.thirdeye.detection.PredictionResult;
 
-import static org.apache.pinot.thirdeye.dataframe.DoubleSeries.*;
 import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
 
 
@@ -41,21 +39,9 @@ public class EvaluationDTO extends EvaluationBean {
     evaluation.setEndTime(endTime);
     evaluation.setDetectorName(predictionResult.getDetectorName());
     evaluation.setMetricUrn(predictionResult.getMetricUrn());
-    evaluation.setMape(calculateMape(predictionResult.getPredictedTimeSeries()));
-
+    DataFrame df = predictionResult.getPredictedTimeSeries();
+    df = df.filter(df.getDoubles(COL_CURRENT).eq(0.0).not()).dropNull(COL_CURRENT, COL_VALUE);
+    evaluation.setMape(Evaluation.calculateMape(df.getDoubles(COL_CURRENT), df.getDoubles(COL_VALUE)));
     return evaluation;
-  }
-
-  private static double calculateMape(DataFrame predictedTimeSeires) {
-    Preconditions.checkArgument(predictedTimeSeires.contains(COL_TIME));
-    if (!predictedTimeSeires.contains(COL_CURRENT) || !predictedTimeSeires.contains(COL_VALUE)) {
-      return Double.NaN;
-    }
-
-    predictedTimeSeires.getDoubles(COL_VALUE).map((Series.DoubleFunction) values -> {
-
-    })
-        divide(predictedTimeSeires.getDoubles(COL_CURRENT)).abs();
-    return 0;
   }
 }

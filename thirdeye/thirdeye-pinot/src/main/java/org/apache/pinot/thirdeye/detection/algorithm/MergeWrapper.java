@@ -34,6 +34,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.commons.collections.MapUtils;
 import org.apache.pinot.thirdeye.common.dimension.DimensionMap;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.EvaluationDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.detection.ConfigUtils;
 import org.apache.pinot.thirdeye.detection.DataProvider;
@@ -44,6 +45,7 @@ import org.apache.pinot.thirdeye.detection.PredictionResult;
 import org.apache.pinot.thirdeye.detection.spi.model.AnomalySlice;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import weka.classifiers.evaluation.Evaluation;
 
 
 /**
@@ -108,6 +110,7 @@ public class MergeWrapper extends DetectionPipeline {
     // generate anomalies
     List<MergedAnomalyResultDTO> generated = new ArrayList<>();
     List<PredictionResult> predictionResults = new ArrayList<>();
+    List<EvaluationDTO> evaluations = new ArrayList<>();
     int i = 0;
     Set<Long> lastTimeStamps = new HashSet<>();
     for (Map<String, Object> properties : this.nestedProperties) {
@@ -127,6 +130,7 @@ public class MergeWrapper extends DetectionPipeline {
 
       generated.addAll(intermediate.getAnomalies());
       predictionResults.addAll(intermediate.getPredictions());
+      evaluations.addAll(intermediate.getEvaluations());
       diagnostics.put(String.valueOf(i), intermediate.getDiagnostics());
 
       i++;
@@ -137,7 +141,8 @@ public class MergeWrapper extends DetectionPipeline {
     all.addAll(retrieveAnomaliesFromDatabase(generated));
     all.addAll(generated);
 
-    return new DetectionPipelineResult(this.merge(all), DetectionUtils.consolidateNestedLastTimeStamps(lastTimeStamps), predictionResults).setDiagnostics(diagnostics);
+    return new DetectionPipelineResult(this.merge(all), DetectionUtils.consolidateNestedLastTimeStamps(lastTimeStamps),
+        predictionResults, evaluations).setDiagnostics(diagnostics);
   }
 
   protected List<MergedAnomalyResultDTO> retrieveAnomaliesFromDatabase(List<MergedAnomalyResultDTO> generated) {
