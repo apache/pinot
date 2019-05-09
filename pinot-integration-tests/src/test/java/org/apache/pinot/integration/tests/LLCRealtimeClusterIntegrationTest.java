@@ -133,8 +133,8 @@ public class LLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegratio
           // Total docs should not change during reload
           Assert.assertEquals(queryResponse.get("totalDocs").asLong(), numTotalDocs);
           Assert.assertEquals(queryResponse.get("numConsumingQueried").asLong(), 2);
-          Assert.assertTrue(queryResponse.get("minConsumingFreshnessMs").asLong() > _startTime);
-          Assert.assertTrue(queryResponse.get("minConsumingFreshnessMs").asLong() < System.currentTimeMillis());
+          Assert.assertTrue(queryResponse.get("minConsumingFreshnessTimeMs").asLong() > _startTime);
+          Assert.assertTrue(queryResponse.get("minConsumingFreshnessTimeMs").asLong() < System.currentTimeMillis());
           return queryResponse.get("numEntriesScannedInFilter").asLong() == 0;
         } catch (Exception e) {
           throw new RuntimeException(e);

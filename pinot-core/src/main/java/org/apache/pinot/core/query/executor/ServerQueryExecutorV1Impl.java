@@ -258,7 +258,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
     if (numConsumingSegmentsQueried > 0) {
       dataTable.getMetadata().put(DataTable.NUM_CONSUMING_SEGMENTS_QUERIED, Integer.toString(numConsumingSegmentsQueried));
-      dataTable.getMetadata().put(DataTable.MIN_CONSUMING_FRESHNESS_MS, Long.toString(minConsumingFreshnessTimeMs));
+      dataTable.getMetadata().put(DataTable.MIN_CONSUMING_FRESHNESS_TIME_MS, Long.toString(minConsumingFreshnessTimeMs));
     }
 
     LOGGER.debug("Query processing time for request Id - {}: {}", requestId, queryProcessingTime);
