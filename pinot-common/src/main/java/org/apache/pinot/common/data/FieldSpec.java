@@ -49,19 +49,19 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, ConfigNodeLife
   // TODO: revisit to see if we allow 0-length byte array
   private static final byte[] NULL_BYTE_ARRAY_VALUE = new byte[0];
 
-  private static final Integer DEFAULT_DIMENSION_NULL_VALUE_OF_INT = Integer.MIN_VALUE;
-  private static final Long DEFAULT_DIMENSION_NULL_VALUE_OF_LONG = Long.MIN_VALUE;
-  private static final Float DEFAULT_DIMENSION_NULL_VALUE_OF_FLOAT = Float.NEGATIVE_INFINITY;
-  private static final Double DEFAULT_DIMENSION_NULL_VALUE_OF_DOUBLE = Double.NEGATIVE_INFINITY;
-  private static final byte[] DEFAULT_DIMENSION_NULL_VALUE_OF_BYTES = NULL_BYTE_ARRAY_VALUE;
+  public static final Integer DEFAULT_DIMENSION_NULL_VALUE_OF_INT = Integer.MIN_VALUE;
+  public static final Long DEFAULT_DIMENSION_NULL_VALUE_OF_LONG = Long.MIN_VALUE;
+  public static final Float DEFAULT_DIMENSION_NULL_VALUE_OF_FLOAT = Float.NEGATIVE_INFINITY;
+  public static final Double DEFAULT_DIMENSION_NULL_VALUE_OF_DOUBLE = Double.NEGATIVE_INFINITY;
+  public static final String DEFAULT_DIMENSION_NULL_VALUE_OF_STRING = "null";
+  public static final byte[] DEFAULT_DIMENSION_NULL_VALUE_OF_BYTES = NULL_BYTE_ARRAY_VALUE;
 
-  private static final String DEFAULT_DIMENSION_NULL_VALUE_OF_STRING = "null";
-  private static final Integer DEFAULT_METRIC_NULL_VALUE_OF_INT = 0;
-  private static final Long DEFAULT_METRIC_NULL_VALUE_OF_LONG = 0L;
-  private static final Float DEFAULT_METRIC_NULL_VALUE_OF_FLOAT = 0.0F;
-  private static final Double DEFAULT_METRIC_NULL_VALUE_OF_DOUBLE = 0.0D;
-  private static final String DEFAULT_METRIC_NULL_VALUE_OF_STRING = "null";
-  private static final byte[] DEFAULT_METRIC_NULL_VALUE_OF_BYTES = NULL_BYTE_ARRAY_VALUE;
+  public static final Integer DEFAULT_METRIC_NULL_VALUE_OF_INT = 0;
+  public static final Long DEFAULT_METRIC_NULL_VALUE_OF_LONG = 0L;
+  public static final Float DEFAULT_METRIC_NULL_VALUE_OF_FLOAT = 0.0F;
+  public static final Double DEFAULT_METRIC_NULL_VALUE_OF_DOUBLE = 0.0D;
+  public static final String DEFAULT_METRIC_NULL_VALUE_OF_STRING = "null";
+  public static final byte[] DEFAULT_METRIC_NULL_VALUE_OF_BYTES = NULL_BYTE_ARRAY_VALUE;
 
   @ConfigKey("name")
   protected String _name;

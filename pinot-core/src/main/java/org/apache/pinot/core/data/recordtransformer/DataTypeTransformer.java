@@ -74,9 +74,9 @@ public class DataTypeTransformer implements RecordTransformer {
       PinotDataType dest = entry.getValue();
       Object value = record.getValue(column);
 
-      // NOTE: should not be null in normal case if combined with other transformers (without TimeTransformer, outgoing
-      // time column might be null)
-      if (value == null) {
+      // NOTE: should not need to set default null value in normal case (RecordReader is responsible for filling in the
+      // default null value; TimeTransformer is responsible for filling in the outgoing time value if not exists)
+      if (value == null || (value instanceof Object[] && ((Object[]) value).length == 0)) {
         // Set default null value
         FieldSpec fieldSpec = _schema.getFieldSpecFor(column);
         Object defaultNullValue = fieldSpec.getDefaultNullValue();
@@ -91,7 +91,6 @@ public class DataTypeTransformer implements RecordTransformer {
         if (value instanceof Object[]) {
           // Multi-valued column
           Object[] values = (Object[]) value;
-          assert values.length > 0;
           source = MULTI_VALUE_TYPE_MAP.get(values[0].getClass());
           if (source == null) {
             source = PinotDataType.OBJECT_ARRAY;
