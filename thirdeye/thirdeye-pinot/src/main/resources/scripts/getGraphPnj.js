@@ -11,6 +11,9 @@ var options = {
   output: args[2],
   width: args[3],
   height: args[4],
+  cookieName: args[5],
+  cookieValue: args[6],
+  domain: args[7]
 };
 
 page.viewportSize = {
@@ -21,6 +24,11 @@ page.settings.resourceTimeout = 180000;
 page.onResourceTimeout = function(error) {
   phantom.exit(1);
 };
+page.addCookie({
+  'name'   : options.cookieName,
+  'value'  : options.cookieValue,
+  'domain' : options.domain
+});
 var requestsArray = [];
 
 
@@ -62,7 +70,7 @@ page.onLoadFinished = function(status) {
 
       clearInterval(interval);
         var clipRect = page.evaluate(function () {
-          return document.querySelector('#anomaly-screenshot').getBoundingClientRect();
+          return document.querySelector('.timeseries-chart').getBoundingClientRect();
         });
         page.clipRect = {
           top:    clipRect.top,
