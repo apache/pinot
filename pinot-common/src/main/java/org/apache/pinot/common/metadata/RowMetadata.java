@@ -16,26 +16,23 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.realtime.stream;
+package org.apache.pinot.common.metadata;
 
-import org.apache.pinot.common.metadata.RowMetadata;
+import org.apache.pinot.annotations.InterfaceAudience;
+import org.apache.pinot.annotations.InterfaceStability;
 
 
 /**
- * A class that provides metadata associated with the message of a stream, for e.g.,
- * ingestion-timestamp of the message.
+ * A class that provides relevant row-level metadata for rows ingested into a segment.
+ *
+ * Currently this is relevant for rows ingested into a mutable segment.
  */
-public class StreamMessageMetadata implements RowMetadata {
+@InterfaceAudience.Public
+@InterfaceStability.Evolving
+public interface RowMetadata {
 
-  private final long _ingestionTimeMs;
-
-  public StreamMessageMetadata(long ingestionTimeMs) {
-    _ingestionTimeMs = ingestionTimeMs;
-  }
-
-  @Override
-  public long getIngestionTimeMs() {
-    return _ingestionTimeMs;
-  }
-
+  /**
+   * Return the ingestion timestamp of the row.
+   */
+  long getIngestionTimeMs();
 }

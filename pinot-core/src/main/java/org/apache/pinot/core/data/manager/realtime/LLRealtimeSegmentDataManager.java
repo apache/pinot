@@ -40,6 +40,7 @@ import org.apache.pinot.common.config.SegmentPartitionConfig;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.data.StarTreeIndexSpec;
+import org.apache.pinot.common.metadata.RowMetadata;
 import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
 import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
@@ -409,7 +410,6 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     int streamMessageCount = 0;
     boolean canTakeMore = true;
     GenericRow decodedRow = null;
-    StreamMessageMetadata msgMetadata = new StreamMessageMetadata();
 
     for (int index = 0; index < messagesAndOffsets.getMessageCount(); index++) {
       if (_shouldStop || endCriteriaReached()) {
@@ -438,14 +438,13 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
       // Index each message
       decodedRow = GenericRow.createOrReuseRow(decodedRow);
-      msgMetadata.reset();
       // retrieve metadata from the message batch if available
       // this can be overridden by the decoder if there is a better indicator in the message payload
-      messagesAndOffsets.getMetadataAtIndex(index, msgMetadata);
+      RowMetadata msgMetadata = messagesAndOffsets.getMetadataAtIndex(index);
 
       decodedRow = _messageDecoder
           .decode(messagesAndOffsets.getMessageAtIndex(index), messagesAndOffsets.getMessageOffsetAtIndex(index),
-              messagesAndOffsets.getMessageLengthAtIndex(index), decodedRow, msgMetadata);
+              messagesAndOffsets.getMessageLengthAtIndex(index), decodedRow);
 
       if (decodedRow != null) {
         try {

@@ -47,6 +47,7 @@ public class LLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegratio
 
   public final boolean _isDirectAlloc = RANDOM.nextBoolean();
   public final boolean _isConsumerDirConfigured = RANDOM.nextBoolean();
+  private final long _startTime = System.currentTimeMillis();
 
   private static final String TEST_UPDATED_INVERTED_INDEX_QUERY =
       "SELECT COUNT(*) FROM mytable WHERE DivActualElapsedTime = 305";
@@ -131,6 +132,9 @@ public class LLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegratio
           JsonNode queryResponse = postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY);
           // Total docs should not change during reload
           Assert.assertEquals(queryResponse.get("totalDocs").asLong(), numTotalDocs);
+          Assert.assertEquals(queryResponse.get("numConsumingSegmentsQueried").asLong(), 2);
+          Assert.assertTrue(queryResponse.get("minConsumingFreshnessTimeMs").asLong() > _startTime);
+          Assert.assertTrue(queryResponse.get("minConsumingFreshnessTimeMs").asLong() < System.currentTimeMillis());
           return queryResponse.get("numEntriesScannedInFilter").asLong() == 0;
         } catch (Exception e) {
           throw new RuntimeException(e);

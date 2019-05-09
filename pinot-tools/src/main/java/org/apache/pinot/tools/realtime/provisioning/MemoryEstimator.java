@@ -129,15 +129,12 @@ public class MemoryEstimator {
     // create mutable segment impl
     MutableSegmentImpl mutableSegmentImpl = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build());
 
-    StreamMessageMetadata messageMetadata = new StreamMessageMetadata();
     // read all rows and index them
     try (PinotSegmentRecordReader segmentRecordReader = new PinotSegmentRecordReader(_sampleCompletedSegment);) {
       GenericRow row = new GenericRow();
       while (segmentRecordReader.hasNext()) {
-        messageMetadata.reset();
-
         segmentRecordReader.next(row);
-        mutableSegmentImpl.index(row, messageMetadata);
+        mutableSegmentImpl.index(row, null);
         row.clear();
       }
     } catch (Exception e) {

@@ -82,6 +82,8 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
     long numSegmentsQueried = 0L;
     long numSegmentsProcessed = 0L;
     long numSegmentsMatched = 0L;
+    long numConsumingSegmentsQueried = 0L;
+    long minConsumingFreshnessTimeMs = Long.MAX_VALUE;
     long numTotalRawDocs = 0L;
     boolean numGroupsLimitReached = false;
 
@@ -136,6 +138,16 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
         numSegmentsMatched += Long.parseLong(numSegmentsMatchedString);
       }
 
+      String numConsumingString = metadata.get(DataTable.NUM_CONSUMING_SEGMENTS_QUERIED);
+      if (numConsumingString != null) {
+        numConsumingSegmentsQueried += Long.parseLong(numConsumingString);
+      }
+
+      String minConsumingIndexTsString = metadata.get(DataTable.MIN_CONSUMING_FRESHNESS_TIME_MS);
+      if (minConsumingIndexTsString != null) {
+        minConsumingFreshnessTimeMs = Math.min(Long.parseLong(minConsumingIndexTsString), minConsumingFreshnessTimeMs);
+      }
+
       String numTotalRawDocsString = metadata.get(DataTable.TOTAL_DOCS_METADATA_KEY);
       if (numTotalRawDocsString != null) {
         numTotalRawDocs += Long.parseLong(numTotalRawDocsString);
@@ -168,6 +180,13 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
     brokerResponseNative.setNumSegmentsMatched(numSegmentsMatched);
     brokerResponseNative.setTotalDocs(numTotalRawDocs);
     brokerResponseNative.setNumGroupsLimitReached(numGroupsLimitReached);
+    if (numConsumingSegmentsQueried > 0) {
+      if (minConsumingFreshnessTimeMs == Long.MAX_VALUE) {
+        LOGGER.error("Invalid lastIndexedTimestamp across {} consuming segments", numConsumingSegmentsQueried);
+      }
+      brokerResponseNative.setNumConsumingSegmentsQueried(numConsumingSegmentsQueried);
+      brokerResponseNative.setMinConsumingFreshnessTimeMs(minConsumingFreshnessTimeMs);
+    }
 
     // Update broker metrics.
     String tableName = brokerRequest.getQuerySource().getTableName();
