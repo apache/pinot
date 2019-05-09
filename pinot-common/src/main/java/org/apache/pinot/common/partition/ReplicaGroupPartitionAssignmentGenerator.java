@@ -86,7 +86,7 @@ public class ReplicaGroupPartitionAssignmentGenerator {
    * @return Replica group partition assignment from the given configuration
    */
   public ReplicaGroupPartitionAssignment buildReplicaGroupPartitionAssignment(String tableNameWithType,
-      TableConfig tableConfig, List<String> servers) {
+      TableConfig tableConfig, int numReplicas, List<String> servers) {
 
     // Fetch information required to build the mapping table from the table configuration.
     ReplicaGroupStrategyConfig replicaGroupStrategyConfig =
@@ -104,10 +104,6 @@ public class ReplicaGroupPartitionAssignmentGenerator {
           tableConfig.getIndexingConfig().getSegmentPartitionConfig().getNumPartitions(partitionColumn);
     }
 
-    TableType tableType = tableConfig.getTableType();
-    int numReplicas =
-        tableType.equals(TableType.REALTIME) ? tableConfig.getValidationConfig().getReplicasPerPartitionNumber()
-            : tableConfig.getValidationConfig().getReplicationNumber();
     int numServers = servers.size();
 
     // Enforcing disjoint server sets for each replica group.

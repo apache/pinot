@@ -63,6 +63,7 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceUserConfigConstants;
 import org.apache.pinot.core.realtime.stream.StreamConfig;
+import org.apache.pinot.core.util.ReplicationUtils;
 import org.slf4j.LoggerFactory;
 
 
@@ -356,25 +357,22 @@ public class PinotTableRestletResource {
     }
   }
 
-  private void ensureMinReplicas(TableConfig config) {
+  private void ensureMinReplicas(TableConfig tableConfig) {
     // For self-serviced cluster, ensure that the tables are created with at least min replication factor irrespective
     // of table configuration value
-    SegmentsValidationAndRetentionConfig segmentsConfig = config.getValidationConfig();
+    SegmentsValidationAndRetentionConfig segmentsConfig = tableConfig.getValidationConfig();
     int configMinReplication = _controllerConf.getDefaultTableMinReplicas();
-    boolean verifyReplicasPerPartition = false;
-    boolean verifyReplication = true;
+    boolean verifyReplicasPerPartition;
+    boolean verifyReplication;
 
-    if (config.getTableType() == CommonConstants.Helix.TableType.REALTIME) {
-      StreamConfig streamConfig;
-      try {
-        streamConfig = new StreamConfig(config.getIndexingConfig().getStreamConfigs());
-      } catch (Exception e) {
-        String errorMsg = String.format("Invalid tableIndexConfig or streamConfig: %s", e.getMessage());
-        throw new PinotHelixResourceManager.InvalidTableConfigException(errorMsg, e);
-      }
-      verifyReplicasPerPartition = streamConfig.hasLowLevelConsumerType();
-      verifyReplication = streamConfig.hasHighLevelConsumerType();
+    try {
+      verifyReplicasPerPartition = ReplicationUtils.useReplicasPerPartition(tableConfig);
+      verifyReplication = ReplicationUtils.useReplication(tableConfig);
+    } catch (Exception e) {
+      String errorMsg = String.format("Invalid tableIndexConfig or streamConfig: %s", e.getMessage());
+      throw new PinotHelixResourceManager.InvalidTableConfigException(errorMsg, e);
     }
+
 
     if (verifyReplication) {
       int requestReplication;

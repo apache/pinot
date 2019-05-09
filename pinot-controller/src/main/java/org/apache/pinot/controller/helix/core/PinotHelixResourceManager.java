@@ -108,6 +108,7 @@ import org.apache.pinot.controller.helix.core.sharding.SegmentAssignmentStrategy
 import org.apache.pinot.controller.helix.core.util.ZKMetadataUtils;
 import org.apache.pinot.controller.helix.starter.HelixConfig;
 import org.apache.pinot.core.realtime.stream.StreamConfig;
+import org.apache.pinot.core.util.ReplicationUtils;
 import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -1229,8 +1230,10 @@ public class PinotHelixResourceManager {
           RealtimeTagConfig realtimeTagConfig = new RealtimeTagConfig(tableConfig);
           servers = getInstancesWithTag(realtimeTagConfig.getConsumingServerTag());
         }
+        int numReplicas = ReplicationUtils.getReplication(tableConfig);
         ReplicaGroupPartitionAssignment partitionAssignment =
-            partitionAssignmentGenerator.buildReplicaGroupPartitionAssignment(tableNameWithType, tableConfig, servers);
+            partitionAssignmentGenerator.buildReplicaGroupPartitionAssignment(tableNameWithType, tableConfig,
+                numReplicas, servers);
         partitionAssignmentGenerator.writeReplicaGroupPartitionAssignment(partitionAssignment);
       }
     }
