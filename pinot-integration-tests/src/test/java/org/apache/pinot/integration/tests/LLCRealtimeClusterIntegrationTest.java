@@ -132,7 +132,7 @@ public class LLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegratio
           JsonNode queryResponse = postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY);
           // Total docs should not change during reload
           Assert.assertEquals(queryResponse.get("totalDocs").asLong(), numTotalDocs);
-          Assert.assertEquals(queryResponse.get("numConsumingQueried").asLong(), 2);
+          Assert.assertEquals(queryResponse.get("numConsumingSegmentsQueried").asLong(), 2);
           Assert.assertTrue(queryResponse.get("minConsumingFreshnessTimeMs").asLong() > _startTime);
           Assert.assertTrue(queryResponse.get("minConsumingFreshnessTimeMs").asLong() < System.currentTimeMillis());
           return queryResponse.get("numEntriesScannedInFilter").asLong() == 0;
