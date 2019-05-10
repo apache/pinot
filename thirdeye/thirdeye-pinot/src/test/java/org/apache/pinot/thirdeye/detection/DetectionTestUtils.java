@@ -49,10 +49,9 @@ public class DetectionTestUtils {
     return DetectionTestUtils.makeAnomaly(configId, null, start, end, metric, dataset, dimensions);
   }
 
-  public static MergedAnomalyResultDTO makeAnomaly(long start, long end, long id) {
-    MergedAnomalyResultDTO anomalyResultDTO = makeAnomaly(start, end);
-    anomalyResultDTO.setId(id);
-    return anomalyResultDTO;
+  public static MergedAnomalyResultDTO setAnomalyId(MergedAnomalyResultDTO anomaly, long id) {
+    anomaly.setId(id);
+    return anomaly;
   }
 
   public static MergedAnomalyResultDTO makeAnomaly(long start, long end) {

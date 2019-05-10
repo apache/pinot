@@ -100,8 +100,8 @@ public class MergeWrapperTest {
 
     List<MergedAnomalyResultDTO> existing = new ArrayList<>();
     // For existing anomalies add ids.
-    existing.add(makeAnomaly(0, 1000, 0));
-    existing.add(makeAnomaly(1500, 2000, 1));
+    existing.add(setAnomalyId(makeAnomaly(0, 1000), 0));
+    existing.add(setAnomalyId(makeAnomaly(1500, 2000), 1));
 
     this.outputs = new ArrayList<>();
 
@@ -138,7 +138,7 @@ public class MergeWrapperTest {
     Assert.assertEquals(output.getAnomalies().size(), 2);
     Assert.assertEquals(output.getLastTimestamp(), 3000);
     // anomalies [1100, 1200] and [1150,1250] are merged into [0, 1000]
-    Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(0, 1250, 0)));
+    Assert.assertTrue(output.getAnomalies().contains(setAnomalyId(makeAnomaly(0, 1250), 0)));
     // anomalies [2200, 2300] and [2400, 2800] are merged
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(2200, 2800)));
   }
@@ -153,8 +153,8 @@ public class MergeWrapperTest {
 
     Assert.assertEquals(output.getAnomalies().size(), 3);
     Assert.assertEquals(output.getLastTimestamp(), 3000);
-    Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(0, 1250, 0)));
-    Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(1500, 2300, 1)));
+    Assert.assertTrue(output.getAnomalies().contains(setAnomalyId(makeAnomaly(0, 1250), 0)));
+    Assert.assertTrue(output.getAnomalies().contains(setAnomalyId(makeAnomaly(1500, 2300), 1)));
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(2400, 2800)));
   }
 
@@ -176,8 +176,8 @@ public class MergeWrapperTest {
 
     Assert.assertEquals(output.getAnomalies().size(), 4);
     Assert.assertEquals(output.getLastTimestamp(), 3700);
-    Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(0, 1250, 0)));
-    Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(1500, 2300, 1)));
+    Assert.assertTrue(output.getAnomalies().contains(setAnomalyId(makeAnomaly(0, 1250), 0)));
+    Assert.assertTrue(output.getAnomalies().contains(setAnomalyId(makeAnomaly(1500, 2300), 1)));
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(2400, 3650)));
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(3650, 3800)));
   }
@@ -200,8 +200,8 @@ public class MergeWrapperTest {
 
     Assert.assertEquals(output.getAnomalies().size(), 4);
     Assert.assertEquals(output.getLastTimestamp(), 3700);
-    Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(0, 1250, 0)));
-    Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(1500, 2300, 1)));
+    Assert.assertTrue(output.getAnomalies().contains(setAnomalyId(makeAnomaly(0, 1250), 0)));
+    Assert.assertTrue(output.getAnomalies().contains(setAnomalyId(makeAnomaly(1500, 2300), 1)));
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(2400, 3650)));
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(3650, 3800)));
   }
@@ -284,8 +284,8 @@ public class MergeWrapperTest {
 
     Assert.assertEquals(output.getAnomalies().size(), 6);
     Assert.assertEquals(output.getLastTimestamp(), 3000);
-    Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(0, 1250, 0)));
-    Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(1500, 2300, 1)));
+    Assert.assertTrue(output.getAnomalies().contains(setAnomalyId(makeAnomaly(0, 1250), 0)));
+    Assert.assertTrue(output.getAnomalies().contains(setAnomalyId(makeAnomaly(1500, 2300), 1)));
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(2400, 2800)));
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(1150, 1300, Collections.singletonMap("key", "value"))));
     Assert.assertTrue(
@@ -315,7 +315,7 @@ public class MergeWrapperTest {
 
     Assert.assertEquals(output.getAnomalies().size(), 1);
     Assert.assertEquals(output.getLastTimestamp(), 3700);
-    Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(0, 2800, 0)));
+    Assert.assertTrue(output.getAnomalies().contains(setAnomalyId(makeAnomaly(0, 2800), 0)));
     Assert.assertTrue(output.getAnomalies().get(0).getProperties().get(propertyKey).equals(propertyValue));
   }
 }
