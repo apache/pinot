@@ -49,6 +49,12 @@ public class DetectionTestUtils {
     return DetectionTestUtils.makeAnomaly(configId, null, start, end, metric, dataset, dimensions);
   }
 
+  public static MergedAnomalyResultDTO makeAnomaly(long start, long end, long id) {
+    MergedAnomalyResultDTO anomalyResultDTO = makeAnomaly(start, end);
+    anomalyResultDTO.setId(id);
+    return anomalyResultDTO;
+  }
+
   public static MergedAnomalyResultDTO makeAnomaly(long start, long end) {
     return DetectionTestUtils.makeAnomaly(PROP_ID_VALUE, start, end, null, null, Collections.<String, String>emptyMap());
   }

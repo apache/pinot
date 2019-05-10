@@ -59,6 +59,18 @@ public class MergeWrapperTest {
   private static final String PROP_MAX_GAP = "maxGap";
   private static final String PROP_MAX_DURATION = "maxDuration";
 
+  /*
+    Here are the anomalies in the test.
+
+    Existing anomalies:
+    0                1000             1500       2000
+    |-----------------|                |----------|
+    New  anomalies:
+                       1100  1200                     2200  2300
+                        |-----|                         |-----|
+                           1150 1250                            2400          2800
+                            |-----|                               |------------|
+  */
   @BeforeMethod
   public void beforeMethod() {
     this.runs = new ArrayList<>();
@@ -87,26 +99,19 @@ public class MergeWrapperTest {
     this.config.setProperties(this.properties);
 
     List<MergedAnomalyResultDTO> existing = new ArrayList<>();
-    existing.add(makeAnomaly(0, 1000));
-    existing.add(makeAnomaly(1500, 2000));
+    // For existing anomalies add ids.
+    existing.add(makeAnomaly(0, 1000, 0));
+    existing.add(makeAnomaly(1500, 2000, 1));
 
     this.outputs = new ArrayList<>();
 
-    this.outputs.add(new MockPipelineOutput(Arrays.asList(
-        makeAnomaly(1100, 1200),
-        makeAnomaly(2200, 2300)
-    ), 2900));
+    this.outputs.add(new MockPipelineOutput(Arrays.asList(makeAnomaly(1100, 1200), makeAnomaly(2200, 2300)), 2900));
 
-    this.outputs.add(new MockPipelineOutput(Arrays.asList(
-        makeAnomaly(1150, 1250),
-        makeAnomaly(2400, 2800)
-    ), 3000));
+    this.outputs.add(new MockPipelineOutput(Arrays.asList(makeAnomaly(1150, 1250), makeAnomaly(2400, 2800)), 3000));
 
     this.mockLoader = new MockPipelineLoader(this.runs, this.outputs);
 
-    this.provider = new MockDataProvider()
-        .setAnomalies(existing)
-        .setLoader(this.mockLoader);
+    this.provider = new MockDataProvider().setAnomalies(existing).setLoader(this.mockLoader);
   }
 
   @Test
@@ -115,7 +120,10 @@ public class MergeWrapperTest {
     this.wrapper = new MergeWrapper(this.provider, this.config, 1000, 3000);
     DetectionPipelineResult output = this.wrapper.run();
 
-    Assert.assertEquals(output.getAnomalies().size(), 5);
+    Assert.assertEquals(output.getAnomalies().size(), 3);
+    Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(1100, 1250)));
+    Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(2200, 2300)));
+    Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(2400, 2800)));
     Assert.assertEquals(output.getLastTimestamp(), 3000);
   }
 
@@ -126,10 +134,12 @@ public class MergeWrapperTest {
     this.wrapper = new MergeWrapper(this.provider, this.config, 1000, 3000);
     DetectionPipelineResult output = this.wrapper.run();
 
-    Assert.assertEquals(output.getAnomalies().size(), 3);
+    // anomaly [1500, 2000] is not modified
+    Assert.assertEquals(output.getAnomalies().size(), 2);
     Assert.assertEquals(output.getLastTimestamp(), 3000);
-    Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(0, 1250)));
-    Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(1500, 2000)));
+    // anomalies [1100, 1200] and [1150,1250] are merged into [0, 1000]
+    Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(0, 1250, 0)));
+    // anomalies [2200, 2300] and [2400, 2800] are merged
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(2200, 2800)));
   }
 
@@ -143,8 +153,8 @@ public class MergeWrapperTest {
 
     Assert.assertEquals(output.getAnomalies().size(), 3);
     Assert.assertEquals(output.getLastTimestamp(), 3000);
-    Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(0, 1250)));
-    Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(1500, 2300)));
+    Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(0, 1250, 0)));
+    Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(1500, 2300, 1)));
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(2400, 2800)));
   }
 
@@ -153,10 +163,7 @@ public class MergeWrapperTest {
     this.config.getProperties().put(PROP_MAX_GAP, 200);
     this.config.getProperties().put(PROP_MAX_DURATION, 1250);
 
-    this.outputs.add(new MockPipelineOutput(Arrays.asList(
-        makeAnomaly(2800, 3700),
-        makeAnomaly(3700, 3800)
-    ), 3700));
+    this.outputs.add(new MockPipelineOutput(Arrays.asList(makeAnomaly(2800, 3700), makeAnomaly(3700, 3800)), 3700));
 
     Map<String, Object> nestedProperties = new HashMap<>();
     nestedProperties.put(PROP_CLASS_NAME, "none");
@@ -169,8 +176,8 @@ public class MergeWrapperTest {
 
     Assert.assertEquals(output.getAnomalies().size(), 4);
     Assert.assertEquals(output.getLastTimestamp(), 3700);
-    Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(0, 1250)));
-    Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(1500, 2300)));
+    Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(0, 1250, 0)));
+    Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(1500, 2300, 1)));
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(2400, 3650)));
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(3650, 3800)));
   }
@@ -180,10 +187,7 @@ public class MergeWrapperTest {
     this.config.getProperties().put(PROP_MAX_GAP, 200);
     this.config.getProperties().put(PROP_MAX_DURATION, 1250);
 
-    this.outputs.add(new MockPipelineOutput(Arrays.asList(
-        makeAnomaly(2800, 3800),
-        makeAnomaly(3500, 3600)
-    ), 3700));
+    this.outputs.add(new MockPipelineOutput(Arrays.asList(makeAnomaly(2800, 3800), makeAnomaly(3500, 3600)), 3700));
 
     Map<String, Object> nestedProperties = new HashMap<>();
     nestedProperties.put(PROP_CLASS_NAME, "none");
@@ -196,8 +200,8 @@ public class MergeWrapperTest {
 
     Assert.assertEquals(output.getAnomalies().size(), 4);
     Assert.assertEquals(output.getLastTimestamp(), 3700);
-    Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(0, 1250)));
-    Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(1500, 2300)));
+    Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(0, 1250, 0)));
+    Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(1500, 2300, 1)));
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(2400, 3650)));
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(3650, 3800)));
   }
@@ -206,10 +210,7 @@ public class MergeWrapperTest {
   public void testMergerMaxDurationEnforce() throws Exception {
     this.config.getProperties().put(PROP_MAX_DURATION, 500);
 
-    this.outputs.add(new MockPipelineOutput(Arrays.asList(
-        makeAnomaly(2800, 3800),
-        makeAnomaly(3500, 3600)
-    ), 3700));
+    this.outputs.add(new MockPipelineOutput(Arrays.asList(makeAnomaly(2800, 3800), makeAnomaly(3500, 3600)), 3700));
 
     Map<String, Object> nestedProperties = new HashMap<>();
     nestedProperties.put(PROP_CLASS_NAME, "none");
@@ -220,18 +221,14 @@ public class MergeWrapperTest {
     this.wrapper = new MergeWrapper(this.provider, this.config, 1000, 4000);
     DetectionPipelineResult output = this.wrapper.run();
 
-    Assert.assertEquals(output.getAnomalies().size(), 8);
+    Assert.assertEquals(output.getAnomalies().size(), 5);
     Assert.assertEquals(output.getLastTimestamp(), 3700);
-    Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(0, 500)));
-    Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(500, 1000)));
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(1100, 1250)));
-    Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(1500, 2000)));
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(2200, 2300)));
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(2400, 2900)));
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(2900, 3400)));
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(3400, 3800)));
   }
-
 
   @Test
   public void testMergerExecution() throws Exception {
@@ -263,15 +260,13 @@ public class MergeWrapperTest {
     this.config.getProperties().put(PROP_MAX_GAP, 200);
     this.config.getProperties().put(PROP_MAX_DURATION, 1250);
 
-    this.outputs.add(new MockPipelineOutput(Arrays.asList(
-        makeAnomaly(1150, 1250, Collections.singletonMap("key", "value")),
-        makeAnomaly(2400, 2800, Collections.singletonMap("otherKey", "value"))
-    ), 3000));
+    this.outputs.add(new MockPipelineOutput(
+        Arrays.asList(makeAnomaly(1150, 1250, Collections.singletonMap("key", "value")),
+            makeAnomaly(2400, 2800, Collections.singletonMap("otherKey", "value"))), 3000));
 
-    this.outputs.add(new MockPipelineOutput(Arrays.asList(
-        makeAnomaly(1250, 1300, Collections.singletonMap("key", "value")),
-        makeAnomaly(2700, 2900, Collections.singletonMap("otherKey", "otherValue"))
-    ), 3000));
+    this.outputs.add(new MockPipelineOutput(
+        Arrays.asList(makeAnomaly(1250, 1300, Collections.singletonMap("key", "value")),
+            makeAnomaly(2700, 2900, Collections.singletonMap("otherKey", "otherValue"))), 3000));
 
     Map<String, Object> nestedPropertiesThree = new HashMap<>();
     nestedPropertiesThree.put(PROP_CLASS_NAME, "none");
@@ -289,12 +284,38 @@ public class MergeWrapperTest {
 
     Assert.assertEquals(output.getAnomalies().size(), 6);
     Assert.assertEquals(output.getLastTimestamp(), 3000);
-    Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(0, 1250)));
-    Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(1500, 2300)));
+    Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(0, 1250, 0)));
+    Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(1500, 2300, 1)));
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(2400, 2800)));
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(1150, 1300, Collections.singletonMap("key", "value"))));
-    Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(2400, 2800, Collections.singletonMap("otherKey", "value"))));
-    Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(2700, 2900, Collections.singletonMap("otherKey", "otherValue"))));
+    Assert.assertTrue(
+        output.getAnomalies().contains(makeAnomaly(2400, 2800, Collections.singletonMap("otherKey", "value"))));
+    Assert.assertTrue(
+        output.getAnomalies().contains(makeAnomaly(2700, 2900, Collections.singletonMap("otherKey", "otherValue"))));
   }
 
+  @Test
+  public void testMergeProperties() throws Exception {
+
+    MergedAnomalyResultDTO anomaly = makeAnomaly(1100, 1250);
+    String propertyKey = "trend_day1";
+    String propertyValue = "{trend_info}";
+    anomaly.setProperties(Collections.singletonMap(propertyKey, propertyValue));
+
+    this.outputs.add(new MockPipelineOutput(Arrays.asList(anomaly), 3700));
+
+    Map<String, Object> nestedProperties = new HashMap<>();
+    nestedProperties.put(PROP_CLASS_NAME, "none");
+    nestedProperties.put(PROP_METRIC_URN, "thirdeye:metric:1");
+
+    this.nestedProperties.add(nestedProperties);
+
+    this.wrapper = new MergeWrapper(this.provider, this.config, 1000, 4000);
+    DetectionPipelineResult output = this.wrapper.run();
+
+    Assert.assertEquals(output.getAnomalies().size(), 1);
+    Assert.assertEquals(output.getLastTimestamp(), 3700);
+    Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(0, 2800, 0)));
+    Assert.assertTrue(output.getAnomalies().get(0).getProperties().get(propertyKey).equals(propertyValue));
+  }
 }
