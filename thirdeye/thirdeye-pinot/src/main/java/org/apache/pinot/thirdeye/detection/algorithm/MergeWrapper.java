@@ -31,6 +31,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import org.apache.commons.collections.MapUtils;
 import org.apache.pinot.thirdeye.common.dimension.DimensionMap;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
@@ -148,11 +149,18 @@ public class MergeWrapper extends DetectionPipeline {
     return new ArrayList<>(this.provider.fetchAnomalies(Collections.singleton(effectiveSlice), this.config.getId()).get(effectiveSlice));
   }
 
-  // logic to do time-based merging.
+  private boolean isExistingAnomaly(MergedAnomalyResultDTO anomaly) {
+    return anomaly.getId() != null;
+  }
+
+  // Merge new anomalies into existing anomalies. Return the anomalies that need to update or add.
+  // If it is existing anomaly and not updated then it is not returned.
   protected List<MergedAnomalyResultDTO> merge(Collection<MergedAnomalyResultDTO> anomalies) {
     List<MergedAnomalyResultDTO> input = new ArrayList<>(enforceMaxDuration(anomalies));
     Collections.sort(input, COMPARATOR);
 
+    // stores all the existing anomalies that need to modified
+    Set<Long> modifiedExistingIds = new HashSet<>();
     List<MergedAnomalyResultDTO> output = new ArrayList<>();
 
     Map<AnomalyKey, MergedAnomalyResultDTO> parents = new HashMap<>();
@@ -165,16 +173,38 @@ public class MergeWrapper extends DetectionPipeline {
       MergedAnomalyResultDTO parent = parents.get(key);
 
       if (parent == null || anomaly.getStartTime() - parent.getEndTime() > this.maxGap) {
-        // no parent, too far away
+        // no parent, too far away to merge
+        //      parent |-------------|
+        //                                  anomaly |---------------|
+        //
         parents.put(key, anomaly);
-        output.add(anomaly);
-
+        if (!isExistingAnomaly(anomaly)) {
+          output.add(anomaly);
+        }
       } else if (anomaly.getEndTime() <= parent.getEndTime() || anomaly.getEndTime() - parent.getStartTime() <= this.maxDuration) {
-        // fully merge into existing
+        // fully cover
+        //      parent |-------------------|
+        //              anomaly |-------------|
+        // or mergeable
+        //      parent |-------------------|
+        //                      anomaly |-------------|
+        // or small gap
+        //      parent |-------------------|
+        //                                 anomaly |-------------|
+        //
         parent.setEndTime(Math.max(parent.getEndTime(), anomaly.getEndTime()));
-
+        // merge the anomaly's properties into parent
+        Map<String, String> properties = parent.getProperties();
+        properties.putAll(anomaly.getProperties());
+        parent.setProperties(properties);
+        if (isExistingAnomaly(parent)) {
+          modifiedExistingIds.add(parent.getId());
+        }
       } else if (parent.getEndTime() >= anomaly.getStartTime()) {
-        // partially merge, truncate new
+        // mergeable but exceeds maxDuration, then truncate
+        //      parent |---------------------|
+        //                        anomaly |------------------------|
+        //
         long truncationTimestamp = Math.max(parent.getEndTime(), parent.getStartTime() + this.maxDuration);
 
         parent.setEndTime(truncationTimestamp);
@@ -182,29 +212,42 @@ public class MergeWrapper extends DetectionPipeline {
         anomaly.setEndTime(Math.max(truncationTimestamp, anomaly.getEndTime()));
 
         parents.put(key, anomaly);
-        output.add(anomaly);
-
+        if (!isExistingAnomaly(anomaly)) {
+          output.add(anomaly);
+        }
+        if (isExistingAnomaly(parent)) {
+          modifiedExistingIds.add(parent.getId());
+        }
       } else {
         // default to new parent if merge not possible
         parents.put(key, anomaly);
-        output.add(anomaly);
-
+        if (!isExistingAnomaly(anomaly)) {
+          output.add(anomaly);
+        }
       }
     }
 
-    return output;
+    // add modified existing anomalies into output
+    output.addAll(input.stream().filter(x -> x.getId()!= null && modifiedExistingIds.contains(x.getId())).collect(Collectors.toList()));
+
+    return new ArrayList<>(output);
   }
 
   /*
     Make sure that the anomalies generated from detector is shorter than maxDuration. Otherwise, split the anomaly
+    Do not split anomaly if it is existing anomaly.
    */
   private Collection<MergedAnomalyResultDTO> enforceMaxDuration(Collection<MergedAnomalyResultDTO> anomalies) {
     Set<MergedAnomalyResultDTO> result = new HashSet<>();
     for (MergedAnomalyResultDTO anomaly : anomalies) {
-      if (anomaly.getEndTime() - anomaly.getStartTime() > this.maxDuration) {
-        result.addAll(splitAnomaly(anomaly, this.maxDuration));
-      } else {
+      if (isExistingAnomaly(anomaly)) {
         result.add(anomaly);
+      } else {
+        if (anomaly.getEndTime() - anomaly.getStartTime() > this.maxDuration) {
+          result.addAll(splitAnomaly(anomaly, this.maxDuration));
+        } else {
+          result.add(anomaly);
+        }
       }
     }
     return result;
