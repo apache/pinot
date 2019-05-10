@@ -23,27 +23,23 @@
 package org.apache.pinot.thirdeye.detection;
 
 import org.apache.pinot.thirdeye.dataframe.DoubleSeries;
+import org.testng.Assert;
+import org.testng.annotations.Test;
+
+import static org.testng.Assert.*;
 
 
-/**
- * The util class for model evaluation
- */
-public class Evaluation {
-  // Suppresses default constructor, ensuring non-instantiability.
-  private Evaluation() {
+public class EvaluationTest {
+
+  @Test
+  public void testCalculateMape() {
+    double mape = Evaluation.calculateMape(DoubleSeries.buildFrom(10, 20), DoubleSeries.buildFrom(20, 30));
+    Assert.assertEquals(mape, 0.75);
   }
 
-  /**
-   * Calculate the mean absolute percentage error (MAPE).
-   * See https://en.wikipedia.org/wiki/Mean_absolute_percentage_error
-   * @param current current time series
-   * @param predicted baseline time series
-   * @return the mape value
-   */
-  public static double calculateMape(DoubleSeries current, DoubleSeries predicted) {
-    if (current.contains(0.0)) {
-      return Double.POSITIVE_INFINITY;
-    }
-    return predicted.divide(current).subtract(1).abs().mean().getDouble(0);
+  @Test
+  public void testCalculateZero() {
+    double mape = Evaluation.calculateMape(DoubleSeries.buildFrom(0, 20), DoubleSeries.buildFrom(1, 30));
+    Assert.assertEquals(mape, Double.POSITIVE_INFINITY);
   }
 }

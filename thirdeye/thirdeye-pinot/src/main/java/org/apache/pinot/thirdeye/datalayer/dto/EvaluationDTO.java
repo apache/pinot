@@ -30,6 +30,9 @@ import org.apache.pinot.thirdeye.detection.PredictionResult;
 import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
 
 
+/**
+ * The evaluation DTO
+ */
 public class EvaluationDTO extends EvaluationBean {
   public static EvaluationDTO fromPredictionResult(PredictionResult predictionResult, long startTime, long endTime,
       long detectionConfigId) {
@@ -39,9 +42,14 @@ public class EvaluationDTO extends EvaluationBean {
     evaluation.setEndTime(endTime);
     evaluation.setDetectorName(predictionResult.getDetectorName());
     evaluation.setMetricUrn(predictionResult.getMetricUrn());
-    DataFrame df = predictionResult.getPredictedTimeSeries();
-    df = df.filter(df.getDoubles(COL_CURRENT).eq(0.0).not()).dropNull(COL_CURRENT, COL_VALUE);
-    evaluation.setMape(Evaluation.calculateMape(df.getDoubles(COL_CURRENT), df.getDoubles(COL_VALUE)));
+    evaluation.setMape(getMape(predictionResult));
     return evaluation;
+  }
+
+  private static double getMape(PredictionResult result) {
+    DataFrame df = result.getPredictedTimeSeries();
+    // drop zero current value for mape calculation
+    df = df.filter(df.getDoubles(COL_CURRENT).eq(0.0).not()).dropNull(COL_CURRENT, COL_VALUE);
+    return Evaluation.calculateMape(df.getDoubles(COL_CURRENT), df.getDoubles(COL_VALUE));
   }
 }
