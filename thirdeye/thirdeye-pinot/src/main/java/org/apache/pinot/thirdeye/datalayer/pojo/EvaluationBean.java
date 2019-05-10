@@ -25,12 +25,15 @@ package org.apache.pinot.thirdeye.datalayer.pojo;
 import java.util.Objects;
 
 
+/**
+ * The class for evaluation metrics.
+ */
 public class EvaluationBean extends AbstractBean {
-  private long detectionConfigId;
-  private long startTime;
-  private long endTime;
-  private String detectorName;
-  private double mape;
+  private long detectionConfigId; // the detection config id
+  private long startTime; // the start time for the detection window being monitored
+  private long endTime; // the end time for the detection window being monitored
+  private String detectorName; // the name for the detector
+  private double mape; //  the mean absolute percentage error (MAPE)
 
   public long getDetectionConfigId() {
     return detectionConfigId;
