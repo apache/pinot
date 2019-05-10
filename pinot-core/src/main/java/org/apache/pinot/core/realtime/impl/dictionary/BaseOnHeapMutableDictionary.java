@@ -44,7 +44,6 @@ public abstract class BaseOnHeapMutableDictionary extends MutableDictionary {
   /**
    * For performance, we don't validate the dictId passed in. It should be returned by index() or indexOf().
    */
-  @Nonnull
   @Override
   public Object get(int dictId) {
     return _dictIdToValue[dictId >>> SHIFT_OFFSET][dictId & MASK];

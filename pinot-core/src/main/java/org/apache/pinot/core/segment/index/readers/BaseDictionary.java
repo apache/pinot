@@ -51,7 +51,6 @@ public abstract class BaseDictionary implements Dictionary {
   }
 
   @Override
-
   public byte[] getBytesValue(int dictId) {
     throw new UnsupportedOperationException();
   }

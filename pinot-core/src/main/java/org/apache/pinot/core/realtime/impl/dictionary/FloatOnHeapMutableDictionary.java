@@ -109,6 +109,11 @@ public class FloatOnHeapMutableDictionary extends BaseOnHeapMutableDictionary {
   }
 
   @Override
+  public int compare(int dictId1, int dictId2) {
+    return Float.compare(getFloatValue(dictId1), getFloatValue(dictId2));
+  }
+
+  @Override
   public int getIntValue(int dictId) {
     return ((Float) get(dictId)).intValue();
   }

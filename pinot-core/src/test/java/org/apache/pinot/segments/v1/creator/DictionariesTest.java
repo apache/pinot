@@ -37,6 +37,7 @@ import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.FieldSpec.DataType;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.segment.ReadMode;
+import org.apache.pinot.common.utils.primitive.ByteArray;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
@@ -46,6 +47,7 @@ import org.apache.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
 import org.apache.pinot.core.segment.creator.impl.SegmentDictionaryCreator;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
 import org.apache.pinot.core.segment.creator.impl.stats.AbstractColumnStatisticsCollector;
+import org.apache.pinot.core.segment.creator.impl.stats.BytesColumnPredIndexStatsCollector;
 import org.apache.pinot.core.segment.creator.impl.stats.DoubleColumnPreIndexStatsCollector;
 import org.apache.pinot.core.segment.creator.impl.stats.FloatColumnPreIndexStatsCollector;
 import org.apache.pinot.core.segment.creator.impl.stats.IntColumnPreIndexStatsCollector;
@@ -371,6 +373,32 @@ public class DictionariesTest {
     Assert.assertFalse(statsCollector.isSorted());
   }
 
+  @Test
+  public void testBytesColumnPreIndexStatsCollector() {
+    AbstractColumnStatisticsCollector statsCollector = buildStatsCollector("column1", DataType.BYTES);
+    statsCollector.collect(new byte[]{1});
+    Assert.assertTrue(statsCollector.isSorted());
+    statsCollector.collect(new byte[]{1});
+    Assert.assertTrue(statsCollector.isSorted());
+    statsCollector.collect(new byte[]{1, 2});
+    Assert.assertTrue(statsCollector.isSorted());
+    statsCollector.collect(new byte[]{1, 2, 3});
+    Assert.assertTrue(statsCollector.isSorted());
+    statsCollector.collect(new byte[]{1, 2, 3, 4});
+    Assert.assertTrue(statsCollector.isSorted());
+    statsCollector.collect(new byte[]{0});
+    Assert.assertFalse(statsCollector.isSorted());
+    statsCollector.collect(new byte[]{0, 1});
+    Assert.assertFalse(statsCollector.isSorted());
+    statsCollector.collect(new byte[]{1});
+    Assert.assertFalse(statsCollector.isSorted());
+    statsCollector.seal();
+    Assert.assertEquals(statsCollector.getCardinality(), 6);
+    Assert.assertEquals(statsCollector.getMinValue(), new ByteArray(new byte[]{0}));
+    Assert.assertEquals(statsCollector.getMaxValue(), new ByteArray(new byte[]{1, 2, 3, 4}));
+    Assert.assertFalse(statsCollector.isSorted());
+  }
+
   /**
    * Test for ensuring that Strings with special characters can be handled
    * correctly.
@@ -437,22 +465,17 @@ public class DictionariesTest {
     switch (dataType) {
       case INT:
         return new IntColumnPreIndexStatsCollector(column, statsCollectorConfig);
-
       case LONG:
         return new LongColumnPreIndexStatsCollector(column, statsCollectorConfig);
-
       case FLOAT:
         return new FloatColumnPreIndexStatsCollector(column, statsCollectorConfig);
-
       case DOUBLE:
         return new DoubleColumnPreIndexStatsCollector(column, statsCollectorConfig);
-
+      case BOOLEAN:
       case STRING:
         return new StringColumnPreIndexStatsCollector(column, statsCollectorConfig);
-
-      case BOOLEAN:
-        return new StringColumnPreIndexStatsCollector(column, statsCollectorConfig);
-
+      case BYTES:
+        return new BytesColumnPredIndexStatsCollector(column, statsCollectorConfig);
       default:
         throw new IllegalArgumentException("Illegal data type for stats builder: " + dataType);
     }

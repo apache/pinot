@@ -109,6 +109,11 @@ public class DoubleOnHeapMutableDictionary extends BaseOnHeapMutableDictionary {
   }
 
   @Override
+  public int compare(int dictId1, int dictId2) {
+    return Double.compare(getDoubleValue(dictId1), getDoubleValue(dictId2));
+  }
+
+  @Override
   public int getIntValue(int dictId) {
     return ((Double) get(dictId)).intValue();
   }

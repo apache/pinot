@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.segment.index.readers;
 
+import org.apache.pinot.common.utils.BytesUtils;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 
 
@@ -38,12 +39,17 @@ public class BytesDictionary extends ImmutableDictionaryReader {
 
   @Override
   public int insertionIndexOf(Object rawValue) {
-    return binarySearch((byte[]) rawValue);
+    return binarySearch(BytesUtils.toBytes(rawValue));
   }
 
   @Override
   public byte[] get(int dictId) {
-    return getBytes(dictId, getBuffer());
+    return getBytesValue(dictId);
+  }
+
+  @Override
+  public String getStringValue(int dictId) {
+    return BytesUtils.toHexString(getBytesValue(dictId));
   }
 
   @Override
