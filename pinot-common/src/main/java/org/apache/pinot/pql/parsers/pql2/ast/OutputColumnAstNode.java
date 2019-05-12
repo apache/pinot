@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.pql.parsers.pql2.ast;
 
+import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.PinotQuery;
@@ -37,6 +38,7 @@ public class OutputColumnAstNode extends BaseAstNode {
       if (astNode instanceof FunctionCallAstNode) {
         FunctionCallAstNode node = (FunctionCallAstNode) astNode;
         brokerRequest.addToAggregationsInfo(node.buildAggregationInfo());
+
       } else if (astNode instanceof IdentifierAstNode) {
         Selection selection = brokerRequest.getSelections();
         if (selection == null) {

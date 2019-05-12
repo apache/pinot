@@ -18,16 +18,25 @@
  */
 package org.apache.pinot.core.plan;
 
+import static org.apache.pinot.core.query.selection.SelectionOperatorUtils.getSelectionColumns;
+
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Set;
 import javax.annotation.Nonnull;
 import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.request.Selection;
+import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionType;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
+import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,7 +50,8 @@ public class TransformPlanNode implements PlanNode {
   private final String _segmentName;
   private final ProjectionPlanNode _projectionPlanNode;
   private final Set<String> _projectionColumns = new HashSet<>();
-  private final Set<TransformExpressionTree> _expressionTrees = new HashSet<>();
+  private final Set<TransformExpressionTree> _expressionTrees = new LinkedHashSet<>();
+  private int _maxDocPerNextCall = DocIdSetPlanNode.MAX_DOC_PER_CALL;
 
   /**
    * Constructor for the class
@@ -51,17 +61,19 @@ public class TransformPlanNode implements PlanNode {
    */
   public TransformPlanNode(@Nonnull IndexSegment indexSegment, @Nonnull BrokerRequest brokerRequest) {
     _segmentName = indexSegment.getSegmentName();
-    extractColumnsAndTransforms(brokerRequest);
+    extractColumnsAndTransforms(brokerRequest, indexSegment);
     _projectionPlanNode =
-        new ProjectionPlanNode(indexSegment, _projectionColumns, new DocIdSetPlanNode(indexSegment, brokerRequest));
+        new ProjectionPlanNode(indexSegment, _projectionColumns, new DocIdSetPlanNode(indexSegment, brokerRequest, _maxDocPerNextCall));
   }
 
   /**
    * Helper method to extract projection columns and transform expressions from the given broker request.
    *
    * @param brokerRequest Broker request to process
+   * @param indexSegment
    */
-  private void extractColumnsAndTransforms(@Nonnull BrokerRequest brokerRequest) {
+  private void extractColumnsAndTransforms(@Nonnull BrokerRequest brokerRequest,
+      IndexSegment indexSegment) {
     if (brokerRequest.isSetAggregationsInfo()) {
       for (AggregationInfo aggregationInfo : brokerRequest.getAggregationsInfo()) {
         if (!aggregationInfo.getAggregationType().equalsIgnoreCase(AggregationFunctionType.COUNT.getName())) {
@@ -81,15 +93,35 @@ public class TransformPlanNode implements PlanNode {
         }
       }
     } else {
-      throw new UnsupportedOperationException("Transforms not supported in selection queries.");
-      // TODO: Add transform support.
-      // projectionColumns.addAll(brokerRequest.getSelections().getSelectionColumns());
+//      throw new UnsupportedOperationException("Transforms not supported in selection queries.");
+      Selection selection = brokerRequest.getSelections();
+      // No ordering required, select minimum number of documents
+      if (!selection.isSetSelectionSortSequence()) {
+        _maxDocPerNextCall = Math.min(selection.getOffset() + selection.getSize(), _maxDocPerNextCall);
+      }
+      List<String> expressions = selection.getSelectionColumns();
+      if (expressions.size() == 1 && expressions.get(0).equals("*")) {
+        expressions = new LinkedList<>(indexSegment.getPhysicalColumnNames());
+      }
+      if (selection.getSelectionSortSequence() != null) {
+        for (SelectionSort selectionSort : selection.getSelectionSortSequence()) {
+          String expression = selectionSort.getColumn();
+          if(!expressions.contains(expression)) {
+            expressions.add(expression);
+          }
+        }
+      }
+      for (String expression : expressions) {
+        TransformExpressionTree transformExpressionTree = TransformExpressionTree.compileToExpressionTree(expression);
+        transformExpressionTree.getColumns(_projectionColumns);
+        _expressionTrees.add(transformExpressionTree);
+      }
     }
   }
 
   @Override
   public TransformOperator run() {
-    return new TransformOperator(_projectionPlanNode.run(), _expressionTrees);
+    return new TransformOperator(_projectionPlanNode.run(), new ArrayList<>(_expressionTrees));
   }
 
   @Override
