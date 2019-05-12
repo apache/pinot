@@ -76,7 +76,7 @@ public class SelectionOperatorUtils {
   private static final DecimalFormatSymbols DECIMAL_FORMAT_SYMBOLS = DecimalFormatSymbols.getInstance(Locale.US);
 
   /**
-   * Expand <code>'SELECT *'</code> to select all columns with {@link IndexSegment}, order all columns alphabatically.
+   * Expand <code>'SELECT *'</code> to select all columns with {@link IndexSegment}, order all columns alphabetically.
    * (Inner segment)
    *
    * @param selectionColumns unexpanded selection columns (may contain '*').
@@ -88,8 +88,6 @@ public class SelectionOperatorUtils {
       @Nonnull IndexSegment indexSegment) {
     if (selectionColumns.size() == 1 && selectionColumns.get(0).equals("*")) {
       List<String> allColumns = new LinkedList<>(indexSegment.getPhysicalColumnNames());
-      Set<String> columnNames = indexSegment.getPhysicalColumnNames();
-
       Collections.sort(allColumns);
       return allColumns;
     } else {

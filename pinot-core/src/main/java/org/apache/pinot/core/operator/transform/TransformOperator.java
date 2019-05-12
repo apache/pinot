@@ -19,6 +19,7 @@
 package org.apache.pinot.core.operator.transform;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nonnull;
@@ -38,11 +39,13 @@ import org.apache.pinot.core.segment.index.readers.Dictionary;
  * Class for evaluating transform expressions.
  */
 public class TransformOperator extends BaseOperator<TransformBlock> {
+
   private static final String OPERATOR_NAME = "TransformOperator";
 
   private final ProjectionOperator _projectionOperator;
   private final Map<String, DataSource> _dataSourceMap;
   private final Map<TransformExpressionTree, TransformFunction> _transformFunctionMap = new HashMap<>();
+  private final List<TransformExpressionTree> _expressions;
 
   /**
    * Constructor for the class
@@ -51,11 +54,13 @@ public class TransformOperator extends BaseOperator<TransformBlock> {
    * @param expressions Set of expressions to evaluate
    */
   public TransformOperator(@Nonnull ProjectionOperator projectionOperator,
-      @Nonnull Set<TransformExpressionTree> expressions) {
+      @Nonnull List<TransformExpressionTree> expressions) {
     _projectionOperator = projectionOperator;
+    _expressions = expressions;
     _dataSourceMap = projectionOperator.getDataSourceMap();
     for (TransformExpressionTree expression : expressions) {
-      TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+      TransformFunction transformFunction = TransformFunctionFactory
+          .get(expression, _dataSourceMap);
       _transformFunctionMap.put(expression, transformFunction);
     }
   }
@@ -108,5 +113,9 @@ public class TransformOperator extends BaseOperator<TransformBlock> {
   @Override
   public ExecutionStatistics getExecutionStatistics() {
     return _projectionOperator.getExecutionStatistics();
+  }
+
+  public List<TransformExpressionTree> getExpressions() {
+    return _expressions;
   }
 }
