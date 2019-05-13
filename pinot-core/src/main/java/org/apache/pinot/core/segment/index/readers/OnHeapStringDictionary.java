@@ -21,7 +21,10 @@ package org.apache.pinot.core.segment.index.readers;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -34,6 +37,8 @@ import org.apache.pinot.core.segment.memory.PinotDataBuffer;
  * <p>This helps avoid creation of String from byte[], which is expensive as well as creates garbage.
  */
 public class OnHeapStringDictionary extends OnHeapDictionary {
+  Logger LOGGER = LoggerFactory.getLogger(OnHeapStringDictionary.class);
+
   private final byte _paddingByte;
   private final String[] _unpaddedStrings;
   private final String[] _paddedStrings;
@@ -48,6 +53,7 @@ public class OnHeapStringDictionary extends OnHeapDictionary {
     _unpaddedStrings = new String[length];
     _unPaddedStringToIdMap = new HashMap<>(length);
 
+    long startTime = System.currentTimeMillis();
     for (int i = 0; i < length; i++) {
       _unpaddedStrings[i] = getUnpaddedString(i, buffer);
       _unPaddedStringToIdMap.put(_unpaddedStrings[i], i);
@@ -65,6 +71,8 @@ public class OnHeapStringDictionary extends OnHeapDictionary {
         _paddedStringToIdMap.put(_paddedStrings[i], i);
       }
     }
+    LOGGER.info("On-heap string dictionary is generated successfully in {} seconds",
+        TimeUnit.SECONDS.toSeconds(System.currentTimeMillis() - startTime));
   }
 
   @Override

@@ -20,7 +20,10 @@ package org.apache.pinot.core.segment.index.readers;
 
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import java.util.Arrays;
+import java.util.concurrent.TimeUnit;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -33,6 +36,8 @@ import org.apache.pinot.core.segment.memory.PinotDataBuffer;
  * <p>This helps avoid creation of Long from byte[].
  */
 public class OnHeapLongDictionary extends OnHeapDictionary {
+  Logger LOGGER = LoggerFactory.getLogger(OnHeapLongDictionary.class);
+
   private final Long2IntOpenHashMap _valToDictId;
   private final long[] _dictIdToVal;
 
@@ -50,11 +55,14 @@ public class OnHeapLongDictionary extends OnHeapDictionary {
     _valToDictId.defaultReturnValue(-1);
     _dictIdToVal = new long[length];
 
+    long startTime = System.currentTimeMillis();
     for (int dictId = 0; dictId < length; dictId++) {
       long value = getLong(dictId);
       _dictIdToVal[dictId] = value;
       _valToDictId.put(value, dictId);
     }
+    LOGGER.info("On-heap long dictionary is generated successfully in {} seconds",
+        TimeUnit.SECONDS.toSeconds(System.currentTimeMillis() - startTime));
   }
 
   @Override
