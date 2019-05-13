@@ -39,8 +39,31 @@ In general, when deploying Pinot services, it is best to adhere to a specific or
 The ordering is as follows:
 
 #. pinot-controller
+vim conf/default_controller.properties
+cluster.tenant.isolation.enable=false #Enable multi-tenancy
+controller.host=master1
+controller.port=9000
+controller.data.dir=/usr/local/pinot/PinotController
+controller.zk.str=zk1:2181,zk2:2181,zk3:2181
+controller.helix.cluster.name=PinotCluster
+
+bin/start-controller.sh -configFileName conf/default_controller.properties
+
 #. pinot-broker
+vim default_broker.properties 
+pinot.broker.timeoutMs=50000
+pinot.broker.client.queryPort=8099
+
+bin/start-broker.sh -clusterName PinotCluster -zkAddress "zk1:2181,zk2:2181,zk3:2181" -configFileName conf/default_broker.properties
 #. pinot-server
+vim default_server.properties
+pinot.server.netty.host=server1
+pinot.server.netty.port=8098
+pinot.server.instance.dataDir=/usr/local/pinot/data
+pinot.server.instance.segmentTarDir=/usr/local/pinot/segment
+pinot.server.query.executor.timeout=60000
+
+bin/start-server.sh -clusterName PinotCluster -zkAddress "zk1:2181,zk2:2181,zk3:2181" -configFileName conf/default_server.properties
 #. pinot-minion
 
 Managing Pinot
