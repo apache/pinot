@@ -106,9 +106,11 @@ public class MergeWrapper extends DetectionPipeline {
   public DetectionPipelineResult run() throws Exception {
     Map<String, Object> diagnostics = new HashMap<>();
 
-    // generate anomalies
+    // generated anomalies
     List<MergedAnomalyResultDTO> generated = new ArrayList<>();
+    // predicted time series results
     List<PredictionResult> predictionResults = new ArrayList<>();
+    // evaluation for the predictions
     List<EvaluationDTO> evaluations = new ArrayList<>();
     int i = 0;
     Set<Long> lastTimeStamps = new HashSet<>();
