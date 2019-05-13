@@ -44,6 +44,6 @@ public class Evaluation {
     if (current.contains(0.0)) {
       return Double.POSITIVE_INFINITY;
     }
-    return predicted.divide(current).subtract(1).abs().mean().getDouble(0);
+    return predicted.divide(current).subtract(1).abs().mean().value();
   }
 }

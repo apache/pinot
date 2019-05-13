@@ -49,7 +49,7 @@ public class EvaluationDTO extends EvaluationBean {
   private static double getMape(PredictionResult result) {
     DataFrame df = result.getPredictedTimeSeries();
     // drop zero current value for mape calculation
-    df = df.filter(df.getDoubles(COL_CURRENT).eq(0.0).not()).dropNull(COL_CURRENT, COL_VALUE);
+    df = df.filter(df.getDoubles(COL_CURRENT).ne(0.0)).dropNull(COL_CURRENT, COL_VALUE);
     return Evaluation.calculateMape(df.getDoubles(COL_CURRENT), df.getDoubles(COL_VALUE));
   }
 }

@@ -45,7 +45,6 @@ import org.apache.pinot.thirdeye.detection.PredictionResult;
 import org.apache.pinot.thirdeye.detection.spi.model.AnomalySlice;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import weka.classifiers.evaluation.Evaluation;
 
 
 /**

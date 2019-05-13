@@ -25,6 +25,9 @@ package org.apache.pinot.thirdeye.datalayer.bao;
 import org.apache.pinot.thirdeye.datalayer.dto.EvaluationDTO;
 
 
+/**
+ * The DAO for evaluations
+ */
 public interface EvaluationManager extends AbstractManager<EvaluationDTO> {
 
 }

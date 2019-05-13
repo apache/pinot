@@ -753,6 +753,10 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
     }, this, other);
   }
 
+  public BooleanSeries ne(final double constant) {
+    return this.eq(constant).not();
+  }
+
   public BooleanSeries gt(final double constant) {
     if(isNull(constant))
       return BooleanSeries.nulls(this.size());
