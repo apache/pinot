@@ -192,6 +192,19 @@ public class ThresholdRuleAnomalyFilterTest {
     Assert.assertEquals(anomalies.get(2), this.anomalies.get(2));
   }
 
+  @Test(priority = 6)
+  public void testThresholdRuleFilterCurrentMinAndMax() throws Exception {
+    this.specs.put("minValue", 300);
+    this.specs.put("maxValue", 500);
+    this.thresholdRuleFilter = new AnomalyFilterWrapper(this.testDataProvider, this.config, 1551186000000L, 1551189600000L);
+    DetectionPipelineResult result = this.thresholdRuleFilter.run();
+    List<MergedAnomalyResultDTO> anomalies = result.getAnomalies();
+    Assert.assertEquals(result.getLastTimestamp(), 1551200400000L);
+    Assert.assertEquals(anomalies.size(), 1);
+    Assert.assertEquals(anomalies.get(0), this.anomalies.get(2));
+  }
+
+
   private static MergedAnomalyResultDTO makeAnomaly(long start, long end) {
     MergedAnomalyResultDTO anomaly = DetectionTestUtils.makeAnomaly(125L, start, end);
     anomaly.setMetricUrn(METRIC_URN);
