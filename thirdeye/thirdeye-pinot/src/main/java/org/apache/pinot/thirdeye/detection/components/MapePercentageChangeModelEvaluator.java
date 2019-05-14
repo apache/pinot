@@ -40,7 +40,8 @@ import org.joda.time.Instant;
 
 /**
  *  Monitor the recent mean MAPE in last 7 days, and compare that with the mean MAPE for the last 30 days.
- *  If it's dropped to a certain threshold, return bad model status
+ *  If the percentage change dropped to a certain threshold for a metric urn, return a bad model status to trigger
+ *  auto configuration.
  */
 public class MapePercentageChangeModelEvaluator implements ModelEvaluator<MapePercentageChangeModelEvaluatorSpec> {
   private InputDataFetcher dataFetcher;

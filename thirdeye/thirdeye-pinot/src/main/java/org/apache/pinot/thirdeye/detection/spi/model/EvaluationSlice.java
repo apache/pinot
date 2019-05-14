@@ -32,7 +32,7 @@ public class EvaluationSlice {
   private final long start;
   private final long end;
 
-  public EvaluationSlice(long start, long end) {
+  private EvaluationSlice(long start, long end) {
     this.start = start;
     this.end = end;
   }
@@ -48,10 +48,6 @@ public class EvaluationSlice {
 
   public EvaluationSlice withEndTime(long endTime) {
     return new EvaluationSlice(this.start, endTime);
-  }
-
-  public EvaluationSlice withDetectionConfigId(long detectionConfigId) {
-    return new EvaluationSlice(this.start, this.end);
   }
 
   public long getStart() {

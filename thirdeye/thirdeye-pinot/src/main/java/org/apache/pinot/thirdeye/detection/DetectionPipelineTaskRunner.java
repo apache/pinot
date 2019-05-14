@@ -21,7 +21,6 @@ package org.apache.pinot.thirdeye.detection;
 
 import java.util.Collections;
 import java.util.List;
-import java.util.stream.Collectors;
 import org.apache.pinot.thirdeye.anomaly.task.TaskContext;
 import org.apache.pinot.thirdeye.anomaly.task.TaskInfo;
 import org.apache.pinot.thirdeye.anomaly.task.TaskResult;
@@ -42,18 +41,12 @@ import org.apache.pinot.thirdeye.datasource.loader.AggregationLoader;
 import org.apache.pinot.thirdeye.datasource.loader.DefaultAggregationLoader;
 import org.apache.pinot.thirdeye.datasource.loader.DefaultTimeSeriesLoader;
 import org.apache.pinot.thirdeye.datasource.loader.TimeSeriesLoader;
-import org.apache.pinot.thirdeye.detection.annotation.registry.DetectionRegistry;
-import org.apache.pinot.thirdeye.detection.spec.AbstractSpec;
-import org.apache.pinot.thirdeye.detection.spi.components.ModelEvaluator;
-import org.apache.pinot.thirdeye.detection.spi.model.ModelStatus;
-import org.joda.time.Instant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 public class DetectionPipelineTaskRunner implements TaskRunner {
   private static final Logger LOG = LoggerFactory.getLogger(DetectionPipelineTaskRunner.class);
-  private static final DetectionRegistry DETECTION_REGISTRY = DetectionRegistry.getInstance();
   private final DetectionConfigManager detectionDAO;
   private final MergedAnomalyResultManager anomalyDAO;
   private final EvaluationManager evaluationDAO;
@@ -140,24 +133,6 @@ public class DetectionPipelineTaskRunner implements TaskRunner {
         this.evaluationDAO.save(evaluationDTO);
       }
 
-      // if the pipeline is tunable, evaluate the model and try to re-tune
-      if (isTunable(config)){
-        // get the model evaluator
-        List<? extends ModelEvaluator<? extends AbstractSpec>> modelEvaluators = config.getComponents()
-            .values()
-            .stream()
-            .filter(component -> component instanceof ModelEvaluator)
-            .map(component -> (ModelEvaluator<? extends AbstractSpec>) component)
-            .collect(Collectors.toList());
-
-        for(ModelEvaluator<? extends AbstractSpec> modelEvaluator: modelEvaluators) {
-          if(modelEvaluator.evaluateModel(Instant.now()).getStatus().equals(ModelStatus.BAD)) {
-            // TODO: tune model
-            break;
-          }
-        }
-      }
-
       return Collections.emptyList();
 
     } catch(Exception e) {
@@ -169,10 +144,4 @@ public class DetectionPipelineTaskRunner implements TaskRunner {
     }
   }
 
-  private boolean isTunable(DetectionConfigDTO configDTO) {
-    return configDTO.getComponents()
-        .values()
-        .stream()
-        .anyMatch(component -> DETECTION_REGISTRY.isTunable(component.getClass().getName()));
-  }
 }

@@ -149,10 +149,5 @@ public interface DataProvider {
    * @param configId configId
    * @return a multimap of evaluations (keyed by the evaluations slice)
    */
-  default Multimap<EvaluationSlice, EvaluationDTO> fetchEvaluations(Collection<EvaluationSlice> evaluationSlices, long configId) {
-    // adding the new method to the interface without breaking existing implementations
-    throw new NotImplementedException();
-  }
-
-
+  Multimap<EvaluationSlice, EvaluationDTO> fetchEvaluations(Collection<EvaluationSlice> evaluationSlices, long configId);
 }
