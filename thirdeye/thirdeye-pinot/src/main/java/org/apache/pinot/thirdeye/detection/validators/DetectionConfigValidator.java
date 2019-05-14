@@ -57,6 +57,7 @@ public class DetectionConfigValidator implements ConfigValidator<DetectionConfig
     this.provider = new DefaultDataProvider(metricDAO, datasetDAO,
         DAORegistry.getInstance().getEventDAO(),
         DAORegistry.getInstance().getMergedAnomalyResultDAO(),
+        DAORegistry.getInstance().getEvaluationManager(),
         timeseriesLoader, aggregationLoader, loader);
   }
 

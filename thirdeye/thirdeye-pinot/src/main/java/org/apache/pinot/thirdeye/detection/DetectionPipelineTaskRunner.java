@@ -19,7 +19,8 @@
 
 package org.apache.pinot.thirdeye.detection;
 
-import java.util.Map;
+import java.util.Collections;
+import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.pinot.thirdeye.anomaly.task.TaskContext;
 import org.apache.pinot.thirdeye.anomaly.task.TaskInfo;
@@ -41,10 +42,8 @@ import org.apache.pinot.thirdeye.datasource.loader.AggregationLoader;
 import org.apache.pinot.thirdeye.datasource.loader.DefaultAggregationLoader;
 import org.apache.pinot.thirdeye.datasource.loader.DefaultTimeSeriesLoader;
 import org.apache.pinot.thirdeye.datasource.loader.TimeSeriesLoader;
-import java.util.Collections;
-import java.util.List;
+import org.apache.pinot.thirdeye.detection.annotation.registry.DetectionRegistry;
 import org.apache.pinot.thirdeye.detection.spec.AbstractSpec;
-import org.apache.pinot.thirdeye.detection.spi.components.BaseComponent;
 import org.apache.pinot.thirdeye.detection.spi.components.ModelEvaluator;
 import org.apache.pinot.thirdeye.detection.spi.model.ModelEvaluationResult;
 import org.joda.time.Instant;
@@ -54,6 +53,7 @@ import org.slf4j.LoggerFactory;
 
 public class DetectionPipelineTaskRunner implements TaskRunner {
   private static final Logger LOG = LoggerFactory.getLogger(DetectionPipelineTaskRunner.class);
+  private static final DetectionRegistry DETECTION_REGISTRY = DetectionRegistry.getInstance();
   private final DetectionConfigManager detectionDAO;
   private final MergedAnomalyResultManager anomalyDAO;
   private final EvaluationManager evaluationDAO;
@@ -85,7 +85,7 @@ public class DetectionPipelineTaskRunner implements TaskRunner {
             ThirdEyeCacheRegistry.getInstance().getQueryCache(),
             ThirdEyeCacheRegistry.getInstance().getDatasetMaxDataTimeCache());
 
-    this.provider = new DefaultDataProvider(metricDAO, datasetDAO, eventDAO, this.anomalyDAO,
+    this.provider = new DefaultDataProvider(metricDAO, datasetDAO, eventDAO, this.anomalyDAO, this.evaluationDAO,
         timeseriesLoader, aggregationLoader, this.loader);
   }
 
@@ -140,18 +140,21 @@ public class DetectionPipelineTaskRunner implements TaskRunner {
         this.evaluationDAO.save(evaluationDTO);
       }
 
-      List<? extends ModelEvaluator<? extends AbstractSpec>> modelEvaluators = config.getComponents()
-          .values()
-          .stream()
-          .filter(component -> component instanceof ModelEvaluator)
-          .map(component -> (ModelEvaluator<? extends AbstractSpec>) component)
-          .collect(Collectors.toList());
+      // if the pipeline is tunable, evaluate the model and try to re-tune
+      if (isTunable(config)){
+        // get the model evaluator
+        List<? extends ModelEvaluator<? extends AbstractSpec>> modelEvaluators = config.getComponents()
+            .values()
+            .stream()
+            .filter(component -> component instanceof ModelEvaluator)
+            .map(component -> (ModelEvaluator<? extends AbstractSpec>) component)
+            .collect(Collectors.toList());
 
-      for(ModelEvaluator<? extends AbstractSpec> modelEvaluator: modelEvaluators) {
-        if(modelEvaluator.evaluateModel(Instant.now()).getStatus().equals(ModelEvaluationResult.ModelStatus.BAD)) {
-         // tune model
-
-          break;
+        for(ModelEvaluator<? extends AbstractSpec> modelEvaluator: modelEvaluators) {
+          if(modelEvaluator.evaluateModel(Instant.now()).getStatus().equals(ModelEvaluationResult.ModelStatus.BAD)) {
+            // TODO: tune model
+            break;
+          }
         }
       }
 
@@ -164,5 +167,12 @@ public class DetectionPipelineTaskRunner implements TaskRunner {
     } finally {
       ThirdeyeMetricsUtil.detectionTaskSuccessCounter.inc();
     }
+  }
+
+  private boolean isTunable(DetectionConfigDTO configDTO) {
+    return configDTO.getComponents()
+        .values()
+        .stream()
+        .anyMatch(component -> DETECTION_REGISTRY.isTunable(component.getClass().getName()));
   }
 }

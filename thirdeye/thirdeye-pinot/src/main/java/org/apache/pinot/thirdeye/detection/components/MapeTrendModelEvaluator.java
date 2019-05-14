@@ -23,20 +23,26 @@
 package org.apache.pinot.thirdeye.detection.components;
 
 import org.apache.pinot.thirdeye.detection.InputDataFetcher;
-import org.apache.pinot.thirdeye.detection.spec.MapeModelEvaluatorSpec;
+import org.apache.pinot.thirdeye.detection.spec.MapeTrendModelEvaluatorSpec;
 import org.apache.pinot.thirdeye.detection.spi.components.ModelEvaluator;
 import org.apache.pinot.thirdeye.detection.spi.model.ModelEvaluationResult;
 import org.joda.time.Instant;
 
 
-public class MapeModelEvaluator implements ModelEvaluator<MapeModelEvaluatorSpec> {
+/**
+ *  Monitor the recent mean MAPE in last 7 days, and compare that with the mean MAPE for the last 30 days.
+ *  If it's dropped to a certain percentage threshold, re-tune the model
+ */
+public class MapeTrendModelEvaluator implements ModelEvaluator<MapeTrendModelEvaluatorSpec> {
+  private InputDataFetcher dataFetcher;
+
   @Override
   public ModelEvaluationResult evaluateModel(Instant evaluationTimeStamp) {
     return null;
   }
 
   @Override
-  public void init(MapeModelEvaluatorSpec spec, InputDataFetcher dataFetcher) {
-
+  public void init(MapeTrendModelEvaluatorSpec spec, InputDataFetcher dataFetcher) {
+    this.dataFetcher = dataFetcher;
   }
 }
