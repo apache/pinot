@@ -45,7 +45,7 @@ import org.apache.pinot.thirdeye.datasource.loader.TimeSeriesLoader;
 import org.apache.pinot.thirdeye.detection.annotation.registry.DetectionRegistry;
 import org.apache.pinot.thirdeye.detection.spec.AbstractSpec;
 import org.apache.pinot.thirdeye.detection.spi.components.ModelEvaluator;
-import org.apache.pinot.thirdeye.detection.spi.model.ModelEvaluationResult;
+import org.apache.pinot.thirdeye.detection.spi.model.ModelStatus;
 import org.joda.time.Instant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -151,7 +151,7 @@ public class DetectionPipelineTaskRunner implements TaskRunner {
             .collect(Collectors.toList());
 
         for(ModelEvaluator<? extends AbstractSpec> modelEvaluator: modelEvaluators) {
-          if(modelEvaluator.evaluateModel(Instant.now()).getStatus().equals(ModelEvaluationResult.ModelStatus.BAD)) {
+          if(modelEvaluator.evaluateModel(Instant.now()).getStatus().equals(ModelStatus.BAD)) {
             // TODO: tune model
             break;
           }

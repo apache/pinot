@@ -23,16 +23,13 @@
 package org.apache.pinot.thirdeye.detection.spi.model;
 
 public class ModelEvaluationResult {
-  public enum ModelStatus {
-    GOOD, BAD
-  }
-  private ModelStatus status;
+  private final ModelStatus status;
 
   public ModelStatus getStatus() {
     return status;
   }
 
-  public void setStatus(ModelStatus status) {
+  public ModelEvaluationResult(ModelStatus status) {
     this.status = status;
   }
 }
