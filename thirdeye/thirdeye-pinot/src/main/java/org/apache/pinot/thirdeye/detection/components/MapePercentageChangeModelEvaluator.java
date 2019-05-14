@@ -70,7 +70,7 @@ public class MapePercentageChangeModelEvaluator implements ModelEvaluator<MapePe
         .stream()
         .collect(Collectors.toMap(Map.Entry::getKey,
             // compare the MAPE percentage change to threshold
-            e -> e.getValue() / thirtyDaysMeanMapeForMetricUrns.get(e.getKey()) - 1 <= threshold));
+            sevenDayMeanMape -> sevenDayMeanMape.getValue() / thirtyDaysMeanMapeForMetricUrns.get(sevenDayMeanMape.getKey()) - 1 <= threshold));
 
     if (evaluationResultForMetricUrns.values().stream().allMatch(result -> result)) {
       // if all metric urn's status is good, return overall good status
