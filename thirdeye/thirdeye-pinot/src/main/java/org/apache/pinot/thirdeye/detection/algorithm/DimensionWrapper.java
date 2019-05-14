@@ -27,6 +27,7 @@ import java.util.Set;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.EvaluationDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.detection.ConfigUtils;
 import org.apache.pinot.thirdeye.detection.DataProvider;
@@ -252,8 +253,16 @@ public class DimensionWrapper extends DetectionPipeline {
     }
 
     checkNestedMetricsStatus(totalNestedMetrics, successNestedMetrics, lastException);
-    return new DetectionPipelineResult(anomalies, DetectionUtils.consolidateNestedLastTimeStamps(lastTimeStamps), predictionResults)
+    return new DetectionPipelineResult(anomalies, DetectionUtils.consolidateNestedLastTimeStamps(lastTimeStamps), predictionResults
+    , calculateEvaluationMetrics(predictionResults))
         .setDiagnostics(diagnostics);
+  }
+
+  private List<EvaluationDTO> calculateEvaluationMetrics(List<PredictionResult> predictionResults) {
+    return predictionResults.stream()
+        .map(prediction -> EvaluationDTO.fromPredictionResult(prediction, this.startTime, this.endTime,
+            this.config.getId()))
+        .collect(Collectors.toList());
   }
 
   private void checkEarlyStop(long totalNestedMetrics, long successNestedMetrics, int i, Exception lastException) throws DetectionPipelineException {

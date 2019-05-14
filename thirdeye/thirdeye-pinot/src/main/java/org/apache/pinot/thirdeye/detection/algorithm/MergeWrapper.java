@@ -35,6 +35,7 @@ import java.util.stream.Collectors;
 import org.apache.commons.collections.MapUtils;
 import org.apache.pinot.thirdeye.common.dimension.DimensionMap;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.EvaluationDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.detection.ConfigUtils;
 import org.apache.pinot.thirdeye.detection.DataProvider;
@@ -106,9 +107,12 @@ public class MergeWrapper extends DetectionPipeline {
   public DetectionPipelineResult run() throws Exception {
     Map<String, Object> diagnostics = new HashMap<>();
 
-    // generate anomalies
+    // generated anomalies
     List<MergedAnomalyResultDTO> generated = new ArrayList<>();
+    // predicted time series results
     List<PredictionResult> predictionResults = new ArrayList<>();
+    // evaluation for the predictions
+    List<EvaluationDTO> evaluations = new ArrayList<>();
     int i = 0;
     Set<Long> lastTimeStamps = new HashSet<>();
     for (Map<String, Object> properties : this.nestedProperties) {
@@ -128,6 +132,7 @@ public class MergeWrapper extends DetectionPipeline {
 
       generated.addAll(intermediate.getAnomalies());
       predictionResults.addAll(intermediate.getPredictions());
+      evaluations.addAll(intermediate.getEvaluations());
       diagnostics.put(String.valueOf(i), intermediate.getDiagnostics());
 
       i++;
@@ -138,7 +143,8 @@ public class MergeWrapper extends DetectionPipeline {
     all.addAll(retrieveAnomaliesFromDatabase(generated));
     all.addAll(generated);
 
-    return new DetectionPipelineResult(this.merge(all), DetectionUtils.consolidateNestedLastTimeStamps(lastTimeStamps), predictionResults).setDiagnostics(diagnostics);
+    return new DetectionPipelineResult(this.merge(all), DetectionUtils.consolidateNestedLastTimeStamps(lastTimeStamps),
+        predictionResults, evaluations).setDiagnostics(diagnostics);
   }
 
   protected List<MergedAnomalyResultDTO> retrieveAnomaliesFromDatabase(List<MergedAnomalyResultDTO> generated) {
