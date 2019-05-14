@@ -146,9 +146,10 @@ public interface DataProvider {
    * @see Evaluation
    *
    * @param evaluationSlices the evaluation slices
+   * @param configId configId
    * @return a multimap of evaluations (keyed by the evaluations slice)
    */
-  default Multimap<EvaluationSlice, EvaluationDTO> fetchEvaluations(Collection<EvaluationSlice> evaluationSlices) {
+  default Multimap<EvaluationSlice, EvaluationDTO> fetchEvaluations(Collection<EvaluationSlice> evaluationSlices, long configId) {
     throw new NotImplementedException();
   }
 

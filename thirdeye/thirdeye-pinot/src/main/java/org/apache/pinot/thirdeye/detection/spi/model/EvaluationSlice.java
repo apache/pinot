@@ -23,35 +23,32 @@
 package org.apache.pinot.thirdeye.detection.spi.model;
 
 import org.apache.pinot.thirdeye.datalayer.dto.EvaluationDTO;
-import org.apache.pinot.thirdeye.datalayer.dto.EventDTO;
 
 
 public class EvaluationSlice {
   private final long start;
   private final long end;
-  private final long detectionConfigId;
 
-  public EvaluationSlice(long start, long end, long detectionConfigId) {
+  public EvaluationSlice(long start, long end) {
     this.start = start;
     this.end = end;
-    this.detectionConfigId = detectionConfigId;
   }
 
   public EvaluationSlice() {
     // -1 means match any
-    this(-1, -1, -1);
+    this(-1, -1);
   }
 
   public EvaluationSlice withStartTime(long startTime) {
-    return new EvaluationSlice(startTime, this.end, this.detectionConfigId);
+    return new EvaluationSlice(startTime, this.end);
   }
 
   public EvaluationSlice withEndTime(long endTime) {
-    return new EvaluationSlice(this.start, endTime, this.detectionConfigId);
+    return new EvaluationSlice(this.start, endTime);
   }
 
   public EvaluationSlice withDetectionConfigId(long detectionConfigId) {
-    return new EvaluationSlice(this.start, this.end, detectionConfigId);
+    return new EvaluationSlice(this.start, this.end);
   }
 
   public long getStart() {
@@ -62,18 +59,11 @@ public class EvaluationSlice {
     return end;
   }
 
-  public long getDetectionConfigId() {
-    return detectionConfigId;
-  }
-
   public boolean match(EvaluationDTO evaluationDTO) {
     if (this.start >= 0 && evaluationDTO.getEndTime() <= this.start)
       return false;
     if (this.end >= 0 && evaluationDTO.getStartTime() >= this.end)
       return false;
-    if (this.detectionConfigId >= 0 && evaluationDTO.getDetectionConfigId() != this.detectionConfigId) {
-      return false;
-    }
     return true;
   }
 }

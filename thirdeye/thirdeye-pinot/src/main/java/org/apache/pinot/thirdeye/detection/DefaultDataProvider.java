@@ -321,7 +321,7 @@ public class DefaultDataProvider implements DataProvider {
   }
 
   @Override
-  public Multimap<EvaluationSlice, EvaluationDTO> fetchEvaluations(Collection<EvaluationSlice> slices) {
+  public Multimap<EvaluationSlice, EvaluationDTO> fetchEvaluations(Collection<EvaluationSlice> slices, long configId) {
     Multimap<EvaluationSlice, EvaluationDTO> output = ArrayListMultimap.create();
     for (EvaluationSlice slice : slices) {
       List<Predicate> predicates = new ArrayList<>();
@@ -329,13 +329,14 @@ public class DefaultDataProvider implements DataProvider {
         predicates.add(Predicate.LT("startTime", slice.getEnd()));
       if (slice.getStart() >= 0)
         predicates.add(Predicate.GT("endTime", slice.getStart()));
-      if (slice.getDetectionConfigId() >= 0) {
-        predicates.add(Predicate.EQ("detectionConfigId", slice.getDetectionConfigId()));
-      }
       if (predicates.isEmpty())
         throw new IllegalArgumentException("Must provide at least one of start, or end");
+
+      if (configId >= 0) {
+        predicates.add(Predicate.EQ("detectionConfigId", configId));
+      }
       List<EvaluationDTO> evaluations = this.evaluationDAO.findByPredicate(AND(predicates));
-      output.putAll(slice, evaluations.stream().filter(evaluation -> slice.match(evaluation)).collect(Collectors.toList()));
+      output.putAll(slice, evaluations.stream().filter(slice::match).collect(Collectors.toList()));
     }
     return output;
   }
