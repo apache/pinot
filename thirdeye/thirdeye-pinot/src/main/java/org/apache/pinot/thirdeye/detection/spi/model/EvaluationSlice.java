@@ -25,6 +25,9 @@ package org.apache.pinot.thirdeye.detection.spi.model;
 import org.apache.pinot.thirdeye.datalayer.dto.EvaluationDTO;
 
 
+/**
+ * Selector for evaluations based on (optionally) start time and end time.
+ */
 public class EvaluationSlice {
   private final long start;
   private final long end;

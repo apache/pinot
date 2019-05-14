@@ -29,7 +29,7 @@ import java.util.stream.Collectors;
 import org.apache.pinot.thirdeye.datalayer.dto.EvaluationDTO;
 import org.apache.pinot.thirdeye.datalayer.pojo.EvaluationBean;
 import org.apache.pinot.thirdeye.detection.InputDataFetcher;
-import org.apache.pinot.thirdeye.detection.spec.MapeTrendModelEvaluatorSpec;
+import org.apache.pinot.thirdeye.detection.spec.MapePercentageChangeModelEvaluatorSpec;
 import org.apache.pinot.thirdeye.detection.spi.components.ModelEvaluator;
 import org.apache.pinot.thirdeye.detection.spi.model.EvaluationSlice;
 import org.apache.pinot.thirdeye.detection.spi.model.InputDataSpec;
@@ -42,7 +42,7 @@ import org.joda.time.Instant;
  *  Monitor the recent mean MAPE in last 7 days, and compare that with the mean MAPE for the last 30 days.
  *  If it's dropped to a certain threshold, return bad model status
  */
-public class MapeTrendModelEvaluator implements ModelEvaluator<MapeTrendModelEvaluatorSpec> {
+public class MapePercentageChangeModelEvaluator implements ModelEvaluator<MapePercentageChangeModelEvaluatorSpec> {
   private InputDataFetcher dataFetcher;
   private double threshold;
 
@@ -78,7 +78,7 @@ public class MapeTrendModelEvaluator implements ModelEvaluator<MapeTrendModelEva
   }
 
   @Override
-  public void init(MapeTrendModelEvaluatorSpec spec, InputDataFetcher dataFetcher) {
+  public void init(MapePercentageChangeModelEvaluatorSpec spec, InputDataFetcher dataFetcher) {
     this.dataFetcher = dataFetcher;
     this.threshold = spec.getThreshold();
   }

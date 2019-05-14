@@ -22,6 +22,9 @@
 
 package org.apache.pinot.thirdeye.detection.spi.model;
 
+/**
+ * The detection model status.
+ */
 public enum ModelStatus {
   GOOD, BAD
 }
