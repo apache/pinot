@@ -51,24 +51,40 @@ public class MapePercentageChangeModelEvaluator implements ModelEvaluator<MapePe
     EvaluationSlice evaluationSlice =
         new EvaluationSlice().withStartTime(evaluationTimeStamp.toDateTime().minusDays(30).getMillis())
             .withEndTime(evaluationTimeStamp.getMillis());
+    // fetch evaluations
     Collection<EvaluationDTO> evaluations =
         this.dataFetcher.fetchData(new InputDataSpec().withEvaluationSlices(Collections.singleton(evaluationSlice)))
             .getEvaluations()
             .get(evaluationSlice);
+    // calculate past 7 day mean MAPE for each metric urn
     Map<String, Double> sevenDaysMeanMapeForMetricUrns =
         getMeanMapeForEachMetricUrn(evaluations, evaluationTimeStamp, 7);
+
+    // calculate past 30 day mean MAPE for each metric urn
     Map<String, Double> thirtyDaysMeanMapeForMetricUrns =
         getMeanMapeForEachMetricUrn(evaluations, evaluationTimeStamp, 30);
+
+    // evaluate for each metric urn
     Map<String, Boolean> evaluationResultForMetricUrns = sevenDaysMeanMapeForMetricUrns.entrySet()
         .stream()
         .collect(Collectors.toMap(Map.Entry::getKey,
-            e -> (e.getValue() - thirtyDaysMeanMapeForMetricUrns.get(e.getKey())) <= threshold));
-    if (evaluationResultForMetricUrns.values().stream().anyMatch(v -> v.equals(false))) {
+            // compare the MAPE percentage change to threshold
+            e -> e.getValue() / thirtyDaysMeanMapeForMetricUrns.get(e.getKey()) - 1 <= threshold));
+
+    if (evaluationResultForMetricUrns.values().stream().allMatch(result -> result)) {
+      // if all metric urn's status is good, return overall good status
       return new ModelEvaluationResult(ModelStatus.GOOD);
     }
     return new ModelEvaluationResult(ModelStatus.BAD);
   }
 
+  /**
+   * calculate the mean MAPE for each metric urn based on the available evaluations over the past numbe of days
+   * @param evaluations the available evaluations
+   * @param evaluationTimeStamp the time stamp for this evaluation
+   * @param days number of days
+   * @return the mean MAPE keyed by metric urns
+   */
   private Map<String, Double> getMeanMapeForEachMetricUrn(Collection<EvaluationDTO> evaluations,
       Instant evaluationTimeStamp, int days) {
     return evaluations.stream()

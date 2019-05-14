@@ -28,10 +28,12 @@ import org.apache.pinot.thirdeye.dataframe.Series;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.EvaluationDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.EventDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
 import org.apache.pinot.thirdeye.detection.spi.model.AnomalySlice;
+import org.apache.pinot.thirdeye.detection.spi.model.EvaluationSlice;
 import org.apache.pinot.thirdeye.detection.spi.model.EventSlice;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -54,6 +56,7 @@ public class MockDataProvider implements DataProvider {
   private List<MergedAnomalyResultDTO> anomalies;
   private List<MetricConfigDTO> metrics;
   private List<DatasetConfigDTO> datasets;
+  private List<EvaluationDTO>  evaluations;
   private DetectionPipelineLoader loader;
 
   public MockDataProvider() {
@@ -168,6 +171,20 @@ public class MockDataProvider implements DataProvider {
   }
 
   @Override
+  public Multimap<EvaluationSlice, EvaluationDTO> fetchEvaluations(Collection<EvaluationSlice> slices,
+      long configId) {
+    Multimap<EvaluationSlice, EvaluationDTO> result = ArrayListMultimap.create();
+    for (EvaluationSlice slice : slices) {
+      for (EvaluationDTO evaluation  :this.evaluations) {
+        if (slice.match(evaluation) && evaluation.getDetectionConfigId() == configId) {
+          result.put(slice, evaluation);
+        }
+      }
+    }
+    return result;
+  }
+
+  @Override
   public Map<Long, MetricConfigDTO> fetchMetrics(Collection<Long> ids) {
     Map<Long, MetricConfigDTO> result = new HashMap<>();
     for (Long id : ids) {
@@ -269,6 +286,14 @@ public class MockDataProvider implements DataProvider {
   public MockDataProvider setLoader(DetectionPipelineLoader loader) {
     this.loader = loader;
     return this;
+  }
+
+  public List<EvaluationDTO> getEvaluations() {
+    return evaluations;
+  }
+
+  public void setEvaluations(List<EvaluationDTO> evaluations) {
+    this.evaluations = evaluations;
   }
 
   @Override
