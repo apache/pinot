@@ -56,6 +56,7 @@ public class CombinePlanNode implements PlanNode {
    * @param brokerRequest Broker request
    * @param executorService Executor service
    * @param timeOutMs Time out in milliseconds for query execution (not for planning phase)
+   * @param numGroupsLimit Limit of number of groups stored in each segment
    */
   public CombinePlanNode(List<PlanNode> planNodes, BrokerRequest brokerRequest, ExecutorService executorService,
       long timeOutMs, int numGroupsLimit) {
