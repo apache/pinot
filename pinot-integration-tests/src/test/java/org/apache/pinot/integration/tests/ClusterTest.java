@@ -48,7 +48,7 @@ import org.apache.pinot.broker.broker.helix.HelixBrokerStarter;
 import org.apache.pinot.common.config.IndexingConfig;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.config.TableNameBuilder;
-import org.apache.pinot.common.config.TableTaskConfig;
+import org.apache.pinot.common.config.TaskConfig;
 import org.apache.pinot.common.config.TenantConfig;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.utils.CommonConstants.Broker;
@@ -315,7 +315,7 @@ public abstract class ClusterTest extends ControllerTest {
 
   protected void addOfflineTable(String tableName, String timeColumnName, String timeType, String brokerTenant,
       String serverTenant, String loadMode, SegmentVersion segmentVersion, List<String> invertedIndexColumns,
-      List<String> bloomFilterColumns, TableTaskConfig taskConfig)
+      List<String> bloomFilterColumns, TaskConfig taskConfig)
       throws Exception {
     TableConfig tableConfig =
         getOfflineTableConfig(tableName, timeColumnName, timeType, brokerTenant, serverTenant, loadMode, segmentVersion,
@@ -330,7 +330,7 @@ public abstract class ClusterTest extends ControllerTest {
 
   protected void updateOfflineTable(String tableName, String timeColumnName, String timeType, String brokerTenant,
       String serverTenant, String loadMode, SegmentVersion segmentVersion, List<String> invertedIndexColumns,
-      List<String> bloomFilterColumns, TableTaskConfig taskConfig)
+      List<String> bloomFilterColumns, TaskConfig taskConfig)
       throws Exception {
     TableConfig tableConfig =
         getOfflineTableConfig(tableName, timeColumnName, timeType, brokerTenant, serverTenant, loadMode, segmentVersion,
@@ -345,7 +345,7 @@ public abstract class ClusterTest extends ControllerTest {
 
   private static TableConfig getOfflineTableConfig(String tableName, String timeColumnName, String timeType,
       String brokerTenant, String serverTenant, String loadMode, SegmentVersion segmentVersion,
-      List<String> invertedIndexColumns, List<String> bloomFilterColumns, TableTaskConfig taskConfig) {
+      List<String> invertedIndexColumns, List<String> bloomFilterColumns, TaskConfig taskConfig) {
     return new TableConfig.Builder(Helix.TableType.OFFLINE).setTableName(tableName).setTimeColumnName(timeColumnName)
         .setTimeType(timeType).setNumReplicas(3).setBrokerTenant(brokerTenant).setServerTenant(serverTenant)
         .setLoadMode(loadMode).setSegmentVersion(segmentVersion.toString())
@@ -404,7 +404,7 @@ public abstract class ClusterTest extends ControllerTest {
       String kafkaTopic, int realtimeSegmentFlushRows, File avroFile, String timeColumnName, String timeType,
       String schemaName, String brokerTenant, String serverTenant, String loadMode, String sortedColumn,
       List<String> invertedIndexColumns, List<String> bloomFilterColumns, List<String> noDictionaryColumns,
-      TableTaskConfig taskConfig, String streamConsumerFactoryName)
+      TaskConfig taskConfig, String streamConsumerFactoryName)
       throws Exception {
     Map<String, String> streamConfigs = new HashMap<>();
     String streamType = "kafka";
@@ -484,7 +484,7 @@ public abstract class ClusterTest extends ControllerTest {
       String kafkaTopic, int realtimeSegmentFlushSize, File avroFile, String timeColumnName, String timeType,
       String schemaName, String brokerTenant, String serverTenant, String loadMode, String sortedColumn,
       List<String> invertedIndexColumns, List<String> bloomFilterColumns, List<String> noDictionaryColumns,
-      TableTaskConfig taskConfig, String streamConsumerFactoryName)
+      TaskConfig taskConfig, String streamConsumerFactoryName)
       throws Exception {
     addOfflineTable(tableName, timeColumnName, timeType, brokerTenant, serverTenant, loadMode, SegmentVersion.v1,
         invertedIndexColumns, bloomFilterColumns, taskConfig);

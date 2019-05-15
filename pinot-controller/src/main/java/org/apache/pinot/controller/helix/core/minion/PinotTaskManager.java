@@ -25,7 +25,7 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.common.config.PinotTaskConfig;
 import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.config.TableTaskConfig;
+import org.apache.pinot.common.config.TaskConfig;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.ControllerConf;
@@ -121,7 +121,7 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
     for (String tableNameWithType : tableNamesWithType) {
       TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
       if (tableConfig != null) {
-        TableTaskConfig taskConfig = tableConfig.getTaskConfig();
+        TaskConfig taskConfig = tableConfig.getTaskConfig();
         if (taskConfig != null) {
           for (String taskType : taskTypes) {
             if (taskConfig.isTaskTypeEnabled(taskType)) {

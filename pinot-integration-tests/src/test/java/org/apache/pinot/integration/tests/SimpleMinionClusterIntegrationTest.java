@@ -31,7 +31,7 @@ import org.apache.helix.task.TaskState;
 import org.apache.pinot.common.config.PinotTaskConfig;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.config.TableNameBuilder;
-import org.apache.pinot.common.config.TableTaskConfig;
+import org.apache.pinot.common.config.TaskConfig;
 import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
 import org.apache.pinot.controller.helix.core.minion.ClusterInfoProvider;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
@@ -82,7 +82,7 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
     startServer();
 
     // Add 3 offline tables, where 2 of them have TestTask enabled
-    TableTaskConfig taskConfig = new TableTaskConfig();
+    TaskConfig taskConfig = new TaskConfig();
     Map<String, Map<String, String>> taskTypeConfigsMap = new HashMap<>();
     taskTypeConfigsMap.put(TestTaskGenerator.TASK_TYPE, Collections.emptyMap());
     taskConfig.setTaskTypeConfigsMap(taskTypeConfigsMap);

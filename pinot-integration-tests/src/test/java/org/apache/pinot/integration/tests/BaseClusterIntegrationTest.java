@@ -31,7 +31,7 @@ import javax.annotation.Nullable;
 import kafka.server.KafkaServerStartable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.client.ConnectionFactory;
-import org.apache.pinot.common.config.TableTaskConfig;
+import org.apache.pinot.common.config.TaskConfig;
 import org.apache.pinot.common.config.TagNameUtils;
 import org.apache.pinot.common.utils.KafkaStarterUtils;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
@@ -174,7 +174,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   }
 
   @Nullable
-  protected TableTaskConfig getTaskConfig() {
+  protected TaskConfig getTaskConfig() {
     return null;
   }
 

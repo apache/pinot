@@ -27,7 +27,7 @@ import java.util.Set;
 import javax.annotation.Nonnull;
 import org.apache.pinot.common.config.PinotTaskConfig;
 import org.apache.pinot.common.config.TableConfig;
-import org.apache.pinot.common.config.TableTaskConfig;
+import org.apache.pinot.common.config.TaskConfig;
 import org.apache.pinot.common.data.Segment;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.utils.CommonConstants;
@@ -69,10 +69,10 @@ public class ConvertToRawIndexTaskGenerator implements PinotTaskGenerator {
         continue;
       }
 
-      TableTaskConfig tableTaskConfig = tableConfig.getTaskConfig();
-      Preconditions.checkNotNull(tableTaskConfig);
+      TaskConfig taskConfig = tableConfig.getTaskConfig();
+      Preconditions.checkNotNull(taskConfig);
       Map<String, String> taskConfigs =
-          tableTaskConfig.getConfigsForTaskType(MinionConstants.ConvertToRawIndexTask.TASK_TYPE);
+          taskConfig.getConfigsForTaskType(MinionConstants.ConvertToRawIndexTask.TASK_TYPE);
       Preconditions.checkNotNull(taskConfigs, "Task config shouldn't be null for Table: {}", offlineTableName);
 
       // Get max number of tasks for this table

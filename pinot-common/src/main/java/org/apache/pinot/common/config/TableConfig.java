@@ -77,7 +77,7 @@ public class TableConfig {
   private QuotaConfig _quotaConfig;
 
   @NestedConfig
-  private TableTaskConfig _taskConfig;
+  private TaskConfig _taskConfig;
 
   @NestedConfig
   private RoutingConfig _routingConfig;
@@ -93,7 +93,7 @@ public class TableConfig {
 
   private TableConfig(String tableName, TableType tableType, SegmentsValidationAndRetentionConfig validationConfig,
       TenantConfig tenantConfig, IndexingConfig indexingConfig, TableCustomConfig customConfig,
-      @Nullable QuotaConfig quotaConfig, @Nullable TableTaskConfig taskConfig, @Nullable RoutingConfig routingConfig) {
+      @Nullable QuotaConfig quotaConfig, @Nullable TaskConfig taskConfig, @Nullable RoutingConfig routingConfig) {
     _tableName = TableNameBuilder.forType(tableType).tableNameWithType(tableName);
     _tableType = tableType;
     _validationConfig = validationConfig;
@@ -142,7 +142,7 @@ public class TableConfig {
       quotaConfig.validate();
     }
 
-    TableTaskConfig taskConfig = extractChildConfig(jsonConfig, TASK_CONFIG_KEY, TableTaskConfig.class);
+    TaskConfig taskConfig = extractChildConfig(jsonConfig, TASK_CONFIG_KEY, TaskConfig.class);
 
     RoutingConfig routingConfig = extractChildConfig(jsonConfig, ROUTING_CONFIG_KEY, RoutingConfig.class);
 
@@ -238,10 +238,10 @@ public class TableConfig {
       quotaConfig.validate();
     }
 
-    TableTaskConfig taskConfig = null;
+    TaskConfig taskConfig = null;
     String taskConfigString = simpleFields.get(TASK_CONFIG_KEY);
     if (taskConfigString != null) {
-      taskConfig = JsonUtils.stringToObject(taskConfigString, TableTaskConfig.class);
+      taskConfig = JsonUtils.stringToObject(taskConfigString, TaskConfig.class);
     }
 
     RoutingConfig routingConfig = null;
@@ -355,11 +355,11 @@ public class TableConfig {
   }
 
   @Nullable
-  public TableTaskConfig getTaskConfig() {
+  public TaskConfig getTaskConfig() {
     return _taskConfig;
   }
 
-  public void setTaskConfig(TableTaskConfig taskConfig) {
+  public void setTaskConfig(TaskConfig taskConfig) {
     _taskConfig = taskConfig;
   }
 
@@ -454,7 +454,7 @@ public class TableConfig {
 
     private TableCustomConfig _customConfig;
     private QuotaConfig _quotaConfig;
-    private TableTaskConfig _taskConfig;
+    private TaskConfig _taskConfig;
     private RoutingConfig _routingConfig;
     private HllConfig _hllConfig;
     private StarTreeIndexSpec _starTreeIndexSpec;
@@ -599,7 +599,7 @@ public class TableConfig {
       return this;
     }
 
-    public Builder setTaskConfig(TableTaskConfig taskConfig) {
+    public Builder setTaskConfig(TaskConfig taskConfig) {
       _taskConfig = taskConfig;
       return this;
     }

@@ -26,7 +26,7 @@ import org.apache.pinot.common.utils.EqualityUtils;
 
 @SuppressWarnings("unused")
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class TableTaskConfig {
+public class TaskConfig {
 
   @ConfigKey("taskConfig")
   @UseChildKeyHandler(TaskConfigMapChildKeyHandler.class)
@@ -60,7 +60,7 @@ public class TableTaskConfig {
       return false;
     }
 
-    TableTaskConfig that = (TableTaskConfig) o;
+    TaskConfig that = (TaskConfig) o;
 
     return EqualityUtils.isEqual(_taskTypeConfigsMap, that._taskTypeConfigsMap);
   }

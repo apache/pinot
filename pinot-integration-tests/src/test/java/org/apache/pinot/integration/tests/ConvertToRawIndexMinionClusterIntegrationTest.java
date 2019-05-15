@@ -28,7 +28,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang.StringUtils;
 import org.apache.helix.task.TaskState;
 import org.apache.pinot.common.config.TableNameBuilder;
-import org.apache.pinot.common.config.TableTaskConfig;
+import org.apache.pinot.common.config.TaskConfig;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.segment.SegmentMetadata;
 import org.apache.pinot.common.utils.CommonConstants;
@@ -61,8 +61,8 @@ public class ConvertToRawIndexMinionClusterIntegrationTest extends HybridCluster
   }
 
   @Override
-  protected TableTaskConfig getTaskConfig() {
-    TableTaskConfig taskConfig = new TableTaskConfig();
+  protected TaskConfig getTaskConfig() {
+    TaskConfig taskConfig = new TaskConfig();
     Map<String, String> convertToRawIndexTaskConfigs = new HashMap<>();
     convertToRawIndexTaskConfigs.put(MinionConstants.TABLE_MAX_NUM_TASKS_KEY, "5");
     convertToRawIndexTaskConfigs.put(MinionConstants.ConvertToRawIndexTask.COLUMNS_TO_CONVERT_KEY, COLUMNS_TO_CONVERT);
