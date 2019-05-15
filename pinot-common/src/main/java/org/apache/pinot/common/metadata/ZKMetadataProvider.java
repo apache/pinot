@@ -94,8 +94,8 @@ public class ZKMetadataProvider {
     return StringUtil.join("/", PROPERTYSTORE_SCHEMAS_PREFIX, schemaName);
   }
 
-  public static String constructPropertyStorePathForInstancePartitions(String offlineTableName) {
-    return StringUtil.join("/", PROPERTYSTORE_INSTANCE_PARTITIONS_PREFIX, offlineTableName);
+  public static String constructPropertyStorePathForInstancePartitions(String tableNameWithType) {
+    return StringUtil.join("/", PROPERTYSTORE_INSTANCE_PARTITIONS_PREFIX, tableNameWithType);
   }
 
   public static String constructPropertyStorePathForResource(String resourceName) {
@@ -137,8 +137,8 @@ public class ZKMetadataProvider {
   }
 
   public static void removeInstancePartitionAssignmentFromPropertyStore(ZkHelixPropertyStore<ZNRecord> propertyStore,
-      String offlineTableName) {
-    String propertyStorePath = constructPropertyStorePathForInstancePartitions(offlineTableName);
+      String tableNameWithType) {
+    String propertyStorePath = constructPropertyStorePathForInstancePartitions(tableNameWithType);
     if (propertyStore.exists(propertyStorePath, AccessOption.PERSISTENT)) {
       propertyStore.remove(propertyStorePath, AccessOption.PERSISTENT);
     }

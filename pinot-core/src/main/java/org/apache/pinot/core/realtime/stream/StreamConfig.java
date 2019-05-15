@@ -75,7 +75,6 @@ public class StreamConfig {
 
   /**
    * Initializes a StreamConfig using the map of stream configs from the table config
-   * @param streamConfigMap
    */
   public StreamConfig(Map<String, String> streamConfigMap) {
 
@@ -101,15 +100,9 @@ public class StreamConfig {
 
     String consumerFactoryClassKey =
         StreamConfigProperties.constructStreamProperty(_type, StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS);
-    if (streamConfigMap.containsKey(consumerFactoryClassKey)) {
-      _consumerFactoryClassName = streamConfigMap.get(consumerFactoryClassKey);
-    } else {
-      // For backward compatibility, default consumer factory is for Kafka.
-      _consumerFactoryClassName = DEFAULT_CONSUMER_FACTORY_CLASS_NAME_STRING;
-    }
-    LOGGER
-        .info("Stream type: {}, name: {}, consumer types: {}, consumer factory: {}", _type, _topicName, _consumerTypes,
-            _consumerFactoryClassName);
+    // For backward compatibility, default consumer factory is for Kafka.
+    _consumerFactoryClassName =
+        streamConfigMap.getOrDefault(consumerFactoryClassKey, DEFAULT_CONSUMER_FACTORY_CLASS_NAME_STRING);
 
     String offsetCriteriaKey =
         StreamConfigProperties.constructStreamProperty(_type, StreamConfigProperties.STREAM_CONSUMER_OFFSET_CRITERIA);
