@@ -176,7 +176,10 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
     }, 60_000L, "Failed to get all tasks COMPLETED");
 
     // Delete the task queue
-    _helixTaskResourceManager.deleteTaskQueue(TestTaskGenerator.TASK_TYPE);
+    // Note: Comment out the api for now since there is a known race condition
+    // where helix controller might write a deleted workflow back to ZK because it's still caching it.
+    // TODO: revert this after merging the fix
+//    _helixTaskResourceManager.deleteTaskQueue(TestTaskGenerator.TASK_TYPE);
   }
 
   @AfterClass
