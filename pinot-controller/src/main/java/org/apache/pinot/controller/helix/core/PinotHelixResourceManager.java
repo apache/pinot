@@ -1114,9 +1114,7 @@ public class PinotHelixResourceManager {
         ZKMetadataProvider.setRealtimeTableConfig(_propertyStore, tableNameWithType, tableConfig.toZNRecord());
 
         // Update replica group partition assignment to the property store if applicable
-        IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
-        StreamConfig streamConfig = new StreamConfig(indexingConfig.getStreamConfigs());
-        if (streamConfig.hasLowLevelConsumerType() && !streamConfig.hasHighLevelConsumerType()) {
+        if (ReplicationUtils.setupRealtimeReplicaGroups(tableConfig)) {
           updateReplicaGroupPartitionAssignment(tableConfig);
         }
 
@@ -1132,6 +1130,7 @@ public class PinotHelixResourceManager {
          * We also need to support the case when a high-level consumer already exists for a table and we are adding
          * the low-level consumers.
          */
+        IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
         ensureRealtimeClusterIsSetUp(tableConfig, tableNameWithType, indexingConfig);
 
         LOGGER.info("Successfully added or updated the table {} ", tableNameWithType);
@@ -1347,12 +1346,12 @@ public class PinotHelixResourceManager {
       throws IOException {
 
     if (tableType == TableType.REALTIME) {
-      IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
-      StreamConfig streamConfig = new StreamConfig(indexingConfig.getStreamConfigs());
-      if (streamConfig.hasLowLevelConsumerType() && !streamConfig.hasHighLevelConsumerType()) {
+      // Update replica group partition assignment to the property store if applicable
+      if (ReplicationUtils.setupRealtimeReplicaGroups(tableConfig)) {
         updateReplicaGroupPartitionAssignment(tableConfig);
       }
       ZKMetadataProvider.setRealtimeTableConfig(_propertyStore, tableNameWithType, tableConfig.toZNRecord());
+      IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
       ensureRealtimeClusterIsSetUp(tableConfig, tableNameWithType, indexingConfig);
     } else if (tableType == TableType.OFFLINE) {
       // Update replica group partition assignment to the property store if applicable
