@@ -25,7 +25,7 @@ package org.apache.pinot.thirdeye.detection.spec;
 /**
  * The spec class for MAPE change evaluator
  */
-public class MapePercentageChangeModelEvaluatorSpec extends AbstractSpec {
+public class MapeAveragePercentageChangeModelEvaluatorSpec extends AbstractSpec {
   private double threshold = 0.1; // default threshold to 10%
 
   public double getThreshold() {

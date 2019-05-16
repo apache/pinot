@@ -27,7 +27,7 @@ import org.apache.pinot.thirdeye.datalayer.dto.EvaluationDTO;
 import org.apache.pinot.thirdeye.detection.DefaultInputDataFetcher;
 import org.apache.pinot.thirdeye.detection.InputDataFetcher;
 import org.apache.pinot.thirdeye.detection.MockDataProvider;
-import org.apache.pinot.thirdeye.detection.spec.MapePercentageChangeModelEvaluatorSpec;
+import org.apache.pinot.thirdeye.detection.spec.MapeAveragePercentageChangeModelEvaluatorSpec;
 import org.apache.pinot.thirdeye.detection.spi.model.ModelEvaluationResult;
 import org.apache.pinot.thirdeye.detection.spi.model.ModelStatus;
 import org.joda.time.Instant;
@@ -62,9 +62,9 @@ public class MapePercentageChangeModelEvaluatorTest {
 
   @Test
   public void testEvaluateModelGood() {
-    MapePercentageChangeModelEvaluatorSpec spec = new MapePercentageChangeModelEvaluatorSpec();
+    MapeAveragePercentageChangeModelEvaluatorSpec spec = new MapeAveragePercentageChangeModelEvaluatorSpec();
     spec.setThreshold(0.1);
-    MapePercentageChangeModelEvaluator evaluator = new MapePercentageChangeModelEvaluator();
+    MapeAveragePercentageChangeModelEvaluator evaluator = new MapeAveragePercentageChangeModelEvaluator();
     evaluator.init(spec, dataFetcher);
     ModelEvaluationResult result = evaluator.evaluateModel(Instant.parse("2019-05-08T20:00:00.000Z"));
     Assert.assertEquals(result.getStatus(), ModelStatus.GOOD);
@@ -72,9 +72,9 @@ public class MapePercentageChangeModelEvaluatorTest {
 
   @Test
   public void testEvaluateModelBad() {
-    MapePercentageChangeModelEvaluatorSpec spec = new MapePercentageChangeModelEvaluatorSpec();
+    MapeAveragePercentageChangeModelEvaluatorSpec spec = new MapeAveragePercentageChangeModelEvaluatorSpec();
     spec.setThreshold(0.01);
-    MapePercentageChangeModelEvaluator evaluator = new MapePercentageChangeModelEvaluator();
+    MapeAveragePercentageChangeModelEvaluator evaluator = new MapeAveragePercentageChangeModelEvaluator();
     evaluator.init(spec, dataFetcher);
     ModelEvaluationResult result = evaluator.evaluateModel(Instant.parse("2019-05-08T20:00:00.000Z"));
     Assert.assertEquals(result.getStatus(), ModelStatus.BAD);

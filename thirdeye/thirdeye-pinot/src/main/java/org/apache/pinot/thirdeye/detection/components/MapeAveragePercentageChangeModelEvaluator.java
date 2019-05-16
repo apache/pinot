@@ -29,7 +29,7 @@ import java.util.stream.Collectors;
 import org.apache.pinot.thirdeye.datalayer.dto.EvaluationDTO;
 import org.apache.pinot.thirdeye.datalayer.pojo.EvaluationBean;
 import org.apache.pinot.thirdeye.detection.InputDataFetcher;
-import org.apache.pinot.thirdeye.detection.spec.MapePercentageChangeModelEvaluatorSpec;
+import org.apache.pinot.thirdeye.detection.spec.MapeAveragePercentageChangeModelEvaluatorSpec;
 import org.apache.pinot.thirdeye.detection.spi.components.ModelEvaluator;
 import org.apache.pinot.thirdeye.detection.spi.model.EvaluationSlice;
 import org.apache.pinot.thirdeye.detection.spi.model.InputDataSpec;
@@ -43,7 +43,7 @@ import org.joda.time.Instant;
  *  If the percentage change dropped to a certain threshold for a metric urn, return a bad model status to trigger
  *  auto configuration.
  */
-public class MapePercentageChangeModelEvaluator implements ModelEvaluator<MapePercentageChangeModelEvaluatorSpec> {
+public class MapeAveragePercentageChangeModelEvaluator implements ModelEvaluator<MapeAveragePercentageChangeModelEvaluatorSpec> {
   private static final int MAPE_LOOK_BACK_DAYS_RECENT = 7;
   private static final int MAPE_LOOK_BACK_DAYS_BASELINE = 30;
 
@@ -117,7 +117,7 @@ public class MapePercentageChangeModelEvaluator implements ModelEvaluator<MapePe
   }
 
   @Override
-  public void init(MapePercentageChangeModelEvaluatorSpec spec, InputDataFetcher dataFetcher) {
+  public void init(MapeAveragePercentageChangeModelEvaluatorSpec spec, InputDataFetcher dataFetcher) {
     this.dataFetcher = dataFetcher;
     this.threshold = spec.getThreshold();
   }
