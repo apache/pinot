@@ -392,8 +392,8 @@ public class ReplicaGroupRebalanceSegmentStrategy implements RebalanceSegmentStr
     }
 
     // Update Idealstate with rebalanced segment assignment
-    Map<String, Map<String, String>> serverToSegmentsMapping = buildSegmentToServerMapping(serverToSegments);
-    for (Map.Entry<String, Map<String, String>> entry : serverToSegmentsMapping.entrySet()) {
+    Map<String, Map<String, String>> newSegmentToServersMap = buildSegmentToServerMapping(serverToSegments);
+    for (Map.Entry<String, Map<String, String>> entry : newSegmentToServersMap.entrySet()) {
       idealState.setInstanceStateMap(entry.getKey(), entry.getValue());
     }
     idealState.setReplicas(Integer.toString(numReplicaGroups));
@@ -519,11 +519,8 @@ public class ReplicaGroupRebalanceSegmentStrategy implements RebalanceSegmentStr
     for (Map.Entry<String, LinkedList<String>> entry : serverToSegments.entrySet()) {
       String server = entry.getKey();
       for (String segment : entry.getValue()) {
-        if (!segmentsToServerMapping.containsKey(segment)) {
-          segmentsToServerMapping.put(segment, new HashMap<String, String>());
-        }
-        segmentsToServerMapping.get(segment)
-            .put(server, CommonConstants.Helix.StateModel.SegmentOnlineOfflineStateModel.ONLINE);
+        Map<String, String> serverToStateMap = segmentsToServerMapping.computeIfAbsent(segment, k -> new HashMap<>());
+        serverToStateMap.put(server, CommonConstants.Helix.StateModel.SegmentOnlineOfflineStateModel.ONLINE);
       }
     }
     return segmentsToServerMapping;

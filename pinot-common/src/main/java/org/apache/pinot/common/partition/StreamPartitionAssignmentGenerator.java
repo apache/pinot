@@ -21,7 +21,6 @@ package org.apache.pinot.common.partition;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Lists;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -32,7 +31,6 @@ import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.config.RealtimeTagConfig;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.exception.InvalidConfigException;
-import org.apache.pinot.common.utils.EqualityUtils;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 
@@ -114,8 +112,6 @@ public class StreamPartitionAssignmentGenerator {
   public PartitionAssignment generateStreamPartitionAssignment(TableConfig tableConfig, int numPartitions)
       throws InvalidConfigException {
 
-    // TODO: add an override which can read from znode, instead of generating on the fly
-
     List<String> partitions = new ArrayList<>(numPartitions);
     for (int i = 0; i < numPartitions; i++) {
       partitions.add(String.valueOf(i));
@@ -123,49 +119,12 @@ public class StreamPartitionAssignmentGenerator {
 
     String tableNameWithType = tableConfig.getTableName();
     int numReplicas = tableConfig.getValidationConfig().getReplicasPerPartitionNumber();
-
     List<String> consumingTaggedInstances = getConsumingTaggedInstances(tableConfig);
-    if (consumingTaggedInstances.size() < numReplicas) {
-      throw new InvalidConfigException(
-          "Not enough consuming instances tagged. Must be atleast equal to numReplicas:" + numReplicas);
-    }
 
-    /**
-     * TODO: We will use only uniform assignment for now
-     * This will be refactored as AssignmentStrategy interface and implementations UniformAssignment, BalancedAssignment etc
-     * {@link StreamPartitionAssignmentGenerator} and AssignmentStrategy interface will together replace
-     * StreamPartitionAssignmentGenerator and StreamPartitionAssignmentStrategy
-     */
-    return uniformAssignment(tableNameWithType, partitions, numReplicas, consumingTaggedInstances);
-  }
-
-  /**
-   * Uniformly sprays the partitions and replicas across given list of instances
-   * Picks starting point based on table hash value. This ensures that we will always pick the same starting point,
-   * and return consistent assignment across calls
-   * @param allInstances
-   * @param partitions
-   * @param numReplicas
-   * @return
-   */
-  private PartitionAssignment uniformAssignment(String tableName, List<String> partitions, int numReplicas,
-      List<String> allInstances) {
-
-    PartitionAssignment partitionAssignment = new PartitionAssignment(tableName);
-
-    Collections.sort(allInstances);
-
-    int numInstances = allInstances.size();
-    int serverId = Math.abs(EqualityUtils.hashCodeOf(tableName)) % numInstances;
-    for (String partition : partitions) {
-      List<String> instances = new ArrayList<>(numReplicas);
-      for (int r = 0; r < numReplicas; r++) {
-        instances.add(allInstances.get(serverId));
-        serverId = (serverId + 1) % numInstances;
-      }
-      partitionAssignment.addPartition(partition, instances);
-    }
-    return partitionAssignment;
+    StreamPartitionAssignmentStrategy streamPartitionAssignmentStrategy =
+        StreamPartitionAssignmentStrategyFactory.getStreamPartitionAssignmentStrategy(tableConfig);
+    return streamPartitionAssignmentStrategy.getStreamPartitionAssignment(_helixManager, tableNameWithType, partitions,
+        numReplicas, consumingTaggedInstances);
   }
 
   @VisibleForTesting
