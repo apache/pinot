@@ -33,6 +33,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import org.apache.pinot.thirdeye.cube.data.dbrow.DimensionValues;
 import org.apache.pinot.thirdeye.cube.data.dbrow.Dimensions;
 import org.apache.pinot.thirdeye.cube.data.node.CubeNode;
+import org.apache.pinot.thirdeye.cube.ratio.RatioCubeNode;
 
 
 public class SummaryResponse {
@@ -162,11 +163,32 @@ public class SummaryResponse {
   public void buildDiffSummary(List<CubeNode> nodes, int targetLevelCount, CostFunction costFunction) {
     // Compute the total baseline and current value
 
+    double baselineNumerator = 0d;
+    double baselineDenominator = 0d;
+    double currentNumerator = 0d;
+    double currentDenominator = 0d;
+    boolean isRatio = false;
     for(CubeNode node : nodes) {
-      baselineTotal += node.getBaselineValue();
-      baselineTotalSize += node.getBaselineValue();
-      currentTotal += node.getCurrentValue();
-      currentTotalSize += node.getCurrentValue();
+      if (node instanceof RatioCubeNode) {
+        RatioCubeNode ratioNode = (RatioCubeNode) node;
+        baselineNumerator += ratioNode.getBaselineNumeratorValue();
+        baselineDenominator += ratioNode.getBaselineDenominatorValue();
+        currentNumerator += ratioNode.getCurrentNumeratorValue();
+        currentDenominator += ratioNode.getCurrentDenominatorValue();
+        ((RatioCubeNode) node).computeStatus();
+        isRatio = true;
+      } else {
+        baselineTotal += node.getBaselineValue();
+        baselineTotalSize += node.getBaselineValue();
+        currentTotal += node.getCurrentValue();
+        currentTotalSize += node.getCurrentValue();
+      }
+    }
+    if (isRatio) {
+      baselineTotal = baselineNumerator / baselineDenominator;
+      currentTotal = currentNumerator / currentDenominator;
+      baselineTotalSize = baselineNumerator + baselineDenominator;
+      currentTotalSize = currentNumerator + currentDenominator;
     }
     if (Double.compare(baselineTotal, 0d) != 0) {
       globalRatio = roundUp(currentTotal / baselineTotal);
