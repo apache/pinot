@@ -69,8 +69,6 @@ public class StreamPartitionAssignmentGenerator {
 
   /**
    * Generates a map of partition id to latest llc segment
-   * @param idealState
-   * @return
    */
   @VisibleForTesting
   public Map<String, LLCSegmentName> getPartitionToLatestSegments(IdealState idealState) {
