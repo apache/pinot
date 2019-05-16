@@ -44,35 +44,47 @@ import org.joda.time.Instant;
  *  auto configuration.
  */
 public class MapePercentageChangeModelEvaluator implements ModelEvaluator<MapePercentageChangeModelEvaluatorSpec> {
+  private static final int MAPE_LOOK_BACK_DAYS_RECENT = 7;
+  private static final int MAPE_LOOK_BACK_DAYS_BASELINE = 30;
+
   private InputDataFetcher dataFetcher;
   private double threshold;
 
   @Override
   public ModelEvaluationResult evaluateModel(Instant evaluationTimeStamp) {
     EvaluationSlice evaluationSlice =
-        new EvaluationSlice().withStartTime(evaluationTimeStamp.toDateTime().minusDays(30).getMillis())
+        new EvaluationSlice().withStartTime(evaluationTimeStamp.toDateTime().minusDays(MAPE_LOOK_BACK_DAYS_BASELINE).getMillis())
             .withEndTime(evaluationTimeStamp.getMillis());
     // fetch evaluations
     Collection<EvaluationDTO> evaluations =
         this.dataFetcher.fetchData(new InputDataSpec().withEvaluationSlices(Collections.singleton(evaluationSlice)))
             .getEvaluations()
             .get(evaluationSlice);
-    // calculate past 7 day mean MAPE for each metric urn
-    Map<String, Double> sevenDaysMeanMapeForMetricUrns =
-        getMeanMapeForEachMetricUrn(evaluations, evaluationTimeStamp, 7);
 
-    // calculate past 30 day mean MAPE for each metric urn
-    Map<String, Double> thirtyDaysMeanMapeForMetricUrns =
-        getMeanMapeForEachMetricUrn(evaluations, evaluationTimeStamp, 30);
+    Collection<EvaluationDTO> recentEvaluations = getEvaluationsWithinDays(evaluations, evaluationTimeStamp,
+        MAPE_LOOK_BACK_DAYS_RECENT);
+    Collection<EvaluationDTO> baselineEvaluations = getEvaluationsWithinDays(evaluations, evaluationTimeStamp,
+        MAPE_LOOK_BACK_DAYS_BASELINE);
+
+    if (recentEvaluations.isEmpty() || recentEvaluations.containsAll(baselineEvaluations)) {
+      // data is insufficient for performing evaluations
+      return new ModelEvaluationResult(ModelStatus.UNKNOWN);
+    }
+
+    // calculate past 7 day mean MAPE for each metric urn and rules
+    Map<String, Double> recentMeanMapeForMetricUrnsAndRules = getMeanMapeForEachMetricUrnAndRule(recentEvaluations);
+
+    // calculate past 30 day mean MAPE for each metric urn and rules
+    Map<String, Double> baselineMeanMapeForMetricUrnsAndRules = getMeanMapeForEachMetricUrnAndRule(baselineEvaluations);
 
     // evaluate for each metric urn
-    Map<String, Boolean> evaluationResultForMetricUrns = sevenDaysMeanMapeForMetricUrns.entrySet()
+    Map<String, Boolean> evaluationResultForMetricUrnsAndRules = recentMeanMapeForMetricUrnsAndRules.entrySet()
         .stream()
         .collect(Collectors.toMap(Map.Entry::getKey,
             // compare the MAPE percentage change to threshold
-            sevenDayMeanMape -> sevenDayMeanMape.getValue() / thirtyDaysMeanMapeForMetricUrns.get(sevenDayMeanMape.getKey()) - 1 <= threshold));
+            recentMeanMape -> recentMeanMape.getValue() / baselineMeanMapeForMetricUrnsAndRules.get(recentMeanMape.getKey()) - 1 <= threshold));
 
-    if (evaluationResultForMetricUrns.values().stream().allMatch(result -> result)) {
+    if (evaluationResultForMetricUrnsAndRules.values().stream().allMatch(result -> result)) {
       // if all metric urn's status is good, return overall good status
       return new ModelEvaluationResult(ModelStatus.GOOD);
     }
@@ -80,18 +92,28 @@ public class MapePercentageChangeModelEvaluator implements ModelEvaluator<MapePe
   }
 
   /**
-   * calculate the mean MAPE for each metric urn based on the available evaluations over the past numbe of days
-   * @param evaluations the available evaluations
-   * @param evaluationTimeStamp the time stamp for this evaluation
-   * @param days number of days
-   * @return the mean MAPE keyed by metric urns
+   * Filter the evaluations to return only the past number days.
+   * @param evaluations evaluations
+   * @param evaluationTimeStamp the time stamp for evaluations
+   * @param days look back number of days
+   * @return the filtered collection of evaluationDTOs
    */
-  private Map<String, Double> getMeanMapeForEachMetricUrn(Collection<EvaluationDTO> evaluations,
+  private Collection<EvaluationDTO> getEvaluationsWithinDays(Collection<EvaluationDTO> evaluations,
       Instant evaluationTimeStamp, int days) {
     return evaluations.stream()
         .filter(eval -> evaluationTimeStamp.toDateTime().minusDays(days).getMillis() < eval.getStartTime())
-        .collect(
-            Collectors.groupingBy(EvaluationBean::getMetricUrn, Collectors.averagingDouble(EvaluationBean::getMape)));
+        .collect(Collectors.toSet());
+  }
+
+  /**
+   * calculate the mean MAPE for each metric urn based on the available evaluations over the past numbe of days
+   * @param evaluations the available evaluations
+   * @return the mean MAPE keyed by metric urns
+   */
+  private Map<String, Double> getMeanMapeForEachMetricUrnAndRule(Collection<EvaluationDTO> evaluations) {
+    return
+        evaluations.stream().collect(
+            Collectors.groupingBy(e -> String.format("%s:%s", e.getMetricUrn(), e.getDetectorName()), Collectors.averagingDouble(EvaluationBean::getMape)));
   }
 
   @Override
