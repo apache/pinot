@@ -24,5 +24,5 @@ public enum DetectionTag {
   RULE_DETECTION,
   ALGORITHM_FILTER,
   RULE_FILTER,
-  CUSTOM
+  GROUPER
 }

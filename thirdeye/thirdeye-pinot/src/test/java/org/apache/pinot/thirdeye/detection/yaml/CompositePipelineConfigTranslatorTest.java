@@ -76,4 +76,11 @@ public class CompositePipelineConfigTranslatorTest {
     CompositePipelineConfigTranslator translator = new CompositePipelineConfigTranslator(this.yamlConfig, this.provider);
     translator.generateDetectionConfig();
   }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testMultipleGrouperLogic() {
+    this.yamlConfig = (Map<String, Object>) this.yaml.load(this.getClass().getResourceAsStream("pipeline-config-3.yaml"));
+    CompositePipelineConfigTranslator translator = new CompositePipelineConfigTranslator(this.yamlConfig, this.provider);
+    translator.generateDetectionConfig();
+  }
 }

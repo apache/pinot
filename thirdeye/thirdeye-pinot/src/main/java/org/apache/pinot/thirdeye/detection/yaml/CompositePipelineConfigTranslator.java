@@ -506,6 +506,9 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
           "The maxDuration field set is not acceptable. Please check the the document  and set it correctly.");
     }
 
+    // We support only one grouper per metric
+    Preconditions.checkArgument(getList(yamlConfig.get(PROP_GROUPER)).size() <= 1, "Multiple groupers detected for metric. We support only one grouper per metric.");
+
     Set<String> names = new HashSet<>();
     List<Map<String, Object>> ruleYamls = getList(yamlConfig.get(PROP_RULES));
     for (int i = 0; i < ruleYamls.size(); i++) {
