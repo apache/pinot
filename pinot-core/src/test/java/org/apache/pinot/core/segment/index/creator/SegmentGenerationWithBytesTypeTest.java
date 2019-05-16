@@ -285,7 +285,7 @@ public class SegmentGenerationWithBytesTypeTest {
       for (int i = 0; i < NUM_ROWS; i++) {
         GenericData.Record record = new GenericData.Record(avroSchema);
 
-        TDigest tDigest = TDigest.createMergingDigest(PercentileTDigestAggregationFunction.DEFAULT_TDIGEST_COMPRESSION);
+        TDigest tDigest = PercentileTDigestAggregationFunction.getDefaultTDigest();
         tDigest.add(_random.nextDouble());
 
         ByteBuffer buffer = ByteBuffer.allocate(tDigest.byteSize());

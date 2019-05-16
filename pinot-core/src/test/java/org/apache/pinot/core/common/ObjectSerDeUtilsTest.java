@@ -137,7 +137,7 @@ public class ObjectSerDeUtilsTest {
   @Test
   public void testQuantileDigest() {
     for (int i = 0; i < NUM_ITERATIONS; i++) {
-      QuantileDigest expected = new QuantileDigest(PercentileEstAggregationFunction.DEFAULT_MAX_ERROR);
+      QuantileDigest expected = PercentileEstAggregationFunction.getDefaultQuantileDigest();
       int size = RANDOM.nextInt(100) + 1;
       for (int j = 0; j < size; j++) {
         expected.add(RANDOM.nextLong());
@@ -188,7 +188,7 @@ public class ObjectSerDeUtilsTest {
   @Test
   public void testTDigest() {
     for (int i = 0; i < NUM_ITERATIONS; i++) {
-      TDigest expected = TDigest.createMergingDigest(PercentileTDigestAggregationFunction.DEFAULT_TDIGEST_COMPRESSION);
+      TDigest expected = PercentileTDigestAggregationFunction.getDefaultTDigest();
       int size = RANDOM.nextInt(100) + 1;
       for (int j = 0; j < size; j++) {
         expected.add(RANDOM.nextDouble());

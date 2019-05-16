@@ -33,6 +33,10 @@ import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder
 public class PercentileEstAggregationFunction implements AggregationFunction<QuantileDigest, Long> {
   public static final double DEFAULT_MAX_ERROR = 0.05;
 
+  public static QuantileDigest getDefaultQuantileDigest() {
+    return new QuantileDigest(DEFAULT_MAX_ERROR);
+  }
+
   protected final int _percentile;
 
   public PercentileEstAggregationFunction(int percentile) {
@@ -79,16 +83,19 @@ public class PercentileEstAggregationFunction implements AggregationFunction<Qua
       case LONG:
       case FLOAT:
       case DOUBLE:
-        double[] valueArray = blockValSets[0].getDoubleValuesSV();
+        long[] longValues = blockValSets[0].getLongValuesSV();
         for (int i = 0; i < length; i++) {
-          quantileDigest.add((long) valueArray[i]);
+          quantileDigest.add(longValues[i]);
         }
         break;
       case BYTES:
         // Serialized QuantileDigest
         byte[][] bytesValues = blockValSets[0].getBytesValuesSV();
         for (int i = 0; i < length; i++) {
-          quantileDigest.merge(ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.deserialize(bytesValues[i]));
+          // Skip zero-length byte array
+          if (bytesValues[i].length != 0) {
+            quantileDigest.merge(ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.deserialize(bytesValues[i]));
+          }
         }
         break;
       default:
@@ -105,18 +112,21 @@ public class PercentileEstAggregationFunction implements AggregationFunction<Qua
       case LONG:
       case FLOAT:
       case DOUBLE:
-        double[] valueArray = blockValSets[0].getDoubleValuesSV();
+        long[] longValues = blockValSets[0].getLongValuesSV();
         for (int i = 0; i < length; i++) {
           QuantileDigest quantileDigest = getQuantileDigest(groupByResultHolder, groupKeyArray[i]);
-          quantileDigest.add((long) valueArray[i]);
+          quantileDigest.add(longValues[i]);
         }
         break;
       case BYTES:
         // Serialized QuantileDigest
         byte[][] bytesValues = blockValSets[0].getBytesValuesSV();
         for (int i = 0; i < length; i++) {
-          QuantileDigest quantileDigest = getQuantileDigest(groupByResultHolder, groupKeyArray[i]);
-          quantileDigest.merge(ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.deserialize(bytesValues[i]));
+          // Skip zero-length byte array
+          if (bytesValues[i].length != 0) {
+            QuantileDigest quantileDigest = getQuantileDigest(groupByResultHolder, groupKeyArray[i]);
+            quantileDigest.merge(ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.deserialize(bytesValues[i]));
+          }
         }
         break;
       default:
@@ -133,12 +143,12 @@ public class PercentileEstAggregationFunction implements AggregationFunction<Qua
       case LONG:
       case FLOAT:
       case DOUBLE:
-        double[] valueArray = blockValSets[0].getDoubleValuesSV();
+        long[] longValues = blockValSets[0].getLongValuesSV();
         for (int i = 0; i < length; i++) {
-          double value = valueArray[i];
+          long value = longValues[i];
           for (int groupKey : groupKeysArray[i]) {
             QuantileDigest quantileDigest = getQuantileDigest(groupByResultHolder, groupKey);
-            quantileDigest.add((long) value);
+            quantileDigest.add(value);
           }
         }
         break;
@@ -146,10 +156,13 @@ public class PercentileEstAggregationFunction implements AggregationFunction<Qua
         // Serialized QuantileDigest
         byte[][] bytesValues = blockValSets[0].getBytesValuesSV();
         for (int i = 0; i < length; i++) {
-          QuantileDigest value = ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.deserialize(bytesValues[i]);
-          for (int groupKey : groupKeysArray[i]) {
-            QuantileDigest quantileDigest = getQuantileDigest(groupByResultHolder, groupKey);
-            quantileDigest.merge(value);
+          // Skip zero-length byte array
+          if (bytesValues[i].length != 0) {
+            QuantileDigest value = ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.deserialize(bytesValues[i]);
+            for (int groupKey : groupKeysArray[i]) {
+              QuantileDigest quantileDigest = getQuantileDigest(groupByResultHolder, groupKey);
+              quantileDigest.merge(value);
+            }
           }
         }
         break;
@@ -163,7 +176,7 @@ public class PercentileEstAggregationFunction implements AggregationFunction<Qua
   public QuantileDigest extractAggregationResult(@Nonnull AggregationResultHolder aggregationResultHolder) {
     QuantileDigest quantileDigest = aggregationResultHolder.getResult();
     if (quantileDigest == null) {
-      return new QuantileDigest(DEFAULT_MAX_ERROR);
+      return getDefaultQuantileDigest();
     } else {
       return quantileDigest;
     }
@@ -174,7 +187,7 @@ public class PercentileEstAggregationFunction implements AggregationFunction<Qua
   public QuantileDigest extractGroupByResult(@Nonnull GroupByResultHolder groupByResultHolder, int groupKey) {
     QuantileDigest quantileDigest = groupByResultHolder.getResult(groupKey);
     if (quantileDigest == null) {
-      return new QuantileDigest(DEFAULT_MAX_ERROR);
+      return getDefaultQuantileDigest();
     } else {
       return quantileDigest;
     }
@@ -214,7 +227,7 @@ public class PercentileEstAggregationFunction implements AggregationFunction<Qua
   protected static QuantileDigest getQuantileDigest(@Nonnull AggregationResultHolder aggregationResultHolder) {
     QuantileDigest quantileDigest = aggregationResultHolder.getResult();
     if (quantileDigest == null) {
-      quantileDigest = new QuantileDigest(DEFAULT_MAX_ERROR);
+      quantileDigest = getDefaultQuantileDigest();
       aggregationResultHolder.setValue(quantileDigest);
     }
     return quantileDigest;
@@ -230,7 +243,7 @@ public class PercentileEstAggregationFunction implements AggregationFunction<Qua
   protected static QuantileDigest getQuantileDigest(@Nonnull GroupByResultHolder groupByResultHolder, int groupKey) {
     QuantileDigest quantileDigest = groupByResultHolder.getResult(groupKey);
     if (quantileDigest == null) {
-      quantileDigest = new QuantileDigest(DEFAULT_MAX_ERROR);
+      quantileDigest = getDefaultQuantileDigest();
       groupByResultHolder.setValueForKey(groupKey, quantileDigest);
     }
     return quantileDigest;

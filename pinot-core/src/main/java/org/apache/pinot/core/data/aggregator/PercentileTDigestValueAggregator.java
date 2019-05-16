@@ -44,11 +44,17 @@ public class PercentileTDigestValueAggregator implements ValueAggregator<Object,
   public TDigest getInitialAggregatedValue(Object rawValue) {
     TDigest initialValue;
     if (rawValue instanceof byte[]) {
+      // Use default value for zero-length byte array
       byte[] bytes = (byte[]) rawValue;
-      initialValue = deserializeAggregatedValue(bytes);
-      _maxByteSize = Math.max(_maxByteSize, bytes.length);
+      if (bytes.length != 0) {
+        initialValue = deserializeAggregatedValue(bytes);
+        _maxByteSize = Math.max(_maxByteSize, bytes.length);
+      } else {
+        initialValue = PercentileTDigestAggregationFunction.getDefaultTDigest();
+        _maxByteSize = Math.max(_maxByteSize, initialValue.byteSize());
+      }
     } else {
-      initialValue = TDigest.createMergingDigest(PercentileTDigestAggregationFunction.DEFAULT_TDIGEST_COMPRESSION);
+      initialValue = PercentileTDigestAggregationFunction.getDefaultTDigest();
       initialValue.add(((Number) rawValue).doubleValue());
       _maxByteSize = Math.max(_maxByteSize, initialValue.byteSize());
     }
@@ -58,11 +64,16 @@ public class PercentileTDigestValueAggregator implements ValueAggregator<Object,
   @Override
   public TDigest applyRawValue(TDigest value, Object rawValue) {
     if (rawValue instanceof byte[]) {
-      value.add(deserializeAggregatedValue((byte[]) rawValue));
+      // Skip zero-length byte array
+      byte[] bytes = (byte[]) rawValue;
+      if (bytes.length != 0) {
+        value.add(deserializeAggregatedValue(bytes));
+        _maxByteSize = Math.max(_maxByteSize, value.byteSize());
+      }
     } else {
-      value.add(((Number) rawValue).doubleValue());
+      value.add(((Number) rawValue).longValue());
+      _maxByteSize = Math.max(_maxByteSize, value.byteSize());
     }
-    _maxByteSize = Math.max(_maxByteSize, value.byteSize());
     return value;
   }
 

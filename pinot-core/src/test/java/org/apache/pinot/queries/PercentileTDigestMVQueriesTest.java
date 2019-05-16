@@ -60,7 +60,7 @@ public class PercentileTDigestMVQueriesTest extends PercentileTDigestQueriesTest
 
       int numMultiValues = RANDOM.nextInt(MAX_NUM_MULTI_VALUES) + 1;
       Double[] values = new Double[numMultiValues];
-      TDigest tDigest = TDigest.createMergingDigest(PercentileTDigestAggregationFunction.DEFAULT_TDIGEST_COMPRESSION);
+      TDigest tDigest = PercentileTDigestAggregationFunction.getDefaultTDigest();
       for (int j = 0; j < numMultiValues; j++) {
         double value = RANDOM.nextDouble() * VALUE_RANGE;
         values[j] = value;

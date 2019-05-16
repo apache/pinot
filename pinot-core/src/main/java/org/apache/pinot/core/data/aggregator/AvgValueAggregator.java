@@ -21,6 +21,7 @@ package org.apache.pinot.core.data.aggregator;
 import org.apache.pinot.common.data.FieldSpec.DataType;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionType;
+import org.apache.pinot.core.query.aggregation.function.AvgAggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.customobject.AvgPair;
 
 
@@ -40,7 +41,13 @@ public class AvgValueAggregator implements ValueAggregator<Object, AvgPair> {
   @Override
   public AvgPair getInitialAggregatedValue(Object rawValue) {
     if (rawValue instanceof byte[]) {
-      return deserializeAggregatedValue((byte[]) rawValue);
+      // Use default value for zero-length byte array
+      byte[] bytes = (byte[]) rawValue;
+      if (bytes.length != 0) {
+        return deserializeAggregatedValue(bytes);
+      } else {
+        return AvgAggregationFunction.getDefaultAvgPair();
+      }
     } else {
       return new AvgPair(((Number) rawValue).doubleValue(), 1L);
     }
@@ -49,7 +56,11 @@ public class AvgValueAggregator implements ValueAggregator<Object, AvgPair> {
   @Override
   public AvgPair applyRawValue(AvgPair value, Object rawValue) {
     if (rawValue instanceof byte[]) {
-      value.apply(deserializeAggregatedValue((byte[]) rawValue));
+      // Skip zero-length byte array
+      byte[] bytes = (byte[]) rawValue;
+      if (bytes.length != 0) {
+        value.apply(deserializeAggregatedValue(bytes));
+      }
     } else {
       value.apply(((Number) rawValue).doubleValue(), 1L);
     }

@@ -47,11 +47,17 @@ public class DistinctCountHLLValueAggregator implements ValueAggregator<Object, 
   public HyperLogLog getInitialAggregatedValue(Object rawValue) {
     HyperLogLog initialValue;
     if (rawValue instanceof byte[]) {
+      // Use default value for zero-length byte array
       byte[] bytes = (byte[]) rawValue;
-      initialValue = deserializeAggregatedValue(bytes);
-      _maxByteSize = Math.max(_maxByteSize, bytes.length);
+      if (bytes.length != 0) {
+        initialValue = deserializeAggregatedValue(bytes);
+        _maxByteSize = Math.max(_maxByteSize, bytes.length);
+      } else {
+        initialValue = DistinctCountHLLAggregationFunction.getDefaultHyperLogLog();
+        _maxByteSize = Math.max(_maxByteSize, DEFAULT_LOG2M_BYTE_SIZE);
+      }
     } else {
-      initialValue = new HyperLogLog(DistinctCountHLLAggregationFunction.DEFAULT_LOG2M);
+      initialValue = DistinctCountHLLAggregationFunction.getDefaultHyperLogLog();
       initialValue.offer(rawValue);
       _maxByteSize = Math.max(_maxByteSize, DEFAULT_LOG2M_BYTE_SIZE);
     }
@@ -61,10 +67,14 @@ public class DistinctCountHLLValueAggregator implements ValueAggregator<Object, 
   @Override
   public HyperLogLog applyRawValue(HyperLogLog value, Object rawValue) {
     if (rawValue instanceof byte[]) {
-      try {
-        value.addAll(deserializeAggregatedValue((byte[]) rawValue));
-      } catch (CardinalityMergeException e) {
-        throw new RuntimeException(e);
+      // Skip zero-length byte array
+      byte[] bytes = (byte[]) rawValue;
+      if (bytes.length != 0) {
+        try {
+          value.addAll(deserializeAggregatedValue(bytes));
+        } catch (CardinalityMergeException e) {
+          throw new RuntimeException(e);
+        }
       }
     } else {
       value.offer(rawValue);

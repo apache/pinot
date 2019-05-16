@@ -33,6 +33,10 @@ import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder
 public class AvgAggregationFunction implements AggregationFunction<AvgPair, Double> {
   private static final double DEFAULT_FINAL_RESULT = Double.NEGATIVE_INFINITY;
 
+  public static AvgPair getDefaultAvgPair() {
+    return new AvgPair(0.0, 0L);
+  }
+
   @Nonnull
   @Override
   public AggregationFunctionType getType() {
@@ -71,10 +75,10 @@ public class AvgAggregationFunction implements AggregationFunction<AvgPair, Doub
       case LONG:
       case FLOAT:
       case DOUBLE:
-        double[] valueArray = blockValSets[0].getDoubleValuesSV();
+        double[] doubleValues = blockValSets[0].getDoubleValuesSV();
         double sum = 0.0;
         for (int i = 0; i < length; i++) {
-          sum += valueArray[i];
+          sum += doubleValues[i];
         }
         setAggregationResult(aggregationResultHolder, sum, (long) length);
         break;
@@ -84,9 +88,12 @@ public class AvgAggregationFunction implements AggregationFunction<AvgPair, Doub
         sum = 0.0;
         long count = 0L;
         for (int i = 0; i < length; i++) {
-          AvgPair value = ObjectSerDeUtils.AVG_PAIR_SER_DE.deserialize(bytesValues[i]);
-          sum += value.getSum();
-          count += value.getCount();
+          // Skip zero-length byte array
+          if (bytesValues[i].length != 0) {
+            AvgPair value = ObjectSerDeUtils.AVG_PAIR_SER_DE.deserialize(bytesValues[i]);
+            sum += value.getSum();
+            count += value.getCount();
+          }
         }
         setAggregationResult(aggregationResultHolder, sum, count);
         break;
@@ -114,17 +121,20 @@ public class AvgAggregationFunction implements AggregationFunction<AvgPair, Doub
       case LONG:
       case FLOAT:
       case DOUBLE:
-        double[] valueArray = blockValSets[0].getDoubleValuesSV();
+        double[] doubleValues = blockValSets[0].getDoubleValuesSV();
         for (int i = 0; i < length; i++) {
-          setGroupByResult(groupKeyArray[i], groupByResultHolder, valueArray[i], 1L);
+          setGroupByResult(groupKeyArray[i], groupByResultHolder, doubleValues[i], 1L);
         }
         break;
       case BYTES:
         // Serialized AvgPair
         byte[][] bytesValues = blockValSets[0].getBytesValuesSV();
         for (int i = 0; i < length; i++) {
-          AvgPair value = ObjectSerDeUtils.AVG_PAIR_SER_DE.deserialize(bytesValues[i]);
-          setGroupByResult(groupKeyArray[i], groupByResultHolder, value.getSum(), value.getCount());
+          // Skip zero-length byte array
+          if (bytesValues[i].length != 0) {
+            AvgPair value = ObjectSerDeUtils.AVG_PAIR_SER_DE.deserialize(bytesValues[i]);
+            setGroupByResult(groupKeyArray[i], groupByResultHolder, value.getSum(), value.getCount());
+          }
         }
         break;
       default:
@@ -141,9 +151,9 @@ public class AvgAggregationFunction implements AggregationFunction<AvgPair, Doub
       case LONG:
       case FLOAT:
       case DOUBLE:
-        double[] valueArray = blockValSets[0].getDoubleValuesSV();
+        double[] doubleValues = blockValSets[0].getDoubleValuesSV();
         for (int i = 0; i < length; i++) {
-          double value = valueArray[i];
+          double value = doubleValues[i];
           for (int groupKey : groupKeysArray[i]) {
             setGroupByResult(groupKey, groupByResultHolder, value, 1L);
           }
@@ -153,11 +163,14 @@ public class AvgAggregationFunction implements AggregationFunction<AvgPair, Doub
         // Serialized AvgPair
         byte[][] bytesValues = blockValSets[0].getBytesValuesSV();
         for (int i = 0; i < length; i++) {
-          AvgPair value = ObjectSerDeUtils.AVG_PAIR_SER_DE.deserialize(bytesValues[i]);
-          double sum = value.getSum();
-          long count = value.getCount();
-          for (int groupKey : groupKeysArray[i]) {
-            setGroupByResult(groupKey, groupByResultHolder, sum, count);
+          // Skip zero-length byte array
+          if (bytesValues[i].length != 0) {
+            AvgPair value = ObjectSerDeUtils.AVG_PAIR_SER_DE.deserialize(bytesValues[i]);
+            double sum = value.getSum();
+            long count = value.getCount();
+            for (int groupKey : groupKeysArray[i]) {
+              setGroupByResult(groupKey, groupByResultHolder, sum, count);
+            }
           }
         }
         break;
@@ -181,7 +194,7 @@ public class AvgAggregationFunction implements AggregationFunction<AvgPair, Doub
   public AvgPair extractAggregationResult(@Nonnull AggregationResultHolder aggregationResultHolder) {
     AvgPair avgPair = aggregationResultHolder.getResult();
     if (avgPair == null) {
-      return new AvgPair(0.0, 0L);
+      return getDefaultAvgPair();
     } else {
       return avgPair;
     }
@@ -192,7 +205,7 @@ public class AvgAggregationFunction implements AggregationFunction<AvgPair, Doub
   public AvgPair extractGroupByResult(@Nonnull GroupByResultHolder groupByResultHolder, int groupKey) {
     AvgPair avgPair = groupByResultHolder.getResult(groupKey);
     if (avgPair == null) {
-      return new AvgPair(0.0, 0L);
+      return getDefaultAvgPair();
     } else {
       return avgPair;
     }

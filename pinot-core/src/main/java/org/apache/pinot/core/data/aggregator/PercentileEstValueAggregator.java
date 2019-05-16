@@ -44,11 +44,17 @@ public class PercentileEstValueAggregator implements ValueAggregator<Object, Qua
   public QuantileDigest getInitialAggregatedValue(Object rawValue) {
     QuantileDigest initialValue;
     if (rawValue instanceof byte[]) {
+      // Use default value for zero-length byte array
       byte[] bytes = (byte[]) rawValue;
-      initialValue = deserializeAggregatedValue(bytes);
-      _maxByteSize = Math.max(_maxByteSize, bytes.length);
+      if (bytes.length != 0) {
+        initialValue = deserializeAggregatedValue(bytes);
+        _maxByteSize = Math.max(_maxByteSize, bytes.length);
+      } else {
+        initialValue = PercentileEstAggregationFunction.getDefaultQuantileDigest();
+        _maxByteSize = Math.max(_maxByteSize, initialValue.getByteSize());
+      }
     } else {
-      initialValue = new QuantileDigest(PercentileEstAggregationFunction.DEFAULT_MAX_ERROR);
+      initialValue = PercentileEstAggregationFunction.getDefaultQuantileDigest();
       initialValue.add(((Number) rawValue).longValue());
       _maxByteSize = Math.max(_maxByteSize, initialValue.getByteSize());
     }
@@ -58,11 +64,16 @@ public class PercentileEstValueAggregator implements ValueAggregator<Object, Qua
   @Override
   public QuantileDigest applyRawValue(QuantileDigest value, Object rawValue) {
     if (rawValue instanceof byte[]) {
-      value.merge(deserializeAggregatedValue((byte[]) rawValue));
+      // Skip zero-length byte array
+      byte[] bytes = (byte[]) rawValue;
+      if (bytes.length != 0) {
+        value.merge(deserializeAggregatedValue(bytes));
+        _maxByteSize = Math.max(_maxByteSize, value.getByteSize());
+      }
     } else {
       value.add(((Number) rawValue).longValue());
+      _maxByteSize = Math.max(_maxByteSize, value.getByteSize());
     }
-    _maxByteSize = Math.max(_maxByteSize, value.getByteSize());
     return value;
   }
 

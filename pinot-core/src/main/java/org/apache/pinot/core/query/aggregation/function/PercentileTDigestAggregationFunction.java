@@ -37,6 +37,10 @@ import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder
 public class PercentileTDigestAggregationFunction implements AggregationFunction<TDigest, Double> {
   public static final int DEFAULT_TDIGEST_COMPRESSION = 100;
 
+  public static TDigest getDefaultTDigest() {
+    return TDigest.createMergingDigest(DEFAULT_TDIGEST_COMPRESSION);
+  }
+
   protected final int _percentile;
 
   public PercentileTDigestAggregationFunction(int percentile) {
@@ -83,16 +87,19 @@ public class PercentileTDigestAggregationFunction implements AggregationFunction
       case LONG:
       case FLOAT:
       case DOUBLE:
-        double[] valueArray = blockValSets[0].getDoubleValuesSV();
+        double[] doubleValues = blockValSets[0].getDoubleValuesSV();
         for (int i = 0; i < length; i++) {
-          tDigest.add(valueArray[i]);
+          tDigest.add(doubleValues[i]);
         }
         break;
       case BYTES:
         // Serialized TDigest
         byte[][] bytesValues = blockValSets[0].getBytesValuesSV();
         for (int i = 0; i < length; i++) {
-          tDigest.add(ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(ByteBuffer.wrap(bytesValues[i])));
+          // Skip zero-length byte array
+          if (bytesValues[i].length != 0) {
+            tDigest.add(ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(ByteBuffer.wrap(bytesValues[i])));
+          }
         }
         break;
       default:
@@ -109,18 +116,21 @@ public class PercentileTDigestAggregationFunction implements AggregationFunction
       case LONG:
       case FLOAT:
       case DOUBLE:
-        double[] valueArray = blockValSets[0].getDoubleValuesSV();
+        double[] doubleValues = blockValSets[0].getDoubleValuesSV();
         for (int i = 0; i < length; i++) {
           TDigest tDigest = getTDigest(groupByResultHolder, groupKeyArray[i]);
-          tDigest.add(valueArray[i]);
+          tDigest.add(doubleValues[i]);
         }
         break;
       case BYTES:
         // Serialized TDigest
         byte[][] bytesValues = blockValSets[0].getBytesValuesSV();
         for (int i = 0; i < length; i++) {
-          TDigest tDigest = getTDigest(groupByResultHolder, groupKeyArray[i]);
-          tDigest.add(ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(ByteBuffer.wrap(bytesValues[i])));
+          // Skip zero-length byte array
+          if (bytesValues[i].length != 0) {
+            TDigest tDigest = getTDigest(groupByResultHolder, groupKeyArray[i]);
+            tDigest.add(ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(ByteBuffer.wrap(bytesValues[i])));
+          }
         }
         break;
       default:
@@ -137,9 +147,9 @@ public class PercentileTDigestAggregationFunction implements AggregationFunction
       case LONG:
       case FLOAT:
       case DOUBLE:
-        double[] valueArray = blockValSets[0].getDoubleValuesSV();
+        double[] doubleValues = blockValSets[0].getDoubleValuesSV();
         for (int i = 0; i < length; i++) {
-          double value = valueArray[i];
+          double value = doubleValues[i];
           for (int groupKey : groupKeysArray[i]) {
             TDigest tDigest = getTDigest(groupByResultHolder, groupKey);
             tDigest.add(value);
@@ -149,10 +159,13 @@ public class PercentileTDigestAggregationFunction implements AggregationFunction
         // Serialized QuantileDigest
         byte[][] bytesValues = blockValSets[0].getBytesValuesSV();
         for (int i = 0; i < length; i++) {
-          TDigest value = ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(ByteBuffer.wrap(bytesValues[i]));
-          for (int groupKey : groupKeysArray[i]) {
-            TDigest tDigest = getTDigest(groupByResultHolder, groupKey);
-            tDigest.add(value);
+          // Skip zero-length byte array
+          if (bytesValues[i].length != 0) {
+            TDigest value = ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(ByteBuffer.wrap(bytesValues[i]));
+            for (int groupKey : groupKeysArray[i]) {
+              TDigest tDigest = getTDigest(groupByResultHolder, groupKey);
+              tDigest.add(value);
+            }
           }
         }
         break;
@@ -166,7 +179,7 @@ public class PercentileTDigestAggregationFunction implements AggregationFunction
   public TDigest extractAggregationResult(@Nonnull AggregationResultHolder aggregationResultHolder) {
     TDigest tDigest = aggregationResultHolder.getResult();
     if (tDigest == null) {
-      return TDigest.createMergingDigest(DEFAULT_TDIGEST_COMPRESSION);
+      return getDefaultTDigest();
     } else {
       return tDigest;
     }
@@ -177,7 +190,7 @@ public class PercentileTDigestAggregationFunction implements AggregationFunction
   public TDigest extractGroupByResult(@Nonnull GroupByResultHolder groupByResultHolder, int groupKey) {
     TDigest tDigest = groupByResultHolder.getResult(groupKey);
     if (tDigest == null) {
-      return TDigest.createMergingDigest(DEFAULT_TDIGEST_COMPRESSION);
+      return getDefaultTDigest();
     } else {
       return tDigest;
     }
@@ -229,7 +242,7 @@ public class PercentileTDigestAggregationFunction implements AggregationFunction
   protected static TDigest getTDigest(@Nonnull AggregationResultHolder aggregationResultHolder) {
     TDigest tDigest = aggregationResultHolder.getResult();
     if (tDigest == null) {
-      tDigest = TDigest.createMergingDigest(DEFAULT_TDIGEST_COMPRESSION);
+      tDigest = getDefaultTDigest();
       aggregationResultHolder.setValue(tDigest);
     }
     return tDigest;
@@ -245,7 +258,7 @@ public class PercentileTDigestAggregationFunction implements AggregationFunction
   protected static TDigest getTDigest(@Nonnull GroupByResultHolder groupByResultHolder, int groupKey) {
     TDigest tDigest = groupByResultHolder.getResult(groupKey);
     if (tDigest == null) {
-      tDigest = TDigest.createMergingDigest(DEFAULT_TDIGEST_COMPRESSION);
+      tDigest = getDefaultTDigest();
       groupByResultHolder.setValueForKey(groupKey, tDigest);
     }
     return tDigest;

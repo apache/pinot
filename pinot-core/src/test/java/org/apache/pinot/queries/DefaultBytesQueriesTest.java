@@ -18,17 +18,14 @@
  */
 package org.apache.pinot.queries;
 
+import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import com.tdunning.math.stats.TDigest;
-import it.unimi.dsi.fastutil.doubles.DoubleList;
 import java.io.File;
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.data.DimensionFieldSpec;
@@ -51,7 +48,9 @@ import org.apache.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.query.AggregationGroupByOperator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
-import org.apache.pinot.core.query.aggregation.function.PercentileTDigestAggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.customobject.AvgPair;
+import org.apache.pinot.core.query.aggregation.function.customobject.MinMaxRangePair;
+import org.apache.pinot.core.query.aggregation.function.customobject.QuantileDigest;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
@@ -60,34 +59,33 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
+
 
 /**
- * Tests for PERCENTILE_TDIGEST aggregation function.
+ * Tests for default bytes (zero-length byte array) values.
  *
+ * <p>Aggregation function that supports bytes values:
  * <ul>
- *   <li>Generates a segment with a double column, a TDigest column and a group-by column</li>
- *   <li>Runs aggregation and group-by queries on the generated segment</li>
- *   <li>
- *     Compares the results for PERCENTILE_TDIGEST on double column and TDigest column with results for PERCENTILE on
- *     double column
- *   </li>
+ *   <li>AVG</li>
+ *   <li>DISTINCTCOUNTHLL</li>
+ *   <li>MINMAXRANGE</li>
+ *   <li>PERCENTILEEST</li>
+ *   <li>PERCENTILETDIGEST</li>
  * </ul>
  */
-public class PercentileTDigestQueriesTest extends BaseQueriesTest {
-  protected static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "PercentileTDigestQueriesTest");
+public class DefaultBytesQueriesTest extends BaseQueriesTest {
+  protected static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "DefaultBytesQueriesTest");
   protected static final String TABLE_NAME = "testTable";
   protected static final String SEGMENT_NAME = "testSegment";
 
   protected static final int NUM_ROWS = 1000;
-  protected static final double VALUE_RANGE = Integer.MAX_VALUE;
-  protected static final double DELTA = 0.05 * VALUE_RANGE; // Allow 5% quantile error
-  protected static final String DOUBLE_COLUMN = "doubleColumn";
-  protected static final String TDIGEST_COLUMN = "tDigestColumn";
+  protected static final String BYTES_COLUMN = "bytesColumn";
   protected static final String GROUP_BY_COLUMN = "groupByColumn";
   protected static final String[] GROUPS = new String[]{"G1", "G2", "G3"};
   protected static final long RANDOM_SEED = System.nanoTime();
   protected static final Random RANDOM = new Random(RANDOM_SEED);
-  protected static final String ERROR_MESSAGE = "Random seed: " + RANDOM_SEED;
 
   private ImmutableSegment _indexSegment;
   private List<SegmentDataManager> _segmentDataManagers;
@@ -118,20 +116,13 @@ public class PercentileTDigestQueriesTest extends BaseQueriesTest {
         Arrays.asList(new ImmutableSegmentDataManager(_indexSegment), new ImmutableSegmentDataManager(_indexSegment));
   }
 
-  protected void buildSegment()
+  private void buildSegment()
       throws Exception {
     List<GenericRow> rows = new ArrayList<>(NUM_ROWS);
     for (int i = 0; i < NUM_ROWS; i++) {
       HashMap<String, Object> valueMap = new HashMap<>();
 
-      double value = RANDOM.nextDouble() * VALUE_RANGE;
-      valueMap.put(DOUBLE_COLUMN, value);
-
-      TDigest tDigest = PercentileTDigestAggregationFunction.getDefaultTDigest();
-      tDigest.add(value);
-      ByteBuffer byteBuffer = ByteBuffer.allocate(tDigest.byteSize());
-      tDigest.asBytes(byteBuffer);
-      valueMap.put(TDIGEST_COLUMN, byteBuffer.array());
+      valueMap.put(BYTES_COLUMN, FieldSpec.DEFAULT_METRIC_NULL_VALUE_OF_BYTES);
 
       String group = GROUPS[RANDOM.nextInt(GROUPS.length)];
       valueMap.put(GROUP_BY_COLUMN, group);
@@ -142,15 +133,13 @@ public class PercentileTDigestQueriesTest extends BaseQueriesTest {
     }
 
     Schema schema = new Schema();
-    schema.addField(new MetricFieldSpec(DOUBLE_COLUMN, FieldSpec.DataType.DOUBLE));
-    schema.addField(new MetricFieldSpec(TDIGEST_COLUMN, FieldSpec.DataType.BYTES));
+    schema.addField(new MetricFieldSpec(BYTES_COLUMN, FieldSpec.DataType.BYTES));
     schema.addField(new DimensionFieldSpec(GROUP_BY_COLUMN, FieldSpec.DataType.STRING, true));
 
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(schema);
     config.setOutDir(INDEX_DIR.getPath());
     config.setTableName(TABLE_NAME);
     config.setSegmentName(SEGMENT_NAME);
-    config.setRawIndexCreationColumns(Collections.singletonList(TDIGEST_COLUMN));
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
     try (RecordReader recordReader = new GenericRowRecordReader(rows, schema)) {
@@ -162,97 +151,128 @@ public class PercentileTDigestQueriesTest extends BaseQueriesTest {
   @Test
   public void testInnerSegmentAggregation() {
     // For inner segment case, percentile does not affect the intermediate result
-    AggregationOperator aggregationOperator = getOperatorForQuery(getAggregationQuery(0));
+    AggregationOperator aggregationOperator = getOperatorForQuery(getAggregationQuery());
     IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
     List<Object> aggregationResult = resultsBlock.getAggregationResult();
     Assert.assertNotNull(aggregationResult);
-    Assert.assertEquals(aggregationResult.size(), 3);
-    DoubleList doubleList = (DoubleList) aggregationResult.get(0);
-    Collections.sort(doubleList);
-    assertTDigest((TDigest) aggregationResult.get(1), doubleList);
-    assertTDigest((TDigest) aggregationResult.get(2), doubleList);
+    assertEquals(aggregationResult.size(), 5);
+    // Avg
+    AvgPair avgPair = (AvgPair) aggregationResult.get(0);
+    assertEquals(avgPair.getSum(), 0.0);
+    assertEquals(avgPair.getCount(), 0L);
+    // DistinctCountHLL
+    HyperLogLog hyperLogLog = (HyperLogLog) aggregationResult.get(1);
+    assertEquals(hyperLogLog.cardinality(), 0L);
+    // MinMaxRange
+    MinMaxRangePair minMaxRangePair = (MinMaxRangePair) aggregationResult.get(2);
+    assertEquals(minMaxRangePair.getMax(), Double.NEGATIVE_INFINITY);
+    assertEquals(minMaxRangePair.getMin(), Double.POSITIVE_INFINITY);
+    // PercentileEst
+    QuantileDigest quantileDigest = (QuantileDigest) aggregationResult.get(3);
+    assertEquals(quantileDigest.getQuantile(0.5), Long.MIN_VALUE);
+    // PercentileTDigest
+    TDigest tDigest = (TDigest) aggregationResult.get(4);
+    assertTrue(Double.isNaN(tDigest.quantile(0.5)));
   }
 
   @Test
   public void testInterSegmentAggregation() {
     for (int percentile = 0; percentile <= 100; percentile++) {
-      BrokerResponseNative brokerResponse = getBrokerResponseForQuery(getAggregationQuery(percentile));
+      BrokerResponseNative brokerResponse = getBrokerResponseForQuery(getAggregationQuery());
       List<AggregationResult> aggregationResults = brokerResponse.getAggregationResults();
       Assert.assertNotNull(aggregationResults);
-      Assert.assertEquals(aggregationResults.size(), 3);
-      double expected = Double.parseDouble((String) aggregationResults.get(0).getValue());
-      double resultForDoubleColumn = Double.parseDouble((String) aggregationResults.get(1).getValue());
-      Assert.assertEquals(resultForDoubleColumn, expected, DELTA, ERROR_MESSAGE);
-      double resultForTDigestColumn = Double.parseDouble((String) aggregationResults.get(2).getValue());
-      Assert.assertEquals(resultForTDigestColumn, expected, DELTA, ERROR_MESSAGE);
+      assertEquals(aggregationResults.size(), 5);
+      // Avg
+      assertEquals(Double.parseDouble((String) aggregationResults.get(0).getValue()), Double.NEGATIVE_INFINITY);
+      // DistinctCountHLL
+      assertEquals(Long.parseLong((String) aggregationResults.get(1).getValue()), 0L);
+      // MinMaxRange
+      assertEquals(Double.parseDouble((String) aggregationResults.get(2).getValue()), Double.NEGATIVE_INFINITY);
+      // PercentileEst
+      assertEquals(Long.parseLong((String) aggregationResults.get(3).getValue()), Long.MIN_VALUE);
+      // PercentileTDigest
+      assertTrue(Double.isNaN(Double.parseDouble((String) aggregationResults.get(4).getValue())));
     }
   }
 
   @Test
   public void testInnerSegmentGroupBy() {
     // For inner segment case, percentile does not affect the intermediate result
-    AggregationGroupByOperator groupByOperator = getOperatorForQuery(getGroupByQuery(0));
+    AggregationGroupByOperator groupByOperator = getOperatorForQuery(getGroupByQuery());
     IntermediateResultsBlock resultsBlock = groupByOperator.nextBlock();
     AggregationGroupByResult groupByResult = resultsBlock.getAggregationGroupByResult();
     Assert.assertNotNull(groupByResult);
     Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator = groupByResult.getGroupKeyIterator();
     while (groupKeyIterator.hasNext()) {
       GroupKeyGenerator.GroupKey groupKey = groupKeyIterator.next();
-      DoubleList doubleList = (DoubleList) groupByResult.getResultForKey(groupKey, 0);
-      Collections.sort(doubleList);
-      assertTDigest((TDigest) groupByResult.getResultForKey(groupKey, 1), doubleList);
-      assertTDigest((TDigest) groupByResult.getResultForKey(groupKey, 2), doubleList);
+      // Avg
+      AvgPair avgPair = (AvgPair) groupByResult.getResultForKey(groupKey, 0);
+      assertEquals(avgPair.getSum(), 0.0);
+      assertEquals(avgPair.getCount(), 0L);
+      // DistinctCountHLL
+      HyperLogLog hyperLogLog = (HyperLogLog) groupByResult.getResultForKey(groupKey, 1);
+      assertEquals(hyperLogLog.cardinality(), 0L);
+      // MinMaxRange
+      MinMaxRangePair minMaxRangePair = (MinMaxRangePair) groupByResult.getResultForKey(groupKey, 2);
+      assertEquals(minMaxRangePair.getMax(), Double.NEGATIVE_INFINITY);
+      assertEquals(minMaxRangePair.getMin(), Double.POSITIVE_INFINITY);
+      // PercentileEst
+      QuantileDigest quantileDigest = (QuantileDigest) groupByResult.getResultForKey(groupKey, 3);
+      assertEquals(quantileDigest.getQuantile(0.5), Long.MIN_VALUE);
+      // PercentileTDigest
+      TDigest tDigest = (TDigest) groupByResult.getResultForKey(groupKey, 4);
+      assertTrue(Double.isNaN(tDigest.quantile(0.5)));
     }
   }
 
   @Test
   public void testInterSegmentGroupBy() {
     for (int percentile = 0; percentile <= 100; percentile++) {
-      BrokerResponseNative brokerResponse = getBrokerResponseForQuery(getGroupByQuery(percentile));
+      BrokerResponseNative brokerResponse = getBrokerResponseForQuery(getGroupByQuery());
       List<AggregationResult> aggregationResults = brokerResponse.getAggregationResults();
       Assert.assertNotNull(aggregationResults);
-      Assert.assertEquals(aggregationResults.size(), 3);
-      Map<String, Double> expectedValues = new HashMap<>();
-      for (GroupByResult groupByResult : aggregationResults.get(0).getGroupByResult()) {
-        expectedValues.put(groupByResult.getGroup().get(0), Double.parseDouble((String) groupByResult.getValue()));
+      assertEquals(aggregationResults.size(), 5);
+      // Avg
+      List<GroupByResult> groupByResults = aggregationResults.get(0).getGroupByResult();
+      assertEquals(groupByResults.size(), 3);
+      for (GroupByResult groupByResult : groupByResults) {
+        assertEquals(Double.parseDouble((String) groupByResult.getValue()), Double.NEGATIVE_INFINITY);
       }
-      for (GroupByResult groupByResult : aggregationResults.get(1).getGroupByResult()) {
-        String group = groupByResult.getGroup().get(0);
-        double expected = expectedValues.get(group);
-        double resultForDoubleColumn = Double.parseDouble((String) groupByResult.getValue());
-        Assert.assertEquals(resultForDoubleColumn, expected, DELTA, ERROR_MESSAGE);
+      // DistinctCountHLL
+      groupByResults = aggregationResults.get(1).getGroupByResult();
+      assertEquals(groupByResults.size(), 3);
+      for (GroupByResult groupByResult : groupByResults) {
+        assertEquals(Long.parseLong((String) groupByResult.getValue()), 0L);
       }
-      for (GroupByResult groupByResult : aggregationResults.get(2).getGroupByResult()) {
-        String group = groupByResult.getGroup().get(0);
-        double expected = expectedValues.get(group);
-        double resultForTDigestColumn = Double.parseDouble((String) groupByResult.getValue());
-        Assert.assertEquals(resultForTDigestColumn, expected, DELTA, ERROR_MESSAGE);
+      // MinMaxRange
+      groupByResults = aggregationResults.get(2).getGroupByResult();
+      assertEquals(groupByResults.size(), 3);
+      for (GroupByResult groupByResult : groupByResults) {
+        assertEquals(Double.parseDouble((String) groupByResult.getValue()), Double.NEGATIVE_INFINITY);
+      }
+      // PercentileEst
+      groupByResults = aggregationResults.get(3).getGroupByResult();
+      assertEquals(groupByResults.size(), 3);
+      for (GroupByResult groupByResult : groupByResults) {
+        assertEquals(Long.parseLong((String) groupByResult.getValue()), Long.MIN_VALUE);
+      }
+      // PercentileTDigest
+      groupByResults = aggregationResults.get(4).getGroupByResult();
+      assertEquals(groupByResults.size(), 3);
+      for (GroupByResult groupByResult : groupByResults) {
+        assertTrue(Double.isNaN(Double.parseDouble((String) groupByResult.getValue())));
       }
     }
   }
 
-  protected String getAggregationQuery(int percentile) {
-    return String
-        .format("SELECT PERCENTILE%d(%s), PERCENTILETDIGEST%d(%s), PERCENTILETDIGEST%d(%s) FROM %s", percentile,
-            DOUBLE_COLUMN, percentile, DOUBLE_COLUMN, percentile, TDIGEST_COLUMN, TABLE_NAME);
+  private String getAggregationQuery() {
+    return String.format(
+        "SELECT AVG(%s), DISTINCTCOUNTHLL(%s), MINMAXRANGE(%s), PERCENTILEEST50(%s), PERCENTILETDIGEST50(%s) FROM %s",
+        BYTES_COLUMN, BYTES_COLUMN, BYTES_COLUMN, BYTES_COLUMN, BYTES_COLUMN, TABLE_NAME);
   }
 
-  private String getGroupByQuery(int percentile) {
-    return String.format("%s GROUP BY %s", getAggregationQuery(percentile), GROUP_BY_COLUMN);
-  }
-
-  private void assertTDigest(TDigest tDigest, DoubleList doubleList) {
-    for (int percentile = 0; percentile <= 100; percentile++) {
-      double expected;
-      if (percentile == 100) {
-        expected = doubleList.getDouble(doubleList.size() - 1);
-      } else {
-        expected = doubleList.getDouble(doubleList.size() * percentile / 100);
-      }
-      Assert
-          .assertEquals(PercentileTDigestAggregationFunction.calculatePercentile(tDigest, percentile), expected, DELTA,
-              ERROR_MESSAGE);
-    }
+  private String getGroupByQuery() {
+    return String.format("%s GROUP BY %s", getAggregationQuery(), GROUP_BY_COLUMN);
   }
 
   @AfterClass

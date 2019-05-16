@@ -21,6 +21,7 @@ package org.apache.pinot.core.data.aggregator;
 import org.apache.pinot.common.data.FieldSpec.DataType;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionType;
+import org.apache.pinot.core.query.aggregation.function.MinMaxRangeAggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.customobject.MinMaxRangePair;
 
 
@@ -40,7 +41,13 @@ public class MinMaxRangeValueAggregator implements ValueAggregator<Object, MinMa
   @Override
   public MinMaxRangePair getInitialAggregatedValue(Object rawValue) {
     if (rawValue instanceof byte[]) {
-      return deserializeAggregatedValue((byte[]) rawValue);
+      // Use default value for zero-length byte array
+      byte[] bytes = (byte[]) rawValue;
+      if (bytes.length != 0) {
+        return deserializeAggregatedValue(bytes);
+      } else {
+        return MinMaxRangeAggregationFunction.getDefaultMinMaxRangePair();
+      }
     } else {
       double doubleValue = ((Number) rawValue).doubleValue();
       return new MinMaxRangePair(doubleValue, doubleValue);
@@ -50,7 +57,11 @@ public class MinMaxRangeValueAggregator implements ValueAggregator<Object, MinMa
   @Override
   public MinMaxRangePair applyRawValue(MinMaxRangePair value, Object rawValue) {
     if (rawValue instanceof byte[]) {
-      value.apply(deserializeAggregatedValue((byte[]) rawValue));
+      // Skip zero-length byte array
+      byte[] bytes = (byte[]) rawValue;
+      if (bytes.length != 0) {
+        value.apply(deserializeAggregatedValue(bytes));
+      }
     } else {
       double doubleValue = ((Number) rawValue).doubleValue();
       value.apply(doubleValue, doubleValue);
