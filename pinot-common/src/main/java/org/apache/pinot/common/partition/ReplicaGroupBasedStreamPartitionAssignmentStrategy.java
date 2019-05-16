@@ -46,21 +46,18 @@ public class ReplicaGroupBasedStreamPartitionAssignmentStrategy implements Strea
       throw new InvalidConfigException("ReplicaGroupPartitionAssignment is null for table:" + tableNameWithType);
     }
     int numReplicaGroups = replicaGroupPartitionAssignment.getNumReplicaGroups();
-    if (numReplicaGroups != numReplicas) {
-      throw new InvalidConfigException(
-          "numReplicas:" + numReplicas + " is not equal to numReplicaGroups:" + numReplicaGroups
-              + " from znode for table:" + tableNameWithType);
-    }
+    // TODO: we might move to a model of not having the same numInstancesPerReplicaGroup.
+    // We would have to handle numInstancesInReplicaGroup on a replica group by replica group basis, and uniformly assign withing each replica group
     int numInstancesPerReplicaGroup = replicaGroupPartitionAssignment.getInstancesFromReplicaGroup(0, 0).size();
 
     PartitionAssignment streamPartitionAssignment = new PartitionAssignment(tableNameWithType);
 
     List<List<String>> verticalSlices = new ArrayList<>(numInstancesPerReplicaGroup);
     for (int i = 0; i < numInstancesPerReplicaGroup; i++) {
-      verticalSlices.add(new ArrayList<>(numReplicas));
+      verticalSlices.add(new ArrayList<>(numReplicaGroups));
     }
 
-    for (int replicaGroupNumber = 0; replicaGroupNumber < numReplicas; replicaGroupNumber++) {
+    for (int replicaGroupNumber = 0; replicaGroupNumber < numReplicaGroups; replicaGroupNumber++) {
       List<String> instancesFromReplicaGroup =
           replicaGroupPartitionAssignment.getInstancesFromReplicaGroup(0, replicaGroupNumber);
       for (int serverIndex = 0; serverIndex < numInstancesPerReplicaGroup; serverIndex++) {
