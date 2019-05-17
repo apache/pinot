@@ -3,6 +3,7 @@ description: My test pipeline
 metric: test_metric
 dataset: test_dataset
 pipelineType: Composite
+cron: "0 0 14 * * ? *"
 filters:
   D1:
   - v1
