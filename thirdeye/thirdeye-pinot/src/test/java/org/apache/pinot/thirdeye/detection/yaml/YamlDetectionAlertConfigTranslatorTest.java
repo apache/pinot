@@ -35,7 +35,7 @@ public class YamlDetectionAlertConfigTranslatorTest {
     alertYamlConfigs.put(PROP_SUBS_GROUP_NAME, "test_group_name");
     alertYamlConfigs.put(PROP_APPLICATION, "test_application");
     alertYamlConfigs.put(PROP_FROM, "thirdeye@thirdeye");
-    alertYamlConfigs.put(PROP_CRON, CRON_SCHEDULE_DEFAULT);
+    alertYamlConfigs.put(PROP_CRON, 0 + CRON_SCHEDULE_DEFAULT_NO_SECOND);
     alertYamlConfigs.put(PROP_ACTIVE, true);
     alertYamlConfigs.put(PROP_DETECTION_NAMES, Collections.singletonList("test_pipeline_1"));
 

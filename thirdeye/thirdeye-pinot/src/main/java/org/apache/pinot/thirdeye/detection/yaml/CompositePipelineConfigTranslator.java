@@ -31,6 +31,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.collections.MapUtils;
@@ -379,16 +380,24 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
     return properties;
   }
 
+  //  Default schedule:
+  //  minute granularity: every 15 minutes, starts at 0 minute
+  //  hourly: every hour, starts at 0 minute
+  //  daily: every day, starts at 2 pm UTC
+  //  others: every day, start at 12 am UTC
   private String buildCron() {
+    // starts at random second to reduce task spike
+    Random random = new Random();
+    String second = Integer.toString(random.nextInt(59));
     switch (this.datasetConfig.bucketTimeGranularity().getUnit()) {
       case MINUTES:
-        return "0 0/15 * * * ? *";
+        return second + " 0/15 * * * ? *";
       case HOURS:
-        return "0 0 * * * ? *";
+        return second + " 0 * * * ? *";
       case DAYS:
-        return "0 0 14 * * ? *";
+        return second + " 0 14 * * ? *";
       default:
-        return "0 0 0 * * ?";
+        return second + " 0 0 * * ?";
     }
   }
 

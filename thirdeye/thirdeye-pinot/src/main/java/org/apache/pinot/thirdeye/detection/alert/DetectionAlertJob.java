@@ -22,6 +22,7 @@ package org.apache.pinot.thirdeye.detection.alert;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
+import java.util.Random;
 import org.apache.pinot.thirdeye.anomaly.task.TaskConstants;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionAlertConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.TaskManager;
@@ -91,8 +92,15 @@ public class DetectionAlertJob implements Job {
     taskDTO.setStatus(TaskConstants.TaskStatus.WAITING);
     taskDTO.setTaskInfo(taskInfoJson);
 
-    long taskId = taskDAO.save(taskDTO);
-    LOG.info("Created subscription task {} with settings {}", taskId, taskDTO);
+    // Sleep random 0 - 1000 milliseconds to distribute load to mysql.
+    Random random = new Random();
+    try {
+      Thread.sleep(random.nextInt(1000));
+      long taskId = taskDAO.save(taskDTO);
+      LOG.info("Created subscription task {} with settings {}", taskId, taskDTO);
+    } catch (InterruptedException e) {
+      LOG.error(e.toString());
+    }
   }
 
   private Long getIdFromJobKey(String jobKey) {

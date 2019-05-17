@@ -24,6 +24,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
+import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.apache.pinot.thirdeye.anomaly.task.TaskConstants;
@@ -82,9 +83,15 @@ public class DetectionPipelineJob implements Job {
     taskDTO.setStatus(TaskConstants.TaskStatus.WAITING);
     taskDTO.setTaskInfo(taskInfoJson);
 
-    long taskId = taskDAO.save(taskDTO);
-    LOG.info("Created detection pipeline task {} with taskId {}", taskDTO, taskId);
-
+    // Sleep random 0 - 1000 milliseconds to distribute load to mysql.
+    Random random = new Random();
+    try {
+      Thread.sleep(random.nextInt(1000));
+      long taskId = taskDAO.save(taskDTO);
+      LOG.info("Created detection pipeline task {} with taskId {}", taskDTO, taskId);
+    } catch (InterruptedException e) {
+      LOG.error(e.toString());
+    }
   }
 
   private Long getIdFromJobKey(String jobKey) {
