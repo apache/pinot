@@ -21,7 +21,6 @@ package org.apache.pinot.thirdeye.detection.yaml;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ArrayListMultimap;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Multimap;
 import java.util.ArrayList;
@@ -31,7 +30,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.collections.MapUtils;
@@ -386,18 +384,15 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
   //  daily: every day, starts at 2 pm UTC
   //  others: every day, start at 12 am UTC
   private String buildCron() {
-    // starts at random second to reduce task spike
-    Random random = new Random();
-    String second = Integer.toString(random.nextInt(59));
     switch (this.datasetConfig.bucketTimeGranularity().getUnit()) {
       case MINUTES:
-        return second + " 0/15 * * * ? *";
+        return "0 0/15 * * * ? *";
       case HOURS:
-        return second + " 0 * * * ? *";
+        return "0 0 * * * ? *";
       case DAYS:
-        return second + " 0 14 * * ? *";
+        return "0 0 14 * * ? *";
       default:
-        return second + " 0 0 * * ?";
+        return "0 0 0 * * ?";
     }
   }
 

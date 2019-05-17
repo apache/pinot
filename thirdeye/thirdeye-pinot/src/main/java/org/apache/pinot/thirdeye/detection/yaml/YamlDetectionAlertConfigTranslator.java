@@ -20,7 +20,6 @@
 package org.apache.pinot.thirdeye.detection.yaml;
 
 import com.google.common.base.CaseFormat;
-import java.util.Random;
 import java.util.stream.Collectors;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
@@ -63,8 +62,8 @@ public class YamlDetectionAlertConfigTranslator {
   static final String PROP_ALERT_SUPPRESSORS = "alertSuppressors";
   static final String PROP_REFERENCE_LINKS = "referenceLinks";
   static final String PROP_TIME_WINDOWS = "timeWindows";
-  // Every 5 minutes. Second needs to be provided.
-  static final String CRON_SCHEDULE_DEFAULT_NO_SECOND = " 0/5 * * * ? *";
+  // Every 5 minutes.
+  static final String CRON_SCHEDULE_DEFAULT = "0 0/5 * * * ? *";
 
   private static final String PROP_ONLY_FETCH_LEGACY_ANOMALIES = "onlyFetchLegacyAnomalies";
   private static final String PROP_DIMENSION = "dimension";
@@ -164,10 +163,7 @@ public class YamlDetectionAlertConfigTranslator {
     alertConfigDTO.setApplication(MapUtils.getString(yamlAlertConfig, PROP_APPLICATION));
     alertConfigDTO.setFrom(MapUtils.getString(yamlAlertConfig, PROP_FROM));
 
-    // starts at random second to reduce task spike
-    Random random = new Random();
-    String second = Integer.toString(random.nextInt(59));
-    alertConfigDTO.setCronExpression(MapUtils.getString(yamlAlertConfig, PROP_CRON, second + CRON_SCHEDULE_DEFAULT_NO_SECOND));
+    alertConfigDTO.setCronExpression(MapUtils.getString(yamlAlertConfig, PROP_CRON, CRON_SCHEDULE_DEFAULT));
     alertConfigDTO.setActive(MapUtils.getBooleanValue(yamlAlertConfig, PROP_ACTIVE, true));
 
     alertConfigDTO.setSubjectType(AlertConfigBean.SubjectType.valueOf(
