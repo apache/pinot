@@ -132,6 +132,7 @@ public class YamlOnboardingTaskRunner implements TaskRunner {
         translator.withTuningWindow(info.getTuningWindowStart(), info.getTuningWindowEnd())
         .withExistingDetectionConfig(config)
         .generateDetectionConfig();
+    newDetectionConfig.setYaml(config.getYaml());
 
     this.detectionDAO.save(newDetectionConfig);
 

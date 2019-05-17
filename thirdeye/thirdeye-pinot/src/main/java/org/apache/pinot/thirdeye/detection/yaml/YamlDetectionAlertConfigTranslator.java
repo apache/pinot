@@ -20,19 +20,13 @@
 package org.apache.pinot.thirdeye.detection.yaml;
 
 import com.google.common.base.CaseFormat;
-import com.google.common.base.Preconditions;
 import java.util.stream.Collectors;
-import org.apache.pinot.thirdeye.datalayer.bao.DetectionAlertConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
-import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
-import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.pojo.AlertConfigBean;
 import org.apache.pinot.thirdeye.datalayer.util.Predicate;
-import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.apache.pinot.thirdeye.detection.ConfigUtils;
 import org.apache.pinot.thirdeye.detection.annotation.registry.DetectionAlertRegistry;
-import org.apache.pinot.thirdeye.detection.annotation.registry.DetectionRegistry;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -42,6 +36,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.collections.MapUtils;
+import org.apache.pinot.thirdeye.detection.validators.SubscriptionConfigValidator;
 import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.Yaml;
 
@@ -70,9 +65,10 @@ public class YamlDetectionAlertConfigTranslator {
   static final String PROP_TIME_WINDOWS = "timeWindows";
   static final String CRON_SCHEDULE_DEFAULT = "0 0/5 * * * ? *"; // Every 5 min
 
-  private static final String PROP_ONLY_FETCH_LEGACY_ANOMALIES = "onlyFetchLegacyAnomalies";
   private static final String PROP_DIMENSION = "dimension";
   private static final String PROP_DIMENSION_RECIPIENTS = "dimensionRecipients";
+
+  SubscriptionConfigValidator subscriptionValidator;
 
   private static final DetectionAlertRegistry DETECTION_ALERT_REGISTRY = DetectionAlertRegistry.getInstance();
   private static final Set<String> PROPERTY_KEYS = new HashSet<>(
@@ -81,6 +77,7 @@ public class YamlDetectionAlertConfigTranslator {
 
   public YamlDetectionAlertConfigTranslator(DetectionConfigManager detectionConfigDAO) {
     this.detectionConfigDAO = detectionConfigDAO;
+    this.subscriptionValidator = new SubscriptionConfigValidator();
   }
 
   private Map<String, Object> buildAlerterProperties(Map<String, Object> alertYamlConfigs, Collection<Long> detectionConfigIds) {
@@ -161,7 +158,9 @@ public class YamlDetectionAlertConfigTranslator {
   /**
    * Generates the {@link DetectionAlertConfigDTO} from the YAML Alert Map
    */
-  public DetectionAlertConfigDTO translate(Map<String,Object> yamlAlertConfig) {
+  public DetectionAlertConfigDTO translate(Map<String,Object> yamlAlertConfig) throws IllegalArgumentException {
+    subscriptionValidator.validateConfig(yamlAlertConfig);
+
     DetectionAlertConfigDTO alertConfigDTO = new DetectionAlertConfigDTO();
 
     alertConfigDTO.setName(MapUtils.getString(yamlAlertConfig, PROP_SUBS_GROUP_NAME));

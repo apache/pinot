@@ -20,11 +20,12 @@
 package org.apache.pinot.thirdeye.detection.yaml;
 
 import com.google.common.base.Preconditions;
+import java.util.HashMap;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.detection.DataProvider;
-import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.collections.MapUtils;
+import org.apache.pinot.thirdeye.detection.validators.DetectionConfigValidator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.DumperOptions;
@@ -38,21 +39,24 @@ import org.yaml.snakeyaml.Yaml;
 public abstract class YamlDetectionConfigTranslator {
   protected static final Logger LOG = LoggerFactory.getLogger(YamlDetectionConfigTranslator.class);
   private static final String PROP_NAME = "detectionName";
-  private static final String PROP_FILTER = "filter";
   private static final String PROP_DESC_NAME = "description";
   private static final String PROP_ACTIVE = "active";
 
-  protected Map<String, Object> yamlConfig;
+  DetectionConfigValidator detectionValidator;
+  Map<String, Object> yamlConfig;
+  DetectionConfigDTO existingConfig;
+  Map<String, Object> existingComponentSpecs;
+
   protected long startTime;
   protected long endTime;
   protected DataProvider dataProvider;
-  protected DetectionConfigDTO existingConfig;
-  protected Map<String, Object> existingComponentSpecs;
+
 
   public YamlDetectionConfigTranslator(Map<String, Object> yamlConfig, DataProvider provider) {
     this.yamlConfig = yamlConfig;
     this.dataProvider = provider;
     this.existingComponentSpecs = new HashMap<>();
+    this.detectionValidator = new DetectionConfigValidator(dataProvider);
   }
 
   public YamlDetectionConfigTranslator withTuningWindow(long startTime, long endTime) {
@@ -77,7 +81,7 @@ public abstract class YamlDetectionConfigTranslator {
    * Fill in common fields of detection config. Properties of the pipeline is filled by the subclass.
    */
   public DetectionConfigDTO generateDetectionConfig() {
-    validateYAML(yamlConfig);
+    detectionValidator.validateConfig(yamlConfig);
 
     DetectionConfigDTO config = new DetectionConfigDTO();
     config.setName(MapUtils.getString(yamlConfig, PROP_NAME));
@@ -102,31 +106,5 @@ public abstract class YamlDetectionConfigTranslator {
     }
 
     return config;
-  }
-
-  /**
-   * Check the yaml configuration is semantically valid. Throws an IllegalArgumentException if not.
-   * @param yamlConfig yamlConfiguration to be checked
-   */
-  protected void validateYAML(Map<String, Object> yamlConfig) {
-    validatePropertyExists(PROP_NAME);
-    validateFilter();
-  }
-
-  /**
-   * Validate property name exists.
-   * @param propName The property name to validate.
-   */
-  private void validatePropertyExists(String propName) {
-    Preconditions.checkArgument(yamlConfig.containsKey(propName), "Property missing " + propName);
-  }
-
-  /**
-   * Validate filter is set in correct level.
-   */
-  private void validateFilter() {
-    if (yamlConfig.containsKey(PROP_FILTER)) {
-      throw new IllegalArgumentException("Filter should be set under rules");
-    }
   }
 }
