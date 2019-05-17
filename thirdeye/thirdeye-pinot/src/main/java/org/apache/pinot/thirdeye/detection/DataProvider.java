@@ -23,14 +23,17 @@ import com.google.common.collect.Multimap;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.lang.NotImplementedException;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.EvaluationDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.EventDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
 import org.apache.pinot.thirdeye.detection.spi.model.AnomalySlice;
+import org.apache.pinot.thirdeye.detection.spi.model.EvaluationSlice;
 import org.apache.pinot.thirdeye.detection.spi.model.EventSlice;
 
 
@@ -136,4 +139,15 @@ public interface DataProvider {
    * @throws Exception
    */
   DetectionPipeline loadPipeline(DetectionConfigDTO config, long start, long end) throws Exception;
+
+  /**
+   * Returns a multimap of evaluations (keyed by the evaluations slice) for a given set of evaluations slices.
+   *
+   * @see Evaluation
+   *
+   * @param evaluationSlices the evaluation slices
+   * @param configId configId
+   * @return a multimap of evaluations (keyed by the evaluations slice)
+   */
+  Multimap<EvaluationSlice, EvaluationDTO> fetchEvaluations(Collection<EvaluationSlice> evaluationSlices, long configId);
 }
