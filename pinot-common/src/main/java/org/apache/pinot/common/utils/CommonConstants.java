@@ -187,6 +187,9 @@ public class CommonConstants {
     public static final String CONFIG_OF_SERVER_MIN_RESOURCE_PERCENT_FOR_START =
         "pinot.server.startup.minResourcePercent";
     public static final double DEFAULT_SERVER_MIN_RESOURCE_PERCENT_FOR_START = 100.0;
+    public static final String CONFIG_OF_STARTUP_REALTIME_CONSUMPTION_CATCHUP_WAIT_MS =
+        "pinot.server.starter.realtimeConsumptionCatchupWaitMs";
+    public static final int DEFAULT_STARTUP_REALTIME_CONSUMPTION_CATCHUP_WAIT_MS = 0;
 
     public static final int DEFAULT_ADMIN_API_PORT = 8097;
     public static final String DEFAULT_READ_MODE = "heap";
