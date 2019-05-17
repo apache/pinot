@@ -107,6 +107,13 @@ public class DetectionAlertTaskRunner implements TaskRunner {
       DetectionAlertFilter alertFilter = detAlertTaskFactory.loadAlertFilter(alertConfig, System.currentTimeMillis());
       DetectionAlertFilterResult result = alertFilter.run();
 
+      // TODO: The old UI relies on notified tag to display the anomalies. After the migration
+      // we need to clean up all references to notified tag.
+      for (MergedAnomalyResultDTO anomaly : result.getAllAnomalies()) {
+        anomaly.setNotified(true);
+        mergedAnomalyDAO.update(anomaly);
+      }
+
       // Suppress alerts if any and get the filtered anomalies to be notified
       Set<DetectionAlertSuppressor> alertSuppressors = detAlertTaskFactory.loadAlertSuppressors(alertConfig);
       for (DetectionAlertSuppressor alertSuppressor : alertSuppressors) {
