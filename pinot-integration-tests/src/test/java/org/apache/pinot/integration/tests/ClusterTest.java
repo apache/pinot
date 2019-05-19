@@ -137,8 +137,7 @@ public abstract class ClusterTest extends ControllerTest {
     Configuration configuration = DefaultHelixStarterServerConfig.loadDefaultServerConf();
     configuration.setProperty(Helix.KEY_OF_SERVER_NETTY_HOST, LOCAL_HOST);
     configuration.setProperty(Server.CONFIG_OF_SEGMENT_FORMAT_VERSION, "v3");
-    configuration.addProperty(Server.CONFIG_OF_ENABLE_DEFAULT_COLUMNS, true);
-    configuration.setProperty(Server.CONFIG_OF_ENABLE_SHUTDOWN_DELAY, false);
+    configuration.setProperty(Server.CONFIG_OF_SHUTDOWN_ENABLE_QUERY_CHECK, false);
     return configuration;
   }
 
@@ -163,15 +162,13 @@ public abstract class ClusterTest extends ControllerTest {
   protected void startServers(int numServers, Configuration configuration, int baseAdminApiPort, int baseNettyPort,
       String zkStr) {
     try {
+      overrideServerConf(configuration);
       for (int i = 0; i < numServers; i++) {
         configuration.setProperty(Server.CONFIG_OF_INSTANCE_DATA_DIR, Server.DEFAULT_INSTANCE_DATA_DIR + "-" + i);
         configuration
             .setProperty(Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR, Server.DEFAULT_INSTANCE_SEGMENT_TAR_DIR + "-" + i);
         configuration.setProperty(Server.CONFIG_OF_ADMIN_API_PORT, baseAdminApiPort - i);
         configuration.setProperty(Server.CONFIG_OF_NETTY_PORT, baseNettyPort + i);
-        // Set check interval time to 5 seconds for cluster tests.
-        configuration.setProperty(Server.CONFIG_OF_INSTANCE_CHECK_INTERVAL_TIME, 5_000L);
-        overrideServerConf(configuration);
         _serverStarters.add(new HelixServerStarter(_clusterName, zkStr, configuration));
       }
     } catch (Exception e) {
