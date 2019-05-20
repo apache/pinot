@@ -1,4 +1,4 @@
-import { debounce } from '@ember/runloop';
+import { debounce, later } from '@ember/runloop';
 import Component from '@ember/component';
 import c3 from 'c3';
 import d3 from 'd3';
@@ -207,6 +207,25 @@ export default Component.extend({
 
     if (!_.isEqual(series, cache)) {
       debounce(this, this._updateChart, 300);
+    }
+  },
+
+  didRender(){
+    this._super(...arguments);
+
+    later(() => {
+      this.notifyPhantomJS();
+    });
+  },
+
+  /**
+   * Checks if the page is being viewed from phantomJS
+   * and notifies it that the page is rendered and ready
+   * for a screenshot
+   */
+  notifyPhantomJS() {
+    if (typeof window.callPhantom === 'function') {
+      window.callPhantom({message: 'ready'});
     }
   },
 
