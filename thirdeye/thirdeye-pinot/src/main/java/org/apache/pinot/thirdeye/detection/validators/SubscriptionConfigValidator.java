@@ -90,7 +90,7 @@ public class SubscriptionConfigValidator implements ConfigValidator<DetectionAle
 
   // Validate the raw subscription yaml configuration
   @Override
-  public void validateConfig(Map<String, Object> config) throws IllegalArgumentException {
+  public void validateYaml(Map<String, Object> config) throws IllegalArgumentException {
     // Add validations
   }
 

@@ -160,7 +160,7 @@ public class YamlResource {
     try {
       translator = this.translatorLoader.from(yamlConfig, this.provider);
     } catch (Exception e) {
-      throw new IllegalArgumentException("Unable to instantiate the detection pipeline. Please verify the pipelineType");
+      throw new IllegalArgumentException("Unable to instantiate the detection pipeline. Please verify the pipelineType.", e);
     }
     return translator.withTuningWindow(tuningStartTime, tuningEndTime)
         .withExistingDetectionConfig(existingDetectionConfig)

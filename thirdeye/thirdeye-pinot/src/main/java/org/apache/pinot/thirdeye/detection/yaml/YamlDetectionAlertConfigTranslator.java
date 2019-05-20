@@ -159,7 +159,7 @@ public class YamlDetectionAlertConfigTranslator {
    * Generates the {@link DetectionAlertConfigDTO} from the YAML Alert Map
    */
   public DetectionAlertConfigDTO translate(Map<String,Object> yamlAlertConfig) throws IllegalArgumentException {
-    subscriptionValidator.validateConfig(yamlAlertConfig);
+    subscriptionValidator.validateYaml(yamlAlertConfig);
 
     DetectionAlertConfigDTO alertConfigDTO = new DetectionAlertConfigDTO();
 

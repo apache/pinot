@@ -36,7 +36,7 @@ public class YamlDetectionConfigTranslatorTest {
     this.metricDAO.save(metricConfigDTO);
 
     DetectionConfigValidator validateMocker = mock(DetectionConfigValidator.class);
-    doNothing().when(validateMocker).validateConfig(yamlConfigs);
+    doNothing().when(validateMocker).validateYaml(yamlConfigs);
 
     YamlDetectionConfigTranslator translator = new MockYamlDetectionConfigTranslator(yamlConfigs, new MockDataProvider(), validateMocker);
     DetectionConfigDTO detectionConfigDTO = translator.generateDetectionConfig();

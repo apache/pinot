@@ -40,7 +40,7 @@ interface ConfigValidator<T extends AbstractDTO> {
    * @param config the config
    * @throws IllegalArgumentException exception with error message
    */
-  void validateConfig(Map<String, Object> config) throws IllegalArgumentException;
+  void validateYaml(Map<String, Object> config) throws IllegalArgumentException;
 
   /**
    * Validate if the updates made to the config are acceptable

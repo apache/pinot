@@ -81,7 +81,7 @@ public abstract class YamlDetectionConfigTranslator {
    * Fill in common fields of detection config. Properties of the pipeline is filled by the subclass.
    */
   public DetectionConfigDTO generateDetectionConfig() {
-    detectionValidator.validateConfig(yamlConfig);
+    detectionValidator.validateYaml(yamlConfig);
 
     DetectionConfigDTO config = new DetectionConfigDTO();
     config.setName(MapUtils.getString(yamlConfig, PROP_NAME));

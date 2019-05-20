@@ -122,7 +122,7 @@ public class DetectionConfigValidator implements ConfigValidator<DetectionConfig
    * @param detectionYaml the detection yaml configuration to be validated
    */
   @Override
-  public void validateConfig(Map<String, Object> detectionYaml) {
+  public void validateYaml(Map<String, Object> detectionYaml) {
     // Validate all compulsory fields
     Preconditions.checkArgument(detectionYaml.containsKey(PROP_DETECTION_NAME), "Property missing " + PROP_DETECTION_NAME);
     Preconditions.checkArgument(detectionYaml.containsKey(PROP_METRIC), "Property missing " + PROP_METRIC);
