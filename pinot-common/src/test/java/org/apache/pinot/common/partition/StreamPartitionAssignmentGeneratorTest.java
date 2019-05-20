@@ -31,6 +31,7 @@ import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.config.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.config.TenantConfig;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
@@ -62,6 +63,46 @@ public class StreamPartitionAssignmentGeneratorTest {
     for (int i = 0; i < maxInstances; i++) {
       consumingServerNames[i] = "ConsumingServer_" + i;
     }
+  }
+
+  @Test
+  public void testStreamPartitionAssignmentStrategyFactory() {
+    TableConfig tableConfig = mock(TableConfig.class);
+
+    // null validation config
+    StreamPartitionAssignmentStrategy streamPartitionAssignmentStrategy =
+        StreamPartitionAssignmentStrategyFactory.getStreamPartitionAssignmentStrategy(tableConfig);
+    Assert.assertTrue(streamPartitionAssignmentStrategy instanceof UniformStreamPartitionAssignmentStrategy);
+
+    // null segment assignment strategy
+    SegmentsValidationAndRetentionConfig mockValidationConfig = mock(SegmentsValidationAndRetentionConfig.class);
+    when(tableConfig.getValidationConfig()).thenReturn(mockValidationConfig);
+    streamPartitionAssignmentStrategy =
+        StreamPartitionAssignmentStrategyFactory.getStreamPartitionAssignmentStrategy(tableConfig);
+    Assert.assertTrue(streamPartitionAssignmentStrategy instanceof UniformStreamPartitionAssignmentStrategy);
+
+    // incorrect segment assignment strategy
+    when(mockValidationConfig.getSegmentAssignmentStrategy()).thenReturn("someThing Wrong");
+    when(tableConfig.getValidationConfig()).thenReturn(mockValidationConfig);
+    streamPartitionAssignmentStrategy =
+        StreamPartitionAssignmentStrategyFactory.getStreamPartitionAssignmentStrategy(tableConfig);
+    Assert.assertTrue(streamPartitionAssignmentStrategy instanceof UniformStreamPartitionAssignmentStrategy);
+
+    // Unsupported type
+    when(mockValidationConfig.getSegmentAssignmentStrategy()).thenReturn(
+        CommonConstants.Helix.DataSource.SegmentAssignmentStrategyType.BalanceNumSegmentAssignmentStrategy.toString());
+    when(tableConfig.getValidationConfig()).thenReturn(mockValidationConfig);
+    streamPartitionAssignmentStrategy =
+        StreamPartitionAssignmentStrategyFactory.getStreamPartitionAssignmentStrategy(tableConfig);
+    Assert.assertTrue(streamPartitionAssignmentStrategy instanceof UniformStreamPartitionAssignmentStrategy);
+
+    // ReplicaGroup
+    when(mockValidationConfig.getSegmentAssignmentStrategy()).thenReturn(
+        CommonConstants.Helix.DataSource.SegmentAssignmentStrategyType.ReplicaGroupSegmentAssignmentStrategy.toString());
+    when(tableConfig.getValidationConfig()).thenReturn(mockValidationConfig);
+    streamPartitionAssignmentStrategy =
+        StreamPartitionAssignmentStrategyFactory.getStreamPartitionAssignmentStrategy(tableConfig);
+    Assert.assertTrue(streamPartitionAssignmentStrategy instanceof ReplicaGroupBasedStreamPartitionAssignmentStrategy);
   }
 
   /**
@@ -286,7 +327,7 @@ public class StreamPartitionAssignmentGeneratorTest {
     int serverId = 0;
     for (int p = 0; p < partitionAssignment.getNumPartitions(); p++) {
       for (String instance : partitionAssignment.getInstancesListForPartition(String.valueOf(p))) {
-        Assert.assertTrue(instance.equals(instancesUsed.get(serverId++)),
+        Assert.assertEquals(instancesUsed.get(serverId++), instance,
             "Uniform strategy test failed for table " + tableName);
         if (serverId == instancesUsed.size()) {
           serverId = 0;
@@ -305,7 +346,7 @@ public class StreamPartitionAssignmentGeneratorTest {
 
     private List<String> _consumingInstances;
 
-    public TestStreamPartitionAssignmentGenerator(HelixManager helixManager) {
+    TestStreamPartitionAssignmentGenerator(HelixManager helixManager) {
       super(helixManager);
       _consumingInstances = new ArrayList<>();
     }
