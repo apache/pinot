@@ -233,6 +233,21 @@ public class CommonConstants {
         "pinot.server.shutdown.resourceCheckIntervalMs";
     public static final long DEFAULT_SHUTDOWN_RESOURCE_CHECK_INTERVAL_MS = 10_000L;
 
+    // TODO: remove the deprecated config keys in the new release
+    @Deprecated
+    public static final String CONFIG_OF_STARTER_ENABLE_SEGMENTS_LOADING_CHECK =
+        "pinot.server.starter.enableSegmentsLoadingCheck";
+    @Deprecated
+    public static final String CONFIG_OF_STARTER_TIMEOUT_IN_SECONDS = "pinot.server.starter.timeoutInSeconds";
+    @Deprecated
+    public static final String CONFIG_OF_ENABLE_SHUTDOWN_DELAY = "pinot.server.instance.enable.shutdown.delay";
+    @Deprecated
+    public static final String CONFIG_OF_INSTANCE_MAX_SHUTDOWN_WAIT_TIME =
+        "pinot.server.instance.starter.maxShutdownWaitTime";
+    @Deprecated
+    public static final String CONFIG_OF_INSTANCE_CHECK_INTERVAL_TIME =
+        "pinot.server.instance.starter.checkIntervalTime";
+
     public static final String DEFAULT_COLUMN_MIN_MAX_VALUE_GENERATOR_MODE = "TIME";
 
     public static class SegmentCompletionProtocol {

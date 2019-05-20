@@ -107,6 +107,15 @@ public class HelixServerStarter {
     // Make a clone so that changes to the config won't propagate to the caller
     _serverConf = ConfigurationUtils.cloneConfiguration(serverConf);
 
+    // Log warnings for usage of deprecated config keys
+    String[] deprecatedConfigKeys =
+        new String[]{CONFIG_OF_STARTER_ENABLE_SEGMENTS_LOADING_CHECK, CONFIG_OF_STARTER_TIMEOUT_IN_SECONDS, CONFIG_OF_ENABLE_SHUTDOWN_DELAY, CONFIG_OF_INSTANCE_MAX_SHUTDOWN_WAIT_TIME, CONFIG_OF_INSTANCE_CHECK_INTERVAL_TIME};
+    for (String deprecatedConfigKey : deprecatedConfigKeys) {
+      if (_serverConf.containsKey(deprecatedConfigKey)) {
+        LOGGER.warn("Found usage of deprecated key: {}", deprecatedConfigKey);
+      }
+    }
+
     if (_serverConf.containsKey(CONFIG_OF_INSTANCE_ID)) {
       _instanceId = _serverConf.getString(CONFIG_OF_INSTANCE_ID);
     } else {
