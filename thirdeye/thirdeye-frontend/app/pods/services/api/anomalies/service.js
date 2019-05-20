@@ -111,17 +111,15 @@ export default Service.extend({
   /**
    * @summary Fetch all application names. We can use it to list in the select box.
    * @method queryApplications
-   * @param {String} appName - the application name for creating the cacheKey
    * @return {Ember.RSVP.Promise}
    * @example: /thirdeye/entity/APPLICATION
      usage: `this.get('anomaliesApiService').queryApplications();`
    */
-  async queryApplications(appName, start) {
+  async queryApplications() {
     const queryCache = this.get('queryCache');
     const modelName = 'application';
-    const query = { appName, start };//remove end to persist cache
     const cacheKey = queryCache.urlForQueryKey(modelName, {});//TODO: Won't pass all the `query` here. The `cacheKey` do not need to be uniqued, since all apps has the same list of apps.
-    const applications = await queryCache.query(modelName, query, { reload: false, cacheKey });
+    const applications = await queryCache.query(modelName, {}, { reload: false, cacheKey });
     return applications;
   },
 

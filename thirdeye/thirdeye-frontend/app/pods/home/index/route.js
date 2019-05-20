@@ -50,7 +50,7 @@ export default Route.extend(AuthenticatedRouteMixin, {
    */
   async model(params) {
     const { appName, startDate, endDate, duration, feedbackType, subGroup } = params;//check params
-    const applications = await this.get('anomaliesApiService').queryApplications(appName, startDate);// Get all applicatons available
+    const applications = await this.get('anomaliesApiService').queryApplications();// Get all applicatons available
     const subscriptionGroups = await this.get('anomaliesApiService').querySubscriptionGroups(); // Get all subscription groups available
 
     return hash({
