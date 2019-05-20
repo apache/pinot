@@ -83,12 +83,13 @@ public class DetectionPipelineJob implements Job {
     taskDTO.setStatus(TaskConstants.TaskStatus.WAITING);
     taskDTO.setTaskInfo(taskInfoJson);
 
+    // TODO: revisit it after identifying bottlenecks
     // Here will write the task information to mysql.
-    // Sleep random 0 - 10 seconds to distribute load to mysql.
+    // Sleep random 0 - 5 seconds to distribute load to mysql.
     Random random = new Random();
     try {
       LOG.info("Wait for " + random + " milliseconds.");
-      Thread.sleep(random.nextInt(10000));
+      Thread.sleep(random.nextInt(5000));
       long taskId = taskDAO.save(taskDTO);
       LOG.info("Created detection pipeline task {} with taskId {}", taskDTO, taskId);
     } catch (InterruptedException e) {
