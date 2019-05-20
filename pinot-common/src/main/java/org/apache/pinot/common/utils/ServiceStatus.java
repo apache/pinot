@@ -180,8 +180,8 @@ public class ServiceStatus {
    */
   public static class RealtimeConsumptionCatchupServiceStatusCallback extends BaseServiceStatusCallback {
 
-    private final Map<String, List<String>> _tableToConsumingSegmentsMap;
-    private long _endWaitTime = 0;
+    private final long _endWaitTime;
+    private Status _serviceStatus = Status.STARTING;
 
     /**
      * Realtime consumption catchup service which adds a static wait time for
@@ -190,46 +190,54 @@ public class ServiceStatus {
         long realtimeConsumptionCatchupWaitMs) {
       super(helixManager, clusterName, instanceName);
 
-      _tableToConsumingSegmentsMap = new HashMap<>();
+      boolean hasConsumingSegments = false;
+
       for (String resourceName : getResourcesInCluster()) {
         if (TableNameBuilder.isRealtimeTableResource(resourceName)) {
 
           IdealState idealState = getResourceIdealState(resourceName);
           if (idealState.isEnabled()) {
-            List<String> consumingSegments = new ArrayList<>();
             for (String segmentName : idealState.getPartitionSet()) {
               Map<String, String> instanceStateMap = idealState.getInstanceStateMap(segmentName);
               if (CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel.CONSUMING.equals(
                   instanceStateMap.get(instanceName))) {
-                consumingSegments.add(segmentName);
+                hasConsumingSegments = true;
+                break;
               }
-            }
-            if (!consumingSegments.isEmpty()) {
-              _tableToConsumingSegmentsMap.put(resourceName, consumingSegments);
             }
           }
         }
+        if (hasConsumingSegments) {
+          break;
+        }
       }
 
-      if (_tableToConsumingSegmentsMap.isEmpty()) {
-        LOGGER.info(
-            "No consuming segments to monitor on instance. Setting realtime consumption catchup wait time to 0ms");
+      if (!hasConsumingSegments) {
+        _endWaitTime = 0;
+        _serviceStatus = Status.GOOD;
+        _statusDescription = "No consuming segments to monitor. Setting status GOOD";
       } else {
         long startTime = System.currentTimeMillis();
+        // A consuming segment will actually be ready to serve queries after (time of creation of partition consumer) + (configured max time to catchup)
+        // We are approximating it to (time of server startup) + (configured max time to catch up)
         _endWaitTime = startTime + TimeUnit.SECONDS.toMillis(realtimeConsumptionCatchupWaitMs);
-        LOGGER.info("Monitoring realtime consumption catchup for tables:{}. Will wait for time:{} ms",
-            _tableToConsumingSegmentsMap.keySet(), realtimeConsumptionCatchupWaitMs);
+        LOGGER.info("Monitoring realtime consumption catchup. Will allow {} ms before marking status GOOD",
+            realtimeConsumptionCatchupWaitMs);
       }
     }
 
     @Override
     public Status getServiceStatus() {
+      if (_serviceStatus.equals(Status.GOOD)) {
+        return _serviceStatus;
+      }
       long now = System.currentTimeMillis();
       if (now < _endWaitTime) {
-        _statusDescription = String.format("Waiting for CONSUMING segments to catchup, timeRemaining=%dms", _endWaitTime - System.currentTimeMillis());
+        _statusDescription =
+            String.format("Waiting for consuming segments to catchup, timeRemaining=%dms", _endWaitTime - now);
         return Status.STARTING;
       }
-      _statusDescription = "Wait time for CONSUMING segments catchup expired, now:" + now + ", endWaitTime:" + _endWaitTime;
+      _statusDescription = String.format("Consuming segments status GOOD since %dms", _endWaitTime);
       return Status.GOOD;
     }
   }

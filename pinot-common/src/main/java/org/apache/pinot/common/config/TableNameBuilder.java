@@ -131,7 +131,7 @@ public class TableNameBuilder {
   }
 
   /**
-   * Return whether the given resource name represents an realtime table resource.
+   * Return whether the given resource name represents a realtime table resource.
    */
   public static boolean isRealtimeTableResource(@Nonnull String resourceName) {
     return REALTIME.tableHasTypeSuffix(resourceName);
