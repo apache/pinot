@@ -95,7 +95,7 @@ public class ThirdEyeResultSetUtils {
         isISOFormat = true;
         inputDataDateTimeFormatter = DateTimeFormat.forPattern(timeFormat).withZone(dateTimeZone);
       }
-      if (sourceName.equals(MYSQL) || sourceName.equals(H2) ) {
+      if (isISOFormat && (sourceName.equals(MYSQL) || sourceName.equals(H2))) {
         serverDataDateTimeFormatter = DateTimeFormat.forPattern(timeFormat).withZone(DateTimeZone.getDefault());
       }
 
