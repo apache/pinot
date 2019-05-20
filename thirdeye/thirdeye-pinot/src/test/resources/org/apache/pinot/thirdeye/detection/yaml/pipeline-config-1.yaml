@@ -44,3 +44,8 @@ rules:
 merger:
   maxGap: 0
   maxDuration: 100
+grouper:
+  - type: MOCK_GROUPER
+    name: test_grouper
+    params:
+      mockParam: 0.3

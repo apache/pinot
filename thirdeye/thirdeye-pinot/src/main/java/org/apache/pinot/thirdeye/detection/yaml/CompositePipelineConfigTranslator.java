@@ -21,7 +21,6 @@ package org.apache.pinot.thirdeye.detection.yaml;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ArrayListMultimap;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Multimap;
 import java.util.ArrayList;
@@ -51,6 +50,7 @@ import org.apache.pinot.thirdeye.detection.wrapper.AnomalyDetectorWrapper;
 import org.apache.pinot.thirdeye.detection.wrapper.AnomalyFilterWrapper;
 import org.apache.pinot.thirdeye.detection.wrapper.BaselineFillingMergeWrapper;
 import org.apache.pinot.thirdeye.detection.wrapper.ChildKeepingMergeWrapper;
+import org.apache.pinot.thirdeye.detection.wrapper.GrouperWrapper;
 import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
@@ -148,6 +148,7 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
   private static final String PROP_DIMENSION_FILTER_METRIC = "dimensionFilterMetric";
   private static final String PROP_NESTED_METRIC_URNS = "nestedMetricUrns";
   private static final String PROP_RULES = "rules";
+  private static final String PROP_GROUPER = "grouper";
   private static final String PROP_NESTED = "nested";
   private static final String PROP_BASELINE_PROVIDER = "baselineValueProvider";
   private static final String PROP_DETECTOR = "detector";
@@ -225,9 +226,16 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
       }
     }
     Map<String, Object> dimensionWrapperProperties = buildDimensionWrapperProperties();
-    Map<String, Object> properties = buildWrapperProperties(ChildKeepingMergeWrapper.class.getName(),
-        Collections.singletonList(
-            buildWrapperProperties(DimensionWrapper.class.getName(), nestedPipelines, dimensionWrapperProperties)), this.mergerProperties);
+    Map<String, Object> properties = buildWrapperProperties(
+        ChildKeepingMergeWrapper.class.getName(),
+        Collections.singletonList(buildWrapperProperties(DimensionWrapper.class.getName(), nestedPipelines, dimensionWrapperProperties)),
+        this.mergerProperties);
+
+    List<Map<String, Object>> grouperYamls = getList(yamlConfig.get(PROP_GROUPER));
+    if (!grouperYamls.isEmpty()) {
+      properties = buildGroupWrapperProperties(grouperYamls.get(0), properties);
+    }
+
     return new YamlTranslationResult().withProperties(properties).withComponents(this.components).withCron(cron);
   }
 
@@ -283,6 +291,21 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
       properties.put(PROP_BASELINE_PROVIDER, baselineProviderKey);
     }
     properties.putAll(this.mergerProperties);
+    return properties;
+  }
+
+  private Map<String, Object> buildGroupWrapperProperties(Map<String, Object> grouperYaml, Map<String, Object> nestedProps) {
+    Map<String, Object> properties = new HashMap<>();
+    properties.put(PROP_CLASS_NAME, GrouperWrapper.class.getName());
+    properties.put(PROP_NESTED, Collections.singletonList(nestedProps));
+
+    String grouperType = MapUtils.getString(grouperYaml, PROP_TYPE);
+    String grouperName = MapUtils.getString(grouperYaml, PROP_NAME);
+    String grouperKey = makeComponentKey(grouperType, grouperName);
+    properties.put(PROP_GROUPER, grouperKey);
+
+    buildComponentSpec(grouperYaml, grouperType, grouperKey);
+
     return properties;
   }
 
@@ -405,15 +428,17 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
   }
 
   private void buildComponentSpec(Map<String, Object> yamlConfig, String type, String componentKey) {
-    String componentName = DetectionUtils.getComponentName(componentKey);
-    String componentClassName = DETECTION_REGISTRY.lookup(type);
     Map<String, Object> componentSpecs = new HashMap<>();
+
+    String componentClassName = DETECTION_REGISTRY.lookup(type);
     componentSpecs.put(PROP_CLASS_NAME, componentClassName);
+
     Map<String, Object> params = new HashMap<>();
     if (yamlConfig.containsKey(PROP_PARAMS)){
       params = MapUtils.getMap(yamlConfig, PROP_PARAMS);
     }
 
+    String componentName = DetectionUtils.getComponentName(componentKey);
     if (!TUNING_OFF_COMPONENTS.contains(type) && DETECTION_REGISTRY.isTunable(componentClassName)) {
       try {
         componentSpecs.putAll(getTunedSpecs(componentName, componentClassName, params));
@@ -480,6 +505,9 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
       Preconditions.checkArgument(MapUtils.getLong(mergerProperties, PROP_MAX_DURATION) >= datasetConfig.bucketTimeGranularity().toMillis(),
           "The maxDuration field set is not acceptable. Please check the the document  and set it correctly.");
     }
+
+    // We support only one grouper per metric
+    Preconditions.checkArgument(getList(yamlConfig.get(PROP_GROUPER)).size() <= 1, "Multiple groupers detected for metric. We support only one grouper per metric.");
 
     Set<String> names = new HashSet<>();
     List<Map<String, Object>> ruleYamls = getList(yamlConfig.get(PROP_RULES));
