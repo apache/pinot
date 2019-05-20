@@ -81,23 +81,8 @@ public class StringOnHeapMutableDictionary extends BaseOnHeapMutableDictionary {
   }
 
   @Override
-  public int getIntValue(int dictId) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public long getLongValue(int dictId) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public float getFloatValue(int dictId) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public double getDoubleValue(int dictId) {
-    throw new UnsupportedOperationException();
+  public int compare(int dictId1, int dictId2) {
+    return getStringValue(dictId1).compareTo(getStringValue(dictId2));
   }
 
   private void updateMinMax(String value) {

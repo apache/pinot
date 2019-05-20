@@ -51,6 +51,11 @@ public abstract class MutableDictionary extends BaseDictionary {
   public abstract boolean isEmpty();
 
   /**
+   * Returns the comparison result of value for dict Id 1 and dict Id 2, i.e. {@code value1.compareTo(value2)}.
+   */
+  public abstract int compare(int dictId1, int dictId2);
+
+  /**
    * Helper method to identify if given (Comparable) value is in provided range.
    *
    * @param lower Lower value of range

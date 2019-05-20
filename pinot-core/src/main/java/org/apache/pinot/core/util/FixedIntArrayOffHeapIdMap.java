@@ -83,7 +83,8 @@ public class FixedIntArrayOffHeapIdMap extends BaseOffHeapMutableDictionary impl
     }
   }
 
-  public Object get(int dictId) {
+  @Override
+  public FixedIntArray get(int dictId) {
     int[] value = new int[_numColumns];
     for (int col = 0; col < _numColumns; col++) {
       value[col] = _dictIdToValue.getInt(dictId, col);
@@ -143,6 +144,11 @@ public class FixedIntArrayOffHeapIdMap extends BaseOffHeapMutableDictionary impl
 
   @Override
   public int getAvgValueSize() {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public int compare(int dictId1, int dictId2) {
     throw new UnsupportedOperationException();
   }
 }

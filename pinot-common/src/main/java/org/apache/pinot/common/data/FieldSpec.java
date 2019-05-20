@@ -22,11 +22,9 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import javax.annotation.Nullable;
 import org.apache.avro.Schema.Type;
-import org.apache.commons.codec.DecoderException;
-import org.apache.commons.codec.binary.Hex;
-import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.config.ConfigKey;
 import org.apache.pinot.common.config.ConfigNodeLifecycleAware;
+import org.apache.pinot.common.utils.BytesUtils;
 import org.apache.pinot.common.utils.EqualityUtils;
 import org.apache.pinot.common.utils.JsonUtils;
 
@@ -168,7 +166,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, ConfigNodeLife
    */
   protected static String getStringValue(Object value) {
     if (value instanceof byte[]) {
-      return Hex.encodeHexString((byte[]) value);
+      return BytesUtils.toHexString((byte[]) value);
     } else {
       return value.toString();
     }
@@ -187,26 +185,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, ConfigNodeLife
   private static Object getDefaultNullValue(FieldType fieldType, DataType dataType,
       @Nullable String stringDefaultNullValue) {
     if (stringDefaultNullValue != null) {
-      switch (dataType) {
-        case INT:
-          return Integer.valueOf(stringDefaultNullValue);
-        case LONG:
-          return Long.valueOf(stringDefaultNullValue);
-        case FLOAT:
-          return Float.valueOf(stringDefaultNullValue);
-        case DOUBLE:
-          return Double.valueOf(stringDefaultNullValue);
-        case STRING:
-          return stringDefaultNullValue;
-        case BYTES:
-          try {
-            return Hex.decodeHex(stringDefaultNullValue.toCharArray());
-          } catch (DecoderException e) {
-            Utils.rethrowException(e); // Re-throw to avoid handling exceptions in all callers.
-          }
-        default:
-          throw new UnsupportedOperationException("Unsupported data type: " + dataType);
-      }
+      return dataType.convert(stringDefaultNullValue);
     } else {
       switch (fieldType) {
         case METRIC:
@@ -383,10 +362,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, ConfigNodeLife
    * The <code>DataType</code> enum is used to demonstrate the data type of a field.
    */
   public enum DataType {
-    INT, LONG, FLOAT, DOUBLE, BOOLEAN,
-
-    // Stored as STRING
-    STRING, BYTES;
+    INT, LONG, FLOAT, DOUBLE, BOOLEAN/* Stored as STRING */, STRING, BYTES;
 
     /**
      * Returns the data type stored in Pinot.
@@ -437,6 +413,28 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, ConfigNodeLife
           return MetricFieldSpec.UNDEFINED_METRIC_SIZE;
         default:
           throw new IllegalStateException("Cannot get number of bytes for: " + this);
+      }
+    }
+
+    /**
+     * Converts the given string value to the data type.
+     */
+    public Object convert(String value) {
+      switch (this) {
+        case INT:
+          return Integer.valueOf(value);
+        case LONG:
+          return Long.valueOf(value);
+        case FLOAT:
+          return Float.valueOf(value);
+        case DOUBLE:
+          return Double.valueOf(value);
+        case STRING:
+          return value;
+        case BYTES:
+          return BytesUtils.toBytes(value);
+        default:
+          throw new UnsupportedOperationException("Unsupported data type: " + this);
       }
     }
   }

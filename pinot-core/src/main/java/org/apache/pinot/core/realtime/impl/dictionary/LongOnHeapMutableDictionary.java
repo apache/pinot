@@ -109,6 +109,11 @@ public class LongOnHeapMutableDictionary extends BaseOnHeapMutableDictionary {
   }
 
   @Override
+  public int compare(int dictId1, int dictId2) {
+    return Long.compare(getLongValue(dictId1), getLongValue(dictId2));
+  }
+
+  @Override
   public int getIntValue(int dictId) {
     return ((Long) get(dictId)).intValue();
   }

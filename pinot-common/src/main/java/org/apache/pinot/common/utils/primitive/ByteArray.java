@@ -20,7 +20,7 @@ package org.apache.pinot.common.utils.primitive;
 
 import java.util.Arrays;
 import javax.annotation.Nonnull;
-import org.apache.commons.codec.binary.Hex;
+import org.apache.pinot.common.utils.BytesUtils;
 
 
 /**
@@ -45,19 +45,13 @@ public class ByteArray implements Comparable<ByteArray> {
     return _bytes.length;
   }
 
-  /**
-   * Static utility function to convert a byte[] to Hex string.
-   *
-   * @param bytes byte[] to convert
-   * @return Equivalent Hex String.
-   */
-  public static String toHexString(byte[] bytes) {
-    return Hex.encodeHexString(bytes);
+  public String toHexString() {
+    return BytesUtils.toHexString(_bytes);
   }
 
   @Override
   public String toString() {
-    return toHexString(_bytes);
+    return toHexString();
   }
 
   @Override
