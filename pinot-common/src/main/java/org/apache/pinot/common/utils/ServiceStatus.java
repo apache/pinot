@@ -190,6 +190,7 @@ public class ServiceStatus {
         long realtimeConsumptionCatchupWaitMs) {
       super(helixManager, clusterName, instanceName);
 
+      long startTime = System.currentTimeMillis();
       boolean hasConsumingSegments = false;
 
       for (String resourceName : getResourcesInCluster()) {
@@ -217,7 +218,6 @@ public class ServiceStatus {
         _serviceStatus = Status.GOOD;
         _statusDescription = "No consuming segments to monitor. Setting status GOOD";
       } else {
-        long startTime = System.currentTimeMillis();
         // A consuming segment will actually be ready to serve queries after (time of creation of partition consumer) + (configured max time to catchup)
         // We are approximating it to (time of server startup) + (configured max time to catch up)
         _endWaitTime = startTime + TimeUnit.SECONDS.toMillis(realtimeConsumptionCatchupWaitMs);
