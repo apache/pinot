@@ -355,7 +355,7 @@ public class Deserializer {
               destinationValue = Long.parseLong(stringValue);
             } else if (fieldType.isAssignableFrom(Boolean.class) || fieldType.isAssignableFrom(boolean.class)){
               destinationValue = Boolean.parseBoolean(stringValue);
-            } else if (fieldType.isAssignableFrom(Enum.class)){
+            } else if (Enum.class.isAssignableFrom(fieldType)){
               destinationValue = Enum.valueOf(fieldType.asSubclass(Enum.class), stringValue.toUpperCase());
             } else if (fieldType.isAssignableFrom(Float.class) || fieldType.isAssignableFrom(float.class)){
               destinationValue = Float.parseFloat(stringValue);
