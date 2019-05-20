@@ -28,7 +28,7 @@ import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.apache.pinot.thirdeye.detection.ConfigUtils;
 import org.quartz.CronExpression;
 
-import static org.apache.pinot.thirdeye.detection.yaml.YamlDetectionAlertConfigTranslator.*;
+import static org.apache.pinot.thirdeye.detection.yaml.translator.YamlDetectionAlertConfigTranslator.*;
 
 
 public class SubscriptionConfigValidator implements ConfigValidator<DetectionAlertConfigDTO> {

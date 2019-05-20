@@ -59,7 +59,7 @@ public class AnomalyFilterWrapper extends DetectionPipeline {
     this.nestedProperties = ConfigUtils.getList(properties.get(PROP_NESTED));
 
     Preconditions.checkArgument(this.config.getProperties().containsKey(PROP_FILTER));
-    String detectorReferenceKey = DetectionUtils.getComponentName(MapUtils.getString(config.getProperties(), PROP_FILTER));
+    String detectorReferenceKey = DetectionUtils.getComponentKey(MapUtils.getString(config.getProperties(), PROP_FILTER));
     Preconditions.checkArgument(this.config.getComponents().containsKey(detectorReferenceKey));
     this.anomalyFilter = (AnomalyFilter) this.config.getComponents().get(detectorReferenceKey);
 

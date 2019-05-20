@@ -77,7 +77,7 @@ public class BaselineFillingMergeWrapper extends MergeWrapper {
     super(provider, config, startTime, endTime);
 
     if (config.getProperties().containsKey(PROP_BASELINE_PROVIDER)) {
-      this.baselineProviderComponentName = DetectionUtils.getComponentName(MapUtils.getString(config.getProperties(), PROP_BASELINE_PROVIDER));
+      this.baselineProviderComponentName = DetectionUtils.getComponentKey(MapUtils.getString(config.getProperties(), PROP_BASELINE_PROVIDER));
       Preconditions.checkArgument(this.config.getComponents().containsKey(this.baselineProviderComponentName));
       this.baselineValueProvider = (BaselineProvider) this.config.getComponents().get(this.baselineProviderComponentName);
     } else {
@@ -91,7 +91,7 @@ public class BaselineFillingMergeWrapper extends MergeWrapper {
     }
 
     if (config.getProperties().containsKey(PROP_CURRENT_PROVIDER)) {
-      String detectorReferenceKey = DetectionUtils.getComponentName(MapUtils.getString(config.getProperties(), PROP_CURRENT_PROVIDER));
+      String detectorReferenceKey = DetectionUtils.getComponentKey(MapUtils.getString(config.getProperties(), PROP_CURRENT_PROVIDER));
       Preconditions.checkArgument(this.config.getComponents().containsKey(detectorReferenceKey));
       this.currentValueProvider = (BaselineProvider) this.config.getComponents().get(detectorReferenceKey);
     } else {
@@ -104,11 +104,11 @@ public class BaselineFillingMergeWrapper extends MergeWrapper {
     }
 
     // inject detector to nested property if possible
-    String detectorComponentKey = MapUtils.getString(config.getProperties(), PROP_DETECTOR);
-    if (detectorComponentKey != null){
-      this.detectorComponentName = DetectionUtils.getComponentName(detectorComponentKey);
+    String detectorComponentRefKey = MapUtils.getString(config.getProperties(), PROP_DETECTOR);
+    if (detectorComponentRefKey != null){
+      this.detectorComponentName = DetectionUtils.getComponentKey(detectorComponentRefKey);
       for (Map<String, Object> properties : this.nestedProperties){
-        properties.put(PROP_DETECTOR, detectorComponentKey);
+        properties.put(PROP_DETECTOR, detectorComponentRefKey);
       }
     }
 

@@ -17,10 +17,8 @@
  * under the License.
  */
 
-package org.apache.pinot.thirdeye.detection.yaml;
+package org.apache.pinot.thirdeye.detection.yaml.translator;
 
-import com.google.common.base.Preconditions;
-import java.util.HashMap;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.detection.DataProvider;
 import java.util.Map;
@@ -36,74 +34,37 @@ import org.yaml.snakeyaml.Yaml;
  * The YAML config translator converts the yaml config into a detection config.
  * Calls training module for each stage.
  */
-public abstract class YamlDetectionConfigTranslator {
+public abstract class YamlDetectionConfigTranslator extends ConfigTranslator {
   protected static final Logger LOG = LoggerFactory.getLogger(YamlDetectionConfigTranslator.class);
   private static final String PROP_NAME = "detectionName";
   private static final String PROP_DESC_NAME = "description";
   private static final String PROP_ACTIVE = "active";
 
-  DetectionConfigValidator detectionValidator;
-  Map<String, Object> yamlConfig;
-  DetectionConfigDTO existingConfig;
-  Map<String, Object> existingComponentSpecs;
-
-  protected long startTime;
-  protected long endTime;
   protected DataProvider dataProvider;
 
-
-  public YamlDetectionConfigTranslator(Map<String, Object> yamlConfig, DataProvider provider) {
-    this.yamlConfig = yamlConfig;
+  YamlDetectionConfigTranslator(Map<String, Object> yamlConfig, DataProvider provider, DetectionConfigValidator validator) {
+    super(yamlConfig, validator);
     this.dataProvider = provider;
-    this.existingComponentSpecs = new HashMap<>();
-    this.detectionValidator = new DetectionConfigValidator(dataProvider);
   }
-
-  public YamlDetectionConfigTranslator withTuningWindow(long startTime, long endTime) {
-    this.startTime = startTime;
-    this.endTime = endTime;
-    return this;
-  }
-
-  public YamlDetectionConfigTranslator withExistingDetectionConfig(DetectionConfigDTO existingDTO) {
-    this.existingConfig = existingDTO;
-    if(existingDTO != null) this.existingComponentSpecs = existingDTO.getComponentSpecs();
-    return this;
-  }
-
-  /**
-   * Convert Yaml configurations into detection properties. Can be customized and override by different detection flow.
-   * @return properties of the detection pipeline
-   */
-  abstract YamlTranslationResult translateYaml();
 
   /**
    * Fill in common fields of detection config. Properties of the pipeline is filled by the subclass.
    */
-  public DetectionConfigDTO generateDetectionConfig() {
-    detectionValidator.validateYaml(yamlConfig);
-
+  DetectionConfigDTO generateDetectionConfig(Map<String, Object> properties, Map<String, Object> components, String cron) {
     DetectionConfigDTO config = new DetectionConfigDTO();
     config.setName(MapUtils.getString(yamlConfig, PROP_NAME));
     config.setDescription(MapUtils.getString(yamlConfig, PROP_DESC_NAME));
     config.setLastTimestamp(System.currentTimeMillis());
-    YamlTranslationResult translationResult = translateYaml();
-    Preconditions.checkArgument(!translationResult.getProperties().isEmpty(), "Empty detection property");
-    config.setProperties(translationResult.getProperties());
-    config.setComponentSpecs(translationResult.getComponents());
-    config.setCron(translationResult.getCron());
+
+    config.setProperties(properties);
+    config.setComponentSpecs(components);
+    config.setCron(cron);
     config.setActive(MapUtils.getBooleanValue(yamlConfig, PROP_ACTIVE, true));
 
     DumperOptions options = new DumperOptions();
     options.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
     options.setPrettyFlow(true);
     config.setYaml(new Yaml(options).dump(yamlConfig));
-
-    if (existingConfig != null) {
-      config.setId(existingConfig.getId());
-      config.setLastTimestamp(existingConfig.getLastTimestamp());
-      config.setCreatedBy(existingConfig.getCreatedBy());
-    }
 
     return config;
   }

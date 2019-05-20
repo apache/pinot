@@ -1,4 +1,4 @@
-package org.apache.pinot.thirdeye.detection.yaml;
+package org.apache.pinot.thirdeye.detection.yaml.translator;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -13,12 +13,14 @@ import org.apache.pinot.thirdeye.datalayer.pojo.AlertConfigBean;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.apache.pinot.thirdeye.detection.ConfigUtils;
 import org.apache.pinot.thirdeye.detection.annotation.registry.DetectionAlertRegistry;
+import org.apache.pinot.thirdeye.detection.validators.SubscriptionConfigValidator;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.thirdeye.detection.yaml.YamlDetectionAlertConfigTranslator.*;
+import static org.apache.pinot.thirdeye.detection.yaml.translator.YamlDetectionAlertConfigTranslator.*;
+import static org.mockito.Mockito.*;
 
 
 public class YamlDetectionAlertConfigTranslatorTest {
@@ -35,6 +37,7 @@ public class YamlDetectionAlertConfigTranslatorTest {
     alertYamlConfigs.put(PROP_SUBS_GROUP_NAME, "test_group_name");
     alertYamlConfigs.put(PROP_APPLICATION, "test_application");
     alertYamlConfigs.put(PROP_FROM, "thirdeye@thirdeye");
+    alertYamlConfigs.put(PROP_TYPE, "DEFAULT_ALERTER_PIPELINE");
     alertYamlConfigs.put(PROP_CRON, CRON_SCHEDULE_DEFAULT);
     alertYamlConfigs.put(PROP_ACTIVE, true);
     alertYamlConfigs.put(PROP_DETECTION_NAMES, Collections.singletonList("test_pipeline_1"));
@@ -65,7 +68,11 @@ public class YamlDetectionAlertConfigTranslatorTest {
     recipients.put("cc", new ArrayList<>(Collections.singleton("userCc@thirdeye.com")));
     alertYamlConfigs.put(PROP_RECIPIENTS, recipients);
 
-    DetectionAlertConfigDTO alertConfig = new YamlDetectionAlertConfigTranslator(this.detectionConfigManager).translate(alertYamlConfigs);
+    SubscriptionConfigValidator validateMocker = mock(SubscriptionConfigValidator.class);
+    doNothing().when(validateMocker).validateYaml(alertYamlConfigs);
+
+    DetectionAlertConfigDTO alertConfig = (DetectionAlertConfigDTO) new YamlDetectionAlertConfigTranslator(
+        this.detectionConfigManager, alertYamlConfigs, validateMocker).translate();
 
     Assert.assertTrue(alertConfig.isActive());
     Assert.assertEquals(alertConfig.getName(), "test_group_name");
