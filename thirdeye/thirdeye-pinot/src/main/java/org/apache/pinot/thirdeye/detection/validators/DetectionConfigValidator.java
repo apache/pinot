@@ -45,6 +45,7 @@ public class DetectionConfigValidator implements ConfigValidator<DetectionConfig
   private static final String PROP_DETECTION = "detection";
   private static final String PROP_FILTER = "filter";
   private static final String PROP_METRIC = "metric";
+  private static final String PROP_GROUPER = "grouper";
   private static final String PROP_DATASET = "dataset";
   private static final String PROP_TYPE = "type";
   private static final String PROP_RULES = "rules";
@@ -140,6 +141,10 @@ public class DetectionConfigValidator implements ConfigValidator<DetectionConfig
     DatasetConfigDTO datasetConfig = provider
         .fetchDatasets(Collections.singletonList(metricConfig.getDataset()))
         .get(metricConfig.getDataset());
+
+    // We support only one grouper per metric
+    Preconditions.checkArgument(ConfigUtils.getList(detectionYaml.get(PROP_GROUPER)).size() <= 1,
+        "Multiple groupers detected for metric. We support only one grouper per metric.");
 
     // Validate all the rules
     Set<String> names = new HashSet<>();
