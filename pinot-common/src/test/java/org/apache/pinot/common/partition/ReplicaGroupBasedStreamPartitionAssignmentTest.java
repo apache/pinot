@@ -65,20 +65,27 @@ public class ReplicaGroupBasedStreamPartitionAssignmentTest {
     }
     Assert.assertTrue(exception);
 
-    // mismatch between numReplicas and numReplicaGroups
+    // mismatch between numReplicas and numReplicaGroups - follow the replica group assignment
     mockStreamPartitionAssignmentStrategy.setReplicaGroupPartitionAssignment(replicaGroupPartitionAssignment);
-    exception = false;
-    try {
-      mockStreamPartitionAssignmentStrategy.getStreamPartitionAssignment(null, tableNameWithType, partitions,
-          5, allTaggedInstances);
-    } catch (InvalidConfigException e) {
-      exception = true;
-    }
-    Assert.assertTrue(exception);
+    PartitionAssignment streamPartitionAssignment =
+        mockStreamPartitionAssignmentStrategy.getStreamPartitionAssignment(null, tableNameWithType, partitions, 5,
+            allTaggedInstances);
+    Assert.assertEquals(streamPartitionAssignment.getInstancesListForPartition("0"),
+        Lists.newArrayList("server_1", "server_5"));
+    Assert.assertEquals(streamPartitionAssignment.getInstancesListForPartition("1"),
+        Lists.newArrayList("server_2", "server_6"));
+    Assert.assertEquals(streamPartitionAssignment.getInstancesListForPartition("2"),
+        Lists.newArrayList("server_3", "server_7"));
+    Assert.assertEquals(streamPartitionAssignment.getInstancesListForPartition("3"),
+        Lists.newArrayList("server_4", "server_8"));
+    Assert.assertEquals(streamPartitionAssignment.getInstancesListForPartition("4"),
+        Lists.newArrayList("server_1", "server_5"));
+    Assert.assertEquals(streamPartitionAssignment.getInstancesListForPartition("5"),
+        Lists.newArrayList("server_2", "server_6"));
 
     // happy path - correctly generated partition assignment
     mockStreamPartitionAssignmentStrategy.setReplicaGroupPartitionAssignment(replicaGroupPartitionAssignment);
-    PartitionAssignment streamPartitionAssignment =
+    streamPartitionAssignment =
         mockStreamPartitionAssignmentStrategy.getStreamPartitionAssignment(null, tableNameWithType, partitions,
             numReplicas, allTaggedInstances);
     Assert.assertEquals(streamPartitionAssignment.getInstancesListForPartition("0"),
