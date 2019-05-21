@@ -364,7 +364,7 @@ public class Deserializer {
             } else if (fieldType.isAssignableFrom(Short.class) || fieldType.isAssignableFrom(short.class)){
               destinationValue = Short.parseShort(stringValue);
             } else if (fieldType.isAssignableFrom(Byte.class) || fieldType.isAssignableFrom(byte.class)){
-              destinationValue = stringValue.getBytes()[0];
+              destinationValue = Byte.parseByte(stringValue);
             } else if (fieldType.isAssignableFrom(Character.class) || fieldType.isAssignableFrom(char.class)){
               destinationValue = stringValue.charAt(0);
             }
