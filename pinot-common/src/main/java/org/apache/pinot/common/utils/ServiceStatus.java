@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.common.utils;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -216,9 +215,9 @@ public class ServiceStatus {
       implements ServiceStatusCallback {
 
     protected final String _clusterName;
-    final String _instanceName;
+    protected final String _instanceName;
     protected final HelixAdmin _helixAdmin;
-    final HelixDataAccessor _helixDataAccessor;
+    protected final HelixDataAccessor _helixDataAccessor;
 
     private final Set<String> _resourcesToMonitor;
     private final int _numTotalResourcesToMonitor;
@@ -230,10 +229,10 @@ public class ServiceStatus {
 
     public IdealStateMatchServiceStatusCallback(HelixManager helixManager, String clusterName, String instanceName,
         double minResourcesStartPercent) {
-      _helixAdmin = helixManager.getClusterManagmentTool();
-      _helixDataAccessor = helixManager.getHelixDataAccessor();
       _clusterName = clusterName;
       _instanceName = instanceName;
+      _helixAdmin = helixManager.getClusterManagmentTool();
+      _helixDataAccessor = helixManager.getHelixDataAccessor();
 
       _resourcesToMonitor = new HashSet<>();
       for (String resourceName : _helixAdmin.getResourcesInCluster(_clusterName)) {
@@ -262,10 +261,10 @@ public class ServiceStatus {
 
     public IdealStateMatchServiceStatusCallback(HelixManager helixManager, String clusterName, String instanceName,
         List<String> resourcesToMonitor, double minResourcesStartPercent) {
-      _helixAdmin = helixManager.getClusterManagmentTool();
-      _helixDataAccessor = helixManager.getHelixDataAccessor();
       _clusterName = clusterName;
       _instanceName = instanceName;
+      _helixAdmin = helixManager.getClusterManagmentTool();
+      _helixDataAccessor = helixManager.getHelixDataAccessor();
 
       _resourcesToMonitor = new HashSet<>(resourcesToMonitor);
       _numTotalResourcesToMonitor = _resourcesToMonitor.size();
@@ -369,17 +368,8 @@ public class ServiceStatus {
       return Status.GOOD;
     }
 
-    @Override
-    public synchronized String getStatusDescription() {
-      return _statusDescription;
-    }
-
-    protected IdealState getResourceIdealState(String resourceName) {
-      return _helixAdmin.getResourceIdealState(_clusterName, resourceName);
-    }
-
     private StatusDescriptionPair evaluateResourceStatus(String resourceName) {
-      IdealState idealState = _helixAdmin.getResourceIdealState(_clusterName, resourceName);;
+      IdealState idealState = getResourceIdealState(resourceName);
       // If the resource has been removed or disabled, ignore it
       if (idealState == null || !idealState.isEnabled()) {
         return new StatusDescriptionPair(Status.GOOD, STATUS_DESCRIPTION_NONE);
@@ -433,6 +423,14 @@ public class ServiceStatus {
       return stringBuilder.append("...]").toString();
     }
 
+    @Override
+    public synchronized String getStatusDescription() {
+      return _statusDescription;
+    }
+
+    protected IdealState getResourceIdealState(String resourceName) {
+      return _helixAdmin.getResourceIdealState(_clusterName, resourceName);
+    }
   }
 
   /**
