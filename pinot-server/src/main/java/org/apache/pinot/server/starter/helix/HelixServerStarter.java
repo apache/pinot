@@ -26,9 +26,9 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationUtils;
-import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.HelixManagerFactory;
@@ -68,8 +68,8 @@ import static org.apache.pinot.common.utils.CommonConstants.Server.*;
 
 
 /**
- * Starter for Helix-based Pinot server.
- * <p>When an instance starts for the first time, it will automatically join the Helix cluster with the default tag.
+ * Starter for Pinot server.
+ * <p>When the server starts for the first time, it will automatically join the Helix cluster with the default tag.
  * <ul>
  *   <li>
  *     Optional start-up checks:
@@ -108,11 +108,32 @@ public class HelixServerStarter {
     _serverConf = ConfigurationUtils.cloneConfiguration(serverConf);
 
     // Log warnings for usage of deprecated config keys
-    String[] deprecatedConfigKeys =
-        new String[]{CONFIG_OF_STARTER_ENABLE_SEGMENTS_LOADING_CHECK, CONFIG_OF_STARTER_TIMEOUT_IN_SECONDS, CONFIG_OF_ENABLE_SHUTDOWN_DELAY, CONFIG_OF_INSTANCE_MAX_SHUTDOWN_WAIT_TIME, CONFIG_OF_INSTANCE_CHECK_INTERVAL_TIME};
-    for (String deprecatedConfigKey : deprecatedConfigKeys) {
+    Map<String, String> deprecatedConfigKeyWarnings = new HashMap<String, String>() {{
+      //noinspection deprecation
+      put(CONFIG_OF_STARTER_ENABLE_SEGMENTS_LOADING_CHECK, String.format(
+          "use %s instead, which will check the service status instead of comparing currentState/externalView with idealState (enabled by default)",
+          CONFIG_OF_STARTUP_ENABLE_SERVICE_STATUS_CHECK));
+      //noinspection deprecation
+      put(CONFIG_OF_STARTER_TIMEOUT_IN_SECONDS, String
+          .format("use %s instead, which is the timeout for the whole startup process (10 minutes by default)",
+              CONFIG_OF_STARTUP_TIMEOUT_MS));
+      //noinspection deprecation
+      put(CONFIG_OF_ENABLE_SHUTDOWN_DELAY, String.format(
+          "use %s instead, which will drain the queries (no incoming queries and all existing queries finished) (enabled by default)",
+          CONFIG_OF_SHUTDOWN_ENABLE_QUERY_CHECK));
+      //noinspection deprecation
+      put(CONFIG_OF_INSTANCE_MAX_SHUTDOWN_WAIT_TIME, String
+          .format("use %s instead, which is the timeout for the whole shutdown process (10 minutes by default)",
+              CONFIG_OF_SHUTDOWN_TIMEOUT_MS));
+      //noinspection deprecation
+      put(CONFIG_OF_INSTANCE_CHECK_INTERVAL_TIME, String
+          .format("use %s instead, which is the interval for the resource check (10 seconds by default)",
+              CONFIG_OF_SHUTDOWN_RESOURCE_CHECK_INTERVAL_MS));
+    }};
+    for (Map.Entry<String, String> entry : deprecatedConfigKeyWarnings.entrySet()) {
+      String deprecatedConfigKey = entry.getKey();
       if (_serverConf.containsKey(deprecatedConfigKey)) {
-        LOGGER.warn("Found usage of deprecated key: {}", deprecatedConfigKey);
+        LOGGER.warn("Found usage of deprecated config key: {}, {}", deprecatedConfigKey, entry.getValue());
       }
     }
 
@@ -261,8 +282,11 @@ public class HelixServerStarter {
       } else if (serviceStatus == Status.BAD) {
         throw new IllegalStateException("Service status is BAD");
       }
+      long sleepTimeMs = Math.min(checkIntervalMs, endTimeMs - currentTimeMs);
+      LOGGER.info("Sleep for {}ms as service status has not turned GOOD: {}", sleepTimeMs,
+          ServiceStatus.getStatusDescription());
       try {
-        Thread.sleep(Math.min(checkIntervalMs, endTimeMs - currentTimeMs));
+        Thread.sleep(sleepTimeMs);
       } catch (InterruptedException e) {
         LOGGER.warn("Got interrupted while checking service status", e);
         Thread.currentThread().interrupt();
@@ -299,7 +323,7 @@ public class HelixServerStarter {
   }
 
   /**
-   * When shutting down the server, drains the queries and waits for all the existing queries to be finished.
+   * When shutting down the server, drains the queries (no incoming queries and all existing queries finished).
    *
    * @param endTimeMs Timeout for the check
    */
@@ -310,35 +334,43 @@ public class HelixServerStarter {
     long maxQueryTimeMs = _serverConf.getLong(CONFIG_OF_QUERY_EXECUTOR_TIMEOUT, DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
     long noQueryThresholdMs = _serverConf.getLong(CONFIG_OF_SHUTDOWN_NO_QUERY_THRESHOLD_MS, maxQueryTimeMs);
 
-    // Drain queries
-    boolean queriesDrained = false;
+    // Wait until no incoming queries
+    boolean noIncomingQueries = false;
     long currentTimeMs;
     while ((currentTimeMs = System.currentTimeMillis()) < endTimeMs) {
-      long latestQueryTimeMs = _serverInstance.getLatestQueryTime();
-      if (currentTimeMs >= latestQueryTimeMs + noQueryThresholdMs) {
-        LOGGER.info("Finished draining queries (no query received within {}ms) after {}ms",
-            currentTimeMs - latestQueryTimeMs, currentTimeMs - startTimeMs);
-        queriesDrained = true;
+      long noQueryTimeMs = currentTimeMs - _serverInstance.getLatestQueryTime();
+      if (noQueryTimeMs >= noQueryThresholdMs) {
+        LOGGER.info("No query received within {}ms (larger than the threshold: {}ms), mark it as no incoming queries",
+            noQueryTimeMs, noQueryThresholdMs);
+        noIncomingQueries = true;
         break;
       }
+      long sleepTimeMs = Math.min(noQueryThresholdMs - noQueryTimeMs, endTimeMs - currentTimeMs);
+      LOGGER.info(
+          "Sleep for {}ms as there are still incoming queries (no query time: {}ms is smaller than the threshold: {}ms)",
+          sleepTimeMs, noQueryTimeMs, noQueryThresholdMs);
       try {
-        Thread.sleep(Math.min(noQueryThresholdMs - latestQueryTimeMs, endTimeMs - currentTimeMs));
+        Thread.sleep(sleepTimeMs);
       } catch (InterruptedException e) {
-        LOGGER.error("Got interrupted while draining queries", e);
+        LOGGER.warn("Got interrupted while waiting for no incoming queries", e);
         Thread.currentThread().interrupt();
         break;
       }
     }
-    if (queriesDrained) {
+    if (noIncomingQueries) {
       // Ensure all the existing queries are finished
       long latestQueryFinishTimeMs = _serverInstance.getLatestQueryTime() + maxQueryTimeMs;
       if (latestQueryFinishTimeMs > currentTimeMs) {
+        long sleepTimeMs = latestQueryFinishTimeMs - currentTimeMs;
+        LOGGER.info("Sleep for {}ms to ensure all the existing queries are finished", sleepTimeMs);
         try {
-          Thread.sleep(latestQueryFinishTimeMs - currentTimeMs);
+          Thread.sleep(sleepTimeMs);
         } catch (InterruptedException e) {
           LOGGER.warn("Got interrupted while waiting for all the existing queries to be finished", e);
+          Thread.currentThread().interrupt();
         }
       }
+      LOGGER.info("Finished draining queries after {}ms", System.currentTimeMillis() - startTimeMs);
     } else {
       LOGGER.warn("Failed to drain queries within {}ms", System.currentTimeMillis() - startTimeMs);
     }
@@ -384,20 +416,25 @@ public class HelixServerStarter {
           .getLong(CONFIG_OF_SHUTDOWN_RESOURCE_CHECK_INTERVAL_MS, DEFAULT_SHUTDOWN_RESOURCE_CHECK_INTERVAL_MS);
       while (System.currentTimeMillis() < endTimeMs) {
         Iterator<String> iterator = resourcesToMonitor.iterator();
+        String currentResource = null;
         while (iterator.hasNext()) {
-          if (isResourceOffline(helixAdmin, iterator.next())) {
+          currentResource = iterator.next();
+          if (isResourceOffline(helixAdmin, currentResource)) {
             iterator.remove();
           } else {
             // Do not check remaining resources if one resource is not OFFLINE
             break;
           }
         }
+        long currentTimeMs = System.currentTimeMillis();
         if (resourcesToMonitor.isEmpty()) {
-          LOGGER.info("All resources are OFFLINE after {}ms", System.currentTimeMillis() - startTimeMs);
+          LOGGER.info("All resources are OFFLINE after {}ms", currentTimeMs - startTimeMs);
           return;
         }
+        long sleepTimeMs = Math.min(checkIntervalMs, endTimeMs - currentTimeMs);
+        LOGGER.info("Sleep for {}ms as some resources [{}, ...] are still ONLINE", sleepTimeMs, currentResource);
         try {
-          Thread.sleep(Math.min(checkIntervalMs, endTimeMs - System.currentTimeMillis()));
+          Thread.sleep(sleepTimeMs);
         } catch (InterruptedException e) {
           LOGGER.warn("Got interrupted while waiting for all resources OFFLINE", e);
           Thread.currentThread().interrupt();
@@ -446,34 +483,19 @@ public class HelixServerStarter {
   /**
    * This method is for reference purpose only.
    */
+  @SuppressWarnings("UnusedReturnValue")
   public static HelixServerStarter startDefault()
       throws Exception {
-    Configuration configuration = new PropertiesConfiguration();
+    Configuration serverConf = new BaseConfiguration();
     int port = 8003;
-    configuration.addProperty(KEY_OF_SERVER_NETTY_PORT, port);
-    configuration.addProperty("pinot.server.instance.dataDir", "/tmp/PinotServer/test" + port + "/index");
-    configuration.addProperty("pinot.server.instance.segmentTarDir", "/tmp/PinotServer/test" + port + "/segmentTar");
-    return new HelixServerStarter("quickstart", "localhost:2191", configuration);
+    serverConf.addProperty(KEY_OF_SERVER_NETTY_PORT, port);
+    serverConf.addProperty(CONFIG_OF_INSTANCE_DATA_DIR, "/tmp/PinotServer/test" + port + "/index");
+    serverConf.addProperty(CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR, "/tmp/PinotServer/test" + port + "/segmentTar");
+    return new HelixServerStarter("quickstart", "localhost:2191", serverConf);
   }
 
   public static void main(String[] args)
       throws Exception {
-    /*
-    // Another way to start a server via IDE
-    if (args.length < 1) {
-      throw new RuntimeException("Usage: cmd <port>");
-    }
-    for (int i = 0; i < args.length; i++) {
-      final int port = Integer.valueOf(args[i]);
-      final String serverFQDN = "localhost";
-      final String server = "Server_" + serverFQDN + "_" + port;
-      final Configuration configuration = new PropertiesConfiguration();
-      configuration.addProperty("pinot.server.instance.dataDir", "/tmp/PinotServer/test" + port + "/index");
-      configuration.addProperty("pinot.server.instance.segmentTarDir", "/tmp/PinotServer/test" + port + "/segmentTar");
-      configuration.addProperty("instanceId", server);
-      final HelixServerStarter pinotHelixStarter = new HelixServerStarter("PinotPerfTestCluster", "localhost:2191", configuration);
-    }
-    */
     startDefault();
   }
 }

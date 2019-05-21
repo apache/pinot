@@ -219,10 +219,10 @@ public class CommonConstants {
     public static final String CONFIG_OF_SHUTDOWN_TIMEOUT_MS = "pinot.server.shutdown.timeoutMs";
     public static final long DEFAULT_SHUTDOWN_TIMEOUT_MS = 600_000L;
     // Shutdown: enable query check before shutting down the server
-    //           Will wait until no new query received and existing queries finished
+    //           Will drain queries (no incoming queries and all existing queries finished)
     public static final String CONFIG_OF_SHUTDOWN_ENABLE_QUERY_CHECK = "pinot.server.shutdown.enableQueryCheck";
     public static final boolean DEFAULT_SHUTDOWN_ENABLE_QUERY_CHECK = true;
-    // Shutdown: threshold to mark that there is no new query received, use max query time as the default threshold
+    // Shutdown: threshold to mark that there is no incoming queries, use max query time as the default threshold
     public static final String CONFIG_OF_SHUTDOWN_NO_QUERY_THRESHOLD_MS = "pinot.server.shutdown.noQueryThresholdMs";
     // Shutdown: enable resource check before shutting down the server
     //           Will wait until all the resources in the external view are neither ONLINE nor CONSUMING
