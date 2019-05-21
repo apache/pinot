@@ -45,6 +45,18 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/**
+ * This class generates query requests to the backend database and retrieve the data for summary algorithm.
+ *
+ * The generated requests are organized the following tree structure:
+ *   Root level by GroupBy dimensions.
+ *   Mid  level by "baseline" or "current"; The "baseline" request is ordered before the "current" request.
+ *   Leaf level by metric functions; This level is handled by the request itself, i.e., a request can gather multiple
+ *   metric functions at the same time.
+ * The generated requests are store in a List. Because of the tree structure, the requests belong to the same
+ * timeline (baseline or current) are located together. Then, the requests belong to the same GroupBy dimension are
+ * located together.
+ */
 public abstract class BaseCubePinotClient<R extends Row> implements CubePinotClient<R> {
   protected static final Logger LOG = LoggerFactory.getLogger(BaseCubePinotClient.class);
 

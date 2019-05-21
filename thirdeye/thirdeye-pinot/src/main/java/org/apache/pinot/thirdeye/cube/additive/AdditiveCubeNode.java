@@ -144,40 +144,42 @@ public class AdditiveCubeNode extends BaseCubeNode<AdditiveCubeNode, AdditiveRow
 
   @Override
   public int hashCode() {
-    return Objects
-        .hash(getLevel(), index, getBaselineValue(), getCurrentValue(), getCost(), data);
+    return Objects.hash(getLevel(), index, getBaselineValue(), getCurrentValue(), getCost(), data);
   }
 
   /**
-   * The toString method for parent node. We don't invoke parent's toString() to prevent multiple calls of toString to
-   * their parents.
-   *
-   * @return a simple string representation of a parent cube node, which does not toString its parent node recursively.
-   */
-  private String toStringAsParent() {
-    return MoreObjects.toStringHelper(this).add("level", level).add("index", index).add("baselineValue", baselineValue)
-        .add("currentValue", currentValue).add("cost", cost).add("data", data).toString();
-  }
-
-  /**
-   * ToString that handles if the given cube node is null, i.e., a root cube node.
+   * ToString that handles if the given cube node is null, i.e., a root cube node. Moreover, it does not invoke
+   * parent's toString() to prevent multiple calls of toString to their parents.
    *
    * @param node the node to be converted to string.
    *
-   * @return a string representation of this node.
+   * @return a simple string representation of a parent cube node, which does not toString its parent node recursively.
    */
-  private static String toStringAsParent(AdditiveCubeNode node) {
+  private String toStringAsParent(AdditiveCubeNode node) {
     if (node == null) {
       return "null";
     } else {
-      return node.toStringAsParent();
+      return MoreObjects.toStringHelper(this)
+          .add("level", level)
+          .add("index", index)
+          .add("baselineValue", baselineValue)
+          .add("currentValue", currentValue)
+          .add("cost", cost)
+          .add("data", data)
+          .toString();
     }
   }
 
   @Override
   public String toString() {
-    return MoreObjects.toStringHelper(this).add("level", level).add("index", index).add("baselineValue", baselineValue)
-        .add("currentValue", currentValue).add("cost", cost).add("data", data).add("parent", toStringAsParent(parent))
+    return MoreObjects.toStringHelper(this)
+        .add("level", level)
+        .add("index", index)
+        .add("baselineValue", baselineValue)
+        .add("currentValue", currentValue)
+        .add("cost", cost)
+        .add("data", data)
+        .add("parent", toStringAsParent(parent))
         .toString();
   }
 }

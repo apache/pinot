@@ -1,11 +1,34 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
 package org.apache.pinot.thirdeye.cube.ratio;
 
+import com.google.common.base.MoreObjects;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import org.apache.pinot.thirdeye.cube.data.cube.CubeUtils;
 import org.apache.pinot.thirdeye.cube.data.node.BaseCubeNode;
 
 
+/**
+ * A CubeNode for ratio metrics such as "observed over expected ratio".
+ */
 public class RatioCubeNode extends BaseCubeNode<RatioCubeNode, RatioRow> {
   private double baselineNumeratorValue;
   private double currentNumeratorValue;
@@ -14,23 +37,38 @@ public class RatioCubeNode extends BaseCubeNode<RatioCubeNode, RatioRow> {
 
   NodeStatus status;
 
+  /**
+   * Constructs a root CubeNode whose level and index is 0 and parent pointer is null.
+   *
+   * @param data the data of this root node.
+   */
   public RatioCubeNode(RatioRow data) {
     super(data);
     resetValues();
   }
 
+  /**
+   * Constructs a CubeNode which is specified information.
+   *
+   * @param level the level of this node.
+   * @param index the index of this node that is located in its parent's children list.
+   * @param data the data of this node.
+   * @param parent the parent of this node.
+   */
   public RatioCubeNode(int level, int index, RatioRow data, RatioCubeNode parent) {
     super(level, index, data, parent);
     resetValues();
   }
 
+  @Override
   public void resetValues() {
-    this.baselineNumeratorValue = data.getBaselineValue();
-    this.currentNumeratorValue = data.getCurrentValue();
+    this.baselineNumeratorValue = data.getBaselineNumeratorValue();
+    this.currentNumeratorValue = data.getCurrentNumeratorValue();
     this.baselineDenominatorValue = data.getBaselineDenominatorValue();
     this.currentDenominatorValue = data.getCurrentDenominatorValue();
   }
 
+  @Override
   public void removeNodeValues(RatioCubeNode node) {
     baselineNumeratorValue = CubeUtils.doubleMinus(baselineNumeratorValue, node.baselineNumeratorValue);
     currentNumeratorValue = CubeUtils.doubleMinus(currentNumeratorValue, node.currentNumeratorValue);
@@ -41,6 +79,7 @@ public class RatioCubeNode extends BaseCubeNode<RatioCubeNode, RatioRow> {
             || currentDenominatorValue < 0));
   }
 
+  @Override
   public void addNodeValues(RatioCubeNode node) {
     this.baselineNumeratorValue += node.baselineNumeratorValue;
     this.currentNumeratorValue += node.currentNumeratorValue;
@@ -48,22 +87,27 @@ public class RatioCubeNode extends BaseCubeNode<RatioCubeNode, RatioRow> {
     this.currentDenominatorValue += node.currentDenominatorValue;
   }
 
+  @Override
   public double getBaselineSize() {
     return baselineNumeratorValue + baselineDenominatorValue;
   }
 
+  @Override
   public double getCurrentSize() {
     return currentNumeratorValue + currentDenominatorValue;
   }
 
+  @Override
   public double getOriginalBaselineSize() {
-    return data.getBaselineValue() + data.getBaselineDenominatorValue();
+    return data.getBaselineNumeratorValue() + data.getBaselineDenominatorValue();
   }
 
+  @Override
   public double getOriginalCurrentSize() {
-    return data.getCurrentValue() + data.getCurrentDenominatorValue();
+    return data.getCurrentNumeratorValue() + data.getCurrentDenominatorValue();
   }
 
+  @Override
   public double getBaselineValue() {
     if (baselineNumeratorValue == 0 && baselineDenominatorValue == 0) {
       return 0.0;
@@ -74,6 +118,7 @@ public class RatioCubeNode extends BaseCubeNode<RatioCubeNode, RatioRow> {
     }
   }
 
+  @Override
   public double getCurrentValue() {
     if (currentNumeratorValue == 0 && currentDenominatorValue == 0) {
       return 0.0;
@@ -84,34 +129,58 @@ public class RatioCubeNode extends BaseCubeNode<RatioCubeNode, RatioRow> {
     }
   }
 
+  @Override
   public double getOriginalBaselineValue() {
-    return data.getBaselineValue() / data.getBaselineDenominatorValue();
+    return data.getBaselineNumeratorValue() / data.getBaselineDenominatorValue();
   }
 
+  @Override
   public double getOriginalCurrentValue() {
-    return data.getCurrentValue() / data.getCurrentDenominatorValue();
+    return data.getCurrentNumeratorValue() / data.getCurrentDenominatorValue();
   }
 
+  @Override
   public double originalChangeRatio() {
-    return (data.getCurrentValue() / data.getCurrentDenominatorValue()) / (data.getBaselineValue() / data.getBaselineDenominatorValue());
+    return (data.getCurrentNumeratorValue() / data.getCurrentDenominatorValue()) / (data.getBaselineNumeratorValue() / data.getBaselineDenominatorValue());
   }
 
+  @Override
   public double changeRatio() {
     return (currentNumeratorValue / currentDenominatorValue) / (baselineNumeratorValue / baselineDenominatorValue);
   }
 
+  /**
+   * Returns the baseline numerator value.
+   *
+   * @return the baseline numerator value.
+   */
   public double getBaselineNumeratorValue() {
     return baselineNumeratorValue;
   }
 
+  /**
+   * Returns the baseline denominator value.
+   *
+   * @return the baseline denominator value.
+   */
   public double getBaselineDenominatorValue() {
     return baselineDenominatorValue;
   }
 
+  /**
+   * Returns the current numerator value.
+   *
+   * @return the current numerator value.
+   */
   public double getCurrentNumeratorValue() {
     return currentNumeratorValue;
   }
 
+  /**
+   * Returns the current denominator value.
+   *
+   * @return the current denominator value.
+   */
   public double getCurrentDenominatorValue() {
     return currentDenominatorValue;
   }
@@ -151,5 +220,45 @@ public class RatioCubeNode extends BaseCubeNode<RatioCubeNode, RatioRow> {
   @Override
   public int hashCode() {
     return Objects.hashCode(super.hashCode(), baselineDenominatorValue, currentDenominatorValue, data);
+  }
+
+  /**
+   * ToString that handles if the given cube node is null, i.e., a root cube node. Moreover, it does not invoke
+   * parent's toString() to prevent multiple calls of toString to their parents.
+   *
+   * @param node the node to be converted to string.
+   *
+   * @return a simple string representation of a parent cube node, which does not toString its parent node recursively.
+   */
+  private String toStringAsParent(RatioCubeNode node) {
+    if (node == null) {
+      return "null";
+    } else {
+      return MoreObjects.toStringHelper(this)
+          .add("level", level)
+          .add("index", index)
+          .add("baselineNumeratorValue", baselineNumeratorValue)
+          .add("baselineDenominatorValue", baselineDenominatorValue)
+          .add("currentNumeratorValue", currentNumeratorValue)
+          .add("currentDenominatorValue", currentDenominatorValue)
+          .add("cost", cost)
+          .add("data", data)
+          .toString();
+    }
+  }
+
+  @Override
+  public String toString() {
+    return MoreObjects.toStringHelper(this)
+        .add("level", level)
+        .add("index", index)
+        .add("baselineNumeratorValue", baselineNumeratorValue)
+        .add("baselineDenominatorValue", baselineDenominatorValue)
+        .add("currentNumeratorValue", currentNumeratorValue)
+        .add("currentDenominatorValue", currentDenominatorValue)
+        .add("cost", cost)
+        .add("data", data)
+        .add("parent", toStringAsParent(parent))
+        .toString();
   }
 }

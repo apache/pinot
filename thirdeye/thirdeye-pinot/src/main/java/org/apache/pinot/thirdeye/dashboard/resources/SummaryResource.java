@@ -24,21 +24,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Strings;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
-import org.apache.pinot.thirdeye.cube.additive.AdditiveRow;
-import org.apache.pinot.thirdeye.cube.data.dbrow.Dimensions;
-import org.apache.pinot.thirdeye.cube.additive.MultiDimensionalSummary;
-import org.apache.pinot.thirdeye.cube.additive.MultiDimensionalSummaryCLITool;
-import org.apache.pinot.thirdeye.cube.additive.AdditiveDBClient;
-import org.apache.pinot.thirdeye.cube.cost.BalancedCostFunction;
-import org.apache.pinot.thirdeye.cube.cost.CostFunction;
-import org.apache.pinot.thirdeye.cube.cost.OeRatioCostFunction;
-import org.apache.pinot.thirdeye.cube.data.dbclient.CubePinotClient;
-import org.apache.pinot.thirdeye.cube.ratio.RatioCubePinotClient;
-import org.apache.pinot.thirdeye.cube.ratio.MultiDimensionalRatioSummary;
-import org.apache.pinot.thirdeye.dashboard.Utils;
-import org.apache.pinot.thirdeye.cube.summary.SummaryResponse;
-import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
-import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
 import java.net.URLDecoder;
 import java.util.Arrays;
 import java.util.Collections;
@@ -50,6 +35,19 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import org.apache.commons.lang.StringUtils;
+import org.apache.pinot.thirdeye.cube.additive.AdditiveDBClient;
+import org.apache.pinot.thirdeye.cube.cost.BalancedCostFunction;
+import org.apache.pinot.thirdeye.cube.cost.CostFunction;
+import org.apache.pinot.thirdeye.cube.cost.OeRatioCostFunction;
+import org.apache.pinot.thirdeye.cube.data.dbrow.Dimensions;
+import org.apache.pinot.thirdeye.cube.entry.MultiDimensionalRatioSummary;
+import org.apache.pinot.thirdeye.cube.entry.MultiDimensionalSummary;
+import org.apache.pinot.thirdeye.cube.entry.MultiDimensionalSummaryCLITool;
+import org.apache.pinot.thirdeye.cube.ratio.RatioDBClient;
+import org.apache.pinot.thirdeye.cube.summary.SummaryResponse;
+import org.apache.pinot.thirdeye.dashboard.Utils;
+import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
+import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
 import org.joda.time.DateTimeZone;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -117,7 +115,7 @@ public class SummaryResource {
 
       CostFunction costFunction = new BalancedCostFunction();
       DateTimeZone dateTimeZone = DateTimeZone.forID(timeZone);
-      CubePinotClient<AdditiveRow> cubeDbClient = new AdditiveDBClient(CACHE_REGISTRY_INSTANCE.getQueryCache());
+      AdditiveDBClient cubeDbClient = new AdditiveDBClient(CACHE_REGISTRY_INSTANCE.getQueryCache());
       MultiDimensionalSummary mdSummary = new MultiDimensionalSummary(cubeDbClient, costFunction, dateTimeZone);
 
       response = mdSummary
@@ -170,7 +168,7 @@ public class SummaryResource {
 
       CostFunction costFunction = new BalancedCostFunction();
       DateTimeZone dateTimeZone = DateTimeZone.forID(timeZone);
-      CubePinotClient<AdditiveRow> cubeDbClient = new AdditiveDBClient(CACHE_REGISTRY_INSTANCE.getQueryCache());
+      AdditiveDBClient cubeDbClient = new AdditiveDBClient(CACHE_REGISTRY_INSTANCE.getQueryCache());
       MultiDimensionalSummary mdSummary = new MultiDimensionalSummary(cubeDbClient, costFunction, dateTimeZone);
 
       response = mdSummary
@@ -234,7 +232,7 @@ public class SummaryResource {
 
       CostFunction costFunction = new OeRatioCostFunction();
       DateTimeZone dateTimeZone = DateTimeZone.forID(timeZone);
-      RatioCubePinotClient dbClient = new RatioCubePinotClient(CACHE_REGISTRY_INSTANCE.getQueryCache());
+      RatioDBClient dbClient = new RatioDBClient(CACHE_REGISTRY_INSTANCE.getQueryCache());
       MultiDimensionalRatioSummary mdSummary = new MultiDimensionalRatioSummary(dbClient, costFunction, dateTimeZone);
 
       response = mdSummary
@@ -243,7 +241,7 @@ public class SummaryResource {
 
     } catch (Exception e) {
       LOG.error("Exception while generating difference summary", e);
-//      response = SummaryResponse.buildNotAvailableResponse(dataset, metric);
+      response = SummaryResponse.buildNotAvailableResponse(dataset, numeratorMetric + "/" + denominatorMetric);
     }
 
     return OBJECT_MAPPER.writeValueAsString(response);

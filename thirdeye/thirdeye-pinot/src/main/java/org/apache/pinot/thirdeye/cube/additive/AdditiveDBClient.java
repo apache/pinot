@@ -30,17 +30,11 @@ import org.apache.pinot.thirdeye.cube.data.dbclient.BaseCubePinotClient;
 import org.apache.pinot.thirdeye.cube.data.dbclient.CubeSpec;
 import org.apache.pinot.thirdeye.datasource.cache.QueryCache;
 
+
 /**
- * This class generates query requests to the backend database and retrieve the data for summary algorithm.
+ * This class generates query requests to the backend database and retrieve the additive metric for summary algorithm.
  *
- * The generated requests are organized the following tree structure:
- *   Root level by GroupBy dimensions.
- *   Mid  level by "baseline" or "current"; The "baseline" request is ordered before the "current" request.
- *   Leaf level by metric functions; This level is handled by the request itself, i.e., a request can gather multiple
- *   metric functions at the same time.
- * The generated requests are store in a List. Because of the tree structure, the requests belong to the same
- * timeline (baseline or current) are located together. Then, the requests belong to the same GroupBy dimension are
- * located together.
+ * @see org.apache.pinot.thirdeye.cube.data.dbclient.BaseCubePinotClient
  */
 public class AdditiveDBClient extends BaseCubePinotClient<AdditiveRow> {
   private String metric;

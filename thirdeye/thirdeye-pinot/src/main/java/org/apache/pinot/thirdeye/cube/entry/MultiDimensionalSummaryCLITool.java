@@ -17,13 +17,15 @@
  * under the License.
  */
 
-package org.apache.pinot.thirdeye.cube.additive;
+package org.apache.pinot.thirdeye.cube.entry;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.Multimap;
+import org.apache.pinot.thirdeye.cube.additive.AdditiveDBClient;
+import org.apache.pinot.thirdeye.cube.additive.AdditiveRow;
 import org.apache.pinot.thirdeye.cube.data.dbrow.Dimensions;
 import org.apache.pinot.thirdeye.cube.cost.BalancedCostFunction;
 import org.apache.pinot.thirdeye.cube.cost.CostFunction;
@@ -225,7 +227,7 @@ public class MultiDimensionalSummaryCLITool {
 
       // Initialize ThirdEye's environment
       ThirdEyeUtils.initLightWeightThirdEyeEnvironment(argList.get(0));
-      CubePinotClient<AdditiveRow> cubeDbClient = new AdditiveDBClient(CACHE_REGISTRY_INSTANCE.getQueryCache());
+      AdditiveDBClient cubeDbClient = new AdditiveDBClient(CACHE_REGISTRY_INSTANCE.getQueryCache());
 
       // Convert JSON string to Objects
       Dimensions dimensions;
