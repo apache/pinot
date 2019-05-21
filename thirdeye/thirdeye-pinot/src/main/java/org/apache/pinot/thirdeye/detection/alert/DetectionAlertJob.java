@@ -97,8 +97,9 @@ public class DetectionAlertJob implements Job {
     // Sleep random 0 - 5 seconds to distribute load to mysql.
     Random random = new Random();
     try {
-      LOG.info("Wait for " + random + " milliseconds.");
-      Thread.sleep(random.nextInt(5000));
+      int sleepTime = random.nextInt(5000);
+      LOG.info("Wait for " + sleepTime + " milliseconds.");
+      Thread.sleep(sleepTime);
       long taskId = taskDAO.save(taskDTO);
       LOG.info("Created subscription task {} with settings {}", taskId, taskDTO);
     } catch (InterruptedException e) {
