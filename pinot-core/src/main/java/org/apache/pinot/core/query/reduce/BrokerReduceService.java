@@ -64,6 +64,7 @@ import org.slf4j.LoggerFactory;
 @ThreadSafe
 public class BrokerReduceService implements ReduceService<BrokerResponseNative> {
   private static final Logger LOGGER = LoggerFactory.getLogger(BrokerReduceService.class);
+  private static final long INVALID_FRESHNESS = -1;
 
   @Nonnull
   @Override
@@ -143,9 +144,13 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
         numConsumingSegmentsQueried += Long.parseLong(numConsumingString);
       }
 
-      String minConsumingIndexTsString = metadata.get(DataTable.MIN_CONSUMING_FRESHNESS_TIME_MS);
-      if (minConsumingIndexTsString != null) {
-        minConsumingFreshnessTimeMs = Math.min(Long.parseLong(minConsumingIndexTsString), minConsumingFreshnessTimeMs);
+      String minConsumingFreshnessTimeMsString = metadata.get(DataTable.MIN_CONSUMING_FRESHNESS_TIME_MS);
+      if (minConsumingFreshnessTimeMsString != null) {
+        long freshness = Long.parseLong(minConsumingFreshnessTimeMsString);
+        // ignore invalid values
+        if (freshness > INVALID_FRESHNESS) {
+          minConsumingFreshnessTimeMs = Math.min(freshness, minConsumingFreshnessTimeMs);
+        }
       }
 
       String numTotalRawDocsString = metadata.get(DataTable.TOTAL_DOCS_METADATA_KEY);
@@ -182,7 +187,9 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
     brokerResponseNative.setNumGroupsLimitReached(numGroupsLimitReached);
     if (numConsumingSegmentsQueried > 0) {
       if (minConsumingFreshnessTimeMs == Long.MAX_VALUE) {
-        LOGGER.error("Invalid lastIndexedTimestamp across {} consuming segments", numConsumingSegmentsQueried);
+        LOGGER.error("Invalid freshness time across {} consuming segments", numConsumingSegmentsQueried);
+        // use the invalid value (-1) for clear logging
+        minConsumingFreshnessTimeMs = INVALID_FRESHNESS;
       }
       brokerResponseNative.setNumConsumingSegmentsQueried(numConsumingSegmentsQueried);
       brokerResponseNative.setMinConsumingFreshnessTimeMs(minConsumingFreshnessTimeMs);
@@ -197,6 +204,11 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
           .addMeteredTableValue(rawTableName, BrokerMeter.ENTRIES_SCANNED_IN_FILTER, numEntriesScannedInFilter);
       brokerMetrics
           .addMeteredTableValue(rawTableName, BrokerMeter.ENTRIES_SCANNED_POST_FILTER, numEntriesScannedPostFilter);
+
+      if (numConsumingSegmentsQueried > 0 && minConsumingFreshnessTimeMs > 0) {
+        brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.FRESHNESS_LAG_MS,
+            System.currentTimeMillis() - minConsumingFreshnessTimeMs);
+      }
     }
 
     // Parse the option from request whether to preserve the type

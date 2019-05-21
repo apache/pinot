@@ -227,7 +227,6 @@ public class BrokerResponseNative implements BrokerResponse {
     _minConsumingFreshnessTimeMs = minConsumingFreshnessTimeMs;
   }
 
-
   @JsonProperty("totalDocs")
   @Override
   public long getTotalDocs() {
