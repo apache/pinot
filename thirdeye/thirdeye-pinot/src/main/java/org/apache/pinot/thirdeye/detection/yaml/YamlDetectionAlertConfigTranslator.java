@@ -63,7 +63,8 @@ public class YamlDetectionAlertConfigTranslator {
   static final String PROP_ALERT_SUPPRESSORS = "alertSuppressors";
   static final String PROP_REFERENCE_LINKS = "referenceLinks";
   static final String PROP_TIME_WINDOWS = "timeWindows";
-  static final String CRON_SCHEDULE_DEFAULT = "0 0/5 * * * ? *"; // Every 5 min
+  // Every 5 minutes.
+  static final String CRON_SCHEDULE_DEFAULT = "0 0/5 * * * ? *";
 
   private static final String PROP_DIMENSION = "dimension";
   private static final String PROP_DIMENSION_RECIPIENTS = "dimensionRecipients";

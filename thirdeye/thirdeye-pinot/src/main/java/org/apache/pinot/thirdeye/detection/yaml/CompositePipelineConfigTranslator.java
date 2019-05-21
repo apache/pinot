@@ -401,6 +401,11 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
     return properties;
   }
 
+  //  Default schedule:
+  //  minute granularity: every 15 minutes, starts at 0 minute
+  //  hourly: every hour, starts at 0 minute
+  //  daily: every day, starts at 2 pm UTC
+  //  others: every day, start at 12 am UTC
   private String buildCron() {
     switch (this.datasetConfig.bucketTimeGranularity().getUnit()) {
       case MINUTES:
