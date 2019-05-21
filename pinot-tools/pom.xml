@@ -98,7 +98,7 @@
                 <initialMemorySize>1G</initialMemorySize>
                 <maxMemorySize>1G</maxMemorySize>
                 <extraArguments>
-                  <extraArgument>-Dlog4j2.configurationFile=$BASEDIR/conf/pinot-tools-log4j2.xml</extraArgument>
+                  <extraArgument>-Dlog4j2.configurationFile=conf/pinot-tools-log4j2.xml</extraArgument>
                 </extraArguments>
               </jvmSettings>
             </program>
@@ -110,7 +110,7 @@
                 <maxMemorySize>4G</maxMemorySize>
                 <extraArguments>
                   <extraArgument>-XX:MaxDirectMemorySize=30g</extraArgument>
-                  <extraArgument>-Dlog4j2.configurationFile=$BASEDIR/conf/pinot-admin-log4j2.xml</extraArgument>
+                  <extraArgument>-Dlog4j2.configurationFile=conf/pinot-admin-log4j2.xml</extraArgument>
                 </extraArguments>
               </jvmSettings>
             </program>
@@ -122,7 +122,7 @@
                 <maxMemorySize>20G</maxMemorySize>
                 <extraArguments>
                   <extraArgument>-XX:MaxDirectMemorySize=30g</extraArgument>
-                  <extraArgument>-Dlog4j2.configurationFile=$BASEDIR/conf/pinot-tools-log4j2.xml</extraArgument>
+                  <extraArgument>-Dlog4j2.configurationFile=conf/pinot-tools-log4j2.xml</extraArgument>
                 </extraArguments>
               </jvmSettings>
             </program>
@@ -134,7 +134,7 @@
                 <maxMemorySize>30G</maxMemorySize>
                 <extraArguments>
                   <extraArgument>-XX:MaxDirectMemorySize=30g</extraArgument>
-                  <extraArgument>-Dlog4j2.configurationFile=$BASEDIR/conf/pinot-tools-log4j2.xml</extraArgument>
+                  <extraArgument>-Dlog4j2.configurationFile=conf/pinot-tools-log4j2.xml</extraArgument>
                 </extraArguments>
               </jvmSettings>
             </program>
@@ -146,7 +146,7 @@
                 <maxMemorySize>30G</maxMemorySize>
                 <extraArguments>
                   <extraArgument>-XX:MaxDirectMemorySize=30g</extraArgument>
-                  <extraArgument>-Dlog4j2.configurationFile=$BASEDIR/conf/pinot-tools-log4j2.xml</extraArgument>
+                  <extraArgument>-Dlog4j2.configurationFile=conf/pinot-tools-log4j2.xml</extraArgument>
                 </extraArguments>
               </jvmSettings>
             </program>
@@ -157,7 +157,7 @@
                 <initialMemorySize>1G</initialMemorySize>
                 <maxMemorySize>1G</maxMemorySize>
                 <extraArguments>
-                  <extraArgument>-Dlog4j2.configurationFile=$BASEDIR/conf/pinot-tools-log4j2.xml</extraArgument>
+                  <extraArgument>-Dlog4j2.configurationFile=conf/pinot-tools-log4j2.xml</extraArgument>
                 </extraArguments>
               </jvmSettings>
             </program>
@@ -168,7 +168,7 @@
                 <initialMemorySize>1G</initialMemorySize>
                 <maxMemorySize>1G</maxMemorySize>
                 <extraArguments>
-                  <extraArgument>-Dlog4j2.configurationFile=$BASEDIR/conf/pinot-tools-log4j2.xml</extraArgument>
+                  <extraArgument>-Dlog4j2.configurationFile=conf/pinot-tools-log4j2.xml</extraArgument>
                 </extraArguments>
               </jvmSettings>
             </program>
@@ -179,7 +179,7 @@
                 <initialMemorySize>1G</initialMemorySize>
                 <maxMemorySize>1G</maxMemorySize>
                 <extraArguments>
-                  <extraArgument>-Dlog4j2.configurationFile=$BASEDIR/conf/pinot-controller-log4j2.xml</extraArgument>
+                  <extraArgument>-Dlog4j2.configurationFile=conf/pinot-controller-log4j2.xml</extraArgument>
                 </extraArguments>
               </jvmSettings>
             </program>
@@ -190,7 +190,7 @@
                 <initialMemorySize>1G</initialMemorySize>
                 <maxMemorySize>1G</maxMemorySize>
                 <extraArguments>
-                  <extraArgument>-Dlog4j2.configurationFile=$BASEDIR/conf/pinot-broker-log4j2.xml</extraArgument>
+                  <extraArgument>-Dlog4j2.configurationFile=conf/pinot-broker-log4j2.xml</extraArgument>
                 </extraArguments>
               </jvmSettings>
             </program>
@@ -201,7 +201,7 @@
                 <initialMemorySize>1G</initialMemorySize>
                 <maxMemorySize>1G</maxMemorySize>
                 <extraArguments>
-                  <extraArgument>-Dlog4j2.configurationFile=$BASEDIR/conf/pinot-server-log4j2.xml</extraArgument>
+                  <extraArgument>-Dlog4j2.configurationFile=conf/pinot-server-log4j2.xml</extraArgument>
                 </extraArguments>
               </jvmSettings>
             </program>
@@ -212,7 +212,7 @@
                 <initialMemorySize>1G</initialMemorySize>
                 <maxMemorySize>1G</maxMemorySize>
                 <extraArguments>
-                  <extraArgument>-Dlog4j2.configurationFile=$BASEDIR/conf/quickstart-log4j2.xml</extraArgument>
+                  <extraArgument>-Dlog4j2.configurationFile=conf/quickstart-log4j2.xml</extraArgument>
                 </extraArguments>
               </jvmSettings>
             </program>
@@ -224,7 +224,7 @@
                 <maxMemorySize>1G</maxMemorySize>
                 <extraArguments>
                   <extraArgument>-XX:MaxDirectMemorySize=6g</extraArgument>
-                  <extraArgument>-Dlog4j2.configurationFile=$BASEDIR/conf/quickstart-log4j2.xml</extraArgument>
+                  <extraArgument>-Dlog4j2.configurationFile=conf/quickstart-log4j2.xml</extraArgument>
                 </extraArguments>
               </jvmSettings>
             </program>
@@ -235,7 +235,7 @@
                 <initialMemorySize>1G</initialMemorySize>
                 <maxMemorySize>1G</maxMemorySize>
                 <extraArguments>
-                  <extraArgument>-Dlog4j2.configurationFile=$BASEDIR/conf/quickstart-log4j2.xml</extraArgument>
+                  <extraArgument>-Dlog4j2.configurationFile=conf/quickstart-log4j2.xml</extraArgument>
                 </extraArguments>
               </jvmSettings>
             </program>
