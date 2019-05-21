@@ -109,7 +109,9 @@ public class Summary {
     }
     computeChildDPArray(root);
     List<CubeNode> answer = new ArrayList<>(dpArrays.get(0).getAnswer());
-    SummaryResponse response = new SummaryResponse();
+    SummaryResponse response =
+        new SummaryResponse(cube.getBaselineTotal(), cube.getCurrentTotal(), cube.getBaselineTotalSize(),
+            cube.getCurrentTotalSize());
     response.buildDiffSummary(answer, this.levelCount, costFunction);
     response.buildGainerLoserGroup(costSet);
     response.setDimensionCosts(sortedDimensionCosts);
