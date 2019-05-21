@@ -130,4 +130,30 @@ public class PartitionFunctionTest {
       }
     }
   }
+
+  @Test
+  public void testHashCodePartitioner() {
+    long seed = System.currentTimeMillis();
+    Random random = new Random(seed);
+
+    for (int i = 0; i < 1000; i++) {
+      int expectedNumPartitions = Math.abs(random.nextInt());
+
+      // Avoid divide-by-zero.
+      if (expectedNumPartitions == 0) {
+        expectedNumPartitions = 1;
+      }
+
+      String functionName = "HaShCoDe";
+      PartitionFunction partitionFunction =
+          PartitionFunctionFactory.getPartitionFunction(functionName, expectedNumPartitions);
+      Assert.assertEquals(partitionFunction.toString().toLowerCase(), functionName.toLowerCase());
+      Assert.assertEquals(partitionFunction.getNumPartitions(), expectedNumPartitions);
+
+      for (int j = 0; j < 1000; j++) {
+        Integer value = random.nextInt();
+        Assert.assertEquals(partitionFunction.getPartition(value), Math.abs(value.hashCode()) % expectedNumPartitions);
+      }
+    }
+  }
 }

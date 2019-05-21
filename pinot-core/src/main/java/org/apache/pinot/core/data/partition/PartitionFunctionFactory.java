@@ -29,7 +29,7 @@ import javax.annotation.Nonnull;
 public class PartitionFunctionFactory {
   // Enum for various partition functions to be added.
   public enum PartitionFunctionType {
-    Modulo, Murmur, ByteArray;
+    Modulo, Murmur, ByteArray, HashCode;
     // Add more functions here.
 
     private static final Map<String, PartitionFunctionType> VALUE_MAP = new HashMap<>();
@@ -74,6 +74,9 @@ public class PartitionFunctionFactory {
 
       case ByteArray:
         return new ByteArrayPartitionFunction(numPartitions);
+
+      case HashCode:
+        return new HashCodePartitionFunction(numPartitions);
 
       default:
         throw new IllegalArgumentException("Illegal partition function name: " + functionName);
