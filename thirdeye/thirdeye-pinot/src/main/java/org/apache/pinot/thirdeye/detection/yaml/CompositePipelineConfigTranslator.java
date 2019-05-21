@@ -27,7 +27,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -483,64 +482,5 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
 
   private String makeComponentKey(String type, String name) {
     return "$" + name + ":" + type;
-  }
-
-  @Override
-  protected void validateYAML(Map<String, Object> yamlConfig) {
-    super.validateYAML(yamlConfig);
-    Preconditions.checkArgument(yamlConfig.containsKey(PROP_METRIC), "Property missing " + PROP_METRIC);
-    Preconditions.checkArgument(yamlConfig.containsKey(PROP_DATASET), "Property missing " + PROP_DATASET);
-    Preconditions.checkArgument(yamlConfig.containsKey(PROP_RULES), "Property missing " + PROP_RULES);
-    Preconditions.checkArgument(!yamlConfig.containsKey(PROP_FILTER),
-        "Please double check the filter config. Adding dimensions filters should be in the yaml root level using 'filters' as the key. Anomaly filter should be added in to the indentation level of detection yaml it applies to.");
-    if (existingConfig != null) {
-      Map<String, Object> existingYamlConfig = (Map<String, Object>) this.yaml.load(existingConfig.getYaml());
-      Preconditions.checkArgument(MapUtils.getString(yamlConfig, PROP_METRIC).equals(MapUtils.getString(existingYamlConfig, PROP_METRIC)), "metric name cannot be modified");
-      Preconditions.checkArgument(MapUtils.getString(yamlConfig, PROP_DATASET).equals(MapUtils.getString(existingYamlConfig, PROP_DATASET)), "dataset name cannot be modified");
-    }
-
-    // Safety condition: Validate if maxDuration is greater than 15 minutes
-    Map<String, Object> mergerProperties = MapUtils.getMap(yamlConfig, PROP_MERGER, new HashMap());
-    if (mergerProperties.get(PROP_MAX_DURATION) != null) {
-      Preconditions.checkArgument(MapUtils.getLong(mergerProperties, PROP_MAX_DURATION) >= datasetConfig.bucketTimeGranularity().toMillis(),
-          "The maxDuration field set is not acceptable. Please check the the document  and set it correctly.");
-    }
-
-    // We support only one grouper per metric
-    Preconditions.checkArgument(getList(yamlConfig.get(PROP_GROUPER)).size() <= 1, "Multiple groupers detected for metric. We support only one grouper per metric.");
-
-    Set<String> names = new HashSet<>();
-    List<Map<String, Object>> ruleYamls = getList(yamlConfig.get(PROP_RULES));
-    for (int i = 0; i < ruleYamls.size(); i++) {
-      Map<String, Object> ruleYaml = ruleYamls.get(i);
-      Preconditions.checkArgument(ruleYaml.containsKey(PROP_DETECTION),
-          "In rule No." + (i + 1) + ", detection rule is missing. ");
-      List<Map<String, Object>> detectionStageYamls = ConfigUtils.getList(ruleYaml.get(PROP_DETECTION));
-      // check each detection rule
-      for (Map<String, Object> detectionStageYaml : detectionStageYamls) {
-        Preconditions.checkArgument(detectionStageYaml.containsKey(PROP_TYPE),
-            "In rule No." + (i + 1) + ", a detection rule type is missing. ");
-        String type = MapUtils.getString(detectionStageYaml, PROP_TYPE);
-        String name = MapUtils.getString(detectionStageYaml, PROP_NAME);
-        Preconditions.checkNotNull(name, "In rule No." + (i + 1) + ", a detection rule name for type " +  type + " is missing");
-        Preconditions.checkArgument(!names.contains(name), "In rule No." + (i + 1) +
-            ", found duplicate rule name, rule name must be unique." );
-        Preconditions.checkArgument(!name.contains(":"), "Sorry, rule name cannot contain \':\'");
-      }
-      if (ruleYaml.containsKey(PROP_FILTER)) {
-        List<Map<String, Object>> filterStageYamls = ConfigUtils.getList(ruleYaml.get(PROP_FILTER));
-        // check each filter rule
-        for (Map<String, Object> filterStageYaml : filterStageYamls) {
-          Preconditions.checkArgument(filterStageYaml.containsKey(PROP_TYPE),
-              "In rule No." + (i + 1) + ", a filter rule type is missing. ");
-          String type = MapUtils.getString(filterStageYaml, PROP_TYPE);
-          String name = MapUtils.getString(filterStageYaml, PROP_NAME);
-          Preconditions.checkNotNull(name, "In rule No." + (i + 1) + ", a filter rule name for type " + type + " is missing");
-          Preconditions.checkArgument(!names.contains(name), "In rule No." + (i + 1) +
-              ", found duplicate rule name, rule name must be unique." );
-          Preconditions.checkArgument(!name.contains(":"), "Sorry, rule name cannot contain \':\'");
-        }
-      }
-    }
   }
 }
