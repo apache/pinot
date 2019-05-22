@@ -34,11 +34,11 @@
 
       <#if anomalyCount == 1>
         <p>
-          <a style="padding: 6px 12px; border-radius: 2px; border: 1px solid #FFF; font-size: 16px; font-weight: bold; color: white; text-decoration: none; line-height: 32px;" href="${dashboardHost}/thirdeye#anomalies?anomaliesSearchMode=id&anomalyIds=${anomalyIds}">View anomaly on ThirdEye</a>
+          <a style="padding: 6px 12px; border-radius: 2px; border: 1px solid #FFF; font-size: 16px; font-weight: bold; color: white; text-decoration: none; line-height: 32px;" href="${dashboardHost}/app/#/anomalies?anomalyIds=${anomalyIds}">View anomaly on ThirdEye</a>
         </p>
       <#else>
         <p>
-          <a style="padding: 6px 12px; border-radius: 2px; border: 1px solid #FFF; font-size: 16px; font-weight: bold; color: white; text-decoration: none; line-height: 32px;" href="${dashboardHost}/thirdeye#anomalies?anomaliesSearchMode=id&anomalyIds=${anomalyIds}">View all anomalies on ThirdEye</a>
+          <a style="padding: 6px 12px; border-radius: 2px; border: 1px solid #FFF; font-size: 16px; font-weight: bold; color: white; text-decoration: none; line-height: 32px;" href="${dashboardHost}/app/#/anomalies?anomalyIds=${anomalyIds}">View all anomalies on ThirdEye</a>
         </p>
       </#if>
     </td>
