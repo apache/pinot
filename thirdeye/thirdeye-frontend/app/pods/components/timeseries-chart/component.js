@@ -40,7 +40,7 @@ export default Component.extend({
   tooltip: {
     format: {
       title: (d) => moment(d).format('MM/DD hh:mm a'),
-      value: (val, ratio, id) => d3.format('.3s')(val)
+      value: (val) => d3.format('.3s')(val)
     }
   },
 
@@ -81,7 +81,8 @@ export default Component.extend({
   },
 
   zoom: { // on init only
-    enabled: true
+    enabled: true,
+    onzoom: null
   },
 
   point: { // on init only
@@ -190,12 +191,64 @@ export default Component.extend({
   _updateChart() {
     const diffConfig = this._makeDiffConfig();
     const chart = this.get('_chart');
-    diffConfig.legend.show ? chart.legend.show() : chart.legend.hide();
     chart.regions(diffConfig.regions);
     chart.axis.range(this._makeAxisRange(diffConfig.axis));
     chart.unzoom();
     chart.load(diffConfig);
     this._updateCache();
+  },
+
+  _shadeBounds(){
+    d3.select(".confidence-bounds").remove();
+    d3.select(".sub-confidence-bounds").remove();
+    const chart = this.api;
+    if (chart && chart.legend && chart.internal && chart.internal.data && chart.internal.data.targets) {
+      if (chart.internal.data.targets.length > 24) {
+        chart.legend.hide();
+      }
+    }
+    if(chart && chart.internal && chart.internal.data && chart.internal.data.xs && Array.isArray(chart.internal.data.xs.upperBound)) {
+      const indices = d3.range(chart.internal.data.xs.upperBound.length);
+      const yscale = chart.internal.y;
+      const xscale = chart.internal.x;
+      const yscaleSub = chart.internal.subY;
+      const xscaleSub = chart.internal.subX;
+      const xVals = chart.internal.data.xs.upperBound;
+      let upperBoundVals = chart.internal.data.targets.find(target => {
+        return target.id === 'upperBound';
+      });
+      let lowerBoundVals = chart.internal.data.targets.find(target => {
+        return target.id === 'lowerBound';
+      });
+
+      if (upperBoundVals && lowerBoundVals) {
+        upperBoundVals = upperBoundVals.values.map(e => e.value);
+        lowerBoundVals = lowerBoundVals.values.map(e => e.value);
+
+        const area_main = d3.svg.area()
+          .interpolate('linear')
+          .x(d => xscale(xVals[d]))
+          .y0(d => yscale(lowerBoundVals[d]))
+          .y1(d => yscale(upperBoundVals[d]));
+
+        const area_sub = d3.svg.area()
+          .interpolate('linear')
+          .x(d => xscaleSub(xVals[d]))
+          .y0(d => yscaleSub(lowerBoundVals[d]))
+          .y1(d => yscaleSub(upperBoundVals[d]));
+
+        d3.select(".c3-chart").append('path')
+          .datum(indices)
+          .attr('class', 'confidence-bounds')
+          .attr('d', area_main);
+
+        d3.select(".c3-brush").append('path')
+          .datum(indices)
+          .attr('class', 'sub-confidence-bounds')
+          .attr('d', area_sub);
+      }
+    }
+
   },
 
   didUpdateAttrs() {
@@ -252,8 +305,11 @@ export default Component.extend({
     config.size = this.get('height');
     config.point = this.get('point');
     config.line = this.get('line');
+    config.onrendered = this.get('_shadeBounds');
 
-    this.set('_chart', c3.generate(config));
+    const chart = c3.generate(config);
+    this.set('_chart', chart);
+
     this._updateCache();
   }
 });

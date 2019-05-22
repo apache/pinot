@@ -14,11 +14,11 @@
  */
 
 import Component from '@ember/component';
-import { computed, observer, set, get, getProperties } from '@ember/object';
+import { computed, set, get, getProperties } from '@ember/object';
 import { later } from '@ember/runloop';
-import { checkStatus, humanizeFloat, postProps } from 'thirdeye-frontend/utils/utils';
+import { checkStatus, humanizeFloat, postProps, stripNonFiniteValues } from 'thirdeye-frontend/utils/utils';
 import { toastOptions } from 'thirdeye-frontend/utils/constants';
-import { colorMapping, toColor, makeTime, toMetricLabel, extractTail } from 'thirdeye-frontend/utils/rca-utils';
+import { colorMapping, makeTime, toMetricLabel, extractTail } from 'thirdeye-frontend/utils/rca-utils';
 import { getYamlPreviewAnomalies,
   getAnomaliesByAlertId,
   getFormattedDuration,
@@ -56,10 +56,8 @@ export default Component.extend({
     enabled: true,
     rescale: true
   },
-
-  legend: {
-    show: true,
-    position: 'right'
+  point: {
+    show: false
   },
   errorTimeseries: null,
   metricUrn: null,
@@ -71,22 +69,11 @@ export default Component.extend({
   showDetails: false,
   componentId: 'timeseries-chart',
   anomalies: null,
-  baselineOptions: [
-    { name: 'wo1w', isActive: true},
-    { name: 'wo2w', isActive: false},
-    { name: 'wo3w', isActive: false},
-    { name: 'wo4w', isActive: false},
-    { name: 'mean4w', isActive: false},
-    { name: 'median4w', isActive: false},
-    { name: 'min4w', isActive: false},
-    { name: 'max4w', isActive: false},
-    { name: 'none', isActive: false}
-  ],
   sortColumnStartUp: true,
   sortColumnChangeUp: false,
   sortColumnFeedbackUp: false,
   selectedSortMode: 'start:down',
-  selectedBaseline: 'wo1w',
+  selectedBaseline: null,
   pageSize: 10,
   currentPage: 1,
   isPreviewMode: false,
@@ -100,26 +87,49 @@ export default Component.extend({
   isReportFailure: false,
   openReportModal: false,
   missingAnomalyProps: {},
+  uniqueTimeSeries: null,
+  selectedRule: null,
+  isLoadingTimeSeries: false,
 
 
 
-  updateVisuals: observer(
-    'analysisRange',
-    'metricUrn',
+  /**
+   * This needs to be a computed variable until there is an endpoint for showing predicted with any metricurn
+   * @type {Array}
+   */
+  baselineOptions: computed(
+    'isPreviewMode',
     function() {
-      const {
-        isPreviewMode,
-        metricUrn
-      } = this.getProperties('isPreviewMode', 'metricUrn');
-      if(metricUrn) {
-        if(!isPreviewMode) {
-          this._fetchAnomalies();
-        } else {
-          this._fetchTimeseries();
-        }
+      let options;
+      if (get(this, 'isPreviewMode')) {
+        options = [
+          { name: 'predicted', isActive: true},
+          { name: 'wo1w', isActive: false},
+          { name: 'wo2w', isActive: false},
+          { name: 'wo3w', isActive: false},
+          { name: 'wo4w', isActive: false},
+          { name: 'mean4w', isActive: false},
+          { name: 'median4w', isActive: false},
+          { name: 'min4w', isActive: false},
+          { name: 'max4w', isActive: false},
+          { name: 'none', isActive: false}
+        ];
+      } else {
+        options = [
+          { name: 'wo1w', isActive: true},
+          { name: 'wo2w', isActive: false},
+          { name: 'wo3w', isActive: false},
+          { name: 'wo4w', isActive: false},
+          { name: 'mean4w', isActive: false},
+          { name: 'median4w', isActive: false},
+          { name: 'min4w', isActive: false},
+          { name: 'max4w', isActive: false},
+          { name: 'none', isActive: false}
+        ];
       }
-
-    }),
+      return options;
+    }
+  ),
 
   /**
    * Separate time range for anomalies in preview mode
@@ -133,14 +143,41 @@ export default Component.extend({
       range.push(analysisRange[0]);
       // set end to now if the end time is in the future
       const end = Math.min(moment().valueOf(), analysisRange[1]);
-      range.push(end)
+      range.push(end);
       return range;
     }
   ),
 
   /**
-   * Whether the alert has multiple dimensions
+   * Rules to display in rules dropdown
+   * @type {Array}
+   */
+  ruleOptions: computed(
+    'uniqueTimeSeries',
+    function() {
+      const uniqueTimeSeries = get(this, 'uniqueTimeSeries');
+      if (uniqueTimeSeries) {
+        return [...new Set(uniqueTimeSeries.map(series => series.detectorName))];
+      }
+      return [];
+    }
+  ),
+
+  /**
+   * flag to differentiate preview loading and graph loading
    * @type {Boolean}
+   */
+  isPreviewLoading: computed(
+    'isPreviewMode',
+    'isLoading',
+    function() {
+      return (get(this, 'isPreviewMode') && get(this, 'isLoading'));
+    }
+  ),
+
+  /**
+   * dimensions to display in dimensions dropdown
+   * @type {Array}
    */
   dimensionOptions: computed(
     'metricUrnList',
@@ -310,34 +347,74 @@ export default Component.extend({
     }
   ),
 
-  series: computed(
+  currentAnomalies: computed(
     'anomalies',
+    'metricUrn',
+    'selectedRule',
+    'selectedDimension',
+    function() {
+      let currentAnomalies = [];
+      const {
+        metricUrn, anomalies, selectedRule
+      } = getProperties(this, 'metricUrn', 'anomalies', 'selectedRule');
+      if (!_.isEmpty(anomalies)) {
+
+        currentAnomalies = anomalies.filter(anomaly => {
+          if (anomaly.metricUrn === metricUrn) {
+            if(get(this, 'isPreviewMode') && anomaly.properties && typeof anomaly.properties === 'object') {
+              return (anomaly.properties.detectorComponentName.includes(selectedRule));
+            } else if (!get(this, 'isPreviewMode')) {
+              // This is necessary until we surface rule selector in Alert Overview
+              return true;
+            }
+          }
+          return false;
+        });
+      }
+      return currentAnomalies;
+    }
+  ),
+
+  legend: computed(
+    'numCurrentAnomalies',
+    function() {
+      if (get(this, 'numCurrentAnomalies') > ANOMALY_LEGEND_THRESHOLD) {
+        return {
+          show: false,
+          position: 'right'
+        };
+      }
+      return {
+        show: true,
+        position: 'right'
+      };
+    }
+  ),
+
+  numCurrentAnomalies: computed(
+    'currentAnomalies.@each',
+    function() {
+      const currentAnomalies = get(this, 'currentAnomalies');
+      return currentAnomalies.length;
+    }
+  ),
+
+  series: computed(
+    'currentAnomalies.@each',
     'timeseries',
     'baseline',
     'analysisRange',
+    'selectedRule',
+    'metricUrn',
     function () {
       const {
-        metricUrn, anomalies, timeseries, baseline
-      } = getProperties(this, 'metricUrn', 'anomalies', 'timeseries',
-        'baseline');
+        currentAnomalies, timeseries, baseline
+      } = getProperties(this, 'currentAnomalies', 'timeseries', 'baseline');
 
       const series = {};
+      if (!_.isEmpty(currentAnomalies)) {
 
-      if (!_.isEmpty(anomalies)) {
-
-        const anomaliesInGraph = anomalies.filter(anomaly => anomaly.metricUrn === metricUrn);
-        if (anomaliesInGraph.length > ANOMALY_LEGEND_THRESHOLD) {
-          set(this, 'legend', {
-            show: false,
-            position: 'right'
-          });
-        } else {
-          set(this, 'legend', {
-            show: true,
-            position: 'right'
-          });
-        }
-        anomaliesInGraph.forEach(anomaly => {
+        currentAnomalies.forEach(anomaly => {
           const key = this._formatAnomaly(anomaly);
           series[key] = {
             timestamps: [anomaly.startTime, anomaly.endTime],
@@ -353,21 +430,51 @@ export default Component.extend({
         });
       }
 
-      if (timeseries && !_.isEmpty(timeseries.value)) {
-        series['current'] = {
-          timestamps: timeseries.timestamp,
-          values: timeseries.value,
-          type: 'line',
-          color: toColor(metricUrn)
-        };
+      // The current time series has a different naming convention in Preview
+      if (get(this, 'isPreviewMode')) {
+        if (timeseries && !_.isEmpty(timeseries.current)) {
+          series['current'] = {
+            timestamps: timeseries.timestamp,
+            values: stripNonFiniteValues(timeseries.current),
+            type: 'line',
+            color: 'grey'
+          };
+        }
+      } else {
+        if (timeseries && !_.isEmpty(timeseries.value)) {
+          series['current'] = {
+            timestamps: timeseries.timestamp,
+            values: stripNonFiniteValues(timeseries.value),
+            type: 'line',
+            color: 'grey'
+          };
+        }
       }
 
       if (baseline && !_.isEmpty(baseline.value)) {
         series['baseline'] = {
           timestamps: baseline.timestamp,
-          values: baseline.value,
+          values: stripNonFiniteValues(baseline.value),
           type: 'line',
-          color: 'light-' + toColor(metricUrn)
+          color: 'blue'
+        };
+      }
+
+      if (baseline && !_.isEmpty(baseline.upper_bound)) {
+        series['upperBound'] = {
+          timestamps: baseline.timestamp,
+          values: stripNonFiniteValues(baseline.upper_bound),
+          type: 'line',
+          color: 'confidence-bounds-blue'
+        };
+      }
+
+      if (baseline && !_.isEmpty(baseline.lower_bound)) {
+        series['lowerBound'] = {
+          timestamps: baseline.timestamp,
+          values: stripNonFiniteValues(baseline.lower_bound),
+          type: 'line',
+          color: 'confidence-bounds-blue'
         };
       }
       return series;
@@ -521,6 +628,7 @@ export default Component.extend({
     const startAnomalies = anomaliesRange[0];
     const endAnomalies = anomaliesRange[1];
     let anomalies;
+    let uniqueTimeSeries;
     let applicationAnomalies;
     let metricUrnList;
     try {
@@ -530,9 +638,13 @@ export default Component.extend({
           metricUrnList = Object.keys(applicationAnomalies.diagnostics['0']);
           set(this, 'metricUrnList', metricUrnList);
           set(this, 'selectedDimension', toMetricLabel(extractTail(decodeURIComponent(metricUrnList[0]))));
+          if (applicationAnomalies.predictions && Array.isArray(applicationAnomalies.predictions) && (typeof applicationAnomalies.predictions[0] === 'object')){
+            set(this, 'selectedRule', applicationAnomalies.predictions[0].detectorName);
+          }
           set(this, 'metricUrn', metricUrnList[0]);
         }
         anomalies = applicationAnomalies.anomalies;
+        uniqueTimeSeries = applicationAnomalies.predictions;
       } else {
         applicationAnomalies = yield getAnomaliesByAlertId(alertId, start, end);
         const metricUrnObj = {};
@@ -543,6 +655,8 @@ export default Component.extend({
           metricUrnList = Object.keys(metricUrnObj);
           if (metricUrnList.length > 0) {
             set(this, 'metricUrnList', metricUrnList);
+            set(this, 'selectedDimension', toMetricLabel(extractTail(decodeURIComponent(metricUrnList[0]))));
+            set(this, 'metricUrn', metricUrnList[0]);
           }
         }
         anomalies = applicationAnomalies;
@@ -567,12 +681,15 @@ export default Component.extend({
         });
       }
     } catch (error) {
-      notifications.error(error.body.message, 'Error', toastOptions);
+      if (error.body) {
+        notifications.error(error.body.message, 'Error', toastOptions);
+      }
     }
 
     return {
       anomalyMapping,
-      anomalies
+      anomalies,
+      uniqueTimeSeries
     };
   }).drop(),
 
@@ -580,12 +697,18 @@ export default Component.extend({
     this._super(...arguments);
     const isPreviewMode = get(this, 'isPreviewMode');
     if (!isPreviewMode) {
-      set(this, 'analysisRange', [moment().add(1, 'day').subtract(1, 'month').startOf('day').valueOf(), moment().add(1, 'day').startOf('day').valueOf()]);
-      set(this, 'duration', '1m');
-      set(this, 'selectedDimension', 'Choose a dimension');
+      this.setProperties({
+        analysisRange: [moment().add(1, 'day').subtract(1, 'month').startOf('day').valueOf(), moment().add(1, 'day').startOf('day').valueOf()],
+        duration: '1m',
+        selectedDimension: 'Choose a dimension',
+        selectedBaseline: 'wo1w'
+      });
       this._fetchAnomalies();
     } else {
-      set(this, 'duration', '1d');
+      this.setProperties({
+        duration: '1d',
+        selectedBaseline: 'predicted'
+      });
     }
   },
 
@@ -641,32 +764,65 @@ export default Component.extend({
     const {
       metricUrn,
       analysisRange,
-      selectedBaseline
-    } = this.getProperties('metricUrn', 'analysisRange', 'selectedBaseline');
-
-    set(this, 'errorTimeseries', null);
-
+      selectedBaseline,
+      isPreviewMode,
+      selectedRule,
+      uniqueTimeSeries
+    } = this.getProperties('metricUrn', 'analysisRange', 'selectedBaseline', 'isPreviewMode', 'selectedRule', 'uniqueTimeSeries');
     const timeZone = 'America/Los_Angeles';
-    const urlCurrent = `/rootcause/metric/timeseries?urn=${metricUrn}&start=${analysisRange[0]}&end=${analysisRange[1]}&offset=current&timezone=${timeZone}`;
-    fetch(urlCurrent)
-      .then(checkStatus)
-      .then(res => {
-        this.setProperties({
-          timeseries: res,
-          isLoading: false
-        });
+
+    this.setProperties({
+      errorTimeseries: null,
+      isLoadingTimeSeries: true
+    });
+
+    if (isPreviewMode) {
+      const seriesSet = uniqueTimeSeries.find(series => {
+        if (series.detectorName === selectedRule && series.metricUrn === metricUrn) {
+          return series;
+        }
       });
-
+      if (selectedBaseline === 'predicted') {
+        this.setProperties({
+          timeseries: seriesSet.predictedTimeSeries,
+          baseline: seriesSet.predictedTimeSeries,
+          isLoadingTimeSeries: false
+        });
+      } else {
+        const urlBaseline = `/rootcause/metric/timeseries?urn=${metricUrn}&start=${analysisRange[0]}&end=${analysisRange[1]}&offset=${selectedBaseline}&timezone=${timeZone}`;
+        fetch(urlBaseline)
+          .then(checkStatus)
+          .then(res => {
+            this.setProperties({
+              timeseries: seriesSet.predictedTimeSeries,
+              baseline: res,
+              isLoadingTimeSeries: false
+            });
+          });
+      }
+    } else {
+      const urlCurrent = `/rootcause/metric/timeseries?urn=${metricUrn}&start=${analysisRange[0]}&end=${analysisRange[1]}&offset=current&timezone=${timeZone}`;
+      fetch(urlCurrent)
+        .then(checkStatus)
+        .then(res => {
+          this.setProperties({
+            timeseries: res,
+            isLoadingTimeSeries: false
+          });
+        });
+      const urlBaseline = `/rootcause/metric/timeseries?urn=${metricUrn}&start=${analysisRange[0]}&end=${analysisRange[1]}&offset=${selectedBaseline}&timezone=${timeZone}`;
+      fetch(urlBaseline)
+        .then(checkStatus)
+        .then(res => set(this, 'baseline', res));
+    }
     set(this, 'errorBaseline', null);
-
-    const urlBaseline = `/rootcause/metric/timeseries?urn=${metricUrn}&start=${analysisRange[0]}&end=${analysisRange[1]}&offset=${selectedBaseline}&timezone=${timeZone}`;
-    fetch(urlBaseline)
-      .then(checkStatus)
-      .then(res => set(this, 'baseline', res));
   },
 
   _fetchAnomalies() {
-    set(this, 'errorAnomalies', null);
+    this.setProperties({
+      errorAnomalies: null,
+      isLoading: true
+    });
 
     try {
       const content = get(this, 'alertYaml');
@@ -675,6 +831,7 @@ export default Component.extend({
           this.setProperties({
             anomalyMapping: results.anomalyMapping,
             anomalies: results.anomalies,
+            uniqueTimeSeries: results.uniqueTimeSeries,
             isLoading: false
           });
           if (get(this, 'metricUrn')) {
@@ -850,6 +1007,11 @@ export default Component.extend({
         });
     },
 
+    onSelectRule(selected) {
+      set(this, 'selectedRule', selected);
+      this._fetchTimeseries();
+    },
+
     onSelectDimension(selected) {
       const metricUrnList = get(this, 'metricUrnList');
       const newMetricUrn = metricUrnList.find(urn => {
@@ -861,6 +1023,7 @@ export default Component.extend({
         metricUrn: newMetricUrn,
         selectedDimension: toMetricLabel(extractTail(decodeURIComponent(newMetricUrn)))
       });
+      this._fetchTimeseries();
     },
 
     /**
@@ -907,6 +1070,7 @@ export default Component.extend({
       //Update the time range option selected
       set(this, 'analysisRange', [startDate, endDate]);
       set(this, 'duration', duration);
+      this._fetchAnomalies();
     },
 
     /**
@@ -914,7 +1078,6 @@ export default Component.extend({
     */
     getPreview() {
       this.setProperties({
-        isLoading: true,
         showDetails: true,
         dataIsCurrent: true
       });
