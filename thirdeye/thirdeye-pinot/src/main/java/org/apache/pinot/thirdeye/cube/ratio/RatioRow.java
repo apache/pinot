@@ -21,7 +21,6 @@ package org.apache.pinot.thirdeye.cube.ratio;
 
 import com.google.common.base.MoreObjects;
 import com.google.common.base.Objects;
-import com.google.common.base.Preconditions;
 import org.apache.pinot.thirdeye.cube.data.dbrow.DimensionValues;
 import org.apache.pinot.thirdeye.cube.data.dbrow.Dimensions;
 import org.apache.pinot.thirdeye.cube.data.node.CubeNode;
@@ -44,12 +43,30 @@ public class RatioRow extends BaseRow {
    * @param dimensionValues the dimension values of this row.
    */
   public RatioRow(Dimensions dimensions, DimensionValues dimensionValues) {
-    this.dimensions = Preconditions.checkNotNull(dimensions);
-    this.dimensionValues = Preconditions.checkNotNull(dimensionValues);
+    super(dimensions, dimensionValues);
     this.baselineNumeratorValue = 0.0;
     this.currentNumeratorValue = 0.0;
     this.baselineDenominatorValue = 0.0;
     this.currentDenominatorValue = 0.0;
+  }
+
+  /**
+   * Constructs an ratio row.
+   *
+   * @param dimensions the dimension names of this row.
+   * @param dimensionValues the dimension values of this row.
+   * @param baselineNumeratorValue the baseline numerator of this ratio row.
+   * @param baselineDenominatorValue the baseline denominator of this ratio row.
+   * @param currentNumeratorValue the current numerator of this ratio row.
+   * @param currentDenominatorValue the current denominator of this ratio row.
+   */
+  public RatioRow(Dimensions dimensions, DimensionValues dimensionValues, double baselineNumeratorValue,
+      double baselineDenominatorValue, double currentNumeratorValue, double currentDenominatorValue) {
+    super(dimensions, dimensionValues);
+    this.baselineNumeratorValue = baselineNumeratorValue;
+    this.baselineDenominatorValue = baselineDenominatorValue;
+    this.currentNumeratorValue = currentNumeratorValue;
+    this.currentDenominatorValue = currentDenominatorValue;
   }
 
   /**
@@ -142,6 +159,9 @@ public class RatioRow extends BaseRow {
     if (!(o instanceof RatioRow)) {
       return false;
     }
+    if (!super.equals(o)) {
+      return false;
+    }
     RatioRow ratioRow = (RatioRow) o;
     return Double.compare(ratioRow.baselineNumeratorValue, baselineNumeratorValue) == 0
         && Double.compare(ratioRow.currentNumeratorValue, currentNumeratorValue) == 0
@@ -151,7 +171,8 @@ public class RatioRow extends BaseRow {
 
   @Override
   public int hashCode() {
-    return Objects.hashCode(baselineNumeratorValue, currentNumeratorValue, baselineDenominatorValue, currentDenominatorValue);
+    return Objects.hashCode(super.hashCode(), baselineNumeratorValue, currentNumeratorValue, baselineDenominatorValue,
+        currentDenominatorValue);
   }
 
   @Override

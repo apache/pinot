@@ -21,7 +21,7 @@ package org.apache.pinot.thirdeye.cube.additive;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.google.common.base.MoreObjects;
-import java.util.Objects;
+import com.google.common.base.Objects;
 import org.apache.pinot.thirdeye.cube.data.node.BaseCubeNode;
 
 
@@ -132,19 +132,20 @@ public class AdditiveCubeNode extends BaseCubeNode<AdditiveCubeNode, AdditiveRow
     if (this == o) {
       return true;
     }
-    if (o == null || getClass() != o.getClass()) {
+    if (!(o instanceof AdditiveCubeNode)) {
+      return false;
+    }
+    if (!super.equals(o)) {
       return false;
     }
     AdditiveCubeNode that = (AdditiveCubeNode) o;
-    return getLevel() == that.getLevel() && index == that.index
-        && Double.compare(that.getBaselineValue(), getBaselineValue()) == 0
-        && Double.compare(that.getCurrentValue(), getCurrentValue()) == 0
-        && Double.compare(that.getCost(), getCost()) == 0 && Objects.equals(data, that.data);
+    return Double.compare(that.baselineValue, baselineValue) == 0
+        && Double.compare(that.currentValue, currentValue) == 0;
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(getLevel(), index, getBaselineValue(), getCurrentValue(), getCost(), data);
+    return Objects.hashCode(super.hashCode(), baselineValue, currentValue);
   }
 
   /**

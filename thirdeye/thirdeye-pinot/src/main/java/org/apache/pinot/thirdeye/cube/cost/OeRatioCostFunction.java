@@ -1,12 +1,13 @@
 package org.apache.pinot.thirdeye.cube.cost;
 
 import com.google.common.base.Preconditions;
+import com.google.common.math.DoubleMath;
 import java.util.Map;
 
 
 public class OeRatioCostFunction implements CostFunction {
   // The threshold to the contribution to overall changes in percentage
-  private double epsilon = 0.00001;
+  private static double epsilon = 0.00001;
 
   public OeRatioCostFunction() {
   }
@@ -42,8 +43,8 @@ public class OeRatioCostFunction implements CostFunction {
 
     // Contribution is the size of the node
     double contribution = (baselineSize + currentSize) / (topBaselineSize + topCurrentSize);
-    Preconditions.checkState(Double.compare(contribution, 0) >= 0, "Contribution {} is smaller than 0.", contribution);
-    Preconditions.checkState(Double.compare(contribution, 1) <= 0, "Contribution {} is larger than 1", contribution);
+    Preconditions.checkState(DoubleMath.fuzzyCompare(contribution,0, epsilon) >= 0, "Contribution {} is smaller than 0.", contribution);
+    Preconditions.checkState(DoubleMath.fuzzyCompare(contribution,1, epsilon) <= 0, "Contribution {} is larger than 1", contribution);
     // The cost function considers change difference, change changeRatio, and node size (i.e., contribution)
     return fillEmptyValuesAndGetError(baselineValue, currentValue, parentChangeRatio, contribution);
   }
@@ -54,18 +55,16 @@ public class OeRatioCostFunction implements CostFunction {
     double weightedExpectedRatio = (expectedRatio - 1) * contribution + 1;
     double logExpRatio = Math.log(weightedExpectedRatio);
     double cost = (currentValue - expectedBaselineValue) * logExpRatio;
-//    double cost = Math.abs(logExpRatio);
     return cost;
   }
 
   private static double errorWithEmptyBaselineOrCurrent(double baseline, double currentValue, double parentRatio,
       double contribution) {
-    if (Double.compare(parentRatio, 1) < 0) {
+    if (DoubleMath.fuzzyCompare(parentRatio, 1, epsilon) < 0) {
       parentRatio = 2 - parentRatio;
     }
     double logExpRatio = Math.log((parentRatio - 1) * contribution + 1);
     double cost = (currentValue - baseline) * logExpRatio;
-//    double cost = Math.abs(logExpRatio);
     return cost;
   }
 

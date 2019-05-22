@@ -28,39 +28,10 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
+/**
+ * Tests the hierarchy among cube nodes. The main challenge is handling parent and children nodes.
+ */
 public class CubeNodeTest {
-
-  // Since CubeNode has cyclic reference between current node and parent node, the toString() will encounter
-  // overflowStack exception if it doesn't take care of the cyclic reference carefully.
-  @Test
-  public void testToString() {
-    AdditiveRow root = new AdditiveRow(new Dimensions(), new DimensionValues());
-    AdditiveCubeNode rootNode = new AdditiveCubeNode(root);
-
-    AdditiveRow child = new AdditiveRow(new Dimensions(Collections.singletonList("country")),
-        new DimensionValues(Collections.singletonList("US")), 20, 30);
-    AdditiveCubeNode childNode = new AdditiveCubeNode(1, 0, child, rootNode);
-
-    childNode.toString();
-  }
-
-  @Test
-  public void testSimpleEquals() {
-    AdditiveRow root1 = new AdditiveRow(new Dimensions(), new DimensionValues());
-    AdditiveCubeNode rootNode1 = new AdditiveCubeNode(root1);
-
-    AdditiveRow root2 = new AdditiveRow(new Dimensions(), new DimensionValues());
-    AdditiveCubeNode rootNode2 = new AdditiveCubeNode(root2);
-
-    Assert.assertEquals(rootNode1, rootNode2);
-    Assert.assertTrue(CubeNodeUtils.equalHierarchy(rootNode1, rootNode2));
-
-    AdditiveRow root3 = new AdditiveRow(new Dimensions(Collections.singletonList("country")),
-        new DimensionValues(Collections.singletonList("US")));
-    CubeNode rootNode3 = new AdditiveCubeNode(root3);
-    Assert.assertNotEquals(rootNode1, rootNode3);
-  }
-
   @Test
   public void testHierarchicalEquals() {
     AdditiveCubeNode rootNode1 = buildHierarchicalNodes();
@@ -103,7 +74,7 @@ public class CubeNodeTest {
    * Failed because data difference.
    */
   @Test
-  public void testHierarchicalEqualsFail2() throws Exception {
+  public void testHierarchicalEqualsFail2() {
     AdditiveCubeNode rootNode1 = buildHierarchicalNodes();
 
     AdditiveRow rootRow = new AdditiveRow(new Dimensions(), new DimensionValues(), 20, 15);
@@ -147,6 +118,12 @@ public class CubeNodeTest {
     Assert.assertFalse(CubeNodeUtils.equalHierarchy(rootNode1, rootNode2));
   }
 
+  /**
+   * Provides data for this hierarchy:
+   *      A
+   *     / \
+   *    B  C
+   */
   private List<List<Row>> buildHierarchicalRows() {
     List<List<Row>> hierarchicalRows = new ArrayList<>();
     // Root level
@@ -169,6 +146,12 @@ public class CubeNodeTest {
     return hierarchicalRows;
   }
 
+/**
+ * Builds hierarchy:
+ *      A
+ *     / \
+ *    B  C
+ */
   private AdditiveCubeNode buildHierarchicalNodes() {
     List<List<Row>> rows = buildHierarchicalRows();
     // Root level

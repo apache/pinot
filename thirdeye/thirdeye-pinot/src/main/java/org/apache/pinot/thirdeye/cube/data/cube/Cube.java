@@ -322,6 +322,10 @@ public class Cube { // the cube (Ca|Cb)
             wowNode.getBaselineSize(), wowNode.getCurrentSize(), topBaselineValue, topCurrentValue, topBaselineSize,
             topCurrentSize);
 
+        if (wowNode.getBaselineValue() > 10d) {
+          System.out.println(wowNode);
+        }
+
         costSet.add(new DimNameValueCostEntry(dimensionName, dimensionValue, wowNode.getBaselineValue(),
             wowNode.getCurrentValue(), wowNode.getBaselineSize(), wowNode.getCurrentSize(), contributionFactor, cost));
       }

@@ -20,6 +20,7 @@
 package org.apache.pinot.thirdeye.cube.data.node;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -140,5 +141,23 @@ public abstract class BaseCubeNode<N extends BaseCubeNode, R extends Row> implem
     } else {
       return Double.compare(1., originalChangeRatio()) <= 0;
     }
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (!(o instanceof BaseCubeNode)) {
+      return false;
+    }
+    BaseCubeNode<?, ?> that = (BaseCubeNode<?, ?>) o;
+    return level == that.level && index == that.index && Double.compare(that.cost, cost) == 0 && Objects.equal(data,
+        that.data);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hashCode(level, index, cost, data);
   }
 }

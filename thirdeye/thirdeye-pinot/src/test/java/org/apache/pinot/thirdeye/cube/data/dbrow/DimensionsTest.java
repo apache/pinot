@@ -21,7 +21,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import org.apache.commons.collections.ListUtils;
-import org.apache.pinot.thirdeye.cube.data.dbrow.Dimensions;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 

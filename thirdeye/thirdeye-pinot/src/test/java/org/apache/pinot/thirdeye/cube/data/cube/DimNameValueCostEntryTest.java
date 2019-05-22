@@ -16,7 +16,6 @@
 
 package org.apache.pinot.thirdeye.cube.data.cube;
 
-import org.apache.pinot.thirdeye.cube.data.cube.DimNameValueCostEntry;
 import org.testng.annotations.Test;
 
 public class DimNameValueCostEntryTest {

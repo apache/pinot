@@ -22,6 +22,7 @@ package org.apache.pinot.thirdeye.cube.ratio;
 import com.google.common.base.MoreObjects;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
+import com.google.common.math.DoubleMath;
 import org.apache.pinot.thirdeye.cube.data.cube.CubeUtils;
 import org.apache.pinot.thirdeye.cube.data.node.BaseCubeNode;
 
@@ -30,6 +31,8 @@ import org.apache.pinot.thirdeye.cube.data.node.BaseCubeNode;
  * A CubeNode for ratio metrics such as "observed over expected ratio".
  */
 public class RatioCubeNode extends BaseCubeNode<RatioCubeNode, RatioRow> {
+  private static double epsilon = 0.0001;
+
   private double baselineNumeratorValue;
   private double currentNumeratorValue;
   private double baselineDenominatorValue;
@@ -74,9 +77,10 @@ public class RatioCubeNode extends BaseCubeNode<RatioCubeNode, RatioRow> {
     currentNumeratorValue = CubeUtils.doubleMinus(currentNumeratorValue, node.currentNumeratorValue);
     baselineDenominatorValue = CubeUtils.doubleMinus(baselineDenominatorValue, node.baselineDenominatorValue);
     currentDenominatorValue = CubeUtils.doubleMinus(currentDenominatorValue, node.currentDenominatorValue);
-    Preconditions.checkArgument(
-        !(this.baselineNumeratorValue < 0 || this.currentNumeratorValue < 0 || baselineDenominatorValue < 0
-            || currentDenominatorValue < 0));
+    Preconditions.checkArgument(!(DoubleMath.fuzzyCompare(baselineNumeratorValue, 0, epsilon) < 0
+        || DoubleMath.fuzzyCompare(currentNumeratorValue, 0, epsilon) < 0
+        || DoubleMath.fuzzyCompare(baselineDenominatorValue, 0, epsilon) < 0
+        || DoubleMath.fuzzyCompare(currentDenominatorValue, 0, epsilon) < 0));
   }
 
   @Override
@@ -109,23 +113,25 @@ public class RatioCubeNode extends BaseCubeNode<RatioCubeNode, RatioRow> {
 
   @Override
   public double getBaselineValue() {
-    if (baselineNumeratorValue == 0 && baselineDenominatorValue == 0) {
-      return 0.0;
-    } else if (baselineDenominatorValue <= 0d) {
-      return baselineNumeratorValue;
-    } else {
+    if (!DoubleMath.fuzzyEquals(baselineDenominatorValue, 0, epsilon)) {
       return baselineNumeratorValue / baselineDenominatorValue;
+    } else if (DoubleMath.fuzzyEquals(baselineNumeratorValue, 0, epsilon)) {
+      return 0d;
+    } else {
+      // divide the numerator value by numerator sum to prevent large change diff.
+      return baselineNumeratorValue / (currentNumeratorValue + baselineNumeratorValue);
     }
   }
 
   @Override
   public double getCurrentValue() {
-    if (currentNumeratorValue == 0 && currentDenominatorValue == 0) {
-      return 0.0;
-    } else if (currentDenominatorValue <= 0d) {
-      return currentNumeratorValue;
-    } else {
+    if (!DoubleMath.fuzzyEquals(currentDenominatorValue, 0, epsilon)) {
       return currentNumeratorValue / currentDenominatorValue;
+    } else if (DoubleMath.fuzzyEquals(currentNumeratorValue, 0, epsilon)) {
+      return 0d;
+    } else {
+      // divide the numerator value by numerator sum to prevent large change diff.
+      return currentNumeratorValue / (currentNumeratorValue + baselineNumeratorValue);
     }
   }
 
@@ -212,14 +218,16 @@ public class RatioCubeNode extends BaseCubeNode<RatioCubeNode, RatioRow> {
       return false;
     }
     RatioCubeNode that = (RatioCubeNode) o;
-    return Double.compare(that.baselineDenominatorValue, baselineDenominatorValue) == 0
-        && Double.compare(that.currentDenominatorValue, currentDenominatorValue) == 0 && Objects.equal(data,
-        that.data);
+    return Double.compare(that.baselineNumeratorValue, baselineNumeratorValue) == 0
+        && Double.compare(that.currentNumeratorValue, currentNumeratorValue) == 0
+        && Double.compare(that.baselineDenominatorValue, baselineDenominatorValue) == 0
+        && Double.compare(that.currentDenominatorValue, currentDenominatorValue) == 0;
   }
 
   @Override
   public int hashCode() {
-    return Objects.hashCode(super.hashCode(), baselineDenominatorValue, currentDenominatorValue, data);
+    return Objects.hashCode(super.hashCode(), baselineNumeratorValue, currentNumeratorValue, baselineDenominatorValue,
+        currentDenominatorValue);
   }
 
   /**

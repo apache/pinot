@@ -122,12 +122,12 @@ public class DimNameValueCostEntry implements Comparable<DimNameValueCostEntry>{
         .add("dim", String.format("%s:%s", dimName, dimValue))
         .add("baselineVal", baselineValue)
         .add("currentVal", currentValue)
+        .add("changeRatio", String.format("%.4f", currentValue / baselineValue))
         .add("delta", currentValue - baselineValue)
-        .add("changeRatio", String.format("%.2f", currentValue / baselineValue))
         .add("baselineSize", baselineSize)
         .add("currentSize", currentSize)
-        .add("sizeFactor", String.format("%.2f", contributionFactor))
-        .add("cost", String.format("%.4f", cost))
+        .add("sizeFactor", String.format("%.4f", contributionFactor))
+        .add("cost", String.format("%.6f", cost))
         .toString();
   }
 }
