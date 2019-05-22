@@ -170,13 +170,11 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       }
     }
 
-    long minConsumingFreshnessTimeMs = -1;
+    long minConsumingFreshnessTimeMs = minIngestionTimeMs;
     if (numConsumingSegmentsQueried > 0) {
       if (minIngestionTimeMs == Long.MAX_VALUE) {
         LOGGER.debug("Did not find valid ingestionTimestamp across consuming segments! Using indexTime instead");
         minConsumingFreshnessTimeMs = minIndexTimeMs;
-      } else {
-        minConsumingFreshnessTimeMs = minIngestionTimeMs;
       }
       LOGGER.debug("Querying {} consuming segments with min minConsumingFreshnessTimeMs {}", numConsumingSegmentsQueried, minConsumingFreshnessTimeMs);
     }

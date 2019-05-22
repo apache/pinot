@@ -63,9 +63,6 @@ public enum BrokerMeter implements AbstractMetrics.Meter {
   ENTRIES_SCANNED_IN_FILTER("documents", false),
   ENTRIES_SCANNED_POST_FILTER("documents", false),
 
-  // metric tracking the freshness lag for consuming segments
-  FRESHNESS_LAG_MS("latency", false),
-
   REQUEST_CONNECTION_TIMEOUTS("timeouts", false),
   HELIX_ZOOKEEPER_RECONNECTS("reconnects", true),
 

@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
@@ -33,6 +34,7 @@ import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.common.metrics.BrokerTimer;
 import org.apache.pinot.common.query.ReduceService;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.GroupBy;
@@ -64,7 +66,6 @@ import org.slf4j.LoggerFactory;
 @ThreadSafe
 public class BrokerReduceService implements ReduceService<BrokerResponseNative> {
   private static final Logger LOGGER = LoggerFactory.getLogger(BrokerReduceService.class);
-  private static final long INVALID_FRESHNESS = -1;
 
   @Nonnull
   @Override
@@ -146,11 +147,7 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
 
       String minConsumingFreshnessTimeMsString = metadata.get(DataTable.MIN_CONSUMING_FRESHNESS_TIME_MS);
       if (minConsumingFreshnessTimeMsString != null) {
-        long freshness = Long.parseLong(minConsumingFreshnessTimeMsString);
-        // ignore invalid values
-        if (freshness > INVALID_FRESHNESS) {
-          minConsumingFreshnessTimeMs = Math.min(freshness, minConsumingFreshnessTimeMs);
-        }
+          minConsumingFreshnessTimeMs = Math.min(Long.parseLong(minConsumingFreshnessTimeMsString), minConsumingFreshnessTimeMs);
       }
 
       String numTotalRawDocsString = metadata.get(DataTable.TOTAL_DOCS_METADATA_KEY);
@@ -186,11 +183,6 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
     brokerResponseNative.setTotalDocs(numTotalRawDocs);
     brokerResponseNative.setNumGroupsLimitReached(numGroupsLimitReached);
     if (numConsumingSegmentsQueried > 0) {
-      if (minConsumingFreshnessTimeMs == Long.MAX_VALUE) {
-        LOGGER.error("Invalid freshness time across {} consuming segments", numConsumingSegmentsQueried);
-        // use the invalid value (-1) for clear logging
-        minConsumingFreshnessTimeMs = INVALID_FRESHNESS;
-      }
       brokerResponseNative.setNumConsumingSegmentsQueried(numConsumingSegmentsQueried);
       brokerResponseNative.setMinConsumingFreshnessTimeMs(minConsumingFreshnessTimeMs);
     }
@@ -206,8 +198,8 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
           .addMeteredTableValue(rawTableName, BrokerMeter.ENTRIES_SCANNED_POST_FILTER, numEntriesScannedPostFilter);
 
       if (numConsumingSegmentsQueried > 0 && minConsumingFreshnessTimeMs > 0) {
-        brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.FRESHNESS_LAG_MS,
-            System.currentTimeMillis() - minConsumingFreshnessTimeMs);
+        brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.FRESHNESS_LAG_MS,
+            System.currentTimeMillis() - minConsumingFreshnessTimeMs, TimeUnit.MILLISECONDS);
       }
     }
 

@@ -208,6 +208,7 @@ public class BrokerResponseNative implements BrokerResponse {
   }
 
   @JsonProperty("numConsumingSegmentsQueried")
+  @Override
   public long getNumConsumingSegmentsQueried() {
     return _numConsumingSegmentsQueried;
   }
@@ -218,6 +219,7 @@ public class BrokerResponseNative implements BrokerResponse {
   }
 
   @JsonProperty("minConsumingFreshnessTimeMs")
+  @Override
   public long getMinConsumingFreshnessTimeMs() {
     return _minConsumingFreshnessTimeMs;
   }
