@@ -39,6 +39,7 @@ import org.slf4j.LoggerFactory;
 public class BrokerServerBuilder {
   private static final Logger LOGGER = LoggerFactory.getLogger(BrokerServerBuilder.class);
 
+
   public enum State {
     INIT, STARTING, RUNNING, SHUTTING_DOWN, SHUTDOWN
   }
@@ -70,7 +71,8 @@ public class BrokerServerBuilder {
     MetricsHelper.initializeMetrics(config.subset(Broker.METRICS_CONFIG_PREFIX));
     MetricsHelper.registerMetricsRegistry(_metricsRegistry);
     _brokerMetrics =
-        new BrokerMetrics(_metricsRegistry, !_config.getBoolean(Broker.CONFIG_OF_ENABLE_TABLE_LEVEL_METRICS, true));
+        new BrokerMetrics(config.getString(Broker.METRICS_NAME_PREFIX, BrokerMetrics.METRICS_PREFIX_DEFAULT), _metricsRegistry,
+            !_config.getBoolean(Broker.CONFIG_OF_ENABLE_TABLE_LEVEL_METRICS, true));
     _brokerMetrics.initializeGlobalMeters();
     _brokerRequestHandler = buildRequestHandler();
     _brokerAdminApplication = new BrokerAdminApiApplication(this);

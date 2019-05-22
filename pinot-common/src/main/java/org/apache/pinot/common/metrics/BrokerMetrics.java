@@ -26,17 +26,25 @@ import com.yammer.metrics.core.MetricsRegistry;
  *
  */
 public class BrokerMetrics extends AbstractMetrics<BrokerQueryPhase, BrokerMeter, BrokerGauge, BrokerTimer> {
+
+  public static final String METRICS_PREFIX_DEFAULT = "pinot.broker.";
+  public static final boolean GLOBAL_DEFAULT = false;
+
   /**
    * Constructs the broker metrics.
    *
    * @param metricsRegistry The metric registry used to register timers and meters.
    */
   public BrokerMetrics(MetricsRegistry metricsRegistry) {
-    super("pinot.broker.", metricsRegistry, BrokerMetrics.class);
+    this(metricsRegistry, GLOBAL_DEFAULT);
   }
 
   public BrokerMetrics(MetricsRegistry metricsRegistry, boolean global) {
-    super("pinot.broker.", metricsRegistry, BrokerMetrics.class, global);
+    this(METRICS_PREFIX_DEFAULT, metricsRegistry, global);
+  }
+
+  public BrokerMetrics(String prefix, MetricsRegistry metricsRegistry, boolean global) {
+    super(prefix, metricsRegistry, BrokerMetrics.class, global);
   }
 
   @Override

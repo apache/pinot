@@ -20,6 +20,7 @@ package org.apache.pinot.server.conf;
 
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
+import org.apache.pinot.common.metrics.ServerMetrics;
 
 
 /**
@@ -30,6 +31,7 @@ public class ServerConf {
   private static final String PINOT_ = "pinot.";
   private static final String PINOT_SERVER_INSTANCE = "pinot.server.instance";
   private static final String PINOT_SERVER_METRICS = "pinot.server.metrics";
+  private static final String PINOT_SERVER_METRICS_PREFIX = "pinot.server.metrics.prefix";
   private static final String PINOT_SERVER_TABLE_LEVEL_METRICS = "pinot.server.enableTableLevelMetrics";
   // List of metrics to always send table level metrics even if table level metrics is disabled
   private static final String PINOT_SERVER_TABLE_LEVEL_METRICS_LIST = "pinot.server.tablelevel.metrics.whitelist";
@@ -99,5 +101,9 @@ public class ServerConf {
 
   public boolean emitTableLevelMetrics() {
     return _serverConf.getBoolean(PINOT_SERVER_TABLE_LEVEL_METRICS, true);
+  }
+
+  public String getMetricsPrefix() {
+    return _serverConf.getString(PINOT_SERVER_METRICS_PREFIX, ServerMetrics.METRICS_PREFIX);
   }
 }

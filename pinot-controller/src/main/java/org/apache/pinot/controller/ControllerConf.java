@@ -29,6 +29,7 @@ import java.util.Random;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.StringUtil;
@@ -57,6 +58,7 @@ public class ControllerConf extends PropertiesConfiguration {
   private static final String CONSOLE_WEBAPP_USE_HTTPS = "controller.query.console.useHttps";
   private static final String EXTERNAL_VIEW_ONLINE_TO_OFFLINE_TIMEOUT = "controller.upload.onlineToOfflineTimeout";
   private static final String CONTROLLER_MODE = "controller.mode";
+  private static final String CONTROLLER_METRICS_PREFIX = "controller.metrics.prefix";
 
   public enum ControllerMode {
     DUAL,
@@ -641,5 +643,9 @@ public class ControllerConf extends PropertiesConfiguration {
 
   public void setHLCTablesAllowed(boolean allowHLCTables) {
     setProperty(ALLOW_HLC_TABLES, allowHLCTables);
+  }
+
+  public String getMetricsPrefix() {
+    return getString(CONTROLLER_METRICS_PREFIX, ControllerMetrics.METRICS_PREFIX_DEFAULT);
   }
 }

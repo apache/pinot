@@ -26,6 +26,10 @@ import com.yammer.metrics.core.MetricsRegistry;
  *
  */
 public class ServerMetrics extends AbstractMetrics<ServerQueryPhase, ServerMeter, ServerGauge, ServerTimer> {
+
+  public static final boolean GLOBAL_METRICS_DEFAULT = false;
+  public static final String METRICS_PREFIX = "pinot.server.";
+
   @Override
   protected ServerQueryPhase[] getQueryPhases() {
     return ServerQueryPhase.values();
@@ -42,10 +46,15 @@ public class ServerMetrics extends AbstractMetrics<ServerQueryPhase, ServerMeter
   }
 
   public ServerMetrics(MetricsRegistry metricsRegistry) {
-    super("pinot.server.", metricsRegistry, ServerMetrics.class);
+    this(METRICS_PREFIX, metricsRegistry, GLOBAL_METRICS_DEFAULT);
   }
 
   public ServerMetrics(MetricsRegistry metricsRegistry, boolean global) {
-    super("pinot.server.", metricsRegistry, ServerMetrics.class, global);
+    this(METRICS_PREFIX, metricsRegistry, global);
   }
+
+  public ServerMetrics(String prefix, MetricsRegistry metricsRegistry, boolean global) {
+    super(prefix, metricsRegistry, ServerMetrics.class, global);
+  }
+
 }
