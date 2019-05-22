@@ -27,7 +27,6 @@ import java.lang.reflect.Method;
 import java.util.LinkedList;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
-import org.apache.kafka.common.protocol.Errors;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
@@ -40,9 +39,13 @@ import org.apache.pinot.core.data.GenericRow;
 import org.apache.pinot.core.data.manager.config.InstanceDataManagerConfig;
 import org.apache.pinot.core.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.core.realtime.impl.RealtimeSegmentStatsHistory;
+import org.apache.pinot.core.realtime.stream.PartitionLevelConsumer;
 import org.apache.pinot.core.realtime.stream.PermanentConsumerException;
 import org.apache.pinot.core.realtime.stream.StreamConfigProperties;
+import org.apache.pinot.core.realtime.stream.StreamConsumerFactory;
+import org.apache.pinot.core.realtime.stream.StreamLevelConsumer;
 import org.apache.pinot.core.realtime.stream.StreamMessageDecoder;
+import org.apache.pinot.core.realtime.stream.StreamMetadataProvider;
 import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -50,8 +53,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.mockito.Matchers.any;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 
 // TODO Write more tests for other parts of the class
@@ -88,7 +90,7 @@ public class LLRealtimeSegmentDataManagerTest {
           + "\": \"" + maxTimeForSegmentCloseMs + "\", \n" + "      \"stream.kafka.broker.list\": \"broker:7777\", \n"
           + "      \"stream.kafka.consumer.prop.auto.offset.reset\": \"smallest\", \n"
           + "      \"stream.kafka.consumer.type\": \"simple\", \n"
-          + "      \"stream.kafka.consumer.factory.class.name\": \"org.apache.pinot.core.realtime.impl.kafka.KafkaConsumerFactory\", \n"
+          + "      \"stream.kafka.consumer.factory.class.name\": \"" + FakeStreamConsumerFactory.class.getName()+ "\", \n"
           + "      \"stream.kafka.decoder.class.name\": \"" + FakeStreamMessageDecoder.class.getName() + "\", \n"
           + "      \"stream.kafka.decoder.prop.schema.registry.rest.url\": \"http://schema-registry-host.corp.ceo:1766/schemas\", \n"
           + "      \"stream.kafka.decoder.prop.schema.registry.schema.name\": \"UnknownSchema\", \n"
@@ -131,6 +133,30 @@ public class LLRealtimeSegmentDataManagerTest {
     segmentZKMetadata.setSegmentName(_segmentNameStr);
     segmentZKMetadata.setStartOffset(_startOffset);
     return segmentZKMetadata;
+  }
+
+  public static class FakeStreamConsumerFactory extends StreamConsumerFactory {
+
+    @Override
+    public PartitionLevelConsumer createPartitionLevelConsumer(String clientId, int partition) {
+      return null;
+    }
+
+    @Override
+    public StreamLevelConsumer createStreamLevelConsumer(String clientId, String tableName, Schema schema,
+        InstanceZKMetadata instanceZKMetadata, ServerMetrics serverMetrics) {
+      return null;
+    }
+
+    @Override
+    public StreamMetadataProvider createPartitionMetadataProvider(String clientId, int partition) {
+      return null;
+    }
+
+    @Override
+    public StreamMetadataProvider createStreamMetadataProvider(String clientId) {
+      return null;
+    }
   }
 
   public static class FakeStreamMessageDecoder implements StreamMessageDecoder<byte[]> {
@@ -717,7 +743,7 @@ public class LLRealtimeSegmentDataManagerTest {
     protected boolean consumeLoop()
         throws Exception {
       if (_throwExceptionFromConsume) {
-        throw new PermanentConsumerException(Errors.OFFSET_OUT_OF_RANGE.exception());
+        throw new PermanentConsumerException(new Throwable("Offset out of range"));
       }
       setCurrentOffset(_consumeOffsets.remove());
       terminateLoopIfNecessary();

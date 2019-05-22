@@ -28,8 +28,6 @@ import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import org.apache.pinot.common.partition.PartitionAssignment;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.LLCSegmentName;
-import org.apache.pinot.core.realtime.impl.kafka.KafkaAvroMessageDecoder;
-import org.apache.pinot.core.realtime.impl.kafka.KafkaConsumerFactory;
 import org.apache.pinot.core.realtime.stream.StreamConfig;
 import org.apache.pinot.core.realtime.stream.StreamConfigProperties;
 import org.testng.Assert;
@@ -274,8 +272,8 @@ public class FlushThresholdUpdaterTest {
     Map<String, String> streamConfigs = new HashMap<>();
     String streamType = "kafka";
     String streamTopic = "aTopic";
-    String consumerFactoryClass = KafkaConsumerFactory.class.getName();
-    String decoderClass = KafkaAvroMessageDecoder.class.getName();
+    String consumerFactoryClass = "com.test.TestConsumerFactoryClass";
+    String decoderClass = "com.test.TestDecoderClass";
     streamConfigs.put(StreamConfigProperties.STREAM_TYPE, streamType);
     streamConfigs
         .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_TOPIC_NAME),

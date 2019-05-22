@@ -63,9 +63,6 @@ import org.apache.pinot.controller.helix.core.PinotTableIdealStateBuilder;
 import org.apache.pinot.controller.helix.core.realtime.segment.CommittingSegmentDescriptor;
 import org.apache.pinot.controller.util.SegmentCompletionUtils;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
-import org.apache.pinot.core.realtime.impl.kafka.KafkaAvroMessageDecoder;
-import org.apache.pinot.core.realtime.impl.kafka.KafkaConsumerFactory;
-import org.apache.pinot.core.realtime.impl.kafka.KafkaStreamConfigProperties;
 import org.apache.pinot.core.realtime.stream.OffsetCriteria;
 import org.apache.pinot.core.realtime.stream.StreamConfig;
 import org.apache.pinot.core.realtime.stream.StreamConfigProperties;
@@ -1272,8 +1269,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
     String streamType = "kafka";
     streamConfigMap.put(StreamConfigProperties.STREAM_TYPE, streamType);
     String topic = "aTopic";
-    String consumerFactoryClass = KafkaConsumerFactory.class.getName();
-    String decoderClass = KafkaAvroMessageDecoder.class.getName();
+    String consumerFactoryClass = "com.test.TestConsumerFactoryClass";
+    String decoderClass = "com.test.TestDecoderClass";
     streamConfigMap
         .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_TOPIC_NAME),
             topic);
@@ -1287,10 +1284,6 @@ public class PinotLLCRealtimeSegmentManagerTest {
     streamConfigMap
         .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_DECODER_CLASS),
             decoderClass);
-
-    final String bootstrapHostConfigKey = KafkaStreamConfigProperties
-        .constructStreamProperty(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_BROKER_LIST);
-    streamConfigMap.put(bootstrapHostConfigKey, bootstrapHosts);
 
     IndexingConfig mockIndexConfig = mock(IndexingConfig.class);
     when(mockIndexConfig.getStreamConfigs()).thenReturn(streamConfigMap);
@@ -1316,8 +1309,6 @@ public class PinotLLCRealtimeSegmentManagerTest {
             "simple");
     streamPropMap.put(StreamConfigProperties
         .constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_OFFSET_CRITERIA), "smallest");
-    streamPropMap.put(KafkaStreamConfigProperties
-        .constructStreamProperty(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_BROKER_LIST), "host:1234");
     return streamPropMap;
   }
 

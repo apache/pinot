@@ -41,8 +41,6 @@ import org.apache.pinot.common.partition.PartitionAssignment;
 import org.apache.pinot.common.partition.StreamPartitionAssignmentGenerator;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
-import org.apache.pinot.core.realtime.impl.kafka.KafkaAvroMessageDecoder;
-import org.apache.pinot.core.realtime.impl.kafka.KafkaConsumerFactory;
 import org.apache.pinot.core.realtime.stream.StreamConfigProperties;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
@@ -584,8 +582,8 @@ public class DefaultRebalanceStrategyTest {
     Map<String, String> streamConfigMap = new HashMap<>(1);
     String streamType = "kafka";
     String topic = "aTopic";
-    String consumerFactoryClass = KafkaConsumerFactory.class.getName();
-    String decoderClass = KafkaAvroMessageDecoder.class.getName();
+    String consumerFactoryClass = "com.test.TestConsumerFactoryClass";
+    String decoderClass = "com.test.TestDecoderClass";
     streamConfigMap.put(StreamConfigProperties.STREAM_TYPE, streamType);
     streamConfigMap
         .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_TOPIC_NAME),
