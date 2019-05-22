@@ -178,6 +178,7 @@ public class BrokerResponseNative implements BrokerResponse {
   }
 
   @JsonProperty("numSegmentsQueried")
+  @Override
   public long getNumSegmentsQueried() {
     return _numSegmentsQueried;
   }
@@ -188,6 +189,7 @@ public class BrokerResponseNative implements BrokerResponse {
   }
 
   @JsonProperty("numSegmentsProcessed")
+  @Override
   public long getNumSegmentsProcessed() {
     return _numSegmentsProcessed;
   }
@@ -198,6 +200,7 @@ public class BrokerResponseNative implements BrokerResponse {
   }
 
   @JsonProperty("numSegmentsMatched")
+  @Override
   public long getNumSegmentsMatched() {
     return _numSegmentsMatched;
   }
