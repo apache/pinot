@@ -27,7 +27,9 @@ import org.apache.pinot.common.Utils;
  */
 public enum BrokerTimer implements AbstractMetrics.Timer {
   ROUTING_TABLE_UPDATE_TIME(true),
-  CLUSTER_CHANGE_QUEUE_TIME(true);
+  CLUSTER_CHANGE_QUEUE_TIME(true),
+  // metric tracking the freshness lag for consuming segments
+  FRESHNESS_LAG_MS(false);
 
   private final String timerName;
   private final boolean global;
