@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.segment.index.readers;
 
+import org.apache.pinot.core.io.util.FixedByteValueReaderWriter;
 import org.apache.pinot.core.io.util.ValueReader;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 
@@ -25,7 +26,7 @@ import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 public class IntDictionary extends ImmutableDictionaryReader {
 
   public IntDictionary(PinotDataBuffer dataBuffer, int length) {
-    super(dataBuffer, length, Integer.BYTES, (byte) 0);
+    super(new FixedByteValueReaderWriter(dataBuffer), length, Integer.BYTES, (byte) 0);
   }
 
   public IntDictionary(ValueReader valueReader, int length) {

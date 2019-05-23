@@ -31,9 +31,10 @@ import java.nio.ByteOrder;
 import java.util.Arrays;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.data.FieldSpec;
-import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.common.utils.primitive.ByteArray;
 import org.apache.pinot.core.io.util.FixedByteValueReaderWriter;
+import org.apache.pinot.core.io.util.VarLengthBytesValueReaderWriter;
+import org.apache.pinot.core.io.util.VarLengthStringsReaderWriter;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -154,24 +155,18 @@ public class SegmentDictionaryCreator implements Closeable {
         _stringValueToIndexMap = new Object2IntOpenHashMap<>(numValues);
 
         // Get the maximum length of all entries
-        byte[][] sortedStringBytes = new byte[numValues][];
         for (int i = 0; i < numValues; i++) {
           String value = sortedStrings[i];
           _stringValueToIndexMap.put(value, i);
-          byte[] valueBytes = StringUtil.encodeUtf8(value);
-          sortedStringBytes[i] = valueBytes;
-          _numBytesPerEntry = Math.max(_numBytesPerEntry, valueBytes.length);
         }
 
         // Backward-compatible: index file is always big-endian
-        try (PinotDataBuffer dataBuffer = PinotDataBuffer
-            .mapFile(_dictionaryFile, false, 0, (long) numValues * _numBytesPerEntry, ByteOrder.BIG_ENDIAN,
+        long size = VarLengthStringsReaderWriter.getRequiredSize(sortedStrings);
+        try (PinotDataBuffer dataBuffer =
+            PinotDataBuffer.mapFile(_dictionaryFile, false, 0, size, ByteOrder.BIG_ENDIAN,
                 getClass().getSimpleName());
-            FixedByteValueReaderWriter writer = new FixedByteValueReaderWriter(dataBuffer)) {
-          for (int i = 0; i < numValues; i++) {
-            byte[] value = sortedStringBytes[i];
-            writer.writeUnpaddedString(i, _numBytesPerEntry, value);
-          }
+            VarLengthStringsReaderWriter writer = new VarLengthStringsReaderWriter(dataBuffer)) {
+          writer.init(sortedStrings);
         }
         LOGGER.info(
             "Created dictionary for STRING column: {} with cardinality: {}, max length in bytes: {}, range: {} to {}",
@@ -185,21 +180,20 @@ public class SegmentDictionaryCreator implements Closeable {
         Preconditions.checkState(numValues > 0);
         _bytesValueToIndexMap = new Object2IntOpenHashMap<>(numValues);
 
+        byte[][] sortedByteArrays = new byte[sortedBytes.length][];
         for (int i = 0; i < numValues; i++) {
           ByteArray value = sortedBytes[i];
+          sortedByteArrays[i] = value.getBytes();
           _bytesValueToIndexMap.put(value, i);
-          _numBytesPerEntry = Math.max(_numBytesPerEntry, value.getBytes().length);
         }
 
         // Backward-compatible: index file is always big-endian
+        size = VarLengthBytesValueReaderWriter.getRequiredSize(sortedByteArrays);
         try (PinotDataBuffer dataBuffer = PinotDataBuffer
-            .mapFile(_dictionaryFile, false, 0, (long) numValues * _numBytesPerEntry, ByteOrder.BIG_ENDIAN,
+            .mapFile(_dictionaryFile, false, 0, size, ByteOrder.BIG_ENDIAN,
                 getClass().getSimpleName());
-            FixedByteValueReaderWriter writer = new FixedByteValueReaderWriter(dataBuffer)) {
-          for (int i = 0; i < numValues; i++) {
-            byte[] value = sortedBytes[i].getBytes();
-            writer.writeUnpaddedString(i, _numBytesPerEntry, value);
-          }
+            VarLengthBytesValueReaderWriter writer = new VarLengthBytesValueReaderWriter(dataBuffer)) {
+          writer.init(sortedByteArrays);
         }
         LOGGER.info(
             "Created dictionary for BYTES column: {} with cardinality: {}, max length in bytes: {}, range: {} to {}",
@@ -234,7 +228,7 @@ public class SegmentDictionaryCreator implements Closeable {
     }
   }
 
-  public int[] indexOfMV(Object value) {
+  int[] indexOfMV(Object value) {
     Object[] multiValues = (Object[]) value;
     int[] indexes = new int[multiValues.length];
 

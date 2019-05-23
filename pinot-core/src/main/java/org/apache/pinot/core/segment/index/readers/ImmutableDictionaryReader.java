@@ -35,9 +35,8 @@ public abstract class ImmutableDictionaryReader extends BaseDictionary {
   private final int _numBytesPerValue;
   private final byte _paddingByte;
 
-  protected ImmutableDictionaryReader(PinotDataBuffer dataBuffer, int length, int numBytesPerValue, byte paddingByte) {
-    Preconditions.checkState(dataBuffer.size() == length * numBytesPerValue);
-    _valueReader = new FixedByteValueReaderWriter(dataBuffer);
+  protected ImmutableDictionaryReader(ValueReader valueReader, int length, int numBytesPerValue, byte paddingByte) {
+    _valueReader = valueReader;
     _length = length;
     _numBytesPerValue = numBytesPerValue;
     _paddingByte = paddingByte;
@@ -146,13 +145,12 @@ public abstract class ImmutableDictionaryReader extends BaseDictionary {
   }
 
   protected int binarySearch(String value) {
-    byte[] buffer = getBuffer();
     int low = 0;
     int high = _length - 1;
     if (_paddingByte == 0) {
       while (low <= high) {
         int mid = (low + high) >>> 1;
-        String midValue = _valueReader.getUnpaddedString(mid, _numBytesPerValue, _paddingByte, buffer);
+        String midValue = _valueReader.getString(mid);
         int compareResult = midValue.compareTo(value);
         if (compareResult < 0) {
           low = mid + 1;
@@ -166,7 +164,7 @@ public abstract class ImmutableDictionaryReader extends BaseDictionary {
       String paddedValue = padString(value);
       while (low <= high) {
         int mid = (low + high) >>> 1;
-        String midValue = _valueReader.getPaddedString(mid, _numBytesPerValue, buffer);
+        String midValue = _valueReader.getString(mid);
         int compareResult = midValue.compareTo(paddedValue);
         if (compareResult < 0) {
           low = mid + 1;
@@ -229,6 +227,10 @@ public abstract class ImmutableDictionaryReader extends BaseDictionary {
 
   protected double getDouble(int dictId) {
     return _valueReader.getDouble(dictId);
+  }
+
+  protected String getString(int dictId) {
+    return _valueReader.getString(dictId);
   }
 
   protected String getUnpaddedString(int dictId, byte[] buffer) {

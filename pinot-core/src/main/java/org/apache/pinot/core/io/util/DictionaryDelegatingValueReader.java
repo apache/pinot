@@ -67,8 +67,18 @@ public class DictionaryDelegatingValueReader implements ValueReader {
   }
 
   @Override
+  public String getString(int index) {
+    return _dictionary.getStringValue(index);
+  }
+
+  @Override
   public byte[] getBytes(int index, int numBytesPerValue, byte[] buffer) {
     throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public byte[] getBytes(int index) {
+    return _dictionary.getBytesValue(index);
   }
 
   @Override
