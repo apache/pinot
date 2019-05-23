@@ -19,8 +19,6 @@
 package org.apache.pinot.core.data.partition;
 
 import java.util.Random;
-import kafka.producer.ByteArrayPartitioner;
-import org.apache.kafka.common.utils.Utils;
 import org.apache.pinot.common.utils.StringUtil;
 import org.testng.Assert;
 import org.testng.annotations.Test;
