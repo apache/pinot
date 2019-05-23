@@ -1146,8 +1146,13 @@ public class SegmentCompletionTest {
     public HelixManager _helixManager = mock(HelixManager.class);
 
     protected MockPinotLLCRealtimeSegmentManager(PinotHelixResourceManager pinotHelixResourceManager) {
-      super(pinotHelixResourceManager, CONTROLLER_CONF, new ControllerMetrics(new MetricsRegistry()),
-          new ControllerLeadershipManager(pinotHelixResourceManager.getHelixZkManager()));
+      this(pinotHelixResourceManager, new ControllerMetrics(new MetricsRegistry()));
+    }
+
+    protected MockPinotLLCRealtimeSegmentManager(PinotHelixResourceManager pinotHelixResourceManager,
+        ControllerMetrics controllerMetrics) {
+      super(pinotHelixResourceManager, CONTROLLER_CONF, controllerMetrics,
+          new ControllerLeadershipManager(pinotHelixResourceManager.getHelixZkManager(), controllerMetrics));
     }
 
     @Override
@@ -1199,12 +1204,13 @@ public class SegmentCompletionTest {
 
     protected MockSegmentCompletionManager(HelixManager helixManager, PinotLLCRealtimeSegmentManager segmentManager,
         boolean isLeader) {
-      this(helixManager, segmentManager, isLeader, new ControllerLeadershipManager(helixManager));
+      this(helixManager, segmentManager, isLeader, new ControllerMetrics(new MetricsRegistry()));
     }
 
     protected MockSegmentCompletionManager(HelixManager helixManager, PinotLLCRealtimeSegmentManager segmentManager,
-        boolean isLeader, ControllerLeadershipManager controllerLeadershipManager) {
-      super(helixManager, segmentManager, new ControllerMetrics(new MetricsRegistry()), controllerLeadershipManager,
+        boolean isLeader, ControllerMetrics controllerMetrics) {
+      super(helixManager, segmentManager, controllerMetrics,
+          new ControllerLeadershipManager(helixManager, controllerMetrics),
           SegmentCompletionProtocol.getDefaultMaxSegmentCommitTimeSeconds());
       _isLeader = isLeader;
     }

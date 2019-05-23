@@ -22,6 +22,8 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.helix.HelixManager;
 import org.apache.helix.api.listeners.ControllerChangeListener;
+import org.apache.pinot.common.metrics.ControllerGauge;
+import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,13 +37,16 @@ public class ControllerLeadershipManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(ControllerLeadershipManager.class);
 
   private HelixManager _helixManager;
+  private ControllerMetrics _controllerMetrics;
   private volatile boolean _amILeader = false;
 
   private Map<String, LeadershipChangeSubscriber> _subscribers = new ConcurrentHashMap<>();
 
-  public ControllerLeadershipManager(HelixManager helixManager) {
+  public ControllerLeadershipManager(HelixManager helixManager, ControllerMetrics controllerMetrics) {
     _helixManager = helixManager;
+    _controllerMetrics = controllerMetrics;
     _helixManager.addControllerListener((ControllerChangeListener) notificationContext -> onControllerChange());
+    _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.PINOT_CONTROLLER_LEADER, 0L);
   }
 
   /**
@@ -81,11 +86,17 @@ public class ControllerLeadershipManager {
   }
 
   private void onBecomingLeader() {
+    long startTimeMs = System.currentTimeMillis();
+    _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.PINOT_CONTROLLER_LEADER, 1L);
     _subscribers.forEach((k, v) -> v.onBecomingLeader());
+    LOGGER.info("Finished on becoming leader in {}ms", (System.currentTimeMillis() - startTimeMs));
   }
 
   private void onBecomingNonLeader() {
+    long startTimeMs = System.currentTimeMillis();
+    _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.PINOT_CONTROLLER_LEADER, 0L);
     _subscribers.forEach((k, v) -> v.onBecomingNonLeader());
+    LOGGER.info("Finished on becoming non-leader in {}ms", (System.currentTimeMillis() - startTimeMs));
   }
 
   /**
