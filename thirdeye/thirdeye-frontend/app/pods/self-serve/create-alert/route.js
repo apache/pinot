@@ -5,22 +5,18 @@
  */
 import fetch from 'fetch';
 import { hash } from 'rsvp';
-import moment from 'moment';
 import Route from '@ember/routing/route';
-import { task, timeout } from 'ember-concurrency';
-import {
-  selfServeApiCommon,
-  selfServeApiOnboard
-} from 'thirdeye-frontend/utils/api/self-serve';
+import { selfServeApiOnboard } from 'thirdeye-frontend/utils/api/self-serve';
 import { postProps, checkStatus } from 'thirdeye-frontend/utils/utils';
 import { inject as service } from '@ember/service';
-import { get } from '@ember/object';
+import { yamlAlertSettings } from 'thirdeye-frontend/utils/constants';
 
-let onboardStartTime = {};
+const CREATE_GROUP_TEXT = 'Create a new subscription group';
 
 export default Route.extend({
   anomaliesApiService: service('services/api/anomalies'),
   session: service(),
+  store: service('store'),
 
   /**
    * Model hook for the create alert route.
@@ -36,6 +32,42 @@ export default Route.extend({
       subscriptionGroups,
       applications,
       debug
+    });
+  },
+
+  setupController(controller, model) {
+    const createGroup = {
+      name: CREATE_GROUP_TEXT,
+      id: 'n/a',
+      yaml: yamlAlertSettings
+    };
+    const moddedArray = [createGroup];
+    const subscriptionGroups = this.get('store')
+      .peekAll('subscription-groups')
+      .sortBy('name')
+      .filter(group => (group.get('active') && group.get('yaml')))
+      .map(group => {
+        return {
+          name: group.get('name'),
+          id: group.get('id'),
+          yaml: group.get('yaml')
+        };
+      });
+    const subscriptionGroupNamesDisplay = [...moddedArray, ...subscriptionGroups];
+    let subscriptionYaml = yamlAlertSettings;
+    let groupName = createGroup;
+    if (subscriptionGroupNamesDisplay && Array.isArray(subscriptionGroupNamesDisplay) && subscriptionGroupNamesDisplay.length > 0) {
+      const firstGroup = subscriptionGroupNamesDisplay[0];
+      subscriptionYaml = firstGroup.yaml;
+      groupName = firstGroup;
+    }
+
+    controller.setProperties({
+      subscriptionGroupNames: model.subscriptionGroups,
+      subscriptionGroupNamesDisplay,
+      groupName,
+      subscriptionYaml,
+      model
     });
   },
 
@@ -114,7 +146,7 @@ export default Route.extend({
     * @method triggerReplaySequence
     */
     triggerOnboardingJob(data) {
-      const { ignore, payload } = data;
+      const { payload } = data;
       const jobName = payload.functionName;
 
       fetch(selfServeApiOnboard.updateAlert(jobName), postProps(payload))
@@ -128,7 +160,7 @@ export default Route.extend({
             this.jumpToAlertPage(result.jobId, null);
           }
         })
-        .catch((err) => {
+        .catch(() => {
           // Error state will be handled on alert page
           this.jumpToAlertPage(-1, jobName);
         });

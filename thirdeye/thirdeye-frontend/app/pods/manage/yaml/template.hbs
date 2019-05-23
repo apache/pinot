@@ -23,13 +23,65 @@
         <p class="te-alert-page-pending__text">{{errorText}}</p>
       </div>
     {{else}}
-      {{yaml-editor
-        alertId=model.alertId
-        isEditMode=true
-        showSettings=true
-        subscriptionGroupNames=model.subscriptionGroups
-        detectionYaml=model.detectionYaml
-      }}
+      <fieldset class="te-form__section te-form__section--first row">
+
+        {{#detection-yaml
+          isEditMode=true
+          alertId=model.alertId
+          detectionYaml=detectionYaml
+          setDetectionYaml=(action "updateDetectionYaml")
+          disableYamlSave=disableYamlSave
+        }}
+        {{/detection-yaml}}
+
+        <div class="col-xs-12">
+          {{#bs-accordion onChange=(action "changeAccordion") as |acc|}}
+            {{#acc.item value=preview as |aitem|}}
+              {{#aitem.title}}
+                <section class="dashboard-container__title thirdeye-link-secondary">Preview alert [Beta] {{if toggleCollapsed "/ Enter YAML configuration to preview alert." ""}}
+                  <span class="pull-right"><i class="glyphicon glyphicon-menu-{{if toggleCollapsed "down" "up"}}"></i></span>
+                </section>
+              {{/aitem.title}}
+              {{#aitem.body}}
+                {{#alert-details
+                  isPreviewMode=true
+                  alertYaml=detectionYaml
+                  dataIsCurrent=alertDataIsCurrent
+                }}
+                  {{yield}}
+                {{/alert-details}}
+              {{/aitem.body}}
+            {{/acc.item}}
+          {{/bs-accordion}}
+        </div>
+
+        <div class="col-xs-12">
+          <hr/>
+        </div>
+
+        {{#subscription-yaml
+          isEditMode=true
+          subscriptionYaml=subscriptionYaml
+          setSubscriptionYaml=(action "updateSubscriptionYaml")
+          subscriptionMsg=""
+          selectSubscriptionGroup=(action "changeSubscriptionGroup")
+          subscriptionGroupNamesDisplay=subscriptionGroupNamesDisplay
+          groupName=groupName
+          createGroup=createGroup
+        }}
+        {{/subscription-yaml}}
+
+      </fieldset>
+      <fieldset class="te-form__section-submit">
+        {{bs-button
+            defaultText=subGroupButtonText
+            type="primary"
+            buttonType="submit"
+            disabled=disableSubGroupSave
+            onClick=(action "submitSubscriptionGroup")
+            class="te-button te-button--submit"
+          }}
+      </fieldset>
     {{/if}}
   </div>
 </section>

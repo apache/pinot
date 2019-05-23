@@ -9,10 +9,13 @@ import { set, get } from '@ember/object';
 import { inject as service } from '@ember/service';
 import yamljs from 'yamljs';
 import moment from 'moment';
-import { toastOptions } from 'thirdeye-frontend/utils/constants';
+import { yamlAlertSettings, toastOptions } from 'thirdeye-frontend/utils/constants';
 import { formatYamlFilter } from 'thirdeye-frontend/utils/utils';
 
+const CREATE_GROUP_TEXT = 'Create a new subscription group';
+
 export default Route.extend({
+  anomaliesApiService: service('services/api/anomalies'),
   notifications: service('toast'),
 
   async model(params) {
@@ -86,14 +89,58 @@ export default Route.extend({
       }
     }
 
+    const subscriptionGroupNames = await this.get('anomaliesApiService').querySubscriptionGroups(); // Get all subscription groups available
+
     return RSVP.hash({
       alertId,
       alertData: get(this, 'detectionInfo'),
       detectionYaml: get (this, 'rawDetectionYaml'),
       subscriptionGroups: get(this, 'subscriptionGroups'),
-      subscribedGroups
+      subscribedGroups,
+      subscriptionGroupNames // all subscription groups as Ember data
     });
   },
+
+  setupController(controller, model) {
+    const createGroup = {
+      name: CREATE_GROUP_TEXT,
+      id: 'n/a',
+      yaml: yamlAlertSettings
+    };
+    const moddedArray = [createGroup];
+    const subscriptionGroups = this.get('store')
+      .peekAll('subscription-groups')
+      .sortBy('name')
+      .filter(group => (group.get('active') && group.get('yaml')))
+      .map(group => {
+        return {
+          name: group.get('name'),
+          id: group.get('id'),
+          yaml: group.get('yaml')
+        };
+      });
+    const subscriptionGroupNamesDisplay = [
+      { groupName: 'Create Group', options: moddedArray },
+      { groupName: 'Subscribed Groups', options: model.subscriptionGroups },
+      { groupName: 'Other Groups', options: subscriptionGroups}
+    ];
+
+    let subscriptionYaml = yamlAlertSettings;
+    let groupName = createGroup;
+    let subscriptionGroupId = createGroup.id;
+
+    controller.setProperties({
+      alertId: model.alertId,
+      subscriptionGroupNames: model.subscriptionGroups,
+      subscriptionGroupNamesDisplay,
+      detectionYaml: model.detectionYaml,
+      groupName,
+      subscriptionGroupId,
+      subscriptionYaml,
+      model,
+      createGroup
+    });
+  }
 
 
 });

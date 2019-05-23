@@ -47,19 +47,6 @@ export default Component.extend({
 
 
 
-  /**
-   * sets Yaml value displayed to contents of detectionYaml or currentYamlAlertOriginal
-   * @method currentYamlAlert
-   * @return {String}
-   */
-  currentYamlAlert: computed(
-    'detectionYaml',
-    function() {
-      const inputYaml = get(this, 'detectionYaml');
-      return inputYaml || get(this, 'currentYamlAlertOriginal');
-    }
-  ),
-
   isDetectionMsg: computed(
     'detectionMsg',
     function() {
@@ -67,6 +54,17 @@ export default Component.extend({
       return detectionMsg !== '';
     }
   ),
+
+  init() {
+    this._super(...arguments);
+    const {
+      detectionYaml,
+      currentYamlAlertOriginal
+    } = this.getProperties('detectionYaml', 'currentYamlAlertOriginal');
+    if (!detectionYaml) {
+      set(this, 'detectionYaml', currentYamlAlertOriginal);
+    }
+  },
 
   /**
    * Calls api's for specific metric's autocomplete
