@@ -20,6 +20,8 @@
 package org.apache.pinot.thirdeye.datasource;
 
 import com.google.common.collect.ArrayListMultimap;
+import java.util.Collections;
+import java.util.Map;
 import org.apache.pinot.thirdeye.datasource.pinot.PinotThirdEyeDataSource;
 
 import java.util.ArrayList;
@@ -48,9 +50,11 @@ public class ThirdEyeRequest {
   private final List<MetricFunction> metricFunctions;
   private final DateTime startTime;
   private final DateTime endTime;
-  private final Multimap<String, String> filterSet;
+  private final Multimap<String, String> filterSet; // D1 IN (V1, V2) AND D2 in (V3,V4)
   // TODO - what kind of advanced expressions do we want here? This could potentially force code to
   // depend on a specific client implementation
+  // multiple filters in one query
+  private final Collection<Multimap<String, String>> filterSets;  // ((D1=V1) AND (D2=V2)) OR ((D1=V1) AND (D2=V3))
   private final String filterClause;
   private final List<String> groupByDimensions;
   private final TimeGranularity groupByTimeGranularity;
@@ -69,6 +73,7 @@ public class ThirdEyeRequest {
     this.groupByDimensions = new ArrayList<>(builder.groupBy);
     this.groupByTimeGranularity = builder.groupByTimeGranularity;
     this.dataSource = builder.dataSource;
+    this.filterSets = builder.filterSets;
     metricNames = new ArrayList<>();
     for (MetricFunction metric : metricFunctions) {
       metricNames.add(metric.toString());
@@ -107,6 +112,10 @@ public class ThirdEyeRequest {
 
   public Multimap<String, String> getFilterSet() {
     return filterSet;
+  }
+
+  public Collection<Multimap<String, String>> getFilterSets() {
+    return filterSets;
   }
 
   public String getFilterClause() {
@@ -170,10 +179,12 @@ public class ThirdEyeRequest {
     private TimeGranularity groupByTimeGranularity;
     private String dataSource = PinotThirdEyeDataSource.DATA_SOURCE_NAME;
     private int limit;
+    private Collection<Multimap<String, String>> filterSets;
 
     public ThirdEyeRequestBuilder() {
       this.filterSet = LinkedListMultimap.create();
       this.groupBy = new ArrayList<String>();
+      this.filterSets = Collections.emptyList();
       metricFunctions = new ArrayList<>();
     }
 
@@ -223,6 +234,11 @@ public class ThirdEyeRequest {
         this.filterSet.clear();
         this.filterSet.putAll(filterSet);
       }
+      return this;
+    }
+
+    public ThirdEyeRequestBuilder setFilterSets(Collection<Multimap<String, String>> filterSets) {
+      this.filterSets = new ArrayList<>(filterSets);
       return this;
     }
 

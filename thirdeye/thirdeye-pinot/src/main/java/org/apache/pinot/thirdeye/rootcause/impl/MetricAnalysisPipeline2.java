@@ -348,7 +348,13 @@ public class MetricAnalysisPipeline2 extends Pipeline {
     List<TimeSeriesRequestContainer> requests = new ArrayList<>();
     for(MetricSlice slice : slices) {
       try {
-        requests.add(DataFrameUtils.makeTimeSeriesRequestAligned(slice, makeIdentifier(slice), this.metricDAO, this.datasetDAO));
+        MetricConfigDTO metric = metricDAO.findById(slice.getMetricId());
+        if(metric == null)
+          throw new IllegalArgumentException(String.format("Could not resolve metric id %d", slice.getMetricId()));
+        DatasetConfigDTO dataset = datasetDAO.findByDataset(metric.getDataset());
+        if(dataset == null)
+          throw new IllegalArgumentException(String.format("Could not resolve dataset '%s' for metric id '%d'", metric.getDataset(), metric.getId()));
+        requests.add(DataFrameUtils.makeTimeSeriesRequestAligned(slice, makeIdentifier(slice), metric, dataset));
       } catch (Exception ex) {
         LOG.warn(String.format("Could not make request. Skipping."), ex);
       }

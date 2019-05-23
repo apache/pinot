@@ -19,6 +19,8 @@
 
 package org.apache.pinot.thirdeye.datasource.loader;
 
+import java.util.Collection;
+import java.util.Map;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
 import org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
@@ -44,4 +46,6 @@ public interface TimeSeriesLoader {
    * @return dataframe with aligned timestamps and values
    */
   DataFrame load(MetricSlice slice) throws Exception;
+
+  Map<MetricSlice, DataFrame> loadTimeSeries(Collection<MetricSlice> slices) throws Exception;
 }

@@ -25,21 +25,25 @@ import com.google.common.cache.LoadingCache;
 import com.google.common.cache.Weigher;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Collections2;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import javax.xml.crypto.Data;
 import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
 import org.apache.pinot.thirdeye.dataframe.LongSeries;
@@ -143,19 +147,21 @@ public class DefaultDataProvider implements DataProvider {
       }
 
       // if not in cache, fetch from data source
-      Map<MetricSlice, Future<DataFrame>> futures = new HashMap<>();
-      for (final MetricSlice slice : slices) {
-        if (!output.containsKey(slice)){
-          futures.put(slice, this.executor.submit(() -> DefaultDataProvider.this.timeseriesLoader.load(slice)));
-        }
-      }
-      //LOG.info("Fetching {} slices of timeseries, {} cache hit, {} cache miss", slices.size(), output.size(), futures.size());
-      final long deadline = System.currentTimeMillis() + TIMEOUT;
-      for (MetricSlice slice : slices) {
-        if (!output.containsKey(slice)) {
-          output.put(slice, futures.get(slice).get(makeTimeout(deadline), TimeUnit.MILLISECONDS));
-        }
-      }
+      output.putAll(this.timeseriesLoader.loadTimeSeries(slices.stream().filter(slice -> !output.containsKey(slice)).collect(
+          Collectors.toList())));
+//      Map<MetricSlice, Future<DataFrame>> futures = new HashMap<>();
+//      for (final MetricSlice slice : slices) {
+//        if (!output.containsKey(slice)){
+//          futures.put(slice, this.executor.submit(() -> DefaultDataProvider.this.timeseriesLoader.load(slice)));
+//        }
+//      }
+//      //LOG.info("Fetching {} slices of timeseries, {} cache hit, {} cache miss", slices.size(), output.size(), futures.size());
+//      final long deadline = System.currentTimeMillis() + TIMEOUT;
+//      for (MetricSlice slice : slices) {
+//        if (!output.containsKey(slice)) {
+//          output.put(slice, futures.get(slice).get(makeTimeout(deadline), TimeUnit.MILLISECONDS));
+//        }
+//      }
       //LOG.info("Fetching {} slices used {} milliseconds", slices.size(), System.currentTimeMillis() - ts);
       return output;
 

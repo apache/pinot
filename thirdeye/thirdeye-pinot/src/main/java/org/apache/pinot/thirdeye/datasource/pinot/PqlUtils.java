@@ -60,6 +60,7 @@ import org.slf4j.LoggerFactory;
 public class PqlUtils {
   private static final Joiner AND = Joiner.on(" AND ");
   private static final Joiner COMMA = Joiner.on(", ");
+  private static final Joiner OR = Joiner.on(" OR ");
 
   private static final String PREFIX_NOT_EQUALS = "!";
   private static final String PREFIX_LESS_THAN = "<";
@@ -90,13 +91,13 @@ public class PqlUtils {
     // TODO handle request.getFilterClause()
 
     return getPql(metricFunction, request.getStartTimeInclusive(), request.getEndTimeExclusive(), filterSet,
-        request.getGroupBy(), request.getGroupByTimeGranularity(), dataTimeSpec, request.getLimit());
+        request.getGroupBy(), request.getGroupByTimeGranularity(), dataTimeSpec, request.getLimit(), request.getFilterSets());
   }
 
 
   private static String getPql(MetricFunction metricFunction, DateTime startTime,
       DateTime endTimeExclusive, Multimap<String, String> filterSet, List<String> groupBy,
-      TimeGranularity timeGranularity, TimeSpec dataTimeSpec, int limit) throws ExecutionException {
+      TimeGranularity timeGranularity, TimeSpec dataTimeSpec, int limit, Collection<Multimap<String, String>> filterSets) throws ExecutionException {
 
     MetricConfigDTO metricConfig = ThirdEyeUtils.getMetricConfigFromId(metricFunction.getMetricId());
     String dataset = metricFunction.getDataset();
@@ -110,7 +111,12 @@ public class PqlUtils {
     String betweenClause = getBetweenClause(startTime, endTimeExclusive, dataTimeSpec, dataset);
     sb.append(" WHERE ").append(betweenClause);
 
-    String dimensionWhereClause = getDimensionWhereClause(filterSet);
+    String dimensionWhereClause;
+    if (filterSets.isEmpty()) {
+      dimensionWhereClause = getDimensionWhereClause(filterSet);
+    } else {
+      dimensionWhereClause = getDimensionWhereClauseBatch(filterSets);
+    }
     if (StringUtils.isNotBlank(dimensionWhereClause)) {
       sb.append(" AND ").append(dimensionWhereClause);
     }
@@ -287,6 +293,15 @@ public class PqlUtils {
 
     return String.format(" %s >= %s AND %s < %s", timeField, startUnits, timeField, endUnits);
   }
+
+  private static String getDimensionWhereClauseBatch(Collection<Multimap<String, String>> filterSets){
+    List<String> queries = new ArrayList<>();
+    for (Multimap<String, String> filterSet : filterSets) {
+      queries.add(getDimensionWhereClause(filterSet));
+    }
+    return OR.join(queries);
+  }
+
 
   /**
    * Generates PQL WHERE clause for a given filter map. The supported operation are:

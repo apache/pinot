@@ -31,6 +31,8 @@ import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
 import org.apache.pinot.thirdeye.dataframe.util.TimeSeriesRequestContainer;
 import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
+import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeRequest;
@@ -293,8 +295,14 @@ public class MetricAnalysisPipeline extends Pipeline {
       jointFilters.putAll(me.getFilters());
 
       MetricSlice slice = MetricSlice.from(me.getId(), start, end, jointFilters, this.granularity);
+      MetricConfigDTO metric = metricDAO.findById(slice.getMetricId());
+      if(metric == null)
+        throw new IllegalArgumentException(String.format("Could not resolve metric id %d", slice.getMetricId()));
+      DatasetConfigDTO dataset = datasetDAO.findByDataset(metric.getDataset());
+      if(dataset == null)
+        throw new IllegalArgumentException(String.format("Could not resolve dataset '%s' for metric id '%d'", metric.getDataset(), metric.getId()));
       try {
-        requests.add(DataFrameUtils.makeTimeSeriesRequestAligned(slice, me.getUrn(), this.metricDAO, this.datasetDAO));
+        requests.add(DataFrameUtils.makeTimeSeriesRequestAligned(slice, me.getUrn(), metric, dataset));
       } catch (Exception ex) {
         LOG.warn(String.format("Could not make request for '%s'. Skipping.", me.getUrn()), ex);
       }

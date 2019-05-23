@@ -19,6 +19,7 @@
 
 package org.apache.pinot.thirdeye.dataframe.util;
 
+import com.google.common.collect.Multimap;
 import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.dashboard.Utils;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
@@ -293,20 +294,12 @@ public class DataFrameUtils {
    *
    * @param slice metric data slice
    * @param reference unique identifier for request
-   * @param metricDAO metric config DAO
-   * @param datasetDAO dataset config DAO
+   * @param metric metric config DTO
+   * @param dataset dataset config DTO
    * @return TimeSeriesRequestContainer
    * @throws Exception
    */
-  public static TimeSeriesRequestContainer makeTimeSeriesRequestAligned(MetricSlice slice, String reference, MetricConfigManager metricDAO, DatasetConfigManager datasetDAO) throws Exception {
-    MetricConfigDTO metric = metricDAO.findById(slice.metricId);
-    if(metric == null)
-      throw new IllegalArgumentException(String.format("Could not resolve metric id %d", slice.metricId));
-
-    DatasetConfigDTO dataset = datasetDAO.findByDataset(metric.getDataset());
-    if(dataset == null)
-      throw new IllegalArgumentException(String.format("Could not resolve dataset '%s' for metric id '%d'", metric.getDataset(), metric.getId()));
-
+  public static TimeSeriesRequestContainer makeTimeSeriesRequestAligned(MetricSlice slice, String reference, MetricConfigDTO metric, DatasetConfigDTO dataset) throws Exception {
     List<MetricExpression> expressions = Utils.convertToMetricExpressions(metric.getName(),
         metric.getDefaultAggFunction(), metric.getDataset());
 
@@ -323,9 +316,48 @@ public class DataFrameUtils {
 
     MetricSlice alignedSlice = MetricSlice.from(slice.metricId, start.getMillis(), end.getMillis(), slice.filters, slice.granularity);
 
-    ThirdEyeRequest request = makeThirdEyeRequestBuilder(alignedSlice, metric, dataset, expressions, metricDAO)
+    ThirdEyeRequest request = makeThirdEyeRequestBuilder(alignedSlice, metric, dataset, expressions)
         .setGroupByTimeGranularity(granularity)
         .build(reference);
+
+    return new TimeSeriesRequestContainer(request, expressions, start, end, granularity.toPeriod());
+  }
+
+  public static TimeSeriesRequestContainer makeTimeSeriesRequestAlignedBatch(
+      long startTime,
+      long endTime,
+      List<Multimap<String, String>> filters,
+      List<String> dimensions,
+      TimeGranularity timeGranularity,
+      String reference, MetricConfigDTO metric, DatasetConfigDTO dataset) throws Exception {
+    List<MetricExpression> expressions = Utils.convertToMetricExpressions(metric.getName(),
+        metric.getDefaultAggFunction(), metric.getDataset());
+
+    TimeGranularity granularity = dataset.bucketTimeGranularity();
+    if (!MetricSlice.NATIVE_GRANULARITY.equals(timeGranularity)) {
+      granularity = timeGranularity;
+    }
+
+    DateTimeZone timezone = DateTimeZone.forID(dataset.getTimezone());
+    Period period = granularity.toPeriod();
+
+    DateTime start = new DateTime(startTime, timezone).withFields(makeOrigin(period.getPeriodType()));
+    DateTime end = new DateTime(endTime, timezone).withFields(makeOrigin(period.getPeriodType()));
+
+    List<MetricFunction> functions = new ArrayList<>();
+    for(MetricExpression exp : expressions) {
+      functions.addAll(exp.computeMetricFunctions());
+    }
+
+    ThirdEyeRequest request = ThirdEyeRequest.newBuilder()
+        .setStartTimeInclusive(startTime)
+        .setEndTimeExclusive(endTime)
+        .setFilterSets(filters)
+        .setGroupBy(dimensions)
+        .setMetricFunctions(functions)
+        .setDataSource(dataset.getDataSource()).setGroupByTimeGranularity(granularity)
+        .build(reference);
+
 
     return new TimeSeriesRequestContainer(request, expressions, start, end, granularity.toPeriod());
   }
@@ -364,7 +396,7 @@ public class DataFrameUtils {
     DateTime start = new DateTime(slice.start, timezone).withFields(makeOrigin(period.getPeriodType()));
     DateTime end = new DateTime(slice.end, timezone).withFields(makeOrigin(period.getPeriodType()));
 
-    ThirdEyeRequest request = makeThirdEyeRequestBuilder(slice, metric, dataset, expressions, metricDAO)
+    ThirdEyeRequest request = makeThirdEyeRequestBuilder(slice, metric, dataset, expressions)
         .setGroupByTimeGranularity(granularity)
         .build(reference);
 
@@ -413,7 +445,7 @@ public class DataFrameUtils {
     List<MetricExpression> expressions = Utils.convertToMetricExpressions(metric.getName(),
         metric.getDefaultAggFunction(), metric.getDataset());
 
-    ThirdEyeRequest request = makeThirdEyeRequestBuilder(slice, metric, dataset, expressions, metricDAO)
+    ThirdEyeRequest request = makeThirdEyeRequestBuilder(slice, metric, dataset, expressions)
         .setGroupBy(dimensions)
         .setLimit(limit)
         .build(reference);
@@ -496,11 +528,10 @@ public class DataFrameUtils {
    * @param metric metric dto
    * @param dataset dataset dto
    * @param expressions metric expressions
-   * @param metricDAO metric config DAO
    * @return ThirdeyeRequestBuilder
    * @throws ExecutionException
    */
-  private static ThirdEyeRequest.ThirdEyeRequestBuilder makeThirdEyeRequestBuilder(MetricSlice slice, MetricConfigDTO metric, DatasetConfigDTO dataset, List<MetricExpression> expressions, MetricConfigManager metricDAO) throws ExecutionException {
+  private static ThirdEyeRequest.ThirdEyeRequestBuilder makeThirdEyeRequestBuilder(MetricSlice slice, MetricConfigDTO metric, DatasetConfigDTO dataset, List<MetricExpression> expressions) throws ExecutionException {
     List<MetricFunction> functions = new ArrayList<>();
     for(MetricExpression exp : expressions) {
       functions.addAll(exp.computeMetricFunctions());

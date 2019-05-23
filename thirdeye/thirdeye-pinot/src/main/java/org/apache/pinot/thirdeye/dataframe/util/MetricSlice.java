@@ -101,7 +101,7 @@ public final class MetricSlice {
    * check if current metric slice contains another metric slice
    */
   public boolean containSlice(MetricSlice slice) {
-    return slice.metricId == this.metricId && slice.granularity.equals(this.granularity) && slice.getFilters().equals(this.getFilters()) &&
+    return slice.metricId == this.metricId && slice.granularity.equals(this.granularity) && slice.getFilters().asMap().equals(this.getFilters().asMap()) &&
         slice.start >= this.start && slice.end <= this.end;
   }
 
