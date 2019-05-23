@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.data.partition;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.pinot.common.utils.StringUtil;
 
@@ -55,11 +56,14 @@ public class MurmurPartitionFunction implements PartitionFunction {
   }
 
   /**
+   * NOTE: This code has been copied over from org.apache.kafka.common.utils.Utils::murmur2
+   *
    * Generates 32 bit murmur2 hash from byte array
    * @param data byte array to hash
    * @return 32 bit hash of the given array
    */
-  private int murmur2(final byte[] data) {
+  @VisibleForTesting
+  int murmur2(final byte[] data) {
     int length = data.length;
     int seed = 0x9747b28c;
     // 'm' and 'r' are mixing constants generated offline.

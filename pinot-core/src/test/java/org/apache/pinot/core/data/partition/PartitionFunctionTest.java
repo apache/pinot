@@ -19,6 +19,9 @@
 package org.apache.pinot.core.data.partition;
 
 import java.util.Random;
+import kafka.producer.ByteArrayPartitioner;
+import org.apache.kafka.common.utils.Utils;
+import org.apache.pinot.common.utils.StringUtil;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -154,6 +157,90 @@ public class PartitionFunctionTest {
         Integer value = random.nextInt();
         Assert.assertEquals(partitionFunction.getPartition(value), Math.abs(value.hashCode()) % expectedNumPartitions);
       }
+    }
+  }
+
+  /**
+   * Tests the equivalence of org.apache.kafka.common.utils.Utils::murmur2 and {@link MurmurPartitionFunction::murmur2}
+   * Our implementation of murmur2 has been copied over from Utils::murmur2
+   */
+  @Test
+  public void testMurmurEquivalence() {
+
+    // 10 values of size 7, were randomly generated, using {@link Random::nextBytes} with seed 100
+    // Applied org.apache.kafka.common.utils.Utils::murmur2 to those values and stored in expectedMurmurValues
+    int[] expectedMurmurValues =
+        new int[]{-1044832774, -594851693, 1441878663, 1766739604, 1034724141, -296671913, 443511156, 1483601453,
+            1819695080, -931669296};
+
+    long seed = 100;
+    Random random = new Random(seed);
+
+    int numPartitions = 5;
+    MurmurPartitionFunction murmurPartitionFunction = new MurmurPartitionFunction(numPartitions);
+
+    // Generate the same values as above - 10 random values of size 7, using {@link Random::nextBytes} with seed 100
+    // Apply {@link MurmurPartitionFunction::murmur2
+    // compare with stored results
+    byte[] array = new byte[7];
+    for (int expectedMurmurValue : expectedMurmurValues) {
+      random.nextBytes(array);
+      int actualMurmurValue = murmurPartitionFunction.murmur2(array);
+      Assert.assertEquals(actualMurmurValue, expectedMurmurValue);
+    }
+  }
+
+  /**
+   * Tests the equivalence of partitioning using org.apache.kafka.common.utils.Utils::partition and {@link MurmurPartitionFunction::getPartition}
+   */
+  @Test
+  public void testMurmurPartitionFunctionEquivalence() {
+
+    // 10 String values of size 7, were randomly generated, using {@link Random::nextBytes} with seed 100
+    // Applied {@link MurmurPartitionFunction} initialized with 5 partitions, by overriding {@MurmurPartitionFunction::murmur2} with org.apache.kafka.common.utils.Utils::murmur2
+    // stored the results in expectedPartitions
+    int[] expectedPartitions = new int[]{1, 4, 4, 1, 1, 2, 0, 4, 2, 3};
+
+    // initialized {@link MurmurPartitionFunction} with 5 partitions
+    int numPartitions = 5;
+    MurmurPartitionFunction murmurPartitionFunction = new MurmurPartitionFunction(numPartitions);
+
+    // generate the same 10 String values
+    // Apply the partition function and compare with stored results
+    testPartitionFunctionEquivalence(murmurPartitionFunction, expectedPartitions);
+  }
+
+  /**
+   * Tests the equivalence of kafka.producer.ByteArrayPartitioner::partition and {@link ByteArrayPartitionFunction::getPartition}
+   */
+  @Test
+  public void testByteArrayPartitionFunctionEquivalence() {
+    // 10 String values of size 7, were randomly generated, using {@link Random::nextBytes} with seed 100
+    // Applied kafka.producer.ByteArrayPartitioner::partition to those values and stored in expectedPartitions
+    int[] expectedPartitions = new int[]{1, 3, 2, 0, 0, 4, 4, 1, 2, 4};
+
+    // initialized {@link ByteArrayPartitionFunction} with 5 partitions
+    int numPartitions = 5;
+    ByteArrayPartitionFunction byteArrayPartitionFunction = new ByteArrayPartitionFunction(numPartitions);
+
+    // generate the same 10 String values
+    // Apply the partition function and compare with stored results
+    testPartitionFunctionEquivalence(byteArrayPartitionFunction, expectedPartitions);
+  }
+
+  private void testPartitionFunctionEquivalence(PartitionFunction partitionFunction, int[] expectedPartitions) {
+    long seed = 100;
+    Random random = new Random(seed);
+
+    // Generate 10 random String values of size 7, using {@link Random::nextBytes} with seed 100
+    // Apply given partition function
+    // compare with expectedPartitions
+    byte[] array = new byte[7];
+    for (int expectedPartition : expectedPartitions) {
+      random.nextBytes(array);
+      String nextString = StringUtil.decodeUtf8(array);
+      int actualPartition = partitionFunction.getPartition(nextString);
+      Assert.assertEquals(actualPartition, expectedPartition);
     }
   }
 }
