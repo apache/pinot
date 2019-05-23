@@ -274,8 +274,14 @@ public class ControllerStarter {
         new SegmentCompletionManager(helixParticipantManager, _pinotLLCRealtimeSegmentManager, _controllerMetrics,
             _controllerLeadershipManager, _config.getSegmentCommitTimeoutSeconds());
 
-    _realtimeSegmentsManager = new PinotRealtimeSegmentManager(_helixResourceManager, _controllerLeadershipManager);
-    _realtimeSegmentsManager.start(_controllerMetrics);
+    if (_config.getHLCTablesAllowed()) {
+      LOGGER.info("HLC table is allowed. HLC realtime segment completion is enabled.");
+      _realtimeSegmentsManager = new PinotRealtimeSegmentManager(_helixResourceManager, _controllerLeadershipManager);
+      _realtimeSegmentsManager.start(_controllerMetrics);
+    } else {
+      LOGGER.info("HLC table is disallowed. HLC realtime segment completion is disabled.");
+      _realtimeSegmentsManager = null;
+    }
 
     // Setting up periodic tasks
     List<PeriodicTask> controllerPeriodicTasks = setupControllerPeriodicTasks();
@@ -484,8 +490,10 @@ public class ControllerStarter {
       LOGGER.info("Stopping Jersey admin API");
       _adminApp.stop();
 
-      LOGGER.info("Stopping realtime segment manager");
-      _realtimeSegmentsManager.stop();
+      if (_realtimeSegmentsManager != null) {
+        LOGGER.info("Stopping realtime segment manager");
+        _realtimeSegmentsManager.stop();
+      }
 
       LOGGER.info("Stopping resource manager");
       _helixResourceManager.stop();

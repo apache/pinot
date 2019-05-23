@@ -21,15 +21,24 @@ package org.apache.pinot.integration.tests;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Function;
 import java.io.File;
+import java.io.IOException;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import org.apache.avro.reflect.Nullable;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.ZNRecord;
+import org.apache.pinot.common.config.IndexingConfig;
+import org.apache.pinot.common.config.SegmentsValidationAndRetentionConfig;
+import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.common.config.TableCustomConfig;
 import org.apache.pinot.common.config.TableNameBuilder;
+import org.apache.pinot.common.config.TenantConfig;
 import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
@@ -67,6 +76,13 @@ public class LLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegratio
     }
 
     super.setUp();
+  }
+
+  @Override
+  public void startController() {
+    ControllerConf controllerConfig = getDefaultControllerConfiguration();
+    controllerConfig.setHLCTablesAllowed(false);
+    startController(controllerConfig);
   }
 
   @Override
@@ -141,6 +157,30 @@ public class LLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegratio
         }
       }
     }, 600_000L, "Failed to generate inverted index");
+  }
+
+  @Test
+  public void testAddHLCTableShouldFail() {
+    TableConfig tableConfig = new TableConfig();
+    IndexingConfig indexingConfig = new IndexingConfig();
+    Map<String, String> streamConfigs = new HashMap<>();
+    streamConfigs.put("stream.kafka.consumer.type", "HIGHLEVEL");
+    indexingConfig.setStreamConfigs(streamConfigs);
+    tableConfig.setIndexingConfig(indexingConfig);
+    tableConfig.setTableName("testTable");
+    tableConfig.setTableType(CommonConstants.Helix.TableType.REALTIME);
+    SegmentsValidationAndRetentionConfig validationAndRetentionConfig = new SegmentsValidationAndRetentionConfig();
+    tableConfig.setValidationConfig(validationAndRetentionConfig);
+    TenantConfig tenantConfig = new TenantConfig();
+    tableConfig.setTenantConfig(tenantConfig);
+    TableCustomConfig tableCustomConfig = new TableCustomConfig();
+    tableConfig.setCustomConfig(tableCustomConfig);
+    try {
+      sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJsonConfigString());
+      Assert.fail();
+    } catch (IOException e) {
+      // Expected
+    }
   }
 }
 

@@ -32,7 +32,6 @@ import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.StringUtil;
-import org.apache.pinot.controller.helix.core.util.HelixSetupUtils;
 import org.apache.pinot.filesystem.LocalPinotFS;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -136,8 +135,8 @@ public class ControllerConf extends PropertiesConfiguration {
   private static final String REALTIME_SEGMENT_METADATA_COMMIT_NUMLOCKS =
       "controller.realtime.segment.metadata.commit.numLocks";
   private static final String ENABLE_STORAGE_QUOTA_CHECK = "controller.enable.storage.quota.check";
-
   private static final String ENABLE_BATCH_MESSAGE_MODE = "controller.enable.batch.message.mode";
+  private static final String ALLOW_HLC_TABLES = "controller.allow.hlc.tables";
 
   // Defines the kind of storage and the underlying PinotFS implementation
   private static final String PINOT_FS_FACTORY_CLASS_PREFIX = "controller.storage.factory.class";
@@ -155,6 +154,7 @@ public class ControllerConf extends PropertiesConfiguration {
   private static final int DEFAULT_REALTIME_SEGMENT_METADATA_COMMIT_NUMLOCKS = 64;
   private static final boolean DEFAULT_ENABLE_STORAGE_QUOTA_CHECK = true;
   private static final boolean DEFAULT_ENABLE_BATCH_MESSAGE_MODE = false;
+  private static final boolean DEFAULT_ALLOW_HLC_TABLES = true;
   private static final String DEFAULT_CONTROLLER_MODE = ControllerMode.DUAL.name();
 
   private static final String DEFAULT_PINOT_FS_FACTORY_CLASS_LOCAL = LocalPinotFS.class.getName();
@@ -636,5 +636,13 @@ public class ControllerConf extends PropertiesConfiguration {
 
   public ControllerMode getControllerMode() {
     return ControllerMode.valueOf(getString(CONTROLLER_MODE, DEFAULT_CONTROLLER_MODE).toUpperCase());
+  }
+
+  public boolean getHLCTablesAllowed() {
+    return getBoolean(ALLOW_HLC_TABLES, DEFAULT_ALLOW_HLC_TABLES);
+  }
+
+  public void setHLCTablesAllowed(boolean allowHLCTables) {
+    setProperty(ALLOW_HLC_TABLES, allowHLCTables);
   }
 }
