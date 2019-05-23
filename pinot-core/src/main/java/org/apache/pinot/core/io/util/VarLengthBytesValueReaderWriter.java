@@ -24,8 +24,8 @@ import java.io.IOException;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 
 public class VarLengthBytesValueReaderWriter implements Closeable, ValueReader {
-  protected final PinotDataBuffer _dataBuffer;
-  protected transient int _numElements;
+  private final PinotDataBuffer _dataBuffer;
+  private transient int _numElements;
 
   public static long getRequiredSize(byte[][] byteArrays) {
     // First include the length size and offset of each byte array.
@@ -64,7 +64,7 @@ public class VarLengthBytesValueReaderWriter implements Closeable, ValueReader {
     }
   }
 
-  public int getNumElements() {
+  int getNumElements() {
     // Lazily initialize the numElements.
     if (_numElements == 0) {
       _numElements = _dataBuffer.getInt(0);
