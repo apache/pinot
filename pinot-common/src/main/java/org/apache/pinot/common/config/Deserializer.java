@@ -349,23 +349,23 @@ public class Deserializer {
         } else if (value instanceof String) {
           String stringValue = (String) value;
           try {
-            if (fieldType.isAssignableFrom(Integer.class) || fieldType.isAssignableFrom(int.class)){
+            if (fieldType.isAssignableFrom(Integer.class) || fieldType.isAssignableFrom(int.class)) {
               destinationValue = Integer.parseInt(stringValue);
-            } else if (fieldType.isAssignableFrom(Long.class) || fieldType.isAssignableFrom(long.class)){
+            } else if (fieldType.isAssignableFrom(Long.class) || fieldType.isAssignableFrom(long.class)) {
               destinationValue = Long.parseLong(stringValue);
-            } else if (fieldType.isAssignableFrom(Boolean.class) || fieldType.isAssignableFrom(boolean.class)){
+            } else if (fieldType.isAssignableFrom(Boolean.class) || fieldType.isAssignableFrom(boolean.class)) {
               destinationValue = Boolean.parseBoolean(stringValue);
-            } else if (Enum.class.isAssignableFrom(fieldType)){
+            } else if (Enum.class.isAssignableFrom(fieldType)) {
               destinationValue = Enum.valueOf(fieldType.asSubclass(Enum.class), stringValue.toUpperCase());
-            } else if (fieldType.isAssignableFrom(Float.class) || fieldType.isAssignableFrom(float.class)){
+            } else if (fieldType.isAssignableFrom(Float.class) || fieldType.isAssignableFrom(float.class)) {
               destinationValue = Float.parseFloat(stringValue);
-            } else if (fieldType.isAssignableFrom(Double.class) || fieldType.isAssignableFrom(double.class)){
+            } else if (fieldType.isAssignableFrom(Double.class) || fieldType.isAssignableFrom(double.class)) {
               destinationValue = Double.parseDouble(stringValue);
-            } else if (fieldType.isAssignableFrom(Short.class) || fieldType.isAssignableFrom(short.class)){
+            } else if (fieldType.isAssignableFrom(Short.class) || fieldType.isAssignableFrom(short.class)) {
               destinationValue = Short.parseShort(stringValue);
-            } else if (fieldType.isAssignableFrom(Byte.class) || fieldType.isAssignableFrom(byte.class)){
+            } else if (fieldType.isAssignableFrom(Byte.class) || fieldType.isAssignableFrom(byte.class)) {
               destinationValue = Byte.parseByte(stringValue);
-            } else if (fieldType.isAssignableFrom(Character.class) || fieldType.isAssignableFrom(char.class)){
+            } else if (fieldType.isAssignableFrom(Character.class) || fieldType.isAssignableFrom(char.class)) {
               destinationValue = stringValue.charAt(0);
             }
             else {
