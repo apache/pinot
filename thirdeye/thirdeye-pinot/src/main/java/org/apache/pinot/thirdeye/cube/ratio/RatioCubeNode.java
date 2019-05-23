@@ -38,8 +38,6 @@ public class RatioCubeNode extends BaseCubeNode<RatioCubeNode, RatioRow> {
   private double baselineDenominatorValue;
   private double currentDenominatorValue;
 
-  NodeStatus status;
-
   /**
    * Constructs a root CubeNode whose level and index is 0 and parent pointer is null.
    *
@@ -111,28 +109,36 @@ public class RatioCubeNode extends BaseCubeNode<RatioCubeNode, RatioRow> {
     return data.getCurrentNumeratorValue() + data.getCurrentDenominatorValue();
   }
 
-  @Override
-  public double getBaselineValue() {
-    if (!DoubleMath.fuzzyEquals(baselineDenominatorValue, 0, epsilon)) {
-      return baselineNumeratorValue / baselineDenominatorValue;
-    } else if (DoubleMath.fuzzyEquals(baselineNumeratorValue, 0, epsilon)) {
-      return 0d;
+  /**
+   * Calculates the value of the given numerator and denominator.
+   * If denominator is non-zero, then return (numerator / denominator);
+   * If both numerator and denominator are zero, then return 0.
+   * If only denominator is zero, then return (numerator / node size).
+   *
+   * @param numerator the numerator.
+   * @param denominator the denominator.
+   *
+   * @return the value of the given numerator and denominator.
+   */
+  private double calculateValue(double numerator, double denominator) {
+    if (!DoubleMath.fuzzyEquals(denominator, 0, epsilon)) {
+      return numerator / denominator;
+    } else if (DoubleMath.fuzzyEquals(numerator, 0, epsilon)) {
+      return 0d; // Let the algorithm to handle this case as a missing value.
     } else {
-      // divide the numerator value by numerator sum to prevent large change diff.
-      return baselineNumeratorValue / (currentNumeratorValue + baselineNumeratorValue);
+      // Divide the numerator value by node size to prevent large change diff.
+      return numerator / (getCurrentSize() + getBaselineSize());
     }
   }
 
   @Override
+  public double getBaselineValue() {
+    return calculateValue(baselineNumeratorValue, baselineDenominatorValue);
+  }
+
+  @Override
   public double getCurrentValue() {
-    if (!DoubleMath.fuzzyEquals(currentDenominatorValue, 0, epsilon)) {
-      return currentNumeratorValue / currentDenominatorValue;
-    } else if (DoubleMath.fuzzyEquals(currentNumeratorValue, 0, epsilon)) {
-      return 0d;
-    } else {
-      // divide the numerator value by numerator sum to prevent large change diff.
-      return currentNumeratorValue / (currentNumeratorValue + baselineNumeratorValue);
-    }
+    return calculateValue(currentNumeratorValue, currentDenominatorValue);
   }
 
   @Override
@@ -153,6 +159,28 @@ public class RatioCubeNode extends BaseCubeNode<RatioCubeNode, RatioRow> {
   @Override
   public double changeRatio() {
     return (currentNumeratorValue / currentDenominatorValue) / (baselineNumeratorValue / baselineDenominatorValue);
+  }
+
+  @Override
+  public boolean side() {
+    double currentValue = getCurrentValue();
+    double baselineValue = getBaselineValue();
+    if (!DoubleMath.fuzzyEquals(currentValue, 0, epsilon) && !DoubleMath.fuzzyEquals(baselineValue, 0, epsilon)) {
+      // The most common case is located first in order to reduce performance impact
+      return DoubleMath.fuzzyCompare(currentValue, baselineValue, epsilon) >= 0;
+    } else {
+      if (parent != null) {
+        if (DoubleMath.fuzzyEquals(currentValue, 0, epsilon) && DoubleMath.fuzzyEquals(baselineValue, 0, epsilon)) {
+          return parent.side();
+        } else if (DoubleMath.fuzzyEquals(currentValue, 0, epsilon)) {
+          return DoubleMath.fuzzyCompare(baselineValue, parent.getBaselineValue(), epsilon) < 0;
+        } else { //if (DoubleMath.fuzzyEquals(baselineValue, 0, epsilon)) {
+          return DoubleMath.fuzzyCompare(currentValue, parent.getCurrentValue(), epsilon) >= 0;
+        }
+      } else {
+        return DoubleMath.fuzzyCompare(currentValue, baselineValue, epsilon) >= 0;
+      }
+    }
   }
 
   /**
@@ -189,21 +217,6 @@ public class RatioCubeNode extends BaseCubeNode<RatioCubeNode, RatioRow> {
    */
   public double getCurrentDenominatorValue() {
     return currentDenominatorValue;
-  }
-
-  public void computeStatus() {
-    NodeStatus status = new NodeStatus();
-    status.baselineRatio = this.getBaselineValue();
-    status.currentRatio = this.getCurrentValue();
-    status.baselineSize = this.getBaselineSize();
-    status.currentSize = this.getCurrentSize();
-  }
-
-  public static class NodeStatus {
-    double baselineRatio;
-    double currentRatio;
-    double baselineSize;
-    double currentSize;
   }
 
   @Override

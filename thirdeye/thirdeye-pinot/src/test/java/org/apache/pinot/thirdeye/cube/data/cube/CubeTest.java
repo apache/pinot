@@ -91,13 +91,13 @@ public class CubeTest {
 
   private List<DimNameValueCostEntry> getBasicCostSet() {
     List<DimNameValueCostEntry> costSet = new ArrayList<>();
-    costSet.add(new DimNameValueCostEntry("country", "US", 0, 0, 0, 0, 0, 7));
-    costSet.add(new DimNameValueCostEntry("country", "IN", 0, 0, 0, 0,  0, 3));
-    costSet.add(new DimNameValueCostEntry("continent", "N. America", 0, 0, 0,  0, 0, 4));
-    costSet.add(new DimNameValueCostEntry("continent", "S. America", 0, 0, 0, 0, 0,  1));
-    costSet.add(new DimNameValueCostEntry("page", "front_page", 0, 0, 0, 0,  0, 4));
-    costSet.add(new DimNameValueCostEntry("page", "page", 0, 0, 0, 0,  0, 3));
-    costSet.add(new DimNameValueCostEntry("page", "page2", 0, 0, 0, 0,  0, 1));
+    costSet.add(new DimNameValueCostEntry("country", "US", 0, 0, 0d, 0d, 0, 0, 0, 7));
+    costSet.add(new DimNameValueCostEntry("country", "IN", 0, 0, 0d, 0d, 0, 0,  0, 3));
+    costSet.add(new DimNameValueCostEntry("continent", "N. America", 0, 0, 0d, 0d, 0,  0, 0, 4));
+    costSet.add(new DimNameValueCostEntry("continent", "S. America", 0, 0, 0d, 0d, 0, 0, 0,  1));
+    costSet.add(new DimNameValueCostEntry("page", "front_page", 0, 0, 0d, 0d, 0, 0,  0, 4));
+    costSet.add(new DimNameValueCostEntry("page", "page", 0, 0, 0d, 0d, 0, 0,  0, 3));
+    costSet.add(new DimNameValueCostEntry("page", "page2", 0, 0, 0d, 0d, 0, 0,  0, 1));
     return costSet;
   }
 

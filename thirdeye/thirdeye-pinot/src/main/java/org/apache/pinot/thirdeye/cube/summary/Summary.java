@@ -102,7 +102,7 @@ public class Summary {
     CubeNode root = cube.getRoot();
     if (doOneSideError) {
       oneSideErrorRowInserter =
-          new OneSideErrorRowInserter(basicRowInserter, Double.compare(1., root.targetChangeRatio()) <= 0);
+          new OneSideErrorRowInserter(basicRowInserter, Double.compare(1., root.bootStrapChangeRatio()) <= 0);
       // If this cube contains only one dimension, one side error is calculated starting at leaf (detailed) level;
       // otherwise, a row at different side is removed through internal nodes.
       if (this.levelCount == 1) leafRowInserter = oneSideErrorRowInserter;
@@ -156,7 +156,7 @@ public class Summary {
     CubeNode parent = node.getParent();
     DPArray dpArray = dpArrays.get(node.getLevel());
     dpArray.fullReset();
-    dpArray.targetRatio = node.targetChangeRatio();
+    dpArray.targetRatio = node.bootStrapChangeRatio();
 
     // Compute DPArray if the current node is the lowest internal node.
     // Otherwise, merge DPArrays from its children.
@@ -167,16 +167,16 @@ public class Summary {
 //        dpArray.setShrinkSize(Math.max(2, (node.childrenSize()+1)/2));
 //      }
       for (CubeNode child : (List<CubeNode>) node.getChildren()) {
-        leafRowInserter.insertRowToDPArray(dpArray, child, node.targetChangeRatio());
+        leafRowInserter.insertRowToDPArray(dpArray, child, node.bootStrapChangeRatio());
         updateWowValues(node, dpArray.getAnswer());
-        dpArray.targetRatio = node.targetChangeRatio(); // get updated changeRatio
+        dpArray.targetRatio = node.bootStrapChangeRatio(); // get updated changeRatio
       }
     } else {
       for (CubeNode child : (List<CubeNode>) node.getChildren()) {
         computeChildDPArray(child);
         mergeDPArray(node, dpArray, dpArrays.get(node.getLevel() + 1));
         updateWowValues(node, dpArray.getAnswer());
-        dpArray.targetRatio = node.targetChangeRatio(); // get updated changeRatio
+        dpArray.targetRatio = node.bootStrapChangeRatio(); // get updated changeRatio
       }
       // Use the following block to replace the above one to roll-up rows aggressively
 //      List<CubeNode> removedNodes = new ArrayList<>();
@@ -187,7 +187,7 @@ public class Summary {
 //          computeChildDPArray(child);
 //          removedNodes.addAll(mergeDPArray(node, dpArray, dpArrays.get(node.getLevel() + 1)));
 //          updateWowValues(node, dpArray.getAnswer());
-//          dpArray.targetChangeRatio = node.targetChangeRatio(); // get updated changeRatio
+//          dpArray.bootStrapChangeRatio = node.bootStrapChangeRatio(); // get updated changeRatio
 //        }
 //        // Aggregate current node's answer if it is thinned out due to the user's answer size is too huge.
 //        // If the current node is kept being thinned out, it eventually aggregates all its children.
@@ -197,7 +197,7 @@ public class Summary {
 //          removedNodes.clear();
 //          dpArray.setShrinkSize(Math.max(1, (dpArray.getAnswer().size()*2)/3));
 //          dpArray.reset();
-//          dpArray.targetChangeRatio = node.targetChangeRatio();
+//          dpArray.bootStrapChangeRatio = node.bootStrapChangeRatio();
 //        }
 //      } while (doRollback);
     }
@@ -207,7 +207,7 @@ public class Summary {
     // Moreover, if a node is thinned out by its children, it won't be inserted to the answer.
     if (node.getLevel() != 0) {
       updateWowValues(parent, dpArray.getAnswer());
-      double targetRatio = parent.targetChangeRatio();
+      double targetRatio = parent.bootStrapChangeRatio();
       recomputeCostAndRemoveSmallNodes(node, dpArray, targetRatio);
       dpArray.targetRatio = targetRatio;
       if ( !nodeIsThinnedOut(node) ) {
@@ -313,7 +313,7 @@ public class Summary {
   }
 
   /**
-   * Recompute costs of the nodes in a DPArray using targetChangeRatio for calculating the cost.
+   * Recompute costs of the nodes in a DPArray using bootStrapChangeRatio for calculating the cost.
    */
   private void recomputeCostAndRemoveSmallNodes(CubeNode parentNode, DPArray dp, double targetRatio) {
     Set<CubeNode> removedNodes = new HashSet<>(dp.getAnswer());
@@ -335,12 +335,12 @@ public class Summary {
 
   /**
    * If the node's parent is also in the DPArray, then it's parent's current changeRatio is used as the target changeRatio for
-   * calculating the cost of the node; otherwise, targetChangeRatio is used.
+   * calculating the cost of the node; otherwise, bootStrapChangeRatio is used.
    */
   private void insertRowWithAdaptiveRatioNoOneSideError(DPArray dp, CubeNode node, double targetRatio) {
     if (dp.getAnswer().contains(node.getParent())) {
       // For one side error if node's parent is included in the solution, then its cost will be calculated normally.
-      basicRowInserter.insertRowToDPArray(dp, node, node.getParent().targetChangeRatio());
+      basicRowInserter.insertRowToDPArray(dp, node, node.getParent().bootStrapChangeRatio());
     } else {
       basicRowInserter.insertRowToDPArray(dp, node, targetRatio);
     }
@@ -348,12 +348,12 @@ public class Summary {
 
   /**
    * If the node's parent is also in the DPArray, then it's parent's current changeRatio is used as the target changeRatio for
-   * calculating the cost of the node; otherwise, targetChangeRatio is used.
+   * calculating the cost of the node; otherwise, bootStrapChangeRatio is used.
    */
   private void insertRowWithAdaptiveRatio(DPArray dp, CubeNode node, double targetRatio) {
     if (dp.getAnswer().contains(node.getParent())) {
       // For one side error if node's parent is included in the solution, then its cost will be calculated normally.
-      basicRowInserter.insertRowToDPArray(dp, node, node.getParent().targetChangeRatio());
+      basicRowInserter.insertRowToDPArray(dp, node, node.getParent().bootStrapChangeRatio());
     } else {
       oneSideErrorRowInserter.insertRowToDPArray(dp, node, targetRatio);
     }
@@ -410,10 +410,10 @@ public class Summary {
     public void insertRowToDPArray(DPArray dp, CubeNode node, double targetRatio)  {
       // If the row has the same change trend with the top row, then it is inserted.
       if ( side == node.side() ) {
-        // When do oneSide, we try to make the root's changeRatio close to 1 in order to see the major root causes.
-        if ( (side && Double.compare(targetRatio, 1d) > 0) || (!side && Double.compare(targetRatio, 1d) < 0)) {
-          targetRatio = 1d;
-        }
+//        // When do oneSide, we try to make the root's changeRatio close to 1 in order to see the major root causes.
+//        if ( (side && Double.compare(targetRatio, 1d) > 0) || (!side && Double.compare(targetRatio, 1d) < 0)) {
+//          targetRatio = 1d;
+//        }
         basicRowInserter.insertRowToDPArray(dp, node, targetRatio);
       } else { // Otherwise, it is inserted only there exists an intermediate parent besides root node
         CubeNode parent = findAncestor(node, null, dp.getAnswer());

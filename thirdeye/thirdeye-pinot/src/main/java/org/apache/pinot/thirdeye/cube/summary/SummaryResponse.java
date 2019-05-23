@@ -37,7 +37,7 @@ import org.apache.pinot.thirdeye.cube.data.node.CubeNode;
 
 public class SummaryResponse {
   private final static int MAX_GAINER_LOSER_COUNT = 5;
-  private final static NumberFormat DOUBLE_FORMATTER = new DecimalFormat("#0.00");
+  private final static NumberFormat DOUBLE_FORMATTER = new DecimalFormat("#0.0000");
   static final  String INFINITE = "";
 
   static final String ALL = "(ALL)";
@@ -154,8 +154,7 @@ public class SummaryResponse {
     SummaryGainerLoserResponseRow row = new SummaryGainerLoserResponseRow();
     row.baselineValue = costEntry.getBaselineValue();
     row.currentValue = costEntry.getCurrentValue();
-    row.baselineSize = costEntry.getBaselineSize();
-    row.currentSize = costEntry.getCurrentSize();
+    row.sizeFactor = costEntry.getSizeFactor();
     row.dimensionName = costEntry.getDimName();
     row.dimensionValue = costEntry.getDimValue();
     row.percentageChange = computePercentageChange(row.baselineValue, row.currentValue);
@@ -223,8 +222,8 @@ public class SummaryResponse {
       row.baselineValue = node.getBaselineValue();
       row.currentValue = node.getCurrentValue();
       row.percentageChange = computePercentageChange(row.baselineValue, row.currentValue);
-      row.baselineSize = node.getBaselineSize();
-      row.currentSize = node.getCurrentSize();
+      row.sizeFactor =
+          (node.getBaselineSize() + node.getCurrentSize()) / (baselineTotalSize + currentTotalSize);
       row.contributionChange =
           computeContributionChange(row.baselineValue, row.currentValue, baselineTotal, currentTotal);
       row.contributionToOverallChange =
@@ -271,7 +270,7 @@ public class SummaryResponse {
   }
 
   private static double roundUp(double number) {
-    return Math.round(number * 100d) / 100d;
+    return Math.round(number * 10000d) / 10000d;
   }
 
   public String toString() {

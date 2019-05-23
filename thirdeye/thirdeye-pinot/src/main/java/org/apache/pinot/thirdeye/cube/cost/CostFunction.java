@@ -35,6 +35,7 @@ public interface CostFunction {
    *
    * @return the error cost of the current node.
    */
+  // TODO: Change to take as input nodes instead of values
   double computeCost(double parentChangeRatio, double baselineValue, double currentValue, double baselineSize,
       double currentSize, double topBaselineValue, double topCurrentValue, double topBaselineSize,
       double topCurrentSize);

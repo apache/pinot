@@ -25,11 +25,18 @@ import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import org.apache.pinot.thirdeye.cube.data.cube.CubeUtils;
 import org.apache.pinot.thirdeye.cube.data.dbrow.DimensionValues;
 import org.apache.pinot.thirdeye.cube.data.dbrow.Dimensions;
 import org.apache.pinot.thirdeye.cube.data.dbrow.Row;
 
 
+/**
+ * Provides basic implementation for hierarchical cube nodes.
+ *
+ * @param <N> the class of the inherited cube node.
+ * @param <R> the Row class of the inherited cube node.
+ */
 public abstract class BaseCubeNode<N extends BaseCubeNode, R extends Row> implements CubeNode<N> {
   protected int level;
   protected int index;
@@ -114,18 +121,24 @@ public abstract class BaseCubeNode<N extends BaseCubeNode, R extends Row> implem
     return Collections.unmodifiableList(children);
   }
 
+  /**
+   * Returns the change ratio of the node if it is a finite number; otherwise, returns an alternative ratio as follows:
+   * 1. If originalChangeRatio is a finite number, return it;
+   * 2. otherwise, get the ratio from its parent.
+   * 3. If none is available, return 1.0.
+   */
   @Override
-  public double targetChangeRatio() {
+  public double bootStrapChangeRatio() {
     double ratio = changeRatio();
-    if (!Double.isInfinite(ratio) && Double.compare(ratio, 0d) != 0) {
+    if (Double.isFinite(ratio) && Double.compare(ratio, 0d) != 0) {
       return ratio;
     } else {
       ratio = originalChangeRatio();
-      if (!Double.isInfinite(ratio) && Double.compare(ratio, 0d) != 0) {
-        return ratio;
+      if (Double.isFinite(ratio) && Double.compare(ratio, 0d) != 0) {
+        return CubeUtils.ensureChangeRatioDirection(getBaselineValue(), getCurrentValue(), ratio);
       } else {
         if (parent != null) {
-          return parent.targetChangeRatio();
+          return CubeUtils.ensureChangeRatioDirection(getBaselineValue(), getCurrentValue(), parent.bootStrapChangeRatio());
         } else {
           return 1.;
         }

@@ -106,6 +106,7 @@ public class RatioDBClient extends BaseCubePinotClient<RatioRow> {
           row.setCurrentDenominatorValue(value);
           break;
         default:
+          throw new IllegalArgumentException("Unsupported CubeTag: " + tag.name());
       }
     }
   }

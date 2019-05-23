@@ -82,4 +82,29 @@ public class CubeUtils {
       return ret;
     }
   }
+
+  /**
+   * Flips parent's change ratio if the change ratios of current node and its parent are different.
+   *
+   * @param baselineValue the baseline value of a node.
+   * @param currentValue the current value of a node.
+   * @param ratio the (parent) ratio to be flipped.
+   *
+   * @return the ratio that has the same direction as the change direction of baseline and current value.
+   */
+  public static double ensureChangeRatioDirection(double baselineValue, double currentValue, double ratio) {
+    // case: value goes down but parent's value goes up
+    if (DoubleMath.fuzzyCompare(baselineValue, currentValue, epsilon) > 0 && DoubleMath.fuzzyCompare(ratio, 1, epsilon) > 0) {
+      if (Double.compare(ratio, 2) >= 0) {
+        ratio = 2d - (ratio - ((long) ratio - 1));
+      } else {
+        ratio = 2d - ratio;
+      }
+      // case: value goes up but parent's value goes down
+    } else if (DoubleMath.fuzzyCompare(baselineValue, currentValue, epsilon) < 0 && DoubleMath.fuzzyCompare(ratio, 1, epsilon) < 0) {
+      ratio = 2d - ratio;
+    }
+    // return the original ratio for other cases.
+    return ratio;
+  }
 }
