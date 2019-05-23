@@ -19,13 +19,13 @@
 package org.apache.pinot.core.segment.index.readers;
 
 import org.apache.pinot.core.io.util.ValueReader;
+import org.apache.pinot.core.io.util.VarLengthStringsReaderWriter;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
-
 
 public class StringDictionary extends ImmutableDictionaryReader {
 
   public StringDictionary(PinotDataBuffer dataBuffer, int length, int numBytesPerValue, byte paddingByte) {
-    super(dataBuffer, length, numBytesPerValue, paddingByte);
+    super(new VarLengthStringsReaderWriter(dataBuffer), length, numBytesPerValue, paddingByte);
   }
 
   public StringDictionary(ValueReader valueReader, int length) {
@@ -45,20 +45,19 @@ public class StringDictionary extends ImmutableDictionaryReader {
 
   @Override
   public String get(int dictId) {
-    return getUnpaddedString(dictId, getBuffer());
+    return getStringValue(dictId);
   }
 
   @Override
   public String getStringValue(int dictId) {
-    return getUnpaddedString(dictId, getBuffer());
+    return getString(dictId);
   }
 
   @Override
   public void readStringValues(int[] dictIds, int inStartPos, int length, String[] outValues, int outStartPos) {
-    byte[] buffer = getBuffer();
     int inEndPos = inStartPos + length;
     for (int i = inStartPos; i < inEndPos; i++) {
-      outValues[outStartPos++] = getUnpaddedString(dictIds[i], buffer);
+      outValues[outStartPos++] = getStringValue(dictIds[i]);
     }
   }
 }

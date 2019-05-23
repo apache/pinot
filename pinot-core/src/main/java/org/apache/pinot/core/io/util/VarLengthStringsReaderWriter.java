@@ -16,19 +16,35 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.segment.index.readers;
+package org.apache.pinot.core.io.util;
 
-import org.apache.pinot.core.io.util.FixedByteValueReaderWriter;
+import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 
+public class VarLengthStringsReaderWriter extends VarLengthBytesValueReaderWriter {
 
-/**
- * Abstract base class for all on-heap dictionary implementations.
- *
- */
-public abstract class OnHeapDictionary extends ImmutableDictionaryReader {
+  private static byte[][] convertToByteArrays(String[] strings) {
+    byte[][] byteArrays = new byte[strings.length][];
+    for (int i = 0; i < strings.length; i++) {
+      byteArrays[i] = StringUtil.encodeUtf8(strings[i]);
+    }
+    return byteArrays;
+  }
 
-  protected OnHeapDictionary(PinotDataBuffer dataBuffer, int length, int numBytesPerValue, byte paddingByte) {
-    super(new FixedByteValueReaderWriter(dataBuffer), length, numBytesPerValue, paddingByte);
+  public static long getRequiredSize(String[] strings) {
+    return getRequiredSize(convertToByteArrays(strings));
+  }
+
+  public VarLengthStringsReaderWriter(PinotDataBuffer dataBuffer) {
+    super(dataBuffer);
+  }
+
+  public void init(String[] strings) {
+    super.init(convertToByteArrays(strings));
+  }
+
+  @Override
+  public String getString(int index) {
+    return StringUtil.decodeUtf8(getBytes(index));
   }
 }

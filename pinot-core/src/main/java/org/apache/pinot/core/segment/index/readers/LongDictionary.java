@@ -18,13 +18,14 @@
  */
 package org.apache.pinot.core.segment.index.readers;
 
+import org.apache.pinot.core.io.util.FixedByteValueReaderWriter;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 
 
 public class LongDictionary extends ImmutableDictionaryReader {
 
   public LongDictionary(PinotDataBuffer dataBuffer, int length) {
-    super(dataBuffer, length, Long.BYTES, (byte) 0);
+    super(new FixedByteValueReaderWriter(dataBuffer), length, Long.BYTES, (byte) 0);
   }
 
   @Override
