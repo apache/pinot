@@ -22,6 +22,8 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.common.utils.DataSize;
 import org.apache.pinot.common.utils.time.TimeUtils;
+import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConsumerFactory;
+import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamMessageDecoder;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -38,9 +40,10 @@ public class StreamConfigTest {
     String streamType = "kafka";
     String topic = "aTopic";
     String consumerType = StreamConfig.ConsumerType.LOWLEVEL.toString();
-    String consumerFactoryClass = "com.test.TestConsumerFactoryClass";
-    String decoderClass = "com.test.TestDecoderClass";
+    String consumerFactoryClass = FakeStreamConsumerFactory.class.getName();
+    String decoderClass = FakeStreamMessageDecoder.class.getName();
 
+    // test with empty map
     try {
       Map<String, String> streamConfigMap = new HashMap<>();
       streamConfig = new StreamConfig(streamConfigMap);
@@ -146,8 +149,8 @@ public class StreamConfigTest {
     String streamType = "kafka";
     String topic = "aTopic";
     String consumerType = "simple";
-    String consumerFactoryClass = "com.test.TestConsumerFactoryClass";
-    String decoderClass = "com.test.TestDecoderClass";
+    String consumerFactoryClass = FakeStreamConsumerFactory.class.getName();
+    String decoderClass = FakeStreamMessageDecoder.class.getName();
 
     Map<String, String> streamConfigMap = new HashMap<>();
     streamConfigMap.put(StreamConfigProperties.STREAM_TYPE, streamType);
@@ -244,8 +247,8 @@ public class StreamConfigTest {
     String streamType = "kafka";
     String topic = "aTopic";
     String consumerType = "simple";
-    String consumerFactoryClass = "com.test.TestConsumerFactoryClass";
-    String decoderClass = "com.test.TestDecoderClass";
+    String consumerFactoryClass = FakeStreamConsumerFactory.class.getName();
+    String decoderClass = FakeStreamMessageDecoder.class.getName();
 
     // All mandatory properties set
     Map<String, String> streamConfigMap = new HashMap<>();
@@ -323,8 +326,8 @@ public class StreamConfigTest {
     String streamType = "kafka";
     String topic = "aTopic";
     String consumerType = "lowlevel";
-    String consumerFactoryClass = "com.test.TestConsumerFactoryClass";
-    String decoderClass = "com.test.TestDecoderClass";
+    String consumerFactoryClass = FakeStreamConsumerFactory.class.getName();
+    String decoderClass = FakeStreamMessageDecoder.class.getName();
     String flushThresholdRows = "200";
     String flushThresholdRowsLLC = "400";
     String flushThresholdTime = "2h";
@@ -403,8 +406,8 @@ public class StreamConfigTest {
   public void testConsumerTypes() {
     String streamType = "kafka";
     String topic = "aTopic";
-    String consumerFactoryClass = "com.test.TestConsumerFactoryClass";
-    String decoderClass = "com.test.TestDecoderClass";
+    String consumerFactoryClass = FakeStreamConsumerFactory.class.getName();
+    String decoderClass = FakeStreamMessageDecoder.class.getName();
 
     Map<String, String> streamConfigMap = new HashMap<>();
     streamConfigMap.put(StreamConfigProperties.STREAM_TYPE, streamType);

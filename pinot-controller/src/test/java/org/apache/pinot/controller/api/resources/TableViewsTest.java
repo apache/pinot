@@ -20,7 +20,6 @@ package org.apache.pinot.controller.api.resources;
 
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.util.HashMap;
 import java.util.Map;
 import org.apache.helix.InstanceType;
 import org.apache.pinot.common.config.TableConfig;
@@ -31,8 +30,8 @@ import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.controller.helix.ControllerRequestBuilderUtil;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
+import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
 import org.apache.pinot.core.realtime.stream.StreamConfig;
-import org.apache.pinot.core.realtime.stream.StreamConfigProperties;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -77,26 +76,9 @@ public class TableViewsTest extends ControllerTest {
 
     // add schema for realtime table
     addDummySchema(HYBRID_TABLE_NAME);
-    Map<String, String> streamConfigs = new HashMap<>();
-    String streamType = "kafka";
-    String topic = "aTopic";
-    String consumerFactoryClass = "com.test.TestConsumerFactoryClass";
-    String decoderClass = "com.test.TestDecoderClass";
-    streamConfigs.put(StreamConfigProperties.STREAM_TYPE, streamType);
-    streamConfigs
-        .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_TOPIC_NAME),
-            topic);
-    streamConfigs
-        .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
-            StreamConfig.ConsumerType.HIGHLEVEL.toString());
-    streamConfigs.put(StreamConfigProperties
-            .constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS),
-        consumerFactoryClass);
-    streamConfigs
-        .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_DECODER_CLASS),
-            decoderClass);
+    StreamConfig streamConfig = FakeStreamConfigUtils.getDefaultHighLevelStreamConfigs();
     tableConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.REALTIME).setTableName(HYBRID_TABLE_NAME)
-        .setNumReplicas(2).setStreamConfigs(streamConfigs).build();
+        .setNumReplicas(2).setStreamConfigs(streamConfig.getStreamConfigsMap()).build();
     _helixResourceManager.addTable(tableConfig);
 
     // Wait for external view get updated
