@@ -36,14 +36,15 @@ import org.apache.pinot.core.realtime.stream.StreamMetadataProvider;
 
 /**
  * Implementation of {@link StreamConsumerFactory} for a fake stream
- * 2 partitions
- * Data source is /resources/data/On_Time_Performance_2014_partition.tar.gz
+ * Data source is /resources/data/fakestream_avro_data.tar.gz
+ * Avro schema is /resources/data/fakestream/fake_stream_avro_schema.avsc
+ * Pinot schema is /resources/data/fakestream/fake_stream_pinot_schema.avsc
  */
 public class FakeStreamConsumerFactory extends StreamConsumerFactory {
 
   @Override
   public PartitionLevelConsumer createPartitionLevelConsumer(String clientId, int partition) {
-    return new FakePartitionLevelConsumer(partition);
+    return new FakePartitionLevelConsumer(partition, _streamConfig);
   }
 
   @Override
@@ -54,19 +55,20 @@ public class FakeStreamConsumerFactory extends StreamConsumerFactory {
 
   @Override
   public StreamMetadataProvider createPartitionMetadataProvider(String clientId, int partition) {
-    return new FakeStreamMetadataProvider();
+    return new FakeStreamMetadataProvider(_streamConfig);
   }
 
   @Override
   public StreamMetadataProvider createStreamMetadataProvider(String clientId) {
-    return new FakeStreamMetadataProvider();
+    return new FakeStreamMetadataProvider(_streamConfig);
   }
 
   public static void main(String[] args) throws Exception {
     String clientId = "client_id_localhost_tester";
 
     // stream config
-    StreamConfig streamConfig = FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs();
+    int numPartitions = 5;
+    StreamConfig streamConfig = FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs(numPartitions);
 
     // stream consumer factory
     StreamConsumerFactory streamConsumerFactory = StreamConsumerFactoryProvider.create(streamConfig);
@@ -77,14 +79,16 @@ public class FakeStreamConsumerFactory extends StreamConsumerFactory {
     System.out.println(partitionCount);
 
     // Partition metadata provider
+    int partition = 3;
     StreamMetadataProvider partitionMetadataProvider =
-        streamConsumerFactory.createPartitionMetadataProvider(clientId, 1);
+        streamConsumerFactory.createPartitionMetadataProvider(clientId, partition);
     long partitionOffset =
         partitionMetadataProvider.fetchPartitionOffset(OffsetCriteria.SMALLEST_OFFSET_CRITERIA, 10_000);
     System.out.println(partitionOffset);
 
     // Partition level consumer
-    PartitionLevelConsumer partitionLevelConsumer = streamConsumerFactory.createPartitionLevelConsumer(clientId, 0);
+    PartitionLevelConsumer partitionLevelConsumer =
+        streamConsumerFactory.createPartitionLevelConsumer(clientId, partition);
     MessageBatch messageBatch = partitionLevelConsumer.fetchMessages(10, 40, 10_000);
 
     // Message decoder

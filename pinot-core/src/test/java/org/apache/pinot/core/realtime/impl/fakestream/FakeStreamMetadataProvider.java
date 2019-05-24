@@ -19,10 +19,12 @@
 package org.apache.pinot.core.realtime.impl.fakestream;
 
 import java.io.IOException;
+import java.util.Map;
 import java.util.concurrent.TimeoutException;
 import javax.annotation.Nonnull;
 import org.apache.pinot.core.realtime.stream.OffsetCriteria;
 import org.apache.pinot.core.realtime.stream.StreamConfig;
+import org.apache.pinot.core.realtime.stream.StreamConfigProperties;
 import org.apache.pinot.core.realtime.stream.StreamMetadataProvider;
 
 
@@ -30,18 +32,23 @@ import org.apache.pinot.core.realtime.stream.StreamMetadataProvider;
  * StreamMetadataProvider implementation for the fake stream
  */
 public class FakeStreamMetadataProvider implements StreamMetadataProvider {
+  private int _numPartitions;
+
+  public FakeStreamMetadataProvider(StreamConfig streamConfig) {
+    _numPartitions = FakeStreamConfigUtils.getNumPartitions(streamConfig);
+  }
 
   @Override
   public int fetchPartitionCount(long timeoutMillis) {
-    return FakeStreamConfigUtils.getNumPartitions();
+    return _numPartitions;
   }
 
   @Override
   public long fetchPartitionOffset(@Nonnull OffsetCriteria offsetCriteria, long timeoutMillis) throws TimeoutException {
-    if (offsetCriteria.isLargest()) {
-      return FakeStreamConfigUtils.getLargestOffset();
-    } else {
+    if (offsetCriteria.isSmallest()) {
       return FakeStreamConfigUtils.getSmallestOffset();
+    } else {
+      return FakeStreamConfigUtils.getLargestOffset();
     }
   }
 

@@ -37,27 +37,33 @@ import org.testng.Assert;
  * Helper methods to provide fake stream details
  */
 public class FakeStreamConfigUtils {
-  private static final String AVRO_TAR_FILE_NAME_PREFIX = "fake_stream_partition_";
-  private static final String AVRO_TAR_FILE_NAME_SUFFIX = ".tar.gz";
+  private static final String AVRO_TAR_FILE = "fake_stream_avro_data.tar.gz";
   private static final String AVRO_SCHEMA_FILE = "fake_stream_avro_schema.avsc";
   private static final String PINOT_SCHEMA_FILE = "fake_stream_pinot_schema.json";
 
-  private static final int NUM_PARTITIONS = 2;
   private static final int SMALLEST_OFFSET = 0;
-  private static final int LARGEST_OFFSET = 58307;
+  private static final int LARGEST_OFFSET = Integer.MAX_VALUE;
+  public static final String NUM_PARTITIONS_KEY = "num.partitions";
+  private static final int DEFAULT_NUM_PARTITIONS = 2;
 
   private static final String STREAM_TYPE = "fakeStream";
   private static final String TOPIC_NAME = "fakeTopic";
   private static final String CONSUMER_FACTORY_CLASS = FakeStreamConsumerFactory.class.getName();
   private static final String OFFSET_CRITERIA = "smallest";
   private static final String DECODER_CLASS = FakeStreamMessageDecoder.class.getName();
-  private static final int SEGMENT_FLUSH_THRESHOLD_ROWS = 5000;
+  private static final int SEGMENT_FLUSH_THRESHOLD_ROWS = 500;
 
   /**
    * Gets default num partitions
    */
-  static int getNumPartitions() {
-    return NUM_PARTITIONS;
+  static int getNumPartitions(StreamConfig streamConfig) {
+    Map<String, String> streamConfigsMap = streamConfig.getStreamConfigsMap();
+    String numPartitionsKey =
+        StreamConfigProperties.constructStreamProperty(streamConfig.getType(), NUM_PARTITIONS_KEY);
+    if (streamConfigsMap.containsKey(numPartitionsKey)) {
+      return Integer.parseInt(streamConfigsMap.get(numPartitionsKey));
+    }
+    return DEFAULT_NUM_PARTITIONS;
   }
 
   /**
@@ -75,20 +81,13 @@ public class FakeStreamConfigUtils {
   }
 
   /**
-   * Gets avro tar file for partition
-   */
-  static String getAvroTarFileName(int partition) {
-    return AVRO_TAR_FILE_NAME_PREFIX + partition + AVRO_TAR_FILE_NAME_SUFFIX;
-  }
-
-  /**
    * Unpacks avro tar file
    */
-  static List<File> unpackAvroTarFile(String avroTarFileName, File outputDir) throws Exception {
+  static List<File> unpackAvroTarFile(File outputDir) throws Exception {
     if (outputDir.exists()) {
       FileUtils.deleteDirectory(outputDir);
     }
-    File avroTarFile = getResourceFile(avroTarFileName);
+    File avroTarFile = getResourceFile(AVRO_TAR_FILE);
     return TarGzCompressionUtils.unTar(avroTarFile, outputDir);
   }
 
@@ -114,15 +113,25 @@ public class FakeStreamConfigUtils {
   }
 
   /**
-   * Generate fake stream configs for low level stream
+   * Generate fake stream configs for low level stream with custom number of partitions
    */
-  public static StreamConfig getDefaultLowLevelStreamConfigs() {
+  public static StreamConfig getDefaultLowLevelStreamConfigs(int numPartitions) {
     Map<String, String> streamConfigMap = getDefaultStreamConfigs();
     streamConfigMap.put(
         StreamConfigProperties.constructStreamProperty(STREAM_TYPE, StreamConfigProperties.STREAM_CONSUMER_TYPES),
         StreamConfig.ConsumerType.LOWLEVEL.toString());
+    streamConfigMap.put(
+        StreamConfigProperties.constructStreamProperty(STREAM_TYPE, NUM_PARTITIONS_KEY),
+        String.valueOf(numPartitions));
 
     return new StreamConfig(streamConfigMap);
+  }
+
+  /**
+   * Generate fake stream configs for low level stream
+   */
+  public static StreamConfig getDefaultLowLevelStreamConfigs() {
+    return getDefaultLowLevelStreamConfigs(DEFAULT_NUM_PARTITIONS);
   }
 
   /**

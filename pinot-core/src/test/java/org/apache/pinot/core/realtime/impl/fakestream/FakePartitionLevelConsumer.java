@@ -33,6 +33,7 @@ import org.apache.avro.io.EncoderFactory;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.core.realtime.stream.MessageBatch;
 import org.apache.pinot.core.realtime.stream.PartitionLevelConsumer;
+import org.apache.pinot.core.realtime.stream.StreamConfig;
 import org.apache.pinot.core.util.AvroUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -51,39 +52,43 @@ public class FakePartitionLevelConsumer implements PartitionLevelConsumer {
   private List<Integer> messageOffsets = new ArrayList<>();
   private List<byte[]> messageBytes = new ArrayList<>();
 
-  FakePartitionLevelConsumer(int partition) {
+  FakePartitionLevelConsumer(int partition, StreamConfig streamConfig) {
 
-    String avroTarFileName = FakeStreamConfigUtils.getAvroTarFileName(partition);
+    // TODO: this logic can move to a FakeStreamProducer instead of being inside the Consumer
     File tempDir = new File(FileUtils.getTempDirectory(), getClass().getSimpleName());
     File outputDir = new File(tempDir, String.valueOf(partition));
 
     int offset = 0;
 
     try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream(65536)) {
-      List<File> avroFiles = unpackAvroTarFile(avroTarFileName, outputDir);
+      File avroFile = unpackAvroTarFile(outputDir).get(0);
 
-      for (File avroFile : avroFiles) {
-        try (DataFileStream<GenericRecord> reader = AvroUtils.getAvroReader(avroFile)) {
-          BinaryEncoder binaryEncoder = new EncoderFactory().directBinaryEncoder(outputStream, null);
-          GenericDatumWriter<GenericRecord> datumWriter = new GenericDatumWriter<>(reader.getSchema());
+      int numPartitions = FakeStreamConfigUtils.getNumPartitions(streamConfig);
 
-          for (GenericRecord genericRecord : reader) {
-            outputStream.reset();
+      try (DataFileStream<GenericRecord> reader = AvroUtils.getAvroReader(avroFile)) {
+        BinaryEncoder binaryEncoder = new EncoderFactory().directBinaryEncoder(outputStream, null);
+        GenericDatumWriter<GenericRecord> datumWriter = new GenericDatumWriter<>(reader.getSchema());
 
-            datumWriter.write(genericRecord, binaryEncoder);
-            binaryEncoder.flush();
-
-            byte[] bytes = outputStream.toByteArray();
-            // contiguous offsets
-            messageOffsets.add(offset++);
-            messageBytes.add(bytes);
+        int recordNumber = 0;
+        for (GenericRecord genericRecord : reader) {
+          if (getPartitionNumber(recordNumber++, numPartitions) != partition) {
+            continue;
           }
+          outputStream.reset();
+
+          datumWriter.write(genericRecord, binaryEncoder);
+          binaryEncoder.flush();
+
+          byte[] bytes = outputStream.toByteArray();
+          // contiguous offsets
+          messageOffsets.add(offset++);
+          messageBytes.add(bytes);
         }
       }
     } catch (Exception e) {
       LOGGER.error("Could not create {}", FakePartitionLevelConsumer.class.getName(), e);
     } finally {
-      FileUtils.deleteQuietly(tempDir);
+      FileUtils.deleteQuietly(outputDir);
     }
   }
 
@@ -104,5 +109,13 @@ public class FakePartitionLevelConsumer implements PartitionLevelConsumer {
 
   @Override
   public void close() throws IOException {
+  }
+
+  /**
+   * Partitions the raw data
+   * This can be abstracted out and injected via stream configs to incorporate custom partitioning logic
+   */
+  public int getPartitionNumber(int recordNumber, int numPartitions) {
+    return recordNumber % numPartitions;
   }
 }
