@@ -63,11 +63,12 @@ struct Identifier {
 union Literal {
   1: optional bool boolValue;
   2: optional byte byteValue;
-  3: optional i32 intValue;
-  4: optional i64 longValue;
-  5: optional double doubleValue;
-  6: optional string stringValue;
-  7: optional binary binaryValue;
+  3: optional i16 shortValue;
+  4: optional i32 intValue;
+  5: optional i64 longValue;
+  6: optional double doubleValue;
+  7: optional string stringValue;
+  8: optional binary binaryValue;
 }
 
 struct Function {
