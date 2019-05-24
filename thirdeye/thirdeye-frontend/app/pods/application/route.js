@@ -16,12 +16,16 @@ export default Route.extend(ApplicationRouteMixin, {
   session: service(),
   notifications: service('toast'),
   queryParams: {
-    debug: queryParamsConfig,
+    debug: queryParamsConfig
   },
-  
+
   beforeModel() {
     // calling this._super to trigger ember-simple-auth's hook
     this._super(...arguments);
+
+    if (config.environment === 'production' && location.protocol != 'https:') {
+      location.href = 'https:' + window.location.href.substring(window.location.protocol.length);
+    }
 
     // invalidates session if cookie expired
     if (this.get('session.isAuthenticated')) {
