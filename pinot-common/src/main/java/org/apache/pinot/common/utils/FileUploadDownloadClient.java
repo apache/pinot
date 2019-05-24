@@ -202,8 +202,9 @@ public class FileUploadDownloadClient implements Closeable {
     return requestBuilder.build();
   }
 
-  private static HttpUriRequest getAddSchemaRequest(URI uri, String schemaName, File schemaFile) {
-    return getUploadFileRequest(HttpPost.METHOD_NAME, uri, getContentBody(schemaName, schemaFile), null, null,
+  private static HttpUriRequest getAddSchemaRequest(URI uri, String schemaName, File schemaFile, List<Header> headers,
+                                                    List<NameValuePair> parameters) {
+    return getUploadFileRequest(HttpPost.METHOD_NAME, uri, getContentBody(schemaName, schemaFile), headers, parameters,
         DEFAULT_SOCKET_TIMEOUT_MS);
   }
 
@@ -367,7 +368,22 @@ public class FileUploadDownloadClient implements Closeable {
    */
   public SimpleHttpResponse addSchema(URI uri, String schemaName, File schemaFile)
       throws IOException, HttpErrorStatusException {
-    return sendRequest(getAddSchemaRequest(uri, schemaName, schemaFile));
+    return addSchema(uri, schemaName, schemaFile, null, null);
+  }
+
+  /**
+   * Add schema.
+   *
+   * @param uri URI
+   * @param schemaName Schema name
+   * @param schemaFile Schema file
+   * @return Response
+   * @throws IOException
+   * @throws HttpErrorStatusException
+   */
+  public SimpleHttpResponse addSchema(URI uri, String schemaName, File schemaFile, List<Header> headers,
+                                      List<NameValuePair> parameters) throws IOException, HttpErrorStatusException {
+    return sendRequest(getAddSchemaRequest(uri, schemaName, schemaFile, headers, parameters));
   }
 
   /**
