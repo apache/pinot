@@ -33,7 +33,7 @@ public class PinotBenchmarkEventTableCreationCommand extends AbstractBaseAdminCo
     //final String _timeIntervalConfig = "pinot_benchmark/event_data_config/time_intervals_100_days_of_2017_2018.properties";
     //final String _timeIntervalConfig = "pinot_benchmark/event_data_config/time_intervals_feb_2018.properties";
 
-    final String _timeIntervalConfig = "pinot_benchmark/event_data_config/time_intervals_5_tables_120_days_of_2017_2018.properties";
+    final String _timeIntervalConfig = "pinot_benchmark/event_data_config/time_intervals_5_tables_120_days_of_2019.properties";
 
     final String _tableConfig = "pinot_benchmark/event_data_config/event_table_config.properties";
     private final int _minimumRecordCount = 2000;
@@ -56,8 +56,8 @@ public class PinotBenchmarkEventTableCreationCommand extends AbstractBaseAdminCo
     //private double[] _numRecordRatio = {1, 0.6, 0.5, 0.3};
     //private int[] _meanDocCount = {30000, 15000, 10000, 20000};
     //private int[] _standardDeviation = {1000, 4000, 2000, 3000};
-    private int[] _meanDocCount = {40000, 15000, 5000, 20000,1000};
-    private int[] _standardDeviation = {4000, 1500, 500, 2000,100};
+    private int[] _meanDocCount = {30000, 10000, 3000, 15000,1000};
+    private int[] _standardDeviation = {1000, 600, 200, 750,100};
 
 
     private int[] _varianceList = {5000, 10000, 15000, 20000,25000};
@@ -93,6 +93,7 @@ public class PinotBenchmarkEventTableCreationCommand extends AbstractBaseAdminCo
         int[] everyRoundRecordCount = new int[5];
 
 
+	//for (int i = 1; i < 31; i++) { 
         for (int i = 1; i < timeIntervals.size(); i++) {
         //for (int i = 1; i < 2; i++) {
             String[] timeIntervalInfo = timeIntervals.get(i).split(",");
@@ -115,10 +116,10 @@ public class PinotBenchmarkEventTableCreationCommand extends AbstractBaseAdminCo
 
             EventTableGenerator eventTableGenerator = new EventTableGenerator(_dataDir, outDir);
             eventTableGenerator.generateProfileViewTable(timeIntervalStart, timeIntervalEnd, everyRoundRecordCount[0]);
-            eventTableGenerator.generateAdClickTable(timeIntervalStart, timeIntervalEnd, everyRoundRecordCount[1]);
+            //eventTableGenerator.generateAdClickTable(timeIntervalStart, timeIntervalEnd, everyRoundRecordCount[1]);
             eventTableGenerator.generateArticleReadTable(timeIntervalStart, timeIntervalEnd, everyRoundRecordCount[2]);
             eventTableGenerator.generateJobApplyTable(timeIntervalStart, timeIntervalEnd, everyRoundRecordCount[3]);
-            eventTableGenerator.generateCompanySearchTable(timeIntervalStart,timeIntervalEnd, everyRoundRecordCount[4]);
+            //eventTableGenerator.generateCompanySearchTable(timeIntervalStart,timeIntervalEnd, everyRoundRecordCount[4]);
         }
 
 

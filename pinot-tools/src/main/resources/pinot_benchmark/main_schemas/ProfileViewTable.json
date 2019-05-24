@@ -5,9 +5,9 @@
     "segmentPushType": "APPEND",
     "timeColumnName": "ViewStartTime",
     "timeType": "SECONDS",
-    "segmentAssignmentStrategy": "GetafixSegmentAssignmentStrategy",
+    "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
     "schemaName": "ProfileViewSchema",
-    "replication": "3"
+    "replication": "1"
   },
   "tenants": {
   },

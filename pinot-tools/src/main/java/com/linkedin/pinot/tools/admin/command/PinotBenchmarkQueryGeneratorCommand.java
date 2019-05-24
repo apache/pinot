@@ -23,7 +23,7 @@ import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
+import java.util.concurrent.*;
 import java.util.*;
 
 public class PinotBenchmarkQueryGeneratorCommand extends AbstractBaseAdminCommand implements Command {
@@ -66,13 +66,14 @@ public class PinotBenchmarkQueryGeneratorCommand extends AbstractBaseAdminComman
         return this;
     }
 
+    List<QueryExecutor> executorList;
     @Override
     public boolean execute() throws Exception {
         PostQueryCommand postQueryCommand = new PostQueryCommand();
         postQueryCommand.setBrokerPort(_brokerPort);
         postQueryCommand.setBrokerHost(_brokerHost);
+	executorList = QueryExecutor.getTableExecutors();
 
-        List<QueryExecutor> executorList = QueryExecutor.getTableExecutors();
         for (QueryExecutor executor : executorList) {
             executor.setPostQueryCommand(postQueryCommand);
             executor.setDataDir(_dataDir);
@@ -80,9 +81,44 @@ public class PinotBenchmarkQueryGeneratorCommand extends AbstractBaseAdminComman
             executor.setTestDuration(_testDuration);
             executor.setSlotDuration(_slotDuration);
             executor.setUseCPUMap(_useCPUMap);
-            executor.start();
+	    //    executor.start();
         }
-
+	Thread t1 = new Thread() {
+		public void run() {
+			try {
+				executorList.get(0).start();
+			}
+			catch (InterruptedException e) {
+                                System.out.println("EXCEPTION " + e);
+			}
+		}
+	};
+	Thread t2 = new Thread() {
+                public void run() {
+                        try {
+                                executorList.get(1).start();
+                        }
+                        catch (InterruptedException e) {
+                                System.out.println("EXCEPTION " + e);
+                        }
+                }
+        };
+	Thread t3 = new Thread() {
+                public void run() {
+                        try {
+                                executorList.get(2).start();
+                        }
+                        catch (InterruptedException e) {
+                                System.out.println("EXCEPTION " + e);
+                        }
+                }
+        };
+	t1.start();
+	t2.start();
+	t3.start();
+	t1.join();
+	t2.join();
+	t3.join();
         return true;
     }
 

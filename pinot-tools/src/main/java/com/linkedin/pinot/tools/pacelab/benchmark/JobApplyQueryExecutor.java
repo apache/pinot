@@ -31,13 +31,14 @@ public class JobApplyQueryExecutor extends QueryExecutor {
                         " WHERE ApplicantProfileId = '%s'" + "%s" +
                         " LIMIT %d",
 
-                "SELECT JobID, COUNT(*) FROM JobApply" +
+                "SELECT JobID, COUNT(*), AVG(TimeSpent), AVG(JobSalary) FROM JobApply" +
                          " WHERE JobCompany = '%s'" + "%s" +
                          " GROUP BY JobID ORDER BY COUNT(*) desc TOP %d",
 
                 "SELECT JobCompany, COUNT(*), AVG(TimeSpent), AVG(JobSalary) FROM JobApply" +
                         "%s" +
                         " GROUP BY JobCompany TOP %d",
+
 
                 "SELECT JobCompany, JobID, ApplicantPosition, DidApplyIsFinalized, COUNT(*),AVG(JobSalary) FROM JobApply" +
                         "%s" +

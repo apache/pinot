@@ -29,6 +29,7 @@ public class QueryTask implements Runnable{
     protected String _dataDir;
     protected int _testDuration;
     //static int queryCount=0;
+    protected int queryType = 0;
     protected Criteria criteria;
 
     public enum Color {
@@ -67,7 +68,7 @@ public class QueryTask implements Runnable{
                 {
                     if (randomLikelihood <= likelihood[i])
                     {
-                        generateAndRunQuery(i);
+                        generateAndRunQuery(i, queryType);
                         break;
                     }
                 }
@@ -129,7 +130,7 @@ public class QueryTask implements Runnable{
         this.queries = queries;
     }
 
-    public void generateAndRunQuery(int queryId) throws Exception {
+    public void generateAndRunQuery(int queryId, int queryType) throws Exception {
 
     }
 
@@ -153,5 +154,11 @@ public class QueryTask implements Runnable{
     public void setTestDuration(int testDuration)
     {
         _testDuration = testDuration;
+    }
+    public int getQueryType() { 
+	    return queryType;
+    }
+    public void setQueryType(int queryType) {
+	    this.queryType = queryType;
     }
 }

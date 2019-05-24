@@ -25,8 +25,8 @@ import java.util.TimeZone;
 public class CreateTimeIntervals {
     public static void main(String args[])
     {
-        long startTime = 1512086400;
-        int segmentCount = 121;
+        long startTime = 1546300800;
+        int segmentCount = 120;
         SimpleDateFormat sdf = new SimpleDateFormat("dd-MM-yyyy");
         sdf.setTimeZone(TimeZone.getTimeZone("GMT"));
         SimpleDateFormat sdf2 = new SimpleDateFormat("ddMMyyyy");

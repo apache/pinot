@@ -43,7 +43,7 @@ public class PinotBenchmarkSegmentCreationCommand extends AbstractBaseAdminComma
     //final String _timeIntervalConfig = "pinot_benchmark/event_data_config/time_intervals_100_days_of_2017_2018.properties";
     //final String _timeIntervalConfig = "pinot_benchmark/event_data_config/time_intervals_feb_2018.properties";
 
-    final String _timeIntervalConfig = "pinot_benchmark/event_data_config/time_intervals_5_tables_120_days_of_2017_2018.properties";
+    final String _timeIntervalConfig = "pinot_benchmark/event_data_config/time_intervals_5_tables_120_days_of_2019.properties";
 
     final String _tableNameFile = "pinot_benchmark/event_data_config/event_table_config.properties";
     //final String _tableNameFile = "pinot_benchmark/event_data_config/event_table_JA_AR_config.properties";
@@ -80,7 +80,8 @@ public class PinotBenchmarkSegmentCreationCommand extends AbstractBaseAdminComma
         List<String> configLines =  FileUtils.readLines(new File(configFile));
 
 
-        for(int i=1;i<tablesInfo.size();i++)
+        for(int i = 1; i < 4; i++)
+//	for(int i=1;i<tablesInfo.size();i++)
         {
             String[] tableInfoRecord = tablesInfo.get(i).split(",");
 
