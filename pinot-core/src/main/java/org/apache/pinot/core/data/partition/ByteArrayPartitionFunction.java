@@ -19,8 +19,7 @@
 package org.apache.pinot.core.data.partition;
 
 import com.google.common.base.Preconditions;
-import kafka.producer.ByteArrayPartitioner;
-
+import java.util.Arrays;
 
 /**
  * Implementation of {@link Byte array partitioner}
@@ -29,7 +28,6 @@ import kafka.producer.ByteArrayPartitioner;
 public class ByteArrayPartitionFunction implements PartitionFunction {
   private static final String NAME = "ByteArray";
   private final int _numPartitions;
-  public ByteArrayPartitioner _byteArrayPartitioner;
 
   /**
    * Constructor for the class.
@@ -38,12 +36,11 @@ public class ByteArrayPartitionFunction implements PartitionFunction {
   public ByteArrayPartitionFunction(int numPartitions) {
     Preconditions.checkArgument(numPartitions > 0, "Number of partitions must be > 0, specified", numPartitions);
     _numPartitions = numPartitions;
-    _byteArrayPartitioner = new ByteArrayPartitioner(null);
   }
 
   @Override
   public int getPartition(Object valueIn) {
-    return _byteArrayPartitioner.partition(valueIn.toString().getBytes(), _numPartitions);
+    return abs(Arrays.hashCode(valueIn.toString().getBytes())) % _numPartitions;
   }
 
   @Override
@@ -54,6 +51,10 @@ public class ByteArrayPartitionFunction implements PartitionFunction {
   @Override
   public String toString() {
     return NAME;
+  }
+
+  private int abs(int n) {
+    return (n == Integer.MIN_VALUE) ? 0 : Math.abs(n);
   }
 }
 
