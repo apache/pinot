@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Locale;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.segment.SegmentMetadata;
 import org.apache.pinot.core.plan.AggregationFunctionInitializer;
