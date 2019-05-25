@@ -197,16 +197,12 @@ public class HelixServerStarter {
     // Register the service status handler
     double minResourcePercentForStartup = _serverConf
         .getDouble(CONFIG_OF_SERVER_MIN_RESOURCE_PERCENT_FOR_START, DEFAULT_SERVER_MIN_RESOURCE_PERCENT_FOR_START);
-    int consumptionCatchupWaitMs = _serverConf.getInt(
+    int realtimeConsumptionCatchupWaitMs = _serverConf.getInt(
         CommonConstants.Server.CONFIG_OF_STARTUP_REALTIME_CONSUMPTION_CATCHUP_WAIT_MS,
         CommonConstants.Server.DEFAULT_STARTUP_REALTIME_CONSUMPTION_CATCHUP_WAIT_MS);
     ServiceStatus.setServiceStatusCallback(new ServiceStatus.MultipleCallbackServiceStatusCallback(ImmutableList.of(
-        new ServiceStatus.IdealStateAndCurrentStateMatchServiceStatusCallback(_helixManager, _helixClusterName,
-            _instanceId, minResourcePercentForStartup),
-        new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(_helixManager, _helixClusterName,
-            _instanceId, minResourcePercentForStartup),
-        new ServiceStatus.RealtimeConsumptionCatchupServiceStatusCallback(_helixManager, _helixClusterName, _instanceId,
-            consumptionCatchupWaitMs))));
+        new ServiceStatus.IdealStateServiceStatusCallback(_helixManager, _helixClusterName,
+            _instanceId, minResourcePercentForStartup, realtimeConsumptionCatchupWaitMs))));
 
     ControllerLeaderLocator.create(_helixManager);
 

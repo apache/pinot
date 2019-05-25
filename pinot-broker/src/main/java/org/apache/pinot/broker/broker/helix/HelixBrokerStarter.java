@@ -240,11 +240,9 @@ public class HelixBrokerStarter {
     LOGGER.info("Registering service status handler");
     double minResourcePercentForStartup = _brokerConf.getDouble(Broker.CONFIG_OF_BROKER_MIN_RESOURCE_PERCENT_FOR_START,
         Broker.DEFAULT_BROKER_MIN_RESOURCE_PERCENT_FOR_START);
-    ServiceStatus.setServiceStatusCallback(new ServiceStatus.MultipleCallbackServiceStatusCallback(ImmutableList
-        .of(new ServiceStatus.IdealStateAndCurrentStateMatchServiceStatusCallback(_participantHelixManager,
-                _clusterName, _brokerId, minResourcePercentForStartup),
-            new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(_participantHelixManager,
-                _clusterName, _brokerId, minResourcePercentForStartup))));
+    ServiceStatus.setServiceStatusCallback(new ServiceStatus.MultipleCallbackServiceStatusCallback(ImmutableList.of(
+        new ServiceStatus.IdealStateServiceStatusCallback(_participantHelixManager, _clusterName, _brokerId,
+            minResourcePercentForStartup))));
 
     LOGGER.info("Finish starting Pinot broker");
   }

@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.common.utils;
 
+import com.google.common.collect.Lists;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -130,6 +132,88 @@ public class ServiceStatus {
   }
 
   /**
+   * Service status callback for initializing all other ideal state related callbacks
+   */
+  public static class IdealStateServiceStatusCallback implements ServiceStatusCallback {
+    private final List<ServiceStatusCallback> _statusCallbacks;
+
+    public IdealStateServiceStatusCallback(HelixManager helixManager, String clusterName, String instanceName,
+        double minResourcePercentForStartup, long realtimeConsumptionCatchupMs) {
+      HelixAdmin helixAdmin = helixManager.getClusterManagmentTool();
+
+      // collect all resources which have this instance in the ideal state
+      List<String> resourcesToMonitor = new ArrayList<>();
+      // if even 1 resource has this instance in ideal state with state CONSUMING, set this to true
+      boolean foundConsuming = false;
+      boolean checkRealtime = realtimeConsumptionCatchupMs > 0;
+
+      for (String resourceName : helixAdmin.getResourcesInCluster(clusterName)) {
+        // Only monitor table resources and broker resource
+        if (!TableNameBuilder.isTableResource(resourceName) && !resourceName
+            .equals(CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)) {
+          continue;
+        }
+
+        // Only monitor enabled resources
+        IdealState idealState = helixAdmin.getResourceIdealState(clusterName, resourceName);
+        if (idealState.isEnabled()) {
+
+          for (String partitionName : idealState.getPartitionSet()) {
+            if (idealState.getInstanceSet(partitionName).contains(instanceName)) {
+              resourcesToMonitor.add(resourceName);
+              break;
+            }
+          }
+          if (checkRealtime && !foundConsuming && TableNameBuilder.isRealtimeTableResource(resourceName)) {
+            for (String partitionName : idealState.getPartitionSet()) {
+              if (CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel.CONSUMING.equals(
+                  idealState.getInstanceStateMap(partitionName).get(instanceName))) {
+                foundConsuming = true;
+                break;
+              }
+            }
+          }
+        }
+      }
+
+      _statusCallbacks = Lists.newArrayList(
+          new IdealStateAndCurrentStateMatchServiceStatusCallback(helixManager, clusterName, instanceName,
+              resourcesToMonitor, minResourcePercentForStartup),
+          new IdealStateAndExternalViewMatchServiceStatusCallback(helixManager, clusterName, instanceName,
+              resourcesToMonitor, minResourcePercentForStartup));
+      if (checkRealtime && foundConsuming) {
+        _statusCallbacks.add(new RealtimeConsumptionCatchupServiceStatusCallback(helixManager, clusterName, instanceName,
+            realtimeConsumptionCatchupMs));
+      }
+    }
+
+    public IdealStateServiceStatusCallback(HelixManager helixManager, String clusterName, String instanceName, double minResourcePercentForStartup) {
+      this(helixManager, clusterName, instanceName, minResourcePercentForStartup, 0);
+    }
+
+    @Override
+    public synchronized Status getServiceStatus() {
+      for (ServiceStatusCallback statusCallback : _statusCallbacks) {
+        final Status serviceStatus = statusCallback.getServiceStatus();
+        if (serviceStatus != Status.GOOD) {
+          return serviceStatus;
+        }
+      }
+      return Status.GOOD;
+    }
+
+    @Override
+    public synchronized String getStatusDescription() {
+      StringBuilder statusDescription = new StringBuilder();
+      for (ServiceStatusCallback statusCallback : _statusCallbacks) {
+        statusDescription.append(statusCallback.getClass().getSimpleName()).append(":")
+            .append(statusCallback.getStatusDescription()).append(";");
+      }
+      return statusDescription.toString();
+    }
+  }
+
+  /**
    * Service status callback that checks whether realtime consumption has caught up
    * TODO: In this initial version, we are simply adding a configurable static wait time
    * This can be made smarter:
@@ -137,57 +221,28 @@ public class ServiceStatus {
    * 2) Monitor consumption rate during startup, report GOOD when it stabilizes to average rate
    * 3) Monitor consumption rate during startup, report GOOD if it is idle
    */
-  public static class RealtimeConsumptionCatchupServiceStatusCallback implements ServiceStatusCallback {
+  private static class RealtimeConsumptionCatchupServiceStatusCallback implements ServiceStatusCallback {
 
     String _statusDescription = STATUS_DESCRIPTION_INIT;
     private Status _serviceStatus = Status.STARTING;
     private final long _endWaitTime;
 
     /**
-     * Realtime consumption catchup service which adds a static wait time for
+     * Realtime consumption catchup service which adds a static wait time for consuming segments to catchup
      */
-    public RealtimeConsumptionCatchupServiceStatusCallback(HelixManager helixManager, String clusterName, String instanceName,
+    RealtimeConsumptionCatchupServiceStatusCallback(HelixManager helixManager, String clusterName, String instanceName,
         long realtimeConsumptionCatchupWaitMs) {
-      HelixAdmin helixAdmin = helixManager.getClusterManagmentTool();
 
-      long startTime = System.currentTimeMillis();
-      boolean hasConsumingSegments = false;
+      // A consuming segment will actually be ready to serve queries after (time of creation of partition consumer) + (configured max time to catchup)
+      // We are approximating it to (time of server startup) + (configured max time to catch up)
+      _endWaitTime = System.currentTimeMillis() + realtimeConsumptionCatchupWaitMs;
+      LOGGER.info("Monitoring realtime consumption catchup. Will allow {} ms before marking status GOOD",
+          realtimeConsumptionCatchupWaitMs);
 
-      for (String resourceName : helixAdmin.getResourcesInCluster(clusterName)) {
-        if (TableNameBuilder.isRealtimeTableResource(resourceName)) {
-
-          IdealState idealState = helixAdmin.getResourceIdealState(clusterName, resourceName);
-          if (idealState.isEnabled()) {
-            for (String segmentName : idealState.getPartitionSet()) {
-              Map<String, String> instanceStateMap = idealState.getInstanceStateMap(segmentName);
-              if (CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel.CONSUMING.equals(
-                  instanceStateMap.get(instanceName))) {
-                hasConsumingSegments = true;
-                break;
-              }
-            }
-          }
-        }
-        if (hasConsumingSegments) {
-          break;
-        }
-      }
-
-      if (!hasConsumingSegments) {
-        _endWaitTime = 0;
-        _serviceStatus = Status.GOOD;
-        _statusDescription = "No consuming segments to monitor. Setting status GOOD";
-      } else {
-        // A consuming segment will actually be ready to serve queries after (time of creation of partition consumer) + (configured max time to catchup)
-        // We are approximating it to (time of server startup) + (configured max time to catch up)
-        _endWaitTime = startTime + TimeUnit.SECONDS.toMillis(realtimeConsumptionCatchupWaitMs);
-        LOGGER.info("Monitoring realtime consumption catchup. Will allow {} ms before marking status GOOD",
-            realtimeConsumptionCatchupWaitMs);
-      }
     }
 
     @Override
-    public Status getServiceStatus() {
+    public synchronized Status getServiceStatus() {
       if (_serviceStatus.equals(Status.GOOD)) {
         return _serviceStatus;
       }
@@ -214,10 +269,10 @@ public class ServiceStatus {
   private static abstract class IdealStateMatchServiceStatusCallback<T extends HelixProperty>
       implements ServiceStatusCallback {
 
-    protected final String _clusterName;
-    protected final String _instanceName;
-    protected final HelixAdmin _helixAdmin;
-    protected final HelixDataAccessor _helixDataAccessor;
+    final String _clusterName;
+    final String _instanceName;
+    final HelixAdmin _helixAdmin;
+    final HelixDataAccessor _helixDataAccessor;
 
     private final Set<String> _resourcesToMonitor;
     private final int _numTotalResourcesToMonitor;
@@ -227,39 +282,7 @@ public class ServiceStatus {
 
     private String _statusDescription = STATUS_DESCRIPTION_INIT;
 
-    public IdealStateMatchServiceStatusCallback(HelixManager helixManager, String clusterName, String instanceName,
-        double minResourcesStartPercent) {
-      _clusterName = clusterName;
-      _instanceName = instanceName;
-      _helixAdmin = helixManager.getClusterManagmentTool();
-      _helixDataAccessor = helixManager.getHelixDataAccessor();
-
-      _resourcesToMonitor = new HashSet<>();
-      for (String resourceName : _helixAdmin.getResourcesInCluster(_clusterName)) {
-        // Only monitor table resources and broker resource
-        if (!TableNameBuilder.isTableResource(resourceName) && !resourceName
-            .equals(CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)) {
-          continue;
-        }
-        // Only monitor enabled resources
-        IdealState idealState = getResourceIdealState(resourceName);
-        if (idealState.isEnabled()) {
-          for (String partitionName : idealState.getPartitionSet()) {
-            if (idealState.getInstanceSet(partitionName).contains(_instanceName)) {
-              _resourcesToMonitor.add(resourceName);
-              break;
-            }
-          }
-        }
-      }
-      _numTotalResourcesToMonitor = _resourcesToMonitor.size();
-      _minResourcesStartCount = (int) Math.ceil(minResourcesStartPercent * _numTotalResourcesToMonitor / 100);
-
-      LOGGER.info("Monitoring {} resources: {} for start up of instance {}", _numTotalResourcesToMonitor,
-          getResourceListAsString(), _instanceName);
-    }
-
-    public IdealStateMatchServiceStatusCallback(HelixManager helixManager, String clusterName, String instanceName,
+    IdealStateMatchServiceStatusCallback(HelixManager helixManager, String clusterName, String instanceName,
         List<String> resourcesToMonitor, double minResourcesStartPercent) {
       _clusterName = clusterName;
       _instanceName = instanceName;
@@ -438,15 +461,10 @@ public class ServiceStatus {
    * external view and current state. This callback considers the ERROR state in the current view to be equivalent to
    * the ideal state value.
    */
-  public static class IdealStateAndCurrentStateMatchServiceStatusCallback extends IdealStateMatchServiceStatusCallback<CurrentState> {
+  static class IdealStateAndCurrentStateMatchServiceStatusCallback extends IdealStateMatchServiceStatusCallback<CurrentState> {
     private static final String MATCH_NAME = "CurrentStateMatch";
 
-    public IdealStateAndCurrentStateMatchServiceStatusCallback(HelixManager helixManager, String clusterName,
-        String instanceName, double minResourcesStartPercent) {
-      super(helixManager, clusterName, instanceName, minResourcesStartPercent);
-    }
-
-    public IdealStateAndCurrentStateMatchServiceStatusCallback(HelixManager helixManager, String clusterName,
+    IdealStateAndCurrentStateMatchServiceStatusCallback(HelixManager helixManager, String clusterName,
         String instanceName, List<String> resourcesToMonitor, double minResourcesStartPercent) {
       super(helixManager, clusterName, instanceName, resourcesToMonitor, minResourcesStartPercent);
     }
@@ -475,15 +493,10 @@ public class ServiceStatus {
    * external view and ideal state. This callback considers the ERROR state in the external view to be equivalent to the
    * ideal state value.
    */
-  public static class IdealStateAndExternalViewMatchServiceStatusCallback extends IdealStateMatchServiceStatusCallback<ExternalView> {
+  static class IdealStateAndExternalViewMatchServiceStatusCallback extends IdealStateMatchServiceStatusCallback<ExternalView> {
     private static final String MATCH_NAME = "ExternalViewMatch";
 
-    public IdealStateAndExternalViewMatchServiceStatusCallback(HelixManager helixManager, String clusterName,
-        String instanceName, double minResourcesStartPercent) {
-      super(helixManager, clusterName, instanceName, minResourcesStartPercent);
-    }
-
-    public IdealStateAndExternalViewMatchServiceStatusCallback(HelixManager helixManager, String clusterName,
+    IdealStateAndExternalViewMatchServiceStatusCallback(HelixManager helixManager, String clusterName,
         String instanceName, List<String> resourcesToMonitor, double minResourcesStartPercent) {
       super(helixManager, clusterName, instanceName, resourcesToMonitor, minResourcesStartPercent);
     }
