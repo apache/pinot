@@ -130,9 +130,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       if (instance.startsWith(CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE) || instance
           .startsWith(CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE)) {
         _serviceStatusCallbacks.add(new ServiceStatus.MultipleCallbackServiceStatusCallback(ImmutableList
-            .of(new ServiceStatus.IdealStateAndCurrentStateMatchServiceStatusCallback(_helixManager, _clusterName,
+            .of(new ServiceStatus.IdealStateServiceStatusCallback(_helixManager, _clusterName,
                     instance, 100.0),
-                new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(_helixManager, _clusterName,
+                new ServiceStatus.IdealStateServiceStatusCallback(_helixManager, _clusterName,
                     instance, 100.0))));
       }
     }
