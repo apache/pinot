@@ -34,9 +34,8 @@ import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.operator.transform.TransformOperator;
-import org.apache.pinot.core.query.aggregation.function.AggregationFunctionType;
+import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
-import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

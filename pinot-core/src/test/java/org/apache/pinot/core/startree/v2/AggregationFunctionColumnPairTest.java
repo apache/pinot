@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.core.startree.v2;
 
-import org.apache.pinot.core.query.aggregation.function.AggregationFunctionType;
+import org.apache.pinot.common.function.AggregationFunctionType;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 

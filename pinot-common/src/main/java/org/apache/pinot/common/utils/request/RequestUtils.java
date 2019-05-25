@@ -21,6 +21,7 @@ package org.apache.pinot.common.utils.request;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -233,7 +234,7 @@ public class RequestUtils {
    * Extracts all columns from the given selection, '*' will be ignored.
    */
   public static Set<String> extractSelectionColumns(Selection selection) {
-    Set<String> selectionColumns = new HashSet<>();
+    Set<String> selectionColumns = new LinkedHashSet<>();
     for (String selectionColumn : selection.getSelectionColumns()) {
       if (!selectionColumn.equals("*")) {
         selectionColumns.add(selectionColumn);

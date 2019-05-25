@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.common.function.FunctionDefinitionRegistry;
 import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.Expression;
@@ -140,11 +141,21 @@ public class PinotQuery2BrokerRequestConverter {
           selection.addToSelectionColumns(expression.getIdentifier().getName());
           break;
         case FUNCTION:
-          AggregationInfo aggInfo = buildAggregationInfo(expression.getFunctionCall());
-          if (aggregationInfoList == null) {
-            aggregationInfoList = new ArrayList<>();
+
+          Function functionCall = expression.getFunctionCall();
+          String functionName = functionCall.getOperator();
+          if(FunctionDefinitionRegistry.isAggFunc(functionName)) {
+            AggregationInfo aggInfo = buildAggregationInfo(functionCall);
+            if (aggregationInfoList == null) {
+              aggregationInfoList = new ArrayList<>();
+            }
+            aggregationInfoList.add(aggInfo);
+          } else {
+            if (selection == null) {
+              selection = new Selection();
+            }
+            selection.addToSelectionColumns(standardizeExpression(expression, false));
           }
-          aggregationInfoList.add(aggInfo);
           break;
       }
     }
