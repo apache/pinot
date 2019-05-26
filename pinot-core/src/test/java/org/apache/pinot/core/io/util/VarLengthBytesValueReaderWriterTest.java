@@ -22,17 +22,20 @@ public class VarLengthBytesValueReaderWriterTest {
     byte[] array = new byte[] {1, 2, 3, 4};
     byte[][] byteArrays = new byte[][]{array};
     long size = VarLengthBytesValueReaderWriter.getRequiredSize(byteArrays);
-    Assert.assertEquals(12, size);
+    Assert.assertEquals(16, size);
 
     try (PinotDataBuffer buffer = PinotDataBuffer
         .mapFile(TEMP_FILE, false, 0, size, ByteOrder.BIG_ENDIAN, null)) {
       VarLengthBytesValueReaderWriter readerWriter = new VarLengthBytesValueReaderWriter(buffer);
       readerWriter.init(byteArrays);
       Assert.assertEquals(1, readerWriter.getNumElements());
+    }
 
-      readerWriter = new VarLengthBytesValueReaderWriter(buffer);
+    try (PinotDataBuffer buffer = PinotDataBuffer
+        .mapFile(TEMP_FILE, true, 0, size, ByteOrder.BIG_ENDIAN, null)) {
+      VarLengthBytesValueReaderWriter readerWriter = new VarLengthBytesValueReaderWriter(buffer);
       Assert.assertEquals(1, readerWriter.getNumElements());
-      byte[] newArray = readerWriter.getBytes(0);
+      byte[] newArray = readerWriter.getBytes(0, -1, null);
       Assert.assertTrue(Arrays.equals(array, newArray));
     }
     finally {
@@ -56,12 +59,15 @@ public class VarLengthBytesValueReaderWriterTest {
       VarLengthBytesValueReaderWriter readerWriter = new VarLengthBytesValueReaderWriter(buffer);
       readerWriter.init(byteArrays);
       Assert.assertEquals(byteArrays.length, readerWriter.getNumElements());
+    }
 
-      readerWriter = new VarLengthBytesValueReaderWriter(buffer);
+    try (PinotDataBuffer buffer = PinotDataBuffer
+        .mapFile(TEMP_FILE, false, 0, size, ByteOrder.BIG_ENDIAN, null)) {
+      VarLengthBytesValueReaderWriter readerWriter = new VarLengthBytesValueReaderWriter(buffer);
       Assert.assertEquals(byteArrays.length, readerWriter.getNumElements());
       for (int i = 0; i < byteArrays.length; i++) {
         byte[] array = byteArrays[i];
-        byte[] newArray = readerWriter.getBytes(i);
+        byte[] newArray = readerWriter.getBytes(i, -1, null);
         Assert.assertTrue(Arrays.equals(array, newArray));
       }
     }

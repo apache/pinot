@@ -77,22 +77,12 @@ public final class FixedByteValueReaderWriter implements Closeable, ValueReader 
   }
 
   @Override
-  public String getString(int index) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
   public byte[] getBytes(int index, int numBytesPerValue, byte[] buffer) {
     assert buffer.length >= numBytesPerValue;
 
     long startOffset = (long) index * numBytesPerValue;
     _dataBuffer.copyTo(startOffset, buffer, 0, numBytesPerValue);
     return buffer;
-  }
-
-  @Override
-  public byte[] getBytes(int index) {
-    throw new UnsupportedOperationException();
   }
 
   public void writeInt(int index, int value) {

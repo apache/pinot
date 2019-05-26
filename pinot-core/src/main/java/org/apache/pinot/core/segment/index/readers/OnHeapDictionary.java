@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.segment.index.readers;
 
-import org.apache.pinot.core.io.util.FixedByteValueReaderWriter;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 
 
@@ -29,6 +28,6 @@ import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 public abstract class OnHeapDictionary extends ImmutableDictionaryReader {
 
   protected OnHeapDictionary(PinotDataBuffer dataBuffer, int length, int numBytesPerValue, byte paddingByte) {
-    super(new FixedByteValueReaderWriter(dataBuffer), length, numBytesPerValue, paddingByte);
+    super(dataBuffer, length, numBytesPerValue, paddingByte);
   }
 }
