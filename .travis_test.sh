@@ -58,12 +58,12 @@ fi
 passed=0
 # Only run integration tests if needed
 if [ "$RUN_INTEGRATION_TESTS" != 'false' ]; then
-  mvn test -B -P travis,travis-integration-tests-only
+  mvn test -B -P travis,travis-integration-tests-only,build-thrift
   if [ $? -eq 0 ]; then
     passed=1
   fi
 else
-  mvn test -B -P travis,travis-no-integration-tests
+  mvn test -B -P travis,travis-no-integration-tests,build-thrift
   if [ $? -eq 0 ]; then
     passed=1
   fi

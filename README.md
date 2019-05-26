@@ -52,6 +52,7 @@ Because of the design choices we made to achieve these goals, there are certain 
 Pinot works very well for querying time series data with lots of Dimensions and Metrics. Example - Query (profile views, ad campaign performance, etc.) in an analytical fashion (who viewed this profile in the last weeks, how many ads were clicked per campaign). 
 
 ## Instructions to build Pinot
+Building Pinot requires JDK 8 or later, Apache Maven 3 and [Apache Thrift](https://thrift.apache.org/docs/install/).
 More detailed instructions can be found at [Quick Demo](https://pinot.readthedocs.io/en/latest/getting_started.html) section in the documentation.
 ```
 # Clone a repo
@@ -59,7 +60,7 @@ $ git clone https://github.com/apache/incubator-pinot.git
 $ cd incubator-pinot
 
 # Build Pinot
-$ mvn clean install -DskipTests -Pbin-dist
+$ mvn clean install -DskipTests -Pbin-dist -Pbuild-thrift
 
 # Run Quck Demo
 $ cd pinot-distribution/target/apache-pinot-incubating-<version>-SNAPSHOT-bin

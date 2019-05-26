@@ -37,10 +37,10 @@ Compiling the code
 ~~~~~~~~~~~~~~~~~~
 
 One can also run the Pinot demonstration by checking out the code on GitHub, compiling it, and running it. Compiling
-Pinot requires JDK 8 or later and Apache Maven 3.
+Pinot requires JDK 8 or later, Apache Maven 3 and `Apache Thrift<https://thrift.apache.org/docs/install/>`_.
 
 #. Check out the code from GitHub (https://github.com/apache/incubator-pinot)
-#. With Maven installed, run ``mvn install package -DskipTests -Pbin-dist`` in the directory in which you checked out Pinot.
+#. With Maven installed, run ``mvn install package -DskipTests -Pbin-dist -Pbuild-thrift`` in the directory in which you checked out Pinot.
 #. Make the generated scripts executable ``cd pinot-distribution/target/apache-pinot-incubating-<version>-SNAPSHOT-bin; chmod +x bin/*.sh``
 
 Trying out Offline quickstart demo

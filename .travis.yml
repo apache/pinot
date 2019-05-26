@@ -20,6 +20,13 @@ cache:
 addons:
   firefox: latest
 
+before_install:
+  - sudo apt-get update -qq
+  - sudo apt-get install automake bison flex g++ git libboost-all-dev libevent-dev libssl-dev libtool make pkg-config
+  - wget http://archive.apache.org/dist/thrift/0.9.3/thrift-0.9.3.tar.gz -O /tmp/thrift-0.9.3.tar.gz
+  - tar xfz /tmp/thrift-0.9.3.tar.gz --directory  /tmp
+  - base_dir=`pwd` && cd /tmp/thrift-0.9.3 && ./configure --with-cpp=no --with-c_glib=no --with-java=yes --with-python=no --with-ruby=no --with-erlang=no --with-go=no --with-nodejs=no --with-php=no && sudo make install && cd ${base_dir}
+
 install:
   - ./.travis_install.sh
 

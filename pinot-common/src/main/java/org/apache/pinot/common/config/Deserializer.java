@@ -413,9 +413,8 @@ public class Deserializer {
     config = config.resolve();
 
     try {
-      Map<String, Object> map = io.vavr.collection.HashSet.ofAll(config.entrySet())
-          .toMap(entry -> Tuple.of(entry.getKey(), entry.getValue().unwrapped()));
-      return deserialize(clazz, map, "");
+      return deserialize(clazz, io.vavr.collection.HashSet.ofAll(config.entrySet())
+          .toMap(entry -> Tuple.of(entry.getKey(), entry.getValue().unwrapped())), "");
     } catch (Exception e) {
       Utils.rethrowException(e);
       return null;

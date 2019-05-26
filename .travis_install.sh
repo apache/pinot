@@ -41,14 +41,14 @@ fi
 if [ $noThirdEyeChange -ne 0 ]; then
   echo "Full Pinot build"
   echo "No ThirdEye changes"
-  mvn clean install -B -DskipTests=true -Dmaven.javadoc.skip=true -Dassembly.skipAssembly=true || exit $?
+  mvn clean install -B -P build-thrift -DskipTests=true -Dmaven.javadoc.skip=true -Dassembly.skipAssembly=true || exit $?
 fi
 
 # Build ThirdEye for ThirdEye related changes
 if [ $noThirdEyeChange -eq 0 ]; then
   echo "Partial Pinot build"
   echo "ThirdEye changes only"
-  mvn install -B -DskipTests -Dmaven.javadoc.skip=true -Dassembly.skipAssembly=true -pl pinot-common,pinot-core,pinot-api -am
+  mvn install -B -DskipTests -P build-thrift -Dmaven.javadoc.skip=true -Dassembly.skipAssembly=true -pl pinot-common,pinot-core,pinot-api -am
   cd thirdeye/thirdeye-hadoop
   mvn clean compile -B -DskipTests
   cd ../..
