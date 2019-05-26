@@ -21,6 +21,7 @@ package org.apache.pinot.core.segment.index.readers;
 import org.apache.pinot.core.io.util.ValueReader;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 
+
 public class StringDictionary extends ImmutableDictionaryReader {
 
   public StringDictionary(PinotDataBuffer dataBuffer, int length, int numBytesPerValue, byte paddingByte) {
@@ -54,9 +55,10 @@ public class StringDictionary extends ImmutableDictionaryReader {
 
   @Override
   public void readStringValues(int[] dictIds, int inStartPos, int length, String[] outValues, int outStartPos) {
+    byte[] buffer = getBuffer();
     int inEndPos = inStartPos + length;
     for (int i = inStartPos; i < inEndPos; i++) {
-      outValues[outStartPos++] = getStringValue(dictIds[i]);
+      outValues[outStartPos++] = getUnpaddedString(dictIds[i], buffer);
     }
   }
 }
