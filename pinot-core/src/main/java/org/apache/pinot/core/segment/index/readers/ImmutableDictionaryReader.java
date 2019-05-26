@@ -35,21 +35,18 @@ public abstract class ImmutableDictionaryReader extends BaseDictionary {
   private final int _length;
   private final int _numBytesPerValue;
   private final byte _paddingByte;
-  private final boolean _isUsingVarLengthReader;
 
   protected ImmutableDictionaryReader(PinotDataBuffer dataBuffer, int length, int numBytesPerValue, byte paddingByte) {
     if (VarLengthBytesValueReaderWriter.isVarLengthBytesDictBuffer(dataBuffer)) {
       _valueReader = new VarLengthBytesValueReaderWriter(dataBuffer);
       _numBytesPerValue = -1;
       _paddingByte = 0;
-      _isUsingVarLengthReader = true;
     }
     else {
       Preconditions.checkState(dataBuffer.size() == length * numBytesPerValue);
       _valueReader = new FixedByteValueReaderWriter(dataBuffer);
       _numBytesPerValue = numBytesPerValue;
       _paddingByte = paddingByte;
-      _isUsingVarLengthReader = false;
     }
     _length = length;
   }
@@ -59,7 +56,6 @@ public abstract class ImmutableDictionaryReader extends BaseDictionary {
     _length = length;
     _numBytesPerValue = -1;
     _paddingByte = 0;
-    _isUsingVarLengthReader = valueReader instanceof VarLengthBytesValueReaderWriter;
   }
 
   /**
