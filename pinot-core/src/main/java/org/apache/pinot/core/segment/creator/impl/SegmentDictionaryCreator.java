@@ -31,10 +31,10 @@ import java.nio.ByteOrder;
 import java.util.Arrays;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.common.utils.primitive.ByteArray;
 import org.apache.pinot.core.io.util.FixedByteValueReaderWriter;
 import org.apache.pinot.core.io.util.VarLengthBytesValueReaderWriter;
-import org.apache.pinot.core.io.util.VarLengthStringsReaderWriter;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -155,19 +155,16 @@ public class SegmentDictionaryCreator implements Closeable {
         _stringValueToIndexMap = new Object2IntOpenHashMap<>(numValues);
 
         // Get the maximum length of all entries
+        byte[][] sortedStringBytes = new byte[numValues][];
         for (int i = 0; i < numValues; i++) {
           String value = sortedStrings[i];
           _stringValueToIndexMap.put(value, i);
+          byte[] valueBytes = StringUtil.encodeUtf8(value);
+          sortedStringBytes[i] = valueBytes;
+          _numBytesPerEntry = Math.max(_numBytesPerEntry, valueBytes.length);
         }
 
-        // Backward-compatible: index file is always big-endian
-        long size = VarLengthStringsReaderWriter.getRequiredSize(sortedStrings);
-        try (PinotDataBuffer dataBuffer =
-            PinotDataBuffer.mapFile(_dictionaryFile, false, 0, size, ByteOrder.BIG_ENDIAN,
-                getClass().getSimpleName());
-            VarLengthStringsReaderWriter writer = new VarLengthStringsReaderWriter(dataBuffer)) {
-          writer.init(sortedStrings);
-        }
+        writeBytesValueDictionary(numValues, sortedStringBytes);
         LOGGER.info(
             "Created dictionary for STRING column: {} with cardinality: {}, max length in bytes: {}, range: {} to {}",
             _fieldSpec.getName(), numValues, _numBytesPerEntry, sortedStrings[0], sortedStrings[numValues - 1]);
@@ -187,14 +184,7 @@ public class SegmentDictionaryCreator implements Closeable {
           _bytesValueToIndexMap.put(value, i);
         }
 
-        // Backward-compatible: index file is always big-endian
-        size = VarLengthBytesValueReaderWriter.getRequiredSize(sortedByteArrays);
-        try (PinotDataBuffer dataBuffer = PinotDataBuffer
-            .mapFile(_dictionaryFile, false, 0, size, ByteOrder.BIG_ENDIAN,
-                getClass().getSimpleName());
-            VarLengthBytesValueReaderWriter writer = new VarLengthBytesValueReaderWriter(dataBuffer)) {
-          writer.init(sortedByteArrays);
-        }
+        writeBytesValueDictionary(numValues, sortedByteArrays);
         LOGGER.info(
             "Created dictionary for BYTES column: {} with cardinality: {}, max length in bytes: {}, range: {} to {}",
             _fieldSpec.getName(), numValues, _numBytesPerEntry, sortedBytes[0], sortedBytes[numValues - 1]);
@@ -202,6 +192,36 @@ public class SegmentDictionaryCreator implements Closeable {
 
       default:
         throw new UnsupportedOperationException("Unsupported data type: " + _fieldSpec.getDataType());
+    }
+  }
+
+  private void writeBytesValueDictionary(int numValues, byte[][] sortedByteArrays) throws IOException {
+    // TODO: Fix this to be dynamic based on the standard deviation in the lengths
+    // of the values in byte array, max length of array, etc.
+    boolean useFixedSizeDict = false;
+
+    if (useFixedSizeDict) {
+      // Backward-compatible: index file is always big-endian
+      try (PinotDataBuffer dataBuffer = PinotDataBuffer
+          .mapFile(_dictionaryFile, false, 0, (long) numValues * _numBytesPerEntry, ByteOrder.BIG_ENDIAN,
+              getClass().getSimpleName());
+          FixedByteValueReaderWriter writer = new FixedByteValueReaderWriter(dataBuffer)) {
+        for (int i = 0; i < numValues; i++) {
+          byte[] value = sortedByteArrays[i];
+          writer.writeUnpaddedString(i, _numBytesPerEntry, value);
+        }
+      }
+    }
+    else {
+      // Backward-compatible: index file is always big-endian
+      long size = VarLengthBytesValueReaderWriter.getRequiredSize(sortedByteArrays);
+      try (PinotDataBuffer dataBuffer = PinotDataBuffer
+          .mapFile(_dictionaryFile, false, 0, size, ByteOrder.BIG_ENDIAN,
+              getClass().getSimpleName());
+          VarLengthBytesValueReaderWriter writer = new VarLengthBytesValueReaderWriter(
+              dataBuffer)) {
+        writer.init(sortedByteArrays);
+      }
     }
   }
 

@@ -19,7 +19,6 @@
 package org.apache.pinot.core.segment.index.readers;
 
 import org.apache.pinot.common.utils.BytesUtils;
-import org.apache.pinot.core.io.util.VarLengthBytesValueReaderWriter;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 
 
@@ -29,7 +28,7 @@ import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 public class BytesDictionary extends ImmutableDictionaryReader {
 
   public BytesDictionary(PinotDataBuffer dataBuffer, int length, int numBytesPerValue) {
-    super(new VarLengthBytesValueReaderWriter(dataBuffer), length, numBytesPerValue, (byte) 0);
+    super(dataBuffer, length, numBytesPerValue, (byte) 0);
   }
 
   @Override

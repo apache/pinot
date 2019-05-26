@@ -33,15 +33,11 @@ public interface ValueReader {
 
   double getDouble(int index);
 
-  String getString(int index);
-
   String getUnpaddedString(int index, int numBytesPerValue, byte paddingByte, byte[] buffer);
 
   String getPaddedString(int index, int numBytesPerValue, byte[] buffer);
 
   byte[] getBytes(int index, int numBytesPerValue, byte[] buffer);
-
-  byte[] getBytes(int index);
 
   void close() throws IOException;
 }

@@ -25,6 +25,7 @@ import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.common.utils.primitive.ByteArray;
 import org.apache.pinot.core.io.util.FixedByteValueReaderWriter;
 import org.apache.pinot.core.io.util.ValueReader;
+import org.apache.pinot.core.io.util.VarLengthBytesValueReaderWriter;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 
 
@@ -34,12 +35,23 @@ public abstract class ImmutableDictionaryReader extends BaseDictionary {
   private final int _length;
   private final int _numBytesPerValue;
   private final byte _paddingByte;
+  private final boolean _isUsingVarLengthReader;
 
-  protected ImmutableDictionaryReader(ValueReader valueReader, int length, int numBytesPerValue, byte paddingByte) {
-    _valueReader = valueReader;
+  protected ImmutableDictionaryReader(PinotDataBuffer dataBuffer, int length, int numBytesPerValue, byte paddingByte) {
+    if (VarLengthBytesValueReaderWriter.isVarLengthBytesDictBuffer(dataBuffer)) {
+      _valueReader = new VarLengthBytesValueReaderWriter(dataBuffer);
+      _numBytesPerValue = -1;
+      _paddingByte = 0;
+      _isUsingVarLengthReader = true;
+    }
+    else {
+      Preconditions.checkState(dataBuffer.size() == length * numBytesPerValue);
+      _valueReader = new FixedByteValueReaderWriter(dataBuffer);
+      _numBytesPerValue = numBytesPerValue;
+      _paddingByte = paddingByte;
+      _isUsingVarLengthReader = false;
+    }
     _length = length;
-    _numBytesPerValue = numBytesPerValue;
-    _paddingByte = paddingByte;
   }
 
   protected ImmutableDictionaryReader(ValueReader valueReader, int length) {
@@ -47,6 +59,7 @@ public abstract class ImmutableDictionaryReader extends BaseDictionary {
     _length = length;
     _numBytesPerValue = -1;
     _paddingByte = 0;
+    _isUsingVarLengthReader = valueReader instanceof VarLengthBytesValueReaderWriter;
   }
 
   /**
@@ -145,12 +158,13 @@ public abstract class ImmutableDictionaryReader extends BaseDictionary {
   }
 
   protected int binarySearch(String value) {
+    byte[] buffer = getBuffer();
     int low = 0;
     int high = _length - 1;
     if (_paddingByte == 0) {
       while (low <= high) {
         int mid = (low + high) >>> 1;
-        String midValue = _valueReader.getString(mid);
+        String midValue = _valueReader.getUnpaddedString(mid, _numBytesPerValue, _paddingByte, buffer);
         int compareResult = midValue.compareTo(value);
         if (compareResult < 0) {
           low = mid + 1;
@@ -164,7 +178,7 @@ public abstract class ImmutableDictionaryReader extends BaseDictionary {
       String paddedValue = padString(value);
       while (low <= high) {
         int mid = (low + high) >>> 1;
-        String midValue = _valueReader.getString(mid);
+        String midValue = _valueReader.getPaddedString(mid, _numBytesPerValue, buffer);
         int compareResult = midValue.compareTo(paddedValue);
         if (compareResult < 0) {
           low = mid + 1;
@@ -229,10 +243,6 @@ public abstract class ImmutableDictionaryReader extends BaseDictionary {
     return _valueReader.getDouble(dictId);
   }
 
-  protected String getString(int dictId) {
-    return _valueReader.getString(dictId);
-  }
-
   protected String getUnpaddedString(int dictId, byte[] buffer) {
     return _valueReader.getUnpaddedString(dictId, _numBytesPerValue, _paddingByte, buffer);
   }
@@ -246,6 +256,6 @@ public abstract class ImmutableDictionaryReader extends BaseDictionary {
   }
 
   protected byte[] getBuffer() {
-    return new byte[_numBytesPerValue];
+    return _numBytesPerValue <= 0 ? null : new byte[_numBytesPerValue];
   }
 }
