@@ -210,6 +210,9 @@ public class SegmentDictionaryCreator implements Closeable {
           byte[] value = sortedByteArrays[i];
           writer.writeUnpaddedString(i, _numBytesPerEntry, value);
         }
+
+        LOGGER.info("Using fixed bytes value dictionary for column: {}, size: {}",
+            _fieldSpec.getName(), (long) numValues * _numBytesPerEntry);
       }
     }
     else {
@@ -221,6 +224,9 @@ public class SegmentDictionaryCreator implements Closeable {
           VarLengthBytesValueReaderWriter writer = new VarLengthBytesValueReaderWriter(
               dataBuffer)) {
         writer.init(sortedByteArrays);
+
+        LOGGER.info("Using variable length bytes dictionary for column: {}, size: {}",
+            _fieldSpec.getName(), size);
       }
     }
   }

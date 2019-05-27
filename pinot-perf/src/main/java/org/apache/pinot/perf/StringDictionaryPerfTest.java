@@ -27,6 +27,7 @@ import java.util.Random;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.RandomStringUtils;
+import org.apache.commons.math.stat.descriptive.DescriptiveStatistics;
 import org.apache.pinot.common.data.DimensionFieldSpec;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.Schema;
@@ -46,11 +47,12 @@ import org.apache.pinot.core.segment.index.readers.Dictionary;
  */
 public class StringDictionaryPerfTest {
   private static final int MAX_STRING_LENGTH = 100;
+  private static final boolean USE_FIXED_SIZE_STRING = false;
   private static final String TMP_DIR = System.getProperty("java.io.tmpdir");
   private static final String COLUMN_NAME = "test";
-  private static final int TOTAL_NUM_LOOKUPS = 100_000;
 
-  String[] _inputStrings;
+  private final DescriptiveStatistics _statistics = new DescriptiveStatistics();
+  private String[] _inputStrings;
   private File _indexDir;
   private int _dictLength;
 
@@ -64,7 +66,7 @@ public class StringDictionaryPerfTest {
    * @param dictLength Length of the dictionary
    * @throws Exception
    */
-  public void buildSegment(int dictLength)
+  private void buildSegment(int dictLength)
       throws Exception {
     Schema schema = new Schema();
     String segmentName = "perfTestSegment" + System.currentTimeMillis();
@@ -89,14 +91,17 @@ public class StringDictionaryPerfTest {
     int i = 0;
     while (i < dictLength) {
       HashMap<String, Object> map = new HashMap<>();
-      String randomString = RandomStringUtils.randomAlphanumeric(1 + random.nextInt(MAX_STRING_LENGTH));
+      String randomString = RandomStringUtils.randomAlphanumeric(
+          USE_FIXED_SIZE_STRING ? MAX_STRING_LENGTH : (1 + random.nextInt(MAX_STRING_LENGTH)));
 
       if (uniqueStrings.contains(randomString)) {
         continue;
       }
 
       _inputStrings[i] = randomString;
-      uniqueStrings.add(randomString);
+      if (uniqueStrings.add(randomString)) {
+        _statistics.addValue(randomString.length());
+      }
       map.put("test", _inputStrings[i++]);
 
       GenericRow genericRow = new GenericRow();
@@ -130,11 +135,36 @@ public class StringDictionaryPerfTest {
     }
 
     FileUtils.deleteQuietly(_indexDir);
-    System.out.println("Total time for " + TOTAL_NUM_LOOKUPS + " lookups: " + (System.currentTimeMillis() - start));
+    System.out.println("Total time for " + numLookups + " lookups: "
+        + (System.currentTimeMillis() - start) + "ms");
   }
 
-  public static void main(String[] args)
-      throws Exception {
+  /**
+   * Measures the performance of string dictionary lookups by dictId performing the provided
+   * number of reads from dictionary at random indices.
+   *
+   * @param numGetValues Number of values to read from the dictionary
+   * @throws Exception
+   */
+  private void perfTestGetValues(int numGetValues) throws Exception {
+    ImmutableSegment immutableSegment = ImmutableSegmentLoader.load(_indexDir, ReadMode.heap);
+    Dictionary dictionary = immutableSegment.getDictionary(COLUMN_NAME);
+
+    Random random = new Random(System.nanoTime());
+    long start = System.currentTimeMillis();
+
+    for (int i = 0; i < numGetValues; i++) {
+      int index = random.nextInt(_dictLength);
+      dictionary.get(index);
+    }
+
+    FileUtils.deleteQuietly(_indexDir);
+    System.out.println("Total time for " + numGetValues + " lookups: "
+        + (System.currentTimeMillis() - start) + "ms");
+    System.out.println(_statistics.toString());
+  }
+
+  public static void main(String[] args) throws Exception {
     if (args.length != 2) {
       System.out.println("Usage: StringDictionaryPerfRunner <dictionary_length> <num_lookups> ");
     }
@@ -144,6 +174,7 @@ public class StringDictionaryPerfTest {
 
     StringDictionaryPerfTest test = new StringDictionaryPerfTest();
     test.buildSegment(dictLength);
-    test.perfTestLookups(numLookups);
+//    test.perfTestLookups(numLookups);
+    test.perfTestGetValues(numLookups);
   }
 }
