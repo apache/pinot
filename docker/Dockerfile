@@ -1,6 +1,6 @@
-FROM openjdk:8u181-jdk-stretch
+FROM openjdk:8
 
-LABEL MAINTAINER=fx19880617@gmail.com
+LABEL MAINTAINER=dev@pinot.apache.org
 
 ARG PINOT_BRANCH=master
 ARG PINOT_GIT_URL="https://github.com/apache/incubator-pinot.git"
@@ -9,11 +9,11 @@ ENV PINOT_HOME=/opt/pinot
 ENV PINOT_BUILD_DIR=/opt/pinot-build
 
 # extra dependency for running launcher
-RUN apt-get update && apt-get install -y --no-install-recommends \
-		vim wget curl git maven\
-	&& rm -rf /var/lib/apt/lists/*
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends vim wget curl git maven && \
+    rm -rf /var/lib/apt/lists/*
 
-RUN git clone ${PINOT_GIT_URL} ${PINOT_BUILD_DIR}  && \
+RUN git clone ${PINOT_GIT_URL} ${PINOT_BUILD_DIR} && \
     cd ${PINOT_BUILD_DIR} && \
     git checkout ${PINOT_BRANCH} && \
     mvn install package -DskipTests -Pbin-dist && \
@@ -26,7 +26,8 @@ RUN git clone ${PINOT_GIT_URL} ${PINOT_BUILD_DIR}  && \
 
 VOLUME ["${PINOT_HOME}/configs", "${PINOT_HOME}/data"]
 
-EXPOSE 9000 8099 8098 8097 8096 9514
+# expose ports for controller/broker/server/admin
+EXPOSE 9000 8099 8098 8097 8096
 
 WORKDIR ${PINOT_HOME}
 
