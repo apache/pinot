@@ -26,6 +26,53 @@ import org.testng.annotations.Test;
 
 
 public class RatioCubeNodeTest {
+
+  @Test
+  public void testSide() {
+    RatioRow root = new RatioRow(new Dimensions(), new DimensionValues());
+    root.setBaselineNumeratorValue(100);
+    root.setBaselineDenominatorValue(200);
+    root.setCurrentNumeratorValue(150);
+    root.setCurrentDenominatorValue(250);
+    RatioCubeNode rootNode = new RatioCubeNode(root);
+
+    // Ratio node with clear side()
+    RatioRow rowUS = new RatioRow(new Dimensions(Collections.singletonList("country")),
+        new DimensionValues(Collections.singletonList("US")));
+    rowUS.setBaselineNumeratorValue(50); // 50 left
+    rowUS.setBaselineDenominatorValue(120); // 80 left
+    rowUS.setCurrentNumeratorValue(80); // 70 left
+    rowUS.setCurrentDenominatorValue(180); // 70 left
+    RatioCubeNode nodeUS = new RatioCubeNode(1, 0, rowUS, rootNode);
+    Assert.assertEquals(nodeUS.changeRatio(), (80/180d) / (50d/120d));
+    Assert.assertEquals(nodeUS.side(), nodeUS.changeRatio() > 1d);
+
+    // Ratio node doesn't have baseline
+    RatioRow rowIN = new RatioRow(new Dimensions(Collections.singletonList("country")),
+        new DimensionValues(Collections.singletonList("IN")));
+    rowIN.setBaselineNumeratorValue(0); // 50 left
+    rowIN.setBaselineDenominatorValue(0); // 80 left
+    rowIN.setCurrentNumeratorValue(70); // 0 left
+    rowIN.setCurrentDenominatorValue(50); // 20 left
+    RatioCubeNode nodeIN = new RatioCubeNode(1, 1, rowIN, rootNode);
+    Assert.assertEquals(nodeIN.changeRatio(), Double.NaN); // The ratio will be inferred by algorithm itself
+    Assert.assertEquals(nodeIN.side(), nodeIN.getCurrentValue() > rootNode.getCurrentValue());
+
+
+    // Ratio node doesn't have baseline
+    RatioRow rowFR = new RatioRow(new Dimensions(Collections.singletonList("country")),
+        new DimensionValues(Collections.singletonList("IN")));
+    rowFR.setBaselineNumeratorValue(25); // 25 left
+    rowFR.setBaselineDenominatorValue(60); // 20 left
+    rowFR.setCurrentNumeratorValue(0); // 0 left
+    rowFR.setCurrentDenominatorValue(0); // 20 left
+    RatioCubeNode nodeFR = new RatioCubeNode(1, 2, rowFR, rootNode);
+    Assert.assertEquals(nodeFR.changeRatio(), Double.NaN); // The ratio will be inferred by algorithm itself
+    // The side of FR is UP because it's baseline has lower ratio than it's parent; hence, we expect that removing FR
+    // will move the metric upward.
+    Assert.assertEquals(nodeFR.side(), nodeFR.getBaselineValue() < rootNode.getBaselineValue());
+  }
+
   // Since CubeNode has cyclic reference between current node and parent node, the toString() will encounter
   // overflowStack exception if it doesn't take care of the cyclic reference carefully.
   @Test
