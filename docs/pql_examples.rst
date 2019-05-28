@@ -148,7 +148,8 @@ Supported aggregations on single-value columns
 * ``MINMAXRANGE``
 * ``DISTINCTCOUNT``
 * ``DISTINCTCOUNTHLL``
-* ``FASTHLL``
+* ``FASTHLL`` (**WARN**: will be deprecated soon. ``FASTHLL`` stores serialized HyperLogLog in String format, which performs
+  worse than ``DISTINCTCOUNTHLL``, which supports serialized HyperLogLog in BYTES (byte array) format)
 * ``PERCENTILE[0-100]``: e.g. ``PERCENTILE5``, ``PERCENTILE50``, ``PERCENTILE99``, etc.
 * ``PERCENTILEEST[0-100]``: e.g. ``PERCENTILEEST5``, ``PERCENTILEEST50``, ``PERCENTILEEST99``, etc.
 
@@ -163,7 +164,8 @@ Supported aggregations on multi-value columns
 * ``MINMAXRANGEMV``
 * ``DISTINCTCOUNTMV``
 * ``DISTINCTCOUNTHLLMV``
-* ``FASTHLLMV``
+* ``FASTHLLMV`` (**WARN**: will be deprecated soon. It does not make lots of sense to configure serialized HyperLogLog
+  column as a dimension)
 * ``PERCENTILE[0-100]MV``: e.g. ``PERCENTILE5MV``, ``PERCENTILE50MV``, ``PERCENTILE99MV``, etc.
 * ``PERCENTILEEST[0-100]MV``: e.g. ``PERCENTILEEST5MV``, ``PERCENTILEEST50MV``, ``PERCENTILEEST99MV``, etc.
 
