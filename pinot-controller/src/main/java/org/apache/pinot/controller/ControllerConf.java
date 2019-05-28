@@ -136,6 +136,9 @@ public class ControllerConf extends PropertiesConfiguration {
       "controller.realtime.segment.metadata.commit.numLocks";
   private static final String ENABLE_STORAGE_QUOTA_CHECK = "controller.enable.storage.quota.check";
   private static final String ENABLE_BATCH_MESSAGE_MODE = "controller.enable.batch.message.mode";
+  // It is used to disable the HLC realtime segment completion and disallow HLC table in the cluster. True by default.
+  // If it's set to false, existing HLC realtime tables will stop consumption, and creation of new HLC tables will be disallowed.
+  // Please make sure there is no HLC table running in the cluster before disallowing it.
   private static final String ALLOW_HLC_TABLES = "controller.allow.hlc.tables";
 
   // Defines the kind of storage and the underlying PinotFS implementation

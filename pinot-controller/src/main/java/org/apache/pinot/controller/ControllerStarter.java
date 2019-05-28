@@ -275,11 +275,11 @@ public class ControllerStarter {
             _controllerLeadershipManager, _config.getSegmentCommitTimeoutSeconds());
 
     if (_config.getHLCTablesAllowed()) {
-      LOGGER.info("HLC table is allowed. HLC realtime segment completion is enabled.");
+      LOGGER.info("Realtime tables with High Level consumers will be supported");
       _realtimeSegmentsManager = new PinotRealtimeSegmentManager(_helixResourceManager, _controllerLeadershipManager);
       _realtimeSegmentsManager.start(_controllerMetrics);
     } else {
-      LOGGER.info("HLC table is disallowed. HLC realtime segment completion is disabled.");
+      LOGGER.info("Realtime tables with High Level consumers will NOT be supported");
       _realtimeSegmentsManager = null;
     }
 

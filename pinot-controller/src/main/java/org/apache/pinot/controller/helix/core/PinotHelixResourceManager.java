@@ -1100,12 +1100,8 @@ public class PinotHelixResourceManager {
         updateReplicaGroupPartitionAssignment(tableConfig);
         break;
       case REALTIME:
-        // Check if HLC table is allowed
         IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
-        StreamConfig streamConfig = new StreamConfig(indexingConfig.getStreamConfigs());
-        if (streamConfig.hasHighLevelConsumerType() && !_allowHLCTables) {
-          throw new InvalidTableConfigException("Creating HLC table is not allowed for Table: " + tableNameWithType);
-        }
+        verifyIndexingConfig(tableNameWithType, indexingConfig);
 
         // Ensure that realtime table is not created if schema is not present
         Schema schema =
@@ -1278,6 +1274,14 @@ public class PinotHelixResourceManager {
     _rebalanceSegmentStrategyFactory = rebalanceSegmentStrategyFactory;
   }
 
+  private void verifyIndexingConfig(String tableNameWithType, IndexingConfig indexingConfig) {
+    // Check if HLC table is allowed.
+    StreamConfig streamConfig = new StreamConfig(indexingConfig.getStreamConfigs());
+    if (streamConfig.hasHighLevelConsumerType() && !_allowHLCTables) {
+      throw new InvalidTableConfigException("Creating HLC realtime table is not allowed for Table: " + tableNameWithType);
+    }
+  }
+
   private void ensureRealtimeClusterIsSetUp(TableConfig config, String realtimeTableName,
       IndexingConfig indexingConfig) {
     StreamConfig streamConfig = new StreamConfig(indexingConfig.getStreamConfigs());
@@ -1354,12 +1358,8 @@ public class PinotHelixResourceManager {
       throws IOException {
 
     if (tableType == TableType.REALTIME) {
-      // Check if HLC table is allowed
       IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
-      StreamConfig streamConfig = new StreamConfig(indexingConfig.getStreamConfigs());
-      if (streamConfig.hasHighLevelConsumerType() && !_allowHLCTables) {
-        throw new InvalidTableConfigException("HLC table is not allowed for Table: " + tableNameWithType);
-      }
+      verifyIndexingConfig(tableNameWithType, indexingConfig);
       // Update replica group partition assignment to the property store if applicable
       if (ReplicationUtils.setupRealtimeReplicaGroups(tableConfig)) {
         updateReplicaGroupPartitionAssignment(tableConfig);
@@ -1422,10 +1422,7 @@ public class PinotHelixResourceManager {
 
     if (type == TableType.REALTIME) {
       // Check if HLC table is allowed
-      StreamConfig streamConfig = new StreamConfig(newConfigs.getStreamConfigs());
-      if (streamConfig.hasHighLevelConsumerType() && !_allowHLCTables) {
-        throw new InvalidTableConfigException("HLC table is not allowed for Table: " + tableNameWithType);
-      }
+      verifyIndexingConfig(tableNameWithType, newConfigs);
       ensureRealtimeClusterIsSetUp(tableConfig, tableName, newConfigs);
     }
   }
