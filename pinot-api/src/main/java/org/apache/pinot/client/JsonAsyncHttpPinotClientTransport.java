@@ -68,7 +68,7 @@ class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
       AsyncHttpClient.BoundRequestBuilder request = _httpClient.preparePost(url);
 
       if(_headers != null) {
-        _headers.forEach( (k,v) -> request.addHeader(k, v));
+        _headers.forEach((k, v) -> request.addHeader(k, v));
       }
 
       final Future<Response> response = request

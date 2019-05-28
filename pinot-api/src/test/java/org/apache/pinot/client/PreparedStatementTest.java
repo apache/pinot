@@ -73,7 +73,6 @@ public class PreparedStatementTest {
     public PinotClientTransport buildTransport(Map<String, String> headers) {
       return _dummyPinotClientTransport;
     }
-
   }
 
   @BeforeClass
