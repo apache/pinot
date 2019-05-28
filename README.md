@@ -60,7 +60,7 @@ $ git clone https://github.com/apache/incubator-pinot.git
 $ cd incubator-pinot
 
 # Build Pinot
-$ mvn clean install -DskipTests -Pbin-dist -Pbuild-thrift
+$ mvn clean install -DskipTests -Pbin-dist
 
 # Run Quck Demo
 $ cd pinot-distribution/target/apache-pinot-incubating-<version>-SNAPSHOT-bin
