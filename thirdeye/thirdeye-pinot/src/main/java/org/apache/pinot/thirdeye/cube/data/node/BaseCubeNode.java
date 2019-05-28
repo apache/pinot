@@ -76,6 +76,13 @@ public abstract class BaseCubeNode<N extends BaseCubeNode, R extends Row> implem
           "Current node is not a child node of the given parent node. Current and parent dimensions: ",
           data.getDimensions(), parent.getDimensions());
       parent.children.add(this);
+      // Sort node from large to small to increase stability of this algorithm.
+      // The reason is that the parent values will dynamically be updated whenever a child is extracted. In addition,
+      // large children are unlikely to be interfered by small children. Therefore, evaluating large children before
+      // small children can increase the stability of this algorithm.
+      parent.children.sort( (Object o1, Object o2) ->
+          (int) ((((CubeNode)o2).getBaselineSize() + ((CubeNode)o2).getCurrentSize()) - (((CubeNode)o1).getBaselineSize() + ((CubeNode)o1).getCurrentSize()))
+      );
     }
   }
 

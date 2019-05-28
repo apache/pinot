@@ -66,9 +66,6 @@ public class Summary {
     this.levelCount = this.maxLevelCount;
     this.costSet = cube.getCostSet();
     this.sortedDimensionCosts = cube.getSortedDimensionCosts();
-    this.basicRowInserter = new BasicRowInserter(new BalancedCostFunction());
-    this.oneSideErrorRowInserter = basicRowInserter;
-    this.leafRowInserter = basicRowInserter;
 
     this.costFunction = costFunction;
     this.basicRowInserter = new BasicRowInserter(costFunction);
