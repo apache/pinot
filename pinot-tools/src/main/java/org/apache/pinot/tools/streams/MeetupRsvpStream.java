@@ -35,8 +35,8 @@ import kafka.producer.KeyedMessage;
 import kafka.producer.ProducerConfig;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.utils.JsonUtils;
-import org.apache.pinot.common.utils.KafkaStarterUtils;
 import org.apache.pinot.core.realtime.impl.kafka.KafkaJSONMessageDecoder;
+import org.apache.pinot.core.realtime.impl.kafka.KafkaStarterUtils;
 import org.glassfish.tyrus.client.ClientManager;
 
 

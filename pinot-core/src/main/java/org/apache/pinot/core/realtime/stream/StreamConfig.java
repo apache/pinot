@@ -27,7 +27,6 @@ import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.utils.DataSize;
 import org.apache.pinot.common.utils.EqualityUtils;
 import org.apache.pinot.common.utils.time.TimeUtils;
-import org.apache.pinot.core.realtime.impl.kafka.KafkaConsumerFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -48,7 +47,8 @@ public class StreamConfig {
   private static final int DEFAULT_FLUSH_THRESHOLD_ROWS = 5_000_000;
   private static final long DEFAULT_FLUSH_THRESHOLD_TIME = TimeUnit.MILLISECONDS.convert(6, TimeUnit.HOURS);
   private static final long DEFAULT_DESIRED_SEGMENT_SIZE_BYTES = 200 * 1024 * 1024; // 200M
-  private static final String DEFAULT_CONSUMER_FACTORY_CLASS_NAME_STRING = KafkaConsumerFactory.class.getName();
+  private static final String DEFAULT_CONSUMER_FACTORY_CLASS_NAME_STRING =
+      "org.apache.pinot.core.realtime.impl.kafka.KafkaConsumerFactory";
 
   protected static final long DEFAULT_STREAM_CONNECTION_TIMEOUT_MILLIS = 30_000;
   protected static final int DEFAULT_STREAM_FETCH_TIMEOUT_MILLIS = 5_000;

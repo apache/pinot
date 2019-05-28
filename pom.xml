@@ -55,6 +55,7 @@
     <module>pinot-azure-filesystem</module>
     <module>pinot-orc</module>
     <module>pinot-parquet</module>
+    <module>pinot-kafka-0.9.0.1</module>
   </modules>
 
   <licenses>
