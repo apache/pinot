@@ -41,8 +41,8 @@ import org.apache.pinot.common.partition.PartitionAssignment;
 import org.apache.pinot.common.partition.StreamPartitionAssignmentGenerator;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
-import org.apache.pinot.core.realtime.impl.kafka.KafkaAvroMessageDecoder;
-import org.apache.pinot.core.realtime.impl.kafka.KafkaConsumerFactory;
+import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
+import org.apache.pinot.core.realtime.stream.StreamConfig;
 import org.apache.pinot.core.realtime.stream.StreamConfigProperties;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
@@ -581,26 +581,15 @@ public class DefaultRebalanceStrategyTest {
     CommonConstants.Helix.TableType tableTypeFromTableName = TableNameBuilder.getTableTypeFromTableName(tableName);
     when(mockTableConfig.getTableType()).thenReturn(tableTypeFromTableName);
 
-    Map<String, String> streamConfigMap = new HashMap<>(1);
-    String streamType = "kafka";
-    String topic = "aTopic";
-    String consumerFactoryClass = KafkaConsumerFactory.class.getName();
-    String decoderClass = KafkaAvroMessageDecoder.class.getName();
-    streamConfigMap.put(StreamConfigProperties.STREAM_TYPE, streamType);
-    streamConfigMap
-        .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_TOPIC_NAME),
-            topic);
-    streamConfigMap
-        .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
-            consumerTypesCSV);
-    streamConfigMap.put(StreamConfigProperties
-            .constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS),
-        consumerFactoryClass);
-    streamConfigMap
-        .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_DECODER_CLASS),
-            decoderClass);
+    StreamConfig streamConfig;
+    if (StreamConfig.ConsumerType.HIGHLEVEL.toString().equalsIgnoreCase(consumerTypesCSV)) {
+      streamConfig = FakeStreamConfigUtils.getDefaultHighLevelStreamConfigs();
+    } else {
+      streamConfig = FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs();
+    }
+
     IndexingConfig mockIndexConfig = mock(IndexingConfig.class);
-    when(mockIndexConfig.getStreamConfigs()).thenReturn(streamConfigMap);
+    when(mockIndexConfig.getStreamConfigs()).thenReturn(streamConfig.getStreamConfigsMap());
     when(mockTableConfig.getIndexingConfig()).thenReturn(mockIndexConfig);
 
     return mockTableConfig;

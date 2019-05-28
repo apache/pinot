@@ -28,8 +28,7 @@ import org.apache.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import org.apache.pinot.common.partition.PartitionAssignment;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.LLCSegmentName;
-import org.apache.pinot.core.realtime.impl.kafka.KafkaAvroMessageDecoder;
-import org.apache.pinot.core.realtime.impl.kafka.KafkaConsumerFactory;
+import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
 import org.apache.pinot.core.realtime.stream.StreamConfig;
 import org.apache.pinot.core.realtime.stream.StreamConfigProperties;
 import org.testng.Assert;
@@ -271,24 +270,7 @@ public class FlushThresholdUpdaterTest {
     TableConfig realtimeTableConfig;
 
     FlushThresholdUpdater flushThresholdUpdater;
-    Map<String, String> streamConfigs = new HashMap<>();
-    String streamType = "kafka";
-    String streamTopic = "aTopic";
-    String consumerFactoryClass = KafkaConsumerFactory.class.getName();
-    String decoderClass = KafkaAvroMessageDecoder.class.getName();
-    streamConfigs.put(StreamConfigProperties.STREAM_TYPE, streamType);
-    streamConfigs
-        .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_TOPIC_NAME),
-            streamTopic);
-    streamConfigs
-        .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
-            StreamConfig.ConsumerType.LOWLEVEL.toString());
-    streamConfigs.put(StreamConfigProperties
-            .constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS),
-        consumerFactoryClass);
-    streamConfigs
-        .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_DECODER_CLASS),
-            decoderClass);
+    Map<String, String> streamConfigs = FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap();
     tableConfigBuilder.setStreamConfigs(streamConfigs);
 
     // flush size set
@@ -500,7 +482,6 @@ public class FlushThresholdUpdaterTest {
     String tableName = "fakeTable_REALTIME";
     int seqNum = 0;
     long startOffset = 0;
-    long committingSegmentSizeBytes;
     CommittingSegmentDescriptor committingSegmentDescriptor;
     long now = System.currentTimeMillis();
     long seg0time = now - 1334_650;

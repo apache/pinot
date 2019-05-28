@@ -21,8 +21,6 @@ package org.apache.pinot.controller.api.resources;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
 import org.apache.pinot.common.config.QuotaConfig;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
@@ -31,9 +29,8 @@ import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.ControllerRequestBuilderUtil;
 import org.apache.pinot.controller.helix.ControllerTest;
-import org.apache.pinot.core.realtime.impl.kafka.KafkaStreamConfigProperties;
+import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
 import org.apache.pinot.core.realtime.stream.StreamConfig;
-import org.apache.pinot.core.realtime.stream.StreamConfigProperties;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -75,30 +72,10 @@ public class PinotTableRestletResourceTest extends ControllerTest {
 
     // add schema for realtime table
     addDummySchema(REALTIME_TABLE_NAME);
-
-    Map<String, String> streamConfigs = new HashMap<>();
-    String streamType = "kafka";
-    streamConfigs.put(StreamConfigProperties.STREAM_TYPE, streamType);
-    streamConfigs
-        .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
-            StreamConfig.ConsumerType.HIGHLEVEL.toString());
-    streamConfigs
-        .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_TOPIC_NAME),
-            "fakeTopic");
-    streamConfigs
-        .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_DECODER_CLASS),
-            "fakeClass");
-    streamConfigs.put(StreamConfigProperties
-        .constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS), "fakeClass");
-    streamConfigs.put(KafkaStreamConfigProperties
-            .constructStreamProperty(KafkaStreamConfigProperties.HighLevelConsumer.KAFKA_HLC_ZK_CONNECTION_STRING),
-        "fakeUrl");
-    streamConfigs.put(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS, Integer.toString(1234));
-    streamConfigs.put(StreamConfigProperties
-        .constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_OFFSET_CRITERIA), "smallest");
+    StreamConfig streamConfig = FakeStreamConfigUtils.getDefaultHighLevelStreamConfigs();
     _realtimeBuilder.setTableName(REALTIME_TABLE_NAME).setTimeColumnName("timeColumn").setTimeType("DAYS")
         .setRetentionTimeUnit("DAYS").setRetentionTimeValue("5").setSchemaName(REALTIME_TABLE_NAME)
-        .setStreamConfigs(streamConfigs);
+        .setStreamConfigs(streamConfig.getStreamConfigsMap());
   }
 
   @Test

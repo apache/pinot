@@ -40,8 +40,7 @@ import org.apache.pinot.controller.helix.ControllerRequestBuilderUtil;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.utils.ReplicaGroupTestUtils;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
-import org.apache.pinot.core.realtime.impl.kafka.KafkaAvroMessageDecoder;
-import org.apache.pinot.core.realtime.impl.kafka.KafkaStreamConfigProperties;
+import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
 import org.apache.pinot.core.realtime.stream.StreamConfig;
 import org.apache.pinot.core.realtime.stream.StreamConfigProperties;
 import org.testng.Assert;
@@ -253,17 +252,7 @@ public class SegmentAssignmentStrategyTest extends ControllerTest {
     Schema schema = new Schema.SchemaBuilder().setSchemaName(rawTableName).build();
     _helixResourceManager.addOrUpdateSchema(schema);
 
-    Map<String, String> streamConfigMap = new HashMap<>();
-    String type = "kafka";
-    streamConfigMap.put(StreamConfigProperties.STREAM_TYPE, type);
-    streamConfigMap.put(StreamConfigProperties.constructStreamProperty(type, StreamConfigProperties.STREAM_TOPIC_NAME),
-        "test");
-    streamConfigMap.put(
-        StreamConfigProperties.constructStreamProperty(type, StreamConfigProperties.STREAM_CONSUMER_TYPES),
-        StreamConfig.ConsumerType.LOWLEVEL.toString());
-    streamConfigMap.put(
-        StreamConfigProperties.constructStreamProperty(type, StreamConfigProperties.STREAM_DECODER_CLASS),
-        KafkaAvroMessageDecoder.class.getName());
+    Map<String, String> streamConfigMap = FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap();
 
     // Adding a table without replica group
     TableConfig tableConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.REALTIME).setTableName(

@@ -63,9 +63,7 @@ import org.apache.pinot.controller.helix.core.PinotTableIdealStateBuilder;
 import org.apache.pinot.controller.helix.core.realtime.segment.CommittingSegmentDescriptor;
 import org.apache.pinot.controller.util.SegmentCompletionUtils;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
-import org.apache.pinot.core.realtime.impl.kafka.KafkaAvroMessageDecoder;
-import org.apache.pinot.core.realtime.impl.kafka.KafkaConsumerFactory;
-import org.apache.pinot.core.realtime.impl.kafka.KafkaStreamConfigProperties;
+import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
 import org.apache.pinot.core.realtime.stream.OffsetCriteria;
 import org.apache.pinot.core.realtime.stream.StreamConfig;
 import org.apache.pinot.core.realtime.stream.StreamConfigProperties;
@@ -1268,32 +1266,10 @@ public class PinotLLCRealtimeSegmentManagerTest {
     when(mockValidationConfig.getReplicasPerPartition()).thenReturn(Integer.toString(nReplicas));
     when(mockValidationConfig.getReplicasPerPartitionNumber()).thenReturn(nReplicas);
     when(mockTableConfig.getValidationConfig()).thenReturn(mockValidationConfig);
-    Map<String, String> streamConfigMap = new HashMap<>(1);
-    String streamType = "kafka";
-    streamConfigMap.put(StreamConfigProperties.STREAM_TYPE, streamType);
-    String topic = "aTopic";
-    String consumerFactoryClass = KafkaConsumerFactory.class.getName();
-    String decoderClass = KafkaAvroMessageDecoder.class.getName();
-    streamConfigMap
-        .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_TOPIC_NAME),
-            topic);
-    streamConfigMap.put(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS, "100000");
-    streamConfigMap
-        .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
-            "simple");
-    streamConfigMap.put(StreamConfigProperties
-            .constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS),
-        consumerFactoryClass);
-    streamConfigMap
-        .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_DECODER_CLASS),
-            decoderClass);
 
-    final String bootstrapHostConfigKey = KafkaStreamConfigProperties
-        .constructStreamProperty(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_BROKER_LIST);
-    streamConfigMap.put(bootstrapHostConfigKey, bootstrapHosts);
-
+    StreamConfig streamConfig = FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs();
     IndexingConfig mockIndexConfig = mock(IndexingConfig.class);
-    when(mockIndexConfig.getStreamConfigs()).thenReturn(streamConfigMap);
+    when(mockIndexConfig.getStreamConfigs()).thenReturn(streamConfig.getStreamConfigsMap());
 
     when(mockTableConfig.getIndexingConfig()).thenReturn(mockIndexConfig);
     TenantConfig mockTenantConfig = mock(TenantConfig.class);
@@ -1301,24 +1277,6 @@ public class PinotLLCRealtimeSegmentManagerTest {
     when(mockTableConfig.getTenantConfig()).thenReturn(mockTenantConfig);
 
     return mockTableConfig;
-  }
-
-  private static Map<String, String> getStreamConfigs() {
-    Map<String, String> streamPropMap = new HashMap<>(1);
-    String streamType = "kafka";
-    streamPropMap.put(StreamConfigProperties.STREAM_TYPE, streamType);
-    String topic = "aTopic";
-    streamPropMap
-        .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_TOPIC_NAME),
-            topic);
-    streamPropMap
-        .put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
-            "simple");
-    streamPropMap.put(StreamConfigProperties
-        .constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_OFFSET_CRITERIA), "smallest");
-    streamPropMap.put(KafkaStreamConfigProperties
-        .constructStreamProperty(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_BROKER_LIST), "host:1234");
-    return streamPropMap;
   }
 
   //////////////////////////////////////////////////////////////////////////////////
@@ -1372,7 +1330,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
         TableConfig mockTableConfig = mock(TableConfig.class);
         IndexingConfig mockIndexingConfig = mock(IndexingConfig.class);
         when(mockTableConfig.getIndexingConfig()).thenReturn(mockIndexingConfig);
-        when(mockIndexingConfig.getStreamConfigs()).thenReturn(getStreamConfigs());
+        StreamConfig streamConfig = FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs();
+        when(mockIndexingConfig.getStreamConfigs()).thenReturn(streamConfig.getStreamConfigsMap());
         when(mockCache.getTableConfig(anyString())).thenReturn(mockTableConfig);
 
         Field tableConfigCacheField = PinotLLCRealtimeSegmentManager.class.getDeclaredField("_tableConfigCache");
