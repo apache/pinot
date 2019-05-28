@@ -37,6 +37,7 @@ import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixManager;
 import org.apache.helix.SystemPropertyKeys;
+import org.apache.helix.api.listeners.ControllerChangeListener;
 import org.apache.helix.task.TaskDriver;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.metrics.ControllerMeter;
@@ -230,6 +231,9 @@ public class ControllerStarter {
         () -> _controllerMetrics.addMeteredGlobalValue(ControllerMeter.HELIX_ZOOKEEPER_RECONNECTS, 1L));
 
     _serviceStatusCallbackList.add(generateServiceStatusCallback(_helixControllerManager));
+
+    LOGGER.info("Initializing controller leadership manager");
+    _controllerLeadershipManager = new ControllerLeadershipManager(_helixControllerManager, _controllerMetrics);
   }
 
   private void setUpPinotController() {
@@ -249,14 +253,11 @@ public class ControllerStarter {
     _helixResourceManager.start();
     HelixManager helixParticipantManager = _helixResourceManager.getHelixZkManager();
 
-    LOGGER.info("Init controller leadership manager");
-    // Note: Currently leadership depends on helix controller, thus assign helixControllerManager to ControllerLeadershipManager.
-    // TODO: In the future when Helix separation is completed, leadership only depends on the master in leadControllerResource, and ControllerLeadershipManager will be removed.
-    if (_helixControllerManager != null) {
-      _controllerLeadershipManager = new ControllerLeadershipManager(_helixControllerManager, _controllerMetrics);
-    } else {
-      _controllerLeadershipManager = new ControllerLeadershipManager(helixParticipantManager, _controllerMetrics);
-    }
+    LOGGER.info("Registering controller leadership manager");
+    // TODO: when Helix separation is completed, leadership only depends on the master in leadControllerResource, remove
+    //       ControllerLeadershipManager and this callback.
+    helixParticipantManager.addControllerListener(
+        (ControllerChangeListener) changeContext -> _controllerLeadershipManager.onControllerChange());
 
     LOGGER.info("Starting task resource manager");
     _helixTaskResourceManager = new PinotHelixTaskResourceManager(new TaskDriver(helixParticipantManager));
