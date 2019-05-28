@@ -55,6 +55,7 @@ import org.apache.pinot.thirdeye.dashboard.resources.v2.rootcause.AnomalyEventFo
 import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionAlertConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
+import org.apache.pinot.thirdeye.datalayer.bao.EvaluationManager;
 import org.apache.pinot.thirdeye.datalayer.bao.EventManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
@@ -98,6 +99,7 @@ public class DetectionResource {
   private final DetectionPipelineLoader loader;
   private final DataProvider provider;
   private final DetectionConfigManager configDAO;
+  private final EvaluationManager evaluationDAO;
   private final DetectionAlertConfigManager detectionAlertConfigDAO;
 
   public DetectionResource() {
@@ -107,6 +109,7 @@ public class DetectionResource {
     this.anomalyDAO = DAORegistry.getInstance().getMergedAnomalyResultDAO();
     this.configDAO = DAORegistry.getInstance().getDetectionConfigManager();
     this.detectionAlertConfigDAO = DAORegistry.getInstance().getDetectionAlertConfigManager();
+    this.evaluationDAO = DAORegistry.getInstance().getEvaluationManager();
 
     TimeSeriesLoader timeseriesLoader =
         new DefaultTimeSeriesLoader(metricDAO, datasetDAO, ThirdEyeCacheRegistry.getInstance().getQueryCache());
@@ -117,7 +120,7 @@ public class DetectionResource {
 
     this.loader = new DetectionPipelineLoader();
 
-    this.provider = new DefaultDataProvider(metricDAO, datasetDAO, eventDAO, anomalyDAO, timeseriesLoader, aggregationLoader, loader);
+    this.provider = new DefaultDataProvider(metricDAO, datasetDAO, eventDAO, anomalyDAO, evaluationDAO, timeseriesLoader, aggregationLoader, loader);
   }
 
   @Path("/{id}")

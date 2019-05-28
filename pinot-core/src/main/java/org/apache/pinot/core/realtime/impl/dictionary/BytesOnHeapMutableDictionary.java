@@ -20,9 +20,7 @@ package org.apache.pinot.core.realtime.impl.dictionary;
 
 import java.util.Arrays;
 import javax.annotation.Nonnull;
-import org.apache.commons.codec.DecoderException;
-import org.apache.commons.codec.binary.Hex;
-import org.apache.pinot.common.Utils;
+import org.apache.pinot.common.utils.BytesUtils;
 import org.apache.pinot.common.utils.primitive.ByteArray;
 
 
@@ -36,46 +34,28 @@ public class BytesOnHeapMutableDictionary extends BaseOnHeapMutableDictionary {
 
   @Override
   public int indexOf(Object rawValue) {
-    byte[] bytes = null;
-    // Convert hex string to byte[].
-    if (rawValue instanceof byte[]) {
-      bytes = (byte[]) rawValue;
-    } else if (rawValue instanceof String) {
-      try {
-        bytes = Hex.decodeHex(((String) rawValue).toCharArray());
-      } catch (DecoderException e) {
-        Utils.rethrowException(e);
-      }
-    } else {
-      assert rawValue instanceof byte[];
-    }
+    byte[] bytes = BytesUtils.toBytes(rawValue);
     return getDictId(new ByteArray(bytes));
   }
 
   @Override
   public byte[] get(int dictId) {
-    return ((ByteArray) super.get(dictId)).getBytes();
+    return getBytesValue(dictId);
+  }
+
+  @Override
+  public String getStringValue(int dictId) {
+    return BytesUtils.toHexString(getBytesValue(dictId));
   }
 
   @Override
   public byte[] getBytesValue(int dictId) {
-    return get(dictId);
+    return ((ByteArray) super.get(dictId)).getBytes();
   }
 
   @Override
   public void index(@Nonnull Object rawValue) {
-    byte[] bytes = null;
-    // Convert hex string to byte[].
-    if (rawValue instanceof String) {
-      try {
-        bytes = Hex.decodeHex(((String) rawValue).toCharArray());
-      } catch (DecoderException e) {
-        Utils.rethrowException(e);
-      }
-    } else {
-      assert rawValue instanceof byte[];
-      bytes = (byte[]) rawValue;
-    }
+    byte[] bytes = BytesUtils.toBytes(rawValue);
     ByteArray byteArray = new ByteArray(bytes);
     indexValue(byteArray);
     updateMinMax(byteArray);
@@ -84,7 +64,8 @@ public class BytesOnHeapMutableDictionary extends BaseOnHeapMutableDictionary {
   @Override
   public boolean inRange(@Nonnull String lower, @Nonnull String upper, int dictIdToCompare, boolean includeLower,
       boolean includeUpper) {
-    throw new UnsupportedOperationException("In-range not supported for Bytes data type.");
+    return valueInRange(new ByteArray(BytesUtils.toBytes(lower)), new ByteArray(BytesUtils.toBytes(upper)),
+        includeLower, includeUpper, (ByteArray) super.get(dictIdToCompare));
   }
 
   @Nonnull
@@ -111,6 +92,11 @@ public class BytesOnHeapMutableDictionary extends BaseOnHeapMutableDictionary {
 
     Arrays.sort(sortedValues);
     return sortedValues;
+  }
+
+  @Override
+  public int compare(int dictId1, int dictId2) {
+    return ByteArray.compare(getBytesValue(dictId1), getBytesValue(dictId2));
   }
 
   private void updateMinMax(ByteArray value) {

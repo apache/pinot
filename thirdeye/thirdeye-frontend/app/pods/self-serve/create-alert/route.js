@@ -4,7 +4,7 @@
  * @exports alert create model
  */
 import fetch from 'fetch';
-import RSVP from 'rsvp';
+import { hash } from 'rsvp';
 import moment from 'moment';
 import Route from '@ember/routing/route';
 import { task, timeout } from 'ember-concurrency';
@@ -19,6 +19,7 @@ import { get } from '@ember/object';
 let onboardStartTime = {};
 
 export default Route.extend({
+  anomaliesApiService: service('services/api/anomalies'),
   session: service(),
 
   /**
@@ -26,11 +27,14 @@ export default Route.extend({
    * @method model
    * @return {Object}
    */
-  model(params, transition) {
+  async model(params, transition) {
     const debug = transition.state.queryParams.debug || '';
-    return RSVP.hash({
-      allConfigGroups: fetch(selfServeApiCommon.allConfigGroups).then(checkStatus),
-      allAppNames: fetch(selfServeApiCommon.allApplications).then(checkStatus),
+    const applications = await this.get('anomaliesApiService').queryApplications(); // Get all applicatons available
+    const subscriptionGroups = await this.get('anomaliesApiService').querySubscriptionGroups(); // Get all subscription groups available
+
+    return hash({
+      subscriptionGroups,
+      applications,
       debug
     });
   },

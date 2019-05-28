@@ -278,6 +278,7 @@ public class ImmutableDictionaryReaderTest {
         assertEquals(new ByteArray(bytesDictionary.getBytesValue(i)), _bytesValues[i]);
 
         assertEquals(bytesDictionary.indexOf(_bytesValues[i].getBytes()), i);
+        assertEquals(bytesDictionary.indexOf(_bytesValues[i].toHexString()), i);
 
         byte[] randomBytes = new byte[BYTES_LENGTH];
         RANDOM.nextBytes(randomBytes);

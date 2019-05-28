@@ -30,6 +30,7 @@ import org.apache.pinot.thirdeye.anomaly.task.TaskRunner;
 import org.apache.pinot.thirdeye.constant.AnomalyResultSource;
 import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
+import org.apache.pinot.thirdeye.datalayer.bao.EvaluationManager;
 import org.apache.pinot.thirdeye.datalayer.bao.EventManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
@@ -62,6 +63,7 @@ public class YamlOnboardingTaskRunner implements TaskRunner {
   private static final Logger LOG = LoggerFactory.getLogger(YamlOnboardingTaskRunner.class);
   private final DetectionConfigManager detectionDAO;
   private final MergedAnomalyResultManager anomalyDAO;
+  private final EvaluationManager evaluationDAO;
   private final DetectionPipelineLoader loader;
   private final DataProvider provider;
   private final YamlDetectionTranslatorLoader translatorLoader;
@@ -72,6 +74,7 @@ public class YamlOnboardingTaskRunner implements TaskRunner {
     this.loader = new DetectionPipelineLoader();
     this.detectionDAO = DAORegistry.getInstance().getDetectionConfigManager();
     this.anomalyDAO = DAORegistry.getInstance().getMergedAnomalyResultDAO();
+    this.evaluationDAO = DAORegistry.getInstance().getEvaluationManager();
     this.translatorLoader = new YamlDetectionTranslatorLoader();
     this.yaml = new Yaml();
 
@@ -88,7 +91,7 @@ public class YamlOnboardingTaskRunner implements TaskRunner {
             ThirdEyeCacheRegistry.getInstance().getQueryCache(),
             ThirdEyeCacheRegistry.getInstance().getDatasetMaxDataTimeCache());
 
-    this.provider = new DefaultDataProvider(metricDAO, datasetDAO, eventDAO, this.anomalyDAO,
+    this.provider = new DefaultDataProvider(metricDAO, datasetDAO, eventDAO, this.anomalyDAO, this.evaluationDAO,
         timeseriesLoader, aggregationLoader, this.loader);
   }
 
@@ -129,6 +132,7 @@ public class YamlOnboardingTaskRunner implements TaskRunner {
         translator.withTuningWindow(info.getTuningWindowStart(), info.getTuningWindowEnd())
         .withExistingDetectionConfig(config)
         .generateDetectionConfig();
+    newDetectionConfig.setYaml(config.getYaml());
 
     this.detectionDAO.save(newDetectionConfig);
 

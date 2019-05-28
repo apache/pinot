@@ -49,8 +49,8 @@ public class StringOffHeapMutableDictionary extends BaseOffHeapMutableDictionary
   }
 
   @Override
-  public Object get(int dictionaryId) {
-    return StringUtil.decodeUtf8(_byteStore.get(dictionaryId));
+  public String get(int dictId) {
+    return StringUtil.decodeUtf8(_byteStore.get(dictId));
   }
 
   @Override
@@ -90,19 +90,19 @@ public class StringOffHeapMutableDictionary extends BaseOffHeapMutableDictionary
 
   @Nonnull
   @Override
-  public Object getMinVal() {
+  public String getMinVal() {
     return _min;
   }
 
   @Nonnull
   @Override
-  public Object getMaxVal() {
+  public String getMaxVal() {
     return _max;
   }
 
   @Nonnull
   @Override
-  public Object getSortedValues() {
+  public String[] getSortedValues() {
     int numValues = length();
     String[] sortedValues = new String[numValues];
 
@@ -140,5 +140,10 @@ public class StringOffHeapMutableDictionary extends BaseOffHeapMutableDictionary
   @Override
   public int getAvgValueSize() {
     return (int) _byteStore.getAvgValueSize();
+  }
+
+  @Override
+  public int compare(int dictId1, int dictId2) {
+    return getStringValue(dictId1).compareTo(getStringValue(dictId2));
   }
 }

@@ -21,9 +21,9 @@ package org.apache.pinot.core.query.selection.iterator;
 import com.clearspring.analytics.util.Preconditions;
 import java.io.Serializable;
 import org.apache.pinot.common.data.FieldSpec;
-import org.apache.pinot.common.utils.primitive.ByteArray;
 import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.BlockSingleValIterator;
+import org.apache.pinot.common.utils.BytesUtils;
 
 
 /**
@@ -48,8 +48,7 @@ public class StringSelectionColumnIterator implements SelectionColumnIterator {
 
     if (_dataType.equals(FieldSpec.DataType.BYTES)) {
       // byte[] is converted to equivalent Hex String for selection queries.
-      byte[] bytes = bvIter.nextBytesVal();
-      return ByteArray.toHexString(bytes);
+      return BytesUtils.toHexString(bvIter.nextBytesVal());
     } else {
       return bvIter.nextStringVal();
     }

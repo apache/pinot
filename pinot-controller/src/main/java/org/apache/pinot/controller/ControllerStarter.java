@@ -224,6 +224,7 @@ public class ControllerStarter {
     // Emit helix controller metrics
     _controllerMetrics.addCallbackGauge(CommonConstants.Helix.INSTANCE_CONNECTED_METRIC_NAME,
         () -> _helixControllerManager.isConnected() ? 1L : 0L);
+    // Deprecated, since getting the leadership of Helix does not mean Helix has been ready for pinot.
     _controllerMetrics.addCallbackGauge("helix.leader", () -> _helixControllerManager.isLeader() ? 1L : 0L);
     _helixControllerManager.addPreConnectCallback(
         () -> _controllerMetrics.addMeteredGlobalValue(ControllerMeter.HELIX_ZOOKEEPER_RECONNECTS, 1L));
@@ -252,9 +253,9 @@ public class ControllerStarter {
     // Note: Currently leadership depends on helix controller, thus assign helixControllerManager to ControllerLeadershipManager.
     // TODO: In the future when Helix separation is completed, leadership only depends on the master in leadControllerResource, and ControllerLeadershipManager will be removed.
     if (_helixControllerManager != null) {
-      _controllerLeadershipManager = new ControllerLeadershipManager(_helixControllerManager);
+      _controllerLeadershipManager = new ControllerLeadershipManager(_helixControllerManager, _controllerMetrics);
     } else {
-      _controllerLeadershipManager = new ControllerLeadershipManager(helixParticipantManager);
+      _controllerLeadershipManager = new ControllerLeadershipManager(helixParticipantManager, _controllerMetrics);
     }
 
     LOGGER.info("Starting task resource manager");

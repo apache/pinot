@@ -165,6 +165,18 @@ body {
     &--left {
       margin-left: -15px;
     }
+
+    &--same-line {
+      display: inline-flex;
+      align-items: baseline;
+      width: 100%;
+      position: relative;
+      padding: 0px;
+    }
+
+    &--margin-left {
+      margin-left: 20px;
+    }
   }
 
   &__new-sub {

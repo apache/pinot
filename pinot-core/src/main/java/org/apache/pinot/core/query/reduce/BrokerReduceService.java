@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
@@ -33,6 +34,7 @@ import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.common.metrics.BrokerTimer;
 import org.apache.pinot.common.query.ReduceService;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.GroupBy;
@@ -143,9 +145,9 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
         numConsumingSegmentsQueried += Long.parseLong(numConsumingString);
       }
 
-      String minConsumingIndexTsString = metadata.get(DataTable.MIN_CONSUMING_FRESHNESS_TIME_MS);
-      if (minConsumingIndexTsString != null) {
-        minConsumingFreshnessTimeMs = Math.min(Long.parseLong(minConsumingIndexTsString), minConsumingFreshnessTimeMs);
+      String minConsumingFreshnessTimeMsString = metadata.get(DataTable.MIN_CONSUMING_FRESHNESS_TIME_MS);
+      if (minConsumingFreshnessTimeMsString != null) {
+          minConsumingFreshnessTimeMs = Math.min(Long.parseLong(minConsumingFreshnessTimeMsString), minConsumingFreshnessTimeMs);
       }
 
       String numTotalRawDocsString = metadata.get(DataTable.TOTAL_DOCS_METADATA_KEY);
@@ -181,9 +183,6 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
     brokerResponseNative.setTotalDocs(numTotalRawDocs);
     brokerResponseNative.setNumGroupsLimitReached(numGroupsLimitReached);
     if (numConsumingSegmentsQueried > 0) {
-      if (minConsumingFreshnessTimeMs == Long.MAX_VALUE) {
-        LOGGER.error("Invalid lastIndexedTimestamp across {} consuming segments", numConsumingSegmentsQueried);
-      }
       brokerResponseNative.setNumConsumingSegmentsQueried(numConsumingSegmentsQueried);
       brokerResponseNative.setMinConsumingFreshnessTimeMs(minConsumingFreshnessTimeMs);
     }
@@ -197,6 +196,11 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
           .addMeteredTableValue(rawTableName, BrokerMeter.ENTRIES_SCANNED_IN_FILTER, numEntriesScannedInFilter);
       brokerMetrics
           .addMeteredTableValue(rawTableName, BrokerMeter.ENTRIES_SCANNED_POST_FILTER, numEntriesScannedPostFilter);
+
+      if (numConsumingSegmentsQueried > 0 && minConsumingFreshnessTimeMs > 0) {
+        brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.FRESHNESS_LAG_MS,
+            System.currentTimeMillis() - minConsumingFreshnessTimeMs, TimeUnit.MILLISECONDS);
+      }
     }
 
     // Parse the option from request whether to preserve the type

@@ -170,7 +170,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       }
     }
 
-    long minConsumingFreshnessTimeMs = Long.MAX_VALUE;
+    long minConsumingFreshnessTimeMs = minIngestionTimeMs;
     if (numConsumingSegmentsQueried > 0) {
       if (minIngestionTimeMs == Long.MAX_VALUE) {
         LOGGER.debug("Did not find valid ingestionTimestamp across consuming segments! Using indexTime instead");

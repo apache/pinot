@@ -23,13 +23,13 @@
   {{#if isForm}}
     <fieldset class="te-form__section te-form__section--first row">
       <div class="col-xs-12">
-        <legend class="te-form__section-title">Select a metric to monitor</legend>
+        <legend class="te-form__section-title">Define metric</legend>
       </div>
       <div class="col-xs-12 col-sm-8">
-        <label for="select-metric" class="control-label te-label te-label--taller required">Search for a metric, or
+        <label for="select-metric" class="control-label te-label te-label--taller required">Select a metric to monitor, or
           {{#link-to "self-serve.import-metric" class="thirdeye-link-secondary thirdeye-link-secondary--inside"}}
-            Import a Metric From InGraphs
-          {{/link-to}} 
+            Import from InGraphs
+          {{/link-to}}
           {{!-- or
           {{#link-to "self-serve.import-sql-metric" class="thirdeye-link-secondary thirdeye-link-secondary--inside"}}
             Import a Metric From Presto or MySQL
@@ -56,7 +56,7 @@
       </div>
 
       <div class="te-form__custom-field te-form__custom-field--lower col-xs-6 col-sm-4">
-        <label for="select-granularity" class="control-label te-label te-label--taller">Monitor at this data granularity</label>
+        <label for="select-granularity" class="control-label te-label te-label--taller">Data granularity</label>
         {{#power-select
           options=metricGranularityOptions
           selected=selectedGranularity
@@ -426,11 +426,58 @@
       {{/if}}
     </fieldset>
   {{else}}
-    {{#yaml-editor
-      isEditMode=false
-      showSettings=true
-    }}
-    {{/yaml-editor}}
+    <fieldset class="te-form__section te-form__section--first row">
+
+      {{#detection-yaml
+        isEditMode=false
+        detectionYaml=detectionYaml
+        setDetectionYaml=(action "updateDetectionYaml")
+      }}
+      {{/detection-yaml}}
+
+      <div class="col-xs-12">
+        {{#bs-accordion onChange=(action "changeAccordion") as |acc|}}
+          {{#acc.item value=preview as |aitem|}}
+            {{#aitem.title}}
+              <section class="dashboard-container__title thirdeye-link-secondary">Preview alert [Beta] {{if toggleCollapsed "/ Enter YAML configuration to preview alert." ""}}
+                <span class="pull-right"><i class="glyphicon glyphicon-menu-{{if toggleCollapsed "down" "up"}}"></i></span>
+              </section>
+            {{/aitem.title}}
+            {{#aitem.body}}
+              {{#alert-details
+                isPreviewMode=true
+                alertYaml=detectionYaml
+                dataIsCurrent=alertDataIsCurrent
+              }}
+                {{yield}}
+              {{/alert-details}}
+            {{/aitem.body}}
+          {{/acc.item}}
+        {{/bs-accordion}}
+      </div>
+
+      <div class="col-xs-12">
+        <hr/>
+      </div>
+
+      {{#subscription-yaml
+        isEditMode=false
+        subscriptionYaml=subscriptionYaml
+        setSubscriptionYaml=(action "updateSubscriptionYaml")
+      }}
+      {{/subscription-yaml}}
+
+    </fieldset>
+    <fieldset class="te-form__section-submit">
+      {{bs-button
+        defaultText="Create alert"
+        type="primary"
+        buttonType="submit"
+        disabled=disableYamlSave
+        onClick=(action "createAlertYamlAction")
+        class="te-button te-button--submit"
+      }}
+    </fieldset>
   {{/if}}
   {{outlet}}
 </main>

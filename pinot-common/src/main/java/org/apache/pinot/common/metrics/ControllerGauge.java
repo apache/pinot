@@ -45,6 +45,9 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   DISABLED_TABLE_COUNT("TableCount", true),
   PERIODIC_TASK_NUM_TABLES_PROCESSED("PeriodicTaskNumTablesProcessed", true),
 
+  // Pinot controller leader
+  PINOT_CONTROLLER_LEADER("PinotControllerLeader", true),
+
   // Number of extra live instances needed
   SHORT_OF_LIVE_INSTANCES("ShortOfLiveInstances", false),
 

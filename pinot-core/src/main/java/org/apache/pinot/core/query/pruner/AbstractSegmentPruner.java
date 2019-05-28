@@ -23,6 +23,8 @@ import java.util.Map;
 import javax.annotation.Nonnull;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.request.FilterOperator;
+import org.apache.pinot.common.utils.BytesUtils;
+import org.apache.pinot.common.utils.primitive.ByteArray;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
 import org.apache.pinot.core.query.exception.BadQueryRequestException;
 import org.apache.pinot.core.segment.index.ColumnMetadata;
@@ -87,26 +89,17 @@ public abstract class AbstractSegmentPruner implements SegmentPruner {
    * @param input Input String for which to get the value
    * @param dataType Data type to construct from the String.
    * @return Comparable value of specified data type built from the input String.
-   * @note It is assumed that the 'input' here is a value taken from the query, so this method
-   * should not be used to for other internal purposes.
+   * @apiNote It is assumed that the 'input' here is a value taken from the query, so this method should not be used for
+   * other internal purposes.
    */
   protected static Comparable getValue(@Nonnull String input, @Nonnull FieldSpec.DataType dataType) {
     try {
-      switch (dataType) {
-        case INT:
-          return Integer.valueOf(input);
-        case LONG:
-          return Long.valueOf(input);
-        case FLOAT:
-          return Float.valueOf(input);
-        case DOUBLE:
-          return Double.valueOf(input);
-        case STRING:
-          return input;
-        default:
-          throw new IllegalStateException("Unsupported data type: " + dataType);
+      if (dataType != FieldSpec.DataType.BYTES) {
+        return (Comparable) dataType.convert(input);
+      } else {
+        return new ByteArray(BytesUtils.toBytes(input));
       }
-    } catch (NumberFormatException e) {
+    } catch (Exception e) {
       throw new BadQueryRequestException(e);
     }
   }

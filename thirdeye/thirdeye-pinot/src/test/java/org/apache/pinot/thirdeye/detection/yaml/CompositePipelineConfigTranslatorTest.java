@@ -2,11 +2,13 @@ package org.apache.pinot.thirdeye.detection.yaml;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableMap;
+import org.apache.commons.io.IOUtils;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
 import org.apache.pinot.thirdeye.detection.DataProvider;
 import org.apache.pinot.thirdeye.detection.MockDataProvider;
 import org.apache.pinot.thirdeye.detection.annotation.registry.DetectionRegistry;
+import org.apache.pinot.thirdeye.detection.components.MockGrouper;
 import org.apache.pinot.thirdeye.detection.components.RuleBaselineProvider;
 import org.apache.pinot.thirdeye.detection.components.ThresholdRuleAnomalyFilter;
 import org.apache.pinot.thirdeye.detection.components.ThresholdRuleDetector;
@@ -43,12 +45,13 @@ public class CompositePipelineConfigTranslatorTest {
     DetectionRegistry.registerComponent(ThresholdRuleDetector.class.getName(), "THRESHOLD");
     DetectionRegistry.registerComponent(ThresholdRuleAnomalyFilter.class.getName(), "THRESHOLD_RULE_FILTER");
     DetectionRegistry.registerComponent(RuleBaselineProvider.class.getName(), "RULE_BASELINE");
+    DetectionRegistry.registerComponent(MockGrouper.class.getName(), "MOCK_GROUPER");
     this.provider = new MockDataProvider().setMetrics(Collections.singletonList(metricConfig)).setDatasets(Collections.singletonList(datasetConfigDTO));
   }
 
 
   @Test
-  public void testBuildDetectionPropertiesFull() throws Exception {
+  public void testBuildPropertiesFull() throws Exception {
     this.yamlConfig = (Map<String, Object>) this.yaml.load(this.getClass().getResourceAsStream("pipeline-config-1.yaml"));
     CompositePipelineConfigTranslator translator = new CompositePipelineConfigTranslator(this.yamlConfig, this.provider);
     YamlTranslationResult result = translator.translateYaml();
@@ -70,6 +73,13 @@ public class CompositePipelineConfigTranslatorTest {
     this.yamlConfig = (Map<String, Object>) this.yaml.load(this.getClass().getResourceAsStream("pipeline-config-1.yaml"));
     this.yamlConfig.put("rules", Collections.singletonList(
         ImmutableMap.of("name", "rule2","detection", Collections.singletonList(ImmutableMap.of("change", 0.3)))));
+    CompositePipelineConfigTranslator translator = new CompositePipelineConfigTranslator(this.yamlConfig, this.provider);
+    translator.generateDetectionConfig();
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testMultipleGrouperLogic() {
+    this.yamlConfig = (Map<String, Object>) this.yaml.load(this.getClass().getResourceAsStream("pipeline-config-3.yaml"));
     CompositePipelineConfigTranslator translator = new CompositePipelineConfigTranslator(this.yamlConfig, this.provider);
     translator.generateDetectionConfig();
   }

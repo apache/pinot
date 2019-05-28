@@ -8,10 +8,13 @@ import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.apache.pinot.thirdeye.detection.MockDataProvider;
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.pinot.thirdeye.detection.validators.DetectionConfigValidator;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
+
+import static org.mockito.Mockito.*;
 
 
 public class YamlDetectionConfigTranslatorTest {
@@ -32,7 +35,10 @@ public class YamlDetectionConfigTranslatorTest {
     metricConfigDTO.setAlias("alias");
     this.metricDAO.save(metricConfigDTO);
 
-    YamlDetectionConfigTranslator translator = new MockYamlDetectionConfigTranslator(yamlConfigs, new MockDataProvider());
+    DetectionConfigValidator validateMocker = mock(DetectionConfigValidator.class);
+    doNothing().when(validateMocker).validateYaml(yamlConfigs);
+
+    YamlDetectionConfigTranslator translator = new MockYamlDetectionConfigTranslator(yamlConfigs, new MockDataProvider(), validateMocker);
     DetectionConfigDTO detectionConfigDTO = translator.generateDetectionConfig();
     Assert.assertEquals(detectionConfigDTO.getName(), "testPipeline");
     Assert.assertEquals(detectionConfigDTO.getDescription(), "myTestPipeline");

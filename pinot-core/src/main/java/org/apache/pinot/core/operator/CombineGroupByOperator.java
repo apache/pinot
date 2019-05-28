@@ -54,10 +54,17 @@ public class CombineGroupByOperator extends BaseOperator<IntermediateResultsBloc
   private static final Logger LOGGER = LoggerFactory.getLogger(CombineGroupByOperator.class);
   private static final String OPERATOR_NAME = "CombineGroupByOperator";
 
+  // Use a higher limit for groups stored across segments. For most cases, most groups from each segment should be the
+  // same, thus the total number of groups across segments should be equal or slightly higher than the number of groups
+  // in each segment. We still put a limit across segments to protect cases where data is very skewed across different
+  // segments.
+  private static final int INTER_SEGMENT_NUM_GROUPS_LIMIT_FACTOR = 2;
+
   private final List<Operator> _operators;
   private final BrokerRequest _brokerRequest;
   private final ExecutorService _executorService;
   private final long _timeOutMs;
+  // Limit on number of groups stored for each segment, beyond which no new group will be created
   private final int _numGroupsLimit;
 
   public CombineGroupByOperator(List<Operator> operators, BrokerRequest brokerRequest, ExecutorService executorService,
@@ -96,6 +103,7 @@ public class CombineGroupByOperator extends BaseOperator<IntermediateResultsBloc
     CountDownLatch operatorLatch = new CountDownLatch(numOperators);
     ConcurrentHashMap<String, Object[]> resultsMap = new ConcurrentHashMap<>();
     AtomicInteger numGroups = new AtomicInteger();
+    int interSegmentNumGroupsLimit = _numGroupsLimit * INTER_SEGMENT_NUM_GROUPS_LIMIT_FACTOR;
     ConcurrentLinkedQueue<ProcessingException> mergedProcessingExceptions = new ConcurrentLinkedQueue<>();
 
     AggregationFunctionContext[] aggregationFunctionContexts =
@@ -134,8 +142,7 @@ public class CombineGroupByOperator extends BaseOperator<IntermediateResultsBloc
                 GroupKeyGenerator.GroupKey groupKey = groupKeyIterator.next();
                 resultsMap.compute(groupKey._stringKey, (key, value) -> {
                   if (value == null) {
-                    if (numGroups.get() < _numGroupsLimit) {
-                      numGroups.getAndIncrement();
+                    if (numGroups.getAndIncrement() < interSegmentNumGroupsLimit) {
                       value = new Object[numAggregationFunctions];
                       for (int i = 0; i < numAggregationFunctions; i++) {
                         value[i] = aggregationGroupByResult.getResultForKey(groupKey, i);
@@ -198,8 +205,10 @@ public class CombineGroupByOperator extends BaseOperator<IntermediateResultsBloc
       mergedBlock.setNumSegmentsProcessed(executionStatistics.getNumSegmentsProcessed());
       mergedBlock.setNumSegmentsMatched(executionStatistics.getNumSegmentsMatched());
       mergedBlock.setNumTotalRawDocs(executionStatistics.getNumTotalRawDocs());
-      // NOTE: numGroups might go slightly over numGroupsLimit because the comparison is not atomic
-      if (numGroups.get() >= _numGroupsLimit) {
+
+      // TODO: this value should be set in the inner-segment operators. Setting it here might cause false positive as we
+      //       are comparing number of groups across segments with the groups limit for each segment.
+      if (resultsMap.size() >= _numGroupsLimit) {
         mergedBlock.setNumGroupsLimitReached(true);
       }
 

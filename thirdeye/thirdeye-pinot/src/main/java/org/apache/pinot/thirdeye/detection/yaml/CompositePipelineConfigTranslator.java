@@ -21,14 +21,12 @@ package org.apache.pinot.thirdeye.detection.yaml;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ArrayListMultimap;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Multimap;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -51,6 +49,7 @@ import org.apache.pinot.thirdeye.detection.wrapper.AnomalyDetectorWrapper;
 import org.apache.pinot.thirdeye.detection.wrapper.AnomalyFilterWrapper;
 import org.apache.pinot.thirdeye.detection.wrapper.BaselineFillingMergeWrapper;
 import org.apache.pinot.thirdeye.detection.wrapper.ChildKeepingMergeWrapper;
+import org.apache.pinot.thirdeye.detection.wrapper.GrouperWrapper;
 import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
@@ -148,6 +147,7 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
   private static final String PROP_DIMENSION_FILTER_METRIC = "dimensionFilterMetric";
   private static final String PROP_NESTED_METRIC_URNS = "nestedMetricUrns";
   private static final String PROP_RULES = "rules";
+  private static final String PROP_GROUPER = "grouper";
   private static final String PROP_NESTED = "nested";
   private static final String PROP_BASELINE_PROVIDER = "baselineValueProvider";
   private static final String PROP_DETECTOR = "detector";
@@ -225,9 +225,16 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
       }
     }
     Map<String, Object> dimensionWrapperProperties = buildDimensionWrapperProperties();
-    Map<String, Object> properties = buildWrapperProperties(ChildKeepingMergeWrapper.class.getName(),
-        Collections.singletonList(
-            buildWrapperProperties(DimensionWrapper.class.getName(), nestedPipelines, dimensionWrapperProperties)), this.mergerProperties);
+    Map<String, Object> properties = buildWrapperProperties(
+        ChildKeepingMergeWrapper.class.getName(),
+        Collections.singletonList(buildWrapperProperties(DimensionWrapper.class.getName(), nestedPipelines, dimensionWrapperProperties)),
+        this.mergerProperties);
+
+    List<Map<String, Object>> grouperYamls = getList(yamlConfig.get(PROP_GROUPER));
+    if (!grouperYamls.isEmpty()) {
+      properties = buildGroupWrapperProperties(grouperYamls.get(0), properties);
+    }
+
     return new YamlTranslationResult().withProperties(properties).withComponents(this.components).withCron(cron);
   }
 
@@ -283,6 +290,21 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
       properties.put(PROP_BASELINE_PROVIDER, baselineProviderKey);
     }
     properties.putAll(this.mergerProperties);
+    return properties;
+  }
+
+  private Map<String, Object> buildGroupWrapperProperties(Map<String, Object> grouperYaml, Map<String, Object> nestedProps) {
+    Map<String, Object> properties = new HashMap<>();
+    properties.put(PROP_CLASS_NAME, GrouperWrapper.class.getName());
+    properties.put(PROP_NESTED, Collections.singletonList(nestedProps));
+
+    String grouperType = MapUtils.getString(grouperYaml, PROP_TYPE);
+    String grouperName = MapUtils.getString(grouperYaml, PROP_NAME);
+    String grouperKey = makeComponentKey(grouperType, grouperName);
+    properties.put(PROP_GROUPER, grouperKey);
+
+    buildComponentSpec(grouperYaml, grouperType, grouperKey);
+
     return properties;
   }
 
@@ -379,6 +401,11 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
     return properties;
   }
 
+  //  Default schedule:
+  //  minute granularity: every 15 minutes, starts at 0 minute
+  //  hourly: every hour, starts at 0 minute
+  //  daily: every day, starts at 2 pm UTC
+  //  others: every day, start at 12 am UTC
   private String buildCron() {
     switch (this.datasetConfig.bucketTimeGranularity().getUnit()) {
       case MINUTES:
@@ -405,15 +432,17 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
   }
 
   private void buildComponentSpec(Map<String, Object> yamlConfig, String type, String componentKey) {
-    String componentName = DetectionUtils.getComponentName(componentKey);
-    String componentClassName = DETECTION_REGISTRY.lookup(type);
     Map<String, Object> componentSpecs = new HashMap<>();
+
+    String componentClassName = DETECTION_REGISTRY.lookup(type);
     componentSpecs.put(PROP_CLASS_NAME, componentClassName);
+
     Map<String, Object> params = new HashMap<>();
     if (yamlConfig.containsKey(PROP_PARAMS)){
       params = MapUtils.getMap(yamlConfig, PROP_PARAMS);
     }
 
+    String componentName = DetectionUtils.getComponentName(componentKey);
     if (!TUNING_OFF_COMPONENTS.contains(type) && DETECTION_REGISTRY.isTunable(componentClassName)) {
       try {
         componentSpecs.putAll(getTunedSpecs(componentName, componentClassName, params));
@@ -458,61 +487,5 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
 
   private String makeComponentKey(String type, String name) {
     return "$" + name + ":" + type;
-  }
-
-  @Override
-  protected void validateYAML(Map<String, Object> yamlConfig) {
-    super.validateYAML(yamlConfig);
-    Preconditions.checkArgument(yamlConfig.containsKey(PROP_METRIC), "Property missing " + PROP_METRIC);
-    Preconditions.checkArgument(yamlConfig.containsKey(PROP_DATASET), "Property missing " + PROP_DATASET);
-    Preconditions.checkArgument(yamlConfig.containsKey(PROP_RULES), "Property missing " + PROP_RULES);
-    Preconditions.checkArgument(!yamlConfig.containsKey(PROP_FILTER),
-        "Please double check the filter config. Adding dimensions filters should be in the yaml root level using 'filters' as the key. Anomaly filter should be added in to the indentation level of detection yaml it applies to.");
-    if (existingConfig != null) {
-      Map<String, Object> existingYamlConfig = (Map<String, Object>) this.yaml.load(existingConfig.getYaml());
-      Preconditions.checkArgument(MapUtils.getString(yamlConfig, PROP_METRIC).equals(MapUtils.getString(existingYamlConfig, PROP_METRIC)), "metric name cannot be modified");
-      Preconditions.checkArgument(MapUtils.getString(yamlConfig, PROP_DATASET).equals(MapUtils.getString(existingYamlConfig, PROP_DATASET)), "dataset name cannot be modified");
-    }
-
-    // Safety condition: Validate if maxDuration is greater than 15 minutes
-    Map<String, Object> mergerProperties = MapUtils.getMap(yamlConfig, PROP_MERGER, new HashMap());
-    if (mergerProperties.get(PROP_MAX_DURATION) != null) {
-      Preconditions.checkArgument(MapUtils.getLong(mergerProperties, PROP_MAX_DURATION) >= datasetConfig.bucketTimeGranularity().toMillis(),
-          "The maxDuration field set is not acceptable. Please check the the document  and set it correctly.");
-    }
-
-    Set<String> names = new HashSet<>();
-    List<Map<String, Object>> ruleYamls = getList(yamlConfig.get(PROP_RULES));
-    for (int i = 0; i < ruleYamls.size(); i++) {
-      Map<String, Object> ruleYaml = ruleYamls.get(i);
-      Preconditions.checkArgument(ruleYaml.containsKey(PROP_DETECTION),
-          "In rule No." + (i + 1) + ", detection rule is missing. ");
-      List<Map<String, Object>> detectionStageYamls = ConfigUtils.getList(ruleYaml.get(PROP_DETECTION));
-      // check each detection rule
-      for (Map<String, Object> detectionStageYaml : detectionStageYamls) {
-        Preconditions.checkArgument(detectionStageYaml.containsKey(PROP_TYPE),
-            "In rule No." + (i + 1) + ", a detection rule type is missing. ");
-        String type = MapUtils.getString(detectionStageYaml, PROP_TYPE);
-        String name = MapUtils.getString(detectionStageYaml, PROP_NAME);
-        Preconditions.checkNotNull(name, "In rule No." + (i + 1) + ", a detection rule name for type " +  type + " is missing");
-        Preconditions.checkArgument(!names.contains(name), "In rule No." + (i + 1) +
-            ", found duplicate rule name, rule name must be unique." );
-        Preconditions.checkArgument(!name.contains(":"), "Sorry, rule name cannot contain \':\'");
-      }
-      if (ruleYaml.containsKey(PROP_FILTER)) {
-        List<Map<String, Object>> filterStageYamls = ConfigUtils.getList(ruleYaml.get(PROP_FILTER));
-        // check each filter rule
-        for (Map<String, Object> filterStageYaml : filterStageYamls) {
-          Preconditions.checkArgument(filterStageYaml.containsKey(PROP_TYPE),
-              "In rule No." + (i + 1) + ", a filter rule type is missing. ");
-          String type = MapUtils.getString(filterStageYaml, PROP_TYPE);
-          String name = MapUtils.getString(filterStageYaml, PROP_NAME);
-          Preconditions.checkNotNull(name, "In rule No." + (i + 1) + ", a filter rule name for type " + type + " is missing");
-          Preconditions.checkArgument(!names.contains(name), "In rule No." + (i + 1) +
-              ", found duplicate rule name, rule name must be unique." );
-          Preconditions.checkArgument(!name.contains(":"), "Sorry, rule name cannot contain \':\'");
-        }
-      }
-    }
   }
 }

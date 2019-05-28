@@ -78,6 +78,8 @@ public class ControllerConf extends PropertiesConfiguration {
         "controller.realtime.segment.validation.frequencyInSeconds";
     private static final String BROKER_RESOURCE_VALIDATION_FREQUENCY_IN_SECONDS =
         "controller.broker.resource.validation.frequencyInSeconds";
+    private static final String BROKER_RESOURCE_VALIDATION_INITIAL_DELAY_IN_SECONDS =
+        "controller.broker.resource.validation.initialDelayInSeconds";
     private static final String STATUS_CHECKER_FREQUENCY_IN_SECONDS = "controller.statuschecker.frequencyInSeconds";
     private static final String STATUS_CHECKER_WAIT_FOR_PUSH_TIME_IN_SECONDS =
         "controller.statuschecker.waitForPushTimeInSeconds";
@@ -451,6 +453,16 @@ public class ControllerConf extends PropertiesConfiguration {
   public void setBrokerResourceValidationFrequencyInSeconds(int validationFrequencyInSeconds) {
     setProperty(ControllerPeriodicTasksConf.BROKER_RESOURCE_VALIDATION_FREQUENCY_IN_SECONDS,
         Integer.toString(validationFrequencyInSeconds));
+  }
+
+  public long getBrokerResourceValidationInitialDelayInSeconds() {
+    return getLong(ControllerPeriodicTasksConf.BROKER_RESOURCE_VALIDATION_INITIAL_DELAY_IN_SECONDS,
+        getPeriodicTaskInitialDelayInSeconds());
+  }
+
+  public void setBrokerResourceValidationInitialDelayInSeconds(long validationInitialDelayInSeconds) {
+    setProperty(ControllerPeriodicTasksConf.BROKER_RESOURCE_VALIDATION_INITIAL_DELAY_IN_SECONDS,
+        validationInitialDelayInSeconds);
   }
 
   public int getStatusCheckerFrequencyInSeconds() {

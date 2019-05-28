@@ -19,7 +19,7 @@
 
 package org.apache.pinot.thirdeye.detection.validators;
 
-import javax.xml.bind.ValidationException;
+import java.util.Map;
 import org.apache.pinot.thirdeye.datalayer.dto.AbstractDTO;
 
 
@@ -29,17 +29,24 @@ import org.apache.pinot.thirdeye.datalayer.dto.AbstractDTO;
  */
 interface ConfigValidator<T extends AbstractDTO> {
   /**
-   * Validate the configuration. Thrown a validation exception if validation failed.
+   * Validate the configuration
    * @param config the config
-   * @throws ValidationException the validation exception with error message
+   * @throws IllegalArgumentException exception with error message
    */
-  void validateConfig(T config) throws ValidationException;
+  void validateConfig(T config) throws IllegalArgumentException;
 
   /**
-   * Validate the configuration. Thrown a validation exception if validation failed.
+   * Validate the yaml configuration
+   * @param config the config
+   * @throws IllegalArgumentException exception with error message
+   */
+  void validateYaml(Map<String, Object> config) throws IllegalArgumentException;
+
+  /**
+   * Validate if the updates made to the config are acceptable
    * @param updatedConfig the new config
    * @param oldConfig the old config
-   * @throws ValidationException the validation exception with error message
+   * @throws IllegalArgumentException exception with error message
    */
-  void validateUpdatedConfig(T updatedConfig, T oldConfig) throws ValidationException;
+  void validateUpdatedConfig(T updatedConfig, T oldConfig) throws IllegalArgumentException;
 }

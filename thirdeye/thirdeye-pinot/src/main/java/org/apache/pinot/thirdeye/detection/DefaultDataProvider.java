@@ -45,11 +45,13 @@ import org.apache.pinot.thirdeye.dataframe.DataFrame;
 import org.apache.pinot.thirdeye.dataframe.LongSeries;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
 import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
+import org.apache.pinot.thirdeye.datalayer.bao.EvaluationManager;
 import org.apache.pinot.thirdeye.datalayer.bao.EventManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.EvaluationDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.EventDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
@@ -58,6 +60,7 @@ import org.apache.pinot.thirdeye.datasource.comparison.Row;
 import org.apache.pinot.thirdeye.datasource.loader.AggregationLoader;
 import org.apache.pinot.thirdeye.datasource.loader.TimeSeriesLoader;
 import org.apache.pinot.thirdeye.detection.spi.model.AnomalySlice;
+import org.apache.pinot.thirdeye.detection.spi.model.EvaluationSlice;
 import org.apache.pinot.thirdeye.detection.spi.model.EventSlice;
 import org.joda.time.DateTimeZone;
 import org.slf4j.Logger;
@@ -76,19 +79,20 @@ public class DefaultDataProvider implements DataProvider {
   private final DatasetConfigManager datasetDAO;
   private final EventManager eventDAO;
   private final MergedAnomalyResultManager anomalyDAO;
+  private final EvaluationManager evaluationDAO;
   private final TimeSeriesLoader timeseriesLoader;
   private final AggregationLoader aggregationLoader;
   private final DetectionPipelineLoader loader;
   private static LoadingCache<MetricSlice, DataFrame> DETECTION_TIME_SERIES_CACHE;
 
-
   public DefaultDataProvider(MetricConfigManager metricDAO, DatasetConfigManager datasetDAO, EventManager eventDAO,
-      MergedAnomalyResultManager anomalyDAO, TimeSeriesLoader timeseriesLoader, AggregationLoader aggregationLoader,
-      DetectionPipelineLoader loader) {
+      MergedAnomalyResultManager anomalyDAO, EvaluationManager evaluationDAO, TimeSeriesLoader timeseriesLoader,
+      AggregationLoader aggregationLoader, DetectionPipelineLoader loader) {
     this.metricDAO = metricDAO;
     this.datasetDAO = datasetDAO;
     this.eventDAO = eventDAO;
     this.anomalyDAO = anomalyDAO;
+    this.evaluationDAO = evaluationDAO;
     this.timeseriesLoader = timeseriesLoader;
     this.aggregationLoader = aggregationLoader;
     this.loader = loader;
@@ -314,6 +318,27 @@ public class DefaultDataProvider implements DataProvider {
   @Override
   public MetricConfigDTO fetchMetric(String metricName, String datasetName) {
     return this.metricDAO.findByMetricAndDataset(metricName, datasetName);
+  }
+
+  @Override
+  public Multimap<EvaluationSlice, EvaluationDTO> fetchEvaluations(Collection<EvaluationSlice> slices, long configId) {
+    Multimap<EvaluationSlice, EvaluationDTO> output = ArrayListMultimap.create();
+    for (EvaluationSlice slice : slices) {
+      List<Predicate> predicates = new ArrayList<>();
+      if (slice.getEnd() >= 0)
+        predicates.add(Predicate.LT("startTime", slice.getEnd()));
+      if (slice.getStart() >= 0)
+        predicates.add(Predicate.GT("endTime", slice.getStart()));
+      if (predicates.isEmpty())
+        throw new IllegalArgumentException("Must provide at least one of start, or end");
+
+      if (configId >= 0) {
+        predicates.add(Predicate.EQ("detectionConfigId", configId));
+      }
+      List<EvaluationDTO> evaluations = this.evaluationDAO.findByPredicate(AND(predicates));
+      output.putAll(slice, evaluations.stream().filter(slice::match).collect(Collectors.toList()));
+    }
+    return output;
   }
 
   private static Predicate AND(Collection<Predicate> predicates) {
