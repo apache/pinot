@@ -160,7 +160,7 @@ public class YamlResource {
     try {
       translator = this.translatorLoader.from(yamlConfig, this.provider);
     } catch (Exception e) {
-      throw new IllegalArgumentException("Unable to instantiate the detection pipeline. Please verify the pipelineType.", e);
+      throw new IllegalArgumentException("Unable to instantiate the detection pipeline.", e);
     }
     return translator.withTuningWindow(tuningStartTime, tuningEndTime)
         .withExistingDetectionConfig(existingDetectionConfig)
@@ -343,14 +343,24 @@ public class YamlResource {
     // Translate config from YAML to detection config (JSON)
     TreeMap<String, Object> newDetectionConfigMap = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
     newDetectionConfigMap.putAll(ConfigUtils.getMap(this.yaml.load(yamlDetectionConfig)));
-    detectionConfig = buildDetectionConfigFromYaml(startTime, endTime, newDetectionConfigMap, existingDetectionConfig);
-    detectionConfig.setYaml(yamlDetectionConfig);
+    try {
+      detectionConfig = buildDetectionConfigFromYaml(startTime, endTime, newDetectionConfigMap, existingDetectionConfig);
+      detectionConfig.setYaml(yamlDetectionConfig);
 
-    // Validate updated config before saving it
-    detectionValidator.validateUpdatedConfig(detectionConfig, existingDetectionConfig);
-    // Save the detection config
-    Long id = this.detectionConfigDAO.save(detectionConfig);
-    Preconditions.checkNotNull(id, "Error while saving the detection pipeline");
+      // Validate updated config before saving it
+      detectionValidator.validateUpdatedConfig(detectionConfig, existingDetectionConfig);
+      // Save the detection config
+      Long id = this.detectionConfigDAO.save(detectionConfig);
+      Preconditions.checkNotNull(id, "Error while saving the detection pipeline");
+    } finally {
+      // If it is to disable the pipeline then no need to do validation and parsing.
+      // It is possible that the metric or dataset was deleted so the validation will fail.
+      if (!MapUtils.getBooleanValue(newDetectionConfigMap, PROP_ACTIVE, true)) {
+        existingDetectionConfig.setActive(false);
+        existingDetectionConfig.setYaml(yamlDetectionConfig);
+        this.detectionConfigDAO.save(existingDetectionConfig);
+      }
+    }
   }
 
   /**
