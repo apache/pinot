@@ -35,9 +35,11 @@ import org.testng.Assert;
 
 /**
  * Helper methods to provide fake stream details
+ * TODO: make input tar file and pinot schema configurable
  */
 public class FakeStreamConfigUtils {
   private static final String AVRO_TAR_FILE = "fake_stream_avro_data.tar.gz";
+  // This avro schema file must be in sync with the avro data
   private static final String AVRO_SCHEMA_FILE = "fake_stream_avro_schema.avsc";
   private static final String PINOT_SCHEMA_FILE = "fake_stream_pinot_schema.json";
 
