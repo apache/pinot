@@ -25,7 +25,7 @@
       defaultText="Reset"
       type="outline-primary"
       buttonType="reset"
-      onClick=(action "resetYAML" "subscription")
+      onClick=(action "resetYAML")
       class="te-button te-button--link"
     }}
     {{bs-button
@@ -41,7 +41,7 @@
   {{!-- subscription settings editor --}}
   {{ember-ace
     lines=25
-    value=currentSubscriptionYaml
+    value=subscriptionYaml
     update=(action "onEditingSubscriptionYamlAction")
     mode="ace/mode/yaml"
   }}
@@ -54,14 +54,3 @@
     </div>
   {{/if}}
 </div>
-
-{{#if isEditMode}}
-  {{bs-button
-      defaultText=subGroupButtonText
-      type="primary"
-      buttonType="submit"
-      disabled=disableSubGroupSave
-      onClick=(action "submitSubscriptionGroup")
-      class="te-button te-button--submit"
-    }}
-{{/if}}

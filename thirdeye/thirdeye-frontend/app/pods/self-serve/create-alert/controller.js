@@ -1076,6 +1076,18 @@ export default Controller.extend({
     },
 
     /**
+     * update the subscription group object for dropdown
+     * @method updateSubscriptionGroup
+     * @return {undefined}
+     */
+    changeSubscriptionGroup(group) {
+      this.setProperties({
+        subscriptionYaml: group.yaml,
+        groupName: group
+      });
+    },
+
+    /**
      * Fired by create button in YAML UI
      * Grabs YAML content and sends it
      */
