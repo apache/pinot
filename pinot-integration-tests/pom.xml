@@ -126,6 +126,15 @@
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-tools</artifactId>
+      <!-- Uncomment and add appropriate modules to add support for custom record readers
+           The example below is for ORC readers
+      <exclusions>
+        <exclusion>
+          <groupId>org.apache.pinot</groupId>
+          <artifactId>pinot-orc</artifactId>
+        </exclusion>
+      </exclusions>
+      -->
     </dependency>
     <dependency>
       <groupId>com.101tec</groupId>

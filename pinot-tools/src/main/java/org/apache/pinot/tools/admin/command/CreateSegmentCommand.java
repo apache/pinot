@@ -228,15 +228,17 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
       }
     }
 
-    FileFormat configFormat = segmentGeneratorConfig.getFormat();
-    if (_format == null) {
-      if (configFormat == null) {
-        throw new RuntimeException("Format cannot be null in config file.");
-      }
-      _format = configFormat;
-    } else {
-      if (configFormat != _format && configFormat != FileFormat.AVRO) {
-        LOGGER.warn("Find format conflict in command line and config file, use config in command line: {}", _format);
+    if (segmentGeneratorConfig.getRecordReaderPath() == null) {
+      FileFormat configFormat = segmentGeneratorConfig.getFormat();
+      if (_format == null) {
+        if (configFormat == null) {
+          throw new RuntimeException("Either recordReaderPath (via generatorConfigFile option) or format must be specified.");
+        }
+        _format = configFormat;
+      } else {
+        if (configFormat != _format && configFormat != FileFormat.AVRO) {
+          LOGGER.warn("Find format conflict in command line and config file, use config in command line: {}", _format);
+        }
       }
     }
 
@@ -291,7 +293,10 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
     File[] files = dir.listFiles(new FilenameFilter() {
       @Override
       public boolean accept(File dir, String name) {
-        return name.toLowerCase().endsWith(_format.toString().toLowerCase());
+        if (_format != null) {
+          return name.toLowerCase().endsWith(_format.toString().toLowerCase());
+        }
+        return true;
       }
     });
 

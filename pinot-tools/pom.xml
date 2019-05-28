@@ -42,6 +42,13 @@
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-common</artifactId>
     </dependency>
+    <!-- Uncomment and add appropriate modules to add support for custom record readers
+         The example below is for ORC readers
+    <dependency>
+    <groupId>org.apache.pinot</groupId>
+    <artifactId>pinot-orc</artifactId>
+    </dependency>
+    -->
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-server</artifactId>
