@@ -50,6 +50,7 @@ public class DateTimeFormatSpec {
   public static final int FORMAT_PATTERN_POSITION = 3;
   public static final int MIN_FORMAT_TOKENS = 3;
   public static final int MAX_FORMAT_TOKENS = 4;
+  public static final String TIMEZONE_PATTERN = "tz";
 
   private String _format;
   private int _size;
@@ -221,7 +222,11 @@ public class DateTimeFormatSpec {
         Preconditions.checkArgument(formatTokens[FORMAT_TIMEFORMAT_POSITION].equals(TimeFormat.SIMPLE_DATE_FORMAT.toString()),
             TIME_FORMAT_ERROR_STR);
       } else {
+        //EPOCH
         Preconditions.checkArgument(formatTokens[FORMAT_TIMEFORMAT_POSITION].equals(TimeFormat.EPOCH.toString()),
+            TIME_FORMAT_ERROR_STR);
+        //tz(Asia/Shanghai)
+        Preconditions.checkArgument(formatTokens[FORMAT_PATTERN_POSITION].toLowerCase().contains(TIMEZONE_PATTERN),
             TIME_FORMAT_ERROR_STR);
       }
     }
