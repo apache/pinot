@@ -25,6 +25,11 @@ import org.apache.pinot.thirdeye.cube.data.dbrow.DimensionValues;
 import org.apache.pinot.thirdeye.cube.data.dbrow.Dimensions;
 
 
+/**
+ * Defines the operations that are used by the cube algorithm.
+ *
+ * @param <N> the class of the actual cube node. For example, ratio cube algorithm will use RatioCubeNode.
+ */
 public interface CubeNode<N extends CubeNode> {
 
   /**

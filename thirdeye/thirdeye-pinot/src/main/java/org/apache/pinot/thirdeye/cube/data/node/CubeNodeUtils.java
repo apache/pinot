@@ -38,8 +38,9 @@ public class CubeNodeUtils {
   }
 
   public static boolean equalHierarchy(CubeNode node1, CubeNode node1Parent, CubeNode node2, CubeNode node2Parent) {
-    boolean sameData = ObjectUtils.equals(node1, node2);
-    if (sameData) {
+    if (!ObjectUtils.equals(node1, node2)) { // Return false if data of the nodes are different.
+      return false;
+    } else { // Check hierarchy if the two given nodes have the same data value.
       // Check parent reference
       if (node1Parent != null && node1.getParent() != node1Parent) {
         return false;
@@ -64,8 +65,6 @@ public class CubeNodeUtils {
         }
       }
       return true;
-    } else {
-      return false;
     }
   }
 
