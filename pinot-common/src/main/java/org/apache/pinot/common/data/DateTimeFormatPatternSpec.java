@@ -19,6 +19,7 @@
 package org.apache.pinot.common.data;
 
 import java.util.Locale;
+import java.util.Objects;
 import java.util.TimeZone;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -34,8 +35,10 @@ public class DateTimeFormatPatternSpec {
 
   /** eg: yyyyMMdd tz(CST) or yyyyMMdd HH tz(GMT+0700) or yyyyMMddHH tz(America/Chicago) **/
   private static final Pattern SDF_PATTERN_WITH_TIMEZONE = Pattern.compile("^(.+)( tz[ ]*\\((.+)\\))[ ]*");
+  private static final Pattern EPOCH_PATTERN_WITH_TIMEZONE = Pattern.compile("^(tz[ ]*\\((.+)\\))[ ]*");
   private static final int SDF_PATTERN_GROUP = 1;
   private static final int TIMEZONE_GROUP = 3;
+  private static final int EPOCH_TIMEZONE_GROUP = 2;
   public static final DateTimeZone DEFAULT_DATETIMEZONE = DateTimeZone.UTC;
   public static final Locale DEFAULT_LOCALE = Locale.ENGLISH;
 
@@ -55,7 +58,17 @@ public class DateTimeFormatPatternSpec {
         _dateTimeZone = DateTimeZone.forTimeZone(TimeZone.getTimeZone(timezoneString));
       }
       _dateTimeFormatter = DateTimeFormat.forPattern(_sdfPattern).withZone(_dateTimeZone).withLocale(DEFAULT_LOCALE);
+    } else {
+      //tz(Asia/Shanghai) or tz(CST)
+      if (Objects.nonNull(sdfPatternWithTz)) {
+        Matcher matcher = EPOCH_PATTERN_WITH_TIMEZONE.matcher(sdfPatternWithTz);
+        if (matcher.find()) {
+          String timezoneString = matcher.group(EPOCH_TIMEZONE_GROUP).trim();
+          _dateTimeZone = DateTimeZone.forTimeZone(TimeZone.getTimeZone(timezoneString));
+        }
+      }
     }
+
   }
 
   public TimeFormat getTimeFormat() {

@@ -18,13 +18,16 @@
  */
 package org.apache.pinot.core.operator.transform.transformer.datetime;
 
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
+import org.apache.pinot.common.data.DateTimeFieldSpec;
 import org.apache.pinot.common.data.DateTimeFormatSpec;
 import org.apache.pinot.common.data.DateTimeFormatUnitSpec.DateTimeTransformUnit;
 import org.apache.pinot.common.data.DateTimeGranularitySpec;
 import org.apache.pinot.core.operator.transform.transformer.DataTransformer;
 import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
 import org.joda.time.format.DateTimeFormatter;
 
 
@@ -43,6 +46,7 @@ public abstract class BaseDateTimeTransformer<I, O> implements DataTransformer<I
   private final DateTimeGranularitySpec _outputGranularity;
   private final long _outputGranularityMillis;
   private final SDFDateTimeTruncate _dateTimeTruncate;
+  private Truncate _truncate;
 
   private interface SDFDateTimeTruncate {
     String truncate(DateTime dateTime);
@@ -58,6 +62,11 @@ public abstract class BaseDateTimeTransformer<I, O> implements DataTransformer<I
     _outputDateTimeFormatter = outputFormat.getDateTimeFormatter();
     _outputGranularity = outputGranularity;
     _outputGranularityMillis = outputGranularity.granularityToMillis();
+
+    if (!outputFormat.getDateTimezone().equals(DateTimeZone.UTC) && outputFormat.getPatternSpec().getTimeFormat()
+        .equals(DateTimeFieldSpec.TimeFormat.EPOCH)) {
+      _truncate = new Truncate(outputFormat.getDateTimezone(), _outputGranularityMillis);
+    }
 
     // setup date time truncating based on output granularity
     final int sz = _outputGranularity.getSize();
@@ -96,7 +105,11 @@ public abstract class BaseDateTimeTransformer<I, O> implements DataTransformer<I
   }
 
   protected long transformMillisToEpoch(long millisSinceEpoch) {
-    return _outputTimeUnit.fromMillis(millisSinceEpoch) / _outputTimeSize;
+    if (Objects.nonNull(_truncate)) {
+      return _truncate.transform(_outputTimeUnit.toString(), millisSinceEpoch) / _outputTimeSize;
+    } else {
+      return _outputTimeUnit.fromMillis(millisSinceEpoch) / _outputTimeSize;
+    }
   }
 
   protected String transformMillisToSDF(long millisSinceEpoch) {
@@ -105,6 +118,10 @@ public abstract class BaseDateTimeTransformer<I, O> implements DataTransformer<I
   }
 
   protected long transformToOutputGranularity(long millisSinceEpoch) {
-    return (millisSinceEpoch / _outputGranularityMillis) * _outputGranularityMillis;
+    if (Objects.nonNull(_truncate)) {
+      return _truncate.truncate(millisSinceEpoch);
+    } else {
+      return (millisSinceEpoch / _outputGranularityMillis) * _outputGranularityMillis;
+    }
   }
 }

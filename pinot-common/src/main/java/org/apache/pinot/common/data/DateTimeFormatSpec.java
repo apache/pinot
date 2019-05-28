@@ -36,7 +36,7 @@ public class DateTimeFormatSpec {
   public static final String FORMAT_PATTERN_ERROR_STR =
       "format must be of format [0-9]+:<TimeUnit>:<TimeFormat>(:pattern)";
   public static final String TIME_FORMAT_ERROR_STR =
-      "format must be of format [0-9]+:<TimeUnit>:EPOCH or [0-9]+:<TimeUnit>:SIMPLE_DATE_FORMAT:<format>";
+      "format must be of format [0-9]+:<TimeUnit>:EPOCH or [0-9]+:<TimeUnit>:EPOCH:tz(Asia/Shanghai) or [0-9]+:<TimeUnit>:SIMPLE_DATE_FORMAT:<format>";
 
   public static final String NUMBER_REGEX = "[1-9][0-9]*";
 
@@ -136,6 +136,10 @@ public class DateTimeFormatSpec {
     return _patternSpec.getDateTimeFormatter();
   }
 
+  public DateTimeFormatPatternSpec getPatternSpec() {
+    return _patternSpec;
+  }
+
   /**
    * <ul>
    * <li>Given a timestamp in millis, convert it to the given format
@@ -213,9 +217,13 @@ public class DateTimeFormatSpec {
       Preconditions.checkArgument(formatTokens[FORMAT_TIMEFORMAT_POSITION].equals(TimeFormat.EPOCH.toString()),
           TIME_FORMAT_ERROR_STR);
     } else {
-      Preconditions
-          .checkArgument(formatTokens[FORMAT_TIMEFORMAT_POSITION].equals(TimeFormat.SIMPLE_DATE_FORMAT.toString()),
-              TIME_FORMAT_ERROR_STR);
+      if(!formatTokens[FORMAT_TIMEFORMAT_POSITION].equals(TimeFormat.EPOCH.toString())) {
+        Preconditions.checkArgument(formatTokens[FORMAT_TIMEFORMAT_POSITION].equals(TimeFormat.SIMPLE_DATE_FORMAT.toString()),
+            TIME_FORMAT_ERROR_STR);
+      } else {
+        Preconditions.checkArgument(formatTokens[FORMAT_TIMEFORMAT_POSITION].equals(TimeFormat.EPOCH.toString()),
+            TIME_FORMAT_ERROR_STR);
+      }
     }
     return true;
   }

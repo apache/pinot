@@ -98,6 +98,34 @@ public class DateTimeConverterTest {
       long[] expected = {2489L, 2488L, 2487L};
       entries.add(new Object[]{"1:MILLISECONDS:EPOCH", "1:WEEKS:EPOCH", "1:MILLISECONDS", input, expected});
     }
+    {
+      // Test conversion from mills to millis and bucketing to days time zone Shanghai
+      long[] input =
+          {1558371600000L /* 20190521 01:00:00 */, 1558458000000L /* 20180522 01:00:00 */, 1558544400000L /* 20190523 01:00:00 */};
+      long[] expected = {1558368000000L, 1558454400000L, 1558540800000L};
+      entries.add(new Object[]{"1:MILLISECONDS:EPOCH", "1:MILLISECONDS:EPOCH:tz(Asia/Shanghai)", "1:DAYS", input, expected});
+    }
+    {
+      // Test conversion from mills to millis and bucketing to days and time zone Shanghai
+      long[] input =
+          {1558371600000L /* 20190521 01:00:00 */, 1558458000000L /* 20180522 01:00:00 */, 1558544400000L /* 20190523 01:00:00 */};
+      long[] expected = {1558371600000L, 1558458000000L, 1558544400000L};
+      entries.add(new Object[]{"1:MILLISECONDS:EPOCH", "1:MILLISECONDS:EPOCH:tz(Asia/Shanghai)", "1:HOURS", input, expected});
+    }
+    {
+      // Test conversion from mills to seconds and bucketing to days and time zone Shanghai
+      long[] input =
+          {1558368000000L /* 20190521 01:00:00 */, 1558458000000L /* 20180522 01:00:00 */, 1558544400000L /* 20190523 01:00:00 */};
+      long[] expected = {432880L, 432904L, 432928L};
+      entries.add(new Object[]{"1:MILLISECONDS:EPOCH", "1:HOURS:EPOCH:tz(Asia/Shanghai)", "1:DAYS", input, expected});
+    }
+    {
+      // Test conversion from mills to days and bucketing to days and time zone Shanghai
+      long[] input =
+          {1558371600000L /* 20190521 01:00:00 */, 1558458000000L /* 20180522 01:00:00 */, 1558544400000L /* 20190523 01:00:00 */};
+      long[] expected = {18037L, 18038L, 18039L};
+      entries.add(new Object[]{"1:MILLISECONDS:EPOCH", "1:DAYS:EPOCH:tz(Asia/Shanghai)", "1:DAYS", input, expected});
+    }
 
     /*************** Epoch to SDF ***************/
     {
@@ -243,7 +271,26 @@ public class DateTimeConverterTest {
       entries.add(
           new Object[]{"1:DAYS:SIMPLE_DATE_FORMAT:M/d/yyyy h:mm:ss a", "1:MILLISECONDS:EPOCH", "1:MILLISECONDS", input, expected});
     }
-
+    {
+      // Test conversion from simple date format (East Coast timezone) to millis since epoch with tz
+      // Converted to
+      String[] input =
+          {"20190521" , "20190522", "20190523"};
+      long[] expected =
+          {1558368000000L /* 20190521 00:00:00 */, 1558454400000L /* 20190522 00:00:00 */, 1558540800000L /* 20190523 00:00:00 */};
+      entries.add(
+          new Object[]{"1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd tz(Asia/Shanghai)", "1:MILLISECONDS:EPOCH:tz(Asia/Shanghai)", "1:DAYS", input, expected});
+    }
+    {
+      // Test conversion from simple date format (East Coast timezone) to millis since epoch with tz
+      // Converted to
+      String[] input =
+          {"20190521 01:00:01" , "20190522 01:00:01", "20190523 01:00:01"};
+      long[] expected =
+          {1558371600000L /* 20190521 00:00:00 */, 1558458000000L /* 20190522 00:00:00 */, 1558544400000L /* 20190523 01:00:00 */};
+      entries.add(
+          new Object[]{"1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd HH:mm:ss tz(Asia/Shanghai)", "1:MILLISECONDS:EPOCH:tz(Asia/Shanghai)", "1:HOURS", input, expected});
+    }
     /*************** SDF to SDF ***************/
     {
       // Test conversion from simple date format to another simple date format
