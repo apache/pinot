@@ -18,12 +18,14 @@
  */
 package org.apache.pinot.client;
 
+import java.util.Map;
+
 /**
  * Pinot client transport factory for JSON encoded BrokerResults through HTTP.
  */
 class JsonAsyncHttpPinotClientTransportFactory implements PinotClientTransportFactory {
   @Override
-  public PinotClientTransport buildTransport() {
-    return new JsonAsyncHttpPinotClientTransport();
+  public PinotClientTransport buildTransport(Map<String, String> headers) {
+    return new JsonAsyncHttpPinotClientTransport(headers);
   }
 }

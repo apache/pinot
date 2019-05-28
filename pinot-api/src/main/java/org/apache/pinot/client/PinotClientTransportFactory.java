@@ -18,9 +18,11 @@
  */
 package org.apache.pinot.client;
 
+import java.util.Map;
+
 /**
  * Factory for client transports.
  */
 interface PinotClientTransportFactory {
-  PinotClientTransport buildTransport();
+  PinotClientTransport buildTransport(Map<String, String> headers);
 }

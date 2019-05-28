@@ -19,7 +19,10 @@
 package org.apache.pinot.client;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -55,6 +58,20 @@ public class ConnectionFactoryTest {
     List<String> brokers = new ArrayList<String>();
     brokers.add(broker1);
     brokers.add(broker2);
+    Assert.assertEquals(connection.getBrokerList(), brokers);
+  }
+
+  @Test
+  public void testBrokerListWithHeaders() {
+    // Create the connection
+    List<String> brokers = new ArrayList<>();
+    brokers.add("127.0.0.1:1234");
+    brokers.add("localhost:2345");
+    Map<String, String> headers = new HashMap<>();
+    headers.put("Caller", "curl");
+    Connection connection = ConnectionFactory.fromHostList(brokers, headers);
+
+    // Check that the broker list has the right length and has the same servers
     Assert.assertEquals(connection.getBrokerList(), brokers);
   }
 

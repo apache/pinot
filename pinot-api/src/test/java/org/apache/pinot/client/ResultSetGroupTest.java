@@ -20,6 +20,7 @@ package org.apache.pinot.client;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.InputStream;
+import java.util.Map;
 import java.util.concurrent.Future;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -151,7 +152,7 @@ public class ResultSetGroupTest {
 
   class DummyJsonTransportFactory implements PinotClientTransportFactory {
     @Override
-    public PinotClientTransport buildTransport() {
+    public PinotClientTransport buildTransport(Map<String, String> headers) {
       return _dummyJsonTransport;
     }
   }

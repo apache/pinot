@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.client;
 
+import java.util.Map;
 import java.util.concurrent.Future;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -69,9 +70,10 @@ public class PreparedStatementTest {
 
   class DummyPinotClientTransportFactory implements PinotClientTransportFactory {
     @Override
-    public PinotClientTransport buildTransport() {
+    public PinotClientTransport buildTransport(Map<String, String> headers) {
       return _dummyPinotClientTransport;
     }
+
   }
 
   @BeforeClass
