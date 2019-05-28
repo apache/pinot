@@ -22,6 +22,7 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.common.utils.DataSize;
 import org.apache.pinot.common.utils.time.TimeUtils;
+import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConsumerFactory;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamMessageDecoder;
 import org.testng.Assert;
@@ -37,8 +38,8 @@ public class StreamConfigTest {
   public void testStreamConfig() {
     boolean exception = false;
     StreamConfig streamConfig;
-    String streamType = "kafka";
-    String topic = "aTopic";
+    String streamType = "fakeStream";
+    String topic = "fakeTopic";
     String consumerType = StreamConfig.ConsumerType.LOWLEVEL.toString();
     String consumerFactoryClass = FakeStreamConsumerFactory.class.getName();
     String decoderClass = FakeStreamMessageDecoder.class.getName();
@@ -146,8 +147,8 @@ public class StreamConfigTest {
    */
   @Test
   public void testStreamConfigDefaults() {
-    String streamType = "kafka";
-    String topic = "aTopic";
+    String streamType = "fakeStream";
+    String topic = "fakeTopic";
     String consumerType = "simple";
     String consumerFactoryClass = FakeStreamConsumerFactory.class.getName();
     String decoderClass = FakeStreamMessageDecoder.class.getName();
@@ -244,8 +245,8 @@ public class StreamConfigTest {
   public void testStreamConfigValidations() {
     boolean exception;
     StreamConfig streamConfig;
-    String streamType = "kafka";
-    String topic = "aTopic";
+    String streamType = "fakeStream";
+    String topic = "fakeTopic";
     String consumerType = "simple";
     String consumerFactoryClass = FakeStreamConsumerFactory.class.getName();
     String decoderClass = FakeStreamMessageDecoder.class.getName();
@@ -323,8 +324,8 @@ public class StreamConfigTest {
   @Test
   public void testFlushThresholdStreamConfigs() {
     StreamConfig streamConfig;
-    String streamType = "kafka";
-    String topic = "aTopic";
+    String streamType = "fakeStream";
+    String topic = "fakeTopic";
     String consumerType = "lowlevel";
     String consumerFactoryClass = FakeStreamConsumerFactory.class.getName();
     String decoderClass = FakeStreamMessageDecoder.class.getName();
@@ -404,8 +405,8 @@ public class StreamConfigTest {
 
   @Test
   public void testConsumerTypes() {
-    String streamType = "kafka";
-    String topic = "aTopic";
+    String streamType = "fakeStream";
+    String topic = "fakeTopic";
     String consumerFactoryClass = FakeStreamConsumerFactory.class.getName();
     String decoderClass = FakeStreamMessageDecoder.class.getName();
 

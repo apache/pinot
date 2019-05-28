@@ -82,17 +82,17 @@ public class LLRealtimeSegmentDataManagerTest {
           + "    \"segmentFormatVersion\": null, \n" + "    \"sortedColumn\": [], \n" + "    \"streamConfigs\": {\n"
           + "      \"" + StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS + "\": \"" + String
           .valueOf(maxRowsInSegment) + "\", \n" + "      \"" + StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_TIME
-          + "\": \"" + maxTimeForSegmentCloseMs + "\", \n" + "      \"stream.kafka.broker.list\": \"broker:7777\", \n"
-          + "      \"stream.kafka.consumer.prop.auto.offset.reset\": \"smallest\", \n"
-          + "      \"stream.kafka.consumer.type\": \"simple\", \n"
-          + "      \"stream.kafka.consumer.factory.class.name\": \"" + FakeStreamConsumerFactory.class.getName()+ "\", \n"
-          + "      \"stream.kafka.decoder.class.name\": \"" + FakeStreamMessageDecoder.class.getName() + "\", \n"
-          + "      \"stream.kafka.decoder.prop.schema.registry.rest.url\": \"http://schema-registry-host.corp.ceo:1766/schemas\", \n"
-          + "      \"stream.kafka.decoder.prop.schema.registry.schema.name\": \"UnknownSchema\", \n"
-          + "      \"stream.kafka.hlc.zk.connect.string\": \"zoo:2181/kafka-queuing\", \n"
-          + "      \"stream.kafka.topic.name\": \"" + _topicName + "\", \n"
-          + "      \"stream.kafka.zk.broker.url\": \"kafka-broker:2181/kafka-queuing\", \n"
-          + "      \"streamType\": \"kafka\"\n" + "    }\n" + "  }, \n" + "  \"tableName\": \"Coffee_REALTIME\", \n"
+          + "\": \"" + maxTimeForSegmentCloseMs + "\", \n" + "      \"stream.fakeStream.broker.list\": \"broker:7777\", \n"
+          + "      \"stream.fakeStream.consumer.prop.auto.offset.reset\": \"smallest\", \n"
+          + "      \"stream.fakeStream.consumer.type\": \"simple\", \n"
+          + "      \"stream.fakeStream.consumer.factory.class.name\": \"" + FakeStreamConsumerFactory.class.getName()+ "\", \n"
+          + "      \"stream.fakeStream.decoder.class.name\": \"" + FakeStreamMessageDecoder.class.getName() + "\", \n"
+          + "      \"stream.fakeStream.decoder.prop.schema.registry.rest.url\": \"http://schema-registry-host.corp.ceo:1766/schemas\", \n"
+          + "      \"stream.fakeStream.decoder.prop.schema.registry.schema.name\": \"UnknownSchema\", \n"
+          + "      \"stream.fakeStream.hlc.zk.connect.string\": \"zoo:2181/kafka-queuing\", \n"
+          + "      \"stream.fakeStream.topic.name\": \"" + _topicName + "\", \n"
+          + "      \"stream.fakeStream.zk.broker.url\": \"kafka-broker:2181/kafka-queuing\", \n"
+          + "      \"streamType\": \"fakeStream\"\n" + "    }\n" + "  }, \n" + "  \"tableName\": \"Coffee_REALTIME\", \n"
           + "  \"tableType\": \"realtime\", \n" + "  \"tenants\": {\n" + "    \"broker\": \"shared\", \n"
           + "    \"server\": \"server-1\"\n" + "  }\n" + "}";
 

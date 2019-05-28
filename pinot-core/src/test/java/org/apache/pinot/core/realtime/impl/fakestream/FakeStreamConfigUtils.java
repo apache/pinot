@@ -43,7 +43,7 @@ public class FakeStreamConfigUtils {
 
   private static final int SMALLEST_OFFSET = 0;
   private static final int LARGEST_OFFSET = Integer.MAX_VALUE;
-  public static final String NUM_PARTITIONS_KEY = "num.partitions";
+  private static final String NUM_PARTITIONS_KEY = "num.partitions";
   private static final int DEFAULT_NUM_PARTITIONS = 2;
 
   private static final String STREAM_TYPE = "fakeStream";
