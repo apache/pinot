@@ -131,6 +131,7 @@ public class PinotHelixResourceManager {
   private final long _externalViewOnlineToOfflineTimeoutMillis;
   private final boolean _isSingleTenantCluster;
   private final boolean _enableBatchMessageMode;
+  private final boolean _allowHLCTables;
 
   private HelixManager _helixZkManager;
   private HelixAdmin _helixAdmin;
@@ -145,7 +146,7 @@ public class PinotHelixResourceManager {
 
   public PinotHelixResourceManager(@Nonnull String zkURL, @Nonnull String helixClusterName,
       @Nonnull String controllerInstanceId, String dataDir, long externalViewOnlineToOfflineTimeoutMillis,
-      boolean isSingleTenantCluster, boolean enableBatchMessageMode) {
+      boolean isSingleTenantCluster, boolean enableBatchMessageMode, boolean allowHLCTables) {
     _helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(zkURL);
     _helixClusterName = helixClusterName;
     _instanceId = controllerInstanceId;
@@ -153,19 +154,20 @@ public class PinotHelixResourceManager {
     _externalViewOnlineToOfflineTimeoutMillis = externalViewOnlineToOfflineTimeoutMillis;
     _isSingleTenantCluster = isSingleTenantCluster;
     _enableBatchMessageMode = enableBatchMessageMode;
+    _allowHLCTables = allowHLCTables;
   }
 
   public PinotHelixResourceManager(@Nonnull String zkURL, @Nonnull String helixClusterName,
       @Nonnull String controllerInstanceId, @Nonnull String dataDir) {
     this(zkURL, helixClusterName, controllerInstanceId, dataDir, DEFAULT_EXTERNAL_VIEW_UPDATE_TIMEOUT_MILLIS, false,
-        true);
+        true, true);
   }
 
   public PinotHelixResourceManager(@Nonnull ControllerConf controllerConf) {
     this(controllerConf.getZkStr(), controllerConf.getHelixClusterName(),
         controllerConf.getControllerHost() + "_" + controllerConf.getControllerPort(), controllerConf.getDataDir(),
         controllerConf.getExternalViewOnlineToOfflineTimeout(), controllerConf.tenantIsolationEnabled(),
-        controllerConf.getEnableBatchMessageMode());
+        controllerConf.getEnableBatchMessageMode(), controllerConf.getHLCTablesAllowed());
   }
 
   /**
@@ -1098,6 +1100,9 @@ public class PinotHelixResourceManager {
         updateReplicaGroupPartitionAssignment(tableConfig);
         break;
       case REALTIME:
+        IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+        verifyIndexingConfig(tableNameWithType, indexingConfig);
+
         // Ensure that realtime table is not created if schema is not present
         Schema schema =
             ZKMetadataProvider.getSchema(_propertyStore, TableNameBuilder.extractRawTableName(tableNameWithType));
@@ -1130,7 +1135,6 @@ public class PinotHelixResourceManager {
          * We also need to support the case when a high-level consumer already exists for a table and we are adding
          * the low-level consumers.
          */
-        IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
         ensureRealtimeClusterIsSetUp(tableConfig, tableNameWithType, indexingConfig);
 
         LOGGER.info("Successfully added or updated the table {} ", tableNameWithType);
@@ -1270,6 +1274,14 @@ public class PinotHelixResourceManager {
     _rebalanceSegmentStrategyFactory = rebalanceSegmentStrategyFactory;
   }
 
+  private void verifyIndexingConfig(String tableNameWithType, IndexingConfig indexingConfig) {
+    // Check if HLC table is allowed.
+    StreamConfig streamConfig = new StreamConfig(indexingConfig.getStreamConfigs());
+    if (streamConfig.hasHighLevelConsumerType() && !_allowHLCTables) {
+      throw new InvalidTableConfigException("Creating HLC realtime table is not allowed for Table: " + tableNameWithType);
+    }
+  }
+
   private void ensureRealtimeClusterIsSetUp(TableConfig config, String realtimeTableName,
       IndexingConfig indexingConfig) {
     StreamConfig streamConfig = new StreamConfig(indexingConfig.getStreamConfigs());
@@ -1346,12 +1358,13 @@ public class PinotHelixResourceManager {
       throws IOException {
 
     if (tableType == TableType.REALTIME) {
+      IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+      verifyIndexingConfig(tableNameWithType, indexingConfig);
       // Update replica group partition assignment to the property store if applicable
       if (ReplicationUtils.setupRealtimeReplicaGroups(tableConfig)) {
         updateReplicaGroupPartitionAssignment(tableConfig);
       }
       ZKMetadataProvider.setRealtimeTableConfig(_propertyStore, tableNameWithType, tableConfig.toZNRecord());
-      IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
       ensureRealtimeClusterIsSetUp(tableConfig, tableNameWithType, indexingConfig);
     } else if (tableType == TableType.OFFLINE) {
       // Update replica group partition assignment to the property store if applicable
@@ -1408,6 +1421,8 @@ public class PinotHelixResourceManager {
     setExistingTableConfig(tableConfig, tableNameWithType, type);
 
     if (type == TableType.REALTIME) {
+      // Check if HLC table is allowed
+      verifyIndexingConfig(tableNameWithType, newConfigs);
       ensureRealtimeClusterIsSetUp(tableConfig, tableName, newConfigs);
     }
   }
