@@ -18,45 +18,22 @@ export default Controller.extend({
   disableSubGroupSave: true,
 
   /**
-   * Flag to trigger special case of no existing subscription groups for an alert
-   * @method noExistingSubscriptionGroup
-   * @return {Boolean}
-   */
-  noExistingSubscriptionGroup: computed(
-    'subscriptionGroupNames',
-    function() {
-      const subscriptionGroupNames = get(this, 'subscriptionGroupNames');
-      if (subscriptionGroupNames && Array.isArray(subscriptionGroupNames) && subscriptionGroupNames.length > 0) {
-        return false;
-      }
-      return true;
-    }
-  ),
-
-  /**
    * Change subscription group button text depending on whether creating or updating
    * @method subGroupButtonText
    * @return {String}
    */
   subGroupButtonText: computed(
-    'noExistingSubscriptionGroup',
     'groupName',
     function() {
-      const {
-        noExistingSubscriptionGroup,
-        groupName
-      } = this.getProperties('noExistingSubscriptionGroup', 'groupName');
-      return (noExistingSubscriptionGroup || !groupName || groupName.name === CREATE_GROUP_TEXT) ? "Create Group" : "Update Group";
+      const groupName = get(this, 'groupName');
+      return (!groupName || groupName.name === CREATE_GROUP_TEXT) ? "Create Group" : "Update Group";
     }
   ),
 
   // Method for handling subscription group, whether there are any or not
   async _handleSubscriptionGroup(subscriptionYaml, notifications, subscriptionGroupId) {
-    const {
-      noExistingSubscriptionGroup,
-      groupName
-    } = this.getProperties('noExistingSubscriptionGroup', 'groupName');
-    if (noExistingSubscriptionGroup || !groupName || groupName.name === CREATE_GROUP_TEXT) {
+    const groupName = get(this, 'groupName');
+    if (!groupName || groupName.name === CREATE_GROUP_TEXT) {
       //POST settings
       const setting_url = '/yaml/subscription';
       const settingsPostProps = {
