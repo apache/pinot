@@ -41,6 +41,8 @@ Pinot requires JDK 8 or later, Apache Maven 3 and `Apache Thrift<https://thrift.
 
 #. Check out the code from GitHub (https://github.com/apache/incubator-pinot)
 #. With Maven installed, run ``mvn install package -DskipTests -Pbin-dist`` in the directory in which you checked out Pinot.
+#. (Optional) If your thrift executable is not installed at `/usr/local/bin/thrift`, you can specify your own thrift executable. E.g.
+  ``mvn install package -DskipTests -Pbin-dist -Dthrift.executable=$(which thrift)``
 #. Make the generated scripts executable ``cd pinot-distribution/target/apache-pinot-incubating-<version>-SNAPSHOT-bin; chmod +x bin/*.sh``
 
 Trying out Offline quickstart demo
