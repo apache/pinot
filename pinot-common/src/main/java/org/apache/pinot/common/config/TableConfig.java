@@ -457,6 +457,7 @@ public class TableConfig {
     private TableTaskConfig _taskConfig;
     private RoutingConfig _routingConfig;
     private HllConfig _hllConfig;
+    private SegmentPartitionConfig _segmentPartitionConfig;
     private StarTreeIndexSpec _starTreeIndexSpec;
 
     public Builder(TableType tableType) {
@@ -609,6 +610,11 @@ public class TableConfig {
       return this;
     }
 
+    public Builder setSegmentPartitionConfig(SegmentPartitionConfig segmentPartitionConfig) {
+      _segmentPartitionConfig = segmentPartitionConfig;
+      return this;
+    }
+
     public TableConfig build() {
       // Validation config
       SegmentsValidationAndRetentionConfig validationConfig = new SegmentsValidationAndRetentionConfig();
@@ -646,7 +652,7 @@ public class TableConfig {
       StreamConsumptionConfig streamConsumptionConfig = new StreamConsumptionConfig();
       streamConsumptionConfig.setStreamPartitionAssignmentStrategy(_streamPartitionAssignmentStrategy);
       indexingConfig.setStreamConsumptionConfig(streamConsumptionConfig);
-      // TODO: set SegmentPartitionConfig here
+      indexingConfig.setSegmentPartitionConfig(_segmentPartitionConfig);
 
       if (_customConfig == null) {
         _customConfig = new TableCustomConfig();

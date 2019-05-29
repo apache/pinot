@@ -117,7 +117,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     // Create the table
     addOfflineTable(getTableName(), null, null, null, null, getLoadMode(), SegmentVersion.v1, getInvertedIndexColumns(),
-        getBloomFilterIndexColumns(), getTaskConfig());
+        getBloomFilterIndexColumns(), getTaskConfig(), null, null);
 
     completeTableConfiguration();
 
@@ -221,7 +221,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     // Update table config and trigger reload
     updateOfflineTable(getTableName(), null, null, null, null, getLoadMode(), SegmentVersion.v1,
-        UPDATED_INVERTED_INDEX_COLUMNS, null, getTaskConfig());
+        UPDATED_INVERTED_INDEX_COLUMNS, null, getTaskConfig(), null, null);
 
     updateTableConfiguration();
 
@@ -248,7 +248,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     // Update table config and trigger reload
     updateOfflineTable(getTableName(), null, null, null, null, getLoadMode(), SegmentVersion.v1, null,
-        UPDATED_BLOOM_FILTER_COLUMNS, getTaskConfig());
+        UPDATED_BLOOM_FILTER_COLUMNS, getTaskConfig(), null, null);
 
     updateTableConfiguration();
 

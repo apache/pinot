@@ -52,4 +52,17 @@ public class JobConfigConstants {
 
   // The path to the record reader to be configured
   public static final String RECORD_READER_PATH = "record.reader.path";
+
+  public static final String ENABLE_PARTITIONING = "enable.partitioning";
+  public static final String ENABLE_SORTING = "enable.sorting";
+  public static final String ENABLE_RESIZING = "enable.resizing";
+
+  public static final String PARTITION_COLUMN = "partition.column";
+  public static final String NUMBER_OF_PARTITIONS = "num.partitions";
+  public static final String PARTITION_FUNCTION = "partition.function";
+
+  public static final String SORTED_COLUMN = "sorted.column";
+
+  public static final String MINIMUM_NUMBER_OF_OUTPUT_FILES = "min.num.output.files";
+  public static final String MAXIMUM_NUMBER_OF_RECORDS = "max.num.records";
 }

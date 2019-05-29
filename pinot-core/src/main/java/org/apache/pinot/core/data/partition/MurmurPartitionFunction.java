@@ -35,7 +35,7 @@ public class MurmurPartitionFunction implements PartitionFunction {
    * @param numPartitions Number of partitions.
    */
   public MurmurPartitionFunction(int numPartitions) {
-    Preconditions.checkArgument(numPartitions > 0, "Number of partitions must be > 0, specified", numPartitions);
+    Preconditions.checkArgument(numPartitions > 0, "Number of partitions must be > 0");
     _numPartitions = numPartitions;
   }
 

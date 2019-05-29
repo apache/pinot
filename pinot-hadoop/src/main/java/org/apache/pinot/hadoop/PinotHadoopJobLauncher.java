@@ -21,6 +21,7 @@ package org.apache.pinot.hadoop;
 import java.io.FileInputStream;
 import java.util.Arrays;
 import java.util.Properties;
+import org.apache.pinot.hadoop.job.SegmentPreprocessingJob;
 import org.apache.pinot.hadoop.job.SegmentCreationJob;
 import org.apache.pinot.hadoop.job.SegmentTarPushJob;
 import org.apache.pinot.hadoop.job.SegmentUriPushJob;
@@ -29,7 +30,8 @@ import org.apache.pinot.hadoop.job.SegmentUriPushJob;
 public class PinotHadoopJobLauncher {
 
   enum PinotHadoopJobType {
-    SegmentCreation, SegmentTarPush, SegmentUriPush, SegmentCreationAndTarPush, SegmentCreationAndUriPush
+    SegmentCreation, SegmentTarPush, SegmentUriPush, SegmentCreationAndTarPush, SegmentCreationAndUriPush,
+    SegmentPreprocessing
   }
 
   private static final String USAGE = "usage: [job_type] [job.properties]";
@@ -60,6 +62,9 @@ public class PinotHadoopJobLauncher {
       case SegmentCreationAndUriPush:
         new SegmentCreationJob(jobConf).run();
         new SegmentUriPushJob(jobConf).run();
+        break;
+      case SegmentPreprocessing:
+        new SegmentPreprocessingJob(jobConf).run();
         break;
       default:
         throw new RuntimeException("Not a valid jobType - " + jobType);

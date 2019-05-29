@@ -24,13 +24,17 @@ import java.net.URL;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Executor;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import kafka.server.KafkaServerStartable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.client.ConnectionFactory;
+import org.apache.pinot.common.config.ColumnPartitionConfig;
+import org.apache.pinot.common.config.SegmentPartitionConfig;
 import org.apache.pinot.common.config.TableTaskConfig;
 import org.apache.pinot.common.config.TagNameUtils;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
@@ -67,6 +71,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
   protected final File _tempDir = new File(FileUtils.getTempDirectory(), getClass().getSimpleName());
   protected final File _avroDir = new File(_tempDir, "avroDir");
+  protected final File _preprocessingDir = new File(_tempDir, "preprocessingDir");
   protected final File _segmentDir = new File(_tempDir, "segmentDir");
   protected final File _tarDir = new File(_tempDir, "tarDir");
   protected List<KafkaServerStartable> _kafkaStarters;
@@ -186,6 +191,16 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   @Nullable
   protected String getBrokerTenant() {
     return TagNameUtils.DEFAULT_TENANT_NAME;
+  }
+
+  protected SegmentPartitionConfig getSegmentPartitionConfig() {
+
+    ColumnPartitionConfig columnPartitionConfig = new ColumnPartitionConfig("murmur", 2);
+    Map<String, ColumnPartitionConfig> columnPartitionConfigMap = new HashMap<>();
+    columnPartitionConfigMap.put("AirlineID", columnPartitionConfig);
+
+    SegmentPartitionConfig segmentPartitionConfig = new SegmentPartitionConfig(columnPartitionConfigMap);
+    return segmentPartitionConfig;
   }
 
   /**
