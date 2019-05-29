@@ -21,6 +21,8 @@ addons:
   firefox: latest
 
 before_install:
+  - sudo apt-get clean
+  - sudo rm -rf /var/lib/apt/lists/*
   - sudo apt-get update -qq
   - sudo apt-get install automake bison flex g++ git libboost-all-dev libevent-dev libssl-dev libtool make pkg-config
   - wget http://archive.apache.org/dist/thrift/0.12.0/thrift-0.12.0.tar.gz -O /tmp/thrift-0.12.0.tar.gz
