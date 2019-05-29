@@ -46,10 +46,15 @@ public class EvaluationDTO extends EvaluationBean {
     return evaluation;
   }
 
-  private static double getMape(PredictionResult result) {
+  private static Double getMape(PredictionResult result) {
     DataFrame df = result.getPredictedTimeSeries();
     // drop zero current value for mape calculation
     df = df.filter(df.getDoubles(COL_CURRENT).ne(0.0)).dropNull(COL_CURRENT, COL_VALUE);
-    return Evaluation.calculateMape(df.getDoubles(COL_CURRENT), df.getDoubles(COL_VALUE));
+    Double mape = Evaluation.calculateMape(df.getDoubles(COL_CURRENT), df.getDoubles(COL_VALUE));
+    if (Double.isNaN(mape)) {
+      // explicitly swap NaN to null values because mysql doesn't support storing NaN and will thrown a exception.
+      mape = null;
+    }
+    return mape;
   }
 }
