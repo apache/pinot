@@ -19,7 +19,6 @@
 
 package org.apache.pinot.thirdeye.detection;
 
-import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
 import java.lang.reflect.ParameterizedType;
 import java.util.ArrayList;
@@ -44,12 +43,10 @@ import org.apache.pinot.thirdeye.detection.spi.components.BaselineProvider;
 import org.apache.pinot.thirdeye.detection.spi.model.TimeSeries;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
-import org.joda.time.Duration;
 import org.joda.time.Period;
 import org.joda.time.PeriodType;
 
 import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
-import static org.apache.pinot.thirdeye.rootcause.impl.MetricEntity.*;
 
 
 public class DetectionUtils {
