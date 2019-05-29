@@ -20,9 +20,7 @@
 package org.apache.pinot.thirdeye.detection.yaml.translator;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Multimap;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -194,7 +192,7 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
     Preconditions.checkNotNull(this.datasetConfig, "dataset not found");
     this.mergerProperties = MapUtils.getMap(yamlConfig, PROP_MERGER, new HashMap<String, Object>());
     this.filterMaps = MapUtils.getMap(yamlConfig, PROP_FILTERS);
-    this.metricUrn = MetricEntity.buildMetricUrn(filterMaps, this.metricConfig.getId());
+    this.metricUrn = MetricEntity.fromMetric(filterMaps, this.metricConfig.getId()).getUrn();
   }
 
   @Override
@@ -241,7 +239,7 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
       dimensionWrapperProperties.putAll(dimensionExploreYaml);
       if (dimensionExploreYaml.containsKey(PROP_DIMENSION_FILTER_METRIC)){
         MetricConfigDTO dimensionExploreMetric = this.dataProvider.fetchMetric(MapUtils.getString(dimensionExploreYaml, PROP_DIMENSION_FILTER_METRIC), this.datasetConfig.getDataset());
-        dimensionWrapperProperties.put(PROP_METRIC_URN, MetricEntity.buildMetricUrn(filterMaps, dimensionExploreMetric.getId()));
+        dimensionWrapperProperties.put(PROP_METRIC_URN, MetricEntity.fromMetric(filterMaps, dimensionExploreMetric.getId()).getUrn());
       } else {
         dimensionWrapperProperties.put(PROP_METRIC_URN, this.metricUrn);
       }

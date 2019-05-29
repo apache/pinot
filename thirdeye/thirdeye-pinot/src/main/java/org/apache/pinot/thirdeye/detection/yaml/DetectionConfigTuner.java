@@ -22,6 +22,7 @@ package org.apache.pinot.thirdeye.detection.yaml;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.collections.MapUtils;
@@ -45,6 +46,12 @@ import org.slf4j.LoggerFactory;
 
 import static org.apache.pinot.thirdeye.detection.DetectionUtils.*;
 
+
+/**
+ * This class focuses on tuning the detection config for the provided tuning window
+ *
+ * This wraps and calls the appropriate tunable implementation
+ */
 public class DetectionConfigTuner {
   protected static final Logger LOG = LoggerFactory.getLogger(DetectionConfigTuner.class);
 
@@ -86,19 +93,20 @@ public class DetectionConfigTuner {
         .get(metricConfig.getDataset());
     Preconditions.checkNotNull(this.datasetConfig, "dataset not found");
 
-    this.metricUrn = MetricEntity.buildMetricUrn(MapUtils.getMap(yamlConfig, PROP_FILTERS), metricConfig.getId());
+    this.metricUrn = MetricEntity.fromMetric(MapUtils.getMap(yamlConfig, PROP_FILTERS), metricConfig.getId()).getUrn();
   }
 
   /**
    * Returns the default(for new alert) or tuned configuration for the specified component
    *
-   * @param componentKey the key used to reference the component within the detection
    * @param componentProps previously tuned configuration along with user supplied yaml config
    * @param startTime start time of the tuning window
    * @param endTime end time of the tuning window
    */
-  private Map<String, Object> getTunedSpecs(String componentKey, Map<String, Object> componentProps, long startTime, long endTime)
+  private Map<String, Object> getTunedSpecs(Map<String, Object> componentProps, long startTime, long endTime)
       throws Exception {
+    Map<String, Object> tunedSpec = new HashMap<>();
+
     // Instantiate tunable component
     long configId = detectionConfig == null ? 0 : detectionConfig.getId();
     String componentClassName = componentProps.get(PROP_CLASS_NAME).toString();
@@ -112,13 +120,14 @@ public class DetectionConfigTuner {
     DateTime end =  new DateTime(endTime, timezone).withTimeAtStartOfDay();
     Interval window = new Interval(start, end);
 
-    // TODO can you use componentProps instead? what is the difference btw component and componentSpec
-    Map<String, Object> existingComponentSpec =
-        detectionConfig.getComponents().containsKey(componentKey) ?
-            MapUtils.getMap(detectionConfig.getComponents(), componentKey) : Collections.emptyMap();
-
     // TODO: if dimension drill down applied, pass in the metric urn of top dimension
-    return tunable.tune(existingComponentSpec, window, this.metricUrn);
+    tunedSpec.putAll(tunable.tune(componentProps, window, this.metricUrn));
+
+    // Hack to retain the raw yaml parameters.
+    // The tunable requires raw yaml params and previously tuned params to generate fresh params
+    tunedSpec.put(PROP_YAML_PARAMS, yamlParams);
+
+    return tunedSpec;
   }
 
   private Tunable instantiateTunable(String componentClassName, Map<String, Object> yamlParams, InputDataFetcher dataFetcher)
@@ -136,23 +145,34 @@ public class DetectionConfigTuner {
    * Scans through all the tunable components and injects tuned model params into the detection config
    */
   public DetectionConfigDTO tune(long tuningWindowStart, long tuningWindowEnd) {
+    Map<String, Object> tunedComponentSpecs = new HashMap<>();
+
+    // Tune each tunable component in the detection componentSpecs
     Map<String, Object> allComponentSpecs = this.detectionConfig.getComponentSpecs();
     for (Map.Entry<String, Object> componentSpec : allComponentSpecs.entrySet()) {
+      Map<String, Object> tunedComponentProps = new HashMap<>();
+
       String componentKey = componentSpec.getKey();
-      Map<String, Object> componentProps = ConfigUtils.getMap(componentSpec.getValue());
+      Map<String, Object> existingComponentProps = ConfigUtils.getMap(componentSpec.getValue());
 
       // For tunable components, the model params are computed from user supplied yaml params and previous model params.
-      String componentClassName = componentProps.get(PROP_CLASS_NAME).toString();
+      String componentClassName = existingComponentProps.get(PROP_CLASS_NAME).toString();
       String type = DetectionUtils.getComponentType(componentKey);
       if (!TURNOFF_TUNING_COMPONENTS.contains(type) && DETECTION_REGISTRY.isTunable(componentClassName)) {
         try {
-          componentProps.putAll(getTunedSpecs(componentKey, componentProps, tuningWindowStart, tuningWindowEnd));
-          detectionConfig.setComponentSpecs(componentProps);
+          tunedComponentProps.put(PROP_CLASS_NAME, componentClassName);
+          tunedComponentProps.putAll(getTunedSpecs(existingComponentProps, tuningWindowStart, tuningWindowEnd));
         } catch (Exception e) {
           LOG.error("Tuning failed for component " + type, e);
         }
+      } else {
+        tunedComponentProps.putAll(existingComponentProps);
       }
+
+      tunedComponentSpecs.put(componentKey, tunedComponentProps);
     }
+
+    detectionConfig.setComponentSpecs(tunedComponentSpecs);
     return detectionConfig;
   }
 }

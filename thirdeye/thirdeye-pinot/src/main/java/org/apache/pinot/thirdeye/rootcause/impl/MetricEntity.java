@@ -91,6 +91,17 @@ public class MetricEntity extends Entity {
     return fromMetric(score, new ArrayList<Entity>(), id, TreeMultimap.<String, String>create());
   }
 
+  public static MetricEntity fromMetric(Map<String, Collection<String>> filterMaps, long id) {
+    Multimap<String, String> filters = ArrayListMultimap.create();
+    if (filterMaps != null) {
+      for (Map.Entry<String, Collection<String>> entry : filterMaps.entrySet()) {
+        filters.putAll(entry.getKey(), entry.getValue());
+      }
+    }
+
+    return fromMetric(1.0, id, filters);
+  }
+
   public static MetricEntity fromURN(String urn, double score) {
     ParsedUrn parsedUrn = EntityUtils.parseUrnString(urn, TYPE, 3);
     long id = Long.parseLong(parsedUrn.getPrefixes().get(2));
@@ -103,16 +114,5 @@ public class MetricEntity extends Entity {
 
   public static MetricEntity fromSlice(MetricSlice slice, double score) {
     return fromMetric(score, slice.getMetricId(), slice.getFilters());
-  }
-
-  public static String buildMetricUrn(Map<String, Collection<String>> filterMaps, long metricId) {
-    Multimap<String, String> filters = ArrayListMultimap.create();
-    if (filterMaps != null) {
-      for (Map.Entry<String, Collection<String>> entry : filterMaps.entrySet()) {
-        filters.putAll(entry.getKey(), entry.getValue());
-      }
-    }
-
-    return fromMetric(1.0, metricId, filters).getUrn();
   }
 }
