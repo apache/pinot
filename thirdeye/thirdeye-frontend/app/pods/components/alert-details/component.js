@@ -33,7 +33,6 @@ import floatToPercent from 'thirdeye-frontend/utils/float-to-percent';
 import { setUpTimeRangeOptions } from 'thirdeye-frontend/utils/manage-alert-utils';
 import moment from 'moment';
 import _ from 'lodash';
-import d3 from 'd3';
 
 const TABLE_DATE_FORMAT = 'MMM DD, hh:mm A'; // format for anomaly table
 const TIME_PICKER_INCREMENT = 5; // tells date picker hours field how granularly to display time
@@ -157,7 +156,14 @@ export default Component.extend({
     function() {
       const uniqueTimeSeries = get(this, 'uniqueTimeSeries');
       if (uniqueTimeSeries) {
-        return [...new Set(uniqueTimeSeries.map(series => series.detectorName))];
+        return [...new Set(uniqueTimeSeries.map(series => {
+          const detectorName = series.detectorName;
+          const nameOnly = detectorName.split(':')[0];
+          return {
+            detectorName,
+            name: nameOnly
+          };
+        }))];
       }
       return [];
     }
@@ -639,7 +645,12 @@ export default Component.extend({
           set(this, 'metricUrnList', metricUrnList);
           set(this, 'selectedDimension', toMetricLabel(extractTail(decodeURIComponent(metricUrnList[0]))));
           if (applicationAnomalies.predictions && Array.isArray(applicationAnomalies.predictions) && (typeof applicationAnomalies.predictions[0] === 'object')){
-            set(this, 'selectedRule', applicationAnomalies.predictions[0].detectorName);
+            const detectorName = applicationAnomalies.predictions[0].detectorName;
+            const selectedRule = {
+              detectorName,
+              name: detectorName.split(':')[0]
+            };
+            set(this, 'selectedRule', selectedRule);
           }
           set(this, 'metricUrn', metricUrnList[0]);
         }
@@ -712,46 +723,6 @@ export default Component.extend({
     }
   },
 
-  didRender(){
-    this._super(...arguments);
-
-    later(() => {
-      this._buildSliderButton();
-    });
-  },
-
-  // Helper function that builds the subchart region buttons
-  _buildSliderButton() {
-    const componentId = this.get('componentId');
-    const resizeButtons = d3.select(`.${componentId}`).selectAll('.resize');
-
-    resizeButtons.append('circle')
-      .attr('cx', 0)
-      .attr('cy', 30)
-      .attr('r', 10)
-      .attr('fill', '#0091CA');
-    resizeButtons.append('line')
-      .attr('class', 'anomaly-graph__slider-line')
-      .attr("x1", 0)
-      .attr("y1", 27)
-      .attr("x2", 0)
-      .attr("y2", 33);
-
-    resizeButtons.append('line')
-      .attr('class', 'anomaly-graph__slider-line')
-      .attr("x1", -5)
-      .attr("y1", 27)
-      .attr("x2", -5)
-      .attr("y2", 33);
-
-    resizeButtons.append('line')
-      .attr('class', 'anomaly-graph__slider-line')
-      .attr("x1", 5)
-      .attr("y1", 27)
-      .attr("x2", 5)
-      .attr("y2", 33);
-  },
-
   _formatAnomaly(anomaly) {
     return `${moment(anomaly.startTime).format(TABLE_DATE_FORMAT)}`;
   },
@@ -778,7 +749,7 @@ export default Component.extend({
 
     if (isPreviewMode) {
       const seriesSet = uniqueTimeSeries.find(series => {
-        if (series.detectorName === selectedRule && series.metricUrn === metricUrn) {
+        if (series.detectorName === selectedRule.detectorName && series.metricUrn === metricUrn) {
           return series;
         }
       });

@@ -88,7 +88,7 @@
 
           <div class="te-content-block">
             {{#if isPreviewMode}}
-              <h4 class="te-self-serve__block-title">{{selectedRule}} {{#if alertHasDimensions}}/ {{selectedDimension}}{{/if}} anomalies over time ({{numCurrentAnomalies}})</h4>
+              <h4 class="te-self-serve__block-title">{{selectedRule.name}} {{#if alertHasDimensions}}/ {{selectedDimension}}{{/if}} anomalies over time ({{numCurrentAnomalies}})</h4>
             {{else}}
               <h4 class="te-self-serve__block-title">{{#if alertHasDimensions}}{{selectedDimension}} a{{else}}A{{/if}}nomalies over time ({{numCurrentAnomalies}})</h4>
             {{/if}}
@@ -109,10 +109,11 @@
                   matchTriggerWidth=false
                   matchContentWidth=true
                   selected=selectedRule
+                  searchField="name"
                   onchange=(action "onSelectRule")
                   as |rule|
                 }}
-                  {{rule}}
+                  {{rule.name}}
                 {{/power-select}}
 
                 {{!-- Dimension selector --}}
