@@ -35,34 +35,28 @@ import org.apache.pinot.thirdeye.detection.spi.model.ModelStatus;
 import org.joda.time.Instant;
 
 
-public class DefaultDetectionMaintenanceFlow {
+public class DefaultModelMaintenanceFlow implements ModelMaintenanceFlow {
   private final DataProvider provider;
-  private final DetectionConfigDTO detectionConfig;
   private final DetectionRegistry detectionRegistry;
-  private Collection<? extends ModelEvaluator<? extends AbstractSpec>> modelEvaluators;
 
-  public DetectionMaintenanceFlow(DataProvider provider, DetectionConfigDTO detectionConfig, DetectionRegistry detectionRegistry) {
+  DefaultModelMaintenanceFlow(DataProvider provider, DetectionRegistry detectionRegistry) {
     this.provider = provider;
-    this.detectionConfig = detectionConfig;
     this.detectionRegistry = detectionRegistry;
-
-    // if the pipeline is tunable, get the model evaluators
-    this.modelEvaluators = Collections.emptyList();
-    if (isTunable(this.detectionConfig)) {
-      this.modelEvaluators = getModelEvaluators(detectionConfig);
-    }
   }
 
-  public DetectionConfigDTO maintain(Instant timestamp){
-    Collection<? extends ModelEvaluator<? extends AbstractSpec>> modelEvaluators = getModelEvaluators(this.detectionConfig);
-    for (ModelEvaluator<? extends AbstractSpec> modelEvaluator : modelEvaluators) {
-      if (modelEvaluator.evaluateModel(timestamp).getStatus().equals(ModelStatus.BAD)) {
-        // TODO: tune model
-        this.detectionConfig.setLastTuningTimestamp(timestamp.getMillis());
-        break;
+  public DetectionConfigDTO maintain(DetectionConfigDTO config, Instant timestamp){
+    // if the pipeline is tunable, get the model evaluators
+    if (isTunable(config)) {
+      Collection<? extends ModelEvaluator<? extends AbstractSpec>> modelEvaluators = getModelEvaluators(config);
+      for (ModelEvaluator<? extends AbstractSpec> modelEvaluator : modelEvaluators) {
+        if (modelEvaluator.evaluateModel(timestamp).getStatus().equals(ModelStatus.BAD)) {
+          // TODO: tune model
+          config.setLastTuningTimestamp(timestamp.getMillis());
+          break;
+        }
       }
     }
-    return this.detectionConfig;
+    return config;
   }
 
   private Collection<? extends ModelEvaluator<? extends AbstractSpec>> getModelEvaluators(DetectionConfigDTO config) {
@@ -76,17 +70,17 @@ public class DefaultDetectionMaintenanceFlow {
 
     if (modelEvaluators.isEmpty()) {
       // if evaluators are not configured, use the default ones
-      modelEvaluators = getDefaultModelEvaluators();
+      modelEvaluators = instantiateDefaultEvaluators(config);
     }
 
     return modelEvaluators;
   }
 
-  private Collection<ModelEvaluator<MapeAveragePercentageChangeModelEvaluatorSpec>> getDefaultModelEvaluators() {
+  private Collection<ModelEvaluator<MapeAveragePercentageChangeModelEvaluatorSpec>> instantiateDefaultEvaluators(DetectionConfigDTO config) {
     ModelEvaluator<MapeAveragePercentageChangeModelEvaluatorSpec> evaluator =
         new MapeAveragePercentageChangeModelEvaluator();
     evaluator.init(new MapeAveragePercentageChangeModelEvaluatorSpec(),
-        new DefaultInputDataFetcher(this.provider, this.detectionConfig.getId()));
+        new DefaultInputDataFetcher(this.provider, config.getId()));
     return Collections.singleton(evaluator);
   }
 
@@ -102,5 +96,4 @@ public class DefaultDetectionMaintenanceFlow {
         .stream()
         .anyMatch(component -> this.detectionRegistry.isTunable(component.getClass().getName()));
   }
-
 }

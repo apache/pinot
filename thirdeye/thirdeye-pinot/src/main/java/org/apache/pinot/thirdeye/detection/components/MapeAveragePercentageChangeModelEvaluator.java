@@ -25,6 +25,7 @@ package org.apache.pinot.thirdeye.detection.components;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import org.apache.pinot.thirdeye.datalayer.dto.EvaluationDTO;
 import org.apache.pinot.thirdeye.datalayer.pojo.EvaluationBean;
@@ -101,12 +102,13 @@ public class MapeAveragePercentageChangeModelEvaluator implements ModelEvaluator
   private Collection<EvaluationDTO> getEvaluationsWithinDays(Collection<EvaluationDTO> evaluations,
       Instant evaluationTimeStamp, int days) {
     return evaluations.stream()
+        .filter(eval -> Objects.nonNull(eval.getMape()))
         .filter(eval -> evaluationTimeStamp.toDateTime().minusDays(days).getMillis() < eval.getStartTime())
         .collect(Collectors.toSet());
   }
 
   /**
-   * calculate the mean MAPE for each metric urn based on the available evaluations over the past numbe of days
+   * calculate the mean MAPE for each metric urn based on the available evaluations over the past number of days
    * @param evaluations the available evaluations
    * @return the mean MAPE keyed by metric urns
    */

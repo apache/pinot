@@ -41,6 +41,8 @@ import org.apache.pinot.thirdeye.datasource.loader.AggregationLoader;
 import org.apache.pinot.thirdeye.datasource.loader.DefaultAggregationLoader;
 import org.apache.pinot.thirdeye.datasource.loader.DefaultTimeSeriesLoader;
 import org.apache.pinot.thirdeye.datasource.loader.TimeSeriesLoader;
+import org.apache.pinot.thirdeye.detection.annotation.registry.DetectionRegistry;
+import org.joda.time.Instant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -133,6 +135,11 @@ public class DetectionPipelineTaskRunner implements TaskRunner {
         this.evaluationDAO.save(evaluationDTO);
       }
 
+      // run maintenance flow to update model if possible
+      ModelMaintenanceFlow maintenanceFlow = new DefaultModelMaintenanceFlow(provider, config, DetectionRegistry.getInstance());
+      config = maintenanceFlow.maintain(Instant.now());
+      this.detectionDAO.update(config);
+
       return Collections.emptyList();
 
     } catch(Exception e) {
@@ -143,5 +150,4 @@ public class DetectionPipelineTaskRunner implements TaskRunner {
       ThirdeyeMetricsUtil.detectionTaskSuccessCounter.inc();
     }
   }
-
 }
