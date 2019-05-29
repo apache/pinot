@@ -32,6 +32,7 @@
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/..</pinot.root>
+    <thrift.executable>/usr/local/bin/thrift</thrift.executable>
   </properties>
   <build>
     <!-- Antlr stuff -->
@@ -356,7 +357,7 @@
       <id>build-thrift</id>
       <activation>
         <file>
-          <exists>/usr/local/bin/thrift</exists>
+          <exists>${thrift.executable}</exists>
         </file>
       </activation>
       <build>
@@ -366,7 +367,7 @@
             <artifactId>maven-thrift-plugin</artifactId>
             <version>0.1.11</version>
             <configuration>
-              <thriftExecutable>/usr/local/bin/thrift</thriftExecutable>
+              <thriftExecutable>${thrift.executable}</thriftExecutable>
               <thriftSourceRoot>${basedir}/src/main/thrift</thriftSourceRoot>
               <generator>java</generator>
             </configuration>
