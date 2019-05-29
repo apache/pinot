@@ -110,7 +110,7 @@ public class EmailScreenshotHelper {
         } while (line != null);
       }
     }
-    boolean isComplete = proc.waitFor(3, TimeUnit.MINUTES);
+    boolean isComplete = proc.waitFor(2, TimeUnit.MINUTES);
     if (!isComplete) {
       proc.destroyForcibly();
       throw new Exception("PhantomJS process timeout");
