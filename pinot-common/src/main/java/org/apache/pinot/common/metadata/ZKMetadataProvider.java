@@ -94,8 +94,8 @@ public class ZKMetadataProvider {
     return StringUtil.join("/", PROPERTYSTORE_SCHEMAS_PREFIX, schemaName);
   }
 
-  public static String constructPropertyStorePathForInstancePartitions(String tableNameWithType) {
-    return StringUtil.join("/", PROPERTYSTORE_INSTANCE_PARTITIONS_PREFIX, tableNameWithType);
+  public static String constructPropertyStorePathForInstancePartitions(String instancePartitionsName) {
+    return StringUtil.join("/", PROPERTYSTORE_INSTANCE_PARTITIONS_PREFIX, instancePartitionsName);
   }
 
   public static String constructPropertyStorePathForResource(String resourceName) {
