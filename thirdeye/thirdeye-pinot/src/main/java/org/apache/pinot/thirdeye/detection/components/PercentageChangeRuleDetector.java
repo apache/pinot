@@ -121,9 +121,8 @@ public class PercentageChangeRuleDetector implements AnomalyDetector<PercentageC
 
   @Override
   public TimeSeries computePredictedTimeSeries(MetricSlice slice) {
-    InputData data = this.dataFetcher.fetchData(new InputDataSpec().withTimeseriesSlices(this.baseline.scatter(slice)));
-    DataFrame dfBase = this.baseline.gather(slice, data.getTimeseries());
-    return TimeSeries.fromDataFrame(constructPercentageChangeBoundaries(dfBase));
+    DataFrame df = RuleBaselineProvider.buildBaselines(slice, this.baseline, this.dataFetcher);
+    return TimeSeries.fromDataFrame(constructPercentageChangeBoundaries(df));
   }
 
   private DataFrame constructPercentageChangeBoundaries(DataFrame dfBase) {

@@ -19,8 +19,10 @@
 
 package org.apache.pinot.thirdeye.detection.components;
 
+import java.util.ArrayList;
+import java.util.List;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.BaselineParsingUtils;
-import org.apache.pinot.thirdeye.dataframe.Series;
+import org.apache.pinot.thirdeye.dataframe.DataFrame;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
 import org.apache.pinot.thirdeye.detection.InputDataFetcher;
 import org.apache.pinot.thirdeye.detection.annotation.Components;
@@ -44,8 +46,13 @@ public class RuleBaselineProvider implements BaselineProvider<RuleBaselineProvid
 
   @Override
   public TimeSeries computePredictedTimeSeries(MetricSlice slice) {
-    InputData data = this.dataFetcher.fetchData(new InputDataSpec().withTimeseriesSlices(this.baseline.scatter(slice)));
-    return TimeSeries.fromDataFrame(this.baseline.gather(slice, data.getTimeseries()));
+    return TimeSeries.fromDataFrame(buildBaselines(slice, this.baseline, this.dataFetcher));
+  }
+
+  static DataFrame buildBaselines(MetricSlice slice, Baseline baseline, InputDataFetcher dataFetcher) {
+    List<MetricSlice> slices = new ArrayList<>(baseline.scatter(slice));
+    InputData data = dataFetcher.fetchData(new InputDataSpec().withTimeseriesSlices(slices));
+    return baseline.gather(slice, data.getTimeseries());
   }
 
   @Override
