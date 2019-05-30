@@ -129,4 +129,11 @@ public class TableNameBuilder {
   public static boolean isOfflineTableResource(@Nonnull String resourceName) {
     return OFFLINE.tableHasTypeSuffix(resourceName);
   }
+
+  /**
+   * Return whether the given resource name represents a realtime table resource.
+   */
+  public static boolean isRealtimeTableResource(@Nonnull String resourceName) {
+    return REALTIME.tableHasTypeSuffix(resourceName);
+  }
 }

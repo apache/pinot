@@ -18,12 +18,15 @@
  */
 package org.apache.pinot.common.utils;
 
+import com.google.common.collect.Lists;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
@@ -129,14 +132,64 @@ public class ServiceStatus {
   }
 
   /**
+   * Service status callback that checks whether realtime consumption has caught up
+   * TODO: In this initial version, we are simply adding a configurable static wait time
+   * This can be made smarter:
+   * 1) Keep track of average consumption rate for table in server stats
+   * 2) Monitor consumption rate during startup, report GOOD when it stabilizes to average rate
+   * 3) Monitor consumption rate during startup, report GOOD if it is idle
+   */
+  public static class RealtimeConsumptionCatchupServiceStatusCallback implements ServiceStatusCallback {
+
+    String _statusDescription = STATUS_DESCRIPTION_INIT;
+    private Status _serviceStatus = Status.STARTING;
+    private final long _endWaitTime;
+
+    /**
+     * Realtime consumption catchup service which adds a static wait time for consuming segments to catchup
+     */
+    public RealtimeConsumptionCatchupServiceStatusCallback(HelixManager helixManager, String clusterName,
+        String instanceName, long realtimeConsumptionCatchupWaitMs) {
+
+      // A consuming segment will actually be ready to serve queries after (time of creation of partition consumer) + (configured max time to catchup)
+      // We are approximating it to (time of server startup) + (configured max time to catch up)
+      _endWaitTime = System.currentTimeMillis() + realtimeConsumptionCatchupWaitMs;
+      LOGGER.info("Monitoring realtime consumption catchup. Will allow {} ms before marking status GOOD",
+          realtimeConsumptionCatchupWaitMs);
+    }
+
+    @Override
+    public synchronized Status getServiceStatus() {
+      if (_serviceStatus.equals(Status.GOOD)) {
+        return _serviceStatus;
+      }
+      long now = System.currentTimeMillis();
+      if (now < _endWaitTime) {
+        _statusDescription =
+            String.format("Waiting for consuming segments to catchup, timeRemaining=%dms", _endWaitTime - now);
+        return Status.STARTING;
+      }
+      _statusDescription = String.format("Consuming segments status GOOD since %dms", _endWaitTime);
+      return Status.GOOD;
+    }
+
+    @Override
+    public synchronized String getStatusDescription() {
+      return _statusDescription;
+    }
+  }
+
+  /**
    * Service status callback that compares ideal state with another Helix state. Used to share most of the logic between
    * the ideal state/external view comparison and ideal state/current state comparison.
    */
-  private static abstract class IdealStateMatchServiceStatusCallback<T extends HelixProperty> implements ServiceStatusCallback {
-    protected final String _clusterName;
-    protected final String _instanceName;
-    protected final HelixAdmin _helixAdmin;
-    protected final HelixDataAccessor _helixDataAccessor;
+  private static abstract class IdealStateMatchServiceStatusCallback<T extends HelixProperty>
+      implements ServiceStatusCallback {
+
+    final String _clusterName;
+    final String _instanceName;
+    final HelixAdmin _helixAdmin;
+    final HelixDataAccessor _helixDataAccessor;
 
     private final Set<String> _resourcesToMonitor;
     private final int _numTotalResourcesToMonitor;
@@ -146,39 +199,7 @@ public class ServiceStatus {
 
     private String _statusDescription = STATUS_DESCRIPTION_INIT;
 
-    public IdealStateMatchServiceStatusCallback(HelixManager helixManager, String clusterName, String instanceName,
-        double minResourcesStartPercent) {
-      _clusterName = clusterName;
-      _instanceName = instanceName;
-      _helixAdmin = helixManager.getClusterManagmentTool();
-      _helixDataAccessor = helixManager.getHelixDataAccessor();
-
-      _resourcesToMonitor = new HashSet<>();
-      for (String resourceName : _helixAdmin.getResourcesInCluster(_clusterName)) {
-        // Only monitor table resources and broker resource
-        if (!TableNameBuilder.isTableResource(resourceName) && !resourceName
-            .equals(CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)) {
-          continue;
-        }
-        // Only monitor enabled resources
-        IdealState idealState = getResourceIdealState(resourceName);
-        if (idealState.isEnabled()) {
-          for (String partitionName : idealState.getPartitionSet()) {
-            if (idealState.getInstanceSet(partitionName).contains(_instanceName)) {
-              _resourcesToMonitor.add(resourceName);
-              break;
-            }
-          }
-        }
-      }
-      _numTotalResourcesToMonitor = _resourcesToMonitor.size();
-      _minResourcesStartCount = (int) Math.ceil(minResourcesStartPercent * _numTotalResourcesToMonitor / 100);
-
-      LOGGER.info("Monitoring {} resources: {} for start up of instance {}", _numTotalResourcesToMonitor,
-          getResourceListAsString(), _instanceName);
-    }
-
-    public IdealStateMatchServiceStatusCallback(HelixManager helixManager, String clusterName, String instanceName,
+    IdealStateMatchServiceStatusCallback(HelixManager helixManager, String clusterName, String instanceName,
         List<String> resourcesToMonitor, double minResourcesStartPercent) {
       _clusterName = clusterName;
       _instanceName = instanceName;
@@ -361,11 +382,6 @@ public class ServiceStatus {
     private static final String MATCH_NAME = "CurrentStateMatch";
 
     public IdealStateAndCurrentStateMatchServiceStatusCallback(HelixManager helixManager, String clusterName,
-        String instanceName, double minResourcesStartPercent) {
-      super(helixManager, clusterName, instanceName, minResourcesStartPercent);
-    }
-
-    public IdealStateAndCurrentStateMatchServiceStatusCallback(HelixManager helixManager, String clusterName,
         String instanceName, List<String> resourcesToMonitor, double minResourcesStartPercent) {
       super(helixManager, clusterName, instanceName, resourcesToMonitor, minResourcesStartPercent);
     }
@@ -396,11 +412,6 @@ public class ServiceStatus {
    */
   public static class IdealStateAndExternalViewMatchServiceStatusCallback extends IdealStateMatchServiceStatusCallback<ExternalView> {
     private static final String MATCH_NAME = "ExternalViewMatch";
-
-    public IdealStateAndExternalViewMatchServiceStatusCallback(HelixManager helixManager, String clusterName,
-        String instanceName, double minResourcesStartPercent) {
-      super(helixManager, clusterName, instanceName, minResourcesStartPercent);
-    }
 
     public IdealStateAndExternalViewMatchServiceStatusCallback(HelixManager helixManager, String clusterName,
         String instanceName, List<String> resourcesToMonitor, double minResourcesStartPercent) {

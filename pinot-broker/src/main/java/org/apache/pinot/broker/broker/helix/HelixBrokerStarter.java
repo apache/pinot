@@ -35,6 +35,7 @@ import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.InstanceType;
 import org.apache.helix.SystemPropertyKeys;
 import org.apache.helix.ZNRecord;
+import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.Message;
 import org.apache.helix.participant.StateMachineEngine;
@@ -237,16 +238,35 @@ public class HelixBrokerStarter {
         .addPreConnectCallback(() -> brokerMetrics.addMeteredGlobalValue(BrokerMeter.HELIX_ZOOKEEPER_RECONNECTS, 1L));
 
     // Register the service status handler
-    LOGGER.info("Registering service status handler");
-    double minResourcePercentForStartup = _brokerConf.getDouble(Broker.CONFIG_OF_BROKER_MIN_RESOURCE_PERCENT_FOR_START,
-        Broker.DEFAULT_BROKER_MIN_RESOURCE_PERCENT_FOR_START);
-    ServiceStatus.setServiceStatusCallback(new ServiceStatus.MultipleCallbackServiceStatusCallback(ImmutableList
-        .of(new ServiceStatus.IdealStateAndCurrentStateMatchServiceStatusCallback(_participantHelixManager,
-                _clusterName, _brokerId, minResourcePercentForStartup),
-            new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(_participantHelixManager,
-                _clusterName, _brokerId, minResourcePercentForStartup))));
+    registerServiceStatusHandler();
 
     LOGGER.info("Finish starting Pinot broker");
+  }
+
+  /**
+   * Fetches the resources to monitor and registers the {@link org.apache.pinot.common.utils.ServiceStatus.ServiceStatusCallback}s
+   */
+  private void registerServiceStatusHandler() {
+    List<String> resourcesToMonitor = new ArrayList<>(1);
+    IdealState brokerResourceIdealState = _helixAdmin.getResourceIdealState(_clusterName, Helix.BROKER_RESOURCE_INSTANCE);
+    if (brokerResourceIdealState != null && brokerResourceIdealState.isEnabled()) {
+      for (String partitionName : brokerResourceIdealState.getPartitionSet()) {
+        if (brokerResourceIdealState.getInstanceSet(partitionName).contains(_brokerId)) {
+          resourcesToMonitor.add(Helix.BROKER_RESOURCE_INSTANCE);
+          break;
+        }
+      }
+    }
+
+    double minResourcePercentForStartup = _brokerConf.getDouble(Broker.CONFIG_OF_BROKER_MIN_RESOURCE_PERCENT_FOR_START,
+        Broker.DEFAULT_BROKER_MIN_RESOURCE_PERCENT_FOR_START);
+
+    LOGGER.info("Registering service status handler");
+    ServiceStatus.setServiceStatusCallback(new ServiceStatus.MultipleCallbackServiceStatusCallback(ImmutableList.of(
+        new ServiceStatus.IdealStateAndCurrentStateMatchServiceStatusCallback(_participantHelixManager, _clusterName,
+            _brokerId, resourcesToMonitor, minResourcePercentForStartup),
+        new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(_participantHelixManager, _clusterName,
+            _brokerId, resourcesToMonitor, minResourcePercentForStartup))));
   }
 
   private void addInstanceTagIfNeeded() {
