@@ -32,6 +32,7 @@ import org.apache.pinot.thirdeye.detection.spec.AbstractSpec;
 import org.apache.pinot.thirdeye.detection.spec.MapeAveragePercentageChangeModelEvaluatorSpec;
 import org.apache.pinot.thirdeye.detection.spi.components.ModelEvaluator;
 import org.apache.pinot.thirdeye.detection.spi.model.ModelStatus;
+import org.apache.pinot.thirdeye.detection.yaml.DetectionConfigTuner;
 import org.joda.time.Instant;
 
 
@@ -40,6 +41,8 @@ import org.joda.time.Instant;
  * the detection config and automatically re-tunes the model.
  */
 public class DefaultModelMaintenanceFlow implements ModelMaintenanceFlow {
+  private static int DEFAULT_TUNING_WINDOW_DAYS = 28;
+
   private final DataProvider provider;
   private final DetectionRegistry detectionRegistry;
 
@@ -54,7 +57,9 @@ public class DefaultModelMaintenanceFlow implements ModelMaintenanceFlow {
       Collection<? extends ModelEvaluator<? extends AbstractSpec>> modelEvaluators = getModelEvaluators(config);
       for (ModelEvaluator<? extends AbstractSpec> modelEvaluator : modelEvaluators) {
         if (modelEvaluator.evaluateModel(timestamp).getStatus().equals(ModelStatus.BAD)) {
-          // TODO: tune model
+          DetectionConfigTuner detectionConfigTuner = new DetectionConfigTuner(config, provider);
+          config = detectionConfigTuner.tune(timestamp.toDateTime().minusDays(DEFAULT_TUNING_WINDOW_DAYS).getMillis(),
+              timestamp.getMillis());
           config.setLastTuningTimestamp(timestamp.getMillis());
           break;
         }
