@@ -25,7 +25,7 @@ import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 
 public class AutoOnboardConfiguration {
 
-  private TimeGranularity runFrequency = new TimeGranularity(15, TimeUnit.MINUTES);
+  private TimeGranularity runFrequency = new TimeGranularity(6, TimeUnit.HOURS);
 
   public TimeGranularity getRunFrequency() {
     return runFrequency;
