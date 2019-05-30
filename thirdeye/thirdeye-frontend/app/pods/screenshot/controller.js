@@ -72,10 +72,10 @@ export default Controller.extend({
         };
       }
 
-      if (current && !_.isEmpty(current.value)) {
+      if (current && !_.isEmpty(current.current)) {
         series['current'] = {
           timestamps: current.timestamp,
-          values: current.value,
+          values: current.current,
           type: 'line',
           color: 'blue'
         };
@@ -95,8 +95,19 @@ export default Controller.extend({
 
   axis: computed(
     'anomalyData',
+    'series',
     function () {
-      const anomalyData = get(this, 'anomalyData');
+      const {
+        anomalyData,
+        series
+      } = this.getProperties('anomalyData', 'series');
+
+      let start = anomalyData.startTime;
+      let end = anomalyData.endTime;
+      if (series.current && series.current.timestamps && Array.isArray(series.current.timestamps)) {
+        start = series.current.timestamps[0];
+        end = series.current.timestamps[series.current.timestamps.length - 1];
+      }
 
       return {
         y: {
@@ -113,8 +124,8 @@ export default Controller.extend({
         x: {
           type: 'timeseries',
           show: true,
-          min: anomalyData.startTime,
-          max: anomalyData.endTime,
+          min: start,
+          max: end,
           tick: {
             fit: false,
             format: (d) => {

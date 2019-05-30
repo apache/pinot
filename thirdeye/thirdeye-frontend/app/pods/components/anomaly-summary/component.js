@@ -81,8 +81,19 @@ export default Component.extend({
 
   axis: computed(
     'anomalyData',
+    'series',
     function () {
-      const anomalyData = get(this, 'anomalyData');
+      const {
+        anomalyData,
+        series
+      } = this.getProperties('anomalyData', 'series');
+
+      let start = anomalyData.startTime;
+      let end = anomalyData.endTime;
+      if (series.current && series.current.timestamps && Array.isArray(series.current.timestamps)) {
+        start = series.current.timestamps[0];
+        end = series.current.timestamps[series.current.timestamps.length - 1];
+      }
 
       return {
         y: {
@@ -99,8 +110,8 @@ export default Component.extend({
         x: {
           type: 'timeseries',
           show: true,
-          min: anomalyData.startTime,
-          max: anomalyData.endTime,
+          min: start,
+          max: end,
           tick: {
             fit: false,
             format: (d) => {
@@ -137,10 +148,10 @@ export default Component.extend({
         };
       }
 
-      if (current && !_.isEmpty(current.value)) {
+      if (current && !_.isEmpty(current.current)) {
         series['current'] = {
           timestamps: current.timestamp,
-          values: current.value,
+          values: current.current,
           type: 'line',
           color: 'blue'
         };
@@ -206,17 +217,14 @@ export default Component.extend({
       .then(checkStatus)
       .then(res => {
         set(this, 'anomalyData', res);
-        const timeZone = 'America/Los_Angeles';
-        const currentUrl = `/rootcause/metric/timeseries?urn=${res.metricUrn}&start=${res.startTime}&end=${res.endTime}&offset=current&timezone=${timeZone}`;
-        const predictedUrl = `/detection/predicted-baseline/${anomalyId}?start=${res.startTime}&end=${res.endTime}`;
+        const predictedUrl = `/detection/predicted-baseline/${anomalyId}?start=${res.startTime}&end=${res.endTime}&padding=true`;
         const timeseriesHash = {
-          current: fetch(currentUrl).then(res => checkStatus(res, 'get', true)),
           predicted: fetch(predictedUrl).then(res => checkStatus(res, 'get', true))
         };
         return RSVP.hash(timeseriesHash);
       })
       .then((res) => {
-        set(this, 'current', res.current);
+        set(this, 'current', res.predicted);
         set(this, 'predicted', res.predicted);
         set(this, 'isLoading', false);
       })

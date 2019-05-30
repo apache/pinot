@@ -12,11 +12,8 @@ export default Route.extend(UnauthenticatedRouteMixin, {
     return fetch(anomalyUrl)
       .then(checkStatus)
       .then(res => {
-        const timeZone = 'America/Los_Angeles';
-        const currentUrl = `/rootcause/metric/timeseries?urn=${res.metricUrn}&start=${res.startTime}&end=${res.endTime}&offset=current&timezone=${timeZone}`;
-        const predictedUrl = `/detection/predicted-baseline/${id}?start=${res.startTime}&end=${res.endTime}`;
+        const predictedUrl = `/detection/predicted-baseline/${id}?start=${res.startTime}&end=${res.endTime}&padding=true`;
         const timeseriesHash = {
-          current: fetch(currentUrl).then(res => checkStatus(res, 'get', true)),
           predicted: fetch(predictedUrl).then(res => checkStatus(res, 'get', true)),
           anomalyData: res
         };
@@ -31,7 +28,7 @@ export default Route.extend(UnauthenticatedRouteMixin, {
   setupController(controller, model) {
     this._super(...arguments);
     controller.setProperties({
-      current: model.current,
+      current: model.predicted,
       predicted: model.predicted,
       anomalyData: model.anomalyData
     });
