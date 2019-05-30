@@ -248,9 +248,14 @@ public class HelixBrokerStarter {
    */
   private void registerServiceStatusHandler() {
     List<String> resourcesToMonitor = new ArrayList<>(1);
-    IdealState resourceIdealState = _helixAdmin.getResourceIdealState(_clusterName, Helix.BROKER_RESOURCE_INSTANCE);
-    if (resourceIdealState != null && resourceIdealState.isEnabled()) {
-      resourcesToMonitor.add(Helix.BROKER_RESOURCE_INSTANCE);
+    IdealState brokerResourceIdealState = _helixAdmin.getResourceIdealState(_clusterName, Helix.BROKER_RESOURCE_INSTANCE);
+    if (brokerResourceIdealState != null && brokerResourceIdealState.isEnabled()) {
+      for (String partitionName : brokerResourceIdealState.getPartitionSet()) {
+        if (brokerResourceIdealState.getInstanceSet(partitionName).contains(_brokerId)) {
+          resourcesToMonitor.add(Helix.BROKER_RESOURCE_INSTANCE);
+          break;
+        }
+      }
     }
 
     double minResourcePercentForStartup = _brokerConf.getDouble(Broker.CONFIG_OF_BROKER_MIN_RESOURCE_PERCENT_FOR_START,
