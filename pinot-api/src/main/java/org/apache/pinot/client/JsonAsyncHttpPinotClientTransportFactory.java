@@ -25,6 +25,11 @@ import java.util.Map;
  */
 class JsonAsyncHttpPinotClientTransportFactory implements PinotClientTransportFactory {
   @Override
+  public PinotClientTransport buildTransport() {
+    return new JsonAsyncHttpPinotClientTransport();
+  }
+
+  @Override
   public PinotClientTransport buildTransport(Map<String, String> headers) {
     return new JsonAsyncHttpPinotClientTransport(headers);
   }

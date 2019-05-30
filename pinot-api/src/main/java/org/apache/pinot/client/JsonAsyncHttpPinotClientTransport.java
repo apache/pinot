@@ -43,6 +43,8 @@ class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
   AsyncHttpClient _httpClient = new AsyncHttpClient();
   Map<String, String> _headers;
 
+  public JsonAsyncHttpPinotClientTransport() {}
+
   public JsonAsyncHttpPinotClientTransport(Map<String, String> headers) {
     _headers = headers;
   }

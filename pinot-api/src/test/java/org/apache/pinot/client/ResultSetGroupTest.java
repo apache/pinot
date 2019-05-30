@@ -152,7 +152,7 @@ public class ResultSetGroupTest {
 
   class DummyJsonTransportFactory implements PinotClientTransportFactory {
     @Override
-    public PinotClientTransport buildTransport(Map<String, String> headers) {
+    public PinotClientTransport buildTransport() {
       return _dummyJsonTransport;
     }
   }

@@ -70,7 +70,7 @@ public class PreparedStatementTest {
 
   class DummyPinotClientTransportFactory implements PinotClientTransportFactory {
     @Override
-    public PinotClientTransport buildTransport(Map<String, String> headers) {
+    public PinotClientTransport buildTransport() {
       return _dummyPinotClientTransport;
     }
   }

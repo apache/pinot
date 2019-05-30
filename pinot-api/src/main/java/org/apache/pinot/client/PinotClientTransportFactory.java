@@ -18,11 +18,28 @@
  */
 package org.apache.pinot.client;
 
+import org.apache.yetus.audience.InterfaceAudience;
+import org.apache.yetus.audience.InterfaceStability;
+
 import java.util.Map;
 
 /**
  * Factory for client transports.
  */
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 interface PinotClientTransportFactory {
-  PinotClientTransport buildTransport(Map<String, String> headers);
+  /**
+   * This method is deprecating. Method with headers can be used in place of this by passing null headers.
+   */
+  @Deprecated
+  PinotClientTransport buildTransport();
+
+  /**
+   * Fetch pinot client transport
+   * @param headers custom headers to be passed in the pinot client call.
+   */
+  default PinotClientTransport buildTransport(Map<String, String> headers) {
+    return buildTransport();
+  }
 }
