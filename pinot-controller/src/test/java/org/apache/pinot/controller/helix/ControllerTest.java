@@ -57,7 +57,7 @@ import org.testng.Assert;
 public abstract class ControllerTest {
   public static final String LOCAL_HOST = "localhost";
 
-  private static final int DEFAULT_CONTROLLER_PORT = 8998;
+  private static final int DEFAULT_CONTROLLER_PORT = 18998;
   private static final String DEFAULT_DATA_DIR =
       new File(FileUtils.getTempDirectoryPath(), "test-controller-" + System.currentTimeMillis()).getAbsolutePath();
 
