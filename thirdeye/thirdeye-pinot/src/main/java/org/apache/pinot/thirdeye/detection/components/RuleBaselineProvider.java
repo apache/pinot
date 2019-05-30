@@ -46,17 +46,13 @@ public class RuleBaselineProvider implements BaselineProvider<RuleBaselineProvid
 
   @Override
   public TimeSeries computePredictedTimeSeries(MetricSlice slice) {
-    return TimeSeries.fromDataFrame(buildCurrentAndBaselines(slice, this.baseline, this.dataFetcher));
+    return TimeSeries.fromDataFrame(buildBaselines(slice, this.baseline, this.dataFetcher));
   }
 
-  static DataFrame buildCurrentAndBaselines(MetricSlice slice, Baseline baseline, InputDataFetcher dataFetcher) {
-    List<MetricSlice> slices = new ArrayList<>();
-    slices.add(slice);
-    slices.addAll(baseline.scatter(slice));
+  static DataFrame buildBaselines(MetricSlice slice, Baseline baseline, InputDataFetcher dataFetcher) {
+    List<MetricSlice> slices = new ArrayList<>(baseline.scatter(slice));
     InputData data = dataFetcher.fetchData(new InputDataSpec().withTimeseriesSlices(slices));
-    DataFrame dfBase = baseline.gather(slice, data.getTimeseries());
-    DataFrame dfCurr = data.getTimeseries().get(slice).renameSeries(COL_VALUE, COL_CURRENT);
-    return new DataFrame(dfCurr).addSeries(dfBase);
+    return baseline.gather(slice, data.getTimeseries());
   }
 
   @Override

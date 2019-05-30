@@ -117,7 +117,7 @@ public class AbsoluteChangeRuleDetector implements AnomalyDetector<AbsoluteChang
 
   @Override
   public TimeSeries computePredictedTimeSeries(MetricSlice slice) {
-    DataFrame df = RuleBaselineProvider.buildCurrentAndBaselines(slice, this.baseline, this.dataFetcher);
+    DataFrame df = RuleBaselineProvider.buildBaselines(slice, this.baseline, this.dataFetcher);
     return TimeSeries.fromDataFrame(constructAbsoluteChangeBoundaries(df));
   }
 
