@@ -35,6 +35,10 @@ import org.apache.pinot.thirdeye.detection.spi.model.ModelStatus;
 import org.joda.time.Instant;
 
 
+/**
+ * The default model maintenance flow. If the model is tunable, this flow will run the configured model evaluators for
+ * the detection config and automatically re-tunes the model.
+ */
 public class DefaultModelMaintenanceFlow implements ModelMaintenanceFlow {
   private final DataProvider provider;
   private final DetectionRegistry detectionRegistry;
@@ -44,7 +48,7 @@ public class DefaultModelMaintenanceFlow implements ModelMaintenanceFlow {
     this.detectionRegistry = detectionRegistry;
   }
 
-  public DetectionConfigDTO maintain(DetectionConfigDTO config, Instant timestamp){
+  public DetectionConfigDTO maintain(DetectionConfigDTO config, Instant timestamp) {
     // if the pipeline is tunable, get the model evaluators
     if (isTunable(config)) {
       Collection<? extends ModelEvaluator<? extends AbstractSpec>> modelEvaluators = getModelEvaluators(config);
@@ -76,14 +80,14 @@ public class DefaultModelMaintenanceFlow implements ModelMaintenanceFlow {
     return modelEvaluators;
   }
 
-  private Collection<ModelEvaluator<MapeAveragePercentageChangeModelEvaluatorSpec>> instantiateDefaultEvaluators(DetectionConfigDTO config) {
+  private Collection<ModelEvaluator<MapeAveragePercentageChangeModelEvaluatorSpec>> instantiateDefaultEvaluators(
+      DetectionConfigDTO config) {
     ModelEvaluator<MapeAveragePercentageChangeModelEvaluatorSpec> evaluator =
         new MapeAveragePercentageChangeModelEvaluator();
     evaluator.init(new MapeAveragePercentageChangeModelEvaluatorSpec(),
         new DefaultInputDataFetcher(this.provider, config.getId()));
     return Collections.singleton(evaluator);
   }
-
 
   /**
    * If the detection config contains a tunable component
