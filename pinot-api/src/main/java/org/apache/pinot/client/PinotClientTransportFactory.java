@@ -26,7 +26,7 @@ import java.util.Map;
 /**
  * Factory for client transports.
  */
-@InterfaceAudience.Public
+@InterfaceAudience.Private
 @InterfaceStability.Stable
 interface PinotClientTransportFactory {
   /**
