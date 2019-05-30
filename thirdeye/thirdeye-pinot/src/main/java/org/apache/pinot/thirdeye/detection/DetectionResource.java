@@ -551,11 +551,15 @@ public class DetectionResource {
       end = new DateTime(end, dataTimeZone).plus(offsets.getPostOffsetPeriod()).getMillis();
     }
     MetricEntity me = MetricEntity.fromURN(anomaly.getMetricUrn());
-    TimeSeries baselineTimeseries = DetectionUtils.getBaselineTimeseries(anomaly, me.getFilters(), me.getId(), configDAO.findById(anomaly.getDetectionConfigId()), start, end, loader, provider);
-    // add current time series
-    MetricSlice currentSlice = MetricSlice.from(me.getId(), start, end, me.getFilters());
-    DataFrame dfCurrent = this.provider.fetchTimeseries(Collections.singleton(currentSlice)).get(currentSlice).renameSeries(COL_VALUE, COL_CURRENT);
-    return Response.ok(dfCurrent.joinOuter(baselineTimeseries.getDataFrame())).build();
+    DataFrame baselineTimeseries = DetectionUtils.getBaselineTimeseries(anomaly, me.getFilters(), me.getId(),
+        configDAO.findById(anomaly.getDetectionConfigId()), start, end, loader, provider).getDataFrame();
+    if (!baselineTimeseries.contains(COL_CURRENT)) {
+      // add current time series if not exists
+      MetricSlice currentSlice = MetricSlice.from(me.getId(), start, end, me.getFilters());
+      DataFrame dfCurrent = this.provider.fetchTimeseries(Collections.singleton(currentSlice)).get(currentSlice).renameSeries(COL_VALUE, COL_CURRENT);
+      baselineTimeseries = dfCurrent.joinOuter(baselineTimeseries);
+    }
+    return Response.ok(baselineTimeseries).build();
   }
 
 }
