@@ -43,7 +43,6 @@ import org.apache.pinot.thirdeye.detection.spi.model.InputDataSpec;
 import org.apache.pinot.thirdeye.detection.spi.model.TimeSeries;
 import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
 import org.joda.time.Interval;
-import org.joda.time.Period;
 
 import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
 
@@ -102,6 +101,7 @@ public class ThresholdRuleDetector implements AnomalyDetector<ThresholdRuleDetec
     InputData data =
         this.dataFetcher.fetchData(new InputDataSpec().withTimeseriesSlices(Collections.singletonList(slice)));
     DataFrame df = data.getTimeseries().get(slice);
+    df = df.joinRight(df.copy().renameSeries(COL_VALUE, COL_CURRENT), COL_TIME);
     return TimeSeries.fromDataFrame(constructThresholdBoundaries(df));
   }
 

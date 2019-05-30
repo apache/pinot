@@ -60,6 +60,7 @@ import org.apache.pinot.thirdeye.datalayer.bao.EventManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
 import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
@@ -75,7 +76,10 @@ import org.apache.pinot.thirdeye.detection.finetune.GridSearchTuningAlgorithm;
 import org.apache.pinot.thirdeye.detection.finetune.TuningAlgorithm;
 import org.apache.pinot.thirdeye.detection.spi.model.AnomalySlice;
 import org.apache.pinot.thirdeye.detection.spi.model.TimeSeries;
+import org.apache.pinot.thirdeye.detector.function.BaseAnomalyFunction;
+import org.apache.pinot.thirdeye.util.AnomalyOffset;
 import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
 import org.joda.time.Interval;
 import org.quartz.CronExpression;
 import org.slf4j.Logger;
@@ -522,8 +526,9 @@ public class DetectionResource {
   @Path(value = "/predicted-baseline/{anomalyId}")
   public Response getPredictedBaseline(
     @PathParam("anomalyId") @ApiParam("anomalyId") long anomalyId,
-      @QueryParam("start") long start,
-      @QueryParam("end") long end
+      @ApiParam("Start time for the predicted baselines") @QueryParam("start") long start,
+      @ApiParam("End time for the predicted baselines") @QueryParam("end") long end,
+      @ApiParam("Add padding to the window based on metric granularity") @QueryParam("padding") @DefaultValue("false") boolean padding
   ) throws Exception {
     MergedAnomalyResultDTO anomaly = anomalyDAO.findById(anomalyId);
     if (anomaly == null) {
@@ -533,6 +538,17 @@ public class DetectionResource {
     if (metric == null) {
       throw new IllegalArgumentException(String.format("Could not resolve metric '%s' in dataset '%s' for anomaly id %d", anomaly.getMetric(), anomaly.getCollection(), anomaly.getId()));
     }
+    if (padding) {
+      DatasetConfigDTO dataset = this.datasetDAO.findByDataset(anomaly.getCollection());
+      if (dataset == null) {
+        throw new IllegalArgumentException(String.format("Could not resolve dataset '%s' for anomaly id %d", anomaly.getCollection(), anomalyId));
+      }
+      AnomalyOffset offsets = BaseAnomalyFunction.getDefaultOffsets(dataset);
+      DateTimeZone dataTimeZone = DateTimeZone.forID(dataset.getTimezone());
+      start = new DateTime(start, dataTimeZone).minus(offsets.getPreOffsetPeriod()).getMillis();
+      end = new DateTime(end, dataTimeZone).plus(offsets.getPostOffsetPeriod()).getMillis();
+    }
+
     TimeSeries ts = DetectionUtils.getBaselineTimeseries(anomaly, Multimaps.forMap(anomaly.getDimensions()), metric.getId(), configDAO.findById(anomaly.getDetectionConfigId()), start, end, loader, provider);
     return Response.ok(ts.getDataFrame()).build();
   }
