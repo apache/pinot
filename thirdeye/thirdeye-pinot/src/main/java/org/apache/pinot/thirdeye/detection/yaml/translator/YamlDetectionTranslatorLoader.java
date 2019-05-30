@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.pinot.thirdeye.detection.yaml;
+package org.apache.pinot.thirdeye.detection.yaml.translator;
 
 import org.apache.pinot.thirdeye.detection.DataProvider;
 import org.apache.pinot.thirdeye.detection.annotation.registry.DetectionRegistry;

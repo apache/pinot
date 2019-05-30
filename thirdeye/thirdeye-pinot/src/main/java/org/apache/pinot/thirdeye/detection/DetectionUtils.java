@@ -43,7 +43,6 @@ import org.apache.pinot.thirdeye.detection.spi.components.BaselineProvider;
 import org.apache.pinot.thirdeye.detection.spi.model.TimeSeries;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
-import org.joda.time.Duration;
 import org.joda.time.Period;
 import org.joda.time.PeriodType;
 
@@ -67,11 +66,20 @@ public class DetectionUtils {
     return key.startsWith("$");
   }
 
-  // get the component name from the reference key
-  // example "$myRule:ALGORITHM:0" -> "myRule:ALGORITHM:0"
-  public static String getComponentName(String key) {
-    if (isReferenceName(key)) return key.substring(1);
+  // Extracts the component key from the reference key
+  // e.g., "$myRule:ALGORITHM" -> "myRule:ALGORITHM"
+  public static String getComponentKey(String componentRefKey) {
+    if (isReferenceName(componentRefKey)) return componentRefKey.substring(1);
     else throw new IllegalArgumentException("not a component reference key. should starts with $");
+  }
+
+  // Extracts the component type from the component key
+  // e.g., "myRule:ALGORITHM" -> "ALGORITHM"
+  public static String getComponentType(String componentKey) {
+    if (componentKey != null && componentKey.contains(":")) {
+      return componentKey.substring(componentKey.lastIndexOf(":") + 1);
+    }
+    throw new IllegalArgumentException("componentKey is invalid; must be of type componentName:type");
   }
 
   // get the spec class name for a component class

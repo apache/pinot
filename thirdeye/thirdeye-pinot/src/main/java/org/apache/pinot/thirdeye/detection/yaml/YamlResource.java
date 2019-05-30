@@ -79,13 +79,16 @@ import org.apache.pinot.thirdeye.detection.spi.components.BaselineProvider;
 import org.apache.pinot.thirdeye.detection.spi.model.TimeSeries;
 import org.apache.pinot.thirdeye.detection.validators.DetectionConfigValidator;
 import org.apache.pinot.thirdeye.detection.validators.SubscriptionConfigValidator;
+import org.apache.pinot.thirdeye.detection.yaml.translator.YamlDetectionAlertConfigTranslator;
+import org.apache.pinot.thirdeye.detection.yaml.translator.YamlDetectionConfigTranslator;
+import org.apache.pinot.thirdeye.detection.yaml.translator.YamlDetectionTranslatorLoader;
 import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
 
 import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
-import static org.apache.pinot.thirdeye.detection.yaml.YamlDetectionAlertConfigTranslator.*;
+import static org.apache.pinot.thirdeye.detection.yaml.translator.YamlDetectionAlertConfigTranslator.*;
 
 
 @Path("/yaml")
@@ -102,7 +105,6 @@ public class YamlResource {
   private final DetectionConfigManager detectionConfigDAO;
   private final DetectionAlertConfigManager detectionAlertConfigDAO;
   private final YamlDetectionTranslatorLoader translatorLoader;
-  private final YamlDetectionAlertConfigTranslator alertConfigTranslator;
   private final DetectionConfigValidator detectionValidator;
   private final SubscriptionConfigValidator subscriptionValidator;
   private final DataProvider provider;
@@ -119,7 +121,6 @@ public class YamlResource {
     this.detectionConfigDAO = DAORegistry.getInstance().getDetectionConfigManager();
     this.detectionAlertConfigDAO = DAORegistry.getInstance().getDetectionAlertConfigManager();
     this.translatorLoader = new YamlDetectionTranslatorLoader();
-    this.alertConfigTranslator = new YamlDetectionAlertConfigTranslator(this.detectionConfigDAO);
     this.metricDAO = DAORegistry.getInstance().getMetricConfigDAO();
     this.datasetDAO = DAORegistry.getInstance().getDatasetConfigDAO();
     this.eventDAO = DAORegistry.getInstance().getEventDAO();
@@ -147,7 +148,7 @@ public class YamlResource {
    * Build the detection config from a yaml.
    */
   private DetectionConfigDTO buildDetectionConfigFromYaml(long tuningStartTime, long tuningEndTime, Map<String, Object> yamlConfig,
-      DetectionConfigDTO existingDetectionConfig) {
+      DetectionConfigDTO existingConfig) {
 
     // Configure the tuning window
     if (tuningStartTime == 0L && tuningEndTime == 0L) {
@@ -156,15 +157,26 @@ public class YamlResource {
       tuningStartTime = tuningEndTime - TimeUnit.DAYS.toMillis(28);
     }
 
-    YamlDetectionConfigTranslator translator;
+    YamlDetectionConfigTranslator detectionConfigTranslator;
     try {
-      translator = this.translatorLoader.from(yamlConfig, this.provider);
+      detectionConfigTranslator = this.translatorLoader.from(yamlConfig, this.provider);
     } catch (Exception e) {
       throw new IllegalArgumentException("Unable to instantiate the detection pipeline.", e);
     }
-    return translator.withTuningWindow(tuningStartTime, tuningEndTime)
-        .withExistingDetectionConfig(existingDetectionConfig)
-        .generateDetectionConfig();
+
+    // Translate the raw yaml config to detection config object
+    DetectionConfigDTO config = (DetectionConfigDTO) detectionConfigTranslator.translate();
+
+    // Tune the detection config - Passes the raw yaml params & injects tuned params
+    DetectionConfigTuner detectionTuner = new DetectionConfigTuner(config, provider);
+    config = detectionTuner.tune(tuningStartTime, tuningEndTime);
+
+    if (existingConfig != null) {
+      config.setId(existingConfig.getId());
+      config.setLastTimestamp(existingConfig.getLastTimestamp());
+      config.setCreatedBy(existingConfig.getCreatedBy());
+    }
+    return config;
   }
 
   /*
@@ -408,7 +420,8 @@ public class YamlResource {
     // Translate config from YAML to detection alert config (JSON)
     TreeMap<String, Object> newAlertConfigMap = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
     newAlertConfigMap.putAll(ConfigUtils.getMap(this.yaml.load(yamlAlertConfig)));
-    DetectionAlertConfigDTO alertConfig = this.alertConfigTranslator.translate(newAlertConfigMap);
+    DetectionAlertConfigDTO alertConfig = (DetectionAlertConfigDTO)
+        new YamlDetectionAlertConfigTranslator(detectionConfigDAO, newAlertConfigMap).translate();
     alertConfig.setYaml(yamlAlertConfig);
 
     // Check for duplicates
@@ -488,7 +501,8 @@ public class YamlResource {
     // Translate payload to detection alert config
     TreeMap<String, Object> newAlertConfigMap = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
     newAlertConfigMap.putAll(ConfigUtils.getMap(this.yaml.load(yamlAlertConfig)));
-    DetectionAlertConfigDTO newAlertConfig = this.alertConfigTranslator.translate(newAlertConfigMap);
+    DetectionAlertConfigDTO newAlertConfig = (DetectionAlertConfigDTO)
+        new YamlDetectionAlertConfigTranslator(detectionConfigDAO, newAlertConfigMap).translate();
 
     // Update existing alert config with the newly supplied config.
     DetectionAlertConfigDTO updatedAlertConfig = updateDetectionAlertConfig(oldAlertConfig, newAlertConfig);

@@ -119,7 +119,7 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
     this.metric = provider.fetchMetrics(Collections.singleton(this.metricEntity.getId())).get(this.metricEntity.getId());
 
     Preconditions.checkArgument(this.config.getProperties().containsKey(PROP_DETECTOR));
-    this.detectorName = DetectionUtils.getComponentName(MapUtils.getString(config.getProperties(), PROP_DETECTOR));
+    this.detectorName = DetectionUtils.getComponentKey(MapUtils.getString(config.getProperties(), PROP_DETECTOR));
     Preconditions.checkArgument(this.config.getComponents().containsKey(this.detectorName));
     this.anomalyDetector = (AnomalyDetector) this.config.getComponents().get(this.detectorName);
 

@@ -17,12 +17,10 @@
  * under the License.
  */
 
-package org.apache.pinot.thirdeye.detection.yaml;
+package org.apache.pinot.thirdeye.detection.yaml.translator;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Multimap;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -34,29 +32,24 @@ import java.util.concurrent.TimeUnit;
 import org.apache.commons.collections.MapUtils;
 import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
 import org.apache.pinot.thirdeye.detection.ConfigUtils;
 import org.apache.pinot.thirdeye.detection.DataProvider;
-import org.apache.pinot.thirdeye.detection.DefaultInputDataFetcher;
 import org.apache.pinot.thirdeye.detection.DetectionUtils;
-import org.apache.pinot.thirdeye.detection.InputDataFetcher;
 import org.apache.pinot.thirdeye.detection.algorithm.DimensionWrapper;
 import org.apache.pinot.thirdeye.detection.annotation.Yaml;
 import org.apache.pinot.thirdeye.detection.annotation.registry.DetectionRegistry;
-import org.apache.pinot.thirdeye.detection.spec.AbstractSpec;
-import org.apache.pinot.thirdeye.detection.spi.components.Tunable;
+import org.apache.pinot.thirdeye.detection.validators.DetectionConfigValidator;
 import org.apache.pinot.thirdeye.detection.wrapper.AnomalyDetectorWrapper;
 import org.apache.pinot.thirdeye.detection.wrapper.AnomalyFilterWrapper;
 import org.apache.pinot.thirdeye.detection.wrapper.BaselineFillingMergeWrapper;
 import org.apache.pinot.thirdeye.detection.wrapper.ChildKeepingMergeWrapper;
 import org.apache.pinot.thirdeye.detection.wrapper.GrouperWrapper;
 import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
-import org.joda.time.DateTime;
-import org.joda.time.DateTimeZone;
-import org.joda.time.Interval;
 
 import static org.apache.pinot.thirdeye.detection.ConfigUtils.*;
-import static org.apache.pinot.thirdeye.detection.DetectionUtils.*;
+import static org.apache.pinot.thirdeye.detection.yaml.DetectionConfigTuner.*;
 
 
 /**
@@ -160,10 +153,8 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
   private static final String PROP_MERGER = "merger";
   private static final String PROP_TIMEZONE = "timezone";
   private static final String PROP_NAME = "name";
-  private static final String DEFAULT_TIMEZONE = "America/Los_Angeles";
   private static final String DEFAULT_BASELINE_PROVIDER_YAML_TYPE = "RULE_BASELINE";
   private static final String PROP_BUCKET_PERIOD = "bucketPeriod";
-  private static final String PROP_MAX_DURATION = "maxDuration";
   private static final String PROP_CACHE_PERIOD_LOOKBACK = "cachingPeriodLookback";
 
   private static final DetectionRegistry DETECTION_REGISTRY = DetectionRegistry.getInstance();
@@ -174,8 +165,6 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
     DetectionRegistry.registerComponent("com.linkedin.thirdeye.detection.components.AdLibAnomalyDetector",
         "MIGRATED_ALGORITHM");
   }
-  private static final Set<String> TUNING_OFF_COMPONENTS =
-      ImmutableSet.of("MIGRATED_ALGORITHM_FILTER", "MIGRATED_ALGORITHM", "MIGRATED_ALGORITHM_BASELINE");
   private static final Set<String> MOVING_WINDOW_DETECTOR_TYPES = ImmutableSet.of("ALGORITHM", "MIGRATED_ALGORITHM");
 
   private final Map<String, Object> components = new HashMap<>();
@@ -188,7 +177,11 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
   protected final org.yaml.snakeyaml.Yaml yaml;
 
   public CompositePipelineConfigTranslator(Map<String, Object> yamlConfig, DataProvider provider) {
-    super(yamlConfig, provider);
+    this(yamlConfig, provider, new DetectionConfigValidator(provider));
+  }
+
+  public CompositePipelineConfigTranslator(Map<String, Object> yamlConfig, DataProvider provider, DetectionConfigValidator validator) {
+    super(yamlConfig, provider, validator);
     this.yaml = new org.yaml.snakeyaml.Yaml();
     this.metricConfig = this.dataProvider.fetchMetric(MapUtils.getString(yamlConfig, PROP_METRIC),
         MapUtils.getString(yamlConfig, PROP_DATASET));
@@ -199,11 +192,11 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
     Preconditions.checkNotNull(this.datasetConfig, "dataset not found");
     this.mergerProperties = MapUtils.getMap(yamlConfig, PROP_MERGER, new HashMap<String, Object>());
     this.filterMaps = MapUtils.getMap(yamlConfig, PROP_FILTERS);
-    this.metricUrn = buildMetricUrn(filterMaps, this.metricConfig.getId());
+    this.metricUrn = MetricEntity.fromMetric(filterMaps, this.metricConfig.getId()).getUrn();
   }
 
   @Override
-  YamlTranslationResult translateYaml() {
+  DetectionConfigDTO translateConfig() throws IllegalArgumentException {
     String detectionCronInYaml = MapUtils.getString(yamlConfig, PROP_CRON);
     String cron = (detectionCronInYaml == null) ? buildCron() : detectionCronInYaml;
 
@@ -235,7 +228,7 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
       properties = buildGroupWrapperProperties(grouperYamls.get(0), properties);
     }
 
-    return new YamlTranslationResult().withProperties(properties).withComponents(this.components).withCron(cron);
+    return super.generateDetectionConfig(properties, this.components, cron);
   }
 
   private Map<String, Object> buildDimensionWrapperProperties() {
@@ -246,7 +239,7 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
       dimensionWrapperProperties.putAll(dimensionExploreYaml);
       if (dimensionExploreYaml.containsKey(PROP_DIMENSION_FILTER_METRIC)){
         MetricConfigDTO dimensionExploreMetric = this.dataProvider.fetchMetric(MapUtils.getString(dimensionExploreYaml, PROP_DIMENSION_FILTER_METRIC), this.datasetConfig.getDataset());
-        dimensionWrapperProperties.put(PROP_METRIC_URN, buildMetricUrn(filterMaps, dimensionExploreMetric.getId()));
+        dimensionWrapperProperties.put(PROP_METRIC_URN, MetricEntity.fromMetric(filterMaps, dimensionExploreMetric.getId()).getUrn());
       } else {
         dimensionWrapperProperties.put(PROP_METRIC_URN, this.metricUrn);
       }
@@ -268,24 +261,24 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
     String name = MapUtils.getString(yamlConfig, PROP_NAME);
     Map<String, Object> nestedProperties = new HashMap<>();
     nestedProperties.put(PROP_CLASS_NAME, AnomalyDetectorWrapper.class.getName());
-    String detectorKey = makeComponentKey(detectorType, name);
+    String detectorRefKey = makeComponentRefKey(detectorType, name);
 
     fillInDetectorWrapperProperties(nestedProperties, yamlConfig, detectorType);
 
-    buildComponentSpec(yamlConfig, detectorType, detectorKey);
+    buildComponentSpec(yamlConfig, detectorType, detectorRefKey);
 
     Map<String, Object> properties = new HashMap<>();
     properties.put(PROP_CLASS_NAME, BaselineFillingMergeWrapper.class.getName());
     properties.put(PROP_NESTED, Collections.singletonList(nestedProperties));
-    properties.put(PROP_DETECTOR, detectorKey);
+    properties.put(PROP_DETECTOR, detectorRefKey);
 
     // fill in baseline provider properties
     if (DETECTION_REGISTRY.isBaselineProvider(detectorType)) {
       // if the detector implements the baseline provider interface, use it to generate baseline
-      properties.put(PROP_BASELINE_PROVIDER, detectorKey);
+      properties.put(PROP_BASELINE_PROVIDER, detectorRefKey);
     } else {
       String baselineProviderType = DEFAULT_BASELINE_PROVIDER_YAML_TYPE;
-      String baselineProviderKey = makeComponentKey(baselineProviderType, name);
+      String baselineProviderKey = makeComponentRefKey(baselineProviderType, name);
       buildComponentSpec(yamlConfig, baselineProviderType, baselineProviderKey);
       properties.put(PROP_BASELINE_PROVIDER, baselineProviderKey);
     }
@@ -300,10 +293,10 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
 
     String grouperType = MapUtils.getString(grouperYaml, PROP_TYPE);
     String grouperName = MapUtils.getString(grouperYaml, PROP_NAME);
-    String grouperKey = makeComponentKey(grouperType, grouperName);
-    properties.put(PROP_GROUPER, grouperKey);
+    String grouperRefKey = makeComponentRefKey(grouperType, grouperName);
+    properties.put(PROP_GROUPER, grouperRefKey);
 
-    buildComponentSpec(grouperYaml, grouperType, grouperKey);
+    buildComponentSpec(grouperYaml, grouperType, grouperRefKey);
 
     return properties;
   }
@@ -371,9 +364,9 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
     }
     String name = MapUtils.getString(yamlConfig, PROP_NAME);
     String filterType = MapUtils.getString(yamlConfig, PROP_TYPE);
-    String filterKey = makeComponentKey(filterType, name);
-    wrapperProperties.put(PROP_FILTER, filterKey);
-    buildComponentSpec(yamlConfig, filterType, filterKey);
+    String filterRefKey = makeComponentRefKey(filterType, name);
+    wrapperProperties.put(PROP_FILTER, filterRefKey);
+    buildComponentSpec(yamlConfig, filterType, filterRefKey);
 
     return Collections.singletonList(wrapperProperties);
   }
@@ -419,19 +412,7 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
     }
   }
 
-  private String buildMetricUrn(Map<String, Collection<String>> filterMaps, long metricId) {
-    Multimap<String, String> filters = ArrayListMultimap.create();
-    if (filterMaps != null) {
-      for (Map.Entry<String, Collection<String>> entry : filterMaps.entrySet()) {
-        filters.putAll(entry.getKey(), entry.getValue());
-      }
-    }
-
-    MetricEntity me = MetricEntity.fromMetric(1.0, metricId, filters);
-    return me.getUrn();
-  }
-
-  private void buildComponentSpec(Map<String, Object> yamlConfig, String type, String componentKey) {
+  private void buildComponentSpec(Map<String, Object> yamlConfig, String type, String componentRefKey) {
     Map<String, Object> componentSpecs = new HashMap<>();
 
     String componentClassName = DETECTION_REGISTRY.lookup(type);
@@ -442,50 +423,18 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
       params = MapUtils.getMap(yamlConfig, PROP_PARAMS);
     }
 
-    String componentName = DetectionUtils.getComponentName(componentKey);
-    if (!TUNING_OFF_COMPONENTS.contains(type) && DETECTION_REGISTRY.isTunable(componentClassName)) {
-      try {
-        componentSpecs.putAll(getTunedSpecs(componentName, componentClassName, params));
-      } catch (Exception e) {
-        LOG.error("Tuning failed for component " + type, e);
-      }
+    // For tunable components, the model params are computed from user supplied yaml params and previous model params.
+    // We store the yaml params under a separate key, PROP_YAML_PARAMS, to distinguish from model params.
+    if (!TURNOFF_TUNING_COMPONENTS.contains(type) && DETECTION_REGISTRY.isTunable(componentClassName)) {
+      componentSpecs.put(PROP_YAML_PARAMS, params);
     } else {
       componentSpecs.putAll(params);
     }
-    this.components.put(componentName, componentSpecs);
+
+    this.components.put(DetectionUtils.getComponentKey(componentRefKey), componentSpecs);
   }
 
-  private Map<String, Object> getTunedSpecs(String componentName, String componentClassName, Map<String, Object> params)
-      throws Exception {
-    long configId = this.existingConfig == null ? 0 : this.existingConfig.getId();
-    InputDataFetcher dataFetcher = new DefaultInputDataFetcher(this.dataProvider, configId);
-    Tunable tunable = getTunable(componentClassName, params, dataFetcher);
-
-    // round to daily boundary
-    DateTimeZone timezone = DateTimeZone.forID(this.datasetConfig.getTimezone() == null ? DEFAULT_TIMEZONE : this.datasetConfig.getTimezone());
-    DateTime start = new DateTime(this.startTime, timezone).withTimeAtStartOfDay();
-    DateTime end =  new DateTime(this.endTime, timezone).withTimeAtStartOfDay();
-    Interval window = new Interval(start, end);
-    Map<String, Object> existingComponentSpec =
-        this.existingComponentSpecs.containsKey(componentName) ? MapUtils.getMap(this.existingComponentSpecs,
-            componentName) : Collections.emptyMap();
-
-    // TODO: if dimension drill down applied, pass in the metric urn of top dimension
-    return tunable.tune(existingComponentSpec, window, this.metricUrn);
-  }
-
-  private Tunable getTunable(String componentClassName, Map<String, Object> params, InputDataFetcher dataFetcher)
-      throws Exception {
-    String tunableClassName = DETECTION_REGISTRY.lookupTunable(componentClassName);
-    Class clazz = Class.forName(tunableClassName);
-    Class<AbstractSpec> specClazz = (Class<AbstractSpec>) Class.forName(getSpecClassName(clazz));
-    AbstractSpec spec = AbstractSpec.fromProperties(params, specClazz);
-    Tunable tunable = (Tunable) clazz.newInstance();
-    tunable.init(spec, dataFetcher);
-    return tunable;
-  }
-
-  private String makeComponentKey(String type, String name) {
+  private String makeComponentRefKey(String type, String name) {
     return "$" + name + ":" + type;
   }
 }

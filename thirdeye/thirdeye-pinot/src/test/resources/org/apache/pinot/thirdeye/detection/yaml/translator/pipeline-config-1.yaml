@@ -43,7 +43,7 @@ rules:
       min: 50
 merger:
   maxGap: 0
-  maxDuration: 100
+  maxDuration: 100000000
 grouper:
   - type: MOCK_GROUPER
     name: test_grouper

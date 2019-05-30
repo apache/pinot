@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.pinot.thirdeye.detection.yaml;
+package org.apache.pinot.thirdeye.detection.yaml.translator;
 
 import com.google.common.base.CaseFormat;
 import java.util.stream.Collectors;
@@ -26,6 +26,7 @@ import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.pojo.AlertConfigBean;
 import org.apache.pinot.thirdeye.datalayer.util.Predicate;
 import org.apache.pinot.thirdeye.detection.ConfigUtils;
+import org.apache.pinot.thirdeye.detection.DataProvider;
 import org.apache.pinot.thirdeye.detection.annotation.registry.DetectionAlertRegistry;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -44,7 +45,7 @@ import org.yaml.snakeyaml.Yaml;
 /**
  * The translator converts the alert yaml config into a detection alert config
  */
-public class YamlDetectionAlertConfigTranslator {
+public class YamlDetectionAlertConfigTranslator extends ConfigTranslator {
   public static final String PROP_DETECTION_CONFIG_IDS = "detectionConfigIds";
   public static final String PROP_RECIPIENTS = "recipients";
 
@@ -69,16 +70,18 @@ public class YamlDetectionAlertConfigTranslator {
   private static final String PROP_DIMENSION = "dimension";
   private static final String PROP_DIMENSION_RECIPIENTS = "dimensionRecipients";
 
-  SubscriptionConfigValidator subscriptionValidator;
-
   private static final DetectionAlertRegistry DETECTION_ALERT_REGISTRY = DetectionAlertRegistry.getInstance();
   private static final Set<String> PROPERTY_KEYS = new HashSet<>(
       Arrays.asList(PROP_RECIPIENTS, PROP_DIMENSION, PROP_DIMENSION_RECIPIENTS));
   private final DetectionConfigManager detectionConfigDAO;
 
-  public YamlDetectionAlertConfigTranslator(DetectionConfigManager detectionConfigDAO) {
+  public YamlDetectionAlertConfigTranslator(DetectionConfigManager detectionConfigDAO, Map<String,Object> yamlAlertConfig) {
+    this(detectionConfigDAO, yamlAlertConfig, new SubscriptionConfigValidator());
+  }
+
+  public YamlDetectionAlertConfigTranslator(DetectionConfigManager detectionConfigDAO, Map<String,Object> yamlAlertConfig, SubscriptionConfigValidator validator) {
+    super(yamlAlertConfig, validator);
     this.detectionConfigDAO = detectionConfigDAO;
-    this.subscriptionValidator = new SubscriptionConfigValidator();
   }
 
   private Map<String, Object> buildAlerterProperties(Map<String, Object> alertYamlConfigs, Collection<Long> detectionConfigIds) {
@@ -159,39 +162,38 @@ public class YamlDetectionAlertConfigTranslator {
   /**
    * Generates the {@link DetectionAlertConfigDTO} from the YAML Alert Map
    */
-  public DetectionAlertConfigDTO translate(Map<String,Object> yamlAlertConfig) throws IllegalArgumentException {
-    subscriptionValidator.validateYaml(yamlAlertConfig);
-
+  @Override
+  DetectionAlertConfigDTO translateConfig() throws IllegalArgumentException {
     DetectionAlertConfigDTO alertConfigDTO = new DetectionAlertConfigDTO();
 
-    alertConfigDTO.setName(MapUtils.getString(yamlAlertConfig, PROP_SUBS_GROUP_NAME));
-    alertConfigDTO.setApplication(MapUtils.getString(yamlAlertConfig, PROP_APPLICATION));
-    alertConfigDTO.setFrom(MapUtils.getString(yamlAlertConfig, PROP_FROM));
+    alertConfigDTO.setName(MapUtils.getString(this.yamlConfig, PROP_SUBS_GROUP_NAME));
+    alertConfigDTO.setApplication(MapUtils.getString(this.yamlConfig, PROP_APPLICATION));
+    alertConfigDTO.setFrom(MapUtils.getString(this.yamlConfig, PROP_FROM));
 
-    alertConfigDTO.setCronExpression(MapUtils.getString(yamlAlertConfig, PROP_CRON, CRON_SCHEDULE_DEFAULT));
-    alertConfigDTO.setActive(MapUtils.getBooleanValue(yamlAlertConfig, PROP_ACTIVE, true));
+    alertConfigDTO.setCronExpression(MapUtils.getString(this.yamlConfig, PROP_CRON, CRON_SCHEDULE_DEFAULT));
+    alertConfigDTO.setActive(MapUtils.getBooleanValue(this.yamlConfig, PROP_ACTIVE, true));
 
     alertConfigDTO.setSubjectType(AlertConfigBean.SubjectType.valueOf(
-        (String) MapUtils.getObject(yamlAlertConfig, PROP_EMAIL_SUBJECT_TYPE, AlertConfigBean.SubjectType.METRICS.name())));
+        (String) MapUtils.getObject(this.yamlConfig, PROP_EMAIL_SUBJECT_TYPE, AlertConfigBean.SubjectType.METRICS.name())));
 
-    Map<String, String> refLinks = MapUtils.getMap(yamlAlertConfig, PROP_REFERENCE_LINKS);
+    Map<String, String> refLinks = MapUtils.getMap(this.yamlConfig, PROP_REFERENCE_LINKS);
     if (refLinks == null) {
       refLinks = new HashMap<>();
-      yamlAlertConfig.put(PROP_REFERENCE_LINKS, refLinks);
+      this.yamlConfig.put(PROP_REFERENCE_LINKS, refLinks);
     }
     if (refLinks.isEmpty()) {
       refLinks.put("ThirdEye User Guide", "https://go/thirdeyeuserguide");
       refLinks.put("Add Reference Links", "https://go/thirdeyealertreflink");
     }
-    alertConfigDTO.setReferenceLinks(MapUtils.getMap(yamlAlertConfig, PROP_REFERENCE_LINKS));
+    alertConfigDTO.setReferenceLinks(MapUtils.getMap(this.yamlConfig, PROP_REFERENCE_LINKS));
 
-    alertConfigDTO.setAlertSchemes(buildAlertSchemes(yamlAlertConfig));
-    alertConfigDTO.setAlertSuppressors(buildAlertSuppressors(yamlAlertConfig));
+    alertConfigDTO.setAlertSchemes(buildAlertSchemes(this.yamlConfig));
+    alertConfigDTO.setAlertSuppressors(buildAlertSuppressors(this.yamlConfig));
     alertConfigDTO.setHighWaterMark(0L);
 
     // NOTE: The below fields will/should be hidden from the YAML/UI. They will only be updated by the backend pipeline.
     List<Long> detectionConfigIds = new ArrayList<>();
-    List<String> detectionNames = ConfigUtils.getList(yamlAlertConfig.get(PROP_DETECTION_NAMES));
+    List<String> detectionNames = ConfigUtils.getList(this.yamlConfig.get(PROP_DETECTION_NAMES));
 
     try {
       detectionConfigIds.addAll(detectionNames.stream().map(detectionName ->  this.detectionConfigDAO.findByPredicate(
@@ -200,7 +202,7 @@ public class YamlDetectionAlertConfigTranslator {
       throw new IllegalArgumentException("Cannot find detection pipeline, please check the subscribed detections.");
     }
 
-    alertConfigDTO.setProperties(buildAlerterProperties(yamlAlertConfig, detectionConfigIds));
+    alertConfigDTO.setProperties(buildAlerterProperties(this.yamlConfig, detectionConfigIds));
     Map<Long, Long> vectorClocks = new HashMap<>();
     long currentTimestamp = System.currentTimeMillis();
     for (long detectionConfigId : detectionConfigIds) {
@@ -211,7 +213,7 @@ public class YamlDetectionAlertConfigTranslator {
     DumperOptions options = new DumperOptions();
     options.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
     options.setPrettyFlow(true);
-    alertConfigDTO.setYaml(new Yaml(options).dump(yamlAlertConfig));
+    alertConfigDTO.setYaml(new Yaml(options).dump(this.yamlConfig));
 
     return alertConfigDTO;
   }
