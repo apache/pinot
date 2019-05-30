@@ -270,7 +270,7 @@ public class PinotURIUploadIntegrationTest extends BaseClusterIntegrationTestSet
   private List<String> getAllSegments(String tablename)
       throws IOException {
     List<String> allSegments = new ArrayList<>();
-    HttpHost controllerHttpHost = new HttpHost("localhost", 8998);
+    HttpHost controllerHttpHost = new HttpHost("localhost", _controllerPort);
     HttpClient controllerClient = new DefaultHttpClient();
     HttpGet req = new HttpGet("/segments/" + URLEncoder.encode(tablename, "UTF-8"));
     HttpResponse res = controllerClient.execute(controllerHttpHost, req);
