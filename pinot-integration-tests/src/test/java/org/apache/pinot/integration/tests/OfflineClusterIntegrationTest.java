@@ -32,7 +32,9 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
+import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.JsonUtils;
@@ -125,20 +127,36 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // Set up service status callbacks
     // NOTE: put this step after creating the table and uploading all segments so that brokers and servers can find the
     // resources to monitor
-    List<String> instances = _helixAdmin.getInstancesInCluster(_clusterName);
-    for (String instance : instances) {
-      if (instance.startsWith(CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE) || instance
-          .startsWith(CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE)) {
-        _serviceStatusCallbacks.add(new ServiceStatus.MultipleCallbackServiceStatusCallback(ImmutableList
-            .of(new ServiceStatus.IdealStateServiceStatusCallback(_helixManager, _clusterName,
-                    instance, 100.0),
-                new ServiceStatus.IdealStateServiceStatusCallback(_helixManager, _clusterName,
-                    instance, 100.0))));
-      }
-    }
+    registerCallbackHandlers();
 
     // Wait for all documents loaded
     waitForAllDocsLoaded(600_000L);
+  }
+
+  private void registerCallbackHandlers() {
+    List<String> instances = _helixAdmin.getInstancesInCluster(_clusterName);
+    instances.removeIf(instance -> (!instance.startsWith(CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE) && !instance.startsWith(
+        CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE)));
+    List<String> resourcesInCluster = _helixAdmin.getResourcesInCluster(_clusterName);
+    resourcesInCluster.removeIf(resource -> (!TableNameBuilder.isTableResource(resource)
+        && !CommonConstants.Helix.BROKER_RESOURCE_INSTANCE.equals(resource)));
+    for (String instance : instances) {
+      List<String> resourcesToMonitor = new ArrayList<>();
+      for (String resourceName : resourcesInCluster) {
+        IdealState idealState = _helixAdmin.getResourceIdealState(_clusterName, resourceName);
+        for (String partitionName : idealState.getPartitionSet()) {
+          if (idealState.getInstanceSet(partitionName).contains(instance)) {
+            resourcesToMonitor.add(resourceName);
+            break;
+          }
+        }
+      }
+      _serviceStatusCallbacks.add(new ServiceStatus.MultipleCallbackServiceStatusCallback(ImmutableList.of(
+          new ServiceStatus.IdealStateAndCurrentStateMatchServiceStatusCallback(_helixManager, _clusterName, instance,
+              resourcesToMonitor, 100.0),
+          new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(_helixManager, _clusterName, instance,
+              resourcesToMonitor, 100.0))));
+    }
   }
 
   @Test

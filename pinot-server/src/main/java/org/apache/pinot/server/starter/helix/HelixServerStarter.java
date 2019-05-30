@@ -20,6 +20,7 @@ package org.apache.pinot.server.starter.helix;
 
 import com.google.common.collect.ImmutableList;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -195,14 +196,7 @@ public class HelixServerStarter {
         .addPreConnectCallback(() -> serverMetrics.addMeteredGlobalValue(ServerMeter.HELIX_ZOOKEEPER_RECONNECTS, 1L));
 
     // Register the service status handler
-    double minResourcePercentForStartup = _serverConf
-        .getDouble(CONFIG_OF_SERVER_MIN_RESOURCE_PERCENT_FOR_START, DEFAULT_SERVER_MIN_RESOURCE_PERCENT_FOR_START);
-    int realtimeConsumptionCatchupWaitMs = _serverConf.getInt(
-        CommonConstants.Server.CONFIG_OF_STARTUP_REALTIME_CONSUMPTION_CATCHUP_WAIT_MS,
-        CommonConstants.Server.DEFAULT_STARTUP_REALTIME_CONSUMPTION_CATCHUP_WAIT_MS);
-    ServiceStatus.setServiceStatusCallback(new ServiceStatus.MultipleCallbackServiceStatusCallback(ImmutableList.of(
-        new ServiceStatus.IdealStateServiceStatusCallback(_helixManager, _helixClusterName,
-            _instanceId, minResourcePercentForStartup, realtimeConsumptionCatchupWaitMs))));
+    registerServiceStatusHandler();
 
     ControllerLeaderLocator.create(_helixManager);
 
@@ -220,6 +214,69 @@ public class HelixServerStarter {
     serverMetrics.addCallbackGauge("memory.mmapBufferCount", PinotDataBuffer::getMmapBufferCount);
     serverMetrics.addCallbackGauge("memory.mmapBufferUsage", PinotDataBuffer::getMmapBufferUsage);
     serverMetrics.addCallbackGauge("memory.allocationFailureCount", PinotDataBuffer::getAllocationFailureCount);
+  }
+
+  /**
+   * Fetches the resources to monitor and registers the {@link org.apache.pinot.common.utils.ServiceStatus.ServiceStatusCallback}s
+   */
+  private void registerServiceStatusHandler() {
+
+    double minResourcePercentForStartup = _serverConf
+        .getDouble(CONFIG_OF_SERVER_MIN_RESOURCE_PERCENT_FOR_START, DEFAULT_SERVER_MIN_RESOURCE_PERCENT_FOR_START);
+    int realtimeConsumptionCatchupWaitMs = _serverConf.getInt(
+        CommonConstants.Server.CONFIG_OF_STARTUP_REALTIME_CONSUMPTION_CATCHUP_WAIT_MS,
+        CommonConstants.Server.DEFAULT_STARTUP_REALTIME_CONSUMPTION_CATCHUP_WAIT_MS);
+
+    // collect all resources which have this instance in the ideal state
+    List<String> resourcesToMonitor = new ArrayList<>();
+    // if even 1 resource has this instance in ideal state with state CONSUMING, set this to true
+    boolean foundConsuming = false;
+    boolean checkRealtime = realtimeConsumptionCatchupWaitMs > 0;
+
+    for (String resourceName : _helixAdmin.getResourcesInCluster(_helixClusterName)) {
+      // Only monitor table resources
+      if (!TableNameBuilder.isTableResource(resourceName)) {
+        continue;
+      }
+
+      // Only monitor enabled resources
+      IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, resourceName);
+      if (idealState.isEnabled()) {
+
+        for (String partitionName : idealState.getPartitionSet()) {
+          if (idealState.getInstanceSet(partitionName).contains(_instanceId)) {
+            resourcesToMonitor.add(resourceName);
+            break;
+          }
+        }
+        if (checkRealtime && !foundConsuming && TableNameBuilder.isRealtimeTableResource(resourceName)) {
+          for (String partitionName : idealState.getPartitionSet()) {
+            if (CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel.CONSUMING.equals(
+                idealState.getInstanceStateMap(partitionName).get(_instanceId))) {
+              foundConsuming = true;
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    ImmutableList.Builder<ServiceStatus.ServiceStatusCallback> serviceStatusCallbackListBuilder =
+        new ImmutableList.Builder<>();
+    serviceStatusCallbackListBuilder.add(
+        new ServiceStatus.IdealStateAndCurrentStateMatchServiceStatusCallback(_helixManager, _helixClusterName,
+            _instanceId, resourcesToMonitor, minResourcePercentForStartup));
+    serviceStatusCallbackListBuilder.add(
+        new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(_helixManager, _helixClusterName,
+            _instanceId, resourcesToMonitor, minResourcePercentForStartup));
+    if (checkRealtime && foundConsuming) {
+      serviceStatusCallbackListBuilder.add(
+          new ServiceStatus.RealtimeConsumptionCatchupServiceStatusCallback(_helixManager, _helixClusterName,
+              _instanceId, realtimeConsumptionCatchupWaitMs));
+    }
+    LOGGER.info("Registering service status handler");
+    ServiceStatus.setServiceStatusCallback(
+        new ServiceStatus.MultipleCallbackServiceStatusCallback(serviceStatusCallbackListBuilder.build()));
   }
 
   private void setAdminApiPort(int adminApiPort) {
