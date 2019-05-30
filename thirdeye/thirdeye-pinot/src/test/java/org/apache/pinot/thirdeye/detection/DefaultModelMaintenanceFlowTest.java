@@ -83,12 +83,13 @@ public class DefaultModelMaintenanceFlowTest {
     MockModelEvaluatorSpec spec = new MockModelEvaluatorSpec();
     spec.setMockModelStatus(ModelStatus.BAD);
     evaluator.init(spec, this.dataFetcher);
-    MockTunableDetector detector = new MockTunableDetector();
-    configDTO.setComponents(ImmutableMap.of("evaluator_1", evaluator, "detector", detector));
+    MockTunableDetector tunableDetector = new MockTunableDetector();
+    configDTO.setComponents(ImmutableMap.of("evaluator_1", evaluator, "detector", tunableDetector));
     configDTO.setLastTuningTimestamp(1559175301000L);
     Instant maintainTimestamp = Instant.now();
     DetectionConfigDTO maintainedConfig = this.maintenanceFlow.maintain(configDTO, maintainTimestamp);
     Assert.assertEquals(maintainedConfig.getLastTuningTimestamp(), maintainTimestamp.getMillis());
+    Assert.assertEquals(tunableDetector.getTuneRuns(), 1);
   }
 
 }

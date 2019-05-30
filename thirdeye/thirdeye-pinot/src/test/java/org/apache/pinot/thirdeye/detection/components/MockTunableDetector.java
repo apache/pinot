@@ -37,8 +37,16 @@ import org.joda.time.Interval;
 @Tune(tunable = "MOCK_TUNABLE")
 @Components(type = "MOCK_TUNABLE")
 public class MockTunableDetector implements AnomalyDetector<MockTunableSpec>, Tunable<MockTunableSpec> {
+  private int tuneRunes = 0;
+
+  public int getTuneRuns() {
+    return tuneRunes;
+  }
+
+
   @Override
   public Map<String, Object> tune(Map<String, Object> currentSpec, Interval tuningWindow, String metricUrn) {
+    this.tuneRunes++;
     return Collections.emptyMap();
   }
 
