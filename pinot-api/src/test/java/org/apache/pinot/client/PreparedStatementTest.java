@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.client;
 
-import java.util.Map;
 import java.util.concurrent.Future;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
