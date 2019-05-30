@@ -540,6 +540,7 @@ public class DetectionResource {
       throw new IllegalArgumentException(String.format("Could not resolve anomaly id %d", anomalyId));
     }
     if (padding) {
+      // add paddings for the time range
       DatasetConfigDTO dataset = this.datasetDAO.findByDataset(anomaly.getCollection());
       if (dataset == null) {
         throw new IllegalArgumentException(String.format("Could not resolve dataset '%s' for anomaly id %d", anomaly.getCollection(), anomalyId));
@@ -551,6 +552,7 @@ public class DetectionResource {
     }
     MetricEntity me = MetricEntity.fromURN(anomaly.getMetricUrn());
     TimeSeries baselineTimeseries = DetectionUtils.getBaselineTimeseries(anomaly, me.getFilters(), me.getId(), configDAO.findById(anomaly.getDetectionConfigId()), start, end, loader, provider);
+    // add current time series
     MetricSlice currentSlice = MetricSlice.from(me.getId(), start, end, me.getFilters());
     DataFrame dfCurrent = this.provider.fetchTimeseries(Collections.singleton(currentSlice)).get(currentSlice).renameSeries(COL_VALUE, COL_CURRENT);
     return Response.ok(dfCurrent.joinOuter(baselineTimeseries.getDataFrame())).build();

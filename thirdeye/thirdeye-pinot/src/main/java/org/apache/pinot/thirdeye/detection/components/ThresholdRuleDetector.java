@@ -101,7 +101,6 @@ public class ThresholdRuleDetector implements AnomalyDetector<ThresholdRuleDetec
     InputData data =
         this.dataFetcher.fetchData(new InputDataSpec().withTimeseriesSlices(Collections.singletonList(slice)));
     DataFrame df = data.getTimeseries().get(slice);
-    df = df.joinOuter(df.copy().renameSeries(COL_VALUE, COL_CURRENT), COL_TIME);
     return TimeSeries.fromDataFrame(constructThresholdBoundaries(df));
   }
 
