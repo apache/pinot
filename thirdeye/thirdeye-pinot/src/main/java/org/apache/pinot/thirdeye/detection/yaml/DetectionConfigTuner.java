@@ -32,6 +32,7 @@ import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
 import org.apache.pinot.thirdeye.detection.ConfigUtils;
 import org.apache.pinot.thirdeye.detection.DataProvider;
 import org.apache.pinot.thirdeye.detection.DefaultInputDataFetcher;
+import org.apache.pinot.thirdeye.detection.DetectionPipelineLoader;
 import org.apache.pinot.thirdeye.detection.DetectionUtils;
 import org.apache.pinot.thirdeye.detection.InputDataFetcher;
 import org.apache.pinot.thirdeye.detection.annotation.registry.DetectionRegistry;
@@ -78,10 +79,13 @@ public class DetectionConfigTuner {
   private final DataProvider dataProvider;
   private final DatasetConfigDTO datasetConfig;
   private final String metricUrn;
+  private final DetectionPipelineLoader loader;
 
-  public DetectionConfigTuner(DetectionConfigDTO config, DataProvider dataProvider) {
+  public DetectionConfigTuner(DetectionConfigDTO config, DataProvider dataProvider, DetectionPipelineLoader loader) {
+    Preconditions.checkNotNull(config);
     this.detectionConfig = config;
     this.dataProvider = dataProvider;
+    this.loader = loader;
 
     Map<String, Object> yamlConfig = ConfigUtils.getMap(new org.yaml.snakeyaml.Yaml().load(config.getYaml()));
 
@@ -108,7 +112,7 @@ public class DetectionConfigTuner {
     Map<String, Object> tunedSpec = new HashMap<>();
 
     // Instantiate tunable component
-    long configId = detectionConfig == null ? 0 : detectionConfig.getId();
+    long configId = detectionConfig.getId() == null ? 0 : detectionConfig.getId();
     String componentClassName = componentProps.get(PROP_CLASS_NAME).toString();
     Map<String, Object> yamlParams = ConfigUtils.getMap(componentProps.get(PROP_YAML_PARAMS));
     InputDataFetcher dataFetcher = new DefaultInputDataFetcher(dataProvider, configId);
@@ -173,6 +177,27 @@ public class DetectionConfigTuner {
     }
 
     detectionConfig.setComponentSpecs(tunedComponentSpecs);
+    semanticValidation(detectionConfig);
     return detectionConfig;
+  }
+
+  /**
+   * Validate the pipeline by loading and initializing components
+   */
+  private void semanticValidation(DetectionConfigDTO detectionConfig) {
+    try {
+      // backup and swap out id
+      Long id = detectionConfig.getId();
+      detectionConfig.setId(-1L);
+
+      // try to load the detection pipeline and init all the components
+      this.loader.from(dataProvider, detectionConfig, 0, 0);
+
+      // set id back
+      detectionConfig.setId(id);
+    } catch (Exception e){
+      // exception thrown in validate pipeline via reflection
+      throw new IllegalArgumentException("Semantic error: " + e.getCause().getMessage());
+    }
   }
 }

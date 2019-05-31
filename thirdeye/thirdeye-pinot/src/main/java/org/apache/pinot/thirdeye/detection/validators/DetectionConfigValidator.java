@@ -61,26 +61,6 @@ public class DetectionConfigValidator implements ConfigValidator<DetectionConfig
   }
 
   /**
-   * Validate the pipeline by loading and initializing components
-   */
-  private void semanticValidation(DetectionConfigDTO detectionConfig) {
-    try {
-      // backup and swap out id
-      Long id = detectionConfig.getId();
-      detectionConfig.setId(-1L);
-
-      // try to load the detection pipeline and init all the components
-      this.loader.from(provider, detectionConfig, 0, 0);
-
-      // set id back
-      detectionConfig.setId(id);
-    } catch (Exception e){
-      // exception thrown in validate pipeline via reflection
-      throw new IllegalArgumentException("Semantic error: " + e.getCause().getMessage());
-    }
-  }
-
-  /**
    * Perform validation on the detection config like verifying if all the required fields are set
    */
   @Override
@@ -97,8 +77,6 @@ public class DetectionConfigValidator implements ConfigValidator<DetectionConfig
             && detectionConfig.getProperties().get(PROP_CLASS_NAME) != null
             && StringUtils.isNotEmpty((detectionConfig.getProperties().get(PROP_CLASS_NAME).toString()))),
         "No detection properties found");
-
-    semanticValidation(detectionConfig);
   }
 
   /**

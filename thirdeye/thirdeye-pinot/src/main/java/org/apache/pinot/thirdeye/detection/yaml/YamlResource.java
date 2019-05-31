@@ -167,15 +167,15 @@ public class YamlResource {
     // Translate the raw yaml config to detection config object
     DetectionConfigDTO config = (DetectionConfigDTO) detectionConfigTranslator.translate();
 
-    // Tune the detection config - Passes the raw yaml params & injects tuned params
-    DetectionConfigTuner detectionTuner = new DetectionConfigTuner(config, provider);
-    config = detectionTuner.tune(tuningStartTime, tuningEndTime);
-
     if (existingConfig != null) {
       config.setId(existingConfig.getId());
       config.setLastTimestamp(existingConfig.getLastTimestamp());
       config.setCreatedBy(existingConfig.getCreatedBy());
     }
+
+    // Tune the detection config - Passes the raw yaml params & injects tuned params
+    DetectionConfigTuner detectionTuner = new DetectionConfigTuner(config, provider, loader);
+    config = detectionTuner.tune(tuningStartTime, tuningEndTime);
     return config;
   }
 
