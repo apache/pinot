@@ -14,12 +14,6 @@ test-output
 pinot-transport/test-output/
 pinot-broker/test-output/
 pinot-core/test-output/
-pinot-dashboard/.env
-pinot-dashboard/activate
-pinot-dashboard/config.yml
-pinot-dashboard/logs/*
-pinot-dashboard/dist
-pinot-dashboard/pinotui.egg-info
 *.log
 .doppelganger
 docs/_build
