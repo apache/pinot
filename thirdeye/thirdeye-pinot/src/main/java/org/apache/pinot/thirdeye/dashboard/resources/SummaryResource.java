@@ -38,7 +38,7 @@ import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.thirdeye.cube.additive.AdditiveDBClient;
 import org.apache.pinot.thirdeye.cube.cost.BalancedCostFunction;
 import org.apache.pinot.thirdeye.cube.cost.CostFunction;
-import org.apache.pinot.thirdeye.cube.cost.OeRatioCostFunction;
+import org.apache.pinot.thirdeye.cube.cost.RatioCostFunction;
 import org.apache.pinot.thirdeye.cube.data.dbrow.Dimensions;
 import org.apache.pinot.thirdeye.cube.entry.MultiDimensionalRatioSummary;
 import org.apache.pinot.thirdeye.cube.entry.MultiDimensionalSummary;
@@ -230,7 +230,7 @@ public class SummaryResource {
           OBJECT_MAPPER.readValue(hierarchiesPayload, new TypeReference<List<List<String>>>() {
           });
 
-      CostFunction costFunction = new OeRatioCostFunction();
+      CostFunction costFunction = new RatioCostFunction();
       DateTimeZone dateTimeZone = DateTimeZone.forID(timeZone);
       RatioDBClient dbClient = new RatioDBClient(CACHE_REGISTRY_INSTANCE.getQueryCache());
       MultiDimensionalRatioSummary mdSummary = new MultiDimensionalRatioSummary(dbClient, costFunction, dateTimeZone);

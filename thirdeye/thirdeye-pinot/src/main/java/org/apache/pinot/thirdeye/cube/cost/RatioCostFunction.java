@@ -1,29 +1,52 @@
 package org.apache.pinot.thirdeye.cube.cost;
 
 import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
 import com.google.common.math.DoubleMath;
 import java.util.Map;
 import org.apache.pinot.thirdeye.cube.data.cube.CubeUtils;
 
 
-public class OeRatioCostFunction implements CostFunction {
+/**
+ * Calculates the cost for ratio metrics such as O/E ratio, mean, etc.
+ * The calculation of cost considers change difference, change changeRatio, and node size.
+ */
+ public class RatioCostFunction implements CostFunction {
+  public static final String SIZE_FACTOR_THRESHOLD_PARAM = "min_size_factor";
+
   // The threshold to the contribution to overall changes in percentage
   private static double epsilon = 0.00001;
+  private double minSizeFactor = 0.01d; // 1%
 
-  public OeRatioCostFunction() {
-  }
-
-  public OeRatioCostFunction(Map<String, String> params) {
+  /**
+   * Constructs a ratio cost function with default parameters.
+   */
+  public RatioCostFunction() {
   }
 
   /**
-   * Returns the cost that consider change difference, change changeRatio, and node size (contribution percentage of a node).
+   * Constructs a ratio cost function with customized parameters.
+   *
+   * Available parameters:
+   *   SIZE_FACTOR_THRESHOLD_PARAM -> Double.  Any node whose size factor is smaller than this threshold, its cost = 0.
+   *
+   * @param params the parameters for this cost function.
+   */
+  public RatioCostFunction(Map<String, String> params) {
+    if (params.containsKey(SIZE_FACTOR_THRESHOLD_PARAM)) {
+      String pctThresholdString = params.get(SIZE_FACTOR_THRESHOLD_PARAM);
+      Preconditions.checkArgument(!Strings.isNullOrEmpty(pctThresholdString));
+      this.minSizeFactor = Double.parseDouble(pctThresholdString);
+    }
+  }
+
+  /**
+   * Returns the cost that consider change difference, change changeRatio, and node size.
    *
    * In brief, this function uses this formula to compute the cost:
    *   change difference * log(contribution percentage * change changeRatio)
    *
-   * In addition, if a node's contribution to overall changes is smaller than the threshold, which is defined when
-   * constructing this class, then the cost is always zero.
+   * In addition, if a node size to overall data is smaller than 1%, then the cost is always zero.
    *
    * @param parentChangeRatio the changeRatio between baseline and current value of parent node.
    * @param baselineValue the baseline value of the current node.
@@ -45,7 +68,7 @@ public class OeRatioCostFunction implements CostFunction {
     // Contribution is the size of the node
     double sizeFactor = (baselineSize + currentSize) / (topBaselineSize + topCurrentSize);
     // Ignore <1% nodes
-    if (DoubleMath.fuzzyCompare(sizeFactor, 0.01, epsilon) < 0) {
+    if (DoubleMath.fuzzyCompare(sizeFactor, minSizeFactor, epsilon) < 0) {
       return 0d;
     }
     Preconditions.checkState(DoubleMath.fuzzyCompare(sizeFactor,0, epsilon) >= 0, "Contribution {} is smaller than 0.", sizeFactor);
@@ -54,6 +77,16 @@ public class OeRatioCostFunction implements CostFunction {
     return fillEmptyValuesAndGetError(baselineValue, currentValue, parentChangeRatio, sizeFactor);
   }
 
+  /**
+   * The basic calculation of cost.
+   *
+   * @param baselineValue the baseline value of the current node.
+   * @param currentValue the current value of the current node.
+   * @param parentRatio parent's change ratio, which is used to produce a virtual change ratio for the node.
+   * @param sizeFactor the size factor of the node w.r.t. the entire data.
+   *
+   * @return the error cost of the given baseline and current value.
+   */
   private static double error(double baselineValue, double currentValue, double parentRatio, double sizeFactor) {
     double expectedBaselineValue = parentRatio * baselineValue;
     double expectedRatio = currentValue / expectedBaselineValue;

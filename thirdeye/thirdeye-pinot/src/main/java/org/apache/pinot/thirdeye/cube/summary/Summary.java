@@ -33,10 +33,12 @@ import org.apache.pinot.thirdeye.cube.data.cube.DimNameValueCostEntry;
 import org.apache.pinot.thirdeye.cube.cost.BalancedCostFunction;
 import org.apache.pinot.thirdeye.cube.cost.CostFunction;
 import org.apache.pinot.thirdeye.cube.data.node.CubeNode;
-import org.jfree.util.Log;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class Summary {
+  private static final Logger LOG = LoggerFactory.getLogger(Summary.class);
   static final NodeDimensionValuesComparator NODE_COMPARATOR = new NodeDimensionValuesComparator();
 
   private Cube cube;
@@ -130,7 +132,7 @@ public class Summary {
     for (CubeNode node : nodeList) {
       if (Double.compare(node.getBaselineValue(), node.getOriginalBaselineValue()) != 0
           || Double.compare(node.getCurrentValue(), node.getOriginalCurrentValue()) != 0) {
-        Log.warn("Wrong Wow values at node: " + node.getDimensionValues() + ". Expected: "
+        LOG.warn("Wrong Wow values at node: " + node.getDimensionValues() + ". Expected: "
             + node.getOriginalBaselineValue() + "," + node.getOriginalCurrentValue() + ", actual: "
             + node.getBaselineValue() + "," + node.getCurrentValue());
       }
@@ -407,10 +409,6 @@ public class Summary {
     public void insertRowToDPArray(DPArray dp, CubeNode node, double targetRatio)  {
       // If the row has the same change trend with the top row, then it is inserted.
       if ( side == node.side() ) {
-//        // When do oneSide, we try to make the root's changeRatio close to 1 in order to see the major root causes.
-//        if ( (side && Double.compare(targetRatio, 1d) > 0) || (!side && Double.compare(targetRatio, 1d) < 0)) {
-//          targetRatio = 1d;
-//        }
         basicRowInserter.insertRowToDPArray(dp, node, targetRatio);
       } else { // Otherwise, it is inserted only there exists an intermediate parent besides root node
         CubeNode parent = findAncestor(node, null, dp.getAnswer());
