@@ -34,7 +34,7 @@ import org.yaml.snakeyaml.Yaml;
  * The YAML config translator converts the yaml config into a detection config.
  * Calls training module for each stage.
  */
-public abstract class YamlDetectionConfigTranslator extends ConfigTranslator {
+public abstract class YamlDetectionConfigTranslator extends ConfigTranslator<DetectionConfigDTO, DetectionConfigValidator> {
   protected static final Logger LOG = LoggerFactory.getLogger(YamlDetectionConfigTranslator.class);
   private static final String PROP_NAME = "detectionName";
   private static final String PROP_DESC_NAME = "description";

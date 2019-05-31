@@ -79,13 +79,11 @@ public class DetectionConfigTuner {
   private final DataProvider dataProvider;
   private final DatasetConfigDTO datasetConfig;
   private final String metricUrn;
-  private final DetectionPipelineLoader loader;
 
-  public DetectionConfigTuner(DetectionConfigDTO config, DataProvider dataProvider, DetectionPipelineLoader loader) {
+  public DetectionConfigTuner(DetectionConfigDTO config, DataProvider dataProvider) {
     Preconditions.checkNotNull(config);
     this.detectionConfig = config;
     this.dataProvider = dataProvider;
-    this.loader = loader;
 
     Map<String, Object> yamlConfig = ConfigUtils.getMap(new org.yaml.snakeyaml.Yaml().load(config.getYaml()));
 

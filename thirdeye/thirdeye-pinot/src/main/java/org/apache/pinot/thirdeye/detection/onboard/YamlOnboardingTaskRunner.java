@@ -124,7 +124,7 @@ public class YamlOnboardingTaskRunner implements TaskRunner {
     }
 
     // re-tune the detection pipeline because tuning is depend on replay result. e.g. algorithm-based alert filter
-    DetectionConfigTuner detectionConfigTuner = new DetectionConfigTuner(config, provider, loader);
+    DetectionConfigTuner detectionConfigTuner = new DetectionConfigTuner(config, provider);
     DetectionConfigDTO tunedConfig = detectionConfigTuner.tune(info.getTuningWindowStart(), info.getTuningWindowEnd());
     this.detectionDAO.save(tunedConfig);
 

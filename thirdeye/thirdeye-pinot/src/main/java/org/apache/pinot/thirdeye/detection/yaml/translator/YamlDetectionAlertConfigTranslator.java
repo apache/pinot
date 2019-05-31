@@ -45,7 +45,7 @@ import org.yaml.snakeyaml.Yaml;
 /**
  * The translator converts the alert yaml config into a detection alert config
  */
-public class YamlDetectionAlertConfigTranslator extends ConfigTranslator {
+public class YamlDetectionAlertConfigTranslator extends ConfigTranslator<DetectionAlertConfigDTO, SubscriptionConfigValidator> {
   public static final String PROP_DETECTION_CONFIG_IDS = "detectionConfigIds";
   public static final String PROP_RECIPIENTS = "recipients";
 

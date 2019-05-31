@@ -61,26 +61,6 @@ public class DetectionConfigValidator implements ConfigValidator<DetectionConfig
   }
 
   /**
-   * Perform validation on the detection config like verifying if all the required fields are set
-   */
-  @Override
-  public void validateConfig(DetectionConfigDTO detectionConfig) throws IllegalArgumentException {
-    Preconditions.checkNotNull(detectionConfig);
-
-    // Cron Validator
-    Preconditions.checkArgument(CronExpression.isValidExpression(detectionConfig.getCron()),
-        "The detection cron specified is incorrect. Please verify your cron expression using online cron"
-            + " makers.");
-
-    // Empty detection properties
-    Preconditions.checkArgument((detectionConfig.getProperties() != null
-            && detectionConfig.getProperties().get(PROP_CLASS_NAME) != null
-            && StringUtils.isNotEmpty((detectionConfig.getProperties().get(PROP_CLASS_NAME).toString()))),
-        "No detection properties found");
-    semanticValidation(detectionConfig);
-  }
-
-  /**
    * Validate the pipeline by loading and initializing components
    */
   private void semanticValidation(DetectionConfigDTO detectionConfig) {
@@ -98,6 +78,27 @@ public class DetectionConfigValidator implements ConfigValidator<DetectionConfig
       // exception thrown in validate pipeline via reflection
       throw new IllegalArgumentException("Semantic error: " + e.getCause().getMessage());
     }
+  }
+
+  /**
+   * Perform validation on the detection config like verifying if all the required fields are set
+   */
+  @Override
+  public void validateConfig(DetectionConfigDTO detectionConfig) throws IllegalArgumentException {
+    Preconditions.checkNotNull(detectionConfig);
+
+    // Cron Validator
+    Preconditions.checkArgument(CronExpression.isValidExpression(detectionConfig.getCron()),
+        "The detection cron specified is incorrect. Please verify your cron expression using online cron"
+            + " makers.");
+
+    // Empty detection properties
+    Preconditions.checkArgument((detectionConfig.getProperties() != null
+            && detectionConfig.getProperties().get(PROP_CLASS_NAME) != null
+            && StringUtils.isNotEmpty((detectionConfig.getProperties().get(PROP_CLASS_NAME).toString()))),
+        "No detection properties found");
+
+    semanticValidation(detectionConfig);
   }
 
   /**
