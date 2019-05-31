@@ -92,6 +92,7 @@ public class DefaultModelMaintenanceFlowTest {
 
   @Test
   public void testMaintainTunableBad() {
+    DetectionRegistry.registerTunableComponent(MockTunableDetector.class.getName(), "MOCK_TUNABLE", "MOCK_TUNABLE");
     DetectionConfigDTO configDTO = new DetectionConfigDTO();
     configDTO.setId(this.configId);
     configDTO.setYaml(String.format("metric: %s\ndataset: %s\n", METRIC_NAME, DATASET_NAME));

@@ -34,8 +34,6 @@ import org.apache.pinot.thirdeye.detection.spi.exception.DetectorException;
 import org.apache.pinot.thirdeye.detection.spi.model.DetectionResult;
 import org.joda.time.Interval;
 
-@Tune(tunable = "MOCK_TUNABLE")
-@Components(type = "MOCK_TUNABLE")
 public class MockTunableDetector implements AnomalyDetector<MockTunableSpec>, Tunable<MockTunableSpec> {
   private int tuneRunes = 0;
 

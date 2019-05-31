@@ -115,6 +115,27 @@ public class DetectionRegistry {
     }
   }
 
+  public static void registerTunableComponent(String className, String tunable, String type) {
+    try {
+      Class<? extends BaseComponent> clazz = (Class<? extends BaseComponent>) Class.forName(className);
+      REGISTRY_MAP.put(type, ImmutableMap.of(KEY_CLASS_NAME, className, KEY_IS_BASELINE_PROVIDER, isBaselineProvider(clazz)));
+      Tune tune = new Tune(){
+        @Override
+        public String tunable() {
+          return tunable;
+        }
+
+        @Override
+        public Class<? extends Annotation> annotationType() {
+          return Tune.class;
+        }
+      };
+      TUNE_MAP.put(className, tune);
+    } catch (Exception e) {
+      LOG.warn("Encountered exception when registering component {}", className, e);
+    }
+  }
+
   public static void registerYamlConvertor(String className, String type) {
     YAML_MAP.put(type, className);
   }
