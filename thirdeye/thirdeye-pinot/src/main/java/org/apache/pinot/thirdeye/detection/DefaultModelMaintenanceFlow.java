@@ -41,7 +41,7 @@ import org.joda.time.Instant;
  * the detection config and automatically re-tunes the model.
  */
 public class DefaultModelMaintenanceFlow implements ModelMaintenanceFlow {
-  private static int DEFAULT_TUNING_WINDOW_DAYS = 28;
+  private static final int DEFAULT_TUNING_WINDOW_DAYS = 28;
 
   private final DataProvider provider;
   private final DetectionRegistry detectionRegistry;
@@ -52,10 +52,12 @@ public class DefaultModelMaintenanceFlow implements ModelMaintenanceFlow {
   }
 
   public DetectionConfigDTO maintain(DetectionConfigDTO config, Instant timestamp) {
-    // if the pipeline is tunable, get the model evaluators
     if (isTunable(config)) {
+      // if the pipeline is tunable, get the model evaluators
       Collection<? extends ModelEvaluator<? extends AbstractSpec>> modelEvaluators = getModelEvaluators(config);
+      // check the status for model evaluators
       for (ModelEvaluator<? extends AbstractSpec> modelEvaluator : modelEvaluators) {
+        // if returns bad model status, trigger model tuning
         if (modelEvaluator.evaluateModel(timestamp).getStatus().equals(ModelStatus.BAD)) {
           DetectionConfigTuner detectionConfigTuner = new DetectionConfigTuner(config, provider);
           config = detectionConfigTuner.tune(timestamp.toDateTime().minusDays(DEFAULT_TUNING_WINDOW_DAYS).getMillis(),
