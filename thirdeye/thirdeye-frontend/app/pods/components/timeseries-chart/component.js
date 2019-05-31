@@ -201,6 +201,8 @@ export default Component.extend({
   _shadeBounds(){
     d3.select(".confidence-bounds").remove();
     d3.select(".sub-confidence-bounds").remove();
+    d3.select('.timeseries-graph__slider-circle').remove();
+    d3.selectAll('timeseries-graph__slider-line').remove();
     const chart = this.api;
     if (chart && chart.legend && chart.internal && chart.internal.data && chart.internal.data.targets) {
       if (chart.internal.data.targets.length > 24) {
@@ -237,18 +239,53 @@ export default Component.extend({
           .y0(d => yscaleSub(lowerBoundVals[d]))
           .y1(d => yscaleSub(upperBoundVals[d]));
 
-        d3.select(".c3-chart").append('path')
-          .datum(indices)
-          .attr('class', 'confidence-bounds')
-          .attr('d', area_main);
-
-        d3.select(".c3-brush").append('path')
-          .datum(indices)
-          .attr('class', 'sub-confidence-bounds')
-          .attr('d', area_sub);
+        let i = 0;
+        const bothCharts = d3.selectAll('.c3-chart');
+        bothCharts.each(function() {
+          if (i === 0 && this) {
+            d3.select(this).append('path')
+              .datum(indices)
+              .attr('class', 'confidence-bounds')
+              .attr('d', area_main);
+          } else if (i === 1 && this) {
+            d3.select(this).append('path')
+              .datum(indices)
+              .attr('class', 'sub-confidence-bounds')
+              .attr('d', area_sub);
+          }
+          i++;
+        });
       }
     }
+    // add resize buttons after shading bounds
+    const resizeButtons = d3.selectAll('.resize');
 
+    resizeButtons.append('circle')
+      .attr('class', 'timeseries-graph__slider-circle')
+      .attr('cx', 0)
+      .attr('cy', 30)
+      .attr('r', 10)
+      .attr('fill', '#0091CA');
+    resizeButtons.append('line')
+      .attr('class', 'timeseries-graph__slider-line')
+      .attr("x1", 0)
+      .attr("y1", 27)
+      .attr("x2", 0)
+      .attr("y2", 33);
+
+    resizeButtons.append('line')
+      .attr('class', 'timeseries-graph__slider-line')
+      .attr("x1", -5)
+      .attr("y1", 27)
+      .attr("x2", -5)
+      .attr("y2", 33);
+
+    resizeButtons.append('line')
+      .attr('class', 'timeseries-graph__slider-line')
+      .attr("x1", 5)
+      .attr("y1", 27)
+      .attr("x2", 5)
+      .attr("y2", 33);
   },
 
   didUpdateAttrs() {
