@@ -177,27 +177,6 @@ public class DetectionConfigTuner {
     }
 
     detectionConfig.setComponentSpecs(tunedComponentSpecs);
-    semanticValidation(detectionConfig);
     return detectionConfig;
-  }
-
-  /**
-   * Validate the pipeline by loading and initializing components
-   */
-  private void semanticValidation(DetectionConfigDTO detectionConfig) {
-    try {
-      // backup and swap out id
-      Long id = detectionConfig.getId();
-      detectionConfig.setId(-1L);
-
-      // try to load the detection pipeline and init all the components
-      this.loader.from(dataProvider, detectionConfig, 0, 0);
-
-      // set id back
-      detectionConfig.setId(id);
-    } catch (Exception e){
-      // exception thrown in validate pipeline via reflection
-      throw new IllegalArgumentException("Semantic error: " + e.getCause().getMessage());
-    }
   }
 }

@@ -176,6 +176,7 @@ public class YamlResource {
     // Tune the detection config - Passes the raw yaml params & injects tuned params
     DetectionConfigTuner detectionTuner = new DetectionConfigTuner(config, provider, loader);
     config = detectionTuner.tune(tuningStartTime, tuningEndTime);
+    this.detectionValidator.validateConfig(config);
     return config;
   }
 
