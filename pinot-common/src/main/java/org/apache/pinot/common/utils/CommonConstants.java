@@ -42,11 +42,10 @@ public class CommonConstants {
     public static final String BROKER_RESOURCE_INSTANCE = "brokerResource";
     public static final String LEAD_CONTROLLER_RESOURCE_NAME = "leadControllerResource";
 
-    // This is for specifying the number of partitions in leadControllerResource.
-    // In most of the cases there won't be more than 17 controllers in one single cluster.
-    // Hard code the number of partitions to 17 since it's rarely changed and for less changes of hash collision.
-    public static final int DEFAULT_NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE = 17;
-    public static final int DEFAULT_NUMBER_OF_CONTROLLER_REPLICAS = 1;
+    // More information on why these numbers are set can be found in the following doc:
+    // https://cwiki.apache.org/confluence/display/PINOT/Controller+Separation+between+Helix+and+Pinot
+    public static final int NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE = 17;
+    public static final int NUMBER_OF_CONTROLLER_REPLICAS = 1;
 
     public static final String UNTAGGED_SERVER_INSTANCE = "server_untagged";
     public static final String UNTAGGED_BROKER_INSTANCE = "broker_untagged";

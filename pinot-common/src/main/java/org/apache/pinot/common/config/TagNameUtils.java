@@ -46,33 +46,20 @@ public class TagNameUtils {
     return false;
   }
 
-  public static boolean isServerTag(String tagName)
-      throws InvalidConfigException {
-    return TenantRole.SERVER == getTenantRoleFromTag(tagName);
+  public static boolean isServerTag(String tagName) {
+    return isOfflineServerTag(tagName) || isRealtimeServerTag(tagName);
   }
 
-  public static boolean isBrokerTags(String tagName)
-      throws InvalidConfigException {
-    return TenantRole.BROKER == getTenantRoleFromTag(tagName);
+  public static boolean isOfflineServerTag(String tagName) {
+    return tagName.endsWith(ServerType.OFFLINE.toString());
   }
 
-  // Make this method private to avoid exposing null out of this class.
-  private static TenantRole getTenantRoleFromTag(String tagName) throws InvalidConfigException {
-    if (tagName.endsWith(ServerType.REALTIME.toString())) {
-      return TenantRole.SERVER;
-    }
-    if (tagName.endsWith(ServerType.OFFLINE.toString())) {
-      return TenantRole.SERVER;
-    }
-    if (tagName.endsWith(TenantRole.BROKER.toString())) {
-      return TenantRole.BROKER;
-    }
-    // Helix uses this tag to support full-auto.
-    // Return null if the tag is controller, which isn't a type of tenant in Pinot.
-    if (tagName.equalsIgnoreCase(CommonConstants.Helix.CONTROLLER_INSTANCE_TYPE)) {
-      return null;
-    }
-    throw new InvalidConfigException("Cannot identify tenant type from tag name : " + tagName);
+  public static boolean isRealtimeServerTag(String tagName) {
+    return tagName.endsWith(ServerType.REALTIME.toString());
+  }
+
+  public static boolean isBrokerTags(String tagName) {
+    return tagName.endsWith(TenantRole.BROKER.toString());
   }
 
   public static String getTagFromTenantAndServerType(String tenantName, ServerType type) {

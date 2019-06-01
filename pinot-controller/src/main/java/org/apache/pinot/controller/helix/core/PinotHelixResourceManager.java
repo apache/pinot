@@ -288,7 +288,6 @@ public class PinotHelixResourceManager {
    * Add instance group tag for controller so that pinot controller can be assigned to lead controller resource.
    */
   private void addInstanceGroupTag() {
-    _helixZkManager.getClusterManagmentTool().enableInstance(_helixClusterName, _controllerParticipantInstanceId, true);
     InstanceConfig instanceConfig = getHelixInstanceConfig(_controllerParticipantInstanceId);
     instanceConfig.addTag(CommonConstants.Helix.CONTROLLER_INSTANCE_TYPE);
     HelixDataAccessor accessor = _helixZkManager.getHelixDataAccessor();
@@ -862,12 +861,8 @@ public class PinotHelixResourceManager {
             .equals(CommonConstants.Minion.UNTAGGED_INSTANCE)) {
           continue;
         }
-        try {
-          if (TagNameUtils.isBrokerTags(tag)) {
-            tenantSet.add(TagNameUtils.getTenantNameFromTag(tag));
-          }
-        } catch (InvalidConfigException e) {
-          LOGGER.warn("Instance {} contains an invalid tag: {}", instanceName, tag);
+        if (TagNameUtils.isBrokerTags(tag)) {
+          tenantSet.add(TagNameUtils.getTenantNameFromTag(tag));
         }
       }
     }
@@ -885,12 +880,8 @@ public class PinotHelixResourceManager {
             .equals(CommonConstants.Minion.UNTAGGED_INSTANCE)) {
           continue;
         }
-        try {
-          if (TagNameUtils.isServerTag(tag)) {
-            tenantSet.add(TagNameUtils.getTenantNameFromTag(tag));
-          }
-        } catch (InvalidConfigException e) {
-          LOGGER.warn("Instance {} contains an invalid tag: {}", instanceName, tag);
+        if (TagNameUtils.isServerTag(tag)) {
+          tenantSet.add(TagNameUtils.getTenantNameFromTag(tag));
         }
       }
     }

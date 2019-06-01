@@ -19,14 +19,23 @@
 package org.apache.pinot.controller.helix.core;
 
 import com.google.common.collect.BiMap;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import org.I0Itec.zkclient.ZkClient;
+import org.apache.helix.HelixDataAccessor;
+import org.apache.helix.PropertyKey;
 import org.apache.helix.PropertyPathBuilder;
 import org.apache.helix.ZNRecord;
+import org.apache.helix.controller.rebalancer.strategy.CrushEdRebalanceStrategy;
+import org.apache.helix.controller.stages.ClusterDataCache;
 import org.apache.helix.manager.zk.ZNRecordSerializer;
+import org.apache.helix.model.ClusterConfig;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
@@ -53,7 +62,7 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.common.utils.CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME;
+import static org.apache.pinot.common.utils.CommonConstants.Helix.*;
 import static org.apache.pinot.controller.helix.core.PinotHelixResourceManager.*;
 
 
@@ -471,7 +480,7 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
     Assert.assertEquals(leadControllerResourceIdealState.getInstanceGroupTag(),
         CommonConstants.Helix.CONTROLLER_INSTANCE_TYPE);
     Assert.assertEquals(leadControllerResourceIdealState.getNumPartitions(),
-        CommonConstants.Helix.DEFAULT_NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE);
+        CommonConstants.Helix.NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE);
     Assert.assertEquals(leadControllerResourceIdealState.getReplicas(), "1");
     Assert.assertEquals(leadControllerResourceIdealState.getRebalanceMode(), IdealState.RebalanceMode.FULL_AUTO);
     Assert.assertTrue(leadControllerResourceIdealState
@@ -482,8 +491,74 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
       Map<String, String> stateMap = leadControllerResourceExternalView.getStateMap(partition);
       Assert.assertEquals(stateMap.size(), 1);
       Map.Entry<String, String> entry = stateMap.entrySet().iterator().next();
-      Assert.assertEquals(entry.getKey(), CommonConstants.Helix.PREFIX_OF_CONTROLLER_INSTANCE + "localhost_8998");
+      Assert.assertEquals(entry.getKey(), PREFIX_OF_CONTROLLER_INSTANCE + LOCAL_HOST + "_" + _controllerPort);
       Assert.assertEquals(entry.getValue(), "MASTER");
+    }
+  }
+
+  @Test
+  public void testLeadControllerAssignment() {
+    // Given a list of instances (from 1 to 10), make sure all the instances got assigned to lead controller resource.
+    for (int nInstances = 1; nInstances <= 10; nInstances++) {
+      List<String> instanceNames = new ArrayList<>(nInstances);
+      List<Integer> ports = new ArrayList<>(nInstances);
+      for (int i = 0; i < nInstances; i++) {
+        instanceNames.add(PREFIX_OF_CONTROLLER_INSTANCE + LOCAL_HOST + "_" + i);
+        ports.add(i);
+      }
+
+      List<String> partitions = new ArrayList<>(NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE);
+      for (int i = 0; i < NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE; i++) {
+        partitions.add(PREFIX_OF_CONTROLLER_INSTANCE + LOCAL_HOST + "_" + i);
+      }
+
+      LinkedHashMap<String, Integer> states = new LinkedHashMap<>(2);
+      states.put("OFFLINE", 0);
+      states.put("MASTER", NUMBER_OF_CONTROLLER_REPLICAS);
+
+      CrushEdRebalanceStrategy crushEdRebalanceStrategy = new CrushEdRebalanceStrategy();
+      crushEdRebalanceStrategy.init(LEAD_CONTROLLER_RESOURCE_NAME, partitions, states, Integer.MAX_VALUE);
+
+      ClusterDataCache clusterDataCache = new ClusterDataCache();
+      PropertyKey.Builder keyBuilder = new PropertyKey.Builder(getHelixClusterName());
+      HelixDataAccessor accessor = _helixManager.getHelixDataAccessor();
+      ClusterConfig clusterConfig = accessor.getProperty(keyBuilder.clusterConfig());
+      clusterDataCache.setClusterConfig(clusterConfig);
+
+      Map<String, InstanceConfig> instanceConfigMap = new HashMap<>(nInstances);
+      for (int i = 0; i < nInstances; i++) {
+        String instanceName = instanceNames.get(i);
+        int port = ports.get(i);
+        instanceConfigMap.put(instanceName, new InstanceConfig(instanceName
+            + ", {HELIX_ENABLED=true, HELIX_ENABLED_TIMESTAMP=1559546216610, HELIX_HOST=Controller_localhost, HELIX_PORT="
+            + port + "}{}{TAG_LIST=[controller]}"));
+      }
+      clusterDataCache.setInstanceConfigMap(instanceConfigMap);
+      ZNRecord znRecord =
+          crushEdRebalanceStrategy.computePartitionAssignment(instanceNames, instanceNames, new HashMap<>(0),
+              clusterDataCache);
+
+      Assert.assertNotNull(znRecord);
+      Map<String, List<String>> listFields = znRecord.getListFields();
+      Assert.assertEquals(listFields.size(), NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE);
+
+      Map<String, Integer> instanceToMasterAssignmentCountMap = new HashMap<>();
+      int maxCount = 0;
+      for (List<String> assignments : listFields.values()) {
+        Assert.assertEquals(assignments.size(), NUMBER_OF_CONTROLLER_REPLICAS);
+        if (!instanceToMasterAssignmentCountMap.containsKey(assignments.get(0))) {
+          instanceToMasterAssignmentCountMap.put(assignments.get(0), 1);
+        } else {
+          instanceToMasterAssignmentCountMap.put(assignments.get(0),
+              instanceToMasterAssignmentCountMap.get(assignments.get(0)) + 1);
+        }
+        maxCount = Math.max(instanceToMasterAssignmentCountMap.get(assignments.get(0)), maxCount);
+      }
+      Assert.assertEquals(instanceToMasterAssignmentCountMap.size(), nInstances,
+          "Not all the instances got assigned to the resource!");
+      for (Integer count : instanceToMasterAssignmentCountMap.values()) {
+        Assert.assertTrue((maxCount - count == 0 || maxCount - count == 1), "Instance assignment isn't distributed");
+      }
     }
   }
 

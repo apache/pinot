@@ -42,7 +42,7 @@ public class PinotControllerModeTest extends ControllerTest {
   public void setUp() {
     startZk();
     config = getDefaultControllerConfiguration();
-    controllerPortOffset = 200;
+    controllerPortOffset = 0;
   }
 
   @Test
@@ -72,6 +72,25 @@ public class PinotControllerModeTest extends ControllerTest {
         "Failed to start " + config.getControllerMode() + " controller in " + TIMEOUT_IN_MS + "ms.");
     Assert.assertEquals(_controllerStarter.getControllerMode(), ControllerConf.ControllerMode.DUAL);
 
+    // Enable the lead controller resource.
+    _helixAdmin.enableResource(getHelixClusterName(), CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME, true);
+
+    // Starting a second dual-mode controller.
+    ControllerConf controllerConfig = getDefaultControllerConfiguration();
+    controllerConfig.setHelixClusterName(getHelixClusterName());
+    controllerConfig.setControllerMode(ControllerConf.ControllerMode.DUAL);
+    controllerConfig.setControllerPort(Integer.toString(Integer.parseInt(this.config.getControllerPort()) + controllerPortOffset++));
+
+    ControllerStarter secondDualModeController = new TestOnlyControllerStarter(controllerConfig);
+    secondDualModeController.start();
+    TestUtils.waitForCondition(
+        aVoid -> secondDualModeController.getHelixResourceManager().getHelixZkManager().isConnected(), TIMEOUT_IN_MS,
+        "Failed to start " + config.getControllerMode() + " controller in " + TIMEOUT_IN_MS + "ms.");
+    Assert.assertEquals(secondDualModeController.getControllerMode(), ControllerConf.ControllerMode.DUAL);
+
+    Thread.sleep(100000_000L);
+
+    secondDualModeController.stop();
     stopController();
     _controllerStarter = null;
   }
