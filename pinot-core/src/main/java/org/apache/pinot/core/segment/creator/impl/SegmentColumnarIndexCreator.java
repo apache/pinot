@@ -158,8 +158,12 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         }
 
         // Initialize inverted index creator
+        // Do not created inverted index if sorted, clean up invertedIndexColumns
         if (invertedIndexColumns.contains(columnName)) {
-          if (segmentCreationSpec.isOnHeap()) {
+          if (indexCreationInfo.isSorted()){
+            invertedIndexColumns.remove(columnName);
+            //config.getInvertedIndexCreationColumns().remove(columnName); Do we clean up config?
+          } else if (segmentCreationSpec.isOnHeap()) {
             _invertedIndexCreatorMap
                 .put(columnName, new OnHeapBitmapInvertedIndexCreator(_indexDir, columnName, cardinality));
           } else {
