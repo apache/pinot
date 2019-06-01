@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.utils;
+package org.apache.pinot.core.realtime.impl.kafka;
 
 import java.io.File;
 import java.security.Permission;
@@ -28,6 +28,7 @@ import kafka.server.KafkaConfig;
 import kafka.server.KafkaServerStartable;
 import org.I0Itec.zkclient.ZkClient;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.utils.ZkStarter;
 
 
 /**

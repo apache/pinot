@@ -169,22 +169,6 @@
       <artifactId>jopt-simple</artifactId>
     </dependency>
 
-    <!-- Kafka -->
-    <dependency>
-      <groupId>org.apache.kafka</groupId>
-      <artifactId>kafka_2.10</artifactId>
-      <exclusions>
-        <exclusion>
-          <groupId>net.sf.jopt-simple</groupId>
-          <artifactId>jopt-simple</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.scala-lang</groupId>
-          <artifactId>scala-library</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-
     <!-- test -->
     <dependency>
       <groupId>org.apache.pinot</groupId>
