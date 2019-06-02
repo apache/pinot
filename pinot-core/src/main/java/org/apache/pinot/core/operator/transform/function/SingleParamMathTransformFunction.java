@@ -21,14 +21,18 @@ package org.apache.pinot.core.operator.transform.function;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+
 import javax.annotation.Nonnull;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
-import org.apache.pinot.core.util.ArrayCopyUtils;
 
-
+/**
+ * A group of commonly used math transformation which has only one single parameter,
+ * including abs, exp, ceil, floor, ln, log10, sqrt.
+ *
+ */
 public abstract class SingleParamMathTransformFunction extends BaseTransformFunction {
   private double _firstLiteral;
   private TransformFunction _firstTransformFunction;
@@ -75,33 +79,23 @@ public abstract class SingleParamMathTransformFunction extends BaseTransformFunc
       switch (_firstTransformFunction.getResultMetadata().getDataType()) {
         case INT:
           int[] intValues = _firstTransformFunction.transformToIntValuesSV(projectionBlock);
-          for (int i = 0; i < length; i++) {
-            _result[i] = transformInt(intValues[i]);
-          }
+          transformInt(_result, intValues, length);
           break;
         case LONG:
           long[] longValues = _firstTransformFunction.transformToLongValuesSV(projectionBlock);
-          for (int i = 0; i < length; i++) {
-            _result[i] = transformLong(longValues[i]);
-          }
+          transformLong(_result, longValues, length);
           break;
         case FLOAT:
           float[] floatValues = _firstTransformFunction.transformToFloatValuesSV(projectionBlock);
-          for (int i = 0; i < length; i++) {
-            _result[i] = transformFloat(floatValues[i]);
-          }
+          transformFloat(_result, floatValues, length);
           break;
         case DOUBLE:
           double[] doubleValues = _firstTransformFunction.transformToDoubleValuesSV(projectionBlock);
-          for (int i = 0; i < length; i++) {
-            _result[i] = transformDouble(doubleValues[i]);
-          }
+          transformDouble(_result, doubleValues, length);
           break;
         case STRING:
           String[] stringValues = _firstTransformFunction.transformToStringValuesSV(projectionBlock);
-          for (int i = 0; i < length; i++) {
-            _result[i] = transformString(stringValues[i]);
-          }
+          transformString(_result, stringValues, length);
           break;
         default:
           throw new UnsupportedOperationException();
@@ -111,26 +105,15 @@ public abstract class SingleParamMathTransformFunction extends BaseTransformFunc
     return _result;
   }
 
-  protected double transformInt(int value) {
-    return transformDouble(value);
-  }
+  abstract protected void transformInt(double[] result, int[] values, int length);
 
-  protected double transformLong(long value) {
-    return transformDouble(value);
-  }
+  abstract protected void transformLong(double[] result, long[] values, int length);
 
-  protected double transformFloat(float value) {
-    return transformDouble(value);
-  }
+  abstract protected void transformFloat(double[] result, float[] values, int length);
 
-  protected double transformDouble(double value) {
-    return transformDouble(value);
-  }
+  abstract protected void transformDouble(double[] result, double[] values, int length);
 
-  protected double transformString(String value) {
-    double doubleValue = Double.parseDouble(value);
-    return transformDouble(doubleValue);
-  }
+  abstract protected void transformString(double[] result, String[] values, int length);
 
   public static class AbsTransformFunction extends SingleParamMathTransformFunction {
     public static final String FUNCTION_NAME = "abs";
@@ -141,23 +124,39 @@ public abstract class SingleParamMathTransformFunction extends BaseTransformFunc
     }
 
     @Override
-    protected double transformInt(int value) {
-      return Math.abs(value);
+    protected void transformInt(double[] result, int[] values, int length) {
+      for (int i = 0; i < length; i++) {
+         result[i] = Math.abs(values[i]);
+      }
     }
 
     @Override
-    protected double transformLong(long value) {
-      return Math.abs(value);
+    protected void transformLong(double[] result, long[] values, int length) {
+      for (int i = 0; i < length; i++) {
+        result[i] = Math.abs(values[i]);
+      }
     }
 
     @Override
-    protected double transformFloat(float value) {
-      return Math.abs(value);
+    protected void transformFloat(double[] result, float[] values, int length) {
+      for (int i = 0; i < length; i++) {
+        result[i] = Math.abs(values[i]);
+      }
     }
 
     @Override
-    protected double transformDouble(double value) {
-      return Math.abs(value);
+    protected void transformDouble(double[] result, double[] values, int length) {
+      for (int i = 0; i < length; i++) {
+        result[i] = Math.abs(values[i]);
+      }
+    }
+
+    @Override
+    protected void transformString(double[] result, String[] values, int length) {
+      for (int i = 0; i < length; i++) {
+        double doubleValue = Double.parseDouble(values[i]);
+        result[i] = Math.abs(doubleValue);
+      }
     }
   }
 
@@ -170,8 +169,39 @@ public abstract class SingleParamMathTransformFunction extends BaseTransformFunc
     }
 
     @Override
-    protected double transformDouble(double value) {
-      return Math.ceil(value);
+    protected void transformInt(double[] result, int[] values, int length) {
+      for (int i = 0; i < length; i++) {
+         result[i] = Math.ceil(values[i]);
+      }
+    }
+
+    @Override
+    protected void transformLong(double[] result, long[] values, int length) {
+      for (int i = 0; i < length; i++) {
+        result[i] = Math.ceil(values[i]);
+      }
+    }
+
+    @Override
+    protected void transformFloat(double[] result, float[] values, int length) {
+      for (int i = 0; i < length; i++) {
+        result[i] = Math.ceil(values[i]);
+      }
+    }
+
+    @Override
+    protected void transformDouble(double[] result, double[] values, int length) {
+      for (int i = 0; i < length; i++) {
+        result[i] = Math.ceil(values[i]);
+      }
+    }
+
+    @Override
+    protected void transformString(double[] result, String[] values, int length) {
+      for (int i = 0; i < length; i++) {
+        double doubleValue = Double.parseDouble(values[i]);
+        result[i] = Math.ceil(doubleValue);
+      }
     }
   }
 
@@ -184,8 +214,39 @@ public abstract class SingleParamMathTransformFunction extends BaseTransformFunc
     }
 
     @Override
-    protected double transformDouble(double value) {
-      return Math.exp(value);
+    protected void transformInt(double[] result, int[] values, int length) {
+      for (int i = 0; i < length; i++) {
+         result[i] = Math.exp(values[i]);
+      }
+    }
+
+    @Override
+    protected void transformLong(double[] result, long[] values, int length) {
+      for (int i = 0; i < length; i++) {
+        result[i] = Math.exp(values[i]);
+      }
+    }
+
+    @Override
+    protected void transformFloat(double[] result, float[] values, int length) {
+      for (int i = 0; i < length; i++) {
+        result[i] = Math.exp(values[i]);
+      }
+    }
+
+    @Override
+    protected void transformDouble(double[] result, double[] values, int length) {
+      for (int i = 0; i < length; i++) {
+        result[i] = Math.exp(values[i]);
+      }
+    }
+
+    @Override
+    protected void transformString(double[] result, String[] values, int length) {
+      for (int i = 0; i < length; i++) {
+        double doubleValue = Double.parseDouble(values[i]);
+        result[i] = Math.exp(doubleValue);
+      }
     }
   }
 
@@ -198,8 +259,39 @@ public abstract class SingleParamMathTransformFunction extends BaseTransformFunc
     }
 
     @Override
-    protected double transformDouble(double value) {
-      return Math.floor(value);
+    protected void transformInt(double[] result, int[] values, int length) {
+      for (int i = 0; i < length; i++) {
+         result[i] = Math.floor(values[i]);
+      }
+    }
+
+    @Override
+    protected void transformLong(double[] result, long[] values, int length) {
+      for (int i = 0; i < length; i++) {
+        result[i] = Math.floor(values[i]);
+      }
+    }
+
+    @Override
+    protected void transformFloat(double[] result, float[] values, int length) {
+      for (int i = 0; i < length; i++) {
+        result[i] = Math.floor(values[i]);
+      }
+    }
+
+    @Override
+    protected void transformDouble(double[] result, double[] values, int length) {
+      for (int i = 0; i < length; i++) {
+        result[i] = Math.floor(values[i]);
+      }
+    }
+
+    @Override
+    protected void transformString(double[] result, String[] values, int length) {
+      for (int i = 0; i < length; i++) {
+        double doubleValue = Double.parseDouble(values[i]);
+        result[i] = Math.floor(doubleValue);
+      }
     }
   }
 
@@ -212,8 +304,39 @@ public abstract class SingleParamMathTransformFunction extends BaseTransformFunc
     }
 
     @Override
-    protected double transformDouble(double value) {
-      return Math.log(value);
+    protected void transformInt(double[] result, int[] values, int length) {
+      for (int i = 0; i < length; i++) {
+         result[i] = Math.log(values[i]);
+      }
+    }
+
+    @Override
+    protected void transformLong(double[] result, long[] values, int length) {
+      for (int i = 0; i < length; i++) {
+        result[i] = Math.log(values[i]);
+      }
+    }
+
+    @Override
+    protected void transformFloat(double[] result, float[] values, int length) {
+      for (int i = 0; i < length; i++) {
+        result[i] = Math.log(values[i]);
+      }
+    }
+
+    @Override
+    protected void transformDouble(double[] result, double[] values, int length) {
+      for (int i = 0; i < length; i++) {
+        result[i] = Math.log(values[i]);
+      }
+    }
+
+    @Override
+    protected void transformString(double[] result, String[] values, int length) {
+      for (int i = 0; i < length; i++) {
+        double doubleValue = Double.parseDouble(values[i]);
+        result[i] = Math.log(doubleValue);
+      }
     }
   }
 
@@ -226,8 +349,39 @@ public abstract class SingleParamMathTransformFunction extends BaseTransformFunc
     }
 
     @Override
-    protected double transformDouble(double value) {
-      return Math.log10(value);
+    protected void transformInt(double[] result, int[] values, int length) {
+      for (int i = 0; i < length; i++) {
+         result[i] = Math.log10(values[i]);
+      }
+    }
+
+    @Override
+    protected void transformLong(double[] result, long[] values, int length) {
+      for (int i = 0; i < length; i++) {
+        result[i] = Math.log10(values[i]);
+      }
+    }
+
+    @Override
+    protected void transformFloat(double[] result, float[] values, int length) {
+      for (int i = 0; i < length; i++) {
+        result[i] = Math.log10(values[i]);
+      }
+    }
+
+    @Override
+    protected void transformDouble(double[] result, double[] values, int length) {
+      for (int i = 0; i < length; i++) {
+        result[i] = Math.log10(values[i]);
+      }
+    }
+
+    @Override
+    protected void transformString(double[] result, String[] values, int length) {
+      for (int i = 0; i < length; i++) {
+        double doubleValue = Double.parseDouble(values[i]);
+        result[i] = Math.log10(doubleValue);
+      }
     }
   }
 
@@ -240,8 +394,39 @@ public abstract class SingleParamMathTransformFunction extends BaseTransformFunc
     }
 
     @Override
-    protected double transformDouble(double value) {
-      return Math.sqrt(value);
+    protected void transformInt(double[] result, int[] values, int length) {
+      for (int i = 0; i < length; i++) {
+         result[i] = Math.sqrt(values[i]);
+      }
+    }
+
+    @Override
+    protected void transformLong(double[] result, long[] values, int length) {
+      for (int i = 0; i < length; i++) {
+        result[i] = Math.sqrt(values[i]);
+      }
+    }
+
+    @Override
+    protected void transformFloat(double[] result, float[] values, int length) {
+      for (int i = 0; i < length; i++) {
+        result[i] = Math.sqrt(values[i]);
+      }
+    }
+
+    @Override
+    protected void transformDouble(double[] result, double[] values, int length) {
+      for (int i = 0; i < length; i++) {
+        result[i] = Math.sqrt(values[i]);
+      }
+    }
+
+    @Override
+    protected void transformString(double[] result, String[] values, int length) {
+      for (int i = 0; i < length; i++) {
+        double doubleValue = Double.parseDouble(values[i]);
+        result[i] = Math.sqrt(doubleValue);
+      }
     }
   }
 
