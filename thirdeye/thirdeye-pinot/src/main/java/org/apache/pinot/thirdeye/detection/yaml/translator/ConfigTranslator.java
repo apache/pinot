@@ -47,9 +47,6 @@ public abstract class ConfigTranslator<T extends AbstractDTO, V extends ConfigVa
    */
   public T translate() throws IllegalArgumentException {
     validator.validateYaml(this.yamlConfig);
-    T configDTO = this.translateConfig();
-    validator.validateConfig(configDTO);
-
-    return configDTO;
+    return this.translateConfig();
   }
 }

@@ -165,17 +165,18 @@ public class YamlResource {
     }
 
     // Translate the raw yaml config to detection config object
-    DetectionConfigDTO config = (DetectionConfigDTO) detectionConfigTranslator.translate();
-
-    // Tune the detection config - Passes the raw yaml params & injects tuned params
-    DetectionConfigTuner detectionTuner = new DetectionConfigTuner(config, provider);
-    config = detectionTuner.tune(tuningStartTime, tuningEndTime);
+    DetectionConfigDTO config = detectionConfigTranslator.translate();
 
     if (existingConfig != null) {
       config.setId(existingConfig.getId());
       config.setLastTimestamp(existingConfig.getLastTimestamp());
       config.setCreatedBy(existingConfig.getCreatedBy());
     }
+
+    // Tune the detection config - Passes the raw yaml params & injects tuned params
+    DetectionConfigTuner detectionTuner = new DetectionConfigTuner(config, provider);
+    config = detectionTuner.tune(tuningStartTime, tuningEndTime);
+    this.detectionValidator.validateConfig(config);
     return config;
   }
 
@@ -501,8 +502,7 @@ public class YamlResource {
     // Translate payload to detection alert config
     TreeMap<String, Object> newAlertConfigMap = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
     newAlertConfigMap.putAll(ConfigUtils.getMap(this.yaml.load(yamlAlertConfig)));
-    DetectionAlertConfigDTO newAlertConfig = (DetectionAlertConfigDTO)
-        new YamlDetectionAlertConfigTranslator(detectionConfigDAO, newAlertConfigMap).translate();
+    DetectionAlertConfigDTO newAlertConfig = new YamlDetectionAlertConfigTranslator(detectionConfigDAO, newAlertConfigMap).translate();
 
     // Update existing alert config with the newly supplied config.
     DetectionAlertConfigDTO updatedAlertConfig = updateDetectionAlertConfig(oldAlertConfig, newAlertConfig);
