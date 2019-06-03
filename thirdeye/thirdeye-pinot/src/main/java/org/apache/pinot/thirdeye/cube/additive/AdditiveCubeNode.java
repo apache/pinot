@@ -21,7 +21,7 @@ package org.apache.pinot.thirdeye.cube.additive;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.google.common.base.MoreObjects;
-import java.util.Objects;
+import com.google.common.base.Objects;
 import org.apache.pinot.thirdeye.cube.data.node.BaseCubeNode;
 
 
@@ -132,52 +132,55 @@ public class AdditiveCubeNode extends BaseCubeNode<AdditiveCubeNode, AdditiveRow
     if (this == o) {
       return true;
     }
-    if (o == null || getClass() != o.getClass()) {
+    if (!(o instanceof AdditiveCubeNode)) {
+      return false;
+    }
+    if (!super.equals(o)) {
       return false;
     }
     AdditiveCubeNode that = (AdditiveCubeNode) o;
-    return getLevel() == that.getLevel() && index == that.index
-        && Double.compare(that.getBaselineValue(), getBaselineValue()) == 0
-        && Double.compare(that.getCurrentValue(), getCurrentValue()) == 0
-        && Double.compare(that.getCost(), getCost()) == 0 && Objects.equals(data, that.data);
+    return Double.compare(that.baselineValue, baselineValue) == 0
+        && Double.compare(that.currentValue, currentValue) == 0;
   }
 
   @Override
   public int hashCode() {
-    return Objects
-        .hash(getLevel(), index, getBaselineValue(), getCurrentValue(), getCost(), data);
+    return Objects.hashCode(super.hashCode(), baselineValue, currentValue);
   }
 
   /**
-   * The toString method for parent node. We don't invoke parent's toString() to prevent multiple calls of toString to
-   * their parents.
-   *
-   * @return a simple string representation of a parent cube node, which does not toString its parent node recursively.
-   */
-  private String toStringAsParent() {
-    return MoreObjects.toStringHelper(this).add("level", level).add("index", index).add("baselineValue", baselineValue)
-        .add("currentValue", currentValue).add("cost", cost).add("data", data).toString();
-  }
-
-  /**
-   * ToString that handles if the given cube node is null, i.e., a root cube node.
+   * ToString that handles if the given cube node is null, i.e., a root cube node. Moreover, it does not invoke
+   * parent's toString() to prevent multiple calls of toString to their parents.
    *
    * @param node the node to be converted to string.
    *
-   * @return a string representation of this node.
+   * @return a simple string representation of a parent cube node, which does not toString its parent node recursively.
    */
-  private static String toStringAsParent(AdditiveCubeNode node) {
+  private String toStringAsParent(AdditiveCubeNode node) {
     if (node == null) {
       return "null";
     } else {
-      return node.toStringAsParent();
+      return MoreObjects.toStringHelper(this)
+          .add("level", level)
+          .add("index", index)
+          .add("baselineValue", baselineValue)
+          .add("currentValue", currentValue)
+          .add("cost", cost)
+          .add("data", data)
+          .toString();
     }
   }
 
   @Override
   public String toString() {
-    return MoreObjects.toStringHelper(this).add("level", level).add("index", index).add("baselineValue", baselineValue)
-        .add("currentValue", currentValue).add("cost", cost).add("data", data).add("parent", toStringAsParent(parent))
+    return MoreObjects.toStringHelper(this)
+        .add("level", level)
+        .add("index", index)
+        .add("baselineValue", baselineValue)
+        .add("currentValue", currentValue)
+        .add("cost", cost)
+        .add("data", data)
+        .add("parent", toStringAsParent(parent))
         .toString();
   }
 }

@@ -20,15 +20,23 @@
 package org.apache.pinot.thirdeye.cube.data.node;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import org.apache.pinot.thirdeye.cube.data.cube.CubeUtils;
 import org.apache.pinot.thirdeye.cube.data.dbrow.DimensionValues;
 import org.apache.pinot.thirdeye.cube.data.dbrow.Dimensions;
 import org.apache.pinot.thirdeye.cube.data.dbrow.Row;
 
 
+/**
+ * Provides basic implementation for hierarchical cube nodes.
+ *
+ * @param <N> the class of the inherited cube node.
+ * @param <R> the Row class of the inherited cube node.
+ */
 public abstract class BaseCubeNode<N extends BaseCubeNode, R extends Row> implements CubeNode<N> {
   protected int level;
   protected int index;
@@ -68,6 +76,13 @@ public abstract class BaseCubeNode<N extends BaseCubeNode, R extends Row> implem
           "Current node is not a child node of the given parent node. Current and parent dimensions: ",
           data.getDimensions(), parent.getDimensions());
       parent.children.add(this);
+      // Sort node from large to small to increase stability of this algorithm.
+      // The reason is that the parent values will dynamically be updated whenever a child is extracted. In addition,
+      // large children are unlikely to be interfered by small children. Therefore, evaluating large children before
+      // small children can increase the stability of this algorithm.
+      parent.children.sort( (Object o1, Object o2) ->
+          (int) ((((CubeNode)o2).getBaselineSize() + ((CubeNode)o2).getCurrentSize()) - (((CubeNode)o1).getBaselineSize() + ((CubeNode)o1).getCurrentSize()))
+      );
     }
   }
 
@@ -113,18 +128,24 @@ public abstract class BaseCubeNode<N extends BaseCubeNode, R extends Row> implem
     return Collections.unmodifiableList(children);
   }
 
+  /**
+   * Returns the change ratio of the node if it is a finite number; otherwise, returns an alternative ratio as follows:
+   * 1. If originalChangeRatio is a finite number, return it;
+   * 2. otherwise, get the ratio from its parent.
+   * 3. If none is available, return 1.0.
+   */
   @Override
-  public double targetChangeRatio() {
+  public double bootStrapChangeRatio() {
     double ratio = changeRatio();
-    if (!Double.isInfinite(ratio) && Double.compare(ratio, 0d) != 0) {
+    if (Double.isFinite(ratio) && Double.compare(ratio, 0d) != 0) {
       return ratio;
     } else {
       ratio = originalChangeRatio();
-      if (!Double.isInfinite(ratio) && Double.compare(ratio, 0d) != 0) {
-        return ratio;
+      if (Double.isFinite(ratio) && Double.compare(ratio, 0d) != 0) {
+        return CubeUtils.ensureChangeRatioDirection(getBaselineValue(), getCurrentValue(), ratio);
       } else {
         if (parent != null) {
-          return parent.targetChangeRatio();
+          return CubeUtils.ensureChangeRatioDirection(getBaselineValue(), getCurrentValue(), parent.bootStrapChangeRatio());
         } else {
           return 1.;
         }
@@ -140,5 +161,23 @@ public abstract class BaseCubeNode<N extends BaseCubeNode, R extends Row> implem
     } else {
       return Double.compare(1., originalChangeRatio()) <= 0;
     }
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (!(o instanceof BaseCubeNode)) {
+      return false;
+    }
+    BaseCubeNode<?, ?> that = (BaseCubeNode<?, ?>) o;
+    return level == that.level && index == that.index && Double.compare(that.cost, cost) == 0 && Objects.equal(data,
+        that.data);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hashCode(level, index, cost, data);
   }
 }

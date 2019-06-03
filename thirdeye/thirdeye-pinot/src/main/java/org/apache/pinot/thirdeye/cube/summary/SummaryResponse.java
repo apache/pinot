@@ -37,7 +37,7 @@ import org.apache.pinot.thirdeye.cube.data.node.CubeNode;
 
 public class SummaryResponse {
   private final static int MAX_GAINER_LOSER_COUNT = 5;
-  private final static NumberFormat DOUBLE_FORMATTER = new DecimalFormat("#0.00");
+  private final static NumberFormat DOUBLE_FORMATTER = new DecimalFormat("#0.0000");
   static final  String INFINITE = "";
 
   static final String ALL = "(ALL)";
@@ -80,6 +80,14 @@ public class SummaryResponse {
   @JsonProperty("dimensionCosts")
   private List<Cube.DimensionCost> dimensionCosts = new ArrayList<>();
 
+  public SummaryResponse(double baselineTotal, double currentTotal, double baselineTotalSize, double currentTotalSize) {
+    this.baselineTotal = baselineTotal;
+    this.currentTotal = currentTotal;
+    this.baselineTotalSize = baselineTotalSize;
+    this.currentTotalSize = currentTotalSize;
+    globalRatio = roundUp(currentTotal / baselineTotal);
+  }
+
   public String getDataset() {
     return dataset;
   }
@@ -117,7 +125,7 @@ public class SummaryResponse {
   }
 
   public static SummaryResponse buildNotAvailableResponse(String dataset, String metricName) {
-    SummaryResponse response = new SummaryResponse();
+    SummaryResponse response = new SummaryResponse(0d, 0d, 0d, 0d);
     response.setDataset(dataset);
     response.setMetricName(metricName);
     response.dimensions.add(NOT_AVAILABLE);
@@ -146,8 +154,7 @@ public class SummaryResponse {
     SummaryGainerLoserResponseRow row = new SummaryGainerLoserResponseRow();
     row.baselineValue = costEntry.getBaselineValue();
     row.currentValue = costEntry.getCurrentValue();
-    row.baselineSize = costEntry.getBaselineSize();
-    row.currentSize = costEntry.getCurrentSize();
+    row.sizeFactor = costEntry.getSizeFactor();
     row.dimensionName = costEntry.getDimName();
     row.dimensionValue = costEntry.getDimValue();
     row.percentageChange = computePercentageChange(row.baselineValue, row.currentValue);
@@ -160,18 +167,6 @@ public class SummaryResponse {
   }
 
   public void buildDiffSummary(List<CubeNode> nodes, int targetLevelCount, CostFunction costFunction) {
-    // Compute the total baseline and current value
-
-    for(CubeNode node : nodes) {
-      baselineTotal += node.getBaselineValue();
-      baselineTotalSize += node.getBaselineValue();
-      currentTotal += node.getCurrentValue();
-      currentTotalSize += node.getCurrentValue();
-    }
-    if (Double.compare(baselineTotal, 0d) != 0) {
-      globalRatio = roundUp(currentTotal / baselineTotal);
-    }
-
     // If all nodes have a lower level count than targetLevelCount, then it is not necessary to print the summary with
     // height higher than the available level.
     int maxNodeLevelCount = 0;
@@ -227,8 +222,8 @@ public class SummaryResponse {
       row.baselineValue = node.getBaselineValue();
       row.currentValue = node.getCurrentValue();
       row.percentageChange = computePercentageChange(row.baselineValue, row.currentValue);
-      row.baselineSize = node.getBaselineSize();
-      row.currentSize = node.getCurrentSize();
+      row.sizeFactor =
+          (node.getBaselineSize() + node.getCurrentSize()) / (baselineTotalSize + currentTotalSize);
       row.contributionChange =
           computeContributionChange(row.baselineValue, row.currentValue, baselineTotal, currentTotal);
       row.contributionToOverallChange =
@@ -275,7 +270,7 @@ public class SummaryResponse {
   }
 
   private static double roundUp(double number) {
-    return Math.round(number * 100d) / 100d;
+    return Math.round(number * 10000d) / 10000d;
   }
 
   public String toString() {

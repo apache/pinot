@@ -323,7 +323,8 @@ public class Cube { // the cube (Ca|Cb)
             topCurrentSize);
 
         costSet.add(new DimNameValueCostEntry(dimensionName, dimensionValue, wowNode.getBaselineValue(),
-            wowNode.getCurrentValue(), wowNode.getBaselineSize(), wowNode.getCurrentSize(), contributionFactor, cost));
+            wowNode.getCurrentValue(), wowNode.changeRatio(), wowNode.getCurrentValue() - wowNode.getBaselineValue(),
+            wowNode.getBaselineSize(), wowNode.getCurrentSize(), contributionFactor, cost));
       }
     }
 

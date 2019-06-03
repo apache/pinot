@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.util.Arrays;
 import java.util.List;
+import org.apache.pinot.thirdeye.cube.entry.MultiDimensionalSummaryCLITool;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 

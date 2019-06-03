@@ -25,6 +25,11 @@ import org.apache.pinot.thirdeye.cube.data.dbrow.DimensionValues;
 import org.apache.pinot.thirdeye.cube.data.dbrow.Dimensions;
 
 
+/**
+ * Defines the operations that are used by the cube algorithm.
+ *
+ * @param <N> the class of the actual cube node. For example, ratio cube algorithm will use RatioCubeNode.
+ */
 public interface CubeNode<N extends CubeNode> {
 
   /**
@@ -176,11 +181,10 @@ public interface CubeNode<N extends CubeNode> {
   double changeRatio();
 
   /**
-   * Return the changeRatio of the node. If the changeRatio is not a finite number, then it returns the originalChangeRatio.
-   * If the originalChangeRatio is not a finite number, then it bootstraps to the parents until it finds a finite
-   * changeRatio. If no finite changeRatio available, then it returns 1.
+   * Returns the change ratio of the node if it is a finite number; otherwise, provide an alternative change ratio.
+   * @see BaseCubeNode for the basic implementation.
    */
-  double targetChangeRatio();
+  double bootStrapChangeRatio();
 
   /**
    * Returns the current changeRatio of this node is increased or decreased, i.e., returns true if changeRatio of the node >= 1.0.

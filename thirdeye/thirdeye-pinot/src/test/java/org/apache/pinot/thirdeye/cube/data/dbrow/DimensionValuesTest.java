@@ -19,7 +19,6 @@ package org.apache.pinot.thirdeye.cube.data.dbrow;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import org.apache.pinot.thirdeye.cube.data.dbrow.DimensionValues;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 

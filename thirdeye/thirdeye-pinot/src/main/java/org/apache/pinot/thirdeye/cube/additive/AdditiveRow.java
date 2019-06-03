@@ -20,7 +20,6 @@
 package org.apache.pinot.thirdeye.cube.additive;
 
 import com.google.common.base.MoreObjects;
-import com.google.common.base.Preconditions;
 import java.util.Objects;
 import org.apache.pinot.thirdeye.cube.data.dbrow.DimensionValues;
 import org.apache.pinot.thirdeye.cube.data.dbrow.Dimensions;
@@ -42,8 +41,7 @@ public class AdditiveRow extends BaseRow {
    * @param dimensionValues the dimension values of this row.
    */
   public AdditiveRow(Dimensions dimensions, DimensionValues dimensionValues) {
-    this.dimensions = Preconditions.checkNotNull(dimensions);
-    this.dimensionValues = Preconditions.checkNotNull(dimensionValues);
+    super(dimensions, dimensionValues);
   }
 
   /**
@@ -55,8 +53,7 @@ public class AdditiveRow extends BaseRow {
    * @param currentValue the current value of this additive metric.
    */
   public AdditiveRow(Dimensions dimensions, DimensionValues dimensionValues, double baselineValue, double currentValue) {
-    this.dimensions = Preconditions.checkNotNull(dimensions);
-    this.dimensionValues = Preconditions.checkNotNull(dimensionValues);
+    super(dimensions, dimensionValues);
     this.baselineValue = baselineValue;
     this.currentValue = currentValue;
   }

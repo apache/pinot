@@ -17,16 +17,16 @@
  * under the License.
  */
 
-package org.apache.pinot.thirdeye.cube.additive;
+package org.apache.pinot.thirdeye.cube.entry;
 
 import com.google.common.base.Preconditions;
-import com.google.common.base.Strings;
 import com.google.common.collect.Multimap;
+import java.util.ArrayList;
 import java.util.List;
-import org.apache.pinot.thirdeye.cube.data.dbrow.Dimensions;
+import org.apache.pinot.thirdeye.cube.additive.AdditiveDBClient;
 import org.apache.pinot.thirdeye.cube.cost.CostFunction;
 import org.apache.pinot.thirdeye.cube.data.cube.Cube;
-import org.apache.pinot.thirdeye.cube.data.dbclient.CubePinotClient;
+import org.apache.pinot.thirdeye.cube.data.dbrow.Dimensions;
 import org.apache.pinot.thirdeye.cube.summary.Summary;
 import org.apache.pinot.thirdeye.cube.summary.SummaryResponse;
 import org.joda.time.DateTime;
@@ -34,19 +34,20 @@ import org.joda.time.DateTimeZone;
 
 
 /**
- * A portal class that is used to trigger the multi-dimensional summary algorithm and to get the summary response.
+ * A portal class that is used to trigger the multi-dimensional summary algorithm and to get the summary response on
+ * an additive metric.
  */
 public class MultiDimensionalSummary {
-  private CubePinotClient dbClient;
+  private AdditiveDBClient dbClient;
   private CostFunction costFunction;
   private DateTimeZone dateTimeZone;
 
-  public MultiDimensionalSummary(CubePinotClient olapClient, CostFunction costFunction,
+  public MultiDimensionalSummary(AdditiveDBClient dbClient, CostFunction costFunction,
       DateTimeZone dateTimeZone) {
-    Preconditions.checkNotNull(olapClient);
+    Preconditions.checkNotNull(dbClient);
     Preconditions.checkNotNull(dateTimeZone);
     Preconditions.checkNotNull(costFunction);
-    this.dbClient = olapClient;
+    this.dbClient = dbClient;
     this.costFunction = costFunction;
     this.dateTimeZone = dateTimeZone;
   }
@@ -71,25 +72,20 @@ public class MultiDimensionalSummary {
    *                    of dimensions.
    * @param doOneSideError if the summary should only consider one side error.
    *
-   * @return the multi-dimensional summary.
+   * @return the multi-dimensional summary of an additive metric.
    */
   public SummaryResponse buildSummary(String dataset, String metric, long currentStartInclusive,
       long currentEndExclusive, long baselineStartInclusive, long baselineEndExclusive, Dimensions dimensions,
       Multimap<String, String> dataFilters, int summarySize, int depth, List<List<String>> hierarchies,
       boolean doOneSideError) throws Exception {
-    Preconditions.checkArgument(!Strings.isNullOrEmpty(dataset));
-    Preconditions.checkArgument(!Strings.isNullOrEmpty(metric));
-    Preconditions.checkArgument(currentStartInclusive < currentEndExclusive);
-    Preconditions.checkArgument(baselineStartInclusive < baselineEndExclusive);
-    Preconditions.checkNotNull(dimensions);
-    Preconditions.checkArgument(dimensions.size() > 0);
-    Preconditions.checkNotNull(dataFilters);
-    Preconditions.checkArgument(summarySize > 1);
-    Preconditions.checkNotNull(hierarchies);
-    Preconditions.checkArgument(depth >= 0);
+    // Check arguments
+    List<String> metrics = new ArrayList<>();
+    metrics.add(metric);
+    SummaryUtils.checkArguments(dataset, metrics, currentStartInclusive, currentEndExclusive, baselineStartInclusive,
+        baselineEndExclusive, dimensions, dataFilters, summarySize, depth, hierarchies);
 
     dbClient.setDataset(dataset);
-    ((AdditiveDBClient) dbClient).setMetric(metric);
+    dbClient.setMetric(metric);
     dbClient.setCurrentStartInclusive(new DateTime(currentStartInclusive, dateTimeZone));
     dbClient.setCurrentEndExclusive(new DateTime(currentEndExclusive, dateTimeZone));
     dbClient.setBaselineStartInclusive(new DateTime(baselineStartInclusive, dateTimeZone));

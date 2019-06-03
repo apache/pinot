@@ -25,15 +25,17 @@ import com.google.common.base.Preconditions;
 public class DimNameValueCostEntry implements Comparable<DimNameValueCostEntry>{
   private String dimName;
   private String dimValue;
-  private double cost;
-  private double contributionFactor;
-  private double currentValue;
   private double baselineValue;
+  private double currentValue;
+  private double changeRatio;
+  private double changeDiff;
   private double baselineSize;
   private double currentSize;
+  private double sizeFactor;
+  private double cost;
 
   public DimNameValueCostEntry(String dimensionName, String dimensionValue, double baselineValue, double currentValue,
-      double baselineSize, double currentSize, double contributionFactor, double cost) {
+      double changeRatio, double changeDiff, double baselineSize, double currentSize, double sizeFactor, double cost) {
     Preconditions.checkNotNull(dimensionName, "dimension name cannot be null.");
     Preconditions.checkNotNull(dimensionValue, "dimension value cannot be null.");
 
@@ -41,18 +43,20 @@ public class DimNameValueCostEntry implements Comparable<DimNameValueCostEntry>{
     this.dimValue = dimensionValue;
     this.baselineValue = baselineValue;
     this.currentValue = currentValue;
+    this.changeRatio = changeRatio;
+    this.changeDiff = changeDiff;
     this.baselineSize = baselineSize;
     this.currentSize = currentSize;
-    this.contributionFactor = contributionFactor;
+    this.sizeFactor = sizeFactor;
     this.cost = cost;
   }
 
-  public double getContributionFactor() {
-    return contributionFactor;
+  public double getSizeFactor() {
+    return sizeFactor;
   }
 
-  public void setContributionFactor(double contributionFactor) {
-    this.contributionFactor = contributionFactor;
+  public void setSizeFactor(double sizeFactor) {
+    this.sizeFactor = sizeFactor;
   }
 
   public String getDimName() {
@@ -111,6 +115,22 @@ public class DimNameValueCostEntry implements Comparable<DimNameValueCostEntry>{
     this.currentSize = currentSize;
   }
 
+  public double getChangeRatio() {
+    return changeRatio;
+  }
+
+  public void setChangeRatio(double changeRatio) {
+    this.changeRatio = changeRatio;
+  }
+
+  public double getChangeDiff() {
+    return changeDiff;
+  }
+
+  public void setChangeDiff(double changeDiff) {
+    this.changeDiff = changeDiff;
+  }
+
   @Override
   public int compareTo(DimNameValueCostEntry that) {
     return Double.compare(this.cost, that.cost);
@@ -120,14 +140,14 @@ public class DimNameValueCostEntry implements Comparable<DimNameValueCostEntry>{
   public String toString() {
     return MoreObjects.toStringHelper("Entry")
         .add("dim", String.format("%s:%s", dimName, dimValue))
-        .add("baselineVal", baselineValue)
-        .add("currentVal", currentValue)
-        .add("delta", currentValue - baselineValue)
-        .add("changeRatio", String.format("%.2f", currentValue / baselineValue))
-        .add("baselineSize", baselineSize)
-        .add("currentSize", currentSize)
-        .add("sizeFactor", String.format("%.2f", contributionFactor))
-        .add("cost", String.format("%.4f", cost))
+        .add("baseVal", baselineValue)
+        .add("curVal", currentValue)
+        .add("ratio", String.format("%.4f", changeRatio))
+        .add("delta", changeDiff)
+        .add("baseSize", baselineSize)
+        .add("curSize", currentSize)
+        .add("sizeFactor", String.format("%.4f", sizeFactor))
+        .add("cost", String.format("%.6f", cost))
         .toString();
   }
 }
