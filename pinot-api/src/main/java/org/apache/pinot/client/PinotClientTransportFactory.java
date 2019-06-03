@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.client;
 
-import org.apache.pinot.annotations.InterfaceAudience;
-import org.apache.pinot.annotations.InterfaceStability;
+import org.apache.yetus.audience.InterfaceAudience;
+import org.apache.yetus.audience.InterfaceStability;
 
 import java.util.Map;
 
