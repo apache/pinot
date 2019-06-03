@@ -156,14 +156,13 @@ export default Component.extend({
     function() {
       const uniqueTimeSeries = get(this, 'uniqueTimeSeries');
       if (uniqueTimeSeries) {
-        return [...new Set(uniqueTimeSeries.map(series => {
-          const detectorName = series.detectorName;
-          const nameOnly = detectorName.split(':')[0];
+        return [...new Set(uniqueTimeSeries.map(series => series.detectorName))].map(detector => {
+          const nameOnly = detector.split(':')[0];
           return {
-            detectorName,
+            detectorName: detector,
             name: nameOnly
-          };
-        }))];
+          }
+        });
       }
       return [];
     }
@@ -191,7 +190,9 @@ export default Component.extend({
       const metricUrnList = get(this, 'metricUrnList');
       let options = [];
       metricUrnList.forEach(urn => {
-        options.push(toMetricLabel(extractTail(decodeURIComponent(urn))));
+        let dimensionUrn = toMetricLabel(extractTail(decodeURIComponent(urn)));
+        dimensionUrn = dimensionUrn ? dimensionUrn : 'All Dimensions';
+        options.push(dimensionUrn);
       });
       return options;
     }
@@ -637,13 +638,16 @@ export default Component.extend({
     let uniqueTimeSeries;
     let applicationAnomalies;
     let metricUrnList;
+    let firstDimension;
     try {
       if(isPreviewMode){
         applicationAnomalies = yield getYamlPreviewAnomalies(alertYaml, startAnomalies, endAnomalies, alertId);
         if (applicationAnomalies && applicationAnomalies.diagnostics && applicationAnomalies.diagnostics['0']) {
           metricUrnList = Object.keys(applicationAnomalies.diagnostics['0']);
           set(this, 'metricUrnList', metricUrnList);
-          set(this, 'selectedDimension', toMetricLabel(extractTail(decodeURIComponent(metricUrnList[0]))));
+          firstDimension = toMetricLabel(extractTail(decodeURIComponent(metricUrnList[0])));
+          firstDimension = firstDimension ? firstDimension : 'All Dimensions';
+          set(this, 'selectedDimension', firstDimension);
           if (applicationAnomalies.predictions && Array.isArray(applicationAnomalies.predictions) && (typeof applicationAnomalies.predictions[0] === 'object')){
             const detectorName = applicationAnomalies.predictions[0].detectorName;
             const selectedRule = {
@@ -665,9 +669,13 @@ export default Component.extend({
           });
           metricUrnList = Object.keys(metricUrnObj);
           if (metricUrnList.length > 0) {
-            set(this, 'metricUrnList', metricUrnList);
-            set(this, 'selectedDimension', toMetricLabel(extractTail(decodeURIComponent(metricUrnList[0]))));
-            set(this, 'metricUrn', metricUrnList[0]);
+            firstDimension = toMetricLabel(extractTail(decodeURIComponent(metricUrnList[0])));
+            firstDimension = firstDimension ? firstDimension : 'All Dimensions';
+            this.setProperties({
+              metricUrnList,
+              selectedDimension: firstDimension,
+              metricUrn: metricUrnList[0]
+            });
           }
         }
         anomalies = applicationAnomalies;
@@ -986,13 +994,19 @@ export default Component.extend({
     onSelectDimension(selected) {
       const metricUrnList = get(this, 'metricUrnList');
       const newMetricUrn = metricUrnList.find(urn => {
-        if (toMetricLabel(extractTail(decodeURIComponent(urn))) === selected) {
+        const dimensionUrn = toMetricLabel(extractTail(decodeURIComponent(urn)));
+        if ( dimensionUrn === selected) {
+          return urn;
+          // if there is no tail, this will be called 'All Dimensions' in the UI
+        } else if (dimensionUrn === '' && selected === 'All Dimensions') {
           return urn;
         }
       });
+      let dimension = toMetricLabel(extractTail(decodeURIComponent(newMetricUrn)));
+      dimension = dimension ? dimension : 'All Dimensions';
       this.setProperties({
         metricUrn: newMetricUrn,
-        selectedDimension: toMetricLabel(extractTail(decodeURIComponent(newMetricUrn)))
+        selectedDimension: dimension
       });
       this._fetchTimeseries();
     },
