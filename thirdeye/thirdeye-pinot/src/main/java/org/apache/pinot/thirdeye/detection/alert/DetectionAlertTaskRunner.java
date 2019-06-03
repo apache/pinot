@@ -80,19 +80,18 @@ public class DetectionAlertTaskRunner implements TaskRunner {
   }
 
   private void updateAlertConfigWatermarks(DetectionAlertFilterResult result, DetectionAlertConfigDTO alertConfig) {
-    long highWaterMark = AlertUtils.getHighWaterMark(result.getAllAnomalies());
-    if (alertConfig.getHighWaterMark() != null) {
-      highWaterMark = Math.max(alertConfig.getHighWaterMark(), highWaterMark);
+    if (!result.getAllAnomalies().isEmpty()) {
+      long highWaterMark = AlertUtils.getHighWaterMark(result.getAllAnomalies());
+      if (alertConfig.getHighWaterMark() != null) {
+        highWaterMark = Math.max(alertConfig.getHighWaterMark(), highWaterMark);
+      }
+
+      alertConfig.setHighWaterMark(highWaterMark);
+      alertConfig.setVectorClocks(AlertUtils.mergeVectorClock(alertConfig.getVectorClocks(), AlertUtils.makeVectorClock(result.getAllAnomalies())));
+
+      LOG.info("Updating watermarks for alertConfigDAO : {}", alertConfig.getId());
+      this.alertConfigDAO.save(alertConfig);
     }
-
-    alertConfig.setHighWaterMark(highWaterMark);
-    alertConfig.setVectorClocks(
-        AlertUtils.mergeVectorClock(alertConfig.getVectorClocks(),
-        AlertUtils.makeVectorClock(result.getAllAnomalies()))
-    );
-
-    LOG.info("Updating watermarks for alertConfigDAO : {}", alertConfig.getId());
-    this.alertConfigDAO.save(alertConfig);
   }
 
   @Override
