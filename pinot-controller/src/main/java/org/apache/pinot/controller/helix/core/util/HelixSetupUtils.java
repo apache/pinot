@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.helix.core.util;
 
+import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -67,19 +68,19 @@ public class HelixSetupUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixSetupUtils.class);
 
   public static synchronized HelixManager setup(String helixClusterName, String zkPath,
-      String pinotControllerInstanceId) {
+      String helixControllerInstanceId) {
     try {
       setupHelixCluster(helixClusterName, zkPath);
     } catch (final Exception e) {
       LOGGER.error("Caught exception when setting up Helix cluster: {}", helixClusterName, e);
-      return null;
+      throw e;
     }
 
     try {
-      return startHelixControllerInStandadloneMode(helixClusterName, zkPath, pinotControllerInstanceId);
+      return startHelixControllerInStandadloneMode(helixClusterName, zkPath, helixControllerInstanceId);
     } catch (final Exception e) {
       LOGGER.error("Caught exception when starting helix controller", e);
-      return null;
+      throw e;
     }
   }
 
@@ -110,19 +111,14 @@ public class HelixSetupUtils {
   public static void setupPinotCluster(String helixClusterName, String zkPath, boolean isUpdateStateModel,
       boolean enableBatchMessageMode) {
     final HelixAdmin admin = new ZKHelixAdmin(zkPath);
-    if (!admin.getClusters().contains(helixClusterName)) {
-      LOGGER.error("Helix cluster: {} hasn't been set up", helixClusterName);
-      throw new RuntimeException();
-    }
+    Preconditions.checkState(admin.getClusters().contains(helixClusterName),
+        String.format("Helix cluster: %s hasn't been set up", helixClusterName));
 
     // Ensure auto join.
     ensureAutoJoin(helixClusterName, admin);
 
     // Add segment state model definition if needed
     addSegmentStateModelDefinitionIfNeeded(helixClusterName, admin, zkPath, isUpdateStateModel);
-
-    // Add broker resource online offline state model definition if needed
-    addBrokerResourceOnlineOfflineStateModelDefinitionIfNeeded(helixClusterName, admin);
 
     // Add broker resource if needed
     createBrokerResourceIfNeeded(helixClusterName, admin, enableBatchMessageMode);
@@ -157,13 +153,8 @@ public class HelixSetupUtils {
         PinotHelixSegmentOnlineOfflineStateModelGenerator.PINOT_SEGMENT_ONLINE_OFFLINE_STATE_MODEL;
     StateModelDefinition stateModelDefinition = admin.getStateModelDef(helixClusterName, segmentStateModelName);
     if (stateModelDefinition == null) {
-      LOGGER.info(
-          "Adding state model {} (with CONSUMED state) generated using {}",
-          segmentStateModelName, PinotHelixSegmentOnlineOfflineStateModelGenerator.class.toString());
-
-      // If this is a fresh cluster we are creating, then the cluster will see the CONSUMING state in the
-      // state model. But then the servers will never be asked to go to that STATE (whether they have the code
-      // to handle it or not) unil we complete the feature using low-level consumers and turn the feature on.
+      LOGGER.info("Adding state model {} (with CONSUMED state) generated using {}", segmentStateModelName,
+          PinotHelixSegmentOnlineOfflineStateModelGenerator.class.toString());
       admin.addStateModelDef(helixClusterName, segmentStateModelName,
           PinotHelixSegmentOnlineOfflineStateModelGenerator.generatePinotStateModelDefinition());
     } else if (isUpdateStateModel) {
@@ -181,14 +172,15 @@ public class HelixSetupUtils {
         HelixDataAccessor accessor = new ZKHelixDataAccessor(helixClusterName, new ZkBaseDataAccessor<>(zkClient));
         PropertyKey.Builder keyBuilder = accessor.keyBuilder();
         accessor.setProperty(keyBuilder.stateModelDef(segmentStateModelName), newStateModelDef);
-        LOGGER.info("Completed updating statemodel {}", segmentStateModelName);
+        LOGGER.info("Completed updating state model {}", segmentStateModelName);
         zkClient.close();
       }
     }
   }
 
-  private static void addBrokerResourceOnlineOfflineStateModelDefinitionIfNeeded(String helixClusterName,
-      HelixAdmin admin) {
+  private static void createBrokerResourceIfNeeded(String helixClusterName, HelixAdmin admin,
+      boolean enableBatchMessageMode) {
+    // Add broker resource online offline state model definition if needed
     StateModelDefinition brokerResourceStateModelDefinition = admin.getStateModelDef(helixClusterName,
         PinotHelixBrokerResourceOnlineOfflineStateModelGenerator.PINOT_BROKER_RESOURCE_ONLINE_OFFLINE_STATE_MODEL);
     if (brokerResourceStateModelDefinition == null) {
@@ -199,10 +191,8 @@ public class HelixSetupUtils {
           PinotHelixBrokerResourceOnlineOfflineStateModelGenerator.PINOT_BROKER_RESOURCE_ONLINE_OFFLINE_STATE_MODEL,
           PinotHelixBrokerResourceOnlineOfflineStateModelGenerator.generatePinotStateModelDefinition());
     }
-  }
 
-  private static void createBrokerResourceIfNeeded(String helixClusterName, HelixAdmin admin,
-      boolean enableBatchMessageMode) {
+    // Create broker resource if needed.
     IdealState brokerResourceIdealState =
         admin.getResourceIdealState(helixClusterName, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
     if (brokerResourceIdealState == null) {
@@ -217,15 +207,20 @@ public class HelixSetupUtils {
 
   private static void createLeadControllerResourceIfNeeded(String helixClusterName, HelixAdmin admin,
       boolean enableBatchMessageMode) {
+    StateModelDefinition masterSlaveStateModelDefinition =
+        admin.getStateModelDef(helixClusterName, MasterSlaveSMD.name);
+    if (masterSlaveStateModelDefinition == null) {
+      LOGGER.info("Adding state model definition named : {} generated using : {}", MasterSlaveSMD.name,
+          MasterSlaveSMD.class.toString());
+      admin.addStateModelDef(helixClusterName, MasterSlaveSMD.name, MasterSlaveSMD.build());
+    }
+
     IdealState leadControllerResourceIdealState =
         admin.getResourceIdealState(helixClusterName, LEAD_CONTROLLER_RESOURCE_NAME);
     if (leadControllerResourceIdealState == null) {
       LOGGER.info("Cluster {} doesn't contain {}. Creating one.", helixClusterName, LEAD_CONTROLLER_RESOURCE_NAME);
-
-      admin.addStateModelDef(helixClusterName, MasterSlaveSMD.name, MasterSlaveSMD.build());
-
       HelixHelper.updateResourceConfigsFor(new HashMap<>(), LEAD_CONTROLLER_RESOURCE_NAME, helixClusterName, admin);
-      // FULL-AUTO Master-Slave state model with CrushED rebalance strategy.
+      // FULL-AUTO Master-Slave state model with CrushED reBalance strategy.
       admin.addResource(helixClusterName, LEAD_CONTROLLER_RESOURCE_NAME,
           CommonConstants.Helix.NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE, MasterSlaveSMD.name,
           IdealState.RebalanceMode.FULL_AUTO.toString(), CrushEdRebalanceStrategy.class.getName());
@@ -235,13 +230,16 @@ public class HelixSetupUtils {
           admin.getResourceIdealState(helixClusterName, LEAD_CONTROLLER_RESOURCE_NAME);
       leadControllerIdealState.setInstanceGroupTag(CommonConstants.Helix.CONTROLLER_INSTANCE_TYPE);
       leadControllerIdealState.setBatchMessageMode(enableBatchMessageMode);
+      // The below config guarantees if active number of replicas is no less than minimum active replica, there will not be partition movements happened.
+      // Set it to 0 so that whenever a master becomes unavailable, another available instance will immediately be chosen by Helix controller to become the new master.
       leadControllerIdealState.setMinActiveReplicas(0);
       admin.setResourceIdealState(helixClusterName, LEAD_CONTROLLER_RESOURCE_NAME, leadControllerIdealState);
 
       LOGGER.info("Re-balance lead controller resource with replicas: {}",
-          CommonConstants.Helix.NUMBER_OF_CONTROLLER_REPLICAS);
+          CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_REPLICA_COUNT);
+      // Set it to 1 so that there's only 1 instance (i.e. master) shown in every partitions.
       admin.rebalance(helixClusterName, LEAD_CONTROLLER_RESOURCE_NAME,
-          CommonConstants.Helix.NUMBER_OF_CONTROLLER_REPLICAS);
+          CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_REPLICA_COUNT);
     }
   }
 

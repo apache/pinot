@@ -62,7 +62,6 @@ import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.LiveInstance;
 import org.apache.helix.model.MasterSlaveSMD;
-import org.apache.helix.participant.StateMachineEngine;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.config.IndexingConfig;
 import org.apache.pinot.common.config.OfflineTagConfig;
@@ -129,7 +128,6 @@ public class PinotHelixResourceManager {
   private final String _helixZkURL;
   private final String _helixClusterName;
   private final String _instanceId;
-  private final String _controllerParticipantInstanceId;
   private final String _dataDir;
   private final long _externalViewOnlineToOfflineTimeoutMillis;
   private final boolean _isSingleTenantCluster;
@@ -153,7 +151,6 @@ public class PinotHelixResourceManager {
     _helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(zkURL);
     _helixClusterName = helixClusterName;
     _instanceId = controllerInstanceId;
-    _controllerParticipantInstanceId = CommonConstants.Helix.PREFIX_OF_CONTROLLER_INSTANCE + _instanceId;
     _dataDir = dataDir;
     _externalViewOnlineToOfflineTimeoutMillis = externalViewOnlineToOfflineTimeoutMillis;
     _isSingleTenantCluster = isSingleTenantCluster;
@@ -161,15 +158,10 @@ public class PinotHelixResourceManager {
     _allowHLCTables = allowHLCTables;
   }
 
-  public PinotHelixResourceManager(@Nonnull String zkURL, @Nonnull String helixClusterName,
-      @Nonnull String controllerInstanceId, @Nonnull String dataDir) {
-    this(zkURL, helixClusterName, controllerInstanceId, dataDir, DEFAULT_EXTERNAL_VIEW_UPDATE_TIMEOUT_MILLIS, false,
-        true, true);
-  }
-
   public PinotHelixResourceManager(@Nonnull ControllerConf controllerConf) {
     this(controllerConf.getZkStr(), controllerConf.getHelixClusterName(),
-        controllerConf.getControllerHost() + "_" + controllerConf.getControllerPort(), controllerConf.getDataDir(),
+        CommonConstants.Helix.PREFIX_OF_CONTROLLER_INSTANCE + controllerConf.getControllerHost() + "_"
+            + controllerConf.getControllerPort(), controllerConf.getDataDir(),
         controllerConf.getExternalViewOnlineToOfflineTimeout(), controllerConf.tenantIsolationEnabled(),
         controllerConf.getEnableBatchMessageMode(), controllerConf.getHLCTablesAllowed());
   }
@@ -191,7 +183,7 @@ public class PinotHelixResourceManager {
             Collections.singletonList(instanceConfigs));
 
     // Add instance group tag for controller
-    addInstanceGroupTag();
+    addInstanceGroupTagIfNeeded();
 
     _keyBuilder = _helixDataAccessor.keyBuilder();
     _segmentDeletionManager = new SegmentDeletionManager(_dataDir, _helixAdmin, _helixClusterName, _propertyStore);
@@ -267,18 +259,19 @@ public class PinotHelixResourceManager {
    * Register and connect to Helix cluster as PARTICIPANT role.
    */
   private HelixManager registerAndConnectAsHelixParticipant() {
-    HelixManager helixManager = HelixManagerFactory
-        .getZKHelixManager(_helixClusterName, _controllerParticipantInstanceId, InstanceType.PARTICIPANT, _helixZkURL);
+    HelixManager helixManager =
+        HelixManagerFactory.getZKHelixManager(_helixClusterName, _instanceId, InstanceType.PARTICIPANT, _helixZkURL);
 
-    StateMachineEngine stateMach = helixManager.getStateMachineEngine();
-    MasterSlaveStateModelFactory factory = new MasterSlaveStateModelFactory();
-    stateMach.registerStateModelFactory(MasterSlaveSMD.name, factory);
+    // Registers Master-Slave state model to state machine engine, which is for calculating participant assignment in lead controller resource.
+    helixManager.getStateMachineEngine()
+        .registerStateModelFactory(MasterSlaveSMD.name, new MasterSlaveStateModelFactory());
+
     try {
       helixManager.connect();
       return helixManager;
     } catch (Exception e) {
-      String errorMsg = String.format("Exception when connecting the instance %s as Participant to Helix.",
-          _controllerParticipantInstanceId);
+      String errorMsg =
+          String.format("Exception when connecting the instance %s as Participant to Helix.", _instanceId);
       LOGGER.error(errorMsg, e);
       throw new RuntimeException(errorMsg);
     }
@@ -287,11 +280,15 @@ public class PinotHelixResourceManager {
   /**
    * Add instance group tag for controller so that pinot controller can be assigned to lead controller resource.
    */
-  private void addInstanceGroupTag() {
-    InstanceConfig instanceConfig = getHelixInstanceConfig(_controllerParticipantInstanceId);
-    instanceConfig.addTag(CommonConstants.Helix.CONTROLLER_INSTANCE_TYPE);
-    HelixDataAccessor accessor = _helixZkManager.getHelixDataAccessor();
-    accessor.setProperty(accessor.keyBuilder().instanceConfig(_controllerParticipantInstanceId), instanceConfig);
+  private void addInstanceGroupTagIfNeeded() {
+    InstanceConfig instanceConfig = getHelixInstanceConfig(_instanceId);
+    if (!instanceConfig.containsTag(CommonConstants.Helix.CONTROLLER_INSTANCE_TYPE)) {
+      LOGGER.info("Controller: {} doesn't contain group tag: {}. Adding one.", _instanceId,
+          CommonConstants.Helix.CONTROLLER_INSTANCE_TYPE);
+      instanceConfig.addTag(CommonConstants.Helix.CONTROLLER_INSTANCE_TYPE);
+      HelixDataAccessor accessor = _helixZkManager.getHelixDataAccessor();
+      accessor.setProperty(accessor.keyBuilder().instanceConfig(_instanceId), instanceConfig);
+    }
   }
 
   /**
@@ -856,12 +853,7 @@ public class PinotHelixResourceManager {
     for (String instanceName : instancesInCluster) {
       InstanceConfig config = _helixDataAccessor.getProperty(_keyBuilder.instanceConfig(instanceName));
       for (String tag : config.getTags()) {
-        if (tag.equals(CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE) || tag
-            .equals(CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE) || tag
-            .equals(CommonConstants.Minion.UNTAGGED_INSTANCE)) {
-          continue;
-        }
-        if (TagNameUtils.isBrokerTags(tag)) {
+        if (TagNameUtils.isBrokerTag(tag)) {
           tenantSet.add(TagNameUtils.getTenantNameFromTag(tag));
         }
       }
@@ -875,11 +867,6 @@ public class PinotHelixResourceManager {
     for (String instanceName : instancesInCluster) {
       InstanceConfig config = _helixDataAccessor.getProperty(_keyBuilder.instanceConfig(instanceName));
       for (String tag : config.getTags()) {
-        if (tag.equals(CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE) || tag
-            .equals(CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE) || tag
-            .equals(CommonConstants.Minion.UNTAGGED_INSTANCE)) {
-          continue;
-        }
         if (TagNameUtils.isServerTag(tag)) {
           tenantSet.add(TagNameUtils.getTenantNameFromTag(tag));
         }
@@ -2385,16 +2372,6 @@ public class PinotHelixResourceManager {
       endpointToInstance.put(instance, hostnameSplit[1] + ":" + adminPort);
     }
     return endpointToInstance;
-  }
-
-  public IdealState getLeadControllerResourceIdealState() {
-    return _helixAdmin
-        .getResourceIdealState(getHelixClusterName(), CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME);
-  }
-
-  public ExternalView getLeadControllerResourceExternalView() {
-    return _helixAdmin
-        .getResourceExternalView(getHelixClusterName(), CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME);
   }
 
   /*

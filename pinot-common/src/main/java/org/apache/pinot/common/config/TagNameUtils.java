@@ -58,7 +58,7 @@ public class TagNameUtils {
     return tagName.endsWith(ServerType.REALTIME.toString());
   }
 
-  public static boolean isBrokerTags(String tagName) {
+  public static boolean isBrokerTag(String tagName) {
     return tagName.endsWith(TenantRole.BROKER.toString());
   }
 

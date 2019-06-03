@@ -44,8 +44,8 @@ public class CommonConstants {
 
     // More information on why these numbers are set can be found in the following doc:
     // https://cwiki.apache.org/confluence/display/PINOT/Controller+Separation+between+Helix+and+Pinot
-    public static final int NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE = 17;
-    public static final int NUMBER_OF_CONTROLLER_REPLICAS = 1;
+    public static final int NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE = 24;
+    public static final int LEAD_CONTROLLER_RESOURCE_REPLICA_COUNT = 1;
 
     public static final String UNTAGGED_SERVER_INSTANCE = "server_untagged";
     public static final String UNTAGGED_BROKER_INSTANCE = "broker_untagged";

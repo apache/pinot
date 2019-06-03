@@ -46,8 +46,7 @@ public class PinotControllerModeTest extends ControllerTest {
   }
 
   @Test
-  public void testHelixOnlyController()
-      throws Exception {
+  public void testHelixOnlyController() throws Exception {
     config.setControllerMode(ControllerConf.ControllerMode.HELIX_ONLY);
     config.setControllerPort(Integer.toString(Integer.parseInt(config.getControllerPort()) + controllerPortOffset++));
 
@@ -62,11 +61,11 @@ public class PinotControllerModeTest extends ControllerTest {
   }
 
   @Test
-  public void testDualModeController()
-      throws Exception {
+  public void testDualModeController() throws Exception {
     config.setControllerMode(ControllerConf.ControllerMode.DUAL);
     config.setControllerPort(Integer.toString(Integer.parseInt(config.getControllerPort()) + controllerPortOffset++));
 
+    // Helix cluster will be set up when starting the first controller.
     startController(config);
     TestUtils.waitForCondition(aVoid -> _helixManager.isConnected(), TIMEOUT_IN_MS,
         "Failed to start " + config.getControllerMode() + " controller in " + TIMEOUT_IN_MS + "ms.");
@@ -75,11 +74,12 @@ public class PinotControllerModeTest extends ControllerTest {
     // Enable the lead controller resource.
     _helixAdmin.enableResource(getHelixClusterName(), CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME, true);
 
-    // Starting a second dual-mode controller.
+    // Starting a second dual-mode controller. Helix cluster has already been set up.
     ControllerConf controllerConfig = getDefaultControllerConfiguration();
     controllerConfig.setHelixClusterName(getHelixClusterName());
     controllerConfig.setControllerMode(ControllerConf.ControllerMode.DUAL);
-    controllerConfig.setControllerPort(Integer.toString(Integer.parseInt(this.config.getControllerPort()) + controllerPortOffset++));
+    controllerConfig.setControllerPort(
+        Integer.toString(Integer.parseInt(this.config.getControllerPort()) + controllerPortOffset++));
 
     ControllerStarter secondDualModeController = new TestOnlyControllerStarter(controllerConfig);
     secondDualModeController.start();
@@ -88,8 +88,6 @@ public class PinotControllerModeTest extends ControllerTest {
         "Failed to start " + config.getControllerMode() + " controller in " + TIMEOUT_IN_MS + "ms.");
     Assert.assertEquals(secondDualModeController.getControllerMode(), ControllerConf.ControllerMode.DUAL);
 
-    Thread.sleep(100000_000L);
-
     secondDualModeController.stop();
     stopController();
     _controllerStarter = null;
@@ -97,9 +95,8 @@ public class PinotControllerModeTest extends ControllerTest {
 
   // TODO: enable it after removing ControllerLeadershipManager which requires both CONTROLLER and PARTICIPANT
   //       HelixManager
-  @Test (enabled = false)
-  public void testPinotOnlyController()
-      throws Exception {
+  @Test(enabled = false)
+  public void testPinotOnlyController() throws Exception {
     config.setControllerMode(ControllerConf.ControllerMode.PINOT_ONLY);
     config.setControllerPort(Integer.toString(Integer.parseInt(config.getControllerPort()) + controllerPortOffset++));
 
@@ -134,10 +131,11 @@ public class PinotControllerModeTest extends ControllerTest {
 
     ControllerStarter firstPinotOnlyController = new TestOnlyControllerStarter(config3);
     firstPinotOnlyController.start();
-    PinotHelixResourceManager firstPinotOnlyPinotHelixResourceManager = firstPinotOnlyController.getHelixResourceManager();
+    PinotHelixResourceManager firstPinotOnlyPinotHelixResourceManager =
+        firstPinotOnlyController.getHelixResourceManager();
 
-    TestUtils.waitForCondition(aVoid -> firstPinotOnlyPinotHelixResourceManager.getHelixZkManager().isConnected(), TIMEOUT_IN_MS,
-        "Failed to start " + config.getControllerMode() + " controller in " + TIMEOUT_IN_MS + "ms.");
+    TestUtils.waitForCondition(aVoid -> firstPinotOnlyPinotHelixResourceManager.getHelixZkManager().isConnected(),
+        TIMEOUT_IN_MS, "Failed to start " + config.getControllerMode() + " controller in " + TIMEOUT_IN_MS + "ms.");
     Assert.assertEquals(firstPinotOnlyController.getControllerMode(), ControllerConf.ControllerMode.PINOT_ONLY);
 
     // Start a second Pinot only controller.
@@ -149,24 +147,25 @@ public class PinotControllerModeTest extends ControllerTest {
     ControllerStarter secondControllerStarter = new TestOnlyControllerStarter(config4);
     secondControllerStarter.start();
     // Two controller instances assigned to cluster.
-    TestUtils.waitForCondition(aVoid -> firstPinotOnlyPinotHelixResourceManager.getAllInstances().size() == 2, TIMEOUT_IN_MS,
-        "Failed to start the 2nd pinot only controller in " + TIMEOUT_IN_MS + "ms.");
+    TestUtils.waitForCondition(aVoid -> firstPinotOnlyPinotHelixResourceManager.getAllInstances().size() == 2,
+        TIMEOUT_IN_MS, "Failed to start the 2nd pinot only controller in " + TIMEOUT_IN_MS + "ms.");
 
     // Disable lead controller resource, all the participants are in offline state (from slave state).
     helixAdmin.enableResource(getHelixClusterName(), CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME, false);
 
     TestUtils.waitForCondition(aVoid -> {
-          ExternalView leadControllerResourceExternalView = firstPinotOnlyPinotHelixResourceManager.getLeadControllerResourceExternalView();
-          for (String partition : leadControllerResourceExternalView.getPartitionSet()) {
-            Map<String, String> stateMap = leadControllerResourceExternalView.getStateMap(partition);
-            for (Map.Entry<String, String> entry : stateMap.entrySet()) {
-              if (!"OFFLINE".equals(entry.getValue())) {
-                return false;
-              }
-            }
+      ExternalView leadControllerResourceExternalView = firstPinotOnlyPinotHelixResourceManager.getHelixAdmin()
+          .getResourceExternalView(getHelixClusterName(), CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME);
+      for (String partition : leadControllerResourceExternalView.getPartitionSet()) {
+        Map<String, String> stateMap = leadControllerResourceExternalView.getStateMap(partition);
+        for (Map.Entry<String, String> entry : stateMap.entrySet()) {
+          if (!"OFFLINE".equals(entry.getValue())) {
+            return false;
           }
-          return true;
-        }, TIMEOUT_IN_MS, "Failed to mark all the participants offline in " + TIMEOUT_IN_MS + "ms.");
+        }
+      }
+      return true;
+    }, TIMEOUT_IN_MS, "Failed to mark all the participants offline in " + TIMEOUT_IN_MS + "ms.");
 
     // Re-enable lead controller resource, all the participants are in healthy state (either master or slave).
     helixAdmin.enableResource(getHelixClusterName(), CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME, true);
@@ -175,7 +174,8 @@ public class PinotControllerModeTest extends ControllerTest {
     secondControllerStarter.stop();
 
     TestUtils.waitForCondition(aVoid -> {
-      ExternalView leadControllerResourceExternalView = firstPinotOnlyPinotHelixResourceManager.getLeadControllerResourceExternalView();
+      ExternalView leadControllerResourceExternalView = firstPinotOnlyPinotHelixResourceManager.getHelixAdmin()
+          .getResourceExternalView(getHelixClusterName(), CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME);
       for (String partition : leadControllerResourceExternalView.getPartitionSet()) {
         Map<String, String> stateMap = leadControllerResourceExternalView.getStateMap(partition);
         // Only 1 participant left in each partition, which will become the master.
@@ -191,12 +191,14 @@ public class PinotControllerModeTest extends ControllerTest {
     // Shutdown the only one controller left, the partition map should be empty.
     firstPinotOnlyController.stop();
     TestUtils.waitForCondition(aVoid -> {
-      ExternalView leadControllerResourceExternalView = helixAdmin
-          .getResourceExternalView(getHelixClusterName(), CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME);
+      ExternalView leadControllerResourceExternalView = helixAdmin.getResourceExternalView(getHelixClusterName(),
+          CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME);
       for (String partition : leadControllerResourceExternalView.getPartitionSet()) {
         Map<String, String> stateMap = leadControllerResourceExternalView.getStateMap(partition);
         // There's no participant in all the partitions.
-        return stateMap.isEmpty();
+        if (!stateMap.isEmpty()) {
+          return false;
+        }
       }
       return true;
     }, TIMEOUT_IN_MS, "Failed to have all the partitions empty in " + TIMEOUT_IN_MS + "ms.");
