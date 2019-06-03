@@ -29,6 +29,7 @@ import io.netty.channel.ChannelHandlerContext;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.Arrays;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -126,8 +127,13 @@ public class ScheduledRequestHandlerTest {
           @Nonnull
           @Override
           public ListenableFuture<byte[]> submit(@Nonnull ServerQueryRequest queryRequest) {
-            ListenableFuture<DataTable> dataTable = resourceManager.getQueryRunners().submit(() -> {
-              throw new RuntimeException("query processing error");
+            // The default version of Java 1.8 cannot recognize whether the submit method comes from ListeningExecutorService or Runnable.
+            // Specifying it for less ambiguity.
+            ListenableFuture<DataTable> dataTable = resourceManager.getQueryRunners().submit(new Callable<DataTable>() {
+              @Override
+              public DataTable call() throws Exception {
+                throw new RuntimeException("query processing error");
+              }
             });
             ListenableFuture<DataTable> queryResponse = Futures.catching(dataTable, Throwable.class, input -> {
               DataTable result = new DataTableImplV2();
