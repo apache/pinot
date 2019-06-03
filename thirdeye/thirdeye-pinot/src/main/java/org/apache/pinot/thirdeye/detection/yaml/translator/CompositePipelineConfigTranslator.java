@@ -124,7 +124,7 @@ import static org.apache.pinot.thirdeye.detection.yaml.DetectionConfigTuner.*;
  *
  */
 @Yaml(pipelineType = "COMPOSITE")
-public class CompositePipelineConfigTranslator extends YamlDetectionConfigTranslator {
+public class CompositePipelineConfigTranslator extends DetectionConfigTranslator {
   private static final String PROP_DIMENSION_EXPLORATION = "dimensionExploration";
 
   private static final String PROP_DETECTION = "detection";

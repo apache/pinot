@@ -33,13 +33,13 @@ public class YamlDetectionTranslatorLoader {
   private static final String DEFAULT_PIPELINE_TYPE= "Composite";
   private static DetectionRegistry DETECTION_REGISTRY = DetectionRegistry.getInstance();
 
-  public YamlDetectionConfigTranslator from(Map<String, Object> yamlConfig, DataProvider provider) throws Exception {
+  public DetectionConfigTranslator from(Map<String, Object> yamlConfig, DataProvider provider) throws Exception {
     if (!yamlConfig.containsKey(PROP_PIPELINE_TYPE)) {
       yamlConfig.put(PROP_PIPELINE_TYPE, DEFAULT_PIPELINE_TYPE);
     }
     String className = DETECTION_REGISTRY.lookupYamlConverter(yamlConfig.get(PROP_PIPELINE_TYPE).toString().toUpperCase());
     Constructor<?> constructor = Class.forName(className).getConstructor(Map.class, DataProvider.class);
-    return (YamlDetectionConfigTranslator) constructor.newInstance(yamlConfig, provider);
+    return (DetectionConfigTranslator) constructor.newInstance(yamlConfig, provider);
   }
 
 }

@@ -26,7 +26,7 @@ import org.apache.pinot.thirdeye.detection.annotation.Tune;
 import org.apache.pinot.thirdeye.detection.annotation.Yaml;
 import org.apache.pinot.thirdeye.detection.spi.components.BaseComponent;
 import org.apache.pinot.thirdeye.detection.spi.components.BaselineProvider;
-import org.apache.pinot.thirdeye.detection.yaml.translator.YamlDetectionConfigTranslator;
+import org.apache.pinot.thirdeye.detection.yaml.translator.DetectionConfigTranslator;
 import java.lang.annotation.Annotation;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -92,9 +92,9 @@ public class DetectionRegistry {
         }
       }
       // register yaml translators
-      Set<Class<? extends YamlDetectionConfigTranslator>> yamlConverterClasses =
-          reflections.getSubTypesOf(YamlDetectionConfigTranslator.class);
-      for (Class<? extends YamlDetectionConfigTranslator> clazz : yamlConverterClasses) {
+      Set<Class<? extends DetectionConfigTranslator>> yamlConverterClasses =
+          reflections.getSubTypesOf(DetectionConfigTranslator.class);
+      for (Class<? extends DetectionConfigTranslator> clazz : yamlConverterClasses) {
         for (Annotation annotation : clazz.getAnnotations()) {
           if (annotation instanceof Yaml) {
             YAML_MAP.put(((Yaml) annotation).pipelineType(), clazz.getName());
