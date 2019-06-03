@@ -80,7 +80,7 @@ import org.apache.pinot.thirdeye.detection.spi.components.BaselineProvider;
 import org.apache.pinot.thirdeye.detection.spi.model.TimeSeries;
 import org.apache.pinot.thirdeye.detection.validators.DetectionConfigValidator;
 import org.apache.pinot.thirdeye.detection.validators.SubscriptionConfigValidator;
-import org.apache.pinot.thirdeye.detection.yaml.translator.YamlDetectionAlertConfigTranslator;
+import org.apache.pinot.thirdeye.detection.yaml.translator.SubscriptionConfigTranslator;
 import org.apache.pinot.thirdeye.detection.yaml.translator.YamlDetectionConfigTranslator;
 import org.apache.pinot.thirdeye.detection.yaml.translator.YamlDetectionTranslatorLoader;
 import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
@@ -89,7 +89,7 @@ import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
 
 import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
-import static org.apache.pinot.thirdeye.detection.yaml.translator.YamlDetectionAlertConfigTranslator.*;
+import static org.apache.pinot.thirdeye.detection.yaml.translator.SubscriptionConfigTranslator.*;
 
 
 @Path("/yaml")
@@ -496,7 +496,7 @@ public class YamlResource {
     TreeMap<String, Object> newAlertConfigMap = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
     newAlertConfigMap.putAll(ConfigUtils.getMap(this.yaml.load(yamlAlertConfig)));
     DetectionAlertConfigDTO alertConfig = (DetectionAlertConfigDTO)
-        new YamlDetectionAlertConfigTranslator(detectionConfigDAO, newAlertConfigMap).translate();
+        new SubscriptionConfigTranslator(detectionConfigDAO, newAlertConfigMap).translate();
     alertConfig.setYaml(yamlAlertConfig);
 
     // Check for duplicates
@@ -576,7 +576,8 @@ public class YamlResource {
     // Translate payload to detection alert config
     TreeMap<String, Object> newAlertConfigMap = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
     newAlertConfigMap.putAll(ConfigUtils.getMap(this.yaml.load(yamlAlertConfig)));
-    DetectionAlertConfigDTO newAlertConfig = new YamlDetectionAlertConfigTranslator(detectionConfigDAO, newAlertConfigMap).translate();
+    DetectionAlertConfigDTO newAlertConfig = (DetectionAlertConfigDTO)
+        new SubscriptionConfigTranslator(detectionConfigDAO, newAlertConfigMap).translate();
 
     // Update existing alert config with the newly supplied config.
     DetectionAlertConfigDTO updatedAlertConfig = updateDetectionAlertConfig(oldAlertConfig, newAlertConfig);

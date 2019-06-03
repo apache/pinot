@@ -19,7 +19,7 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.thirdeye.detection.yaml.translator.YamlDetectionAlertConfigTranslator.*;
+import static org.apache.pinot.thirdeye.detection.yaml.translator.SubscriptionConfigTranslator.*;
 import static org.mockito.Mockito.*;
 
 
@@ -71,7 +71,7 @@ public class YamlDetectionAlertConfigTranslatorTest {
     SubscriptionConfigValidator validateMocker = mock(SubscriptionConfigValidator.class);
     doNothing().when(validateMocker).validateYaml(alertYamlConfigs);
 
-    DetectionAlertConfigDTO alertConfig = (DetectionAlertConfigDTO) new YamlDetectionAlertConfigTranslator(
+    DetectionAlertConfigDTO alertConfig = (DetectionAlertConfigDTO) new SubscriptionConfigTranslator(
         this.detectionConfigManager, alertYamlConfigs, validateMocker).translate();
 
     Assert.assertTrue(alertConfig.isActive());

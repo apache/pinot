@@ -26,7 +26,6 @@ import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.pojo.AlertConfigBean;
 import org.apache.pinot.thirdeye.datalayer.util.Predicate;
 import org.apache.pinot.thirdeye.detection.ConfigUtils;
-import org.apache.pinot.thirdeye.detection.DataProvider;
 import org.apache.pinot.thirdeye.detection.annotation.registry.DetectionAlertRegistry;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -45,7 +44,7 @@ import org.yaml.snakeyaml.Yaml;
 /**
  * The translator converts the alert yaml config into a detection alert config
  */
-public class YamlDetectionAlertConfigTranslator extends ConfigTranslator<DetectionAlertConfigDTO, SubscriptionConfigValidator> {
+public class SubscriptionConfigTranslator extends ConfigTranslator<DetectionAlertConfigDTO, SubscriptionConfigValidator> {
   public static final String PROP_DETECTION_CONFIG_IDS = "detectionConfigIds";
   public static final String PROP_RECIPIENTS = "recipients";
 
@@ -75,11 +74,11 @@ public class YamlDetectionAlertConfigTranslator extends ConfigTranslator<Detecti
       Arrays.asList(PROP_RECIPIENTS, PROP_DIMENSION, PROP_DIMENSION_RECIPIENTS));
   private final DetectionConfigManager detectionConfigDAO;
 
-  public YamlDetectionAlertConfigTranslator(DetectionConfigManager detectionConfigDAO, Map<String,Object> yamlAlertConfig) {
+  public SubscriptionConfigTranslator(DetectionConfigManager detectionConfigDAO, Map<String,Object> yamlAlertConfig) {
     this(detectionConfigDAO, yamlAlertConfig, new SubscriptionConfigValidator());
   }
 
-  public YamlDetectionAlertConfigTranslator(DetectionConfigManager detectionConfigDAO, Map<String,Object> yamlAlertConfig, SubscriptionConfigValidator validator) {
+  public SubscriptionConfigTranslator(DetectionConfigManager detectionConfigDAO, Map<String,Object> yamlAlertConfig, SubscriptionConfigValidator validator) {
     super(yamlAlertConfig, validator);
     this.detectionConfigDAO = detectionConfigDAO;
   }
