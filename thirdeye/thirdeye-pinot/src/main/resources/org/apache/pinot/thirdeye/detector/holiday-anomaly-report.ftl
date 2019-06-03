@@ -82,6 +82,9 @@
                   <span style="color: #606060; font-size: 16px; text-decoration: none; display:inline-block; vertical-align: middle; width: 77%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${detectionName}</span>
                   <a href="${dashboardHost}/app/#/manage/explore/${functionToId[detectionName]?string.computer}" target="blank" style="text-decoration: none; color: #0B5EA1; display:inline-block; vertical-align: middle;">(Edit Settings)</a>
                 </p>
+                <p>
+                  <span style="color: #606060; font-size: 13px; text-decoration: none; display:inline-block; vertical-align: middle; width: 77%; white-space: wrap;">${description}</span>
+                </p>
               </#if>
 
               <!-- List all the anomalies under this detection -->
