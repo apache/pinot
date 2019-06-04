@@ -83,7 +83,7 @@ public class DetectionPipelineTaskRunner implements TaskRunner {
 
     this.provider = new DefaultDataProvider(metricDAO, datasetDAO, eventDAO, this.anomalyDAO, this.evaluationDAO,
         timeseriesLoader, aggregationLoader, this.loader);
-    this.maintenanceFlow = new DefaultModelMaintenanceFlow(this.provider, DetectionRegistry.getInstance());
+    this.maintenanceFlow = new ModelRetuneFlow(this.provider, DetectionRegistry.getInstance());
   }
 
   /**
@@ -102,7 +102,7 @@ public class DetectionPipelineTaskRunner implements TaskRunner {
     this.evaluationDAO = evaluationDAO;
     this.loader = loader;
     this.provider = provider;
-    this.maintenanceFlow = new DefaultModelMaintenanceFlow(this.provider, DetectionRegistry.getInstance());
+    this.maintenanceFlow = new ModelRetuneFlow(this.provider, DetectionRegistry.getInstance());
   }
 
   @Override

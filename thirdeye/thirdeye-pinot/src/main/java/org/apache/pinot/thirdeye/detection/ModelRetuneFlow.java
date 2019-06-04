@@ -40,13 +40,13 @@ import org.joda.time.Instant;
  * The default model maintenance flow. If the model is tunable, this flow will run the configured model evaluators for
  * the detection config and automatically re-tunes the model.
  */
-public class DefaultModelMaintenanceFlow implements ModelMaintenanceFlow {
+public class ModelRetuneFlow implements ModelMaintenanceFlow {
   private static final int DEFAULT_TUNING_WINDOW_DAYS = 28;
 
   private final DataProvider provider;
   private final DetectionRegistry detectionRegistry;
 
-  DefaultModelMaintenanceFlow(DataProvider provider, DetectionRegistry detectionRegistry) {
+  ModelRetuneFlow(DataProvider provider, DetectionRegistry detectionRegistry) {
     this.provider = provider;
     this.detectionRegistry = detectionRegistry;
   }

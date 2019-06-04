@@ -23,7 +23,6 @@
 package org.apache.pinot.thirdeye.detection;
 
 import com.google.common.collect.ImmutableMap;
-import java.util.Collection;
 import java.util.Collections;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
@@ -61,7 +60,7 @@ public class DefaultModelMaintenanceFlowTest {
     this.provider = new MockDataProvider().setMetrics(Collections.singletonList(metric)).setDatasets(Collections.singletonList(dataset));
     this.configId = 100L;
     this.dataFetcher = new DefaultInputDataFetcher(this.provider, this.configId);
-    this.maintenanceFlow = new DefaultModelMaintenanceFlow(this.provider, DetectionRegistry.getInstance());
+    this.maintenanceFlow = new ModelRetuneFlow(this.provider, DetectionRegistry.getInstance());
   }
 
   @Test

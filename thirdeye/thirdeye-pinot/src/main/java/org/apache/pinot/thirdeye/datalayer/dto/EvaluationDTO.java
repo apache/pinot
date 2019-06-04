@@ -52,7 +52,7 @@ public class EvaluationDTO extends EvaluationBean {
     df = df.filter(df.getDoubles(COL_CURRENT).ne(0.0)).dropNull(COL_CURRENT, COL_VALUE);
     Double mape = Evaluation.calculateMape(df.getDoubles(COL_CURRENT), df.getDoubles(COL_VALUE));
     if (Double.isNaN(mape)) {
-      // explicitly swap NaN to null values because mysql doesn't support storing NaN and will thrown a exception.
+      // explicitly swap NaN to null values because mysql doesn't support storing NaN and will throw an exception.
       mape = null;
     }
     return mape;
