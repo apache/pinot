@@ -629,6 +629,11 @@ public class ControllerConf extends PropertiesConfiguration {
         initialDelayInSeconds);
   }
 
+  public void setOfflineSegmentIntervalCheckerInitialDelayInSeconds(long initialDelayInSeconds) {
+    setProperty(ControllerPeriodicTasksConf.OFFLINE_SEGMENT_INTERVAL_CHECKER_INITIAL_DELAY_IN_SECONDS,
+        initialDelayInSeconds);
+  }
+
   public long getPeriodicTaskInitialDelayInSeconds() {
     return ControllerPeriodicTasksConf.getRandomInitialDelayInSeconds();
   }

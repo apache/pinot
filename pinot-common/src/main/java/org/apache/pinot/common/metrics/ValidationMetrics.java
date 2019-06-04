@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.metrics;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.yammer.metrics.core.Gauge;
 import com.yammer.metrics.core.MetricName;
 import com.yammer.metrics.core.MetricsRegistry;
@@ -245,5 +246,14 @@ public class ValidationMetrics {
 
     _metricNames.clear();
     _gaugeValues.clear();
+  }
+
+  @VisibleForTesting
+  public long getValueOfGuage(final String fullGuageName) {
+    Long value  = _gaugeValues.get(fullGuageName);
+    if (value == null) {
+      return 0;
+    }
+    return value;
   }
 }
