@@ -18,16 +18,11 @@
  */
 package org.apache.pinot.client;
 
-import org.apache.yetus.audience.InterfaceAudience;
-import org.apache.yetus.audience.InterfaceStability;
-
 import java.util.Map;
 
 /**
  * Factory for client transports.
  */
-@InterfaceAudience.Private
-@InterfaceStability.Stable
 interface PinotClientTransportFactory {
   /**
    * This method is deprecating. Method with headers can be used in place of this by passing null headers.

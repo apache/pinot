@@ -18,9 +18,6 @@
  */
 package org.apache.pinot.client;
 
-import org.apache.yetus.audience.InterfaceAudience;
-import org.apache.yetus.audience.InterfaceStability;
-
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -30,8 +27,6 @@ import java.util.Properties;
 /**
  * Creates connections to Pinot, given various initialization methods.
  */
-@InterfaceAudience.Public
-@InterfaceStability.Evolving
 public class ConnectionFactory {
   static PinotClientTransportFactory _transportFactory = new JsonAsyncHttpPinotClientTransportFactory();
 
