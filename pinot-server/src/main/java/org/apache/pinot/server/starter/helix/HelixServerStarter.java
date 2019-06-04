@@ -342,15 +342,14 @@ public class HelixServerStarter {
         throw new IllegalStateException("Service status is BAD");
       }
       long sleepTimeMs = Math.min(checkIntervalMs, endTimeMs - currentTimeMs);
-      if (sleepTimeMs > 0) {
-        LOGGER.info("Sleep for {}ms as service status has not turned GOOD: {}", sleepTimeMs, ServiceStatus.getStatusDescription());
-        try {
-          Thread.sleep(sleepTimeMs);
-        } catch (InterruptedException e) {
-          LOGGER.warn("Got interrupted while checking service status", e);
-          Thread.currentThread().interrupt();
-          break;
-        }
+      LOGGER.info("Sleep for {}ms as service status has not turned GOOD: {}", sleepTimeMs,
+          ServiceStatus.getStatusDescription());
+      try {
+        Thread.sleep(sleepTimeMs);
+      } catch (InterruptedException e) {
+        LOGGER.warn("Got interrupted while checking service status", e);
+        Thread.currentThread().interrupt();
+        break;
       }
     }
 
