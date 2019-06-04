@@ -54,8 +54,6 @@ public class TransformFunctionFactory {
           put(CeilTransformFunction.FUNCTION_NAME.toLowerCase(), CeilTransformFunction.class);
           put(ExpTransformFunction.FUNCTION_NAME.toLowerCase(), ExpTransformFunction.class);
           put(FloorTransformFunction.FUNCTION_NAME.toLowerCase(), FloorTransformFunction.class);
-          put(LnTransformFunction.FUNCTION_NAME.toLowerCase(), LnTransformFunction.class);
-          put(Log10TransformFunction.FUNCTION_NAME.toLowerCase(), Log10TransformFunction.class);
           put(SqrtTransformFunction.FUNCTION_NAME.toLowerCase(), SqrtTransformFunction.class);
         }
       };
