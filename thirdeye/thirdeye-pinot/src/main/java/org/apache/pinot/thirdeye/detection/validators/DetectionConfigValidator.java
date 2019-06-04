@@ -115,11 +115,10 @@ public class DetectionConfigValidator implements ConfigValidator<DetectionConfig
   private void validateRule(String alertName, Map<String, Object> ruleYaml, int ruleIndex, String ruleType, Set<String> ruleNamesTaken) {
     Preconditions.checkArgument(ruleYaml.containsKey(PROP_TYPE),
         "Missing property " + ruleType + " (" + ruleType + ") for sub-alert " + alertName + " rule no. " + ruleIndex);
-    String type = MapUtils.getString(ruleYaml, PROP_TYPE);
 
     Preconditions.checkArgument(ruleYaml.containsKey(PROP_NAME),
         "Missing property " + ruleType + " (" + PROP_NAME + ") for sub-alert " + alertName + " rule no. " + ruleIndex);
-    String name = (String) ruleYaml.get(PROP_NAME);
+    String name = MapUtils.getString(ruleYaml, PROP_NAME);
 
     Preconditions.checkArgument(!ruleNamesTaken.contains(name),
         "Duplicate rule name (" + name + ") found for sub-alert " + alertName + " rule no. " + ruleIndex + ". Names have to be unique within a config.");
@@ -131,11 +130,11 @@ public class DetectionConfigValidator implements ConfigValidator<DetectionConfig
   private void validateBasicAttributes(Map<String, Object> detectionYaml, String parentAlertName) {
     Preconditions.checkArgument(detectionYaml.containsKey(PROP_NAME),
         "Missing property ( " + PROP_NAME + " ) in one of the sub-alerts under " + parentAlertName);
-    String alertName = (String) detectionYaml.get(PROP_NAME);
+    String alertName = MapUtils.getString(detectionYaml, PROP_NAME);
 
     Preconditions.checkArgument(detectionYaml.containsKey(PROP_TYPE),
         "Missing property ( " + PROP_TYPE + " ) in sub-alert " + alertName);
-    String alertType = (String) detectionYaml.get(PROP_TYPE);
+    String alertType = MapUtils.getString(detectionYaml, PROP_TYPE);
 
     Preconditions.checkArgument(SUPPORTED_ALERT_TYPES.contains(alertType),
         "Unsupported type (" + alertType + ") in sub-alert " + alertName);
@@ -144,7 +143,7 @@ public class DetectionConfigValidator implements ConfigValidator<DetectionConfig
   private void validateMetricAlertConfig(Map<String, Object> detectionYaml, String parentAlertName)
       throws IllegalArgumentException {
     validateBasicAttributes(detectionYaml, parentAlertName);
-    String alertName = (String) detectionYaml.get(PROP_NAME);
+    String alertName = MapUtils.getString(detectionYaml, PROP_NAME);
 
     // Validate all compulsory fields
     Preconditions.checkArgument(detectionYaml.containsKey(PROP_METRIC),
@@ -209,7 +208,7 @@ public class DetectionConfigValidator implements ConfigValidator<DetectionConfig
 
   private void validateCompositeAlertConfig(Map<String, Object> detectionYaml, String parentAlertName) throws IllegalArgumentException {
     validateBasicAttributes(detectionYaml, parentAlertName);
-    String alertName = (String) detectionYaml.get(PROP_NAME);
+    String alertName = MapUtils.getString(detectionYaml, PROP_NAME);
 
     // Validate all compulsory fields
     Preconditions.checkArgument(detectionYaml.containsKey(PROP_ALERTS),
@@ -239,7 +238,7 @@ public class DetectionConfigValidator implements ConfigValidator<DetectionConfig
   public void validateYaml(Map<String, Object> detectionYaml) throws IllegalArgumentException {
     // Validate detectionName
     Preconditions.checkArgument(detectionYaml.containsKey(PROP_DETECTION_NAME), "Property missing: " + PROP_DETECTION_NAME);
-    String alertName = (String) detectionYaml.get(PROP_DETECTION_NAME);
+    String alertName = MapUtils.getString(detectionYaml, PROP_DETECTION_NAME);
 
     // Hack to support 'detectionName' attribute at root level and 'name' attribute elsewhere
     // We consistently use 'name' as a convention to define the sub-alerts. However, at the root
