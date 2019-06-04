@@ -195,6 +195,7 @@ public class ControllerStarter {
     // Set up controller metrics
     MetricsHelper.initializeMetrics(_config.subset(METRICS_REGISTRY_NAME));
     MetricsHelper.registerMetricsRegistry(_metricsRegistry);
+    _controllerMetrics.initializeGlobalMeters();
 
     switch (_controllerMode) {
       case DUAL:
@@ -213,7 +214,6 @@ public class ControllerStarter {
 
     ServiceStatus
         .setServiceStatusCallback(new ServiceStatus.MultipleCallbackServiceStatusCallback(_serviceStatusCallbackList));
-    _controllerMetrics.initializeGlobalMeters();
   }
 
   private void setUpHelixController() {

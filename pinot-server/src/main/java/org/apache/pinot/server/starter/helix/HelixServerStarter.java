@@ -52,7 +52,6 @@ import org.apache.pinot.common.config.TagNameUtils;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.ServiceStatus.Status;
@@ -220,12 +219,10 @@ public class HelixServerStarter {
    * Fetches the resources to monitor and registers the {@link org.apache.pinot.common.utils.ServiceStatus.ServiceStatusCallback}s
    */
   private void registerServiceStatusHandler() {
-
     double minResourcePercentForStartup = _serverConf
         .getDouble(CONFIG_OF_SERVER_MIN_RESOURCE_PERCENT_FOR_START, DEFAULT_SERVER_MIN_RESOURCE_PERCENT_FOR_START);
-    int realtimeConsumptionCatchupWaitMs = _serverConf.getInt(
-        CommonConstants.Server.CONFIG_OF_STARTUP_REALTIME_CONSUMPTION_CATCHUP_WAIT_MS,
-        CommonConstants.Server.DEFAULT_STARTUP_REALTIME_CONSUMPTION_CATCHUP_WAIT_MS);
+    int realtimeConsumptionCatchupWaitMs = _serverConf.getInt(CONFIG_OF_STARTUP_REALTIME_CONSUMPTION_CATCHUP_WAIT_MS,
+        DEFAULT_STARTUP_REALTIME_CONSUMPTION_CATCHUP_WAIT_MS);
 
     // collect all resources which have this instance in the ideal state
     List<String> resourcesToMonitor = new ArrayList<>();
@@ -251,8 +248,8 @@ public class HelixServerStarter {
         }
         if (checkRealtime && !foundConsuming && TableNameBuilder.isRealtimeTableResource(resourceName)) {
           for (String partitionName : idealState.getPartitionSet()) {
-            if (CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel.CONSUMING.equals(
-                idealState.getInstanceStateMap(partitionName).get(_instanceId))) {
+            if (StateModel.RealtimeSegmentOnlineOfflineStateModel.CONSUMING
+                .equals(idealState.getInstanceStateMap(partitionName).get(_instanceId))) {
               foundConsuming = true;
               break;
             }
@@ -342,14 +339,16 @@ public class HelixServerStarter {
         throw new IllegalStateException("Service status is BAD");
       }
       long sleepTimeMs = Math.min(checkIntervalMs, endTimeMs - currentTimeMs);
-      LOGGER.info("Sleep for {}ms as service status has not turned GOOD: {}", sleepTimeMs,
-          ServiceStatus.getStatusDescription());
-      try {
-        Thread.sleep(sleepTimeMs);
-      } catch (InterruptedException e) {
-        LOGGER.warn("Got interrupted while checking service status", e);
-        Thread.currentThread().interrupt();
-        break;
+      if (sleepTimeMs > 0) {
+        LOGGER.info("Sleep for {}ms as service status has not turned GOOD: {}", sleepTimeMs,
+            ServiceStatus.getStatusDescription());
+        try {
+          Thread.sleep(sleepTimeMs);
+        } catch (InterruptedException e) {
+          LOGGER.warn("Got interrupted while checking service status", e);
+          Thread.currentThread().interrupt();
+          break;
+        }
       }
     }
 
@@ -491,13 +490,15 @@ public class HelixServerStarter {
           return;
         }
         long sleepTimeMs = Math.min(checkIntervalMs, endTimeMs - currentTimeMs);
-        LOGGER.info("Sleep for {}ms as some resources [{}, ...] are still ONLINE", sleepTimeMs, currentResource);
-        try {
-          Thread.sleep(sleepTimeMs);
-        } catch (InterruptedException e) {
-          LOGGER.warn("Got interrupted while waiting for all resources OFFLINE", e);
-          Thread.currentThread().interrupt();
-          break;
+        if (sleepTimeMs > 0) {
+          LOGGER.info("Sleep for {}ms as some resources [{}, ...] are still ONLINE", sleepTimeMs, currentResource);
+          try {
+            Thread.sleep(sleepTimeMs);
+          } catch (InterruptedException e) {
+            LOGGER.warn("Got interrupted while waiting for all resources OFFLINE", e);
+            Thread.currentThread().interrupt();
+            break;
+          }
         }
       }
 
