@@ -31,6 +31,7 @@ import org.apache.pinot.common.config.ReplicaGroupStrategyConfig;
 import org.apache.pinot.common.config.SegmentPartitionConfig;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.config.TableNameBuilder;
+import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.partition.ReplicaGroupPartitionAssignment;
 import org.apache.pinot.common.partition.ReplicaGroupPartitionAssignmentGenerator;
 import org.apache.pinot.common.utils.CommonConstants;
@@ -39,6 +40,9 @@ import org.apache.pinot.controller.helix.ControllerRequestBuilderUtil;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.utils.ReplicaGroupTestUtils;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
+import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
+import org.apache.pinot.core.realtime.stream.StreamConfig;
+import org.apache.pinot.core.realtime.stream.StreamConfigProperties;
 import org.testng.Assert;
 import org.testng.annotations.AfterTest;
 import org.testng.annotations.BeforeTest;
@@ -186,7 +190,7 @@ public class SegmentAssignmentStrategyTest extends ControllerTest {
   }
 
   @Test
-  public void testReplicaGroupPartitionAssignment()
+  public void testOfflineReplicaGroupPartitionAssignment()
       throws Exception {
     String rawTableName = TABLE_NAME_REPLICA_GROUP_PARTITION_ASSIGNMENT;
     String tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
@@ -235,6 +239,85 @@ public class SegmentAssignmentStrategyTest extends ControllerTest {
     _helixResourceManager.deleteOfflineTable(rawTableName);
     partitionAssignment = _partitionAssignmentGenerator.getReplicaGroupPartitionAssignment(tableNameWithType);
     Assert.assertTrue(partitionAssignment == null);
+  }
+
+  /**
+   * Tests to check creation/deletion of replica group znode when table is created/updated/deleted
+   */
+  @Test
+  public void testRealtimeReplicaGroupPartitionAssignment() {
+    String rawTableName = TABLE_NAME_REPLICA_GROUP_PARTITION_ASSIGNMENT;
+    String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(rawTableName);
+
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(rawTableName).build();
+    _helixResourceManager.addOrUpdateSchema(schema);
+
+    Map<String, String> streamConfigMap = FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap();
+
+    // Adding a table without replica group
+    TableConfig tableConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.REALTIME).setTableName(
+        TABLE_NAME_REPLICA_GROUP_PARTITION_ASSIGNMENT)
+        .setSegmentAssignmentStrategy("RandomAssignmentStrategy")
+        .setNumReplicas(NUM_REPLICA)
+        .setStreamConfigs(streamConfigMap)
+        .setLLC(true)
+        .build();
+    try {
+      _helixResourceManager.addTable(tableConfig);
+    } catch (Exception e) {
+      // ignore
+    }
+
+    // Check that partition assignment does not exist
+    ReplicaGroupPartitionAssignment partitionAssignment =
+        _partitionAssignmentGenerator.getReplicaGroupPartitionAssignment(tableNameWithType);
+
+    Assert.assertNull(partitionAssignment);
+
+    // Update table config with replica group config
+    int numInstancesPerPartition = 5;
+    ReplicaGroupStrategyConfig replicaGroupStrategyConfig = new ReplicaGroupStrategyConfig();
+    replicaGroupStrategyConfig.setNumInstancesPerPartition(numInstancesPerPartition);
+    replicaGroupStrategyConfig.setMirrorAssignmentAcrossReplicaGroups(true);
+
+    TableConfig replicaGroupTableConfig =
+        new TableConfig.Builder(CommonConstants.Helix.TableType.REALTIME).setTableName(
+            TABLE_NAME_REPLICA_GROUP_PARTITION_ASSIGNMENT)
+            .setNumReplicas(NUM_REPLICA)
+            .setSegmentAssignmentStrategy("ReplicaGroupSegmentAssignmentStrategy")
+            .setStreamConfigs(streamConfigMap)
+            .setLLC(true)
+            .build();
+
+    replicaGroupTableConfig.getValidationConfig().setReplicaGroupStrategyConfig(replicaGroupStrategyConfig);
+
+    // Check that the replica group partition assignment is created
+    try {
+      _helixResourceManager.setExistingTableConfig(replicaGroupTableConfig, tableNameWithType, CommonConstants.Helix.TableType.REALTIME);
+    } catch (Exception e) {
+      // ignore
+    }
+    partitionAssignment = _partitionAssignmentGenerator.getReplicaGroupPartitionAssignment(tableNameWithType);
+    Assert.assertNotNull(partitionAssignment);
+
+    // After table deletion, check that the replica group partition assignment is deleted
+    _helixResourceManager.deleteRealtimeTable(rawTableName);
+    partitionAssignment = _partitionAssignmentGenerator.getReplicaGroupPartitionAssignment(tableNameWithType);
+    Assert.assertNull(partitionAssignment);
+
+    // Create a table with replica group
+    try {
+      _helixResourceManager.addTable(replicaGroupTableConfig);
+    } catch (Exception e) {
+      // ignore
+    }
+    partitionAssignment = _partitionAssignmentGenerator.getReplicaGroupPartitionAssignment(tableNameWithType);
+    Assert.assertNotNull(partitionAssignment);
+
+    // Check that the replica group partition assignment is deleted
+    _helixResourceManager.deleteRealtimeTable(rawTableName);
+    partitionAssignment = _partitionAssignmentGenerator.getReplicaGroupPartitionAssignment(tableNameWithType);
+    Assert.assertNull(partitionAssignment);
   }
 
   @Test

@@ -18,15 +18,19 @@
  */
 package org.apache.pinot.common.utils;
 
+import com.google.common.collect.Lists;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
+import org.apache.helix.HelixProperty;
 import org.apache.helix.PropertyKey;
 import org.apache.helix.model.CurrentState;
 import org.apache.helix.model.ExternalView;
@@ -128,14 +132,64 @@ public class ServiceStatus {
   }
 
   /**
+   * Service status callback that checks whether realtime consumption has caught up
+   * TODO: In this initial version, we are simply adding a configurable static wait time
+   * This can be made smarter:
+   * 1) Keep track of average consumption rate for table in server stats
+   * 2) Monitor consumption rate during startup, report GOOD when it stabilizes to average rate
+   * 3) Monitor consumption rate during startup, report GOOD if it is idle
+   */
+  public static class RealtimeConsumptionCatchupServiceStatusCallback implements ServiceStatusCallback {
+
+    String _statusDescription = STATUS_DESCRIPTION_INIT;
+    private Status _serviceStatus = Status.STARTING;
+    private final long _endWaitTime;
+
+    /**
+     * Realtime consumption catchup service which adds a static wait time for consuming segments to catchup
+     */
+    public RealtimeConsumptionCatchupServiceStatusCallback(HelixManager helixManager, String clusterName,
+        String instanceName, long realtimeConsumptionCatchupWaitMs) {
+
+      // A consuming segment will actually be ready to serve queries after (time of creation of partition consumer) + (configured max time to catchup)
+      // We are approximating it to (time of server startup) + (configured max time to catch up)
+      _endWaitTime = System.currentTimeMillis() + realtimeConsumptionCatchupWaitMs;
+      LOGGER.info("Monitoring realtime consumption catchup. Will allow {} ms before marking status GOOD",
+          realtimeConsumptionCatchupWaitMs);
+    }
+
+    @Override
+    public synchronized Status getServiceStatus() {
+      if (_serviceStatus.equals(Status.GOOD)) {
+        return _serviceStatus;
+      }
+      long now = System.currentTimeMillis();
+      if (now < _endWaitTime) {
+        _statusDescription =
+            String.format("Waiting for consuming segments to catchup, timeRemaining=%dms", _endWaitTime - now);
+        return Status.STARTING;
+      }
+      _statusDescription = String.format("Consuming segments status GOOD since %dms", _endWaitTime);
+      return Status.GOOD;
+    }
+
+    @Override
+    public synchronized String getStatusDescription() {
+      return _statusDescription;
+    }
+  }
+
+  /**
    * Service status callback that compares ideal state with another Helix state. Used to share most of the logic between
    * the ideal state/external view comparison and ideal state/current state comparison.
    */
-  private static abstract class IdealStateMatchServiceStatusCallback<T> implements ServiceStatusCallback {
-    protected final String _clusterName;
-    protected final String _instanceName;
-    protected final HelixAdmin _helixAdmin;
-    protected final HelixDataAccessor _helixDataAccessor;
+  private static abstract class IdealStateMatchServiceStatusCallback<T extends HelixProperty>
+      implements ServiceStatusCallback {
+
+    final String _clusterName;
+    final String _instanceName;
+    final HelixAdmin _helixAdmin;
+    final HelixDataAccessor _helixDataAccessor;
 
     private final Set<String> _resourcesToMonitor;
     private final int _numTotalResourcesToMonitor;
@@ -145,39 +199,7 @@ public class ServiceStatus {
 
     private String _statusDescription = STATUS_DESCRIPTION_INIT;
 
-    public IdealStateMatchServiceStatusCallback(HelixManager helixManager, String clusterName, String instanceName,
-        double minResourcesStartPercent) {
-      _clusterName = clusterName;
-      _instanceName = instanceName;
-      _helixAdmin = helixManager.getClusterManagmentTool();
-      _helixDataAccessor = helixManager.getHelixDataAccessor();
-
-      _resourcesToMonitor = new HashSet<>();
-      for (String resourceName : _helixAdmin.getResourcesInCluster(_clusterName)) {
-        // Only monitor table resources and broker resource
-        if (!TableNameBuilder.isTableResource(resourceName) && !resourceName
-            .equals(CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)) {
-          continue;
-        }
-        // Only monitor enabled resources
-        IdealState idealState = getResourceIdealState(resourceName);
-        if (idealState.isEnabled()) {
-          for (String partitionName : idealState.getPartitionSet()) {
-            if (idealState.getInstanceSet(partitionName).contains(_instanceName)) {
-              _resourcesToMonitor.add(resourceName);
-              break;
-            }
-          }
-        }
-      }
-      _numTotalResourcesToMonitor = _resourcesToMonitor.size();
-      _minResourcesStartCount = (int) Math.ceil(minResourcesStartPercent * _numTotalResourcesToMonitor / 100);
-
-      LOGGER.info("Monitoring {} resources: {} for start up of instance {}", _numTotalResourcesToMonitor,
-          getResourceListAsString(), _instanceName);
-    }
-
-    public IdealStateMatchServiceStatusCallback(HelixManager helixManager, String clusterName, String instanceName,
+    IdealStateMatchServiceStatusCallback(HelixManager helixManager, String clusterName, String instanceName,
         List<String> resourcesToMonitor, double minResourcesStartPercent) {
       _clusterName = clusterName;
       _instanceName = instanceName;
@@ -199,24 +221,18 @@ public class ServiceStatus {
     protected abstract String getMatchName();
 
     private boolean isDone() {
-      if (_resourcesToMonitor.isEmpty() || _numTotalResourcesToMonitor <= 0) {
-        return true;
-      }
-      if (_numTotalResourcesToMonitor - _resourcesToMonitor.size() >= _minResourcesStartCount) {
-        return true;
-      }
-      return false;
+      return _numTotalResourcesToMonitor - _resourcesToMonitor.size() >= _minResourcesStartCount;
     }
 
-    // Each time getServiceStatus is called, we move on to the next resource that needs to be examined. If we
+    // Each time getServiceStatus() is called, we move on to the next resource that needs to be examined. If we
     // reach the end, we set the iterator back to the beginning, starting again on the resource we left off
     // a while ago.
-    // We do so until minResourcesStartPercent percent of resources have converged their externalview (or currentstate)
-    // to the idealstate. If any resource has not converged (and we have still not reached the threshold percent) then
+    // We do so until minResourcesStartPercent percent of resources have converged their ExternalView (or CurrentState)
+    // to the IdealState. If any resource has not converged (and we have still not reached the threshold percent) then
     // we return immediately.
     // This allows us to move forward with resources that have converged as opposed to getting stuck with those that
     // have not.
-    // In large installations with 1000s of resources, some resources may be stuck in transitions due to zookpeer
+    // In large installations with 1000s of resources, some resources may be stuck in transitions due to zookeeper
     // connection issues in helix. In such cases, setting a percentage threshold to be (say) 99.9% allows us to move
     // past and declare the server as having STARTED as opposed to waiting for the one resource that may never converge.
     // Note:
@@ -250,9 +266,10 @@ public class ServiceStatus {
           return statusDescriptionPair._status;
         }
       }
+      _resourceIterator = null;
 
       // At this point, one of the following conditions hold:
-      // 1. We entered the loop above, and all the remaining resources ended up in GOOOD state.
+      // 1. We entered the loop above, and all the remaining resources ended up in GOOD state.
       //    In that case _resourcesToMonitor would be empty.
       // 2. We entered the loop above and cleared most of the remaining resources, but some small
       //    number are still not converged. In that case, we exited the loop because we have met
@@ -264,26 +281,25 @@ public class ServiceStatus {
       //    the same action as for (2) above.
       // In all three cases above, we need to return Status.GOOD
 
+      int logCount = MAX_RESOURCE_NAMES_TO_LOG;
+      Iterator<String> resourceIterator = _resourcesToMonitor.iterator();
+      while (resourceIterator.hasNext()) {
+        String resource = resourceIterator.next();
+        StatusDescriptionPair statusDescriptionPair = evaluateResourceStatus(resource);
+        if (statusDescriptionPair._status == Status.GOOD) {
+          resourceIterator.remove();
+        } else {
+          if (logCount-- <= 0) {
+            break;
+          }
+          LOGGER.info("Resource: {}, StatusDescription: {}", resource, statusDescriptionPair._description);
+        }
+      }
       if (_resourcesToMonitor.isEmpty()) {
         _statusDescription = STATUS_DESCRIPTION_NONE;
-        LOGGER.info("Instance {} has finished starting up", _instanceName);
       } else {
-        int logCount = MAX_RESOURCE_NAMES_TO_LOG;
-        _resourceIterator = _resourcesToMonitor.iterator();
-        while (_resourceIterator.hasNext()) {
-          String resource = _resourceIterator.next();
-          StatusDescriptionPair statusDescriptionPair = evaluateResourceStatus(resource);
-          if (statusDescriptionPair._status == Status.GOOD) {
-            _resourceIterator.remove();
-          } else {
-            LOGGER.info("Resource: {}, StatusDescription: {}", resource, statusDescriptionPair._description);
-            if (--logCount <= 0) {
-              break;
-            }
-          }
-        }
         _statusDescription = String
-            .format("waitingFor=%s, numResourcesLeft=%d, numTotalResources=%d, minStartCount=%d," + " resourceList=%s",
+            .format("waitingFor=%s, numResourcesLeft=%d, numTotalResources=%d, minStartCount=%d, resourceList=%s",
                 getMatchName(), _resourcesToMonitor.size(), _numTotalResourcesToMonitor, _minResourcesStartCount,
                 getResourceListAsString());
         LOGGER.info("Instance {} returning GOOD because {}", _instanceName, _statusDescription);
@@ -323,8 +339,11 @@ public class ServiceStatus {
           if ("ERROR".equals(currentStateStatus)) {
             LOGGER.error(String.format("Resource: %s, partition: %s is in ERROR state", resourceName, partitionName));
           } else {
+            HelixProperty.Stat stat = helixState.getStat();
             String description = String
-                .format("partition=%s, expected=%s, found=%s", partitionName, idealStateStatus, currentStateStatus);
+                .format("partition=%s, expected=%s, found=%s, creationTime=%d, modifiedTime=%d, version=%d", partitionName,
+                    idealStateStatus, currentStateStatus, stat != null ? stat.getCreationTime() : -1,
+                    stat != null ? stat.getModifiedTime() : -1, stat != null ? stat.getVersion() : -1);
             return new StatusDescriptionPair(Status.STARTING, description);
           }
         }
@@ -336,7 +355,12 @@ public class ServiceStatus {
       if (_resourcesToMonitor.size() <= MAX_RESOURCE_NAMES_TO_LOG) {
         return _resourcesToMonitor.toString();
       }
-      return "[" + _resourcesToMonitor.iterator().next() + ",...]";
+      StringBuilder stringBuilder = new StringBuilder("[");
+      Iterator<String> resourceIterator = _resourcesToMonitor.iterator();
+      for (int i = 0; i < MAX_RESOURCE_NAMES_TO_LOG; i++) {
+        stringBuilder.append(resourceIterator.next()).append(", ");
+      }
+      return stringBuilder.append("...]").toString();
     }
 
     @Override
@@ -356,11 +380,6 @@ public class ServiceStatus {
    */
   public static class IdealStateAndCurrentStateMatchServiceStatusCallback extends IdealStateMatchServiceStatusCallback<CurrentState> {
     private static final String MATCH_NAME = "CurrentStateMatch";
-
-    public IdealStateAndCurrentStateMatchServiceStatusCallback(HelixManager helixManager, String clusterName,
-        String instanceName, double minResourcesStartPercent) {
-      super(helixManager, clusterName, instanceName, minResourcesStartPercent);
-    }
 
     public IdealStateAndCurrentStateMatchServiceStatusCallback(HelixManager helixManager, String clusterName,
         String instanceName, List<String> resourcesToMonitor, double minResourcesStartPercent) {
@@ -393,11 +412,6 @@ public class ServiceStatus {
    */
   public static class IdealStateAndExternalViewMatchServiceStatusCallback extends IdealStateMatchServiceStatusCallback<ExternalView> {
     private static final String MATCH_NAME = "ExternalViewMatch";
-
-    public IdealStateAndExternalViewMatchServiceStatusCallback(HelixManager helixManager, String clusterName,
-        String instanceName, double minResourcesStartPercent) {
-      super(helixManager, clusterName, instanceName, minResourcesStartPercent);
-    }
 
     public IdealStateAndExternalViewMatchServiceStatusCallback(HelixManager helixManager, String clusterName,
         String instanceName, List<String> resourcesToMonitor, double minResourcesStartPercent) {

@@ -304,7 +304,7 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
   public void build()
       throws Exception {
     long startTime = System.currentTimeMillis();
-    LOGGER.info("Start building star-trees with config: {}", _builderConfig);
+    LOGGER.info("Starting building star-tree with config: {}", _builderConfig);
 
     int numSegmentRecords = _segment.getSegmentMetadata().getTotalRawDocs();
     Iterator<Record> recordIterator = sortAndAggregateSegmentRecords(numSegmentRecords);
@@ -314,20 +314,21 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
     int numStarTreeRecords = _numDocs;
     LOGGER.info("Generated {} star-tree records from {} segment records", numStarTreeRecords, numSegmentRecords);
 
-    int numRecordsUnderStarNode = _numDocs - numStarTreeRecords;
     constructStarTree(_rootNode, 0, _numDocs);
-    LOGGER.info("Finish constructing star-tree, got {} tree nodes and {} records under star-node", _numNodes,
+    int numRecordsUnderStarNode = _numDocs - numStarTreeRecords;
+    LOGGER.info("Finished constructing star-tree, got {} tree nodes and {} records under star-node", _numNodes,
         numRecordsUnderStarNode);
 
     createAggregatedDocs(_rootNode);
-    LOGGER.info("Finish creating aggregated documents, got {} aggregated records", _numDocs - numRecordsUnderStarNode);
+    int numAggregatedRecords = _numDocs - numSegmentRecords - numRecordsUnderStarNode;
+    LOGGER.info("Finished creating aggregated documents, got {} aggregated records", numAggregatedRecords);
 
     createForwardIndexes();
     StarTreeBuilderUtils
         .serializeTree(new File(_outputDir, STAR_TREE_INDEX_FILE_NAME), _rootNode, _dimensionsSplitOrder, _numNodes);
     writeMetadata();
 
-    LOGGER.info("Finish building star-tree in {}ms", System.currentTimeMillis() - startTime);
+    LOGGER.info("Finished building star-tree in {}ms", System.currentTimeMillis() - startTime);
   }
 
   private void appendToStarTree(Record record)

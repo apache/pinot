@@ -30,7 +30,8 @@ export default Route.extend(AuthenticatedRouteMixin, {
     endDate: queryParamsConfig,
     duration: queryParamsConfig,
     feedbackType: queryParamsConfig,
-    shareId: queryParamsConfig
+    shareId: queryParamsConfig,
+    subGroup: queryParamsConfig
   },
   appName: null,
   startDate: moment().subtract(1, 'day').utc().valueOf(), //taylored for Last 24 hours vs Today -> moment().startOf('day').utc().valueOf(),
@@ -38,10 +39,12 @@ export default Route.extend(AuthenticatedRouteMixin, {
   duration: '1d', //Last 24 hours
   feedbackType: 'All Resolutions',
   shareId: null,
+  subGroup: null,
 
   async model(params) {
-    const { appName, startDate, endDate, duration, feedbackType, shareId } = params;//check params
-    const applications = await get(this, 'anomaliesApiService').queryApplications(appName, startDate);// Get all applicatons available
+    const { appName, startDate, endDate, duration, feedbackType, shareId, subGroup } = params;//check params
+    const applications = await get(this, 'anomaliesApiService').queryApplications();// Get all applicatons available
+    const subscriptionGroups = await this.get('anomaliesApiService').querySubscriptionGroups(); // Get all subscription groups available
 
     return hash({
       appName,
@@ -50,7 +53,9 @@ export default Route.extend(AuthenticatedRouteMixin, {
       duration,
       applications,
       feedbackType,
-      shareId
+      shareId,
+      subscriptionGroups,
+      subGroup
     });
   },
 
@@ -62,18 +67,20 @@ export default Route.extend(AuthenticatedRouteMixin, {
     const duration = model.duration || get(this, 'duration');
     const feedbackType = model.feedbackType || get(this, 'feedbackType');
     const shareId = model.shareId || get(this, 'shareId');
+    const subGroup = model.subGroup || null;
     // Update props
     setProperties(this, {
       appName,
       startDate,
       endDate,
       duration,
-      feedbackType
+      feedbackType,
+      subGroup
     });
 
     return new RSVP.Promise(async (resolve, reject) => {
       try {
-        const anomalyMapping = appName ? await get(this, '_getAnomalyMapping').perform(model) : []; //DEMO:
+        const anomalyMapping = (appName || subGroup) ? await get(this, '_getAnomalyMapping').perform(model) : []; //DEMO:
         const shareMetaData = shareId ? await get(this, 'shareDashboardApiService').queryShareMetaById(shareId) : [];
         const shareTemplateConfig = appName ? await get(this, 'shareTemplateConfigApiService').queryShareTemplateConfigByAppName(appName) : {};
         const defaultParams = {
@@ -97,17 +104,25 @@ export default Route.extend(AuthenticatedRouteMixin, {
 
   _getAnomalyMapping: task (function * () {//TODO: need to add to anomaly util - LH
     let anomalyMapping = {};
+    let anomalies;
     //fetch the anomalies from the onion wrapper cache.
-    const applicationAnomalies = yield get(this, 'anomaliesApiService').queryAnomaliesByAppName(get(this, 'appName'), get(this, 'startDate'), get(this, 'endDate'));
+    if (this.get('appName') && this.get('subGroup')) {
+      //this functionality is not provided in the UI, but the user can manually type the params into URL simultaneously
+      anomalies = yield this.get('anomaliesApiService').queryAnomaliesByJoin(this.get('appName'), this.get('subGroup'), this.get('startDate'), this.get('endDate'));
+    } else if (this.get('appName')) {
+      anomalies = yield this.get('anomaliesApiService').queryAnomaliesByAppName(this.get('appName'), this.get('startDate'), this.get('endDate'));
+    } else {
+      anomalies = yield this.get('anomaliesApiService').queryAnomaliesBySubGroup(this.get('subGroup'), this.get('startDate'), this.get('endDate'));
+    }
     const humanizedObject = {
       queryDuration: get(this, 'duration'),
       queryStart: get(this, 'startDate'),
       queryEnd: get(this, 'endDate')
     };
-    set(this, 'applicationAnomalies', applicationAnomalies);
+    set(this, 'anomalies', anomalies);
     let index = 1;
 
-    applicationAnomalies.forEach(anomaly => {
+    anomalies.forEach(anomaly => {
       const metricName = get(anomaly, 'metricName');
       const metricId = get(anomaly, 'metricId');
       const functionName = get(anomaly, 'functionName');
@@ -227,7 +242,8 @@ export default Route.extend(AuthenticatedRouteMixin, {
       startDateDisplay:  moment(get(this, 'startDate')).format('MM/DD/YYYY'),
       endDateDisplay: moment(get(this, 'endDate')).format('MM/DD/YYYY'),
       appNameDisplay: get(this, 'appName'),
-      anomaliesCount: get(this, 'applicationAnomalies.content') ? get(this, 'applicationAnomalies.content').length : 0
+      subGroupDisplay: get(this, 'subGroup'),
+      anomaliesCount: get(this, 'anomalies.content') ? get(this, 'anomalies.content').length : 0
     });
   }
 });

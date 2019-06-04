@@ -58,7 +58,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   public static final int DEFAULT_NUM_GROUPS_LIMIT = 100_000;
 
   private final int _maxInitialResultHolderCapacity;
-  // Limit on number of groups, beyond which no new group will be created
+  // Limit on number of groups stored for each segment, beyond which no new group will be created
   private final int _numGroupsLimit;
 
   @VisibleForTesting

@@ -18,50 +18,67 @@
  */
 package org.apache.pinot.controller;
 
+import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import javax.annotation.concurrent.ThreadSafe;
 import org.apache.helix.HelixManager;
-import org.apache.helix.api.listeners.ControllerChangeListener;
+import org.apache.pinot.common.metrics.ControllerGauge;
+import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 /**
- * Single place for listening on controller changes
- * This should be created at controller startup and everyone who wants to listen to controller changes should subscribe
+ * Single place for listening on controller changes.
+ * This should be created at controller startup and everyone who wants to listen to controller changes should subscribe.
  */
+@ThreadSafe
 public class ControllerLeadershipManager {
-
   private static final Logger LOGGER = LoggerFactory.getLogger(ControllerLeadershipManager.class);
 
-  // TODO: fix the misuse of singleton.
-  private static ControllerLeadershipManager INSTANCE = null;
+  private final HelixManager _helixControllerManager;
+  private final ControllerMetrics _controllerMetrics;
 
-  private HelixManager _helixManager;
-  private volatile boolean _amILeader = false;
+  private Map<String, LeadershipChangeSubscriber> _subscribers = new HashMap<>();
+  private boolean _amILeader = false;
 
-  private Map<String, LeadershipChangeSubscriber> _subscribers = new ConcurrentHashMap<>();
-
-  public ControllerLeadershipManager(HelixManager helixManager) {
-    _helixManager = helixManager;
-    _helixManager.addControllerListener((ControllerChangeListener) notificationContext -> onControllerChange());
+  public ControllerLeadershipManager(HelixManager helixControllerManager, ControllerMetrics controllerMetrics) {
+    _helixControllerManager = helixControllerManager;
+    _controllerMetrics = controllerMetrics;
+    _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.PINOT_CONTROLLER_LEADER, 0L);
   }
 
   /**
-   * When stopping this service, if the controller is leader, invoke {@link ControllerLeadershipManager#onBecomingNonLeader()}
+   * Subscribes to changes in the controller leadership.
+   * <p>If controller is already leader, invoke {@link LeadershipChangeSubscriber#onBecomingLeader()}
    */
-  public void stop() {
+  public synchronized void subscribe(String name, LeadershipChangeSubscriber subscriber) {
+    LOGGER.info("{} subscribing to leadership changes", name);
+    _subscribers.put(name, subscriber);
+    if (_amILeader) {
+      subscriber.onBecomingLeader();
+    }
+  }
+
+  public boolean isLeader() {
+    return _amILeader;
+  }
+
+  /**
+   * Stops the service.
+   * <p>If controller is leader, invoke {@link ControllerLeadershipManager#onBecomingNonLeader()}
+   */
+  public synchronized void stop() {
     if (_amILeader) {
       onBecomingNonLeader();
     }
-    INSTANCE = null;
   }
 
   /**
-   * Callback on changes in the controller
+   * Callback on changes in the controller. Should be registered to the controller callback.
    */
-  protected void onControllerChange() {
-    if (_helixManager.isLeader()) {
+  synchronized void onControllerChange() {
+    if (_helixControllerManager.isLeader()) {
       if (!_amILeader) {
         _amILeader = true;
         LOGGER.info("Became leader");
@@ -80,29 +97,21 @@ public class ControllerLeadershipManager {
     }
   }
 
-  public boolean isLeader() {
-    return _amILeader;
-  }
-
   private void onBecomingLeader() {
-    _subscribers.forEach((k, v) -> v.onBecomingLeader());
+    long startTimeMs = System.currentTimeMillis();
+    _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.PINOT_CONTROLLER_LEADER, 1L);
+    for (LeadershipChangeSubscriber subscriber : _subscribers.values()) {
+      subscriber.onBecomingLeader();
+    }
+    LOGGER.info("Finished on becoming leader in {}ms", System.currentTimeMillis() - startTimeMs);
   }
 
   private void onBecomingNonLeader() {
-    _subscribers.forEach((k, v) -> v.onBecomingNonLeader());
-  }
-
-  /**
-   * Subscribe to changes in the controller leadership
-   * If controller is already leader, invoke {@link LeadershipChangeSubscriber#onBecomingLeader()}
-   * @param name
-   * @param subscriber
-   */
-  public void subscribe(String name, LeadershipChangeSubscriber subscriber) {
-    LOGGER.info("{} subscribing to leadership changes", name);
-    _subscribers.put(name, subscriber);
-    if (_amILeader) {
-      subscriber.onBecomingLeader();
+    long startTimeMs = System.currentTimeMillis();
+    _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.PINOT_CONTROLLER_LEADER, 0L);
+    for (LeadershipChangeSubscriber subscriber : _subscribers.values()) {
+      subscriber.onBecomingNonLeader();
     }
+    LOGGER.info("Finished on becoming non-leader in {}ms", System.currentTimeMillis() - startTimeMs);
   }
 }

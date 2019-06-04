@@ -39,18 +39,19 @@ import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.io.DatumReader;
 import org.apache.avro.io.DecoderFactory;
+import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.http.HttpStatus;
-import org.apache.pinot.broker.broker.BrokerServerBuilder;
-import org.apache.pinot.broker.broker.BrokerTestUtils;
 import org.apache.pinot.broker.broker.helix.HelixBrokerStarter;
 import org.apache.pinot.common.config.IndexingConfig;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.config.TableTaskConfig;
+import org.apache.pinot.common.config.TenantConfig;
 import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.common.utils.CommonConstants.Broker;
 import org.apache.pinot.common.utils.CommonConstants.Helix;
 import org.apache.pinot.common.utils.CommonConstants.Minion;
 import org.apache.pinot.common.utils.CommonConstants.Server;
@@ -96,33 +97,39 @@ public abstract class ClusterTest extends ControllerTest {
   protected TableConfig _offlineTableConfig;
   protected TableConfig _realtimeTableConfig;
 
-  protected void startBroker() {
+  protected void startBroker()
+      throws Exception {
     startBrokers(1);
   }
 
-  protected void startBroker(int basePort, String zkStr) {
+  protected void startBroker(int basePort, String zkStr)
+      throws Exception {
     startBrokers(1, basePort, zkStr);
   }
 
-  protected void startBrokers(int numBrokers) {
+  protected void startBrokers(int numBrokers)
+      throws Exception {
     startBrokers(numBrokers, DEFAULT_BROKER_PORT, ZkStarter.DEFAULT_ZK_STR);
   }
 
-  protected void startBrokers(int numBrokers, int basePort, String zkStr) {
+  protected void startBrokers(int numBrokers, int basePort, String zkStr)
+      throws Exception {
     _brokerBaseApiUrl = "http://localhost:" + basePort;
     for (int i = 0; i < numBrokers; i++) {
-      Configuration configuration = BrokerTestUtils.getDefaultBrokerConfiguration();
-      configuration.setProperty("pinot.broker.timeoutMs", 100 * 1000L);
-      configuration.setProperty("pinot.broker.client.queryPort", Integer.toString(basePort + i));
-      configuration.setProperty("pinot.broker.routing.table.builder.class", "random");
-      configuration.setProperty(BrokerServerBuilder.DELAY_SHUTDOWN_TIME_MS_CONFIG, 0);
+      Configuration brokerConf = new BaseConfiguration();
+      brokerConf.setProperty(Broker.CONFIG_OF_BROKER_TIMEOUT_MS, 60 * 1000L);
+      brokerConf.setProperty(Helix.KEY_OF_BROKER_QUERY_PORT, Integer.toString(basePort + i));
+      brokerConf.setProperty(Broker.CONFIG_OF_DELAY_SHUTDOWN_TIME_MS, 0);
       // Randomly choose to use connection-pool or single-connection request handler
       if (RANDOM.nextBoolean()) {
-        configuration.setProperty(BrokerServerBuilder.REQUEST_HANDLER_TYPE_CONFIG,
-            BrokerServerBuilder.SINGLE_CONNECTION_REQUEST_HANDLER_TYPE);
+        brokerConf.setProperty(Broker.CONFIG_OF_REQUEST_HANDLER_TYPE, Broker.CONNECTION_POOL_REQUEST_HANDLER_TYPE);
+      } else {
+        brokerConf.setProperty(Broker.CONFIG_OF_REQUEST_HANDLER_TYPE, Broker.SINGLE_CONNECTION_REQUEST_HANDLER_TYPE);
       }
-      overrideBrokerConf(configuration);
-      _brokerStarters.add(BrokerTestUtils.startBroker(_clusterName, zkStr, configuration));
+      overrideBrokerConf(brokerConf);
+      HelixBrokerStarter brokerStarter = new HelixBrokerStarter(brokerConf, _clusterName, zkStr);
+      brokerStarter.start();
+      _brokerStarters.add(brokerStarter);
     }
   }
 
@@ -130,8 +137,7 @@ public abstract class ClusterTest extends ControllerTest {
     Configuration configuration = DefaultHelixStarterServerConfig.loadDefaultServerConf();
     configuration.setProperty(Helix.KEY_OF_SERVER_NETTY_HOST, LOCAL_HOST);
     configuration.setProperty(Server.CONFIG_OF_SEGMENT_FORMAT_VERSION, "v3");
-    configuration.addProperty(Server.CONFIG_OF_ENABLE_DEFAULT_COLUMNS, true);
-    configuration.setProperty(Server.CONFIG_OF_ENABLE_SHUTDOWN_DELAY, false);
+    configuration.setProperty(Server.CONFIG_OF_SHUTDOWN_ENABLE_QUERY_CHECK, false);
     return configuration;
   }
 
@@ -156,15 +162,13 @@ public abstract class ClusterTest extends ControllerTest {
   protected void startServers(int numServers, Configuration configuration, int baseAdminApiPort, int baseNettyPort,
       String zkStr) {
     try {
+      overrideServerConf(configuration);
       for (int i = 0; i < numServers; i++) {
         configuration.setProperty(Server.CONFIG_OF_INSTANCE_DATA_DIR, Server.DEFAULT_INSTANCE_DATA_DIR + "-" + i);
         configuration
             .setProperty(Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR, Server.DEFAULT_INSTANCE_SEGMENT_TAR_DIR + "-" + i);
         configuration.setProperty(Server.CONFIG_OF_ADMIN_API_PORT, baseAdminApiPort - i);
         configuration.setProperty(Server.CONFIG_OF_NETTY_PORT, baseNettyPort + i);
-        // Set check interval time to 5 seconds for cluster tests.
-        configuration.setProperty(Server.CONFIG_OF_INSTANCE_CHECK_INTERVAL_TIME, 5_000L);
-        overrideServerConf(configuration);
         _serverStarters.add(new HelixServerStarter(_clusterName, zkStr, configuration));
       }
     } catch (Exception e) {
@@ -213,14 +217,14 @@ public abstract class ClusterTest extends ControllerTest {
     // Do nothing, to be overridden by tests if they need something specific
   }
 
-  protected void overrideBrokerConf(Configuration configuration) {
+  protected void overrideBrokerConf(Configuration brokerConf) {
     // Do nothing, to be overridden by tests if they need something specific
   }
 
   protected void stopBroker() {
     for (HelixBrokerStarter brokerStarter : _brokerStarters) {
       try {
-        BrokerTestUtils.stopBroker(brokerStarter);
+        brokerStarter.shutdown();
       } catch (Exception e) {
         LOGGER.error("Encountered exception while stopping broker {}", e.getMessage());
       }
@@ -455,6 +459,15 @@ public abstract class ClusterTest extends ControllerTest {
     config.setBloomFilterColumns(bloomFilterCols);
 
     sendPutRequest(_controllerRequestURLBuilder.forUpdateTableConfig(tablename),
+        _realtimeTableConfig.toJsonConfigString());
+  }
+
+  protected void updateRealtimeTableTenant(String tableName, TenantConfig tenantConfig)
+      throws Exception {
+
+    _realtimeTableConfig.setTenantConfig(tenantConfig);
+
+    sendPutRequest(_controllerRequestURLBuilder.forUpdateTableConfig(tableName),
         _realtimeTableConfig.toJsonConfigString());
   }
 

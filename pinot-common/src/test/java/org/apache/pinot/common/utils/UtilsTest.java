@@ -43,16 +43,29 @@ public class UtilsTest {
 
   @Test
   public void testTimeUtils() {
-    assertEquals(TimeUtils.timeUnitFromString("days"), TimeUnit.DAYS);
-    assertEquals(TimeUtils.timeUnitFromString("HOURS"), TimeUnit.HOURS);
-    assertEquals(TimeUtils.timeUnitFromString("Minutes"), TimeUnit.MINUTES);
-    assertEquals(TimeUtils.timeUnitFromString("SeCoNdS"), TimeUnit.SECONDS);
+    // Test all time units
+    for (TimeUnit timeUnit : TimeUnit.values()) {
+      assertEquals(TimeUtils.timeUnitFromString(timeUnit.name()), timeUnit);
+      assertEquals(TimeUtils.timeUnitFromString(timeUnit.name().toLowerCase()), timeUnit);
+    }
+
+    // Test other time unit string
     assertEquals(TimeUtils.timeUnitFromString("daysSinceEpoch"), TimeUnit.DAYS);
     assertEquals(TimeUtils.timeUnitFromString("HOURSSINCEEPOCH"), TimeUnit.HOURS);
     assertEquals(TimeUtils.timeUnitFromString("MinutesSinceEpoch"), TimeUnit.MINUTES);
     assertEquals(TimeUtils.timeUnitFromString("SeCoNdSsInCeEpOcH"), TimeUnit.SECONDS);
+    assertEquals(TimeUtils.timeUnitFromString("millissinceepoch"), TimeUnit.MILLISECONDS);
+    assertEquals(TimeUtils.timeUnitFromString("MILLISECONDSSINCEEPOCH"), TimeUnit.MILLISECONDS);
+    assertEquals(TimeUtils.timeUnitFromString("microssinceepoch"), TimeUnit.MICROSECONDS);
+    assertEquals(TimeUtils.timeUnitFromString("MICROSECONDSSINCEEPOCH"), TimeUnit.MICROSECONDS);
+    assertEquals(TimeUtils.timeUnitFromString("nanossinceepoch"), TimeUnit.NANOSECONDS);
+    assertEquals(TimeUtils.timeUnitFromString("NANOSECONDSSINCEEPOCH"), TimeUnit.NANOSECONDS);
+
+    // Test null and empty time unit string
     assertNull(TimeUtils.timeUnitFromString(null));
     assertNull(TimeUtils.timeUnitFromString(""));
+
+    // Test invalid time unit string
     try {
       TimeUtils.timeUnitFromString("unknown");
       fail();

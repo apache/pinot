@@ -2,23 +2,56 @@ import { hash } from 'rsvp';
 import Route from '@ember/routing/route';
 import moment from 'moment';
 import { inject as service } from '@ember/service';
+import { isPresent } from '@ember/utils';
 import { powerSort } from 'thirdeye-frontend/utils/manage-alert-utils';
-import {  getAnomalyIdsByTimeRange, anomalyResponseObjNew } from 'thirdeye-frontend/utils/anomaly';
+import {
+  getAnomalyFiltersByTimeRange,
+  getAnomalyFiltersByAnomalyId,
+  anomalyResponseObjNew } from 'thirdeye-frontend/utils/anomaly';
+import _ from 'lodash';
 
 const start = moment().subtract(1, 'day').valueOf();
 const end = moment().valueOf();
+
+const queryParamsConfig = {
+  refreshModel: true,
+  replace: false
+};
 
 export default Route.extend({
 
   // Make duration service accessible
   durationCache: service('services/duration'),
+  anomaliesApiService: service('services/api/anomalies'),
   session: service(),
+  store: service('store'),
+  queryParams: {
+    anomalyIds: queryParamsConfig
+  },
+  anomalyIds: null,
 
-  model() {
+  async model(params) {
+    // anomalyIds param allows for clicking into the route from email and listing a specific set of anomalyIds
+    let { anomalyIds } = params;
+    const anomaliesById = anomalyIds ? await getAnomalyFiltersByAnomalyId(start, end, anomalyIds) : await getAnomalyFiltersByTimeRange(start, end);
+    const subscriptionGroups = await this.get('anomaliesApiService').querySubscriptionGroups(); // Get all subscription groups available
     return hash({
-      updateAnomalies:  getAnomalyIdsByTimeRange,
-      anomaliesById: getAnomalyIdsByTimeRange(start, end)
+      updateAnomalies:  getAnomalyFiltersByTimeRange,
+      anomaliesById,
+      subscriptionGroups,
+      anomalyIds
     });
+  },
+
+  afterModel(model) {
+    // If we set anomalyIds to null in the controller, the route will refresh and clear the params from url
+    const anomalyIds = model.anomalyIds || null;
+    this.set('anomalyIds', anomalyIds);
+    const defaultParams = {
+      anomalyIds
+    };
+    Object.assign(model, { ...defaultParams});
+    return model;
   },
 
   setupController(controller, model) {
@@ -56,21 +89,26 @@ export default Route.extend({
         type: 'select',
         matchWidth: true,
         filterKeys: []
+      },
+      {
+        name: 'subscriptionFilterMap',
+        title: 'Subscription Groups',
+        type: 'select',
+        filterKeys: []
       }
     ];
 
     // Fill in select options for these filters ('filterKeys') based on alert properties from model.alerts
     filterBlocksLocal.forEach((filter) => {
-      if (filter.name === "dimensionFilterMap") {
+      let filterKeys = [];
+      if (filter.name === "dimensionFilterMap" && isPresent(model.anomaliesById.searchFilters[filter.name])) {
         const anomalyPropertyArray = Object.keys(model.anomaliesById.searchFilters[filter.name]);
-        let filterKeys = [];
         anomalyPropertyArray.forEach(dimensionType => {
           let group = Object.keys(model.anomaliesById.searchFilters[filter.name][dimensionType]);
           group = group.map(dim => `${dimensionType}::${dim}`);
           filterKeys = [...filterKeys, ...group];
         });
-        Object.assign(filter, { filterKeys });
-      } else if (filter.name === "statusFilterMap"){
+      } else if (filter.name === "statusFilterMap" && isPresent(model.anomaliesById.searchFilters[filter.name])){
         let anomalyPropertyArray = Object.keys(model.anomaliesById.searchFilters[filter.name]);
         anomalyPropertyArray = anomalyPropertyArray.map(prop => {
           // get the right object
@@ -78,20 +116,25 @@ export default Route.extend({
           // map the status to name
           return mapping.length > 0 ? mapping[0].name : prop;
         });
-        const filterKeys = [ ...new Set(powerSort(anomalyPropertyArray, null))];
-        // Add filterKeys prop to each facet or filter block
-        Object.assign(filter, { filterKeys });
+        filterKeys = [ ...new Set(powerSort(anomalyPropertyArray, null))];
+      } else if (filter.name === "subscriptionFilterMap"){
+        filterKeys = this.get('store')
+          .peekAll('subscription-groups')
+          .sortBy('name')
+          .filter(group => (group.get('active') && group.get('yaml')))
+          .map(group => group.get('name'));
       } else {
-        const anomalyPropertyArray = Object.keys(model.anomaliesById.searchFilters[filter.name]);
-        const filterKeys = [ ...new Set(powerSort(anomalyPropertyArray, null))];
-        // Add filterKeys prop to each facet or filter block
-        Object.assign(filter, { filterKeys });
+        if (isPresent(model.anomaliesById.searchFilters[filter.name])) {
+          const anomalyPropertyArray = Object.keys(model.anomaliesById.searchFilters[filter.name]);
+          filterKeys = [ ...new Set(powerSort(anomalyPropertyArray, null))];
+        }
       }
+      Object.assign(filter, { filterKeys });
     });
 
     // Keep an initial copy of the secondary filter blocks in memory
     Object.assign(model, {
-      initialFiltersLocal: filterBlocksLocal
+      initialFiltersLocal: _.cloneDeep(filterBlocksLocal)
     });
     // Send filters to controller
     controller.setProperties({
@@ -100,8 +143,10 @@ export default Route.extend({
       resultsActive: true,
       updateAnomalies: model.updateAnomalies,  //requires start and end time in epoch ex updateAnomalies(start, end)
       filterBlocksLocal,
-      anomalyIds: model.anomaliesById.anomalyIds,
-      anomaliesRange: [start, end]
+      anomalyIdList: model.anomaliesById.anomalyIds,
+      anomaliesRange: [start, end],
+      subscriptionGroups: model.subscriptionGroups,
+      anomalyIds: this.get('anomalyIds')
     });
   },
 

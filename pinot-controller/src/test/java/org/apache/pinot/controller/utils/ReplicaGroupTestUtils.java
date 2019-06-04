@@ -98,7 +98,7 @@ public class ReplicaGroupTestUtils {
     // Check if the servers in a replica group covers all segments
     for (int partitionId = 0; partitionId < numPartitions; partitionId++) {
       for (int replicaId = 0; replicaId < numReplicaGroups; replicaId++) {
-        List<String> replicaGroup = replicaGroupMapping.getInstancesfromReplicaGroup(partitionId, replicaId);
+        List<String> replicaGroup = replicaGroupMapping.getInstancesFromReplicaGroup(partitionId, replicaId);
         Set<String> replicaGroupSegments = new HashSet<>();
         for (String server : replicaGroup) {
           for (String segment : serverToSegments.get(server)) {
@@ -124,7 +124,7 @@ public class ReplicaGroupTestUtils {
         for (int serverIndex = 0; serverIndex < replicaGroupConfig.getNumInstancesPerPartition(); serverIndex++) {
           Set<String> mirrorSegments = new HashSet<>();
           for (int replicaId = 0; replicaId < numReplicaGroups; replicaId++) {
-            List<String> replicaGroup = replicaGroupMapping.getInstancesfromReplicaGroup(partitionId, replicaId);
+            List<String> replicaGroup = replicaGroupMapping.getInstancesFromReplicaGroup(partitionId, replicaId);
             String server = replicaGroup.get(serverIndex);
             Set<String> currentSegments = new HashSet<>(serverToSegments.get(server));
             mirrorSegments.addAll(currentSegments);

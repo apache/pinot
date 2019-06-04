@@ -22,7 +22,6 @@ package org.apache.pinot.thirdeye.detection.onboard;
 
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import org.apache.pinot.thirdeye.anomaly.task.TaskContext;
 import org.apache.pinot.thirdeye.anomaly.task.TaskInfo;
 import org.apache.pinot.thirdeye.anomaly.task.TaskResult;
@@ -30,6 +29,7 @@ import org.apache.pinot.thirdeye.anomaly.task.TaskRunner;
 import org.apache.pinot.thirdeye.constant.AnomalyResultSource;
 import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
+import org.apache.pinot.thirdeye.datalayer.bao.EvaluationManager;
 import org.apache.pinot.thirdeye.datalayer.bao.EventManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
@@ -46,8 +46,8 @@ import org.apache.pinot.thirdeye.detection.DefaultDataProvider;
 import org.apache.pinot.thirdeye.detection.DetectionPipeline;
 import org.apache.pinot.thirdeye.detection.DetectionPipelineLoader;
 import org.apache.pinot.thirdeye.detection.DetectionPipelineResult;
-import org.apache.pinot.thirdeye.detection.yaml.YamlDetectionConfigTranslator;
-import org.apache.pinot.thirdeye.detection.yaml.YamlDetectionTranslatorLoader;
+import org.apache.pinot.thirdeye.detection.yaml.DetectionConfigTuner;
+import org.apache.pinot.thirdeye.detection.yaml.translator.YamlDetectionTranslatorLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
@@ -62,6 +62,7 @@ public class YamlOnboardingTaskRunner implements TaskRunner {
   private static final Logger LOG = LoggerFactory.getLogger(YamlOnboardingTaskRunner.class);
   private final DetectionConfigManager detectionDAO;
   private final MergedAnomalyResultManager anomalyDAO;
+  private final EvaluationManager evaluationDAO;
   private final DetectionPipelineLoader loader;
   private final DataProvider provider;
   private final YamlDetectionTranslatorLoader translatorLoader;
@@ -72,6 +73,7 @@ public class YamlOnboardingTaskRunner implements TaskRunner {
     this.loader = new DetectionPipelineLoader();
     this.detectionDAO = DAORegistry.getInstance().getDetectionConfigManager();
     this.anomalyDAO = DAORegistry.getInstance().getMergedAnomalyResultDAO();
+    this.evaluationDAO = DAORegistry.getInstance().getEvaluationManager();
     this.translatorLoader = new YamlDetectionTranslatorLoader();
     this.yaml = new Yaml();
 
@@ -88,7 +90,7 @@ public class YamlOnboardingTaskRunner implements TaskRunner {
             ThirdEyeCacheRegistry.getInstance().getQueryCache(),
             ThirdEyeCacheRegistry.getInstance().getDatasetMaxDataTimeCache());
 
-    this.provider = new DefaultDataProvider(metricDAO, datasetDAO, eventDAO, this.anomalyDAO,
+    this.provider = new DefaultDataProvider(metricDAO, datasetDAO, eventDAO, this.anomalyDAO, this.evaluationDAO,
         timeseriesLoader, aggregationLoader, this.loader);
   }
 
@@ -122,15 +124,9 @@ public class YamlOnboardingTaskRunner implements TaskRunner {
     }
 
     // re-tune the detection pipeline because tuning is depend on replay result. e.g. algorithm-based alert filter
-    YamlDetectionConfigTranslator translator =
-        this.translatorLoader.from((Map<String, Object>) this.yaml.load(config.getYaml()), this.provider);
-
-    DetectionConfigDTO newDetectionConfig =
-        translator.withTuningWindow(info.getTuningWindowStart(), info.getTuningWindowEnd())
-        .withExistingDetectionConfig(config)
-        .generateDetectionConfig();
-
-    this.detectionDAO.save(newDetectionConfig);
+    DetectionConfigTuner detectionConfigTuner = new DetectionConfigTuner(config, provider);
+    DetectionConfigDTO tunedConfig = detectionConfigTuner.tune(info.getTuningWindowStart(), info.getTuningWindowEnd());
+    this.detectionDAO.save(tunedConfig);
 
     LOG.info("Yaml detection onboarding task for id {} completed", info.getConfigId());
     return Collections.emptyList();

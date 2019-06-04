@@ -63,7 +63,7 @@ public class MutableSegmentImplAggregateMetricsTest {
     }
 
     Map<String, Long> expectedValues = new HashMap<>();
-    StreamMessageMetadata defaultMetadata = new StreamMessageMetadata();
+    StreamMessageMetadata defaultMetadata = new StreamMessageMetadata(System.currentTimeMillis());
     Random random = new Random();
     for (int i = 0; i < NUM_ROWS; i++) {
       GenericRow row = new GenericRow();

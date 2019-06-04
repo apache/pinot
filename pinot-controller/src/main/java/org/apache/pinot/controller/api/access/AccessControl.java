@@ -19,8 +19,12 @@
 package org.apache.pinot.controller.api.access;
 
 import javax.ws.rs.core.HttpHeaders;
+import org.apache.pinot.annotations.InterfaceAudience;
+import org.apache.pinot.annotations.InterfaceStability;
 
 
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public interface AccessControl {
 
   /**

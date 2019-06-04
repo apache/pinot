@@ -26,10 +26,10 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 public class ThresholdRuleFilterSpec extends AbstractSpec {
   private double minValueHourly = Double.NaN;
   private double minValueDaily = Double.NaN;
-
   private double maxValueHourly = Double.NaN;
   private double maxValueDaily = Double.NaN;
-
+  private double minValue = Double.NaN;
+  private double maxValue = Double.NaN;
 
   public double getMinValueHourly() {
     return minValueHourly;
@@ -61,5 +61,21 @@ public class ThresholdRuleFilterSpec extends AbstractSpec {
 
   public void setMaxValueDaily(double maxValueDaily) {
     this.maxValueDaily = maxValueDaily;
+  }
+
+  public double getMinValue() {
+    return minValue;
+  }
+
+  public void setMinValue(double minValue) {
+    this.minValue = minValue;
+  }
+
+  public double getMaxValue() {
+    return maxValue;
+  }
+
+  public void setMaxValue(double maxValue) {
+    this.maxValue = maxValue;
   }
 }

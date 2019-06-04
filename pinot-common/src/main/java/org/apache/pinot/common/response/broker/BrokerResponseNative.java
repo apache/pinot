@@ -39,7 +39,7 @@ import org.apache.pinot.common.utils.JsonUtils;
  *
  * Supports serialization via JSON.
  */
-@JsonPropertyOrder({"selectionResults", "aggregationResults", "exceptions", "numServersQueried", "numServersResponded", "numSegmentsQueried", "numSegmentsProcessed", "numSegmentsMatched", "numDocsScanned", "numEntriesScannedInFilter", "numEntriesScannedPostFilter", "numGroupsLimitReached", "totalDocs", "timeUsedMs", "segmentStatistics", "traceInfo"})
+@JsonPropertyOrder({"selectionResults", "aggregationResults", "exceptions", "numServersQueried", "numServersResponded", "numSegmentsQueried", "numSegmentsProcessed", "numSegmentsMatched", "numConsumingSegmentsQueried", "numDocsScanned", "numEntriesScannedInFilter", "numEntriesScannedPostFilter", "numGroupsLimitReached", "totalDocs", "timeUsedMs", "segmentStatistics", "traceInfo"})
 public class BrokerResponseNative implements BrokerResponse {
   public static final BrokerResponseNative EMPTY_RESULT = BrokerResponseNative.empty();
   public static final BrokerResponseNative NO_TABLE_RESULT =
@@ -53,6 +53,10 @@ public class BrokerResponseNative implements BrokerResponse {
   private long _numSegmentsQueried = 0L;
   private long _numSegmentsProcessed = 0L;
   private long _numSegmentsMatched = 0L;
+  private long _numConsumingSegmentsQueried = 0L;
+  // the timestamp indicating the freshness of the data queried in consuming segments.
+  // This can be ingestion timestamp if provided by the stream, or the last index time
+  private long _minConsumingFreshnessTimeMs = 0L;
 
   private long _totalDocs = 0L;
   private boolean _numGroupsLimitReached = false;
@@ -174,6 +178,7 @@ public class BrokerResponseNative implements BrokerResponse {
   }
 
   @JsonProperty("numSegmentsQueried")
+  @Override
   public long getNumSegmentsQueried() {
     return _numSegmentsQueried;
   }
@@ -184,6 +189,7 @@ public class BrokerResponseNative implements BrokerResponse {
   }
 
   @JsonProperty("numSegmentsProcessed")
+  @Override
   public long getNumSegmentsProcessed() {
     return _numSegmentsProcessed;
   }
@@ -194,6 +200,7 @@ public class BrokerResponseNative implements BrokerResponse {
   }
 
   @JsonProperty("numSegmentsMatched")
+  @Override
   public long getNumSegmentsMatched() {
     return _numSegmentsMatched;
   }
@@ -201,6 +208,28 @@ public class BrokerResponseNative implements BrokerResponse {
   @JsonProperty("numSegmentsMatched")
   public void setNumSegmentsMatched(long numSegmentsMatched) {
     _numSegmentsMatched = numSegmentsMatched;
+  }
+
+  @JsonProperty("numConsumingSegmentsQueried")
+  @Override
+  public long getNumConsumingSegmentsQueried() {
+    return _numConsumingSegmentsQueried;
+  }
+
+  @JsonProperty("numConsumingSegmentsQueried")
+  public void setNumConsumingSegmentsQueried(long numConsumingSegmentsQueried) {
+    _numConsumingSegmentsQueried = numConsumingSegmentsQueried;
+  }
+
+  @JsonProperty("minConsumingFreshnessTimeMs")
+  @Override
+  public long getMinConsumingFreshnessTimeMs() {
+    return _minConsumingFreshnessTimeMs;
+  }
+
+  @JsonProperty("minConsumingFreshnessTimeMs")
+  public void setMinConsumingFreshnessTimeMs(long minConsumingFreshnessTimeMs) {
+    _minConsumingFreshnessTimeMs = minConsumingFreshnessTimeMs;
   }
 
   @JsonProperty("totalDocs")

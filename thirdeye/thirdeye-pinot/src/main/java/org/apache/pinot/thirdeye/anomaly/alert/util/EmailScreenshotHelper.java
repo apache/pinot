@@ -110,9 +110,10 @@ public class EmailScreenshotHelper {
         } while (line != null);
       }
     }
-    int exitVal = proc.waitFor();
-    if (exitVal != 0) {
-      throw new Exception("PhantomJS process failed with error code " + exitVal + ":\n" + sbError.toString());
+    boolean isComplete = proc.waitFor(2, TimeUnit.MINUTES);
+    if (!isComplete) {
+      proc.destroyForcibly();
+      throw new Exception("PhantomJS process timeout");
     }
     return imgPath;
   }

@@ -19,16 +19,19 @@
 package org.apache.pinot.core.indexsegment.mutable;
 
 import com.google.common.base.Preconditions;
+import it.unimi.dsi.fastutil.ints.IntArrays;
+import it.unimi.dsi.fastutil.ints.IntComparator;
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.config.SegmentPartitionConfig;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.common.metadata.RowMetadata;
 import org.apache.pinot.common.segment.SegmentMetadata;
 import org.apache.pinot.common.utils.NetUtil;
 import org.apache.pinot.core.data.GenericRow;
@@ -96,9 +99,9 @@ public class MutableSegmentImpl implements MutableSegment {
   private final int _numKeyColumns;
 
   // default message metadata
-  private static final StreamMessageMetadata _defaultMetadata = new StreamMessageMetadata();
-  private long _lastIndexedTimestamp = Long.MIN_VALUE;
-  private long _latestIngestionTimestamp = Long.MIN_VALUE;
+  private static final StreamMessageMetadata _defaultMetadata = new StreamMessageMetadata(System.currentTimeMillis());
+  private volatile long _lastIndexedTimeMs = Long.MIN_VALUE;
+  private volatile long _latestIngestionTimeMs = Long.MIN_VALUE;
 
   public MutableSegmentImpl(RealtimeSegmentConfig config) {
     _segmentName = config.getSegmentName();
@@ -118,12 +121,12 @@ public class MutableSegmentImpl implements MutableSegment {
 
       @Override
       public long getLastIndexedTimestamp() {
-        return _lastIndexedTimestamp;
+        return _lastIndexedTimeMs;
       }
 
       @Override
       public long getLatestIngestionTimestamp() {
-        return _latestIngestionTimestamp;
+        return _latestIngestionTimeMs;
       }
     };
 
@@ -211,9 +214,9 @@ public class MutableSegmentImpl implements MutableSegment {
   }
 
   @Override
-  public boolean index(GenericRow row, StreamMessageMetadata msgMetadata) {
+  public boolean index(GenericRow row, @Nullable RowMetadata rowMetadata) {
 
-    boolean canTakeMore = false;
+    boolean canTakeMore;
     // Update dictionary first
     Map<String, Object> dictIdMap = updateDictionary(row);
 
@@ -238,12 +241,11 @@ public class MutableSegmentImpl implements MutableSegment {
       canTakeMore = aggregateMetrics(row, docId);
     }
 
-    _lastIndexedTimestamp = System.currentTimeMillis();
+    _lastIndexedTimeMs = System.currentTimeMillis();
 
-    if (msgMetadata != null) {
-      _latestIngestionTimestamp = Math.max(_latestIngestionTimestamp, msgMetadata.getIngestionTimestamp());
+    if (rowMetadata != null) {
+      _latestIngestionTimeMs = Math.max(_latestIngestionTimeMs, rowMetadata.getIngestionTimeMs());
     }
-
     return canTakeMore;
   }
 
@@ -517,118 +519,6 @@ public class MutableSegmentImpl implements MutableSegment {
     }
   }
 
-  private IntIterator[] getSortedBitmapIntIteratorsForIntColumn(String column) {
-    MutableDictionary dictionary = _dictionaryMap.get(column);
-    int numValues = dictionary.length();
-    IntIterator[] intIterators = new IntIterator[numValues];
-    RealtimeInvertedIndexReader invertedIndex = _invertedIndexMap.get(column);
-
-    int[] values = new int[numValues];
-    for (int i = 0; i < numValues; i++) {
-      values[i] = (Integer) dictionary.get(i);
-    }
-
-    long start = System.currentTimeMillis();
-    Arrays.sort(values);
-    _logger.info("Spent {}ms sorting int column: {} with cardinality: {}", System.currentTimeMillis() - start, column,
-        numValues);
-
-    for (int i = 0; i < numValues; i++) {
-      intIterators[i] = invertedIndex.getDocIds(dictionary.indexOf(values[i])).getIntIterator();
-    }
-    return intIterators;
-  }
-
-  private IntIterator[] getSortedBitmapIntIteratorsForLongColumn(String column) {
-    MutableDictionary dictionary = _dictionaryMap.get(column);
-    int numValues = dictionary.length();
-    IntIterator[] intIterators = new IntIterator[numValues];
-    RealtimeInvertedIndexReader invertedIndex = _invertedIndexMap.get(column);
-
-    long[] values = new long[numValues];
-    for (int i = 0; i < numValues; i++) {
-      values[i] = (Long) dictionary.get(i);
-    }
-
-    long start = System.currentTimeMillis();
-    Arrays.sort(values);
-    _logger.info("Spent {}ms sorting long column: {} with cardinality: {}", System.currentTimeMillis() - start, column,
-        numValues);
-
-    for (int i = 0; i < numValues; i++) {
-      intIterators[i] = invertedIndex.getDocIds(dictionary.indexOf(values[i])).getIntIterator();
-    }
-    return intIterators;
-  }
-
-  private IntIterator[] getSortedBitmapIntIteratorsForFloatColumn(String column) {
-    MutableDictionary dictionary = _dictionaryMap.get(column);
-    int numValues = dictionary.length();
-    IntIterator[] intIterators = new IntIterator[numValues];
-    RealtimeInvertedIndexReader invertedIndex = _invertedIndexMap.get(column);
-
-    float[] values = new float[numValues];
-    for (int i = 0; i < numValues; i++) {
-      values[i] = (Float) dictionary.get(i);
-    }
-
-    long start = System.currentTimeMillis();
-    Arrays.sort(values);
-    _logger.info("Spent {}ms sorting float column: {} with cardinality: {}", System.currentTimeMillis() - start, column,
-        numValues);
-
-    for (int i = 0; i < numValues; i++) {
-      intIterators[i] = invertedIndex.getDocIds(dictionary.indexOf(values[i])).getIntIterator();
-    }
-    return intIterators;
-  }
-
-  private IntIterator[] getSortedBitmapIntIteratorsForDoubleColumn(String column) {
-    MutableDictionary dictionary = _dictionaryMap.get(column);
-    int numValues = dictionary.length();
-    IntIterator[] intIterators = new IntIterator[numValues];
-    RealtimeInvertedIndexReader invertedIndex = _invertedIndexMap.get(column);
-
-    double[] values = new double[numValues];
-    for (int i = 0; i < numValues; i++) {
-      values[i] = (Double) dictionary.get(i);
-    }
-
-    long start = System.currentTimeMillis();
-    Arrays.sort(values);
-    _logger
-        .info("Spent {}ms sorting double column: {} with cardinality: {}", System.currentTimeMillis() - start, column,
-            numValues);
-
-    for (int i = 0; i < numValues; i++) {
-      intIterators[i] = invertedIndex.getDocIds(dictionary.indexOf(values[i])).getIntIterator();
-    }
-    return intIterators;
-  }
-
-  private IntIterator[] getSortedBitmapIntIteratorsForStringColumn(String column) {
-    MutableDictionary dictionary = _dictionaryMap.get(column);
-    int numValues = dictionary.length();
-    IntIterator[] intIterators = new IntIterator[numValues];
-    RealtimeInvertedIndexReader invertedIndex = _invertedIndexMap.get(column);
-
-    String[] values = new String[numValues];
-    for (int i = 0; i < numValues; i++) {
-      values[i] = (String) dictionary.get(i);
-    }
-
-    long start = System.currentTimeMillis();
-    Arrays.sort(values);
-    _logger
-        .info("Spent {}ms sorting string column: {} with cardinality: {}", System.currentTimeMillis() - start, column,
-            numValues);
-
-    for (int i = 0; i < numValues; i++) {
-      intIterators[i] = invertedIndex.getDocIds(dictionary.indexOf(values[i])).getIntIterator();
-    }
-    return intIterators;
-  }
-
   /**
    * Returns the docIds to use for iteration when the data is sorted by the given column.
    * <p>Called only by realtime record reader.
@@ -637,42 +527,39 @@ public class MutableSegmentImpl implements MutableSegment {
    * @return The docIds to use for iteration
    */
   public int[] getSortedDocIdIterationOrderWithSortedColumn(String column) {
-    int[] docIds = new int[_numDocsIndexed];
+    MutableDictionary dictionary = _dictionaryMap.get(column);
+    int numValues = dictionary.length();
 
-    // Get docId iterators that iterate in order on the data
-    IntIterator[] iterators;
-    FieldSpec.DataType dataType = _schema.getFieldSpecFor(column).getDataType();
-    switch (dataType) {
-      case INT:
-        iterators = getSortedBitmapIntIteratorsForIntColumn(column);
-        break;
-      case LONG:
-        iterators = getSortedBitmapIntIteratorsForLongColumn(column);
-        break;
-      case FLOAT:
-        iterators = getSortedBitmapIntIteratorsForFloatColumn(column);
-        break;
-      case DOUBLE:
-        iterators = getSortedBitmapIntIteratorsForDoubleColumn(column);
-        break;
-      case STRING:
-        iterators = getSortedBitmapIntIteratorsForStringColumn(column);
-        break;
-      default:
-        throw new UnsupportedOperationException("Unsupported data type: " + dataType + " for sorted column: " + column);
+    int[] dictIds = new int[numValues];
+    for (int i = 0; i < numValues; i++) {
+      dictIds[i] = i;
     }
+    IntArrays.quickSort(dictIds, new IntComparator() {
+      @Override
+      public int compare(int dictId1, int dictId2) {
+        return dictionary.compare(dictId1, dictId2);
+      }
 
-    // Drain the iterators into the docIds array
-    int i = 0;
-    for (IntIterator iterator : iterators) {
-      while (iterator.hasNext()) {
-        docIds[i++] = iterator.next();
+      @Override
+      public int compare(Integer o1, Integer o2) {
+        return compare((int) o1, (int) o2);
+      }
+    });
+
+    RealtimeInvertedIndexReader invertedIndex = _invertedIndexMap.get(column);
+    int[] docIds = new int[_numDocsIndexed];
+    int docIdIndex = 0;
+    for (int dictId : dictIds) {
+      IntIterator intIterator = invertedIndex.getDocIds(dictId).getIntIterator();
+      while (intIterator.hasNext()) {
+        docIds[docIdIndex++] = intIterator.next();
       }
     }
 
     // Sanity check
-    Preconditions.checkState(_numDocsIndexed == i,
-        "The number of docs indexed: %s is not equal to the number of sorted documents: %s", _numDocsIndexed, i);
+    Preconditions.checkState(_numDocsIndexed == docIdIndex,
+        "The number of documents indexed: %s is not equal to the number of sorted documents: %s", _numDocsIndexed,
+        docIdIndex);
 
     return docIds;
   }
@@ -763,8 +650,8 @@ public class MutableSegmentImpl implements MutableSegment {
       }
       // https://github.com/apache/incubator-pinot/issues/3867
       if (!schema.getDimensionSpec(dimension).isSingleValueField()) {
-        _logger
-            .warn("Metrics aggregation cannot be turned ON in presence of multi-value dimension columns, eg: {}", dimension);
+        _logger.warn("Metrics aggregation cannot be turned ON in presence of multi-value dimension columns, eg: {}",
+            dimension);
         _aggregateMetrics = false;
         break;
       }

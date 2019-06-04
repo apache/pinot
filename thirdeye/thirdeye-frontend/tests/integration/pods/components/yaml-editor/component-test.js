@@ -47,7 +47,7 @@ module('Integration | Component | yaml-editor', function(hooks) {
 
   test(`displays default yaml file of alert configuration in create mode`, async function(assert) {
 
-    const defaultText = '# Below is a sample template for setting up a WoW percentage rule. You may refer the documentation for more examples and update the fields accordingly.';
+    const defaultText = '# Below is a sample template. You may refer the documentation for more examples and update the fields accordingly.';
     await render(hbs`
       {{yaml-editor
         isEditMode=false
@@ -56,54 +56,6 @@ module('Integration | Component | yaml-editor', function(hooks) {
     `);
 
     assert.ok(this.$('.ace_line')[0].children[0].textContent === defaultText);
-  });
-
-  test(`displays first subscription group in dropdown in edit mode`, async function(assert) {
-    this.setProperties({
-      alertId: 1,
-      subscriptionGroups: [ {
-        id : 1,
-        name : 'test_subscription_group',
-        yaml : testText
-      } ],
-      detectionYaml: testText
-    });
-
-    await render(hbs`
-      {{yaml-editor
-        alertId=alertId
-        isEditMode=true
-        showSettings=true
-        subscriptionGroupNames=subscriptionGroups
-        detectionYaml=detectionYaml
-      }}
-    `);
-
-    assert.ok(this.$('.ember-power-select-selected-item')[0].innerText === `test_subscription_group (1)`);
-  });
-
-  test(`displays first subscription group yaml in edit mode`, async function(assert) {
-    this.setProperties({
-      alertId: 1,
-      subscriptionGroups: [ {
-        id : 1,
-        name : 'test_subscription_group',
-        yaml : testText
-      } ],
-      detectionYaml: 'nothing'
-    });
-
-    await render(hbs`
-      {{yaml-editor
-        alertId=alertId
-        isEditMode=true
-        showSettings=true
-        subscriptionGroupNames=subscriptionGroups
-        detectionYaml=detectionYaml
-      }}
-    `);
-
-    assert.ok(this.$('.ace_line')[1].innerText === testText);
   });
 
   test(`displays default yaml file of subscription group in create mode`, async function(assert) {

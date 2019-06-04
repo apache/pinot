@@ -42,15 +42,8 @@ public class LLCUtils {
 
       final LLCSegmentName segmentName = new LLCSegmentName(segment);
       String streamPartitionId = segmentName.getPartitionRange();
-      SortedSet<SegmentName> segmentsForPartition = sortedSegmentsByStreamPartition.get(streamPartitionId);
-
-      // Create sorted set if necessary
-      if (segmentsForPartition == null) {
-        segmentsForPartition = new TreeSet<>();
-
-        sortedSegmentsByStreamPartition.put(streamPartitionId, segmentsForPartition);
-      }
-
+      SortedSet<SegmentName> segmentsForPartition =
+          sortedSegmentsByStreamPartition.computeIfAbsent(streamPartitionId, k -> new TreeSet<>());
       segmentsForPartition.add(segmentName);
     }
     return sortedSegmentsByStreamPartition;

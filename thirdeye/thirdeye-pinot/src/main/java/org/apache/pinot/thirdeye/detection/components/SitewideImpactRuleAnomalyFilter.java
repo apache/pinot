@@ -92,16 +92,16 @@ public class SitewideImpactRuleAnomalyFilter implements AnomalyFilter<SitewideIm
         .getAggregates();
 
     double currentValue = getValueFromAggregates(currentSlice, aggregates);
-    double baselineValue = baselineSlice == null ? anomaly.getAvgBaselineVal() : getValueFromAggregates(baselineSlice, aggregates);
-    double siteWideBaselineValue = getValueFromAggregates(siteWideSlice, aggregates);
+    double baselineValue = baseline == null ? anomaly.getAvgBaselineVal() :  this.baseline.gather(currentSlice, aggregates).getDouble(COL_VALUE, 0);
+    double siteWideValue = getValueFromAggregates(siteWideSlice, aggregates);
 
     // if inconsistent with up/down, filter the anomaly
     if (!pattern.equals(Pattern.UP_OR_DOWN) && (currentValue < baselineValue && pattern.equals(Pattern.UP)) || (currentValue > baselineValue && pattern.equals(Pattern.DOWN))) {
       return false;
     }
     // if doesn't pass the threshold, filter the anomaly
-    if (siteWideBaselineValue != 0
-        && (Math.abs(currentValue - baselineValue) / siteWideBaselineValue) < this.threshold) {
+    if (siteWideValue != 0
+        && (Math.abs(currentValue - baselineValue) / siteWideValue) < this.threshold) {
       return false;
     }
 

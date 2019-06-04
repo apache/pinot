@@ -71,10 +71,11 @@ public class PinotControllerModeTest extends ControllerTest {
     _controllerStarter = null;
   }
 
-  @Test
+  // TODO: enable it after removing ControllerLeadershipManager which requires both CONTROLLER and PARTICIPANT
+  //       HelixManager
+  @Test (enabled = false)
   public void testPinotOnlyController()
       throws Exception {
-
     config.setControllerMode(ControllerConf.ControllerMode.PINOT_ONLY);
     config.setControllerPort(Integer.toString(Integer.parseInt(config.getControllerPort()) + controllerPortOffset++));
 
@@ -102,6 +103,17 @@ public class PinotControllerModeTest extends ControllerTest {
     TestUtils.waitForCondition(aVoid -> _helixResourceManager.getHelixZkManager().isConnected(), TIMEOUT_IN_MS,
         "Failed to start " + config.getControllerMode() + " controller in " + TIMEOUT_IN_MS + "ms.");
     Assert.assertEquals(_controllerStarter.getControllerMode(), ControllerConf.ControllerMode.PINOT_ONLY);
+
+    // Start a second Pinot only controller.
+    config.setControllerPort(Integer.toString(Integer.parseInt(config.getControllerPort()) + controllerPortOffset++));
+    ControllerStarter secondControllerStarter = new TestOnlyControllerStarter(config);
+
+    secondControllerStarter.start();
+    // Two controller instances assigned to cluster.
+    TestUtils.waitForCondition(aVoid -> _helixResourceManager.getAllInstances().size() == 2, TIMEOUT_IN_MS,
+        "Failed to start the 2nd pinot only controller in " + TIMEOUT_IN_MS + "ms.");
+
+    secondControllerStarter.stop();
 
     stopController();
     _controllerStarter = null;

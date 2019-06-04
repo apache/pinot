@@ -67,7 +67,6 @@ public class DimensionDetectionAlertFilterTest {
 
   private MockDataProvider provider;
   private DetectionAlertConfigDTO alertConfig;
-  private DetectionAlertConfigDTO alertConfigForLegacyAnomalies;
 
   @BeforeMethod
   public void beforeMethod() {
@@ -90,7 +89,6 @@ public class DimensionDetectionAlertFilterTest {
         .setAnomalies(this.detectedAnomalies);
 
     this.alertConfig = createDetectionAlertConfig();
-    this.alertConfigForLegacyAnomalies = createDetectionAlertConfig();
   }
 
   private DetectionAlertConfigDTO createDetectionAlertConfig() {

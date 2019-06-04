@@ -29,6 +29,8 @@ public class CommonConstants {
   public static class Helix {
     public static final String IS_SHUTDOWN_IN_PROGRESS = "shutdownInProgress";
 
+    public static final String INSTANCE_CONNECTED_METRIC_NAME = "helix.connected";
+
     public static final String PREFIX_OF_SERVER_INSTANCE = "Server_";
     public static final String PREFIX_OF_BROKER_INSTANCE = "Broker_";
     public static final String PREFIX_OF_CONTROLLER_INSTANCE = "Controller_";
@@ -98,21 +100,35 @@ public class CommonConstants {
     public static final int DEFAULT_BROKER_QUERY_PORT = 8099;
     public static final String KEY_OF_SERVER_NETTY_HOST = "pinot.server.netty.host";
 
-    public static final String HELIX_MANAGER_FLAPPING_TIME_WINDOW_KEY = "helixmanager.flappingTimeWindow";
-    public static final String HELIX_MANAGER_MAX_DISCONNECT_THRESHOLD_KEY = "helixmanager.maxDisconnectThreshold";
-    public static final String CONFIG_OF_HELIX_FLAPPING_TIMEWINDOW_MS = "pinot.server.flapping.timeWindowMs";
-    public static final String CONFIG_OF_HELIX_MAX_DISCONNECT_THRESHOLD =
-        "pinot.server.flapping.maxDisconnectThreshold";
-    public static final String DEFAULT_HELIX_FLAPPING_TIMEWINDOW_MS = "1";
-    public static final String DEFAULT_HELIX_FLAPPING_MAX_DISCONNECT_THRESHOLD = "100";
+    // NOTE: Helix will disconnect the manager and disable the instance if it detects flapping (too frequent disconnect
+    // from ZooKeeper). Setting flapping time window to a small value can avoid this from happening. Helix ignores the
+    // non-positive value, so set the default value as 1.
+    public static final String CONFIG_OF_CONTROLLER_FLAPPING_TIME_WINDOW_MS = "pinot.controller.flapping.timeWindowMs";
+    public static final String CONFIG_OF_BROKER_FLAPPING_TIME_WINDOW_MS = "pinot.broker.flapping.timeWindowMs";
+    public static final String CONFIG_OF_SERVER_FLAPPING_TIME_WINDOW_MS = "pinot.server.flapping.timeWindowMs";
+    public static final String CONFIG_OF_MINION_FLAPPING_TIME_WINDOW_MS = "pinot.minion.flapping.timeWindowMs";
+    public static final String DEFAULT_FLAPPING_TIME_WINDOW_MS = "1";
   }
 
   public static class Broker {
+    public static final String ROUTING_TABLE_CONFIG_PREFIX = "pinot.broker.routing.table";
+    public static final String ACCESS_CONTROL_CONFIG_PREFIX = "pinot.broker.access.control";
+    public static final String METRICS_CONFIG_PREFIX = "pinot.broker.metrics";
+
+    public static final String CONFIG_OF_DELAY_SHUTDOWN_TIME_MS = "pinot.broker.delayShutdownTimeMs";
+    public static final long DEFAULT_DELAY_SHUTDOWN_TIME_MS = 10_000L;
+    public static final String CONFIG_OF_ENABLE_TABLE_LEVEL_METRICS = "pinot.broker.enableTableLevelMetrics";
+    public static final String CONFIG_OF_REQUEST_HANDLER_TYPE = "pinot.broker.requestHandlerType";
+    public static final String SINGLE_CONNECTION_REQUEST_HANDLER_TYPE = "singleConnection";
+    public static final String CONNECTION_POOL_REQUEST_HANDLER_TYPE = "connectionPool";
+    public static final String DEFAULT_REQUEST_HANDLER_TYPE = SINGLE_CONNECTION_REQUEST_HANDLER_TYPE;
+
     public static final String CONFIG_OF_BROKER_QUERY_RESPONSE_LIMIT = "pinot.broker.query.response.limit";
     public static final int DEFAULT_BROKER_QUERY_RESPONSE_LIMIT = Integer.MAX_VALUE;
     public static final String CONFIG_OF_BROKER_QUERY_LOG_LENGTH = "pinot.broker.query.log.length";
     public static final int DEFAULT_BROKER_QUERY_LOG_LENGTH = Integer.MAX_VALUE;
-    public static final String CONFIG_OF_BROKER_QUERY_LOG_MAX_RATE_PER_SECOND = "pinot.broker.query.log.maxRatePerSecond";
+    public static final String CONFIG_OF_BROKER_QUERY_LOG_MAX_RATE_PER_SECOND =
+        "pinot.broker.query.log.maxRatePerSecond";
     public static final double DEFAULT_BROKER_QUERY_LOG_MAX_RATE_PER_SECOND = 10_000d;
     public static final String CONFIG_OF_BROKER_TIMEOUT_MS = "pinot.broker.timeoutMs";
     public static final long DEFAULT_BROKER_TIMEOUT_MS = 10_000L;
@@ -127,7 +143,8 @@ public class CommonConstants {
     // Configuration to consider the broker ServiceStatus as being STARTED if the percent of resources (tables) that
     // are ONLINE for this this broker has crossed the threshold percentage of the total number of tables
     // that it is expected to serve.
-    public static final String CONFIG_OF_BROKER_MIN_RESOURCE_PERCENT_FOR_START = "pinot.broker.startup.minResourcePercent";
+    public static final String CONFIG_OF_BROKER_MIN_RESOURCE_PERCENT_FOR_START =
+        "pinot.broker.startup.minResourcePercent";
     public static final double DEFAULT_BROKER_MIN_RESOURCE_PERCENT_FOR_START = 100.0;
 
     public static class Request {
@@ -154,33 +171,27 @@ public class CommonConstants {
     public static final String CONFIG_OF_REQUEST_HANDLER_FACTORY_CLASS = "pinot.server.requestHandlerFactory.class";
     public static final String CONFIG_OF_NETTY_PORT = "pinot.server.netty.port";
     public static final String CONFIG_OF_ADMIN_API_PORT = "pinot.server.adminapi.port";
-    public static final String CONFIG_OF_STARTER_ENABLE_SEGMENTS_LOADING_CHECK =
-        "pinot.server.starter.enableSegmentsLoadingCheck";
-    public static final String CONFIG_OF_STARTER_TIMEOUT_IN_SECONDS = "pinot.server.starter.timeoutInSeconds";
 
     public static final String CONFIG_OF_SEGMENT_FORMAT_VERSION = "pinot.server.instance.segment.format.version";
-    public static final String CONFIG_OF_ENABLE_DEFAULT_COLUMNS = "pinot.server.instance.enable.default.columns";
-    public static final String CONFIG_OF_ENABLE_SHUTDOWN_DELAY = "pinot.server.instance.enable.shutdown.delay";
     public static final String CONFIG_OF_ENABLE_SPLIT_COMMIT = "pinot.server.instance.enable.split.commit";
-    public static final String CONFIG_OF_ENABLE_COMMIT_END_WITH_METADATA = "pinot.server.instance.enable.commitend.metadata";
+    public static final String CONFIG_OF_ENABLE_COMMIT_END_WITH_METADATA =
+        "pinot.server.instance.enable.commitend.metadata";
     public static final String CONFIG_OF_REALTIME_OFFHEAP_ALLOCATION = "pinot.server.instance.realtime.alloc.offheap";
     public static final String CONFIG_OF_REALTIME_OFFHEAP_DIRECT_ALLOCATION =
         "pinot.server.instance.realtime.alloc.offheap.direct";
     public static final String PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY = "pinot.server.storage.factory";
     public static final String PREFIX_OF_CONFIG_OF_PINOT_CRYPTER = "pinot.server.crypter";
-    public static final String CONFIG_OF_INSTANCE_MAX_SHUTDOWN_WAIT_TIME =
-        "pinot.server.instance.starter.maxShutdownWaitTime";
-    public static final String CONFIG_OF_INSTANCE_CHECK_INTERVAL_TIME =
-        "pinot.server.instance.starter.checkIntervalTime";
     // Configuration to consider the server ServiceStatus as being STARTED if the percent of resources (tables) that
     // are ONLINE for this this server has crossed the threshold percentage of the total number of tables
     // that it is expected to serve.
-    public static final String CONFIG_OF_SERVER_MIN_RESOURCE_PERCENT_FOR_START = "pinot.server.startup.minResourcePercent";
+    public static final String CONFIG_OF_SERVER_MIN_RESOURCE_PERCENT_FOR_START =
+        "pinot.server.startup.minResourcePercent";
     public static final double DEFAULT_SERVER_MIN_RESOURCE_PERCENT_FOR_START = 100.0;
+    public static final String CONFIG_OF_STARTUP_REALTIME_CONSUMPTION_CATCHUP_WAIT_MS =
+        "pinot.server.starter.realtimeConsumptionCatchupWaitMs";
+    public static final int DEFAULT_STARTUP_REALTIME_CONSUMPTION_CATCHUP_WAIT_MS = 0;
 
     public static final int DEFAULT_ADMIN_API_PORT = 8097;
-    public static final boolean DEFAULT_STARTER_ENABLE_SEGMENTS_LOADING_CHECK = false;
-    public static final int DEFAULT_STARTER_TIMEOUT_IN_SECONDS = 600;
     public static final String DEFAULT_READ_MODE = "heap";
     public static final String DEFAULT_INSTANCE_BASE_DIR =
         System.getProperty("java.io.tmpdir") + File.separator + "PinotServer";
@@ -195,11 +206,63 @@ public class CommonConstants {
     public static final String DEFAULT_REQUEST_HANDLER_FACTORY_CLASS =
         "org.apache.pinot.server.request.SimpleRequestHandlerFactory";
     public static final String PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY = "pinot.server.segment.fetcher";
-    public static final String PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER = "pinot.server.segment.uploader";
-    public static final String DEFAULT_STAR_TREE_FORMAT_VERSION = "OFF_HEAP";
+
+    // Configs for server starter startup/shutdown checks
+    // Startup: timeout for the startup checks
+    public static final String CONFIG_OF_STARTUP_TIMEOUT_MS = "pinot.server.startup.timeoutMs";
+    public static final long DEFAULT_STARTUP_TIMEOUT_MS = 600_000L;
+    // Startup: enable service status check before claiming server up
+    public static final String CONFIG_OF_STARTUP_ENABLE_SERVICE_STATUS_CHECK =
+        "pinot.server.startup.enableServiceStatusCheck";
+    public static final boolean DEFAULT_STARTUP_ENABLE_SERVICE_STATUS_CHECK = true;
+    public static final String CONFIG_OF_STARTUP_SERVICE_STATUS_CHECK_INTERVAL_MS =
+        "pinot.server.startup.serviceStatusCheckIntervalMs";
+    public static final long DEFAULT_STARTUP_SERVICE_STATUS_CHECK_INTERVAL_MS = 10_000L;
+    // Shutdown: timeout for the shutdown checks
+    public static final String CONFIG_OF_SHUTDOWN_TIMEOUT_MS = "pinot.server.shutdown.timeoutMs";
+    public static final long DEFAULT_SHUTDOWN_TIMEOUT_MS = 600_000L;
+    // Shutdown: enable query check before shutting down the server
+    //           Will drain queries (no incoming queries and all existing queries finished)
+    public static final String CONFIG_OF_SHUTDOWN_ENABLE_QUERY_CHECK = "pinot.server.shutdown.enableQueryCheck";
+    public static final boolean DEFAULT_SHUTDOWN_ENABLE_QUERY_CHECK = true;
+    // Shutdown: threshold to mark that there is no incoming queries, use max query time as the default threshold
+    public static final String CONFIG_OF_SHUTDOWN_NO_QUERY_THRESHOLD_MS = "pinot.server.shutdown.noQueryThresholdMs";
+    // Shutdown: enable resource check before shutting down the server
+    //           Will wait until all the resources in the external view are neither ONLINE nor CONSUMING
+    //           No need to enable this check if startup service status check is enabled
+    public static final String CONFIG_OF_SHUTDOWN_ENABLE_RESOURCE_CHECK = "pinot.server.shutdown.enableResourceCheck";
+    public static final boolean DEFAULT_SHUTDOWN_ENABLE_RESOURCE_CHECK = false;
+    public static final String CONFIG_OF_SHUTDOWN_RESOURCE_CHECK_INTERVAL_MS =
+        "pinot.server.shutdown.resourceCheckIntervalMs";
+    public static final long DEFAULT_SHUTDOWN_RESOURCE_CHECK_INTERVAL_MS = 10_000L;
+
+    // TODO: remove the deprecated config keys in the new release
+    @Deprecated
+    public static final String CONFIG_OF_STARTER_ENABLE_SEGMENTS_LOADING_CHECK =
+        "pinot.server.starter.enableSegmentsLoadingCheck";
+    @Deprecated
+    public static final String CONFIG_OF_STARTER_TIMEOUT_IN_SECONDS = "pinot.server.starter.timeoutInSeconds";
+    @Deprecated
+    public static final String CONFIG_OF_ENABLE_SHUTDOWN_DELAY = "pinot.server.instance.enable.shutdown.delay";
+    @Deprecated
+    public static final String CONFIG_OF_INSTANCE_MAX_SHUTDOWN_WAIT_TIME =
+        "pinot.server.instance.starter.maxShutdownWaitTime";
+    @Deprecated
+    public static final String CONFIG_OF_INSTANCE_CHECK_INTERVAL_TIME =
+        "pinot.server.instance.starter.checkIntervalTime";
+
     public static final String DEFAULT_COLUMN_MIN_MAX_VALUE_GENERATOR_MODE = "TIME";
-    public static final long DEFAULT_MAX_SHUTDOWN_WAIT_TIME_MS = 600_000L;
-    public static final long DEFAULT_CHECK_INTERVAL_TIME_MS = 60_000L;
+
+    public static class SegmentCompletionProtocol {
+      public static final String PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER = "pinot.server.segment.uploader";
+
+      public static final String CONFIG_OF_CONTROLLER_HTTPS_ENABLED = "enabled";
+      public static final String CONFIG_OF_CONTROLLER_HTTPS_PORT = "controller.port";
+      public static final String CONFIG_OF_SEGMENT_UPLOAD_REQUEST_TIMEOUT_MS = "upload.request.timeout.ms";
+
+      public static final int DEFAULT_SEGMENT_UPLOAD_REQUEST_TIMEOUT_MS = 300_000;
+      public static final int DEFAULT_OTHER_REQUESTS_TIMEOUT = 10_000;
+    }
   }
 
   public static class Controller {

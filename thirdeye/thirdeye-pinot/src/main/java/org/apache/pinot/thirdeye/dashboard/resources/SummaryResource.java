@@ -24,17 +24,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Strings;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
-import org.apache.pinot.thirdeye.client.diffsummary.Dimensions;
-import org.apache.pinot.thirdeye.client.diffsummary.MultiDimensionalSummary;
-import org.apache.pinot.thirdeye.client.diffsummary.MultiDimensionalSummaryCLITool;
-import org.apache.pinot.thirdeye.client.diffsummary.OLAPDataBaseClient;
-import org.apache.pinot.thirdeye.client.diffsummary.ThirdEyeSummaryClient;
-import org.apache.pinot.thirdeye.client.diffsummary.costfunctions.BalancedCostFunction;
-import org.apache.pinot.thirdeye.client.diffsummary.costfunctions.CostFunction;
-import org.apache.pinot.thirdeye.dashboard.Utils;
-import org.apache.pinot.thirdeye.dashboard.views.diffsummary.SummaryResponse;
-import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
-import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
 import java.net.URLDecoder;
 import java.util.Arrays;
 import java.util.Collections;
@@ -46,6 +35,19 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import org.apache.commons.lang.StringUtils;
+import org.apache.pinot.thirdeye.cube.additive.AdditiveDBClient;
+import org.apache.pinot.thirdeye.cube.cost.BalancedCostFunction;
+import org.apache.pinot.thirdeye.cube.cost.CostFunction;
+import org.apache.pinot.thirdeye.cube.cost.RatioCostFunction;
+import org.apache.pinot.thirdeye.cube.data.dbrow.Dimensions;
+import org.apache.pinot.thirdeye.cube.entry.MultiDimensionalRatioSummary;
+import org.apache.pinot.thirdeye.cube.entry.MultiDimensionalSummary;
+import org.apache.pinot.thirdeye.cube.entry.MultiDimensionalSummaryCLITool;
+import org.apache.pinot.thirdeye.cube.ratio.RatioDBClient;
+import org.apache.pinot.thirdeye.cube.summary.SummaryResponse;
+import org.apache.pinot.thirdeye.dashboard.Utils;
+import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
+import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
 import org.joda.time.DateTimeZone;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -113,8 +115,8 @@ public class SummaryResource {
 
       CostFunction costFunction = new BalancedCostFunction();
       DateTimeZone dateTimeZone = DateTimeZone.forID(timeZone);
-      OLAPDataBaseClient olapClient = new ThirdEyeSummaryClient(CACHE_REGISTRY_INSTANCE.getQueryCache());
-      MultiDimensionalSummary mdSummary = new MultiDimensionalSummary(olapClient, costFunction, dateTimeZone);
+      AdditiveDBClient cubeDbClient = new AdditiveDBClient(CACHE_REGISTRY_INSTANCE.getQueryCache());
+      MultiDimensionalSummary mdSummary = new MultiDimensionalSummary(cubeDbClient, costFunction, dateTimeZone);
 
       response = mdSummary
           .buildSummary(dataset, metric, currentStartInclusive, currentEndExclusive, baselineStartInclusive,
@@ -166,8 +168,8 @@ public class SummaryResource {
 
       CostFunction costFunction = new BalancedCostFunction();
       DateTimeZone dateTimeZone = DateTimeZone.forID(timeZone);
-      OLAPDataBaseClient olapClient = new ThirdEyeSummaryClient(CACHE_REGISTRY_INSTANCE.getQueryCache());
-      MultiDimensionalSummary mdSummary = new MultiDimensionalSummary(olapClient, costFunction, dateTimeZone);
+      AdditiveDBClient cubeDbClient = new AdditiveDBClient(CACHE_REGISTRY_INSTANCE.getQueryCache());
+      MultiDimensionalSummary mdSummary = new MultiDimensionalSummary(cubeDbClient, costFunction, dateTimeZone);
 
       response = mdSummary
           .buildSummary(dataset, metric, currentStartInclusive, currentEndExclusive, baselineStartInclusive,
@@ -177,6 +179,71 @@ public class SummaryResource {
       LOG.error("Exception while generating difference summary", e);
       response = SummaryResponse.buildNotAvailableResponse(dataset, metric);
     }
+    return OBJECT_MAPPER.writeValueAsString(response);
+  }
+
+  @GET
+  @Path(value = "/summary/autoRatioDimensionOrder")
+  @Produces(MediaType.APPLICATION_JSON)
+  public String buildRatioSummary(@QueryParam("dataset") String dataset,
+      @QueryParam("numeratorMetric") String numeratorMetric,
+      @QueryParam("denominatorMetric") String denominatorMetric,
+      @QueryParam("currentStart") long currentStartInclusive,
+      @QueryParam("currentEnd") long currentEndExclusive,
+      @QueryParam("baselineStart") long baselineStartInclusive,
+      @QueryParam("baselineEnd") long baselineEndExclusive,
+      @QueryParam("dimensions") String groupByDimensions,
+      @QueryParam("filters") String filterJsonPayload,
+      @QueryParam("summarySize") int summarySize,
+      @QueryParam("depth") @DefaultValue(DEFAULT_DEPTH) int depth,
+      @QueryParam("hierarchies") @DefaultValue(DEFAULT_HIERARCHIES) String hierarchiesPayload,
+      @QueryParam("oneSideError") @DefaultValue(DEFAULT_ONE_SIDE_ERROR) boolean doOneSideError,
+      @QueryParam("excludedDimensions") @DefaultValue(DEFAULT_EXCLUDED_DIMENSIONS) String excludedDimensions,
+      @QueryParam("timeZone") @DefaultValue(DEFAULT_TIMEZONE_ID) String timeZone) throws Exception {
+    if (summarySize < 1) summarySize = 1;
+
+    SummaryResponse response = null;
+
+    try {
+      Dimensions dimensions;
+      if (StringUtils.isBlank(groupByDimensions) || JAVASCRIPT_NULL_STRING.equals(groupByDimensions)) {
+        dimensions =
+            MultiDimensionalSummaryCLITool.sanitizeDimensions(new Dimensions(Utils.getSchemaDimensionNames(dataset)));
+      } else {
+        dimensions = new Dimensions(Arrays.asList(groupByDimensions.trim().split(",")));
+      }
+
+      if (!Strings.isNullOrEmpty(excludedDimensions)) {
+        List<String> dimensionsToBeRemoved = Arrays.asList(excludedDimensions.trim().split(","));
+        dimensions = MultiDimensionalSummaryCLITool.removeDimensions(dimensions, dimensionsToBeRemoved);
+      }
+
+      Multimap<String, String> filterSetMap;
+      if (StringUtils.isBlank(filterJsonPayload) || JAVASCRIPT_NULL_STRING.equals(filterJsonPayload)) {
+        filterSetMap = ArrayListMultimap.create();
+      } else {
+        filterJsonPayload = URLDecoder.decode(filterJsonPayload, HTML_STRING_ENCODING);
+        filterSetMap = ThirdEyeUtils.convertToMultiMap(filterJsonPayload);
+      }
+
+      List<List<String>> hierarchies =
+          OBJECT_MAPPER.readValue(hierarchiesPayload, new TypeReference<List<List<String>>>() {
+          });
+
+      CostFunction costFunction = new RatioCostFunction();
+      DateTimeZone dateTimeZone = DateTimeZone.forID(timeZone);
+      RatioDBClient dbClient = new RatioDBClient(CACHE_REGISTRY_INSTANCE.getQueryCache());
+      MultiDimensionalRatioSummary mdSummary = new MultiDimensionalRatioSummary(dbClient, costFunction, dateTimeZone);
+
+      response = mdSummary
+          .buildRatioSummary(dataset, numeratorMetric, denominatorMetric, currentStartInclusive, currentEndExclusive, baselineStartInclusive,
+              baselineEndExclusive, dimensions, filterSetMap, summarySize, depth, hierarchies, doOneSideError);
+
+    } catch (Exception e) {
+      LOG.error("Exception while generating difference summary", e);
+      response = SummaryResponse.buildNotAvailableResponse(dataset, numeratorMetric + "/" + denominatorMetric);
+    }
+
     return OBJECT_MAPPER.writeValueAsString(response);
   }
 }

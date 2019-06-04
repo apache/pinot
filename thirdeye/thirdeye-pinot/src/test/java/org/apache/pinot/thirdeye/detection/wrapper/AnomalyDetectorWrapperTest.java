@@ -19,9 +19,12 @@ package org.apache.pinot.thirdeye.detection.wrapper;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ListMultimap;
+import java.sql.Time;
 import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.common.time.TimeSpec;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
+import org.apache.pinot.thirdeye.dataframe.DoubleSeries;
+import org.apache.pinot.thirdeye.dataframe.LongSeries;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
@@ -34,6 +37,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.thirdeye.detection.spi.model.TimeSeries;
 import org.joda.time.DateTimeZone;
 import org.joda.time.Interval;
 import org.testng.Assert;
@@ -169,4 +173,34 @@ public class AnomalyDetectorWrapperTest {
         new AnomalyDetectorWrapper(this.provider, this.config, 1546819200000L, 1546905600000L);
     Assert.assertEquals(detectionPipeline.getLastTimeStamp(), -1);
   }
+
+  @Test
+  public void testConsolidateTimeSeries() {
+    TimeSeries ts1 =
+        new TimeSeries(LongSeries.buildFrom(1L, 2L, 3L, 4L, 5L), DoubleSeries.buildFrom(1.0, 20.0, 30.0, 40.0, 50.0),
+            DoubleSeries.buildFrom(1.0, 2.0, 3.0, 4.0, 5.0), DoubleSeries.buildFrom(1.0, 2.0, 3.0, 4.0, 5.0),
+            DoubleSeries.buildFrom(1.0, 2.0, 3.0, 4.0, 5.0));
+    TimeSeries ts2 =
+        new TimeSeries(LongSeries.buildFrom(2L, 3L, 4L, 5L, 6L), DoubleSeries.buildFrom(1.0, 2.0, 3.0, 4.0, 5.0),
+            DoubleSeries.buildFrom(2.0, 3.0, 4.0, 5.0, 6.0), DoubleSeries.buildFrom(1.0, 2.0, 3.0, 4.0, 5.0),
+            DoubleSeries.buildFrom(1.0, 2.0, 3.0, 4.0, 5.0));
+    TimeSeries result = AnomalyDetectorWrapper.consolidateTimeSeries(ts1, ts2);
+    Assert.assertEquals(result.getTime(), LongSeries.buildFrom(1L, 2L, 3L, 4L, 5L, 6L));
+    Assert.assertEquals(result.getCurrent(), DoubleSeries.buildFrom(1.0, 2.0, 3.0, 4.0, 5.0, 6.0));
+    Assert.assertEquals(result.getPredictedBaseline(), DoubleSeries.buildFrom(1.0, 1.0, 2.0, 3.0, 4.0, 5.0));
+    Assert.assertEquals(result.getPredictedUpperBound(), DoubleSeries.buildFrom(1.0, 1.0, 2.0, 3.0, 4.0, 5.0));
+    Assert.assertEquals(result.getPredictedLowerBound(), DoubleSeries.buildFrom(1.0, 1.0, 2.0, 3.0, 4.0, 5.0));
+  }
+
+  @Test
+  public void testConsolidateTimeSeriesWithNull() {
+    TimeSeries ts1 = TimeSeries.empty();
+    TimeSeries ts2 = new TimeSeries(LongSeries.buildFrom(1L, 2L, 3L, 4L, 5L), DoubleSeries.buildFrom(1.0, 20.0, 30.0, 40.0, 50.0));
+    TimeSeries ts3 = new TimeSeries(LongSeries.buildFrom(2L, 3L, 4L, 5L, 6L), DoubleSeries.buildFrom(2.0 ,3.0, 4.0, Double.NaN, 6.0));
+    TimeSeries result1 = AnomalyDetectorWrapper.consolidateTimeSeries(ts1, ts2);
+    TimeSeries result = AnomalyDetectorWrapper.consolidateTimeSeries(result1, ts3);
+    Assert.assertEquals(result.getTime(), LongSeries.buildFrom(1L, 2L, 3L, 4L, 5L, 6L));
+    Assert.assertEquals(result.getPredictedBaseline(), DoubleSeries.buildFrom(1.0, 2.0, 3.0, 4.0, Double.NaN, 6.0));
+  }
+
 }

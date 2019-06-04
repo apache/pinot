@@ -90,22 +90,21 @@ public abstract class DetectionPipeline {
     Map<String, BaseComponent> instancesMap = config.getComponents();
     Map<String, Object> componentSpecs = config.getComponentSpecs();
     if (componentSpecs != null) {
-      for (String componentName : componentSpecs.keySet()) {
-        Map<String, Object> componentSpec = MapUtils.getMap(componentSpecs, componentName);
-        if (!instancesMap.containsKey(componentName)){
-          instancesMap.put(componentName, createComponent(componentSpec));
+      for (String componentKey : componentSpecs.keySet()) {
+        Map<String, Object> componentSpec = MapUtils.getMap(componentSpecs, componentKey);
+        if (!instancesMap.containsKey(componentKey)){
+          instancesMap.put(componentKey, createComponent(componentSpec));
         }
       }
 
-      for (String componentName : componentSpecs.keySet()) {
-        Map<String, Object> componentSpec = MapUtils.getMap(componentSpecs, componentName);
+      for (String componentKey : componentSpecs.keySet()) {
+        Map<String, Object> componentSpec = MapUtils.getMap(componentSpecs, componentKey);
         for (Map.Entry<String, Object> entry : componentSpec.entrySet()){
           if (DetectionUtils.isReferenceName(entry.getValue().toString())) {
-            String refComponentName = DetectionUtils.getComponentName(entry.getValue().toString());
-            componentSpec.put(entry.getKey(), instancesMap.get(refComponentName));
+            componentSpec.put(entry.getKey(), instancesMap.get(DetectionUtils.getComponentKey(entry.getValue().toString())));
           }
         }
-        instancesMap.get(componentName).init(getComponentSpec(componentSpec), dataFetcher);
+        instancesMap.get(componentKey).init(getComponentSpec(componentSpec), dataFetcher);
       }
     }
     config.setComponents(instancesMap);

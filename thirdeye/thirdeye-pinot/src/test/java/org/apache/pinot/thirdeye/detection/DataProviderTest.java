@@ -33,6 +33,7 @@ import org.apache.pinot.thirdeye.common.dimension.DimensionMap;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
 import org.apache.pinot.thirdeye.datalayer.bao.DAOTestBase;
 import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
+import org.apache.pinot.thirdeye.datalayer.bao.EvaluationManager;
 import org.apache.pinot.thirdeye.datalayer.bao.EventManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
@@ -65,6 +66,7 @@ public class DataProviderTest {
   private MergedAnomalyResultManager anomalyDAO;
   private MetricConfigManager metricDAO;
   private DatasetConfigManager datasetDAO;
+  private EvaluationManager evaluationDAO;
   private QueryCache cache;
   private TimeSeriesLoader timeseriesLoader;
 
@@ -86,7 +88,7 @@ public class DataProviderTest {
     this.anomalyDAO = reg.getMergedAnomalyResultDAO();
     this.metricDAO = reg.getMetricConfigDAO();
     this.datasetDAO = reg.getDatasetConfigDAO();
-
+    this.evaluationDAO = reg.getEvaluationManager();
     // events
     this.eventIds = new ArrayList<>();
     this.eventIds.add(this.eventDAO.save(makeEvent(3600000L, 7200000L)));
@@ -140,7 +142,7 @@ public class DataProviderTest {
     this.timeseriesLoader = new DefaultTimeSeriesLoader(this.metricDAO, this.datasetDAO, this.cache);
 
     // provider
-    this.provider = new DefaultDataProvider(this.metricDAO, this.datasetDAO, this.eventDAO, this.anomalyDAO,
+    this.provider = new DefaultDataProvider(this.metricDAO, this.datasetDAO, this.eventDAO, this.anomalyDAO, this.evaluationDAO,
         this.timeseriesLoader, null, null);
   }
 

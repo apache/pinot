@@ -35,6 +35,8 @@ import {inject as service} from '@ember/service';
 import {task} from 'ember-concurrency';
 import config from 'thirdeye-frontend/config/environment';
 
+const CREATE_GROUP_TEXT = 'Create a new subscription group';
+
 export default Component.extend({
   classNames: ['yaml-editor'],
   notifications: service('toast'),
@@ -48,16 +50,15 @@ export default Component.extend({
   isEditMode: false,
   showSettings: true,
   disableYamlSave: true,
+  disableSubGroupSave: true,
   detectionMsg: '',                   //General alert failures
   subscriptionMsg: '',                //General subscription failures
   detectionYaml: null,                // The YAML for the anomaly detection
   subscriptionYaml:  null,            // The YAML for the subscription group
-  yamlAlertProps: yamlAlertProps,
-  yamlAlertSettings: yamlAlertSettings,
+  currentYamlAlertOriginal: yamlAlertProps,
+  currentYamlSettingsOriginal: yamlAlertSettings,
   showAnomalyModal: false,
   showNotificationModal: false,
-  currentYamlAlertOriginal: '',
-  currentYamlSettingsOriginal: '',
   toggleCollapsed: true,
   alertDataIsCurrent: true,
 
@@ -65,19 +66,13 @@ export default Component.extend({
 
   init() {
     this._super(...arguments);
-    // In edit mode, sets subscription group to an existing group by default and sets default yamls
-    if (get(this, 'isEditMode')) {
-      const subscriptionGroupNames = get(this, 'subscriptionGroupNames');
-      // Checks to make sure there is a subscription group array with at least one subscription group
-      if (subscriptionGroupNames && Array.isArray(subscriptionGroupNames) && subscriptionGroupNames.length > 0) {
-        const firstGroup = subscriptionGroupNames[0];
-        set(this, 'subscriptionYaml', firstGroup.yaml);
-        set(this, 'groupName', firstGroup);
-        set(this, 'subscriptionGroupId', firstGroup.id);
-      }
-      // Sets default yamls after checking for and setting default subscription group
-      set(this, 'currentYamlAlertOriginal', get(this, 'detectionYaml') || get(this, 'yamlAlertProps'));
-      set(this, 'currentYamlSettingsOriginal', get(this, 'subscriptionYaml') || get(this, 'yamlAlertSettings'));
+    const subscriptionGroupNamesDisplay = get(this, 'subscriptionGroupNamesDisplay');
+    // Checks to make sure there is a subscription group array with at least one subscription group
+    if (subscriptionGroupNamesDisplay && Array.isArray(subscriptionGroupNamesDisplay) && subscriptionGroupNamesDisplay.length > 0) {
+      const firstGroup = subscriptionGroupNamesDisplay[0];
+      set(this, 'subscriptionYaml', firstGroup.yaml);
+      set(this, 'groupName', firstGroup);
+      set(this, 'subscriptionGroupId', firstGroup.id);
     }
   },
 
@@ -89,12 +84,21 @@ export default Component.extend({
   subscriptionGroupNamesDisplay: computed(
     'subscriptionGroupNames',
     async function() {
-      const isEditMode = get(this, 'isEditMode');
+      const {
+        isEditMode,
+        subscriptionGroupNames
+      } = this.getProperties('isEditMode', 'subscriptionGroupNames');
+      const createGroup = {
+        name: CREATE_GROUP_TEXT,
+        id: 'n/a',
+        yaml: yamlAlertSettings
+      };
+      const moddedArray = [createGroup];
       if (isEditMode) {
-        return get(this, 'subscriptionGroupNames');
+        return [...moddedArray, ...subscriptionGroupNames];
       }
       const subscriptionGroups = await get(this, '_fetchSubscriptionGroups').perform();
-      return get(this, 'subscriptionGroupNames') || subscriptionGroups;
+      return [...moddedArray, ...subscriptionGroups];
     }
   ),
 
@@ -115,7 +119,24 @@ export default Component.extend({
   ),
 
   /**
-   * sets Yaml value displayed to contents of detectionYaml or yamlAlertProps
+   * Change subscription group button text depending on whether creating or updating
+   * @method subGroupButtonText
+   * @return {String}
+   */
+  subGroupButtonText: computed(
+    'noExistingSubscriptionGroup',
+    'groupName',
+    function() {
+      const {
+        noExistingSubscriptionGroup,
+        groupName
+      } = this.getProperties('noExistingSubscriptionGroup', 'groupName');
+      return (noExistingSubscriptionGroup || !groupName || groupName.name === CREATE_GROUP_TEXT) ? "Create Group" : "Update Group";
+    }
+  ),
+
+  /**
+   * sets Yaml value displayed to contents of detectionYaml or currentYamlAlertOriginal
    * @method currentYamlAlert
    * @return {String}
    */
@@ -123,12 +144,12 @@ export default Component.extend({
     'detectionYaml',
     function() {
       const inputYaml = get(this, 'detectionYaml');
-      return inputYaml || get(this, 'yamlAlertProps');
+      return inputYaml || get(this, 'currentYamlAlertOriginal');
     }
   ),
 
   /**
-   * sets Yaml value displayed to contents of subscriptionYaml or yamlAlertSettings
+   * sets Yaml value displayed to contents of subscriptionYaml or currentYamlSettingsOriginal
    * @method currentYamlAlert
    * @return {String}
    */
@@ -136,7 +157,7 @@ export default Component.extend({
     'subscriptionYaml',
     function() {
       const subscriptionYaml = get(this, 'subscriptionYaml');
-      return subscriptionYaml || get(this, 'yamlAlertSettings');
+      return subscriptionYaml || get(this, 'currentYamlSettingsOriginal');
     }
   ),
 
@@ -292,9 +313,12 @@ export default Component.extend({
 
   // Method for handling subscription group, whether there are any or not
   async _handleSubscriptionGroup(subscriptionYaml, notifications, subscriptionGroupId) {
-    const noExistingSubscriptionGroup = get(this, 'noExistingSubscriptionGroup');
-    if (noExistingSubscriptionGroup) {
-      //PUT settings
+    const {
+      noExistingSubscriptionGroup,
+      groupName
+    } = this.getProperties('noExistingSubscriptionGroup', 'groupName');
+    if (noExistingSubscriptionGroup || !groupName || groupName.name === CREATE_GROUP_TEXT) {
+      //POST settings
       const setting_url = '/yaml/subscription';
       const settingsPostProps = {
         method: 'POST',
@@ -352,15 +376,15 @@ export default Component.extend({
         if(isEditMode) {
           set(this, 'detectionYaml', get(this, 'currentYamlAlertOriginal'));
         } else {
-          const yamlAlertProps = get(this, 'yamlAlertProps');
-          set(this, 'detectionYaml', yamlAlertProps);
+          const currentYamlAlertOriginal = get(this, 'currentYamlAlertOriginal');
+          set(this, 'detectionYaml', currentYamlAlertOriginal);
         }
       } else if (field === 'subscription') {
         if(isEditMode) {
           set(this, 'subscriptionYaml', get(this, 'currentYamlSettingsOriginal'));
         } else {
-          const yamlAlertSettings = get(this, 'yamlAlertSettings');
-          set(this, 'subscriptionYaml', yamlAlertSettings);
+          const currentYamlSettingsOriginal = get(this, 'currentYamlSettingsOriginal');
+          set(this, 'subscriptionYaml', currentYamlSettingsOriginal);
         }
       }
     },
@@ -439,7 +463,7 @@ export default Component.extend({
      */
     onEditingSubscriptionYamlAction(value) {
       setProperties(this, {
-        disableYamlSave: false,
+        disableSubGroupSave: false,
         subscriptionYaml: value
       });
     },
@@ -492,17 +516,15 @@ export default Component.extend({
     },
 
     /**
-     * Fired by save button in YAML UI
-     * Grabs each yaml (alert and settings) and save them to their respective apis.
+     * Fired by alert button in YAML UI in edit mode
+     * Grabs alert yaml and puts it to the backend.
      */
-    async saveEditYamlAction() {
+    async submitAlertEdit() {
       const {
         detectionYaml,
-        subscriptionYaml,
         notifications,
-        alertId,
-        subscriptionGroupId
-      } = getProperties(this, 'detectionYaml', 'subscriptionYaml', 'notifications', 'alertId', 'subscriptionGroupId');
+        alertId
+      } = getProperties(this, 'detectionYaml', 'notifications', 'alertId');
 
       //PUT alert
       const alert_url = `/yaml/${alertId}`;
@@ -524,6 +546,18 @@ export default Component.extend({
       } catch (error) {
         notifications.error('Error while saving detection config.', error, toastOptions);
       }
+    },
+
+    /**
+     * Fired by subscription group button in YAML UI in edit mode
+     * Grabs subscription group yaml and posts or puts it to the backend.
+     */
+    async submitSubscriptionGroup() {
+      const {
+        subscriptionYaml,
+        notifications,
+        subscriptionGroupId
+      } = getProperties(this, 'subscriptionYaml', 'notifications', 'subscriptionGroupId');
       // If there is no existing subscription group, this method will handle it
       this._handleSubscriptionGroup(subscriptionYaml, notifications, subscriptionGroupId);
     }

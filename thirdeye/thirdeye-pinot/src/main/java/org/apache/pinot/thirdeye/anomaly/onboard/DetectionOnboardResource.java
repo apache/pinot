@@ -51,6 +51,7 @@ import org.slf4j.LoggerFactory;
 @Path("/detection-onboard")
 @Produces(MediaType.APPLICATION_JSON)
 @Api(tags = {Constants.ONBOARD_TAG})
+@Deprecated
 public class DetectionOnboardResource {
   private static final Logger LOG = LoggerFactory.getLogger(DetectionOnboardResource.class);
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();

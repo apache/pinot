@@ -19,8 +19,10 @@
 
 package org.apache.pinot.thirdeye.rootcause.impl;
 
+import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.TreeMultimap;
+import java.util.Map;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
 import org.apache.pinot.thirdeye.rootcause.Entity;
 import org.apache.pinot.thirdeye.rootcause.util.EntityUtils;
@@ -87,6 +89,17 @@ public class MetricEntity extends Entity {
 
   public static MetricEntity fromMetric(double score, long id) {
     return fromMetric(score, new ArrayList<Entity>(), id, TreeMultimap.<String, String>create());
+  }
+
+  public static MetricEntity fromMetric(Map<String, Collection<String>> filterMaps, long id) {
+    Multimap<String, String> filters = ArrayListMultimap.create();
+    if (filterMaps != null) {
+      for (Map.Entry<String, Collection<String>> entry : filterMaps.entrySet()) {
+        filters.putAll(entry.getKey(), entry.getValue());
+      }
+    }
+
+    return fromMetric(1.0, id, filters);
   }
 
   public static MetricEntity fromURN(String urn, double score) {

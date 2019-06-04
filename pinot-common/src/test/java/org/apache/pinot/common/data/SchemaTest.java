@@ -19,12 +19,10 @@
 package org.apache.pinot.common.data;
 
 import java.io.File;
-import java.io.IOException;
 import java.net.URL;
 import java.util.concurrent.TimeUnit;
-import org.apache.commons.codec.DecoderException;
-import org.apache.commons.codec.binary.Hex;
 import org.apache.pinot.common.data.TimeGranularitySpec.TimeFormat;
+import org.apache.pinot.common.utils.BytesUtils;
 import org.apache.pinot.common.utils.SchemaUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -304,10 +302,10 @@ public class SchemaTest {
 
   @Test
   public void testByteType()
-      throws DecoderException, IOException {
+      throws Exception {
     Schema expectedSchema = new Schema();
     byte[] expectedEmptyDefault = new byte[0];
-    byte[] expectedNonEmptyDefault = Hex.decodeHex("abcd1234".toCharArray());
+    byte[] expectedNonEmptyDefault = BytesUtils.toBytes("abcd1234");
 
     expectedSchema.setSchemaName("test");
     expectedSchema.addField(new MetricFieldSpec("noDefault", FieldSpec.DataType.BYTES));

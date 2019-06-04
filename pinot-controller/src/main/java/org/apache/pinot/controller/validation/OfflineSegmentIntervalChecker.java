@@ -20,8 +20,8 @@ package org.apache.pinot.controller.validation;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.config.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.config.TableNameBuilder;
@@ -29,12 +29,13 @@ import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.metrics.ValidationMetrics;
 import org.apache.pinot.common.utils.CommonConstants;
-import org.apache.pinot.common.utils.time.TimeUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
+import org.apache.pinot.controller.util.SegmentIntervalUtils;
 import org.joda.time.Duration;
 import org.joda.time.Interval;
+import org.joda.time.base.BaseInterval;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -79,13 +80,12 @@ public class OfflineSegmentIntervalChecker extends ControllerPeriodicTask<Void> 
     int numMissingSegments = 0;
     int numSegments = offlineSegmentZKMetadataList.size();
     SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
-    if (numSegments >= 2 && StringUtils.isNotEmpty(validationConfig.getTimeColumnName())) {
+    if (SegmentIntervalUtils.eligibleForMissingSegmentCheck(numSegments, validationConfig)) {
       List<Interval> segmentIntervals = new ArrayList<>(numSegments);
       int numSegmentsWithInvalidIntervals = 0;
       for (OfflineSegmentZKMetadata offlineSegmentZKMetadata : offlineSegmentZKMetadataList) {
         Interval timeInterval = offlineSegmentZKMetadata.getTimeInterval();
-        if (timeInterval != null && TimeUtils.timeValueInValidRange(timeInterval.getStartMillis()) && TimeUtils
-            .timeValueInValidRange(timeInterval.getEndMillis())) {
+        if (SegmentIntervalUtils.isValidInterval(timeInterval)) {
           segmentIntervals.add(timeInterval);
         } else {
           numSegmentsWithInvalidIntervals ++;
@@ -95,7 +95,7 @@ public class OfflineSegmentIntervalChecker extends ControllerPeriodicTask<Void> 
         LOGGER.warn("Table: {} has {} segments with invalid interval", offlineTableName,
             numSegmentsWithInvalidIntervals);
       }
-      Duration frequency = convertToDuration(validationConfig.getSegmentPushFrequency());
+      Duration frequency = SegmentIntervalUtils.convertToDuration(validationConfig.getSegmentPushFrequency());
       numMissingSegments = computeNumMissingSegments(segmentIntervals, frequency);
     }
     // Update the gauge that contains the number of missing segments
@@ -132,25 +132,6 @@ public class OfflineSegmentIntervalChecker extends ControllerPeriodicTask<Void> 
   }
 
   /**
-   * Converts push frequency into duration. For invalid or less than 'hourly' push frequency, treats it as 'daily'.
-   */
-  private Duration convertToDuration(String pushFrequency) {
-    if ("hourly".equalsIgnoreCase(pushFrequency)) {
-      return Duration.standardHours(1L);
-    }
-    if ("daily".equalsIgnoreCase(pushFrequency)) {
-      return Duration.standardDays(1L);
-    }
-    if ("weekly".equalsIgnoreCase(pushFrequency)) {
-      return Duration.standardDays(7L);
-    }
-    if ("monthly".equalsIgnoreCase(pushFrequency)) {
-      return Duration.standardDays(30L);
-    }
-    return Duration.standardDays(1L);
-  }
-
-  /**
    * Computes the number of missing segments based on the given existing segment intervals and the expected frequency
    * of the intervals.
    * <p>We count the interval as missing if there are at least two intervals between the start of the previous interval
@@ -171,7 +152,7 @@ public class OfflineSegmentIntervalChecker extends ControllerPeriodicTask<Void> 
     }
 
     // Sort the intervals by ascending starting time
-    segmentIntervals.sort((o1, o2) -> Long.compare(o1.getStartMillis(), o2.getStartMillis()));
+    segmentIntervals.sort(Comparator.comparingLong(BaseInterval::getStartMillis));
 
     int numMissingSegments = 0;
     long frequencyMs = frequency.getMillis();

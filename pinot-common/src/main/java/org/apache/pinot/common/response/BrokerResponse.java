@@ -98,6 +98,16 @@ public interface BrokerResponse {
   long getNumSegmentsMatched();
 
   /**
+   * Get number of consuming segments that were queried.
+   */
+  long getNumConsumingSegmentsQueried();
+
+  /**
+   * Get the minimum freshness timestamp across consuming segments that were queried
+   */
+  long getMinConsumingFreshnessTimeMs();
+
+  /**
    * Get total number of documents within the table hit.
    */
   long getTotalDocs();

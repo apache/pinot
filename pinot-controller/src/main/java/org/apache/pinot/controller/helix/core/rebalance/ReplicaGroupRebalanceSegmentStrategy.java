@@ -20,6 +20,7 @@ package org.apache.pinot.controller.helix.core.rebalance;
 
 import com.google.common.base.Function;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -206,7 +207,7 @@ public class ReplicaGroupRebalanceSegmentStrategy implements RebalanceSegmentStr
       int currentNewReplicaGroupId = 0;
       for (int groupId = 0; groupId < oldNumReplicaGroup; groupId++) {
         List<String> oldReplicaGroup =
-            oldReplicaGroupPartitionAssignment.getInstancesfromReplicaGroup(partitionId, groupId);
+            oldReplicaGroupPartitionAssignment.getInstancesFromReplicaGroup(partitionId, groupId);
         List<String> newReplicaGroup = new ArrayList<>();
         boolean removeGroup = false;
 
@@ -373,7 +374,7 @@ public class ReplicaGroupRebalanceSegmentStrategy implements RebalanceSegmentStr
       List<String> referenceReplicaGroup = new ArrayList<>();
       for (int replicaId = 0; replicaId < numReplicaGroups; replicaId++) {
         List<String> serversInReplicaGroup =
-            replicaGroupPartitionAssignment.getInstancesfromReplicaGroup(partitionId, replicaId);
+            replicaGroupPartitionAssignment.getInstancesFromReplicaGroup(partitionId, replicaId);
         if (replicaId == 0) {
           // We need to keep the first replica group in case of mirroring.
           referenceReplicaGroup.addAll(serversInReplicaGroup);
@@ -391,8 +392,8 @@ public class ReplicaGroupRebalanceSegmentStrategy implements RebalanceSegmentStr
     }
 
     // Update Idealstate with rebalanced segment assignment
-    Map<String, Map<String, String>> serverToSegmentsMapping = buildSegmentToServerMapping(serverToSegments);
-    for (Map.Entry<String, Map<String, String>> entry : serverToSegmentsMapping.entrySet()) {
+    Map<String, Map<String, String>> newSegmentToServersMap = buildSegmentToServerMapping(serverToSegments);
+    for (Map.Entry<String, Map<String, String>> entry : newSegmentToServersMap.entrySet()) {
       idealState.setInstanceStateMap(entry.getKey(), entry.getValue());
     }
     idealState.setReplicas(Integer.toString(numReplicaGroups));
@@ -454,6 +455,8 @@ public class ReplicaGroupRebalanceSegmentStrategy implements RebalanceSegmentStr
     // Remove segments from servers that has more segments
     for (String server : serversInReplicaGroup) {
       LinkedList<String> segmentsInServer = serverToSegments.get(server);
+      // randomize the segments to be moved
+      Collections.shuffle(segmentsInServer);
       int segmentToMove = numSegmentsPerServer - segmentsInServer.size();
       if (segmentToMove < 0) {
         // Server has more segments than needed, remove segments from this server
@@ -463,6 +466,8 @@ public class ReplicaGroupRebalanceSegmentStrategy implements RebalanceSegmentStr
       }
     }
 
+    // randomize the segments to be added
+    Collections.shuffle(segmentsToAdd);
     // Add segments to servers that has less segments than numSegmentsPerServer
     for (String server : serversInReplicaGroup) {
       LinkedList<String> segmentsInServer = serverToSegments.get(server);
@@ -514,11 +519,8 @@ public class ReplicaGroupRebalanceSegmentStrategy implements RebalanceSegmentStr
     for (Map.Entry<String, LinkedList<String>> entry : serverToSegments.entrySet()) {
       String server = entry.getKey();
       for (String segment : entry.getValue()) {
-        if (!segmentsToServerMapping.containsKey(segment)) {
-          segmentsToServerMapping.put(segment, new HashMap<String, String>());
-        }
-        segmentsToServerMapping.get(segment)
-            .put(server, CommonConstants.Helix.StateModel.SegmentOnlineOfflineStateModel.ONLINE);
+        Map<String, String> serverToStateMap = segmentsToServerMapping.computeIfAbsent(segment, k -> new HashMap<>());
+        serverToStateMap.put(server, CommonConstants.Helix.StateModel.SegmentOnlineOfflineStateModel.ONLINE);
       }
     }
     return segmentsToServerMapping;

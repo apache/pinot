@@ -32,20 +32,32 @@ export function getAnomaliesByAlertIdUrl(alertId, startTime, endTime) {
 }
 
 /**
- * Returns the url for getting anomaly ids of all anomalies over the specified time range
+ * Returns the url for getting anomaly filters of all anomalies over the specified time range
  * @param {Number} startTime - beginning of time range of interest
  * @param {Number} endTime - end of time range of interest
- * @example getAnomalyIdsByTimeRangeUrl(1508472700000, 1508472800000) // yields => /anomalies/search/time/1508472700000/1508472800000/1?filterOnly=true
+ * @example getAnomalyFiltersByTimeRangeUrl(1508472700000, 1508472800000) // yields => /anomalies/search/time/1508472700000/1508472800000/1?filterOnly=true
  */
-export function getAnomalyIdsByTimeRangeUrl(startTime, endTime) {
+export function getAnomalyFiltersByTimeRangeUrl(startTime, endTime) {
   return `/anomalies/search/time/${startTime}/${endTime}/1?filterOnly=true`;
+}
+
+/**
+ * Returns the url for getting anomaly filters of anomalies with given id's
+ * @param {Number} startTime - beginning of time range of interest
+ * @param {Number} endTime - end of time range of interest
+ * @param {String} anomalyIds - string of comma delimitedanomaly ids
+ * @example getAnomalyFiltersByAnomalyIdUrl(1508472700000, 1508472800000, anomalyIds) // yields => /anomalies/search/anomalyIds/1508472700000/1508472800000/1?anomalyIds={anomalyIds}
+ */
+export function getAnomalyFiltersByAnomalyIdUrl(startTime, endTime, anomalyIds) {
+  return `/anomalies/search/anomalyIds/${startTime}/${endTime}/1?anomalyIds=${encodeURIComponent(anomalyIds)}`;
 }
 
 export const anomalyApiUrls = {
   getAnomalyDataUrl,
   getAnomaliesForYamlPreviewUrl,
   getAnomaliesByAlertIdUrl,
-  getAnomalyIdsByTimeRangeUrl
+  getAnomalyFiltersByTimeRangeUrl,
+  getAnomalyFiltersByAnomalyIdUrl
 };
 
 export default {

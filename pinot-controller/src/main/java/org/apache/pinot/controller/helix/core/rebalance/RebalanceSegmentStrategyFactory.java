@@ -24,35 +24,18 @@ import org.apache.pinot.controller.helix.core.sharding.SegmentAssignmentStrategy
 
 
 /**
- * Singleton factory class, to fetch the right rebalance segments strategy based on table config
+ * This class is used to fetch the right rebalance segments strategy based on table config.
  */
 public class RebalanceSegmentStrategyFactory {
 
-  // TODO: fix the misuse of singleton.
-  private static RebalanceSegmentStrategyFactory INSTANCE = null;
-
   private HelixManager _helixManager;
 
-  private RebalanceSegmentStrategyFactory(HelixManager helixManager) {
+  public RebalanceSegmentStrategyFactory(HelixManager helixManager) {
     _helixManager = helixManager;
   }
 
-  public static void createInstance(HelixManager helixManager) {
-    if (INSTANCE != null) {
-      throw new RuntimeException("Instance already created for " + RebalanceSegmentStrategyFactory.class.getName());
-    }
-    INSTANCE = new RebalanceSegmentStrategyFactory(helixManager);
-  }
-
-  public static RebalanceSegmentStrategyFactory getInstance() {
-    if (INSTANCE == null) {
-      throw new RuntimeException("Instance not yet created for " + RebalanceSegmentStrategyFactory.class.getName());
-    }
-    return INSTANCE;
-  }
-
   public RebalanceSegmentStrategy getRebalanceSegmentsStrategy(TableConfig tableConfig) {
-    // If we use replica group segment assignment strategy, we pick the replica group rebalancer
+    // If we use replica group segment assignment strategy, we pick the replica group rebalancer.
     String segmentAssignmentStrategy = tableConfig.getValidationConfig().getSegmentAssignmentStrategy();
     if (segmentAssignmentStrategy == null) {
       return new DefaultRebalanceSegmentStrategy(_helixManager);
@@ -63,9 +46,5 @@ public class RebalanceSegmentStrategyFactory {
       default:
         return new DefaultRebalanceSegmentStrategy(_helixManager);
     }
-  }
-
-  public static void stop() {
-    INSTANCE = null;
   }
 }

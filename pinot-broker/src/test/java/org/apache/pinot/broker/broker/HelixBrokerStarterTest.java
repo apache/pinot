@@ -29,16 +29,17 @@ import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 import org.I0Itec.zkclient.ZkClient;
+import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.commons.configuration.Configuration;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
-import org.apache.pinot.broker.broker.helix.DefaultHelixBrokerConfig;
 import org.apache.pinot.broker.broker.helix.HelixBrokerStarter;
 import org.apache.pinot.broker.routing.HelixExternalViewBasedRouting;
 import org.apache.pinot.broker.routing.TimeBoundaryService;
 import org.apache.pinot.broker.routing.builder.RoutingTableBuilder;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.config.TableNameBuilder;
+import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import org.apache.pinot.common.utils.CommonConstants;
@@ -57,7 +58,8 @@ public class HelixBrokerStarterTest extends ControllerTest {
   private static final String RAW_DINING_TABLE_NAME = "dining";
   private static final String DINING_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(RAW_DINING_TABLE_NAME);
   private static final String COFFEE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType("coffee");
-  private final Configuration _pinotHelixBrokerProperties = DefaultHelixBrokerConfig.getDefaultBrokerConf();
+
+  private final Configuration _brokerConf = new BaseConfiguration();
 
   private ZkClient _zkClient;
   private HelixBrokerStarter _helixBrokerStarter;
@@ -71,11 +73,10 @@ public class HelixBrokerStarterTest extends ControllerTest {
 
     startController();
 
-    _pinotHelixBrokerProperties.addProperty(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT, 8943);
-    _pinotHelixBrokerProperties
-        .addProperty(CommonConstants.Broker.CONFIG_OF_BROKER_REFRESH_TIMEBOUNDARY_INFO_SLEEP_INTERVAL, 100L);
-    _helixBrokerStarter =
-        new HelixBrokerStarter(getHelixClusterName(), ZkStarter.DEFAULT_ZK_STR, _pinotHelixBrokerProperties);
+    _brokerConf.addProperty(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT, 8943);
+    _brokerConf.addProperty(CommonConstants.Broker.CONFIG_OF_BROKER_REFRESH_TIMEBOUNDARY_INFO_SLEEP_INTERVAL, 100L);
+    _helixBrokerStarter = new HelixBrokerStarter(_brokerConf, getHelixClusterName(), ZkStarter.DEFAULT_ZK_STR);
+    _helixBrokerStarter.start();
 
     ControllerRequestBuilderUtil
         .addFakeBrokerInstancesToAutoJoinHelixCluster(getHelixClusterName(), ZkStarter.DEFAULT_ZK_STR, 5, true);
@@ -119,8 +120,8 @@ public class HelixBrokerStarterTest extends ControllerTest {
         new TableConfig.Builder(CommonConstants.Helix.TableType.REALTIME).setTableName(RAW_DINING_TABLE_NAME)
             .setTimeColumnName("timeColumn").setTimeType("DAYS").
             setStreamConfigs(streamConfigs).build();
-    Schema schema = new Schema();
-    schema.setSchemaName(RAW_DINING_TABLE_NAME);
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(RAW_DINING_TABLE_NAME)
+        .addTime("timeColumn", TimeUnit.DAYS, FieldSpec.DataType.INT).build();
     _helixResourceManager.addOrUpdateSchema(schema);
     _helixResourceManager.addTable(realtimeTimeConfig);
     _helixBrokerStarter.getHelixExternalViewBasedRouting()
@@ -139,8 +140,10 @@ public class HelixBrokerStarterTest extends ControllerTest {
       throws Exception {
     IdealState idealState;
 
-    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_BROKER").size(), 6);
-    idealState = _helixAdmin.getResourceIdealState(getHelixClusterName(), CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_BROKER").size(),
+        6);
+    idealState =
+        _helixAdmin.getResourceIdealState(getHelixClusterName(), CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
     Assert.assertEquals(idealState.getInstanceSet(DINING_TABLE_NAME).size(), SEGMENT_COUNT);
 
     ExternalView externalView =
@@ -173,8 +176,10 @@ public class HelixBrokerStarterTest extends ControllerTest {
         .setBrokerTenant("testBroker").setServerTenant("testServer").build();
     _helixResourceManager.addTable(tableConfig);
 
-    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_BROKER").size(), 6);
-    idealState = _helixAdmin.getResourceIdealState(getHelixClusterName(), CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
+    Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(getHelixClusterName(), "DefaultTenant_BROKER").size(),
+        6);
+    idealState =
+        _helixAdmin.getResourceIdealState(getHelixClusterName(), CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
     Assert.assertEquals(idealState.getInstanceSet(COFFEE_TABLE_NAME).size(), SEGMENT_COUNT);
     Assert.assertEquals(idealState.getInstanceSet(DINING_TABLE_NAME).size(), SEGMENT_COUNT);
 
@@ -183,8 +188,9 @@ public class HelixBrokerStarterTest extends ControllerTest {
       @Override
       public Boolean call()
           throws Exception {
-        return _helixAdmin.getResourceExternalView(getHelixClusterName(), CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)
-            .getStateMap(COFFEE_TABLE_NAME).size() == SEGMENT_COUNT;
+        return
+            _helixAdmin.getResourceExternalView(getHelixClusterName(), CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)
+                .getStateMap(COFFEE_TABLE_NAME).size() == SEGMENT_COUNT;
       }
     }, 30000L);
 
@@ -253,7 +259,7 @@ public class HelixBrokerStarterTest extends ControllerTest {
     TimeBoundaryService.TimeBoundaryInfo tbi = _helixBrokerStarter.getHelixExternalViewBasedRouting().
         getTimeBoundaryService().getTimeBoundaryInfoFor(DINING_TABLE_NAME);
 
-    Assert.assertEquals(tbi.getTimeValue(), Long.toString(currentTimeBoundary));
+    Assert.assertEquals(tbi.getTimeValue(), Long.toString(currentTimeBoundary - 1));
 
     List<String> segmentNames = _helixResourceManager.getSegmentsFor(DINING_TABLE_NAME);
     long endTime = currentTimeBoundary + 10;
@@ -273,8 +279,7 @@ public class HelixBrokerStarterTest extends ControllerTest {
       TimeBoundaryService.TimeBoundaryInfo timeBoundaryInfo = _helixBrokerStarter.getHelixExternalViewBasedRouting().
           getTimeBoundaryService().getTimeBoundaryInfoFor(DINING_TABLE_NAME);
       return currentTimeBoundary < Long.parseLong(timeBoundaryInfo.getTimeValue());
-    }, 5 * _pinotHelixBrokerProperties
-        .getLong(CommonConstants.Broker.CONFIG_OF_BROKER_REFRESH_TIMEBOUNDARY_INFO_SLEEP_INTERVAL));
+    }, 5 * _brokerConf.getLong(CommonConstants.Broker.CONFIG_OF_BROKER_REFRESH_TIMEBOUNDARY_INFO_SLEEP_INTERVAL));
     tbi = _helixBrokerStarter.getHelixExternalViewBasedRouting().
         getTimeBoundaryService().getTimeBoundaryInfoFor(DINING_TABLE_NAME);
     Assert.assertTrue(currentTimeBoundary < Long.parseLong(tbi.getTimeValue()));

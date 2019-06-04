@@ -20,22 +20,30 @@ package org.apache.pinot.core.minion;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.data.DimensionFieldSpec;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.common.segment.ReadMode;
 import org.apache.pinot.core.data.GenericRow;
 import org.apache.pinot.core.data.readers.GenericRowRecordReader;
 import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
-import org.testng.Assert;
+import org.apache.pinot.core.segment.store.ColumnIndexType;
+import org.apache.pinot.core.segment.store.SegmentDirectory;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotEquals;
+import static org.testng.Assert.assertTrue;
 
 
 public class SegmentPurgerTest {
@@ -83,6 +91,7 @@ public class SegmentPurgerTest {
     config.setOutDir(ORIGINAL_SEGMENT_DIR.getPath());
     config.setTableName(TABLE_NAME);
     config.setSegmentName(SEGMENT_NAME);
+    config.setInvertedIndexCreationColumns(Collections.singletonList(D1));
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
     driver.init(config, genericRowRecordReader);
@@ -94,23 +103,15 @@ public class SegmentPurgerTest {
   public void testPurgeSegment()
       throws Exception {
     // Purge records with d1 = 0
-    SegmentPurger.RecordPurger recordPurger = new SegmentPurger.RecordPurger() {
-      @Override
-      public boolean shouldPurge(GenericRow row) {
-        return row.getValue(D1).equals(0);
-      }
-    };
+    SegmentPurger.RecordPurger recordPurger = row -> row.getValue(D1).equals(0);
 
-    // Modify records with d2 = 0 to d2 = 100
-    SegmentPurger.RecordModifier recordModifier = new SegmentPurger.RecordModifier() {
-      @Override
-      public boolean modifyRecord(GenericRow row) {
-        if (row.getValue(D2).equals(0)) {
-          row.putField(D2, Integer.MAX_VALUE);
-          return true;
-        } else {
-          return false;
-        }
+    // Modify records with d2 = 0 to d2 = Integer.MAX_VALUE
+    SegmentPurger.RecordModifier recordModifier = row -> {
+      if (row.getValue(D2).equals(0)) {
+        row.putField(D2, Integer.MAX_VALUE);
+        return true;
+      } else {
+        return false;
       }
     };
 
@@ -119,14 +120,14 @@ public class SegmentPurgerTest {
     File purgedIndexDir = segmentPurger.purgeSegment();
 
     // Check the purge/modify counter in segment purger
-    Assert.assertEquals(segmentPurger.getNumRecordsPurged(), _expectedNumRecordsPurged);
-    Assert.assertEquals(segmentPurger.getNumRecordsModified(), _expectedNumRecordsModified);
+    assertEquals(segmentPurger.getNumRecordsPurged(), _expectedNumRecordsPurged);
+    assertEquals(segmentPurger.getNumRecordsModified(), _expectedNumRecordsModified);
 
     // Check crc and index creation time
     SegmentMetadataImpl purgedSegmentMetadata = new SegmentMetadataImpl(purgedIndexDir);
     SegmentMetadataImpl originalSegmentMetadata = new SegmentMetadataImpl(_originalIndexDir);
-    Assert.assertFalse(purgedSegmentMetadata.getCrc().equals(originalSegmentMetadata.getCrc()));
-    Assert.assertEquals(purgedSegmentMetadata.getIndexCreationTime(), originalSegmentMetadata.getIndexCreationTime());
+    assertNotEquals(purgedSegmentMetadata.getCrc(), originalSegmentMetadata.getCrc());
+    assertEquals(purgedSegmentMetadata.getIndexCreationTime(), originalSegmentMetadata.getIndexCreationTime());
 
     try (PinotSegmentRecordReader pinotSegmentRecordReader = new PinotSegmentRecordReader(purgedIndexDir)) {
       int numRecordsRemaining = 0;
@@ -137,8 +138,8 @@ public class SegmentPurgerTest {
         row = pinotSegmentRecordReader.next(row);
 
         // Purged segment should not have any record with d1 = 0 or d2 = 0
-        Assert.assertFalse(row.getValue(D1).equals(0));
-        Assert.assertFalse(row.getValue(D2).equals(0));
+        assertNotEquals(row.getValue(D1), 0);
+        assertNotEquals(row.getValue(D2), 0);
 
         numRecordsRemaining++;
         if (row.getValue(D2).equals(Integer.MAX_VALUE)) {
@@ -146,8 +147,16 @@ public class SegmentPurgerTest {
         }
       }
 
-      Assert.assertEquals(numRecordsRemaining, NUM_ROWS - _expectedNumRecordsPurged);
-      Assert.assertEquals(numRecordsModified, _expectedNumRecordsModified);
+      assertEquals(numRecordsRemaining, NUM_ROWS - _expectedNumRecordsPurged);
+      assertEquals(numRecordsModified, _expectedNumRecordsModified);
+    }
+
+    // Check inverted index
+    try (SegmentDirectory segmentDirectory = SegmentDirectory
+        .createFromLocalFS(purgedIndexDir, purgedSegmentMetadata, ReadMode.mmap);
+        SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
+      assertTrue(reader.hasIndexFor(D1, ColumnIndexType.INVERTED_INDEX));
+      assertFalse(reader.hasIndexFor(D2, ColumnIndexType.INVERTED_INDEX));
     }
   }
 

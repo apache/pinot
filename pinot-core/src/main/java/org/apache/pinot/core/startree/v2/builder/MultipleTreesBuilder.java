@@ -70,7 +70,6 @@ public class MultipleTreesBuilder {
    * @param builderConfigs List of builder configs
    * @param indexDir Index directory
    * @param buildMode Build mode (ON_HEAP or OFF_HEAP)
-   * @throws Exception
    */
   public MultipleTreesBuilder(List<StarTreeV2BuilderConfig> builderConfigs, File indexDir, BuildMode buildMode)
       throws Exception {
@@ -94,7 +93,7 @@ public class MultipleTreesBuilder {
       throws Exception {
     long startTime = System.currentTimeMillis();
     int numStarTrees = _builderConfigs.size();
-    LOGGER.info("Start building {} star-trees with configs: {} using {} builder", numStarTrees, _builderConfigs,
+    LOGGER.info("Starting building {} star-trees with configs: {} using {} builder", numStarTrees, _builderConfigs,
         _buildMode);
 
     try (
@@ -121,7 +120,7 @@ public class MultipleTreesBuilder {
       FileUtils.forceDelete(starTreeIndexDir);
     }
 
-    LOGGER.info("Finish building {} star-trees in {}ms", numStarTrees, System.currentTimeMillis() - startTime);
+    LOGGER.info("Finished building {} star-trees in {}ms", numStarTrees, System.currentTimeMillis() - startTime);
   }
 
   private static SingleTreeBuilder getSingleTreeBuilder(StarTreeV2BuilderConfig builderConfig, File outputDir,

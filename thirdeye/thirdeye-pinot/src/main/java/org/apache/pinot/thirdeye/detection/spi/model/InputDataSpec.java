@@ -53,6 +53,12 @@ public class InputDataSpec {
   final Collection<EventSlice> eventSlices;
 
   /*
+    Specs for evaluations. Describe what evaluations to fetch.
+    Each slice defines the time range and detection config id of the evaluations to fetch.
+  */
+  final Collection<EvaluationSlice> evaluationSlices;
+
+  /*
     Metric ids to fetch the MetricConfigDTO for.
    */
   final Collection<Long> metricIds;
@@ -91,23 +97,27 @@ public class InputDataSpec {
   }
 
   public InputDataSpec() {
-    this.timeseriesSlices = Collections.emptyList();
-    this.aggregateSlices = Collections.emptyList();
-    this.anomalySlices = Collections.emptyList();
-    this.eventSlices = Collections.emptyList();
-    this.metricIds = Collections.emptyList();
-    this.datasetNames = Collections.emptyList();
-    this.metricIdsForDatasets = Collections.emptyList();
-    this.metricAndDatasetNames = Collections.emptyList();
+    this(Collections.emptyList(), Collections.emptyList(), Collections.emptyList(), Collections.emptyList(),
+        Collections.emptyList(), Collections.emptyList(), Collections.emptyList(), Collections.emptyList(),
+        Collections.emptyList());
   }
 
   public InputDataSpec(Collection<MetricSlice> timeseriesSlices, Collection<MetricSlice> aggregateSlices,
       Collection<AnomalySlice> anomalySlices, Collection<EventSlice> eventSlices, Collection<Long> metricIds, Collection<String> datasetNames,
       Collection<Long> metricIdsForDatasets, Collection<MetricAndDatasetName> metricAndDatasetNames) {
+    this(timeseriesSlices, aggregateSlices, anomalySlices, eventSlices, Collections.emptyList(), metricIds,
+        datasetNames, metricIdsForDatasets, metricAndDatasetNames);
+  }
+
+  public InputDataSpec(Collection<MetricSlice> timeseriesSlices, Collection<MetricSlice> aggregateSlices,
+      Collection<AnomalySlice> anomalySlices, Collection<EventSlice> eventSlices,
+      Collection<EvaluationSlice> evaluationSlices, Collection<Long> metricIds, Collection<String> datasetNames,
+      Collection<Long> metricIdsForDatasets, Collection<MetricAndDatasetName> metricAndDatasetNames) {
     this.timeseriesSlices = timeseriesSlices;
     this.aggregateSlices = aggregateSlices;
     this.anomalySlices = anomalySlices;
     this.eventSlices = eventSlices;
+    this.evaluationSlices = evaluationSlices;
     this.metricIds = metricIds;
     this.datasetNames = datasetNames;
     this.metricIdsForDatasets = metricIdsForDatasets;
@@ -138,6 +148,10 @@ public class InputDataSpec {
     return datasetNames;
   }
 
+  public Collection<EvaluationSlice> getEvaluationSlices() {
+    return evaluationSlices;
+  }
+
   public Collection<Long> getMetricIdsForDatasets() {
     return metricIdsForDatasets;
   }
@@ -160,6 +174,10 @@ public class InputDataSpec {
 
   public InputDataSpec withEventSlices(Collection<EventSlice> eventSlices) {
     return new InputDataSpec(this.timeseriesSlices, this.aggregateSlices, this.anomalySlices, eventSlices, this.metricIds, this.datasetNames, this.metricIdsForDatasets, this.metricAndDatasetNames);
+  }
+
+  public InputDataSpec withEvaluationSlices(Collection<EvaluationSlice> evaluationSlices) {
+    return new InputDataSpec(this.timeseriesSlices, this.aggregateSlices, this.anomalySlices, this.eventSlices, evaluationSlices, this.metricIds, this.datasetNames, this.metricIdsForDatasets, this.metricAndDatasetNames);
   }
 
   public InputDataSpec withMetricIds(Collection<Long> metricIds) {

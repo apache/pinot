@@ -1,0 +1,28 @@
+// Overriding default c3
+
+.timeseries-chart {
+  .c3-target-baseline {
+    stroke-dasharray: 2,2;
+  }
+  .c3-target-predicted {
+    stroke-dasharray: 2,2;
+  }
+  .c3-target-upperBound {
+    opacity: 0.5 !important;
+  }
+  .c3-target-lowerBound {
+    opacity: 0.5 !important;
+  }
+  path.confidence-bounds {
+    stroke: #dcf8f3;
+    stroke-opacity: 0.5;
+	  fill: #dcf8f3;
+    opacity: 0.5
+ }
+ path.sub-confidence-bounds {
+   stroke: #dcf8f3;
+   stroke-opacity: 0.5;
+   fill: #dcf8f3;
+   opacity: 0.5
+}
+};

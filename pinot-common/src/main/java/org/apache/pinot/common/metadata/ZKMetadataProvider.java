@@ -94,8 +94,8 @@ public class ZKMetadataProvider {
     return StringUtil.join("/", PROPERTYSTORE_SCHEMAS_PREFIX, schemaName);
   }
 
-  public static String constructPropertyStorePathForInstancePartitions(String offlineTableName) {
-    return StringUtil.join("/", PROPERTYSTORE_INSTANCE_PARTITIONS_PREFIX, offlineTableName);
+  public static String constructPropertyStorePathForInstancePartitions(String tableNameWithType) {
+    return StringUtil.join("/", PROPERTYSTORE_INSTANCE_PARTITIONS_PREFIX, tableNameWithType);
   }
 
   public static String constructPropertyStorePathForResource(String resourceName) {
@@ -137,8 +137,8 @@ public class ZKMetadataProvider {
   }
 
   public static void removeInstancePartitionAssignmentFromPropertyStore(ZkHelixPropertyStore<ZNRecord> propertyStore,
-      String offlineTableName) {
-    String propertyStorePath = constructPropertyStorePathForInstancePartitions(offlineTableName);
+      String tableNameWithType) {
+    String propertyStorePath = constructPropertyStorePathForInstancePartitions(tableNameWithType);
     if (propertyStore.exists(propertyStorePath, AccessOption.PERSISTENT)) {
       propertyStore.remove(propertyStorePath, AccessOption.PERSISTENT);
     }
@@ -240,6 +240,11 @@ public class ZKMetadataProvider {
     return getTableConfig(propertyStore, TableNameBuilder.REALTIME.tableNameWithType(tableName));
   }
 
+  public static void setSchema(ZkHelixPropertyStore<ZNRecord> propertyStore, Schema schema) {
+    propertyStore.set(constructPropertyStorePathForSchema(schema.getSchemaName()), SchemaUtils.toZNRecord(schema),
+        AccessOption.PERSISTENT);
+  }
+
   @Nullable
   public static Schema getSchema(@Nonnull ZkHelixPropertyStore<ZNRecord> propertyStore, @Nonnull String schemaName) {
     try {
@@ -297,21 +302,28 @@ public class ZKMetadataProvider {
    */
   public static List<OfflineSegmentZKMetadata> getOfflineSegmentZKMetadataListForTable(
       ZkHelixPropertyStore<ZNRecord> propertyStore, String tableName) {
-    List<OfflineSegmentZKMetadata> resultList = new ArrayList<>();
-    if (propertyStore == null) {
-      return resultList;
-    }
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
-    if (propertyStore.exists(constructPropertyStorePathForResource(offlineTableName), AccessOption.PERSISTENT)) {
-      List<ZNRecord> znRecordList = propertyStore
-          .getChildren(constructPropertyStorePathForResource(offlineTableName), null, AccessOption.PERSISTENT);
-      if (znRecordList != null) {
-        for (ZNRecord record : znRecordList) {
-          resultList.add(new OfflineSegmentZKMetadata(record));
+    String parentPath = constructPropertyStorePathForResource(offlineTableName);
+    List<ZNRecord> znRecords = propertyStore.getChildren(parentPath, null, AccessOption.PERSISTENT);
+    if (znRecords != null) {
+      int numZNRecords = znRecords.size();
+      List<OfflineSegmentZKMetadata> offlineSegmentZKMetadataList = new ArrayList<>(numZNRecords);
+      for (ZNRecord znRecord : znRecords) {
+        // NOTE: it is possible that znRecord is null if the record gets removed while calling this method
+        if (znRecord != null) {
+          offlineSegmentZKMetadataList.add(new OfflineSegmentZKMetadata(znRecord));
         }
       }
+      int numNullZNRecords = numZNRecords - offlineSegmentZKMetadataList.size();
+      if (numNullZNRecords > 0) {
+        LOGGER.warn("Failed to read {}/{} offline segment ZK metadata under path: {}", numZNRecords - numNullZNRecords,
+            numZNRecords, parentPath);
+      }
+      return offlineSegmentZKMetadataList;
+    } else {
+      LOGGER.warn("Path: {} does not exist", parentPath);
+      return Collections.emptyList();
     }
-    return resultList;
   }
 
   /**
@@ -319,22 +331,29 @@ public class ZKMetadataProvider {
    * segment names are needed.
    */
   public static List<RealtimeSegmentZKMetadata> getRealtimeSegmentZKMetadataListForTable(
-      ZkHelixPropertyStore<ZNRecord> propertyStore, String resourceName) {
-    List<RealtimeSegmentZKMetadata> resultList = new ArrayList<>();
-    if (propertyStore == null) {
-      return resultList;
-    }
-    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(resourceName);
-    if (propertyStore.exists(constructPropertyStorePathForResource(realtimeTableName), AccessOption.PERSISTENT)) {
-      List<ZNRecord> znRecordList = propertyStore
-          .getChildren(constructPropertyStorePathForResource(realtimeTableName), null, AccessOption.PERSISTENT);
-      if (znRecordList != null) {
-        for (ZNRecord record : znRecordList) {
-          resultList.add(new RealtimeSegmentZKMetadata(record));
+      ZkHelixPropertyStore<ZNRecord> propertyStore, String tableName) {
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
+    String parentPath = constructPropertyStorePathForResource(realtimeTableName);
+    List<ZNRecord> znRecords = propertyStore.getChildren(parentPath, null, AccessOption.PERSISTENT);
+    if (znRecords != null) {
+      int numZNRecords = znRecords.size();
+      List<RealtimeSegmentZKMetadata> realtimeSegmentZKMetadataList = new ArrayList<>(numZNRecords);
+      for (ZNRecord znRecord : znRecords) {
+        // NOTE: it is possible that znRecord is null if the record gets removed while calling this method
+        if (znRecord != null) {
+          realtimeSegmentZKMetadataList.add(new RealtimeSegmentZKMetadata(znRecord));
         }
       }
+      int numNullZNRecords = numZNRecords - realtimeSegmentZKMetadataList.size();
+      if (numNullZNRecords > 0) {
+        LOGGER.warn("Failed to read {}/{} realtime segment ZK metadata under path: {}", numZNRecords - numNullZNRecords,
+            numZNRecords, parentPath);
+      }
+      return realtimeSegmentZKMetadataList;
+    } else {
+      LOGGER.warn("Path: {} does not exist", parentPath);
+      return Collections.emptyList();
     }
-    return resultList;
   }
 
   /**
@@ -342,25 +361,29 @@ public class ZKMetadataProvider {
    * only segment names are needed.
    */
   public static List<LLCRealtimeSegmentZKMetadata> getLLCRealtimeSegmentZKMetadataListForTable(
-      ZkHelixPropertyStore<ZNRecord> propertyStore, String resourceName) {
-    List<LLCRealtimeSegmentZKMetadata> resultList = new ArrayList<>();
-    if (propertyStore == null) {
-      return resultList;
-    }
-    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(resourceName);
-    if (propertyStore.exists(constructPropertyStorePathForResource(realtimeTableName), AccessOption.PERSISTENT)) {
-      List<ZNRecord> znRecordList = propertyStore
-          .getChildren(constructPropertyStorePathForResource(realtimeTableName), null, AccessOption.PERSISTENT);
-      if (znRecordList != null) {
-        for (ZNRecord record : znRecordList) {
-          RealtimeSegmentZKMetadata realtimeSegmentZKMetadata = new RealtimeSegmentZKMetadata(record);
-          if (SegmentName.isLowLevelConsumerSegmentName(realtimeSegmentZKMetadata.getSegmentName())) {
-            resultList.add(new LLCRealtimeSegmentZKMetadata(record));
-          }
+      ZkHelixPropertyStore<ZNRecord> propertyStore, String tableName) {
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
+    String parentPath = constructPropertyStorePathForResource(realtimeTableName);
+    List<ZNRecord> znRecords = propertyStore.getChildren(parentPath, null, AccessOption.PERSISTENT);
+    if (znRecords != null) {
+      int numZNRecords = znRecords.size();
+      List<LLCRealtimeSegmentZKMetadata> llcRealtimeSegmentZKMetadataList = new ArrayList<>(numZNRecords);
+      for (ZNRecord znRecord : znRecords) {
+        // NOTE: it is possible that znRecord is null if the record gets removed while calling this method
+        if (znRecord != null) {
+          llcRealtimeSegmentZKMetadataList.add(new LLCRealtimeSegmentZKMetadata(znRecord));
         }
       }
+      int numNullZNRecords = numZNRecords - llcRealtimeSegmentZKMetadataList.size();
+      if (numNullZNRecords > 0) {
+        LOGGER.warn("Failed to read {}/{} LLC realtime segment ZK metadata under path: {}",
+            numZNRecords - numNullZNRecords, numZNRecords, parentPath);
+      }
+      return llcRealtimeSegmentZKMetadataList;
+    } else {
+      LOGGER.warn("Path: {} does not exist", parentPath);
+      return Collections.emptyList();
     }
-    return resultList;
   }
 
   /**

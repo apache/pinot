@@ -9,12 +9,14 @@ import {
   get,
   computed,
   getProperties,
-  setProperties,
-  observer
+  setProperties
 } from '@ember/object';
-import { isPresent } from '@ember/utils';
+import { inject as service } from '@ember/service';
+import { isPresent, isEmpty } from '@ember/utils';
 import Controller from '@ember/controller';
+import yamljs from 'yamljs';
 import { reads } from '@ember/object/computed';
+import { toastOptions } from 'thirdeye-frontend/utils/constants';
 import { setUpTimeRangeOptions, powerSort } from 'thirdeye-frontend/utils/manage-alert-utils';
 import {  anomalyResponseObjNew } from 'thirdeye-frontend/utils/anomaly';
 import moment from 'moment';
@@ -28,6 +30,9 @@ const TIME_RANGE_OPTIONS = ['1d', '1w', '1m', '3m'];
 export default Controller.extend({
 
   queryParams: ['testMode'],
+  store: service('store'),
+
+  notifications: service('toast'),
 
   /**
    * One-way CP to store all sub groups
@@ -91,33 +96,6 @@ export default Controller.extend({
     }
   ),
 
-  // When the user changes the time range, this will fetch the anomaly ids
-  updateVisuals: observer(
-    'anomaliesRange',
-    function() {
-      const {
-        anomaliesRange,
-        updateAnomalies
-      } = this.getProperties('anomaliesRange', 'updateAnomalies');
-      set(this, 'isLoading', true);
-      const [ start, end ] = anomaliesRange;
-      updateAnomalies(start, end)
-        .then(res => {
-          this.setProperties({
-            anomaliesById: res,
-            anomalyIds: res.anomalyIds
-          });
-          this._resetLocalFilters();
-          set(this, 'isLoading', false);
-        })
-        .catch(() => {
-          this._resetLocalFilters();
-          set(this, 'isLoading', false);
-        });
-
-    }
-  ),
-
   // Total Number of pages to display
   pagesNum: computed(
     'totalAnomalies',
@@ -153,29 +131,27 @@ export default Controller.extend({
   // return list of anomalyIds according to filter(s) applied
   selectedAnomalies: computed(
     'anomalyFilters',
-    'anomalyIds',
+    'anomalyIdList',
     'activeFiltersString',
     function() {
       const {
-        anomalyIds,
+        anomalyIdList,
         anomalyFilters,
         anomaliesById,
         activeFiltersString
-      } = this.getProperties('anomalyIds', 'anomalyFilters', 'anomaliesById', 'activeFiltersString');
+      } = this.getProperties('anomalyIdList', 'anomalyFilters', 'anomaliesById', 'activeFiltersString');
       const filterMaps = ['statusFilterMap', 'functionFilterMap', 'datasetFilterMap', 'metricFilterMap', 'dimensionFilterMap'];
       if (activeFiltersString === 'All Anomalies') {
         // no filter applied, just return all
-        return anomalyIds;
+        return anomalyIdList;
       }
-      let selectedAnomalies = [];
+      let selectedAnomalies = anomalyIdList;
       filterMaps.forEach(map => {
-        if (anomalyFilters[map]) {
+        const selectedFilters = anomalyFilters[map];
+        // When a filter gets deleted, it leaves an empty array behind.  We need to treat null and empty array the same here
+        if (!isEmpty(selectedFilters)) {
           // a filter is selected, grab relevant anomalyIds
-          if (selectedAnomalies.length === 0) {
-            selectedAnomalies = this._unionOfArrays(anomaliesById, map, anomalyFilters[map]);
-          } else {
-            selectedAnomalies = this._intersectOfArrays(selectedAnomalies, this._unionOfArrays(anomaliesById, map, anomalyFilters[map]));
-          }
+          selectedAnomalies = this._intersectOfArrays(selectedAnomalies, this._unionOfArrays(anomaliesById, map, anomalyFilters[map]));
         }
       });
       return selectedAnomalies;
@@ -186,6 +162,13 @@ export default Controller.extend({
     'selectedAnomalies',
     function() {
       return get(this, 'selectedAnomalies').length;
+    }
+  ),
+
+  noAnomalies: computed(
+    'totalAnomalies',
+    function() {
+      return (get(this, 'totalAnomalies') === 0);
     }
   ),
 
@@ -272,6 +255,34 @@ export default Controller.extend({
     }
   ),
 
+  // When the user changes the time range, this will fetch the anomaly ids
+  _updateVisuals() {
+    const {
+      anomaliesRange,
+      updateAnomalies,
+      anomalyIds
+    } = this.getProperties('anomaliesRange', 'updateAnomalies', 'anomalyIds');
+    set(this, 'isLoading', true);
+    const [ start, end ] = anomaliesRange;
+    if (anomalyIds) {
+      set(this, 'anomalyIds', null);
+    } else {
+      updateAnomalies(start, end)
+        .then(res => {
+          this.setProperties({
+            anomaliesById: res,
+            anomalyIdList: res.anomalyIds
+          });
+          this._resetLocalFilters();
+          set(this, 'isLoading', false);
+        })
+        .catch(() => {
+          this._resetLocalFilters();
+          set(this, 'isLoading', false);
+        });
+    }
+  },
+
   /**
    * When user chooses to either find an alert by name, or use a global filter,
    * we should re-set all local filters.
@@ -287,16 +298,21 @@ export default Controller.extend({
 
     // Fill in select options for these filters ('filterKeys') based on alert properties from model.alerts
     newFilterBlocksLocal.forEach((filter) => {
-      if (filter.name === "dimensionFilterMap") {
+      let filterKeys = [];
+      if (filter.name === "dimensionFilterMap" && isPresent(anomaliesById.searchFilters[filter.name])) {
         const anomalyPropertyArray = Object.keys(anomaliesById.searchFilters[filter.name]);
-        let filterKeys = [];
         anomalyPropertyArray.forEach(dimensionType => {
           let group = Object.keys(anomaliesById.searchFilters[filter.name][dimensionType]);
           group = group.map(dim => `${dimensionType}::${dim}`);
           filterKeys = [...filterKeys, ...group];
         });
-        Object.assign(filter, { filterKeys });
-      } else if (filter.name === "statusFilterMap"){
+      } else if (filter.name === "subscriptionFilterMap"){
+        filterKeys = this.get('store')
+          .peekAll('subscription-groups')
+          .sortBy('name')
+          .filter(group => (group.get('active') && group.get('yaml')))
+          .map(group => group.get('name'));
+      } else if (filter.name === "statusFilterMap" && isPresent(anomaliesById.searchFilters[filter.name])){
         let anomalyPropertyArray = Object.keys(anomaliesById.searchFilters[filter.name]);
         anomalyPropertyArray = anomalyPropertyArray.map(prop => {
           // get the right object
@@ -304,17 +320,16 @@ export default Controller.extend({
           // map the status to name
           return mapping.length > 0 ? mapping[0].name : prop;
         });
-        const filterKeys = [ ...new Set(powerSort(anomalyPropertyArray, null))];
-        // Add filterKeys prop to each facet or filter block
-        Object.assign(filter, { filterKeys });
+        filterKeys = [ ...new Set(powerSort(anomalyPropertyArray, null))];
       } else {
-        const anomalyPropertyArray = Object.keys(anomaliesById.searchFilters[filter.name]);
-        const filterKeys = [ ...new Set(powerSort(anomalyPropertyArray, null))];
-        // Add filterKeys prop to each facet or filter block
-        Object.assign(filter, { filterKeys });
+        if (isPresent(anomaliesById.searchFilters[filter.name])) {
+          const anomalyPropertyArray = Object.keys(anomaliesById.searchFilters[filter.name]);
+          filterKeys = [ ...new Set(powerSort(anomalyPropertyArray, null))];
+        }
       }
+      // Add filterKeys prop to each facet or filter block
+      Object.assign(filter, { filterKeys });
     });
-
     // Reset local (secondary) filters, and set select fields to 'disabled'
     setProperties(this, {
       filterBlocksLocal: newFilterBlocksLocal,
@@ -326,15 +341,13 @@ export default Controller.extend({
   // method to union anomalyId arrays for filters applied of same type
   _unionOfArrays(anomaliesById, filterType, selectedFilters) {
     //handle dimensions separately, since they are nested
-    if (filterType === 'dimensionFilterMap') {
-      let addedIds = [];
+    let addedIds = [];
+    if (filterType === 'dimensionFilterMap' && isPresent(anomaliesById.searchFilters[filterType])) {
       selectedFilters.forEach(filter => {
         const [type, dimension] = filter.split('::');
         addedIds = [...addedIds, ...anomaliesById.searchFilters.dimensionFilterMap[type][dimension]];
       });
-      return addedIds;
-    } else if (filterType === 'statusFilterMap'){
-      let addedIds = [];
+    } else if (filterType === 'statusFilterMap' && isPresent(anomaliesById.searchFilters[filterType])){
       const translatedFilters = selectedFilters.map(f => {
         // get the right object
         const mapping = anomalyResponseObjNew.filter(e => (e.name === f));
@@ -344,14 +357,17 @@ export default Controller.extend({
       translatedFilters.forEach(filter => {
         addedIds = [...addedIds, ...anomaliesById.searchFilters[filterType][filter]];
       });
-      return addedIds;
     } else {
-      let addedIds = [];
-      selectedFilters.forEach(filter => {
-        addedIds = [...addedIds, ...anomaliesById.searchFilters[filterType][filter]];
-      });
-      return addedIds;
+      if (isPresent(anomaliesById.searchFilters[filterType])) {
+        selectedFilters.forEach(filter => {
+          // If there are no anomalies from the time range with these filters, then the result will be null, so we handle that here
+          // It can happen for functionFilterMap only, because we are using subscription groups to map to alert names (function filters)
+          const anomalyIdsInResponse = anomaliesById.searchFilters[filterType][filter];
+          addedIds = anomalyIdsInResponse ? [...addedIds, ...anomaliesById.searchFilters[filterType][filter]] : addedIds;
+        });
+      }
     }
+    return addedIds;
   },
 
   // method to intersect anomalyId arrays for filters applied of different types
@@ -360,10 +376,57 @@ export default Controller.extend({
     return existingArray.filter(anomalyId => incomingArray.includes(anomalyId));
   },
 
+  /**
+   * This will retrieve the subscription groups from Ember Data and extract yaml configs
+   * The yaml configs are used to extract alert names and apply them as filters
+   * @method _subscriptionGroupFilter
+   * @param {Object} filterObj
+   * @returns {Object}
+   * @private
+   */
+  _subscriptionGroupFilter(filterObj) {
+    // get selected subscription groups, if any
+    const notifications = get(this, 'notifications');
+    const selectedSubGroups = filterObj['subscriptionFilterMap'];
+    if (Array.isArray(selectedSubGroups) && selectedSubGroups.length > 0) {
+      // extract selected subscription groups from Ember Data
+      const selectedSubGroupObjects = this.get('store')
+        .peekAll('subscription-groups')
+        .filter(group => {
+          return selectedSubGroups.includes(group.get('name'));
+        });
+      let additionalAlertNames = [];
+      // for each group, grab yaml, extract alert names for adding to filterObj
+      selectedSubGroupObjects.forEach(group => {
+        try {
+          const yamlAsObject = yamljs.parse(group.get('yaml'));
+          if (Array.isArray(yamlAsObject.subscribedDetections)) {
+            additionalAlertNames = [ ...additionalAlertNames, ...yamlAsObject.subscribedDetections];
+          }
+        }
+        catch(error){
+          notifications.error(`Failed to retrieve alert names for subscription group: ${group.get('name')}`, 'Error', toastOptions);
+        }
+      });
+      // add the alert names extracted from groups to any that are already present
+      let updatedFunctionFilterMap = Array.isArray(filterObj['functionFilterMap']) ? [ ...filterObj['functionFilterMap'], ...additionalAlertNames] : additionalAlertNames;
+      updatedFunctionFilterMap = [ ...new Set(powerSort(updatedFunctionFilterMap, null))];
+      set(filterObj, 'functionFilterMap', updatedFunctionFilterMap);
+    }
+    return filterObj;
+  },
+
   actions: {
+    // Clears all selected filters at once
+    clearFilters() {
+      this._resetLocalFilters();
+    },
+
     // Handles filter selections (receives array of filter options)
     userDidSelectFilter(filterObj) {
       const filterBlocksLocal = get(this, 'filterBlocksLocal');
+      // handle special case of subscription groups
+      filterObj = this._subscriptionGroupFilter(filterObj);
       filterBlocksLocal.forEach(block => {
         block.selected = filterObj[block.name];
       });
@@ -393,6 +456,7 @@ export default Controller.extend({
       //Update the time range option selected
       set(this, 'anomaliesRange', [startDate, endDate]);
       set(this, 'duration', duration);
+      this._updateVisuals();
     },
 
     // Handles UI sort change

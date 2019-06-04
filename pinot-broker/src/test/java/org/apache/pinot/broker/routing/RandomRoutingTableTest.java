@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.commons.io.IOUtils;
+import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.manager.zk.ZNRecordSerializer;
 import org.apache.helix.model.ExternalView;
@@ -35,6 +36,7 @@ import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.config.TableConfig.Builder;
 import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
+import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -58,7 +60,8 @@ public class RandomRoutingTableTest {
     int numSegmentsInEV = externalView.getPartitionSet().size();
     int numServersInEV = instanceConfigs.size();
 
-    HelixExternalViewBasedRouting routing = new HelixExternalViewBasedRouting(null, null, new BaseConfiguration());
+    HelixExternalViewBasedRouting routing = new HelixExternalViewBasedRouting(new BaseConfiguration());
+    routing.init(Mockito.mock(HelixManager.class));
     routing.markDataResourceOnline(generateTableConfig(tableName), externalView, instanceConfigs);
 
     for (int i = 0; i < NUM_ROUNDS; i++) {

@@ -4,7 +4,6 @@
  * @exports application
  */
 import { inject as service } from '@ember/service';
-import { observer, get, set } from '@ember/object';
 import { alias } from '@ember/object/computed';
 import Controller from '@ember/controller';
 
@@ -27,8 +26,8 @@ export default Controller.extend({
     },
     {
       className: 'anomalies',
-      link: '/thirdeye#anomalies',
-      isCustomLink: true,
+      link: 'anomalies',
+      isCustomLink: false,
       title: 'Anomalies'
     },
     {

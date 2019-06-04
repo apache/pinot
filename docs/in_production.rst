@@ -72,15 +72,15 @@ Pinot Server
 
 * Query latency - `TOTAL_QUERY_TIME <https://github.com/apache/incubator-pinot/blob/ce2d9ee9dc73b2d7273a63a4eede774eb024ea8f/pinot-common/src/main/java/org/apache/pinot/common/metrics/ServerQueryPhase.java>`_
 
-  * The number of exception which might have occurred during query execution
+  * Total time to take from receiving to finishing executing the query.
 
 * Query Execution Exceptions - `QUERY_EXECUTION_EXCEPTIONS <https://github.com/apache/incubator-pinot/blob/master/pinot-common/src/main/java/org/apache/pinot/common/metrics/ServerMeter.java>`_
 
-  * The number of exception which might have occurred during query execution
+  * The number of exception which might have occurred during query execution.
 
 * Realtime Consumption Status - `LLC_PARTITION_CONSUMING <https://github.com/apache/incubator-pinot/blob/master/pinot-common/src/main/java/org/apache/pinot/common/metrics/ServerGauge.java>`_
 
-  * This gives a binary value based on whether low-level consumption is healthy (1) or unhealthy (0). It's important to ensure at least a single replica of each partition is consuming
+  * This gives a binary value based on whether low-level consumption is healthy (1) or unhealthy (0). It's important to ensure at least a single replica of each partition is consuming.
 
 * Realtime Highest Offset Consumed - `HIGHEST_STREAM_OFFSET_CONSUMED <https://github.com/apache/incubator-pinot/blob/master/pinot-common/src/main/java/org/apache/pinot/common/metrics/ServerGauge.java>`_
 

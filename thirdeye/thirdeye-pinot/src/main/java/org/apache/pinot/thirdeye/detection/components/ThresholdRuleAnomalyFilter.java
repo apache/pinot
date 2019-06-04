@@ -50,6 +50,8 @@ public class ThresholdRuleAnomalyFilter implements AnomalyFilter<ThresholdRuleFi
   private double maxValueHourly;
   private double minValueDaily;
   private double maxValueDaily;
+  private double maxValue;
+  private double minValue;
   private InputDataFetcher dataFetcher;
 
   @Override
@@ -64,13 +66,17 @@ public class ThresholdRuleAnomalyFilter implements AnomalyFilter<ThresholdRuleFi
     Interval anomalyInterval = new Interval(anomaly.getStartTime(), anomaly.getEndTime());
     double hourlyMultiplier = TimeUnit.HOURS.toMillis(1) / (double) anomalyInterval.toDurationMillis();
     double dailyMultiplier = TimeUnit.DAYS.toMillis(1) / (double) anomalyInterval.toDurationMillis();
+    if (!Double.isNaN(this.minValue) && currentValue < this.minValue
+        || !Double.isNaN(this.maxValue) && currentValue > this.maxValue) {
+      return false;
+    }
     if (!Double.isNaN(this.minValueHourly) && currentValue * hourlyMultiplier < this.minValueHourly) {
       return false;
     }
     if (!Double.isNaN(this.maxValueHourly) && currentValue * hourlyMultiplier > this.maxValueHourly) {
       return false;
     }
-    if (!Double.isNaN(this.minValueDaily) && currentValue * dailyMultiplier< this.minValueDaily) {
+    if (!Double.isNaN(this.minValueDaily) && currentValue * dailyMultiplier < this.minValueDaily) {
       return false;
     }
     if (!Double.isNaN(this.maxValueDaily) && currentValue * dailyMultiplier > this.maxValueDaily) {
@@ -85,6 +91,8 @@ public class ThresholdRuleAnomalyFilter implements AnomalyFilter<ThresholdRuleFi
     this.maxValueHourly = spec.getMaxValueHourly();
     this.minValueDaily = spec.getMinValueDaily();
     this.maxValueDaily = spec.getMaxValueDaily();
+    this.maxValue = spec.getMaxValue();
+    this.minValue = spec.getMinValue();
     this.dataFetcher = dataFetcher;
   }
 

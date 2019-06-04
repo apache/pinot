@@ -39,6 +39,7 @@ import org.apache.pinot.thirdeye.datalayer.entity.DetectionAlertConfigIndex;
 import org.apache.pinot.thirdeye.datalayer.entity.DetectionConfigIndex;
 import org.apache.pinot.thirdeye.datalayer.entity.DetectionStatusIndex;
 import org.apache.pinot.thirdeye.datalayer.entity.EntityToEntityMappingIndex;
+import org.apache.pinot.thirdeye.datalayer.entity.EvaluationIndex;
 import org.apache.pinot.thirdeye.datalayer.entity.EventIndex;
 import org.apache.pinot.thirdeye.datalayer.entity.GenericJsonEntity;
 import org.apache.pinot.thirdeye.datalayer.entity.GroupedAnomalyResultsIndex;
@@ -203,7 +204,8 @@ public abstract class DaoProviderUtil {
             convertCamelCaseToUnderscore(DetectionConfigIndex.class.getSimpleName()));
         entityMappingHolder.register(conn, DetectionAlertConfigIndex.class,
             convertCamelCaseToUnderscore(DetectionAlertConfigIndex.class.getSimpleName()));
-
+        entityMappingHolder.register(conn, EvaluationIndex.class,
+            convertCamelCaseToUnderscore(EvaluationIndex.class.getSimpleName()));
       } catch (Exception e) {
         throw new RuntimeException(e);
       }

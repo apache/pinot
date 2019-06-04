@@ -127,12 +127,11 @@ public class SqlUtils {
    *
    * @param tableName table name
    * @param columnNames column names in CSV, separated by ,
-   * @param row one raw row in CSV
+   * @param items row items
    * @throws SQLException
    */
-  public static void insertCSVRow(DataSource ds, String tableName, String columnNames, String row) throws SQLException {
+  public static void insertCSVRow(DataSource ds, String tableName, String columnNames, String[] items) throws SQLException {
     // Put quotes around values that contains spaces
-    String[] items = row.split(",");
     StringBuilder sb = new StringBuilder();
     String prefix = "";
     for (String item: items) {

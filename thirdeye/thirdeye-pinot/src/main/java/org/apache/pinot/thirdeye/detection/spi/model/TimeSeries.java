@@ -19,6 +19,7 @@
 
 package org.apache.pinot.thirdeye.detection.spi.model;
 
+import com.google.common.base.Preconditions;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
 import org.apache.pinot.thirdeye.dataframe.DoubleSeries;
 import org.apache.pinot.thirdeye.dataframe.LongSeries;
@@ -33,38 +34,106 @@ import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
 public class TimeSeries {
   private DataFrame df;
 
-  public TimeSeries() {
+  private TimeSeries() {
     this.df = new DataFrame();
   }
 
-  /**
-   * Add the time stamps into the timeseries
-   * @param timestamps
-   */
-  public void addTimeStamps(LongSeries timestamps) {
+  public TimeSeries(LongSeries timestamps, DoubleSeries baselineValues) {
+    this.df = new DataFrame();
     this.df.addSeries(COL_TIME, timestamps).setIndex(COL_TIME);
-  }
-
-  /**
-   * Add the predicted baseline into the timeseries
-   * @param baselineValues predicted baseline values
-   */
-  public void addPredictedBaseline(DoubleSeries baselineValues) {
     this.df.addSeries(DataFrameUtils.COL_VALUE, baselineValues);
   }
 
-  public static TimeSeries fromDataFrame(DataFrame df) {
+  public TimeSeries(LongSeries timestamps, DoubleSeries baselineValues, DoubleSeries currentValues,
+      DoubleSeries upperBoundValues, DoubleSeries lowerBoundValues) {
+    this(timestamps, baselineValues);
+    this.df.addSeries(DataFrameUtils.COL_CURRENT, currentValues);
+    this.df.addSeries(DataFrameUtils.COL_UPPER_BOUND, upperBoundValues);
+    this.df.addSeries(DataFrameUtils.COL_LOWER_BOUND, lowerBoundValues);
+  }
+
+  /**
+   * the size of the time series
+   * @return the size of the time series (number of data points)
+   */
+  public int size() {
+    return this.df.size();
+  }
+
+  /**
+   * Add the series into TimeSeries if it exists in the DataFrame.
+   * @param df The source DataFrame.
+   * @param name The series name.
+   */
+  private static void addSeries(TimeSeries ts, DataFrame df, String name) {
+    if (df.contains(name)) {
+      ts.df.addSeries(name, df.get(name));
+    }
+  }
+
+  /**
+   * return a empty time series
+   * @return a empty time series
+   */
+  public static TimeSeries empty() {
     TimeSeries ts = new TimeSeries();
-    ts.df.addSeries(COL_TIME, df.get(COL_TIME)).setIndex(COL_TIME);
-    ts.df.addSeries(DataFrameUtils.COL_VALUE, df.get(DataFrameUtils.COL_VALUE));
+    ts.df.addSeries(COL_TIME, LongSeries.empty())
+        .addSeries(COL_VALUE, DoubleSeries.empty())
+        .addSeries(COL_CURRENT, DoubleSeries.empty())
+        .addSeries(COL_UPPER_BOUND, DoubleSeries.empty())
+        .addSeries(COL_LOWER_BOUND, DoubleSeries.empty())
+        .setIndex(COL_TIME);
     return ts;
+  }
+
+  /**
+   * Add DataFrame into TimeSeries.
+   * @param df The source DataFrame.
+   * @return TimeSeries that contains the predicted values.
+   */
+  public static TimeSeries fromDataFrame(DataFrame df) {
+    Preconditions.checkArgument(df.contains(COL_TIME));
+    Preconditions.checkArgument(df.contains(COL_VALUE));
+    TimeSeries ts = new TimeSeries();
+    // time stamp
+    ts.df.addSeries(COL_TIME, df.get(COL_TIME)).setIndex(COL_TIME);
+    // predicted baseline values
+    addSeries(ts, df, COL_VALUE);
+    // current values
+    addSeries(ts, df, COL_CURRENT);
+    // upper bound
+    addSeries(ts, df, COL_UPPER_BOUND);
+    // lower bound
+    addSeries(ts, df, COL_LOWER_BOUND);
+    return ts;
+  }
+
+  public DoubleSeries getCurrent() {
+    return this.df.getDoubles(DataFrameUtils.COL_CURRENT);
+  }
+
+  public LongSeries getTime() {
+    return this.df.getLongs(DataFrameUtils.COL_TIME);
   }
 
   public DoubleSeries getPredictedBaseline() {
     return this.df.getDoubles(DataFrameUtils.COL_VALUE);
   }
 
+  public DoubleSeries getPredictedUpperBound() {
+    return this.df.getDoubles(DataFrameUtils.COL_UPPER_BOUND);
+  }
+
+  public DoubleSeries getPredictedLowerBound() {
+    return this.df.getDoubles(DataFrameUtils.COL_LOWER_BOUND);
+  }
+
   public DataFrame getDataFrame() {
     return df;
+  }
+
+  @Override
+  public String toString() {
+    return "TimeSeries{" + "df=" + df + '}';
   }
 }

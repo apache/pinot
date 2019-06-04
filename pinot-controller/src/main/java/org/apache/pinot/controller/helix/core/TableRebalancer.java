@@ -96,11 +96,11 @@ public class TableRebalancer {
 
     RebalanceResult result = new RebalanceResult();
 
-    String tableName = tableConfig.getTableName();
+    String tableNameWithType = tableConfig.getTableName();
     HelixDataAccessor dataAccessor = _helixManager.getHelixDataAccessor();
     ZkBaseDataAccessor zkBaseDataAccessor = (ZkBaseDataAccessor) dataAccessor.getBaseDataAccessor();
 
-    PropertyKey idealStateKey = dataAccessor.keyBuilder().idealStates(tableName);
+    PropertyKey idealStateKey = dataAccessor.keyBuilder().idealStates(tableNameWithType);
     IdealState previousIdealState = dataAccessor.getProperty(idealStateKey);
 
     if (rebalanceConfig.getBoolean(RebalanceUserConfigConstants.DRYRUN, RebalanceUserConfigConstants.DEFAULT_DRY_RUN)) {
@@ -123,7 +123,7 @@ public class TableRebalancer {
       IdealState currentIdealState = dataAccessor.getProperty(idealStateKey);
 
       if (targetIdealState == null || !EqualityUtils.isEqual(previousIdealState, currentIdealState)) {
-        LOGGER.info("Computing new rebalanced state for table {}", tableName);
+        LOGGER.info("Computing new rebalanced state for table {}", tableNameWithType);
 
         // we need to recompute target state
 
@@ -139,9 +139,9 @@ public class TableRebalancer {
       }
 
       if (EqualityUtils.isEqual(targetIdealState, currentIdealState)) {
-        LOGGER.info("Table {} is rebalanced.", tableName);
+        LOGGER.info("Table {} is rebalanced.", tableNameWithType);
 
-        LOGGER.info("Finished rebalancing table {} in {} ms.", tableName,
+        LOGGER.info("Finished rebalancing table {} in {} ms.", tableNameWithType,
             TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startTime));
         result.setIdealStateMapping(targetIdealState.getRecord().getMapFields());
         result.setPartitionAssignment(targetPartitionAssignment);
@@ -158,33 +158,33 @@ public class TableRebalancer {
 
       // Check version and set ideal state
       try {
-        LOGGER.info("Updating IdealState for table {}", tableName);
+        LOGGER.info("Updating IdealState for table {}", tableNameWithType);
         if (zkBaseDataAccessor
             .set(idealStateKey.getPath(), nextIdealState.getRecord(), currentIdealState.getRecord().getVersion(),
                 AccessOption.PERSISTENT)) {
           // if we succeeded, wait for the change to stabilize
-          waitForStable(tableName);
+          waitForStable(tableNameWithType);
           // clear retries as it tracks failures with each idealstate update attempt
           retries = 0;
           continue;
         }
         // in case of any error, we retry a bounded number of types
       } catch (ZkBadVersionException e) {
-        LOGGER.warn("Version changed while updating ideal state for resource: {}", tableName);
+        LOGGER.warn("Version changed while updating ideal state for resource: {}", tableNameWithType);
       } catch (Exception e) {
-        LOGGER.warn("Caught exception while updating ideal state for resource: {}", tableName, e);
+        LOGGER.warn("Caught exception while updating ideal state for resource: {}", tableNameWithType, e);
       }
 
       previousIdealState = currentIdealState;
       if (retries++ > MAX_RETRIES) {
-        LOGGER.error("Unable to rebalance table {} in {} attempts. Giving up", tableName, MAX_RETRIES);
+        LOGGER.error("Unable to rebalance table {} in {} attempts. Giving up", tableNameWithType, MAX_RETRIES);
         return result;
       }
       // wait before retrying
       try {
         Thread.sleep(retryDelayMs);
       } catch (InterruptedException e) {
-        LOGGER.error("Got interrupted while rebalancing table {}", tableName);
+        LOGGER.error("Got interrupted while rebalancing table {}", tableNameWithType);
         Thread.currentThread().interrupt();
         return result;
       }

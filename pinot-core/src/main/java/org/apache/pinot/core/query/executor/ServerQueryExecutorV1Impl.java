@@ -33,6 +33,7 @@ import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerQueryPhase;
 import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.segment.SegmentMetadata;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
@@ -41,6 +42,7 @@ import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.SegmentDataManager;
 import org.apache.pinot.core.data.manager.TableDataManager;
 import org.apache.pinot.core.indexsegment.IndexSegment;
+import org.apache.pinot.core.indexsegment.mutable.MutableSegment;
 import org.apache.pinot.core.plan.Plan;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.core.plan.maker.PlanMaker;
@@ -149,6 +151,34 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       TraceContext.register(requestId);
     }
 
+    int numConsumingSegmentsQueried = 0;
+    long minIndexTimeMs = Long.MAX_VALUE;
+    long minIngestionTimeMs = Long.MAX_VALUE;
+    // gather stats for realtime consuming segments
+    for (SegmentDataManager segmentMgr : segmentDataManagers) {
+      if (segmentMgr.getSegment() instanceof MutableSegment) {
+        numConsumingSegmentsQueried += 1;
+        SegmentMetadata metadata = segmentMgr.getSegment().getSegmentMetadata();
+        long indexedTime = metadata.getLastIndexedTimestamp();
+        if (indexedTime != Long.MIN_VALUE && indexedTime < minIndexTimeMs) {
+          minIndexTimeMs = metadata.getLastIndexedTimestamp();
+        }
+        long ingestionTime = metadata.getLatestIngestionTimestamp();
+        if (ingestionTime != Long.MIN_VALUE && ingestionTime < minIngestionTimeMs) {
+          minIngestionTimeMs = ingestionTime;
+        }
+      }
+    }
+
+    long minConsumingFreshnessTimeMs = minIngestionTimeMs;
+    if (numConsumingSegmentsQueried > 0) {
+      if (minIngestionTimeMs == Long.MAX_VALUE) {
+        LOGGER.debug("Did not find valid ingestionTimestamp across consuming segments! Using indexTime instead");
+        minConsumingFreshnessTimeMs = minIndexTimeMs;
+      }
+      LOGGER.debug("Querying {} consuming segments with min minConsumingFreshnessTimeMs {}", numConsumingSegmentsQueried, minConsumingFreshnessTimeMs);
+    }
+
     DataTable dataTable = null;
     try {
       TimerContext.Timer segmentPruneTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.SEGMENT_PRUNING);
@@ -219,11 +249,16 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       // Currently, given the deleted segments cache is in-memory only, a server restart will reset it
       // We might end up sending partial-response metadata in such cases. It appears that the likelihood of
       // this occurence is low; ie, segment has to be retained out and the server must be restarted while the
-      // broker view is still behind. We would however like to validate that and/or conf control this based on 
+      // broker view is still behind. We would however like to validate that and/or conf control this based on
       // data.
       /*dataTable.addException(QueryException.getException(QueryException.SEGMENTS_MISSING_ERROR,
           "Could not find " + missingSegments + " segments on the server"));*/
       _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_MISSING_SEGMENTS, missingSegments);
+    }
+
+    if (numConsumingSegmentsQueried > 0) {
+      dataTable.getMetadata().put(DataTable.NUM_CONSUMING_SEGMENTS_QUERIED, Integer.toString(numConsumingSegmentsQueried));
+      dataTable.getMetadata().put(DataTable.MIN_CONSUMING_FRESHNESS_TIME_MS, Long.toString(minConsumingFreshnessTimeMs));
     }
 
     LOGGER.debug("Query processing time for request Id - {}: {}", requestId, queryProcessingTime);

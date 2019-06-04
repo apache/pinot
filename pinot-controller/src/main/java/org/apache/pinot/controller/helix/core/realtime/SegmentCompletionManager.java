@@ -19,12 +19,15 @@
 package org.apache.pinot.controller.helix.core.realtime;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
 import org.apache.pinot.common.config.TableNameBuilder;
@@ -64,9 +67,6 @@ public class SegmentCompletionManager {
     ABORTED,      // state machine is aborted. we will start a fresh one when the next segmentConsumed comes in.
   }
 
-  // TODO: fix the misuse of singleton.
-  private static SegmentCompletionManager _instance = null;
-
   private final HelixManager _helixManager;
   // A map that holds the FSM for each segment.
   private final Map<String, SegmentCompletionFSM> _fsmMap = new ConcurrentHashMap<>();
@@ -74,6 +74,8 @@ public class SegmentCompletionManager {
   private final PinotLLCRealtimeSegmentManager _segmentManager;
   private final ControllerMetrics _controllerMetrics;
   private final ControllerLeadershipManager _controllerLeadershipManager;
+  private final Lock[] _fsmLocks;
+  private static final int NUM_FSM_LOCKS = 20;
 
   // Half hour max commit time for all segments
   private static final int MAX_COMMIT_TIME_FOR_ALL_SEGMENTS_SECONDS = 1800;
@@ -84,12 +86,19 @@ public class SegmentCompletionManager {
 
   // TODO keep some history of past committed segments so that we can avoid looking up PROPERTYSTORE if some server comes in late.
 
-  protected SegmentCompletionManager(HelixManager helixManager, PinotLLCRealtimeSegmentManager segmentManager,
-      ControllerMetrics controllerMetrics, ControllerLeadershipManager controllerLeadershipManager) {
+  public SegmentCompletionManager(HelixManager helixManager, PinotLLCRealtimeSegmentManager segmentManager,
+      ControllerMetrics controllerMetrics, ControllerLeadershipManager controllerLeadershipManager,
+      int segmentCommitTimeoutSeconds) {
     _helixManager = helixManager;
     _segmentManager = segmentManager;
     _controllerMetrics = controllerMetrics;
     _controllerLeadershipManager = controllerLeadershipManager;
+    SegmentCompletionProtocol
+        .setMaxSegmentCommitTimeMs(TimeUnit.MILLISECONDS.convert(segmentCommitTimeoutSeconds, TimeUnit.SECONDS));
+    _fsmLocks = new Lock[NUM_FSM_LOCKS];
+    for (int i = 0; i < NUM_FSM_LOCKS; i ++) {
+      _fsmLocks[i] = new ReentrantLock();
+    }
   }
 
   public boolean isSplitCommitEnabled() {
@@ -100,37 +109,24 @@ public class SegmentCompletionManager {
     return _segmentManager.getControllerVipUrl();
   }
 
-  public static SegmentCompletionManager create(HelixManager helixManager,
-      PinotLLCRealtimeSegmentManager segmentManager, ControllerConf controllerConf,
-      ControllerMetrics controllerMetrics, ControllerLeadershipManager controllerLeadershipManager) {
-    if (_instance != null) {
-      throw new RuntimeException("Cannot create multiple instances");
-    }
-    _instance = new SegmentCompletionManager(helixManager, segmentManager, controllerMetrics, controllerLeadershipManager);
-    SegmentCompletionProtocol.setMaxSegmentCommitTimeMs(
-        TimeUnit.MILLISECONDS.convert(controllerConf.getSegmentCommitTimeoutSeconds(), TimeUnit.SECONDS));
-    return _instance;
-  }
-
-  public static SegmentCompletionManager getInstance() {
-    if (_instance == null) {
-      throw new RuntimeException("Not yet created");
-    }
-    return _instance;
-  }
-
   protected long getCurrentTimeMs() {
     return System.currentTimeMillis();
   }
 
-  // We need to make sure that we never create multiple FSMs for the same segment, so this method must be synchronized.
-  private synchronized SegmentCompletionFSM lookupOrCreateFsm(final LLCSegmentName segmentName, String msgType) {
+  // We need to make sure that we never create multiple FSMs for the same segment
+  // Obtain locks based on segment name, so as to disallow same segment names entering together
+  private SegmentCompletionFSM lookupOrCreateFsm(final LLCSegmentName segmentName, String msgType) {
     final String segmentNameStr = segmentName.getSegmentName();
-    SegmentCompletionFSM fsm = _fsmMap.get(segmentNameStr);
-    if (fsm == null) {
-      // Look up propertystore to see if this is a completed segment
-      ZNRecord segment;
-      try {
+
+    int lockIndex = (segmentNameStr.hashCode() & Integer.MAX_VALUE) % NUM_FSM_LOCKS;
+    Lock lock = _fsmLocks[lockIndex];
+
+    SegmentCompletionFSM fsm;
+    try {
+      lock.lock();
+      fsm = _fsmMap.get(segmentNameStr);
+      if (fsm == null) {
+        // Look up propertystore to see if this is a completed segment
         // TODO if we keep a list of last few committed segments, we don't need to go to zk for this.
         final String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(segmentName.getTableName());
         LLCRealtimeSegmentZKMetadata segmentMetadata =
@@ -140,22 +136,24 @@ public class SegmentCompletionManager {
           // Also good for synchronization, because it is possible that multiple threads take this path, and we don't want
           // multiple instances of the FSM to be created for the same commit sequence at the same time.
           final long endOffset = segmentMetadata.getEndOffset();
-          fsm = SegmentCompletionFSM
-              .fsmInCommit(_segmentManager, this, segmentName, segmentMetadata.getNumReplicas(), endOffset);
+          fsm = SegmentCompletionFSM.fsmInCommit(_segmentManager, this, segmentName, segmentMetadata.getNumReplicas(),
+              endOffset);
         } else if (msgType.equals(SegmentCompletionProtocol.MSG_TYPE_STOPPED_CONSUMING)) {
-          fsm = SegmentCompletionFSM
-              .fsmStoppedConsuming(_segmentManager, this, segmentName, segmentMetadata.getNumReplicas());
+          fsm = SegmentCompletionFSM.fsmStoppedConsuming(_segmentManager, this, segmentName,
+              segmentMetadata.getNumReplicas());
         } else {
           // Segment is in the process of completing, and this is the first one to respond. Create fsm
           fsm = SegmentCompletionFSM.fsmInHolding(_segmentManager, this, segmentName, segmentMetadata.getNumReplicas());
         }
         LOGGER.info("Created FSM {}", fsm);
         _fsmMap.put(segmentNameStr, fsm);
-      } catch (Exception e) {
-        // Server gone wonky. Segment does not exist in propstore
-        LOGGER.error("Exception creating FSM for segment {}", segmentNameStr, e);
-        throw new RuntimeException("Exception creating FSM for segment " + segmentNameStr, e);
       }
+    } catch (Exception e) {
+      // Server gone wonky. Segment does not exist in propstore
+      LOGGER.error("Exception getting FSM for segment {}", segmentNameStr, e);
+      throw new RuntimeException("Exception getting FSM for segment " + segmentNameStr, e);
+    } finally {
+      lock.unlock();
     }
     return fsm;
   }
@@ -181,7 +179,7 @@ public class SegmentCompletionManager {
       fsm = lookupOrCreateFsm(segmentName, SegmentCompletionProtocol.MSG_TYPE_CONSUMED);
       response = fsm.segmentConsumed(instanceId, offset, stopReason);
     } catch (Exception e) {
-      // Return failed response
+      LOGGER.error("Caught exception in segmentConsumed for segment {}", segmentNameStr, e);
     }
     if (fsm != null && fsm.isDone()) {
       LOGGER.info("Removing FSM (if present):{}", fsm.toString());
@@ -513,7 +511,7 @@ public class SegmentCompletionManager {
         return SegmentCompletionProtocol.RESP_FAILED;
       }
       synchronized (this) {
-        LOGGER.info("Processing segmentCommit({}, {})", instanceId, offset);
+        LOGGER.info("Processing segmentCommitStart({}, {})", instanceId, offset);
         switch (_state) {
           case PARTIAL_CONSUMING:
             return PARTIAL_CONSUMING__commit(instanceId, offset, now);
@@ -616,7 +614,7 @@ public class SegmentCompletionManager {
           LOGGER.warn("Not accepting commitEnd from {} since it had stoppd consuming", instanceId);
           return abortAndReturnFailed();
         }
-        LOGGER.info("Processing segmentCommit({}, {})", instanceId, offset);
+        LOGGER.info("Processing segmentCommitEnd({}, {})", instanceId, offset);
         if (!_state.equals(State.COMMITTER_UPLOADING) || !instanceId.equals(_winner) || offset != _winningOffset) {
           // State changed while we were out of sync. return a failed commit.
           LOGGER.warn("State change during upload: state={} segment={} winner={} winningOffset={}", _state,
@@ -1116,10 +1114,6 @@ public class SegmentCompletionManager {
       }
       return false;
     }
-  }
-
-  public static void stop() {
-    _instance = null;
   }
 
   @VisibleForTesting

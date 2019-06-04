@@ -177,6 +177,16 @@ export function toIso(dateStr) {
 }
 
 /**
+ * Replace all Infinity and NaN with null in array of numbers
+ * @param {Array} timeSeries - time series to modify
+ */
+export function stripNonFiniteValues(timeSeries) {
+  return timeSeries.map(value => {
+    return (isFinite(value) ? value : null);
+  });
+}
+
+/**
  * The yaml filters formatter. Convert filters in the yaml file in to a legacy filters string
  * For example, filters = {
  *   "country": ["us", "cn"],
@@ -219,6 +229,7 @@ export default {
   parseProps,
   postProps,
   toIso,
+  stripNonFiniteValues,
   postYamlProps,
   formatYamlFilter
 };

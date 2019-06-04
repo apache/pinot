@@ -84,7 +84,7 @@ public class ReplicaGroupSegmentAssignmentStrategy implements SegmentAssignmentS
     int index = 0;
     for (int groupId = 0; groupId < numReplicas; groupId++) {
       List<String> instancesInReplicaGroup =
-          replicaGroupPartitionAssignment.getInstancesfromReplicaGroup(partitionNumber, groupId);
+          replicaGroupPartitionAssignment.getInstancesFromReplicaGroup(partitionNumber, groupId);
       int numInstances = instancesInReplicaGroup.size();
       if (mirrorAssignmentAcrossReplicaGroups) {
         // Randomly pick the index and use the same index for all replica groups.

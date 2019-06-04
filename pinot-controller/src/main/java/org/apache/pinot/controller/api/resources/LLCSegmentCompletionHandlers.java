@@ -75,6 +75,9 @@ public class LLCSegmentCompletionHandlers {
   @Inject
   ControllerConf _controllerConf;
 
+  @Inject
+  SegmentCompletionManager _segmentCompletionManager;
+
   @VisibleForTesting
   public static String getScheme() {
     return SCHEME;
@@ -104,7 +107,7 @@ public class LLCSegmentCompletionHandlers {
         .withExtraTimeSec(extraTimeSec);
     LOGGER.info("Processing extendBuildTime:{}", requestParams.toString());
 
-    SegmentCompletionProtocol.Response response = SegmentCompletionManager.getInstance().extendBuildTime(requestParams);
+    SegmentCompletionProtocol.Response response = _segmentCompletionManager.extendBuildTime(requestParams);
 
     final String responseStr = response.toJsonString();
     LOGGER.info("Response to extendBuildTime:{}", responseStr);
@@ -130,9 +133,9 @@ public class LLCSegmentCompletionHandlers {
         .withMemoryUsedBytes(memoryUsedBytes).withNumRows(numRows);
     LOGGER.info("Processing segmentConsumed:{}", requestParams.toString());
 
-    SegmentCompletionProtocol.Response response = SegmentCompletionManager.getInstance().segmentConsumed(requestParams);
+    SegmentCompletionProtocol.Response response = _segmentCompletionManager.segmentConsumed(requestParams);
     final String responseStr = response.toJsonString();
-    LOGGER.info("Response to segmentConsumed:{}", responseStr);
+    LOGGER.info("Response to segmentConsumed for segment:{} is :{}", segmentName, responseStr);
     return responseStr;
   }
 
@@ -153,9 +156,9 @@ public class LLCSegmentCompletionHandlers {
     LOGGER.info("Processing segmentStoppedConsuming:{}", requestParams.toString());
 
     SegmentCompletionProtocol.Response response =
-        SegmentCompletionManager.getInstance().segmentStoppedConsuming(requestParams);
+        _segmentCompletionManager.segmentStoppedConsuming(requestParams);
     final String responseStr = response.toJsonString();
-    LOGGER.info("Response to segmentStoppedConsuming:{}", responseStr);
+    LOGGER.info("Response to segmentStoppedConsuming for segment:{} is:{}", segmentName, responseStr);
     return responseStr;
   }
 
@@ -183,9 +186,9 @@ public class LLCSegmentCompletionHandlers {
     LOGGER.info("Processing segmentCommitStart:{}", requestParams.toString());
 
     SegmentCompletionProtocol.Response response =
-        SegmentCompletionManager.getInstance().segmentCommitStart(requestParams);
+        _segmentCompletionManager.segmentCommitStart(requestParams);
     final String responseStr = response.toJsonString();
-    LOGGER.info("Response to segmentCommitStart:{}", responseStr);
+    LOGGER.info("Response to segmentCommitStart for segment:{} is:{}", segmentName, responseStr);
     return responseStr;
   }
 
@@ -230,10 +233,10 @@ public class LLCSegmentCompletionHandlers {
 
     CommittingSegmentDescriptor committingSegmentDescriptor =
         CommittingSegmentDescriptor.fromSegmentCompletionReqParamsAndMetadata(requestParams, segmentMetadata);
-    SegmentCompletionProtocol.Response response = SegmentCompletionManager.getInstance()
+    SegmentCompletionProtocol.Response response = _segmentCompletionManager
         .segmentCommitEnd(requestParams, isSuccess, isSplitCommit, committingSegmentDescriptor);
     final String responseStr = response.toJsonString();
-    LOGGER.info("Response to segmentCommitEnd:{}", responseStr);
+    LOGGER.info("Response to segmentCommitEnd for segment:{} is:{}", segmentName, responseStr);
     return responseStr;
   }
 
@@ -255,7 +258,7 @@ public class LLCSegmentCompletionHandlers {
         .withNumRows(numRows).withMemoryUsedBytes(memoryUsedBytes);
     LOGGER.info("Processing segmentCommit:{}", requestParams.toString());
 
-    final SegmentCompletionManager segmentCompletionManager = SegmentCompletionManager.getInstance();
+    final SegmentCompletionManager segmentCompletionManager = _segmentCompletionManager;
     SegmentCompletionProtocol.Response response = segmentCompletionManager.segmentCommitStart(requestParams);
 
     CommittingSegmentDescriptor committingSegmentDescriptor =
@@ -297,7 +300,7 @@ public class LLCSegmentCompletionHandlers {
               // check for existing segment file and remove it. So, the block cannot be removed altogether.
               // For now, we live with these corner cases. Once we have split-commit enabled and working, this code will no longer
               // be used.
-              synchronized (SegmentCompletionManager.getInstance()) {
+              synchronized (_segmentCompletionManager) {
                 if (pinotFS.exists(segmentFileURI)) {
                   LOGGER.warn("Segment file {} exists. Replacing with upload from {} for segment {}",
                       segmentFileURI.toString(), instanceId, segmentName);
@@ -359,7 +362,7 @@ public class LLCSegmentCompletionHandlers {
 
       String response = new SegmentCompletionProtocol.Response(responseParams).toJsonString();
 
-      LOGGER.info("Response to segmentUpload:{}", response);
+      LOGGER.info("Response to segmentUpload for segment:{} is:{}", segmentName, response);
 
       return response;
     } catch (Exception e) {
@@ -396,7 +399,7 @@ public class LLCSegmentCompletionHandlers {
         .withSegmentLocation(segmentLocation).withSegmentSizeBytes(segmentSizeBytes)
         .withBuildTimeMillis(buildTimeMillis).withWaitTimeMillis(waitTimeMillis).withNumRows(numRows)
         .withMemoryUsedBytes(memoryUsedBytes);
-    LOGGER.info("Processing segmentCommitEnd:{}", requestParams.toString());
+    LOGGER.info("Processing segmentCommitEndWithMetadata:{}", requestParams.toString());
 
     final boolean isSuccess = true;
     final boolean isSplitCommit = true;
@@ -406,11 +409,11 @@ public class LLCSegmentCompletionHandlers {
       LOGGER.error("Segment metadata extraction failure for segment {}", segmentName);
       return SegmentCompletionProtocol.RESP_FAILED.toJsonString();
     }
-    SegmentCompletionProtocol.Response response = SegmentCompletionManager.getInstance()
+    SegmentCompletionProtocol.Response response = _segmentCompletionManager
         .segmentCommitEnd(requestParams, isSuccess, isSplitCommit,
             CommittingSegmentDescriptor.fromSegmentCompletionReqParamsAndMetadata(requestParams, segmentMetadata));
     final String responseStr = response.toJsonString();
-    LOGGER.info("Response to segmentCommitEnd:{}", responseStr);
+    LOGGER.info("Response to segmentCommitEndWithMetadata for segment:{} is:{}", segmentName, responseStr);
     return responseStr;
   }
 

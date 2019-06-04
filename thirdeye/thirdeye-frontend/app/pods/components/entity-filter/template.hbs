@@ -1,5 +1,11 @@
 <header class="entity-filter__head">
-  <div class="manage-alert-container__title">{{title}}</div>
+  <div class="manage-alert-container__title">{{title}}
+    {{#if canClear}}
+    <a href="#" {{action "clearFilters"}} >
+      <span class="pull-right">Clear All</span>
+    </a>
+    {{/if}}
+  </div>
 </header>
 
 {{#each filterBlocks as |block|}}

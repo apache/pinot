@@ -18,9 +18,13 @@
  */
 package org.apache.pinot.broker.api;
 
+import org.apache.pinot.annotations.InterfaceAudience;
+import org.apache.pinot.annotations.InterfaceStability;
 import org.apache.pinot.common.request.BrokerRequest;
 
 
+@InterfaceAudience.Public
+@InterfaceStability.Stable
 public interface AccessControl {
   boolean hasAccess(RequesterIdentity requesterIdentity, BrokerRequest brokerRequest);
 }

@@ -10,7 +10,7 @@ import {
   computed,
   getProperties
 } from '@ember/object';
-import { colorMapping, toColor, makeTime } from 'thirdeye-frontend/utils/rca-utils';
+import { colorMapping, makeTime } from 'thirdeye-frontend/utils/rca-utils';
 import { getFormattedDuration,
   anomalyResponseMapNew,
   verifyAnomalyFeedback,
@@ -25,7 +25,7 @@ import columns from 'thirdeye-frontend/shared/anomaliesTableColumns';
 import moment from 'moment';
 import _ from 'lodash';
 
-const TABLE_DATE_FORMAT = 'MMM DD, hh:mm A'; // format for anomaly table
+const TABLE_DATE_FORMAT = 'MMM DD, hh:mm A'; // format for anomaly table and legend
 
 export default Component.extend({
   /**
@@ -45,15 +45,15 @@ export default Component.extend({
    */
   anomalyData: {},
   /**
-   * Anomaly data, fetched using the anomalyId
+   * current time series
    */
   current: null,
   /**
-   * Anomaly data, fetched using the anomalyId
+   * predicted time series
    */
   predicted: null,
   /**
-   * List of associated classes
+   * imported color mapping for graph
    */
   colorMapping: colorMapping,
   zoom: {
@@ -61,9 +61,13 @@ export default Component.extend({
     rescale: true
   },
 
+  // legend and point are for the graph
   legend: {
     show: true,
     position: 'right'
+  },
+  point: {
+    show: false
   },
   isLoading: false,
   feedbackOptions: ['Not reviewed yet', 'Yes - unexpected', 'Expected temporary change', 'Expected permanent change', 'No change observed'],
@@ -77,8 +81,19 @@ export default Component.extend({
 
   axis: computed(
     'anomalyData',
+    'series',
     function () {
-      const anomalyData = get(this, 'anomalyData');
+      const {
+        anomalyData,
+        series
+      } = this.getProperties('anomalyData', 'series');
+
+      let start = anomalyData.startTime;
+      let end = anomalyData.endTime;
+      if (series.current && series.current.timestamps && Array.isArray(series.current.timestamps)) {
+        start = series.current.timestamps[0];
+        end = series.current.timestamps[series.current.timestamps.length - 1];
+      }
 
       return {
         y: {
@@ -95,8 +110,8 @@ export default Component.extend({
         x: {
           type: 'timeseries',
           show: true,
-          min: anomalyData.startTime,
-          max: anomalyData.endTime,
+          min: start,
+          max: end,
           tick: {
             fit: false,
             format: (d) => {
@@ -133,10 +148,10 @@ export default Component.extend({
         };
       }
 
-      if (current && !_.isEmpty(current.value)) {
+      if (current && !_.isEmpty(current.current)) {
         series['current'] = {
           timestamps: current.timestamp,
-          values: current.value,
+          values: current.current,
           type: 'line',
           color: 'blue'
         };
@@ -202,21 +217,18 @@ export default Component.extend({
       .then(checkStatus)
       .then(res => {
         set(this, 'anomalyData', res);
-        const timeZone = 'America/Los_Angeles';
-        const currentUrl = `/rootcause/metric/timeseries?urn=${res.metricUrn}&start=${res.startTime}&end=${res.endTime}&offset=current&timezone=${timeZone}`;
-        const predictedUrl = `/detection/predicted-baseline/${anomalyId}?start=${res.startTime}&end=${res.endTime}`;
+        const predictedUrl = `/detection/predicted-baseline/${anomalyId}?start=${res.startTime}&end=${res.endTime}&padding=true`;
         const timeseriesHash = {
-          current: fetch(currentUrl).then(res => checkStatus(res, 'get', true)),
           predicted: fetch(predictedUrl).then(res => checkStatus(res, 'get', true))
         };
         return RSVP.hash(timeseriesHash);
       })
       .then((res) => {
-        set(this, 'current', res.current);
+        set(this, 'current', res.predicted);
         set(this, 'predicted', res.predicted);
         set(this, 'isLoading', false);
       })
-      .catch(err => {
+      .catch(() => {
         set(this, 'isLoading', false);
       });
   },

@@ -2,19 +2,32 @@
 
   <div class="pull-right">
     {{#if isPreviewMode}}
-      {{bs-button
-        defaultText=(if showDetails "Rerun Preview" "Preview Alert")
-        disabled=disablePreviewButton
-        type="outline-primary"
-        buttonType="refresh"
-        onClick=(action "getPreview")
-        class="te-button te-button--cancel"
-      }}
+      {{#if showDetails}}
+        {{#unless dataIsCurrent}}
+          {{bs-button
+            defaultText=(if showDetails "Rerun Preview" "Preview Alert")
+            disabled=disablePreviewButton
+            type="outline-primary"
+            buttonType="refresh"
+            onClick=(action "getPreview")
+            class="te-button te-button--cancel"
+          }}
+        {{/unless}}
+      {{else}}
+        {{bs-button
+          defaultText="Preview Alert"
+          disabled=disablePreviewButton
+          type="outline-primary"
+          buttonType="refresh"
+          onClick=(action "getPreview")
+          class="te-button te-button--cancel"
+        }}
+      {{/if}}
     {{/if}}
   </div>
   {{#unless errorAnomalies}}
     {{#if showDetails}}
-      {{#if isLoading}}
+      {{#if isPreviewLoading}}
         {{ember-spinner scale=0.5 rotate=10 speed='1.1' color='#3498DB'}}
         <p>Running detection between <strong>{{pill.activeRangeStart}}</strong> and <strong>{{pill.activeRangeEnd}}</strong>.</p>
       {{else}}
@@ -23,292 +36,341 @@
             <h4><i class="glyphicon glyphicon-exclamation-sign"></i> Use with caution!</h4>
             <p>Preview can take a long time to run. We recommend previewing for less than a week on
               daily metrics and less than a day on hourly/minutely metrics.</p>
-            <p>Click on the "Rerun Preview" option if you updated the time window.</p>
+            {{#if dataIsCurrent}}
+              <p>Preview will be rerun automatically when you update the time window.</p>
+            {{else}}
+              <p>Click "Rerun Preview" to get the preview for your updated configuration</p>
+            {{/if}}
           </div>
         {{/if}}
         {{#if dataIsCurrent}}
-        {{range-pill-selectors
-          title="Showing"
-          uiDateFormat=pill.uiDateFormat
-          activeRangeEnd=pill.activeRangeEnd
-          activeRangeStart=pill.activeRangeStart
-          timeRangeOptions=pill.timeRangeOptions
-          timePickerIncrement=pill.timePickerIncrement
-          predefinedRanges=pill.predefinedRanges
-          selectAction=(action "onRangeSelection")
-        }}
-        <div class="te-horizontal-cards te-content-block">
-          <h4 class="te-self-serve__block-title">
-            <label for="select-dimension" class="control-label te-label">
-              Alert Performance
-              <span>
-                <i class="glyphicon glyphicon-question-sign"></i>
-                {{#tooltip-on-element class="te-tooltip"}}
-                  All estimated performance numbers are based on reviewed anomalies.
-                {{/tooltip-on-element}}
-              </span>
-            </label>
-          </h4>
-          {{!-- Alert anomaly stats cards --}}
-          {{stats-cards stats=stats}}
-
-          {{#if repRunStatus}}
-            <p class="te-self-serve__block-subtext te-self-serve__block-subtext--normal">Replay in progress. Please check back later...</p>
-          {{/if}}
-        </div>
-
-        {{#if isReportSuccess}}
-          {{#bs-alert type="success" class="te-form__banner te-form__banner--success"}}
-            <strong>Success:</strong> Anomaly reported for dates <strong>{{reportedRange}}</strong>. Refresh page to see new anomalies...
-          {{/bs-alert}}
-        {{/if}}
-
-        {{#if isReportFailure}}
-          {{#bs-alert type="danger" class="te-form__banner te-form__banner--failure"}}
-            <strong>Error:</strong> Failed to save reported anomaly.
-          {{/bs-alert}}
-        {{/if}}
-
-        <div class="te-content-block">
-          {{#if alertHasDimensions}}
-            <h4 class="te-self-serve__block-title">Anomalies over time for dimension {{selectedDimension}}</h4>
-          {{else}}
-            <h4 class="te-self-serve__block-title">Anomalies over time </h4>
-          {{/if}}
-
-          {{#unless isPreviewMode}}
-            <a class="te-self-serve__side-link te-self-serve__side-link--high" {{action "onClickReportAnomaly" this}}>Report missing anomaly</a>
-          {{/unless}}
-
-          {{!-- Dimension selector --}}
-          {{#if alertHasDimensions}}
-            <div class="te-form__select te-form__select--wider col-md-3">
-              {{#power-select
-                triggerId="select-dimension"
-                triggerClass="te-form__select"
-                options=dimensionOptions
-                searchEnabled=true
-                searchPlaceholder="Type to filter..."
-                matchTriggerWidth=true
-                matchContentWidth=true
-                selected=selectedDimension
-                onchange=(action "onSelectDimension")
-                as |dimension|
-              }}
-                {{dimension}}
-              {{/power-select}}
-            </div>
-          {{/if}}
-
-          {{!-- Missing anomaly modal --}}
-          {{#te-modal
-            cancelButtonText="Cancel"
-            submitButtonText="Report"
-            submitAction=(action "onSave")
-            cancelAction=(action "onCancel")
-            isShowingModal=openReportModal
-            headerText="Report Undetected Anomaly"
+          {{range-pill-selectors
+            title="Showing"
+            uiDateFormat=pill.uiDateFormat
+            activeRangeEnd=pill.activeRangeEnd
+            activeRangeStart=pill.activeRangeStart
+            timeRangeOptions=pill.timeRangeOptions
+            timePickerIncrement=pill.timePickerIncrement
+            predefinedRanges=pill.predefinedRanges
+            selectAction=(action "onRangeSelection")
           }}
-            {{#if renderModalContent}}
-              {{alert-report-modal
+          <div class="te-horizontal-cards te-content-block">
+            <h4 class="te-self-serve__block-title">
+              <label for="select-dimension" class="control-label te-label">
+                Alert Performance
+                <span>
+                  <i class="glyphicon glyphicon-question-sign"></i>
+                  {{#tooltip-on-element class="te-tooltip"}}
+                    All estimated performance numbers are based on reviewed anomalies.
+                  {{/tooltip-on-element}}
+                </span>
+              </label>
+            </h4>
+            {{!-- Alert anomaly stats cards --}}
+            {{stats-cards stats=stats}}
+
+            {{#if repRunStatus}}
+              <p class="te-self-serve__block-subtext te-self-serve__block-subtext--normal">Replay in progress. Please check back later...</p>
+            {{/if}}
+          </div>
+
+          {{#if isReportSuccess}}
+            {{#bs-alert type="success" class="te-form__banner te-form__banner--success"}}
+              <strong>Success:</strong> Anomaly reported for dates <strong>{{reportedRange}}</strong>. Refresh page to see new anomalies...
+            {{/bs-alert}}
+          {{/if}}
+
+          {{#if isReportFailure}}
+            {{#bs-alert type="danger" class="te-form__banner te-form__banner--failure"}}
+              <strong>Error:</strong> Failed to save reported anomaly.
+            {{/bs-alert}}
+          {{/if}}
+
+          <div class="te-content-block">
+            {{#if isPreviewMode}}
+              <h4 class="te-self-serve__block-title">{{selectedRule.name}} {{#if alertHasDimensions}}/ {{selectedDimension}}{{/if}} anomalies over time ({{numCurrentAnomalies}})</h4>
+            {{else}}
+              <h4 class="te-self-serve__block-title">{{#if alertHasDimensions}}{{selectedDimension}} a{{else}}A{{/if}}nomalies over time ({{numCurrentAnomalies}})</h4>
+            {{/if}}
+
+            {{#unless isPreviewMode}}
+              <a class="te-self-serve__side-link te-self-serve__side-link--high" {{action "onClickReportAnomaly" this}}>Report missing anomaly</a>
+            {{/unless}}
+
+            <div class="te-form__select te-form__select--same-line col-md-3">
+              {{!-- Rule selector --}}
+              {{#if isPreviewMode}}
+                {{#power-select
+                  triggerId="select-rule"
+                  triggerClass="te-form__select"
+                  options=ruleOptions
+                  searchEnabled=true
+                  searchPlaceholder="Type to filter..."
+                  matchTriggerWidth=false
+                  matchContentWidth=true
+                  selected=selectedRule
+                  searchField="name"
+                  onchange=(action "onSelectRule")
+                  as |rule|
+                }}
+                  {{rule.name}}
+                {{/power-select}}
+
+                {{!-- Dimension selector --}}
+                {{#if alertHasDimensions}}
+                  <div class="te-form__select te-form__select--margin-left">
+                    {{#power-select
+                      triggerId="select-dimension"
+                      triggerClass="te-form__select"
+                      options=dimensionOptions
+                      searchEnabled=true
+                      searchPlaceholder="Type to filter..."
+                      matchTriggerWidth=false
+                      matchContentWidth=true
+                      selected=selectedDimension
+                      onchange=(action "onSelectDimension")
+                      as |dimension|
+                    }}
+                      {{dimension}}
+                    {{/power-select}}
+                  </div>
+                {{/if}}
+              {{else}}
+                {{!-- Dimension selector --}}
+                {{#if alertHasDimensions}}
+                  {{#power-select
+                    triggerId="select-dimension"
+                    triggerClass="te-form__select"
+                    options=dimensionOptions
+                    searchEnabled=true
+                    searchPlaceholder="Type to filter..."
+                    matchTriggerWidth=false
+                    matchContentWidth=true
+                    selected=selectedDimension
+                    onchange=(action "onSelectDimension")
+                    as |dimension|
+                  }}
+                    {{dimension}}
+                  {{/power-select}}
+                {{/if}}
+              {{/if}}
+            </div>
+
+            {{!-- Missing anomaly modal --}}
+            {{#te-modal
+              cancelButtonText="Cancel"
+              submitButtonText="Report"
+              submitAction=(action "onSave")
+              cancelAction=(action "onCancel")
+              isShowingModal=openReportModal
+              headerText="Report Undetected Anomaly"
+            }}
+              {{#if renderModalContent}}
+                {{alert-report-modal
+                  series=series
+                  colorMapping=colorMapping
+                  axis=axis
+                  zoom=zoom
+                  legend=legend
+                  metricName=alertData.metric
+                  alertName=alertData.detectionName
+                  predefinedRanges=predefinedRanges
+                  dimensionOptions=dimensionOptions
+                  selectedDimension=selectedDimension
+                  alertHasDimensions=alertHasDimensions
+                  isMetricDataLoading=isMetricDataLoading
+                  isMetricDataInvalid=isMetricDataInvalid
+                  inputAction=(action "onInputMissingAnomaly")
+                }}
+              {{else}}
+                {{ember-spinner}}
+              {{/if}}
+            {{/te-modal}}
+
+            <div class="col-xs-12 te-graph-container">
+              {{#if isLoadingTimeSeries}}
+                <div class="spinner-wrapper spinner-wrapper--card">
+                  {{ember-spinner}}
+                </div>
+              {{/if}}
+              {{timeseries-chart
                 series=series
                 colorMapping=colorMapping
                 axis=axis
                 zoom=zoom
                 legend=legend
-                metricName=alertData.metric
-                alertName=alertData.detectionName
-                predefinedRanges=predefinedRanges
-                dimensionOptions=dimensionOptions
-                selectedDimension=selectedDimension
-                alertHasDimensions=alertHasDimensions
-                isMetricDataLoading=isMetricDataLoading
-                isMetricDataInvalid=isMetricDataInvalid
-                inputAction=(action "onInputMissingAnomaly")
+                point=point
               }}
-            {{else}}
-              {{ember-spinner}}
-            {{/if}}
-          {{/te-modal}}
+              {{#unless isPreviewMode}}
+                <div class="te-form__note">
+                  NOTE: If you find the metric shown above is inconsistent, please email <a class="thirdeye-link-secondary" target="_blank" href="{{graphMailtoLink}}">ask_thirdeye</a>.
+                </div>
+              {{/unless}}
+          </div>
+          {{!-- Baseline type selector --}}
+          {{range-pill-selectors
+            title="Baseline"
+            timeRangeOptions=baselineOptions
+            selectAction=(action "onBaselineOptionClick")
+          }}
+            {{#if anomalies}}
 
-          <div class="col-xs-12 te-graph-container">
-            {{timeseries-chart
-              series=series
-              colorMapping=colorMapping
-              axis=axis
-              zoom=zoom
-              legend=legend
-            }}
-            {{#unless isPreviewMode}}
-              <div class="te-form__note">
-                NOTE: If you find the metric shown above is inconsistent, please email <a class="thirdeye-link-secondary" target="_blank" href="{{graphMailtoLink}}">ask_thirdeye</a>.
-              </div>
-            {{/unless}}
-        </div>
-        {{!-- Baseline type selector --}}
-        {{range-pill-selectors
-          title="Baseline"
-          timeRangeOptions=baselineOptions
-          selectAction=(action "onBaselineOptionClick")
-        }}
-          {{#if anomalies}}
-
-            {{!-- Alert anomaly table --}}
-            <div class="te-block-container">
-              <table class="te-anomaly-table">
-                {{#if anomalies}}
-                  <thead>
-                    <tr class="te-anomaly-table__row te-anomaly-table__head">
-                      <th class="te-anomaly-table__cell-head te-anomaly-table__cell-head--left">
-                        <a class="te-anomaly-table__cell-link" {{action "toggleSortDirection" "start"}}>
-                          Start/Duration (PDT)
-                          <i class="te-anomaly-table__icon glyphicon {{if sortColumnStartUp "glyphicon-menu-up" "glyphicon-menu-down"}}"></i>
-                        </a>
-                      </th>
-                      {{#if alertHasDimensions}}
-                        <th class="te-anomaly-table__cell-head te-anomaly-table__cell-head--fixed">Dimensions</th>
-                      {{/if}}
-                      <th class="te-anomaly-table__cell-head">
-                        <a class="te-anomaly-table__cell-link" {{action "toggleSortDirection" "change"}}>
-                          Average Current / Average Predicted
-                          <i class="te-anomaly-table__icon glyphicon {{if sortColumnChangeUp "glyphicon-menu-up" "glyphicon-menu-down"}}"></i>
-                        </a>
-                      </th>
-                      {{#unless isPreviewMode}}
-                        <th class="te-anomaly-table__cell-head">
-                          <a class="te-anomaly-table__cell-link" {{action "toggleSortDirection" "feedback"}}>
-                            Feedback
-                            <i class="te-anomaly-table__icon glyphicon {{if sortColumnFeedbackUp "glyphicon-menu-up" "glyphicon-menu-down"}}"></i>
+              {{!-- Alert anomaly table --}}
+              <div class="te-block-container">
+                <table class="te-anomaly-table">
+                  {{#if anomalies}}
+                    <thead>
+                      <tr class="te-anomaly-table__row te-anomaly-table__head">
+                        <th class="te-anomaly-table__cell-head te-anomaly-table__cell-head--left">
+                          <a class="te-anomaly-table__cell-link" {{action "toggleSortDirection" "start"}}>
+                            Start/Duration (PDT)
+                            <i class="te-anomaly-table__icon glyphicon {{if sortColumnStartUp "glyphicon-menu-up" "glyphicon-menu-down"}}"></i>
                           </a>
                         </th>
-                        <th class="te-anomaly-table__cell-head"></th>
-                      {{/unless}}
-                    </tr>
-                  </thead>
-                {{/if}}
-                <tbody>
-                  {{#each paginatedFilteredAnomalies as |anomaly|}}
-                    <tr class="te-anomaly-table__row">
-                       <td class="te-anomaly-table__cell">
-                        <ul class="te-anomaly-table__list te-anomaly-table__list--left">
-                          <li class="te-anomaly-table__list-item te-anomaly-table__list-item--stronger">
-                            {{#if isPreviewMode}}
-                              {{anomaly.startDateStr}}
-                            {{else}}
-                              <a target="_blank" class="te-anomaly-table__link" href="/app/#/rootcause?anomalyId={{anomaly.anomalyId}}">
-                                {{anomaly.startDateStr}}
-                              </a>
-                            {{/if}}
-                          </li>
-                          <li class="te-anomaly-table__list-item te-anomaly-table__list-item--lighter">{{anomaly.durationStr}}</li>
-                        </ul>
-                       </td>
-                       {{#if alertHasDimensions}}
+                        {{#if alertHasDimensions}}
+                          <th class="te-anomaly-table__cell-head te-anomaly-table__cell-head--fixed">Dimensions</th>
+                        {{/if}}
+                        <th class="te-anomaly-table__cell-head">
+                          <a class="te-anomaly-table__cell-link" {{action "toggleSortDirection" "change"}}>
+                            Current / Predicted
+                            <i class="te-anomaly-table__icon glyphicon {{if sortColumnChangeUp "glyphicon-menu-up" "glyphicon-menu-down"}}"></i>
+                          </a>
+                        </th>
+                        {{#unless isPreviewMode}}
+                          <th class="te-anomaly-table__cell-head">
+                            <a class="te-anomaly-table__cell-link" {{action "toggleSortDirection" "feedback"}}>
+                              Feedback
+                              <i class="te-anomaly-table__icon glyphicon {{if sortColumnFeedbackUp "glyphicon-menu-up" "glyphicon-menu-down"}}"></i>
+                            </a>
+                          </th>
+                          <th class="te-anomaly-table__cell-head"></th>
+                        {{/unless}}
+                      </tr>
+                    </thead>
+                  {{/if}}
+                  <tbody>
+                    {{#each paginatedFilteredAnomalies as |anomaly|}}
+                      <tr class="te-anomaly-table__row">
                          <td class="te-anomaly-table__cell">
-                          <ul class="te-anomaly-table__list">
-                           {{#each anomaly.dimensionList as |dimension|}}
-                              <li class="te-anomaly-table__list-item te-anomaly-table__list-item--smaller" title="{{dimension.dimensionVal}}">
-                                {{dimension}}: <span class="stronger">{{get anomaly.dimensions dimension}}</span>
-                              </li>
-                           {{else}}
-                              -
-                           {{/each}}
+                          <ul class="te-anomaly-table__list te-anomaly-table__list--left">
+                            <li class="te-anomaly-table__list-item te-anomaly-table__list-item--stronger">
+                              {{#if isPreviewMode}}
+                                {{anomaly.startDateStr}}
+                              {{else}}
+                                <a target="_blank" class="te-anomaly-table__link" href="/app/#/rootcause?anomalyId={{anomaly.anomalyId}}">
+                                  {{anomaly.startDateStr}}
+                                </a>
+                              {{/if}}
+                            </li>
+                            <li class="te-anomaly-table__list-item te-anomaly-table__list-item--lighter">{{anomaly.durationStr}}</li>
                           </ul>
                          </td>
-                       {{/if}}
-                       <td class="te-anomaly-table__cell">
-                        <ul class="te-anomaly-table__list">
-                          <li>{{anomaly.shownCurrent}} / {{anomaly.shownBaseline}}</li>
-                          <li class="te-anomaly-table__value-label te-anomaly-table__value-label--{{calculate-direction anomaly.shownChangeRate}}">
-                            {{#if (not anomaly.isNullChangeRate)}}
-                              ({{anomaly.shownChangeRate}}%)
-                            {{else}}
-                              (N/A)
-                            {{/if}}
-                          </li>
-                        </ul>
-                       </td>
-                       {{#unless isPreviewMode}}
+                         {{#if alertHasDimensions}}
+                           <td class="te-anomaly-table__cell">
+                            <ul class="te-anomaly-table__list">
+                             {{#each anomaly.dimensionList as |dimension|}}
+                                <li class="te-anomaly-table__list-item te-anomaly-table__list-item--smaller" title="{{dimension.dimensionVal}}">
+                                  {{dimension}}: <span class="stronger">{{get anomaly.dimensions dimension}}</span>
+                                </li>
+                             {{else}}
+                                -
+                             {{/each}}
+                            </ul>
+                           </td>
+                         {{/if}}
                          <td class="te-anomaly-table__cell">
-                            {{#if renderStatusIcon}}
-                              {{#if anomaly.showResponseSaved}}
-                                <i class="te-anomaly-table__icon--status glyphicon glyphicon-ok-circle"></i>
+                          <ul class="te-anomaly-table__list">
+                            <li>{{anomaly.shownCurrent}} / {{anomaly.shownBaseline}}</li>
+                            <li class="te-anomaly-table__value-label te-anomaly-table__value-label--{{calculate-direction anomaly.shownChangeRate}}">
+                              {{#if (not anomaly.isNullChangeRate)}}
+                                ({{anomaly.shownChangeRate}}%)
+                              {{else}}
+                                (N/A)
                               {{/if}}
-                              {{#if anomaly.showResponseFailed}}
-                                <i class="te-anomaly-table__icon--status te-anomaly-table__icon--error glyphicon glyphicon-remove-circle"></i>
+                            </li>
+                          </ul>
+                         </td>
+                         {{#unless isPreviewMode}}
+                           <td class="te-anomaly-table__cell">
+                              {{#if renderStatusIcon}}
+                                {{#if anomaly.showResponseSaved}}
+                                  <i class="te-anomaly-table__icon--status glyphicon glyphicon-ok-circle"></i>
+                                {{/if}}
+                                {{#if anomaly.showResponseFailed}}
+                                  <i class="te-anomaly-table__icon--status te-anomaly-table__icon--error glyphicon glyphicon-remove-circle"></i>
+                                {{/if}}
                               {{/if}}
-                            {{/if}}
 
-                            {{#if anomaly.isUserReported}}
-                              <div class="te-anomaly-table__text te-anomaly-table__text--explore">User Reported</div>
-                              <div class="te-anomaly-table__comment">
-                                <i class="glyphicon glyphicon-th-list"></i>
-                                {{#tooltip-on-element class="te-anomaly-table__tooltip"}}
-                                  {{anomaly.anomalyFeedbackComments}}
-                                {{/tooltip-on-element}}
+                              {{#if anomaly.isUserReported}}
+                                <div class="te-anomaly-table__text te-anomaly-table__text--explore">User Reported</div>
+                                <div class="te-anomaly-table__comment">
+                                  <i class="glyphicon glyphicon-th-list"></i>
+                                  {{#tooltip-on-element class="te-anomaly-table__tooltip"}}
+                                    {{anomaly.anomalyFeedbackComments}}
+                                  {{/tooltip-on-element}}
+                                </div>
+                              {{else}}
+                                {{#power-select
+                                  triggerId=anomaly.anomalyId
+                                  triggerClass="te-anomaly-table__select"
+                                  options=feedbackOptions
+                                  searchEnabled=false
+                                  selected=(get labelMap anomaly.anomalyFeedback)
+                                  onchange=(action "onChangeAnomalyFeedback" anomaly)
+                                  as |response|
+                                }}
+                                  {{response}}
+                                {{/power-select}}
+                              {{/if}}
+                           </td>
+                           <td class="te-anomaly-table__cell te-anomaly-table__cell--feedback">
+                              <div class="te-anomaly-table__link-wrapper">
+                                {{#link-to 'rootcause' (query-params anomalyId=anomaly.anomalyId) target="_blank" class="te-anomaly-table__link"}}
+                                  Investigate
+                                {{/link-to}}
                               </div>
-                            {{else}}
-                              {{#power-select
-                                triggerId=anomaly.anomalyId
-                                triggerClass="te-anomaly-table__select"
-                                options=feedbackOptions
-                                searchEnabled=false
-                                selected=(get labelMap anomaly.anomalyFeedback)
-                                onchange=(action "onChangeAnomalyFeedback" anomaly)
-                                as |response|
-                              }}
-                                {{response}}
-                              {{/power-select}}
-                            {{/if}}
-                         </td>
-                         <td class="te-anomaly-table__cell te-anomaly-table__cell--feedback">
-                            <div class="te-anomaly-table__link-wrapper">
-                              {{#link-to 'rootcause' (query-params anomalyId=anomaly.anomalyId) target="_blank" class="te-anomaly-table__link"}}
-                                Investigate
-                              {{/link-to}}
-                            </div>
-                         </td>
-                       {{/unless}}
-                    </tr>
-                  {{/each}}
-                </tbody>
-              </table>
-            </div>
-
-            {{!--pagination--}}
-            {{#if (gt pagesNum 1)}}
-              <nav class="text-center" aria-label="Page navigation">
-                <ul class="pagination">
-                  <li class={{if (eq currentPage 1) 'active disabled'}} >
-                    <a href="#" {{action "onPaginationClick" 1}} aria-label="First">
-                      <span aria-hidden="true">First</span>
-                    </a>
-                  </li>
-                  <li class={{if (eq currentPage 1) 'active disabled'}}>
-                    <a href="#" {{action "onPaginationClick" "previous"}} aria-label="Previous">
-                      <span aria-hidden="true">Previous</span>
-                    </a>
-                  </li>
-                  {{#each viewPages as |page|}}
-                    <li class={{if (eq page currentPage) 'active'}}><a href="#" {{action "onPaginationClick" page}}>{{page}}</a></li>
-                  {{/each}}
-                  <li class={{if (eq currentPage pagesNum) 'disabled'}} >
-                    <a href="#" {{action "onPaginationClick" "next"}} aria-label="Next">
-                      <span aria-hidden="true">Next</span>
-                    </a>
-                  </li>
-                  <li class={{if (eq currentPage pagesNum) 'disabled'}} >
-                    <a href="#" {{action "onPaginationClick" pagesNum}} aria-label="Last">
-                      <span aria-hidden="true">Last</span>
-                    </a>
-                  </li>
-                </ul>
-              </nav>
-            {{/if}}
-          {{/if}}
-
-
+                           </td>
+                         {{/unless}}
+                      </tr>
+                    {{/each}}
+                  </tbody>
+                </table>
               </div>
+
+              {{!--pagination--}}
+              {{#if (gt pagesNum 1)}}
+                <nav class="text-center" aria-label="Page navigation">
+                  <ul class="pagination">
+                    <li class={{if (eq currentPage 1) 'active disabled'}} >
+                      <a href="#" {{action "onPaginationClick" 1}} aria-label="First">
+                        <span aria-hidden="true">First</span>
+                      </a>
+                    </li>
+                    <li class={{if (eq currentPage 1) 'active disabled'}}>
+                      <a href="#" {{action "onPaginationClick" "previous"}} aria-label="Previous">
+                        <span aria-hidden="true">Previous</span>
+                      </a>
+                    </li>
+                    {{#each viewPages as |page|}}
+                      <li class={{if (eq page currentPage) 'active'}}><a href="#" {{action "onPaginationClick" page}}>{{page}}</a></li>
+                    {{/each}}
+                    <li class={{if (eq currentPage pagesNum) 'disabled'}} >
+                      <a href="#" {{action "onPaginationClick" "next"}} aria-label="Next">
+                        <span aria-hidden="true">Next</span>
+                      </a>
+                    </li>
+                    <li class={{if (eq currentPage pagesNum) 'disabled'}} >
+                      <a href="#" {{action "onPaginationClick" pagesNum}} aria-label="Last">
+                        <span aria-hidden="true">Last</span>
+                      </a>
+                    </li>
+                  </ul>
+                </nav>
+              {{/if}}
+            {{/if}}
+
+
+                </div>
         {{else}}
         <div class="yaml-editor-msg">Alert configuration has changed.</div>
         {{/if}}

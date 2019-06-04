@@ -212,17 +212,16 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
         int numRowsErrored = 0;
         GenericRow consumedRow = null;
-        StreamMessageMetadata messageMetadata = new StreamMessageMetadata();
         do {
           try {
             consumedRow = GenericRow.createOrReuseRow(consumedRow);
-            messageMetadata.reset();
-            consumedRow = _streamLevelConsumer.next(consumedRow, messageMetadata);
+            consumedRow = _streamLevelConsumer.next(consumedRow);
 
             if (consumedRow != null) {
               GenericRow transformedRow = _recordTransformer.transform(consumedRow);
               if (transformedRow != null) {
-                notFull = realtimeSegment.index(transformedRow, messageMetadata);
+                // we currently do not get ingestion data through stream-consumer
+                notFull = realtimeSegment.index(transformedRow, null);
                 exceptionSleepMillis = 50L;
               }
             }

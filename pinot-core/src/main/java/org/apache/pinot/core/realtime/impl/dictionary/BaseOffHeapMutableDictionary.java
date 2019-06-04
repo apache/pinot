@@ -209,36 +209,6 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
   }
 
   @Override
-  public int indexOf(Object rawValue) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public Object get(int dictionaryId) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public long getLongValue(int dictionaryId) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public double getDoubleValue(int dictionaryId) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public float getFloatValue(int dictionaryId) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public int getIntValue(int dictionaryId) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
   public int length() {
     return _numEntries;
   }

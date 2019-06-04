@@ -23,6 +23,7 @@ import org.apache.pinot.thirdeye.anomaly.task.TaskContext;
 import org.apache.pinot.thirdeye.common.dimension.DimensionMap;
 import org.apache.pinot.thirdeye.datalayer.bao.DAOTestBase;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
+import org.apache.pinot.thirdeye.datalayer.bao.EvaluationManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
@@ -49,6 +50,7 @@ public class DetectionPipelineTaskRunnerTest {
   private DAOTestBase testDAOProvider;
   private DetectionConfigManager detectionDAO;
   private MergedAnomalyResultManager anomalyDAO;
+  private EvaluationManager evaluationDAO;
   private DetectionPipelineLoader loader;
   private DataProvider provider;
   private Map<String, Object> properties;
@@ -64,6 +66,7 @@ public class DetectionPipelineTaskRunnerTest {
     this.testDAOProvider = DAOTestBase.getInstance();
     this.detectionDAO = DAORegistry.getInstance().getDetectionConfigManager();
     this.anomalyDAO = DAORegistry.getInstance().getMergedAnomalyResultDAO();
+    this.evaluationDAO = DAORegistry.getInstance().getEvaluationManager();
     this.loader = new MockPipelineLoader(this.runs, this.outputs);
     this.provider = new MockDataProvider();
 
@@ -81,6 +84,7 @@ public class DetectionPipelineTaskRunnerTest {
     this.runner = new DetectionPipelineTaskRunner(
         this.detectionDAO,
         this.anomalyDAO,
+        this.evaluationDAO,
         this.loader,
         this.provider
     );

@@ -59,9 +59,9 @@ public class PinotSegmentRebalancer extends PinotZKChanger {
    * return true if IdealState = ExternalView
    * @return
    */
-  public int isStable(String tableName) {
-    IdealState idealState = helixAdmin.getResourceIdealState(clusterName, tableName);
-    ExternalView externalView = helixAdmin.getResourceExternalView(clusterName, tableName);
+  public int isStable(String tableNameWithType) {
+    IdealState idealState = helixAdmin.getResourceIdealState(clusterName, tableNameWithType);
+    ExternalView externalView = helixAdmin.getResourceExternalView(clusterName, tableNameWithType);
     Map<String, Map<String, String>> mapFieldsIS = idealState.getRecord().getMapFields();
     Map<String, Map<String, String>> mapFieldsEV = externalView.getRecord().getMapFields();
     int numDiff = 0;

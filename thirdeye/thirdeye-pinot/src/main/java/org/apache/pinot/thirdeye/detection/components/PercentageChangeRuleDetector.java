@@ -19,10 +19,14 @@
 
 package org.apache.pinot.thirdeye.detection.components;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.BaselineParsingUtils;
 import org.apache.pinot.thirdeye.dataframe.BooleanSeries;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
+import org.apache.pinot.thirdeye.dataframe.DoubleSeries;
 import org.apache.pinot.thirdeye.dataframe.Series;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
@@ -36,16 +40,14 @@ import org.apache.pinot.thirdeye.detection.annotation.Param;
 import org.apache.pinot.thirdeye.detection.annotation.PresentationOption;
 import org.apache.pinot.thirdeye.detection.spec.PercentageChangeRuleDetectorSpec;
 import org.apache.pinot.thirdeye.detection.spi.components.AnomalyDetector;
+import org.apache.pinot.thirdeye.detection.spi.components.BaselineProvider;
+import org.apache.pinot.thirdeye.detection.spi.model.DetectionResult;
 import org.apache.pinot.thirdeye.detection.spi.model.InputData;
 import org.apache.pinot.thirdeye.detection.spi.model.InputDataSpec;
+import org.apache.pinot.thirdeye.detection.spi.model.TimeSeries;
 import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
 import org.apache.pinot.thirdeye.rootcause.timeseries.Baseline;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
 import org.joda.time.Interval;
-import org.joda.time.Period;
-import org.joda.time.PeriodType;
 
 import static org.apache.pinot.thirdeye.dataframe.DoubleSeries.*;
 import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
@@ -58,7 +60,7 @@ import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
     @PresentationOption(name = "percentage change", template = "comparing ${offset} is ${pattern} more than ${percentageChange}")}, params = {
     @Param(name = "offset", defaultValue = "wo1w"), @Param(name = "percentageChange", placeholder = "value"),
     @Param(name = "pattern", allowableValues = {"up", "down"})})
-public class PercentageChangeRuleDetector implements AnomalyDetector<PercentageChangeRuleDetectorSpec> {
+public class PercentageChangeRuleDetector implements AnomalyDetector<PercentageChangeRuleDetectorSpec>, BaselineProvider<PercentageChangeRuleDetectorSpec> {
   private double percentageChange;
   private InputDataFetcher dataFetcher;
   private Baseline baseline;
@@ -67,24 +69,22 @@ public class PercentageChangeRuleDetector implements AnomalyDetector<PercentageC
   private TimeGranularity timeGranularity;
 
   private static final String COL_CURR = "current";
-  private static final String COL_BASE = "baseline";
   private static final String COL_CHANGE = "change";
   private static final String COL_ANOMALY = "anomaly";
   private static final String COL_PATTERN = "pattern";
   private static final String COL_CHANGE_VIOLATION = "change_violation";
 
   @Override
-  public List<MergedAnomalyResultDTO> runDetection(Interval window, String metricUrn) {
+  public DetectionResult runDetection(Interval window, String metricUrn) {
     MetricEntity me = MetricEntity.fromURN(metricUrn);
-    MetricSlice slice =
-        MetricSlice.from(me.getId(), window.getStartMillis(), window.getEndMillis(), me.getFilters(), timeGranularity);
+    MetricSlice slice = MetricSlice.from(me.getId(), window.getStartMillis(), window.getEndMillis(), me.getFilters(), timeGranularity);
     List<MetricSlice> slices = new ArrayList<>(this.baseline.scatter(slice));
     slices.add(slice);
 
     InputData data = this.dataFetcher.fetchData(new InputDataSpec().withTimeseriesSlices(slices)
         .withMetricIdsForDataset(Collections.singletonList(slice.getMetricId())));
     DataFrame dfCurr = data.getTimeseries().get(slice).renameSeries(COL_VALUE, COL_CURR);
-    DataFrame dfBase = this.baseline.gather(slice, data.getTimeseries()).renameSeries(COL_VALUE, COL_BASE);
+    DataFrame dfBase = this.baseline.gather(slice, data.getTimeseries());
 
     DataFrame df = new DataFrame(dfCurr).addSeries(dfBase);
 
@@ -94,7 +94,7 @@ public class PercentageChangeRuleDetector implements AnomalyDetector<PercentageC
         return Double.compare(values[0], 0.0) == 0 ? 0.0 : (values[0] > 0 ? Double.POSITIVE_INFINITY : Double.NEGATIVE_INFINITY);
       }
       return (values[0] - values[1]) / values[1];
-    }, df.getDoubles(COL_CURR), df.get(COL_BASE)));
+    }, df.getDoubles(COL_CURR), df.get(COL_VALUE)));
 
     // defaults
     df.addSeries(COL_ANOMALY, BooleanSeries.fillValues(df.size(), false));
@@ -112,10 +112,43 @@ public class PercentageChangeRuleDetector implements AnomalyDetector<PercentageC
       df.mapInPlace(BooleanSeries.ALL_TRUE, COL_ANOMALY, COL_PATTERN, COL_CHANGE_VIOLATION);
     }
 
-    // anomalies
     DatasetConfigDTO datasetConfig = data.getDatasetForMetricId().get(me.getId());
-    return DetectionUtils.makeAnomalies(slice, df, COL_ANOMALY, window.getEndMillis(),
+    List<MergedAnomalyResultDTO> anomalies = DetectionUtils.makeAnomalies(slice, df, COL_ANOMALY, window.getEndMillis(),
         DetectionUtils.getMonitoringGranularityPeriod(monitoringGranularity, datasetConfig), datasetConfig);
+    DataFrame baselineWithBoundaries = constructPercentageChangeBoundaries(df);
+    return DetectionResult.from(anomalies, TimeSeries.fromDataFrame(baselineWithBoundaries));
+  }
+
+  @Override
+  public TimeSeries computePredictedTimeSeries(MetricSlice slice) {
+    DataFrame df = RuleBaselineProvider.buildBaselines(slice, this.baseline, this.dataFetcher);
+    return TimeSeries.fromDataFrame(constructPercentageChangeBoundaries(df));
+  }
+
+  private DataFrame constructPercentageChangeBoundaries(DataFrame dfBase) {
+    if (!Double.isNaN(this.percentageChange)) {
+      switch (this.pattern) {
+        case UP:
+          fillPercentageChangeBound(dfBase, COL_UPPER_BOUND, 1 + this.percentageChange);
+          dfBase.addSeries(COL_LOWER_BOUND, DoubleSeries.zeros(dfBase.size()));
+          break;
+        case DOWN:
+          dfBase.addSeries(COL_UPPER_BOUND, DoubleSeries.fillValues(dfBase.size(), POSITIVE_INFINITY));
+          fillPercentageChangeBound(dfBase, COL_LOWER_BOUND, 1 - this.percentageChange);
+          break;
+        case UP_OR_DOWN:
+          fillPercentageChangeBound(dfBase, COL_UPPER_BOUND, 1 + this.percentageChange);
+          fillPercentageChangeBound(dfBase, COL_LOWER_BOUND, 1 - this.percentageChange);
+          break;
+        default:
+          throw new IllegalArgumentException();
+      }
+    }
+    return dfBase;
+  }
+
+  private void fillPercentageChangeBound(DataFrame dfBase, String colBound, double multiplier) {
+    dfBase.addSeries(colBound, map((DoubleFunction) values -> values[0] * multiplier, dfBase.getDoubles(COL_VALUE)));
   }
 
   @Override

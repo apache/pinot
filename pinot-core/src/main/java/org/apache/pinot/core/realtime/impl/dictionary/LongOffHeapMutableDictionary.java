@@ -39,8 +39,29 @@ public class LongOffHeapMutableDictionary extends BaseOffHeapMutableDictionary {
         allocationContext);
   }
 
-  public Object get(int dictionaryId) {
-    return _dictIdToValue.getLong(dictionaryId);
+  @Override
+  public Long get(int dictId) {
+    return getLongValue(dictId);
+  }
+
+  @Override
+  public int getIntValue(int dictId) {
+    return (int) getLongValue(dictId);
+  }
+
+  @Override
+  public long getLongValue(int dictId) {
+    return _dictIdToValue.getLong(dictId);
+  }
+
+  @Override
+  public float getFloatValue(int dictId) {
+    return getLongValue(dictId);
+  }
+
+  @Override
+  public double getDoubleValue(int dictId) {
+    return getLongValue(dictId);
   }
 
   @Override
@@ -132,28 +153,13 @@ public class LongOffHeapMutableDictionary extends BaseOffHeapMutableDictionary {
   }
 
   @Override
+  public int compare(int dictId1, int dictId2) {
+    return Long.compare(getLongValue(dictId1), getLongValue(dictId2));
+  }
+
+  @Override
   protected void setRawValueAt(int dictId, Object value, byte[] serializedValue) {
     _dictIdToValue.setLong(dictId, (Long) value);
-  }
-
-  @Override
-  public int getIntValue(int dictId) {
-    return ((Long) get(dictId)).intValue();
-  }
-
-  @Override
-  public long getLongValue(int dictId) {
-    return (Long) get(dictId);
-  }
-
-  @Override
-  public float getFloatValue(int dictId) {
-    return ((Long) get(dictId)).floatValue();
-  }
-
-  @Override
-  public double getDoubleValue(int dictId) {
-    return ((Long) get(dictId)).doubleValue();
   }
 
   @Override

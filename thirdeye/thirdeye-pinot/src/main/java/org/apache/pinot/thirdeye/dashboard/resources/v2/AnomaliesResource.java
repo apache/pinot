@@ -82,6 +82,7 @@ import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
 import org.apache.pinot.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
+import org.apache.pinot.thirdeye.datalayer.bao.EvaluationManager;
 import org.apache.pinot.thirdeye.datalayer.bao.EventManager;
 import org.apache.pinot.thirdeye.datalayer.bao.GroupedAnomalyResultsManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MergedAnomalyResultManager;
@@ -155,6 +156,7 @@ public class AnomaliesResource {
   private final DetectionConfigManager detectionDAO;
   private final EventManager eventDAO;
   private final MergedAnomalyResultManager anomalyDAO;
+  private final EvaluationManager evaluationDAO;
 
   private final ExecutorService threadPool;
   private final AlertFilterFactory alertFilterFactory;
@@ -177,6 +179,7 @@ public class AnomaliesResource {
     this.anomalyFunctionFactory = anomalyFunctionFactory;
     this.eventDAO = DAORegistry.getInstance().getEventDAO();
     this.anomalyDAO = DAORegistry.getInstance().getMergedAnomalyResultDAO();
+    this.evaluationDAO = DAO_REGISTRY.getEvaluationManager();
 
     QueryCache queryCache = ThirdEyeCacheRegistry.getInstance().getQueryCache();
     LoadingCache<String, Long> maxTimeCache = ThirdEyeCacheRegistry.getInstance().getDatasetMaxDataTimeCache();
@@ -185,7 +188,8 @@ public class AnomaliesResource {
     this.aggregationLoader = new DefaultAggregationLoader(this.metricConfigDAO, this.datasetConfigDAO, queryCache, maxTimeCache);
     this.loader = new DetectionPipelineLoader();
 
-    this.provider = new DefaultDataProvider(this.metricConfigDAO, this.datasetConfigDAO, this.eventDAO, this.anomalyDAO, this.timeSeriesLoader, this.aggregationLoader, this.loader);
+    this.provider = new DefaultDataProvider(this.metricConfigDAO, this.datasetConfigDAO, this.eventDAO, this.anomalyDAO, this.evaluationDAO,
+        this.timeSeriesLoader, this.aggregationLoader, this.loader);
   }
 
   @GET
@@ -1130,10 +1134,17 @@ public class AnomaliesResource {
         .withStart(new DateTime(sliceAnomalyCurrent.getStart(), dataTimeZone).minus(offsets.getPreOffsetPeriod()).getMillis())
         .withEnd(new DateTime(sliceAnomalyCurrent.getEnd(), dataTimeZone).plus(offsets.getPostOffsetPeriod()).getMillis());
 
-    DataFrame dfCurrent = this.timeSeriesLoader.load(sliceViewCurrent);
     DataFrame dfBaseline = DetectionUtils.getBaselineTimeseries(anomaly, filters, metric.getId(), config, sliceViewCurrent.getStart(), sliceViewCurrent.getEnd(), this.loader, this.provider).getDataFrame();
-    DataFrame dfAligned = dfCurrent.renameSeries(COL_VALUE, COL_CURRENT).joinOuter(
-        dfBaseline.renameSeries(COL_VALUE, COL_BASELINE));
+    DataFrame dfAligned;
+    if (dfBaseline.contains(COL_CURRENT)) {
+      // if baseline provider returns both current values and baseline values, using them as the result
+      dfAligned = dfBaseline;
+      dfAligned.renameSeries(COL_VALUE, COL_BASELINE);
+    } else {
+      // otherwise fetch current values and join the time series to generate the result
+      DataFrame dfCurrent = this.timeSeriesLoader.load(sliceViewCurrent);
+      dfAligned = dfCurrent.renameSeries(COL_VALUE, COL_CURRENT).joinOuter(dfBaseline.renameSeries(COL_VALUE, COL_BASELINE));
+    }
 
     details.setDates(makeStringDates(dfAligned.getLongs(COL_TIME)));
     details.setCurrentValues(makeStringValues(dfAligned.getDoubles(COL_CURRENT)));

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.broker.routing.builder;
 
+import it.unimi.dsi.fastutil.ints.IntArrays;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -47,10 +48,10 @@ import org.slf4j.LoggerFactory;
  * for routing. The look up table is in the format of < segment_name -> (replica_id -> server_instance) >.
  *
  * When the query comes in, the routing algorithm is as follows:
- *   1. Randomly pick a replica id (or replica group id)
+ *   1. Shuffle the replica group ids
  *   2. For each segment of the given table,
  *      a. Check if the segment can be pruned. If pruned, go to the next segment.
- *      b. If not pruned, assign the segment to a server with the replica id that is picked above.
+ *      b. If not pruned, assign the segment to a server with the replica id based on the shuffled replica group ids.
  *
  */
 public abstract class BasePartitionAwareRoutingTableBuilder implements RoutingTableBuilder {
@@ -101,8 +102,15 @@ public abstract class BasePartitionAwareRoutingTableBuilder implements RoutingTa
     Map<String, List<String>> routingTable = new HashMap<>();
     SegmentPrunerContext prunerContext = new SegmentPrunerContext(request.getBrokerRequest());
 
-    // 1. Randomly pick a replica id
-    int replicaId = _random.nextInt(_numReplicas);
+    // Shuffle the replica group ids in order to satisfy:
+    // a. Pick a replica group in an evenly distributed fashion
+    // b. When a server is not available, the request should be distributed evenly among other available servers.
+    int[] shuffledReplicaGroupIds = new int[_numReplicas];
+    for (int i = 0; i < _numReplicas; i++) {
+      shuffledReplicaGroupIds[i] = i;
+    }
+    IntArrays.shuffle(shuffledReplicaGroupIds, _random);
+
     for (String segmentName : segmentsToQuery) {
       SegmentZKMetadata segmentZKMetadata = _segmentToZkMetadataMapping.get(segmentName);
 
@@ -110,25 +118,26 @@ public abstract class BasePartitionAwareRoutingTableBuilder implements RoutingTa
       boolean segmentPruned = (segmentZKMetadata != null) && _pruner.prune(segmentZKMetadata, prunerContext);
 
       if (!segmentPruned) {
-        // 2b. Segment cannot be pruned. Assign the segment to a server with the replica id picked above.
+        // 2b. Segment cannot be pruned. Assign the segment to a server based on the shuffled replica group ids
         Map<Integer, String> replicaIdToServerMap = segmentToReplicaToServerMap.get(segmentName);
-        String serverName = replicaIdToServerMap.get(replicaId);
 
-        // When the server is not available with this replica id, we need to pick another available server.
-        if (serverName == null) {
-          if (!replicaIdToServerMap.isEmpty()) {
-            serverName = replicaIdToServerMap.values().iterator().next();
-          } else {
-            // No server is found for this segment
-            continue;
+        String serverName = null;
+        for (int i = 0; i < _numReplicas; i++) {
+          serverName = replicaIdToServerMap.get(shuffledReplicaGroupIds[i]);
+          // If a server is found, update routing table for the current segment
+          if (serverName != null) {
+            break;
           }
         }
-        List<String> segmentsForServer = routingTable.get(serverName);
-        if (segmentsForServer == null) {
-          segmentsForServer = new ArrayList<>();
-          routingTable.put(serverName, segmentsForServer);
+
+        if (serverName != null) {
+          routingTable.computeIfAbsent(serverName, k -> new ArrayList<>()).add(segmentName);
+        } else {
+          // No server is found for this segment if the code reach here
+
+          // TODO: we need to discuss and decide on how we will be handling this case since we are not returning the
+          // complete result here.
         }
-        segmentsForServer.add(segmentName);
       }
     }
 

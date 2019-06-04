@@ -116,7 +116,7 @@ public class RoutingTableBuilderFactory {
                 == CommonConstants.Helix.DataSource.SegmentAssignmentStrategyType.ReplicaGroupSegmentAssignmentStrategy);
 
         // Check that replica group strategy config is correctly set
-        boolean hasReplicaGroupStrategyConfig = (validationConfig != null);
+        boolean hasReplicaGroupStrategyConfig = (validationConfig.getReplicaGroupStrategyConfig() != null);
 
         // Check that the table push type is not 'refresh'.
         boolean isNotRefreshPush =

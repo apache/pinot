@@ -49,6 +49,12 @@
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-broker</artifactId>
     </dependency>
+    <!-- TODO: figure out a way to avoid explicitly setting the kafka module dependency, and instead inject it, such that any kafka stream implementation can use this -->
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-connector-kafka-0.9</artifactId>
+      <version>${project.version}</version>
+    </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-integration-tests</artifactId>
@@ -187,7 +193,7 @@
           <includeConfigurationDirectoryInClasspath>false</includeConfigurationDirectoryInClasspath>
           <assembleDirectory>${project.build.directory}/${project.artifactId}-pkg</assembleDirectory>
           <!-- Extra JVM arguments that will be included in the bin scripts -->
-          <extraJvmArguments>-Xms24G -Xmx24G -Dlog4j.configuration=log4j.properties</extraJvmArguments>
+          <extraJvmArguments>-Xms24G -Xmx24G -Dlog4j2.configurationFile=log4j2.xml</extraJvmArguments>
           <!-- Generate bin scripts for windows and unix pr default -->
           <platforms>
             <platform>unix</platform>

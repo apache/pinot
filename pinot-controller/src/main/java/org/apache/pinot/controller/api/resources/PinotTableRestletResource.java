@@ -63,6 +63,7 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceUserConfigConstants;
 import org.apache.pinot.core.realtime.stream.StreamConfig;
+import org.apache.pinot.core.util.ReplicationUtils;
 import org.slf4j.LoggerFactory;
 
 
@@ -102,6 +103,11 @@ public class PinotTableRestletResource {
   @Inject
   ExecutorService _executorService;
 
+  /**
+   * API to create a table. Before adding, validations will be done (min number of replicas,
+   * checking offline and realtime table configs match, checking for tenants existing)
+   * @param tableConfigStr
+   */
   @POST
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables")
@@ -302,7 +308,7 @@ public class PinotTableRestletResource {
 
       ensureMinReplicas(tableConfig);
       verifyTableConfigs(tableConfig);
-      _pinotHelixResourceManager.setExistingTableConfig(tableConfig, tableNameWithType, tableType);
+      _pinotHelixResourceManager.updateTableConfig(tableConfig, tableNameWithType, tableType);
     } catch (PinotHelixResourceManager.InvalidTableConfigException e) {
       String errStr = String.format("Failed to update configuration for %s due to: %s", tableName, e.getMessage());
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_UPDATE_ERROR, 1L);
@@ -351,25 +357,22 @@ public class PinotTableRestletResource {
     }
   }
 
-  private void ensureMinReplicas(TableConfig config) {
+  private void ensureMinReplicas(TableConfig tableConfig) {
     // For self-serviced cluster, ensure that the tables are created with at least min replication factor irrespective
     // of table configuration value
-    SegmentsValidationAndRetentionConfig segmentsConfig = config.getValidationConfig();
+    SegmentsValidationAndRetentionConfig segmentsConfig = tableConfig.getValidationConfig();
     int configMinReplication = _controllerConf.getDefaultTableMinReplicas();
-    boolean verifyReplicasPerPartition = false;
-    boolean verifyReplication = true;
+    boolean verifyReplicasPerPartition;
+    boolean verifyReplication;
 
-    if (config.getTableType() == CommonConstants.Helix.TableType.REALTIME) {
-      StreamConfig streamConfig;
-      try {
-        streamConfig = new StreamConfig(config.getIndexingConfig().getStreamConfigs());
-      } catch (Exception e) {
-        String errorMsg = String.format("Invalid tableIndexConfig or streamConfig: %s", e.getMessage());
-        throw new PinotHelixResourceManager.InvalidTableConfigException(errorMsg, e);
-      }
-      verifyReplicasPerPartition = streamConfig.hasLowLevelConsumerType();
-      verifyReplication = streamConfig.hasHighLevelConsumerType();
+    try {
+      verifyReplicasPerPartition = ReplicationUtils.useReplicasPerPartition(tableConfig);
+      verifyReplication = ReplicationUtils.useReplication(tableConfig);
+    } catch (Exception e) {
+      String errorMsg = String.format("Invalid tableIndexConfig or streamConfig: %s", e.getMessage());
+      throw new PinotHelixResourceManager.InvalidTableConfigException(errorMsg, e);
     }
+
 
     if (verifyReplication) {
       int requestReplication;

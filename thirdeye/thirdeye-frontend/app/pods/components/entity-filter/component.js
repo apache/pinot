@@ -153,6 +153,15 @@ export default Component.extend({
     toggleDisplay(clickedBlock) {
       // Note: toggleProperty will not be able to find 'filterBlocks', as it is not an observed property
       set(clickedBlock, 'isHidden', !clickedBlock.isHidden);
+    },
+
+    /**
+     * Bubbles clear filters action up to parent
+     * @method clearFilters
+     * @return {undefined}
+     */
+    clearFilters() {
+      this.get('onClearFilters')();
     }
   }
 });

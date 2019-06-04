@@ -75,6 +75,7 @@ import static org.apache.pinot.thirdeye.dashboard.resources.EntityManagerResourc
 @Path("/onboard")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
+@Deprecated
 public class OnboardResource {
   private final AnomalyFunctionManager anomalyFunctionDAO;
   private final MergedAnomalyResultManager mergedAnomalyResultDAO;

@@ -65,10 +65,6 @@
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-filesystem</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-hadoop-filesystem</artifactId>
     </dependency>
     <dependency>

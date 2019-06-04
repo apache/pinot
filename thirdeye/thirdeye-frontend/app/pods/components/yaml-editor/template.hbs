@@ -27,7 +27,7 @@
       }}
     </div>
   </div>
-  <div class="col-xs-12">
+  <div class="col-xs-12 {{if isEditMode "bottom-margin"}}">
     {{ember-ace
       lines=35
       value=currentYamlAlert
@@ -36,6 +36,18 @@
       update=(action "onEditingDetectionYamlAction")
       mode="ace/mode/yaml"
     }}
+    {{#if isEditMode}}
+      <div class="pull-right">
+        {{bs-button
+          defaultText="Update Alert"
+          type="primary"
+          buttonType="submit"
+          disabled=disableYamlSave
+          onClick=(action "submitAlertEdit")
+          class="te-button te-button--submit"
+        }}
+      </div>
+    {{/if}}
   </div>
   <div class="col-xs-12">
     {{#if isDetectionMsg}}
@@ -142,13 +154,13 @@
 <fieldset class="te-form__section-submit">
   {{#if isEditMode}}
     {{bs-button
-      defaultText="Save changes"
-      type="primary"
-      buttonType="submit"
-      disabled=disableYamlSave
-      onClick=(action "saveEditYamlAction")
-      class="te-button te-button--submit"
-    }}
+        defaultText=subGroupButtonText
+        type="primary"
+        buttonType="submit"
+        disabled=disableSubGroupSave
+        onClick=(action "submitSubscriptionGroup")
+        class="te-button te-button--submit"
+      }}
   {{else}}
     {{bs-button
       defaultText="Create alert"

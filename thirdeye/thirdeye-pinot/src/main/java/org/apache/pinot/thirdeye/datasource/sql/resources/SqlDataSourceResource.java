@@ -1,6 +1,6 @@
 package org.apache.pinot.thirdeye.datasource.sql.resources;
 
-import com.facebook.presto.jdbc.internal.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;

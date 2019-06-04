@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
@@ -33,6 +34,7 @@ import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.common.metrics.BrokerTimer;
 import org.apache.pinot.common.query.ReduceService;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.GroupBy;
@@ -82,6 +84,8 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
     long numSegmentsQueried = 0L;
     long numSegmentsProcessed = 0L;
     long numSegmentsMatched = 0L;
+    long numConsumingSegmentsQueried = 0L;
+    long minConsumingFreshnessTimeMs = Long.MAX_VALUE;
     long numTotalRawDocs = 0L;
     boolean numGroupsLimitReached = false;
 
@@ -136,6 +140,16 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
         numSegmentsMatched += Long.parseLong(numSegmentsMatchedString);
       }
 
+      String numConsumingString = metadata.get(DataTable.NUM_CONSUMING_SEGMENTS_QUERIED);
+      if (numConsumingString != null) {
+        numConsumingSegmentsQueried += Long.parseLong(numConsumingString);
+      }
+
+      String minConsumingFreshnessTimeMsString = metadata.get(DataTable.MIN_CONSUMING_FRESHNESS_TIME_MS);
+      if (minConsumingFreshnessTimeMsString != null) {
+          minConsumingFreshnessTimeMs = Math.min(Long.parseLong(minConsumingFreshnessTimeMsString), minConsumingFreshnessTimeMs);
+      }
+
       String numTotalRawDocsString = metadata.get(DataTable.TOTAL_DOCS_METADATA_KEY);
       if (numTotalRawDocsString != null) {
         numTotalRawDocs += Long.parseLong(numTotalRawDocsString);
@@ -168,6 +182,10 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
     brokerResponseNative.setNumSegmentsMatched(numSegmentsMatched);
     brokerResponseNative.setTotalDocs(numTotalRawDocs);
     brokerResponseNative.setNumGroupsLimitReached(numGroupsLimitReached);
+    if (numConsumingSegmentsQueried > 0) {
+      brokerResponseNative.setNumConsumingSegmentsQueried(numConsumingSegmentsQueried);
+      brokerResponseNative.setMinConsumingFreshnessTimeMs(minConsumingFreshnessTimeMs);
+    }
 
     // Update broker metrics.
     String tableName = brokerRequest.getQuerySource().getTableName();
@@ -178,6 +196,11 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
           .addMeteredTableValue(rawTableName, BrokerMeter.ENTRIES_SCANNED_IN_FILTER, numEntriesScannedInFilter);
       brokerMetrics
           .addMeteredTableValue(rawTableName, BrokerMeter.ENTRIES_SCANNED_POST_FILTER, numEntriesScannedPostFilter);
+
+      if (numConsumingSegmentsQueried > 0 && minConsumingFreshnessTimeMs > 0) {
+        brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.FRESHNESS_LAG_MS,
+            System.currentTimeMillis() - minConsumingFreshnessTimeMs, TimeUnit.MILLISECONDS);
+      }
     }
 
     // Parse the option from request whether to preserve the type

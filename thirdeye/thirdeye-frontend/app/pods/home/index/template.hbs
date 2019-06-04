@@ -10,8 +10,8 @@
       predefinedRanges=pill.predefinedRanges
       selectAction=(action "onRangeSelection")
     }}
-    {{#if appName}}
-      {{#link-to "home.share-dashboard" (query-params appName=appName duration=duration startDate=startDate endDate=endDate feedbackType=feedbackType shareId=null) tagName="button" type="button" class="pull-right te-button te-button--outline"}}
+    {{#if appOrSubGroup}}
+      {{#link-to "home.share-dashboard" (query-params appName=appName subGroup=subGroup duration=duration startDate=startDate endDate=endDate feedbackType=feedbackType shareId=null) tagName="button" type="button" class="pull-right te-button te-button--outline"}}
         Share
       {{/link-to}}
     {{/if}}
@@ -19,19 +19,46 @@
 
   <article class="dashboard-container__body">
     <section class="dashboard-container__application-header">
-      <h2 class="dashboard-container__title">Application:<span>{{appName}}</span></h2>
-      <div class="dashboard-container__application-header-dropdown">
-        {{#power-select
-          options=sortedApplications
-          selected=appNameSelected
-          searchField="application"
-          searchEnabled=true
-          placeholder="Please pick an application"
-          onchange=(action "selectApplication")
-          as |app|}}
-          {{app.application}}
-        {{/power-select}}
-      </div>
+      <h3 class="dashboard-container__title">Anomalies Filtered by: </h3>
+      {{#power-select
+        triggerId="dash-anomalies-by"
+        triggerClass="te-anomaly-table__select te-anomaly-table__select--margin-left"
+        options=anomaliesByOptions
+        searchEnabled=false
+        selected=anomaliesBySelected
+        onchange=(action "onAnomaliesBy")
+        as |getBy|
+      }}
+        {{getBy}}
+      {{/power-select}}
+
+      {{#if byApplication}}
+        <div class="dashboard-container__application-header-dropdown">
+          {{#power-select
+            options=sortedApplications
+            selected=appNameSelected
+            searchField="application"
+            searchEnabled=true
+            placeholder="Please pick an application"
+            onchange=(action "selectApplication")
+            as |app|}}
+            {{app.application}}
+          {{/power-select}}
+        </div>
+      {{else}}
+        <div class="dashboard-container__application-header-dropdown">
+          {{#power-select
+            options=sortedSubscriptionGroups
+            selected=subGroupSelected
+            searchField="name"
+            searchEnabled=true
+            placeholder="Please pick a subscription group"
+            onchange=(action "selectSubscriptionGroup")
+            as |subGroup|}}
+            {{subGroup.name}}
+          {{/power-select}}
+        </div>
+      {{/if}}
     </section>
 
   {{#if (gt anomaliesCount 0)}}

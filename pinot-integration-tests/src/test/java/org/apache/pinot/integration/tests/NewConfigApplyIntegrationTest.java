@@ -43,7 +43,8 @@ public class NewConfigApplyIntegrationTest extends BaseClusterIntegrationTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(NewConfigApplyIntegrationTest.class);
 
   @BeforeClass
-  public void setUp() {
+  public void setUp()
+      throws Exception {
     // Start an empty cluster
     startZk();
     startController();
@@ -64,32 +65,32 @@ public class NewConfigApplyIntegrationTest extends BaseClusterIntegrationTest {
     FileUtils.copyDirectoryToDirectory(configFiles.get(2).getParentFile(), new File("."));
 
     // Create a new table using the command line tools without a profile
-    runAdminCommand("ApplyTableConfig", "-controllerUrl", "http://localhost:8998/", "-tableConfigFile",
+    runAdminCommand("ApplyTableConfig", "-controllerUrl", _controllerBaseApiUrl, "-tableConfigFile",
         configFiles.get(0).getAbsolutePath());
 
     // Check that the table exists
-    String tableConfiguration = sendGetRequestRaw("http://localhost:8998/v2/tables/mytable");
+    String tableConfiguration = sendGetRequestRaw(_controllerBaseApiUrl + "/v2/tables/mytable");
     CombinedConfig tableConfigurationObject = CombinedConfigLoader.loadCombinedConfig(tableConfiguration);
     assertEquals(tableConfigurationObject.getOfflineTableConfig().getTableName(), "mytable_OFFLINE");
     assertEquals(tableConfigurationObject.getOfflineTableConfig().getValidationConfig().getReplicationNumber(), 3);
 
     // Update the table using a configuration profile
-    runAdminCommand("ApplyTableConfig", "-controllerUrl", "http://localhost:8998/", "-tableConfigFile",
+    runAdminCommand("ApplyTableConfig", "-controllerUrl", _controllerBaseApiUrl, "-tableConfigFile",
         configFiles.get(1).getAbsolutePath(), "-profile", "test2");
 
     // Check that the table is updated
-    tableConfiguration = sendGetRequestRaw("http://localhost:8998/v2/tables/mytable");
+    tableConfiguration = sendGetRequestRaw(_controllerBaseApiUrl + "/v2/tables/mytable");
     tableConfigurationObject = CombinedConfigLoader.loadCombinedConfig(tableConfiguration);
     assertEquals(tableConfigurationObject.getOfflineTableConfig().getTableName(), "mytable_OFFLINE");
     assertEquals(tableConfigurationObject.getOfflineTableConfig().getValidationConfig().getReplicationNumber(), 4);
     assertEquals(tableConfigurationObject.getOfflineTableConfig().getIndexingConfig().getLoadMode(), "MMAP");
 
     // Update the table using a configuration profile
-    runAdminCommand("ApplyTableConfig", "-controllerUrl", "http://localhost:8998/", "-tableConfigFile",
+    runAdminCommand("ApplyTableConfig", "-controllerUrl", _controllerBaseApiUrl, "-tableConfigFile",
         configFiles.get(0).getAbsolutePath(), "-profile", "test1");
 
     // Check that the table is updated
-    tableConfiguration = sendGetRequestRaw("http://localhost:8998/v2/tables/mytable");
+    tableConfiguration = sendGetRequestRaw(_controllerBaseApiUrl + "/v2/tables/mytable");
     tableConfigurationObject = CombinedConfigLoader.loadCombinedConfig(tableConfiguration);
     assertEquals(tableConfigurationObject.getOfflineTableConfig().getTableName(), "mytable_OFFLINE");
     assertEquals(tableConfigurationObject.getOfflineTableConfig().getValidationConfig().getReplicationNumber(), 3);

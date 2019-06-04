@@ -25,9 +25,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.LinkedList;
-import java.util.Map;
 import org.apache.commons.io.FileUtils;
-import org.apache.kafka.common.protocol.Errors;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
@@ -36,13 +34,13 @@ import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.LLCSegmentName;
-import org.apache.pinot.core.data.GenericRow;
 import org.apache.pinot.core.data.manager.config.InstanceDataManagerConfig;
 import org.apache.pinot.core.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.core.realtime.impl.RealtimeSegmentStatsHistory;
+import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConsumerFactory;
+import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamMessageDecoder;
 import org.apache.pinot.core.realtime.stream.PermanentConsumerException;
 import org.apache.pinot.core.realtime.stream.StreamConfigProperties;
-import org.apache.pinot.core.realtime.stream.StreamMessageDecoder;
 import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -50,8 +48,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.mockito.Matchers.any;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 
 // TODO Write more tests for other parts of the class
@@ -85,17 +82,17 @@ public class LLRealtimeSegmentDataManagerTest {
           + "    \"segmentFormatVersion\": null, \n" + "    \"sortedColumn\": [], \n" + "    \"streamConfigs\": {\n"
           + "      \"" + StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS + "\": \"" + String
           .valueOf(maxRowsInSegment) + "\", \n" + "      \"" + StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_TIME
-          + "\": \"" + maxTimeForSegmentCloseMs + "\", \n" + "      \"stream.kafka.broker.list\": \"broker:7777\", \n"
-          + "      \"stream.kafka.consumer.prop.auto.offset.reset\": \"smallest\", \n"
-          + "      \"stream.kafka.consumer.type\": \"simple\", \n"
-          + "      \"stream.kafka.consumer.factory.class.name\": \"org.apache.pinot.core.realtime.impl.kafka.KafkaConsumerFactory\", \n"
-          + "      \"stream.kafka.decoder.class.name\": \"" + FakeStreamMessageDecoder.class.getName() + "\", \n"
-          + "      \"stream.kafka.decoder.prop.schema.registry.rest.url\": \"http://schema-registry-host.corp.ceo:1766/schemas\", \n"
-          + "      \"stream.kafka.decoder.prop.schema.registry.schema.name\": \"UnknownSchema\", \n"
-          + "      \"stream.kafka.hlc.zk.connect.string\": \"zoo:2181/kafka-queuing\", \n"
-          + "      \"stream.kafka.topic.name\": \"" + _topicName + "\", \n"
-          + "      \"stream.kafka.zk.broker.url\": \"kafka-broker:2181/kafka-queuing\", \n"
-          + "      \"streamType\": \"kafka\"\n" + "    }\n" + "  }, \n" + "  \"tableName\": \"Coffee_REALTIME\", \n"
+          + "\": \"" + maxTimeForSegmentCloseMs + "\", \n" + "      \"stream.fakeStream.broker.list\": \"broker:7777\", \n"
+          + "      \"stream.fakeStream.consumer.prop.auto.offset.reset\": \"smallest\", \n"
+          + "      \"stream.fakeStream.consumer.type\": \"simple\", \n"
+          + "      \"stream.fakeStream.consumer.factory.class.name\": \"" + FakeStreamConsumerFactory.class.getName()+ "\", \n"
+          + "      \"stream.fakeStream.decoder.class.name\": \"" + FakeStreamMessageDecoder.class.getName() + "\", \n"
+          + "      \"stream.fakeStream.decoder.prop.schema.registry.rest.url\": \"http://schema-registry-host.corp.ceo:1766/schemas\", \n"
+          + "      \"stream.fakeStream.decoder.prop.schema.registry.schema.name\": \"UnknownSchema\", \n"
+          + "      \"stream.fakeStream.hlc.zk.connect.string\": \"zoo:2181/kafka-queuing\", \n"
+          + "      \"stream.fakeStream.topic.name\": \"" + _topicName + "\", \n"
+          + "      \"stream.fakeStream.zk.broker.url\": \"kafka-broker:2181/kafka-queuing\", \n"
+          + "      \"streamType\": \"fakeStream\"\n" + "    }\n" + "  }, \n" + "  \"tableName\": \"Coffee_REALTIME\", \n"
           + "  \"tableType\": \"realtime\", \n" + "  \"tenants\": {\n" + "    \"broker\": \"shared\", \n"
           + "    \"server\": \"server-1\"\n" + "  }\n" + "}";
 
@@ -131,25 +128,6 @@ public class LLRealtimeSegmentDataManagerTest {
     segmentZKMetadata.setSegmentName(_segmentNameStr);
     segmentZKMetadata.setStartOffset(_startOffset);
     return segmentZKMetadata;
-  }
-
-  public static class FakeStreamMessageDecoder implements StreamMessageDecoder<byte[]> {
-
-    @Override
-    public void init(Map<String, String> props, Schema indexingSchema, String topicName)
-        throws Exception {
-
-    }
-
-    @Override
-    public GenericRow decode(byte[] payload, GenericRow destination) {
-      return null;
-    }
-
-    @Override
-    public GenericRow decode(byte[] payload, int offset, int length, GenericRow destination) {
-      return null;
-    }
   }
 
   private FakeLLRealtimeSegmentDataManager createFakeSegmentManager()
@@ -717,7 +695,7 @@ public class LLRealtimeSegmentDataManagerTest {
     protected boolean consumeLoop()
         throws Exception {
       if (_throwExceptionFromConsume) {
-        throw new PermanentConsumerException(Errors.OFFSET_OUT_OF_RANGE.exception());
+        throw new PermanentConsumerException(new Throwable("Offset out of range"));
       }
       setCurrentOffset(_consumeOffsets.remove());
       terminateLoopIfNecessary();

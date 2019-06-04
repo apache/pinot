@@ -98,39 +98,5 @@ export default Route.extend({
       metricUrn: get(this, 'metricUrn'),
       metricUrnList: get(this, 'metricUrnList') ? get(this, 'metricUrnList') : []
     });
-  },
-
-  /**
-   * The yaml filters formatter. Convert filters in the yaml file in to a legacy filters string
-   * For example, filters = {
-   *   "country": ["us", "cn"],
-   *   "browser": ["chrome"]
-   * }
-   * will be convert into "country=us;country=cn;browser=chrome"
-   *
-   * @method _formatYamlFilter
-   * @param {Map} filters multimap of filters
-   * @return {String} - formatted filters string
-   */
-   _formatYamlFilter(filters) {
-     if (filters){
-       const filterStrings = [];
-       Object.keys(filters).forEach(
-         function(filterKey) {
-           const filter = filters[filterKey];
-           if (filter && Array.isArray(filter)) {
-             filter.forEach(
-               function (filterValue) {
-                 filterStrings.push(filterKey + '=' + filterValue);
-               }
-             );
-           } else {
-             filterStrings.push(filterKey + '=' + filter);
-           }
-         }
-       );
-       return filterStrings.join(';');
-     }
-     return '';
-   }
+  }
 });

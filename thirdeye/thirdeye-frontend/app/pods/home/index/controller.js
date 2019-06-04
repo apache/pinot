@@ -18,6 +18,8 @@ export default Controller.extend({
   toggleCollapsed: false, /* hide/show accordians */
   isReportAnomalyEnabled: false,
   store: service('store'),
+  anomaliesByOptions: ['Application', 'Subscription Group'],
+  anomaliesBySelected: 'Application',
 
   /**
    * Overrides ember-models-table's css classes
@@ -41,12 +43,56 @@ export default Controller.extend({
     });
   },
 
+  /**
+   * Flag for showing appropriate dropdown
+   * @type {Boolean}
+   */
+  byApplication: computed(
+    'anomaliesBySelected',
+    function() {
+      return (get(this, 'anomaliesBySelected') === 'Application');
+    }
+  ),
+
+  /**
+   * Flag for showing share button
+   * @type {Boolean}
+   */
+  appOrSubGroup: computed(
+    'appName',
+    'subGroup',
+    function() {
+      return (get(this, 'appName') || get(this, 'subGroup'));
+    }
+  ),
+
+  /**
+   * Grabs Ember Data objects from the application collection - peekAll will look at what's in the store without requesting from the backend
+   * Sorts the array of application objects by the field "application" and returns it
+   * @type {Array}
+   */
   sortedApplications: computed(
     'model.applications',
     function() {
       // Iterate through each anomaly
       let applications =  this.get('store').peekAll('application').sortBy('application');
       return applications;
+    }
+  ),
+
+  /**
+   * Grabs Ember Data objects from the subscription-groups collection - peekAll will look at what's in the store without requesting from the backend
+   * Sorts the array of application objects by the field "application", filters objects that are inactive or lack yaml fields and returns it
+   * @type {Array}
+   */
+  sortedSubscriptionGroups: computed(
+    'subscriptionGroups',
+    function() {
+      // Iterate through each anomaly
+      let groups = this.get('store').peekAll('subscription-groups')
+        .sortBy('name')
+        .filter(group => (group.get('active') && group.get('yaml')));
+      return groups;
     }
   ),
 
@@ -217,11 +263,28 @@ export default Controller.extend({
 
     /**
      * Sets the selected application property based on user selection
+     * Sets subGroup to null since these two have a NAND relationship in the UI
      * @param {Object} selectedApplication - object that represents selected application
      * @return {undefined}
      */
     selectApplication(selectedApplication) {
-      set(this, 'appName', selectedApplication.get('application'));
+      this.setProperties({
+        appName: selectedApplication.get('application'),
+        subGroup: null
+      });
+    },
+
+    /**
+     * Sets the selected subscription group property based on user selection
+     * Sets appName to null since these two have a NAND relationship in the UI
+     * @param {Object} selectedSubGroup - object that represents selected subscription group
+     * @return {undefined}
+     */
+    selectSubscriptionGroup(selectedSubGroup) {
+      this.setProperties({
+        subGroup: selectedSubGroup.get('name'),
+        appName: null
+      });
     },
 
     /**
@@ -253,6 +316,15 @@ export default Controller.extend({
     onFilterBy(feedbackType, selected) {
       const feedbackItem = this._checkFeedback(selected);
       set(this, 'feedbackType', feedbackItem.name);
+    },
+
+    /**
+     * Switch between getting anomalies by Application or Subscription Group
+     * @method onAnomaliesBy
+     * @param {String} selected - the selection item
+     */
+    onAnomaliesBy(selected) {
+      set(this, 'anomaliesBySelected', selected);
     }
   }
 });

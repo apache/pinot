@@ -21,6 +21,7 @@ package org.apache.pinot.thirdeye.detection.wrapper;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -30,6 +31,7 @@ import org.apache.commons.collections.MapUtils;
 import org.apache.pinot.thirdeye.anomaly.detection.DetectionJobSchedulerUtils;
 import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.common.time.TimeSpec;
+import org.apache.pinot.thirdeye.dataframe.DataFrame;
 import org.apache.pinot.thirdeye.dataframe.DoubleSeries;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
 import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFunctionDTO;
@@ -39,10 +41,14 @@ import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
 import org.apache.pinot.thirdeye.detection.DataProvider;
 import org.apache.pinot.thirdeye.detection.DetectionPipeline;
+import org.apache.pinot.thirdeye.detection.DetectionPipelineException;
 import org.apache.pinot.thirdeye.detection.DetectionPipelineResult;
 import org.apache.pinot.thirdeye.detection.DetectionUtils;
+import org.apache.pinot.thirdeye.detection.PredictionResult;
 import org.apache.pinot.thirdeye.detection.spi.components.AnomalyDetector;
 import org.apache.pinot.thirdeye.detection.spi.exception.DetectorDataInsufficientException;
+import org.apache.pinot.thirdeye.detection.spi.model.DetectionResult;
+import org.apache.pinot.thirdeye.detection.spi.model.TimeSeries;
 import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
 import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
 import org.joda.time.DateTime;
@@ -82,7 +88,9 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
   private static final long CACHING_PERIOD_LOOKBACK_MINUTELY = -1;
   // fail detection job if it failed successively for the first 5 windows
   private static final long EARLY_TERMINATE_WINDOW = 5;
-
+  // expression to consolidate the time series
+  private static final String[] TIMESERIES_AGGREGATION_EXPRESSIONS =
+      {COL_VALUE + ":last", COL_CURRENT + ":last", COL_LOWER_BOUND + ":last", COL_UPPER_BOUND + ":last"};
   private static final Logger LOG = LoggerFactory.getLogger(AnomalyDetectorWrapper.class);
 
   private final String metricUrn;
@@ -111,7 +119,7 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
     this.metric = provider.fetchMetrics(Collections.singleton(this.metricEntity.getId())).get(this.metricEntity.getId());
 
     Preconditions.checkArgument(this.config.getProperties().containsKey(PROP_DETECTOR));
-    this.detectorName = DetectionUtils.getComponentName(MapUtils.getString(config.getProperties(), PROP_DETECTOR));
+    this.detectorName = DetectionUtils.getComponentKey(MapUtils.getString(config.getProperties(), PROP_DETECTOR));
     Preconditions.checkArgument(this.config.getComponents().containsKey(this.detectorName));
     this.anomalyDetector = (AnomalyDetector) this.config.getComponents().get(this.detectorName);
 
@@ -157,36 +165,40 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
 
     List<Interval> monitoringWindows = this.getMonitoringWindows();
     List<MergedAnomalyResultDTO> anomalies = new ArrayList<>();
+    TimeSeries predictedResult = TimeSeries.empty();
     int totalWindows = monitoringWindows.size();
     int successWindows = 0;
+    // The last exception of the detection windows. It will be thrown out to upper level.
+    Exception lastException = null;
     for (int i = 0; i < totalWindows; i++) {
-      if (i == EARLY_TERMINATE_WINDOW && successWindows == 0) {
-        LOG.error("Successive first {}/{} detection windows failed for config {} metricUrn {}. Discard remaining windows",
-            EARLY_TERMINATE_WINDOW, totalWindows, config.getId(), metricUrn);
-        break;
-      }
+      checkEarlyStop(totalWindows, successWindows, i, lastException);
 
       // run detection
       Interval window = monitoringWindows.get(i);
-      List<MergedAnomalyResultDTO> anomaliesForOneWindow = new ArrayList<>();
+      DetectionResult detectionResult = DetectionResult.empty();
       try {
         LOG.info("[Pipeline] start detection for config {} metricUrn {} window ({}/{}) - start {} end {}",
             config.getId(), metricUrn, i + 1, monitoringWindows.size(), window.getStart(), window.getEnd());
         long ts = System.currentTimeMillis();
-        anomaliesForOneWindow = anomalyDetector.runDetection(window, this.metricUrn);
+        detectionResult = anomalyDetector.runDetection(window, this.metricUrn);
         LOG.info("[Pipeline] end detection for config {} metricUrn {} window ({}/{}) - start {} end {} used {} milliseconds, detected {} anomalies",
             config.getId(), metricUrn, i + 1, monitoringWindows.size(), window.getStart(), window.getEnd(),
-            System.currentTimeMillis() - ts, anomaliesForOneWindow.size());
+            System.currentTimeMillis() - ts, detectionResult.getAnomalies().size());
         successWindows++;
       }
       catch (DetectorDataInsufficientException e) {
         LOG.warn("[DetectionConfigID{}] Insufficient data ro run detection for window {} to {}.", this.config.getId(), window.getStart(), window.getEnd());
+        lastException = e;
       }
       catch (Exception e) {
         LOG.warn("[DetectionConfigID{}] detecting anomalies for window {} to {} failed.", this.config.getId(), window.getStart(), window.getEnd(), e);
+        lastException = e;
       }
-      anomalies.addAll(anomaliesForOneWindow);
+      anomalies.addAll(detectionResult.getAnomalies());
+      predictedResult = consolidateTimeSeries(predictedResult, detectionResult.getTimeseries());
     }
+
+    checkMovingWindowDetectionStatus(totalWindows, successWindows, lastException);
 
     for (MergedAnomalyResultDTO anomaly : anomalies) {
       anomaly.setDetectionConfigId(this.config.getId());
@@ -197,8 +209,44 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
       anomaly.getProperties().put(PROP_DETECTOR_COMPONENT_NAME, this.detectorName);
     }
     long lastTimeStamp = this.getLastTimeStamp();
-    return new DetectionPipelineResult(anomalies.stream().filter(anomaly -> anomaly.getEndTime() <= lastTimeStamp).collect(
-        Collectors.toList()), lastTimeStamp);
+    List<MergedAnomalyResultDTO> anomalyResults = anomalies.stream().filter(anomaly -> anomaly.getEndTime() <= lastTimeStamp).collect(
+        Collectors.toList());
+    PredictionResult predictedTimeSeries = new PredictionResult(this.detectorName, this.metricUrn, predictedResult.getDataFrame());
+    return new DetectionPipelineResult(anomalyResults, lastTimeStamp, Collections.singletonList(predictedTimeSeries));
+  }
+
+  /**
+   * Join two time series, including current, baseline, lower bound and upper bound.
+   * If two time series have overlapped region, take the value in the right time series
+   * @param leftTimeSeries timeseries 1
+   * @param rightTimeSeries timeseries 2
+   * @return the consolidated time series
+   */
+  static TimeSeries consolidateTimeSeries(TimeSeries leftTimeSeries, TimeSeries rightTimeSeries) {
+    DataFrame df1 = leftTimeSeries.getDataFrame();
+    DataFrame df2 = rightTimeSeries.getDataFrame();
+    DataFrame consolidatedDf = df1.append(df2)
+        .groupByValue(COL_TIME)
+        .aggregate(TIMESERIES_AGGREGATION_EXPRESSIONS);
+    return TimeSeries.fromDataFrame(consolidatedDf);
+  }
+
+  private void checkEarlyStop(int totalWindows, int successWindows, int i, Exception lastException) throws DetectionPipelineException {
+    // if the first certain number of windows all failed, throw an exception
+    if (i == EARLY_TERMINATE_WINDOW && successWindows == 0) {
+      throw new DetectionPipelineException(String.format(
+          "Successive first %d/%d detection windows failed for config %d metricUrn %s for monitoring window %d to %d. Discard remaining windows",
+          EARLY_TERMINATE_WINDOW, totalWindows, config.getId(), metricUrn, this.getStartTime(), this.getEndTime()), lastException);
+    }
+  }
+
+  private void checkMovingWindowDetectionStatus(int totalWindows, int successWindows, Exception lastException) throws DetectionPipelineException {
+    // if all moving window detection failed, throw an exception
+    if (successWindows == 0 && totalWindows > 0) {
+      throw new DetectionPipelineException(String.format(
+          "Detection failed for all windows for detection config id %d detector %s for monitoring window %d to %d.",
+          this.config.getId(), this.detectorName, this.getStartTime(), this.getEndTime()), lastException);
+    }
   }
 
   // guess-timate next time stamp
