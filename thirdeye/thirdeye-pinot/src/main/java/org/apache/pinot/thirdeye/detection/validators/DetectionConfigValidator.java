@@ -60,7 +60,7 @@ public class DetectionConfigValidator implements ConfigValidator<DetectionConfig
   private static final String LEGACY_METRIC_ALERT = "COMPOSITE";
   private static final String METRIC_ALERT = "METRIC_ALERT";
   private static final String COMPOSITE_ALERT = "COMPOSITE_ALERT";
-  private static final HashSet<String> SUPPORTED_ALERT_TYPES = new HashSet<>(
+  private static final Set<String> SUPPORTED_ALERT_TYPES = new HashSet<>(
       Arrays.asList(LEGACY_METRIC_ALERT, METRIC_ALERT, COMPOSITE_ALERT));
 
   public DetectionConfigValidator(DataProvider provider) {
