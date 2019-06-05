@@ -34,7 +34,6 @@ import java.util.concurrent.TimeUnit;
  */
 public class ValidationMetrics {
   private final MetricsRegistry _metricsRegistry;
-
   private final Map<String, Long> _gaugeValues = new HashMap<>();
   private final Set<MetricName> _metricNames = new HashSet<>();
 
@@ -217,7 +216,8 @@ public class ValidationMetrics {
     makeGauge(fullGaugeName, makeMetricName(fullGaugeName), _storedValueGaugeFactory, segmentCount);
   }
 
-  private String makeGaugeName(final String resource, final String gaugeName) {
+  @VisibleForTesting
+  public static String makeGaugeName(final String resource, final String gaugeName) {
     return "pinot.controller." + resource + "." + gaugeName;
   }
 
@@ -249,8 +249,8 @@ public class ValidationMetrics {
   }
 
   @VisibleForTesting
-  public long getValueOfGuage(final String fullGuageName) {
-    Long value  = _gaugeValues.get(fullGuageName);
+  public long getValueOfGauge(final String fullGaugeName) {
+    Long value  = _gaugeValues.get(fullGaugeName);
     if (value == null) {
       return 0;
     }

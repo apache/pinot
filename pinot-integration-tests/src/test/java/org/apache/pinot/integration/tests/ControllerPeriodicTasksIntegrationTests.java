@@ -74,7 +74,8 @@ import org.testng.annotations.Test;
  * See group = "segmentStatusChecker" for example.
  * The tables needed for the test will be created in beforeTask(), and dropped in afterTask()
  *
- * The groups run sequentially in the order: segmentStatusChecker -> realtimeSegmentRelocation -> brokerResourceValidationManager -> ....
+ * The groups run sequentially in the order: segmentStatusChecker -> realtimeSegmentRelocation ->
+ * brokerResourceValidationManager -> OfflineSegmentIntervalChecker ....
  */
 public class ControllerPeriodicTasksIntegrationTests extends BaseClusterIntegrationTestSet {
 
@@ -474,23 +475,28 @@ public class ControllerPeriodicTasksIntegrationTests extends BaseClusterIntegrat
     dropOfflineTable(table2);
   }
 
-  @Test
+  @Test(groups = "offlineSegmentIntervalChecker", dependsOnGroups = "brokerResourceValidationManager")
   public void testOfflineSegmentIntervalChecker()
       throws Exception {
     OfflineSegmentIntervalChecker offlineSegmentIntervalChecker = _controllerStarter.getOfflineSegmentIntervalChecker();
     ValidationMetrics validationMetrics = offlineSegmentIntervalChecker.getValidationMetrics();
 
+    String tablNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(DEFAULT_TABLE_NAME);
+
     // Wait until OfflineSegmentIntervalChecker gets executed
     TestUtils.waitForCondition(
-        input -> validationMetrics.getValueOfGuage("pinot.controller.mytable_OFFLINE.SegmentCount") > 0, 60_000,
-        "Timed out waiting for OfflineSegmentIntervalChecker");
+        input -> validationMetrics.getValueOfGauge(ValidationMetrics.makeGaugeName(tablNameWithType, "SegmentCount"))
+            > 0, 60_000, "Timed out waiting for OfflineSegmentIntervalChecker");
 
     // Test the validation metrics values updated by OfflineSegmentIntervalChecker against the known values
     // from segment metadata
-    Assert.assertEquals(validationMetrics.getValueOfGuage("pinot.controller.mytable_OFFLINE.SegmentCount"), 12);
-    Assert.assertEquals(validationMetrics.getValueOfGuage("pinot.controller.mytable_OFFLINE.missingSegmentCount"), 0);
-    Assert
-        .assertEquals(validationMetrics.getValueOfGuage("pinot.controller.mytable_OFFLINE.TotalDocumentCount"), 115545);
+    Assert.assertEquals(
+        validationMetrics.getValueOfGauge(ValidationMetrics.makeGaugeName(tablNameWithType, "SegmentCount")), 12);
+    Assert.assertEquals(
+        validationMetrics.getValueOfGauge(ValidationMetrics.makeGaugeName(tablNameWithType, "missingSegmentCount")), 0);
+    Assert.assertEquals(
+        validationMetrics.getValueOfGauge(ValidationMetrics.makeGaugeName(tablNameWithType, "TotalDocumentCount")),
+        115545);
   }
 
   // TODO: tests for other ControllerPeriodicTasks (RetentionManagert , RealtimeSegmentValidationManager)
