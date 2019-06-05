@@ -29,6 +29,20 @@ import org.apache.pinot.core.segment.memory.PinotDataBuffer;
  * Implementation of {@link ValueReader} that will allow each value to be of variable
  * length and there by avoiding the unnecessary padding.
  *
+ * The layout of the file is as follows:
+ * <p> Header Section: </p>
+ * <ul>
+ *   <li> Magic header byte sequence. </li>
+ * </ul>
+ *
+ * <p> Values: </p>
+ * <ul>
+ *   <li> Integer offsets to start position of byte arrays. </li>
+ *   <li> All byte arrays. </li>
+ * </ul>
+ *
+ * Only sequential writes are supported.
+ *
  * @see FixedByteValueReaderWriter
  */
 public class VarLengthBytesValueReaderWriter implements Closeable, ValueReader {
@@ -39,7 +53,7 @@ public class VarLengthBytesValueReaderWriter implements Closeable, ValueReader {
    * collisions with the regular int/string dictionary values written in fixed size
    * format.
    */
-  private static final byte[] MAGIC_HEADER = StringUtil.encodeUtf8("vl1;");
+  private static final byte[] MAGIC_HEADER = StringUtil.encodeUtf8("....vl1;");
   private static final int MAGIC_HEADER_LENGTH = MAGIC_HEADER.length;
   private static final int INDEX_ARRAY_START_OFFSET = MAGIC_HEADER.length + Integer.BYTES;
 
@@ -57,10 +71,19 @@ public class VarLengthBytesValueReaderWriter implements Closeable, ValueReader {
   }
 
   public static boolean isVarLengthBytesDictBuffer(PinotDataBuffer buffer) {
-    byte[] header = new byte[MAGIC_HEADER_LENGTH];
-    buffer.copyTo(0, header, 0, MAGIC_HEADER_LENGTH);
+    // If the buffer is smaller than header + numElements size, it's not var length dictionary.
+    if (buffer.size() > INDEX_ARRAY_START_OFFSET) {
+      byte[] header = new byte[MAGIC_HEADER_LENGTH];
+      buffer.copyTo(0, header, 0, MAGIC_HEADER_LENGTH);
 
-    return Arrays.equals(MAGIC_HEADER, header);
+      if (Arrays.equals(MAGIC_HEADER, header)) {
+        // Also verify that there is a valid numElements value.
+        int numElements = buffer.getInt(MAGIC_HEADER_LENGTH);
+        return numElements > 0;
+      }
+    }
+
+    return false;
   }
 
   public VarLengthBytesValueReaderWriter(PinotDataBuffer dataBuffer) {
@@ -153,8 +176,15 @@ public class VarLengthBytesValueReaderWriter implements Closeable, ValueReader {
       length = _dataBuffer.getInt(INDEX_ARRAY_START_OFFSET + Integer.BYTES * (index + 1)) - offset;
     }
 
-    byte[] b = buffer == null ? new byte[length] :
-        (buffer.length == length ? buffer : new byte[length]);
+    byte[] b;
+    // If the caller didn't pass a buffer, create one with exact length.
+    if (buffer == null) {
+      b = new byte[length];
+    }
+    else {
+      // If the buffer passed by the caller isn't big enough, create a new one.
+      b = buffer.length == length ? buffer : new byte[length];
+    }
     _dataBuffer.copyTo(offset, b, 0, length);
     return b;
   }
