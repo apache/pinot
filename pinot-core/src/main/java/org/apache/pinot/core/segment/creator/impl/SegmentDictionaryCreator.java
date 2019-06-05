@@ -198,9 +198,23 @@ public class SegmentDictionaryCreator implements Closeable {
   private void writeBytesValueDictionary(int numValues, byte[][] sortedByteArrays) throws IOException {
     // TODO: Fix this to be dynamic based on the standard deviation in the lengths
     // of the values in byte array, max length of array, etc.
-    boolean useFixedSizeDict = false;
+    boolean useVarLenDictionary = false;
 
-    if (useFixedSizeDict) {
+    if (useVarLenDictionary) {
+      // Backward-compatible: index file is always big-endian
+      long size = VarLengthBytesValueReaderWriter.getRequiredSize(sortedByteArrays);
+      try (PinotDataBuffer dataBuffer = PinotDataBuffer
+          .mapFile(_dictionaryFile, false, 0, size, ByteOrder.BIG_ENDIAN,
+              getClass().getSimpleName());
+          VarLengthBytesValueReaderWriter writer = new VarLengthBytesValueReaderWriter(
+              dataBuffer)) {
+        writer.init(sortedByteArrays);
+
+        LOGGER.info("Using variable length bytes dictionary for column: {}, size: {}",
+            _fieldSpec.getName(), size);
+      }
+    }
+    else {
       // Backward-compatible: index file is always big-endian
       try (PinotDataBuffer dataBuffer = PinotDataBuffer
           .mapFile(_dictionaryFile, false, 0, (long) numValues * _numBytesPerEntry, ByteOrder.BIG_ENDIAN,
@@ -213,20 +227,6 @@ public class SegmentDictionaryCreator implements Closeable {
 
         LOGGER.info("Using fixed bytes value dictionary for column: {}, size: {}",
             _fieldSpec.getName(), (long) numValues * _numBytesPerEntry);
-      }
-    }
-    else {
-      // Backward-compatible: index file is always big-endian
-      long size = VarLengthBytesValueReaderWriter.getRequiredSize(sortedByteArrays);
-      try (PinotDataBuffer dataBuffer = PinotDataBuffer
-          .mapFile(_dictionaryFile, false, 0, size, ByteOrder.BIG_ENDIAN,
-              getClass().getSimpleName());
-          VarLengthBytesValueReaderWriter writer = new VarLengthBytesValueReaderWriter(
-              dataBuffer)) {
-        writer.init(sortedByteArrays);
-
-        LOGGER.info("Using variable length bytes dictionary for column: {}, size: {}",
-            _fieldSpec.getName(), size);
       }
     }
   }

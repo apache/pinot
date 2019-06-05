@@ -1,3 +1,21 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
 package org.apache.pinot.core.io.util;
 
 import java.io.File;
@@ -22,7 +40,7 @@ public class VarLengthBytesValueReaderWriterTest {
     byte[] array = new byte[] {1, 2, 3, 4};
     byte[][] byteArrays = new byte[][]{array};
     long size = VarLengthBytesValueReaderWriter.getRequiredSize(byteArrays);
-    Assert.assertEquals(16, size);
+    Assert.assertEquals(20, size);
 
     try (PinotDataBuffer buffer = PinotDataBuffer
         .mapFile(TEMP_FILE, false, 0, size, ByteOrder.BIG_ENDIAN, null)) {
