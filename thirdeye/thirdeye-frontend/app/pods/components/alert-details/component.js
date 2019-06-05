@@ -367,8 +367,8 @@ export default Component.extend({
 
         currentAnomalies = anomalies.filter(anomaly => {
           if (anomaly.metricUrn === metricUrn) {
-            if(get(this, 'isPreviewMode') && anomaly.properties && typeof anomaly.properties === 'object') {
-              return (anomaly.properties.detectorComponentName.includes(selectedRule));
+            if(get(this, 'isPreviewMode') && anomaly.properties && typeof anomaly.properties === 'object' && selectedRule && typeof selectedRule === 'object') {
+              return (anomaly.properties.detectorComponentName.includes(selectedRule.detectorName));
             } else if (!get(this, 'isPreviewMode')) {
               // This is necessary until we surface rule selector in Alert Overview
               return true;
