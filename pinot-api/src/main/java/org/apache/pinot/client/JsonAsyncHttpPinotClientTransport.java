@@ -24,6 +24,8 @@ import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.ning.http.client.AsyncHttpClient;
 import com.ning.http.client.Response;
+
+import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -39,6 +41,13 @@ class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
   private static final ObjectReader OBJECT_READER = new ObjectMapper().reader();
 
   AsyncHttpClient _httpClient = new AsyncHttpClient();
+  Map<String, String> _headers;
+
+  public JsonAsyncHttpPinotClientTransport() {}
+
+  public JsonAsyncHttpPinotClientTransport(Map<String, String> headers) {
+    _headers = headers;
+  }
 
   @Override
   public BrokerResponse executeQuery(String brokerAddress, String query)
@@ -58,7 +67,13 @@ class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
 
       final String url = "http://" + brokerAddress + "/query";
 
-      final Future<Response> response = _httpClient.preparePost(url)
+      AsyncHttpClient.BoundRequestBuilder request = _httpClient.preparePost(url);
+
+      if(_headers != null) {
+        _headers.forEach((k, v) -> request.addHeader(k, v));
+      }
+
+      final Future<Response> response = request
           .addHeader("Content-Type", "application/json; charset=utf-8")
           .setBody(json.toString()).execute();
 

@@ -19,6 +19,8 @@
 package org.apache.pinot.client;
 
 import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 
 
@@ -40,7 +42,7 @@ public class ConnectionFactory {
   public static Connection fromZookeeper(String zkUrl) {
     try {
       DynamicBrokerSelector dynamicBrokerSelector = new DynamicBrokerSelector(zkUrl);
-      return new Connection(dynamicBrokerSelector, _transportFactory.buildTransport());
+      return new Connection(dynamicBrokerSelector, _transportFactory.buildTransport(null));
     } catch (Exception e) {
       throw new PinotClientException(e);
     }
@@ -54,7 +56,7 @@ public class ConnectionFactory {
    */
   public static Connection fromProperties(Properties properties) {
     return new Connection(Arrays.asList(properties.getProperty("brokerList").split(",")),
-        _transportFactory.buildTransport());
+        _transportFactory.buildTransport(null));
   }
 
   /**
@@ -64,6 +66,17 @@ public class ConnectionFactory {
    * @return A connection to the set of brokers specified
    */
   public static Connection fromHostList(String... brokers) {
-    return new Connection(Arrays.asList(brokers), _transportFactory.buildTransport());
+    return new Connection(Arrays.asList(brokers), _transportFactory.buildTransport(null));
+  }
+
+  /**
+   * Creates a connection which sends queries randomly between the specified brokers.
+   *
+   * @param brokers The list of brokers to send queries to
+   * @param headers Map of key and values of header which need to be used during http call
+   * @return A connection to the set of brokers specified
+   */
+  public static Connection fromHostList(List<String> brokers, Map<String, String> headers) {
+    return new Connection(brokers, _transportFactory.buildTransport(headers));
   }
 }
