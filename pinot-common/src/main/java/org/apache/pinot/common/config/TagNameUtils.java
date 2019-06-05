@@ -45,7 +45,8 @@ public class TagNameUtils {
     return false;
   }
 
-  public static TenantRole getTenantRoleFromTag(String tagName) throws InvalidConfigException {
+  public static TenantRole getTenantRoleFromTag(String tagName)
+      throws InvalidConfigException {
     if (tagName.endsWith(ServerType.REALTIME.toString())) {
       return TenantRole.SERVER;
     }

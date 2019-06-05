@@ -38,7 +38,8 @@ public class ReplicaGroupBasedStreamPartitionAssignmentStrategy implements Strea
    */
   @Override
   public PartitionAssignment getStreamPartitionAssignment(HelixManager helixManager, @Nonnull String tableNameWithType,
-      @Nonnull List<String> partitions, int numReplicas, List<String> instances) throws InvalidConfigException {
+      @Nonnull List<String> partitions, int numReplicas, List<String> instances)
+      throws InvalidConfigException {
 
     ReplicaGroupPartitionAssignment replicaGroupPartitionAssignment =
         getReplicaGroupPartitionAssignment(helixManager, tableNameWithType);

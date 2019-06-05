@@ -35,5 +35,6 @@ public interface StreamPartitionAssignmentStrategy {
    */
   // TODO: pass current partition assignment to add smarts which can minimize shuffle
   PartitionAssignment getStreamPartitionAssignment(HelixManager helixManager, @Nonnull String tableNameWithType,
-      @Nonnull List<String> partitions, int numReplicas, List<String> instances) throws InvalidConfigException;
+      @Nonnull List<String> partitions, int numReplicas, List<String> instances)
+      throws InvalidConfigException;
 }

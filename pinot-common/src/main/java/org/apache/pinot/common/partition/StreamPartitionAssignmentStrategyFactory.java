@@ -35,9 +35,8 @@ public class StreamPartitionAssignmentStrategyFactory {
     SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
     if (validationConfig != null) {
       String segmentAssignmentStrategy = validationConfig.getSegmentAssignmentStrategy();
-      if (segmentAssignmentStrategy != null
-          && SegmentAssignmentStrategyType.ReplicaGroupSegmentAssignmentStrategy.toString()
-          .equalsIgnoreCase(segmentAssignmentStrategy)) {
+      if (segmentAssignmentStrategy != null && SegmentAssignmentStrategyType.ReplicaGroupSegmentAssignmentStrategy
+          .toString().equalsIgnoreCase(segmentAssignmentStrategy)) {
         return new ReplicaGroupBasedStreamPartitionAssignmentStrategy();
       }
     }

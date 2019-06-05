@@ -18,15 +18,12 @@
  */
 package org.apache.pinot.common.utils;
 
-import com.google.common.collect.Lists;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
@@ -36,7 +33,6 @@ import org.apache.helix.model.CurrentState;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.LiveInstance;
-import org.apache.pinot.common.config.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -183,8 +179,7 @@ public class ServiceStatus {
    * Service status callback that compares ideal state with another Helix state. Used to share most of the logic between
    * the ideal state/external view comparison and ideal state/current state comparison.
    */
-  private static abstract class IdealStateMatchServiceStatusCallback<T extends HelixProperty>
-      implements ServiceStatusCallback {
+  private static abstract class IdealStateMatchServiceStatusCallback<T extends HelixProperty> implements ServiceStatusCallback {
 
     final String _clusterName;
     final String _instanceName;
@@ -341,8 +336,8 @@ public class ServiceStatus {
           } else {
             HelixProperty.Stat stat = helixState.getStat();
             String description = String
-                .format("partition=%s, expected=%s, found=%s, creationTime=%d, modifiedTime=%d, version=%d", partitionName,
-                    idealStateStatus, currentStateStatus, stat != null ? stat.getCreationTime() : -1,
+                .format("partition=%s, expected=%s, found=%s, creationTime=%d, modifiedTime=%d, version=%d",
+                    partitionName, idealStateStatus, currentStateStatus, stat != null ? stat.getCreationTime() : -1,
                     stat != null ? stat.getModifiedTime() : -1, stat != null ? stat.getVersion() : -1);
             return new StatusDescriptionPair(Status.STARTING, description);
           }

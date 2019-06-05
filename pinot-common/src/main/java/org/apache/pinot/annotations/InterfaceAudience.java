@@ -52,7 +52,8 @@ public class InterfaceAudience {
    * Intended for use by any project or application.
    */
   @Documented
-  public @interface Public {};
+  public @interface Public {
+  }
 
   /**
    * Intended only for the project(s) specified in the annotation.
@@ -61,13 +62,15 @@ public class InterfaceAudience {
   @Documented
   public @interface LimitedPrivate {
     String[] value();
-  };
+  }
 
   /**
    * Intended for use only within Pinot itself.
    */
   @Documented
-  public @interface Private {};
+  public @interface Private {
+  }
 
-  private InterfaceAudience() {} // Audience can't exist on its own
+  private InterfaceAudience() {
+  } // Audience can't exist on its own
 }

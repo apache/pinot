@@ -121,8 +121,9 @@ public class StreamPartitionAssignmentGenerator {
 
     StreamPartitionAssignmentStrategy streamPartitionAssignmentStrategy =
         StreamPartitionAssignmentStrategyFactory.getStreamPartitionAssignmentStrategy(tableConfig);
-    return streamPartitionAssignmentStrategy.getStreamPartitionAssignment(_helixManager, tableNameWithType, partitions,
-        numReplicas, consumingTaggedInstances);
+    return streamPartitionAssignmentStrategy
+        .getStreamPartitionAssignment(_helixManager, tableNameWithType, partitions, numReplicas,
+            consumingTaggedInstances);
   }
 
   @VisibleForTesting

@@ -37,37 +37,36 @@ public class UniformStreamPartitionAssignmentTest {
    * @throws InvalidConfigException
    */
   @Test
-  public void testUniformStreamPartitionAssignmentStrategy() throws InvalidConfigException {
+  public void testUniformStreamPartitionAssignmentStrategy()
+      throws InvalidConfigException {
     UniformStreamPartitionAssignmentStrategy uniformStreamPartitionAssignmentStrategy =
         new UniformStreamPartitionAssignmentStrategy();
 
     String tableNameWithType = "tableName_REALTIME";
     List<String> partitions = Lists.newArrayList("0", "1", "2", "3", "4", "5");
     int numReplicas = 3;
-    List<String> allTaggedInstances =
-        Lists.newArrayList("server_1", "server_2", "server_3", "server_4", "server_5", "server_6", "server_7",
-            "server_8");
+    List<String> allTaggedInstances = Lists
+        .newArrayList("server_1", "server_2", "server_3", "server_4", "server_5", "server_6", "server_7", "server_8");
 
     // num replicas more than tagged instances
     boolean exception = false;
     try {
-      uniformStreamPartitionAssignmentStrategy.getStreamPartitionAssignment(null, tableNameWithType, partitions, 10,
-          allTaggedInstances);
+      uniformStreamPartitionAssignmentStrategy
+          .getStreamPartitionAssignment(null, tableNameWithType, partitions, 10, allTaggedInstances);
     } catch (InvalidConfigException e) {
       exception = true;
     }
     Assert.assertTrue(exception);
 
     // 0 partitions
-    PartitionAssignment uniformPartitionAssignment =
-        uniformStreamPartitionAssignmentStrategy.getStreamPartitionAssignment(null, tableNameWithType,
-            Collections.emptyList(), numReplicas, allTaggedInstances);
+    PartitionAssignment uniformPartitionAssignment = uniformStreamPartitionAssignmentStrategy
+        .getStreamPartitionAssignment(null, tableNameWithType, Collections.emptyList(), numReplicas,
+            allTaggedInstances);
     Assert.assertEquals(uniformPartitionAssignment.getNumPartitions(), 0);
 
     // verify sticky uniform assignment
-    uniformPartitionAssignment =
-        uniformStreamPartitionAssignmentStrategy.getStreamPartitionAssignment(null, tableNameWithType, partitions,
-            numReplicas, allTaggedInstances);
+    uniformPartitionAssignment = uniformStreamPartitionAssignmentStrategy
+        .getStreamPartitionAssignment(null, tableNameWithType, partitions, numReplicas, allTaggedInstances);
 
     List<String> instancesUsed = new ArrayList<>();
     for (int p = 0; p < uniformPartitionAssignment.getNumPartitions(); p++) {
