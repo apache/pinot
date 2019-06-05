@@ -72,6 +72,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   private final File _indexDir;
   private final Map<String, ColumnMetadata> _columnMetadataMap;
   private String _tableName;
+  private String _datasetName;
   private String _segmentName;
   private final Set<String> _allColumns;
   private final Schema _schema;
@@ -152,6 +153,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     setTimeInfo(segmentMetadataPropertiesConfiguration);
     _columnMetadataMap = null;
     _tableName = segmentMetadata.getTableName();
+    _datasetName = segmentMetadata.getDatasetName();
     _segmentName = segmentMetadata.getSegmentName();
     _allColumns = schema.getColumnNames();
     _schema = schema;
@@ -238,8 +240,12 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     addPhysicalColumns(segmentMetadataPropertiesConfiguration.getList(TIME_COLUMN_NAME), _allColumns);
     addPhysicalColumns(segmentMetadataPropertiesConfiguration.getList(DATETIME_COLUMNS), _allColumns);
 
-    //set the table name
+    // Set the table name
     _tableName = segmentMetadataPropertiesConfiguration.getString(TABLE_NAME);
+
+    // Set dataset name
+    _datasetName = segmentMetadataPropertiesConfiguration.getString(DATASET_NAME);
+
     // Set segment name.
     _segmentName = segmentMetadataPropertiesConfiguration.getString(SEGMENT_NAME);
 
@@ -335,6 +341,11 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   @Override
   public String getTableName() {
     return _tableName;
+  }
+
+  @Override
+  public String getDatasetName() {
+    return _datasetName;
   }
 
   @Override

@@ -21,11 +21,13 @@ package org.apache.pinot.controller.helix.core.sharding;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import javax.ws.rs.NotSupportedException;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.config.TagNameUtils;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.segment.SegmentMetadata;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.slf4j.Logger;
@@ -61,5 +63,12 @@ public class BucketizedSegmentStrategy implements SegmentAssignmentStrategy {
     } else {
       throw new RuntimeException("Segment missing sharding key!");
     }
+  }
+
+  @Override
+  public List<String> getAssignedInstances(HelixManager helixManager, HelixAdmin helixAdmin,
+      ZkHelixPropertyStore<ZNRecord> propertyStore, String helixClusterName, String tableNameWithType,
+      SegmentZKMetadata segmentZKMetadata, int numReplicas, String tenantName) {
+    throw new UnsupportedOperationException("Not supported segment assignment");
   }
 }

@@ -28,6 +28,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.Utils;
+import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
@@ -75,11 +76,20 @@ public class SegmentFetcherAndLoader {
   }
 
   public void addOrReplaceOfflineSegment(String tableNameWithType, String segmentName) {
+    TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
+    addOrReplaceOfflineSegment(tableNameWithType, tableConfig, segmentName);
+  }
+
+  public void addOrReplaceOfflineSegment(String tableNameWithType, TableConfig tableConfig, String segmentName) {
+    String datasetNameWithType = tableConfig.getDatasetName();
+    if (datasetNameWithType == null) {
+      datasetNameWithType = tableNameWithType;
+    }
     OfflineSegmentZKMetadata newSegmentZKMetadata =
-        ZKMetadataProvider.getOfflineSegmentZKMetadata(_propertyStore, tableNameWithType, segmentName);
+        ZKMetadataProvider.getOfflineSegmentZKMetadata(_propertyStore, datasetNameWithType, segmentName);
     Preconditions.checkNotNull(newSegmentZKMetadata);
 
-    LOGGER.info("Adding or replacing segment {} for table {}, metadata {}", segmentName, tableNameWithType,
+    LOGGER.info("Adding or replacing segment {} for table {}, metadata {}", segmentName, datasetNameWithType,
         newSegmentZKMetadata);
 
     // This method might modify the file on disk. Use segment lock to prevent race condition
@@ -114,7 +124,7 @@ public class SegmentFetcherAndLoader {
             if (!isNewSegmentMetadata(newSegmentZKMetadata, localSegmentMetadata)) {
               LOGGER.info("Segment metadata same as before, loading {} of table {} (crc {}) from disk", segmentName,
                   tableNameWithType, localSegmentMetadata.getCrc());
-              _instanceDataManager.addOfflineSegment(tableNameWithType, segmentName, indexDir);
+              _instanceDataManager.addOfflineSegment(tableNameWithType, tableConfig, segmentName, indexDir);
               // TODO Update zk metadata with CRC for this instance
               return;
             }
@@ -156,7 +166,7 @@ public class SegmentFetcherAndLoader {
         // Retry will be done here.
         String localSegmentDir = downloadSegmentToLocal(uri, crypter, tableNameWithType, segmentName);
         SegmentMetadata segmentMetadata = new SegmentMetadataImpl(new File(localSegmentDir));
-        _instanceDataManager.addOfflineSegment(tableNameWithType, segmentName, new File(localSegmentDir));
+        _instanceDataManager.addOfflineSegment(tableNameWithType, tableConfig, segmentName, new File(localSegmentDir));
         LOGGER.info("Downloaded segment {} of table {} crc {} from controller", segmentName, tableNameWithType,
             segmentMetadata.getCrc());
       } else {

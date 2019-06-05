@@ -310,12 +310,12 @@ public abstract class ClusterTest extends ControllerTest {
     addOfflineTable(tableName, null, null, null, null, null, segmentVersion, null, null, null);
   }
 
-  protected void addOfflineTable(String tableName, String timeColumnName, String timeType, String brokerTenant,
-      String serverTenant, String loadMode, SegmentVersion segmentVersion, List<String> invertedIndexColumns,
-      List<String> bloomFilterColumns, TableTaskConfig taskConfig)
+  protected void addOfflineTable(String tableName, String timeColumnName, String timeType, String datasetName,
+      String brokerTenant, String serverTenant, String loadMode, SegmentVersion segmentVersion,
+      List<String> invertedIndexColumns, List<String> bloomFilterColumns, TableTaskConfig taskConfig)
       throws Exception {
     TableConfig tableConfig =
-        getOfflineTableConfig(tableName, timeColumnName, timeType, brokerTenant, serverTenant, loadMode, segmentVersion,
+        getOfflineTableConfig(tableName, timeColumnName, timeType, datasetName, brokerTenant, serverTenant, loadMode, segmentVersion,
             invertedIndexColumns, bloomFilterColumns, taskConfig);
 
     if (!isUsingNewConfigFormat()) {
@@ -325,13 +325,21 @@ public abstract class ClusterTest extends ControllerTest {
     }
   }
 
-  protected void updateOfflineTable(String tableName, String timeColumnName, String timeType, String brokerTenant,
+  protected void addOfflineTable(String tableName, String timeColumnName, String timeType, String brokerTenant,
       String serverTenant, String loadMode, SegmentVersion segmentVersion, List<String> invertedIndexColumns,
       List<String> bloomFilterColumns, TableTaskConfig taskConfig)
       throws Exception {
+    addOfflineTable(tableName, timeColumnName, timeType, null, brokerTenant, serverTenant, loadMode, segmentVersion,
+        invertedIndexColumns, bloomFilterColumns, taskConfig);
+  }
+
+  protected void updateOfflineTable(String tableName, String timeColumnName, String timeType, String datasetName,
+      String brokerTenant, String serverTenant, String loadMode, SegmentVersion segmentVersion,
+      List<String> invertedIndexColumns, List<String> bloomFilterColumns, TableTaskConfig taskConfig)
+      throws Exception {
     TableConfig tableConfig =
-        getOfflineTableConfig(tableName, timeColumnName, timeType, brokerTenant, serverTenant, loadMode, segmentVersion,
-            invertedIndexColumns, bloomFilterColumns, taskConfig);
+        getOfflineTableConfig(tableName, timeColumnName, timeType, datasetName, brokerTenant, serverTenant, loadMode,
+            segmentVersion, invertedIndexColumns, bloomFilterColumns, taskConfig);
 
     if (!isUsingNewConfigFormat()) {
       sendPutRequest(_controllerRequestURLBuilder.forUpdateTableConfig(tableName), tableConfig.toJsonConfigString());
@@ -340,12 +348,20 @@ public abstract class ClusterTest extends ControllerTest {
     }
   }
 
+  protected void updateOfflineTable(String tableName, String timeColumnName, String timeType, String brokerTenant,
+      String serverTenant, String loadMode, SegmentVersion segmentVersion, List<String> invertedIndexColumns,
+      List<String> bloomFilterColumns, TableTaskConfig taskConfig)
+      throws Exception {
+    updateOfflineTable(tableName, timeColumnName, timeType, null, brokerTenant, serverTenant, loadMode, segmentVersion,
+        invertedIndexColumns, bloomFilterColumns, taskConfig);
+  }
+
   private static TableConfig getOfflineTableConfig(String tableName, String timeColumnName, String timeType,
-      String brokerTenant, String serverTenant, String loadMode, SegmentVersion segmentVersion,
+      String datasetName, String brokerTenant, String serverTenant, String loadMode, SegmentVersion segmentVersion,
       List<String> invertedIndexColumns, List<String> bloomFilterColumns, TableTaskConfig taskConfig) {
-    return new TableConfig.Builder(Helix.TableType.OFFLINE).setTableName(tableName).setTimeColumnName(timeColumnName)
-        .setTimeType(timeType).setNumReplicas(3).setBrokerTenant(brokerTenant).setServerTenant(serverTenant)
-        .setLoadMode(loadMode).setSegmentVersion(segmentVersion.toString())
+    return new TableConfig.Builder(Helix.TableType.OFFLINE).setTableName(tableName).setDatasetName(datasetName)
+        .setTimeColumnName(timeColumnName).setTimeType(timeType).setNumReplicas(3).setBrokerTenant(brokerTenant)
+        .setServerTenant(serverTenant).setLoadMode(loadMode).setSegmentVersion(segmentVersion.toString())
         .setInvertedIndexColumns(invertedIndexColumns).setBloomFilterColumns(bloomFilterColumns)
         .setTaskConfig(taskConfig).build();
   }

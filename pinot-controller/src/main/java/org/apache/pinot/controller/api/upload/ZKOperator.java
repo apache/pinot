@@ -21,6 +21,7 @@ package org.apache.pinot.controller.api.upload;
 import java.io.File;
 import java.net.URI;
 import java.util.List;
+import java.util.Map;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.apache.helix.ZNRecord;
@@ -207,7 +208,7 @@ public class ZKOperator {
 
   private void processNewSegment(SegmentMetadata segmentMetadata, URI finalSegmentLocationURI,
       File currentSegmentLocation, String zkDownloadURI, String crypter, String rawTableName, String segmentName,
-      boolean moveSegmentToFinalLocation, List<String> assignedInstances) {
+      boolean moveSegmentToFinalLocation, Map<String, List<String>> assignedInstances) {
     // For v1 segment uploads, we will not move the segment
     if (moveSegmentToFinalLocation) {
       try {

@@ -72,7 +72,10 @@ import org.apache.pinot.common.config.TagNameUtils;
 import org.apache.pinot.common.config.TagOverrideConfig;
 import org.apache.pinot.common.config.Tenant;
 import org.apache.pinot.common.config.TenantConfig;
+import org.apache.pinot.common.config.dataset.DatasetNameBuilder;
 import org.apache.pinot.common.data.Schema;
+import org.apache.pinot.common.dataset.DatasetMetadata;
+import org.apache.pinot.common.dataset.DatasetMetadataUtil;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.messages.SegmentRefreshMessage;
@@ -1098,6 +1101,10 @@ public class PinotHelixResourceManager {
 
         // Update replica group partition assignment to the property store if applicable
         updateReplicaGroupPartitionAssignment(tableConfig);
+
+        // Update dataset metadata and bootstrap data if applicable
+        updateDatasetMetadataAndBootstrapDataForOfflineTable(tableConfig);
+
         break;
       case REALTIME:
         IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
@@ -1136,6 +1143,9 @@ public class PinotHelixResourceManager {
          * the low-level consumers.
          */
         ensureRealtimeClusterIsSetUp(tableConfig, tableNameWithType, indexingConfig);
+
+
+        // TODO: update dataset mapping
 
         LOGGER.info("Successfully added or updated the table {} ", tableNameWithType);
         break;
@@ -1240,6 +1250,41 @@ public class PinotHelixResourceManager {
         partitionAssignmentGenerator.writeReplicaGroupPartitionAssignment(partitionAssignment);
       }
     }
+  }
+
+  private void updateDatasetMetadataAndBootstrapDataForOfflineTable(TableConfig tableConfig) {
+    String datasetNameWithType = tableConfig.getDatasetName();
+    // If dataset name is not set, no
+    if (datasetNameWithType == null) {
+      return;
+    }
+
+    // Update dataset metadata
+    String tableNameWithType = tableConfig.getTableName();
+    DatasetMetadata datasetMetadata = DatasetMetadataUtil.fetchDatasetMetadata(_propertyStore, datasetNameWithType);
+    datasetMetadata.addDatasetToTableMapping(tableNameWithType);
+    DatasetMetadataUtil.persistDatasetMetadata(_propertyStore, datasetMetadata);
+
+    // Bootstrap data if required
+    List<OfflineSegmentZKMetadata> segmentZKMetadataList = getOfflineSegmentMetadata(datasetNameWithType);
+    LOGGER.warn("segment metadata : {}", segmentZKMetadataList);
+    for (OfflineSegmentZKMetadata segmentZKMetadata : segmentZKMetadataList) {
+      List<String> assignedServers = getAssignedInstancesMappingForSegment(tableNameWithType, segmentZKMetadata);
+      HelixHelper.addSegmentToIdealState(_helixZkManager, tableNameWithType, segmentZKMetadata.getSegmentName(),
+          assignedServers);
+    }
+  }
+
+  private void removeDatasetTableMapping(TableConfig tableConfig) {
+    String datasetNameWithType = tableConfig.getDatasetName();
+    if (datasetNameWithType == null) {
+      return;
+    }
+    String tableNameWithType = tableConfig.getTableName();
+    DatasetMetadata datasetMetadata = DatasetMetadataUtil.fetchDatasetMetadata(_propertyStore, datasetNameWithType);
+    datasetMetadata.removeDatasetToTableMapping(tableNameWithType);
+
+    DatasetMetadataUtil.persistDatasetMetadata(_propertyStore, datasetMetadata);
   }
 
   public static class InvalidTableConfigException extends RuntimeException {
@@ -1583,13 +1628,13 @@ public class PinotHelixResourceManager {
   }
 
   public void addNewSegment(@Nonnull SegmentMetadata segmentMetadata, @Nonnull String downloadUrl) {
-    List<String> assignedInstances = getAssignedInstancesForSegment(segmentMetadata);
-    addNewSegment(segmentMetadata, downloadUrl, null, assignedInstances);
+    Map<String, List<String>> assignedInstancesMapping = getAssignedInstancesMappingForSegment(segmentMetadata);
+    addNewSegment(segmentMetadata, downloadUrl, null, assignedInstancesMapping);
   }
 
   public void addNewSegment(@Nonnull SegmentMetadata segmentMetadata, @Nonnull String downloadUrl, String crypter,
-      @Nonnull List<String> assignedInstances) {
-    Preconditions.checkNotNull(assignedInstances, "Assigned Instances should not be null!");
+      @Nonnull Map<String, List<String>> assignedInstancesMapping) {
+    Preconditions.checkNotNull(assignedInstancesMapping, "Assigned Instances should not be null!");
     String segmentName = segmentMetadata.getName();
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(segmentMetadata.getTableName());
 
@@ -1606,7 +1651,7 @@ public class PinotHelixResourceManager {
     }
     LOGGER.info("Added segment: {} of table: {} to property store", segmentName, offlineTableName);
 
-    addNewOfflineSegment(segmentMetadata, assignedInstances);
+    addNewOfflineSegment(segmentMetadata, assignedInstancesMapping);
     LOGGER.info("Added segment: {} of table: {} to ideal state", segmentName, offlineTableName);
   }
 
@@ -1816,8 +1861,30 @@ public class PinotHelixResourceManager {
    * @param segmentMetadata segment metadata
    * @return a list of assigned instances.
    */
-  public List<String> getAssignedInstancesForSegment(SegmentMetadata segmentMetadata) {
-    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(segmentMetadata.getTableName());
+  public Map<String, List<String>> getAssignedInstancesMappingForSegment(SegmentMetadata segmentMetadata) {
+    String datasetName = DatasetMetadataUtil.getDatasetNameFromSegmentMetadata(segmentMetadata);
+    String datasetNameWithType =
+        DatasetNameBuilder.forType(CommonConstants.Helix.DatasetType.OFFLINE).datasetNameWithType(datasetName);
+    List<String> tableNamesWithType = DatasetMetadataUtil.getTableNamesFromDatasetName(datasetNameWithType, _propertyStore);
+
+    Map<String, List<String>> assignedInstancesMapping = new HashMap<>();
+    for (String offlineTableName : tableNamesWithType) {
+      TableConfig offlineTableConfig = ZKMetadataProvider.getOfflineTableConfig(_propertyStore, offlineTableName);
+      Preconditions.checkNotNull(offlineTableConfig);
+      int numReplicas = Integer.parseInt(offlineTableConfig.getValidationConfig().getReplication());
+      String serverTenant = TagNameUtils.getOfflineTagForTenant(offlineTableConfig.getTenantConfig().getServer());
+      SegmentAssignmentStrategy segmentAssignmentStrategy = SegmentAssignmentStrategyFactory
+          .getSegmentAssignmentStrategy(offlineTableConfig.getValidationConfig().getSegmentAssignmentStrategy());
+      List<String> assignedInstances = segmentAssignmentStrategy
+          .getAssignedInstances(_helixZkManager, _helixAdmin, _propertyStore, _helixClusterName, segmentMetadata,
+              numReplicas, serverTenant);
+      assignedInstancesMapping.put(offlineTableName, assignedInstances);
+    }
+    return assignedInstancesMapping;
+  }
+
+  public List<String> getAssignedInstancesMappingForSegment(String tableName, SegmentZKMetadata segmentZKMetadata) {
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
     TableConfig offlineTableConfig = ZKMetadataProvider.getOfflineTableConfig(_propertyStore, offlineTableName);
     Preconditions.checkNotNull(offlineTableConfig);
     int numReplicas = Integer.parseInt(offlineTableConfig.getValidationConfig().getReplication());
@@ -1825,9 +1892,10 @@ public class PinotHelixResourceManager {
     SegmentAssignmentStrategy segmentAssignmentStrategy = SegmentAssignmentStrategyFactory
         .getSegmentAssignmentStrategy(offlineTableConfig.getValidationConfig().getSegmentAssignmentStrategy());
     return segmentAssignmentStrategy
-        .getAssignedInstances(_helixZkManager, _helixAdmin, _propertyStore, _helixClusterName, segmentMetadata,
-            numReplicas, serverTenant);
+        .getAssignedInstances(_helixZkManager, _helixAdmin, _propertyStore, _helixClusterName, offlineTableName,
+            segmentZKMetadata, numReplicas, serverTenant);
   }
+
 
   /**
    * Helper method to add the passed in offline segment to the helix cluster.
@@ -1840,13 +1908,26 @@ public class PinotHelixResourceManager {
    * @param segmentMetadata Meta-data for the segment, used to access segmentName and tableName.
    */
   // NOTE: method should be thread-safe
-  private void addNewOfflineSegment(SegmentMetadata segmentMetadata, List<String> assignedInstances) {
-    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(segmentMetadata.getTableName());
+  private void addNewOfflineSegment(SegmentMetadata segmentMetadata, Map<String, List<String>> assignedInstancesMapping) {
+//    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(segmentMetadata.getTableName());
     String segmentName = segmentMetadata.getName();
+//    String datasetName = DatasetMetadataUtil.getDatasetNameFromSegmentMetadata(segmentMetadata);
+//    String datasetNameWithType =
+//        DatasetNameBuilder.forType(CommonConstants.Helix.DatasetType.OFFLINE).datasetNameWithType(datasetName);
+//    List<String> tableNames = DatasetMetadataUtil.getTableNamesFromDatasetName(datasetNameWithType, _propertyStore);
 
+//    LOGGER.warn("dataset name with type: {}, table names: {}", datasetNameWithType, tableNames);
     // Assign new segment to instances
-    HelixHelper.addSegmentToIdealState(_helixZkManager, offlineTableName, segmentName, assignedInstances);
+    for (Map.Entry<String, List<String>> entry: assignedInstancesMapping.entrySet()) {
+      String tableNameWithType = entry.getKey();
+      List<String> assignedInstances = entry.getValue();
+      HelixHelper.addSegmentToIdealState(_helixZkManager, tableNameWithType, segmentName, assignedInstances);
+    }
   }
+
+//  private void addNewOfflineSegmentForDatasetSharedTable(String segmentName, List<String> assignedInstances) {
+//    HelixHelper.addSegmentToIdealState(_helixZkManager, );
+//  }
 
   private boolean updateExistedSegment(SegmentZKMetadata segmentZKMetadata) {
     final String tableName;

@@ -30,6 +30,7 @@ import org.apache.pinot.common.config.ReplicaGroupStrategyConfig;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.partition.ReplicaGroupPartitionAssignment;
 import org.apache.pinot.common.partition.ReplicaGroupPartitionAssignmentGenerator;
 import org.apache.pinot.common.segment.SegmentMetadata;
@@ -102,5 +103,12 @@ public class ReplicaGroupSegmentAssignmentStrategy implements SegmentAssignmentS
         .getTableName() + ", selected instances: " + Arrays.toString(selectedInstanceList.toArray()));
 
     return selectedInstanceList;
+  }
+
+  @Override
+  public List<String> getAssignedInstances(HelixManager helixManager, HelixAdmin helixAdmin,
+      ZkHelixPropertyStore<ZNRecord> propertyStore, String helixClusterName, String tableNameWithType,
+      SegmentZKMetadata segmentZKMetadata, int numReplicas, String tenantName) {
+    throw new UnsupportedOperationException("Not supported segment assignment");
   }
 }

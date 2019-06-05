@@ -28,6 +28,7 @@ import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.segment.SegmentMetadata;
 
@@ -62,14 +63,16 @@ public interface InstanceDataManager {
   /**
    * Adds a segment from local disk into an OFFLINE table.
    */
-  void addOfflineSegment(@Nonnull String offlineTableName, @Nonnull String segmentName, @Nonnull File indexDir)
+  void addOfflineSegment(@Nonnull String offlineTableName, @Nonnull TableConfig tableConfig,
+      @Nonnull String segmentName, @Nonnull File indexDir)
       throws Exception;
 
   /**
    * Adds a segment into an REALTIME table.
    * <p>The segment might be committed or under consuming.
    */
-  void addRealtimeSegment(@Nonnull String realtimeTableName, @Nonnull String segmentName)
+  void addRealtimeSegment(@Nonnull String realtimeTableName, @Nonnull TableConfig tableConfig,
+      @Nonnull String segmentName)
       throws Exception;
 
   /**

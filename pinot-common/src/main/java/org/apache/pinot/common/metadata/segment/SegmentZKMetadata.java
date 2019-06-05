@@ -47,6 +47,7 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
 
   private String _segmentName;
   private String _tableName;
+  private String _datasetName;
   private SegmentType _segmentType;
   private long _startTime = -1;
   private long _endTime = -1;
@@ -68,6 +69,7 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
   public SegmentZKMetadata(ZNRecord znRecord) {
     _segmentName = znRecord.getSimpleField(CommonConstants.Segment.SEGMENT_NAME);
     _tableName = znRecord.getSimpleField(CommonConstants.Segment.TABLE_NAME);
+    _datasetName = znRecord.getSimpleField(CommonConstants.Segment.DATASET_NAME);
     _crypterName = znRecord.getSimpleField(CommonConstants.Segment.CRYPTER_NAME);
     _segmentType = znRecord.getEnumField(CommonConstants.Segment.SEGMENT_TYPE, SegmentType.class, SegmentType.OFFLINE);
     _startTime = znRecord.getLongField(CommonConstants.Segment.START_TIME, -1);
@@ -109,6 +111,14 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
 
   public void setTableName(String tableName) {
     _tableName = tableName;
+  }
+
+  public String getDatasetName() {
+    return _datasetName;
+  }
+
+  public void setDatasetName(String datasetName) {
+    _datasetName = datasetName;
   }
 
   public long getStartTime() {
@@ -235,18 +245,19 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
 
     SegmentZKMetadata metadata = (SegmentZKMetadata) segmentMetadata;
     return isEqual(_segmentName, metadata._segmentName) && isEqual(_crypterName, metadata._crypterName) && isEqual(
-        _tableName, metadata._tableName) && isEqual(_indexVersion, metadata._indexVersion) && isEqual(_timeUnit,
-        metadata._timeUnit) && isEqual(_startTime, metadata._startTime) && isEqual(_endTime, metadata._endTime)
-        && isEqual(_segmentType, metadata._segmentType) && isEqual(_totalRawDocs, metadata._totalRawDocs) && isEqual(
-        _crc, metadata._crc) && isEqual(_creationTime, metadata._creationTime) && isEqual(_partitionMetadata,
-        metadata._partitionMetadata) && isEqual(_segmentUploadStartTime, metadata._segmentUploadStartTime) && isEqual(
-        _customMap, metadata._customMap);
+        _tableName, metadata._tableName) && isEqual(_datasetName, metadata._datasetName) && isEqual(_indexVersion,
+        metadata._indexVersion) && isEqual(_timeUnit, metadata._timeUnit) && isEqual(_startTime, metadata._startTime)
+        && isEqual(_endTime, metadata._endTime) && isEqual(_segmentType, metadata._segmentType) && isEqual(
+        _totalRawDocs, metadata._totalRawDocs) && isEqual(_crc, metadata._crc) && isEqual(_creationTime,
+        metadata._creationTime) && isEqual(_partitionMetadata, metadata._partitionMetadata) && isEqual(
+        _segmentUploadStartTime, metadata._segmentUploadStartTime) && isEqual(_customMap, metadata._customMap);
   }
 
   @Override
   public int hashCode() {
     int result = hashCodeOf(_segmentName);
     result = hashCodeOf(result, _tableName);
+    result = hashCodeOf(result, _datasetName);
     result = hashCodeOf(result, _crypterName);
     result = hashCodeOf(result, _segmentType);
     result = hashCodeOf(result, _startTime);
@@ -267,7 +278,7 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
     ZNRecord znRecord = new ZNRecord(_segmentName);
     znRecord.setSimpleField(CommonConstants.Segment.SEGMENT_NAME, _segmentName);
     znRecord.setSimpleField(CommonConstants.Segment.TABLE_NAME, _tableName);
-
+    znRecord.setSimpleField(CommonConstants.Segment.DATASET_NAME, _datasetName);
     if (_crypterName != null) {
       znRecord.setSimpleField(CommonConstants.Segment.CRYPTER_NAME, _crypterName);
     }
@@ -309,6 +320,7 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
     Map<String, String> configMap = new HashMap<>();
     configMap.put(CommonConstants.Segment.SEGMENT_NAME, _segmentName);
     configMap.put(CommonConstants.Segment.TABLE_NAME, _tableName);
+    configMap.put(CommonConstants.Segment.DATASET_NAME, _datasetName);
     configMap.put(CommonConstants.Segment.SEGMENT_TYPE, _segmentType.toString());
     if (_timeUnit == null) {
       configMap.put(CommonConstants.Segment.TIME_UNIT, null);

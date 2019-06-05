@@ -57,6 +57,9 @@ public class ZKMetadataProvider {
   private static final String PROPERTYSTORE_INSTANCE_CONFIGS_PREFIX = "/CONFIGS/INSTANCE";
   private static final String PROPERTYSTORE_CLUSTER_CONFIGS_PREFIX = "/CONFIGS/CLUSTER";
   private static final String PROPERTYSTORE_SEGMENT_MERGE_LINEAGE = "/SEGMENT_MERGE_LINEAGE";
+  private static final String PROPERTYSTORE_DATASET_PREFIX = "/CONFIGS/DATASET";
+
+  private static final String PROPERTYSTORE_DATASET_METADATA_ZNODE = "metadata";
 
   public static void setRealtimeTableConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String realtimeTableName,
       ZNRecord znRecord) {
@@ -112,6 +115,11 @@ public class ZKMetadataProvider {
 
   public static String constructPropertyStorePathForSegmentMergeLineage(String tableNameWithType) {
     return StringUtil.join("/", PROPERTYSTORE_SEGMENT_MERGE_LINEAGE, tableNameWithType);
+  }
+
+  public static String constructPropertyStorePathForDatasetMetadata(String datasetNameWithType) {
+    return StringUtil
+        .join("/", PROPERTYSTORE_DATASET_PREFIX, datasetNameWithType, PROPERTYSTORE_DATASET_METADATA_ZNODE);
   }
 
   public static boolean isSegmentExisted(ZkHelixPropertyStore<ZNRecord> propertyStore, String resourceNameForResource,

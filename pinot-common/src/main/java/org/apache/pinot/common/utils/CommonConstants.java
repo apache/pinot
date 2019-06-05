@@ -94,6 +94,10 @@ public class CommonConstants {
       }
     }
 
+    public enum DatasetType {
+      OFFLINE, REALTIME;
+    }
+
     public static final String KEY_OF_SERVER_NETTY_PORT = "pinot.server.netty.port";
     public static final int DEFAULT_SERVER_NETTY_PORT = 8098;
     public static final String KEY_OF_BROKER_QUERY_PORT = "pinot.broker.client.queryPort";
@@ -321,6 +325,7 @@ public class CommonConstants {
 
     public static final String SEGMENT_NAME = "segment.name";
     public static final String TABLE_NAME = "segment.table.name";
+    public static final String DATASET_NAME = "segment.dataset.name";
     public static final String SEGMENT_TYPE = "segment.type";
     public static final String CRYPTER_NAME = "segment.crypter";
     public static final String INDEX_VERSION = "segment.index.version";

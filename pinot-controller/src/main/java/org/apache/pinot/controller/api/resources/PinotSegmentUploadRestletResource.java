@@ -389,6 +389,8 @@ public class PinotSegmentUploadRestletResource {
       FileUploadPathProvider provider, SegmentMetadata segmentMetadata, String segmentName, String zkDownloadURI,
       boolean moveSegmentToFinalLocation, SegmentValidatorResponse segmentValidatorResponse)
       throws Exception {
+
+    // TODO: get dataset name from segment metadata
     String finalSegmentPath = StringUtil
         .join("/", provider.getBaseDataDirURI().toString(), segmentMetadata.getTableName(),
             URLEncoder.encode(segmentName, "UTF-8"));

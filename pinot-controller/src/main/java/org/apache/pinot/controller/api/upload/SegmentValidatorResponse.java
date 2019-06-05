@@ -19,6 +19,7 @@
 package org.apache.pinot.controller.api.upload;
 
 import java.util.List;
+import java.util.Map;
 import org.apache.helix.ZNRecord;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.controller.validation.StorageQuotaChecker;
@@ -27,10 +28,10 @@ import org.apache.pinot.controller.validation.StorageQuotaChecker;
 public class SegmentValidatorResponse {
   private final TableConfig _offlineTableConfig;
   private final ZNRecord _segmentMetadataZnRecord;
-  private final List<String> _assignedInstances;
+  private final Map<String, List<String>> _assignedInstances;
   private final StorageQuotaChecker.QuotaCheckerResponse _quotaCheckerResponse;
 
-  public SegmentValidatorResponse(TableConfig offlineTableConfig, ZNRecord segmentMetadataZnRecord, List<String> assignedInstances, StorageQuotaChecker.QuotaCheckerResponse quotaCheckerResponse) {
+  public SegmentValidatorResponse(TableConfig offlineTableConfig, ZNRecord segmentMetadataZnRecord, Map<String, List<String>> assignedInstances, StorageQuotaChecker.QuotaCheckerResponse quotaCheckerResponse) {
     _offlineTableConfig = offlineTableConfig;
     _segmentMetadataZnRecord = segmentMetadataZnRecord;
     _assignedInstances = assignedInstances;
@@ -45,7 +46,7 @@ public class SegmentValidatorResponse {
     return _segmentMetadataZnRecord;
   }
 
-  public List<String> getAssignedInstances() {
+  public Map<String, List<String>> getAssignedInstances() {
     return _assignedInstances;
   }
 

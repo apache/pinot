@@ -108,10 +108,10 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   }
 
   @Override
-  public void addOfflineSegment(@Nonnull String offlineTableName, @Nonnull String segmentName, @Nonnull File indexDir)
+  public void addOfflineSegment(@Nonnull String offlineTableName, @Nonnull TableConfig tableConfig,
+      @Nonnull String segmentName, @Nonnull File indexDir)
       throws Exception {
     LOGGER.info("Adding segment: {} to table: {}", segmentName, offlineTableName);
-    TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, offlineTableName);
     Preconditions.checkNotNull(tableConfig);
     _tableDataManagerMap.computeIfAbsent(offlineTableName, k -> createTableDataManager(k, tableConfig))
         .addSegment(indexDir, new IndexLoadingConfig(_instanceDataManagerConfig, tableConfig));
@@ -119,10 +119,10 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   }
 
   @Override
-  public void addRealtimeSegment(@Nonnull String realtimeTableName, @Nonnull String segmentName)
+  public void addRealtimeSegment(@Nonnull String realtimeTableName, @Nonnull TableConfig tableConfig,
+      @Nonnull String segmentName)
       throws Exception {
     LOGGER.info("Adding segment: {} to table: {}", segmentName, realtimeTableName);
-    TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, realtimeTableName);
     Preconditions.checkNotNull(tableConfig);
     _tableDataManagerMap.computeIfAbsent(realtimeTableName, k -> createTableDataManager(k, tableConfig))
         .addSegment(segmentName, tableConfig, new IndexLoadingConfig(_instanceDataManagerConfig, tableConfig));

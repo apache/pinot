@@ -31,6 +31,7 @@ import org.apache.helix.participant.statemachine.StateModelInfo;
 import org.apache.helix.participant.statemachine.Transition;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.Utils;
+import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
@@ -161,10 +162,14 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
       try {
         TableType tableType = TableNameBuilder.getTableTypeFromTableName(message.getResourceName());
         Preconditions.checkNotNull(tableType);
+
+        // Fetch table config
+        TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
+
         if (tableType == TableType.OFFLINE) {
-          _fetcherAndLoader.addOrReplaceOfflineSegment(tableNameWithType, segmentName);
+          _fetcherAndLoader.addOrReplaceOfflineSegment(tableNameWithType, tableConfig, segmentName);
         } else {
-          _instanceDataManager.addRealtimeSegment(tableNameWithType, segmentName);
+          _instanceDataManager.addRealtimeSegment(tableNameWithType, tableConfig, segmentName);
         }
         // handle any book-keeping after a segment is added
         _instanceDataManager.notifySegmentAdded(tableNameWithType, segmentName);

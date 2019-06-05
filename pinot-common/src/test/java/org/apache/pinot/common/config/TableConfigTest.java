@@ -110,7 +110,9 @@ public class TableConfigTest {
   @Test
   public void testSerializeDeserialize()
       throws Exception {
-    TableConfig.Builder tableConfigBuilder = new TableConfig.Builder(TableType.OFFLINE).setTableName("myTable");
+
+    TableConfig.Builder tableConfigBuilder =
+        new TableConfig.Builder(TableType.OFFLINE).setTableName("myTable");
     {
       // No quota config
       TableConfig tableConfig = tableConfigBuilder.build();
@@ -321,6 +323,28 @@ public class TableConfigTest {
 
       tableConfigToCompare = TableConfig.fromZnRecord(tableConfig.toZNRecord());
       checkTableConfigWithHllConfig(tableConfig, tableConfigToCompare);
+    }
+    {
+      // With null dataset name
+      TableConfig tableConfig = tableConfigBuilder.build();
+
+      // Serialize then de-serialize
+      TableConfig tableConfigToCompare = TableConfig.fromJsonConfig(tableConfig.toJsonConfig());
+      assertEquals(tableConfigToCompare.getDatasetName(), tableConfig.getDatasetName());
+
+      tableConfigToCompare = TableConfig.fromZnRecord(tableConfig.toZNRecord());
+      assertEquals(tableConfigToCompare.getDatasetName(), tableConfig.getDatasetName());
+
+      // With valid dataset name
+      tableConfig.setDatasetName("myDatasetName");
+
+      // Serialize then de-serialize
+      tableConfigToCompare = TableConfig.fromJsonConfig(tableConfig.toJsonConfig());
+      assertEquals(tableConfigToCompare.getDatasetName(), tableConfig.getDatasetName());
+
+      tableConfigToCompare = TableConfig.fromZnRecord(tableConfig.toZNRecord());
+      assertEquals(tableConfigToCompare.getDatasetName(), tableConfig.getDatasetName());
+
     }
   }
 

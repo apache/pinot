@@ -21,6 +21,7 @@ package org.apache.pinot.controller.api.upload;
 import java.io.File;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Executor;
 import javax.annotation.Nonnull;
 import javax.ws.rs.core.Response;
@@ -81,13 +82,13 @@ public class SegmentValidator {
     }
 
     // Verifies whether there's server assigned to this segment when uploading a new segment.
-    List<String> assignedInstances = null;
+    Map<String, List<String>> assignedInstancesMapping = null;
     ZNRecord segmentMetadataZnRecord =
         _pinotHelixResourceManager.getSegmentMetadataZnRecord(offlineTableName, segmentName);
     // Checks whether it's a new segment or an existing one.
     if (segmentMetadataZnRecord == null) {
-      assignedInstances = _pinotHelixResourceManager.getAssignedInstancesForSegment(segmentMetadata);
-      if (assignedInstances.isEmpty()) {
+      assignedInstancesMapping = _pinotHelixResourceManager.getAssignedInstancesMappingForSegment(segmentMetadata);
+      if (assignedInstancesMapping.isEmpty()) {
         throw new ControllerApplicationException(LOGGER, "No assigned Instances for Segment: " + segmentName
             + ". Please check whether the table config is misconfigured.", Response.Status.INTERNAL_SERVER_ERROR);
       }
@@ -115,7 +116,7 @@ public class SegmentValidator {
           Response.Status.NOT_ACCEPTABLE);
     }
 
-    return new SegmentValidatorResponse(offlineTableConfig, segmentMetadataZnRecord, assignedInstances, quotaResponse);
+    return new SegmentValidatorResponse(offlineTableConfig, segmentMetadataZnRecord, assignedInstancesMapping, quotaResponse);
   }
 
   /**

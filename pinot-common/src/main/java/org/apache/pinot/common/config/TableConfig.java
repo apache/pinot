@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.helix.ZNRecord;
+import org.apache.pinot.common.config.dataset.DatasetNameBuilder;
 import org.apache.pinot.common.data.StarTreeIndexSpec;
 import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
 import org.apache.pinot.common.utils.EqualityUtils;
@@ -42,6 +43,7 @@ import org.apache.pinot.startree.hll.HllConfig;
 public class TableConfig {
   public static final String TABLE_NAME_KEY = "tableName";
   public static final String TABLE_TYPE_KEY = "tableType";
+  public static final String DATASET_NAME_KEY = "datasetName";
   public static final String VALIDATION_CONFIG_KEY = "segmentsConfig";
   public static final String TENANT_CONFIG_KEY = "tenants";
   public static final String INDEXING_CONFIG_KEY = "tableIndexConfig";
@@ -82,6 +84,10 @@ public class TableConfig {
   @NestedConfig
   private RoutingConfig _routingConfig;
 
+  @ConfigKey("datasetName")
+  @ConfigDoc(value = "The name for the dataset on deep storage")
+  private String _datasetName;
+
   /**
    * NOTE: DO NOT use this constructor, use builder instead. This constructor is for deserializer only.
    */
@@ -93,7 +99,8 @@ public class TableConfig {
 
   private TableConfig(String tableName, TableType tableType, SegmentsValidationAndRetentionConfig validationConfig,
       TenantConfig tenantConfig, IndexingConfig indexingConfig, TableCustomConfig customConfig,
-      @Nullable QuotaConfig quotaConfig, @Nullable TableTaskConfig taskConfig, @Nullable RoutingConfig routingConfig) {
+      @Nullable QuotaConfig quotaConfig, @Nullable TableTaskConfig taskConfig, @Nullable RoutingConfig routingConfig,
+      @Nullable String datasetName) { // Need to make dataset @Nonnull after migration
     _tableName = TableNameBuilder.forType(tableType).tableNameWithType(tableName);
     _tableType = tableType;
     _validationConfig = validationConfig;
@@ -103,6 +110,8 @@ public class TableConfig {
     _quotaConfig = quotaConfig;
     _taskConfig = taskConfig;
     _routingConfig = routingConfig;
+    _datasetName =
+        (datasetName != null) ? DatasetNameBuilder.forType(tableType).datasetNameWithType(datasetName) : null;
   }
 
   public static TableConfig fromJsonString(String jsonString)
@@ -146,8 +155,13 @@ public class TableConfig {
 
     RoutingConfig routingConfig = extractChildConfig(jsonConfig, ROUTING_CONFIG_KEY, RoutingConfig.class);
 
+    // Optional for backward compatibility. This has to be mandatory fields once we migrate after
+    // table & data config separation
+    JsonNode jsonDatasetName = jsonConfig.get(DATASET_NAME_KEY);
+    String datasetName = (jsonDatasetName.isNull())? null : jsonDatasetName.asText();
+
     return new TableConfig(tableName, tableType, validationConfig, tenantConfig, indexingConfig, customConfig,
-        quotaConfig, taskConfig, routingConfig);
+        quotaConfig, taskConfig, routingConfig, datasetName);
   }
 
   /**
@@ -192,6 +206,10 @@ public class TableConfig {
     if (_routingConfig != null) {
       jsonConfig.set(ROUTING_CONFIG_KEY, JsonUtils.objectToJsonNode(_routingConfig));
     }
+
+    // Optional for backward compatibility. This has to be mandatory fields once we migrate after
+    // table & data config separation
+    jsonConfig.put(DATASET_NAME_KEY, _datasetName);
 
     return jsonConfig;
   }
@@ -250,8 +268,12 @@ public class TableConfig {
       routingConfig = JsonUtils.stringToObject(routingConfigString, RoutingConfig.class);
     }
 
+    // Optional for backward compatibility. This has to be mandatory fields once we migrate after
+    // table & data config separation
+    String datasetName = simpleFields.get(DATASET_NAME_KEY);
+
     return new TableConfig(tableName, tableType, validationConfig, tenantConfig, indexingConfig, customConfig,
-        quotaConfig, taskConfig, routingConfig);
+        quotaConfig, taskConfig, routingConfig, datasetName);
   }
 
   public ZNRecord toZNRecord()
@@ -263,6 +285,7 @@ public class TableConfig {
     // Mandatory fields
     simpleFields.put(TABLE_NAME_KEY, _tableName);
     simpleFields.put(TABLE_TYPE_KEY, _tableType.toString());
+    simpleFields.put(DATASET_NAME_KEY, _datasetName);
     simpleFields.put(VALIDATION_CONFIG_KEY, JsonUtils.objectToString(_validationConfig));
     simpleFields.put(TENANT_CONFIG_KEY, JsonUtils.objectToString(_tenantConfig));
     simpleFields.put(INDEXING_CONFIG_KEY, JsonUtils.objectToString(_indexingConfig));
@@ -278,6 +301,10 @@ public class TableConfig {
     if (_routingConfig != null) {
       simpleFields.put(ROUTING_CONFIG_KEY, JsonUtils.objectToString(_routingConfig));
     }
+
+    // Optional for backward compatibility. This has to be mandatory fields once we migrate after
+    // table & data config separation
+    simpleFields.put(DATASET_NAME_KEY, _datasetName);
 
     ZNRecord znRecord = new ZNRecord(_tableName);
     znRecord.setSimpleFields(simpleFields);
@@ -372,6 +399,14 @@ public class TableConfig {
     _routingConfig = routingConfig;
   }
 
+  public String getDatasetName() {
+    return _datasetName;
+  }
+
+  public void setDatasetName(String datasetName) {
+    _datasetName = datasetName;
+  }
+
   @Override
   public String toString() {
     try {
@@ -393,7 +428,8 @@ public class TableConfig {
           .isEqual(_tenantConfig, that._tenantConfig) && EqualityUtils.isEqual(_indexingConfig, that._indexingConfig)
           && EqualityUtils.isEqual(_customConfig, that._customConfig) && EqualityUtils
           .isEqual(_quotaConfig, that._quotaConfig) && EqualityUtils.isEqual(_taskConfig, that._taskConfig)
-          && EqualityUtils.isEqual(_routingConfig, that._routingConfig);
+          && EqualityUtils.isEqual(_routingConfig, that._routingConfig) && EqualityUtils
+          .isEqual(_datasetName, that._datasetName);
     }
     return false;
   }
@@ -409,6 +445,7 @@ public class TableConfig {
     result = EqualityUtils.hashCodeOf(result, _quotaConfig);
     result = EqualityUtils.hashCodeOf(result, _taskConfig);
     result = EqualityUtils.hashCodeOf(result, _routingConfig);
+    result = EqualityUtils.hashCodeOf(result, _datasetName);
     return result;
   }
 
@@ -423,6 +460,7 @@ public class TableConfig {
 
     private final TableType _tableType;
     private String _tableName;
+    private String _datasetName;
     private boolean _isLLC;
 
     // Validation config related
@@ -465,6 +503,11 @@ public class TableConfig {
 
     public Builder setTableName(String tableName) {
       _tableName = tableName;
+      return this;
+    }
+
+    public Builder setDatasetName(String datasetName) {
+      _datasetName = datasetName;
       return this;
     }
 
@@ -654,7 +697,7 @@ public class TableConfig {
       }
 
       return new TableConfig(_tableName, _tableType, validationConfig, tenantConfig, indexingConfig, _customConfig,
-          _quotaConfig, _taskConfig, _routingConfig);
+          _quotaConfig, _taskConfig, _routingConfig, _datasetName);
     }
   }
 }

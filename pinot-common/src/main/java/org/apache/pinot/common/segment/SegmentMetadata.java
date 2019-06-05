@@ -35,6 +35,8 @@ public interface SegmentMetadata {
 
   String getTimeColumn();
 
+  String getDatasetName();
+
   long getStartTime();
 
   long getEndTime();
