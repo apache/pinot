@@ -19,7 +19,6 @@
 
 package org.apache.pinot.thirdeye.detection.yaml.translator;
 
-import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -38,7 +37,6 @@ import org.apache.pinot.thirdeye.detection.ConfigUtils;
 import org.apache.pinot.thirdeye.detection.DataProvider;
 import org.apache.pinot.thirdeye.detection.DetectionUtils;
 import org.apache.pinot.thirdeye.detection.algorithm.DimensionWrapper;
-import org.apache.pinot.thirdeye.detection.annotation.Yaml;
 import org.apache.pinot.thirdeye.detection.annotation.registry.DetectionRegistry;
 import org.apache.pinot.thirdeye.detection.validators.DetectionConfigValidator;
 import org.apache.pinot.thirdeye.detection.wrapper.AnomalyDetectorWrapper;
@@ -123,7 +121,6 @@ import static org.apache.pinot.thirdeye.detection.yaml.DetectionConfigTuner.*;
  * +-----------------------------------------+
  *
  */
-@Yaml(pipelineType = "COMPOSITE")
 public class CompositePipelineConfigTranslator extends DetectionConfigTranslator {
   private static final String PROP_DIMENSION_EXPLORATION = "dimensionExploration";
 
@@ -168,44 +165,35 @@ public class CompositePipelineConfigTranslator extends DetectionConfigTranslator
   private static final Set<String> MOVING_WINDOW_DETECTOR_TYPES = ImmutableSet.of("ALGORITHM", "MIGRATED_ALGORITHM");
 
   private final Map<String, Object> components = new HashMap<>();
-  private final MetricConfigDTO metricConfig;
-  private final DatasetConfigDTO datasetConfig;
-  private final String metricUrn;
-  private final Map<String, Object> mergerProperties;
-  // metric dimension filter maps
-  private final Map<String, Collection<String>> filterMaps;
-  protected final org.yaml.snakeyaml.Yaml yaml;
 
-  public CompositePipelineConfigTranslator(Map<String, Object> yamlConfig, DataProvider provider) {
+  public CompositePipelineConfigTranslator(String yamlConfig, DataProvider provider) {
     this(yamlConfig, provider, new DetectionConfigValidator(provider));
   }
 
-  public CompositePipelineConfigTranslator(Map<String, Object> yamlConfig, DataProvider provider, DetectionConfigValidator validator) {
+  public CompositePipelineConfigTranslator(String yamlConfig, DataProvider provider, DetectionConfigValidator validator) {
     super(yamlConfig, provider, validator);
-    this.yaml = new org.yaml.snakeyaml.Yaml();
-    this.metricConfig = this.dataProvider.fetchMetric(MapUtils.getString(yamlConfig, PROP_METRIC),
-        MapUtils.getString(yamlConfig, PROP_DATASET));
-    Preconditions.checkNotNull(this.metricConfig, "metric not found");
-
-    this.datasetConfig = this.dataProvider.fetchDatasets(Collections.singletonList(metricConfig.getDataset()))
-        .get(metricConfig.getDataset());
-    Preconditions.checkNotNull(this.datasetConfig, "dataset not found");
-    this.mergerProperties = MapUtils.getMap(yamlConfig, PROP_MERGER, new HashMap<String, Object>());
-    this.filterMaps = MapUtils.getMap(yamlConfig, PROP_FILTERS);
-    this.metricUrn = MetricEntity.fromMetric(filterMaps, this.metricConfig.getId()).getUrn();
   }
 
   @Override
   DetectionConfigDTO translateConfig() throws IllegalArgumentException {
-    String detectionCronInYaml = MapUtils.getString(yamlConfig, PROP_CRON);
-    String cron = (detectionCronInYaml == null) ? buildCron() : detectionCronInYaml;
+    Map<String, Collection<String>> dimensionFiltersMap = MapUtils.getMap(yamlConfigMap, PROP_FILTERS);
 
-    List<Map<String, Object>> ruleYamls = getList(yamlConfig.get(PROP_RULES));
+    MetricConfigDTO metricConfig = this.dataProvider.fetchMetric(MapUtils.getString(yamlConfigMap, PROP_METRIC),
+        MapUtils.getString(yamlConfigMap, PROP_DATASET));
+    DatasetConfigDTO datasetConfig = this.dataProvider.fetchDatasets(Collections.singletonList(metricConfig.getDataset()))
+        .get(metricConfig.getDataset());
+    String metricUrn = MetricEntity.fromMetric(dimensionFiltersMap, metricConfig.getId()).getUrn();
+
+    String detectionCronInYaml = MapUtils.getString(yamlConfigMap, PROP_CRON);
+    String cron = (detectionCronInYaml == null) ? buildCron(datasetConfig.bucketTimeGranularity()) : detectionCronInYaml;
+    Map<String, Object> mergerProperties = MapUtils.getMap(yamlConfigMap, PROP_MERGER, new HashMap<String, Object>());
+
+    List<Map<String, Object>> ruleYamls = getList(yamlConfigMap.get(PROP_RULES));
     List<Map<String, Object>> nestedPipelines = new ArrayList<>();
     for (Map<String, Object> ruleYaml : ruleYamls) {
       List<Map<String, Object>> filterYamls = ConfigUtils.getList(ruleYaml.get(PROP_FILTER));
       List<Map<String, Object>> detectionYamls = ConfigUtils.getList(ruleYaml.get(PROP_DETECTION));
-      List<Map<String, Object>> detectionProperties = buildListOfMergeWrapperProperties(detectionYamls);
+      List<Map<String, Object>> detectionProperties = buildListOfMergeWrapperProperties(detectionYamls, mergerProperties, datasetConfig.bucketTimeGranularity());
       if (filterYamls.isEmpty()) {
         nestedPipelines.addAll(detectionProperties);
       } else {
@@ -217,13 +205,13 @@ public class CompositePipelineConfigTranslator extends DetectionConfigTranslator
         nestedPipelines.addAll(filterNestedProperties);
       }
     }
-    Map<String, Object> dimensionWrapperProperties = buildDimensionWrapperProperties();
+    Map<String, Object> dimensionWrapperProperties = buildDimensionWrapperProperties(dimensionFiltersMap, metricUrn, datasetConfig.getDataset());
     Map<String, Object> properties = buildWrapperProperties(
         ChildKeepingMergeWrapper.class.getName(),
         Collections.singletonList(buildWrapperProperties(DimensionWrapper.class.getName(), nestedPipelines, dimensionWrapperProperties)),
-        this.mergerProperties);
+        mergerProperties);
 
-    List<Map<String, Object>> grouperYamls = getList(yamlConfig.get(PROP_GROUPER));
+    List<Map<String, Object>> grouperYamls = getList(yamlConfigMap.get(PROP_GROUPER));
     if (!grouperYamls.isEmpty()) {
       properties = buildGroupWrapperProperties(grouperYamls.get(0), properties);
     }
@@ -231,39 +219,40 @@ public class CompositePipelineConfigTranslator extends DetectionConfigTranslator
     return super.generateDetectionConfig(properties, this.components, cron);
   }
 
-  private Map<String, Object> buildDimensionWrapperProperties() {
+  private Map<String, Object> buildDimensionWrapperProperties(
+      Map<String, Collection<String>> dimensionFilters, String metricUrn, String datasetName) {
     Map<String, Object> dimensionWrapperProperties = new HashMap<>();
-    dimensionWrapperProperties.put(PROP_NESTED_METRIC_URNS, Collections.singletonList(this.metricUrn));
-    if (yamlConfig.containsKey(PROP_DIMENSION_EXPLORATION)) {
-      Map<String, Object> dimensionExploreYaml = MapUtils.getMap(this.yamlConfig, PROP_DIMENSION_EXPLORATION);
+    dimensionWrapperProperties.put(PROP_NESTED_METRIC_URNS, Collections.singletonList(metricUrn));
+    if (yamlConfigMap.containsKey(PROP_DIMENSION_EXPLORATION)) {
+      Map<String, Object> dimensionExploreYaml = MapUtils.getMap(this.yamlConfigMap, PROP_DIMENSION_EXPLORATION);
       dimensionWrapperProperties.putAll(dimensionExploreYaml);
       if (dimensionExploreYaml.containsKey(PROP_DIMENSION_FILTER_METRIC)){
-        MetricConfigDTO dimensionExploreMetric = this.dataProvider.fetchMetric(MapUtils.getString(dimensionExploreYaml, PROP_DIMENSION_FILTER_METRIC), this.datasetConfig.getDataset());
-        dimensionWrapperProperties.put(PROP_METRIC_URN, MetricEntity.fromMetric(filterMaps, dimensionExploreMetric.getId()).getUrn());
+        MetricConfigDTO dimensionExploreMetric = this.dataProvider.fetchMetric(MapUtils.getString(dimensionExploreYaml, PROP_DIMENSION_FILTER_METRIC), datasetName);
+        dimensionWrapperProperties.put(PROP_METRIC_URN, MetricEntity.fromMetric(dimensionFilters, dimensionExploreMetric.getId()).getUrn());
       } else {
-        dimensionWrapperProperties.put(PROP_METRIC_URN, this.metricUrn);
+        dimensionWrapperProperties.put(PROP_METRIC_URN, metricUrn);
       }
     }
     return dimensionWrapperProperties;
   }
 
   private List<Map<String, Object>> buildListOfMergeWrapperProperties(
-      List<Map<String, Object>> yamlConfigs) {
+      List<Map<String, Object>> yamlConfigs, Map<String, Object> mergerProperties, TimeGranularity datasetTimegranularity) {
     List<Map<String, Object>> properties = new ArrayList<>();
     for (Map<String, Object> yamlConfig : yamlConfigs) {
-      properties.add(buildMergeWrapperProperties(yamlConfig));
+      properties.add(buildMergeWrapperProperties(yamlConfig, mergerProperties, datasetTimegranularity));
     }
     return properties;
   }
 
-  private Map<String, Object> buildMergeWrapperProperties(Map<String, Object> yamlConfig) {
+  private Map<String, Object> buildMergeWrapperProperties(Map<String, Object> yamlConfig, Map<String, Object> mergerProperties, TimeGranularity datasetTimegranularity) {
     String detectorType = MapUtils.getString(yamlConfig, PROP_TYPE);
     String name = MapUtils.getString(yamlConfig, PROP_NAME);
     Map<String, Object> nestedProperties = new HashMap<>();
     nestedProperties.put(PROP_CLASS_NAME, AnomalyDetectorWrapper.class.getName());
     String detectorRefKey = makeComponentRefKey(detectorType, name);
 
-    fillInDetectorWrapperProperties(nestedProperties, yamlConfig, detectorType);
+    fillInDetectorWrapperProperties(nestedProperties, yamlConfig, detectorType, datasetTimegranularity);
 
     buildComponentSpec(yamlConfig, detectorType, detectorRefKey);
 
@@ -282,7 +271,7 @@ public class CompositePipelineConfigTranslator extends DetectionConfigTranslator
       buildComponentSpec(yamlConfig, baselineProviderType, baselineProviderKey);
       properties.put(PROP_BASELINE_PROVIDER, baselineProviderKey);
     }
-    properties.putAll(this.mergerProperties);
+    properties.putAll(mergerProperties);
     return properties;
   }
 
@@ -302,10 +291,10 @@ public class CompositePipelineConfigTranslator extends DetectionConfigTranslator
   }
 
   // fill in window size and unit if detector requires this
-  private void fillInDetectorWrapperProperties(Map<String, Object> properties, Map<String, Object> yamlConfig, String detectorType) {
+  private void fillInDetectorWrapperProperties(Map<String, Object> properties, Map<String, Object> yamlConfig, String detectorType, TimeGranularity datasetTimegranularity) {
     if (MOVING_WINDOW_DETECTOR_TYPES.contains(detectorType)) {
       properties.put(PROP_MOVING_WINDOW_DETECTION, true);
-      switch (this.datasetConfig.bucketTimeGranularity().getUnit()) {
+      switch (datasetTimegranularity.getUnit()) {
         case MINUTES:
           properties.put(PROP_WINDOW_SIZE, 6);
           properties.put(PROP_WINDOW_UNIT, TimeUnit.HOURS);
@@ -326,7 +315,7 @@ public class CompositePipelineConfigTranslator extends DetectionConfigTranslator
       }
     }
     // set default bucketPeriod
-    properties.put(PROP_BUCKET_PERIOD, this.datasetConfig.bucketTimeGranularity().toPeriod().toString());
+    properties.put(PROP_BUCKET_PERIOD, datasetTimegranularity.toPeriod().toString());
     // override from yaml
     if (yamlConfig.containsKey(PROP_WINDOW_SIZE)) {
       properties.put(PROP_MOVING_WINDOW_DETECTION, true);
@@ -399,8 +388,8 @@ public class CompositePipelineConfigTranslator extends DetectionConfigTranslator
   //  hourly: every hour, starts at 0 minute
   //  daily: every day, starts at 2 pm UTC
   //  others: every day, start at 12 am UTC
-  private String buildCron() {
-    switch (this.datasetConfig.bucketTimeGranularity().getUnit()) {
+  private String buildCron(TimeGranularity timegranularity) {
+    switch (timegranularity.getUnit()) {
       case MINUTES:
         return "0 0/15 * * * ? *";
       case HOURS:

@@ -33,7 +33,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 import javax.validation.constraints.NotNull;
 import javax.ws.rs.Consumes;
@@ -80,9 +79,8 @@ import org.apache.pinot.thirdeye.detection.spi.components.BaselineProvider;
 import org.apache.pinot.thirdeye.detection.spi.model.TimeSeries;
 import org.apache.pinot.thirdeye.detection.validators.DetectionConfigValidator;
 import org.apache.pinot.thirdeye.detection.validators.SubscriptionConfigValidator;
+import org.apache.pinot.thirdeye.detection.yaml.translator.CompositePipelineConfigTranslator;
 import org.apache.pinot.thirdeye.detection.yaml.translator.SubscriptionConfigTranslator;
-import org.apache.pinot.thirdeye.detection.yaml.translator.DetectionConfigTranslator;
-import org.apache.pinot.thirdeye.detection.yaml.translator.YamlDetectionTranslatorLoader;
 import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -106,7 +104,6 @@ public class YamlResource {
 
   private final DetectionConfigManager detectionConfigDAO;
   private final DetectionAlertConfigManager detectionAlertConfigDAO;
-  private final YamlDetectionTranslatorLoader translatorLoader;
   private final DetectionConfigValidator detectionValidator;
   private final SubscriptionConfigValidator subscriptionValidator;
   private final DataProvider provider;
@@ -122,7 +119,6 @@ public class YamlResource {
   public YamlResource() {
     this.detectionConfigDAO = DAORegistry.getInstance().getDetectionConfigManager();
     this.detectionAlertConfigDAO = DAORegistry.getInstance().getDetectionAlertConfigManager();
-    this.translatorLoader = new YamlDetectionTranslatorLoader();
     this.metricDAO = DAORegistry.getInstance().getMetricConfigDAO();
     this.datasetDAO = DAORegistry.getInstance().getDatasetConfigDAO();
     this.eventDAO = DAORegistry.getInstance().getEventDAO();
@@ -147,9 +143,9 @@ public class YamlResource {
   }
 
   /*
-   * Build the detection config from a yaml.
+   * Helper method to build the detection config from a yaml.
    */
-  private DetectionConfigDTO buildDetectionConfigFromYaml(long tuningStartTime, long tuningEndTime, Map<String, Object> yamlConfig,
+  private DetectionConfigDTO buildDetectionConfigFromYaml(long tuningStartTime, long tuningEndTime, String yamlConfig,
       DetectionConfigDTO existingConfig) {
 
     // Configure the tuning window
@@ -159,15 +155,8 @@ public class YamlResource {
       tuningStartTime = tuningEndTime - TimeUnit.DAYS.toMillis(28);
     }
 
-    DetectionConfigTranslator detectionConfigTranslator;
-    try {
-      detectionConfigTranslator = this.translatorLoader.from(yamlConfig, this.provider);
-    } catch (Exception e) {
-      throw new IllegalArgumentException("Unable to instantiate the detection pipeline.", e);
-    }
-
     // Translate the raw yaml config to detection config object
-    DetectionConfigDTO config = detectionConfigTranslator.translate();
+    DetectionConfigDTO config = new CompositePipelineConfigTranslator(yamlConfig, this.provider).translate();
 
     if (existingConfig != null) {
       config.setId(existingConfig.getId());
@@ -293,14 +282,11 @@ public class YamlResource {
     return createDetectionPipeline(yamlDetectionConfig, 0, 0);
   }
 
-  long createDetectionPipeline(String yamlDetectionConfig, long startTime, long endTime)
+  long createDetectionPipeline(String payload, long startTime, long endTime)
       throws IllegalArgumentException {
-    Preconditions.checkArgument(StringUtils.isNotBlank(yamlDetectionConfig), "The Yaml Payload in the request is empty.");
-    // Translate config from YAML to detection config (JSON)
-    Map<String, Object> newDetectionConfigMap = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
-    newDetectionConfigMap.putAll(ConfigUtils.getMap(this.yaml.load(yamlDetectionConfig)));
-    DetectionConfigDTO detectionConfig = buildDetectionConfigFromYaml(startTime, endTime, newDetectionConfigMap, null);
-    detectionConfig.setYaml(yamlDetectionConfig);
+    Preconditions.checkArgument(StringUtils.isNotBlank(payload), "The Yaml Payload in the request is empty.");
+
+    DetectionConfigDTO detectionConfig = buildDetectionConfigFromYaml(startTime, endTime, payload, null);
 
     // Check for duplicates
     List<DetectionConfigDTO> detectionConfigDTOS = detectionConfigDAO
@@ -357,18 +343,14 @@ public class YamlResource {
     updateDetectionPipeline(detectionID, yamlDetectionConfig, 0, 0);
   }
 
-  void updateDetectionPipeline(long detectionID, String yamlDetectionConfig, long startTime, long endTime)
+  void updateDetectionPipeline(long detectionID, String payload, long startTime, long endTime)
       throws IllegalArgumentException {
     DetectionConfigDTO existingDetectionConfig = this.detectionConfigDAO.findById(detectionID);
     DetectionConfigDTO detectionConfig;
     Preconditions.checkNotNull(existingDetectionConfig, "Cannot find detection pipeline " + detectionID);
-    Preconditions.checkArgument(StringUtils.isNotBlank(yamlDetectionConfig), "The Yaml Payload in the request is empty.");
-    // Translate config from YAML to detection config (JSON)
-    TreeMap<String, Object> newDetectionConfigMap = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
-    newDetectionConfigMap.putAll(ConfigUtils.getMap(this.yaml.load(yamlDetectionConfig)));
+    Preconditions.checkArgument(StringUtils.isNotBlank(payload), "The Yaml Payload in the request is empty.");
     try {
-      detectionConfig = buildDetectionConfigFromYaml(startTime, endTime, newDetectionConfigMap, existingDetectionConfig);
-      detectionConfig.setYaml(yamlDetectionConfig);
+      detectionConfig = buildDetectionConfigFromYaml(startTime, endTime, payload, existingDetectionConfig);
 
       // Validate updated config before saving it
       detectionValidator.validateUpdatedConfig(detectionConfig, existingDetectionConfig);
@@ -378,9 +360,10 @@ public class YamlResource {
     } finally {
       // If it is to disable the pipeline then no need to do validation and parsing.
       // It is possible that the metric or dataset was deleted so the validation will fail.
-      if (!MapUtils.getBooleanValue(newDetectionConfigMap, PROP_ACTIVE, true)) {
+      Map<String, Object> detectionConfigMap = new HashMap<>(ConfigUtils.getMap(this.yaml.load(payload)));
+      if (!MapUtils.getBooleanValue(detectionConfigMap, PROP_ACTIVE, true)) {
         existingDetectionConfig.setActive(false);
-        existingDetectionConfig.setYaml(yamlDetectionConfig);
+        existingDetectionConfig.setYaml(payload);
         this.detectionConfigDAO.save(existingDetectionConfig);
       }
     }
@@ -488,16 +471,11 @@ public class YamlResource {
     return Response.ok().entity(responseMessage).build();
   }
 
-  long createSubscriptionGroup(String yamlAlertConfig) throws IllegalArgumentException {
-    Preconditions.checkArgument(StringUtils.isNotBlank(yamlAlertConfig),
+  long createSubscriptionGroup(String yamlConfig) throws IllegalArgumentException {
+    Preconditions.checkArgument(StringUtils.isNotBlank(yamlConfig),
         "The Yaml Payload in the request is empty.");
 
-    // Translate config from YAML to detection alert config (JSON)
-    TreeMap<String, Object> newAlertConfigMap = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
-    newAlertConfigMap.putAll(ConfigUtils.getMap(this.yaml.load(yamlAlertConfig)));
-    DetectionAlertConfigDTO alertConfig = (DetectionAlertConfigDTO)
-        new SubscriptionConfigTranslator(detectionConfigDAO, newAlertConfigMap).translate();
-    alertConfig.setYaml(yamlAlertConfig);
+    DetectionAlertConfigDTO alertConfig = new SubscriptionConfigTranslator(detectionConfigDAO, yamlConfig).translate();
 
     // Check for duplicates
     List<DetectionAlertConfigDTO> alertConfigDTOS = detectionAlertConfigDAO
@@ -562,26 +540,20 @@ public class YamlResource {
     oldAlertConfig.setAlertSchemes(newAlertConfig.getAlertSchemes());
     oldAlertConfig.setAlertSuppressors(newAlertConfig.getAlertSuppressors());
     oldAlertConfig.setProperties(newAlertConfig.getProperties());
+    oldAlertConfig.setYaml(newAlertConfig.getYaml());
 
     return oldAlertConfig;
   }
 
-  void updateSubscriptionGroup(long oldAlertConfigID, String yamlAlertConfig) {
+  void updateSubscriptionGroup(long oldAlertConfigID, String yamlConfig) {
     DetectionAlertConfigDTO oldAlertConfig = this.detectionAlertConfigDAO.findById(oldAlertConfigID);
     if (oldAlertConfig == null) {
       throw new RuntimeException("Cannot find subscription group " + oldAlertConfigID);
     }
-    Preconditions.checkArgument(StringUtils.isNotBlank(yamlAlertConfig), "The Yaml Payload in the request is empty.");
+    Preconditions.checkArgument(StringUtils.isNotBlank(yamlConfig), "The Yaml Payload in the request is empty.");
 
-    // Translate payload to detection alert config
-    TreeMap<String, Object> newAlertConfigMap = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
-    newAlertConfigMap.putAll(ConfigUtils.getMap(this.yaml.load(yamlAlertConfig)));
-    DetectionAlertConfigDTO newAlertConfig = (DetectionAlertConfigDTO)
-        new SubscriptionConfigTranslator(detectionConfigDAO, newAlertConfigMap).translate();
-
-    // Update existing alert config with the newly supplied config.
+    DetectionAlertConfigDTO newAlertConfig = new SubscriptionConfigTranslator(detectionConfigDAO, yamlConfig).translate();
     DetectionAlertConfigDTO updatedAlertConfig = updateDetectionAlertConfig(oldAlertConfig, newAlertConfig);
-    updatedAlertConfig.setYaml(yamlAlertConfig);
 
     // Update watermarks to reflect changes to detectionName list in subscription config
     Map<Long, Long> currentVectorClocks = updatedAlertConfig.getVectorClocks();
@@ -676,15 +648,12 @@ public class YamlResource {
     Map<String, String> responseMessage = new HashMap<>();
     DetectionPipelineResult result;
     try {
-      // Translate config from YAML to detection config (JSON)
-      Map<String, Object> newDetectionConfigMap = new HashMap<>(ConfigUtils.getMap(this.yaml.load(payload)));
       DetectionConfigDTO detectionConfig;
-
       if (existingConfig == null) {
-        detectionConfig = buildDetectionConfigFromYaml(tuningStart, tuningEnd, newDetectionConfigMap, null);
+        detectionConfig = buildDetectionConfigFromYaml(tuningStart, tuningEnd, payload, null);
         detectionConfig.setId(Long.MAX_VALUE);
       } else {
-        detectionConfig = buildDetectionConfigFromYaml(tuningStart, tuningEnd, newDetectionConfigMap, existingConfig);
+        detectionConfig = buildDetectionConfigFromYaml(tuningStart, tuningEnd, payload, existingConfig);
       }
 
       Preconditions.checkNotNull(detectionConfig);
@@ -737,9 +706,7 @@ public class YamlResource {
     try {
       Preconditions.checkArgument(StringUtils.isNotBlank(payload), "The Yaml Payload in the request is empty.");
 
-      // Translate config from YAML to detection config (JSON)
-      Map<String, Object> newDetectionConfigMap = new HashMap<>(ConfigUtils.getMap(this.yaml.load(payload)));
-      DetectionConfigDTO detectionConfig = buildDetectionConfigFromYaml(tuningStart, tuningEnd, newDetectionConfigMap, null);
+      DetectionConfigDTO detectionConfig = buildDetectionConfigFromYaml(tuningStart, tuningEnd, payload, null);
       Preconditions.checkNotNull(detectionConfig);
       detectionConfig.setId(Long.MAX_VALUE);
 

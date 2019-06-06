@@ -47,10 +47,8 @@ import org.apache.pinot.thirdeye.detection.DetectionPipeline;
 import org.apache.pinot.thirdeye.detection.DetectionPipelineLoader;
 import org.apache.pinot.thirdeye.detection.DetectionPipelineResult;
 import org.apache.pinot.thirdeye.detection.yaml.DetectionConfigTuner;
-import org.apache.pinot.thirdeye.detection.yaml.translator.YamlDetectionTranslatorLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.yaml.snakeyaml.Yaml;
 
 
 /**
@@ -65,8 +63,6 @@ public class YamlOnboardingTaskRunner implements TaskRunner {
   private final EvaluationManager evaluationDAO;
   private final DetectionPipelineLoader loader;
   private final DataProvider provider;
-  private final YamlDetectionTranslatorLoader translatorLoader;
-  private final Yaml yaml;
 
 
   public YamlOnboardingTaskRunner() {
@@ -74,8 +70,6 @@ public class YamlOnboardingTaskRunner implements TaskRunner {
     this.detectionDAO = DAORegistry.getInstance().getDetectionConfigManager();
     this.anomalyDAO = DAORegistry.getInstance().getMergedAnomalyResultDAO();
     this.evaluationDAO = DAORegistry.getInstance().getEvaluationManager();
-    this.translatorLoader = new YamlDetectionTranslatorLoader();
-    this.yaml = new Yaml();
 
     MetricConfigManager metricDAO = DAORegistry.getInstance().getMetricConfigDAO();
     DatasetConfigManager datasetDAO = DAORegistry.getInstance().getDatasetConfigDAO();

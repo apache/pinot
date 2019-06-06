@@ -19,10 +19,13 @@
 
 package org.apache.pinot.thirdeye.detection.yaml.translator;
 
+import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.thirdeye.datalayer.dto.AbstractDTO;
+import org.apache.pinot.thirdeye.detection.ConfigUtils;
 import org.apache.pinot.thirdeye.detection.DataProvider;
 import org.apache.pinot.thirdeye.detection.validators.ConfigValidator;
+import org.yaml.snakeyaml.Yaml;
 
 
 /**
@@ -30,14 +33,16 @@ import org.apache.pinot.thirdeye.detection.validators.ConfigValidator;
  */
 public abstract class ConfigTranslator<T extends AbstractDTO, V extends ConfigValidator> {
 
-  Map<String, Object> yamlConfig;
-
   protected ConfigValidator validator;
   protected DataProvider dataProvider;
+  protected String yamlConfig;
+  protected Map<String, Object> yamlConfigMap;
+  protected Yaml yaml;
 
-  ConfigTranslator(Map<String, Object> yamlConfig, V validator) {
+  ConfigTranslator(String yamlConfig, V validator) {
     this.yamlConfig = yamlConfig;
     this.validator = validator;
+    this.yaml = new Yaml();
   }
 
   abstract T translateConfig() throws IllegalArgumentException;
@@ -46,7 +51,9 @@ public abstract class ConfigTranslator<T extends AbstractDTO, V extends ConfigVa
    * Convert raw yaml configuration into config object with pre and post validation
    */
   public T translate() throws IllegalArgumentException {
-    validator.validateYaml(this.yamlConfig);
+    this.yamlConfigMap = new HashMap<>(ConfigUtils.getMap(this.yaml.load(yamlConfig)));
+
+    validator.validateYaml(this.yamlConfigMap);
     return this.translateConfig();
   }
 }

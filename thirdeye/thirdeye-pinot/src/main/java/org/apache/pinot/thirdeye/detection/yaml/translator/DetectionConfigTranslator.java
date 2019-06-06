@@ -26,8 +26,6 @@ import org.apache.commons.collections.MapUtils;
 import org.apache.pinot.thirdeye.detection.validators.DetectionConfigValidator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.yaml.snakeyaml.DumperOptions;
-import org.yaml.snakeyaml.Yaml;
 
 
 /**
@@ -42,7 +40,7 @@ public abstract class DetectionConfigTranslator extends ConfigTranslator<Detecti
 
   protected DataProvider dataProvider;
 
-  DetectionConfigTranslator(Map<String, Object> yamlConfig, DataProvider provider, DetectionConfigValidator validator) {
+  DetectionConfigTranslator(String yamlConfig, DataProvider provider, DetectionConfigValidator validator) {
     super(yamlConfig, validator);
     this.dataProvider = provider;
   }
@@ -52,19 +50,15 @@ public abstract class DetectionConfigTranslator extends ConfigTranslator<Detecti
    */
   DetectionConfigDTO generateDetectionConfig(Map<String, Object> properties, Map<String, Object> components, String cron) {
     DetectionConfigDTO config = new DetectionConfigDTO();
-    config.setName(MapUtils.getString(yamlConfig, PROP_NAME));
-    config.setDescription(MapUtils.getString(yamlConfig, PROP_DESC_NAME));
+    config.setName(MapUtils.getString(yamlConfigMap, PROP_NAME));
+    config.setDescription(MapUtils.getString(yamlConfigMap, PROP_DESC_NAME));
     config.setLastTimestamp(System.currentTimeMillis());
 
     config.setProperties(properties);
     config.setComponentSpecs(components);
     config.setCron(cron);
-    config.setActive(MapUtils.getBooleanValue(yamlConfig, PROP_ACTIVE, true));
-
-    DumperOptions options = new DumperOptions();
-    options.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
-    options.setPrettyFlow(true);
-    config.setYaml(new Yaml(options).dump(yamlConfig));
+    config.setActive(MapUtils.getBooleanValue(yamlConfigMap, PROP_ACTIVE, true));
+    config.setYaml(yamlConfig);
 
     return config;
   }

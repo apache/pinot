@@ -2,6 +2,7 @@ package org.apache.pinot.thirdeye.detection.yaml.translator;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableMap;
+import org.apache.commons.io.IOUtils;
 import org.apache.pinot.thirdeye.datalayer.bao.DAOTestBase;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
@@ -72,35 +73,35 @@ public class CompositePipelineConfigTranslatorTest {
 
   @Test
   public void testBuildPropertiesFull() throws Exception {
-    this.yamlConfig = (Map<String, Object>) this.yaml.load(this.getClass().getResourceAsStream("pipeline-config-1.yaml"));
-    CompositePipelineConfigTranslator translator = new CompositePipelineConfigTranslator(this.yamlConfig, this.provider);
-    DetectionConfigDTO result = (DetectionConfigDTO) translator.translate();
+    String yamlConfig = IOUtils.toString(this.getClass().getResourceAsStream("pipeline-config-1.yaml"), "UTF-8");
+    CompositePipelineConfigTranslator translator = new CompositePipelineConfigTranslator(yamlConfig, this.provider);
+    DetectionConfigDTO result = translator.translate();
     YamlTranslationResult expected = OBJECT_MAPPER.readValue(this.getClass().getResourceAsStream("compositePipelineTranslatorTestResult-1.json"), YamlTranslationResult.class);
     Assert.assertEquals(result.getProperties(), expected.getProperties());
   }
 
   @Test
   public void testBuildDetectionPropertiesNoFilter() throws Exception {
-    this.yamlConfig = (Map<String, Object>) this.yaml.load(this.getClass().getResourceAsStream("pipeline-config-2.yaml"));
-    CompositePipelineConfigTranslator translator = new CompositePipelineConfigTranslator(this.yamlConfig, this.provider);
-    DetectionConfigDTO result = (DetectionConfigDTO) translator.translate();
+    String yamlConfig = IOUtils.toString(this.getClass().getResourceAsStream("pipeline-config-2.yaml"), "UTF-8");
+    CompositePipelineConfigTranslator translator = new CompositePipelineConfigTranslator(yamlConfig, this.provider);
+    DetectionConfigDTO result = translator.translate();
     YamlTranslationResult expected = OBJECT_MAPPER.readValue(this.getClass().getResourceAsStream("compositePipelineTranslatorTestResult-2.json"), YamlTranslationResult.class);
     Assert.assertEquals(result.getProperties(), expected.getProperties());
   }
 
   @Test(expectedExceptions = IllegalArgumentException.class)
-  public void testBuildDetectionPipelineMissModuleType() {
+  public void testBuildDetectionPipelineMissModuleType() throws Exception {
     this.yamlConfig = (Map<String, Object>) this.yaml.load(this.getClass().getResourceAsStream("pipeline-config-1.yaml"));
     this.yamlConfig.put("rules", Collections.singletonList(
         ImmutableMap.of("name", "rule2","detection", Collections.singletonList(ImmutableMap.of("change", 0.3)))));
-    CompositePipelineConfigTranslator translator = new CompositePipelineConfigTranslator(this.yamlConfig, this.provider);
+    CompositePipelineConfigTranslator translator = new CompositePipelineConfigTranslator(yaml.dump(this.yamlConfig), this.provider);
     translator.translate();
   }
 
   @Test(expectedExceptions = IllegalArgumentException.class)
-  public void testMultipleGrouperLogic() {
-    this.yamlConfig = (Map<String, Object>) this.yaml.load(this.getClass().getResourceAsStream("pipeline-config-3.yaml"));
-    CompositePipelineConfigTranslator translator = new CompositePipelineConfigTranslator(this.yamlConfig, this.provider);
+  public void testMultipleGrouperLogic() throws Exception {
+    String yamlConfig = IOUtils.toString(this.getClass().getResourceAsStream("pipeline-config-3.yaml"), "UTF-8");
+    CompositePipelineConfigTranslator translator = new CompositePipelineConfigTranslator(yamlConfig, this.provider);
     translator.translate();
   }
 }
