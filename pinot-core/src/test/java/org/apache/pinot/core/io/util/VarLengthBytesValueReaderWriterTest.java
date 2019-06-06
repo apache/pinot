@@ -32,8 +32,7 @@ import org.testng.annotations.Test;
  * Unit test for {@link VarLengthBytesValueReaderWriter}
  */
 public class VarLengthBytesValueReaderWriterTest {
-  private static final File TEMP_FILE = new File(FileUtils.getTempDirectory(),
-      VarLengthBytesValueReaderWriterTest.class.getName());
+  private final Random random = new Random();
 
   @Test
   public void testSingleByteArray() throws IOException {
@@ -42,22 +41,25 @@ public class VarLengthBytesValueReaderWriterTest {
     long size = VarLengthBytesValueReaderWriter.getRequiredSize(byteArrays);
     Assert.assertEquals(20, size);
 
+    final File tempFile = new File(FileUtils.getTempDirectory(),
+        VarLengthBytesValueReaderWriterTest.class.getName() + random.nextInt());
+
     try (PinotDataBuffer buffer = PinotDataBuffer
-        .mapFile(TEMP_FILE, false, 0, size, ByteOrder.BIG_ENDIAN, null)) {
+        .mapFile(tempFile, false, 0, size, ByteOrder.BIG_ENDIAN, null)) {
       VarLengthBytesValueReaderWriter readerWriter = new VarLengthBytesValueReaderWriter(buffer);
       readerWriter.init(byteArrays);
       Assert.assertEquals(1, readerWriter.getNumElements());
     }
 
     try (PinotDataBuffer buffer = PinotDataBuffer
-        .mapFile(TEMP_FILE, true, 0, size, ByteOrder.BIG_ENDIAN, null)) {
+        .mapFile(tempFile, true, 0, size, ByteOrder.BIG_ENDIAN, null)) {
       VarLengthBytesValueReaderWriter readerWriter = new VarLengthBytesValueReaderWriter(buffer);
       Assert.assertEquals(1, readerWriter.getNumElements());
       byte[] newArray = readerWriter.getBytes(0, -1, null);
       Assert.assertTrue(Arrays.equals(array, newArray));
     }
     finally {
-      FileUtils.forceDelete(TEMP_FILE);
+      FileUtils.forceDelete(tempFile);
     }
   }
 
@@ -72,15 +74,18 @@ public class VarLengthBytesValueReaderWriterTest {
     }
     long size = VarLengthBytesValueReaderWriter.getRequiredSize(byteArrays);
 
+    final File tempFile = new File(FileUtils.getTempDirectory(),
+        VarLengthBytesValueReaderWriterTest.class.getName() + random.nextInt());
+
     try (PinotDataBuffer buffer = PinotDataBuffer
-        .mapFile(TEMP_FILE, false, 0, size, ByteOrder.BIG_ENDIAN, null)) {
+        .mapFile(tempFile, false, 0, size, ByteOrder.BIG_ENDIAN, null)) {
       VarLengthBytesValueReaderWriter readerWriter = new VarLengthBytesValueReaderWriter(buffer);
       readerWriter.init(byteArrays);
       Assert.assertEquals(byteArrays.length, readerWriter.getNumElements());
     }
 
     try (PinotDataBuffer buffer = PinotDataBuffer
-        .mapFile(TEMP_FILE, false, 0, size, ByteOrder.BIG_ENDIAN, null)) {
+        .mapFile(tempFile, false, 0, size, ByteOrder.BIG_ENDIAN, null)) {
       VarLengthBytesValueReaderWriter readerWriter = new VarLengthBytesValueReaderWriter(buffer);
       Assert.assertEquals(byteArrays.length, readerWriter.getNumElements());
       for (int i = 0; i < byteArrays.length; i++) {
@@ -90,7 +95,7 @@ public class VarLengthBytesValueReaderWriterTest {
       }
     }
     finally {
-      FileUtils.forceDelete(TEMP_FILE);
+      FileUtils.forceDelete(tempFile);
     }
   }
 }
