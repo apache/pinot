@@ -24,15 +24,8 @@
  */
 package org.apache.pinot.common.request;
 
-
-import java.util.Map;
-import java.util.HashMap;
-import org.apache.thrift.TEnum;
-
 public enum ExpressionType implements org.apache.thrift.TEnum {
-  LITERAL(0),
-  IDENTIFIER(1),
-  FUNCTION(2);
+  LITERAL(0), IDENTIFIER(1), FUNCTION(2);
 
   private final int value;
 

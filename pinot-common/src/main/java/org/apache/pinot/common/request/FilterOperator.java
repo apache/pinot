@@ -24,11 +24,6 @@
  */
 package org.apache.pinot.common.request;
 
-
-import java.util.Map;
-import java.util.HashMap;
-import org.apache.thrift.TEnum;
-
 /**
  * AUTO GENERATED: DO NOT EDIT
  * Filter Operator
