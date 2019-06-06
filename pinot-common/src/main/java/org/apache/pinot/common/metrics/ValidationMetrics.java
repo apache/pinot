@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.metrics;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.yammer.metrics.core.Gauge;
 import com.yammer.metrics.core.MetricName;
 import com.yammer.metrics.core.MetricsRegistry;
@@ -33,7 +34,6 @@ import java.util.concurrent.TimeUnit;
  */
 public class ValidationMetrics {
   private final MetricsRegistry _metricsRegistry;
-
   private final Map<String, Long> _gaugeValues = new HashMap<>();
   private final Set<MetricName> _metricNames = new HashSet<>();
 
@@ -216,7 +216,8 @@ public class ValidationMetrics {
     makeGauge(fullGaugeName, makeMetricName(fullGaugeName), _storedValueGaugeFactory, segmentCount);
   }
 
-  private String makeGaugeName(final String resource, final String gaugeName) {
+  @VisibleForTesting
+  public static String makeGaugeName(final String resource, final String gaugeName) {
     return "pinot.controller." + resource + "." + gaugeName;
   }
 
@@ -245,5 +246,14 @@ public class ValidationMetrics {
 
     _metricNames.clear();
     _gaugeValues.clear();
+  }
+
+  @VisibleForTesting
+  public long getValueOfGauge(final String fullGaugeName) {
+    Long value  = _gaugeValues.get(fullGaugeName);
+    if (value == null) {
+      return 0;
+    }
+    return value;
   }
 }
