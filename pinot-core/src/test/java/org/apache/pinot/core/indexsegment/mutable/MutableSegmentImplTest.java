@@ -71,8 +71,8 @@ public class MutableSegmentImplTest {
     _immutableSegment = ImmutableSegmentLoader.load(new File(TEMP_DIR, driver.getSegmentName()), ReadMode.mmap);
 
     _schema = config.getSchema();
-    _mutableSegmentImpl = MutableSegmentImplTestUtils
-        .createMutableSegmentImpl(_schema, Collections.emptySet(), Collections.emptySet(), false);
+    _mutableSegmentImpl = MutableSegmentImplTestUtils.createMutableSegmentImpl(_schema,
+        Collections.emptySet(), Collections.emptySet(), Collections.emptySet(), false);
     try (RecordReader recordReader = new AvroRecordReader(avroFile, _schema)) {
       GenericRow reuse = new GenericRow();
       while (recordReader.hasNext()) {

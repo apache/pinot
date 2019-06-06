@@ -188,9 +188,8 @@ public class SegmentGeneratorConfig {
         this.setRawIndexCompressionType(serializedNoDictionaryColumnMap);
       }
     }
-    _segmentPartitionConfig = indexingConfig.getSegmentPartitionConfig();
-
     _varLengthDictionaryColumns = indexingConfig.getVarLengthDictionaryColumns();
+    _segmentPartitionConfig = indexingConfig.getSegmentPartitionConfig();
 
     // Star-tree V1 config
     StarTreeIndexSpec starTreeIndexSpec = indexingConfig.getStarTreeIndexSpec();

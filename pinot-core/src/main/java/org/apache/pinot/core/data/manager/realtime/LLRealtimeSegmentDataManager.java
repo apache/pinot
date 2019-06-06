@@ -1047,7 +1047,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     // No dictionary Columns
     _noDictionaryColumns = new ArrayList<>(indexLoadingConfig.getNoDictionaryColumns());
 
-    _varLengthDictionaryColumns = indexingConfig.getVarLengthDictionaryColumns();
+    _varLengthDictionaryColumns = new ArrayList<>(indexLoadingConfig.getVarLengthDictionaryColumns());
 
     // Read the star tree config
     _starTreeIndexSpec = indexingConfig.getStarTreeIndexSpec();
@@ -1067,6 +1067,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             .setSchema(schema).setCapacity(_segmentMaxRowCount)
             .setAvgNumMultiValues(indexLoadingConfig.getRealtimeAvgMultiValueCount())
             .setNoDictionaryColumns(indexLoadingConfig.getNoDictionaryColumns())
+            .setVarLengthDictionaryColumns(indexLoadingConfig.getVarLengthDictionaryColumns())
             .setInvertedIndexColumns(invertedIndexColumns).setRealtimeSegmentZKMetadata(segmentZKMetadata)
             .setOffHeap(_isOffHeap).setMemoryManager(_memoryManager)
             .setStatsHistory(realtimeTableDataManager.getStatsHistory())

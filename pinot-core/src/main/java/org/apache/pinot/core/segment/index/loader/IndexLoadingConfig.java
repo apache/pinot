@@ -46,6 +46,7 @@ public class IndexLoadingConfig {
   private Set<String> _invertedIndexColumns = new HashSet<>();
   private Set<String> _noDictionaryColumns = new HashSet<>(); // TODO: replace this by _noDictionaryConfig.
   private Map<String, String> _noDictionaryConfig = new HashMap<>();
+  private Set<String> _varLengthDictionaryColumns = new HashSet<>();
   private Set<String> _onHeapDictionaryColumns = new HashSet<>();
   private Set<String> _bloomFilterColumns = new HashSet<>();
 
@@ -94,6 +95,11 @@ public class IndexLoadingConfig {
     Map<String, String> noDictionaryConfig = indexingConfig.getNoDictionaryConfig();
     if (noDictionaryConfig != null) {
       _noDictionaryConfig.putAll(noDictionaryConfig);
+    }
+
+    List<String> varLengthDictionaryColumns = indexingConfig.getVarLengthDictionaryColumns();
+    if (varLengthDictionaryColumns != null) {
+      _varLengthDictionaryColumns.addAll(varLengthDictionaryColumns);
     }
 
     List<String> onHeapDictionaryColumns = indexingConfig.getOnHeapDictionaryColumns();
@@ -191,6 +197,11 @@ public class IndexLoadingConfig {
   @Nonnull
   public Map<String, String> getnoDictionaryConfig() {
     return _noDictionaryConfig;
+  }
+
+  @Nonnull
+  public Set<String> getVarLengthDictionaryColumns() {
+    return _varLengthDictionaryColumns;
   }
 
   @Nonnull
