@@ -65,7 +65,6 @@ public abstract class BaseTransformFunctionTest {
   protected static final String STRING_SV_COLUMN = "stringSV";
   protected static final String INT_MV_COLUMN = "intMV";
   protected static final String TIME_COLUMN = "time";
-  protected static final String DOUBLE2_SV_COLUMN = "double2SV";
 
   protected final int[] _intSVValues = new int[NUM_ROWS];
   protected final long[] _longSVValues = new long[NUM_ROWS];
@@ -74,7 +73,6 @@ public abstract class BaseTransformFunctionTest {
   protected final String[] _stringSVValues = new String[NUM_ROWS];
   protected final int[][] _intMVValues = new int[NUM_ROWS][];
   protected final long[] _timeValues = new long[NUM_ROWS];
-  protected final double[] _double2SVValues = new double[NUM_ROWS];
 
   protected Map<String, DataSource> _dataSourceMap;
   protected ProjectionBlock _projectionBlock;
@@ -89,9 +87,8 @@ public abstract class BaseTransformFunctionTest {
       _intSVValues[i] = RANDOM.nextInt();
       _longSVValues[i] = RANDOM.nextLong();
       _floatSVValues[i] = RANDOM.nextFloat();
-      _doubleSVValues[i] = RANDOM.nextDouble();
+      _doubleSVValues[i] = _intSVValues[i] * RANDOM.nextDouble();
       _stringSVValues[i] = Double.toString(RANDOM.nextDouble());
-      _double2SVValues[i] = _intSVValues[i] * RANDOM.nextDouble();
 
       int numValues = 1 + RANDOM.nextInt(MAX_NUM_MULTI_VALUES);
       _intMVValues[i] = new int[numValues];
@@ -113,7 +110,6 @@ public abstract class BaseTransformFunctionTest {
       map.put(STRING_SV_COLUMN, _stringSVValues[i]);
       map.put(INT_MV_COLUMN, ArrayUtils.toObject(_intMVValues[i]));
       map.put(TIME_COLUMN, _timeValues[i]);
-      map.put(DOUBLE2_SV_COLUMN, _double2SVValues[i]);
       GenericRow row = new GenericRow();
       row.init(map);
       rows.add(row);
@@ -127,7 +123,6 @@ public abstract class BaseTransformFunctionTest {
     schema.addField(new DimensionFieldSpec(STRING_SV_COLUMN, FieldSpec.DataType.STRING, true));
     schema.addField(new DimensionFieldSpec(INT_MV_COLUMN, FieldSpec.DataType.INT, false));
     schema.addField(new TimeFieldSpec(TIME_COLUMN, FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS));
-    schema.addField(new DimensionFieldSpec(DOUBLE2_SV_COLUMN, FieldSpec.DataType.DOUBLE, true));
 
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(schema);
     config.setOutDir(INDEX_DIR_PATH);
