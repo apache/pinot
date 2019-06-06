@@ -56,7 +56,10 @@ import org.apache.pinot.controller.helix.core.PinotTableIdealStateBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.pinot.common.utils.CommonConstants.Helix.ENABLE_DELAY_REBALANCE;
 import static org.apache.pinot.common.utils.CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME;
+import static org.apache.pinot.common.utils.CommonConstants.Helix.MIN_ACTIVE_REPLICAS;
+import static org.apache.pinot.common.utils.CommonConstants.Helix.REBALANCE_DELAY_MS;
 
 
 /**
@@ -222,9 +225,18 @@ public class HelixSetupUtils {
       leadControllerIdealState.setInstanceGroupTag(CommonConstants.Helix.CONTROLLER_INSTANCE_TYPE);
       leadControllerIdealState.setBatchMessageMode(enableBatchMessageMode);
       // The below config guarantees if active number of replicas is no less than minimum active replica, there will not be partition movements happened.
-      // Set it to 0 so that whenever a master becomes unavailable, another available instance will immediately be chosen by Helix controller to become the new master.
-      leadControllerIdealState.setMinActiveReplicas(0);
+      // Set min active replicas to 0 and rebalance delay to 5 minutes so that if any master goes offline, Helix controller waits at most 5 minutes and then re-calculate the participant assignment.
+      // This delay is helpful when periodic tasks are running and we don't want them to be re-run too frequently.
+      // Plus, if virtual id is applied to controller hosts, swapping hosts would be easy as new hosts can use the same virtual id and it takes least effort to change the configs.
+      leadControllerIdealState.setMinActiveReplicas(MIN_ACTIVE_REPLICAS);
+      leadControllerIdealState.setRebalanceDelay(REBALANCE_DELAY_MS);
+      leadControllerIdealState.setDelayRebalanceEnabled(ENABLE_DELAY_REBALANCE);
       admin.setResourceIdealState(helixClusterName, LEAD_CONTROLLER_RESOURCE_NAME, leadControllerIdealState);
+
+      // Explicitly disable this resource when creating this new resource.
+      // When all the controllers are running the code with the logic to handle this resource, it can be enabled for backward compatibility.
+      // In the next major release, we can enable this resource by default, so that all the controller logic can be separated.
+      admin.enableResource(helixClusterName, LEAD_CONTROLLER_RESOURCE_NAME, false);
 
       LOGGER.info("Re-balance lead controller resource with replicas: {}",
           CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_REPLICA_COUNT);

@@ -46,6 +46,9 @@ public class CommonConstants {
     // https://cwiki.apache.org/confluence/display/PINOT/Controller+Separation+between+Helix+and+Pinot
     public static final int NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE = 24;
     public static final int LEAD_CONTROLLER_RESOURCE_REPLICA_COUNT = 1;
+    public static final boolean ENABLE_DELAY_REBALANCE = true;
+    public static final int MIN_ACTIVE_REPLICAS = 0;
+    public static final long REBALANCE_DELAY_MS = 300_000L; // 5 minutes.
 
     public static final String UNTAGGED_SERVER_INSTANCE = "server_untagged";
     public static final String UNTAGGED_BROKER_INSTANCE = "broker_untagged";

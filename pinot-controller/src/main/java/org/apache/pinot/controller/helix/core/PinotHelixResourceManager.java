@@ -1170,7 +1170,7 @@ public class PinotHelixResourceManager {
     if (tagOverrideConfig != null) {
       String realtimeConsumingTag = tagOverrideConfig.getRealtimeConsuming();
       if (realtimeConsumingTag != null) {
-        if (!TagNameUtils.hasValidServerTagSuffix(realtimeConsumingTag)) {
+        if (!TagNameUtils.isServerTag(realtimeConsumingTag)) {
           throw new InvalidTableConfigException(
               "Invalid realtime consuming tag: " + realtimeConsumingTag + " for table " + tableNameWithType
                   + ". Must have suffix _REALTIME or _OFFLINE");
@@ -1184,7 +1184,7 @@ public class PinotHelixResourceManager {
 
       String realtimeCompletedTag = tagOverrideConfig.getRealtimeCompleted();
       if (realtimeCompletedTag != null) {
-        if (!TagNameUtils.hasValidServerTagSuffix(realtimeCompletedTag)) {
+        if (!TagNameUtils.isServerTag(realtimeCompletedTag)) {
           throw new InvalidTableConfigException(
               "Invalid realtime completed tag: " + realtimeCompletedTag + " for table " + tableNameWithType
                   + ". Must have suffix _REALTIME or _OFFLINE");

@@ -55,6 +55,7 @@ import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.ControllerRequestBuilderUtil;
 import org.apache.pinot.controller.helix.ControllerTest;
+import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.AfterMethod;
@@ -76,6 +77,7 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
   private static final int CONNECTION_TIMEOUT_IN_MILLISECOND = 10_000;
   private static final int MAX_TIMEOUT_IN_MILLISECOND = 5_000;
   private static final int MAXIMUM_NUMBER_OF_CONTROLLER_INSTANCES = 10;
+  private static final long TIMEOUT_IN_MS = 10_000L;
 
   private final String _helixClusterName = getHelixClusterName();
 
@@ -465,7 +467,8 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
   }
 
   @Test
-  public void testLeadControllerResource() {
+  public void testLeadControllerResource()
+      throws Exception {
     IdealState leadControllerResourceIdealState = _helixResourceManager.getHelixAdmin()
         .getResourceIdealState(getHelixClusterName(), CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME);
     Assert.assertTrue(leadControllerResourceIdealState.isValid());
@@ -480,15 +483,22 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
     Assert.assertTrue(leadControllerResourceIdealState.getInstanceSet(
         leadControllerResourceIdealState.getPartitionSet().iterator().next()).isEmpty());
 
-    ExternalView leadControllerResourceExternalView = _helixResourceManager.getHelixAdmin()
-        .getResourceExternalView(getHelixClusterName(), CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME);
-    for (String partition : leadControllerResourceExternalView.getPartitionSet()) {
-      Map<String, String> stateMap = leadControllerResourceExternalView.getStateMap(partition);
-      Assert.assertEquals(stateMap.size(), 1);
-      Map.Entry<String, String> entry = stateMap.entrySet().iterator().next();
-      Assert.assertEquals(entry.getKey(), PREFIX_OF_CONTROLLER_INSTANCE + LOCAL_HOST + "_" + _controllerPort);
-      Assert.assertEquals(entry.getValue(), "MASTER");
-    }
+    TestUtils
+        .waitForCondition(aVoid -> {
+              ExternalView leadControllerResourceExternalView = _helixResourceManager.getHelixAdmin()
+                  .getResourceExternalView(getHelixClusterName(), CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME);
+              for (String partition : leadControllerResourceExternalView.getPartitionSet()) {
+                Map<String, String> stateMap = leadControllerResourceExternalView.getStateMap(partition);
+                Map.Entry<String, String> entry = stateMap.entrySet().iterator().next();
+                boolean result = (PREFIX_OF_CONTROLLER_INSTANCE + LOCAL_HOST + "_" + _controllerPort).equals(entry.getKey());
+                result &= "MASTER".equals(entry.getValue());
+                if (!result) {
+                  return false;
+                }
+              }
+              return true;
+            },
+            TIMEOUT_IN_MS, "Failed to assign controller hosts to lead controller resource in " + TIMEOUT_IN_MS + " ms.");
   }
 
   @Test

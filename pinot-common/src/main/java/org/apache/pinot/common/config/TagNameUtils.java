@@ -37,10 +37,6 @@ public class TagNameUtils {
     return tenantName + "_" + TenantRole.BROKER.toString();
   }
 
-  public static boolean hasValidServerTagSuffix(String tagName) {
-    return tagName.endsWith(ServerType.REALTIME.toString()) || tagName.endsWith(ServerType.OFFLINE.toString());
-  }
-
   public static boolean isServerTag(String tagName) {
     return isOfflineServerTag(tagName) || isRealtimeServerTag(tagName);
   }
