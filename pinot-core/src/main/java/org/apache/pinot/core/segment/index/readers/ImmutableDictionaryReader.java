@@ -252,6 +252,6 @@ public abstract class ImmutableDictionaryReader extends BaseDictionary {
   }
 
   protected byte[] getBuffer() {
-    return _numBytesPerValue <= 0 ? null : new byte[_numBytesPerValue];
+    return (_valueReader instanceof VarLengthBytesValueReaderWriter) ? null : new byte[_numBytesPerValue];
   }
 }

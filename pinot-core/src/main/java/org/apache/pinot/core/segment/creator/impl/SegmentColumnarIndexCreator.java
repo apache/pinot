@@ -129,7 +129,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
         // Initialize dictionary creator
         SegmentDictionaryCreator dictionaryCreator =
-            new SegmentDictionaryCreator(indexCreationInfo.getSortedUniqueElementsArray(), fieldSpec, _indexDir);
+            new SegmentDictionaryCreator(indexCreationInfo.getSortedUniqueElementsArray(),
+                fieldSpec, _indexDir, indexCreationInfo.isUseVarLengthDictionary());
         _dictionaryCreatorMap.put(columnName, dictionaryCreator);
 
         // Create dictionary

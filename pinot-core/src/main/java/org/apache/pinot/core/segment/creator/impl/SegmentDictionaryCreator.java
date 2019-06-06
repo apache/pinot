@@ -46,6 +46,7 @@ public class SegmentDictionaryCreator implements Closeable {
   private final Object _sortedValues;
   private final FieldSpec _fieldSpec;
   private final File _dictionaryFile;
+  private final boolean _useVarLengthDictionary;
 
   private Int2IntOpenHashMap _intValueToIndexMap;
   private Long2IntOpenHashMap _longValueToIndexMap;
@@ -55,12 +56,18 @@ public class SegmentDictionaryCreator implements Closeable {
   private Object2IntOpenHashMap<ByteArray> _bytesValueToIndexMap;
   private int _numBytesPerEntry = 0;
 
-  public SegmentDictionaryCreator(Object sortedValues, FieldSpec fieldSpec, File indexDir)
-      throws IOException {
+  public SegmentDictionaryCreator(Object sortedValues, FieldSpec fieldSpec, File indexDir,
+      boolean useVarLengthDictionary) throws IOException {
     _sortedValues = sortedValues;
     _fieldSpec = fieldSpec;
     _dictionaryFile = new File(indexDir, fieldSpec.getName() + V1Constants.Dict.FILE_EXTENSION);
     FileUtils.touch(_dictionaryFile);
+    _useVarLengthDictionary = useVarLengthDictionary;
+  }
+
+  public SegmentDictionaryCreator(Object sortedValues, FieldSpec fieldSpec, File indexDir)
+      throws IOException {
+    this(sortedValues, fieldSpec, indexDir, false);
   }
 
   public void build()
@@ -196,11 +203,8 @@ public class SegmentDictionaryCreator implements Closeable {
   }
 
   private void writeBytesValueDictionary(int numValues, byte[][] sortedByteArrays) throws IOException {
-    // TODO: Fix this to be dynamic based on the standard deviation in the lengths
-    // of the values in byte array, max length of array, etc.
-    boolean useVarLenDictionary = false;
 
-    if (useVarLenDictionary) {
+    if (_useVarLengthDictionary) {
       // Backward-compatible: index file is always big-endian
       long size = VarLengthBytesValueReaderWriter.getRequiredSize(sortedByteArrays);
       try (PinotDataBuffer dataBuffer = PinotDataBuffer

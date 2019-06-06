@@ -80,6 +80,7 @@ public class SegmentGeneratorConfig {
   private Map<String, ChunkCompressorFactory.CompressionType> _rawIndexCompressionType = new HashMap<>();
   private List<String> _invertedIndexCreationColumns = new ArrayList<>();
   private List<String> _columnSortOrder = new ArrayList<>();
+  private List<String> _varLengthDictionaryColumns = new ArrayList<>();
   private String _dataDir = null;
   private String _inputFilePath = null;
   private FileFormat _format = FileFormat.AVRO;
@@ -128,6 +129,7 @@ public class SegmentGeneratorConfig {
     _rawIndexCompressionType.putAll(config._rawIndexCompressionType);
     _invertedIndexCreationColumns.addAll(config._invertedIndexCreationColumns);
     _columnSortOrder.addAll(config._columnSortOrder);
+    _varLengthDictionaryColumns.addAll(config._varLengthDictionaryColumns);
     _dataDir = config._dataDir;
     _inputFilePath = config._inputFilePath;
     _format = config._format;
@@ -274,6 +276,14 @@ public class SegmentGeneratorConfig {
   public void setColumnSortOrder(List<String> sortOrder) {
     Preconditions.checkNotNull(sortOrder);
     _columnSortOrder.addAll(sortOrder);
+  }
+
+  public List<String> getVarLengthDictionaryColumns() {
+    return _varLengthDictionaryColumns;
+  }
+
+  public void setVarLengthDictionaryColumns(List<String> _varLengthDictionaryColumns) {
+    this._varLengthDictionaryColumns = _varLengthDictionaryColumns;
   }
 
   public void createInvertedIndexForColumn(String column) {
