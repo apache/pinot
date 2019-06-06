@@ -69,19 +69,9 @@ public class HelixSetupUtils {
 
   public static synchronized HelixManager setup(String helixClusterName, String zkPath,
       String helixControllerInstanceId) {
-    try {
-      setupHelixCluster(helixClusterName, zkPath);
-    } catch (final Exception e) {
-      LOGGER.error("Caught exception when setting up Helix cluster: {}", helixClusterName, e);
-      throw e;
-    }
+    setupHelixCluster(helixClusterName, zkPath);
 
-    try {
-      return startHelixControllerInStandadloneMode(helixClusterName, zkPath, helixControllerInstanceId);
-    } catch (final Exception e) {
-      LOGGER.error("Caught exception when starting helix controller", e);
-      throw e;
-    }
+    return startHelixControllerInStandadloneMode(helixClusterName, zkPath, helixControllerInstanceId);
   }
 
   /**
@@ -101,8 +91,8 @@ public class HelixSetupUtils {
   private static HelixManager startHelixControllerInStandadloneMode(String helixClusterName, String zkUrl,
       String pinotControllerInstanceId) {
     LOGGER.info("Starting Helix Standalone Controller ... ");
-    return HelixControllerMain.startHelixController(zkUrl, helixClusterName, pinotControllerInstanceId,
-        HelixControllerMain.STANDALONE);
+    return HelixControllerMain
+        .startHelixController(zkUrl, helixClusterName, pinotControllerInstanceId, HelixControllerMain.STANDALONE);
   }
 
   /**
@@ -197,10 +187,11 @@ public class HelixSetupUtils {
         admin.getResourceIdealState(helixClusterName, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
     if (brokerResourceIdealState == null) {
       LOGGER.info("Adding empty ideal state for Broker!");
-      HelixHelper.updateResourceConfigsFor(new HashMap<>(), CommonConstants.Helix.BROKER_RESOURCE_INSTANCE,
-          helixClusterName, admin);
-      IdealState idealState = PinotTableIdealStateBuilder.buildEmptyIdealStateForBrokerResource(admin, helixClusterName,
-          enableBatchMessageMode);
+      HelixHelper
+          .updateResourceConfigsFor(new HashMap<>(), CommonConstants.Helix.BROKER_RESOURCE_INSTANCE, helixClusterName,
+              admin);
+      IdealState idealState = PinotTableIdealStateBuilder
+          .buildEmptyIdealStateForBrokerResource(admin, helixClusterName, enableBatchMessageMode);
       admin.setResourceIdealState(helixClusterName, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE, idealState);
     }
   }

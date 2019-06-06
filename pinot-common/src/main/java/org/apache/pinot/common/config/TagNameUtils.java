@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.common.config;
 
-import org.apache.pinot.common.exception.InvalidConfigException;
-import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.ServerType;
 import org.apache.pinot.common.utils.TenantRole;
 
@@ -40,10 +38,7 @@ public class TagNameUtils {
   }
 
   public static boolean hasValidServerTagSuffix(String tagName) {
-    if (tagName.endsWith(ServerType.REALTIME.toString()) || tagName.endsWith(ServerType.OFFLINE.toString())) {
-      return true;
-    }
-    return false;
+    return tagName.endsWith(ServerType.REALTIME.toString()) || tagName.endsWith(ServerType.OFFLINE.toString());
   }
 
   public static boolean isServerTag(String tagName) {
