@@ -189,6 +189,7 @@ public class SegmentDictionaryCreator implements Closeable {
           ByteArray value = sortedBytes[i];
           sortedByteArrays[i] = value.getBytes();
           _bytesValueToIndexMap.put(value, i);
+          _numBytesPerEntry = Math.max(_numBytesPerEntry, value.getBytes().length);
         }
 
         writeBytesValueDictionary(numValues, sortedByteArrays);
