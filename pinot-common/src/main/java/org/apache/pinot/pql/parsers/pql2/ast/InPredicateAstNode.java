@@ -20,8 +20,7 @@ package org.apache.pinot.pql.parsers.pql2.ast;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashSet;
-import java.util.List;
+import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.TreeSet;
 import org.apache.pinot.common.request.Expression;
@@ -95,7 +94,7 @@ public class InPredicateAstNode extends PredicateAstNode {
       throw new Pql2CompilationException("IN predicate has no identifier");
     }
 
-    List<String> values = new ArrayList<>();
+    Set<String> values = new LinkedHashSet<>();
 
     for (AstNode astNode : getChildren()) {
       if (astNode instanceof LiteralAstNode) {
@@ -111,7 +110,7 @@ public class InPredicateAstNode extends PredicateAstNode {
       filterOperator = FilterOperator.IN;
     }
 
-    return new FilterQueryTree(_identifier, values, filterOperator, null);
+    return new FilterQueryTree(_identifier, new ArrayList<>(values), filterOperator, null);
   }
 
   @Override

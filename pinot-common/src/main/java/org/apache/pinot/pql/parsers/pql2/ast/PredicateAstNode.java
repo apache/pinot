@@ -34,7 +34,6 @@ public abstract class PredicateAstNode extends BaseAstNode {
    * Create the query tree for the where clause
    *
    * @return
-   *
    */
   public abstract FilterQueryTree buildFilterQueryTree();
 
@@ -42,7 +41,6 @@ public abstract class PredicateAstNode extends BaseAstNode {
    * Create the query expression tree for the where clause
    *
    * @return
-   *
    */
   public abstract Expression buildFilterExpression();
 

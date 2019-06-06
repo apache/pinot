@@ -124,6 +124,9 @@ public class SelectAstNode extends BaseAstNode {
     if (selections != null) {
       if (_recordLimit != -1) {
         selections.setSize(_recordLimit);
+      } else {
+        // Pinot quirk: default to LIMIT 10
+        selections.setSize(10);
       }
       if (_offset != -1) {
         selections.setOffset(_offset);
@@ -150,7 +153,7 @@ public class SelectAstNode extends BaseAstNode {
   @Override
   public void updatePinotQuery(PinotQuery pinotQuery) {
     // Set data source
-    final DataSource dataSource = new DataSource();
+    DataSource dataSource = new DataSource();
     dataSource.setTableName(_resourceName);
     pinotQuery.setDataSource(dataSource);
     sendPinotQueryUpdateToChildren(pinotQuery);

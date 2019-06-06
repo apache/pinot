@@ -24,7 +24,6 @@ import java.util.List;
 import java.util.Set;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.FilterOperator;
-import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
 import org.apache.pinot.common.utils.request.HavingQueryTree;
@@ -82,10 +81,13 @@ public class RegexpLikePredicateAstNode extends PredicateAstNode {
     if (_identifier == null) {
       throw new Pql2CompilationException("REGEXP_LIKE predicate has no identifier");
     }
-    final Expression expression = RequestUtils.getFunctionExpression(FilterKind.REGEXP_LIKE.name());
+    Expression expression = RequestUtils.getFunctionExpression(FilterKind.REGEXP_LIKE.name());
     expression.getFunctionCall().addToOperands(RequestUtils.getIdentifierExpression(_identifier));
+    if (getChildren().size() > 1) {
+      throw new Pql2CompilationException("Matching more than one regex is NOT supported currently");
+    }
     for (AstNode astNode : getChildren()) {
-      expression.getFunctionCall().addToOperands(TransformExpressionTree.getExpression(astNode));
+      expression.getFunctionCall().addToOperands(RequestUtils.getExpression(astNode));
     }
     return expression;
   }

@@ -25,9 +25,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.Stack;
-import org.apache.commons.lang.StringUtils;
-import org.apache.commons.lang.mutable.MutableInt;
-import org.apache.commons.math3.analysis.function.Exp;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
@@ -38,11 +35,13 @@ import org.apache.pinot.common.request.HavingFilterQuery;
 import org.apache.pinot.common.request.HavingFilterQueryMap;
 import org.apache.pinot.common.request.Identifier;
 import org.apache.pinot.common.request.Literal;
-import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.request.Selection;
 import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
+import org.apache.pinot.pql.parsers.pql2.ast.AstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.FloatingPointLiteralAstNode;
+import org.apache.pinot.pql.parsers.pql2.ast.FunctionCallAstNode;
+import org.apache.pinot.pql.parsers.pql2.ast.IdentifierAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.IntegerLiteralAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.LiteralAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.PredicateAstNode;
@@ -62,8 +61,7 @@ public class RequestUtils {
    */
   public static void generateFilterFromTree(FilterQueryTree filterQueryTree, BrokerRequest request) {
     Map<Integer, FilterQuery> filterQueryMap = new HashMap<>();
-    MutableInt currentId = new MutableInt(0);
-    FilterQuery root = traverseFilterQueryAndPopulateMap(filterQueryTree, filterQueryMap, currentId);
+    FilterQuery root = traverseFilterQueryAndPopulateMap(filterQueryTree, filterQueryMap);
     filterQueryMap.put(root.getId(), root);
     request.setFilterQuery(root);
     FilterQueryMap mp = new FilterQueryMap();
@@ -102,8 +100,7 @@ public class RequestUtils {
 
   public static void generateFilterFromTree(HavingQueryTree filterQueryTree, BrokerRequest request) {
     Map<Integer, HavingFilterQuery> filterQueryMap = new HashMap<>();
-    MutableInt currentId = new MutableInt(0);
-    HavingFilterQuery root = traverseHavingFilterQueryAndPopulateMap(filterQueryTree, filterQueryMap, currentId);
+    HavingFilterQuery root = traverseHavingFilterQueryAndPopulateMap(filterQueryTree, filterQueryMap);
     filterQueryMap.put(root.getId(), root);
     request.setHavingFilterQuery(root);
     HavingFilterQueryMap mp = new HavingFilterQueryMap();
@@ -111,53 +108,48 @@ public class RequestUtils {
     request.setHavingFilterSubQueryMap(mp);
   }
 
-  private static FilterQuery traverseFilterQueryAndPopulateMap(FilterQueryTree tree,
-      Map<Integer, FilterQuery> filterQueryMap, MutableInt currentId) {
-    int currentNodeId = currentId.intValue();
-    currentId.increment();
-
-    final List<Integer> f = new ArrayList<>();
-    if (null != tree.getChildren()) {
-      for (final FilterQueryTree c : tree.getChildren()) {
-        final FilterQuery q = traverseFilterQueryAndPopulateMap(c, filterQueryMap, currentId);
-        int childNodeId = q.getId();
-        f.add(childNodeId);
-        filterQueryMap.put(childNodeId, q);
+  private static FilterQuery traverseFilterQueryAndPopulateMap(FilterQueryTree root,
+      Map<Integer, FilterQuery> filterQueryMap) {
+    List<Integer> childIds = new ArrayList<>();
+    List<FilterQueryTree> children = root.getChildren();
+    if (children != null) {
+      for (FilterQueryTree child : children) {
+        FilterQuery childQuery = traverseFilterQueryAndPopulateMap(child, filterQueryMap);
+        childIds.add(childQuery.getId());
       }
     }
 
+    int id = filterQueryMap.size();
     FilterQuery query = new FilterQuery();
-    query.setColumn(tree.getColumn());
-    query.setId(currentNodeId);
-    query.setNestedFilterQueryIds(f);
-    query.setOperator(tree.getOperator());
-    query.setValue(tree.getValue());
+    filterQueryMap.put(id, query);
+    query.setId(id);
+    query.setNestedFilterQueryIds(childIds);
+    query.setColumn(root.getColumn());
+    query.setOperator(root.getOperator());
+    query.setValue(root.getValue());
     return query;
   }
 
-  private static HavingFilterQuery traverseHavingFilterQueryAndPopulateMap(HavingQueryTree tree,
-      Map<Integer, HavingFilterQuery> filterQueryMap, MutableInt currentId) {
-    int currentNodeId = currentId.intValue();
-    currentId.increment();
-
-    final List<Integer> filterIds = new ArrayList<>();
-    if (null != tree.getChildren()) {
-      for (final HavingQueryTree child : tree.getChildren()) {
-        int childNodeId = currentId.intValue();
-        currentId.increment();
-        filterIds.add(childNodeId);
-        final HavingFilterQuery filterQuery = traverseHavingFilterQueryAndPopulateMap(child, filterQueryMap, currentId);
-        filterQueryMap.put(childNodeId, filterQuery);
+  private static HavingFilterQuery traverseHavingFilterQueryAndPopulateMap(HavingQueryTree root,
+      Map<Integer, HavingFilterQuery> filterQueryMap) {
+    List<Integer> childIds = new ArrayList<>();
+    List<HavingQueryTree> children = root.getChildren();
+    if (children != null) {
+      for (HavingQueryTree child : children) {
+        final HavingFilterQuery childQuery = traverseHavingFilterQueryAndPopulateMap(child, filterQueryMap);
+        childIds.add(childQuery.getId());
       }
     }
 
-    HavingFilterQuery havingFilterQuery = new HavingFilterQuery();
-    havingFilterQuery.setAggregationInfo(tree.getAggregationInfo());
-    havingFilterQuery.setId(currentNodeId);
-    havingFilterQuery.setNestedFilterQueryIds(filterIds);
-    havingFilterQuery.setOperator(tree.getOperator());
-    havingFilterQuery.setValue(tree.getValue());
-    return havingFilterQuery;
+    int id = filterQueryMap.size();
+    HavingFilterQuery query = new HavingFilterQuery();
+    filterQueryMap.put(id, query);
+    query.setId(id);
+    query.setNestedFilterQueryIds(childIds);
+    query.setAggregationInfo(root.getAggregationInfo());
+    query.setOperator(root.getOperator());
+    query.setValue(root.getValue());
+    return query;
   }
 
   /**
@@ -245,5 +237,39 @@ public class RequestUtils {
       }
     }
     return selectionColumns;
+  }
+
+  /**
+   * Returns the expression from a given {@link AstNode}, which can be one of the following:
+   * <ul>
+   *   <li> {@link FunctionCallAstNode}</li>
+   *   <li> {@link LiteralAstNode}</li>
+   *   <li> {@link PredicateAstNode}</li>
+   * </ul>
+   *
+   * @return Expression
+   */
+  public static Expression getExpression(AstNode astNode) {
+    if (astNode instanceof IdentifierAstNode) {
+      // Column name
+      return getIdentifierExpression(((IdentifierAstNode) astNode).getName());
+    } else if (astNode instanceof FunctionCallAstNode) {
+      // Function expression
+      Expression expression = getFunctionExpression(((FunctionCallAstNode) astNode).getName());
+      Function func = expression.getFunctionCall();
+      final List<? extends AstNode> operandsAstNodes = astNode.getChildren();
+      if (operandsAstNodes != null) {
+        for (AstNode child : operandsAstNodes) {
+          func.addToOperands(getExpression(child));
+        }
+      }
+      return expression;
+    } else if (astNode instanceof LiteralAstNode) {
+      return getLiteralExpression(((LiteralAstNode) astNode));
+    } else if (astNode instanceof PredicateAstNode) {
+      return ((PredicateAstNode) astNode).buildFilterExpression();
+    } else {
+      throw new IllegalStateException("Cannot get expression from " + astNode.getClass().getSimpleName());
+    }
   }
 }

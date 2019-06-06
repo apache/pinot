@@ -63,12 +63,14 @@ public class Pql2Compiler implements AbstractCompiler {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(Pql2Compiler.class);
 
+  private static final boolean VALIDATE_CONVERTER =
+      Boolean.valueOf(System.getProperty("pinot.pql.validate.converter", "false"));
+
   private static class ErrorListener extends BaseErrorListener {
 
     @Override
     public void syntaxError(@Nonnull Recognizer<?, ?> recognizer, @Nullable Object offendingSymbol,
-        int line,
-        int charPositionInLine, @Nonnull String msg, @Nullable RecognitionException e) {
+        int line, int charPositionInLine, @Nonnull String msg, @Nullable RecognitionException e) {
       throw new Pql2CompilationException(msg, offendingSymbol, line, charPositionInLine, e);
     }
   }
@@ -113,19 +115,18 @@ public class Pql2Compiler implements AbstractCompiler {
       try {
         PinotQuery pinotQuery = new PinotQuery();
         rootNode.updatePinotQuery(pinotQuery);
-        boolean validateConverter = true;
-        if (validateConverter) {
+        if (VALIDATE_CONVERTER) {
           PinotQuery2BrokerRequestConverter converter = new PinotQuery2BrokerRequestConverter();
           BrokerRequest tempBrokerRequest = converter.convert(pinotQuery);
           boolean result = validate(brokerRequest, tempBrokerRequest);
           if (!result) {
-            LOGGER.warn("Pinot query to broker request conversion failed. PQL:{}", expression);
+            LOGGER.error("Pinot query to broker request conversion failed. PQL:{}", expression);
           }
         }
         brokerRequest.setPinotQuery(pinotQuery);
       } catch (Exception e) {
         //non fatal for now.
-        LOGGER.warn("Non fatal: Failed to populate pinot query and broker request. PQL:{}",
+        LOGGER.error("Non fatal: Failed to populate pinot query and broker request. PQL:{}",
             expression, e);
       }
       return brokerRequest;

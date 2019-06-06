@@ -36,7 +36,6 @@ import org.apache.pinot.pql.parsers.Pql2Compiler;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-@Test(enabled=false)
 public class HavingClauseComparisonTests {
   @Test
   public void testBetweenComparison() {

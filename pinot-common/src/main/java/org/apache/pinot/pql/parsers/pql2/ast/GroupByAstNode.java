@@ -25,6 +25,7 @@ import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.GroupBy;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
+import org.apache.pinot.common.utils.request.RequestUtils;
 
 
 /**
@@ -45,7 +46,7 @@ public class GroupByAstNode extends BaseAstNode {
   public void updatePinotQuery(PinotQuery pinotQuery) {
     List<Expression> groupBy = new ArrayList<>();
     for (AstNode child : getChildren()) {
-      groupBy.add(TransformExpressionTree.getExpression(child));
+      groupBy.add(RequestUtils.getExpression(child));
     }
     pinotQuery.setGroupByList(groupBy);
   }

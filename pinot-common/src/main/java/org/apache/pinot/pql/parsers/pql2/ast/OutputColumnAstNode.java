@@ -22,7 +22,6 @@ import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.request.Selection;
-import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.pql.parsers.Pql2CompilationException;
 
@@ -65,7 +64,7 @@ public class OutputColumnAstNode extends BaseAstNode {
           functionExpr = RequestUtils.getFunctionExpression(node.getName());
           functionExpr.getFunctionCall().addToOperands(RequestUtils.getIdentifierExpression("*"));
         } else {
-          functionExpr = TransformExpressionTree.getExpression(astNode);
+          functionExpr = RequestUtils.getExpression(astNode);
         }
         pinotQuery.addToSelectList(functionExpr);
       } else if (astNode instanceof IdentifierAstNode) {
