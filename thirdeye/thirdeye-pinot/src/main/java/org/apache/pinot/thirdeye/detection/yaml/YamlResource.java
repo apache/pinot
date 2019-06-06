@@ -79,7 +79,7 @@ import org.apache.pinot.thirdeye.detection.spi.components.BaselineProvider;
 import org.apache.pinot.thirdeye.detection.spi.model.TimeSeries;
 import org.apache.pinot.thirdeye.detection.validators.DetectionConfigValidator;
 import org.apache.pinot.thirdeye.detection.validators.SubscriptionConfigValidator;
-import org.apache.pinot.thirdeye.detection.yaml.translator.CompositePipelineConfigTranslator;
+import org.apache.pinot.thirdeye.detection.yaml.translator.DetectionConfigTranslator;
 import org.apache.pinot.thirdeye.detection.yaml.translator.SubscriptionConfigTranslator;
 import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
 import org.slf4j.Logger;
@@ -156,7 +156,7 @@ public class YamlResource {
     }
 
     // Translate the raw yaml config to detection config object
-    DetectionConfigDTO config = new CompositePipelineConfigTranslator(yamlConfig, this.provider).translate();
+    DetectionConfigDTO config = new DetectionConfigTranslator(yamlConfig, this.provider).translate();
 
     if (existingConfig != null) {
       config.setId(existingConfig.getId());
