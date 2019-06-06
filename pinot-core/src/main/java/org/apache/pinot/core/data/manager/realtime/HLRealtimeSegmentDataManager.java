@@ -92,6 +92,7 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private final String sortedColumn;
   private final List<String> invertedIndexColumns;
   private final List<String> noDictionaryColumns;
+  private final List<String> varLengthDictionaryColumns;
   private Logger segmentLogger = LOGGER;
   private final SegmentVersion _segmentVersion;
 
@@ -144,6 +145,8 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
     // No DictionaryColumns
     noDictionaryColumns = new ArrayList<>(indexLoadingConfig.getNoDictionaryColumns());
+
+    varLengthDictionaryColumns = tableConfig.getIndexingConfig().getVarLengthDictionaryColumns();
 
     _streamConfig = new StreamConfig(tableConfig.getIndexingConfig().getStreamConfigs());
 
@@ -257,7 +260,8 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           RealtimeSegmentConverter converter =
               new RealtimeSegmentConverter(realtimeSegment, tempSegmentFolder.getAbsolutePath(), schema,
                   realtimeSegmentZKMetadata.getTableName(), timeColumnName, realtimeSegmentZKMetadata.getSegmentName(),
-                  sortedColumn, HLRealtimeSegmentDataManager.this.invertedIndexColumns, noDictionaryColumns,
+                  sortedColumn, HLRealtimeSegmentDataManager.this.invertedIndexColumns,
+                  noDictionaryColumns, varLengthDictionaryColumns,
                   null/*StarTreeIndexSpec*/); // Star tree not supported for HLC.
 
           segmentLogger.info("Trying to build segment");
