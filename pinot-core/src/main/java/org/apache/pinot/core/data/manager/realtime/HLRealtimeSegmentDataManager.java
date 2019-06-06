@@ -146,7 +146,7 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     // No DictionaryColumns
     noDictionaryColumns = new ArrayList<>(indexLoadingConfig.getNoDictionaryColumns());
 
-    varLengthDictionaryColumns = tableConfig.getIndexingConfig().getVarLengthDictionaryColumns();
+    varLengthDictionaryColumns = new ArrayList<>(indexLoadingConfig.getVarLengthDictionaryColumns());
 
     _streamConfig = new StreamConfig(tableConfig.getIndexingConfig().getStreamConfigs());
 
@@ -184,6 +184,7 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             .setSchema(schema).setCapacity(capacity)
             .setAvgNumMultiValues(indexLoadingConfig.getRealtimeAvgMultiValueCount())
             .setNoDictionaryColumns(indexLoadingConfig.getNoDictionaryColumns())
+            .setVarLengthDictionaryColumns(indexLoadingConfig.getVarLengthDictionaryColumns())
             .setInvertedIndexColumns(invertedIndexColumns).setRealtimeSegmentZKMetadata(realtimeSegmentZKMetadata)
             .setOffHeap(indexLoadingConfig.isRealtimeOffheapAllocation()).setMemoryManager(
             getMemoryManager(realtimeTableDataManager.getConsumerDir(), segmentName,
