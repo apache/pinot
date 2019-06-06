@@ -367,8 +367,7 @@ public class Deserializer {
               destinationValue = Byte.parseByte(stringValue);
             } else if (fieldType.isAssignableFrom(Character.class) || fieldType.isAssignableFrom(char.class)) {
               destinationValue = stringValue.charAt(0);
-            }
-            else {
+            } else {
               throw new RuntimeException("Unsupported conversion from " + objectType + " -> " + fieldType);
             }
           } catch (Exception e) {

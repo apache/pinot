@@ -30,14 +30,7 @@ package org.apache.pinot.common.request;
  *
  */
 public enum FilterOperator implements org.apache.thrift.TEnum {
-  AND(0),
-  OR(1),
-  EQUALITY(2),
-  NOT(3),
-  RANGE(4),
-  REGEXP_LIKE(5),
-  NOT_IN(6),
-  IN(7);
+  AND(0), OR(1), EQUALITY(2), NOT(3), RANGE(4), REGEXP_LIKE(5), NOT_IN(6), IN(7);
 
   private final int value;
 

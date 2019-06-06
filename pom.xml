@@ -146,7 +146,6 @@
       <properties>
         <argLine>-Xms4g -Xmx4g -XX:MaxPermSize=512m -XX:MaxDirectMemorySize=10g
           -Dlog4j2.configurationFile=log4j2-fatal-only.xml
-          -Djava.util.logging.config.file=logging-severe-only.properties
         </argLine>
       </properties>
     </profile>

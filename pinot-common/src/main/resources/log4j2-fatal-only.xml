@@ -29,7 +29,7 @@
   </Appenders>
   <Loggers>
     <AsyncRoot level="fatal" additivity="false">
-      <AppenderRef ref="console" />
+      <AppenderRef ref="console"/>
     </AsyncRoot>
   </Loggers>
 </Configuration>

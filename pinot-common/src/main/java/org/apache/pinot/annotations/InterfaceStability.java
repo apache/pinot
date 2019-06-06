@@ -17,7 +17,9 @@
  * under the License.
  */
 package org.apache.pinot.annotations;
+
 import java.lang.annotation.Documented;
+
 
 /**
  * Annotation to inform users of how much to rely on a particular package,
@@ -53,18 +55,21 @@ public class InterfaceStability {
    * can break compatibility only at major release (ie. at m.0).
    */
   @Documented
-  public @interface Stable {};
+  public @interface Stable {
+  }
 
   /**
    * Evolving, but can break compatibility at minor release (i.e. m.x)
    */
   @Documented
-  public @interface Evolving {};
+  public @interface Evolving {
+  }
 
   /**
    * No guarantee is provided as to reliability or stability across any
    * level of release granularity.
    */
   @Documented
-  public @interface Unstable {};
+  public @interface Unstable {
+  }
 }
