@@ -191,6 +191,8 @@ public class SegmentGeneratorConfig {
     }
     _segmentPartitionConfig = indexingConfig.getSegmentPartitionConfig();
 
+    _varLengthDictionaryColumns = indexingConfig.getVarLengthDictionaryColumns();
+
     // Star-tree V1 config
     StarTreeIndexSpec starTreeIndexSpec = indexingConfig.getStarTreeIndexSpec();
     if (starTreeIndexSpec != null) {

@@ -310,7 +310,6 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         new DefaultColumnStatistics(defaultValue  /* min */, defaultValue  /* max */, sortedArray, isSingleValue,
             totalDocs, maxNumberOfMultiValueElements);
 
-    // TODO: Is it fine not to use var length dictionary for default columns?
     ColumnIndexCreationInfo columnIndexCreationInfo =
         new ColumnIndexCreationInfo(columnStatistics, true/*createDictionary*/,
             false, ForwardIndexType.FIXED_BIT_COMPRESSED,
