@@ -34,8 +34,8 @@ import org.apache.pinot.common.segment.SegmentMetadata;
 public interface SegmentAssignmentStrategy {
 
   List<String> getAssignedInstances(HelixManager helixManager, HelixAdmin helixAdmin,
-      ZkHelixPropertyStore<ZNRecord> propertyStore, String helixClusterName, SegmentMetadata segmentMetadata,
-      int numReplicas, String tenantName);
+      ZkHelixPropertyStore<ZNRecord> propertyStore, String helixClusterName, String tableNameWithType,
+      SegmentMetadata segmentMetadata, int numReplicas, String tenantName);
 }
 
 

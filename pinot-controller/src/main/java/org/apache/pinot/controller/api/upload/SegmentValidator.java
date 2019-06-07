@@ -68,8 +68,8 @@ public class SegmentValidator {
     _controllerLeadershipManager = controllerLeadershipManager;
   }
 
-  public SegmentValidatorResponse validateSegment(SegmentMetadata segmentMetadata, File tempSegmentDir) {
-    String rawTableName = segmentMetadata.getTableName();
+  public SegmentValidatorResponse validateSegment(String rawTableName, SegmentMetadata segmentMetadata,
+      File tempSegmentDir) {
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
     String segmentName = segmentMetadata.getName();
     TableConfig offlineTableConfig =
@@ -86,7 +86,7 @@ public class SegmentValidator {
         _pinotHelixResourceManager.getSegmentMetadataZnRecord(offlineTableName, segmentName);
     // Checks whether it's a new segment or an existing one.
     if (segmentMetadataZnRecord == null) {
-      assignedInstances = _pinotHelixResourceManager.getAssignedInstancesForSegment(segmentMetadata);
+      assignedInstances = _pinotHelixResourceManager.getAssignedInstancesForSegment(rawTableName, segmentMetadata);
       if (assignedInstances.isEmpty()) {
         throw new ControllerApplicationException(LOGGER, "No assigned Instances for Segment: " + segmentName
             + ". Please check whether the table config is misconfigured.", Response.Status.INTERNAL_SERVER_ERROR);
@@ -136,7 +136,7 @@ public class SegmentValidator {
     StorageQuotaChecker quotaChecker =
         new StorageQuotaChecker(offlineTableConfig, tableSizeReader, _controllerMetrics, _pinotHelixResourceManager,
             _controllerLeadershipManager);
-    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(metadata.getTableName());
+    String offlineTableName = offlineTableConfig.getTableName();
     return quotaChecker.isSegmentStorageWithinQuota(segmentFile, offlineTableName, metadata.getName(),
         _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
   }

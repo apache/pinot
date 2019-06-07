@@ -431,8 +431,7 @@ public class MutableSegmentImpl implements MutableSegment {
 
   private ColumnDataSource getVirtualDataSource(String column) {
     VirtualColumnContext virtualColumnContext =
-        new VirtualColumnContext(NetUtil.getHostnameOrAddress(), _segmentMetadata.getTableName(), getSegmentName(),
-            column, _numDocsIndexed + 1);
+        new VirtualColumnContext(NetUtil.getHostnameOrAddress(), getSegmentName(), column, _numDocsIndexed + 1);
     VirtualColumnProvider provider =
         VirtualColumnProviderFactory.buildProvider(_schema.getFieldSpecFor(column).getVirtualColumnProvider());
     return new ColumnDataSource(provider.buildColumnIndexContainer(virtualColumnContext),

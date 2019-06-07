@@ -23,15 +23,13 @@ package org.apache.pinot.core.segment.virtualcolumn;
  */
 public class VirtualColumnContext {
   private String _hostname;
-  private String _tableName;
   private String _segmentName;
   private String _columnName;
   private int _totalDocCount;
 
-  public VirtualColumnContext(String hostname, String tableName, String segmentName, String columnName,
+  public VirtualColumnContext(String hostname, String segmentName, String columnName,
       int totalDocCount) {
     _hostname = hostname;
-    _tableName = tableName;
     _segmentName = segmentName;
     _columnName = columnName;
     _totalDocCount = totalDocCount;
@@ -39,10 +37,6 @@ public class VirtualColumnContext {
 
   public String getHostname() {
     return _hostname;
-  }
-
-  public String getTableName() {
-    return _tableName;
   }
 
   public String getSegmentName() {

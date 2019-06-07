@@ -36,7 +36,6 @@ import org.apache.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
 import org.apache.pinot.core.io.writer.impl.DirectMemoryManager;
 import org.apache.pinot.core.realtime.impl.RealtimeSegmentConfig;
 import org.apache.pinot.core.realtime.impl.RealtimeSegmentStatsHistory;
-import org.apache.pinot.core.realtime.stream.StreamMessageMetadata;
 import org.apache.pinot.core.segment.index.SegmentMetadataImpl;
 
 
@@ -51,6 +50,7 @@ public class MemoryEstimator {
   private static final String STATS_FILE_COPY_NAME = "stats.copy.ser";
 
   private final TableConfig _tableConfig;
+  private final String _tableNameWithType;
   private final File _sampleCompletedSegment;
   private final long _sampleSegmentConsumedSeconds;
   private final long _maxUsableHostMemory;
@@ -69,6 +69,7 @@ public class MemoryEstimator {
   public MemoryEstimator(TableConfig tableConfig, File sampleCompletedSegment, long sampleSegmentConsumedSeconds, long maxUsableHostMemory) {
     _maxUsableHostMemory = maxUsableHostMemory;
     _tableConfig = tableConfig;
+    _tableNameWithType = tableConfig.getTableName();
     _sampleCompletedSegment = sampleCompletedSegment;
     _sampleSegmentConsumedSeconds = sampleSegmentConsumedSeconds;
 
@@ -87,7 +88,7 @@ public class MemoryEstimator {
     }
     _avgMultiValues = getAvgMultiValues();
 
-    _tableDataDir = new File(TMP_DIR, _segmentMetadata.getTableName());
+    _tableDataDir = new File(TMP_DIR, _tableNameWithType);
     try {
       FileUtils.deleteDirectory(_tableDataDir);
     } catch (IOException e) {
@@ -120,7 +121,7 @@ public class MemoryEstimator {
     // create a config
     RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder =
         new RealtimeSegmentConfig.Builder().setSegmentName(_segmentMetadata.getName())
-            .setStreamName(_segmentMetadata.getTableName()).setSchema(_segmentMetadata.getSchema())
+            .setStreamName(_tableNameWithType).setSchema(_segmentMetadata.getSchema())
             .setCapacity(_segmentMetadata.getTotalDocs()).setAvgNumMultiValues(_avgMultiValues)
             .setNoDictionaryColumns(_noDictionaryColumns).setInvertedIndexColumns(_invertedIndexColumns)
             .setRealtimeSegmentZKMetadata(segmentZKMetadata).setOffHeap(true).setMemoryManager(memoryManager)
@@ -218,7 +219,7 @@ public class MemoryEstimator {
 
       RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder =
           new RealtimeSegmentConfig.Builder().setSegmentName(_segmentMetadata.getName())
-              .setStreamName(_segmentMetadata.getTableName()).setSchema(_segmentMetadata.getSchema())
+              .setStreamName(_tableNameWithType).setSchema(_segmentMetadata.getSchema())
               .setCapacity(totalDocs).setAvgNumMultiValues(_avgMultiValues).setNoDictionaryColumns(_noDictionaryColumns)
               .setInvertedIndexColumns(_invertedIndexColumns).setRealtimeSegmentZKMetadata(segmentZKMetadata)
               .setOffHeap(true).setMemoryManager(memoryManager).setStatsHistory(statsHistory);

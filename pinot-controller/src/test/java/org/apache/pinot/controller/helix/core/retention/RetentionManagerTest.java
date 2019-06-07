@@ -306,7 +306,6 @@ public class RetentionManagerTest {
   private SegmentMetadata mockSegmentMetadata(long startTime, long endTime, TimeUnit timeUnit) {
     long creationTime = System.currentTimeMillis();
     SegmentMetadata segmentMetadata = mock(SegmentMetadata.class);
-    when(segmentMetadata.getTableName()).thenReturn(TEST_TABLE_NAME);
     when(segmentMetadata.getName()).thenReturn(TEST_TABLE_NAME + creationTime);
     when(segmentMetadata.getIndexCreationTime()).thenReturn(creationTime);
     when(segmentMetadata.getCrc()).thenReturn(Long.toString(creationTime));

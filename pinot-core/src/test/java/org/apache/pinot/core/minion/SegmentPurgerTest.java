@@ -116,7 +116,7 @@ public class SegmentPurgerTest {
     };
 
     SegmentPurger segmentPurger =
-        new SegmentPurger(_originalIndexDir, PURGED_SEGMENT_DIR, recordPurger, recordModifier);
+        new SegmentPurger(TABLE_NAME, _originalIndexDir, PURGED_SEGMENT_DIR, recordPurger, recordModifier);
     File purgedIndexDir = segmentPurger.purgeSegment();
 
     // Check the purge/modify counter in segment purger

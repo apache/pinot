@@ -102,16 +102,12 @@ public class BenchmarkQueryEngine {
     _perfBenchmarkDriver = new PerfBenchmarkDriver(conf);
     _perfBenchmarkDriver.run();
 
-    Set<String> tables = new HashSet<String>();
     File[] segments = new File(DATA_DIRECTORY, TABLE_NAME).listFiles();
     for (File segmentDir : segments) {
       SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(segmentDir);
-      if (!tables.contains(segmentMetadata.getTableName())) {
-        _perfBenchmarkDriver.configureTable(segmentMetadata.getTableName());
-        tables.add(segmentMetadata.getTableName());
-      }
+      _perfBenchmarkDriver.configureTable(TABLE_NAME);
       System.out.println("Adding segment " + segmentDir.getAbsolutePath());
-      _perfBenchmarkDriver.addSegment(segmentMetadata);
+      _perfBenchmarkDriver.addSegment(TABLE_NAME, segmentMetadata);
     }
 
     ZkClient client = new ZkClient("localhost:2191", 10000, 10000, new ZNRecordSerializer());

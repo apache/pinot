@@ -118,7 +118,8 @@ public class SegmentAssignmentStrategyTest extends ControllerTest {
 
     for (int i = 0; i < 10; ++i) {
       _helixResourceManager
-          .addNewSegment(SegmentMetadataMockUtils.mockSegmentMetadata(TABLE_NAME_RANDOM), "downloadUrl");
+          .addNewSegment(TABLE_NAME_RANDOM, SegmentMetadataMockUtils.mockSegmentMetadata(TABLE_NAME_RANDOM),
+              "downloadUrl");
 
       // Wait for all segments appear in the external view
       while (!allSegmentsPushedToIdealState(TABLE_NAME_RANDOM, i + 1)) {
@@ -153,7 +154,8 @@ public class SegmentAssignmentStrategyTest extends ControllerTest {
     int numSegments = 20;
     for (int i = 0; i < numSegments; ++i) {
       _helixResourceManager
-          .addNewSegment(SegmentMetadataMockUtils.mockSegmentMetadata(TABLE_NAME_BALANCED), "downloadUrl");
+          .addNewSegment(TABLE_NAME_BALANCED, SegmentMetadataMockUtils.mockSegmentMetadata(TABLE_NAME_BALANCED),
+              "downloadUrl");
     }
 
     // Wait for all segments appear in the external view

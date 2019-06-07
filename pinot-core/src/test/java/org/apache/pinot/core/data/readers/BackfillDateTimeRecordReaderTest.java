@@ -49,7 +49,7 @@ import org.testng.annotations.Test;
  */
 public class BackfillDateTimeRecordReaderTest {
   private static final int NUM_ROWS = 10000;
-
+  private static final String TABLE_NAME = "myTable";
   private static String D1 = "d1";
   private static String D2 = "d2";
   private static String M1 = "m1";
@@ -138,7 +138,8 @@ public class BackfillDateTimeRecordReaderTest {
       DateTimeFieldSpec dateTimeFieldSpec, Schema schemaExpected)
       throws Exception {
     BackfillDateTimeColumn backfillDateTimeColumn =
-        new BackfillDateTimeColumn(new File("original"), new File("backup"), timeFieldSpec, dateTimeFieldSpec);
+        new BackfillDateTimeColumn(TABLE_NAME, new File("original"), new File("backup"), timeFieldSpec,
+            dateTimeFieldSpec);
     try (BackfillDateTimeRecordReader wrapperReader = backfillDateTimeColumn
         .getBackfillDateTimeRecordReader(baseRecordReader)) {
 

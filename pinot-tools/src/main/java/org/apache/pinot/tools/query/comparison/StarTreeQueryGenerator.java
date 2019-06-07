@@ -324,12 +324,13 @@ public class StarTreeQueryGenerator {
   public static void main(String[] args)
       throws Exception {
     if (args.length != 2) {
-      System.err.println("Usage: StarTreeQueryGenerator starTreeSegmentsDirectory numQueries");
+      System.err.println("Usage: StarTreeQueryGenerator tableName starTreeSegmentsDirectory numQueries");
       return;
     }
 
     // Get segment metadata for the first segment to get table name and verify query is fit for star tree.
-    File segmentsDir = new File(args[0]);
+    String tableName = args[0];
+    File segmentsDir = new File(args[1]);
     Preconditions.checkState(segmentsDir.exists());
     Preconditions.checkState(segmentsDir.isDirectory());
     File[] segments = segmentsDir.listFiles();
@@ -337,11 +338,10 @@ public class StarTreeQueryGenerator {
     File segment = segments[0];
     IndexSegment indexSegment = ImmutableSegmentLoader.load(segment, ReadMode.heap);
     SegmentMetadata segmentMetadata = indexSegment.getSegmentMetadata();
-    String tableName = segmentMetadata.getTableName();
 
     // Set up star tree query generator.
-    int numQueries = Integer.parseInt(args[1]);
-    SegmentInfoProvider infoProvider = new SegmentInfoProvider(args[0]);
+    int numQueries = Integer.parseInt(args[2]);
+    SegmentInfoProvider infoProvider = new SegmentInfoProvider(args[1]);
     StarTreeQueryGenerator generator =
         new StarTreeQueryGenerator(tableName, infoProvider.getSingleValueDimensionColumns(),
             infoProvider.getMetricColumns(), infoProvider.getSingleValueDimensionValuesMap());

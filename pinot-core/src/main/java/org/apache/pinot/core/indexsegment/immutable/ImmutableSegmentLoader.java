@@ -135,9 +135,8 @@ public class ImmutableSegmentLoader {
         FieldSpec fieldSpec = schema.getFieldSpecFor(columnName);
         VirtualColumnProvider provider =
             VirtualColumnProviderFactory.buildProvider(fieldSpec.getVirtualColumnProvider());
-        VirtualColumnContext context =
-            new VirtualColumnContext(NetUtil.getHostnameOrAddress(), segmentMetadata.getTableName(), segmentName,
-                columnName, segmentMetadata.getTotalDocs());
+        VirtualColumnContext context = new VirtualColumnContext(NetUtil.getHostnameOrAddress(), segmentName, columnName,
+            segmentMetadata.getTotalDocs());
         indexContainerMap.put(columnName, provider.buildColumnIndexContainer(context));
         segmentMetadata.getColumnMetadataMap().put(columnName, provider.buildMetadata(context));
       }

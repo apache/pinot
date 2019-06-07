@@ -1582,16 +1582,17 @@ public class PinotHelixResourceManager {
     return instanceSet;
   }
 
-  public void addNewSegment(@Nonnull SegmentMetadata segmentMetadata, @Nonnull String downloadUrl) {
-    List<String> assignedInstances = getAssignedInstancesForSegment(segmentMetadata);
-    addNewSegment(segmentMetadata, downloadUrl, null, assignedInstances);
+  public void addNewSegment(@Nonnull String rawTableName, @Nonnull SegmentMetadata segmentMetadata,
+      @Nonnull String downloadUrl) {
+    List<String> assignedInstances = getAssignedInstancesForSegment(rawTableName, segmentMetadata);
+    addNewSegment(rawTableName, segmentMetadata, downloadUrl, null, assignedInstances);
   }
 
-  public void addNewSegment(@Nonnull SegmentMetadata segmentMetadata, @Nonnull String downloadUrl, String crypter,
-      @Nonnull List<String> assignedInstances) {
+  public void addNewSegment(@Nonnull String rawTableName, @Nonnull SegmentMetadata segmentMetadata,
+      @Nonnull String downloadUrl, String crypter, @Nonnull List<String> assignedInstances) {
     Preconditions.checkNotNull(assignedInstances, "Assigned Instances should not be null!");
     String segmentName = segmentMetadata.getName();
-    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(segmentMetadata.getTableName());
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
 
     // NOTE: must first set the segment ZK metadata before trying to update ideal state because server will need the
     // segment ZK metadata to download and load the segment
@@ -1606,7 +1607,7 @@ public class PinotHelixResourceManager {
     }
     LOGGER.info("Added segment: {} of table: {} to property store", segmentName, offlineTableName);
 
-    addNewOfflineSegment(segmentMetadata, assignedInstances);
+    addNewOfflineSegment(rawTableName, segmentMetadata, assignedInstances);
     LOGGER.info("Added segment: {} of table: {} to ideal state", segmentName, offlineTableName);
   }
 
@@ -1623,9 +1624,8 @@ public class PinotHelixResourceManager {
     return ZKMetadataProvider.setOfflineSegmentZKMetadata(_propertyStore, segmentMetadata);
   }
 
-  public void refreshSegment(@Nonnull SegmentMetadata segmentMetadata,
+  public void refreshSegment(@Nonnull String offlineTableName, @Nonnull SegmentMetadata segmentMetadata,
       @Nonnull OfflineSegmentZKMetadata offlineSegmentZKMetadata) {
-    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(segmentMetadata.getTableName());
     String segmentName = segmentMetadata.getName();
 
     // NOTE: must first set the segment ZK metadata before trying to refresh because server will pick up the
@@ -1813,11 +1813,12 @@ public class PinotHelixResourceManager {
 
   /**
    * Gets assigned instances for uploading new segment.
+   * @param rawTableName Raw table name without type
    * @param segmentMetadata segment metadata
    * @return a list of assigned instances.
    */
-  public List<String> getAssignedInstancesForSegment(SegmentMetadata segmentMetadata) {
-    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(segmentMetadata.getTableName());
+  public List<String> getAssignedInstancesForSegment(String rawTableName, SegmentMetadata segmentMetadata) {
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
     TableConfig offlineTableConfig = ZKMetadataProvider.getOfflineTableConfig(_propertyStore, offlineTableName);
     Preconditions.checkNotNull(offlineTableConfig);
     int numReplicas = Integer.parseInt(offlineTableConfig.getValidationConfig().getReplication());
@@ -1825,8 +1826,8 @@ public class PinotHelixResourceManager {
     SegmentAssignmentStrategy segmentAssignmentStrategy = SegmentAssignmentStrategyFactory
         .getSegmentAssignmentStrategy(offlineTableConfig.getValidationConfig().getSegmentAssignmentStrategy());
     return segmentAssignmentStrategy
-        .getAssignedInstances(_helixZkManager, _helixAdmin, _propertyStore, _helixClusterName, segmentMetadata,
-            numReplicas, serverTenant);
+        .getAssignedInstances(_helixZkManager, _helixAdmin, _propertyStore, _helixClusterName, offlineTableName,
+            segmentMetadata, numReplicas, serverTenant);
   }
 
   /**
@@ -1836,12 +1837,14 @@ public class PinotHelixResourceManager {
    *   segment assignment strategy and replicas in the table config in the property-store.
    * - Updates ideal state such that the new segment is assigned to required set of instances as per
    *    the segment assignment strategy and replicas.
-   *
+   * @param rawTableName Raw table name without type
    * @param segmentMetadata Meta-data for the segment, used to access segmentName and tableName.
+   * @param assignedInstances Instances that are assigned to the segment
    */
   // NOTE: method should be thread-safe
-  private void addNewOfflineSegment(SegmentMetadata segmentMetadata, List<String> assignedInstances) {
-    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(segmentMetadata.getTableName());
+  private void addNewOfflineSegment(String rawTableName, SegmentMetadata segmentMetadata,
+      List<String> assignedInstances) {
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
     String segmentName = segmentMetadata.getName();
 
     // Assign new segment to instances

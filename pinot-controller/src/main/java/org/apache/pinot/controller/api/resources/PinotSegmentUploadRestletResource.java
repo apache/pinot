@@ -303,19 +303,21 @@ public class PinotSegmentUploadRestletResource {
           throw new UnsupportedOperationException("Unsupported upload type: " + uploadType);
       }
 
+      String rawTableName = segmentMetadata.getTableName();
+
       // This boolean is here for V1 segment upload, where we keep the segment in the downloadURI sent in the header.
       // We will deprecate this behavior eventually.
       if (!moveSegmentToFinalLocation) {
         LOGGER.info("Setting zkDownloadUri to {} for segment {} of table {}, skipping move", currentSegmentLocationURI,
-            segmentMetadata.getName(), segmentMetadata.getTableName());
+            segmentMetadata.getName(), rawTableName);
         zkDownloadUri = currentSegmentLocationURI;
       } else {
-        zkDownloadUri = getZkDownloadURIForSegmentUpload(segmentMetadata, provider);
+        zkDownloadUri = getZkDownloadURIForSegmentUpload(rawTableName, segmentMetadata, provider);
       }
 
       String clientAddress = InetAddress.getByName(request.getRemoteAddr()).getHostName();
       String segmentName = segmentMetadata.getName();
-      String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(segmentMetadata.getTableName());
+      String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
       LOGGER
           .info("Processing upload request for segment: {} of table: {} from client: {}", segmentName, offlineTableName,
               clientAddress);
@@ -323,15 +325,15 @@ public class PinotSegmentUploadRestletResource {
       // Validate segment
       SegmentValidatorResponse segmentValidatorResponse =
           new SegmentValidator(_pinotHelixResourceManager, _controllerConf, _executor, _connectionManager,
-              _controllerMetrics, _controllerLeadershipManager).validateSegment(segmentMetadata, tempSegmentDir);
+              _controllerMetrics, _controllerLeadershipManager)
+              .validateSegment(rawTableName, segmentMetadata, tempSegmentDir);
 
       // Zk operations
-      completeZkOperations(enableParallelPushProtection, headers, tempEncryptedFile, provider, segmentMetadata,
-          segmentName, zkDownloadUri, moveSegmentToFinalLocation, segmentValidatorResponse);
+      completeZkOperations(enableParallelPushProtection, headers, tempEncryptedFile, provider, rawTableName,
+          segmentMetadata, segmentName, zkDownloadUri, moveSegmentToFinalLocation, segmentValidatorResponse);
 
       return new SuccessResponse(
-          "Successfully uploaded segment: " + segmentMetadata.getName() + " of table: " + segmentMetadata
-              .getTableName());
+          "Successfully uploaded segment: " + segmentMetadata.getName() + " of table: " + rawTableName);
     } catch (WebApplicationException e) {
       throw e;
     } catch (Exception e) {
@@ -345,16 +347,16 @@ public class PinotSegmentUploadRestletResource {
     }
   }
 
-  private String getZkDownloadURIForSegmentUpload(SegmentMetadata segmentMetadata, FileUploadPathProvider provider)
+  private String getZkDownloadURIForSegmentUpload(String rawTableName, SegmentMetadata segmentMetadata,
+      FileUploadPathProvider provider)
       throws UnsupportedEncodingException {
     if (provider.getBaseDataDirURI().getScheme().equalsIgnoreCase(CommonConstants.Segment.LOCAL_SEGMENT_SCHEME)) {
-      return ControllerConf
-          .constructDownloadUrl(segmentMetadata.getTableName(), segmentMetadata.getName(), provider.getVip());
+      return ControllerConf.constructDownloadUrl(rawTableName, segmentMetadata.getName(), provider.getVip());
     } else {
       // Receiving .tar.gz segment upload for pluggable storage
       LOGGER.info("Using configured data dir {} for segment {} of table {}", _controllerConf.getDataDir(),
-          segmentMetadata.getName(), segmentMetadata.getTableName());
-      return StringUtil.join("/", provider.getBaseDataDirURI().toString(), segmentMetadata.getTableName(),
+          segmentMetadata.getName(), rawTableName);
+      return StringUtil.join("/", provider.getBaseDataDirURI().toString(), rawTableName,
           URLEncoder.encode(segmentMetadata.getName(), "UTF-8"));
     }
   }
@@ -386,15 +388,14 @@ public class PinotSegmentUploadRestletResource {
   }
 
   private void completeZkOperations(boolean enableParallelPushProtection, HttpHeaders headers, File tempDecryptedFile,
-      FileUploadPathProvider provider, SegmentMetadata segmentMetadata, String segmentName, String zkDownloadURI,
+      FileUploadPathProvider provider, String rawTableName, SegmentMetadata segmentMetadata, String segmentName, String zkDownloadURI,
       boolean moveSegmentToFinalLocation, SegmentValidatorResponse segmentValidatorResponse)
       throws Exception {
     String finalSegmentPath = StringUtil
-        .join("/", provider.getBaseDataDirURI().toString(), segmentMetadata.getTableName(),
-            URLEncoder.encode(segmentName, "UTF-8"));
+        .join("/", provider.getBaseDataDirURI().toString(), rawTableName, URLEncoder.encode(segmentName, "UTF-8"));
     URI finalSegmentLocationURI = new URI(finalSegmentPath);
     ZKOperator zkOperator = new ZKOperator(_pinotHelixResourceManager, _controllerConf, _controllerMetrics);
-    zkOperator.completeSegmentOperations(segmentMetadata, finalSegmentLocationURI, tempDecryptedFile,
+    zkOperator.completeSegmentOperations(rawTableName, segmentMetadata, finalSegmentLocationURI, tempDecryptedFile,
         enableParallelPushProtection, headers, zkDownloadURI, moveSegmentToFinalLocation, segmentValidatorResponse);
   }
 
