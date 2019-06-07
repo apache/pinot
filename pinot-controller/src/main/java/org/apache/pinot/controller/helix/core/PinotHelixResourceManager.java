@@ -1638,7 +1638,7 @@ public class PinotHelixResourceManager {
           "Failed to update ZK metadata for segment: " + segmentName + " of table: " + offlineTableName);
     }
     LOGGER.info("Updated segment: {} of table: {} to property store", segmentName, offlineTableName);
-    final String rawTableName = offlineSegmentZKMetadata.getTableName();
+    final String rawTableName = TableNameBuilder.extractRawTableName(offlineTableName);
     TableConfig tableConfig = ZKMetadataProvider.getOfflineTableConfig(_propertyStore, rawTableName);
     Preconditions.checkNotNull(tableConfig);
 
@@ -1646,14 +1646,14 @@ public class PinotHelixResourceManager {
       // Send a message to the servers to update the segment.
       // We return success even if we are not able to send messages (which can happen if no servers are alive).
       // For segment validation errors we would have returned earlier.
-      sendSegmentRefreshMessage(offlineSegmentZKMetadata);
+      sendSegmentRefreshMessage(offlineTableName, offlineSegmentZKMetadata);
       // Send a message to the brokers to update the table's time boundary info if the segment push type is APPEND.
       if (shouldSendTimeboundaryRefreshMsg(rawTableName, tableConfig)) {
-        sendTimeboundaryRefreshMessageToBrokers(offlineSegmentZKMetadata);
+        sendTimeboundaryRefreshMessageToBrokers(offlineTableName, offlineSegmentZKMetadata);
       }
     } else {
       // Go through the ONLINE->OFFLINE->ONLINE state transition to update the segment
-      if (!updateExistedSegment(offlineSegmentZKMetadata)) {
+      if (!updateExistedSegment(offlineTableName, offlineSegmentZKMetadata)) {
         LOGGER.error("Failed to refresh segment: {} of table: {} by the ONLINE->OFFLINE->ONLINE state transition",
             segmentName, offlineTableName);
       }
@@ -1661,13 +1661,13 @@ public class PinotHelixResourceManager {
   }
 
   // Send a message to the pinot brokers to notify them to update its Timeboundary Info.
-  private void sendTimeboundaryRefreshMessageToBrokers(OfflineSegmentZKMetadata segmentZKMetadata) {
+  private void sendTimeboundaryRefreshMessageToBrokers(String tableNameWithType,
+      OfflineSegmentZKMetadata segmentZKMetadata) {
     final String segmentName = segmentZKMetadata.getSegmentName();
-    final String rawTableName = segmentZKMetadata.getTableName();
-    final String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
+    final String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
     final int timeoutMs = -1; // Infinite timeout on the recipient.
 
-    TimeboundaryRefreshMessage refreshMessage = new TimeboundaryRefreshMessage(offlineTableName, segmentName);
+    TimeboundaryRefreshMessage refreshMessage = new TimeboundaryRefreshMessage(tableNameWithType, segmentName);
 
     Criteria recipientCriteria = new Criteria();
     // Currently Helix does not support send message to a Spectator. So we walk around the problem by sending the
@@ -1678,7 +1678,7 @@ public class PinotHelixResourceManager {
     recipientCriteria.setResource(CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
     recipientCriteria.setDataSource(Criteria.DataSource.EXTERNALVIEW);
     // The brokerResource field in the EXTERNALVIEW stores the offline table name in the Partition subfield.
-    recipientCriteria.setPartition(offlineTableName);
+    recipientCriteria.setPartition(tableNameWithType);
 
     ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
     LOGGER.info("Sending timeboundary refresh message for segment {} of table {}:{} to recipients {}", segmentName,
@@ -1692,7 +1692,7 @@ public class PinotHelixResourceManager {
       // May be the case when none of the brokers are up yet. That is OK, because when they come up they will get
       // the latest time boundary info.
       LOGGER.warn("Unable to send timeboundary refresh message for {} of table {}, nMsgs={}", segmentName,
-          offlineTableName, nMsgsSent);
+          tableNameWithType, nMsgsSent);
     }
   }
 
@@ -1776,12 +1776,13 @@ public class PinotHelixResourceManager {
    * The message is sent as session-specific, so if a new zk session is created (e.g. server restarts)
    * it will not get the message.
    *
+   * @param tableNameWithType Table name with type
    * @param segmentZKMetadata is the metadata of the newly arrived segment.
    */
   // NOTE: method should be thread-safe
-  private void sendSegmentRefreshMessage(OfflineSegmentZKMetadata segmentZKMetadata) {
+  private void sendSegmentRefreshMessage(String tableNameWithType, OfflineSegmentZKMetadata segmentZKMetadata) {
     final String segmentName = segmentZKMetadata.getSegmentName();
-    final String rawTableName = segmentZKMetadata.getTableName();
+    final String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
     final String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
     final int timeoutMs = -1; // Infinite timeout on the recipient.
 
@@ -1848,27 +1849,21 @@ public class PinotHelixResourceManager {
     HelixHelper.addSegmentToIdealState(_helixZkManager, offlineTableName, segmentName, assignedInstances);
   }
 
-  private boolean updateExistedSegment(SegmentZKMetadata segmentZKMetadata) {
-    final String tableName;
-    if (segmentZKMetadata instanceof RealtimeSegmentZKMetadata) {
-      tableName = TableNameBuilder.REALTIME.tableNameWithType(segmentZKMetadata.getTableName());
-    } else {
-      tableName = TableNameBuilder.OFFLINE.tableNameWithType(segmentZKMetadata.getTableName());
-    }
+  private boolean updateExistedSegment(String tableNameWithType, SegmentZKMetadata segmentZKMetadata) {
     final String segmentName = segmentZKMetadata.getSegmentName();
 
     HelixDataAccessor helixDataAccessor = _helixZkManager.getHelixDataAccessor();
-    PropertyKey idealStatePropertyKey = _keyBuilder.idealStates(tableName);
+    PropertyKey idealStatePropertyKey = _keyBuilder.idealStates(tableNameWithType);
 
     // Set all partitions to offline to unload them from the servers
     boolean updateSuccessful;
     do {
-      final IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableName);
+      final IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableNameWithType);
       final Set<String> instanceSet = idealState.getInstanceSet(segmentName);
       if (instanceSet == null || instanceSet.size() == 0) {
         // We are trying to refresh a segment, but there are no instances currently assigned for fielding this segment.
         // When those instances do come up, the segment will be uploaded correctly, so return success but log a warning.
-        LOGGER.warn("No instances as yet for segment {}, table {}", segmentName, tableName);
+        LOGGER.warn("No instances as yet for segment {}, table {}", segmentName, tableNameWithType);
         return true;
       }
       for (final String instance : instanceSet) {
@@ -1878,7 +1873,7 @@ public class PinotHelixResourceManager {
     } while (!updateSuccessful);
 
     // Check that the ideal state has been written to ZK
-    IdealState updatedIdealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableName);
+    IdealState updatedIdealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableNameWithType);
     Map<String, String> instanceStateMap = updatedIdealState.getInstanceStateMap(segmentName);
     for (String state : instanceStateMap.values()) {
       if (!"OFFLINE".equals(state)) {
@@ -1889,7 +1884,7 @@ public class PinotHelixResourceManager {
 
     // Wait until the partitions are offline in the external view
     LOGGER.info("Wait until segment - " + segmentName + " to be OFFLINE in ExternalView");
-    if (!ifExternalViewChangeReflectedForState(tableName, segmentName, "OFFLINE",
+    if (!ifExternalViewChangeReflectedForState(tableNameWithType, segmentName, "OFFLINE",
         _externalViewOnlineToOfflineTimeoutMillis, false)) {
       LOGGER
           .error("External view for segment {} did not reflect the ideal state of OFFLINE within the {} ms time limit",
@@ -1899,7 +1894,7 @@ public class PinotHelixResourceManager {
 
     // Set all partitions to online so that they load the new segment data
     do {
-      final IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableName);
+      final IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableNameWithType);
       final Set<String> instanceSet = idealState.getInstanceSet(segmentName);
       LOGGER.info("Found {} instances for segment '{}', in ideal state", instanceSet.size(), segmentName);
       for (final String instance : instanceSet) {
@@ -1910,7 +1905,7 @@ public class PinotHelixResourceManager {
     } while (!updateSuccessful);
 
     // Check that the ideal state has been written to ZK
-    updatedIdealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableName);
+    updatedIdealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableNameWithType);
     instanceStateMap = updatedIdealState.getInstanceStateMap(segmentName);
     LOGGER
         .info("Found {} instances for segment '{}', after updating ideal state", instanceStateMap.size(), segmentName);

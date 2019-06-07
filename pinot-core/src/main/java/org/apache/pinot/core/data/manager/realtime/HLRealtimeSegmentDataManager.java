@@ -258,7 +258,7 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           // lets convert the segment now
           RealtimeSegmentConverter converter =
               new RealtimeSegmentConverter(realtimeSegment, tempSegmentFolder.getAbsolutePath(), schema,
-                  realtimeSegmentZKMetadata.getTableName(), timeColumnName, realtimeSegmentZKMetadata.getSegmentName(),
+                  tableName, timeColumnName, realtimeSegmentZKMetadata.getSegmentName(),
                   sortedColumn, HLRealtimeSegmentDataManager.this.invertedIndexColumns, noDictionaryColumns,
                   null/*StarTreeIndexSpec*/); // Star tree not supported for HLC.
 
@@ -348,7 +348,7 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           try {
             segmentLogger.info("Marking current segment as completed in Helix");
             RealtimeSegmentZKMetadata metadataToOverwrite = new RealtimeSegmentZKMetadata();
-            metadataToOverwrite.setTableName(realtimeSegmentZKMetadata.getTableName());
+            metadataToOverwrite.setTableName(tableName);
             metadataToOverwrite.setSegmentName(realtimeSegmentZKMetadata.getSegmentName());
             metadataToOverwrite.setSegmentType(SegmentType.OFFLINE);
             metadataToOverwrite.setStatus(Status.DONE);

@@ -38,11 +38,11 @@ public class TimeRetentionStrategy implements RetentionStrategy {
   }
 
   @Override
-  public boolean isPurgeable(SegmentZKMetadata segmentZKMetadata) {
+  public boolean isPurgeable(String tableNameWithType, SegmentZKMetadata segmentZKMetadata) {
     TimeUnit timeUnit = segmentZKMetadata.getTimeUnit();
     if (timeUnit == null) {
       LOGGER.warn("Time unit is not set for {} segment: {} of table: {}", segmentZKMetadata.getSegmentType(),
-          segmentZKMetadata.getSegmentName(), segmentZKMetadata.getTableName());
+          segmentZKMetadata.getSegmentName(), tableNameWithType);
       return false;
     }
     long endTime = segmentZKMetadata.getEndTime();
@@ -51,7 +51,7 @@ public class TimeRetentionStrategy implements RetentionStrategy {
     // Check that the end time is between 1971 and 2071
     if (!TimeUtils.timeValueInValidRange(endTimeMs)) {
       LOGGER.warn("{} segment: {} of table: {} has invalid end time: {} {}", segmentZKMetadata.getSegmentType(),
-          segmentZKMetadata.getSegmentName(), segmentZKMetadata.getTableName(), endTime, timeUnit);
+          segmentZKMetadata.getSegmentName(), tableNameWithType, endTime, timeUnit);
       return false;
     }
 
