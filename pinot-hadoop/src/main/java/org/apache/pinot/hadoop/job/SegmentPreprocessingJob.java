@@ -54,6 +54,7 @@ import org.apache.pinot.common.config.ColumnPartitionConfig;
 import org.apache.pinot.common.config.IndexingConfig;
 import org.apache.pinot.common.config.SegmentPartitionConfig;
 import org.apache.pinot.common.config.TableConfig;
+import org.apache.pinot.common.config.TableCustomConfig;
 import org.apache.pinot.hadoop.io.CombineAvroKeyInputFormat;
 import org.apache.pinot.hadoop.job.mappers.SegmentPreprocessingMapper;
 import org.apache.pinot.hadoop.job.partitioners.GenericPartitioner;
@@ -65,7 +66,6 @@ import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.mapreduce.MRJobConfig.*;
 import static org.apache.hadoop.security.UserGroupInformation.*;
-import static org.apache.pinot.hadoop.job.JobConfigConstants.*;
 
 
 /**
@@ -94,11 +94,11 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
   private final Path _inputSegmentDir;
   private final Path _preprocessedOutputDir;
   protected final String _rawTableName;
+  protected final List<PushLocation> _pushLocations;
 
   // Optional.
   private final Path _pathToDependencyJar;
   private final String _defaultPermissionsMask;
-  protected final List<PushLocation> _pushLocations;
 
   private TableConfig _tableConfig;
   protected FileSystem _fileSystem;
@@ -106,24 +106,31 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
   public SegmentPreprocessingJob(final Properties properties) {
     super(properties);
 
-    if (_properties.getProperty(ENABLE_PARTITIONING) != null) {
-      _enablePartitioning = Boolean.parseBoolean(_properties.getProperty(ENABLE_PARTITIONING));
+    if (_properties.getProperty(JobConfigConstants.ENABLE_PARTITIONING) != null) {
+      _enablePartitioning = Boolean.parseBoolean(_properties.getProperty(JobConfigConstants.ENABLE_PARTITIONING));
     }
 
-    if (_properties.getProperty(ENABLE_SORTING) != null) {
-      _enableSorting = Boolean.parseBoolean(_properties.getProperty(ENABLE_SORTING));
+    if (_properties.getProperty(JobConfigConstants.ENABLE_SORTING) != null) {
+      _enableSorting = Boolean.parseBoolean(_properties.getProperty(JobConfigConstants.ENABLE_SORTING));
     }
 
-    if (!_enablePartitioning && _properties.getProperty(ENABLE_RESIZING) != null) {
-      _enableResizing = Boolean.parseBoolean(_properties.getProperty(ENABLE_RESIZING));
+    boolean resizingForcedDisabled = false;
+    if (_properties.getProperty(JobConfigConstants.ENABLE_RESIZING) != null) {
+      if (!_enablePartitioning) {
+        _enableResizing = Boolean.parseBoolean(_properties.getProperty(JobConfigConstants.ENABLE_RESIZING));
+      } else {
+        resizingForcedDisabled = true;
+        _logger.warn("Resizing cannot be enabled since partitioning has already been enabled!");
+      }
     }
 
     // get input/output paths.
-    _inputSegmentDir = Preconditions.checkNotNull(getPathFromProperty(PATH_TO_INPUT));
-    _preprocessedOutputDir = Preconditions.checkNotNull(getPathFromProperty(PATH_TO_OUTPUT));
+    _inputSegmentDir = Preconditions.checkNotNull(getPathFromProperty(JobConfigConstants.PATH_TO_INPUT));
+    _preprocessedOutputDir =
+        Preconditions.checkNotNull(getPathFromProperty(JobConfigConstants.PREPROCESS_PATH_TO_OUTPUT));
     _rawTableName = Preconditions.checkNotNull(_properties.getProperty(JobConfigConstants.SEGMENT_TABLE_NAME));
 
-    _pathToDependencyJar = getPathFromProperty(PATH_TO_DEPS_JAR);
+    _pathToDependencyJar = getPathFromProperty(JobConfigConstants.PATH_TO_DEPS_JAR);
     _defaultPermissionsMask = _properties.getProperty(JobConfigConstants.DEFAULT_PERMISSIONS_MASK, null);
 
     // Optional push location and table parameters. If set, will use the table config and schema from the push hosts.
@@ -133,21 +140,25 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
       _pushLocations =
           PushLocation.getPushLocations(StringUtils.split(pushHostsString, ','), Integer.parseInt(pushPortString));
     } else {
-      _pushLocations = null;
+      throw new RuntimeException(String
+          .format("Push location is mis-configured! %s: %s, %s: %s", JobConfigConstants.PUSH_TO_HOSTS, pushHostsString,
+              JobConfigConstants.PUSH_TO_PORT, pushPortString));
     }
 
     _logger.info("*********************************************************************");
     _logger.info("enable.partitioning: {}", _enablePartitioning);
     _logger.info("enable.sorting: {}", _enableSorting);
-    _logger.info("enable.resizing: {}", _enableResizing);
+    _logger.info("enable.resizing: {} {}", _enableResizing,
+        (resizingForcedDisabled ? "(forced to be disabled since partitioning is enabled)" : ""));
     _logger.info("path.to.input: {}", _inputSegmentDir);
-    _logger.info("path.to.output: {}", _preprocessedOutputDir);
+    _logger.info("preprocess.path.to.output: {}", _preprocessedOutputDir);
     _logger.info("path.to.deps.jar: {}", _pathToDependencyJar);
     _logger.info("push.locations: {}", _pushLocations);
     _logger.info("*********************************************************************");
   }
 
-  public void run() throws Exception {
+  public void run()
+      throws Exception {
     if (!_enablePartitioning && !_enableSorting && !_enableResizing) {
       _logger.info("Pre-processing job is disabled.");
       return;
@@ -165,18 +176,18 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
     JobPreparationHelper.setDirPermission(_fileSystem, _preprocessedOutputDir, _defaultPermissionsMask);
 
     _tableConfig = getTableConfig();
-    assert _tableConfig != null : "Table config shouldn't be null";
+    Preconditions.checkArgument(_tableConfig != null, "Table config shouldn't be null");
 
     if (_enablePartitioning) {
       fetchPartitioningConfig();
-      _logger.info("{}: {}", PARTITION_COLUMN, _partitionColumn);
-      _logger.info("{}: {}", NUMBER_OF_PARTITIONS, _numberOfPartitions);
-      _logger.info("{}: {}", PARTITION_FUNCTION, _partitionColumn);
+      _logger.info("partition.column: {}", _partitionColumn);
+      _logger.info("num.partitions: {}", _numberOfPartitions);
+      _logger.info("partition.function: {}", _partitionColumn);
     }
 
     if (_enableSorting) {
       fetchSortingConfig();
-      _logger.info("{}: {}", SORTED_COLUMN, _sortedColumn);
+      _logger.info("sorted.column: {}", _sortedColumn);
     }
 
     if (_enableResizing) {
@@ -204,6 +215,9 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
     Schema schema = getSchema(inputDataPath.get(0));
     _logger.info("Schema is: {}", schema.toString(true));
 
+    // Validates configs against schema.
+    validateConfigsAgainstSchema(schema);
+
     // Mapper configs.
     job.setMapperClass(SegmentPreprocessingMapper.class);
     job.setMapOutputKeyClass(AvroKey.class);
@@ -214,12 +228,10 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
     job.setReducerClass(SegmentPreprocessingReducer.class);
     job.setOutputKeyClass(AvroKey.class);
     job.setOutputValueClass(NullWritable.class);
-    if (_properties.getProperty(MAXIMUM_NUMBER_OF_RECORDS) != null) {
-      _logger.info("Setting {} to {}", MAXIMUM_NUMBER_OF_RECORDS, _properties.getProperty(MAXIMUM_NUMBER_OF_RECORDS));
-      job.getConfiguration().set(MAXIMUM_NUMBER_OF_RECORDS, _properties.getProperty(MAXIMUM_NUMBER_OF_RECORDS));
-    }
+
     AvroMultipleOutputs.addNamedOutput(job, "avro", AvroKeyOutputFormat.class, schema);
     AvroMultipleOutputs.setCountersEnabled(job, true);
+    // Use LazyOutputFormat to avoid creating empty files.
     LazyOutputFormat.setOutputFormatClass(job, AvroKeyOutputFormat.class);
 
     // Input and output paths.
@@ -233,16 +245,13 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
     // Partition configs.
     int numReduceTasks = (_numberOfPartitions != 0) ? _numberOfPartitions : inputDataPath.size();
     if (_partitionColumn != null) {
-      // If partition column is specified, the other 2 param have to be specified as well.
-      assert _numberOfPartitions != 0 : "Number of partitions should not be 0!";
-      assert _partitionFunction != null : "Partition function should be specified in table config!";
-      job.getConfiguration().set(ENABLE_PARTITIONING, "true");
+      job.getConfiguration().set(JobConfigConstants.ENABLE_PARTITIONING, "true");
       job.setPartitionerClass(GenericPartitioner.class);
-      job.getConfiguration().set(PARTITION_COLUMN, _partitionColumn);
+      job.getConfiguration().set("partition.column", _partitionColumn);
       if (_partitionFunction != null) {
-        job.getConfiguration().set(PARTITION_FUNCTION, _partitionFunction);
+        job.getConfiguration().set("partition.function", _partitionFunction);
       }
-      job.getConfiguration().set(NUMBER_OF_PARTITIONS, Integer.toString(numReduceTasks));
+      job.getConfiguration().set("num.partitions", Integer.toString(numReduceTasks));
     } else {
       if (_numberOfOutputFiles > 0) {
         numReduceTasks = _numberOfOutputFiles;
@@ -251,6 +260,7 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
       // so that all the rows can be spread evenly.
       addHashCodeField(fieldSet);
     }
+    setMaxNumRecordsConfigIfSpecified(job);
     job.setInputFormatClass(CombineAvroKeyInputFormat.class);
 
     _logger.info("Number of reduce tasks for pre-processing job: {}", numReduceTasks);
@@ -259,7 +269,7 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
     // Sort config.
     if (_sortedColumn != null) {
       _logger.info("Adding sorted column: {} to job config", _sortedColumn);
-      job.getConfiguration().set(SORTED_COLUMN, _sortedColumn);
+      job.getConfiguration().set("sorted.column", _sortedColumn);
 
       addSortedColumnField(schema, fieldSet);
     } else {
@@ -285,7 +295,7 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
       _logger.info("Copying jars locally.");
       JobPreparationHelper.addDepsJarToDistributedCacheHelper(_fileSystem, job, _pathToDependencyJar);
     } else {
-      _logger.info("Property '{}' not specified.", PATH_TO_DEPS_JAR);
+      _logger.info("Property '{}' not specified.", JobConfigConstants.PATH_TO_DEPS_JAR);
     }
 
     long startTime = System.currentTimeMillis();
@@ -319,7 +329,7 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
     SegmentPartitionConfig segmentPartitionConfig = _tableConfig.getIndexingConfig().getSegmentPartitionConfig();
     if (segmentPartitionConfig != null) {
       Map<String, ColumnPartitionConfig> columnPartitionMap = segmentPartitionConfig.getColumnPartitionMap();
-      assert columnPartitionMap.size() <= 1 : "There should be at most 1 partition setting in the table.";
+      Preconditions.checkArgument(columnPartitionMap.size() <= 1, "There should be at most 1 partition setting in the table.");
       if (columnPartitionMap.size() == 1) {
         _partitionColumn = columnPartitionMap.keySet().iterator().next();
         _numberOfPartitions = segmentPartitionConfig.getNumPartitions(_partitionColumn);
@@ -334,17 +344,38 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
     // Fetch sorting info from table config.
     IndexingConfig indexingConfig = _tableConfig.getIndexingConfig();
     List<String> sortedColumns = indexingConfig.getSortedColumn();
-    assert sortedColumns.size() <= 1 : "There should be at most 1 sorted column in the table.";
+    Preconditions.checkArgument(sortedColumns.size() <= 1, "There should be at most 1 sorted column in the table.");
     if (sortedColumns.size() == 1) {
       _sortedColumn = sortedColumns.get(0);
     }
   }
 
   private void fetchResizingConfig() {
-    if (_properties.getProperty(MINIMUM_NUMBER_OF_OUTPUT_FILES) != null) {
-      _numberOfOutputFiles = Integer.parseInt(_properties.getProperty(MINIMUM_NUMBER_OF_OUTPUT_FILES));
+    TableCustomConfig tableCustomConfig = _tableConfig.getCustomConfig();
+    if (tableCustomConfig == null) {
+      _numberOfOutputFiles = 0;
+      return;
+    }
+    Map<String, String> customConfigsMap = tableCustomConfig.getCustomConfigs();
+    if (customConfigsMap != null && customConfigsMap.containsKey("min.num.output.files")) {
+      _numberOfOutputFiles = Integer.parseInt(customConfigsMap.get("min.num.output.files"));
+      Preconditions.checkArgument(_numberOfOutputFiles > 0, String.format("The value of min.num.output.files should be positive! Current value: %s", customConfigsMap.get("min.num.output.files")));
     } else {
       _numberOfOutputFiles = 0;
+    }
+  }
+
+  private void setMaxNumRecordsConfigIfSpecified(Job job) {
+    TableCustomConfig tableCustomConfig = _tableConfig.getCustomConfig();
+    if (tableCustomConfig == null) {
+      return;
+    }
+    Map<String, String> customConfigsMap = tableCustomConfig.getCustomConfigs();
+    if (customConfigsMap != null && customConfigsMap.containsKey("max.num.records")) {
+      int maxNumRecords = Integer.parseInt(customConfigsMap.get("max.num.records"));
+      Preconditions.checkArgument(maxNumRecords > 0, "The value of max.num.records should be positive. Current value: " + customConfigsMap.get("max.num.records"));
+      _logger.info("Setting max.num.records to {}", maxNumRecords);
+      job.getConfiguration().set("max.num.records", Integer.toString(maxNumRecords));
     }
   }
 
@@ -354,7 +385,8 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
    * @return Input schema
    * @throws IOException exception when accessing to IO
    */
-  private static Schema getSchema(Path inputPathDir) throws IOException {
+  private static Schema getSchema(Path inputPathDir)
+      throws IOException {
     FileSystem fs = FileSystem.get(new Configuration());
     Schema avroSchema = null;
     for (FileStatus fileStatus : fs.listStatus(inputPathDir)) {
@@ -373,7 +405,8 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
    * @return Schema in avro file
    * @throws IOException exception when accessing to IO
    */
-  private static Schema extractSchemaFromAvro(Path avroFile) throws IOException {
+  private static Schema extractSchemaFromAvro(Path avroFile)
+      throws IOException {
     DataFileStream<GenericRecord> dataStreamReader = getAvroReader(avroFile);
     Schema avroSchema = dataStreamReader.getSchema();
     dataStreamReader.close();
@@ -388,7 +421,8 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
    * @return Avro reader for the file.
    * @throws IOException exception when accessing to IO
    */
-  private static DataFileStream<GenericRecord> getAvroReader(Path avroFile) throws IOException {
+  private static DataFileStream<GenericRecord> getAvroReader(Path avroFile)
+      throws IOException {
     FileSystem fs = FileSystem.get(new Configuration());
     if (avroFile.getName().endsWith("gz")) {
       return new DataFileStream<>(new GZIPInputStream(fs.open(avroFile)), new GenericDatumReader<>());
@@ -403,11 +437,28 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
     Schema sortedColumnAsKeySchema;
     if (sortedColumnSchema.getType().equals(Schema.Type.UNION)) {
       sortedColumnAsKeySchema = Schema.createUnion(sortedColumnSchema.getTypes());
+    } else if (sortedColumnSchema.getType().equals(Schema.Type.ARRAY)) {
+      sortedColumnAsKeySchema = Schema.createArray(sortedColumnSchema.getElementType());
     } else {
       sortedColumnAsKeySchema = Schema.create(sortedColumnSchema.getType());
     }
     Schema.Field columnField = new Schema.Field(_sortedColumn, sortedColumnAsKeySchema, "sortedColumn", null);
     fieldSet.add(columnField);
+  }
+
+  private void validateConfigsAgainstSchema(Schema schema) {
+    if (_enablePartitioning) {
+      Preconditions.checkArgument(_partitionColumn != null, "Partition column should not be null!");
+      Preconditions.checkArgument(schema.getField(_partitionColumn) != null, String
+          .format("Partition column: %s is not found from the schema of input files.", _partitionColumn));
+      Preconditions.checkArgument(_numberOfPartitions > 0, String.format("Number of partitions should be positive. Current value: %s", _numberOfPartitions));
+      Preconditions.checkArgument(_partitionFunction != null, "Partition function should not be null!");
+    }
+    if (_enableSorting) {
+      Preconditions.checkArgument(_sortedColumn != null, "Sorted column should not be null!");
+      Preconditions.checkArgument(schema.getField(_sortedColumn) != null, String
+          .format("Sorted column: %s is not found from the schema of input files.", _sortedColumn));
+    }
   }
 
   private void addHashCodeField(Set<Schema.Field> fieldSet) {
@@ -417,6 +468,7 @@ public class SegmentPreprocessingJob extends BaseSegmentJob {
 
   @Override
   protected boolean isDataFile(String fileName) {
+    // TODO: support orc format in the future.
     return fileName.endsWith(".avro");
   }
 

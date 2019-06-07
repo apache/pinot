@@ -21,6 +21,7 @@ package org.apache.pinot.hadoop.job;
 public class JobConfigConstants {
   public static final String PATH_TO_INPUT = "path.to.input";
   public static final String PATH_TO_OUTPUT = "path.to.output";
+  public static final String PREPROCESS_PATH_TO_OUTPUT = "preprocess.path.to.output";
   public static final String PATH_TO_DEPS_JAR = "path.to.deps.jar";
   public static final String PATH_TO_READER_CONFIG = "path.to.reader.config";
   // Leave this for backward compatibility. We prefer to use the schema fetched from the controller.
@@ -56,13 +57,4 @@ public class JobConfigConstants {
   public static final String ENABLE_PARTITIONING = "enable.partitioning";
   public static final String ENABLE_SORTING = "enable.sorting";
   public static final String ENABLE_RESIZING = "enable.resizing";
-
-  public static final String PARTITION_COLUMN = "partition.column";
-  public static final String NUMBER_OF_PARTITIONS = "num.partitions";
-  public static final String PARTITION_FUNCTION = "partition.function";
-
-  public static final String SORTED_COLUMN = "sorted.column";
-
-  public static final String MINIMUM_NUMBER_OF_OUTPUT_FILES = "min.num.output.files";
-  public static final String MAXIMUM_NUMBER_OF_RECORDS = "max.num.records";
 }

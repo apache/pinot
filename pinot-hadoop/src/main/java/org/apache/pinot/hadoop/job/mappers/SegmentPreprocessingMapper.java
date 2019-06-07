@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.hadoop.job.mappers;
 
+import com.google.common.base.Preconditions;
 import java.io.IOException;
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericData;
@@ -34,8 +35,7 @@ import org.slf4j.LoggerFactory;
 import static org.apache.pinot.hadoop.job.JobConfigConstants.*;
 
 
-public class SegmentPreprocessingMapper
-    extends Mapper<AvroKey<GenericRecord>, NullWritable, AvroKey<GenericRecord>, AvroValue<GenericRecord>> {
+public class SegmentPreprocessingMapper extends Mapper<AvroKey<GenericRecord>, NullWritable, AvroKey<GenericRecord>, AvroValue<GenericRecord>> {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentPreprocessingMapper.class);
   private String _sortedColumn = null;
   private Schema _outputKeySchema;
@@ -46,7 +46,7 @@ public class SegmentPreprocessingMapper
   public void setup(final Context context) {
     Configuration configuration = context.getConfiguration();
 
-    String sortedColumn = configuration.get(SORTED_COLUMN);
+    String sortedColumn = configuration.get("sorted.column");
     // Logging the configs for the mapper
     LOGGER.info("Sorted Column: " + sortedColumn);
     if (sortedColumn != null) {
@@ -63,7 +63,7 @@ public class SegmentPreprocessingMapper
       throws IOException, InterruptedException {
     final GenericRecord inputRecord = record.datum();
     final Schema schema = inputRecord.getSchema();
-    assert _outputSchema.equals(schema) : "The schema of all avro files should be the same!";
+    Preconditions.checkArgument(_outputSchema.equals(schema), "The schema of all avro files should be the same!");
 
     GenericRecord outputKey = new GenericData.Record(_outputKeySchema);
     if (_sortedColumn == null) {

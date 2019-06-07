@@ -29,17 +29,14 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.apache.avro.file.DataFileStream;
+import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericRecord;
-import org.apache.avro.mapred.AvroKey;
-import org.apache.avro.mapred.AvroKeyComparator;
-import org.apache.avro.util.Utf8;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.io.serializer.avro.AvroRecord;
 import org.apache.hadoop.mapreduce.v2.MiniMRYarnCluster;
 import org.apache.pinot.common.config.ColumnPartitionConfig;
 import org.apache.pinot.common.config.SegmentPartitionConfig;
@@ -185,7 +182,7 @@ public class HadoopSegmentBuildPushOfflineClusterIntegrationTest extends BaseClu
     preComputeProperties.setProperty(ENABLE_SORTING, Boolean.TRUE.toString());
 
     preComputeProperties.setProperty(JobConfigConstants.PATH_TO_INPUT, _avroDir.getPath());
-    preComputeProperties.setProperty(JobConfigConstants.PATH_TO_OUTPUT, _preprocessingDir.getPath());
+    preComputeProperties.setProperty(JobConfigConstants.PREPROCESS_PATH_TO_OUTPUT, _preprocessingDir.getPath());
     properties.setProperty(JobConfigConstants.PATH_TO_INPUT, _preprocessingDir.getPath());
 
     // Run segment pre-processing job
@@ -239,34 +236,14 @@ public class HadoopSegmentBuildPushOfflineClusterIntegrationTest extends BaseClu
         GenericRecord genericRecord = dataFileStream.next();
         partitionIdSet.add(partitionFunction.getPartition(genericRecord.get(partitionColumn)));
         Assert.assertEquals(partitionIdSet.size(), 1, "Partition Id should be the same within a file.");
-        org.apache.avro.Schema.Type type = genericRecord.getSchema().getField(sortedColumn).schema().getType();
-        if (type.equals(org.apache.avro.Schema.Type.UNION)) {
-          type = genericRecord.getSchema().getField(sortedColumn).schema().getTypes().get(0).getType();
-        }
+        org.apache.avro.Schema sortedColumnSchema = genericRecord.getSchema().getField(sortedColumn).schema();
         Object currentObject = genericRecord.get(sortedColumn);
         if (previousObject == null) {
           previousObject = currentObject;
           continue;
         }
         // The values of sorted column should be sorted in ascending order.
-        switch (type) {
-          case STRING:
-            Utf8 u1 = previousObject instanceof Utf8 ? (Utf8)previousObject : new Utf8(previousObject.toString());
-            Utf8 u2 = currentObject instanceof Utf8 ? (Utf8)currentObject : new Utf8(currentObject.toString());
-            Assert.assertTrue(u1.compareTo(u2) <= 0);
-            break;
-          case INT:
-            Assert.assertTrue(((Integer)previousObject).compareTo(((Integer)currentObject)) <= 0);
-            break;
-          case LONG:
-            Assert.assertTrue(((Long)previousObject).compareTo(((Long)currentObject)) <= 0);
-            break;
-          case BOOLEAN:
-            Assert.assertTrue(((Boolean)previousObject).compareTo(((Boolean)currentObject)) <= 0);
-            break;
-          default:
-            break;
-        }
+        Assert.assertTrue(GenericData.get().compare(previousObject, currentObject, sortedColumnSchema) <= 0);
         previousObject = currentObject;
       }
     }

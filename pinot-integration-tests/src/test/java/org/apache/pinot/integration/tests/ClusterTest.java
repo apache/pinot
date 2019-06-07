@@ -330,7 +330,8 @@ public abstract class ClusterTest extends ControllerTest {
   protected void updateOfflineTable(String tableName, String timeColumnName, String timeType, String brokerTenant,
       String serverTenant, String loadMode, SegmentVersion segmentVersion, List<String> invertedIndexColumns,
       List<String> bloomFilterColumns, TableTaskConfig taskConfig, SegmentPartitionConfig segmentPartitionConfig,
-      String sortedColumn) throws Exception {
+      String sortedColumn)
+      throws Exception {
     TableConfig tableConfig =
         getOfflineTableConfig(tableName, timeColumnName, timeType, brokerTenant, serverTenant, loadMode, segmentVersion,
             invertedIndexColumns, bloomFilterColumns, taskConfig, segmentPartitionConfig, sortedColumn);
@@ -346,19 +347,11 @@ public abstract class ClusterTest extends ControllerTest {
       String brokerTenant, String serverTenant, String loadMode, SegmentVersion segmentVersion,
       List<String> invertedIndexColumns, List<String> bloomFilterColumns, TableTaskConfig taskConfig,
       SegmentPartitionConfig segmentPartitionConfig, String sortedColumn) {
-    return new TableConfig.Builder(Helix.TableType.OFFLINE).setTableName(tableName)
-        .setTimeColumnName(timeColumnName)
-        .setTimeType(timeType)
-        .setNumReplicas(3)
-        .setBrokerTenant(brokerTenant)
-        .setServerTenant(serverTenant)
-        .setLoadMode(loadMode)
-        .setSegmentVersion(segmentVersion.toString())
-        .setInvertedIndexColumns(invertedIndexColumns)
-        .setBloomFilterColumns(bloomFilterColumns)
-        .setTaskConfig(taskConfig)
-        .setSegmentPartitionConfig(segmentPartitionConfig)
-        .setSortedColumn(sortedColumn)
+    return new TableConfig.Builder(Helix.TableType.OFFLINE).setTableName(tableName).setTimeColumnName(timeColumnName)
+        .setTimeType(timeType).setNumReplicas(3).setBrokerTenant(brokerTenant).setServerTenant(serverTenant)
+        .setLoadMode(loadMode).setSegmentVersion(segmentVersion.toString())
+        .setInvertedIndexColumns(invertedIndexColumns).setBloomFilterColumns(bloomFilterColumns)
+        .setTaskConfig(taskConfig).setSegmentPartitionConfig(segmentPartitionConfig).setSortedColumn(sortedColumn)
         .build();
   }
 

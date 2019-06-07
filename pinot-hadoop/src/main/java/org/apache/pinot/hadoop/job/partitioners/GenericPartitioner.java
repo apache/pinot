@@ -27,11 +27,8 @@ import org.apache.pinot.core.data.partition.PartitionFunction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.hadoop.job.JobConfigConstants.*;
 
-
-public class GenericPartitioner<T> extends Partitioner<T, AvroValue<GenericRecord>>
-    implements Configurable {
+public class GenericPartitioner<T> extends Partitioner<T, AvroValue<GenericRecord>> implements Configurable {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(GenericPartitioner.class);
   private Configuration _configuration;
@@ -42,10 +39,10 @@ public class GenericPartitioner<T> extends Partitioner<T, AvroValue<GenericRecor
   @Override
   public void setConf(Configuration conf) {
     _configuration = conf;
-    _partitionColumn = _configuration.get(PARTITION_COLUMN);
-    _numPartitions = Integer.parseInt(_configuration.get(NUMBER_OF_PARTITIONS));
+    _partitionColumn = _configuration.get("partition.column");
+    _numPartitions = Integer.parseInt(_configuration.get("num.partitions"));
     _partitionFunction =
-        PartitionFunctionFactory.getPartitionFunction(_configuration.get(PARTITION_FUNCTION, null), _numPartitions);
+        PartitionFunctionFactory.getPartitionFunction(_configuration.get("partition.function", null), _numPartitions);
 
     LOGGER.info("The partition function is: " + _partitionFunction.getClass().getName());
     LOGGER.info("The partition column is: " + _partitionColumn);
@@ -58,8 +55,7 @@ public class GenericPartitioner<T> extends Partitioner<T, AvroValue<GenericRecor
   }
 
   @Override
-  public int getPartition(T genericRecordAvroKey, AvroValue<GenericRecord> genericRecordAvroValue,
-      int numPartitions) {
+  public int getPartition(T genericRecordAvroKey, AvroValue<GenericRecord> genericRecordAvroValue, int numPartitions) {
     final GenericRecord inputRecord = genericRecordAvroValue.datum();
     final Object partitionColumnValue = inputRecord.get(_partitionColumn);
     return _partitionFunction.getPartition(partitionColumnValue);

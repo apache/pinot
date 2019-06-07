@@ -31,11 +31,8 @@ import org.apache.hadoop.mapreduce.Reducer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.hadoop.job.JobConfigConstants.*;
 
-
-public class SegmentPreprocessingReducer<T>
-    extends Reducer<T, AvroValue<GenericRecord>, AvroKey<GenericRecord>, NullWritable> {
+public class SegmentPreprocessingReducer<T> extends Reducer<T, AvroValue<GenericRecord>, AvroKey<GenericRecord>, NullWritable> {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentPreprocessingReducer.class);
 
   private AvroMultipleOutputs _multipleOutputs;
@@ -51,7 +48,7 @@ public class SegmentPreprocessingReducer<T>
     _counter = new AtomicInteger();
     // If it's 0, the output file won't be split into multiple files.
     // If not, output file will be split when the number of records reaches this number.
-    _maxNumberOfRecords = configuration.getInt(MAXIMUM_NUMBER_OF_RECORDS, 0);
+    _maxNumberOfRecords = configuration.getInt("max.num.records", 0);
     LOGGER.info("Maximum number of records per file: {}", _maxNumberOfRecords);
     _filePrefix = RandomStringUtils.randomAlphanumeric(4);
   }
@@ -66,7 +63,8 @@ public class SegmentPreprocessingReducer<T>
   }
 
   @Override
-  public void cleanup(Context context) throws IOException, InterruptedException {
+  public void cleanup(Context context)
+      throws IOException, InterruptedException {
     LOGGER.info("Clean up reducer.");
     if (_multipleOutputs != null) {
       _multipleOutputs.close();
