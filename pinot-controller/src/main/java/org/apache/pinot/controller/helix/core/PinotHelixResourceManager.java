@@ -53,6 +53,7 @@ import org.apache.helix.PropertyKey;
 import org.apache.helix.PropertyKey.Builder;
 import org.apache.helix.PropertyPathBuilder;
 import org.apache.helix.ZNRecord;
+import org.apache.helix.examples.MasterSlaveStateModelFactory;
 import org.apache.helix.manager.zk.ZkBaseDataAccessor;
 import org.apache.helix.manager.zk.ZkCacheBaseDataAccessor;
 import org.apache.helix.model.CurrentState;
@@ -60,6 +61,7 @@ import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.LiveInstance;
+import org.apache.helix.model.MasterSlaveSMD;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.config.IndexingConfig;
 import org.apache.pinot.common.config.OfflineTagConfig;
@@ -92,7 +94,6 @@ import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.BrokerOnli
 import org.apache.pinot.common.utils.CommonConstants.Helix.StateModel.SegmentOnlineOfflineStateModel;
 import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
 import org.apache.pinot.common.utils.SchemaUtils;
-import org.apache.pinot.common.utils.TenantRole;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.common.utils.helix.PinotHelixPropertyStoreZnRecordProvider;
 import org.apache.pinot.common.utils.retry.RetryPolicies;
@@ -157,15 +158,10 @@ public class PinotHelixResourceManager {
     _allowHLCTables = allowHLCTables;
   }
 
-  public PinotHelixResourceManager(@Nonnull String zkURL, @Nonnull String helixClusterName,
-      @Nonnull String controllerInstanceId, @Nonnull String dataDir) {
-    this(zkURL, helixClusterName, controllerInstanceId, dataDir, DEFAULT_EXTERNAL_VIEW_UPDATE_TIMEOUT_MILLIS, false,
-        true, true);
-  }
-
   public PinotHelixResourceManager(@Nonnull ControllerConf controllerConf) {
     this(controllerConf.getZkStr(), controllerConf.getHelixClusterName(),
-        controllerConf.getControllerHost() + "_" + controllerConf.getControllerPort(), controllerConf.getDataDir(),
+        CommonConstants.Helix.PREFIX_OF_CONTROLLER_INSTANCE + controllerConf.getControllerHost() + "_"
+            + controllerConf.getControllerPort(), controllerConf.getDataDir(),
         controllerConf.getExternalViewOnlineToOfflineTimeout(), controllerConf.tenantIsolationEnabled(),
         controllerConf.getEnableBatchMessageMode(), controllerConf.getHLCTablesAllowed());
   }
@@ -185,6 +181,10 @@ public class PinotHelixResourceManager {
     _cacheInstanceConfigsDataAccessor =
         new ZkCacheBaseDataAccessor<>((ZkBaseDataAccessor<ZNRecord>) baseDataAccessor, instanceConfigs, null,
             Collections.singletonList(instanceConfigs));
+
+    // Add instance group tag for controller
+    addInstanceGroupTagIfNeeded();
+
     _keyBuilder = _helixDataAccessor.keyBuilder();
     _segmentDeletionManager = new SegmentDeletionManager(_dataDir, _helixAdmin, _helixClusterName, _propertyStore);
     ZKMetadataProvider.setClusterTenantIsolationEnabled(_propertyStore, _isSingleTenantCluster);
@@ -259,9 +259,13 @@ public class PinotHelixResourceManager {
    * Register and connect to Helix cluster as PARTICIPANT role.
    */
   private HelixManager registerAndConnectAsHelixParticipant() {
-    HelixManager helixManager = HelixManagerFactory
-        .getZKHelixManager(_helixClusterName, CommonConstants.Helix.PREFIX_OF_CONTROLLER_INSTANCE + _instanceId,
-            InstanceType.PARTICIPANT, _helixZkURL);
+    HelixManager helixManager =
+        HelixManagerFactory.getZKHelixManager(_helixClusterName, _instanceId, InstanceType.PARTICIPANT, _helixZkURL);
+
+    // Registers Master-Slave state model to state machine engine, which is for calculating participant assignment in lead controller resource.
+    helixManager.getStateMachineEngine()
+        .registerStateModelFactory(MasterSlaveSMD.name, new MasterSlaveStateModelFactory());
+
     try {
       helixManager.connect();
       return helixManager;
@@ -270,6 +274,20 @@ public class PinotHelixResourceManager {
           String.format("Exception when connecting the instance %s as Participant to Helix.", _instanceId);
       LOGGER.error(errorMsg, e);
       throw new RuntimeException(errorMsg);
+    }
+  }
+
+  /**
+   * Add instance group tag for controller so that pinot controller can be assigned to lead controller resource.
+   */
+  private void addInstanceGroupTagIfNeeded() {
+    InstanceConfig instanceConfig = getHelixInstanceConfig(_instanceId);
+    if (!instanceConfig.containsTag(CommonConstants.Helix.CONTROLLER_INSTANCE_TYPE)) {
+      LOGGER.info("Controller: {} doesn't contain group tag: {}. Adding one.", _instanceId,
+          CommonConstants.Helix.CONTROLLER_INSTANCE_TYPE);
+      instanceConfig.addTag(CommonConstants.Helix.CONTROLLER_INSTANCE_TYPE);
+      HelixDataAccessor accessor = _helixZkManager.getHelixDataAccessor();
+      accessor.setProperty(accessor.keyBuilder().instanceConfig(_instanceId), instanceConfig);
     }
   }
 
@@ -835,20 +853,8 @@ public class PinotHelixResourceManager {
     for (String instanceName : instancesInCluster) {
       InstanceConfig config = _helixDataAccessor.getProperty(_keyBuilder.instanceConfig(instanceName));
       for (String tag : config.getTags()) {
-        if (tag.equals(CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE) || tag
-            .equals(CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE) || tag
-            .equals(CommonConstants.Minion.UNTAGGED_INSTANCE)) {
-          continue;
-        }
-        TenantRole tenantRole;
-        try {
-          tenantRole = TagNameUtils.getTenantRoleFromTag(tag);
-          if (tenantRole == TenantRole.BROKER) {
-            tenantSet.add(TagNameUtils.getTenantNameFromTag(tag));
-          }
-        } catch (InvalidConfigException e) {
-          LOGGER.warn("Instance {} contains an invalid tag: {}", instanceName, tag);
-          continue;
+        if (TagNameUtils.isBrokerTag(tag)) {
+          tenantSet.add(TagNameUtils.getTenantNameFromTag(tag));
         }
       }
     }
@@ -861,20 +867,8 @@ public class PinotHelixResourceManager {
     for (String instanceName : instancesInCluster) {
       InstanceConfig config = _helixDataAccessor.getProperty(_keyBuilder.instanceConfig(instanceName));
       for (String tag : config.getTags()) {
-        if (tag.equals(CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE) || tag
-            .equals(CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE) || tag
-            .equals(CommonConstants.Minion.UNTAGGED_INSTANCE)) {
-          continue;
-        }
-        TenantRole tenantRole;
-        try {
-          tenantRole = TagNameUtils.getTenantRoleFromTag(tag);
-          if (tenantRole == TenantRole.SERVER) {
-            tenantSet.add(TagNameUtils.getTenantNameFromTag(tag));
-          }
-        } catch (InvalidConfigException e) {
-          LOGGER.warn("Instance {} contains an invalid tag: {}", instanceName, tag);
-          continue;
+        if (TagNameUtils.isServerTag(tag)) {
+          tenantSet.add(TagNameUtils.getTenantNameFromTag(tag));
         }
       }
     }
@@ -1176,7 +1170,7 @@ public class PinotHelixResourceManager {
     if (tagOverrideConfig != null) {
       String realtimeConsumingTag = tagOverrideConfig.getRealtimeConsuming();
       if (realtimeConsumingTag != null) {
-        if (!TagNameUtils.hasValidServerTagSuffix(realtimeConsumingTag)) {
+        if (!TagNameUtils.isServerTag(realtimeConsumingTag)) {
           throw new InvalidTableConfigException(
               "Invalid realtime consuming tag: " + realtimeConsumingTag + " for table " + tableNameWithType
                   + ". Must have suffix _REALTIME or _OFFLINE");
@@ -1190,7 +1184,7 @@ public class PinotHelixResourceManager {
 
       String realtimeCompletedTag = tagOverrideConfig.getRealtimeCompleted();
       if (realtimeCompletedTag != null) {
-        if (!TagNameUtils.hasValidServerTagSuffix(realtimeCompletedTag)) {
+        if (!TagNameUtils.isServerTag(realtimeCompletedTag)) {
           throw new InvalidTableConfigException(
               "Invalid realtime completed tag: " + realtimeCompletedTag + " for table " + tableNameWithType
                   + ". Must have suffix _REALTIME or _OFFLINE");

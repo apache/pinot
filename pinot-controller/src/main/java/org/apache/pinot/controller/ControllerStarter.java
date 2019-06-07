@@ -219,8 +219,7 @@ public class ControllerStarter {
   private void setUpHelixController() {
     // Register and connect instance as Helix controller.
     LOGGER.info("Starting Helix controller");
-    _helixControllerManager = HelixSetupUtils
-        .setup(_helixClusterName, _helixZkURL, _instanceId, _isUpdateStateModel, _enableBatchMessageMode);
+    _helixControllerManager = HelixSetupUtils.setup(_helixClusterName, _helixZkURL, _instanceId);
 
     // Emit helix controller metrics
     _controllerMetrics.addCallbackGauge(CommonConstants.Helix.INSTANCE_CONNECTED_METRIC_NAME,
@@ -243,6 +242,9 @@ public class ControllerStarter {
     if (_controllerMode == ControllerConf.ControllerMode.PINOT_ONLY && !isPinotOnlyModeSupported()) {
       throw new RuntimeException("Pinot only controller currently isn't supported in production yet.");
     }
+
+    // Set up Pinot cluster in Helix
+    HelixSetupUtils.setupPinotCluster(_helixClusterName, _helixZkURL, _isUpdateStateModel, _enableBatchMessageMode);
 
     // Start all components
     initPinotFSFactory();
