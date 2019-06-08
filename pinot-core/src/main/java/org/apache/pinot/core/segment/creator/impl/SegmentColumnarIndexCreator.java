@@ -157,8 +157,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
                   indexCreationInfo.getTotalNumberOfEntries()));
         }
 
-        // Initialize inverted index creator
-        // Skip creating inverted index if sorted; _invertedIndexCreatorMap is also correctly populated for metadata writing
+        // Initialize inverted index creator; skip creating inverted index if sorted
         if (invertedIndexColumns.contains(columnName) && !indexCreationInfo.isSorted()) {
           if (segmentCreationSpec.isOnHeap()) {
             _invertedIndexCreatorMap
