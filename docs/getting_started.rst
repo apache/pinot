@@ -41,7 +41,8 @@ Pinot requires JDK 8 or later and Apache Maven 3.
 
 #. Check out the code from GitHub (https://github.com/apache/incubator-pinot)
 #. With Maven installed, run ``mvn install package -DskipTests -Pbin-dist`` in the directory in which you checked out Pinot.
-#. Make the generated scripts executable ``cd pinot-distribution/target/apache-pinot-incubating-<version>-SNAPSHOT-bin; chmod +x bin/*.sh``
+#. Set pinot version variable ``export PINOT_VERSION=0.2.0``
+#. Make the generated scripts executable ``cd pinot-distribution/target/apache-pinot-incubating-$PINOT_VERSION-SNAPSHOT-bin/apache-pinot-incubating-$PINOT_VERSION-SNAPSHOT-bin; chmod +x bin/*.sh``
 
 Trying out Offline quickstart demo
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -154,7 +155,7 @@ To upload the schema, we can use the command below:
 
 .. code-block:: none
 
-  $ ./pinot-distribution/target/apache-pinot-incubating-0.1.0-SNAPSHOT-bin/apache-pinot-incubating-0.1.0-SNAPSHOT-bin/bin/pinot-admin.sh AddSchema -schemaFile /Users/host1/transcript-schema.json -exec
+  $ ./pinot-distribution/target/apache-pinot-incubating-$PINOT_VERSION-SNAPSHOT-bin/apache-pinot-incubating-$PINOT_VERSION-SNAPSHOT-bin/bin/pinot-admin.sh AddSchema -schemaFile /Users/host1/transcript-schema.json -exec
   Executing command: AddSchema -controllerHost [controller_host] -controllerPort 9000 -schemaFilePath /Users/host1/transcript-schema.json -exec
   Sending request: http://[controller_host]:9000/schemas to controller: [controller_host], version: 0.1.0-SNAPSHOT-2c5d42a908213122ab0ad8b7ac9524fcf390e4cb
 
@@ -174,7 +175,7 @@ Then, we need to specify the table config which links the schema to this table:
       "server":"DefaultTenant"
     },
     "tableIndexConfig" : {
-      "invertedIndexColumns" : [],
+      "invertedIndexColumns" : ["ThisFieldIsNotFunctioningInQuickStart!"],
       "loadMode"  : "HEAP",
       "lazyLoad"  : "false"
     },
@@ -186,7 +187,7 @@ And upload the table config to Pinot cluster:
 
 .. code-block:: none
 
-  $ ./pinot-distribution/target/apache-pinot-incubating-0.1.0-SNAPSHOT-bin/apache-pinot-incubating-0.1.0-SNAPSHOT-bin/bin/pinot-admin.sh AddTable -filePath /Users/host1/transcript-table-config.json -exec
+  $ ./pinot-distribution/target/apache-pinot-incubating-$PINOT_VERSION-SNAPSHOT-bin/apache-pinot-incubating-$PINOT_VERSION-SNAPSHOT-bin/bin/pinot-admin.sh AddTable -filePath /Users/host1/transcript-table-config.json -exec
   Executing command: AddTable -filePath /Users/host1/transcript-table-config.json -controllerHost [controller_host] -controllerPort 9000 -exec
   {"status":"Table transcript_OFFLINE successfully added"}
 
@@ -194,7 +195,7 @@ In order to upload our data to Pinot cluster, we need to convert our CSV file to
 
 .. code-block:: none
 
-  $ ./pinot-distribution/target/apache-pinot-incubating-0.1.0-SNAPSHOT-bin/apache-pinot-incubating-0.1.0-SNAPSHOT-bin/bin/pinot-admin.sh CreateSegment -dataDir /Users/host1/Desktop/test/ -format CSV -outDir /Users/host1/Desktop/test2/ -tableName transcript -segmentName transcript_0 -overwrite -schemaFile /Users/host1/transcript-schema.json
+  $ ./pinot-distribution/target/apache-pinot-incubating-$PINOT_VERSION-SNAPSHOT-bin/apache-pinot-incubating-$PINOT_VERSION-SNAPSHOT-bin/bin/pinot-admin.sh CreateSegment -dataDir /Users/host1/Desktop/test/ -format CSV -outDir /Users/host1/Desktop/test2/ -tableName transcript -segmentName transcript_0 -overwrite -schemaFile /Users/host1/transcript-schema.json
   Executing command: CreateSegment  -generatorConfigFile null -dataDir /Users/host1/Desktop/test/ -format CSV -outDir /Users/host1/Desktop/test2/ -overwrite true -tableName transcript -segmentName transcript_0 -timeColumnName null -schemaFile /Users/host1/transcript-schema.json -readerConfigFile null -enableStarTreeIndex false -starTreeIndexSpecFile null -hllSize 9 -hllColumns null -hllSuffix _hll -numThreads 1
   Accepted files: [/Users/host1/Desktop/test/Transcript.csv]
   Finished building StatsCollector!
@@ -215,11 +216,19 @@ In order to upload our data to Pinot cluster, we need to convert our CSV file to
   Driver, stats collector time : 0
   Driver, indexing time : 0
 
+Furthermore, if we want to set the inverted index, a generator config file needs to be added using ``-generatorConfigFile`` option to the above command:
+
+.. code-block:: none
+
+  {
+    "invertedIndexCreationColumns": ["studentID","lastName"]
+  }
+
 Once we have the Pinot segment, we can upload this segment to our cluster:
 
 .. code-block:: none
 
-  $ ./pinot-distribution/target/apache-pinot-incubating-0.1.0-SNAPSHOT-bin/apache-pinot-incubating-0.1.0-SNAPSHOT-bin/bin/pinot-admin.sh UploadSegment -segmentDir /Users/host1/Desktop/test2/
+  $ ./pinot-distribution/target/apache-pinot-incubating-$PINOT_VERSION-SNAPSHOT-bin/apache-pinot-incubating-$PINOT_VERSION-SNAPSHOT-bin/bin/pinot-admin.sh UploadSegment -segmentDir /Users/host1/Desktop/test2/
   Executing command: UploadSegment -controllerHost [controller_host] -controllerPort 9000 -segmentDir /Users/host1/Desktop/test2/
   Compressing segment transcript_0_0
   Uploading segment transcript_0_0.tar.gz
@@ -231,7 +240,7 @@ To get all the number of rows in the table:
 
 .. code-block:: none
 
-  $ ./pinot-distribution/target/apache-pinot-incubating-0.1.0-SNAPSHOT-bin/apache-pinot-incubating-0.1.0-SNAPSHOT-bin/bin/pinot-admin.sh PostQuery -brokerPort 8000 -query "select count(*) from transcript"
+  $ ./pinot-distribution/target/apache-pinot-incubating-$PINOT_VERSION-SNAPSHOT-bin/apache-pinot-incubating-$PINOT_VERSION-SNAPSHOT-bin/bin/pinot-admin.sh PostQuery -brokerPort 8000 -query "select count(*) from transcript"
   Executing command: PostQuery -brokerHost [controller_host] -brokerPort 8000 -query select count(*) from transcript
   Result: {"aggregationResults":[{"function":"count_star","value":"4"}],"exceptions":[],"numServersQueried":1,"numServersResponded":1,"numSegmentsQueried":1,"numSegmentsProcessed":1,"numSegmentsMatched":1,"numDocsScanned":4,"numEntriesScannedInFilter":0,"numEntriesScannedPostFilter":0,"numGroupsLimitReached":false,"totalDocs":4,"timeUsedMs":7,"segmentStatistics":[],"traceInfo":{}}
 
@@ -239,7 +248,7 @@ To get the average score of subject Maths:
 
 .. code-block:: none
 
-  $ ./pinot-distribution/target/apache-pinot-incubating-0.1.0-SNAPSHOT-bin/apache-pinot-incubating-0.1.0-SNAPSHOT-bin/bin/pinot-admin.sh PostQuery -brokerPort 8000 -query "select avg(score) from transcript where subject = \"Maths\""
+  $ ./pinot-distribution/target/apache-pinot-incubating-$PINOT_VERSION-SNAPSHOT-bin/apache-pinot-incubating-$PINOT_VERSION-SNAPSHOT-bin/bin/pinot-admin.sh PostQuery -brokerPort 8000 -query "select avg(score) from transcript where subject = \"Maths\""
   Executing command: PostQuery -brokerHost [controller_host] -brokerPort 8000 -query select avg(score) from transcript where subject = "Maths"
   Result: {"aggregationResults":[{"function":"avg_score","value":"3.50000"}],"exceptions":[],"numServersQueried":1,"numServersResponded":1,"numSegmentsQueried":1,"numSegmentsProcessed":1,"numSegmentsMatched":1,"numDocsScanned":2,"numEntriesScannedInFilter":4,"numEntriesScannedPostFilter":2,"numGroupsLimitReached":false,"totalDocs":4,"timeUsedMs":33,"segmentStatistics":[],"traceInfo":{}}
 
@@ -247,6 +256,6 @@ To get the average score for Lucy Smith:
 
 .. code-block:: none
 
-  $ ./pinot-distribution/target/apache-pinot-incubating-0.1.0-SNAPSHOT-bin/apache-pinot-incubating-0.1.0-SNAPSHOT-bin/bin/pinot-admin.sh PostQuery -brokerPort 8000 -query "select avg(score) from transcript where firstName = \"Lucy\" and lastName = \"Smith\""
+  $ ./pinot-distribution/target/apache-pinot-incubating-$PINOT_VERSION-SNAPSHOT-bin/apache-pinot-incubating-$PINOT_VERSION-SNAPSHOT-bin/bin/pinot-admin.sh PostQuery -brokerPort 8000 -query "select avg(score) from transcript where firstName = \"Lucy\" and lastName = \"Smith\""
   Executing command: PostQuery -brokerHost [controller_host] -brokerPort 8000 -query select avg(score) from transcript where firstName = "Lucy" and lastName = "Smith"
   Result: {"aggregationResults":[{"function":"avg_score","value":"3.65000"}],"exceptions":[],"numServersQueried":1,"numServersResponded":1,"numSegmentsQueried":1,"numSegmentsProcessed":1,"numSegmentsMatched":1,"numDocsScanned":2,"numEntriesScannedInFilter":6,"numEntriesScannedPostFilter":2,"numGroupsLimitReached":false,"totalDocs":4,"timeUsedMs":67,"segmentStatistics":[],"traceInfo":{}}
