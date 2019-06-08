@@ -23,10 +23,13 @@ import java.util.List;
 import java.util.Map;
 
 import javax.annotation.Nonnull;
+
+import org.apache.pinot.common.data.FieldSpec.DataType;
 import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
+import org.apache.pinot.core.util.ArrayCopyUtils;
 
 /**
  * A group of commonly used math transformation which has only one single parameter,
@@ -34,14 +37,14 @@ import org.apache.pinot.core.plan.DocIdSetPlanNode;
  */
 public abstract class SingleParamMathTransformFunction extends BaseTransformFunction {
   private TransformFunction _transformFunction;
-  private double[] _results;
+  protected double[] _results;
 
   @Override
   public abstract String getName();
 
   @Override
   public void init(@Nonnull List<TransformFunction> arguments, @Nonnull Map<String, DataSource> dataSourceMap) {
-    // Check that there are exactly 1 arguments
+    // Check that there are exactly 1 argument
     if (arguments.size() != 1) {
       throw new IllegalArgumentException("Exactly 1 arguments are required for " + getName() + " transform function");
     }
@@ -62,7 +65,6 @@ public abstract class SingleParamMathTransformFunction extends BaseTransformFunc
     return DOUBLE_SV_NO_DICTIONARY_METADATA;
   }
 
-  @SuppressWarnings("Duplicates")
   @Override
   public double[] transformToDoubleValuesSV(@Nonnull ProjectionBlock projectionBlock) {
     if (_results == null) {
@@ -71,26 +73,19 @@ public abstract class SingleParamMathTransformFunction extends BaseTransformFunc
 
     int length = projectionBlock.getNumDocs();
 
-    if (_transformFunction == null) {
-      Arrays.fill(_results, 0, length, 0);
+    if (_transformFunction.getResultMetadata().getDataType() == DataType.STRING) {
+      String[] stringValues = _transformFunction.transformToStringValuesSV(projectionBlock);
+      ArrayCopyUtils.copy(stringValues, _results, length);
+      applyMathOperator(_results, length);
     } else {
-      switch (_transformFunction.getResultMetadata().getDataType()) {
-        case INT:
-        case LONG:
-        case FLOAT:
-        case DOUBLE:
-          double[] doubleValues = _transformFunction.transformToDoubleValuesSV(projectionBlock);
-          applyMathOperator(_results, doubleValues, length);
-          break;
-        default:
-          throw new UnsupportedOperationException();
-      }
+      double[] doubleValues = _transformFunction.transformToDoubleValuesSV(projectionBlock);
+      applyMathOperator(doubleValues, length);
     }
 
     return _results;
   }
 
-  abstract protected void applyMathOperator(double[] result, double[] values, int length);
+  abstract protected void applyMathOperator(double[] values, int length);
 
   public static class AbsTransformFunction extends SingleParamMathTransformFunction {
     public static final String FUNCTION_NAME = "abs";
@@ -101,9 +96,9 @@ public abstract class SingleParamMathTransformFunction extends BaseTransformFunc
     }
 
     @Override
-    protected void applyMathOperator(double[] result, double[] values, int length) {
+    protected void applyMathOperator(double[] values, int length) {
       for (int i = 0; i < length; i++) {
-        result[i] = Math.abs(values[i]);
+        _results[i] = Math.abs(values[i]);
       }
     }
   }
@@ -117,9 +112,9 @@ public abstract class SingleParamMathTransformFunction extends BaseTransformFunc
     }
 
     @Override
-    protected void applyMathOperator(double[] result, double[] values, int length) {
+    protected void applyMathOperator(double[] values, int length) {
       for (int i = 0; i < length; i++) {
-        result[i] = Math.ceil(values[i]);
+        _results[i] = Math.ceil(values[i]);
       }
     }
   }
@@ -133,9 +128,9 @@ public abstract class SingleParamMathTransformFunction extends BaseTransformFunc
     }
 
     @Override
-    protected void applyMathOperator(double[] result, double[] values, int length) {
+    protected void applyMathOperator(double[] values, int length) {
       for (int i = 0; i < length; i++) {
-        result[i] = Math.exp(values[i]);
+        _results[i] = Math.exp(values[i]);
       }
     }
   }
@@ -149,9 +144,25 @@ public abstract class SingleParamMathTransformFunction extends BaseTransformFunc
     }
 
     @Override
-    protected void applyMathOperator(double[] result, double[] values, int length) {
+    protected void applyMathOperator(double[] values, int length) {
       for (int i = 0; i < length; i++) {
-        result[i] = Math.floor(values[i]);
+        _results[i] = Math.floor(values[i]);
+      }
+    }
+  }
+
+  public static class LnTransformFunction extends SingleParamMathTransformFunction {
+    public static final String FUNCTION_NAME = "ln";
+
+    @Override
+    public String getName() {
+      return FUNCTION_NAME;
+    }
+
+    @Override
+    protected void applyMathOperator(double[] values, int length) {
+      for (int i = 0; i < length; i++) {
+        _results[i] = Math.log(values[i]);
       }
     }
   }
@@ -165,11 +176,10 @@ public abstract class SingleParamMathTransformFunction extends BaseTransformFunc
     }
 
     @Override
-    protected void applyMathOperator(double[] result, double[] values, int length) {
+    protected void applyMathOperator(double[] values, int length) {
       for (int i = 0; i < length; i++) {
-        result[i] = Math.sqrt(values[i]);
+        _results[i] = Math.sqrt(values[i]);
       }
     }
   }
-
 }
