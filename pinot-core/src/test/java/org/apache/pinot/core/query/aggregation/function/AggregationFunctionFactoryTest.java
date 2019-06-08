@@ -69,6 +69,11 @@ public class AggregationFunctionFactoryTest {
     Assert.assertEquals(aggregationFunction.getType(), AggregationFunctionType.DISTINCTCOUNTHLL);
     Assert.assertEquals(aggregationFunction.getColumnName(COLUMN), "distinctCountHLL_column");
 
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction("DiStInCtCoUnTrAwHlL");
+    Assert.assertTrue(aggregationFunction instanceof DistinctCountRawHLLAggregationFunction);
+    Assert.assertEquals(aggregationFunction.getType(), AggregationFunctionType.DISTINCTCOUNTRAWHLL);
+    Assert.assertEquals(aggregationFunction.getColumnName(COLUMN), "distinctCountRawHLL_column");;
+
     aggregationFunction = AggregationFunctionFactory.getAggregationFunction("FaStHlL");
     Assert.assertTrue(aggregationFunction instanceof FastHLLAggregationFunction);
     Assert.assertEquals(aggregationFunction.getType(), AggregationFunctionType.FASTHLL);
@@ -128,6 +133,11 @@ public class AggregationFunctionFactoryTest {
     Assert.assertTrue(aggregationFunction instanceof DistinctCountHLLMVAggregationFunction);
     Assert.assertEquals(aggregationFunction.getType(), AggregationFunctionType.DISTINCTCOUNTHLLMV);
     Assert.assertEquals(aggregationFunction.getColumnName(COLUMN), "distinctCountHLLMV_column");
+
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction("DiStInCtCoUnTrAwHlLmV");
+    Assert.assertTrue(aggregationFunction instanceof DistinctCountRawHLLMVAggregationFunction);
+    Assert.assertEquals(aggregationFunction.getType(), AggregationFunctionType.DISTINCTCOUNTRAWHLLMV);
+    Assert.assertEquals(aggregationFunction.getColumnName(COLUMN), "distinctCountRawHLLMV_column");
 
     aggregationFunction = AggregationFunctionFactory.getAggregationFunction("PeRcEnTiLe10Mv");
     Assert.assertTrue(aggregationFunction instanceof PercentileMVAggregationFunction);

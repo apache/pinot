@@ -18,12 +18,15 @@
  */
 package org.apache.pinot.queries;
 
+import java.io.Serializable;
+import java.util.function.Function;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
+import org.apache.pinot.common.utils.BytesUtils;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
+import org.apache.pinot.core.startree.hll.HllUtil;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.*;
 
 
 public class InterSegmentAggregationMultiValueQueriesTest extends BaseMultiValueQueriesTest {
@@ -196,6 +199,28 @@ public class InterSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
     brokerResponse = getBrokerResponseForQuery(query + MV_GROUP_BY);
     QueriesTestUtils
         .testInterSegmentAggregationResult(brokerResponse, 400000L, 0L, 800000L, 400000L, new String[]{"3490"});
+  }
+
+  @Test
+  public void testDistinctCountRawHLLMV() {
+    String query = "SELECT DISTINCTCOUNTRAWHLLMV(column6) FROM testTable";
+    Function<Serializable, String> cardinalityExtractor = value -> String.valueOf(HllUtil.buildHllFromBytes(BytesUtils.toBytes(value)).cardinality());
+
+    BrokerResponseNative brokerResponse = getBrokerResponseForQuery(query);
+    QueriesTestUtils
+        .testInterSegmentAggregationResult(brokerResponse, 400000L, 0L, 400000L, 400000L, cardinalityExtractor, new String[]{"20039"});
+
+    brokerResponse = getBrokerResponseForQueryWithFilter(query);
+    QueriesTestUtils
+        .testInterSegmentAggregationResult(brokerResponse, 62480L, 1053656L, 62480L, 400000L, cardinalityExtractor, new String[]{"1296"});
+
+    brokerResponse = getBrokerResponseForQuery(query + SV_GROUP_BY);
+    QueriesTestUtils
+        .testInterSegmentAggregationResult(brokerResponse, 400000L, 0L, 800000L, 400000L, cardinalityExtractor, new String[]{"4715"});
+
+    brokerResponse = getBrokerResponseForQuery(query + MV_GROUP_BY);
+    QueriesTestUtils
+        .testInterSegmentAggregationResult(brokerResponse, 400000L, 0L, 800000L, 400000L, cardinalityExtractor, new String[]{"3490"});
   }
 
   @Test
