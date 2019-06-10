@@ -41,6 +41,7 @@ import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.utils.retry.RetryPolicies;
 import org.apache.pinot.core.data.GenericRow;
+import org.apache.pinot.core.realtime.stream.AvroRecordToPinotRowGenerator;
 import org.apache.pinot.core.realtime.stream.StreamMessageDecoder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
