@@ -42,7 +42,7 @@ alerts:
     name: composite_alert_on_entity
     alerts:
       - type: METRIC_ALERT
-        name: metric alert on test_metric
+        name: metric_alert_on_test_metric
         metric: test_metric
         dataset: test_dataset
         rules:
