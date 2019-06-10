@@ -4,7 +4,7 @@ type: COMPOSITE_ALERT
 cron: "0 0 14 * * ? *"
 alerts:
   - type: METRIC_ALERT
-    name: metric alert on test_metric
+    name: metric_alert_on_test_metric
     metric: test_metric
     dataset: test_dataset
     filters:
@@ -38,13 +38,8 @@ alerts:
             name: maxThreshold_2
             params:
               max: 100
-        filter:
-          - type: THRESHOLD_RULE_FILTER
-            name: thresholdFilter_3
-            params:
-              min: 50
   - type: COMPOSITE_ALERT
-    name: composite alert on entity
+    name: composite_alert_on_entity
     alerts:
       - type: METRIC_ALERT
         name: metric alert on test_metric
@@ -57,7 +52,7 @@ alerts:
                 params:
                   max: 100
       - type: METRIC_ALERT
-        name: metric alert on test_metric
+        name: another_metric_alert_on_test_metric
         metric: test_metric
         dataset: test_dataset
         rules:
