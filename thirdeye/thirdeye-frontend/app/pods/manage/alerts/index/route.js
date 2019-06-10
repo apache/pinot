@@ -171,7 +171,6 @@ export default Route.extend(AuthenticatedRouteMixin, {
       filterBlocksGlobal,
       filterBlocksLocal,
       filteredAlerts: model.alerts,
-      totalFilteredAlerts: model.alerts.length,
       sortModes: ['Edited:first', 'Edited:last', 'A to Z', 'Z to A'] // Alerts Search Mode options
     });
   },

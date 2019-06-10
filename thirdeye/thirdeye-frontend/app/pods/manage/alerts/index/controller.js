@@ -63,7 +63,7 @@ export default Controller.extend({
   /**
    * Filter settings
    */
-  alertFilters: [],
+  alertFilters: {},
   resetFiltersGlobal: null,
   resetFiltersLocal: null,
   alertFoundByName: null,
@@ -72,9 +72,6 @@ export default Controller.extend({
    * The first and broadest entity search property
    */
   topSearchKeyName: 'application',
-
-  // Total displayed alerts
-  totalFilteredAlerts: 0,
 
   // default current Page
   currentPage: 1,
@@ -186,11 +183,18 @@ export default Controller.extend({
 
       setProperties(this, {
         filtersTriggered: false, // reset filter trigger
-        alertFoundByName: false, // reset single found alert var
-        totalFilteredAlerts: filteredAlerts.length
+        alertFoundByName: false // reset single found alert var
       });
 
       return filteredAlerts;
+    }
+  ),
+
+  // Total displayed alerts
+  totalFilteredAlerts: computed(
+    'selectedAlerts.@each',
+    function() {
+      return this.get('selectedAlerts').length;
     }
   ),
 
@@ -235,6 +239,14 @@ export default Controller.extend({
     }
   ),
 
+  // Total displayed alerts
+  currentPageAlerts: computed(
+    'paginatedSelectedAlerts.@each',
+    function() {
+      return this.get('paginatedSelectedAlerts').length;
+    }
+  ),
+
   // String containing all selected filters for display
   activeFiltersString: computed(
     'alertFilters',
@@ -247,12 +259,11 @@ export default Controller.extend({
       };
       let filterStr = 'All Alerts';
       if (isPresent(alertFilters)) {
-        if (alertFilters.primary) {
-          filterStr = alertFilters.primary;
-          set(this, 'primaryFilterVal', filterStr);
-        } else {
-          let filterArr = [get(this, 'primaryFilterVal')];
-          Object.keys(alertFilters).forEach((filterKey) => {
+        filterStr = alertFilters.primary;
+        set(this, 'primaryFilterVal', filterStr);
+        let filterArr = [get(this, 'primaryFilterVal')];
+        Object.keys(alertFilters).forEach((filterKey) => {
+          if (filterKey !== 'primary') {
             const value = alertFilters[filterKey];
             const isStatusAll = filterKey === 'status' && Array.isArray(value) && value.length > 1;
             // Only display valid search filters
@@ -261,9 +272,9 @@ export default Controller.extend({
               let abbrevKey = filterAbbrevMap[filterKey] || filterKey;
               filterArr.push(`${abbrevKey}: ${concatVal}`);
             }
-          });
-          filterStr = filterArr.join(' | ');
-        }
+          }
+        });
+        filterStr = filterArr.join(' | ');
       }
       return filterStr;
     }
@@ -439,14 +450,16 @@ export default Controller.extend({
     },
 
     // Handles filter selections (receives array of filter options)
-    userDidSelectFilter(filterArr) {
+    userDidSelectFilter(filterObj) {
+      let alertFilters = get(this, 'alertFilters');
+      const updatedAlertFilters = filterObj.primary ? {primary: filterObj.primary} : {primary: alertFilters.primary, ...filterObj};
       setProperties(this, {
         filtersTriggered: true,
         allowFilterSummary: true,
-        alertFilters: filterArr
+        alertFilters: updatedAlertFilters
       });
       // Reset secondary filters component instance if a primary filter was selected
-      if (Object.keys(filterArr).includes('primary')) {
+      if (Object.keys(filterObj).includes('primary')) {
         setProperties(this, {
           filterBlocksLocal: _.cloneDeep(get(this, 'initialFiltersLocal')),
           resetFiltersLocal: moment().valueOf()
