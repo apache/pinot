@@ -58,9 +58,9 @@ public class OrderByAstNode extends BaseAstNode {
         if ("asc".equalsIgnoreCase(node.getOrdering())) {
           ordering = "asc";
         }
-        Expression orderByExpression = RequestUtils.getFunctionExpression(ordering);
+        Expression orderByExpression = RequestUtils.createFunctionExpression(ordering);
         Function orderByFunc = orderByExpression.getFunctionCall();
-        Expression colExpr = RequestUtils.getIdentifierExpression(node.getColumn());
+        Expression colExpr = RequestUtils.createIdentifierExpression(node.getColumn());
         orderByFunc.addToOperands(colExpr);
         pinotQuery.addToOrderByList(orderByExpression);
       } else {

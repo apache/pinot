@@ -42,7 +42,7 @@ public class StarColumnListAstNode extends BaseAstNode {
 
   @Override
   public void updatePinotQuery(PinotQuery pinotQuery) {
-    Expression starExpr = RequestUtils.getIdentifierExpression("*");
+    Expression starExpr = RequestUtils.createIdentifierExpression("*");
     pinotQuery.addToSelectList(starExpr);
   }
 }

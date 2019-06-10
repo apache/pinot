@@ -61,15 +61,15 @@ public class OutputColumnAstNode extends BaseAstNode {
         Expression functionExpr;
         if (node.getName().equalsIgnoreCase("count")) {
           // COUNT aggregation function always works on '*'
-          functionExpr = RequestUtils.getFunctionExpression(node.getName());
-          functionExpr.getFunctionCall().addToOperands(RequestUtils.getIdentifierExpression("*"));
+          functionExpr = RequestUtils.createFunctionExpression(node.getName());
+          functionExpr.getFunctionCall().addToOperands(RequestUtils.createIdentifierExpression("*"));
         } else {
           functionExpr = RequestUtils.getExpression(astNode);
         }
         pinotQuery.addToSelectList(functionExpr);
       } else if (astNode instanceof IdentifierAstNode) {
         IdentifierAstNode node = (IdentifierAstNode) astNode;
-        pinotQuery.addToSelectList(RequestUtils.getIdentifierExpression(node.getName()));
+        pinotQuery.addToSelectList(RequestUtils.createIdentifierExpression(node.getName()));
       } else {
         throw new Pql2CompilationException("Output column is neither a function nor an identifier");
       }

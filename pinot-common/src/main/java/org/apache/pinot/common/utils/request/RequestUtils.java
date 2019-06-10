@@ -69,13 +69,23 @@ public class RequestUtils {
     request.setFilterSubQueryMap(mp);
   }
 
-  public static Expression getIdentifierExpression(String identifier) {
+  /**
+   * Creates Expression from identifier
+   * @param identifier
+   * @return
+   */
+  public static Expression createIdentifierExpression(String identifier) {
     Expression expression = new Expression(ExpressionType.IDENTIFIER);
     expression.setIdentifier(new Identifier(identifier));
     return expression;
   }
 
-  public static Expression getLiteralExpression(LiteralAstNode value) {
+  /**
+   * Creates Literal Expression from LiteralAstNode.
+   * @param value
+   * @return
+   */
+  public static Expression createLiteralExpression(LiteralAstNode value) {
     Expression expression = new Expression(ExpressionType.LITERAL);
     Literal literal = new Literal();
     if(value instanceof StringLiteralAstNode) {
@@ -91,9 +101,14 @@ public class RequestUtils {
     return expression;
   }
 
-  public static Expression getFunctionExpression(String operator) {
+  /**
+   * Create Function Expression given a functionName
+   * @param functionName
+   * @return
+   */
+  public static Expression createFunctionExpression(String functionName) {
     Expression expression = new Expression(ExpressionType.FUNCTION);
-    Function function = new Function(operator);
+    Function function = new Function(functionName);
     expression.setFunctionCall(function);
     return expression;
   }
@@ -252,10 +267,10 @@ public class RequestUtils {
   public static Expression getExpression(AstNode astNode) {
     if (astNode instanceof IdentifierAstNode) {
       // Column name
-      return getIdentifierExpression(((IdentifierAstNode) astNode).getName());
+      return createIdentifierExpression(((IdentifierAstNode) astNode).getName());
     } else if (astNode instanceof FunctionCallAstNode) {
       // Function expression
-      Expression expression = getFunctionExpression(((FunctionCallAstNode) astNode).getName());
+      Expression expression = createFunctionExpression(((FunctionCallAstNode) astNode).getName());
       Function func = expression.getFunctionCall();
       final List<? extends AstNode> operandsAstNodes = astNode.getChildren();
       if (operandsAstNodes != null) {
@@ -265,7 +280,7 @@ public class RequestUtils {
       }
       return expression;
     } else if (astNode instanceof LiteralAstNode) {
-      return getLiteralExpression(((LiteralAstNode) astNode));
+      return createLiteralExpression(((LiteralAstNode) astNode));
     } else if (astNode instanceof PredicateAstNode) {
       return ((PredicateAstNode) astNode).buildFilterExpression();
     } else {

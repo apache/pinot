@@ -159,6 +159,9 @@ public class SelectAstNode extends BaseAstNode {
     sendPinotQueryUpdateToChildren(pinotQuery);
     if (_recordLimit != -1) {
       pinotQuery.setLimit(_recordLimit);
+    } else {
+      // Pinot quirk: default to top 10
+      pinotQuery.setLimit(10);
     }
     if (_offset != -1) {
       pinotQuery.setOffset(_offset);

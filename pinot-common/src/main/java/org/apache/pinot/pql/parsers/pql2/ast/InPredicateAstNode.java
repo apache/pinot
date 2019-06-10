@@ -124,12 +124,12 @@ public class InPredicateAstNode extends PredicateAstNode {
     } else {
       filterOperator = FilterKind.IN;
     }
-    Expression expr = RequestUtils.getFunctionExpression(filterOperator.name());
-    expr.getFunctionCall().addToOperands(RequestUtils.getIdentifierExpression(_identifier));
+    Expression expr = RequestUtils.createFunctionExpression(filterOperator.name());
+    expr.getFunctionCall().addToOperands(RequestUtils.createIdentifierExpression(_identifier));
     for (AstNode astNode : getChildren()) {
       if (astNode instanceof LiteralAstNode) {
         LiteralAstNode node = (LiteralAstNode) astNode;
-        expr.getFunctionCall().addToOperands(RequestUtils.getLiteralExpression(node));
+        expr.getFunctionCall().addToOperands(RequestUtils.createLiteralExpression(node));
       }
     }
     return expr;

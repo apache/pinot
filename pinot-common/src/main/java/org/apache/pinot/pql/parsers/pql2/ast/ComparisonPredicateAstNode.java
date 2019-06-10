@@ -165,18 +165,18 @@ public class ComparisonPredicateAstNode extends PredicateAstNode {
 
     if ("=".equals(_operand)) {
       if (_identifier != null && _literal != null) {
-        Expression expr = RequestUtils.getFunctionExpression(FilterKind.EQUALS.name());
-        expr.getFunctionCall().addToOperands(RequestUtils.getIdentifierExpression(_identifier));
-        expr.getFunctionCall().addToOperands(RequestUtils.getLiteralExpression(_literal));
+        Expression expr = RequestUtils.createFunctionExpression(FilterKind.EQUALS.name());
+        expr.getFunctionCall().addToOperands(RequestUtils.createIdentifierExpression(_identifier));
+        expr.getFunctionCall().addToOperands(RequestUtils.createLiteralExpression(_literal));
         return expr;
       } else {
         throw new Pql2CompilationException("Comparison is not between a column and a constant");
       }
     } else if ("<>".equals(_operand) || "!=".equals(_operand)) {
       if (_identifier != null && _literal != null) {
-        Expression expr = RequestUtils.getFunctionExpression(FilterKind.NOT_EQUALS.name());
-        expr.getFunctionCall().addToOperands(RequestUtils.getIdentifierExpression(_identifier));
-        expr.getFunctionCall().addToOperands(RequestUtils.getLiteralExpression(_literal));
+        Expression expr = RequestUtils.createFunctionExpression(FilterKind.NOT_EQUALS.name());
+        expr.getFunctionCall().addToOperands(RequestUtils.createIdentifierExpression(_identifier));
+        expr.getFunctionCall().addToOperands(RequestUtils.createLiteralExpression(_literal));
         return expr;
       } else {
         throw new Pql2CompilationException("Comparison is not between a column and a constant");
@@ -190,34 +190,34 @@ public class ComparisonPredicateAstNode extends PredicateAstNode {
         Expression expr = null;
         if ("<".equals(_operand)) {
           if (identifierIsOnLeft) {
-            expr = RequestUtils.getFunctionExpression(FilterKind.LESS_THAN.name());
+            expr = RequestUtils.createFunctionExpression(FilterKind.LESS_THAN.name());
           } else {
-            expr = RequestUtils.getFunctionExpression(FilterKind.GREATER_THAN.name());
+            expr = RequestUtils.createFunctionExpression(FilterKind.GREATER_THAN.name());
           }
         } else if ("<=".equals(_operand)) {
           if (identifierIsOnLeft) {
-            expr = RequestUtils.getFunctionExpression(FilterKind.LESS_THAN_OR_EQUAL.name());
+            expr = RequestUtils.createFunctionExpression(FilterKind.LESS_THAN_OR_EQUAL.name());
           } else {
-            expr = RequestUtils.getFunctionExpression(FilterKind.GREATER_THAN_OR_EQUAL.name());
+            expr = RequestUtils.createFunctionExpression(FilterKind.GREATER_THAN_OR_EQUAL.name());
           }
         } else if (">".equals(_operand)) {
           if (identifierIsOnLeft) {
-            expr = RequestUtils.getFunctionExpression(FilterKind.GREATER_THAN.name());
+            expr = RequestUtils.createFunctionExpression(FilterKind.GREATER_THAN.name());
           } else {
-            expr = RequestUtils.getFunctionExpression(FilterKind.LESS_THAN.name());
+            expr = RequestUtils.createFunctionExpression(FilterKind.LESS_THAN.name());
           }
         } else if (">=".equals(_operand)) {
           if (identifierIsOnLeft) {
-            expr = RequestUtils.getFunctionExpression(FilterKind.GREATER_THAN_OR_EQUAL.name());
+            expr = RequestUtils.createFunctionExpression(FilterKind.GREATER_THAN_OR_EQUAL.name());
           } else {
-            expr = RequestUtils.getFunctionExpression(FilterKind.LESS_THAN_OR_EQUAL.name());
+            expr = RequestUtils.createFunctionExpression(FilterKind.LESS_THAN_OR_EQUAL.name());
           }
         }
         if (expr == null) {
           throw new Pql2CompilationException("The comparison operator is not valid/is not supported for HAVING query");
         }
-        expr.getFunctionCall().addToOperands(RequestUtils.getIdentifierExpression(_identifier));
-        expr.getFunctionCall().addToOperands(RequestUtils.getLiteralExpression(_literal));
+        expr.getFunctionCall().addToOperands(RequestUtils.createIdentifierExpression(_identifier));
+        expr.getFunctionCall().addToOperands(RequestUtils.createLiteralExpression(_literal));
         return expr;
       } else {
         throw new Pql2CompilationException("One column is needed for comparison.");

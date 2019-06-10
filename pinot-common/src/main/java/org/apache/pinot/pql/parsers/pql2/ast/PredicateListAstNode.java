@@ -177,7 +177,7 @@ public class PredicateListAstNode extends PredicateAstNode {
   }
 
   public Expression buildFilterExpression(FilterKind operator, List<Expression> children) {
-    final Expression expression = RequestUtils.getFunctionExpression(operator.name());
+    final Expression expression = RequestUtils.createFunctionExpression(operator.name());
     for (Expression child : children) {
       expression.getFunctionCall().addToOperands(child);
     }

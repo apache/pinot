@@ -118,7 +118,7 @@ public class Pql2Compiler implements AbstractCompiler {
         if (VALIDATE_CONVERTER) {
           PinotQuery2BrokerRequestConverter converter = new PinotQuery2BrokerRequestConverter();
           BrokerRequest tempBrokerRequest = converter.convert(pinotQuery);
-          boolean result = validate(brokerRequest, tempBrokerRequest);
+          boolean result = compare(brokerRequest, tempBrokerRequest);
           if (!result) {
             LOGGER.error("Pinot query to broker request conversion failed. PQL:{}", expression);
           }
@@ -137,7 +137,7 @@ public class Pql2Compiler implements AbstractCompiler {
     }
   }
 
-  private boolean validate(BrokerRequest br1, BrokerRequest br2) throws Exception {
+  private boolean compare(BrokerRequest br1, BrokerRequest br2) throws Exception {
     //Having not yet supported
     if (br1.getHavingFilterQuery() != null) {
       return true;

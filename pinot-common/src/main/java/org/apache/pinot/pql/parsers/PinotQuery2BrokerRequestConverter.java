@@ -34,7 +34,6 @@ import org.apache.pinot.common.request.GroupBy;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.request.QuerySource;
-import org.apache.pinot.common.request.QueryType;
 import org.apache.pinot.common.request.Selection;
 import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.pql.parsers.pql2.ast.FilterKind;
@@ -52,30 +51,16 @@ public class PinotQuery2BrokerRequestConverter {
     querySource.setTableName(pinotQuery.getDataSource().getTableName());
     brokerRequest.setQuerySource(querySource);
 
-    handleFilter(pinotQuery, brokerRequest);
+    convertFilter(pinotQuery, brokerRequest);
 
     //Handle select list
-    handleSelectList(pinotQuery, brokerRequest);
+    convertSelectList(pinotQuery, brokerRequest);
 
     //Handle order by
-    handleOrderBy(pinotQuery, brokerRequest);
+    convertOrderBy(pinotQuery, brokerRequest);
 
     //Handle group by
-    handleGroupBy(pinotQuery, brokerRequest);
-
-    //Query Type
-    QueryType queryType = new QueryType();
-    if (brokerRequest.getAggregationsInfo() != null && brokerRequest.getAggregationsInfo().size() > 0) {
-      if (brokerRequest.getGroupBy() != null) {
-        queryType.setHasGroup_by(true);
-      } else {
-        queryType.setHasAggregation(true);
-      }
-    } else {
-      queryType.setHasSelection(true);
-    }
-    // Commenting this out since the current code does not set it.
-    // brokerRequest.setQueryType(queryType);
+    convertGroupBy(pinotQuery, brokerRequest);
 
     //TODO: these should not be part of the query?
     //brokerRequest.setEnableTrace();
@@ -87,7 +72,7 @@ public class PinotQuery2BrokerRequestConverter {
     return brokerRequest;
   }
 
-  private void handleOrderBy(PinotQuery pinotQuery, BrokerRequest brokerRequest) {
+  private void convertOrderBy(PinotQuery pinotQuery, BrokerRequest brokerRequest) {
     if (brokerRequest.getSelections() == null || pinotQuery.getOrderByList() == null) {
       return;
     }
@@ -100,7 +85,7 @@ public class PinotQuery2BrokerRequestConverter {
       } else {
         selectionSort.setIsAsc(false);
       }
-      selectionSort.setColumn(orderByExpr.getFunctionCall().getOperands().get(0).getIdentifier().getName());
+      selectionSort.setColumn(standardizeExpression(orderByExpr, true));
       sortSequenceList.add(selectionSort);
     }
     if (!sortSequenceList.isEmpty()) {
@@ -108,7 +93,7 @@ public class PinotQuery2BrokerRequestConverter {
     }
   }
 
-  private void handleGroupBy(PinotQuery pinotQuery, BrokerRequest brokerRequest) {
+  private void convertGroupBy(PinotQuery pinotQuery, BrokerRequest brokerRequest) {
     List<Expression> groupByList = pinotQuery.getGroupByList();
     if (groupByList != null && groupByList.size() > 0) {
       GroupBy groupBy = new GroupBy();
@@ -121,7 +106,7 @@ public class PinotQuery2BrokerRequestConverter {
     }
   }
 
-  private void handleSelectList(PinotQuery pinotQuery, BrokerRequest brokerRequest) {
+  private void convertSelectList(PinotQuery pinotQuery, BrokerRequest brokerRequest) {
     Selection selection = null;
     List<AggregationInfo> aggregationInfoList = null;
     for (Expression expression : pinotQuery.getSelectList()) {
@@ -164,7 +149,7 @@ public class PinotQuery2BrokerRequestConverter {
     }
   }
 
-  private void handleFilter(PinotQuery pinotQuery, BrokerRequest brokerRequest) {
+  private void convertFilter(PinotQuery pinotQuery, BrokerRequest brokerRequest) {
     Expression filterExpression = pinotQuery.getFilterExpression();
 
     //Handle filter
