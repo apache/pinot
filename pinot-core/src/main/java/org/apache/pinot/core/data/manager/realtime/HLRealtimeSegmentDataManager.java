@@ -51,7 +51,6 @@ import org.apache.pinot.core.realtime.stream.StreamConfig;
 import org.apache.pinot.core.realtime.stream.StreamConsumerFactory;
 import org.apache.pinot.core.realtime.stream.StreamConsumerFactoryProvider;
 import org.apache.pinot.core.realtime.stream.StreamLevelConsumer;
-import org.apache.pinot.core.realtime.stream.StreamMessageMetadata;
 import org.apache.pinot.core.segment.index.loader.IndexLoadingConfig;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
@@ -63,7 +62,7 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(HLRealtimeSegmentDataManager.class);
   private final static long ONE_MINUTE_IN_MILLSEC = 1000 * 60;
 
-  private final String tableName;
+  private final String tableNameWithType;
   private final String segmentName;
   private final Schema schema;
   private final String timeColumnName;
@@ -109,7 +108,7 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     _recordTransformer = CompoundTransformer.getDefaultTransformer(schema);
     this.serverMetrics = serverMetrics;
     this.segmentName = realtimeSegmentZKMetadata.getSegmentName();
-    this.tableName = tableConfig.getTableName();
+    this.tableNameWithType = tableConfig.getTableName();
     this.timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
 
     List<String> sortedColumns = indexLoadingConfig.getSortedColumns();
@@ -164,10 +163,10 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     _streamConsumerFactory = StreamConsumerFactoryProvider.create(_streamConfig);
     String clientId = HLRealtimeSegmentDataManager.class.getSimpleName() + "-" + _streamConfig.getTopicName();
     _streamLevelConsumer =
-        _streamConsumerFactory.createStreamLevelConsumer(clientId, tableName, schema, instanceMetadata, serverMetrics);
+        _streamConsumerFactory.createStreamLevelConsumer(clientId, tableNameWithType, schema, instanceMetadata, serverMetrics);
     _streamLevelConsumer.start();
 
-    tableStreamName = tableName + "_" + _streamConfig.getTopicName();
+    tableStreamName = tableNameWithType + "_" + _streamConfig.getTopicName();
 
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
     if (indexingConfig != null && indexingConfig.isAggregateMetrics()) {
@@ -258,7 +257,7 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           // lets convert the segment now
           RealtimeSegmentConverter converter =
               new RealtimeSegmentConverter(realtimeSegment, tempSegmentFolder.getAbsolutePath(), schema,
-                  tableName, timeColumnName, realtimeSegmentZKMetadata.getSegmentName(),
+                  tableNameWithType, timeColumnName, realtimeSegmentZKMetadata.getSegmentName(),
                   sortedColumn, HLRealtimeSegmentDataManager.this.invertedIndexColumns, noDictionaryColumns,
                   null/*StarTreeIndexSpec*/); // Star tree not supported for HLC.
 
@@ -339,7 +338,7 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             segmentLogger
                 .error("FATAL: Exception committing or shutting down consumer commitSuccessful={}", commitSuccessful,
                     e);
-            serverMetrics.addMeteredTableValue(tableName, ServerMeter.REALTIME_OFFSET_COMMIT_EXCEPTIONS, 1L);
+            serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.REALTIME_OFFSET_COMMIT_EXCEPTIONS, 1L);
             if (!commitSuccessful) {
               _streamLevelConsumer.shutdown();
             }
@@ -348,7 +347,7 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           try {
             segmentLogger.info("Marking current segment as completed in Helix");
             RealtimeSegmentZKMetadata metadataToOverwrite = new RealtimeSegmentZKMetadata();
-            metadataToOverwrite.setTableName(tableName);
+            metadataToOverwrite.setTableName(tableNameWithType);
             metadataToOverwrite.setSegmentName(realtimeSegmentZKMetadata.getSegmentName());
             metadataToOverwrite.setSegmentType(SegmentType.OFFLINE);
             metadataToOverwrite.setStatus(Status.DONE);
@@ -377,7 +376,7 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     });
 
     indexingThread.start();
-    serverMetrics.addValueToTableGauge(tableName, ServerGauge.SEGMENT_COUNT, 1L);
+    serverMetrics.addValueToTableGauge(tableNameWithType, ServerGauge.SEGMENT_COUNT, 1L);
     segmentLogger.debug("scheduling keepIndexing timer check");
     // start a schedule timer to keep track of the segment
     TimerService.timer.schedule(segmentStatusTask, ONE_MINUTE_IN_MILLSEC, ONE_MINUTE_IN_MILLSEC);
@@ -416,7 +415,7 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private void updateCurrentDocumentCountMetrics() {
     int currentRawDocs = realtimeSegment.getNumDocsIndexed();
     serverMetrics
-        .addValueToTableGauge(tableName, ServerGauge.DOCUMENT_COUNT, (currentRawDocs - lastUpdatedRawDocuments.get()));
+        .addValueToTableGauge(tableNameWithType, ServerGauge.DOCUMENT_COUNT, (currentRawDocs - lastUpdatedRawDocuments.get()));
     lastUpdatedRawDocuments.set(currentRawDocs);
   }
 
