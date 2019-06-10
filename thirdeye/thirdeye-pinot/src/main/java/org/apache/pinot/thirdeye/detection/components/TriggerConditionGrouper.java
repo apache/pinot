@@ -20,14 +20,11 @@ package org.apache.pinot.thirdeye.detection.components;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.Stack;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.detection.ConfigUtils;
@@ -59,10 +56,9 @@ public class TriggerConditionGrouper implements Grouper<TriggerConditionGrouperS
   static final String PROP_DETECTOR_COMPONENT_NAME = "detectorComponentName";
   static final String PROP_AND = "and";
   static final String PROP_OR = "or";
-
-  private static final String PROP_OPERATOR = "operator";
-  private static final String PROP_LEFT_OP = "leftOp";
-  private static final String PROP_RIGHT_OP = "rightOp";
+  static final String PROP_OPERATOR = "operator";
+  static final String PROP_LEFT_OP = "leftOp";
+  static final String PROP_RIGHT_OP = "rightOp";
 
   /**
    * Group based on 'AND' criteria - Entity has anomaly if both sub-entities A and B have anomalies
@@ -92,48 +88,26 @@ public class TriggerConditionGrouper implements Grouper<TriggerConditionGrouperS
       List<MergedAnomalyResultDTO> anomalyListA, List<MergedAnomalyResultDTO> anomalyListB) {
     Set<MergedAnomalyResultDTO> groupedAnomalies = new HashSet<>();
     List<MergedAnomalyResultDTO> anomalies = mergeAndSortAnomalies(anomalyListA, anomalyListB);
-
-    Stack<MergedAnomalyResultDTO> anomalyStack = new Stack<>();
-    for (MergedAnomalyResultDTO anomaly : anomalies) {
-      if (anomalyStack.isEmpty()) {
-        anomalyStack.push(makeParentEntityAnomaly(anomaly));
-        continue;
-      }
-
-      MergedAnomalyResultDTO anomalyStackTop = anomalyStack.pop();
-
-      if (anomaly.getStartTime() > anomalyStackTop.getEndTime()) {
-        // No overlap
-        anomalyStack.push(makeParentEntityAnomaly(anomaly));
-      } else if (anomaly.getEndTime() > anomalyStackTop.getEndTime()) {
-        //Partial overlap
-        anomalyStackTop.setStartTime(anomaly.getStartTime());
-        setEntityChildMapping(anomalyStackTop, anomaly);
-
-        anomalyStack.push(anomalyStackTop);
-        anomalyStack.push(makeParentEntityAnomaly(anomaly));
-      } else {
-        // Complete overlap
-        MergedAnomalyResultDTO temp = makeEntityCopy(anomalyStackTop);
-
-        anomalyStackTop.setStartTime(anomaly.getStartTime());
-        anomalyStackTop.setEndTime(anomaly.getEndTime());
-        setEntityChildMapping(anomalyStackTop, anomaly);
-
-        anomalyStack.push(anomalyStackTop);
-        anomalyStack.push(temp);
-      }
+    if (anomalies.isEmpty()) {
+      return anomalies;
     }
 
-    // Pop the extra anomaly out
-    if (!anomalyStack.isEmpty()) {
-      anomalyStack.pop();
-    }
 
-    // Add all parent anomalies along with their children
-    groupedAnomalies.addAll(anomalyStack);
-    for (MergedAnomalyResultDTO anomaly : anomalyStack) {
-      groupedAnomalies.addAll(anomaly.getChildren());
+    for (int i = 0; i < anomalies.size(); i++) {
+      for (int j = i + 1; j < anomalies.size(); j++) {
+        // Check for overlap and output it
+        if (anomalies.get(j).getStartTime() <= anomalies.get(i).getEndTime()) {
+          MergedAnomalyResultDTO currentAnomaly = makeParentEntityAnomaly(anomalies.get(i));
+          currentAnomaly.setEndTime(Math.min(currentAnomaly.getEndTime(), anomalies.get(j). getEndTime()));
+          currentAnomaly.setStartTime(anomalies.get(j). getStartTime());
+          setEntityChildMapping(currentAnomaly, anomalies.get(j));
+
+          groupedAnomalies.add(currentAnomaly);
+          //groupedAnomalies.addAll(currentAnomaly.getChildren());
+        } else {
+          break;
+        }
+      }
     }
 
     return new ArrayList<>(groupedAnomalies);
@@ -147,65 +121,32 @@ public class TriggerConditionGrouper implements Grouper<TriggerConditionGrouperS
    * before calling the grouper, we do not have to deal with overlapping
    * anomalies within an entity/metric
    *
-   * Sort anomalies by start time and iterate through the list
-   * Create new entity anomaly with first anomaly as child and push to stack
-   * For each anomaly following, pop stack and compare
-   * 1. No overlap:
-   *    If the anomaly doesn't overlap, push popped anomaly, create new entity anomaly with current as child and push
-   * 2. Partial overlap:
-   *    If partial overlap, update popped anomaly's end time, child and push to stack
-   * 3. Full overlap:
-   *    If full overlap, update popped anomaly with child info and push it back to stack
-   * Note the each time an entity copy is created, the children needs to be marked and set appropriately
+   * Sort anomalies by start time and incrementally merge anomalies
    *
    */
   private List<MergedAnomalyResultDTO> orGrouping(
       List<MergedAnomalyResultDTO> anomalyListA, List<MergedAnomalyResultDTO> anomalyListB) {
     Set<MergedAnomalyResultDTO> groupedAnomalies = new HashSet<>();
-
     List<MergedAnomalyResultDTO> anomalies = mergeAndSortAnomalies(anomalyListA, anomalyListB);
+    if (anomalies.isEmpty()) {
+      return anomalies;
+    }
 
-    Stack<MergedAnomalyResultDTO> anomalyStack = new Stack<>();
-    for (MergedAnomalyResultDTO anomaly : anomalies) {
-      if (anomalyStack.isEmpty()) {
-        MergedAnomalyResultDTO newEntityAnomaly = makeEntityAnomaly();
-        newEntityAnomaly.setStartTime(anomaly.getStartTime());
-        newEntityAnomaly.setEndTime(anomaly.getEndTime());
-        setEntityChildMapping(newEntityAnomaly, anomaly);
-        anomalyStack.push(newEntityAnomaly);
-        continue;
-      }
-
-      MergedAnomalyResultDTO anomalyStackTop = anomalyStack.pop();
-
-      if (anomaly.getStartTime() > anomalyStackTop.getEndTime()) {
+    MergedAnomalyResultDTO currentAnomaly = makeParentEntityAnomaly(anomalies.get(0));
+    for (int i = 1; i < anomalies.size();  i++) {
+      if (anomalies.get(i).getStartTime() <= currentAnomaly.getEndTime()) {
+        // Partial or full overlap
+        currentAnomaly.setEndTime(Math.max(anomalies.get(i).getEndTime(), currentAnomaly.getEndTime()));
+        setEntityChildMapping(currentAnomaly, anomalies.get(i));
+      }  else {
         // No overlap
-        anomalyStack.push(anomalyStackTop);
-
-        MergedAnomalyResultDTO newEntityAnomaly = makeEntityAnomaly();
-        newEntityAnomaly.setStartTime(anomaly.getStartTime());
-        newEntityAnomaly.setEndTime(anomaly.getEndTime());
-        setEntityChildMapping(newEntityAnomaly, anomaly);
-        anomalyStack.push(newEntityAnomaly);
-      } else if (anomaly.getEndTime() > anomalyStackTop.getEndTime()) {
-        //Partial overlap
-        anomalyStackTop.setEndTime(anomaly.getEndTime());
-        setEntityChildMapping(anomalyStackTop, anomaly);
-
-        anomalyStack.push(anomalyStackTop);
-      } else {
-        // Complete overlap
-        setEntityChildMapping(anomalyStackTop, anomaly);
-
-        anomalyStack.push(anomalyStackTop);
+        groupedAnomalies.add(currentAnomaly);
+        //groupedAnomalies.addAll(currentAnomaly.getChildren());
+        currentAnomaly = makeParentEntityAnomaly(anomalies.get(i));
       }
     }
-
-    // Add all parent anomalies along with their children
-    groupedAnomalies.addAll(anomalyStack);
-    for (MergedAnomalyResultDTO anomaly : anomalyStack) {
-      groupedAnomalies.addAll(anomaly.getChildren());
-    }
+    groupedAnomalies.add(currentAnomaly);
+    //groupedAnomalies.addAll(currentAnomaly.getChildren());
 
     return new ArrayList<>(groupedAnomalies);
   }

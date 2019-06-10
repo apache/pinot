@@ -19,15 +19,14 @@ package org.apache.pinot.thirdeye.detection.components;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
+import java.util.Set;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.detection.DetectionTestUtils;
 import org.apache.pinot.thirdeye.detection.spec.TriggerConditionGrouperSpec;
-import org.apache.pinot.thirdeye.detection.spi.exception.DetectorException;
 import org.testng.Assert;
-import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.thirdeye.detection.DetectionUtils.*;
@@ -81,25 +80,21 @@ public class TriggerConditionGrouperTest {
     grouper.init(spec, null);
     List<MergedAnomalyResultDTO> groupedAnomalies = grouper.group(anomalies);
 
-    Assert.assertEquals(groupedAnomalies.size(), 5);
+    Assert.assertEquals(groupedAnomalies.size(), 2);
 
-    int childCounter = 0;
-    List<MergedAnomalyResultDTO> parents = new ArrayList<>();
+    Set<MergedAnomalyResultDTO> children = new HashSet<>();
     for (MergedAnomalyResultDTO anomaly : groupedAnomalies) {
-      if (anomaly.isChild()) {
-        childCounter++;
-      } else {
-        parents.add(anomaly);
+      if (anomaly.getChildren() != null) {
+        children.addAll(anomaly.getChildren());
       }
     }
-    Assert.assertEquals(childCounter, 3);
-    Assert.assertEquals(parents.size(), 2);
+    Assert.assertEquals(children.size(), 3);
 
-    parents = mergeAndSortAnomalies(parents, null);
-    Assert.assertEquals(parents.get(0).getStartTime(), 500);
-    Assert.assertEquals(parents.get(0).getEndTime(), 1000);
-    Assert.assertEquals(parents.get(1).getStartTime(), 1500);
-    Assert.assertEquals(parents.get(1).getEndTime(), 2000);
+    groupedAnomalies = mergeAndSortAnomalies(groupedAnomalies, null);
+    Assert.assertEquals(groupedAnomalies.get(0).getStartTime(), 500);
+    Assert.assertEquals(groupedAnomalies.get(0).getEndTime(), 1000);
+    Assert.assertEquals(groupedAnomalies.get(1).getStartTime(), 1500);
+    Assert.assertEquals(groupedAnomalies.get(1).getEndTime(), 2000);
   }
 
   /**
@@ -137,24 +132,99 @@ public class TriggerConditionGrouperTest {
     grouper.init(spec, null);
     List<MergedAnomalyResultDTO> groupedAnomalies = grouper.group(anomalies);
 
-    Assert.assertEquals(groupedAnomalies.size(), 6);
+    Assert.assertEquals(groupedAnomalies.size(), 2);
 
-    int childCounter = 0;
-    List<MergedAnomalyResultDTO> parents = new ArrayList<>();
+    Set<MergedAnomalyResultDTO> children = new HashSet<>();
     for (MergedAnomalyResultDTO anomaly : groupedAnomalies) {
-      if (anomaly.isChild()) {
-        childCounter++;
-      } else {
-        parents.add(anomaly);
+      if (anomaly.getChildren() != null) {
+        children.addAll(anomaly.getChildren());
       }
     }
-    Assert.assertEquals(childCounter, 4);
-    Assert.assertEquals(parents.size(), 2);
+    Assert.assertEquals(children.size(), 4);
 
-    parents = mergeAndSortAnomalies(parents, null);
-    Assert.assertEquals(parents.get(0).getStartTime(), 0);
-    Assert.assertEquals(parents.get(0).getEndTime(), 2000);
-    Assert.assertEquals(parents.get(1).getStartTime(), 2500);
-    Assert.assertEquals(parents.get(1).getEndTime(), 3000);
+    groupedAnomalies = mergeAndSortAnomalies(groupedAnomalies, null);
+    Assert.assertEquals(groupedAnomalies.get(0).getStartTime(), 0);
+    Assert.assertEquals(groupedAnomalies.get(0).getEndTime(), 2000);
+    Assert.assertEquals(groupedAnomalies.get(1).getStartTime(), 2500);
+    Assert.assertEquals(groupedAnomalies.get(1).getEndTime(), 3000);
+  }
+
+  /**
+   *
+   *                     0           1000    1500       2000
+   *  A                  |-------------|      |-----------|
+   *
+   *                           500                       2000     2500      3000
+   *  B                         |-------------------------|       |---------|
+   *
+   *                                           1600  1900
+   *  C                                          |----|
+   *
+   *                           500                       2000     2500      3000
+   *  B || C                    |-------------------------|       |---------|
+   *
+   *                           500   1000    1500        2000
+   *  A && (B || C)             |------|       |----------|
+   *
+   */
+  @Test
+  public void testAndOrGrouping() {
+    TriggerConditionGrouper grouper = new TriggerConditionGrouper();
+
+    List<MergedAnomalyResultDTO> anomalies = new ArrayList<>();
+    anomalies.add(makeAnomaly(0, 1000, "entityA"));
+    anomalies.add(makeAnomaly(1500, 2000, "entityA"));
+    anomalies.add(makeAnomaly(500, 2000, "entityB"));
+    anomalies.add(makeAnomaly(2500, 3000, "entityB"));
+    anomalies.add(makeAnomaly(1600, 1900, "entityC"));
+
+    TriggerConditionGrouperSpec spec = new TriggerConditionGrouperSpec();
+
+    Map<String, Object> leftOp = new HashMap<>();
+    leftOp.put(PROP_VALUE, "entityA");
+    Map<String, Object> leftSubOp = new HashMap<>();
+    leftSubOp.put(PROP_VALUE, "entityB");
+    Map<String, Object> rightSubOp = new HashMap<>();
+    rightSubOp.put(PROP_VALUE, "entityC");
+
+    Map<String, Object> rigthOp = new HashMap<>();
+    rigthOp.put(PROP_OPERATOR, PROP_OR);
+    rigthOp.put(PROP_LEFT_OP, leftSubOp);
+    rigthOp.put(PROP_RIGHT_OP, rightSubOp);
+
+    spec.setOperator(PROP_AND);
+    spec.setLeftOp(leftOp);
+    spec.setRightOp(rigthOp);
+
+    grouper.init(spec, null);
+    List<MergedAnomalyResultDTO> groupedAnomalies = grouper.group(anomalies);
+
+    Assert.assertEquals(groupedAnomalies.size(), 2);
+
+    Set<MergedAnomalyResultDTO> children = new HashSet<>();
+    for (MergedAnomalyResultDTO anomaly : groupedAnomalies) {
+      children.addAll(getAllChildAnomalies(anomaly));
+    }
+    Assert.assertEquals(children.size(), 5);
+
+    groupedAnomalies = mergeAndSortAnomalies(groupedAnomalies, null);
+    Assert.assertEquals(groupedAnomalies.get(0).getStartTime(), 500);
+    Assert.assertEquals(groupedAnomalies.get(0).getEndTime(), 1000);
+    Assert.assertEquals(groupedAnomalies.get(1).getStartTime(), 1500);
+    Assert.assertEquals(groupedAnomalies.get(1).getEndTime(), 2000);
+  }
+
+  private List<MergedAnomalyResultDTO> getAllChildAnomalies(MergedAnomalyResultDTO anomaly) {
+    List<MergedAnomalyResultDTO> childAnomalies = new ArrayList<>();
+    if (anomaly == null || anomaly.getChildren() == null) {
+      return childAnomalies;
+    }
+
+    for (MergedAnomalyResultDTO childAnomaly : anomaly.getChildren()) {
+      childAnomalies.add(childAnomaly);
+      childAnomalies.addAll(getAllChildAnomalies(childAnomaly));
+    }
+
+    return childAnomalies;
   }
 }
