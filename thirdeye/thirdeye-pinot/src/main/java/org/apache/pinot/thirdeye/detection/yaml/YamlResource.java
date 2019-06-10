@@ -289,6 +289,10 @@ public class YamlResource {
     ).build();
   }
 
+  long createDetectionPipeline(String yamlDetectionConfig) {
+    return createDetectionPipeline(yamlDetectionConfig, 0, 0);
+  }
+
   long createDetectionPipeline(String yamlDetectionConfig, long startTime, long endTime)
       throws IllegalArgumentException {
     Preconditions.checkArgument(StringUtils.isNotBlank(yamlDetectionConfig), "The Yaml Payload in the request is empty.");
@@ -347,6 +351,10 @@ public class YamlResource {
     responseMessage.put("message", "Alert was created successfully.");
     responseMessage.put("more-info", "Record saved with id " + detectionConfigId);
     return Response.ok().entity(responseMessage).build();
+  }
+
+  void updateDetectionPipeline(long detectionID, String yamlDetectionConfig) {
+    updateDetectionPipeline(detectionID, yamlDetectionConfig, 0, 0);
   }
 
   void updateDetectionPipeline(long detectionID, String yamlDetectionConfig, long startTime, long endTime)
@@ -435,15 +443,15 @@ public class YamlResource {
     return existingDetectionConfig;
   }
 
-  long createUpdateDetectionPipeline(String payload) {
+  long createOrUpdateDetectionPipeline(String payload) {
     Preconditions.checkArgument(StringUtils.isNotBlank(payload), "The Yaml Payload in the request is empty.");
     long detectionId;
     DetectionConfigDTO existingDetection = fetchExistingDetection(payload);
     if (existingDetection != null) {
       detectionId = existingDetection.getId();
-      updateDetectionPipeline(detectionId, payload, 0, 0);
+      updateDetectionPipeline(detectionId, payload);
     } else {
-      detectionId = createDetectionPipeline(payload, 0, 0);
+      detectionId = createDetectionPipeline(payload);
     }
 
     return detectionId;
@@ -458,11 +466,11 @@ public class YamlResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.TEXT_PLAIN)
   @ApiOperation("Create a new detection pipeline or update existing if one already exists")
-  public Response createUpdateDetectionPipelineApi(@ApiParam("yaml config") String payload) {
+  public Response createOrUpdateDetectionPipelineApi(@ApiParam("yaml config") String payload) {
     Map<String, String> responseMessage = new HashMap<>();
     long detectionConfigId;
     try {
-      detectionConfigId = createUpdateDetectionPipeline(payload);
+      detectionConfigId = createOrUpdateDetectionPipeline(payload);
     } catch (IllegalArgumentException e) {
       LOG.warn("Validation error while creating/updating detection pipeline with payload " + payload, e);
       responseMessage.put("message", "Validation Error! " + e.getMessage());
