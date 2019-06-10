@@ -111,7 +111,7 @@ public class SegmentFetcherAndLoader {
             localSegmentMetadata = null;
           }
           try {
-            if (!isNewSegmentMetadata(newSegmentZKMetadata, localSegmentMetadata)) {
+            if (!isNewSegmentMetadata(tableNameWithType, newSegmentZKMetadata, localSegmentMetadata)) {
               LOGGER.info("Segment metadata same as before, loading {} of table {} (crc {}) from disk", segmentName,
                   tableNameWithType, localSegmentMetadata.getCrc());
               _instanceDataManager.addOfflineSegment(tableNameWithType, segmentName, indexDir);
@@ -143,7 +143,7 @@ public class SegmentFetcherAndLoader {
       // If we get here, then either it is the case that we have the segment loaded in memory (and therefore present
       // in disk) or, we need to load from the server. In the former case, we still need to check if the metadata
       // that we have is different from that in zookeeper.
-      if (isNewSegmentMetadata(newSegmentZKMetadata, localSegmentMetadata)) {
+      if (isNewSegmentMetadata(tableNameWithType, newSegmentZKMetadata, localSegmentMetadata)) {
         if (localSegmentMetadata == null) {
           LOGGER.info("Loading new segment {} of table {} from controller", segmentName, tableNameWithType);
         } else {
@@ -172,20 +172,19 @@ public class SegmentFetcherAndLoader {
     }
   }
 
-  private boolean isNewSegmentMetadata(@Nonnull OfflineSegmentZKMetadata newSegmentZKMetadata,
-      @Nullable SegmentMetadata existedSegmentMetadata) {
-    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(newSegmentZKMetadata.getTableName());
+  private boolean isNewSegmentMetadata(@Nonnull String tableNameWithType,
+      @Nonnull OfflineSegmentZKMetadata newSegmentZKMetadata, @Nullable SegmentMetadata existedSegmentMetadata) {
     String segmentName = newSegmentZKMetadata.getSegmentName();
 
     if (existedSegmentMetadata == null) {
-      LOGGER.info("Existed segment metadata is null for segment: {} in table: {}", segmentName, offlineTableName);
+      LOGGER.info("Existed segment metadata is null for segment: {} in table: {}", segmentName, tableNameWithType);
       return true;
     }
 
     long newCrc = newSegmentZKMetadata.getCrc();
     long existedCrc = Long.valueOf(existedSegmentMetadata.getCrc());
     LOGGER.info("New segment CRC: {}, existed segment CRC: {} for segment: {} in table: {}", newCrc, existedCrc,
-        segmentName, offlineTableName);
+        segmentName, tableNameWithType);
     return newCrc != existedCrc;
   }
 

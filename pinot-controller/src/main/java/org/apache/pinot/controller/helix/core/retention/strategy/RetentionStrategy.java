@@ -29,8 +29,9 @@ public interface RetentionStrategy {
   /**
    * Returns whether the segment should be purged
    *
+   * @param tableNameWithType Table name with type
    * @param segmentZKMetadata Segment ZK metadata
    * @return Whether the segment should be purged
    */
-  boolean isPurgeable(SegmentZKMetadata segmentZKMetadata);
+  boolean isPurgeable(String tableNameWithType, SegmentZKMetadata segmentZKMetadata);
 }

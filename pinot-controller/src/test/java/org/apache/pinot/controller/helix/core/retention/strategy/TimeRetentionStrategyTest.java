@@ -34,34 +34,35 @@ public class TimeRetentionStrategyTest {
 
   @Test
   public void testTimeRetention() {
+    String tableNameWithType = "myTable_OFFLINE";
     TimeRetentionStrategy retentionStrategy = new TimeRetentionStrategy(TimeUnit.DAYS, 30L);
 
     SegmentZKMetadata metadata = new OfflineSegmentZKMetadata();
 
     // Without setting time unit or end time, should not throw exception
-    assertFalse(retentionStrategy.isPurgeable(metadata));
+    assertFalse(retentionStrategy.isPurgeable(tableNameWithType, metadata));
     metadata.setTimeUnit(TimeUnit.DAYS);
-    assertFalse(retentionStrategy.isPurgeable(metadata));
+    assertFalse(retentionStrategy.isPurgeable(tableNameWithType, metadata));
 
     // Set end time to Jan 2nd, 1970 (not purgeable due to bogus timestamp)
     metadata.setEndTime(1L);
-    assertFalse(retentionStrategy.isPurgeable(metadata));
+    assertFalse(retentionStrategy.isPurgeable(tableNameWithType, metadata));
 
     // Set end time to today
     long today = TimeUnit.MILLISECONDS.toDays(System.currentTimeMillis());
     metadata.setEndTime(today);
-    assertFalse(retentionStrategy.isPurgeable(metadata));
+    assertFalse(retentionStrategy.isPurgeable(tableNameWithType, metadata));
 
     // Set end time to two weeks ago
     metadata.setEndTime(today - 14);
-    assertFalse(retentionStrategy.isPurgeable(metadata));
+    assertFalse(retentionStrategy.isPurgeable(tableNameWithType, metadata));
 
     // Set end time to two months ago (purgeable due to being past the retention period)
     metadata.setEndTime(today - 60);
-    assertTrue(retentionStrategy.isPurgeable(metadata));
+    assertTrue(retentionStrategy.isPurgeable(tableNameWithType, metadata));
 
     // Set end time to 200 years in the future (not purgeable due to bogus timestamp)
     metadata.setEndTime(today + (365 * 200));
-    assertFalse(retentionStrategy.isPurgeable(metadata));
+    assertFalse(retentionStrategy.isPurgeable(tableNameWithType, metadata));
   }
 }
