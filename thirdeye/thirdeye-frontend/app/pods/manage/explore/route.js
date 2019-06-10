@@ -17,16 +17,18 @@ export default Route.extend({
 
   async model(params) {
     const alertId = params.alert_id;
-    const postProps = {
+    // makes sense to rename this getProps since we are using the get method
+    const getProps = {
       method: 'get',
       headers: { 'content-type': 'application/json' }
     };
     const notifications = get(this, 'notifications');
+    let granularity;
 
     //detection alert fetch
     const detectionUrl = `/detection/${alertId}`;
     try {
-      const detection_result = await fetch(detectionUrl, postProps);
+      const detection_result = await fetch(detectionUrl, getProps);
       const detection_status  = get(detection_result, 'status');
       const detection_json = await detection_result.json();
       if (detection_status !== 200) {
@@ -46,12 +48,18 @@ export default Route.extend({
             rawYaml: detection_json.yaml
           });
 
+          try {
+            granularity = detection_json.properties.nested[0].nested[0].nested[0].windowUnit;
+          } catch (error) {
+            granularity = null;
+          }
           this.setProperties({
             alertId: alertId,
             detectionInfo,
-            rawDetectionYaml: get(this, 'detectionInfo') ? get(this, 'detectionInfo').rawYaml : null,
+            rawDetectionYaml: detection_json.yaml,
             metricUrn: detection_json.properties.nested[0].nestedMetricUrns[0],
-            metricUrnList: detection_json.properties.nested[0].nestedMetricUrns
+            metricUrnList: detection_json.properties.nested[0].nestedMetricUrns,
+            granularity
           });
 
         }
@@ -63,7 +71,7 @@ export default Route.extend({
     //subscription group fetch
     const subUrl = `/detection/subscription-groups/${alertId}`;//dropdown of subscription groups
     try {
-      const settings_result = await fetch(subUrl, postProps);
+      const settings_result = await fetch(subUrl, getProps);
       const settings_status  = get(settings_result, 'status');
       const settings_json = await settings_result.json();
       if (settings_status !== 200) {
@@ -96,7 +104,8 @@ export default Route.extend({
       detectionYaml: get(this, 'rawDetectionYaml'),
       subscribedGroups,
       metricUrn: get(this, 'metricUrn'),
-      metricUrnList: get(this, 'metricUrnList') ? get(this, 'metricUrnList') : []
+      metricUrnList: get(this, 'metricUrnList') ? get(this, 'metricUrnList') : [],
+      granularity
     });
   }
 });
