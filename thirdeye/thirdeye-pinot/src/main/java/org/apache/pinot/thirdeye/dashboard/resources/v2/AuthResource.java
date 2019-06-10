@@ -107,7 +107,7 @@ public class AuthResource {
       sessionDTO.setSessionKey(sessionKey);
       sessionDTO.setPrincipalType(SessionBean.PrincipalType.USER);
       sessionDTO.setPrincipal(principal.getName());
-      sessionDTO.setExpirationTime(System.currentTimeMillis() + TimeUnit.HOURS.toMillis(8));
+      sessionDTO.setExpirationTime(System.currentTimeMillis() + TimeUnit.HOURS.toMillis(24));
       this.sessionDAO.save(sessionDTO);
 
       NewCookie cookie =

@@ -92,19 +92,8 @@ public class DetectionAlertJob implements Job {
     taskDTO.setStatus(TaskConstants.TaskStatus.WAITING);
     taskDTO.setTaskInfo(taskInfoJson);
 
-    // TODO: revisit it after identifying bottlenecks
-    // Here will write the task information to mysql.
-    // Sleep random 0 - 5 seconds to distribute load to mysql.
-    Random random = new Random();
-    try {
-      int sleepTime = random.nextInt(5000);
-      LOG.info("Wait for " + sleepTime + " milliseconds.");
-      Thread.sleep(sleepTime);
-      long taskId = taskDAO.save(taskDTO);
-      LOG.info("Created subscription task {} with settings {}", taskId, taskDTO);
-    } catch (InterruptedException e) {
-      LOG.error(e.toString());
-    }
+    long taskId = taskDAO.save(taskDTO);
+    LOG.info("Created subscription task {} with settings {}", taskId, taskDTO);
   }
 
   private Long getIdFromJobKey(String jobKey) {
