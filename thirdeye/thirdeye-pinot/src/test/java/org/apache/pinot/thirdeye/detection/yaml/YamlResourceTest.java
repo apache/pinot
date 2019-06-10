@@ -55,10 +55,10 @@ public class YamlResourceTest {
   }
 
   @Test
-  public void testCreateUpdateDetectionConfig() throws IOException {
+  public void testCreateOrUpdateDetectionConfig() throws IOException {
     String blankYaml = "";
     try {
-      this.yamlResource.createUpdateDetectionPipeline(blankYaml);
+      this.yamlResource.createOrUpdateDetectionPipeline(blankYaml);
       Assert.fail("Exception not thrown on empty yaml");
     } catch (Exception e) {
       Assert.assertEquals(e.getMessage(), "The Yaml Payload in the request is empty.");
@@ -79,7 +79,7 @@ public class YamlResourceTest {
     // Create a new detection
     String validYaml = IOUtils.toString(this.getClass().getResourceAsStream("detection/detection-config-1.yaml"));
     try {
-      long id = this.yamlResource.createUpdateDetectionPipeline(validYaml);
+      long id = this.yamlResource.createOrUpdateDetectionPipeline(validYaml);
       DetectionConfigDTO detection = daoRegistry.getDetectionConfigManager().findById(id);
       Assert.assertNotNull(detection);
       Assert.assertEquals(detection.getName(), "testPipeline");
@@ -90,7 +90,7 @@ public class YamlResourceTest {
     // Update above created detection
     String updatedYaml = IOUtils.toString(this.getClass().getResourceAsStream("detection/detection-config-2.yaml"));
     try {
-      long id = this.yamlResource.createUpdateDetectionPipeline(updatedYaml);
+      long id = this.yamlResource.createOrUpdateDetectionPipeline(updatedYaml);
       DetectionConfigDTO detection = daoRegistry.getDetectionConfigManager().findById(id);
       Assert.assertNotNull(detection);
       Assert.assertEquals(detection.getName(), "testPipeline");
@@ -101,7 +101,7 @@ public class YamlResourceTest {
   }
 
   @Test
-  public void testCreateDetectionAlertConfig() throws IOException {
+  public void testCreateOrDetectionAlertConfig() throws IOException {
     String blankYaml = "";
     try {
       this.yamlResource.createSubscriptionGroup(blankYaml);
