@@ -318,7 +318,6 @@ public class MemoryEstimator {
     realtimeSegmentZKMetadata.setStartTime(segmentMetadata.getStartTime());
     realtimeSegmentZKMetadata.setEndTime(segmentMetadata.getEndTime());
     realtimeSegmentZKMetadata.setCreationTime(segmentMetadata.getIndexCreationTime());
-    realtimeSegmentZKMetadata.setTableName(segmentMetadata.getTableName());
     realtimeSegmentZKMetadata.setSegmentName(segmentMetadata.getName());
     realtimeSegmentZKMetadata.setTimeUnit(segmentMetadata.getTimeUnit());
     realtimeSegmentZKMetadata.setTotalRawDocs(totalDocs);
