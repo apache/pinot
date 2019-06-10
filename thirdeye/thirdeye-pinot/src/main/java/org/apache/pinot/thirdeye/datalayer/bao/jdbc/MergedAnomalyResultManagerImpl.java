@@ -456,7 +456,7 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
         }
 
         MergedAnomalyResultBean childBean = genericPojoDao.get(id, MergedAnomalyResultBean.class);
-        MergedAnomalyResultDTO child = MODEL_MAPPER.map(childBean, MergedAnomalyResultDTO.class);
+        MergedAnomalyResultDTO child = convertMergedAnomalyBean2DTO(childBean);
         children.add(child);
       }
     }
