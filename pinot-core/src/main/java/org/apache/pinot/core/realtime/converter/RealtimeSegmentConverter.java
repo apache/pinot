@@ -112,7 +112,9 @@ public class RealtimeSegmentConverter {
       genConfig.setRawIndexCompressionType(columnToCompressionType);
     }
 
-    genConfig.setVarLengthDictionaryColumns(varLengthDictionaryColumns);
+    if (varLengthDictionaryColumns != null) {
+      genConfig.setVarLengthDictionaryColumns(varLengthDictionaryColumns);
+    }
 
     // Presence of the spec enables star tree generation.
     if (starTreeIndexSpec != null) {
