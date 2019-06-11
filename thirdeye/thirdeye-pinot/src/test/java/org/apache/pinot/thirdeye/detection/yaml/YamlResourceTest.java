@@ -14,7 +14,7 @@ import java.io.IOException;
 import org.apache.commons.io.IOUtils;
 import org.apache.pinot.thirdeye.detection.annotation.registry.DetectionRegistry;
 import org.apache.pinot.thirdeye.detection.components.ThresholdRuleDetector;
-import org.apache.pinot.thirdeye.detection.yaml.translator.CompositePipelineConfigTranslator;
+import org.apache.pinot.thirdeye.detection.yaml.translator.DetectionConfigTranslator;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
@@ -41,7 +41,7 @@ public class YamlResourceTest {
     config2.setName("test_detection_2");
     alertId2 = detectionDAO.save(config2);
 
-    DetectionRegistry.getInstance().registerYamlConvertor(CompositePipelineConfigTranslator.class.getName(), "COMPOSITE");
+    DetectionRegistry.getInstance().registerYamlConvertor(DetectionConfigTranslator.class.getName(), "COMPOSITE");
     DetectionRegistry.registerComponent(ThresholdRuleDetector.class.getName(), "THRESHOLD");
     DetectionAlertRegistry.getInstance().registerAlertScheme("EMAIL", "EmailClass");
     DetectionAlertRegistry.getInstance().registerAlertScheme("IRIS", "IrisClass");

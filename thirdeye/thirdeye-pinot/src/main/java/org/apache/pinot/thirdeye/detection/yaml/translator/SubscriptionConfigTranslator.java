@@ -162,38 +162,38 @@ public class SubscriptionConfigTranslator extends ConfigTranslator<DetectionAler
    * Generates the {@link DetectionAlertConfigDTO} from the YAML Alert Map
    */
   @Override
-  DetectionAlertConfigDTO translateConfig() throws IllegalArgumentException {
+  DetectionAlertConfigDTO translateConfig(Map<String, Object> yamlConfigMap) throws IllegalArgumentException {
     DetectionAlertConfigDTO alertConfigDTO = new DetectionAlertConfigDTO();
 
-    alertConfigDTO.setName(MapUtils.getString(this.yamlConfigMap, PROP_SUBS_GROUP_NAME));
-    alertConfigDTO.setApplication(MapUtils.getString(this.yamlConfigMap, PROP_APPLICATION));
-    alertConfigDTO.setFrom(MapUtils.getString(this.yamlConfigMap, PROP_FROM));
+    alertConfigDTO.setName(MapUtils.getString(yamlConfigMap, PROP_SUBS_GROUP_NAME));
+    alertConfigDTO.setApplication(MapUtils.getString(yamlConfigMap, PROP_APPLICATION));
+    alertConfigDTO.setFrom(MapUtils.getString(yamlConfigMap, PROP_FROM));
 
-    alertConfigDTO.setCronExpression(MapUtils.getString(this.yamlConfigMap, PROP_CRON, CRON_SCHEDULE_DEFAULT));
-    alertConfigDTO.setActive(MapUtils.getBooleanValue(this.yamlConfigMap, PROP_ACTIVE, true));
+    alertConfigDTO.setCronExpression(MapUtils.getString(yamlConfigMap, PROP_CRON, CRON_SCHEDULE_DEFAULT));
+    alertConfigDTO.setActive(MapUtils.getBooleanValue(yamlConfigMap, PROP_ACTIVE, true));
     alertConfigDTO.setYaml(yamlConfig);
 
     alertConfigDTO.setSubjectType(AlertConfigBean.SubjectType.valueOf(
-        (String) MapUtils.getObject(this.yamlConfigMap, PROP_EMAIL_SUBJECT_TYPE, AlertConfigBean.SubjectType.METRICS.name())));
+        (String) MapUtils.getObject(yamlConfigMap, PROP_EMAIL_SUBJECT_TYPE, AlertConfigBean.SubjectType.METRICS.name())));
 
-    Map<String, String> refLinks = MapUtils.getMap(this.yamlConfigMap, PROP_REFERENCE_LINKS);
+    Map<String, String> refLinks = MapUtils.getMap(yamlConfigMap, PROP_REFERENCE_LINKS);
     if (refLinks == null) {
       refLinks = new HashMap<>();
-      this.yamlConfigMap.put(PROP_REFERENCE_LINKS, refLinks);
+      yamlConfigMap.put(PROP_REFERENCE_LINKS, refLinks);
     }
     if (refLinks.isEmpty()) {
       refLinks.put("ThirdEye User Guide", "https://go/thirdeyeuserguide");
       refLinks.put("Add Reference Links", "https://go/thirdeyealertreflink");
     }
-    alertConfigDTO.setReferenceLinks(MapUtils.getMap(this.yamlConfigMap, PROP_REFERENCE_LINKS));
+    alertConfigDTO.setReferenceLinks(MapUtils.getMap(yamlConfigMap, PROP_REFERENCE_LINKS));
 
-    alertConfigDTO.setAlertSchemes(buildAlertSchemes(this.yamlConfigMap));
-    alertConfigDTO.setAlertSuppressors(buildAlertSuppressors(this.yamlConfigMap));
+    alertConfigDTO.setAlertSchemes(buildAlertSchemes(yamlConfigMap));
+    alertConfigDTO.setAlertSuppressors(buildAlertSuppressors(yamlConfigMap));
     alertConfigDTO.setHighWaterMark(0L);
 
     // NOTE: The below fields will/should be hidden from the YAML/UI. They will only be updated by the backend pipeline.
     List<Long> detectionConfigIds = new ArrayList<>();
-    List<String> detectionNames = ConfigUtils.getList(this.yamlConfigMap.get(PROP_DETECTION_NAMES));
+    List<String> detectionNames = ConfigUtils.getList(yamlConfigMap.get(PROP_DETECTION_NAMES));
 
     try {
       detectionConfigIds.addAll(detectionNames.stream().map(detectionName ->  this.detectionConfigDAO.findByPredicate(
@@ -202,7 +202,7 @@ public class SubscriptionConfigTranslator extends ConfigTranslator<DetectionAler
       throw new IllegalArgumentException("Cannot find detection pipeline, please check the subscribed detections.");
     }
 
-    alertConfigDTO.setProperties(buildAlerterProperties(this.yamlConfigMap, detectionConfigIds));
+    alertConfigDTO.setProperties(buildAlerterProperties(yamlConfigMap, detectionConfigIds));
     Map<Long, Long> vectorClocks = new HashMap<>();
     long currentTimestamp = System.currentTimeMillis();
     for (long detectionConfigId : detectionConfigIds) {

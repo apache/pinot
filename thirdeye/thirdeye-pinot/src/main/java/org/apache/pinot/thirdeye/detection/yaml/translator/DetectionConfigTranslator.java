@@ -180,7 +180,7 @@ public class DetectionConfigTranslator extends ConfigTranslator<DetectionConfigD
   }
 
   @Override
-  DetectionConfigDTO translateConfig() throws IllegalArgumentException {
+  DetectionConfigDTO translateConfig(Map<String, Object> yamlConfigMap) throws IllegalArgumentException {
     Map<String, Collection<String>> dimensionFiltersMap = MapUtils.getMap(yamlConfigMap, PROP_FILTERS);
 
     MetricConfigDTO metricConfig = this.dataProvider.fetchMetric(MapUtils.getString(yamlConfigMap, PROP_METRIC),
@@ -210,7 +210,8 @@ public class DetectionConfigTranslator extends ConfigTranslator<DetectionConfigD
         nestedPipelines.addAll(filterNestedProperties);
       }
     }
-    Map<String, Object> dimensionWrapperProperties = buildDimensionWrapperProperties(dimensionFiltersMap, metricUrn, datasetConfig.getDataset());
+    Map<String, Object> dimensionWrapperProperties = buildDimensionWrapperProperties(
+        yamlConfigMap, dimensionFiltersMap, metricUrn, datasetConfig.getDataset());
     Map<String, Object> properties = buildWrapperProperties(
         ChildKeepingMergeWrapper.class.getName(),
         Collections.singletonList(buildWrapperProperties(DimensionWrapper.class.getName(), nestedPipelines, dimensionWrapperProperties)),
@@ -221,15 +222,15 @@ public class DetectionConfigTranslator extends ConfigTranslator<DetectionConfigD
       properties = buildGroupWrapperProperties(grouperYamls.get(0), properties);
     }
 
-    return generateDetectionConfig(properties, this.components, cron);
+    return generateDetectionConfig(yamlConfigMap, properties, this.components, cron);
   }
 
-  private Map<String, Object> buildDimensionWrapperProperties(
+  private Map<String, Object> buildDimensionWrapperProperties(Map<String, Object> yamlConfigMap,
       Map<String, Collection<String>> dimensionFilters, String metricUrn, String datasetName) {
     Map<String, Object> dimensionWrapperProperties = new HashMap<>();
     dimensionWrapperProperties.put(PROP_NESTED_METRIC_URNS, Collections.singletonList(metricUrn));
     if (yamlConfigMap.containsKey(PROP_DIMENSION_EXPLORATION)) {
-      Map<String, Object> dimensionExploreYaml = MapUtils.getMap(this.yamlConfigMap, PROP_DIMENSION_EXPLORATION);
+      Map<String, Object> dimensionExploreYaml = MapUtils.getMap(yamlConfigMap, PROP_DIMENSION_EXPLORATION);
       dimensionWrapperProperties.putAll(dimensionExploreYaml);
       if (dimensionExploreYaml.containsKey(PROP_DIMENSION_FILTER_METRIC)){
         MetricConfigDTO dimensionExploreMetric = this.dataProvider.fetchMetric(MapUtils.getString(dimensionExploreYaml, PROP_DIMENSION_FILTER_METRIC), datasetName);
@@ -435,7 +436,8 @@ public class DetectionConfigTranslator extends ConfigTranslator<DetectionConfigD
   /**
    * Fill in common fields of detection config. Properties of the pipeline is filled by the subclass.
    */
-  private DetectionConfigDTO generateDetectionConfig(Map<String, Object> properties, Map<String, Object> components, String cron) {
+  private DetectionConfigDTO generateDetectionConfig(Map<String, Object> yamlConfigMap, Map<String, Object> properties,
+      Map<String, Object> components, String cron) {
     DetectionConfigDTO config = new DetectionConfigDTO();
     config.setName(MapUtils.getString(yamlConfigMap, PROP_DETECTION_NAME));
     config.setDescription(MapUtils.getString(yamlConfigMap, PROP_DESC_NAME));

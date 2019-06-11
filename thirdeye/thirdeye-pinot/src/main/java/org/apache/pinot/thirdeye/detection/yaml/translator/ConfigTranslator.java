@@ -33,11 +33,9 @@ import org.yaml.snakeyaml.Yaml;
  */
 public abstract class ConfigTranslator<T extends AbstractDTO, V extends ConfigValidator> {
 
-  protected ConfigValidator validator;
-  protected DataProvider dataProvider;
-  protected String yamlConfig;
-  protected Map<String, Object> yamlConfigMap;
-  protected Yaml yaml;
+  protected final String yamlConfig;
+  protected final ConfigValidator validator;
+  protected final Yaml yaml;
 
   ConfigTranslator(String yamlConfig, V validator) {
     this.yamlConfig = yamlConfig;
@@ -45,15 +43,14 @@ public abstract class ConfigTranslator<T extends AbstractDTO, V extends ConfigVa
     this.yaml = new Yaml();
   }
 
-  abstract T translateConfig() throws IllegalArgumentException;
+  abstract T translateConfig(Map<String, Object> yamlConfigMap) throws IllegalArgumentException;
 
   /**
    * Convert raw yaml configuration into config object with pre and post validation
    */
   public T translate() throws IllegalArgumentException {
-    this.yamlConfigMap = new HashMap<>(ConfigUtils.getMap(this.yaml.load(yamlConfig)));
-
-    validator.validateYaml(this.yamlConfigMap);
-    return this.translateConfig();
+    Map<String, Object> yamlConfigMap = new HashMap<>(ConfigUtils.getMap(this.yaml.load(yamlConfig)));
+    validator.validateYaml(yamlConfigMap);
+    return this.translateConfig(yamlConfigMap);
   }
 }
