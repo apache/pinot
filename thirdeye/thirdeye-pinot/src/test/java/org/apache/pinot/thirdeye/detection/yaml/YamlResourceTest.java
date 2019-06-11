@@ -1,14 +1,20 @@
 package org.apache.pinot.thirdeye.detection.yaml;
 
+import java.util.concurrent.TimeUnit;
 import org.apache.pinot.thirdeye.datalayer.bao.DAOTestBase;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
 import org.apache.pinot.thirdeye.datalayer.dto.ApplicationDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.apache.pinot.thirdeye.detection.annotation.registry.DetectionAlertRegistry;
 import java.io.IOException;
 import org.apache.commons.io.IOUtils;
+import org.apache.pinot.thirdeye.detection.annotation.registry.DetectionRegistry;
+import org.apache.pinot.thirdeye.detection.components.ThresholdRuleDetector;
+import org.apache.pinot.thirdeye.detection.yaml.translator.CompositePipelineConfigTranslator;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
@@ -16,7 +22,6 @@ import org.testng.annotations.Test;
 
 
 public class YamlResourceTest {
-
   private DAOTestBase testDAOProvider;
   private YamlResource yamlResource;
   private DAORegistry daoRegistry;
@@ -36,6 +41,8 @@ public class YamlResourceTest {
     config2.setName("test_detection_2");
     alertId2 = detectionDAO.save(config2);
 
+    DetectionRegistry.getInstance().registerYamlConvertor(CompositePipelineConfigTranslator.class.getName(), "COMPOSITE");
+    DetectionRegistry.registerComponent(ThresholdRuleDetector.class.getName(), "THRESHOLD");
     DetectionAlertRegistry.getInstance().registerAlertScheme("EMAIL", "EmailClass");
     DetectionAlertRegistry.getInstance().registerAlertScheme("IRIS", "IrisClass");
     DetectionAlertRegistry.getInstance().registerAlertSuppressor("TIME_WINDOW", "TimeWindowClass");
@@ -48,7 +55,53 @@ public class YamlResourceTest {
   }
 
   @Test
-  public void testCreateDetectionAlertConfig() throws IOException {
+  public void testCreateOrUpdateDetectionConfig() throws IOException {
+    String blankYaml = "";
+    try {
+      this.yamlResource.createOrUpdateDetectionPipeline(blankYaml);
+      Assert.fail("Exception not thrown on empty yaml");
+    } catch (Exception e) {
+      Assert.assertEquals(e.getMessage(), "The Yaml Payload in the request is empty.");
+    }
+
+    MetricConfigDTO metricConfig = new MetricConfigDTO();
+    metricConfig.setAlias("test_alias");
+    metricConfig.setName("test_metric");
+    metricConfig.setDataset("test_dataset");
+    daoRegistry.getMetricConfigDAO().save(metricConfig);
+
+    DatasetConfigDTO datasetConfigDTO = new DatasetConfigDTO();
+    datasetConfigDTO.setDataset("test_dataset");
+    datasetConfigDTO.setTimeUnit(TimeUnit.DAYS);
+    datasetConfigDTO.setTimeDuration(1);
+    daoRegistry.getDatasetConfigDAO().save(datasetConfigDTO);
+
+    // Create a new detection
+    String validYaml = IOUtils.toString(this.getClass().getResourceAsStream("detection/detection-config-1.yaml"));
+    try {
+      long id = this.yamlResource.createOrUpdateDetectionPipeline(validYaml);
+      DetectionConfigDTO detection = daoRegistry.getDetectionConfigManager().findById(id);
+      Assert.assertNotNull(detection);
+      Assert.assertEquals(detection.getName(), "testPipeline");
+    } catch (Exception e) {
+      Assert.fail("Exception should not be thrown for valid yaml. Message: " + e + " Cause: " + e.getCause());
+    }
+
+    // Update above created detection
+    String updatedYaml = IOUtils.toString(this.getClass().getResourceAsStream("detection/detection-config-2.yaml"));
+    try {
+      long id = this.yamlResource.createOrUpdateDetectionPipeline(updatedYaml);
+      DetectionConfigDTO detection = daoRegistry.getDetectionConfigManager().findById(id);
+      Assert.assertNotNull(detection);
+      Assert.assertEquals(detection.getName(), "testPipeline");
+      Assert.assertEquals(detection.getDescription(), "My modified pipeline");
+    } catch (Exception e) {
+      Assert.fail("Exception should not be thrown if detection already exists. Message: " + e + " Cause: " + e.getCause());
+    }
+  }
+
+  @Test
+  public void testCreateOrDetectionAlertConfig() throws IOException {
     String blankYaml = "";
     try {
       this.yamlResource.createSubscriptionGroup(blankYaml);

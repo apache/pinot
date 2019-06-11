@@ -27,6 +27,7 @@ import com.wordnik.swagger.annotations.ApiOperation;
 import com.wordnik.swagger.annotations.ApiParam;
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -98,6 +99,7 @@ public class YamlResource {
   private static ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   private static final String PROP_SUBS_GROUP_NAME = "subscriptionGroupName";
+  private static final String PROP_DETECTION_NAME = "detectionName";
 
   // default onboarding replay period
   private static final long ONBOARDING_REPLAY_LOOKBACK = TimeUnit.DAYS.toMillis(30);
@@ -287,6 +289,10 @@ public class YamlResource {
     ).build();
   }
 
+  long createDetectionPipeline(String yamlDetectionConfig) {
+    return createDetectionPipeline(yamlDetectionConfig, 0, 0);
+  }
+
   long createDetectionPipeline(String yamlDetectionConfig, long startTime, long endTime)
       throws IllegalArgumentException {
     Preconditions.checkArgument(StringUtils.isNotBlank(yamlDetectionConfig), "The Yaml Payload in the request is empty.");
@@ -342,9 +348,13 @@ public class YamlResource {
     }
 
     LOG.info("Detection Pipeline created with id " + detectionConfigId + " using payload " + payload);
-    responseMessage.put("message", "The subscription group was created successfully.");
+    responseMessage.put("message", "Alert was created successfully.");
     responseMessage.put("more-info", "Record saved with id " + detectionConfigId);
     return Response.ok().entity(responseMessage).build();
+  }
+
+  void updateDetectionPipeline(long detectionID, String yamlDetectionConfig) {
+    updateDetectionPipeline(detectionID, yamlDetectionConfig, 0, 0);
   }
 
   void updateDetectionPipeline(long detectionID, String yamlDetectionConfig, long startTime, long endTime)
@@ -411,6 +421,70 @@ public class YamlResource {
     LOG.info("Detection Pipeline " + id + " updated successfully");
     responseMessage.put("message", "The detection Pipeline was created successfully.");
     responseMessage.put("detectionConfigId", String.valueOf(id));
+    return Response.ok().entity(responseMessage).build();
+  }
+
+  private DetectionConfigDTO fetchExistingDetection(String payload) {
+    DetectionConfigDTO existingDetectionConfig = null;
+
+    // Extract the detectionName from payload
+    Map<String, Object> detectionConfigMap = new HashMap<>();
+    detectionConfigMap.putAll(ConfigUtils.getMap(this.yaml.load(payload)));
+    String detectionName = MapUtils.getString(detectionConfigMap, PROP_DETECTION_NAME);
+    Preconditions.checkNotNull(detectionName, "Missing property detectionName in the detection config.");
+
+    // Check if detection already existing
+    Collection<DetectionConfigDTO> detectionConfigs = this.detectionConfigDAO
+        .findByPredicate(Predicate.EQ("name", detectionName));
+    if (detectionConfigs != null && !detectionConfigs.isEmpty()) {
+      existingDetectionConfig = detectionConfigs.iterator().next();
+    }
+
+    return existingDetectionConfig;
+  }
+
+  long createOrUpdateDetectionPipeline(String payload) {
+    Preconditions.checkArgument(StringUtils.isNotBlank(payload), "The Yaml Payload in the request is empty.");
+    long detectionId;
+    DetectionConfigDTO existingDetection = fetchExistingDetection(payload);
+    if (existingDetection != null) {
+      detectionId = existingDetection.getId();
+      updateDetectionPipeline(detectionId, payload);
+    } else {
+      detectionId = createDetectionPipeline(payload);
+    }
+
+    return detectionId;
+  }
+
+  /**
+   Set up a detection pipeline using a YAML config - create new or update existing
+   @param payload YAML config string
+   @return a message contains the saved detection config id
+   */
+  @POST
+  @Produces(MediaType.APPLICATION_JSON)
+  @Consumes(MediaType.TEXT_PLAIN)
+  @ApiOperation("Create a new detection pipeline or update existing if one already exists")
+  public Response createOrUpdateDetectionPipelineApi(@ApiParam("yaml config") String payload) {
+    Map<String, String> responseMessage = new HashMap<>();
+    long detectionConfigId;
+    try {
+      detectionConfigId = createOrUpdateDetectionPipeline(payload);
+    } catch (IllegalArgumentException e) {
+      LOG.warn("Validation error while creating/updating detection pipeline with payload " + payload, e);
+      responseMessage.put("message", "Validation Error! " + e.getMessage());
+      return Response.status(Response.Status.BAD_REQUEST).entity(responseMessage).build();
+    } catch (Exception e) {
+      LOG.error("Error creating/updating detection pipeline with payload " + payload, e);
+      responseMessage.put("message", "Failed to create the detection pipeline. Reach out to the ThirdEye team.");
+      responseMessage.put("more-info", "Error = " + e.getMessage());
+      return Response.serverError().entity(responseMessage).build();
+    }
+
+    LOG.info("Detection Pipeline created/updated id " + detectionConfigId + " using payload " + payload);
+    responseMessage.put("message", "The alert was created/updated successfully.");
+    responseMessage.put("more-info", "Record saved/updated with id " + detectionConfigId);
     return Response.ok().entity(responseMessage).build();
   }
 
