@@ -36,13 +36,6 @@ struct PinotQuery {
   11: optional map<string, string> queryOptions;
 }
 
-struct InstanceRequestV2 {
-  1: required i64 requestId;
-  3: optional list<string> searchSegments;
-  4: optional bool enableTrace;
-  5: optional string brokerId;
-}
-
 enum ExpressionType {
   LITERAL,
   IDENTIFIER,

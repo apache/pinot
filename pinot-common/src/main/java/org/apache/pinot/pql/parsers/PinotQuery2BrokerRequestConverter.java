@@ -80,12 +80,14 @@ public class PinotQuery2BrokerRequestConverter {
     final List<Expression> orderByList = pinotQuery.getOrderByList();
     for (Expression orderByExpr : orderByList) {
       SelectionSort selectionSort = new SelectionSort();
-      if (orderByExpr.getFunctionCall().getOperator().equalsIgnoreCase("ASC")) {
+      //order by is always a function (ASC or DESC)
+      Function functionCall = orderByExpr.getFunctionCall();
+      if (functionCall.getOperator().equalsIgnoreCase("ASC")) {
         selectionSort.setIsAsc(true);
       } else {
         selectionSort.setIsAsc(false);
       }
-      selectionSort.setColumn(standardizeExpression(orderByExpr, true));
+      selectionSort.setColumn(standardizeExpression(functionCall.getOperands().get(0), true));
       sortSequenceList.add(selectionSort);
     }
     if (!sortSequenceList.isEmpty()) {
@@ -184,20 +186,25 @@ public class PinotQuery2BrokerRequestConverter {
         return expression.getIdentifier().getName();
       case FUNCTION:
         Function functionCall = expression.getFunctionCall();
-        StringBuilder sb = new StringBuilder();
-        sb.append(functionCall.getOperator().toLowerCase());
-        sb.append("(");
-        String delim = "";
-        for (Expression operand : functionCall.getOperands()) {
-          sb.append(delim);
-          sb.append(standardizeExpression(operand, false, true));
-          delim = ",";
-        }
-        sb.append(")");
-        return sb.toString();
+        String functionString = standardizeFunction(functionCall);
+        return functionString;
       default:
         throw new UnsupportedOperationException("Unknown Expression type: " + expression.getType());
     }
+  }
+
+  private String standardizeFunction(Function functionCall) {
+    StringBuilder sb = new StringBuilder();
+    sb.append(functionCall.getOperator().toLowerCase());
+    sb.append("(");
+    String delim = "";
+    for (Expression operand : functionCall.getOperands()) {
+      sb.append(delim);
+      sb.append(standardizeExpression(operand, false, true));
+      delim = ",";
+    }
+    sb.append(")");
+    return sb.toString();
   }
 
   private AggregationInfo buildAggregationInfo(Function function) {

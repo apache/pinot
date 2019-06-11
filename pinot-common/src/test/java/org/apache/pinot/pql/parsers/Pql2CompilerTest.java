@@ -391,7 +391,10 @@ public class Pql2CompilerTest {
   @Test
   public void testConverter()
       throws IOException {
-    Pql2Compiler.FAIL_ON_CONVERSION_ERROR
+    Pql2Compiler.ENABLE_PINOT_QUERY = true;
+    Pql2Compiler.VALIDATE_CONVERTER = true;
+    Pql2Compiler.FAIL_ON_CONVERSION_ERROR = true;
+
     COMPILER.compileToBrokerRequest("SELECT MIN(div(DaysSinceEpoch,2)) FROM mytable");
     COMPILER.compileToBrokerRequest(
         "SELECT SUM(DepDelayMinutes), SUM(ArrDel15), SUM(DepDelay), SUM(DepDel15) FROM myStarTable WHERE Carrier IN ('UA', 'WN', 'FL', 'F9') AND Carrier NOT IN ('EV', 'AS', 'FL') AND DayofMonth > 5 AND DayofMonth <= 17 AND Diverted > 0 AND OriginCityName > 'Detroit, MI' GROUP BY CRSDepTime");
@@ -411,8 +414,8 @@ public class Pql2CompilerTest {
         throw e;
       }
     }
-    System.setProperty("pinot.query.converter.enabled","false");
-    System.setProperty("pinot.query.converter.validate", "false");
-    System.setProperty("pinot.query.converter.fail_on_error", "false");
+    Pql2Compiler.ENABLE_PINOT_QUERY = true;
+    Pql2Compiler.VALIDATE_CONVERTER = true;
+    Pql2Compiler.FAIL_ON_CONVERSION_ERROR = true;
   }
 }

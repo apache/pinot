@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.Stack;
+import org.apache.commons.lang.mutable.MutableInt;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
@@ -61,7 +62,8 @@ public class RequestUtils {
    */
   public static void generateFilterFromTree(FilterQueryTree filterQueryTree, BrokerRequest request) {
     Map<Integer, FilterQuery> filterQueryMap = new HashMap<>();
-    FilterQuery root = traverseFilterQueryAndPopulateMap(filterQueryTree, filterQueryMap);
+    MutableInt currentId = new MutableInt(0);
+    FilterQuery root = traverseFilterQueryAndPopulateMap(filterQueryTree, filterQueryMap, currentId);
     filterQueryMap.put(root.getId(), root);
     request.setFilterQuery(root);
     FilterQueryMap mp = new FilterQueryMap();
@@ -115,7 +117,8 @@ public class RequestUtils {
 
   public static void generateFilterFromTree(HavingQueryTree filterQueryTree, BrokerRequest request) {
     Map<Integer, HavingFilterQuery> filterQueryMap = new HashMap<>();
-    HavingFilterQuery root = traverseHavingFilterQueryAndPopulateMap(filterQueryTree, filterQueryMap);
+    MutableInt currentId = new MutableInt(0);
+    HavingFilterQuery root = traverseHavingFilterQueryAndPopulateMap(filterQueryTree, filterQueryMap, currentId);
     filterQueryMap.put(root.getId(), root);
     request.setHavingFilterQuery(root);
     HavingFilterQueryMap mp = new HavingFilterQueryMap();
@@ -123,48 +126,53 @@ public class RequestUtils {
     request.setHavingFilterSubQueryMap(mp);
   }
 
-  private static FilterQuery traverseFilterQueryAndPopulateMap(FilterQueryTree root,
-      Map<Integer, FilterQuery> filterQueryMap) {
-    List<Integer> childIds = new ArrayList<>();
-    List<FilterQueryTree> children = root.getChildren();
-    if (children != null) {
-      for (FilterQueryTree child : children) {
-        FilterQuery childQuery = traverseFilterQueryAndPopulateMap(child, filterQueryMap);
-        childIds.add(childQuery.getId());
+  private static FilterQuery traverseFilterQueryAndPopulateMap(FilterQueryTree tree,
+      Map<Integer, FilterQuery> filterQueryMap, MutableInt currentId) {
+    int currentNodeId = currentId.intValue();
+    currentId.increment();
+
+    final List<Integer> f = new ArrayList<>();
+    if (null != tree.getChildren()) {
+      for (final FilterQueryTree c : tree.getChildren()) {
+        final FilterQuery q = traverseFilterQueryAndPopulateMap(c, filterQueryMap, currentId);
+        int childNodeId = q.getId();
+        f.add(childNodeId);
+        filterQueryMap.put(childNodeId, q);
       }
     }
 
-    int id = filterQueryMap.size();
     FilterQuery query = new FilterQuery();
-    filterQueryMap.put(id, query);
-    query.setId(id);
-    query.setNestedFilterQueryIds(childIds);
-    query.setColumn(root.getColumn());
-    query.setOperator(root.getOperator());
-    query.setValue(root.getValue());
+    query.setColumn(tree.getColumn());
+    query.setId(currentNodeId);
+    query.setNestedFilterQueryIds(f);
+    query.setOperator(tree.getOperator());
+    query.setValue(tree.getValue());
     return query;
   }
 
-  private static HavingFilterQuery traverseHavingFilterQueryAndPopulateMap(HavingQueryTree root,
-      Map<Integer, HavingFilterQuery> filterQueryMap) {
-    List<Integer> childIds = new ArrayList<>();
-    List<HavingQueryTree> children = root.getChildren();
-    if (children != null) {
-      for (HavingQueryTree child : children) {
-        final HavingFilterQuery childQuery = traverseHavingFilterQueryAndPopulateMap(child, filterQueryMap);
-        childIds.add(childQuery.getId());
+  private static HavingFilterQuery traverseHavingFilterQueryAndPopulateMap(HavingQueryTree tree,
+      Map<Integer, HavingFilterQuery> filterQueryMap, MutableInt currentId) {
+    int currentNodeId = currentId.intValue();
+    currentId.increment();
+
+    final List<Integer> filterIds = new ArrayList<>();
+    if (null != tree.getChildren()) {
+      for (final HavingQueryTree child : tree.getChildren()) {
+        int childNodeId = currentId.intValue();
+        currentId.increment();
+        filterIds.add(childNodeId);
+        final HavingFilterQuery filterQuery = traverseHavingFilterQueryAndPopulateMap(child, filterQueryMap, currentId);
+        filterQueryMap.put(childNodeId, filterQuery);
       }
     }
 
-    int id = filterQueryMap.size();
-    HavingFilterQuery query = new HavingFilterQuery();
-    filterQueryMap.put(id, query);
-    query.setId(id);
-    query.setNestedFilterQueryIds(childIds);
-    query.setAggregationInfo(root.getAggregationInfo());
-    query.setOperator(root.getOperator());
-    query.setValue(root.getValue());
-    return query;
+    HavingFilterQuery havingFilterQuery = new HavingFilterQuery();
+    havingFilterQuery.setAggregationInfo(tree.getAggregationInfo());
+    havingFilterQuery.setId(currentNodeId);
+    havingFilterQuery.setNestedFilterQueryIds(filterIds);
+    havingFilterQuery.setOperator(tree.getOperator());
+    havingFilterQuery.setValue(tree.getValue());
+    return havingFilterQuery;
   }
 
   /**

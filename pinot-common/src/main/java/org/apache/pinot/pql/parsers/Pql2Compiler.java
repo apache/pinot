@@ -64,11 +64,11 @@ public class Pql2Compiler implements AbstractCompiler {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(Pql2Compiler.class);
 
-  public static final boolean ENABLE_PINOT_QUERY =
+  public static boolean ENABLE_PINOT_QUERY =
       Boolean.valueOf(System.getProperty("pinot.query.converter.enabled", "false"));
-  public static final boolean VALIDATE_CONVERTER =
+  public static boolean VALIDATE_CONVERTER =
       Boolean.valueOf(System.getProperty("pinot.query.converter.validate", "false"));
-  public static final boolean FAIL_ON_CONVERSION_ERROR =
+  public static boolean FAIL_ON_CONVERSION_ERROR =
       Boolean.valueOf(System.getProperty("pinot.query.converter.fail_on_error", "false"));
 
   private static class ErrorListener extends BaseErrorListener {
