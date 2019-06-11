@@ -156,4 +156,9 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
   public static final class Context {
     private boolean _updateRealtimeDocumentCount;
   }
+
+  @VisibleForTesting
+  public ValidationMetrics getValidationMetrics() {
+    return _validationMetrics;
+  }
 }
