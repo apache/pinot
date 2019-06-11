@@ -21,6 +21,7 @@ package org.apache.pinot.tools.admin.command;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.data.DateTimeFieldSpec;
 import org.apache.pinot.common.data.TimeFieldSpec;
 import org.apache.pinot.common.utils.CommonConstants.Segment.SegmentType;
@@ -196,10 +197,11 @@ public class BackfillDateTimeColumnCommand extends AbstractBaseAdminCommand impl
       }
 
       // create new segment
+      String rawTableName = TableNameBuilder.extractRawTableName(_tableName);
       File segmentDir = new File(downloadSegmentDir, segmentName);
       File outputDir = new File(downloadSegmentDir, OUTPUT_FOLDER);
       BackfillDateTimeColumn backfillDateTimeColumn =
-          new BackfillDateTimeColumn(segmentDir, outputDir, timeFieldSpec, dateTimeFieldSpec);
+          new BackfillDateTimeColumn(rawTableName, segmentDir, outputDir, timeFieldSpec, dateTimeFieldSpec);
       boolean backfillStatus = backfillDateTimeColumn.backfill();
       LOGGER
           .info("Backfill status for segment {} in {} to {} is {}", segmentName, segmentDir, outputDir, backfillStatus);

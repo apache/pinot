@@ -102,7 +102,8 @@ public class PinotResourceManagerTest extends ControllerTest {
 
     // Basic add/delete case
     for (int i = 1; i <= 2; i++) {
-      _helixResourceManager.addNewSegment(SegmentMetadataMockUtils.mockSegmentMetadata(TABLE_NAME), "downloadUrl");
+      _helixResourceManager
+          .addNewSegment(TABLE_NAME, SegmentMetadataMockUtils.mockSegmentMetadata(TABLE_NAME), "downloadUrl");
     }
     IdealState idealState = _helixAdmin.getResourceIdealState(getHelixClusterName(), offlineTableName);
     Set<String> segments = idealState.getPartitionSet();
@@ -122,7 +123,7 @@ public class PinotResourceManagerTest extends ControllerTest {
         public void run() {
           for (int i = 0; i < 10; i++) {
             _helixResourceManager
-                .addNewSegment(SegmentMetadataMockUtils.mockSegmentMetadata(TABLE_NAME), "downloadUrl");
+                .addNewSegment(TABLE_NAME, SegmentMetadataMockUtils.mockSegmentMetadata(TABLE_NAME), "downloadUrl");
           }
         }
       });

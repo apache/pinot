@@ -128,7 +128,7 @@ public class ValidationManagerTest extends ControllerTest {
       throws Exception {
     SegmentMetadata segmentMetadata = SegmentMetadataMockUtils.mockSegmentMetadata(TEST_TABLE_NAME, TEST_SEGMENT_NAME);
 
-    _helixResourceManager.addNewSegment(segmentMetadata, "http://dummy/");
+    _helixResourceManager.addNewSegment(TEST_TABLE_NAME, segmentMetadata, "http://dummy/");
     OfflineSegmentZKMetadata offlineSegmentZKMetadata =
         _helixResourceManager.getOfflineSegmentZKMetadata(TEST_TABLE_NAME, TEST_SEGMENT_NAME);
     long pushTime = offlineSegmentZKMetadata.getPushTime();
@@ -139,7 +139,7 @@ public class ValidationManagerTest extends ControllerTest {
 
     // Refresh the segment
     Mockito.when(segmentMetadata.getCrc()).thenReturn(Long.toString(System.nanoTime()));
-    _helixResourceManager.refreshSegment(segmentMetadata, offlineSegmentZKMetadata);
+    _helixResourceManager.refreshSegment(TEST_TABLE_NAME, segmentMetadata, offlineSegmentZKMetadata);
 
     offlineSegmentZKMetadata =
         _helixResourceManager.getOfflineSegmentZKMetadata(TEST_TABLE_NAME, TEST_SEGMENT_NAME);

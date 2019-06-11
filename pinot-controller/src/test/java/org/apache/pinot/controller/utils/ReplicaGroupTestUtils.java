@@ -45,7 +45,7 @@ public class ReplicaGroupTestUtils {
       String segmentName = SEGMENT_PREFIX + i;
       SegmentMetadata segmentMetadata = SegmentMetadataMockUtils
           .mockSegmentMetadataWithPartitionInfo(tableName, segmentName, partitionColumn, partition);
-      resourceManager.addNewSegment(segmentMetadata, "downloadUrl");
+      resourceManager.addNewSegment(tableName, segmentMetadata, "downloadUrl");
       if (!segmentsPerPartition.containsKey(partition)) {
         segmentsPerPartition.put(partition, new HashSet<String>());
       }
@@ -58,7 +58,7 @@ public class ReplicaGroupTestUtils {
       String partitionColumn, PinotHelixResourceManager resourceManager) {
     SegmentMetadata segmentMetadata =
         SegmentMetadataMockUtils.mockSegmentMetadataWithPartitionInfo(tableName, segmentName, partitionColumn, 0);
-    resourceManager.addNewSegment(segmentMetadata, "downloadUrl");
+    resourceManager.addNewSegment(tableName, segmentMetadata, "downloadUrl");
   }
 
   /**

@@ -23,6 +23,7 @@ import java.util.Collections;
 import java.util.Map;
 import javax.annotation.Nonnull;
 import org.apache.pinot.common.config.PinotTaskConfig;
+import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.RawIndexConverter;
@@ -35,7 +36,9 @@ public class ConvertToRawIndexTaskExecutor extends BaseSingleSegmentConversionEx
       @Nonnull File workingDir)
       throws Exception {
     Map<String, String> configs = pinotTaskConfig.getConfigs();
-    new RawIndexConverter(originalIndexDir, workingDir,
+    String tableNameWithType = configs.get(MinionConstants.TABLE_NAME_KEY);
+    String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+    new RawIndexConverter(rawTableName, originalIndexDir, workingDir,
         configs.get(MinionConstants.ConvertToRawIndexTask.COLUMNS_TO_CONVERT_KEY)).convert();
     return new SegmentConversionResult.Builder().setFile(workingDir)
         .setTableNameWithType(configs.get(MinionConstants.TABLE_NAME_KEY))

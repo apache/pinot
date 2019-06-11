@@ -71,7 +71,8 @@ public class ControllerSentinelTestV2 extends ControllerTest {
       Assert
           .assertEquals(_helixAdmin.getResourceIdealState(_helixClusterName, tableName + "_OFFLINE").getNumPartitions(),
               i);
-      _helixResourceManager.addNewSegment(SegmentMetadataMockUtils.mockSegmentMetadata(tableName), "downloadUrl");
+      _helixResourceManager
+          .addNewSegment(tableName, SegmentMetadataMockUtils.mockSegmentMetadata(tableName), "downloadUrl");
       Assert
           .assertEquals(_helixAdmin.getResourceIdealState(_helixClusterName, tableName + "_OFFLINE").getNumPartitions(),
               i + 1);

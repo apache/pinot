@@ -57,11 +57,11 @@ public class ZKOperator {
     _controllerMetrics = controllerMetrics;
   }
 
-  public void completeSegmentOperations(SegmentMetadata segmentMetadata, URI finalSegmentLocationURI,
-      File currentSegmentLocation, boolean enableParallelPushProtection, HttpHeaders headers, String zkDownloadURI,
-      boolean moveSegmentToFinalLocation, SegmentValidatorResponse segmentValidatorResponse)
+  public void completeSegmentOperations(String rawTableName, SegmentMetadata segmentMetadata,
+      URI finalSegmentLocationURI, File currentSegmentLocation, boolean enableParallelPushProtection,
+      HttpHeaders headers, String zkDownloadURI, boolean moveSegmentToFinalLocation,
+      SegmentValidatorResponse segmentValidatorResponse)
       throws Exception {
-    String rawTableName = segmentMetadata.getTableName();
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
     String segmentName = segmentMetadata.getName();
 
@@ -176,7 +176,7 @@ public class ZKOperator {
               zkDownloadURI);
         }
 
-        _pinotHelixResourceManager.refreshSegment(segmentMetadata, existingSegmentZKMetadata);
+        _pinotHelixResourceManager.refreshSegment(offlineTableName, segmentMetadata, existingSegmentZKMetadata);
       }
     } catch (Exception e) {
       if (!_pinotHelixResourceManager.updateZkMetadata(existingSegmentZKMetadata)) {
@@ -223,7 +223,7 @@ public class ZKOperator {
       LOGGER.info("Skipping segment move, keeping segment {} from table {} at {}", segmentName, rawTableName,
           zkDownloadURI);
     }
-    _pinotHelixResourceManager.addNewSegment(segmentMetadata, zkDownloadURI, crypter, assignedInstances);
+    _pinotHelixResourceManager.addNewSegment(rawTableName, segmentMetadata, zkDownloadURI, crypter, assignedInstances);
   }
 
   private void moveSegmentToPermanentDirectory(File currentSegmentLocation, URI finalSegmentLocationURI)

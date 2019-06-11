@@ -47,9 +47,8 @@ public class BalanceNumSegmentAssignmentStrategy implements SegmentAssignmentStr
 
   @Override
   public List<String> getAssignedInstances(HelixManager helixManager, HelixAdmin helixAdmin,
-      ZkHelixPropertyStore<ZNRecord> propertyStore, String helixClusterName, SegmentMetadata segmentMetadata,
-      int numReplicas, String tenantName) {
-    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(segmentMetadata.getTableName());
+      ZkHelixPropertyStore<ZNRecord> propertyStore, String helixClusterName, String tableNameWithType,
+      SegmentMetadata segmentMetadata, int numReplicas, String tenantName) {
     String serverTenantName = TagNameUtils.getOfflineTagForTenant(tenantName);
 
     List<String> selectedInstances = new ArrayList<>();
@@ -61,7 +60,7 @@ public class BalanceNumSegmentAssignmentStrategy implements SegmentAssignmentStr
     }
 
     // Count number of segments assigned to each instance
-    IdealState idealState = helixAdmin.getResourceIdealState(helixClusterName, offlineTableName);
+    IdealState idealState = helixAdmin.getResourceIdealState(helixClusterName, tableNameWithType);
     if (idealState != null) {
       for (String partitionName : idealState.getPartitionSet()) {
         Map<String, String> instanceToStateMap = idealState.getInstanceStateMap(partitionName);
@@ -92,8 +91,8 @@ public class BalanceNumSegmentAssignmentStrategy implements SegmentAssignmentStr
       selectedInstances.add(priorityQueue.poll().getB());
     }
 
-    LOGGER.info("Segment assignment result for : " + segmentMetadata.getName() + ", in resource : " + segmentMetadata
-        .getTableName() + ", selected instances: " + Arrays.toString(selectedInstances.toArray()));
+    LOGGER.info("Segment assignment result for : " + segmentMetadata.getName() + ", in resource : " + tableNameWithType
+        + ", selected instances: " + Arrays.toString(selectedInstances.toArray()));
     return selectedInstances;
   }
 }
