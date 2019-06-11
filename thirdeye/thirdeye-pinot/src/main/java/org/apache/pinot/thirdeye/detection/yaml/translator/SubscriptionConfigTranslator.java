@@ -26,7 +26,6 @@ import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.pojo.AlertConfigBean;
 import org.apache.pinot.thirdeye.datalayer.util.Predicate;
 import org.apache.pinot.thirdeye.detection.ConfigUtils;
-import org.apache.pinot.thirdeye.detection.DataProvider;
 import org.apache.pinot.thirdeye.detection.annotation.registry.DetectionAlertRegistry;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -45,7 +44,7 @@ import org.yaml.snakeyaml.Yaml;
 /**
  * The translator converts the alert yaml config into a detection alert config
  */
-public class YamlDetectionAlertConfigTranslator extends ConfigTranslator<DetectionAlertConfigDTO, SubscriptionConfigValidator> {
+public class SubscriptionConfigTranslator extends ConfigTranslator<DetectionAlertConfigDTO, SubscriptionConfigValidator> {
   public static final String PROP_DETECTION_CONFIG_IDS = "detectionConfigIds";
   public static final String PROP_RECIPIENTS = "recipients";
 
@@ -75,12 +74,12 @@ public class YamlDetectionAlertConfigTranslator extends ConfigTranslator<Detecti
       Arrays.asList(PROP_RECIPIENTS, PROP_DIMENSION, PROP_DIMENSION_RECIPIENTS));
   private final DetectionConfigManager detectionConfigDAO;
 
-  public YamlDetectionAlertConfigTranslator(DetectionConfigManager detectionConfigDAO, Map<String,Object> yamlAlertConfig) {
-    this(detectionConfigDAO, yamlAlertConfig, new SubscriptionConfigValidator());
+  public SubscriptionConfigTranslator(DetectionConfigManager detectionConfigDAO, String yamlConfig) {
+    this(detectionConfigDAO, yamlConfig, new SubscriptionConfigValidator());
   }
 
-  public YamlDetectionAlertConfigTranslator(DetectionConfigManager detectionConfigDAO, Map<String,Object> yamlAlertConfig, SubscriptionConfigValidator validator) {
-    super(yamlAlertConfig, validator);
+  public SubscriptionConfigTranslator(DetectionConfigManager detectionConfigDAO, String yamlConfig, SubscriptionConfigValidator validator) {
+    super(yamlConfig, validator);
     this.detectionConfigDAO = detectionConfigDAO;
   }
 
@@ -163,37 +162,38 @@ public class YamlDetectionAlertConfigTranslator extends ConfigTranslator<Detecti
    * Generates the {@link DetectionAlertConfigDTO} from the YAML Alert Map
    */
   @Override
-  DetectionAlertConfigDTO translateConfig() throws IllegalArgumentException {
+  DetectionAlertConfigDTO translateConfig(Map<String, Object> yamlConfigMap) throws IllegalArgumentException {
     DetectionAlertConfigDTO alertConfigDTO = new DetectionAlertConfigDTO();
 
-    alertConfigDTO.setName(MapUtils.getString(this.yamlConfig, PROP_SUBS_GROUP_NAME));
-    alertConfigDTO.setApplication(MapUtils.getString(this.yamlConfig, PROP_APPLICATION));
-    alertConfigDTO.setFrom(MapUtils.getString(this.yamlConfig, PROP_FROM));
+    alertConfigDTO.setName(MapUtils.getString(yamlConfigMap, PROP_SUBS_GROUP_NAME));
+    alertConfigDTO.setApplication(MapUtils.getString(yamlConfigMap, PROP_APPLICATION));
+    alertConfigDTO.setFrom(MapUtils.getString(yamlConfigMap, PROP_FROM));
 
-    alertConfigDTO.setCronExpression(MapUtils.getString(this.yamlConfig, PROP_CRON, CRON_SCHEDULE_DEFAULT));
-    alertConfigDTO.setActive(MapUtils.getBooleanValue(this.yamlConfig, PROP_ACTIVE, true));
+    alertConfigDTO.setCronExpression(MapUtils.getString(yamlConfigMap, PROP_CRON, CRON_SCHEDULE_DEFAULT));
+    alertConfigDTO.setActive(MapUtils.getBooleanValue(yamlConfigMap, PROP_ACTIVE, true));
+    alertConfigDTO.setYaml(yamlConfig);
 
     alertConfigDTO.setSubjectType(AlertConfigBean.SubjectType.valueOf(
-        (String) MapUtils.getObject(this.yamlConfig, PROP_EMAIL_SUBJECT_TYPE, AlertConfigBean.SubjectType.METRICS.name())));
+        (String) MapUtils.getObject(yamlConfigMap, PROP_EMAIL_SUBJECT_TYPE, AlertConfigBean.SubjectType.METRICS.name())));
 
-    Map<String, String> refLinks = MapUtils.getMap(this.yamlConfig, PROP_REFERENCE_LINKS);
+    Map<String, String> refLinks = MapUtils.getMap(yamlConfigMap, PROP_REFERENCE_LINKS);
     if (refLinks == null) {
       refLinks = new HashMap<>();
-      this.yamlConfig.put(PROP_REFERENCE_LINKS, refLinks);
+      yamlConfigMap.put(PROP_REFERENCE_LINKS, refLinks);
     }
     if (refLinks.isEmpty()) {
       refLinks.put("ThirdEye User Guide", "https://go/thirdeyeuserguide");
       refLinks.put("Add Reference Links", "https://go/thirdeyealertreflink");
     }
-    alertConfigDTO.setReferenceLinks(MapUtils.getMap(this.yamlConfig, PROP_REFERENCE_LINKS));
+    alertConfigDTO.setReferenceLinks(MapUtils.getMap(yamlConfigMap, PROP_REFERENCE_LINKS));
 
-    alertConfigDTO.setAlertSchemes(buildAlertSchemes(this.yamlConfig));
-    alertConfigDTO.setAlertSuppressors(buildAlertSuppressors(this.yamlConfig));
+    alertConfigDTO.setAlertSchemes(buildAlertSchemes(yamlConfigMap));
+    alertConfigDTO.setAlertSuppressors(buildAlertSuppressors(yamlConfigMap));
     alertConfigDTO.setHighWaterMark(0L);
 
     // NOTE: The below fields will/should be hidden from the YAML/UI. They will only be updated by the backend pipeline.
     List<Long> detectionConfigIds = new ArrayList<>();
-    List<String> detectionNames = ConfigUtils.getList(this.yamlConfig.get(PROP_DETECTION_NAMES));
+    List<String> detectionNames = ConfigUtils.getList(yamlConfigMap.get(PROP_DETECTION_NAMES));
 
     try {
       detectionConfigIds.addAll(detectionNames.stream().map(detectionName ->  this.detectionConfigDAO.findByPredicate(
@@ -202,18 +202,13 @@ public class YamlDetectionAlertConfigTranslator extends ConfigTranslator<Detecti
       throw new IllegalArgumentException("Cannot find detection pipeline, please check the subscribed detections.");
     }
 
-    alertConfigDTO.setProperties(buildAlerterProperties(this.yamlConfig, detectionConfigIds));
+    alertConfigDTO.setProperties(buildAlerterProperties(yamlConfigMap, detectionConfigIds));
     Map<Long, Long> vectorClocks = new HashMap<>();
     long currentTimestamp = System.currentTimeMillis();
     for (long detectionConfigId : detectionConfigIds) {
       vectorClocks.put(detectionConfigId, currentTimestamp);
     }
     alertConfigDTO.setVectorClocks(vectorClocks);
-
-    DumperOptions options = new DumperOptions();
-    options.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
-    options.setPrettyFlow(true);
-    alertConfigDTO.setYaml(new Yaml(options).dump(this.yamlConfig));
 
     return alertConfigDTO;
   }
