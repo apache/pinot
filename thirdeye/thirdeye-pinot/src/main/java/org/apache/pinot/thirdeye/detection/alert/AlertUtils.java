@@ -84,7 +84,7 @@ public class AlertUtils {
 
   public static long getHighWaterMark(Collection<MergedAnomalyResultDTO> anomalies) {
     if (anomalies.isEmpty()) {
-      return -1;
+      return 0;
     }
     return Collections.max(Collections2.transform(anomalies, mergedAnomalyResultDTO -> mergedAnomalyResultDTO.getId()));
   }
