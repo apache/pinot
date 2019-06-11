@@ -245,6 +245,7 @@ Supported transform functions
    The ``VALUEIN`` transform function is especially useful when the same multi-valued column is both filtering column and grouping column.
    *e.g.* ``VALUEIN(mvColumn, 3, 5, 15)``
 
+
 Differences with SQL
 --------------------
 
