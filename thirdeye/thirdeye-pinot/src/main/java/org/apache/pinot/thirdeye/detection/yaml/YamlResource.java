@@ -446,6 +446,7 @@ public class YamlResource {
    @return a message contains the saved detection config id
    */
   @POST
+  @Path("/create-or-update")
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.TEXT_PLAIN)
   @ApiOperation("Create a new detection pipeline or update existing if one already exists")
