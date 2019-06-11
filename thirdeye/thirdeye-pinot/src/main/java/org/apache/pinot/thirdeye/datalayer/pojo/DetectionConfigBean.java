@@ -41,6 +41,7 @@ public class DetectionConfigBean extends AbstractBean {
   boolean active;
   String yaml;
   Map<String, Object> componentSpecs;
+  long lastTuningTimestamp;
 
   public Map<String, Object> getComponentSpecs() {
     return componentSpecs;
@@ -96,6 +97,14 @@ public class DetectionConfigBean extends AbstractBean {
 
   public void setLastTimestamp(long lastTimestamp) {
     this.lastTimestamp = lastTimestamp;
+  }
+
+  public long getLastTuningTimestamp() {
+    return lastTuningTimestamp;
+  }
+
+  public void setLastTuningTimestamp(long lastTuningTimestamp) {
+    this.lastTuningTimestamp = lastTuningTimestamp;
   }
 
   public boolean isActive() {
