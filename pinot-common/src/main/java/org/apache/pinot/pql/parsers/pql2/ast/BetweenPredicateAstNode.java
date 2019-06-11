@@ -124,8 +124,7 @@ public class BetweenPredicateAstNode extends PredicateAstNode {
             FilterOperator.RANGE, null);
       } catch (ClassCastException e) {
         throw new Pql2CompilationException(
-            "BETWEEN clause was expecting two literal AST nodes, got " + getChildren().get(0) + " and " + getChildren()
-                .get(1));
+            "BETWEEN clause was expecting two literal AST nodes, got " + getChildren());
       }
     } else {
       throw new Pql2CompilationException("BETWEEN clause does not have two children nodes");
