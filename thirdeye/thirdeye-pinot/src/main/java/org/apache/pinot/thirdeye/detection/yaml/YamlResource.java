@@ -98,6 +98,12 @@ public class YamlResource {
   protected static final Logger LOG = LoggerFactory.getLogger(YamlResource.class);
   private static ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
+  private static final String PROP_DETECTION = "detection";
+  private static final String PROP_SUBSCRIPTION = "subscription";
+  private static final String PROP_PREVIEW = "preview";
+  private static final String PROP_CREATING = "creating";
+  private static final String PROP_UPDATING = "updating";
+  private static final String PROP_RUNNING = "running";
   private static final String PROP_SUBS_GROUP_NAME = "subscriptionGroupName";
   private static final String PROP_DETECTION_NAME = "detectionName";
 
@@ -211,6 +217,20 @@ public class YamlResource {
     LOG.info("Created yaml detection onboarding task {} with taskId {}", taskDTO, taskId);
   }
 
+  private Response processBadRequestResponse(String type, String operation, String payload, IllegalArgumentException e) {
+    Map<String, String> responseMessage = new HashMap<>();
+    LOG.warn("Validation error while {} {} with payload {}", operation, type, payload, e);
+    responseMessage.put(type + "Msg", "Validation Error! " + e.getMessage());
+    return Response.status(Response.Status.BAD_REQUEST).entity(responseMessage).build();
+  }
+
+  private Response processServerErrorResponse(String type, String operation, String payload, Exception e) {
+    Map<String, String> responseMessage = new HashMap<>();
+    LOG.error("Error {} {} with payload {}", operation, type, payload, e);
+    responseMessage.put(type + "Msg", "Failed to create the " + type + ". Reach out to the ThirdEye team.");
+    responseMessage.put(type + "Msg-moreInfo", "Error = " + e.getMessage());
+    return Response.serverError().entity(responseMessage).build();
+  }
 
   @POST
   @Path("/create-alert")
@@ -229,26 +249,21 @@ public class YamlResource {
       yamls = OBJECT_MAPPER.readValue(payload, Map.class);
 
       Preconditions.checkArgument(StringUtils.isNotBlank(payload), "The Yaml Payload in the request is empty.");
-      Preconditions.checkArgument(yamls.containsKey("detection"), "Detection pipeline yaml is missing");
+      Preconditions.checkArgument(yamls.containsKey(PROP_DETECTION), "Detection pipeline yaml is missing");
 
-      detectionConfigId = createDetectionPipeline(yamls.get("detection"), startTime, endTime);
+      detectionConfigId = createDetectionPipeline(yamls.get(PROP_DETECTION), startTime, endTime);
     } catch (IllegalArgumentException e) {
-      LOG.warn("Validation error while creating detection pipeline with payload " + payload, e);
-      responseMessage.put("detectionMsg", "Validation Error! " + e.getMessage());
-      return Response.status(Response.Status.BAD_REQUEST).entity(responseMessage).build();
+      return processBadRequestResponse(PROP_DETECTION, PROP_CREATING, payload, e);
     } catch (Exception e) {
-      LOG.error("Error creating detection pipeline with payload " + payload, e);
-      responseMessage.put("detectionMsg", "Failed to create the detection pipeline. Reach out to the ThirdEye team.");
-      responseMessage.put("detectionMsg-moreInfo", "Error = " + e.getMessage());
-      return Response.serverError().entity(responseMessage).build();
+      return processServerErrorResponse(PROP_DETECTION, PROP_CREATING, payload, e);
     }
 
     // Notification
     long detectionAlertConfigId;
     try {
-      Preconditions.checkArgument(yamls.containsKey("subscription"), "Subscription group yaml is missing.");
+      Preconditions.checkArgument(yamls.containsKey(PROP_SUBSCRIPTION), "Subscription group yaml is missing.");
 
-      String subscriptionYaml = yamls.get("subscription");
+      String subscriptionYaml = yamls.get(PROP_SUBSCRIPTION);
       Map<String, Object> subscriptionYamlConfig;
       try {
         subscriptionYamlConfig = ConfigUtils.getMap(this.yaml.load(subscriptionYaml));
@@ -266,16 +281,11 @@ public class YamlResource {
         detectionAlertConfigId = createSubscriptionGroup(subscriptionYaml);
       }
     } catch (IllegalArgumentException e) {
-      LOG.warn("Validation error while creating subscription group with payload " + payload, e);
       this.detectionConfigDAO.deleteById(detectionConfigId);
-      responseMessage.put("subscriptionMsg", "Validation Error! " + e.getMessage());
-      return Response.status(Response.Status.BAD_REQUEST).entity(responseMessage).build();
+      return processBadRequestResponse(PROP_SUBSCRIPTION, PROP_CREATING, payload, e);
     } catch (Exception e) {
-      LOG.error("Error creating subscription group with payload " + payload, e);
       this.detectionConfigDAO.deleteById(detectionConfigId);
-      responseMessage.put("subscriptionMsg", "Failed to create the subscription group. Reach out to the ThirdEye team.");
-      responseMessage.put("subscriptionMsg-moreInfo", "Error = " + e.getMessage());
-      return Response.serverError().entity(responseMessage).build();
+      return processServerErrorResponse(PROP_DETECTION, PROP_CREATING, payload, e);
     }
 
     // create an yaml onboarding task to run replay and tuning
@@ -337,19 +347,14 @@ public class YamlResource {
     try {
       detectionConfigId = createDetectionPipeline(payload, startTime, endTime);
     } catch (IllegalArgumentException e) {
-      LOG.warn("Validation error while creating detection pipeline with payload " + payload, e);
-      responseMessage.put("message", "Validation Error! " + e.getMessage());
-      return Response.status(Response.Status.BAD_REQUEST).entity(responseMessage).build();
+      return processBadRequestResponse(PROP_DETECTION, PROP_CREATING, payload, e);
     } catch (Exception e) {
-      LOG.error("Error creating detection pipeline with payload " + payload, e);
-      responseMessage.put("message", "Failed to create the detection pipeline. Reach out to the ThirdEye team.");
-      responseMessage.put("more-info", "Error = " + e.getMessage());
-      return Response.serverError().entity(responseMessage).build();
+      return processServerErrorResponse(PROP_DETECTION, PROP_CREATING, payload, e);
     }
 
-    LOG.info("Detection Pipeline created with id " + detectionConfigId + " using payload " + payload);
-    responseMessage.put("message", "Alert was created successfully.");
-    responseMessage.put("more-info", "Record saved with id " + detectionConfigId);
+    LOG.info("Detection created with id " + detectionConfigId + " using payload " + payload);
+    responseMessage.put("detectionMsg", "Alert was created successfully.");
+    responseMessage.put("detectionMsg-moreInfo", "Record saved with id " + detectionConfigId);
     return Response.ok().entity(responseMessage).build();
   }
 
@@ -408,18 +413,13 @@ public class YamlResource {
     try {
       updateDetectionPipeline(id, payload, startTime, endTime);
     } catch (IllegalArgumentException e) {
-      LOG.warn("Validation error while creating detection pipeline with payload " + payload, e);
-      responseMessage.put("message", "Validation Error! " + e.getMessage());
-      return Response.status(Response.Status.BAD_REQUEST).entity(responseMessage).build();
+      return processBadRequestResponse(PROP_DETECTION, PROP_UPDATING, payload, e);
     } catch (Exception e) {
-      LOG.error("Error creating detection pipeline with payload " + payload, e);
-      responseMessage.put("message", "Failed to create the subscription group. Reach out to the ThirdEye team.");
-      responseMessage.put("more-info", "Error = " + e.getMessage());
-      return Response.serverError().entity(responseMessage).build();
+      return processServerErrorResponse(PROP_DETECTION, PROP_UPDATING, payload, e);
     }
 
-    LOG.info("Detection Pipeline " + id + " updated successfully");
-    responseMessage.put("message", "The detection Pipeline was created successfully.");
+    LOG.info("Detection with id " + id + " updated");
+    responseMessage.put("message", "Alert was updated successfully.");
     responseMessage.put("detectionConfigId", String.valueOf(id));
     return Response.ok().entity(responseMessage).build();
   }
@@ -472,17 +472,12 @@ public class YamlResource {
     try {
       detectionConfigId = createOrUpdateDetectionPipeline(payload);
     } catch (IllegalArgumentException e) {
-      LOG.warn("Validation error while creating/updating detection pipeline with payload " + payload, e);
-      responseMessage.put("message", "Validation Error! " + e.getMessage());
-      return Response.status(Response.Status.BAD_REQUEST).entity(responseMessage).build();
+      return processBadRequestResponse(PROP_DETECTION, PROP_CREATING + "/" + PROP_UPDATING, payload, e);
     } catch (Exception e) {
-      LOG.error("Error creating/updating detection pipeline with payload " + payload, e);
-      responseMessage.put("message", "Failed to create the detection pipeline. Reach out to the ThirdEye team.");
-      responseMessage.put("more-info", "Error = " + e.getMessage());
-      return Response.serverError().entity(responseMessage).build();
+      return processServerErrorResponse(PROP_DETECTION, PROP_CREATING + "/" + PROP_UPDATING, payload, e);
     }
 
-    LOG.info("Detection Pipeline created/updated id " + detectionConfigId + " using payload " + payload);
+    LOG.info("Detection Pipeline created/updated with id " + detectionConfigId + " using payload " + payload);
     responseMessage.put("message", "The alert was created/updated successfully.");
     responseMessage.put("more-info", "Record saved/updated with id " + detectionConfigId);
     return Response.ok().entity(responseMessage).build();
@@ -522,23 +517,18 @@ public class YamlResource {
   @ApiOperation("Create a subscription group using a YAML config")
   @SuppressWarnings("unchecked")
   public Response createSubscriptionGroupApi(
-      @ApiParam("payload") String yamlAlertConfig) {
+      @ApiParam("payload") String payload) {
     Map<String, String> responseMessage = new HashMap<>();
     long detectionAlertConfigId;
     try {
-      detectionAlertConfigId = createSubscriptionGroup(yamlAlertConfig);
+      detectionAlertConfigId = createSubscriptionGroup(payload);
     } catch (IllegalArgumentException e) {
-      LOG.warn("Validation error while creating subscription group with payload " + yamlAlertConfig, e);
-      responseMessage.put("message", "Validation Error! " + e.getMessage());
-      return Response.serverError().entity(responseMessage).build();
+      return processBadRequestResponse(PROP_SUBSCRIPTION, PROP_CREATING, payload, e);
     } catch (Exception e) {
-      LOG.error("Error creating subscription group with payload " + yamlAlertConfig, e);
-      responseMessage.put("message", "Failed to create the subscription group. Reach out to the ThirdEye team.");
-      responseMessage.put("more-info", "Error = " + e.getMessage());
-      return Response.serverError().entity(responseMessage).build();
+      return processServerErrorResponse(PROP_SUBSCRIPTION, PROP_CREATING, payload, e);
     }
 
-    LOG.info("Notification group created with id " + detectionAlertConfigId + " using payload " + yamlAlertConfig);
+    LOG.info("Notification group created with id " + detectionAlertConfigId + " using payload " + payload);
     responseMessage.put("message", "The subscription group was created successfully.");
     responseMessage.put("detectionAlertConfigId", String.valueOf(detectionAlertConfigId));
     return Response.ok().entity(responseMessage).build();
@@ -614,24 +604,19 @@ public class YamlResource {
   @Consumes(MediaType.TEXT_PLAIN)
   @ApiOperation("Edit a subscription group using a YAML config")
   public Response updateSubscriptionGroupApi(
-      @ApiParam("payload") String yamlAlertConfig,
+      @ApiParam("payload") String payload,
       @ApiParam("the detection alert config id to edit") @PathParam("id") long id) {
     Map<String, String> responseMessage = new HashMap<>();
     try {
-      updateSubscriptionGroup(id, yamlAlertConfig);
+      updateSubscriptionGroup(id, payload);
     } catch (IllegalArgumentException e) {
-      LOG.warn("Validation error while updating subscription group " + id + " with payload " + yamlAlertConfig, e);
-      responseMessage.put("message", "Validation Error! " + e.getMessage());
-      return Response.serverError().entity(responseMessage).build();
+      return processBadRequestResponse(PROP_SUBSCRIPTION, PROP_UPDATING, payload, e);
     } catch (Exception e) {
-      LOG.error("Error updating subscription group " + id + " with payload " + yamlAlertConfig, e);
-      responseMessage.put("message", "Failed to update the subscription group. Reach out to the ThirdEye team.");
-      responseMessage.put("more-info", "Error = " + e.getMessage());
-      return Response.serverError().entity(responseMessage).build();
+      return processServerErrorResponse(PROP_SUBSCRIPTION, PROP_UPDATING, payload, e);
     }
 
-    LOG.info("Notification group " + id + " updated successfully");
-    responseMessage.put("message", "The YAML alert config was updated successfully.");
+    LOG.info("Subscription group with id " + id + " updated");
+    responseMessage.put("message", "The subscription group was updated successfully.");
     responseMessage.put("detectionAlertConfigId", String.valueOf(id));
     return Response.ok().entity(responseMessage).build();
   }
@@ -691,9 +676,7 @@ public class YamlResource {
       result = pipeline.run();
 
     } catch (IllegalArgumentException e) {
-      LOG.warn("Validation error while running preview with payload  " + payload, e);
-      responseMessage.put("message", "Validation Error! " + e.getMessage());
-      return Response.serverError().entity(responseMessage).build();
+      return processBadRequestResponse(PROP_PREVIEW, PROP_RUNNING, payload, e);
     } catch (InvocationTargetException e) {
       responseMessage.put("message", "Failed to run the preview due to " + e.getTargetException().getMessage());
       return Response.serverError().entity(responseMessage).build();
