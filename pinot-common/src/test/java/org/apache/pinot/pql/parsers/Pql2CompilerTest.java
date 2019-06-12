@@ -215,9 +215,6 @@ public class Pql2CompilerTest {
     BrokerRequest brokerRequest =
         COMPILER.compileToBrokerRequest("select * from vegetables where name != 'Brussels sprouts'");
     Assert.assertEquals(brokerRequest.getFilterQuery().getOperator(), FilterOperator.NOT);
-    // Test PinotQuery
-    Assert.assertEquals(brokerRequest.getPinotQuery().getFilterExpression().getFunctionCall().getOperator(),
-        FilterKind.NOT_EQUALS.name());
   }
 
   @Test
@@ -402,6 +399,10 @@ public class Pql2CompilerTest {
     COMPILER.compileToBrokerRequest("Select * from T where a > 1 and a < 10");
     COMPILER.compileToBrokerRequest("Select * from T where a between 1 and 10");
 
+    BrokerRequest brokerRequest =
+        COMPILER.compileToBrokerRequest("select * from vegetables where name != 'Brussels sprouts'");
+    Assert.assertEquals(brokerRequest.getPinotQuery().getFilterExpression().getFunctionCall().getOperator(),
+        FilterKind.NOT_EQUALS.name());
     final BufferedReader br = new BufferedReader(
         new InputStreamReader(Pql2CompilerTest.class.getClassLoader().getResourceAsStream("pql_queries.list")));
     String pql;
