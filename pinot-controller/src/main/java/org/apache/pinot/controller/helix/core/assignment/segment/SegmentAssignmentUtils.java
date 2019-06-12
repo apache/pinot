@@ -48,7 +48,8 @@ class SegmentAssignmentUtils {
   /**
    * Returns the number of segments assigned to each instance.
    */
-  static int[] getNumSegmentsAssigned(Map<String, Map<String, String>> segmentAssignment, List<String> instances) {
+  static int[] getNumSegmentsAssignedPerInstance(Map<String, Map<String, String>> segmentAssignment,
+      List<String> instances) {
     int[] numSegmentsPerInstance = new int[instances.size()];
     Map<String, Integer> instanceNameToIdMap = getInstanceNameToIdMap(instances);
     for (Map<String, String> instanceStateMep : segmentAssignment.values()) {
@@ -74,8 +75,8 @@ class SegmentAssignmentUtils {
   /**
    * Returns the instances for the balance number segment assignment strategy.
    */
-  static List<String> getInstances(HelixManager helixManager, TableConfig tableConfig, int replication,
-      InstancePartitionsType instancePartitionsType) {
+  static List<String> getInstancesForBalanceNumStrategy(HelixManager helixManager, TableConfig tableConfig,
+      int replication, InstancePartitionsType instancePartitionsType) {
     InstancePartitions instancePartitions =
         InstancePartitionsUtils.fetchOrComputeInstancePartitions(helixManager, tableConfig, instancePartitionsType);
     Preconditions.checkArgument(instancePartitions.getNumPartitions() == 1 && instancePartitions.getNumReplicas() == 1,
@@ -155,12 +156,13 @@ class SegmentAssignmentUtils {
     Map<String, Integer> instanceNameToIdMap = SegmentAssignmentUtils.getInstanceNameToIdMap(instances);
 
     // Calculate target number of segments per instance
+    // NOTE: in order to minimize the segment movements, use the ceiling of the quotient
     int numInstances = instances.size();
     int numSegments = segments.size();
     int targetNumSegmentsPerInstance = (numSegments + numInstances - 1) / numInstances;
 
     // Do not move segment if target number of segments is not reached, track the segments need to be moved
-    int[] numSegmentsAssigned = new int[numInstances];
+    int[] numSegmentsAssignedPerInstance = new int[numInstances];
     List<String> segmentsNotAssigned = new ArrayList<>();
     for (Map.Entry<String, Map<String, String>> entry : currentAssignment.entrySet()) {
       String segmentName = entry.getKey();
@@ -171,10 +173,10 @@ class SegmentAssignmentUtils {
       boolean segmentAssigned = false;
       for (String instanceName : entry.getValue().keySet()) {
         Integer instanceId = instanceNameToIdMap.get(instanceName);
-        if (instanceId != null && numSegmentsAssigned[instanceId] < targetNumSegmentsPerInstance) {
+        if (instanceId != null && numSegmentsAssignedPerInstance[instanceId] < targetNumSegmentsPerInstance) {
           newAssignment
               .put(segmentName, getReplicaGroupBasedInstanceStateMap(instancePartitions, partitionId, instanceId));
-          numSegmentsAssigned[instanceId]++;
+          numSegmentsAssignedPerInstance[instanceId]++;
           segmentAssigned = true;
           break;
         }
@@ -187,7 +189,7 @@ class SegmentAssignmentUtils {
     // Assign each not assigned segment to the instance with the least segments, or the smallest id if there is a tie
     PriorityQueue<Pairs.IntPair> heap = new PriorityQueue<>(numInstances, Pairs.intPairComparator());
     for (int instanceId = 0; instanceId < numInstances; instanceId++) {
-      heap.add(new Pairs.IntPair(numSegmentsAssigned[instanceId], instanceId));
+      heap.add(new Pairs.IntPair(numSegmentsAssignedPerInstance[instanceId], instanceId));
     }
     for (String segmentName : segmentsNotAssigned) {
       Pairs.IntPair intPair = heap.remove();
@@ -228,9 +230,9 @@ class SegmentAssignmentUtils {
   /**
    * Returns a map from instance name to number of segments to be moved to it.
    */
-  static Map<String, Integer> getNumSegmentsToBeMoved(Map<String, Map<String, String>> oldAssignment,
+  static Map<String, Integer> getNumSegmentsToBeMovedPerInstance(Map<String, Map<String, String>> oldAssignment,
       Map<String, Map<String, String>> newAssignment) {
-    Map<String, Integer> numSegmentsToBeMoved = new TreeMap<>();
+    Map<String, Integer> numSegmentsToBeMovedPerInstance = new TreeMap<>();
     for (Map.Entry<String, Map<String, String>> entry : newAssignment.entrySet()) {
       String segmentName = entry.getKey();
       Set<String> newInstancesAssigned = entry.getValue().keySet();
@@ -238,11 +240,11 @@ class SegmentAssignmentUtils {
       // For each new assigned instance, check if the segment needs to be moved to it
       for (String instanceName : newInstancesAssigned) {
         if (!oldInstancesAssigned.contains(instanceName)) {
-          numSegmentsToBeMoved.merge(instanceName, 1, Integer::sum);
+          numSegmentsToBeMovedPerInstance.merge(instanceName, 1, Integer::sum);
         }
       }
     }
-    return numSegmentsToBeMoved;
+    return numSegmentsToBeMovedPerInstance;
   }
 
   /**

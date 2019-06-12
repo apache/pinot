@@ -52,22 +52,22 @@ public class OfflineBalanceNumSegmentAssignmentStrategy implements SegmentAssign
     _tableNameWithType = tableConfig.getTableName();
     _replication = tableConfig.getValidationConfig().getReplicationNumber();
 
-    LOGGER
-        .info("Initialized BalanceNumSegmentAssignmentStrategy for table: {} with replication: {}", _tableNameWithType,
-            _replication);
+    LOGGER.info("Initialized OfflineBalanceNumSegmentAssignmentStrategy for table: {} with replication: {}",
+        _tableNameWithType, _replication);
   }
 
   @Override
   public List<String> assignSegment(String segmentName, Map<String, Map<String, String>> currentAssignment) {
-    List<String> instances =
-        SegmentAssignmentUtils.getInstances(_helixManager, _tableConfig, _replication, InstancePartitionsType.OFFLINE);
-    int[] numSegmentsAssigned = SegmentAssignmentUtils.getNumSegmentsAssigned(currentAssignment, instances);
+    List<String> instances = SegmentAssignmentUtils
+        .getInstancesForBalanceNumStrategy(_helixManager, _tableConfig, _replication, InstancePartitionsType.OFFLINE);
+    int[] numSegmentsAssignedPerInstance =
+        SegmentAssignmentUtils.getNumSegmentsAssignedPerInstance(currentAssignment, instances);
 
     // Assign the segment to the instance with the least segments, or the smallest id if there is a tie
-    int numInstances = numSegmentsAssigned.length;
+    int numInstances = numSegmentsAssignedPerInstance.length;
     PriorityQueue<Pairs.IntPair> heap = new PriorityQueue<>(numInstances, Pairs.intPairComparator());
     for (int instanceId = 0; instanceId < numInstances; instanceId++) {
-      heap.add(new Pairs.IntPair(numSegmentsAssigned[instanceId], instanceId));
+      heap.add(new Pairs.IntPair(numSegmentsAssignedPerInstance[instanceId], instanceId));
     }
     List<String> instancesAssigned = new ArrayList<>(_replication);
     for (int i = 0; i < _replication; i++) {
@@ -82,15 +82,15 @@ public class OfflineBalanceNumSegmentAssignmentStrategy implements SegmentAssign
   @Override
   public Map<String, Map<String, String>> rebalanceTable(Map<String, Map<String, String>> currentAssignment,
       Configuration config) {
-    List<String> instances =
-        SegmentAssignmentUtils.getInstances(_helixManager, _tableConfig, _replication, InstancePartitionsType.OFFLINE);
+    List<String> instances = SegmentAssignmentUtils
+        .getInstancesForBalanceNumStrategy(_helixManager, _tableConfig, _replication, InstancePartitionsType.OFFLINE);
     Map<String, Map<String, String>> newAssignment =
         SegmentAssignmentUtils.rebalanceTableWithHelixAutoRebalanceStrategy(currentAssignment, instances, _replication);
 
     LOGGER.info(
         "Rebalanced {} segments to instances: {} for table: {} with replication: {}, number of segments to be moved to each instance: {}",
         currentAssignment.size(), instances, _tableNameWithType, _replication,
-        SegmentAssignmentUtils.getNumSegmentsToBeMoved(currentAssignment, newAssignment));
+        SegmentAssignmentUtils.getNumSegmentsToBeMovedPerInstance(currentAssignment, newAssignment));
     return newAssignment;
   }
 }

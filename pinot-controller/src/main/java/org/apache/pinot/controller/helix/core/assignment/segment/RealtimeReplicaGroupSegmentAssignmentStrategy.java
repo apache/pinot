@@ -123,13 +123,14 @@ public class RealtimeReplicaGroupSegmentAssignmentStrategy implements SegmentAss
           "Rebalanced {} COMPLETED segments with instance partitions: {} and {} CONSUMING segments with instance partitions: {} for table: {}, number of segments to be moved to each instances: {}",
           completedSegmentAssignment.size(), instancePartitionsForCompletedSegments.getPartitionToInstancesMap(),
           consumingSegmentAssignment.size(), instancePartitionsForConsumingSegments.getPartitionToInstancesMap(),
-          _tableNameWithType, SegmentAssignmentUtils.getNumSegmentsToBeMoved(currentAssignment, newAssignment));
+          _tableNameWithType,
+          SegmentAssignmentUtils.getNumSegmentsToBeMovedPerInstance(currentAssignment, newAssignment));
     } else {
       LOGGER.info(
           "Rebalanced {} COMPLETED segments with instance partitions: {} for table: {}, number of segments to be moved to each instance: {}",
           completedSegmentAssignment.size(), instancePartitionsForCompletedSegments.getPartitionToInstancesMap(),
           _tableNameWithType,
-          SegmentAssignmentUtils.getNumSegmentsToBeMoved(completedSegmentAssignment, newAssignment));
+          SegmentAssignmentUtils.getNumSegmentsToBeMovedPerInstance(completedSegmentAssignment, newAssignment));
       newAssignment.putAll(consumingSegmentAssignment);
     }
 

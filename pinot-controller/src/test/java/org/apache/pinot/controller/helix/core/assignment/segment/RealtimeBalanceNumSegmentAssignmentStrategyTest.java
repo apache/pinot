@@ -176,11 +176,12 @@ public class RealtimeBalanceNumSegmentAssignmentStrategyTest {
       }
     }
     // Relocated segments should be balanced (each instance should have at least 28 segments assigned)
-    int[] numSegmentsAssigned = SegmentAssignmentUtils.getNumSegmentsAssigned(newAssignment, COMPLETED_INSTANCES);
-    assertEquals(numSegmentsAssigned.length, NUM_COMPLETED_INSTANCES);
+    int[] numSegmentsAssignedPerInstance =
+        SegmentAssignmentUtils.getNumSegmentsAssignedPerInstance(newAssignment, COMPLETED_INSTANCES);
+    assertEquals(numSegmentsAssignedPerInstance.length, NUM_COMPLETED_INSTANCES);
     int expectedMinNumSegmentsPerInstance = (NUM_SEGMENTS - NUM_PARTITIONS) * NUM_REPLICAS / NUM_COMPLETED_INSTANCES;
     for (int i = 0; i < NUM_COMPLETED_INSTANCES; i++) {
-      assertTrue(numSegmentsAssigned[i] >= expectedMinNumSegmentsPerInstance);
+      assertTrue(numSegmentsAssignedPerInstance[i] >= expectedMinNumSegmentsPerInstance);
     }
 
     // Rebalance all segments (both completed and consuming) should give the same assignment

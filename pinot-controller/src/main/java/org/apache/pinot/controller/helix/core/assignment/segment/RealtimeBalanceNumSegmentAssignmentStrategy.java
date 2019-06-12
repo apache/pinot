@@ -84,7 +84,7 @@ public class RealtimeBalanceNumSegmentAssignmentStrategy implements SegmentAssig
   @Override
   public List<String> assignSegment(String segmentName, Map<String, Map<String, String>> currentAssignment) {
     List<String> instances = SegmentAssignmentUtils
-        .getInstances(_helixManager, _tableConfig, _replication, InstancePartitionsType.CONSUMING);
+        .getInstancesForBalanceNumStrategy(_helixManager, _tableConfig, _replication, InstancePartitionsType.CONSUMING);
     int partitionId = new LLCSegmentName(segmentName).getPartitionId();
     List<String> instancesAssigned = getInstances(instances, partitionId);
     LOGGER.info("Assigned segment: {} with partition id: {} to instances: {} for table: {}", segmentName, partitionId,
@@ -100,7 +100,7 @@ public class RealtimeBalanceNumSegmentAssignmentStrategy implements SegmentAssig
     // Rebalance COMPLETED segments first
     Map<String, Map<String, String>> completedSegmentAssignment = pair.getCompletedSegmentAssignment();
     List<String> instancesForCompletedSegments = SegmentAssignmentUtils
-        .getInstances(_helixManager, _tableConfig, _replication, InstancePartitionsType.COMPLETED);
+        .getInstancesForBalanceNumStrategy(_helixManager, _tableConfig, _replication, InstancePartitionsType.COMPLETED);
     Map<String, Map<String, String>> newAssignment = SegmentAssignmentUtils
         .rebalanceTableWithHelixAutoRebalanceStrategy(completedSegmentAssignment, instancesForCompletedSegments,
             _replication);
@@ -110,7 +110,8 @@ public class RealtimeBalanceNumSegmentAssignmentStrategy implements SegmentAssig
     if (config.getBoolean(RebalanceUserConfigConstants.INCLUDE_CONSUMING,
         RebalanceUserConfigConstants.DEFAULT_INCLUDE_CONSUMING)) {
       List<String> instancesForConsumingSegments = SegmentAssignmentUtils
-          .getInstances(_helixManager, _tableConfig, _replication, InstancePartitionsType.CONSUMING);
+          .getInstancesForBalanceNumStrategy(_helixManager, _tableConfig, _replication,
+              InstancePartitionsType.CONSUMING);
       for (String segmentName : consumingSegmentAssignment.keySet()) {
         int partitionId = new LLCSegmentName(segmentName).getPartitionId();
         List<String> instancesAssigned = getInstances(instancesForConsumingSegments, partitionId);
@@ -122,12 +123,12 @@ public class RealtimeBalanceNumSegmentAssignmentStrategy implements SegmentAssig
           "Rebalanced {} COMPLETED segments to instances: {} and {} CONSUMING segments to instances: {} for table: {} with replication: {}, number of segments to be moved to each instances: {}",
           completedSegmentAssignment.size(), instancesForCompletedSegments, consumingSegmentAssignment.size(),
           instancesForConsumingSegments, _tableNameWithType, _replication,
-          SegmentAssignmentUtils.getNumSegmentsToBeMoved(currentAssignment, newAssignment));
+          SegmentAssignmentUtils.getNumSegmentsToBeMovedPerInstance(currentAssignment, newAssignment));
     } else {
       LOGGER.info(
           "Rebalanced {} COMPLETED segments to instances: {} for table: {} with replication: {}, number of segments to be moved to each instance: {}",
           completedSegmentAssignment.size(), instancesForCompletedSegments, _tableNameWithType, _replication,
-          SegmentAssignmentUtils.getNumSegmentsToBeMoved(completedSegmentAssignment, newAssignment));
+          SegmentAssignmentUtils.getNumSegmentsToBeMovedPerInstance(completedSegmentAssignment, newAssignment));
       newAssignment.putAll(consumingSegmentAssignment);
     }
 

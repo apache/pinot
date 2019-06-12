@@ -199,10 +199,12 @@ public class RealtimeReplicaGroupSegmentAssignmentStrategyTest {
       }
     }
     // Relocated segments should be balanced (each instance should have 24 segments assigned)
-    int[] numSegmentsAssigned = SegmentAssignmentUtils.getNumSegmentsAssigned(newAssignment, COMPLETED_INSTANCES);
-    int[] expectedNumSegmentsAssigned = new int[NUM_COMPLETED_INSTANCES];
-    Arrays.fill(expectedNumSegmentsAssigned, (NUM_SEGMENTS - NUM_PARTITIONS) * NUM_REPLICAS / NUM_COMPLETED_INSTANCES);
-    assertEquals(numSegmentsAssigned, expectedNumSegmentsAssigned);
+    int[] numSegmentsAssignedPerInstance =
+        SegmentAssignmentUtils.getNumSegmentsAssignedPerInstance(newAssignment, COMPLETED_INSTANCES);
+    int[] expectedNumSegmentsAssignedPerInstance = new int[NUM_COMPLETED_INSTANCES];
+    int numSegmentsPerInstance = (NUM_SEGMENTS - NUM_PARTITIONS) * NUM_REPLICAS / NUM_COMPLETED_INSTANCES;
+    Arrays.fill(expectedNumSegmentsAssignedPerInstance, numSegmentsPerInstance);
+    assertEquals(numSegmentsAssignedPerInstance, expectedNumSegmentsAssignedPerInstance);
 
     // Rebalance all segments (both completed and consuming) should give the same assignment
     BaseConfiguration config = new BaseConfiguration();

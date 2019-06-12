@@ -100,13 +100,14 @@ public class OfflineReplicaGroupSegmentAssignmentStrategy implements SegmentAssi
 
     // First assign the segment to replica 0
     List<String> instances = instancePartitions.getInstances(partitionId, 0);
-    int[] numSegmentsAssigned = SegmentAssignmentUtils.getNumSegmentsAssigned(currentAssignment, instances);
-    int minNumSegmentsAssigned = numSegmentsAssigned[0];
+    int[] numSegmentsAssignedPerInstance =
+        SegmentAssignmentUtils.getNumSegmentsAssignedPerInstance(currentAssignment, instances);
+    int minNumSegmentsAssigned = numSegmentsAssignedPerInstance[0];
     int instanceIdWithLeastSegmentsAssigned = 0;
-    int numInstances = numSegmentsAssigned.length;
+    int numInstances = numSegmentsAssignedPerInstance.length;
     for (int instanceId = 1; instanceId < numInstances; instanceId++) {
-      if (numSegmentsAssigned[instanceId] < minNumSegmentsAssigned) {
-        minNumSegmentsAssigned = numSegmentsAssigned[instanceId];
+      if (numSegmentsAssignedPerInstance[instanceId] < minNumSegmentsAssigned) {
+        minNumSegmentsAssigned = numSegmentsAssignedPerInstance[instanceId];
         instanceIdWithLeastSegmentsAssigned = instanceId;
       }
     }
@@ -154,7 +155,7 @@ public class OfflineReplicaGroupSegmentAssignmentStrategy implements SegmentAssi
     LOGGER.info(
         "Rebalanced {} segments with instance partitions: {} for table: {} without partition column, number of segments to be moved to each instance: {}",
         currentAssignment.size(), instancePartitions.getPartitionToInstancesMap(), _tableNameWithType,
-        SegmentAssignmentUtils.getNumSegmentsToBeMoved(currentAssignment, newAssignment));
+        SegmentAssignmentUtils.getNumSegmentsToBeMovedPerInstance(currentAssignment, newAssignment));
     return newAssignment;
   }
 
@@ -179,7 +180,7 @@ public class OfflineReplicaGroupSegmentAssignmentStrategy implements SegmentAssi
     LOGGER.info(
         "Rebalanced {} segments with instance partitions: {} for table: {} with partition column: {}, number of segments to be moved to each instance: {}",
         currentAssignment.size(), instancePartitions.getPartitionToInstancesMap(), _tableNameWithType, _partitionColumn,
-        SegmentAssignmentUtils.getNumSegmentsToBeMoved(currentAssignment, newAssignment));
+        SegmentAssignmentUtils.getNumSegmentsToBeMovedPerInstance(currentAssignment, newAssignment));
     return newAssignment;
   }
 

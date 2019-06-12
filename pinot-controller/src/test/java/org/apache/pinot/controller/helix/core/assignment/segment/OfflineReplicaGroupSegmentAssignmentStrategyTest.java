@@ -251,11 +251,12 @@ public class OfflineReplicaGroupSegmentAssignmentStrategyTest {
       assertEquals(instanceStateMap.size(), NUM_REPLICAS);
     }
     // Each instance should have 15 segments assigned
-    int[] numSegmentsAssigned = SegmentAssignmentUtils.getNumSegmentsAssigned(currentAssignment, INSTANCES);
-    int[] expectedNumSegmentsAssigned = new int[NUM_INSTANCES];
+    int[] numSegmentsAssignedPerInstance =
+        SegmentAssignmentUtils.getNumSegmentsAssignedPerInstance(currentAssignment, INSTANCES);
+    int[] expectedNumSegmentsAssignedPerInstance = new int[NUM_INSTANCES];
     int numSegmentsPerInstance = NUM_SEGMENTS * NUM_REPLICAS / NUM_INSTANCES;
-    Arrays.fill(expectedNumSegmentsAssigned, numSegmentsPerInstance);
-    assertEquals(numSegmentsAssigned, expectedNumSegmentsAssigned);
+    Arrays.fill(expectedNumSegmentsAssignedPerInstance, numSegmentsPerInstance);
+    assertEquals(numSegmentsAssignedPerInstance, expectedNumSegmentsAssignedPerInstance);
     // Current assignment should already be balanced
     assertEquals(_strategyWithoutPartition.rebalanceTable(currentAssignment, null), currentAssignment);
   }
@@ -276,11 +277,12 @@ public class OfflineReplicaGroupSegmentAssignmentStrategyTest {
       assertEquals(instanceStateMap.size(), NUM_REPLICAS);
     }
     // Each instance should have 15 segments assigned
-    int[] numSegmentsAssigned = SegmentAssignmentUtils.getNumSegmentsAssigned(currentAssignment, INSTANCES);
-    int[] expectedNumSegmentsAssigned = new int[NUM_INSTANCES];
+    int[] numSegmentsAssignedPerInstance =
+        SegmentAssignmentUtils.getNumSegmentsAssignedPerInstance(currentAssignment, INSTANCES);
+    int[] expectedNumSegmentsAssignedPerInstance = new int[NUM_INSTANCES];
     int numSegmentsPerInstance = NUM_SEGMENTS * NUM_REPLICAS / NUM_INSTANCES;
-    Arrays.fill(expectedNumSegmentsAssigned, numSegmentsPerInstance);
-    assertEquals(numSegmentsAssigned, expectedNumSegmentsAssigned);
+    Arrays.fill(expectedNumSegmentsAssignedPerInstance, numSegmentsPerInstance);
+    assertEquals(numSegmentsAssignedPerInstance, expectedNumSegmentsAssignedPerInstance);
     // Current assignment should already be balanced
     assertEquals(_strategyWithPartition.rebalanceTable(currentAssignment, null), currentAssignment);
   }
