@@ -23,16 +23,19 @@ import org.apache.pinot.annotations.InterfaceStability;
 
 
 /**
- * A class that provides relevant row-level metadata for rows ingested into a segment.
+ * A class that provides relevant row-level metadata for rows indexed into a segment.
  *
- * Currently this is relevant for rows ingested into a mutable segment.
+ * Currently this is relevant for rows ingested into a mutable segment - the metadata is expected to be
+ * provided by the underlying stream.
  */
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
 public interface RowMetadata {
 
   /**
-   * Return the ingestion timestamp of the row.
+   * Return the timestamp associated with when the row was ingested upstream.
+   *
+   * Expected to be mainly used for stream-based sources.
    */
   long getIngestionTimeMs();
 }
