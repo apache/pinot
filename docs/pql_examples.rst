@@ -118,8 +118,17 @@ The examples below demonstrate the use of UDFs
   SELECT count(*) FROM myTable
     GROUP BY timeConvert(timeColumnName, 'SECONDS', 'DAYS')
 
-  SELECT count(*) FROM myTable
-    GROUP BY div(tim
+Examples with BYTES column
+--------------------------
+
+Pinot supports queries on BYTES column using HEX string. The query response also uses hex string to represent bytes value.
+
+E.g. the query below fetches all the rows for a given UID.
+
+.. code-block:: sql
+
+  SELECT * FROM myTable
+    WHERE UID = "c8b3bce0b378fc5ce8067fc271a34892"
 
 PQL Specification
 -----------------
