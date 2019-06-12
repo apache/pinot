@@ -6,5 +6,6 @@ export default DS.Model.extend({
   createdBy: DS.attr(),
   updatedBy: DS.attr(),
   properties: DS.attr(),
-  yaml: DS.attr()
+  yaml: DS.attr(),
+  application: DS.attr()
 });
