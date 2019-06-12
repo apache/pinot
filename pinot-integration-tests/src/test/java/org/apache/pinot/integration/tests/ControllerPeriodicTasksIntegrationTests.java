@@ -80,6 +80,30 @@ import org.testng.annotations.Test;
  */
 public class ControllerPeriodicTasksIntegrationTests extends BaseClusterIntegrationTestSet {
 
+  // Controller configuration used in this class.
+  private class TestControllerConf extends ControllerConf {
+    private TestControllerConf(ControllerConf controllerConf) {
+      copy(controllerConf);
+    }
+
+    @Override
+    public long getRealtimeSegmentValidationManagerInitialDelaySeconds() {
+      return PERIODIC_TASK_INITIAL_DELAY_SECONDS;
+    }
+    public long getStatusCheckerInitialDelayInSeconds() {
+      return PERIODIC_TASK_INITIAL_DELAY_SECONDS;
+    }
+    public long getRealtimeSegmentRelocationInitialDelayInSeconds() {
+      return PERIODIC_TASK_INITIAL_DELAY_SECONDS;
+    }
+    public long getBrokerResourceValidationInitialDelayInSeconds() {
+      return PERIODIC_TASK_INITIAL_DELAY_SECONDS;
+    }
+    public long getOfflineSegmentIntervalCheckerInitialDelayInSeconds() {
+      return PERIODIC_TASK_INITIAL_DELAY_SECONDS;
+    }
+  }
+
   private static final String TENANT_NAME = "TestTenant";
   private static final String DEFAULT_TABLE_NAME = "mytable";
 
@@ -103,17 +127,12 @@ public class ControllerPeriodicTasksIntegrationTests extends BaseClusterIntegrat
 
     // Set initial delay of 60 seconds for periodic tasks, to allow time for tables setup.
     // Run at 5 seconds freq in order to keep them running, in case first run happens before table setup
-    ControllerConf controllerConf = getDefaultControllerConfiguration();
+    TestControllerConf controllerConf = new TestControllerConf(getDefaultControllerConfiguration());
     controllerConf.setTenantIsolationEnabled(false);
-    controllerConf.setStatusCheckerInitialDelayInSeconds(PERIODIC_TASK_INITIAL_DELAY_SECONDS);
     controllerConf.setStatusCheckerFrequencyInSeconds(PERIODIC_TASK_FREQ_SECONDS);
-    controllerConf.setRealtimeSegmentRelocationInitialDelayInSeconds(PERIODIC_TASK_INITIAL_DELAY_SECONDS);
     controllerConf.setRealtimeSegmentRelocatorFrequency(PERIODIC_TASK_FREQ);
-    controllerConf.setBrokerResourceValidationInitialDelayInSeconds(PERIODIC_TASK_INITIAL_DELAY_SECONDS);
     controllerConf.setBrokerResourceValidationFrequencyInSeconds(PERIODIC_TASK_FREQ_SECONDS);
-    controllerConf.setOfflineSegmentIntervalCheckerInitialDelayInSeconds(PERIODIC_TASK_INITIAL_DELAY_SECONDS);
     controllerConf.setOfflineSegmentIntervalCheckerFrequencyInSeconds(PERIODIC_TASK_FREQ_SECONDS);
-    controllerConf.setSegmentLevelValidationInitialDelayInSeconds(PERIODIC_TASK_INITIAL_DELAY_SECONDS);
     controllerConf.setRealtimeSegmentValidationFrequencyInSeconds(PERIODIC_TASK_FREQ_SECONDS);
 
     startController(controllerConf);
