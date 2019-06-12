@@ -1,6 +1,6 @@
 /**
  * Component to render the detection configuration yaml editor.
- * @module components/detection-editor
+ * @module components/detection-yaml
  * @property {Number} alertId - alertId needed in edit mode, to submit changes to alert config
  * @property {boolean} isEditMode - to activate the edit mode
  * @property {String} detectionYaml - the detection yaml
@@ -32,7 +32,7 @@ export default Component.extend({
   classNames: ['yaml-editor'],
   notifications: service('toast'),
   /**
-   * Properties we expect to receive for the yaml-editor
+   * Properties we expect to receive for the detection-yaml
    */
   currentMetric: null,
   isYamlParseable: true,
