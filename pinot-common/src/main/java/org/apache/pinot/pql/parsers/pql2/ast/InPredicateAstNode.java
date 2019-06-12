@@ -20,13 +20,15 @@ package org.apache.pinot.pql.parsers.pql2.ast;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.TreeSet;
+import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.FilterOperator;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
 import org.apache.pinot.common.utils.request.HavingQueryTree;
+import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.pql.parsers.Pql2CompilationException;
 
 
@@ -92,7 +94,7 @@ public class InPredicateAstNode extends PredicateAstNode {
       throw new Pql2CompilationException("IN predicate has no identifier");
     }
 
-    Set<String> values = new HashSet<>();
+    Set<String> values = new LinkedHashSet<>();
 
     for (AstNode astNode : getChildren()) {
       if (astNode instanceof LiteralAstNode) {
@@ -109,6 +111,35 @@ public class InPredicateAstNode extends PredicateAstNode {
     }
 
     return new FilterQueryTree(_identifier, new ArrayList<>(values), filterOperator, null);
+  }
+
+  @Override
+  public Expression buildFilterExpression() {
+    if (_identifier == null) {
+      throw new Pql2CompilationException("IN predicate has no identifier");
+    }
+    FilterKind filterOperator;
+    if (_isNotInClause) {
+      filterOperator = FilterKind.NOT_IN;
+    } else {
+      filterOperator = FilterKind.IN;
+    }
+    Expression expr = RequestUtils.createFunctionExpression(filterOperator.name());
+    expr.getFunctionCall().addToOperands(RequestUtils.createIdentifierExpression(_identifier));
+
+    Set<String> values = new LinkedHashSet<>();
+
+    for (AstNode astNode : getChildren()) {
+      if (astNode instanceof LiteralAstNode) {
+        LiteralAstNode node = (LiteralAstNode) astNode;
+        if(!values.contains(node.getValueAsString())) {
+          values.add(node.getValueAsString());
+          Expression literalExpression = RequestUtils.createLiteralExpression(node);
+          expr.getFunctionCall().addToOperands(literalExpression);
+        }
+      }
+    }
+    return expr;
   }
 
   @Override

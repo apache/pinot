@@ -27,16 +27,31 @@ import java.util.Set;
 import java.util.Stack;
 import org.apache.commons.lang.mutable.MutableInt;
 import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.request.Expression;
+import org.apache.pinot.common.request.ExpressionType;
 import org.apache.pinot.common.request.FilterQuery;
 import org.apache.pinot.common.request.FilterQueryMap;
+import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.HavingFilterQuery;
 import org.apache.pinot.common.request.HavingFilterQueryMap;
+import org.apache.pinot.common.request.Identifier;
+import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.Selection;
 import org.apache.pinot.common.request.SelectionSort;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
+import org.apache.pinot.pql.parsers.pql2.ast.AstNode;
+import org.apache.pinot.pql.parsers.pql2.ast.FloatingPointLiteralAstNode;
+import org.apache.pinot.pql.parsers.pql2.ast.FunctionCallAstNode;
+import org.apache.pinot.pql.parsers.pql2.ast.IdentifierAstNode;
+import org.apache.pinot.pql.parsers.pql2.ast.IntegerLiteralAstNode;
+import org.apache.pinot.pql.parsers.pql2.ast.LiteralAstNode;
+import org.apache.pinot.pql.parsers.pql2.ast.PredicateAstNode;
+import org.apache.pinot.pql.parsers.pql2.ast.StringLiteralAstNode;
 
 
 public class RequestUtils {
+  private static String DELIMTER = "\t\t";
+
   private RequestUtils() {
   }
 
@@ -54,6 +69,50 @@ public class RequestUtils {
     FilterQueryMap mp = new FilterQueryMap();
     mp.setFilterQueryMap(filterQueryMap);
     request.setFilterSubQueryMap(mp);
+  }
+
+  /**
+   * Creates Expression from identifier
+   * @param identifier
+   * @return
+   */
+  public static Expression createIdentifierExpression(String identifier) {
+    Expression expression = new Expression(ExpressionType.IDENTIFIER);
+    expression.setIdentifier(new Identifier(identifier));
+    return expression;
+  }
+
+  /**
+   * Creates Literal Expression from LiteralAstNode.
+   * @param value
+   * @return
+   */
+  public static Expression createLiteralExpression(LiteralAstNode value) {
+    Expression expression = new Expression(ExpressionType.LITERAL);
+    Literal literal = new Literal();
+    if(value instanceof StringLiteralAstNode) {
+      literal.setStringValue(((StringLiteralAstNode)value).getText());
+    }
+    if(value instanceof IntegerLiteralAstNode) {
+      literal.setLongValue(((IntegerLiteralAstNode)value).getValue());
+    }
+    if(value instanceof FloatingPointLiteralAstNode) {
+      literal.setDoubleValue(((FloatingPointLiteralAstNode)value).getValue());
+    }
+    expression.setLiteral(literal);
+    return expression;
+  }
+
+  /**
+   * Create Function Expression given a functionName
+   * @param functionName
+   * @return
+   */
+  public static Expression createFunctionExpression(String functionName) {
+    Expression expression = new Expression(ExpressionType.FUNCTION);
+    Function function = new Function(functionName);
+    expression.setFunctionCall(function);
+    return expression;
   }
 
   public static void generateFilterFromTree(HavingQueryTree filterQueryTree, BrokerRequest request) {
@@ -75,11 +134,9 @@ public class RequestUtils {
     final List<Integer> f = new ArrayList<>();
     if (null != tree.getChildren()) {
       for (final FilterQueryTree c : tree.getChildren()) {
-        int childNodeId = currentId.intValue();
-        currentId.increment();
-
-        f.add(childNodeId);
         final FilterQuery q = traverseFilterQueryAndPopulateMap(c, filterQueryMap, currentId);
+        int childNodeId = q.getId();
+        f.add(childNodeId);
         filterQueryMap.put(childNodeId, q);
       }
     }
@@ -203,5 +260,39 @@ public class RequestUtils {
       }
     }
     return selectionColumns;
+  }
+
+  /**
+   * Returns the expression from a given {@link AstNode}, which can be one of the following:
+   * <ul>
+   *   <li> {@link FunctionCallAstNode}</li>
+   *   <li> {@link LiteralAstNode}</li>
+   *   <li> {@link PredicateAstNode}</li>
+   * </ul>
+   *
+   * @return Expression
+   */
+  public static Expression getExpression(AstNode astNode) {
+    if (astNode instanceof IdentifierAstNode) {
+      // Column name
+      return createIdentifierExpression(((IdentifierAstNode) astNode).getName());
+    } else if (astNode instanceof FunctionCallAstNode) {
+      // Function expression
+      Expression expression = createFunctionExpression(((FunctionCallAstNode) astNode).getName());
+      Function func = expression.getFunctionCall();
+      final List<? extends AstNode> operandsAstNodes = astNode.getChildren();
+      if (operandsAstNodes != null) {
+        for (AstNode child : operandsAstNodes) {
+          func.addToOperands(getExpression(child));
+        }
+      }
+      return expression;
+    } else if (astNode instanceof LiteralAstNode) {
+      return createLiteralExpression(((LiteralAstNode) astNode));
+    } else if (astNode instanceof PredicateAstNode) {
+      return ((PredicateAstNode) astNode).buildFilterExpression();
+    } else {
+      throw new IllegalStateException("Cannot get expression from " + astNode.getClass().getSimpleName());
+    }
   }
 }

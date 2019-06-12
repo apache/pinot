@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.pql.parsers;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Stack;
@@ -38,7 +39,9 @@ import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.ParseTreeWalker;
 import org.apache.commons.lang.math.NumberUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
+import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.pql.parsers.pql2.ast.AstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.BaseAstNode;
@@ -49,6 +52,8 @@ import org.apache.pinot.pql.parsers.pql2.ast.HavingAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.InPredicateAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.OutputColumnAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.RegexpLikePredicateAstNode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -57,7 +62,17 @@ import org.apache.pinot.pql.parsers.pql2.ast.RegexpLikePredicateAstNode;
 @ThreadSafe
 public class Pql2Compiler implements AbstractCompiler {
 
+  private static final Logger LOGGER = LoggerFactory.getLogger(Pql2Compiler.class);
+
+  public static boolean ENABLE_PINOT_QUERY =
+      Boolean.valueOf(System.getProperty("pinot.query.converter.enabled", "false"));
+  public static boolean VALIDATE_CONVERTER =
+      Boolean.valueOf(System.getProperty("pinot.query.converter.validate", "false"));
+  public static boolean FAIL_ON_CONVERSION_ERROR =
+      Boolean.valueOf(System.getProperty("pinot.query.converter.fail_on_error", "false"));
+
   private static class ErrorListener extends BaseErrorListener {
+
     @Override
     public void syntaxError(@Nonnull Recognizer<?, ?> recognizer, @Nullable Object offendingSymbol, int line,
         int charPositionInLine, @Nonnull String msg, @Nullable RecognitionException e) {
@@ -72,7 +87,6 @@ public class Pql2Compiler implements AbstractCompiler {
    *
    * @param expression Expression to compile
    * @return BrokerRequest
-   * @throws Pql2CompilationException
    */
   @Override
   public BrokerRequest compileToBrokerRequest(String expression)
@@ -103,12 +117,94 @@ public class Pql2Compiler implements AbstractCompiler {
 
       BrokerRequest brokerRequest = new BrokerRequest();
       rootNode.updateBrokerRequest(brokerRequest);
+      if (ENABLE_PINOT_QUERY) {
+        try {
+          PinotQuery pinotQuery = new PinotQuery();
+          rootNode.updatePinotQuery(pinotQuery);
+          if (VALIDATE_CONVERTER) {
+            PinotQuery2BrokerRequestConverter converter = new PinotQuery2BrokerRequestConverter();
+            BrokerRequest tempBrokerRequest = converter.convert(pinotQuery);
+            boolean result = compare(brokerRequest, tempBrokerRequest);
+            if (!result) {
+              LOGGER.error("Pinot query to broker request conversion failed. PQL:{}", expression);
+              if (FAIL_ON_CONVERSION_ERROR) {
+                throw new Pql2CompilationException(
+                    "Pinot query to broker request conversion failed. PQL:" + expression);
+              }
+            }
+          }
+          brokerRequest.setPinotQuery(pinotQuery);
+        } catch (Exception e) {
+          //non fatal for now.
+          LOGGER.error("Non fatal: Failed to populate pinot query and broker request. PQL:{}", expression, e);
+          if (FAIL_ON_CONVERSION_ERROR) {
+            throw e;
+          }
+        }
+      }
       return brokerRequest;
     } catch (Pql2CompilationException e) {
       throw e;
     } catch (Exception e) {
       throw new Pql2CompilationException(ExceptionUtils.getStackTrace(e));
     }
+  }
+
+  private boolean compare(BrokerRequest br1, BrokerRequest br2)
+      throws Exception {
+    //Having not yet supported
+    if (br1.getHavingFilterQuery() != null) {
+      return true;
+    }
+    boolean result = br1.equals(br2);
+    if (!result) {
+      StringBuilder sb = new StringBuilder();
+
+      if (br1.getFilterQuery() != null) {
+        if (!br1.getFilterQuery().equals(br2.getFilterQuery())) {
+          sb.append("br1.getFilterQuery() = ").append(br1.getFilterQuery()).append("\n")
+              .append("br2.getFilterQuery() = ").append(br2.getFilterQuery());
+          LOGGER.error("Filter did not match after conversion.{}", sb);
+          return false;
+        }
+
+        if (!br1.getFilterSubQueryMap().equals(br2.getFilterSubQueryMap())) {
+          sb.append("br1.getFilterSubQueryMap() = ").append(br1.getFilterSubQueryMap()).append("\n")
+              .append("br2.getFilterSubQueryMap() = ").append(br2.getFilterSubQueryMap());
+          LOGGER.error("FilterSubQueryMap did not match after conversion. {}", sb);
+          return false;
+        }
+      }
+      if (br1.getSelections() != null) {
+        if (!br1.getSelections().equals(br2.getSelections())) {
+          sb.append("br1.getSelections() = ").append(br1.getSelections()).append("\n").append("br2.getSelections() = ")
+              .append(br2.getSelections());
+          LOGGER.error("Selection did not match after conversion:{}", sb);
+          return false;
+        }
+      }
+      if (br1.getGroupBy() != null) {
+        if (!br1.getGroupBy().equals(br2.getGroupBy())) {
+          sb.append("br1.getGroupBy() = ").append(br1.getGroupBy()).append("\n").append("br2.getGroupBy() = ")
+              .append(br2.getGroupBy());
+          LOGGER.error("Group By did not match conversion:{}", sb);
+          return false;
+        }
+      }
+      if (br1.getAggregationsInfo() != null) {
+        List<AggregationInfo> aggregationsInfo = br1.getAggregationsInfo();
+        for (int i = 0; i < aggregationsInfo.size(); i++) {
+          AggregationInfo agg1 = br1.getAggregationsInfo().get(i);
+          AggregationInfo agg2 = br2.getAggregationsInfo().get(i);
+          if (!agg1.equals(agg2)) {
+            sb.append("br1.agg1 = ").append(agg1).append("\n").append("br2.agg2() = ").append(agg2);
+            LOGGER.error("AggregationInfo did not match after conversion: {}", sb);
+            return false;
+          }
+        }
+      }
+    }
+    return result;
   }
 
   @Override

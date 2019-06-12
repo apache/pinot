@@ -18,24 +18,17 @@
  */
 package org.apache.pinot.pql.parsers.pql2.ast;
 
-import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.request.PinotQuery;
-import org.apache.pinot.common.utils.request.RequestUtils;
-
-
-/**
- * AST node for the WHERE clause.
- */
-public class WhereAstNode extends BaseAstNode {
-  @Override
-  public void updateBrokerRequest(BrokerRequest brokerRequest) {
-    PredicateAstNode predicateAstNode = (PredicateAstNode) getChildren().get(0);
-    RequestUtils.generateFilterFromTree(predicateAstNode.buildFilterQueryTree(), brokerRequest);
-  }
-
-  @Override
-  public void updatePinotQuery(PinotQuery pinotQuery) {
-    PredicateAstNode predicateAstNode = (PredicateAstNode) getChildren().get(0);
-    pinotQuery.setFilterExpression(predicateAstNode.buildFilterExpression());
-  }
+public enum FilterKind {
+  AND,
+  OR,
+  EQUALS,
+  NOT_EQUALS,
+  GREATER_THAN,
+  GREATER_THAN_OR_EQUAL,
+  LESS_THAN,
+  LESS_THAN_OR_EQUAL,
+  BETWEEN,
+  IN,
+  NOT_IN,
+  REGEXP_LIKE
 }
