@@ -98,12 +98,13 @@ public class YamlResource {
   protected static final Logger LOG = LoggerFactory.getLogger(YamlResource.class);
   private static ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
+  private enum YamlOperations {
+    CREATING, UPDATING, PREVIEW, RUNNING
+  }
+
   private static final String PROP_DETECTION = "detection";
   private static final String PROP_SUBSCRIPTION = "subscription";
-  private static final String PROP_PREVIEW = "preview";
-  private static final String PROP_CREATING = "creating";
-  private static final String PROP_UPDATING = "updating";
-  private static final String PROP_RUNNING = "running";
+
   private static final String PROP_SUBS_GROUP_NAME = "subscriptionGroupName";
   private static final String PROP_DETECTION_NAME = "detectionName";
 
@@ -253,9 +254,9 @@ public class YamlResource {
 
       detectionConfigId = createDetectionPipeline(yamls.get(PROP_DETECTION), startTime, endTime);
     } catch (IllegalArgumentException e) {
-      return processBadRequestResponse(PROP_DETECTION, PROP_CREATING, payload, e);
+      return processBadRequestResponse(PROP_DETECTION, YamlOperations.CREATING.name(), payload, e);
     } catch (Exception e) {
-      return processServerErrorResponse(PROP_DETECTION, PROP_CREATING, payload, e);
+      return processServerErrorResponse(PROP_DETECTION, YamlOperations.CREATING.name(), payload, e);
     }
 
     // Notification
@@ -282,10 +283,10 @@ public class YamlResource {
       }
     } catch (IllegalArgumentException e) {
       this.detectionConfigDAO.deleteById(detectionConfigId);
-      return processBadRequestResponse(PROP_SUBSCRIPTION, PROP_CREATING, payload, e);
+      return processBadRequestResponse(PROP_SUBSCRIPTION, YamlOperations.CREATING.name(), payload, e);
     } catch (Exception e) {
       this.detectionConfigDAO.deleteById(detectionConfigId);
-      return processServerErrorResponse(PROP_DETECTION, PROP_CREATING, payload, e);
+      return processServerErrorResponse(PROP_DETECTION, YamlOperations.CREATING.name(), payload, e);
     }
 
     // create an yaml onboarding task to run replay and tuning
@@ -347,9 +348,9 @@ public class YamlResource {
     try {
       detectionConfigId = createDetectionPipeline(payload, startTime, endTime);
     } catch (IllegalArgumentException e) {
-      return processBadRequestResponse(PROP_DETECTION, PROP_CREATING, payload, e);
+      return processBadRequestResponse(PROP_DETECTION, YamlOperations.CREATING.name(), payload, e);
     } catch (Exception e) {
-      return processServerErrorResponse(PROP_DETECTION, PROP_CREATING, payload, e);
+      return processServerErrorResponse(PROP_DETECTION, YamlOperations.CREATING.name(), payload, e);
     }
 
     LOG.info("Detection created with id " + detectionConfigId + " using payload " + payload);
@@ -413,9 +414,9 @@ public class YamlResource {
     try {
       updateDetectionPipeline(id, payload, startTime, endTime);
     } catch (IllegalArgumentException e) {
-      return processBadRequestResponse(PROP_DETECTION, PROP_UPDATING, payload, e);
+      return processBadRequestResponse(PROP_DETECTION, YamlOperations.UPDATING.name(), payload, e);
     } catch (Exception e) {
-      return processServerErrorResponse(PROP_DETECTION, PROP_UPDATING, payload, e);
+      return processServerErrorResponse(PROP_DETECTION, YamlOperations.UPDATING.name(), payload, e);
     }
 
     LOG.info("Detection with id " + id + " updated");
@@ -472,9 +473,9 @@ public class YamlResource {
     try {
       detectionConfigId = createOrUpdateDetectionPipeline(payload);
     } catch (IllegalArgumentException e) {
-      return processBadRequestResponse(PROP_DETECTION, PROP_CREATING + "/" + PROP_UPDATING, payload, e);
+      return processBadRequestResponse(PROP_DETECTION, YamlOperations.CREATING.name() + "/" + YamlOperations.UPDATING.name(), payload, e);
     } catch (Exception e) {
-      return processServerErrorResponse(PROP_DETECTION, PROP_CREATING + "/" + PROP_UPDATING, payload, e);
+      return processServerErrorResponse(PROP_DETECTION, YamlOperations.CREATING.name() + "/" + YamlOperations.UPDATING.name(), payload, e);
     }
 
     LOG.info("Detection Pipeline created/updated with id " + detectionConfigId + " using payload " + payload);
@@ -523,9 +524,9 @@ public class YamlResource {
     try {
       detectionAlertConfigId = createSubscriptionGroup(payload);
     } catch (IllegalArgumentException e) {
-      return processBadRequestResponse(PROP_SUBSCRIPTION, PROP_CREATING, payload, e);
+      return processBadRequestResponse(PROP_SUBSCRIPTION, YamlOperations.CREATING.name(), payload, e);
     } catch (Exception e) {
-      return processServerErrorResponse(PROP_SUBSCRIPTION, PROP_CREATING, payload, e);
+      return processServerErrorResponse(PROP_SUBSCRIPTION, YamlOperations.CREATING.name(), payload, e);
     }
 
     LOG.info("Notification group created with id " + detectionAlertConfigId + " using payload " + payload);
@@ -610,9 +611,9 @@ public class YamlResource {
     try {
       updateSubscriptionGroup(id, payload);
     } catch (IllegalArgumentException e) {
-      return processBadRequestResponse(PROP_SUBSCRIPTION, PROP_UPDATING, payload, e);
+      return processBadRequestResponse(PROP_SUBSCRIPTION, YamlOperations.UPDATING.name(), payload, e);
     } catch (Exception e) {
-      return processServerErrorResponse(PROP_SUBSCRIPTION, PROP_UPDATING, payload, e);
+      return processServerErrorResponse(PROP_SUBSCRIPTION, YamlOperations.UPDATING.name(), payload, e);
     }
 
     LOG.info("Subscription group with id " + id + " updated");
@@ -676,7 +677,7 @@ public class YamlResource {
       result = pipeline.run();
 
     } catch (IllegalArgumentException e) {
-      return processBadRequestResponse(PROP_PREVIEW, PROP_RUNNING, payload, e);
+      return processBadRequestResponse(YamlOperations.PREVIEW.name(), YamlOperations.RUNNING.name(), payload, e);
     } catch (InvocationTargetException e) {
       responseMessage.put("message", "Failed to run the preview due to " + e.getTargetException().getMessage());
       return Response.serverError().entity(responseMessage).build();
