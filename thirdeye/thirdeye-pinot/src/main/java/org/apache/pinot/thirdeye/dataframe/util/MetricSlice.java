@@ -21,11 +21,14 @@ package org.apache.pinot.thirdeye.dataframe.util;
 
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
+import java.util.Collection;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 import org.apache.pinot.thirdeye.common.time.TimeGranularity;
+import org.apache.pinot.thirdeye.rootcause.Entity;
 
 
 /**
@@ -101,8 +104,25 @@ public final class MetricSlice {
    * check if current metric slice contains another metric slice
    */
   public boolean containSlice(MetricSlice slice) {
-    return slice.metricId == this.metricId && slice.granularity.equals(this.granularity) && slice.getFilters().asMap().equals(this.getFilters().asMap()) &&
+    return slice.metricId == this.metricId && slice.granularity.equals(this.granularity) && filtersEquals(this.getFilters(), slice.getFilters()) &&
         slice.start >= this.start && slice.end <= this.end;
+  }
+
+  private static boolean filtersEquals(Multimap<String, String> filters1, Multimap<String, String> filters2) {
+    Map<String, Collection<String>> filterMaps1 = filters1.asMap();
+    Map<String, Collection<String>> filterMaps2 = filters2.asMap();
+
+    if (!filterMaps1.keySet().equals(filterMaps2.keySet())) {
+      return false;
+    }
+    for (Map.Entry<String, Collection<String>> entry : filterMaps1.entrySet()) {
+      Collection<String> filter1Values = entry.getValue();
+      Collection<String> filter2Values = filterMaps2.get(entry.getKey());
+      if (!(filter1Values.containsAll(filter2Values) && filter2Values.containsAll(filter1Values))) {
+        return false;
+      }
+    }
+    return true;
   }
 
   @Override

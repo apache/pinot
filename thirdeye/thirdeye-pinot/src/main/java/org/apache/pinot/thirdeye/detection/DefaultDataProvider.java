@@ -149,20 +149,6 @@ public class DefaultDataProvider implements DataProvider {
       // if not in cache, fetch from data source
       output.putAll(this.timeseriesLoader.loadTimeSeries(slices.stream().filter(slice -> !output.containsKey(slice)).collect(
           Collectors.toList())));
-//      Map<MetricSlice, Future<DataFrame>> futures = new HashMap<>();
-//      for (final MetricSlice slice : slices) {
-//        if (!output.containsKey(slice)){
-//          futures.put(slice, this.executor.submit(() -> DefaultDataProvider.this.timeseriesLoader.load(slice)));
-//        }
-//      }
-//      //LOG.info("Fetching {} slices of timeseries, {} cache hit, {} cache miss", slices.size(), output.size(), futures.size());
-//      final long deadline = System.currentTimeMillis() + TIMEOUT;
-//      for (MetricSlice slice : slices) {
-//        if (!output.containsKey(slice)) {
-//          output.put(slice, futures.get(slice).get(makeTimeout(deadline), TimeUnit.MILLISECONDS));
-//        }
-//      }
-      //LOG.info("Fetching {} slices used {} milliseconds", slices.size(), System.currentTimeMillis() - ts);
       return output;
 
     } catch (Exception e) {

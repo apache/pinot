@@ -29,6 +29,7 @@ import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.EvaluationDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.datasource.comparison.Row;
 import org.apache.pinot.thirdeye.detection.ConfigUtils;
 import org.apache.pinot.thirdeye.detection.DataProvider;
 import org.apache.pinot.thirdeye.detection.DetectionPipelineException;
@@ -224,10 +225,11 @@ public class DimensionWrapper extends DetectionPipeline {
     }
     if (nestedMetrics.size() > MAX_DIMENSION_COMBINATIONS) {
       throw new DetectionPipelineException(String.format(
-          "Dimension combination for {} is {} which exceeds limit of {}",
+          "Dimension combination for %d is %d which exceeds limit of %d",
           this.config.getId(), nestedMetrics.size(), MAX_DIMENSION_COMBINATIONS));
     }
 
+    // pre-fetch time series for multiple dimensions in one query
     if (this.cachingPeriodLookback >= 0) {
       this.provider.fetchTimeseries(nestedMetrics.stream().map(metricEntity -> MetricSlice.from(metricEntity.getId(), startTime - cachingPeriodLookback, endTime,
           metricEntity.getFilters())).collect(Collectors.toList()));
