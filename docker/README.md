@@ -22,7 +22,7 @@
 # docker-pinot
 This is a docker image of [Apache Pinot](https://github.com/apache/incubator-pinot).
 
-## How to build it
+## How to build a docker image
 
 There is a docker build script which will build a given Git repo/branch and tag the image.
 
@@ -42,20 +42,40 @@ The docker image is tagged as `[Docker Tag]`.
 
 `Pinot Git URL`: The Pinot Git Repo to build, users can set it to their own fork. Please note that, the URL is `https://` based, not `git://`. Default is the Apache Repo: `https://github.com/apache/incubator-pinot.git`.
 
-Example of build and tag a snapshot on your own fork:
+* Example of building and tagging a snapshot on your own fork:
 ```SHELL
 ./docker-build.sh pinot_fork:snapshot-5.2 snapshot-5.2 https://github.com/your_own_fork/pinot.git
 ```
 
-Example of publish a release version:
+* Example of building a release version:
 ```SHELL
 ./docker-build.sh pinot:release-0.1.0 release-0.1.0 https://github.com/apache/incubator-pinot.git
 ```
 
-There is also a `docker-build-and-push.sh` script to publish this docker image to your docker registry after build.
+## How to publish a docker image
+
+Script `docker-push.sh` publishes a given docker image to your docker registry.
+
+In order to push to your own repo, the image needs to be explicitly tagged with the repo name.
+
+* Example of publishing a image to [winedepot/pinot](https://cloud.docker.com/u/winedepot/repository/docker/winedepot/pinot) dockerHub repo.
 
 ```SHELL
-./docker-build-and-push.sh pinot:release-0.1.0 release-0.1.0 https://github.com/apache/incubator-pinot.git
+./docker-push.sh winedepot/pinot:latest
+```
+
+* Tag a built image, then push.
+````SHELL
+docker tag pinot:release-0.1.0 winedepot/pinot:release-0.1.0
+docker push winedepot/pinot:release-0.1.0
+````
+
+Script `docker-build-and-push.sh` builds and publishes this docker image to your docker registry after build.
+
+* Example of building and publishing a image to [winedepot/pinot](https://cloud.docker.com/u/winedepot/repository/docker/winedepot/pinot) dockerHub repo.
+
+```SHELL
+./docker-build-and-push.sh winedepot/pinot:latest master https://github.com/apache/incubator-pinot.git
 ```
 
 ## How to Run it

@@ -19,7 +19,6 @@
 #
 
 
-sh docker-build.sh $@
 if [[ "$#" -gt 0 ]]
 then
   DOCKER_TAG=$1
