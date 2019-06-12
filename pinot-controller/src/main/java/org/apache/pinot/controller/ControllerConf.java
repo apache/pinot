@@ -463,11 +463,6 @@ public class ControllerConf extends PropertiesConfiguration {
         getPeriodicTaskInitialDelayInSeconds());
   }
 
-  public void setBrokerResourceValidationInitialDelayInSeconds(long validationInitialDelayInSeconds) {
-    setProperty(ControllerPeriodicTasksConf.BROKER_RESOURCE_VALIDATION_INITIAL_DELAY_IN_SECONDS,
-        validationInitialDelayInSeconds);
-  }
-
   public int getStatusCheckerFrequencyInSeconds() {
     if (containsKey(ControllerPeriodicTasksConf.STATUS_CHECKER_FREQUENCY_IN_SECONDS)) {
       return Integer.parseInt((String) getProperty(ControllerPeriodicTasksConf.STATUS_CHECKER_FREQUENCY_IN_SECONDS));
@@ -620,18 +615,12 @@ public class ControllerConf extends PropertiesConfiguration {
         ControllerPeriodicTasksConf.getRandomInitialDelayInSeconds());
   }
 
-  public void setStatusCheckerInitialDelayInSeconds(long initialDelayInSeconds) {
-    setProperty(ControllerPeriodicTasksConf.STATUS_CHECKER_INITIAL_DELAY_IN_SECONDS, initialDelayInSeconds);
+  public long getRealtimeSegmentValidationManagerInitialDelaySeconds() {
+    return getPeriodicTaskInitialDelayInSeconds();
   }
 
-  public void setRealtimeSegmentRelocationInitialDelayInSeconds(long initialDelayInSeconds) {
-    setProperty(ControllerPeriodicTasksConf.REALTIME_SEGMENT_RELOCATION_INITIAL_DELAY_IN_SECONDS,
-        initialDelayInSeconds);
-  }
-
-  public void setOfflineSegmentIntervalCheckerInitialDelayInSeconds(long initialDelayInSeconds) {
-    setProperty(ControllerPeriodicTasksConf.OFFLINE_SEGMENT_INTERVAL_CHECKER_INITIAL_DELAY_IN_SECONDS,
-        initialDelayInSeconds);
+  public long getPinotTaskManagerInitialDelaySeconds() {
+    return getPeriodicTaskInitialDelayInSeconds();
   }
 
   public long getPeriodicTaskInitialDelayInSeconds() {
