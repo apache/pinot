@@ -89,6 +89,8 @@ export default Component.extend({
   uniqueTimeSeries: null,
   selectedRule: null,
   isLoadingTimeSeries: false,
+  granularity: null,
+  alertYaml: null,
 
 
 
@@ -427,12 +429,12 @@ export default Component.extend({
             timestamps: [anomaly.startTime, anomaly.endTime],
             values: [1, 1],
             type: 'line',
-            color: 'teal',
+            color: 'red',
             axis: 'y2'
           };
           series[key + '-region'] = Object.assign({}, series[key], {
             type: 'region',
-            color: 'orange'
+            color: 'screenshot-anomaly'
           });
         });
       }
@@ -440,39 +442,39 @@ export default Component.extend({
       // The current time series has a different naming convention in Preview
       if (get(this, 'isPreviewMode')) {
         if (timeseries && !_.isEmpty(timeseries.current)) {
-          series['current'] = {
+          series['Current'] = {
             timestamps: timeseries.timestamp,
             values: stripNonFiniteValues(timeseries.current),
             type: 'line',
-            color: 'grey'
+            color: 'screenshot-current'
           };
         }
       } else {
         if (timeseries && !_.isEmpty(timeseries.value)) {
-          series['current'] = {
+          series['Current'] = {
             timestamps: timeseries.timestamp,
             values: stripNonFiniteValues(timeseries.value),
             type: 'line',
-            color: 'grey'
+            color: 'screenshot-current'
           };
         }
       }
 
       if (baseline && !_.isEmpty(baseline.value)) {
-        series['baseline'] = {
+        series['Baseline'] = {
           timestamps: baseline.timestamp,
           values: stripNonFiniteValues(baseline.value),
           type: 'line',
-          color: 'blue'
+          color: 'screenshot-predicted'
         };
       }
 
       if (baseline && !_.isEmpty(baseline.upper_bound)) {
-        series['upperBound'] = {
+        series['Upper and lower bound'] = {
           timestamps: baseline.timestamp,
           values: stripNonFiniteValues(baseline.upper_bound),
           type: 'line',
-          color: 'confidence-bounds-blue'
+          color: 'screenshot-bounds'
         };
       }
 
@@ -481,7 +483,7 @@ export default Component.extend({
           timestamps: baseline.timestamp,
           values: stripNonFiniteValues(baseline.lower_bound),
           type: 'line',
-          color: 'confidence-bounds-blue'
+          color: 'screenshot-bounds'
         };
       }
       return series;

@@ -40,11 +40,21 @@ export default Component.extend({
   tooltip: {
     format: {
       title: (d) => moment(d).format('MM/DD hh:mm a'),
-      value: (val) => d3.format('.3s')(val)
+      value: (val) => d3.format('.3s')(val),
+      name: (name) => {
+        if (name === 'Upper and lower bound') {
+          return 'Upper bound';
+        } else if (name === 'lowerBound') {
+          return 'Lower bound';
+        }
+        return name;
+      }
     }
   },
 
-  legend: {},
+  legend: {
+    hide: 'lowerBound'
+  },
 
   axis: {
     y: {
@@ -93,6 +103,8 @@ export default Component.extend({
     connectNull: false
   },
 
+  id: 'timeseries-chart',
+
   _makeDiffConfig() {
     const cache = this.get('_seriesCache') || {};
     const series = this.get('series') || {};
@@ -105,6 +117,8 @@ export default Component.extend({
     const changedKeys = seriesKeys.filter(sid => cache[sid] && !_.isEqual(cache[sid], series[sid]));
     const deletedKeys = Object.keys(cache).filter(sid => !series[sid]);
     const regionKeys = seriesKeys.filter(sid => series[sid] && series[sid].type == 'region');
+    // keys containing '-region' should not appear in the graph legend.
+    const noLegendKeys = seriesKeys.filter(sid => (sid.includes('-region')));
 
     const regions = regionKeys.map(sid => {
       const t = series[sid].timestamps;
@@ -117,10 +131,10 @@ export default Component.extend({
       return region;
     });
 
-    const unloadKeys = deletedKeys.concat(regionKeys);
+    const unloadKeys = deletedKeys.concat(noLegendKeys);
     const unload = unloadKeys.concat(unloadKeys.map(sid => `${sid}-timestamps`));
 
-    const loadKeys = addedKeys.concat(changedKeys).filter(sid => !regionKeys.includes(sid));
+    const loadKeys = addedKeys.concat(changedKeys).filter(sid => !noLegendKeys.includes(sid));
     const xs = {};
     loadKeys.forEach(sid => xs[sid] = `${sid}-timestamps`);
 
@@ -138,7 +152,8 @@ export default Component.extend({
 
     const axes = {};
     loadKeys.filter(sid => 'axis' in series[sid]).forEach(sid => axes[sid] = series[sid].axis);
-
+    // keep the lower bound line in graph but remove in from the legend
+    legend.hide = 'lowerBound';
     const config = { unload, xs, columns, types, regions, tooltip, focusedIds, colors, axis, axes, legend };
     return config;
   },
@@ -199,25 +214,27 @@ export default Component.extend({
   },
 
   _shadeBounds(){
-    d3.select(".confidence-bounds").remove();
-    d3.select(".sub-confidence-bounds").remove();
-    d3.select('.timeseries-graph__slider-circle').remove();
-    d3.selectAll('timeseries-graph__slider-line').remove();
+    const parentElement = this.api.internal.config.bindto;
+    d3.select(parentElement).select(".confidence-bounds").remove();
+    d3.select(parentElement).select(".sub-confidence-bounds").remove();
+    d3.select(parentElement).select('.timeseries-graph__slider-circle').remove();
+    d3.select(parentElement).selectAll('timeseries-graph__slider-line').remove();
     const chart = this.api;
     if (chart && chart.legend && chart.internal && chart.internal.data && chart.internal.data.targets) {
       if (chart.internal.data.targets.length > 24) {
         chart.legend.hide();
       }
     }
-    if(chart && chart.internal && chart.internal.data && chart.internal.data.xs && Array.isArray(chart.internal.data.xs.upperBound)) {
-      const indices = d3.range(chart.internal.data.xs.upperBound.length);
+    // key is 'Upper and lower bound' because we delete the lowerBound key for the legend.
+    if(chart && chart.internal && chart.internal.data && chart.internal.data.xs && Array.isArray(chart.internal.data.xs['Upper and lower bound'])) {
+      const indices = d3.range(chart.internal.data.xs['Upper and lower bound'].length);
       const yscale = chart.internal.y;
       const xscale = chart.internal.x;
       const yscaleSub = chart.internal.subY;
       const xscaleSub = chart.internal.subX;
-      const xVals = chart.internal.data.xs.upperBound;
+      const xVals = chart.internal.data.xs['Upper and lower bound'];
       let upperBoundVals = chart.internal.data.targets.find(target => {
-        return target.id === 'upperBound';
+        return target.id === 'Upper and lower bound';
       });
       let lowerBoundVals = chart.internal.data.targets.find(target => {
         return target.id === 'lowerBound';
@@ -240,15 +257,15 @@ export default Component.extend({
           .y1(d => yscaleSub(upperBoundVals[d]));
 
         let i = 0;
-        const bothCharts = d3.selectAll('.c3-chart');
+        const bothCharts = d3.select(parentElement).selectAll('.c3-chart-bars');
         bothCharts.each(function() {
           if (i === 0 && this) {
-            d3.select(this).append('path')
+            d3.select(this).insert('path')
               .datum(indices)
               .attr('class', 'confidence-bounds')
               .attr('d', area_main);
           } else if (i === 1 && this) {
-            d3.select(this).append('path')
+            d3.select(this).insert('path')
               .datum(indices)
               .attr('class', 'sub-confidence-bounds')
               .attr('d', area_sub);
@@ -342,6 +359,7 @@ export default Component.extend({
     config.size = this.get('height');
     config.point = this.get('point');
     config.line = this.get('line');
+    config.id = this.get('id');
     config.onrendered = this.get('_shadeBounds');
 
     const chart = c3.generate(config);
