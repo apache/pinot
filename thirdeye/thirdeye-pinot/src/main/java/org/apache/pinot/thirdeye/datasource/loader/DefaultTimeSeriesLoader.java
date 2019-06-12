@@ -47,6 +47,8 @@ import org.slf4j.LoggerFactory;
 
 public class DefaultTimeSeriesLoader implements TimeSeriesLoader {
   private static final Logger LOG = LoggerFactory.getLogger(DefaultTimeSeriesLoader.class);
+  // the maximum number of time series we fetch in one pinot query
+  private static final int BATCH_QUERY_MAX_SIZE = 50;
 
   private final MetricConfigManager metricDAO;
   private final DatasetConfigManager datasetDAO;
@@ -78,7 +80,7 @@ public class DefaultTimeSeriesLoader implements TimeSeriesLoader {
   @Override
   public Map<MetricSlice, DataFrame> loadTimeSeries(Collection<MetricSlice> slices) throws Exception {
     Map<MetricSlice, DataFrame> output = new HashMap<>();
-
+    // get all query groups
     Collection<QueryGroup> queryGroups = getQueryGroups(slices);
     for (QueryGroup queryGroup : queryGroups) {
       if (queryGroup.slices.size() == 1) {
@@ -89,7 +91,7 @@ public class DefaultTimeSeriesLoader implements TimeSeriesLoader {
         DatasetConfigDTO dataset = retriveDataset(metric);
         if (dataset.getDataSource().equals(PinotThirdEyeDataSource.class.getSimpleName()) && dataset.isAdditive()
             && !metric.isDimensionAsMetric()) {
-          // batch loading
+          // if it's pinot data source, batch load the data for multiple dimension values in one query
           output.putAll(loadFromBatchQuery(queryGroup, metric, dataset));
         } else {
           for (MetricSlice metricSlice : queryGroup.slices) {
@@ -103,6 +105,7 @@ public class DefaultTimeSeriesLoader implements TimeSeriesLoader {
 
   private Map<MetricSlice, DataFrame> loadFromBatchQuery(QueryGroup queryGroup, MetricConfigDTO metric,
       DatasetConfigDTO dataset) throws Exception {
+    LOG.info("Loading time series in batch for {}", queryGroup);
     TimeSeriesRequestContainer rc =
         DataFrameUtils.makeTimeSeriesRequestAlignedBatch(queryGroup.startTime, queryGroup.endTime,
             queryGroup.slices.stream().map(MetricSlice::getFilters).collect(Collectors.toList()), queryGroup.dimensions,
@@ -151,32 +154,57 @@ public class DefaultTimeSeriesLoader implements TimeSeriesLoader {
             slice -> Arrays.asList(slice.getStart(), slice.getEnd(), slice.getMetricId(), slice.getGranularity()),
             Collectors.toList()));
 
-    // group by dimension filters
+    // for slices with the same metric, time range and granularity, group by dimension filters
     for (List<MetricSlice> timeRangeAndMetricGroup : timeRangeAndMetricGroups.values()) {
-//      // filter out slices with multiple values
-//      List<MetricSlice> slicesWithMultipleFilterValues = timeRangeAndMetricGroup.stream()
-//          .filter(metricSlice -> metricSlice.getFilters()
-//              .asMap()
-//              .entrySet()
-//              .stream()
-//              .anyMatch(entry -> entry.getValue().size() > 1))
-//          .collect(Collectors.toList());
-//      queryGroups.addAll(
-//          slicesWithMultipleFilterValues.stream().map(QueryGroup::fromSlice).collect(Collectors.toList()));
-//
-//      timeRangeAndMetricGroup.removeAll(slicesWithMultipleFilterValues);
+      // first filter out slices with dimensions with multiple values, have to send separate queries for those slices
+      // for example, slice one : country in ("us", "mx"), slice two: country in ("us", "cn")
+      List<MetricSlice> slicesWithMultipleFilterValues = timeRangeAndMetricGroup.stream()
+          .filter(metricSlice -> metricSlice.getFilters()
+              .asMap()
+              .entrySet()
+              .stream()
+              .anyMatch(entry -> entry.getValue().size() > 1))
+          .collect(Collectors.toList());
+
+      queryGroups.addAll(slicesWithMultipleFilterValues.stream().map(QueryGroup::fromSlice).collect(Collectors.toList()));
+      timeRangeAndMetricGroup.removeAll(slicesWithMultipleFilterValues);
+
+      // group by dimension filters
       Map<Set<String>, List<MetricSlice>> groups = timeRangeAndMetricGroup.stream()
           .collect(Collectors.groupingBy(slice -> slice.getFilters().keySet(), Collectors.toList()));
+
       for (List<MetricSlice> groupedSlices : groups.values()) {
-        MetricSlice slice = groupedSlices.stream().findFirst().get();
-        queryGroups.add(
-            new QueryGroup(groupedSlices, slice.getMetricId(), slice.getStart(), slice.getEnd(), slice.getGranularity(),
-                new ArrayList<>(slice.getFilters().keySet())));
+        Collection<List<MetricSlice>>  groupedSlicesWithAppropriateSize = enforceBatchSize(groupedSlices);
+        for (List<MetricSlice> metricSlices : groupedSlicesWithAppropriateSize) {
+          MetricSlice slice = metricSlices.stream().findFirst().get();
+          // create a query group for each group of slices with the same metric id, start time, end time, granularity
+          // but different dimension filters, so that we can fetch the data in one query
+          queryGroups.add(new QueryGroup(metricSlices, slice.getMetricId(), slice.getStart(), slice.getEnd(), slice.getGranularity(),
+                  new ArrayList<>(slice.getFilters().keySet())));
+        }
       }
     }
     return queryGroups;
   }
 
+  private Collection<List<MetricSlice>> enforceBatchSize(List<MetricSlice> groupedSlices){
+    if (groupedSlices.size() <= BATCH_QUERY_MAX_SIZE) {
+      return Collections.singleton(groupedSlices);
+    }
+    // if the group size is larger then the maximum allowed number, split the groups
+    Collection<List<MetricSlice>> groupedSlicesCollections = new ArrayList<>();
+    while (!groupedSlices.isEmpty()){
+      List<MetricSlice> slices = groupedSlices.stream().limit(BATCH_QUERY_MAX_SIZE).collect(Collectors.toList());
+      groupedSlicesCollections.add(slices);
+      groupedSlices.removeAll(slices);
+    }
+    return groupedSlicesCollections;
+  }
+
+  /**
+   * The query groups. For slices in the same query group, we send only one query to fetch the time series when possible.
+   * Because they share the same start time, end time and granularities.
+   */
   private static class QueryGroup {
     final Collection<MetricSlice> slices;
     final long metricId;
@@ -198,6 +226,12 @@ public class DefaultTimeSeriesLoader implements TimeSeriesLoader {
       this.endTime = endTime;
       this.granularity = granularity;
       this.dimensions = dimensions;
+    }
+
+    @Override
+    public String toString() {
+      return "QueryGroup{" + "slices=" + slices + ", metricId=" + metricId + ", startTime=" + startTime + ", endTime="
+          + endTime + ", granularity=" + granularity + ", dimensions=" + dimensions + '}';
     }
   }
 }

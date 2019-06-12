@@ -108,6 +108,12 @@ public final class MetricSlice {
         slice.start >= this.start && slice.end <= this.end;
   }
 
+  /**
+   * check if two filter multi-maps are equal regardless of dimension value orders
+   * @param filters1 filter 1
+   * @param filters2 filter 2
+   * @return <tt>true</tt> if two filters are equal
+   */
   private static boolean filtersEquals(Multimap<String, String> filters1, Multimap<String, String> filters2) {
     Map<String, Collection<String>> filterMaps1 = filters1.asMap();
     Map<String, Collection<String>> filterMaps2 = filters2.asMap();
