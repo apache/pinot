@@ -126,10 +126,17 @@ public class InPredicateAstNode extends PredicateAstNode {
     }
     Expression expr = RequestUtils.createFunctionExpression(filterOperator.name());
     expr.getFunctionCall().addToOperands(RequestUtils.createIdentifierExpression(_identifier));
+
+    Set<String> values = new LinkedHashSet<>();
+
     for (AstNode astNode : getChildren()) {
       if (astNode instanceof LiteralAstNode) {
         LiteralAstNode node = (LiteralAstNode) astNode;
-        expr.getFunctionCall().addToOperands(RequestUtils.createLiteralExpression(node));
+        if(!values.contains(node.getValueAsString())) {
+          values.add(node.getValueAsString());
+          Expression literalExpression = RequestUtils.createLiteralExpression(node);
+          expr.getFunctionCall().addToOperands(literalExpression);
+        }
       }
     }
     return expr;

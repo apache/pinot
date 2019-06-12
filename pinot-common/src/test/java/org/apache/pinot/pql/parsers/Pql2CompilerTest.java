@@ -391,7 +391,7 @@ public class Pql2CompilerTest {
     Pql2Compiler.ENABLE_PINOT_QUERY = true;
     Pql2Compiler.VALIDATE_CONVERTER = true;
     Pql2Compiler.FAIL_ON_CONVERSION_ERROR = true;
-    COMPILER.compileToBrokerRequest("Select * from T where a IN (1,2,3,4)");
+    COMPILER.compileToBrokerRequest("Select * from T where a IN (1,2,2,3,4)");
 
     COMPILER.compileToBrokerRequest("SELECT MIN(div(DaysSinceEpoch,2)) FROM mytable");
     COMPILER.compileToBrokerRequest(
