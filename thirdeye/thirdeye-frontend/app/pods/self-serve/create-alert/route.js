@@ -42,6 +42,16 @@ export default Route.extend({
       yaml: yamlAlertSettings
     };
     const moddedArray = [createGroup];
+    // get applications and map to array of vanilla objects
+    const applicationNames = this.get('store')
+      .peekAll('application')
+      .sortBy('application')
+      .map(app => {
+        return {
+          application: app.get('application')
+        };
+      });
+    // get subscription groups and map to array of vanilla objects
     const subscriptionGroups = this.get('store')
       .peekAll('subscription-groups')
       .sortBy('name')
@@ -50,7 +60,8 @@ export default Route.extend({
         return {
           name: group.get('name'),
           id: group.get('id'),
-          yaml: group.get('yaml')
+          yaml: group.get('yaml'),
+          application: group.get('application')
         };
       });
     const subscriptionGroupNamesDisplay = [...moddedArray, ...subscriptionGroups];
@@ -61,28 +72,15 @@ export default Route.extend({
       subscriptionYaml = firstGroup.yaml;
       groupName = firstGroup;
     }
-
     controller.setProperties({
       subscriptionGroupNames: model.subscriptionGroups,
       subscriptionGroupNamesDisplay,
+      allAlertsConfigGroups: subscriptionGroups,
       groupName,
       subscriptionYaml,
+      applicationNames,
       model
     });
-  },
-
-  /**
-   * Model hook for the create alert route.
-   * @method resetController
-   * @param {Object} controller - active controller
-   * @param {Boolean} isExiting - exit status
-   * @return {undefined}
-   */
-  resetController(controller, isExiting) {
-    this._super(...arguments);
-    if (isExiting) {
-      controller.clearAll();
-    }
   },
 
   /**
