@@ -34,8 +34,10 @@ public interface RowMetadata {
 
   /**
    * Return the timestamp associated with when the row was ingested upstream.
-   *
    * Expected to be mainly used for stream-based sources.
+   *
+   * @return timestamp (epoch in milliseconds) when the row was ingested upstream
+   *         Long.MIN_VALUE if not available
    */
   long getIngestionTimeMs();
 }
