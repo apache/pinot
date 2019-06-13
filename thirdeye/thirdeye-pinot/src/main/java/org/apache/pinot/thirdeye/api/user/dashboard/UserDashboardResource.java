@@ -246,7 +246,7 @@ public class UserDashboardResource {
       summary.setMetricId(metricId);
 
       if (metricId > 0) {
-        summary.setMetricUrn(this.getMetricUrn(anomaly));
+        summary.setMetricUrn(anomaly.getMetricUrn());
       }
 
       // TODO use alert filter if necessary
@@ -393,15 +393,5 @@ public class UserDashboardResource {
     } catch (Exception e) {
       return -1;
     }
-  }
-
-  /**
-   * Returns an URN matching the anomalies associated metric (and dimensions)
-   *
-   * @param anomaly anomaly dto
-   * @return metric urn
-   */
-  private String getMetricUrn(MergedAnomalyResultDTO anomaly) {
-    return MetricEntity.fromMetric(1.0, this.getMetricId(anomaly), ResourceUtils.getAnomalyFilters(anomaly, this.datasetDAO)).getUrn();
   }
 }
