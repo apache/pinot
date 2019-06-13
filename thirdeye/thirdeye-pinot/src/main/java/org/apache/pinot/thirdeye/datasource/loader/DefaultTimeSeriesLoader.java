@@ -47,8 +47,6 @@ import org.slf4j.LoggerFactory;
 
 public class DefaultTimeSeriesLoader implements TimeSeriesLoader {
   private static final Logger LOG = LoggerFactory.getLogger(DefaultTimeSeriesLoader.class);
-  // the maximum number of time series we fetch in one pinot query
-  private static final int BATCH_QUERY_MAX_SIZE = 50;
 
   private final MetricConfigManager metricDAO;
   private final DatasetConfigManager datasetDAO;
@@ -120,6 +118,7 @@ public class DefaultTimeSeriesLoader implements TimeSeriesLoader {
     for (MetricSlice slice: queryGroup.slices) {
       DataFrame result = df;
       for (Map.Entry<String, Collection<String>> entry: slice.getFilters().asMap().entrySet()){
+        // pick the result for the respective dimension values
         result = result.filter(result.getStrings(entry.getKey()).map(
             (Series.StringConditional) values -> entry.getValue().contains(values[0]))).dropNull(entry.getKey());
       }
@@ -173,32 +172,16 @@ public class DefaultTimeSeriesLoader implements TimeSeriesLoader {
       Map<Set<String>, List<MetricSlice>> groups = timeRangeAndMetricGroup.stream()
           .collect(Collectors.groupingBy(slice -> slice.getFilters().keySet(), Collectors.toList()));
 
-      for (List<MetricSlice> groupedSlices : groups.values()) {
-        Collection<List<MetricSlice>>  groupedSlicesWithAppropriateSize = enforceBatchSize(groupedSlices);
-        for (List<MetricSlice> metricSlices : groupedSlicesWithAppropriateSize) {
-          MetricSlice slice = metricSlices.stream().findFirst().get();
-          // create a query group for each group of slices with the same metric id, start time, end time, granularity
-          // but different dimension filters, so that we can fetch the data in one query
-          queryGroups.add(new QueryGroup(metricSlices, slice.getMetricId(), slice.getStart(), slice.getEnd(), slice.getGranularity(),
-                  new ArrayList<>(slice.getFilters().keySet())));
-        }
+      for (List<MetricSlice> metricSlices : groups.values()) {
+        MetricSlice slice = metricSlices.stream().findFirst().get();
+        // create a query group for each group of slices with the same metric id, start time, end time, granularity
+        // but different dimension filters, so that we can fetch the data in one query
+        queryGroups.add(
+            new QueryGroup(metricSlices, slice.getMetricId(), slice.getStart(), slice.getEnd(), slice.getGranularity(),
+                new ArrayList<>(slice.getFilters().keySet())));
       }
     }
     return queryGroups;
-  }
-
-  private Collection<List<MetricSlice>> enforceBatchSize(List<MetricSlice> groupedSlices){
-    if (groupedSlices.size() <= BATCH_QUERY_MAX_SIZE) {
-      return Collections.singleton(groupedSlices);
-    }
-    // if the group size is larger then the maximum allowed number, split the groups
-    Collection<List<MetricSlice>> groupedSlicesCollections = new ArrayList<>();
-    while (!groupedSlices.isEmpty()){
-      List<MetricSlice> slices = groupedSlices.stream().limit(BATCH_QUERY_MAX_SIZE).collect(Collectors.toList());
-      groupedSlicesCollections.add(slices);
-      groupedSlices.removeAll(slices);
-    }
-    return groupedSlicesCollections;
   }
 
   /**

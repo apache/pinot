@@ -138,10 +138,8 @@ public class DefaultDataProvider implements DataProvider {
           if (entry.getKey().containSlice(slice)){
             DataFrame df = entry.getValue().filter(entry.getValue().getLongs(COL_TIME).between(slice.getStart(), slice.getEnd())).dropNull(COL_TIME);
             // double check if it is cache hit
-            if (df.getLongs(COL_TIME).size() > 0) {
               output.put(slice, df);
               break;
-            }
           }
         }
       }

@@ -21,14 +21,19 @@ package org.apache.pinot.thirdeye.detection.algorithm;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
 import java.util.HashSet;
 import java.util.Set;
+import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
+import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.EvaluationDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.pojo.MetricConfigBean;
 import org.apache.pinot.thirdeye.datasource.comparison.Row;
 import org.apache.pinot.thirdeye.detection.ConfigUtils;
 import org.apache.pinot.thirdeye.detection.DataProvider;
@@ -81,6 +86,14 @@ public class DimensionWrapper extends DetectionPipeline {
   // Stop running if the first several dimension combinations all failed.
   private static final int EARLY_STOP_THRESHOLD = 10;
 
+  // the maximum number of time series we fetch in one query
+  private static final int BATCH_QUERY_MAX_SIZE = 50;
+  private static final long DEFAULT_CACHING_PERIOD_LOOKBACK = -1;
+  private static final long CACHING_PERIOD_LOOKBACK_DAILY = TimeUnit.DAYS.toMillis(90);
+  private static final long CACHING_PERIOD_LOOKBACK_HOURLY = TimeUnit.DAYS.toMillis(60);
+  // disable minute level cache warm up
+  private static final long CACHING_PERIOD_LOOKBACK_MINUTELY = -1;
+
   private final String metricUrn;
   private final int k;
   private final double minContribution;
@@ -93,7 +106,6 @@ public class DimensionWrapper extends DetectionPipeline {
   private final DateTimeZone timezone;
   private DateTime start;
   private DateTime end;
-  private final long cachingPeriodLookback;
 
   protected final String nestedMetricUrnKey;
   protected final List<String> dimensions;
@@ -134,8 +146,6 @@ public class DimensionWrapper extends DetectionPipeline {
     if (minStart.isBefore(this.start)) {
       this.start = minStart;
     }
-    this.cachingPeriodLookback = config.getProperties().containsKey(PROP_CACHE_PERIOD_LOOKBACK) ?
-        MapUtils.getLong(config.getProperties(), PROP_CACHE_PERIOD_LOOKBACK) : TimeUnit.DAYS.toMillis(90);
   }
 
   /**
@@ -229,42 +239,62 @@ public class DimensionWrapper extends DetectionPipeline {
           this.config.getId(), nestedMetrics.size(), MAX_DIMENSION_COMBINATIONS));
     }
 
-    // pre-fetch time series for multiple dimensions in one query
-    if (this.cachingPeriodLookback >= 0) {
-      this.provider.fetchTimeseries(nestedMetrics.stream().map(metricEntity -> MetricSlice.from(metricEntity.getId(), startTime - cachingPeriodLookback, endTime,
-          metricEntity.getFilters())).collect(Collectors.toList()));
-    }
-
     List<MergedAnomalyResultDTO> anomalies = new ArrayList<>();
     List<PredictionResult> predictionResults = new ArrayList<>();
     Map<String, Object> diagnostics = new HashMap<>();
     Set<Long> lastTimeStamps = new HashSet<>();
 
-    long totalNestedMetrics = nestedMetrics.size();
-    long successNestedMetrics = 0; // record the number of successfully explored dimensions
-    Exception lastException = null;
-    LOG.info("Run detection for {} metrics", totalNestedMetrics);
-    for (int i = 0; i < totalNestedMetrics; i++) {
-      checkEarlyStop(totalNestedMetrics, successNestedMetrics, i, lastException);
-      MetricEntity metric = nestedMetrics.get(i);
-      try {
-        LOG.info("running detection for metric urn {}. {}/{}", metric.getUrn(), i + 1, totalNestedMetrics);
-        for (Map<String, Object> properties : this.nestedProperties) {
-          DetectionPipelineResult intermediate = this.runNested(metric, properties);
-          lastTimeStamps.add(intermediate.getLastTimestamp());
-          anomalies.addAll(intermediate.getAnomalies());
-          diagnostics.put(metric.getUrn(), intermediate.getDiagnostics());
-          predictionResults.addAll(intermediate.getPredictions());
+    Map<Long, MetricConfigDTO> metricConfigs = this.provider.fetchMetrics(
+        nestedMetrics.stream().map(MetricEntity::getId).collect(Collectors.toSet()));
+    Map<String, DatasetConfigDTO> datasets = this.provider.fetchDatasets(
+        metricConfigs.values().stream().map(MetricConfigBean::getDataset).collect(Collectors.toSet()));
+    // group the metric entities by dataset
+    Map<DatasetConfigDTO, List<MetricEntity>> nestedMetricsByDataset = nestedMetrics.stream()
+        .collect(Collectors.groupingBy(metric -> datasets.get(metricConfigs.get(metric.getId()).getDataset()),
+            Collectors.toList()));
+
+    for (Map.Entry<DatasetConfigDTO, List<MetricEntity>> entry: nestedMetricsByDataset.entrySet()) {
+      long cachingPeriodLookback = this.config.getProperties().containsKey(PROP_CACHE_PERIOD_LOOKBACK) ?
+          MapUtils.getLong(config.getProperties(), PROP_CACHE_PERIOD_LOOKBACK) : getCachingPeriodLookback(entry.getKey().bucketTimeGranularity());
+
+      long totalNestedMetrics = entry.getValue().size();
+      long successNestedMetrics = 0; // record the number of successfully explored dimensions
+      long nestedMetricRun = 0; // record the number of metrics already run
+      Exception lastException = null;
+      LOG.info("Run detection for {} metrics", totalNestedMetrics);
+
+      List<List<MetricEntity>> metricEntityBatches = Lists.partition(entry.getValue(), BATCH_QUERY_MAX_SIZE);
+      for (List<MetricEntity> metricEntityBatch : metricEntityBatches) {
+        // pre-cache time series for each metric batch
+        this.provider.fetchTimeseries(metricEntityBatch.stream()
+            .map(metricEntity -> MetricSlice.from(metricEntity.getId(), startTime - cachingPeriodLookback, endTime,
+                metricEntity.getFilters()))
+            .collect(Collectors.toList()));
+
+        for (MetricEntity metric : metricEntityBatch) {
+          nestedMetricRun++;
+          checkEarlyStop(totalNestedMetrics, successNestedMetrics, nestedMetricRun, lastException);
+          try {
+            LOG.info("running detection for metric urn {}. {}/{}", metric.getUrn(), nestedMetricRun,
+                totalNestedMetrics);
+            for (Map<String, Object> properties : this.nestedProperties) {
+              DetectionPipelineResult intermediate = this.runNested(metric, properties);
+              lastTimeStamps.add(intermediate.getLastTimestamp());
+              anomalies.addAll(intermediate.getAnomalies());
+              diagnostics.put(metric.getUrn(), intermediate.getDiagnostics());
+              predictionResults.addAll(intermediate.getPredictions());
+            }
+            successNestedMetrics++;
+          } catch (Exception e) {
+            LOG.warn("[DetectionConfigID{}] detecting anomalies for window {} to {} failed for metric urn {}.",
+                this.config.getId(), this.start, this.end, metric.getUrn(), e);
+            lastException = e;
+          }
         }
-        successNestedMetrics++;
-      } catch (Exception e) {
-        LOG.warn("[DetectionConfigID{}] detecting anomalies for window {} to {} failed for metric urn {}.",
-            this.config.getId(), this.start, this.end, metric.getUrn(), e);
-        lastException = e;
+        checkNestedMetricsStatus(totalNestedMetrics, successNestedMetrics, lastException);
       }
     }
 
-    checkNestedMetricsStatus(totalNestedMetrics, successNestedMetrics, lastException);
     return new DetectionPipelineResult(anomalies, DetectionUtils.consolidateNestedLastTimeStamps(lastTimeStamps), predictionResults
     , calculateEvaluationMetrics(predictionResults))
         .setDiagnostics(diagnostics);
@@ -277,7 +307,7 @@ public class DimensionWrapper extends DetectionPipeline {
         .collect(Collectors.toList());
   }
 
-  private void checkEarlyStop(long totalNestedMetrics, long successNestedMetrics, int i, Exception lastException) throws DetectionPipelineException {
+  private void checkEarlyStop(long totalNestedMetrics, long successNestedMetrics, long i, Exception lastException) throws DetectionPipelineException {
     // if the first certain number of dimensions all failed, throw an exception
     if (i == EARLY_STOP_THRESHOLD && successNestedMetrics == 0) {
       throw new DetectionPipelineException(String.format(
@@ -326,4 +356,23 @@ public class DimensionWrapper extends DetectionPipeline {
 
     return pipeline.run();
   }
+
+  private static long getCachingPeriodLookback(TimeGranularity granularity) {
+    long period;
+    switch (granularity.getUnit()) {
+      case DAYS:
+        period = CACHING_PERIOD_LOOKBACK_DAILY;
+        break;
+      case HOURS:
+        period = CACHING_PERIOD_LOOKBACK_HOURLY;
+        break;
+      case MINUTES:
+        period = CACHING_PERIOD_LOOKBACK_MINUTELY;
+        break;
+      default:
+        period = DEFAULT_CACHING_PERIOD_LOOKBACK;
+    }
+    return period;
+  }
+
 }
