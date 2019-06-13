@@ -1,0 +1,2 @@
+LICENCE: all the source code provided by AOP Alliance is Public Domain.
+
