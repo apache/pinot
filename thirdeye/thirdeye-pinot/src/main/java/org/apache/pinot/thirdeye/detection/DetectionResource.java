@@ -148,6 +148,14 @@ public class DetectionResource {
     return Response.ok(config).build();
   }
 
+  @Path("/dataset")
+  @GET
+  @ApiOperation("get a dataset config by name")
+  public Response getDetectionAlertConfig(@ApiParam("the dataset name") @QueryParam("name") String name){
+    DatasetConfigDTO dataset = this.datasetDAO.findByDataset(name);
+    return Response.ok(dataset).build();
+  }
+
   @Path("/subscription-groups/{id}")
   @GET
   @ApiOperation("get a list of detection alert configs for a given detection config id")
@@ -242,7 +250,7 @@ public class DetectionResource {
     return Response.ok(gridSearch.bestDetectionConfig().getProperties()).build();
   }
 
-  @POST
+  @GET
   @Path("/preview/{id}")
   @ApiOperation("preview a detection with a existing detection config")
   public Response detectionPreview(
