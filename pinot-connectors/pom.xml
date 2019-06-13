@@ -32,12 +32,14 @@
   <artifactId>pinot-connectors</artifactId>
   <packaging>pom</packaging>
   <name>Pinot Connectors</name>
+  <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/..</pinot.root>
   </properties>
 
   <modules>
     <module>pinot-connector-kafka-0.9</module>
+    <module>pinot-connector-kafka-2.0</module>
   </modules>
 
   <dependencies>
