@@ -19,13 +19,12 @@
 package org.apache.pinot.server.realtime;
 
 import com.google.common.annotations.VisibleForTesting;
-import java.util.Map;
-import java.util.Set;
 import org.apache.helix.AccessOption;
 import org.apache.helix.BaseDataAccessor;
 import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
+import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.core.query.utils.Pair;
 import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
@@ -113,8 +112,9 @@ public class ControllerLeaderLocator {
    */
   private String getLeaderForTable(String rawTableName) {
     String leaderForTable;
-    ExternalView leadControllerResourceExternalView = _helixManager.getClusterManagmentTool().getResourceExternalView(_clusterName, LEAD_CONTROLLER_RESOURCE_NAME);
-    String partitionLeader = getPartitionLeader(leadControllerResourceExternalView, rawTableName);
+    ExternalView leadControllerResourceExternalView =
+        _helixManager.getClusterManagmentTool().getResourceExternalView(_clusterName, LEAD_CONTROLLER_RESOURCE_NAME);
+    String partitionLeader = HelixHelper.getLeadControllerForTable(leadControllerResourceExternalView, rawTableName);
     if (partitionLeader != null) {
       leaderForTable = partitionLeader;
     } else {
@@ -130,35 +130,6 @@ public class ControllerLeaderLocator {
   }
 
   /**
-   * Gets partition leader from lead controller resource.
-   * If the resource is disabled or no controller registered as participant, there is no instance in "MASTER" state.
-   *
-   * @param leadControllerResourceExternalView external view of lead controller resource
-   * @param rawTableName table name without type
-   * @return leader of partition, null if not found.
-   */
-  private String getPartitionLeader(ExternalView leadControllerResourceExternalView, String rawTableName) {
-    if (leadControllerResourceExternalView == null) {
-      return null;
-    }
-    Set<String> partitionSet = leadControllerResourceExternalView.getPartitionSet();
-    if (partitionSet == null || partitionSet.isEmpty()) {
-      return null;
-    }
-    int numPartitions = partitionSet.size();
-    int partitionIndex = rawTableName.hashCode() % numPartitions;
-    String partitionName = LEAD_CONTROLLER_RESOURCE_NAME + "_" + partitionIndex;
-    Map<String, String> stateMap = leadControllerResourceExternalView.getStateMap(partitionName);
-
-    for (Map.Entry<String, String> entry : stateMap.entrySet()) {
-      if ("MASTER".equals(entry.getValue())) {
-        return entry.getKey();
-      }
-    }
-    return null;
-  }
-
-  /**
    * Gets Helix leader in the cluster. Null if there is no leader.
    * @return Helix leader.
    */
@@ -166,9 +137,11 @@ public class ControllerLeaderLocator {
     BaseDataAccessor<ZNRecord> dataAccessor = _helixManager.getHelixDataAccessor().getBaseDataAccessor();
     Stat stat = new Stat();
     try {
-      ZNRecord znRecord = dataAccessor.get("/" + _clusterName + "/CONTROLLER/LEADER", stat, AccessOption.THROW_EXCEPTION_IFNOTEXIST);
+      ZNRecord znRecord =
+          dataAccessor.get("/" + _clusterName + "/CONTROLLER/LEADER", stat, AccessOption.THROW_EXCEPTION_IFNOTEXIST);
       String helixLeader = znRecord.getId();
-      LOGGER.info("Getting Helix leader: {} as per znode version {}, mtime {}", helixLeader, stat.getVersion(), stat.getMtime());
+      LOGGER.info("Getting Helix leader: {} as per znode version {}, mtime {}", helixLeader, stat.getVersion(),
+          stat.getMtime());
       return helixLeader;
     } catch (Exception e) {
       LOGGER.warn("Could not locate Helix leader", e);

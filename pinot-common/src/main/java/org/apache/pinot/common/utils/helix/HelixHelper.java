@@ -40,6 +40,7 @@ import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.HelixConfigScope.ConfigScopeProperty;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
+import org.apache.helix.model.MasterSlaveSMD;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.pinot.common.config.TagNameUtils;
 import org.apache.pinot.common.utils.CommonConstants;
@@ -48,6 +49,8 @@ import org.apache.pinot.common.utils.retry.RetryPolicies;
 import org.apache.pinot.common.utils.retry.RetryPolicy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.apache.pinot.common.utils.CommonConstants.Helix.LEAD_CONTROLLER_RESOURCE_NAME;
 
 
 public class HelixHelper {
@@ -499,5 +502,43 @@ public class HelixHelper {
    */
   public static Set<String> getBrokerInstancesForTenant(List<InstanceConfig> instanceConfigs, String tenant) {
     return new HashSet<>(HelixHelper.getInstancesWithTag(instanceConfigs, TagNameUtils.getBrokerTagForTenant(tenant)));
+  }
+
+  /**
+   * Gets hash code for table.
+   * @param rawTableName table name
+   * @return hash code
+   */
+  public static int getHashCodeForTable(String rawTableName) {
+    return rawTableName.hashCode();
+  }
+
+  /**
+   * Gets lead controller for table from lead controller resource.
+   * If the resource is disabled or no controller registered as participant, there is no instance in "MASTER" state.
+   * @param leadControllerResourceExternalView external view of lead controller resource
+   * @param rawTableName table name without type
+   * @return leader of partition, null if not found.
+   */
+  public static String getLeadControllerForTable(ExternalView leadControllerResourceExternalView,  String rawTableName) {
+    if (leadControllerResourceExternalView == null) {
+      return null;
+    }
+    Set<String> partitionSet = leadControllerResourceExternalView.getPartitionSet();
+    if (partitionSet == null || partitionSet.isEmpty()) {
+      return null;
+    }
+    int numPartitions = partitionSet.size();
+    int partitionIndex = getHashCodeForTable(rawTableName) % numPartitions;
+    String partitionName = LEAD_CONTROLLER_RESOURCE_NAME + "_" + partitionIndex;
+    Map<String, String> partitionStateMap = leadControllerResourceExternalView.getStateMap(partitionName);
+
+    // Get master host from partition map. Return null if no master found.
+    for (Map.Entry<String, String> entry : partitionStateMap.entrySet()) {
+      if (MasterSlaveSMD.States.MASTER.name().equals(entry.getValue())) {
+        return entry.getKey();
+      }
+    }
+    return null;
   }
 }

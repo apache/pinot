@@ -59,6 +59,7 @@ import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
 import org.apache.pinot.common.utils.JsonUtils;
 import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceUserConfigConstants;
 import org.apache.pinot.core.util.ReplicationUtils;
@@ -91,6 +92,9 @@ public class PinotTableRestletResource {
 
   @Inject
   PinotHelixResourceManager _pinotHelixResourceManager;
+
+  @Inject
+  LeadControllerManager _leadControllerManager;
 
   @Inject
   ControllerConf _controllerConf;
@@ -497,5 +501,14 @@ public class PinotTableRestletResource {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST);
     }
     return ResourceUtils.convertToJsonString(result);
+  }
+
+  @GET
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("/tables/{tableName}/controller")
+  @ApiOperation(value = "Gets the lead controller for the given table", notes = "Gets lead controller for the table")
+  public String getLeadControllerForTable(
+      @ApiParam(value = "Name of the table") @Nonnull @PathParam("tableName") String tableName) {
+    return _leadControllerManager.getLeadControllerForTable(tableName);
   }
 }

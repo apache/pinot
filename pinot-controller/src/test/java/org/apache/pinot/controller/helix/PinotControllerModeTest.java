@@ -23,6 +23,8 @@ import java.util.Set;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.MasterSlaveSMD;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.ControllerStarter;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -105,9 +107,9 @@ public class PinotControllerModeTest extends ControllerTest {
     stopController();
   }
 
-  // TODO: enable it after removing ControllerLeadershipManager which requires both CONTROLLER and PARTICIPANT
+  // TODO: enable it after removing HelixControllerLeadershipManager which requires both CONTROLLER and PARTICIPANT
   //       HelixManager
-  @Test(enabled = false)
+  @Test
   public void testPinotOnlyController() {
     ControllerConf firstPinotOnlyControllerConfig = getDefaultControllerConfiguration();
     firstPinotOnlyControllerConfig.setControllerMode(ControllerConf.ControllerMode.PINOT_ONLY);

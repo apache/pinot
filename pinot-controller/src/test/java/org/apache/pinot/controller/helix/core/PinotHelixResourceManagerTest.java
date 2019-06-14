@@ -38,6 +38,7 @@ import org.apache.helix.model.ClusterConfig;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
+import org.apache.helix.model.MasterSlaveSMD;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.config.TagNameUtils;
@@ -422,7 +423,7 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
         Map<String, String> stateMap = leadControllerResourceExternalView.getStateMap(partition);
         Map.Entry<String, String> entry = stateMap.entrySet().iterator().next();
         boolean result = (PREFIX_OF_CONTROLLER_INSTANCE + LOCAL_HOST + "_" + _controllerPort).equals(entry.getKey());
-        result &= "MASTER".equals(entry.getValue());
+        result &= MasterSlaveSMD.States.MASTER.name().equals(entry.getValue());
         if (!result) {
           return false;
         }
@@ -448,9 +449,9 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
       }
 
       LinkedHashMap<String, Integer> states = new LinkedHashMap<>(2);
-      states.put("OFFLINE", 0);
-      states.put("SLAVE", LEAD_CONTROLLER_RESOURCE_REPLICA_COUNT - 1);
-      states.put("MASTER", 1);
+      states.put(MasterSlaveSMD.States.OFFLINE.name(), 0);
+      states.put(MasterSlaveSMD.States.SLAVE.name(), LEAD_CONTROLLER_RESOURCE_REPLICA_COUNT - 1);
+      states.put(MasterSlaveSMD.States.MASTER.name(), 1);
 
       CrushEdRebalanceStrategy crushEdRebalanceStrategy = new CrushEdRebalanceStrategy();
       crushEdRebalanceStrategy.init(LEAD_CONTROLLER_RESOURCE_NAME, partitions, states, Integer.MAX_VALUE);
