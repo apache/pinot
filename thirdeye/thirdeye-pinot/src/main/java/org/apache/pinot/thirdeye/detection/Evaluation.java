@@ -38,7 +38,7 @@ public class Evaluation {
    * See https://en.wikipedia.org/wiki/Mean_absolute_percentage_error
    * @param current current time series
    * @param predicted baseline time series
-   * @return the mape value
+   * @return the addRegressionStatus value
    */
   public static double calculateMape(DoubleSeries current, DoubleSeries predicted) {
     if (current.contains(0.0)) {

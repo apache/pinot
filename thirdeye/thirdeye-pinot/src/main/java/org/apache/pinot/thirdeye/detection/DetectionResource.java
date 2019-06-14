@@ -19,11 +19,11 @@
 
 package org.apache.pinot.thirdeye.detection;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.collect.Multimaps;
-import io.swagger.annotations.Api;
-import io.swagger.annotations.ApiOperation;
-import io.swagger.annotations.ApiParam;
+import com.wordnik.swagger.annotations.Api;
+import com.wordnik.swagger.annotations.ApiOperation;
+import com.wordnik.swagger.annotations.ApiParam;
 import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -46,7 +46,6 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.apache.commons.collections4.MapUtils;
 import org.apache.pinot.thirdeye.api.Constants;
 import org.apache.pinot.thirdeye.constant.AnomalyFeedbackType;
 import org.apache.pinot.thirdeye.constant.AnomalyResultSource;
@@ -61,12 +60,12 @@ import org.apache.pinot.thirdeye.datalayer.bao.EvaluationManager;
 import org.apache.pinot.thirdeye.datalayer.bao.EventManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
+import org.apache.pinot.thirdeye.datalayer.bao.TaskManager;
 import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.util.Predicate;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
@@ -77,7 +76,6 @@ import org.apache.pinot.thirdeye.datasource.loader.TimeSeriesLoader;
 import org.apache.pinot.thirdeye.detection.finetune.GridSearchTuningAlgorithm;
 import org.apache.pinot.thirdeye.detection.finetune.TuningAlgorithm;
 import org.apache.pinot.thirdeye.detection.spi.model.AnomalySlice;
-import org.apache.pinot.thirdeye.detection.spi.model.TimeSeries;
 import org.apache.pinot.thirdeye.detector.function.BaseAnomalyFunction;
 import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
 import org.apache.pinot.thirdeye.util.AnomalyOffset;
@@ -109,6 +107,8 @@ public class DetectionResource {
   private final DataProvider provider;
   private final DetectionConfigManager configDAO;
   private final EvaluationManager evaluationDAO;
+  private final TaskManager taskDAO;
+
   private final DetectionAlertConfigManager detectionAlertConfigDAO;
 
   public DetectionResource() {
@@ -119,6 +119,7 @@ public class DetectionResource {
     this.configDAO = DAORegistry.getInstance().getDetectionConfigManager();
     this.detectionAlertConfigDAO = DAORegistry.getInstance().getDetectionAlertConfigManager();
     this.evaluationDAO = DAORegistry.getInstance().getEvaluationManager();
+    this.taskDAO = DAORegistry.getInstance().getTaskDAO();
 
     TimeSeriesLoader timeseriesLoader =
         new DefaultTimeSeriesLoader(metricDAO, datasetDAO, ThirdEyeCacheRegistry.getInstance().getQueryCache());
@@ -562,4 +563,19 @@ public class DetectionResource {
     return Response.ok(baselineTimeseries).build();
   }
 
+
+  @GET
+  @Path(value = "/health/{id}")
+  @ApiOperation("Get the detection health metrics and statuses for a detection config")
+  public Response getDetectionHealth(@PathParam("id") @ApiParam("detection config id") long id,
+      @ApiParam("Start time for the the health metric") @QueryParam("start") long start,
+      @ApiParam("End time for the the health metric") @QueryParam("end") long end,
+      @ApiParam("Max number of detection tasks returned") @QueryParam("limit") @DefaultValue("500") long limit) throws JsonProcessingException {
+    DetectionHealth health = new DetectionHealth.Builder(id, start, end).addRegressionStatus(this.evaluationDAO)
+        .addAnomalyCoverageStatus(this.anomalyDAO)
+        .addDetectionTaskStatus(this.taskDAO, limit)
+        .addOverallHealth()
+        .build();
+    return Response.ok(health).build();
+  }
 }
