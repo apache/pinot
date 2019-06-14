@@ -51,10 +51,15 @@ public class DetectionHealth {
   }
 
   public static class RegressionStatus {
+    // the average mape for each detector
     @JsonProperty
     private Map<String, Double> detectorMapes;
+
+    // the health status for each detector
     @JsonProperty
     private Map<String, HealthStatus> detectorHealthStatus;
+
+    // the overall regression health for the detection config
     @JsonProperty
     private HealthStatus healthStatus;
 
@@ -72,8 +77,11 @@ public class DetectionHealth {
   }
 
   public static class AnomalyCoverageStatus {
+    // the anomaly coverage ratio. the percentage of anomalous duration in the duration of the whole window
     @JsonProperty
     private double anomalyCoverageRatio;
+
+    // the health status of the anomaly coverage ratio
     @JsonProperty
     private HealthStatus healthStatus;
 
@@ -87,10 +95,16 @@ public class DetectionHealth {
   }
 
   public static class DetectionTaskStatus {
+
+    // the task success rate for the detection config
     @JsonProperty
     private double taskSuccessRate;
+
+    // the health status for the detection tasks
     @JsonProperty
     private HealthStatus healthStatus;
+
+    // the list of tasks for the detection config
     @JsonProperty
     private List<TaskDTO> tasks;
 
@@ -136,6 +150,7 @@ public class DetectionHealth {
     private long taskLimit;
     private boolean provideOverallHealth;
 
+    // database column name constants
     private static String COL_NAME_START_TIME = "startTime";
     private static String COL_NAME_END_TIME = "endTime";
     private static String COL_NAME_DETECTION_CONFIG_ID = "detectionConfigId";
@@ -151,7 +166,7 @@ public class DetectionHealth {
     }
 
     /**
-     * Add the regression health status in the health report
+     * Add the regression health status in the health report built by the builder
      * @param evaluationDAO the evaluation dao
      * @return the builder
      */
@@ -161,7 +176,7 @@ public class DetectionHealth {
     }
 
     /**
-     * Add the anomaly coverage health status in the health report
+     * Add the anomaly coverage health status in the health report built by the builder
      * @param anomalyDAO the anomaly dao
      * @return the builder
      */
@@ -171,7 +186,7 @@ public class DetectionHealth {
     }
 
     /**
-     * Add the detection task health status in the health report
+     * Add the detection task health status in the health report built by the builder
      * @param taskDAO the task dao
      * @param limit the maximum number of tasks returned in the health report (ordered by task start time, latest task first)
      * @return the builder
@@ -183,7 +198,7 @@ public class DetectionHealth {
     }
 
     /**
-     * Add the global health status in the report
+     * Add the global health status in the report built by the builder, consider regression health, coverage ratio and task health
      * @return the builder
      */
     public Builder addOverallHealth() {
@@ -191,6 +206,10 @@ public class DetectionHealth {
       return this;
     }
 
+    /**
+     * Build the health status object
+     * @return the health status object
+     */
     public DetectionHealth build() {
       DetectionHealth health = new DetectionHealth();
       if (this.evaluationDAO != null) {
@@ -240,6 +259,11 @@ public class DetectionHealth {
       return HealthStatus.BAD;
     }
 
+    /**
+     * Classify the regression status of the detection config based on the health status for each detector
+     * @param detectorHealthStatus the health status for each detector
+     * @return the overall regression status
+     */
     private static HealthStatus classifyOverallRegressionStatus(Map<String, HealthStatus> detectorHealthStatus) {
       if (detectorHealthStatus.values().contains(HealthStatus.GOOD)) {
         return HealthStatus.GOOD;
@@ -257,7 +281,7 @@ public class DetectionHealth {
               Predicate.EQ(COL_NAME_DETECTION_CONFIG_ID, detectionConfigId)));
       anomalies = anomalies.stream().filter(anomaly -> !anomaly.isChild()).collect(Collectors.toList());
 
-      // merge the anomaly range for sub-dimensions if possible
+      // the anomalies can come from different sub-dimensions, merge the anomaly range if possible
       List<Interval> intervals = new ArrayList<>();
       if (!anomalies.isEmpty()) {
         anomalies.sort(Comparator.comparingLong(MergedAnomalyResultBean::getStartTime));
@@ -310,9 +334,11 @@ public class DetectionHealth {
       Map<TaskConstants.TaskStatus, Long> count =
           tasks.stream().collect(Collectors.groupingBy(TaskBean::getStatus, Collectors.counting()));
       if (count.size() != 0) {
-        taskStatus.taskSuccessRate = (double) count.getOrDefault(TaskConstants.TaskStatus.COMPLETED, 0L) / (
-            count.getOrDefault(TaskConstants.TaskStatus.COMPLETED, 0L) + count.getOrDefault(
-                TaskConstants.TaskStatus.FAILED, 0L) + count.getOrDefault(TaskConstants.TaskStatus.TIMEOUT, 0L));
+        long completedTasks = count.getOrDefault(TaskConstants.TaskStatus.COMPLETED, 0L);
+        long failedTasks = count.getOrDefault(
+            TaskConstants.TaskStatus.FAILED, 0L);
+        long timeoutTasks = count.getOrDefault(TaskConstants.TaskStatus.TIMEOUT, 0L);
+        taskStatus.taskSuccessRate = (double) completedTasks / (failedTasks +  timeoutTasks + completedTasks);
       }
       taskStatus.healthStatus = classifyTaskStatus(taskStatus.taskSuccessRate);
       return taskStatus;

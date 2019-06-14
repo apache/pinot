@@ -117,7 +117,7 @@ public class DetectionJobScheduler implements Runnable {
         DateTimeZone dateTimeZone = Utils.getDataTimeZone(dataset);
         DateTime currentDateTime = new DateTime(dateTimeZone);
 
-        // find last entry into addDetectionTaskStatus table, for this function
+        // find last entry into detectionStatus table, for this function
         DetectionStatusDTO lastEntryForFunction = DAO_REGISTRY.getDetectionStatusDAO().
             findLatestEntryForFunctionId(functionId);
         LOG.info("Function: {} Dataset: {} Last entry is {}", functionId, dataset, lastEntryForFunction);
