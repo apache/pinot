@@ -355,7 +355,7 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             metadataToOverwrite.setEndTime(segEndTime);
             metadataToOverwrite.setTimeUnit(timeUnit);
             metadataToOverwrite.setTotalRawDocs(realtimeSegment.getNumDocsIndexed());
-            notifier.notifySegmentCommitted(metadataToOverwrite, segment);
+            notifier.notifySegmentCommitted(tableNameWithType, metadataToOverwrite, segment);
             segmentLogger
                 .info("Completed write of segment completion to Helix, waiting for controller to assign a new segment");
           } catch (Exception e) {

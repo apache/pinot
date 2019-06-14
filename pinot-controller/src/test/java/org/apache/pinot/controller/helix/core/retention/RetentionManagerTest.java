@@ -299,7 +299,6 @@ public class RetentionManagerTest {
     segmentMetadata.setEndOffset(-1L);
 
     segmentMetadata.setNumReplicas(replicaCount);
-    segmentMetadata.setTableName(TEST_TABLE_NAME);
     return segmentMetadata;
   }
 

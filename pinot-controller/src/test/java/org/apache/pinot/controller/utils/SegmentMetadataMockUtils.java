@@ -39,7 +39,6 @@ public class SegmentMetadataMockUtils {
   public static SegmentMetadata mockSegmentMetadata(String tableName, String segmentName, int numTotalDocs,
       String crc) {
     SegmentMetadata segmentMetadata = Mockito.mock(SegmentMetadata.class);
-    Mockito.when(segmentMetadata.getTableName()).thenReturn(tableName);
     Mockito.when(segmentMetadata.getName()).thenReturn(segmentName);
     Mockito.when(segmentMetadata.getTotalDocs()).thenReturn(numTotalDocs);
     Mockito.when(segmentMetadata.getTotalRawDocs()).thenReturn(numTotalDocs);
@@ -65,7 +64,6 @@ public class SegmentMetadataMockUtils {
   public static RealtimeSegmentZKMetadata mockRealtimeSegmentZKMetadata(String tableName, String segmentName,
       long numTotalDocs) {
     RealtimeSegmentZKMetadata realtimeSegmentZKMetadata = Mockito.mock(RealtimeSegmentZKMetadata.class);
-    Mockito.when(realtimeSegmentZKMetadata.getTableName()).thenReturn(tableName);
     Mockito.when(realtimeSegmentZKMetadata.getSegmentName()).thenReturn(segmentName);
     Mockito.when(realtimeSegmentZKMetadata.getTotalRawDocs()).thenReturn(numTotalDocs);
     return realtimeSegmentZKMetadata;
@@ -81,7 +79,6 @@ public class SegmentMetadataMockUtils {
     if (columnName != null) {
       when(segmentMetadata.getColumnMetadataFor(columnName)).thenReturn(columnMetadata);
     }
-    when(segmentMetadata.getTableName()).thenReturn(tableName);
     when(segmentMetadata.getName()).thenReturn(segmentName);
     when(segmentMetadata.getCrc()).thenReturn("0");
     return segmentMetadata;
@@ -89,7 +86,6 @@ public class SegmentMetadataMockUtils {
 
   public static SegmentMetadata mockSegmentMetadataWithEndTimeInfo(String tableName, String segmentName, long endTime) {
     SegmentMetadata segmentMetadata = Mockito.mock(SegmentMetadata.class);
-    Mockito.when(segmentMetadata.getTableName()).thenReturn(tableName);
     Mockito.when(segmentMetadata.getName()).thenReturn(segmentName);
     Mockito.when(segmentMetadata.getTotalDocs()).thenReturn(0);
     Mockito.when(segmentMetadata.getTotalRawDocs()).thenReturn(0);

@@ -82,7 +82,6 @@ public class V1Constants {
       public static final String SEGMENT_CREATOR_VERSION = "creator.version";
       public static final String SEGMENT_NAME = "segment.name";
       public static final String SEGMENT_VERSION = "segment.index.version";
-      public static final String TABLE_NAME = "segment.table.name";
       public static final String DIMENSIONS = "segment.dimension.column.names";
       public static final String METRICS = "segment.metric.column.names";
       public static final String UNKNOWN_COLUMNS = "segment.unknown.column.names";
@@ -108,6 +107,9 @@ public class V1Constants {
       public static final String SEGMENT_START_TIME = "segment.start.time";
       public static final String SEGMENT_END_TIME = "segment.end.time";
       public static final String SEGMENT_TIME_GRANULARITY = "segment.time.granularity";
+
+      // TODO: Deprecate this after removing table name from segment metadata
+      public static final String TABLE_NAME = "segment.table.name";
     }
 
     public static class Column {

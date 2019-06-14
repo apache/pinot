@@ -71,7 +71,6 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
   private final File _indexDir;
   private final Map<String, ColumnMetadata> _columnMetadataMap;
-  private String _tableName;
   private String _segmentName;
   private final Set<String> _allColumns;
   private final Schema _schema;
@@ -99,6 +98,9 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   private int _totalRawDocs;
   private long _segmentStartTime;
   private long _segmentEndTime;
+
+  // TODO: deprecate table name from segment metadata
+  private String _tableName;
 
   /**
    * For segments on disk.
@@ -240,6 +242,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
     //set the table name
     _tableName = segmentMetadataPropertiesConfiguration.getString(TABLE_NAME);
+
     // Set segment name.
     _segmentName = segmentMetadataPropertiesConfiguration.getString(SEGMENT_NAME);
 

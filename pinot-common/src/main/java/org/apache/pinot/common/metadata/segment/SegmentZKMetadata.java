@@ -46,7 +46,6 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
   protected static final String NULL = "null";
 
   private String _segmentName;
-  private String _tableName;
   private SegmentType _segmentType;
   private long _startTime = -1;
   private long _endTime = -1;
@@ -61,6 +60,9 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
   private long _segmentUploadStartTime = -1;
   private Map<String, String> _customMap;
   private String _crypterName;
+
+  @Deprecated
+  private String _tableName;
 
   public SegmentZKMetadata() {
   }
@@ -103,10 +105,12 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
     _segmentName = segmentName;
   }
 
+  @Deprecated
   public String getTableName() {
     return _tableName;
   }
 
+  @Deprecated
   public void setTableName(String tableName) {
     _tableName = tableName;
   }
@@ -266,7 +270,10 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
   public ZNRecord toZNRecord() {
     ZNRecord znRecord = new ZNRecord(_segmentName);
     znRecord.setSimpleField(CommonConstants.Segment.SEGMENT_NAME, _segmentName);
-    znRecord.setSimpleField(CommonConstants.Segment.TABLE_NAME, _tableName);
+
+    if (_tableName != null) {
+      znRecord.setSimpleField(CommonConstants.Segment.TABLE_NAME, _tableName);
+    }
 
     if (_crypterName != null) {
       znRecord.setSimpleField(CommonConstants.Segment.CRYPTER_NAME, _crypterName);
@@ -308,7 +315,9 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
   public Map<String, String> toMap() {
     Map<String, String> configMap = new HashMap<>();
     configMap.put(CommonConstants.Segment.SEGMENT_NAME, _segmentName);
-    configMap.put(CommonConstants.Segment.TABLE_NAME, _tableName);
+    if (_tableName != null) {
+      configMap.put(CommonConstants.Segment.TABLE_NAME, _tableName);
+    }
     configMap.put(CommonConstants.Segment.SEGMENT_TYPE, _segmentType.toString());
     if (_timeUnit == null) {
       configMap.put(CommonConstants.Segment.TIME_UNIT, null);

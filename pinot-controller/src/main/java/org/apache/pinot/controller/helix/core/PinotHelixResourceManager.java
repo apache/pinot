@@ -1595,7 +1595,7 @@ public class PinotHelixResourceManager {
     offlineSegmentZKMetadata.setDownloadUrl(downloadUrl);
     offlineSegmentZKMetadata.setCrypterName(crypter);
     offlineSegmentZKMetadata.setPushTime(System.currentTimeMillis());
-    if (!ZKMetadataProvider.setOfflineSegmentZKMetadata(_propertyStore, offlineSegmentZKMetadata)) {
+    if (!ZKMetadataProvider.setOfflineSegmentZKMetadata(_propertyStore, offlineTableName, offlineSegmentZKMetadata)) {
       throw new RuntimeException(
           "Failed to set segment ZK metadata for table: " + offlineTableName + ", segment: " + segmentName);
     }
@@ -1610,12 +1610,14 @@ public class PinotHelixResourceManager {
         ZKMetadataProvider.constructPropertyStorePathForSegment(tableNameWithType, segmentName));
   }
 
-  public boolean updateZkMetadata(@Nonnull OfflineSegmentZKMetadata segmentMetadata, int expectedVersion) {
-    return ZKMetadataProvider.setOfflineSegmentZKMetadata(_propertyStore, segmentMetadata, expectedVersion);
+  public boolean updateZkMetadata(@Nonnull String offlineTableName, @Nonnull OfflineSegmentZKMetadata segmentMetadata,
+      int expectedVersion) {
+    return ZKMetadataProvider
+        .setOfflineSegmentZKMetadata(_propertyStore, offlineTableName, segmentMetadata, expectedVersion);
   }
 
-  public boolean updateZkMetadata(@Nonnull OfflineSegmentZKMetadata segmentMetadata) {
-    return ZKMetadataProvider.setOfflineSegmentZKMetadata(_propertyStore, segmentMetadata);
+  public boolean updateZkMetadata(@Nonnull String offlineTableName, @Nonnull OfflineSegmentZKMetadata segmentMetadata) {
+    return ZKMetadataProvider.setOfflineSegmentZKMetadata(_propertyStore, offlineTableName, segmentMetadata);
   }
 
   public void refreshSegment(@Nonnull String offlineTableName, @Nonnull SegmentMetadata segmentMetadata,
@@ -1627,7 +1629,7 @@ public class PinotHelixResourceManager {
     // segment or load from local
     offlineSegmentZKMetadata = ZKMetadataUtils.updateSegmentMetadata(offlineSegmentZKMetadata, segmentMetadata);
     offlineSegmentZKMetadata.setRefreshTime(System.currentTimeMillis());
-    if (!ZKMetadataProvider.setOfflineSegmentZKMetadata(_propertyStore, offlineSegmentZKMetadata)) {
+    if (!ZKMetadataProvider.setOfflineSegmentZKMetadata(_propertyStore, offlineTableName, offlineSegmentZKMetadata)) {
       throw new RuntimeException(
           "Failed to update ZK metadata for segment: " + segmentName + " of table: " + offlineTableName);
     }
