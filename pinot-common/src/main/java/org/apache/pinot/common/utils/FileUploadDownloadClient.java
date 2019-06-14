@@ -28,6 +28,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -55,6 +56,7 @@ import org.apache.http.entity.mime.content.FileBody;
 import org.apache.http.entity.mime.content.InputStreamBody;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
+import org.apache.http.message.BasicHeader;
 import org.apache.http.util.EntityUtils;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.slf4j.Logger;
@@ -522,6 +524,28 @@ public class FileUploadDownloadClient implements Closeable {
   }
 
   /**
+   * Upload segment with segment file. Include table name and segment name headers.
+   *
+   * @param uri URI
+   * @param segmentName Segment name
+   * @param inputStream Segment file input stream
+   * @param rawTableName Raw table name
+   * @return Response
+   * @throws IOException
+   * @throws HttpErrorStatusException
+   */
+  public SimpleHttpResponse uploadSegmentWithTableAndSegmentNameHeader(URI uri, String segmentName,
+      InputStream inputStream, String rawTableName)
+      throws IOException, HttpErrorStatusException {
+    // Add table and segment name to headers
+    Header tableNameHeader = new BasicHeader(CommonConstants.Controller.TABLE_NAME_HTTP_HEADER, rawTableName);
+    Header segmentNameHeader = new BasicHeader(CommonConstants.Controller.SEGMENT_NAME_HTTP_HEADER, segmentName);
+    List<Header> headers = Arrays.asList(tableNameHeader, segmentNameHeader);
+    return sendRequest(
+        getUploadSegmentRequest(uri, segmentName, inputStream, headers, null, DEFAULT_SOCKET_TIMEOUT_MS));
+  }
+
+  /**
    * Send segment uri.
    *
    * @param uri URI
@@ -551,6 +575,27 @@ public class FileUploadDownloadClient implements Closeable {
   public SimpleHttpResponse sendSegmentUri(URI uri, String downloadUri)
       throws IOException, HttpErrorStatusException {
     return sendSegmentUri(uri, downloadUri, null, null, DEFAULT_SOCKET_TIMEOUT_MS);
+  }
+
+  /**
+   * Send segment uri with table name header. Include table name and segment name headers.
+   *
+   * @param uri URI
+   * @param downloadUri Segment download uri
+   * @param rawTableName Raw table name
+   * @return Response
+   * @throws IOException
+   * @throws HttpErrorStatusException
+   */
+  public SimpleHttpResponse sendSegmentUriWithTableAndSegmentNameHeader(URI uri, String downloadUri,
+      String rawTableName)
+      throws IOException, HttpErrorStatusException {
+    // Add table name to headers
+    Header tableNameHeader = new BasicHeader(CommonConstants.Controller.TABLE_NAME_HTTP_HEADER, rawTableName);
+
+    // TODO: add segment name to headers
+    List<Header> headers = Arrays.asList(tableNameHeader);
+    return sendRequest(getSendSegmentUriRequest(uri, downloadUri, headers, null, DEFAULT_SOCKET_TIMEOUT_MS));
   }
 
   /**

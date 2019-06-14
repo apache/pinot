@@ -105,9 +105,9 @@ public class DefaultControllerRestApi implements ControllerRestApi {
       for (PushLocation pushLocation : _pushLocations) {
         LOGGER.info("Pushing segment: {} to location: {}", segmentName, pushLocation);
         try (InputStream inputStream = fileSystem.open(tarFilePath)) {
-          SimpleHttpResponse response = _fileUploadDownloadClient.uploadSegment(
+          SimpleHttpResponse response = _fileUploadDownloadClient.uploadSegmentWithTableAndSegmentNameHeader(
               FileUploadDownloadClient.getUploadSegmentHttpURI(pushLocation.getHost(), pushLocation.getPort()),
-              segmentName, inputStream);
+              segmentName, inputStream, _rawTableName);
           LOGGER.info("Response {}: {}", response.getStatusCode(), response.getResponse());
         } catch (Exception e) {
           LOGGER.error("Caught exception while pushing segment: {} to location: {}", segmentName, pushLocation, e);
@@ -124,9 +124,9 @@ public class DefaultControllerRestApi implements ControllerRestApi {
       for (PushLocation pushLocation : _pushLocations) {
         LOGGER.info("Sending segment URI: {} to location: {}", segmentUri, pushLocation);
         try {
-          SimpleHttpResponse response = _fileUploadDownloadClient.sendSegmentUri(
+          SimpleHttpResponse response = _fileUploadDownloadClient.sendSegmentUriWithTableAndSegmentNameHeader(
               FileUploadDownloadClient.getUploadSegmentHttpURI(pushLocation.getHost(), pushLocation.getPort()),
-              segmentUri);
+              segmentUri, _rawTableName);
           LOGGER.info("Response {}: {}", response.getStatusCode(), response.getResponse());
         } catch (Exception e) {
           LOGGER.error("Caught exception while sending segment URI: {} to location: {}", segmentUri, pushLocation, e);

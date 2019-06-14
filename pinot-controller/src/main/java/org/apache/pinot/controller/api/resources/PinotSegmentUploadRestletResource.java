@@ -20,6 +20,7 @@ package org.apache.pinot.controller.api.resources;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.google.common.base.Preconditions;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
@@ -233,7 +234,6 @@ public class PinotSegmentUploadRestletResource {
   private SuccessResponse uploadSegment(FormDataMultiPart multiPart, boolean enableParallelPushProtection,
       HttpHeaders headers, Request request, boolean moveSegmentToFinalLocation) {
     if (headers != null) {
-      // TODO: Add these headers into open source hadoop jobs
       LOGGER.info("HTTP Header {} is {}", CommonConstants.Controller.SEGMENT_NAME_HTTP_HEADER,
           headers.getRequestHeader(CommonConstants.Controller.SEGMENT_NAME_HTTP_HEADER));
       LOGGER.info("HTTP Header {} is {}", CommonConstants.Controller.TABLE_NAME_HTTP_HEADER,
@@ -288,7 +288,15 @@ public class PinotSegmentUploadRestletResource {
           throw new UnsupportedOperationException("Unsupported upload type: " + uploadType);
       }
 
-      String rawTableName = segmentMetadata.getTableName();
+      // Fetch raw table name. Try to derive the table name from the header and then from segment metadata
+      String rawTableName;
+      List<String> tableNameHeader = headers.getRequestHeader(CommonConstants.Controller.TABLE_NAME_HTTP_HEADER);
+      if (tableNameHeader != null) {
+        Preconditions.checkState(tableNameHeader.size() == 1);
+        rawTableName = headers.getRequestHeader(CommonConstants.Controller.TABLE_NAME_HTTP_HEADER).get(0);
+      } else {
+        rawTableName = segmentMetadata.getTableName();
+      }
       String segmentName = segmentMetadata.getName();
 
       String zkDownloadUri;

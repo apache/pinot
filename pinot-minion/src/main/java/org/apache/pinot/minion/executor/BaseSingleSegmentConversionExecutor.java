@@ -32,8 +32,10 @@ import org.apache.http.NameValuePair;
 import org.apache.http.message.BasicHeader;
 import org.apache.http.message.BasicNameValuePair;
 import org.apache.pinot.common.config.PinotTaskConfig;
+import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
 import org.apache.pinot.common.segment.fetcher.SegmentFetcherFactory;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.core.common.MinionConstants;
@@ -135,7 +137,13 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
           new BasicHeader(FileUploadDownloadClient.CustomHeaders.SEGMENT_ZK_METADATA_CUSTOM_MAP_MODIFIER,
               segmentZKMetadataCustomMapModifier.toJsonString());
 
-      List<Header> httpHeaders = Arrays.asList(ifMatchHeader, segmentZKMetadataCustomMapModifierHeader);
+      // Add table name and segment name to headers
+      Header tableNameHeader = new BasicHeader(CommonConstants.Controller.TABLE_NAME_HTTP_HEADER,
+          TableNameBuilder.extractRawTableName(tableNameWithType));
+      Header segmentNameHeader = new BasicHeader(CommonConstants.Controller.SEGMENT_NAME_HTTP_HEADER, segmentName);
+
+      List<Header> httpHeaders =
+          Arrays.asList(ifMatchHeader, segmentZKMetadataCustomMapModifierHeader, tableNameHeader, segmentNameHeader);
 
       // Set parameters for upload request.
       List<NameValuePair> parameters = Collections.singletonList(

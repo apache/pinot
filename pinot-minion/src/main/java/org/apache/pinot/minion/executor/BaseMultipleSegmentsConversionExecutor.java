@@ -21,16 +21,21 @@ package org.apache.pinot.minion.executor;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import javax.annotation.Nonnull;
 import org.apache.commons.io.FileUtils;
+import org.apache.http.Header;
 import org.apache.http.NameValuePair;
+import org.apache.http.message.BasicHeader;
 import org.apache.http.message.BasicNameValuePair;
 import org.apache.pinot.common.config.PinotTaskConfig;
+import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.segment.fetcher.SegmentFetcherFactory;
+import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.core.common.MinionConstants;
@@ -131,12 +136,21 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
         File convertedTarredSegmentFile = tarredSegmentFiles.get(i);
         String resultSegmentName = segmentConversionResults.get(i).getSegmentName();
 
+        // Add table name and segment name to headers
+        Header tableNameHeader = new BasicHeader(CommonConstants.Controller.TABLE_NAME_HTTP_HEADER,
+            TableNameBuilder.extractRawTableName(tableNameWithType));
+        Header segmentNameHeader =
+            new BasicHeader(CommonConstants.Controller.SEGMENT_NAME_HTTP_HEADER, resultSegmentName);
+
+        List<Header> httpHeaders = Arrays.asList(tableNameHeader, segmentNameHeader);
+
         // Set parameters for upload request
         List<NameValuePair> parameters = Collections.singletonList(
             new BasicNameValuePair(FileUploadDownloadClient.QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION, "true"));
 
-        SegmentConversionUtils.uploadSegment(configs, null, parameters, tableNameWithType, resultSegmentName, uploadURL,
-            convertedTarredSegmentFile);
+        SegmentConversionUtils
+            .uploadSegment(configs, httpHeaders, parameters, tableNameWithType, resultSegmentName, uploadURL,
+                convertedTarredSegmentFile);
       }
 
       String outputSegmentNames = segmentConversionResults.stream().map(SegmentConversionResult::getSegmentName)

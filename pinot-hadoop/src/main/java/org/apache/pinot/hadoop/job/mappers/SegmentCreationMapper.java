@@ -89,7 +89,7 @@ public class SegmentCreationMapper extends Mapper<LongWritable, Text, LongWritab
     _jobConf = context.getConfiguration();
     logConfigurations();
 
-    _rawTableName = Preconditions.checkNotNull(_jobConf.get(JobConfigConstants.SEGMENT_TABLE_NAME));
+    _rawTableName = _jobConf.get(JobConfigConstants.SEGMENT_TABLE_NAME);
     _schema = Schema.fromString(_jobConf.get(JobConfigConstants.SCHEMA));
 
     // Optional
