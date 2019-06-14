@@ -60,6 +60,10 @@ public class VarLengthBytesValueReaderWriter implements Closeable, ValueReader {
   private final PinotDataBuffer _dataBuffer;
   private transient int _numElements;
 
+  public VarLengthBytesValueReaderWriter(PinotDataBuffer dataBuffer) {
+    this._dataBuffer = dataBuffer;
+  }
+
   public static long getRequiredSize(byte[][] byteArrays) {
     // First include the magic header, length field and offsets array.
     long length = INDEX_ARRAY_START_OFFSET + Integer.BYTES * (byteArrays.length);
@@ -84,10 +88,6 @@ public class VarLengthBytesValueReaderWriter implements Closeable, ValueReader {
     }
 
     return false;
-  }
-
-  public VarLengthBytesValueReaderWriter(PinotDataBuffer dataBuffer) {
-    this._dataBuffer = dataBuffer;
   }
 
   private void writeHeader() {

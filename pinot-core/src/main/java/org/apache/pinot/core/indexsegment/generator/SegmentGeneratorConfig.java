@@ -285,8 +285,8 @@ public class SegmentGeneratorConfig {
     return _varLengthDictionaryColumns;
   }
 
-  public void setVarLengthDictionaryColumns(List<String> _varLengthDictionaryColumns) {
-    this._varLengthDictionaryColumns = _varLengthDictionaryColumns;
+  public void setVarLengthDictionaryColumns(List<String> varLengthDictionaryColumns) {
+    this._varLengthDictionaryColumns = varLengthDictionaryColumns;
   }
 
   public void createInvertedIndexForColumn(String column) {
