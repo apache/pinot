@@ -388,7 +388,6 @@ public class KafkaConnectionHandler {
     final Errors kafkaError = Errors.forCode(kafkaErrorCode);
     switch (kafkaError) {
       case UNKNOWN:
-      case OFFSET_OUT_OF_RANGE:
       case CORRUPT_MESSAGE:
       case MESSAGE_TOO_LARGE:
       case OFFSET_METADATA_TOO_LARGE:
@@ -402,6 +401,7 @@ public class KafkaConnectionHandler {
       case INVALID_SESSION_TIMEOUT:
       case INVALID_COMMIT_OFFSET_SIZE:
         return new PermanentConsumerException(new KafkaPermanentConsumerException(kafkaError));
+      case OFFSET_OUT_OF_RANGE:
       case UNKNOWN_TOPIC_OR_PARTITION:
       case LEADER_NOT_AVAILABLE:
       case NOT_LEADER_FOR_PARTITION:
