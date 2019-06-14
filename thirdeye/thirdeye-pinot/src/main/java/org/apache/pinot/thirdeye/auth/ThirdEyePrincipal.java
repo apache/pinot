@@ -29,6 +29,15 @@ public class ThirdEyePrincipal implements Principal {
   Set<String> groups = new HashSet<>();
   String sessionKey;
 
+  public ThirdEyePrincipal(String name, String token) {
+    this.name = name;
+    this.sessionKey = token;
+  }
+
+  public ThirdEyePrincipal() {
+
+  }
+
   public String getSessionKey() {
     return sessionKey;
   }

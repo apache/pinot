@@ -21,15 +21,17 @@ package org.apache.pinot.thirdeye.dashboard;
 
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.google.common.cache.CacheBuilder;
+import io.dropwizard.auth.AuthValueFactoryProvider;
+import io.dropwizard.auth.Authenticator;
 import org.apache.pinot.thirdeye.anomaly.detection.DetectionJobScheduler;
 import org.apache.pinot.thirdeye.anomaly.onboard.DetectionOnboardResource;
 import org.apache.pinot.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutotuneFactory;
 import org.apache.pinot.thirdeye.api.application.ApplicationResource;
+import org.apache.pinot.thirdeye.auth.ThirdEyeCredentials;
 import org.apache.pinot.thirdeye.common.time.TimeGranularity;
-import org.apache.pinot.thirdeye.auth.Credentials;
 import org.apache.pinot.thirdeye.auth.ThirdEyeAuthFilter;
 import org.apache.pinot.thirdeye.auth.ThirdEyeAuthenticatorDisabled;
-import org.apache.pinot.thirdeye.auth.ThirdEyeAuthenticatorLdap;
+import org.apache.pinot.thirdeye.auth.ThirdEyeLdapAuthenticator;
 import org.apache.pinot.thirdeye.auth.ThirdEyePrincipal;
 import org.apache.pinot.thirdeye.common.BaseThirdEyeApplication;
 import org.apache.pinot.thirdeye.common.ThirdEyeSwaggerBundle;
@@ -65,6 +67,7 @@ import org.apache.pinot.thirdeye.api.user.dashboard.UserDashboardResource;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.rootcause.DefaultEntityFormatter;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.rootcause.FormatterLoader;
 import org.apache.pinot.thirdeye.dataset.DatasetAutoOnboardResource;
+import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
 import org.apache.pinot.thirdeye.datasource.loader.AggregationLoader;
 import org.apache.pinot.thirdeye.datasource.loader.DefaultAggregationLoader;
@@ -80,7 +83,6 @@ import org.apache.pinot.thirdeye.rootcause.RCAFramework;
 import org.apache.pinot.thirdeye.rootcause.impl.RCAFrameworkLoader;
 import org.apache.pinot.thirdeye.tracking.RequestStatisticsLogger;
 import io.dropwizard.assets.AssetsBundle;
-import io.dropwizard.auth.Authenticator;
 import io.dropwizard.auth.CachingAuthenticator;
 import io.dropwizard.bundles.redirect.PathRedirect;
 import io.dropwizard.bundles.redirect.RedirectBundle;
@@ -234,21 +236,23 @@ public class ThirdEyeDashboardApplication
       LOG.error("Error loading the resource", e);
     }
 
+    // Authentication
     if (config.getAuthConfig() != null) {
       final AuthConfiguration authConfig = config.getAuthConfig();
 
       // default permissive authenticator
-      Authenticator<Credentials, ThirdEyePrincipal> authenticator = new ThirdEyeAuthenticatorDisabled();
+      Authenticator<ThirdEyeCredentials, ThirdEyePrincipal> authenticator = new ThirdEyeAuthenticatorDisabled();
 
       // ldap authenticator
       if (authConfig.isAuthEnabled()) {
-        final ThirdEyeAuthenticatorLdap authenticatorLdap = new ThirdEyeAuthenticatorLdap(authConfig.getDomainSuffix(), authConfig.getLdapUrl());
+        final ThirdEyeLdapAuthenticator
+            authenticatorLdap = new ThirdEyeLdapAuthenticator(authConfig.getDomainSuffix(), authConfig.getLdapUrl(), DAORegistry.getInstance().getSessionDAO());
         authenticator = new CachingAuthenticator<>(env.metrics(), authenticatorLdap, CacheBuilder.newBuilder().expireAfterWrite(authConfig.getCacheTTL(), TimeUnit.SECONDS));
       }
-      // auth filter
-      env.jersey().register(new ThirdEyeAuthFilter(authenticator, authConfig.getAllowedPaths(), authConfig.getAdminUsers()));
-      // auth resource
+
+      env.jersey().register(new ThirdEyeAuthFilter(authenticator, authConfig.getAllowedPaths(), authConfig.getAdminUsers(), DAORegistry.getInstance().getSessionDAO()));
       env.jersey().register(new AuthResource(authenticator, authConfig.getCookieTTL() * 1000));
+      env.jersey().register(new AuthValueFactoryProvider.Binder<>(ThirdEyePrincipal.class));
     }
 
     env.lifecycle().manage(new Managed() {

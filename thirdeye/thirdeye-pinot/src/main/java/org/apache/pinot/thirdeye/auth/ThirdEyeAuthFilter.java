@@ -19,10 +19,10 @@
 
 package org.apache.pinot.thirdeye.auth;
 
+import javax.ws.rs.core.SecurityContext;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.AuthResource;
 import org.apache.pinot.thirdeye.datalayer.bao.SessionManager;
 import org.apache.pinot.thirdeye.datalayer.dto.SessionDTO;
-import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import io.dropwizard.auth.AuthFilter;
 import io.dropwizard.auth.Authenticator;
 import java.util.HashSet;
@@ -37,35 +37,34 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class ThirdEyeAuthFilter extends AuthFilter<Credentials, ThirdEyePrincipal> {
+public class ThirdEyeAuthFilter extends AuthFilter<ThirdEyeCredentials, ThirdEyePrincipal> {
   private static final Logger LOG = LoggerFactory.getLogger(ThirdEyeAuthFilter.class);
 
   private static final ThreadLocal<ThirdEyePrincipal> principalAuthContextThreadLocal = new ThreadLocal<>();
-  private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
   private final Set<String> allowedPaths;
   private final SessionManager sessionDAO;
   private Set<String> administrators;
 
-  public ThirdEyeAuthFilter(Authenticator<Credentials, ThirdEyePrincipal> authenticator, Set<String> allowedPaths, List<String> administrators) {
+  public ThirdEyeAuthFilter(Authenticator<ThirdEyeCredentials, ThirdEyePrincipal> authenticator, Set<String> allowedPaths, List<String> administrators, SessionManager sessionDAO) {
     this.authenticator = authenticator;
     this.allowedPaths = allowedPaths;
-    this.sessionDAO = DAO_REGISTRY.getSessionDAO();
+    this.sessionDAO = sessionDAO;
     if (administrators != null) {
       this.administrators = new HashSet<>(administrators);
     }
   }
 
   @Override
-  public void filter(ContainerRequestContext containerRequestContext) {
+  public void filter(ContainerRequestContext requestContext) {
     setCurrentPrincipal(null);
 
-    String uriPath = containerRequestContext.getUriInfo().getPath();
+    String uriPath = requestContext.getUriInfo().getPath();
     LOG.info("Checking auth for {}", uriPath);
 
     ThirdEyePrincipal principal = new ThirdEyePrincipal();
 
-    if (!isAuthenticated(containerRequestContext, principal)) {
+    if (!isAuthenticated(requestContext, principal)) {
       // not authenticated, check exceptions
 
       // authenticate end points should be out of auth filter
@@ -99,6 +98,15 @@ public class ThirdEyeAuthFilter extends AuthFilter<Credentials, ThirdEyePrincipa
     }
 
     setCurrentPrincipal(principal);
+
+    ThirdEyeCredentials credentials = new ThirdEyeCredentials();
+    credentials.setPrincipal(principal.getName());
+    credentials.setToken(principal.getSessionKey());
+
+    // Trigger the parent authentication to inject the credentials into the Security Context
+    if (!this.authenticate(requestContext, credentials, SecurityContext.BASIC_AUTH)) {
+      throw new WebApplicationException(unauthorizedHandler.buildResponse(prefix, realm));
+    }
   }
 
   private boolean isAuthenticated(ContainerRequestContext containerRequestContext, ThirdEyePrincipal principal) {
