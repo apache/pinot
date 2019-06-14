@@ -19,11 +19,13 @@
 package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.google.common.base.Function;
 import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
+import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -37,7 +39,10 @@ import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.JsonUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
+import org.apache.pinot.core.plan.SelectionPlanNode;
 import org.apache.pinot.util.TestUtils;
+import org.joda.time.DateTime;
+import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -407,7 +412,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   @Test
-  public void testUDF()
+  public void testGroupByUDF()
       throws Exception {
     String pqlQuery = "SELECT COUNT(*) FROM mytable GROUP BY timeConvert(DaysSinceEpoch,'DAYS','SECONDS')";
     JsonNode response = postQuery(pqlQuery);
@@ -478,6 +483,64 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     aggregationResult = response.get("aggregationResults").get(0);
     assertEquals(aggregationResult.get("function").asText(), "min_div(DaysSinceEpoch,'2')");
     assertEquals(aggregationResult.get("value").asDouble(), 16071.0 / 2);
+  }
+
+  @Test
+  public void testAggregationUDF()
+      throws Exception {
+
+    String pqlQuery = "SELECT MAX(timeConvert(DaysSinceEpoch,'DAYS','SECONDS')) FROM mytable";
+    JsonNode response = postQuery(pqlQuery);
+    JsonNode aggregationResult = response.get("aggregationResults").get(0);
+    assertEquals(aggregationResult.get("function").asText(), "max_timeconvert(DaysSinceEpoch,'DAYS','SECONDS')");
+    assertEquals(aggregationResult.get("value").asDouble(), 16435.0 * 24 * 3600);
+
+    pqlQuery = "SELECT MIN(div(DaysSinceEpoch,2)) FROM mytable";
+    response = postQuery(pqlQuery);
+    aggregationResult = response.get("aggregationResults").get(0);
+    assertEquals(aggregationResult.get("function").asText(), "min_div(DaysSinceEpoch,'2')");
+    assertEquals(aggregationResult.get("value").asDouble(), 16071.0 / 2);
+  }
+
+  @Test
+  public void testSelectionUDF()
+      throws Exception {
+    SelectionPlanNode.enableUDFInSelection = true;
+    String pqlQuery = "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable";
+    JsonNode response = postQuery(pqlQuery);
+    ArrayNode selectionResults = (ArrayNode) response.get("selectionResults").get("results");
+    for (int i = 0; i < selectionResults.size(); i++) {
+      long daysSinceEpoch = selectionResults.get(i).get(0).asLong();
+      long secondsSinceEpoch = selectionResults.get(i).get(1).asLong();
+      Assert.assertEquals(daysSinceEpoch * 24 * 60 * 60, secondsSinceEpoch);
+    }
+
+    pqlQuery =
+        "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable order by DaysSinceEpoch limit 10000";
+    response = postQuery(pqlQuery);
+    selectionResults = (ArrayNode) response.get("selectionResults").get("results");
+    long prevValue = -1;
+    for (int i = 0; i < selectionResults.size(); i++) {
+      long daysSinceEpoch = selectionResults.get(i).get(0).asLong();
+      long secondsSinceEpoch = selectionResults.get(i).get(1).asLong();
+      Assert.assertEquals(daysSinceEpoch * 24 * 60 * 60, secondsSinceEpoch);
+      Assert.assertTrue(daysSinceEpoch >= prevValue);
+      prevValue = daysSinceEpoch;
+    }
+
+    pqlQuery =
+        "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable order by timeConvert(DaysSinceEpoch,'DAYS','SECONDS') DESC limit 10000";
+    response = postQuery(pqlQuery);
+    selectionResults = (ArrayNode) response.get("selectionResults").get("results");
+    prevValue = Long.MAX_VALUE;
+    for (int i = 0; i < selectionResults.size(); i++) {
+      long daysSinceEpoch = selectionResults.get(i).get(0).asLong();
+      long secondsSinceEpoch = selectionResults.get(i).get(1).asLong();
+      Assert.assertEquals(daysSinceEpoch * 24 * 60 * 60, secondsSinceEpoch);
+      Assert.assertTrue(secondsSinceEpoch <= prevValue);
+      prevValue = secondsSinceEpoch;
+    }
+    SelectionPlanNode.enableUDFInSelection = false;
   }
 
   @AfterClass

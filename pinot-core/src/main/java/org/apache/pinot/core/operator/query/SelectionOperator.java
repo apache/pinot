@@ -60,19 +60,18 @@ public class SelectionOperator extends BaseOperator<IntermediateResultsBlock> {
   private Selection _selection;
   private final int _offset;
   private final int _maxRows;
-  private final Collection<Serializable[]> _rowEvents;
   private final List<TransformExpressionTree> _expressions;
   private final List<TransformExpressionTree> _selectExpressions;
   private final List<TransformExpressionTree> _orderByExpressions;
   private final List<Integer> _orderByIndices;
   private final TransformResultMetadata[] _expressionResultMetadata;
   private final Dictionary[] _dictionaries;
-  private final PriorityQueue<Serializable[]> _priorityQueue;
+  private Collection<Serializable[]> _rowEvents;
+  private PriorityQueue<Serializable[]> _priorityQueue;
 
   private ExecutionStatistics _executionStatistics;
 
-  public SelectionOperator(IndexSegment indexSegment, Selection selection,
-      TransformOperator transformOperator) {
+  public SelectionOperator(IndexSegment indexSegment, Selection selection, TransformOperator transformOperator) {
     _indexSegment = indexSegment;
     _offset = selection.getOffset();
     _limit = selection.getSize();
@@ -86,7 +85,7 @@ public class SelectionOperator extends BaseOperator<IntermediateResultsBlock> {
       selectColumns = new LinkedList<>(indexSegment.getPhysicalColumnNames());
     }
 
-    List<String> orderByColumns = selection.getSelectionColumns();
+    List<String> orderByColumns = new ArrayList<>();
     if (selection.getSelectionSortSequence() != null) {
       for (SelectionSort selectionSort : selection.getSelectionSortSequence()) {
         String expression = selectionSort.getColumn();
@@ -109,24 +108,25 @@ public class SelectionOperator extends BaseOperator<IntermediateResultsBlock> {
     _blockValSets = new BlockValSet[_expressions.size()];
     _expressionResultMetadata = new TransformResultMetadata[_expressions.size()];
     _dictionaries = new Dictionary[_expressions.size()];
-    DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[_expressions
-        .size()];
+    DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[_expressions.size()];
     String[] columnNames = new String[_expressions.size()];
     for (int i = 0; i < _expressions.size(); i++) {
       TransformExpressionTree expression = _expressions.get(i);
       _expressionResultMetadata[i] = _transformOperator.getResultMetadata(expression);
       columnDataTypes[i] = DataSchema.ColumnDataType
-          .fromDataType(_expressionResultMetadata[i].getDataType(),
-              _expressionResultMetadata[i].isSingleValue());
+          .fromDataType(_expressionResultMetadata[i].getDataType(), _expressionResultMetadata[i].isSingleValue());
       columnNames[i] = expression.toString();
       if (_expressionResultMetadata[i].hasDictionary()) {
         _dictionaries[i] = _transformOperator.getDictionary(expression);
       }
     }
     _dataSchema = new DataSchema(columnNames, columnDataTypes);
-    Comparator<Serializable[]> comparator = getStrictComparator();
-    _priorityQueue = new PriorityQueue<>(_maxRows, comparator);
-    _rowEvents = new ArrayList<>();
+    if(_orderByExpressions.isEmpty()) {
+      _rowEvents = new ArrayList<>();
+    } else {
+      Comparator<Serializable[]> comparator = getStrictComparator();
+      _priorityQueue = new PriorityQueue<>(_maxRows, comparator);
+    }
   }
 
   private Comparator<Serializable[]> getStrictComparator() {
@@ -138,9 +138,10 @@ public class SelectionOperator extends BaseOperator<IntermediateResultsBlock> {
         for (int i = 0; i < numSortColumns; i++) {
           int ret = 0;
           SelectionSort selectionSort = sortSequence.get(i);
-          Serializable v1 = o1[i];
-          Serializable v2 = o2[i];
           int index = _orderByIndices.get(i);
+          Serializable v1 = o1[index];
+          Serializable v2 = o2[index];
+
           DataType dataType = _expressionResultMetadata[index].getDataType();
           // Only compare single-value columns.
           switch (dataType) {
@@ -197,7 +198,6 @@ public class SelectionOperator extends BaseOperator<IntermediateResultsBlock> {
         return 0;
       }
     };
-
   }
 
   @Override
@@ -212,9 +212,8 @@ public class SelectionOperator extends BaseOperator<IntermediateResultsBlock> {
         _blockValSets[i] = transformBlock.getBlockValueSet(expression);
       }
       TransformBlockDataFetcher dataFetcher;
-      dataFetcher = new TransformBlockDataFetcher(_blockValSets, _dictionaries,
-          _expressionResultMetadata);
-      if (!selectionOnly) {
+      dataFetcher = new TransformBlockDataFetcher(_blockValSets, _dictionaries, _expressionResultMetadata);
+      if (selectionOnly) {
         int docId = 0;
         while (_rowEvents.size() < _limit && docId < transformBlock.getNumDocs()) {
           Serializable[] row = dataFetcher.getRow(docId);
@@ -242,21 +241,18 @@ public class SelectionOperator extends BaseOperator<IntermediateResultsBlock> {
     }
 
     // Create execution statistics.
-    long numEntriesScannedInFilter = _transformOperator.getExecutionStatistics()
-        .getNumEntriesScannedInFilter();
+    long numEntriesScannedInFilter = _transformOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
     long numEntriesScannedPostFilter = numDocsScanned * _transformOperator.getNumColumnsProjected();
     long numTotalRawDocs = _indexSegment.getSegmentMetadata().getTotalRawDocs();
     _executionStatistics =
-        new ExecutionStatistics(numDocsScanned, numEntriesScannedInFilter,
-            numEntriesScannedPostFilter,
+        new ExecutionStatistics(numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter,
             numTotalRawDocs);
-    if (_orderByExpressions.isEmpty()) {
+    if (selectionOnly) {
       return new IntermediateResultsBlock(_dataSchema, _rowEvents);
     } else {
       return new IntermediateResultsBlock(_dataSchema, _priorityQueue);
     }
   }
-
 
   @Override
   public String getOperatorName() {

@@ -19,7 +19,7 @@
 package org.apache.pinot.core.data.aggregator;
 
 import org.apache.pinot.common.data.FieldSpec.DataType;
-import org.apache.pinot.core.query.aggregation.function.AggregationFunctionType;
+import org.apache.pinot.common.function.AggregationFunctionType;
 
 
 public class MinValueAggregator implements ValueAggregator<Number, Double> {

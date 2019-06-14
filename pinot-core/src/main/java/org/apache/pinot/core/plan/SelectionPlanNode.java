@@ -38,17 +38,16 @@ import org.slf4j.LoggerFactory;
 public class SelectionPlanNode implements PlanNode {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SelectionPlanNode.class);
-
+  public static boolean enableUDFInSelection = false;
   private final IndexSegment _indexSegment;
   private final Selection _selection;
   private TransformPlanNode _transformPlanNode;
   private ProjectionPlanNode _projectionPlanNode;
-  boolean supportUDF = false;
 
   public SelectionPlanNode(IndexSegment indexSegment, BrokerRequest brokerRequest) {
     _indexSegment = indexSegment;
     _selection = brokerRequest.getSelections();
-    if (supportUDF) {
+    if (enableUDFInSelection) {
       if (_selection.getSize() > 0) {
         _transformPlanNode = new TransformPlanNode(_indexSegment, brokerRequest);
       } else {
@@ -60,14 +59,11 @@ public class SelectionPlanNode implements PlanNode {
 
         // No ordering required, select minimum number of documents
         if (!_selection.isSetSelectionSortSequence()) {
-          maxDocPerNextCall = Math
-              .min(_selection.getOffset() + _selection.getSize(), maxDocPerNextCall);
+          maxDocPerNextCall = Math.min(_selection.getOffset() + _selection.getSize(), maxDocPerNextCall);
         }
-        DocIdSetPlanNode docIdSetPlanNode = new DocIdSetPlanNode(_indexSegment, brokerRequest,
-            maxDocPerNextCall);
+        DocIdSetPlanNode docIdSetPlanNode = new DocIdSetPlanNode(_indexSegment, brokerRequest, maxDocPerNextCall);
         _projectionPlanNode = new ProjectionPlanNode(_indexSegment,
-            SelectionOperatorUtils.extractSelectionRelatedColumns(_selection, indexSegment),
-            docIdSetPlanNode);
+            SelectionOperatorUtils.extractSelectionRelatedColumns(_selection, indexSegment), docIdSetPlanNode);
       } else {
         _projectionPlanNode = null;
       }
@@ -76,25 +72,16 @@ public class SelectionPlanNode implements PlanNode {
 
   @Override
   public Operator run() {
-    if (!supportUDF) {
-      if (_selection.getSize() > 0) {
-        if (_selection.isSetSelectionSortSequence()) {
-          return new SelectionOrderByOperator(_indexSegment, _selection, _projectionPlanNode.run());
-        } else {
-          return new SelectionOnlyOperator(_indexSegment, _selection, _projectionPlanNode.run());
-        }
-      } else {
-        return new EmptySelectionOperator(_indexSegment, _selection);
-      }
+    if (_selection.getSize() <= 0) {
+      return new EmptySelectionOperator(_indexSegment, _selection);
+    }
+    if (enableUDFInSelection) {
+      return new SelectionOperator(_indexSegment, _selection, _transformPlanNode.run());
     } else {
-      if (_selection.getSize() > 0) {
-        if (_selection.isSetSelectionSortSequence()) {
-          return new SelectionOperator(_indexSegment, _selection, _transformPlanNode.run());
-        } else {
-          return new SelectionOperator(_indexSegment, _selection, _transformPlanNode.run());
-        }
+      if (_selection.isSetSelectionSortSequence()) {
+        return new SelectionOrderByOperator(_indexSegment, _selection, _projectionPlanNode.run());
       } else {
-        return new EmptySelectionOperator(_indexSegment, _selection);
+        return new SelectionOnlyOperator(_indexSegment, _selection, _projectionPlanNode.run());
       }
     }
   }
