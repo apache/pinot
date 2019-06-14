@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -156,6 +157,7 @@ public class DetectionConfigTranslator extends ConfigTranslator<DetectionConfigD
   private static final String PROP_DETECTION_NAME = "detectionName";
   private static final String PROP_DESC_NAME = "description";
   private static final String PROP_ACTIVE = "active";
+  private static final String PROP_OWNERS = "owners";
 
   private static final DetectionRegistry DETECTION_REGISTRY = DetectionRegistry.getInstance();
   static {
@@ -439,6 +441,7 @@ public class DetectionConfigTranslator extends ConfigTranslator<DetectionConfigD
     config.setName(MapUtils.getString(yamlConfigMap, PROP_DETECTION_NAME));
     config.setDescription(MapUtils.getString(yamlConfigMap, PROP_DESC_NAME));
     config.setLastTimestamp(System.currentTimeMillis());
+    config.setOwners(filterOwners(ConfigUtils.getList(yamlConfigMap.get(PROP_OWNERS))));
 
     config.setProperties(properties);
     config.setComponentSpecs(components);
