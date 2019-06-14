@@ -27,6 +27,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import org.apache.pinot.thirdeye.common.dimension.DimensionMap;
 import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.dataframe.BooleanSeries;
@@ -55,8 +56,8 @@ public class DetectionUtils {
   // TODO anomaly should support multimap
   public static DimensionMap toFilterMap(Multimap<String, String> filters) {
     DimensionMap map = new DimensionMap();
-    for (Map.Entry<String, String> entry : filters.entries()) {
-      map.put(entry.getKey(), entry.getValue());
+    for (Map.Entry<String, Collection<String>> entry: filters.asMap().entrySet()){
+      map.put(entry.getKey(), String.join(", ", entry.getValue()));
     }
     return map;
   }
