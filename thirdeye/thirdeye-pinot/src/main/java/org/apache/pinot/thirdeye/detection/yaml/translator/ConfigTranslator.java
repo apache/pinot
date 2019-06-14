@@ -23,7 +23,6 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.thirdeye.datalayer.dto.AbstractDTO;
 import org.apache.pinot.thirdeye.detection.ConfigUtils;
-import org.apache.pinot.thirdeye.detection.DataProvider;
 import org.apache.pinot.thirdeye.detection.validators.ConfigValidator;
 import org.yaml.snakeyaml.Yaml;
 
