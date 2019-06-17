@@ -68,7 +68,8 @@ public class ThirdEyeCredentials {
       return false;
     }
     ThirdEyeCredentials that = (ThirdEyeCredentials) o;
-    return Objects.equals(principal, that.principal) && Objects.equals(password, that.password);
+    return (Objects.equals(principal, that.principal) && Objects.equals(password, that.password))
+        || Objects.equals(token, that.token);
   }
 
   @Override
