@@ -391,7 +391,7 @@
       <dependency>
         <groupId>it.unimi.dsi</groupId>
         <artifactId>fastutil</artifactId>
-        <version>6.5.16</version>
+	<version>8.2.3</version>
       </dependency>
       <dependency>
         <groupId>joda-time</groupId>
