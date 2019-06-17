@@ -158,7 +158,8 @@ export function setUpTimeRangeOptions(datesKeys, duration) {
       [ '2w', ['Last 2 Weeks', 2, 'week'] ],
       [ '1w', ['Last Week', 1, 'week'] ],
       [ '2d', ['Yesterday', 2, 'day'] ],
-      [ '1d', ['Last 24 hours', 1, 'day'] ],
+      [ '1d', ['Last 24 Hours', 1, 'day'] ],
+      [ '48h', ['Last 48 Hours', 2, 'day'] ],
       [ 'today', ['Today'] ]
     ]);
 
@@ -166,6 +167,7 @@ export function setUpTimeRangeOptions(datesKeys, duration) {
     const currVal = dateKeyMap.get(value);
     const label = currVal[0];
     let start = moment().subtract(currVal[1], currVal[2]).startOf('day');
+    // overrides map above
     switch(label) {
       case 'Today':
         start = moment().startOf('day');

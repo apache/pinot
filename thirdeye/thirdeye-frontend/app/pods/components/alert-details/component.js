@@ -39,7 +39,7 @@ const TIME_PICKER_INCREMENT = 5; // tells date picker hours field how granularly
 const DEFAULT_ACTIVE_DURATION = '1m'; // setting this date range selection as default (Last 24 Hours)
 const UI_DATE_FORMAT = 'MMM D, YYYY hh:mm a'; // format for date picker to use (usually varies by route or metric)
 const DISPLAY_DATE_FORMAT = 'YYYY-MM-DD HH:mm'; // format used consistently across app to display custom date range
-const TIME_RANGE_OPTIONS = ['1d', '1w', '1m', '3m'];
+const TIME_RANGE_OPTIONS = ['48h', '1w', '1m', '3m'];
 const ANOMALY_LEGEND_THRESHOLD = 20; // If number of anomalies is larger than this threshold, don't show the legend
 
 export default Component.extend({
@@ -48,7 +48,7 @@ export default Component.extend({
   anomalyMapping: {},
   timeseries: null,
   isLoading: false,
-  analysisRange: [moment().subtract(1, 'day').startOf('day').valueOf(), moment().add(1, 'day').startOf('day').valueOf()],
+  analysisRange: [moment().subtract(2, 'day').startOf('day').valueOf(), moment().add(1, 'day').startOf('day').valueOf()],
   isPendingData: false,
   colorMapping: colorMapping,
   zoom: {
@@ -346,7 +346,7 @@ export default Component.extend({
             format: (d) => {
               const t = makeTime(d);
               if (t.valueOf() === t.clone().startOf('day').valueOf()) {
-                return t.format('MMM D (ddd)');
+                return t.format('MMM D');
               }
               return t.format('h:mm a');
             }
@@ -727,7 +727,7 @@ export default Component.extend({
       this._fetchAnomalies();
     } else {
       this.setProperties({
-        duration: '1d',
+        duration: '48h',
         selectedBaseline: 'predicted'
       });
     }
