@@ -26,7 +26,11 @@ import org.apache.pinot.common.Utils;
  *
  */
 public enum ServerTimer implements AbstractMetrics.Timer {
-  CURRENT_MSG_EVENT_TIMESTAMP_LAG("currentMsgEventTimestampLag", false);
+  // don't see usages for this
+  @Deprecated
+  CURRENT_MSG_EVENT_TIMESTAMP_LAG("currentMsgEventTimestampLag", false),
+  // metric tracking the freshness lag for consuming segments
+  FRESHNESS_LAG_MS("freshnessLagMs", false);
 
   private final String timerName;
   private final boolean global;
