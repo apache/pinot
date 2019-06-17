@@ -31,7 +31,6 @@ import org.joda.time.Interval;
  */
 public interface SegmentMetadata {
 
-  // TODO: deprecate table name from segment metadata
   String getTableName();
 
   String getTimeColumn();
