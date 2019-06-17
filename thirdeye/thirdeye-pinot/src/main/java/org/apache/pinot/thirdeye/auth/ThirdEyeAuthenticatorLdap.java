@@ -19,7 +19,6 @@
 
 package org.apache.pinot.thirdeye.auth;
 
-import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import io.dropwizard.auth.AuthenticationException;
 import io.dropwizard.auth.Authenticator;
@@ -27,11 +26,12 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Hashtable;
 import java.util.List;
+import java.util.Optional;
 import javax.naming.Context;
 import javax.naming.NamingException;
 import javax.naming.directory.InitialDirContext;
-import org.apache.commons.collections.CollectionUtils;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -64,7 +64,7 @@ public class ThirdEyeAuthenticatorLdap implements Authenticator<Credentials, Thi
       String principalName = credentials.getPrincipal();
       if (StringUtils.isBlank(principalName)) {
         LOG.info("Unable to authenticate empty user name.");
-        return Optional.absent();
+        return Optional.empty();
       } else {
         LOG.info("Authenticating '{}' via username and password", principalName);
 
@@ -108,7 +108,7 @@ public class ThirdEyeAuthenticatorLdap implements Authenticator<Credentials, Thi
           for (String errorMessage : errorMessages) {
             LOG.error(errorMessage);
           }
-          return Optional.absent();
+          return Optional.empty();
         }
       }
     } catch (Exception e) {

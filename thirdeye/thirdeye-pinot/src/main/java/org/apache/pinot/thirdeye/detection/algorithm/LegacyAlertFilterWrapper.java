@@ -37,7 +37,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
-import org.apache.commons.collections.MapUtils;
+import org.apache.commons.collections4.MapUtils;
 
 
 /**
@@ -73,12 +73,12 @@ public class LegacyAlertFilterWrapper extends DetectionPipeline {
       throws Exception {
     super(provider, config, startTime, endTime);
 
-    this.anomalyFunctionSpecs = MapUtils.getMap(config.getProperties(), PROP_SPEC);
+    this.anomalyFunctionSpecs = ConfigUtils.getMap(config.getProperties().get(PROP_SPEC));
 
     if (config.getProperties().containsKey(PROP_LEGACY_ALERT_FILTER_CLASS_NAME)) {
       String className = MapUtils.getString(config.getProperties(), PROP_LEGACY_ALERT_FILTER_CLASS_NAME);
       this.alertFilter = (BaseAlertFilter) Class.forName(className).newInstance();
-      this.alertFilter.setParameters(MapUtils.getMap(this.anomalyFunctionSpecs, PROP_ALERT_FILTER));
+      this.alertFilter.setParameters(ConfigUtils.getMap(this.anomalyFunctionSpecs.get(PROP_ALERT_FILTER)));
     } else {
       this.alertFilter = new DummyAlertFilter();
     }

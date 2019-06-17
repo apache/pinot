@@ -21,8 +21,9 @@ package org.apache.pinot.thirdeye.anomaly.onboard.framework;
 
 import com.google.common.base.Preconditions;
 import java.util.Collections;
-import org.apache.commons.configuration.Configuration;
-import org.apache.commons.configuration.MapConfiguration;
+import org.apache.commons.configuration2.Configuration;
+import org.apache.commons.configuration2.MapConfiguration;
+
 
 public class DetectionOnboardTaskContext {
   private Configuration configuration = new MapConfiguration(Collections.emptyMap());

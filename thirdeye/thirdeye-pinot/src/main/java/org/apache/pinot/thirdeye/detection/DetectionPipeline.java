@@ -37,7 +37,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import org.apache.commons.collections.MapUtils;
+import org.apache.commons.collections4.MapUtils;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.Period;
@@ -91,14 +91,14 @@ public abstract class DetectionPipeline {
     Map<String, Object> componentSpecs = config.getComponentSpecs();
     if (componentSpecs != null) {
       for (String componentKey : componentSpecs.keySet()) {
-        Map<String, Object> componentSpec = MapUtils.getMap(componentSpecs, componentKey);
+        Map<String, Object> componentSpec = ConfigUtils.getMap(componentSpecs.get(componentKey));
         if (!instancesMap.containsKey(componentKey)){
           instancesMap.put(componentKey, createComponent(componentSpec));
         }
       }
 
       for (String componentKey : componentSpecs.keySet()) {
-        Map<String, Object> componentSpec = MapUtils.getMap(componentSpecs, componentKey);
+        Map<String, Object> componentSpec = ConfigUtils.getMap(componentSpecs.get(componentKey));
         for (Map.Entry<String, Object> entry : componentSpec.entrySet()){
           if (DetectionUtils.isReferenceName(entry.getValue().toString())) {
             componentSpec.put(entry.getKey(), instancesMap.get(DetectionUtils.getComponentKey(entry.getValue().toString())));

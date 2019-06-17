@@ -57,8 +57,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
-import org.apache.commons.collections.MapUtils;
-import org.apache.commons.lang.NullArgumentException;
+import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
@@ -96,7 +95,7 @@ public class AnomalyDetectionInputContextBuilder {
     DatasetConfigDTO datasetConfig = DAO_REGISTRY.getDatasetConfigDAO().findByDataset(dataset);
     if (datasetConfig == null) {
       LOG.error("Dataset [" + dataset + "] is not found");
-      throw new NullArgumentException(
+      throw new IllegalArgumentException(
           "Dataset [" + dataset + "] is not found with function : " + anomalyFunctionSpec
               .toString());
     }

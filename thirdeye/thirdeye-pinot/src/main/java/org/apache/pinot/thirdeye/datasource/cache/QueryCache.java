@@ -48,6 +48,7 @@ public class QueryCache {
     long tStart = System.nanoTime();
     try {
       String dataSource = request.getDataSource();
+
       return getDataSource(dataSource).execute(request);
 
     } catch (Exception e) {

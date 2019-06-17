@@ -32,7 +32,7 @@ import java.util.List;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.joda.time.Interval;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;

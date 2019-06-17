@@ -58,7 +58,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import org.apache.commons.collections.MapUtils;
+import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
 import org.slf4j.Logger;
@@ -114,7 +114,7 @@ public class LegacyMergeWrapper extends DetectionPipeline {
     super(provider, config, startTime, endTime);
 
     this.anomalyFunctionClassName = MapUtils.getString(config.getProperties(), PROP_ANOMALY_FUNCTION_CLASS);
-    this.anomalyFunctionSpecs = MapUtils.getMap(config.getProperties(), PROP_SPEC);
+    this.anomalyFunctionSpecs = ConfigUtils.getMap(config.getProperties().get(PROP_SPEC));
     this.anomalyFunction = (BaseAnomalyFunction) Class.forName(this.anomalyFunctionClassName).newInstance();
 
     String specs = OBJECT_MAPPER.writeValueAsString(this.anomalyFunctionSpecs);

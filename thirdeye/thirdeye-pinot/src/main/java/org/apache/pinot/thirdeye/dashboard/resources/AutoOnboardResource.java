@@ -19,8 +19,8 @@
 
 package org.apache.pinot.thirdeye.dashboard.resources;
 
-import com.wordnik.swagger.annotations.Api;
-import com.wordnik.swagger.annotations.ApiOperation;
+import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiOperation;
 import org.apache.pinot.thirdeye.api.Constants;
 import org.apache.pinot.thirdeye.auto.onboard.AutoOnboard;
 import org.apache.pinot.thirdeye.auto.onboard.AutoOnboardUtility;

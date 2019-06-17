@@ -19,8 +19,8 @@
 
 package org.apache.pinot.thirdeye.api.application;
 
-import com.wordnik.swagger.annotations.ApiOperation;
-import com.wordnik.swagger.annotations.ApiParam;
+import io.swagger.annotations.ApiOperation;
+import io.swagger.annotations.ApiParam;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;

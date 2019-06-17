@@ -24,8 +24,8 @@ import org.apache.pinot.client.ResultSet;
 import org.apache.pinot.client.ResultSetGroup;
 import java.util.ArrayList;
 import java.util.List;
-import org.apache.commons.collections.CollectionUtils;
-import org.apache.commons.lang.builder.ToStringBuilder;
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.builder.ToStringBuilder;
 
 /**
  * The ThirdEye's own {@link ResultSetGroup} for storing multiple {@link ThirdEyeResultSet} (i.e., an equivalent class

@@ -26,7 +26,7 @@ import org.apache.pinot.thirdeye.anomaly.onboard.framework.DetectionOnboardTaskC
 import org.apache.pinot.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutotuneFactory;
 import org.apache.pinot.thirdeye.detector.email.filter.AlertFilterFactory;
 import org.apache.pinot.thirdeye.detector.function.AnomalyFunctionFactory;
-import org.apache.commons.configuration.Configuration;
+import org.apache.commons.configuration2.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

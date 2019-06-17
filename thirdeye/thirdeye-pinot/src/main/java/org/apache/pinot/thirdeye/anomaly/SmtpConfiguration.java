@@ -23,7 +23,7 @@ import java.util.Map;
 import java.util.Objects;
 
 import com.google.common.base.MoreObjects;
-import org.apache.commons.collections.MapUtils;
+import org.apache.commons.collections4.MapUtils;
 
 
 public class SmtpConfiguration {

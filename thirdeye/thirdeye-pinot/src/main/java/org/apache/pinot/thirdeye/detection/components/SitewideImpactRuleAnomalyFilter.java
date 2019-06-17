@@ -43,7 +43,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 
 import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
 

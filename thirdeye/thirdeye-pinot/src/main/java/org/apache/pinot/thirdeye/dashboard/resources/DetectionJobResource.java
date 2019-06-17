@@ -21,6 +21,9 @@ package org.apache.pinot.thirdeye.dashboard.resources;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.base.Preconditions;
+import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiOperation;
 import org.apache.pinot.thirdeye.anomalydetection.alertFilterAutotune.BaseAlertFilterAutoTune;
 import org.apache.pinot.thirdeye.api.Constants;
 import org.apache.pinot.thirdeye.dashboard.ThirdEyeDashboardConfiguration;
@@ -28,8 +31,6 @@ import org.apache.pinot.thirdeye.datalayer.bao.AlertConfigManager;
 import org.apache.pinot.thirdeye.datalayer.dto.AlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.ApplicationDTO;
 import org.apache.pinot.thirdeye.detector.email.filter.BaseAlertFilter;
-import com.wordnik.swagger.annotations.Api;
-import com.wordnik.swagger.annotations.ApiOperation;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -56,7 +57,6 @@ import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 
 import org.apache.pinot.thirdeye.anomaly.detection.DetectionJobScheduler;
-import org.apache.commons.lang.NullArgumentException;
 import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
 import org.joda.time.Interval;
@@ -135,9 +135,7 @@ public class DetectionJobResource {
 
   private void toggleRequiresCompletenessCheck(Long id, boolean state) {
     AnomalyFunctionDTO anomalyFunctionSpec = anomalyFunctionDAO.findById(id);
-    if (anomalyFunctionSpec == null) {
-      throw new NullArgumentException("Function spec not found");
-    }
+    Preconditions.checkNotNull(anomalyFunctionSpec, "Function spec not found");
     anomalyFunctionSpec.setRequiresCompletenessCheck(state);
     anomalyFunctionDAO.update(anomalyFunctionSpec);
   }

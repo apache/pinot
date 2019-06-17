@@ -19,6 +19,7 @@
 
 package org.apache.pinot.thirdeye.anomaly.alert;
 
+import com.google.common.base.Preconditions;
 import org.apache.pinot.thirdeye.anomaly.alert.v2.AlertJobSchedulerV2;
 import org.apache.pinot.thirdeye.datalayer.bao.AlertConfigManager;
 import org.apache.pinot.thirdeye.datalayer.dto.AlertConfigDTO;
@@ -32,8 +33,6 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-
-import org.apache.commons.lang.NullArgumentException;
 import org.quartz.SchedulerException;
 
 @Path("/alert-job")
@@ -72,9 +71,7 @@ public class AlertJobResource {
 
   private void toggleActive(Long id, boolean state) {
     AlertConfigDTO alertConfig = alertConfigurationDAO.findById(id);
-    if(alertConfig == null) {
-      throw new NullArgumentException("Alert config not found");
-    }
+    Preconditions.checkNotNull(alertConfig, "Alert config not found");
     alertConfig.setActive(state);
     alertConfigurationDAO.update(alertConfig);
   }

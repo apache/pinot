@@ -27,6 +27,7 @@ import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
+import org.apache.pinot.thirdeye.detection.ConfigUtils;
 import org.apache.pinot.thirdeye.detection.DataProvider;
 import org.apache.pinot.thirdeye.detection.DetectionPipeline;
 import org.apache.pinot.thirdeye.detection.DetectionPipelineResult;
@@ -38,7 +39,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import org.apache.commons.collections.MapUtils;
+import org.apache.commons.collections4.MapUtils;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.Interval;
@@ -87,7 +88,7 @@ public class AnomalyDetectionStageWrapper extends DetectionPipeline {
     Map<String, Object> properties = config.getProperties();
     Preconditions.checkArgument(properties.containsKey(PROP_STAGE_CLASSNAME), "Missing " + PROP_STAGE_CLASSNAME);
 
-    this.specs = MapUtils.getMap(properties, PROP_SPECS);
+    this.specs = ConfigUtils.getMap(properties.get(PROP_SPECS));
     this.stageClassName = MapUtils.getString(properties, PROP_STAGE_CLASSNAME);
     this.metricUrn = MapUtils.getString(config.getProperties(), PROP_METRIC_URN);
     if (this.metricUrn != null) {
@@ -101,7 +102,7 @@ public class AnomalyDetectionStageWrapper extends DetectionPipeline {
     // detection window size
     this.windowSize = MapUtils.getIntValue(this.specs, PROP_WINDOW_SIZE, 1);
     this.windowUnit = TimeUnit.valueOf(MapUtils.getString(this.specs, PROP_WINDOW_UNIT, "DAYS"));
-    Map<String, Object> frequency = MapUtils.getMap(this.specs, PROP_FREQUENCY, Collections.emptyMap());
+    Map<String, Object> frequency = ConfigUtils.getMap(this.specs.get(PROP_FREQUENCY), Collections.emptyMap());
     this.functionFrequency = new TimeGranularity(MapUtils.getIntValue(frequency, "size", 15), TimeUnit.valueOf(MapUtils.getString(frequency, "unit", "MINUTES")));
   }
 

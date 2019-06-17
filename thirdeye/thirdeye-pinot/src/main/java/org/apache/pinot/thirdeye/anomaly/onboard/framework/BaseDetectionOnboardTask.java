@@ -20,7 +20,7 @@
 package org.apache.pinot.thirdeye.anomaly.onboard.framework;
 
 import com.google.common.base.Preconditions;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 
 public abstract class BaseDetectionOnboardTask implements DetectionOnboardTask {
   private final String taskName;

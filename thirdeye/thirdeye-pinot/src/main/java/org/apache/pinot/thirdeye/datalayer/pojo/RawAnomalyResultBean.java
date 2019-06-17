@@ -22,7 +22,7 @@ package org.apache.pinot.thirdeye.datalayer.pojo;
 import org.apache.pinot.thirdeye.common.dimension.DimensionMap;
 import org.apache.pinot.thirdeye.constant.AnomalyResultSource;
 import java.util.Objects;
-import org.apache.commons.lang.ObjectUtils;
+import org.apache.commons.lang3.ObjectUtils;
 import org.joda.time.DateTime;
 
 @Deprecated

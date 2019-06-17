@@ -18,9 +18,10 @@ package org.apache.pinot.thirdeye.tools.anomaly.report;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import io.dropwizard.configuration.ConfigurationFactory;
+import io.dropwizard.configuration.YamlConfigurationFactory;
 import org.apache.pinot.thirdeye.anomaly.SmtpConfiguration;
 import org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
-import io.dropwizard.configuration.ConfigurationFactory;
 import io.dropwizard.jackson.Jackson;
 import java.io.File;
 import java.text.SimpleDateFormat;
@@ -96,7 +97,7 @@ public class AnomalyReportDriver {
     }
 
     ConfigurationFactory<ThirdEyeAnomalyConfiguration> factory =
-        new ConfigurationFactory<>(ThirdEyeAnomalyConfiguration.class,
+        new YamlConfigurationFactory<>(ThirdEyeAnomalyConfiguration.class,
             Validation.buildDefaultValidatorFactory().getValidator(), Jackson.newObjectMapper(),
             "");
     ThirdEyeAnomalyConfiguration detectorConfig = factory.build(detectorConfigFile);
