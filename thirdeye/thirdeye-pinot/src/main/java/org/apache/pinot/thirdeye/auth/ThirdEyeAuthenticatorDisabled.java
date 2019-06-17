@@ -26,14 +26,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class ThirdEyeAuthenticatorDisabled implements Authenticator<Credentials, ThirdEyePrincipal> {
+public class ThirdEyeAuthenticatorDisabled implements Authenticator<ThirdEyeCredentials, ThirdEyePrincipal> {
   private static final Logger LOG = LoggerFactory.getLogger(ThirdEyeAuthenticatorDisabled.class);
 
   /**
    *  {@inheritDoc}
    */
   @Override
-  public Optional<ThirdEyePrincipal> authenticate(Credentials credentials) throws AuthenticationException {
+  public Optional<ThirdEyePrincipal> authenticate(ThirdEyeCredentials credentials) throws AuthenticationException {
     LOG.info("Authentication is disabled. Accepting any credentials for {}.", credentials.getPrincipal());
 
     ThirdEyePrincipal principal = new ThirdEyePrincipal();
