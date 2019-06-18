@@ -25,25 +25,21 @@ import com.google.common.cache.LoadingCache;
 import com.google.common.cache.Weigher;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Collections2;
-import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
-import javax.xml.crypto.Data;
 import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.dataframe.DataFrame;
 import org.apache.pinot.thirdeye.dataframe.LongSeries;
@@ -60,13 +56,11 @@ import org.apache.pinot.thirdeye.datalayer.dto.EventDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.util.Predicate;
-import org.apache.pinot.thirdeye.datasource.comparison.Row;
 import org.apache.pinot.thirdeye.datasource.loader.AggregationLoader;
 import org.apache.pinot.thirdeye.datasource.loader.TimeSeriesLoader;
 import org.apache.pinot.thirdeye.detection.spi.model.AnomalySlice;
 import org.apache.pinot.thirdeye.detection.spi.model.EvaluationSlice;
 import org.apache.pinot.thirdeye.detection.spi.model.EventSlice;
-import org.joda.time.DateTimeZone;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -144,11 +138,13 @@ public class DefaultDataProvider implements DataProvider {
         }
       }
 
+      final long deadline = System.currentTimeMillis() + TIMEOUT;
       // if not in cache, fetch from data source
-      output.putAll(this.timeseriesLoader.loadTimeSeries(slices.stream().filter(slice -> !output.containsKey(slice)).collect(
-          Collectors.toList())));
-      return output;
+      Future<Map<MetricSlice, DataFrame>> future = this.executor.submit(() -> this.timeseriesLoader.loadTimeSeries(
+          slices.stream().filter(slice -> !output.containsKey(slice)).collect(Collectors.toList())));
+      output.putAll(future.get(makeTimeout(deadline), TimeUnit.MILLISECONDS));
 
+      return output;
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
