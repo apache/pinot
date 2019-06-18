@@ -45,7 +45,7 @@ public class DetectionTaskStatus {
   @JsonProperty
   private final List<TaskDTO> tasks;
 
-  private static final double TASK_SUCCESS_RATE_BAD_THRESHOLD = 0.5;
+  private static final double TASK_SUCCESS_RATE_BAD_THRESHOLD = 0.2;
   private static final double TASK_SUCCESS_RATE_MODERATE_THRESHOLD = 0.8;
 
   public DetectionTaskStatus(double taskSuccessRate, HealthStatus healthStatus, List<TaskDTO> tasks) {
