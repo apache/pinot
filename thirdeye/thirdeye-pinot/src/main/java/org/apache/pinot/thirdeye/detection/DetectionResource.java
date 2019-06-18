@@ -19,7 +19,6 @@
 
 package org.apache.pinot.thirdeye.detection;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wordnik.swagger.annotations.Api;
 import com.wordnik.swagger.annotations.ApiOperation;
@@ -75,6 +74,7 @@ import org.apache.pinot.thirdeye.datasource.loader.DefaultTimeSeriesLoader;
 import org.apache.pinot.thirdeye.datasource.loader.TimeSeriesLoader;
 import org.apache.pinot.thirdeye.detection.finetune.GridSearchTuningAlgorithm;
 import org.apache.pinot.thirdeye.detection.finetune.TuningAlgorithm;
+import org.apache.pinot.thirdeye.detection.health.DetectionHealth;
 import org.apache.pinot.thirdeye.detection.spi.model.AnomalySlice;
 import org.apache.pinot.thirdeye.detector.function.BaseAnomalyFunction;
 import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
@@ -570,12 +570,17 @@ public class DetectionResource {
   public Response getDetectionHealth(@PathParam("id") @ApiParam("detection config id") long id,
       @ApiParam("Start time for the the health metric") @QueryParam("start") long start,
       @ApiParam("End time for the the health metric") @QueryParam("end") long end,
-      @ApiParam("Max number of detection tasks returned") @QueryParam("limit") @DefaultValue("500") long limit) throws JsonProcessingException {
-    DetectionHealth health = new DetectionHealth.Builder(id, start, end).addRegressionStatus(this.evaluationDAO)
-        .addAnomalyCoverageStatus(this.anomalyDAO)
-        .addDetectionTaskStatus(this.taskDAO, limit)
-        .addOverallHealth()
-        .build();
+      @ApiParam("Max number of detection tasks returned") @QueryParam("limit") @DefaultValue("500") long limit) {
+    DetectionHealth health;
+    try {
+      health = new DetectionHealth.Builder(id, start, end).addRegressionStatus(this.evaluationDAO)
+          .addAnomalyCoverageStatus(this.anomalyDAO)
+          .addDetectionTaskStatus(this.taskDAO, limit)
+          .addOverallHealth()
+          .build();
+    } catch (Exception e) {
+      return Response.status(Response.Status.BAD_REQUEST).entity(e.getMessage()).build();
+    }
     return Response.ok(health).build();
   }
 }

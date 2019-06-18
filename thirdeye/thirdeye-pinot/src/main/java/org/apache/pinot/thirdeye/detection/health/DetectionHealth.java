@@ -1,4 +1,24 @@
-package org.apache.pinot.thirdeye.detection;
+/*
+ *  Licensed to the Apache Software Foundation (ASF) under one
+ *  or more contributor license agreements.  See the NOTICE file
+ *  distributed with this work for additional information
+ *  regarding copyright ownership.  The ASF licenses this file
+ *  to you under the Apache License, Version 2.0 (the
+ *  "License"); you may not use this file except in compliance
+ *  with the License.  You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing,
+ *  software distributed under the License is distributed on an
+ *  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ *  KIND, either express or implied.  See the License for the
+ *  specific language governing permissions and limitations
+ *  under the License.
+ *
+ */
+
+package org.apache.pinot.thirdeye.detection.health;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -46,81 +66,6 @@ public class DetectionHealth {
   @JsonProperty
   private DetectionTaskStatus detectionTaskStatus;
 
-  public enum HealthStatus {
-    GOOD, MODERATE, BAD
-  }
-
-  public static class RegressionStatus {
-    // the average mape for each detector
-    @JsonProperty
-    private Map<String, Double> detectorMapes;
-
-    // the health status for each detector
-    @JsonProperty
-    private Map<String, HealthStatus> detectorHealthStatus;
-
-    // the overall regression health for the detection config
-    @JsonProperty
-    private HealthStatus healthStatus;
-
-    public Map<String, Double> getDetectorMapes() {
-      return detectorMapes;
-    }
-
-    public Map<String, HealthStatus> getDetectorHealthStatus() {
-      return detectorHealthStatus;
-    }
-
-    public HealthStatus getHealthStatus() {
-      return healthStatus;
-    }
-  }
-
-  public static class AnomalyCoverageStatus {
-    // the anomaly coverage ratio. the percentage of anomalous duration in the duration of the whole window
-    @JsonProperty
-    private double anomalyCoverageRatio;
-
-    // the health status of the anomaly coverage ratio
-    @JsonProperty
-    private HealthStatus healthStatus;
-
-    public double getAnomalyCoverageRatio() {
-      return anomalyCoverageRatio;
-    }
-
-    public HealthStatus getHealthStatus() {
-      return healthStatus;
-    }
-  }
-
-  public static class DetectionTaskStatus {
-
-    // the task success rate for the detection config
-    @JsonProperty
-    private double taskSuccessRate;
-
-    // the health status for the detection tasks
-    @JsonProperty
-    private HealthStatus healthStatus;
-
-    // the list of tasks for the detection config
-    @JsonProperty
-    private List<TaskDTO> tasks;
-
-    public double getTaskSuccessRate() {
-      return taskSuccessRate;
-    }
-
-    public HealthStatus getHealthStatus() {
-      return healthStatus;
-    }
-
-    public List<TaskDTO> getTasks() {
-      return tasks;
-    }
-  }
-
   public HealthStatus getOverallHealth() {
     return overallHealth;
   }
@@ -159,7 +104,7 @@ public class DetectionHealth {
     private static String COL_NAME_TASK_TYPE = "type";
 
     public Builder(long detectionConfigId, long startTime, long endTime) {
-      Preconditions.checkArgument(endTime >= startTime);
+      Preconditions.checkArgument(endTime >= startTime, "end time must be after start time");
       this.startTime = startTime;
       this.endTime = endTime;
       this.detectionConfigId = detectionConfigId;
@@ -240,41 +185,11 @@ public class DetectionHealth {
               Collectors.averagingDouble(EvaluationBean::getMape)));
 
       // construct regression status
-      RegressionStatus status = new RegressionStatus();
-      status.detectorMapes = detectorMapes;
-      status.detectorHealthStatus = detectorMapes.entrySet()
-          .stream()
-          .collect(Collectors.toMap(Map.Entry::getKey, e -> classifyMapeHealth(e.getValue())));
-      status.healthStatus = classifyOverallRegressionStatus(status.detectorHealthStatus);
-      return status;
-    }
-
-    private static HealthStatus classifyMapeHealth(double mape) {
-      if (mape < 0.2) {
-        return HealthStatus.GOOD;
-      }
-      if (mape < 0.5) {
-        return HealthStatus.MODERATE;
-      }
-      return HealthStatus.BAD;
-    }
-
-    /**
-     * Classify the regression status of the detection config based on the health status for each detector
-     * @param detectorHealthStatus the health status for each detector
-     * @return the overall regression status
-     */
-    private static HealthStatus classifyOverallRegressionStatus(Map<String, HealthStatus> detectorHealthStatus) {
-      if (detectorHealthStatus.values().contains(HealthStatus.GOOD)) {
-        return HealthStatus.GOOD;
-      }
-      if (detectorHealthStatus.values().contains(HealthStatus.MODERATE)) {
-        return HealthStatus.MODERATE;
-      }
-      return HealthStatus.BAD;
+      return RegressionStatus.fromDetectorMapes(detectorMapes);
     }
 
     private AnomalyCoverageStatus buildAnomalyCoverageStatus() {
+      // fetch anomalies
       List<MergedAnomalyResultDTO> anomalies = this.anomalyDAO.findByPredicate(
           Predicate.AND(Predicate.LT(COL_NAME_START_TIME, this.endTime),
               Predicate.GT(COL_NAME_END_TIME, this.startTime),
@@ -298,23 +213,12 @@ public class DetectionHealth {
         }
         intervals.add(new Interval(start, end));
       }
+
+      // compute coverage
       long totalAnomalyCoverage =
           intervals.stream().map(interval -> interval.getEndMillis() - interval.getStartMillis()).reduce(0L, Long::sum);
-
-      AnomalyCoverageStatus coverageStatus = new AnomalyCoverageStatus();
-      coverageStatus.anomalyCoverageRatio = (double) totalAnomalyCoverage / (this.endTime - this.startTime);
-      coverageStatus.healthStatus = classifyCoverageStatus(coverageStatus.anomalyCoverageRatio);
-      return coverageStatus;
-    }
-
-    private static HealthStatus classifyCoverageStatus(double anomalyCoverageRatio) {
-      if (anomalyCoverageRatio > 0.85 || anomalyCoverageRatio < 0.01) {
-        return HealthStatus.BAD;
-      }
-      if (anomalyCoverageRatio > 0.5) {
-        return HealthStatus.MODERATE;
-      }
-      return HealthStatus.GOOD;
+      double coverageRatio = (double) totalAnomalyCoverage / (this.endTime - this.startTime);
+      return AnomalyCoverageStatus.fromCoverageRatio(coverageRatio);
     }
 
     private DetectionTaskStatus buildTaskStatus() {
@@ -326,38 +230,16 @@ public class DetectionHealth {
               Predicate.IN(COL_NAME_TASK_STATUS, new String[]{TaskConstants.TaskStatus.COMPLETED.toString(),
                   TaskConstants.TaskStatus.FAILED.toString(), TaskConstants.TaskStatus.TIMEOUT.toString()})));
       tasks.sort(Comparator.comparingLong(TaskBean::getStartTime).reversed());
+      // limit the task size
+      tasks = tasks.stream().limit(this.taskLimit).collect(Collectors.toList());
 
-      DetectionTaskStatus taskStatus = new DetectionTaskStatus();
-      taskStatus.tasks = tasks.stream().limit(this.taskLimit).collect(Collectors.toList());
-
-      // count the number of tasks by task status
-      Map<TaskConstants.TaskStatus, Long> count =
-          tasks.stream().collect(Collectors.groupingBy(TaskBean::getStatus, Collectors.counting()));
-      if (count.size() != 0) {
-        long completedTasks = count.getOrDefault(TaskConstants.TaskStatus.COMPLETED, 0L);
-        long failedTasks = count.getOrDefault(
-            TaskConstants.TaskStatus.FAILED, 0L);
-        long timeoutTasks = count.getOrDefault(TaskConstants.TaskStatus.TIMEOUT, 0L);
-        taskStatus.taskSuccessRate = (double) completedTasks / (failedTasks +  timeoutTasks + completedTasks);
-      }
-      taskStatus.healthStatus = classifyTaskStatus(taskStatus.taskSuccessRate);
-      return taskStatus;
-    }
-
-    private static HealthStatus classifyTaskStatus(double taskSuccessRate) {
-      if (taskSuccessRate < 0.5) {
-        return HealthStatus.BAD;
-      }
-      if (taskSuccessRate < 0.8) {
-        return HealthStatus.MODERATE;
-      }
-      return HealthStatus.GOOD;
+      return DetectionTaskStatus.fromTasks(tasks);
     }
 
     private static HealthStatus classifyOverallHealth(DetectionHealth health) {
-      HealthStatus taskHealth = health.detectionTaskStatus.healthStatus;
-      HealthStatus regressionHealth = health.regressionStatus.healthStatus;
-      HealthStatus coverageHealth = health.anomalyCoverageStatus.healthStatus;
+      HealthStatus taskHealth = health.detectionTaskStatus.getHealthStatus();
+      HealthStatus regressionHealth = health.regressionStatus.getHealthStatus();
+      HealthStatus coverageHealth = health.anomalyCoverageStatus.getHealthStatus();
 
       Preconditions.checkNotNull(taskHealth);
       Preconditions.checkNotNull(regressionHealth);
