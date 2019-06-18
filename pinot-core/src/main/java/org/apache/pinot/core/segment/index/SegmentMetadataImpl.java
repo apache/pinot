@@ -240,6 +240,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
     //set the table name
     _tableName = segmentMetadataPropertiesConfiguration.getString(TABLE_NAME);
+
     // Set segment name.
     _segmentName = segmentMetadataPropertiesConfiguration.getString(SEGMENT_NAME);
 

@@ -145,30 +145,29 @@ public class ZKMetadataProvider {
   }
 
   public static boolean setOfflineSegmentZKMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore,
-      OfflineSegmentZKMetadata offlineSegmentZKMetadata, int expectedVersion) {
+      String offlineTableName, OfflineSegmentZKMetadata offlineSegmentZKMetadata, int expectedVersion) {
     // NOTE: Helix will throw ZkBadVersionException if version does not match
     try {
-      return propertyStore.set(constructPropertyStorePathForSegment(
-          TableNameBuilder.OFFLINE.tableNameWithType(offlineSegmentZKMetadata.getTableName()),
-          offlineSegmentZKMetadata.getSegmentName()), offlineSegmentZKMetadata.toZNRecord(), expectedVersion,
-          AccessOption.PERSISTENT);
+      return propertyStore
+          .set(constructPropertyStorePathForSegment(offlineTableName, offlineSegmentZKMetadata.getSegmentName()),
+              offlineSegmentZKMetadata.toZNRecord(), expectedVersion, AccessOption.PERSISTENT);
     } catch (ZkBadVersionException e) {
       return false;
     }
   }
 
   public static boolean setOfflineSegmentZKMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore,
-      OfflineSegmentZKMetadata offlineSegmentZKMetadata) {
-    return propertyStore.set(constructPropertyStorePathForSegment(
-        TableNameBuilder.OFFLINE.tableNameWithType(offlineSegmentZKMetadata.getTableName()),
-        offlineSegmentZKMetadata.getSegmentName()), offlineSegmentZKMetadata.toZNRecord(), AccessOption.PERSISTENT);
+      String offlineTableName, OfflineSegmentZKMetadata offlineSegmentZKMetadata) {
+    return propertyStore
+        .set(constructPropertyStorePathForSegment(offlineTableName, offlineSegmentZKMetadata.getSegmentName()),
+            offlineSegmentZKMetadata.toZNRecord(), AccessOption.PERSISTENT);
   }
 
   public static boolean setRealtimeSegmentZKMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore,
-      RealtimeSegmentZKMetadata realtimeSegmentZKMetadata) {
-    return propertyStore.set(constructPropertyStorePathForSegment(
-        TableNameBuilder.REALTIME.tableNameWithType(realtimeSegmentZKMetadata.getTableName()),
-        realtimeSegmentZKMetadata.getSegmentName()), realtimeSegmentZKMetadata.toZNRecord(), AccessOption.PERSISTENT);
+      String realtimeTableName, RealtimeSegmentZKMetadata realtimeSegmentZKMetadata) {
+    return propertyStore
+        .set(constructPropertyStorePathForSegment(realtimeTableName, realtimeSegmentZKMetadata.getSegmentName()),
+            realtimeSegmentZKMetadata.toZNRecord(), AccessOption.PERSISTENT);
   }
 
   @Nullable

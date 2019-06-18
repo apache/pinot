@@ -168,9 +168,9 @@ public class ControllerPeriodicTasksIntegrationTests extends BaseClusterIntegrat
   /**
    * Setup offline table, with segments from avro
    */
-  private void setupOfflineTableAndSegments(String table, List<File> avroFiles) throws Exception {
+  private void setupOfflineTableAndSegments(String tableName, List<File> avroFiles) throws Exception {
     TestUtils.ensureDirectoriesExistAndEmpty(_segmentDir, _tarDir);
-    setTableName(table);
+    setTableName(tableName);
     _realtimeTableConfig = null;
 
     File schemaFile = getSchemaFile();
@@ -184,11 +184,11 @@ public class ControllerPeriodicTasksIntegrationTests extends BaseClusterIntegrat
     Assert.assertNotNull(outgoingTimeUnit);
     String timeType = outgoingTimeUnit.toString();
 
-    addOfflineTable(table, timeColumnName, timeType, TENANT_NAME, TENANT_NAME, null, SegmentVersion.v1, null, null, null);
+    addOfflineTable(tableName, timeColumnName, timeType, TENANT_NAME, TENANT_NAME, null, SegmentVersion.v1, null, null, null);
     completeTableConfiguration();
 
     ExecutorService executor = Executors.newCachedThreadPool();
-    ClusterIntegrationTestUtils.buildSegmentsFromAvro(avroFiles, 0, _segmentDir, _tarDir, table, false,
+    ClusterIntegrationTestUtils.buildSegmentsFromAvro(avroFiles, 0, _segmentDir, _tarDir, tableName, false,
         null, null, null, executor);
     executor.shutdown();
     executor.awaitTermination(10, TimeUnit.MINUTES);

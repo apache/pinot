@@ -251,7 +251,7 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
           realtimeSegmentMetadataToAdd.setSegmentName(segmentId);
 
           // Add the new metadata to the property store
-          ZKMetadataProvider.setRealtimeSegmentZKMetadata(_pinotHelixResourceManager.getPropertyStore(),
+          ZKMetadataProvider.setRealtimeSegmentZKMetadata(_pinotHelixResourceManager.getPropertyStore(), resourceName,
               realtimeSegmentMetadataToAdd);
 
           // Update the ideal state to add the new realtime segment

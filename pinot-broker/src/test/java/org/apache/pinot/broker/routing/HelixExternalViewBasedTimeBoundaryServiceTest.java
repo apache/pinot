@@ -142,11 +142,12 @@ public class HelixExternalViewBasedTimeBoundaryServiceTest {
   private void addSegmentZKMetadata(String rawTableName, int endTimeInDays, TimeUnit timeUnit) {
     for (int i = 1; i <= endTimeInDays; i++) {
       OfflineSegmentZKMetadata offlineSegmentZKMetadata = new OfflineSegmentZKMetadata();
-      offlineSegmentZKMetadata.setTableName(rawTableName);
       offlineSegmentZKMetadata.setSegmentName(rawTableName + i);
       offlineSegmentZKMetadata.setEndTime(i * timeUnit.convert(1L, TimeUnit.DAYS));
       offlineSegmentZKMetadata.setTimeUnit(timeUnit);
-      ZKMetadataProvider.setOfflineSegmentZKMetadata(_propertyStore, offlineSegmentZKMetadata);
+      ZKMetadataProvider
+          .setOfflineSegmentZKMetadata(_propertyStore, TableNameBuilder.OFFLINE.tableNameWithType(rawTableName),
+              offlineSegmentZKMetadata);
     }
   }
 

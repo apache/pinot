@@ -180,8 +180,9 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     return consumerDir.getAbsolutePath();
   }
 
-  public void notifySegmentCommitted(RealtimeSegmentZKMetadata metadata, ImmutableSegment segment) {
-    ZKMetadataProvider.setRealtimeSegmentZKMetadata(_propertyStore, metadata);
+  public void notifySegmentCommitted(String tableNameWithType, RealtimeSegmentZKMetadata metadata,
+      ImmutableSegment segment) {
+    ZKMetadataProvider.setRealtimeSegmentZKMetadata(_propertyStore, tableNameWithType, metadata);
     addSegment(segment);
   }
 

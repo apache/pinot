@@ -244,7 +244,6 @@ public class FlushThresholdUpdaterTest {
     newSegMetadata.setStartOffset(startOffset);
     newSegMetadata.setEndOffset(Long.MAX_VALUE);
     newSegMetadata.setNumReplicas(3);
-    newSegMetadata.setTableName(realtimeTableName);
     newSegMetadata.setSegmentName(newSegmentName.getSegmentName());
     newSegMetadata.setStatus(CommonConstants.Segment.Realtime.Status.IN_PROGRESS);
     return newSegMetadata;

@@ -124,7 +124,6 @@ public class LLRealtimeSegmentDataManagerTest {
   private LLCRealtimeSegmentZKMetadata createZkMetadata() {
 
     LLCRealtimeSegmentZKMetadata segmentZKMetadata = new LLCRealtimeSegmentZKMetadata();
-    segmentZKMetadata.setTableName(_tableName);
     segmentZKMetadata.setSegmentName(_segmentNameStr);
     segmentZKMetadata.setStartOffset(_startOffset);
     return segmentZKMetadata;
