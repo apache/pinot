@@ -47,5 +47,18 @@ public interface TimeSeriesLoader {
    */
   DataFrame load(MetricSlice slice) throws Exception;
 
+  /**
+   * Returns the metric time series for a collection of slices, If the underlying time series resolution
+   * does not correspond to the desired time granularity, it is up-sampled (via forward fill) or down-sampled
+   * (via sum if additive, or last value otherwise) transparently.
+   *
+   * Send the queries in batches for various dimension combinations if possible
+   *
+   * <br/><b>NOTE:</b> if the start timestamp does not align with the time
+   * resolution, it is aligned with the nearest lower time stamp.
+   *
+   * @param slices metric slices to fetch
+   * @return a map of data frame with aligned timestamps and values keyed by metric slices
+   */
   Map<MetricSlice, DataFrame> loadTimeSeries(Collection<MetricSlice> slices) throws Exception;
 }

@@ -82,7 +82,6 @@ import org.apache.pinot.thirdeye.detection.validators.SubscriptionConfigValidato
 import org.apache.pinot.thirdeye.detection.yaml.translator.DetectionConfigTranslator;
 import org.apache.pinot.thirdeye.detection.yaml.translator.SubscriptionConfigTranslator;
 import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
-import org.joda.time.Instant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
@@ -645,10 +644,8 @@ public class YamlResource {
       }
 
       Preconditions.checkNotNull(detectionConfig);
-      long i = System.currentTimeMillis();
       DetectionPipeline pipeline = this.loader.from(this.provider, detectionConfig, start, end);
       result = pipeline.run();
-      LOG.info("Preview took {} milliseconds", System.currentTimeMillis() - i);
 
     } catch (IllegalArgumentException e) {
       return processBadRequestResponse(YamlOperations.PREVIEW.name(), YamlOperations.RUNNING.name(), payload, e);

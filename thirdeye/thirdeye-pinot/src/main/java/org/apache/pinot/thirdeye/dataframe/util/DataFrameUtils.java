@@ -323,6 +323,22 @@ public class DataFrameUtils {
     return new TimeSeriesRequestContainer(request, expressions, start, end, granularity.toPeriod());
   }
 
+  /**
+   * Constructs and wraps a request for a metric with multiple dimension filters. Resolves all
+   * required dependencies from the Thirdeye database. Also aligns start and end timestamps by
+   * rounding them down (start) and up (end) to align with metric time granularity boundaries.
+   * <br/><b>NOTE:</b> the aligned end timestamp is still exclusive.
+   *
+   * @param startTime the start time
+   * @param endTime the end time
+   * @param filters a list of dimension filters
+   * @param timeGranularity the result time granularity
+   * @param reference unique identifier for request
+   * @param metric metric config DTO
+   * @param dataset dataset config DTO
+   * @return TimeSeriesRequestContainer
+   * @throws Exception
+   */
   public static TimeSeriesRequestContainer makeTimeSeriesRequestAlignedBatch(
       long startTime,
       long endTime,

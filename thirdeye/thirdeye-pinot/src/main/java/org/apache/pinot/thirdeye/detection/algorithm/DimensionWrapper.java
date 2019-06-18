@@ -86,7 +86,8 @@ public class DimensionWrapper extends DetectionPipeline {
   // Stop running if the first several dimension combinations all failed.
   private static final int EARLY_STOP_THRESHOLD = 10;
 
-  // the maximum number of time series we fetch in one query
+  // the maximum number of time series we fetch in one query, if too large,
+  // the data fetching might hit the limitations in query sending and result passing
   private static final int BATCH_QUERY_MAX_SIZE = 50;
   private static final long DEFAULT_CACHING_PERIOD_LOOKBACK = -1;
   private static final long CACHING_PERIOD_LOOKBACK_DAILY = TimeUnit.DAYS.toMillis(90);

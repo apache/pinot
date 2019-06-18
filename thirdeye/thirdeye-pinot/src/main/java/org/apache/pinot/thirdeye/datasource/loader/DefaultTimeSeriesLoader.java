@@ -90,7 +90,7 @@ public class DefaultTimeSeriesLoader implements TimeSeriesLoader {
         DatasetConfigDTO dataset = retriveDataset(metric);
         if (dataset.getDataSource().equals(PinotThirdEyeDataSource.class.getSimpleName()) && dataset.isAdditive()
             && !metric.isDimensionAsMetric()) {
-          // if it's pinot data source, batch load the data for multiple dimension values in one query
+          // if it's pinot data source, and the dataset is additive, batch load the data for multiple dimension values in one query
           output.putAll(loadFromBatchQuery(queryGroup, metric, dataset));
         } else {
           for (MetricSlice metricSlice : queryGroup.slices) {
@@ -117,7 +117,7 @@ public class DefaultTimeSeriesLoader implements TimeSeriesLoader {
   private Map<MetricSlice, DataFrame> evaluateResultForQueryGroup(QueryGroup queryGroup, DataFrame df){
     Map<MetricSlice, DataFrame> output = new HashMap<>();
     for (MetricSlice slice: queryGroup.slices) {
-      DataFrame result = df;
+      DataFrame result = df.copy();
       for (Map.Entry<String, Collection<String>> entry: slice.getFilters().asMap().entrySet()){
         // pick the result for the respective dimension values
         result = result.filter(result.getStrings(entry.getKey()).map(
