@@ -188,6 +188,16 @@
 
   <repositories>
     <repository>
+      <id>apache.org</id>
+      <url>https://repo.maven.apache.org/maven2</url>
+      <releases>
+        <enabled>true</enabled>
+      </releases>
+      <snapshots>
+        <enabled>false</enabled>
+      </snapshots>
+    </repository>
+    <repository>
       <id>jboss.org</id>
       <url>http://repository.jboss.org</url>
       <releases>
