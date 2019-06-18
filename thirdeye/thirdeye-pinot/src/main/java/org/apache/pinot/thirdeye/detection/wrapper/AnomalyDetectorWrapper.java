@@ -135,7 +135,7 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
     // detection window unit
     this.windowUnit = TimeUnit.valueOf(MapUtils.getString(config.getProperties(), PROP_WINDOW_UNIT, "DAYS"));
     // run frequency, used to determine moving windows for minute-level detection
-    Map<String, Object> frequency = ConfigUtils.getMap(config.getProperties().get(PROP_FREQUENCY));
+    Map<String, Object> frequency = (Map<String, Object>) MapUtils.getMap(config.getProperties(), PROP_FREQUENCY);
     this.functionFrequency = new TimeGranularity(MapUtils.getIntValue(frequency, "size", 15), TimeUnit.valueOf(MapUtils.getString(frequency, "unit", "MINUTES")));
 
     MetricConfigDTO metricConfigDTO = this.provider.fetchMetrics(Collections.singletonList(this.metricEntity.getId())).get(this.metricEntity.getId());
