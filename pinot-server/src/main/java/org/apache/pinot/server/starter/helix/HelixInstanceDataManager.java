@@ -180,10 +180,8 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     Preconditions.checkNotNull(tableConfig);
 
     Schema schema = null;
-    // For OFFLINE table, try to get schema for default columns
-    if (TableNameBuilder.OFFLINE.tableHasTypeSuffix(tableNameWithType)) {
-      schema = ZKMetadataProvider.getTableSchema(_propertyStore, tableNameWithType);
-    }
+    // For REALTIME and OFFLINE tables, try to get schema for default columns
+    schema = ZKMetadataProvider.getTableSchema(_propertyStore, tableNameWithType);
 
     reloadSegment(tableNameWithType, segmentMetadata, tableConfig, schema);
 
