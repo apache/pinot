@@ -90,11 +90,12 @@ public class RealtimeReplicaGroupSegmentAssignmentStrategy implements SegmentAss
   @Override
   public Map<String, Map<String, String>> rebalanceTable(Map<String, Map<String, String>> currentAssignment,
       Configuration config) {
-    SegmentAssignmentUtils.CompletedConsumingSegmentAssignmentPair pair =
-        new SegmentAssignmentUtils.CompletedConsumingSegmentAssignmentPair(currentAssignment);
+    SegmentAssignmentUtils.CompletedConsumingOfflineSegmentAssignment completedConsumingOfflineSegmentAssignment =
+        new SegmentAssignmentUtils.CompletedConsumingOfflineSegmentAssignment(currentAssignment);
 
     // Rebalance COMPLETED segments first
-    Map<String, Map<String, String>> completedSegmentAssignment = pair.getCompletedSegmentAssignment();
+    Map<String, Map<String, String>> completedSegmentAssignment =
+        completedConsumingOfflineSegmentAssignment.getCompletedSegmentAssignment();
     InstancePartitions instancePartitionsForCompletedSegments = InstancePartitionsUtils
         .fetchOrComputeInstancePartitions(_helixManager, _tableConfig, InstancePartitionsType.COMPLETED);
     Map<Integer, Set<String>> partitionIdToSegmentsMap = new HashMap<>();
@@ -107,7 +108,8 @@ public class RealtimeReplicaGroupSegmentAssignmentStrategy implements SegmentAss
             partitionIdToSegmentsMap);
 
     // Rebalance CONSUMING segments if needed
-    Map<String, Map<String, String>> consumingSegmentAssignment = pair.getConsumingSegmentAssignment();
+    Map<String, Map<String, String>> consumingSegmentAssignment =
+        completedConsumingOfflineSegmentAssignment.getConsumingSegmentAssignment();
     if (config.getBoolean(RebalanceUserConfigConstants.INCLUDE_CONSUMING,
         RebalanceUserConfigConstants.DEFAULT_INCLUDE_CONSUMING)) {
       InstancePartitions instancePartitionsForConsumingSegments = InstancePartitionsUtils
@@ -133,6 +135,10 @@ public class RealtimeReplicaGroupSegmentAssignmentStrategy implements SegmentAss
           SegmentAssignmentUtils.getNumSegmentsToBeMovedPerInstance(completedSegmentAssignment, newAssignment));
       newAssignment.putAll(consumingSegmentAssignment);
     }
+
+    // Keep the OFFLINE segments not moved, and RealtimeSegmentValidationManager will periodically detect the OFFLINE
+    // segments and re-assign them
+    newAssignment.putAll(completedConsumingOfflineSegmentAssignment.getOfflineSegmentAssignment());
 
     return newAssignment;
   }
