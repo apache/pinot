@@ -19,7 +19,6 @@
 
 package org.apache.pinot.thirdeye.detection.yaml.translator;
 
-import java.text.ParseException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -28,61 +27,54 @@ import org.apache.pinot.thirdeye.common.time.TimeGranularity;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
 import org.apache.pinot.thirdeye.detection.DataProvider;
-import org.quartz.CronExpression;
+import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
 
 
 /**
  * A data holder to store the processed information per metric
  */
-class DetectionConfigMetricCache {
+class DetectionMetricAttributeHolder {
 
   private static final String PROP_METRIC = "metric";
   private static final String PROP_DATASET = "dataset";
+  private static final String PROP_CRON = "cron";
 
-  private final Map<String, DetectionMetricProperties> metricCache = new HashMap<>();
+  private final Map<String, DetectionMetricProperties> metricAttributesMap = new HashMap<>();
   private final DataProvider dataProvider;
 
-  DetectionConfigMetricCache(DataProvider provider) {
+  DetectionMetricAttributeHolder(DataProvider provider) {
     this.dataProvider = provider;
   }
 
-  private void loadMetricCache(Map<String, Object> metricAlertConfigMap) {
+  private String loadMetricCache(Map<String, Object> metricAlertConfigMap) {
     String metricName = MapUtils.getString(metricAlertConfigMap, PROP_METRIC);
     String datasetName = MapUtils.getString(metricAlertConfigMap, PROP_DATASET);
+    String cron = MapUtils.getString(metricAlertConfigMap, PROP_CRON);
+    String metricAliasKey = ThirdEyeUtils.constructMetricAlias(datasetName, metricName);
+    if (metricAttributesMap.containsKey(metricAliasKey)) {
+      return metricAliasKey;
+    }
 
     MetricConfigDTO metricConfig = this.dataProvider.fetchMetric(metricName, datasetName);
     DatasetConfigDTO datasetConfig = this.dataProvider.fetchDatasets(Collections.singletonList(metricConfig.getDataset()))
         .get(metricConfig.getDataset());
-    String cron = buildCron(datasetConfig.bucketTimeGranularity());
+    cron = cron == null ? buildCron(datasetConfig.bucketTimeGranularity()) : cron;
 
-    metricCache.put(metricName, new DetectionMetricProperties(cron, metricConfig, datasetConfig));
+    metricAttributesMap.put(metricAliasKey, new DetectionMetricProperties(cron, metricConfig, datasetConfig));
+
+    return metricAliasKey;
   }
 
   DatasetConfigDTO fetchDataset(Map<String, Object> metricAlertConfigMap) {
-    String metricName = MapUtils.getString(metricAlertConfigMap, PROP_METRIC);
-    if (!metricCache.containsKey(metricName)) {
-      loadMetricCache(metricAlertConfigMap);
-    }
-
-    return metricCache.get(metricName).getDatasetConfigDTO();
+    return metricAttributesMap.get(loadMetricCache(metricAlertConfigMap)).getDatasetConfigDTO();
   }
 
   MetricConfigDTO fetchMetric(Map<String, Object> metricAlertConfigMap) {
-    String metricName = MapUtils.getString(metricAlertConfigMap, PROP_METRIC);
-    if (!metricCache.containsKey(metricName)) {
-      loadMetricCache(metricAlertConfigMap);
-    }
-
-    return metricCache.get(metricName).getMetricConfigDTO();
+    return metricAttributesMap.get(loadMetricCache(metricAlertConfigMap)).getMetricConfigDTO();
   }
 
   String fetchCron(Map<String, Object> metricAlertConfigMap) {
-    String metricName = MapUtils.getString(metricAlertConfigMap, PROP_METRIC);
-    if (!metricCache.containsKey(metricName)) {
-      loadMetricCache(metricAlertConfigMap);
-    }
-
-    return metricCache.get(metricName).getCron();
+    return metricAttributesMap.get(loadMetricCache(metricAlertConfigMap)).getCron();
   }
 
   //  Default schedule:

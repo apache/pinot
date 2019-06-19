@@ -169,13 +169,12 @@ public class DetectionConfigTranslator extends ConfigTranslator<DetectionConfigD
         "MIGRATED_ALGORITHM_FILTER");
     DetectionRegistry.registerComponent("com.linkedin.thirdeye.detection.components.AdLibAnomalyDetector",
         "MIGRATED_ALGORITHM");
-    DetectionRegistry.registerComponent(MockGrouper.class.getName(), "MOCK_GROUPER");
   }
   private static final Set<String> MOVING_WINDOW_DETECTOR_TYPES = ImmutableSet.of("ALGORITHM", "MIGRATED_ALGORITHM");
 
   private final Map<String, Object> components = new HashMap<>();
   private DataProvider dataProvider;
-  private DetectionConfigMetricCache metricCache;
+  private DetectionMetricAttributeHolder metricAttributesMap;
 
   public DetectionConfigTranslator(String yamlConfig, DataProvider provider) {
     this(yamlConfig, provider, new DetectionConfigValidator(provider));
@@ -184,13 +183,13 @@ public class DetectionConfigTranslator extends ConfigTranslator<DetectionConfigD
   public DetectionConfigTranslator(String yamlConfig, DataProvider provider, DetectionConfigValidator validator) {
     super(yamlConfig, validator);
     this.dataProvider = provider;
-    this.metricCache = new DetectionConfigMetricCache(provider);
+    this.metricAttributesMap = new DetectionMetricAttributeHolder(provider);
   }
 
   private Map<String, Object> translateMetricAlert(Map<String, Object> metricAlertConfigMap) {
-    DatasetConfigDTO datasetConfigDTO = metricCache.fetchDataset(metricAlertConfigMap);
+    DatasetConfigDTO datasetConfigDTO = metricAttributesMap.fetchDataset(metricAlertConfigMap);
     Map<String, Collection<String>> dimensionFiltersMap = ConfigUtils.getMap(metricAlertConfigMap.get(PROP_FILTERS));
-    String metricUrn = MetricEntity.fromMetric(dimensionFiltersMap, metricCache.fetchMetric(metricAlertConfigMap).getId()).getUrn();
+    String metricUrn = MetricEntity.fromMetric(dimensionFiltersMap, metricAttributesMap.fetchMetric(metricAlertConfigMap).getId()).getUrn();
     Map<String, Object> mergerProperties = ConfigUtils.getMap(metricAlertConfigMap.get(PROP_MERGER));
 
     // Translate all the rules
@@ -294,7 +293,7 @@ public class DetectionConfigTranslator extends ConfigTranslator<DetectionConfigD
       // The legacy type 'COMPOSITE' will be treated as a metric alert along with the new convention METRIC_ALERT.
       // This is applicable only at the root level to maintain backward compatibility.
       properties = translateMetricAlert(yamlConfigMap);
-      cron = metricCache.fetchCron(yamlConfigMap);
+      cron = metricAttributesMap.fetchCron(yamlConfigMap);
     }
 
     return generateDetectionConfig(yamlConfigMap, properties, this.components, cron);
