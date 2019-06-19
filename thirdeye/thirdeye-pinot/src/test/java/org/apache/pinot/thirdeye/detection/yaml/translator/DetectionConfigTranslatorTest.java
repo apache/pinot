@@ -104,4 +104,22 @@ public class DetectionConfigTranslatorTest {
     DetectionConfigTranslator translator = new DetectionConfigTranslator(yamlConfig, this.provider);
     translator.translate();
   }
+
+  @Test
+  public void testBuildEntityTranslationWithOneMetric() throws Exception {
+    String yamlConfig = IOUtils.toString(this.getClass().getResourceAsStream("pipeline-config-4.yaml"), "UTF-8");
+    DetectionConfigTranslator translator = new DetectionConfigTranslator(yamlConfig, this.provider);
+    DetectionConfigDTO result = translator.translate();
+    YamlTranslationResult expected = OBJECT_MAPPER.readValue(this.getClass().getResourceAsStream("compositePipelineTranslatorTestResult-4.json"), YamlTranslationResult.class);
+    Assert.assertEquals(result.getProperties(), expected.getProperties());
+  }
+
+  @Test
+  public void testBuildEntityTranslationWithMultipleMetrics() throws Exception {
+    String yamlConfig = IOUtils.toString(this.getClass().getResourceAsStream("pipeline-config-5.yaml"), "UTF-8");
+    DetectionConfigTranslator translator = new DetectionConfigTranslator(yamlConfig, this.provider);
+    DetectionConfigDTO result = translator.translate();
+    YamlTranslationResult expected = OBJECT_MAPPER.readValue(this.getClass().getResourceAsStream("compositePipelineTranslatorTestResult-5.json"), YamlTranslationResult.class);
+    Assert.assertEquals(result.getProperties(), expected.getProperties());
+  }
 }

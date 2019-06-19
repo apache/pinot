@@ -19,6 +19,7 @@
 
 package org.apache.pinot.thirdeye.detection.yaml.translator;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -38,6 +39,7 @@ import org.apache.pinot.thirdeye.detection.DataProvider;
 import org.apache.pinot.thirdeye.detection.DetectionUtils;
 import org.apache.pinot.thirdeye.detection.algorithm.DimensionWrapper;
 import org.apache.pinot.thirdeye.detection.annotation.registry.DetectionRegistry;
+import org.apache.pinot.thirdeye.detection.components.MockGrouper;
 import org.apache.pinot.thirdeye.detection.validators.DetectionConfigValidator;
 import org.apache.pinot.thirdeye.detection.wrapper.AnomalyDetectorWrapper;
 import org.apache.pinot.thirdeye.detection.wrapper.AnomalyFilterWrapper;
@@ -127,8 +129,6 @@ public class DetectionConfigTranslator extends ConfigTranslator<DetectionConfigD
   private static final String PROP_CRON = "cron";
   private static final String PROP_FILTER = "filter";
   private static final String PROP_FILTERS = "filters";
-  private static final String PROP_METRIC = "metric";
-  private static final String PROP_DATASET = "dataset";
   private static final String PROP_TYPE = "type";
   private static final String PROP_CLASS_NAME = "className";
   private static final String PROP_PARAMS = "params";
@@ -157,6 +157,11 @@ public class DetectionConfigTranslator extends ConfigTranslator<DetectionConfigD
   private static final String PROP_DESC_NAME = "description";
   private static final String PROP_ACTIVE = "active";
 
+  private static final String PROP_ALERTS = "alerts";
+  private static final String COMPOSITE_ALERT = "COMPOSITE_ALERT";
+  private static final String METRIC_ALERT = "METRIC_ALERT";
+
+
   private static final DetectionRegistry DETECTION_REGISTRY = DetectionRegistry.getInstance();
   static {
     // do not tune for alerts migrated from legacy anomaly function.
@@ -169,6 +174,7 @@ public class DetectionConfigTranslator extends ConfigTranslator<DetectionConfigD
 
   private final Map<String, Object> components = new HashMap<>();
   private DataProvider dataProvider;
+  private DetectionMetricAttributeHolder metricAttributesMap;
 
   public DetectionConfigTranslator(String yamlConfig, DataProvider provider) {
     this(yamlConfig, provider, new DetectionConfigValidator(provider));
@@ -177,28 +183,23 @@ public class DetectionConfigTranslator extends ConfigTranslator<DetectionConfigD
   public DetectionConfigTranslator(String yamlConfig, DataProvider provider, DetectionConfigValidator validator) {
     super(yamlConfig, validator);
     this.dataProvider = provider;
+    this.metricAttributesMap = new DetectionMetricAttributeHolder(provider);
   }
 
-  @Override
-  DetectionConfigDTO translateConfig(Map<String, Object> yamlConfigMap) throws IllegalArgumentException {
-    Map<String, Collection<String>> dimensionFiltersMap = ConfigUtils.getMap(yamlConfigMap.get(PROP_FILTERS));
+  private Map<String, Object> translateMetricAlert(Map<String, Object> metricAlertConfigMap) {
+    DatasetConfigDTO datasetConfigDTO = metricAttributesMap.fetchDataset(metricAlertConfigMap);
+    Map<String, Collection<String>> dimensionFiltersMap = ConfigUtils.getMap(metricAlertConfigMap.get(PROP_FILTERS));
+    String metricUrn = MetricEntity.fromMetric(dimensionFiltersMap, metricAttributesMap.fetchMetric(metricAlertConfigMap).getId()).getUrn();
+    Map<String, Object> mergerProperties = ConfigUtils.getMap(metricAlertConfigMap.get(PROP_MERGER));
 
-    MetricConfigDTO metricConfig = this.dataProvider.fetchMetric(MapUtils.getString(yamlConfigMap, PROP_METRIC),
-        MapUtils.getString(yamlConfigMap, PROP_DATASET));
-    DatasetConfigDTO datasetConfig = this.dataProvider.fetchDatasets(Collections.singletonList(metricConfig.getDataset()))
-        .get(metricConfig.getDataset());
-    String metricUrn = MetricEntity.fromMetric(dimensionFiltersMap, metricConfig.getId()).getUrn();
-
-    String detectionCronInYaml = MapUtils.getString(yamlConfigMap, PROP_CRON);
-    String cron = (detectionCronInYaml == null) ? buildCron(datasetConfig.bucketTimeGranularity()) : detectionCronInYaml;
-    Map<String, Object> mergerProperties = ConfigUtils.getMap(yamlConfigMap.get(PROP_MERGER));
-
-    List<Map<String, Object>> ruleYamls = getList(yamlConfigMap.get(PROP_RULES));
+    // Translate all the rules
+    List<Map<String, Object>> ruleYamls = getList(metricAlertConfigMap.get(PROP_RULES));
     List<Map<String, Object>> nestedPipelines = new ArrayList<>();
     for (Map<String, Object> ruleYaml : ruleYamls) {
       List<Map<String, Object>> filterYamls = ConfigUtils.getList(ruleYaml.get(PROP_FILTER));
       List<Map<String, Object>> detectionYamls = ConfigUtils.getList(ruleYaml.get(PROP_DETECTION));
-      List<Map<String, Object>> detectionProperties = buildListOfMergeWrapperProperties(detectionYamls, mergerProperties, datasetConfig.bucketTimeGranularity());
+      List<Map<String, Object>> detectionProperties = buildListOfMergeWrapperProperties(detectionYamls, mergerProperties,
+          datasetConfigDTO.bucketTimeGranularity());
       if (filterYamls.isEmpty()) {
         nestedPipelines.addAll(detectionProperties);
       } else {
@@ -210,16 +211,89 @@ public class DetectionConfigTranslator extends ConfigTranslator<DetectionConfigD
         nestedPipelines.addAll(filterNestedProperties);
       }
     }
+
+    // Wrap with dimension exploration properties
     Map<String, Object> dimensionWrapperProperties = buildDimensionWrapperProperties(
-        yamlConfigMap, dimensionFiltersMap, metricUrn, datasetConfig.getDataset());
+        metricAlertConfigMap, dimensionFiltersMap, metricUrn, datasetConfigDTO.getDataset());
     Map<String, Object> properties = buildWrapperProperties(
         ChildKeepingMergeWrapper.class.getName(),
         Collections.singletonList(buildWrapperProperties(DimensionWrapper.class.getName(), nestedPipelines, dimensionWrapperProperties)),
         mergerProperties);
 
-    List<Map<String, Object>> grouperYamls = getList(yamlConfigMap.get(PROP_GROUPER));
+    // Wrap with metric level grouper, restricting to only 1 grouper
+    List<Map<String, Object>> grouperYamls = getList(metricAlertConfigMap.get(PROP_GROUPER));
     if (!grouperYamls.isEmpty()) {
-      properties = buildGroupWrapperProperties(grouperYamls.get(0), properties);
+      properties = buildGroupWrapperProperties(grouperYamls.get(0), Collections.singletonList(properties));
+    }
+
+    return properties;
+  }
+
+  private Map<String, Object> translateCompositeAlert(Map<String, Object> compositeAlertConfigMap) {
+    Map<String, Object> properties;
+
+    // Recursively translate all the sub-alerts
+    List<Map<String, Object>> subDetectionYamls = ConfigUtils.getList(compositeAlertConfigMap.get(PROP_ALERTS));
+    List<Map<String, Object>> nestedPropertiesList = new ArrayList<>();
+    for (Map<String, Object> subDetectionYaml : subDetectionYamls) {
+      Map<String, Object> subProps;
+      if (subDetectionYaml.containsKey(PROP_TYPE) && subDetectionYaml.get(PROP_TYPE).equals(COMPOSITE_ALERT)) {
+        subProps = translateCompositeAlert(subDetectionYaml);
+      } else {
+        subProps = translateMetricAlert(subDetectionYaml);
+      }
+
+      nestedPropertiesList.add(subProps);
+    }
+
+    // Wrap the entity level grouper, only 1 grouper is supported now
+    List<Map<String, Object>> grouperProps = ConfigUtils.getList(compositeAlertConfigMap.get(PROP_GROUPER));
+    if (!grouperProps.isEmpty()) {
+      properties = buildGroupWrapperProperties(grouperProps.get(0), nestedPropertiesList);
+    } else {
+      Map<String, Object> defaultGrouper = new HashMap<>();
+      defaultGrouper.put(PROP_TYPE, "MOCK_GROUPER");
+      defaultGrouper.put(PROP_NAME, "Default grouper");
+      properties = buildGroupWrapperProperties(defaultGrouper, nestedPropertiesList);
+    }
+
+    // Wrap the entity level merger
+    Map<String, Object> mergerProperties = ConfigUtils.getMap(compositeAlertConfigMap.get(PROP_MERGER));
+    properties = buildWrapperProperties(
+        ChildKeepingMergeWrapper.class.getName(),
+        Collections.singletonList(properties),
+        mergerProperties);
+
+    return properties;
+  }
+
+  @Override
+  DetectionConfigDTO translateConfig(Map<String, Object> yamlConfigMap) throws IllegalArgumentException {
+    // Hack to support 'detectionName' attribute at root level and 'name' attribute elsewhere
+    // We consistently use 'name' as a convention to define the sub-alerts. However, at the root
+    // level, as a convention, we will use 'detectionName' which defines the name of the complete alert.
+    String alertName = MapUtils.getString(yamlConfigMap, PROP_DETECTION_NAME);
+    yamlConfigMap.put(PROP_NAME, alertName);
+
+    // By default if 'type' is not specified, we assume it as a METRIC_ALERT
+    if (!yamlConfigMap.containsKey(PROP_TYPE)) {
+      yamlConfigMap.put(PROP_TYPE, METRIC_ALERT);
+    }
+
+    // Translate config depending on the type (METRIC_ALERT OR COMPOSITE_ALERT)
+    Map<String, Object> properties;
+    String cron;
+    if (yamlConfigMap.get(PROP_TYPE).equals(COMPOSITE_ALERT)) {
+      properties = translateCompositeAlert(yamlConfigMap);
+
+      // TODO: discuss strategy for default cron
+      Preconditions.checkArgument(yamlConfigMap.containsKey(PROP_CRON), "Missing property (" + PROP_CRON + ") in alert");
+      cron = MapUtils.getString(yamlConfigMap, PROP_CRON);
+    } else {
+      // The legacy type 'COMPOSITE' will be treated as a metric alert along with the new convention METRIC_ALERT.
+      // This is applicable only at the root level to maintain backward compatibility.
+      properties = translateMetricAlert(yamlConfigMap);
+      cron = metricAttributesMap.fetchCron(yamlConfigMap);
     }
 
     return generateDetectionConfig(yamlConfigMap, properties, this.components, cron);
@@ -281,10 +355,10 @@ public class DetectionConfigTranslator extends ConfigTranslator<DetectionConfigD
     return properties;
   }
 
-  private Map<String, Object> buildGroupWrapperProperties(Map<String, Object> grouperYaml, Map<String, Object> nestedProps) {
+  private Map<String, Object> buildGroupWrapperProperties(Map<String, Object> grouperYaml, List<Map<String, Object>> nestedProps) {
     Map<String, Object> properties = new HashMap<>();
     properties.put(PROP_CLASS_NAME, GrouperWrapper.class.getName());
-    properties.put(PROP_NESTED, Collections.singletonList(nestedProps));
+    properties.put(PROP_NESTED, nestedProps);
 
     String grouperType = MapUtils.getString(grouperYaml, PROP_TYPE);
     String grouperName = MapUtils.getString(grouperYaml, PROP_NAME);
@@ -387,24 +461,6 @@ public class DetectionConfigTranslator extends ConfigTranslator<DetectionConfigD
     properties.put(PROP_NESTED, wrapperNestedProperties);
     properties.putAll(defaultProperties);
     return properties;
-  }
-
-  //  Default schedule:
-  //  minute granularity: every 15 minutes, starts at 0 minute
-  //  hourly: every hour, starts at 0 minute
-  //  daily: every day, starts at 2 pm UTC
-  //  others: every day, start at 12 am UTC
-  private String buildCron(TimeGranularity timegranularity) {
-    switch (timegranularity.getUnit()) {
-      case MINUTES:
-        return "0 0/15 * * * ? *";
-      case HOURS:
-        return "0 0 * * * ? *";
-      case DAYS:
-        return "0 0 14 * * ? *";
-      default:
-        return "0 0 0 * * ?";
-    }
   }
 
   private void buildComponentSpec(Map<String, Object> yamlConfig, String type, String componentRefKey) {
