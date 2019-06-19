@@ -19,10 +19,9 @@
 package org.apache.pinot.controller.helix.core.util;
 
 import com.google.common.base.Preconditions;
-import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.helix.AccessOption;
 import org.apache.helix.HelixAdmin;
@@ -39,12 +38,10 @@ import org.apache.helix.manager.zk.ZKHelixManager;
 import org.apache.helix.manager.zk.ZNRecordSerializer;
 import org.apache.helix.manager.zk.ZkBaseDataAccessor;
 import org.apache.helix.manager.zk.ZkClient;
-import org.apache.helix.messaging.handling.HelixTaskExecutor;
 import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.HelixConfigScope.ConfigScopeProperty;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.MasterSlaveSMD;
-import org.apache.helix.model.Message.MessageType;
 import org.apache.helix.model.StateModelDefinition;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -70,28 +67,30 @@ import static org.apache.pinot.common.utils.CommonConstants.Helix.REBALANCE_DELA
 public class HelixSetupUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixSetupUtils.class);
 
-  public static synchronized HelixManager setup(String helixClusterName, String zkPath,
-      String helixControllerInstanceId) {
-    setupHelixCluster(helixClusterName, zkPath);
-
-    return startHelixControllerInStandadloneMode(helixClusterName, zkPath, helixControllerInstanceId);
+  public static HelixManager setup(String helixClusterName, String zkPath, String helixControllerInstanceId) {
+    setupHelixClusterIfNeeded(helixClusterName, zkPath);
+    return startHelixControllerInStandaloneMode(helixClusterName, zkPath, helixControllerInstanceId);
   }
 
   /**
    * Set up a brand new Helix cluster if it doesn't exist.
    */
-  public static void setupHelixCluster(String helixClusterName, String zkPath) {
-    final HelixAdmin admin = new ZKHelixAdmin(zkPath);
+  private static void setupHelixClusterIfNeeded(String helixClusterName, String zkPath) {
+    HelixAdmin admin = new ZKHelixAdmin(zkPath);
     if (admin.getClusters().contains(helixClusterName)) {
       LOGGER.info("Helix cluster: {} already exists", helixClusterName);
-      return;
+    } else {
+      LOGGER.info("Creating a new Helix cluster: {}", helixClusterName);
+      admin.addCluster(helixClusterName, false);
+      // Enable Auto-Join for the cluster
+      HelixConfigScope configScope =
+          new HelixConfigScopeBuilder(ConfigScopeProperty.CLUSTER).forCluster(helixClusterName).build();
+      admin.setConfig(configScope, Collections.singletonMap(ZKHelixManager.ALLOW_PARTICIPANT_AUTO_JOIN, "true"));
+      LOGGER.info("New Helix cluster: {} created", helixClusterName);
     }
-    LOGGER.info("Creating a new Helix cluster: {}", helixClusterName);
-    admin.addCluster(helixClusterName, false);
-    LOGGER.info("New Cluster: {} created.", helixClusterName);
   }
 
-  private static HelixManager startHelixControllerInStandadloneMode(String helixClusterName, String zkUrl,
+  private static HelixManager startHelixControllerInStandaloneMode(String helixClusterName, String zkUrl,
       String pinotControllerInstanceId) {
     LOGGER.info("Starting Helix Standalone Controller ... ");
     return HelixControllerMain
@@ -107,9 +106,6 @@ public class HelixSetupUtils {
     Preconditions.checkState(admin.getClusters().contains(helixClusterName),
         String.format("Helix cluster: %s hasn't been set up", helixClusterName));
 
-    // Ensure auto join.
-    ensureAutoJoin(helixClusterName, admin);
-
     // Add segment state model definition if needed
     addSegmentStateModelDefinitionIfNeeded(helixClusterName, admin, zkPath, isUpdateStateModel);
 
@@ -121,23 +117,6 @@ public class HelixSetupUtils {
 
     // Init property store if needed
     initPropertyStoreIfNeeded(helixClusterName, zkPath);
-  }
-
-  private static void ensureAutoJoin(String helixClusterName, HelixAdmin admin) {
-    final HelixConfigScope scope =
-        new HelixConfigScopeBuilder(ConfigScopeProperty.CLUSTER).forCluster(helixClusterName).build();
-    String stateTransitionMaxThreads = MessageType.STATE_TRANSITION + "." + HelixTaskExecutor.MAX_THREADS;
-    List<String> keys = new ArrayList<>();
-    keys.add(ZKHelixManager.ALLOW_PARTICIPANT_AUTO_JOIN);
-    keys.add(stateTransitionMaxThreads);
-    Map<String, String> configs = admin.getConfig(scope, keys);
-    if (!Boolean.TRUE.toString().equals(configs.get(ZKHelixManager.ALLOW_PARTICIPANT_AUTO_JOIN))) {
-      configs.put(ZKHelixManager.ALLOW_PARTICIPANT_AUTO_JOIN, Boolean.TRUE.toString());
-    }
-    if (!Integer.toString(1).equals(configs.get(stateTransitionMaxThreads))) {
-      configs.put(stateTransitionMaxThreads, String.valueOf(1));
-    }
-    admin.setConfig(scope, configs);
   }
 
   private static void addSegmentStateModelDefinitionIfNeeded(String helixClusterName, HelixAdmin admin, String zkPath,
