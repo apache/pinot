@@ -18,11 +18,25 @@
     stroke-opacity: 0.5;
 	  fill: #1CAFED;
     opacity: 0.5
- }
+  }
    path.sub-confidence-bounds {
      stroke: #1CAFED;
      stroke-opacity: 0.5;
      fill: #1CAFED;
      opacity: 0.5
+  }
+
+  .c3-legend-item-Baseline > .c3-legend-item-tile {
+    stroke-dasharray: 2,2;
+    stroke-width: 3
+  }
+
+  .c3-legend-item-Predicted > .c3-legend-item-tile {
+    stroke-dasharray: 2,2;
+    stroke-width: 3
+  }
+
+  .c3-legend-item-Current > .c3-legend-item-tile {
+    stroke-width: 3
   }
 };
