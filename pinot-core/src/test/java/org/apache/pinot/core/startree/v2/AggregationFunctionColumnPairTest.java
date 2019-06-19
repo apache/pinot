@@ -73,6 +73,15 @@ public class AggregationFunctionColumnPairTest {
     Assert.assertEquals(fromColumnName, pair);
     Assert.assertEquals(fromColumnName.hashCode(), pair.hashCode());
 
+    pair = new AggregationFunctionColumnPair(AggregationFunctionType.DISTINCTCOUNTRAWHLL, COLUMN);
+    Assert.assertEquals(pair.getFunctionType(), AggregationFunctionType.DISTINCTCOUNTRAWHLL);
+    Assert.assertEquals(pair.getColumn(), COLUMN);
+    columnName = pair.toColumnName();
+    Assert.assertEquals(columnName, "distinctCountRawHLL__column");
+    fromColumnName = AggregationFunctionColumnPair.fromColumnName(columnName);
+    Assert.assertEquals(fromColumnName, pair);
+    Assert.assertEquals(fromColumnName.hashCode(), pair.hashCode());
+
     pair = new AggregationFunctionColumnPair(AggregationFunctionType.PERCENTILEEST, COLUMN);
     Assert.assertEquals(pair.getFunctionType(), AggregationFunctionType.PERCENTILEEST);
     Assert.assertEquals(pair.getColumn(), COLUMN);
