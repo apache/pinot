@@ -150,7 +150,7 @@ export default Controller.extend({
             format: (d) => {
               const t = makeTime(d);
               if (t.valueOf() === t.clone().startOf('day').valueOf()) {
-                return t.format('MMM D (ddd)');
+                return t.format('MMM D');
               }
               return t.format('h:mm a');
             }
