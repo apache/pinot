@@ -13,11 +13,24 @@ export function getAnomalyDataUrl(anomalyId) {
  * Returns url for getting the Anomalies for a given YAML configuration so user can preview
  * @param {Number} startTime - the anomaly start time
  * @param {Number} endTime - the anomaly end time
+ * @param {String} alertId - optional alert id that will call /yaml/preview/{id} if provided
  * @returns {String} the complete yaml/preview url
- * @example getAnomaliesForYamlPreview(1508472700000, 1508472800000) // yields => /yaml/preview?start=1508472700000&end=1508472800000&tuningStart=0&tuningEnd=0
+ * @example getAnomaliesForYamlPreviewUrl(1508472700000, 1508472800000) // yields => /yaml/preview?start=1508472700000&end=1508472800000&tuningStart=0&tuningEnd=0
  */
 export function getAnomaliesForYamlPreviewUrl(startTime, endTime, alertId) {
   return `/yaml/preview${alertId ? `/${alertId}` : ''}?start=${startTime}&end=${endTime}&tuningStart=0&tuningEnd=0`;
+}
+
+/**
+ * Returns url for getting the time series and Anomalies for a given detection id
+ * @param {String} detectionId - the detection id
+ * @param {Number} startTime - the anomaly start time
+ * @param {Number} endTime - the anomaly end time
+ * @returns {String} the complete yaml/preview url
+ * @example getBoundsAndAnomalies(111111, 1508472700000, 1508472800000) // yields => /detection/preview/111111?start=1508472700000&end=1508472800000&diagnostics=true
+ */
+export function getBoundsAndAnomaliesUrl(detectionId, startTime, endTime) {
+  return `/detection/preview/${detectionId}?start=${startTime}&end=${endTime}&diagnostics=true`;
 }
 
 /**
@@ -57,7 +70,8 @@ export const anomalyApiUrls = {
   getAnomaliesForYamlPreviewUrl,
   getAnomaliesByAlertIdUrl,
   getAnomalyFiltersByTimeRangeUrl,
-  getAnomalyFiltersByAnomalyIdUrl
+  getAnomalyFiltersByAnomalyIdUrl,
+  getBoundsAndAnomaliesUrl
 };
 
 export default {

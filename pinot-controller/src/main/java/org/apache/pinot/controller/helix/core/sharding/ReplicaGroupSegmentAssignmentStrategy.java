@@ -52,18 +52,17 @@ public class ReplicaGroupSegmentAssignmentStrategy implements SegmentAssignmentS
 
   @Override
   public List<String> getAssignedInstances(HelixManager helixManager, HelixAdmin helixAdmin,
-      ZkHelixPropertyStore<ZNRecord> propertyStore, String helixClusterName, SegmentMetadata segmentMetadata,
-      int numReplicas, String tenantName) {
-    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(segmentMetadata.getTableName());
+      ZkHelixPropertyStore<ZNRecord> propertyStore, String helixClusterName, String tableNameWithType,
+      SegmentMetadata segmentMetadata, int numReplicas, String tenantName) {
 
     // Fetch the partition mapping table from the property store.
     ReplicaGroupPartitionAssignmentGenerator partitionAssignmentGenerator =
         new ReplicaGroupPartitionAssignmentGenerator(propertyStore);
     ReplicaGroupPartitionAssignment replicaGroupPartitionAssignment =
-        partitionAssignmentGenerator.getReplicaGroupPartitionAssignment(offlineTableName);
+        partitionAssignmentGenerator.getReplicaGroupPartitionAssignment(tableNameWithType);
 
     // Fetch the segment assignment related configurations.
-    TableConfig tableConfig = ZKMetadataProvider.getTableConfig(propertyStore, offlineTableName);
+    TableConfig tableConfig = ZKMetadataProvider.getTableConfig(propertyStore, tableNameWithType);
     ReplicaGroupStrategyConfig replicaGroupStrategyConfig =
         tableConfig.getValidationConfig().getReplicaGroupStrategyConfig();
     boolean mirrorAssignmentAcrossReplicaGroups = replicaGroupStrategyConfig.getMirrorAssignmentAcrossReplicaGroups();
@@ -98,8 +97,8 @@ public class ReplicaGroupSegmentAssignmentStrategy implements SegmentAssignmentS
       selectedInstanceList.add(instancesInReplicaGroup.get(index));
     }
 
-    LOGGER.info("Segment assignment result for : " + segmentMetadata.getName() + ", in resource : " + segmentMetadata
-        .getTableName() + ", selected instances: " + Arrays.toString(selectedInstanceList.toArray()));
+    LOGGER.info("Segment assignment result for : " + segmentMetadata.getName() + ", in resource : " + tableNameWithType
+        + ", selected instances: " + Arrays.toString(selectedInstanceList.toArray()));
 
     return selectedInstanceList;
   }

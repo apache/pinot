@@ -54,7 +54,6 @@ class SegmentQueryProcessor {
   private final SegmentMetadataImpl _metadata;
   private final ImmutableSegment _immutableSegment;
 
-  private final String _tableName;
   private final String _segmentName;
   private final int _totalDocs;
 
@@ -64,7 +63,6 @@ class SegmentQueryProcessor {
 
     _immutableSegment = ImmutableSegmentLoader.load(_segmentDir, ReadMode.mmap);
     _metadata = new SegmentMetadataImpl(_segmentDir);
-    _tableName = _metadata.getTableName();
     _segmentName = _metadata.getName();
 
     _totalDocs = _metadata.getTotalDocs();
@@ -139,12 +137,6 @@ class SegmentQueryProcessor {
   }
 
   private boolean pruneSegment(BrokerRequest brokerRequest) {
-    // Check if segment belongs to the table being queried.
-    if (!_tableName.equals(brokerRequest.getQuerySource().getTableName())) {
-      LOGGER.debug("Skipping segment {} from different table {}", _segmentName, _tableName);
-      return true;
-    }
-
     // Check if any column in the query does not exist in the segment.
     Set<String> allColumns = _metadata.getAllColumns();
     if (brokerRequest.isSetAggregationsInfo()) {

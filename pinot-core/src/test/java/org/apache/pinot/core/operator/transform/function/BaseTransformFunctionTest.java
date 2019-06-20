@@ -86,9 +86,9 @@ public abstract class BaseTransformFunctionTest {
     for (int i = 0; i < NUM_ROWS; i++) {
       _intSVValues[i] = RANDOM.nextInt();
       _longSVValues[i] = RANDOM.nextLong();
-      _floatSVValues[i] = RANDOM.nextFloat();
-      _doubleSVValues[i] = RANDOM.nextDouble();
-      _stringSVValues[i] = Double.toString(RANDOM.nextDouble());
+      _floatSVValues[i] = _intSVValues[i] * RANDOM.nextFloat();
+      _doubleSVValues[i] = _intSVValues[i] * RANDOM.nextDouble();
+      _stringSVValues[i] = Double.toString(_intSVValues[i] * RANDOM.nextDouble());
 
       int numValues = 1 + RANDOM.nextInt(MAX_NUM_MULTI_VALUES);
       _intMVValues[i] = new int[numValues];

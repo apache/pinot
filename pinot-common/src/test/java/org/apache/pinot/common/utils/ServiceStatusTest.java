@@ -79,7 +79,8 @@ public class ServiceStatusTest {
   public static final String TABLE_NAME = "myTable_OFFLINE";
   public static final String INSTANCE_NAME = "Server_1.2.3.4_1234";
 
-  private static final String CHARS_IN_RANDOM_TABLE_NAME = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  private static final String CHARS_IN_RANDOM_TABLE_NAME =
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
   private static Random random;
 
   @BeforeClass
@@ -217,7 +218,8 @@ public class ServiceStatusTest {
   // Create a ServiceStatus object that monitors about 2500 tables
   // and returns
   @Test
-  public void testMultipleResourcesAndPercent() throws Exception {
+  public void testMultipleResourcesAndPercent()
+      throws Exception {
     testMultipleResourcesAndPercent(98.6);
     testMultipleResourcesAndPercent(99.3);
     testMultipleResourcesAndPercent(99.5);
@@ -240,7 +242,7 @@ public class ServiceStatusTest {
       tables.add(tableName);
       final String segmentName = "segment1";
       String evState;
-      if (random.nextDouble() *100  < percentReady) {
+      if (random.nextDouble() * 100 < percentReady) {
         evState = "ONLINE";
         readyTables++;
       } else {
@@ -255,16 +257,16 @@ public class ServiceStatusTest {
       externalViews.put(tableName, externalView);
     }
 
-    final double actualReadyPercent = (double)readyTables * 100 / tableCount;
+    final double actualReadyPercent = (double) readyTables * 100 / tableCount;
     double lowestReadyPercent = (int) Math.round(actualReadyPercent);
-    lowestReadyPercent = lowestReadyPercent > 2 ? lowestReadyPercent - 2: 1;  // Should be 2 below  percentReady
+    lowestReadyPercent = lowestReadyPercent > 2 ? lowestReadyPercent - 2 : 1;  // Should be 2 below  percentReady
 
     // Create ServiceCallback objects with minReadyPercent set to values between lowestReadyPercent and 100.
     // Call getServiceStatus() enough number of times so that we are only left with the tables
     // that are not ready yet. We need to call getServiceStatus() at most tableCount times.
     for (double minReadyPercent = lowestReadyPercent; minReadyPercent <= 100; minReadyPercent += 0.1) {
-      TestMultiResourceISAndEVMatchCB callback = new TestMultiResourceISAndEVMatchCB(clusterName, INSTANCE_NAME, tables,
-          minReadyPercent);
+      TestMultiResourceISAndEVMatchCB callback =
+          new TestMultiResourceISAndEVMatchCB(clusterName, INSTANCE_NAME, tables, minReadyPercent);
       callback.setIdealStates(idealStates);
       callback.setExternalViews(externalViews);
 
@@ -277,17 +279,17 @@ public class ServiceStatusTest {
         status = callback.getServiceStatus();
       }
 
-      ServiceStatus.Status expected = minReadyPercent > actualReadyPercent ?
-          ServiceStatus.Status.STARTING : ServiceStatus.Status.GOOD;
-      String errorMsg = "Mismatch at " + minReadyPercent + "%, tableCount=" + tableCount +
-          ", percentTablesReady=" + actualReadyPercent + ":" + callback.getStatusDescription();
+      ServiceStatus.Status expected =
+          minReadyPercent > actualReadyPercent ? ServiceStatus.Status.STARTING : ServiceStatus.Status.GOOD;
+      String errorMsg = "Mismatch at " + minReadyPercent + "%, tableCount=" + tableCount + ", percentTablesReady="
+          + actualReadyPercent + ":" + callback.getStatusDescription();
       Assert.assertEquals(status, expected, errorMsg);
 
       // The status should never change going forward from here.
       for (int i = nBadTables + 1; i < tableCount; i++) {
         ServiceStatus.Status laterStatus = callback.getServiceStatus();
-        String msg = "Mismatch at " + minReadyPercent + "%, tableCount=" + tableCount +
-            ", percentTablesReady=" + actualReadyPercent + ", i=" + i + ":" + callback.getStatusDescription();
+        String msg = "Mismatch at " + minReadyPercent + "%, tableCount=" + tableCount + ", percentTablesReady="
+            + actualReadyPercent + ", i=" + i + ":" + callback.getStatusDescription();
         Assert.assertEquals(laterStatus, status, msg);
       }
     }
@@ -325,8 +327,8 @@ public class ServiceStatusTest {
     public Map<String, IdealState> _idealStates = new HashMap<>();
     public Map<String, ExternalView> _externalViews = new HashMap<>();
 
-    public TestMultiResourceISAndEVMatchCB(String clusterName, String instanceName,
-        List<String> resourcesToMonitor, double minResourcesPercent) {
+    public TestMultiResourceISAndEVMatchCB(String clusterName, String instanceName, List<String> resourcesToMonitor,
+        double minResourcesPercent) {
       super(Mockito.mock(HelixManager.class), clusterName, instanceName, resourcesToMonitor, minResourcesPercent);
     }
 

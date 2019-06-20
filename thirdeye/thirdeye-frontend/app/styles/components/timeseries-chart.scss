@@ -1,28 +1,42 @@
 // Overriding default c3
 
 .timeseries-chart {
-  .c3-target-baseline {
+  .c3-target-Baseline {
     stroke-dasharray: 2,2;
   }
-  .c3-target-predicted {
+  .c3-target-Predicted {
     stroke-dasharray: 2,2;
   }
-  .c3-target-upperBound {
+  .c3-target-Upper-and-lower-bound{
     opacity: 0.5 !important;
   }
   .c3-target-lowerBound {
     opacity: 0.5 !important;
   }
   path.confidence-bounds {
-    stroke: #dcf8f3;
+    stroke: #1CAFED;
     stroke-opacity: 0.5;
-	  fill: #dcf8f3;
+	  fill: #1CAFED;
     opacity: 0.5
- }
- path.sub-confidence-bounds {
-   stroke: #dcf8f3;
-   stroke-opacity: 0.5;
-   fill: #dcf8f3;
-   opacity: 0.5
-}
+  }
+   path.sub-confidence-bounds {
+     stroke: #1CAFED;
+     stroke-opacity: 0.5;
+     fill: #1CAFED;
+     opacity: 0.5
+  }
+
+  .c3-legend-item-Baseline > .c3-legend-item-tile {
+    stroke-dasharray: 2,2;
+    stroke-width: 3
+  }
+
+  .c3-legend-item-Predicted > .c3-legend-item-tile {
+    stroke-dasharray: 2,2;
+    stroke-width: 3
+  }
+
+  .c3-legend-item-Current > .c3-legend-item-tile {
+    stroke-width: 3
+  }
 };

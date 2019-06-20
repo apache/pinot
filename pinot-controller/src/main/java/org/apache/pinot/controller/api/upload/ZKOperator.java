@@ -57,11 +57,11 @@ public class ZKOperator {
     _controllerMetrics = controllerMetrics;
   }
 
-  public void completeSegmentOperations(SegmentMetadata segmentMetadata, URI finalSegmentLocationURI,
-      File currentSegmentLocation, boolean enableParallelPushProtection, HttpHeaders headers, String zkDownloadURI,
-      boolean moveSegmentToFinalLocation, SegmentValidatorResponse segmentValidatorResponse)
+  public void completeSegmentOperations(String rawTableName, SegmentMetadata segmentMetadata,
+      URI finalSegmentLocationURI, File currentSegmentLocation, boolean enableParallelPushProtection,
+      HttpHeaders headers, String zkDownloadURI, boolean moveSegmentToFinalLocation,
+      SegmentValidatorResponse segmentValidatorResponse)
       throws Exception {
-    String rawTableName = segmentMetadata.getTableName();
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
     String segmentName = segmentMetadata.getName();
 
@@ -120,7 +120,8 @@ public class ZKOperator {
 
       // Lock the segment by setting the upload start time in ZK
       existingSegmentZKMetadata.setSegmentUploadStartTime(System.currentTimeMillis());
-      if (!_pinotHelixResourceManager.updateZkMetadata(existingSegmentZKMetadata, znRecord.getVersion())) {
+      if (!_pinotHelixResourceManager
+          .updateZkMetadata(offlineTableName, existingSegmentZKMetadata, znRecord.getVersion())) {
         throw new ControllerApplicationException(LOGGER,
             "Failed to lock the segment: " + segmentName + " of table: " + offlineTableName + ", retry later",
             Response.Status.CONFLICT);
@@ -158,7 +159,7 @@ public class ZKOperator {
         // (creation time is not included in the crc)
         existingSegmentZKMetadata.setCreationTime(segmentMetadata.getIndexCreationTime());
         existingSegmentZKMetadata.setRefreshTime(System.currentTimeMillis());
-        if (!_pinotHelixResourceManager.updateZkMetadata(existingSegmentZKMetadata)) {
+        if (!_pinotHelixResourceManager.updateZkMetadata(offlineTableName, existingSegmentZKMetadata)) {
           throw new RuntimeException(
               "Failed to update ZK metadata for segment: " + segmentName + " of table: " + offlineTableName);
         }
@@ -176,10 +177,10 @@ public class ZKOperator {
               zkDownloadURI);
         }
 
-        _pinotHelixResourceManager.refreshSegment(segmentMetadata, existingSegmentZKMetadata);
+        _pinotHelixResourceManager.refreshSegment(offlineTableName, segmentMetadata, existingSegmentZKMetadata);
       }
     } catch (Exception e) {
-      if (!_pinotHelixResourceManager.updateZkMetadata(existingSegmentZKMetadata)) {
+      if (!_pinotHelixResourceManager.updateZkMetadata(offlineTableName, existingSegmentZKMetadata)) {
         LOGGER.error("Failed to update ZK metadata for segment: {} of table: {}", segmentName, offlineTableName);
       }
       throw e;
@@ -223,7 +224,7 @@ public class ZKOperator {
       LOGGER.info("Skipping segment move, keeping segment {} from table {} at {}", segmentName, rawTableName,
           zkDownloadURI);
     }
-    _pinotHelixResourceManager.addNewSegment(segmentMetadata, zkDownloadURI, crypter, assignedInstances);
+    _pinotHelixResourceManager.addNewSegment(rawTableName, segmentMetadata, zkDownloadURI, crypter, assignedInstances);
   }
 
   private void moveSegmentToPermanentDirectory(File currentSegmentLocation, URI finalSegmentLocationURI)

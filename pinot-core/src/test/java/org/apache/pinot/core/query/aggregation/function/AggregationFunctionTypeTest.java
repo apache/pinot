@@ -37,6 +37,8 @@ public class AggregationFunctionTypeTest {
         AggregationFunctionType.DISTINCTCOUNT);
     Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("DiStInCtCoUnThLl"),
         AggregationFunctionType.DISTINCTCOUNTHLL);
+    Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("DiStInCtCoUnTrAwHlL"),
+        AggregationFunctionType.DISTINCTCOUNTRAWHLL);
     Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("FaStHlL"), AggregationFunctionType.FASTHLL);
     Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("PeRcEnTiLe5"),
         AggregationFunctionType.PERCENTILE);
@@ -55,6 +57,8 @@ public class AggregationFunctionTypeTest {
         AggregationFunctionType.DISTINCTCOUNTMV);
     Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("DiStInCtCoUnThLlMv"),
         AggregationFunctionType.DISTINCTCOUNTHLLMV);
+    Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("DiStInCtCoUnTrAwHlLmV"),
+        AggregationFunctionType.DISTINCTCOUNTRAWHLLMV);
     Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("PeRcEnTiLe10Mv"),
         AggregationFunctionType.PERCENTILEMV);
     Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("PeRcEnTiLeEsT90mV"),

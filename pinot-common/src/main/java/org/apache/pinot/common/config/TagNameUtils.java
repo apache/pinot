@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.common.config;
 
-import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.utils.ServerType;
 import org.apache.pinot.common.utils.TenantRole;
 
@@ -38,24 +37,20 @@ public class TagNameUtils {
     return tenantName + "_" + TenantRole.BROKER.toString();
   }
 
-  public static boolean hasValidServerTagSuffix(String tagName) {
-    if (tagName.endsWith(ServerType.REALTIME.toString()) || tagName.endsWith(ServerType.OFFLINE.toString())) {
-      return true;
-    }
-    return false;
+  public static boolean isServerTag(String tagName) {
+    return isOfflineServerTag(tagName) || isRealtimeServerTag(tagName);
   }
 
-  public static TenantRole getTenantRoleFromTag(String tagName) throws InvalidConfigException {
-    if (tagName.endsWith(ServerType.REALTIME.toString())) {
-      return TenantRole.SERVER;
-    }
-    if (tagName.endsWith(ServerType.OFFLINE.toString())) {
-      return TenantRole.SERVER;
-    }
-    if (tagName.endsWith(TenantRole.BROKER.toString())) {
-      return TenantRole.BROKER;
-    }
-    throw new InvalidConfigException("Cannot identify tenant type from tag name : " + tagName);
+  public static boolean isOfflineServerTag(String tagName) {
+    return tagName.endsWith(ServerType.OFFLINE.toString());
+  }
+
+  public static boolean isRealtimeServerTag(String tagName) {
+    return tagName.endsWith(ServerType.REALTIME.toString());
+  }
+
+  public static boolean isBrokerTag(String tagName) {
+    return tagName.endsWith(TenantRole.BROKER.toString());
   }
 
   public static String getTagFromTenantAndServerType(String tenantName, ServerType type) {

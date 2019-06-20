@@ -30,7 +30,7 @@ import org.apache.pinot.thirdeye.detection.annotation.PresentationOption;
 import org.apache.pinot.thirdeye.rootcause.impl.MetricEntity;
 import java.util.Collections;
 import java.util.Map;
-import org.apache.commons.collections.MapUtils;
+import org.apache.commons.collections4.MapUtils;
 
 import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;
 

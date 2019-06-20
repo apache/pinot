@@ -23,7 +23,7 @@ import org.apache.pinot.thirdeye.api.Constants;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionAlertConfigManager;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.util.Predicate;
-import com.wordnik.swagger.annotations.Api;
+import io.swagger.annotations.Api;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;

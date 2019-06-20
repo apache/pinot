@@ -81,7 +81,7 @@ public class StorageQuotaCheckerTest {
             _controllerLeadershipManager);
     when(_tableConfig.getQuotaConfig()).thenReturn(null);
     StorageQuotaChecker.QuotaCheckerResponse res =
-        checker.isSegmentStorageWithinQuota(TEST_DIR, "myTable", "segment", 1000);
+        checker.isSegmentStorageWithinQuota(TEST_DIR, "segment", 1000);
     Assert.assertTrue(res.isSegmentWithinQuota);
   }
 
@@ -94,7 +94,7 @@ public class StorageQuotaCheckerTest {
     when(_tableConfig.getQuotaConfig()).thenReturn(_quotaConfig);
     when(_quotaConfig.storageSizeBytes()).thenReturn(-1L);
     StorageQuotaChecker.QuotaCheckerResponse res =
-        checker.isSegmentStorageWithinQuota(TEST_DIR, "myTable", "segment", 1000);
+        checker.isSegmentStorageWithinQuota(TEST_DIR, "segment", 1000);
     Assert.assertTrue(res.isSegmentWithinQuota);
   }
 
@@ -136,7 +136,7 @@ public class StorageQuotaCheckerTest {
         new MockStorageQuotaChecker(_tableConfig, _tableSizeReader, _controllerMetrics, _pinotHelixResourceManager,
             _controllerLeadershipManager);
     StorageQuotaChecker.QuotaCheckerResponse response =
-        checker.isSegmentStorageWithinQuota(TEST_DIR, tableName, "segment1", 1000);
+        checker.isSegmentStorageWithinQuota(TEST_DIR, "segment1", 1000);
     Assert.assertTrue(response.isSegmentWithinQuota);
     Assert.assertEquals(
         _controllerMetrics.getValueOfTableGauge(tableName, ControllerGauge.TABLE_STORAGE_QUOTA_UTILIZATION), 80L);
@@ -144,7 +144,7 @@ public class StorageQuotaCheckerTest {
     // Quota exceeded.
     when(_quotaConfig.storageSizeBytes()).thenReturn(2800L);
     when(_quotaConfig.getStorage()).thenReturn("2.8K");
-    response = checker.isSegmentStorageWithinQuota(TEST_DIR, tableName, "segment1", 1000);
+    response = checker.isSegmentStorageWithinQuota(TEST_DIR, "segment1", 1000);
     Assert.assertFalse(response.isSegmentWithinQuota);
     Assert.assertEquals(
         _controllerMetrics.getValueOfTableGauge(tableName, ControllerGauge.TABLE_STORAGE_QUOTA_UTILIZATION), 85L);
@@ -153,7 +153,7 @@ public class StorageQuotaCheckerTest {
     setupTableSegmentSize(6000L, 900L, 0);
     when(_quotaConfig.storageSizeBytes()).thenReturn(2800L);
     when(_quotaConfig.getStorage()).thenReturn("2.8K");
-    response = checker.isSegmentStorageWithinQuota(TEST_DIR, tableName, "segment1", 1000);
+    response = checker.isSegmentStorageWithinQuota(TEST_DIR, "segment1", 1000);
     Assert.assertFalse(response.isSegmentWithinQuota);
     Assert.assertEquals(
         _controllerMetrics.getValueOfTableGauge(tableName, ControllerGauge.TABLE_STORAGE_QUOTA_UTILIZATION), 107L);
@@ -162,21 +162,21 @@ public class StorageQuotaCheckerTest {
     setupTableSegmentSize(-1, -1, 0);
     when(_quotaConfig.storageSizeBytes()).thenReturn(2800L);
     when(_quotaConfig.getStorage()).thenReturn("2.8K");
-    response = checker.isSegmentStorageWithinQuota(TEST_DIR, tableName, "segment1", 1000);
+    response = checker.isSegmentStorageWithinQuota(TEST_DIR, "segment1", 1000);
     Assert.assertTrue(response.isSegmentWithinQuota);
 
     // partial response from servers, but table already over quota
     setupTableSegmentSize(6000L, 900L, -2);
     when(_quotaConfig.storageSizeBytes()).thenReturn(2800L);
     when(_quotaConfig.getStorage()).thenReturn("2.8K");
-    response = checker.isSegmentStorageWithinQuota(TEST_DIR, tableName, "segment1", 1000);
+    response = checker.isSegmentStorageWithinQuota(TEST_DIR, "segment1", 1000);
     Assert.assertFalse(response.isSegmentWithinQuota);
 
     // partial response from servers, but current estimate within quota
     setupTableSegmentSize(2000L, 900L, -2);
     when(_quotaConfig.storageSizeBytes()).thenReturn(2800L);
     when(_quotaConfig.getStorage()).thenReturn("2.8K");
-    response = checker.isSegmentStorageWithinQuota(TEST_DIR, tableName, "segment1", 1000);
+    response = checker.isSegmentStorageWithinQuota(TEST_DIR, "segment1", 1000);
     Assert.assertTrue(response.isSegmentWithinQuota);
   }
 

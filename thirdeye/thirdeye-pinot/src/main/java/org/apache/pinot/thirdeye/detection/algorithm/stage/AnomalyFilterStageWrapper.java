@@ -33,7 +33,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
-import org.apache.commons.collections.MapUtils;
+import org.apache.commons.collections4.MapUtils;
 
 
 /**
@@ -58,7 +58,7 @@ public class AnomalyFilterStageWrapper extends DetectionPipeline {
     Preconditions.checkArgument(properties.containsKey(PROP_STAGE_CLASSNAME), "Missing " + PROP_STAGE_CLASSNAME);
 
     this.anomalyFilter = loadAnomalyFilterStage(MapUtils.getString(properties, PROP_STAGE_CLASSNAME));
-    this.anomalyFilter.init(MapUtils.getMap(properties, PROP_SPECS), config.getId(), startTime, endTime);
+    this.anomalyFilter.init(ConfigUtils.getMap(properties.get(PROP_SPECS)), config.getId(), startTime, endTime);
     this.metricUrn = MapUtils.getString(properties, PROP_METRIC_URN);
   }
 

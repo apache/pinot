@@ -353,11 +353,18 @@
                     <delete dir="target/generated-sources/gen-javabean" />
                     <mkdir dir="target/generated-sources" />
                     <exec executable="/usr/local/bin/thrift">
-                      <arg value="--gen" />
-                      <arg value="java:beans" />
-                      <arg value="-o" />
-                      <arg value="target/generated-sources" />
-                      <arg value="src/thrift/request.thrift" />
+                      <arg value="--gen"/>
+                      <arg value="java:beans"/>
+                      <arg value="-o"/>
+                      <arg value="target/generated-sources"/>
+                      <arg value="src/thrift/query.thrift"/>
+                    </exec>
+                    <exec executable="/usr/local/bin/thrift">
+                      <arg value="--gen"/>
+                      <arg value="java:beans"/>
+                      <arg value="-o"/>
+                      <arg value="target/generated-sources"/>
+                      <arg value="src/thrift/request.thrift"/>
                     </exec>
                     <exec executable="/usr/local/bin/thrift">
                       <arg value="--gen" />

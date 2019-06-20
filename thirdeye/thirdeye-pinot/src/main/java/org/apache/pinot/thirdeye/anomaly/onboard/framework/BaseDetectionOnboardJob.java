@@ -22,7 +22,7 @@ package org.apache.pinot.thirdeye.anomaly.onboard.framework;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 
 public abstract class BaseDetectionOnboardJob implements DetectionOnboardJob {
   private final String jobName;

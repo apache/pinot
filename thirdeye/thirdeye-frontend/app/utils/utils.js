@@ -156,6 +156,17 @@ export function postProps(postData) {
 }
 
 /**
+ * Preps get object
+ * @returns {Object}
+ */
+export function getProps() {
+  return {
+    method: 'get',
+    headers: { 'content-type': 'Application/Json' }
+  };
+}
+
+/**
  * Preps post object for Yaml payload
  * @param {string} text to post
  * @returns {Object}
@@ -231,5 +242,6 @@ export default {
   toIso,
   stripNonFiniteValues,
   postYamlProps,
-  formatYamlFilter
+  formatYamlFilter,
+  getProps
 };

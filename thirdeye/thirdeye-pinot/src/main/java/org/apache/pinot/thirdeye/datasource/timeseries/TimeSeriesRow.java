@@ -26,8 +26,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 
-import org.apache.commons.collections.comparators.ComparableComparator;
-import org.apache.commons.lang.ObjectUtils;
+import org.apache.commons.collections4.comparators.ComparableComparator;
+import org.apache.commons.lang3.ObjectUtils;
 import org.joda.time.DateTime;
 
 public class TimeSeriesRow implements Comparable<TimeSeriesRow> {

@@ -68,7 +68,6 @@ import org.apache.pinot.core.realtime.stream.StreamConsumerFactory;
 import org.apache.pinot.core.realtime.stream.StreamConsumerFactoryProvider;
 import org.apache.pinot.core.realtime.stream.StreamDecoderProvider;
 import org.apache.pinot.core.realtime.stream.StreamMessageDecoder;
-import org.apache.pinot.core.realtime.stream.StreamMessageMetadata;
 import org.apache.pinot.core.realtime.stream.StreamMetadataProvider;
 import org.apache.pinot.core.realtime.stream.TransientConsumerException;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
@@ -234,7 +233,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private PartitionLevelConsumer _partitionLevelConsumer = null;
   private StreamMetadataProvider _streamMetadataProvider = null;
   private final File _resourceTmpDir;
-  private final String _tableName;
+  private final String _tableNameWithType;
   private final String _timeColumnName;
   private final List<String> _invertedIndexColumns;
   private final List<String> _noDictionaryColumns;
@@ -345,7 +344,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     final long maxIdleCountBeforeStatUpdate = (3 * 60 * 1000) / (idlePipeSleepTimeMillis + _partitionLevelStreamConfig
         .getFetchTimeoutMillis());  // 3 minute count
     long lastUpdatedOffset = _currentOffset;  // so that we always update the metric when we enter this method.
-    long idleCount = 0;
+    long consecutiveIdleCount = 0;
     // At this point, we know that we can potentially move the offset, so the old saved segment file is not valid
     // anymore. Remove the file if it exists.
     removeSegmentFile();
@@ -379,6 +378,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       processStreamEvents(messageBatch, idlePipeSleepTimeMillis);
 
       if (_currentOffset != lastUpdatedOffset) {
+        consecutiveIdleCount = 0;
         // We consumed something. Update the highest stream offset as well as partition-consuming metric.
         _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.HIGHEST_KAFKA_OFFSET_CONSUMED, _currentOffset);
         _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.HIGHEST_STREAM_OFFSET_CONSUMED, _currentOffset);
@@ -387,9 +387,9 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       } else {
         // We did not consume any rows. Update the partition-consuming metric only if we have been idling for a long time.
         // Create a new stream consumer wrapper, in case we are stuck on something.
-        if (++idleCount > maxIdleCountBeforeStatUpdate) {
+        if (++consecutiveIdleCount > maxIdleCountBeforeStatUpdate) {
           _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.LLC_PARTITION_CONSUMING, 1);
-          idleCount = 0;
+          consecutiveIdleCount = 0;
           makeStreamConsumer("Idle for too long");
         }
       }
@@ -661,7 +661,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       // lets convert the segment now
       RealtimeSegmentConverter converter =
           new RealtimeSegmentConverter(_realtimeSegment, tempSegmentFolder.getAbsolutePath(), _schema,
-              _segmentZKMetadata.getTableName(), _timeColumnName, _segmentZKMetadata.getSegmentName(), _sortedColumn,
+              _tableNameWithType, _timeColumnName, _segmentZKMetadata.getSegmentName(), _sortedColumn,
               _invertedIndexColumns, _noDictionaryColumns, _starTreeIndexSpec);
       segmentLogger.info("Trying to build segment");
       try {
@@ -1047,11 +1047,11 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     _segmentNameStr = _segmentZKMetadata.getSegmentName();
     _segmentName = new LLCSegmentName(_segmentNameStr);
     _streamPartitionId = _segmentName.getPartitionId();
-    _tableName = _tableConfig.getTableName();
+    _tableNameWithType = _tableConfig.getTableName();
     _timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
-    _metricKeyName = _tableName + "-" + _streamTopic + "-" + _streamPartitionId;
+    _metricKeyName = _tableNameWithType + "-" + _streamTopic + "-" + _streamPartitionId;
     segmentLogger = LoggerFactory.getLogger(LLRealtimeSegmentDataManager.class.getName() + "_" + _segmentNameStr);
-    _tableStreamName = _tableName + "_" + _streamTopic;
+    _tableStreamName = _tableNameWithType + "_" + _streamTopic;
     _memoryManager = getMemoryManager(realtimeTableDataManager.getConsumerDir(), _segmentNameStr,
         indexLoadingConfig.isRealtimeOffheapAllocation(), indexLoadingConfig.isDirectRealtimeOffheapAllocation(),
         serverMetrics);
@@ -1193,7 +1193,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     // Number of rows indexed should be used for DOCUMENT_COUNT metric, and also for segment flush. Whereas,
     // Number of rows consumed should be used for consumption metric.
     long rowsIndexed = _numRowsIndexed - _lastUpdatedRowsIndexed.get();
-    _serverMetrics.addValueToTableGauge(_tableName, ServerGauge.DOCUMENT_COUNT, rowsIndexed);
+    _serverMetrics.addValueToTableGauge(_tableNameWithType, ServerGauge.DOCUMENT_COUNT, rowsIndexed);
     _lastUpdatedRowsIndexed.set(_numRowsIndexed);
     final long now = now();
     final int rowsConsumed = _numRowsConsumed - _lastConsumedCount;

@@ -26,7 +26,7 @@ import org.apache.pinot.thirdeye.datalayer.pojo.EntityToEntityMappingBean;
 import org.apache.pinot.thirdeye.datalayer.util.Predicate;
 import java.util.List;
 import java.util.Set;
-import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections4.CollectionUtils;
 
 @Singleton
 public class EntityToEntityMappingManagerImpl extends AbstractManagerImpl<EntityToEntityMappingDTO> implements EntityToEntityMappingManager {

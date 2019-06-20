@@ -19,7 +19,9 @@
 package org.apache.pinot.pql.parsers.pql2.ast;
 
 import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.request.DataSource;
 import org.apache.pinot.common.request.GroupBy;
+import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.request.QuerySource;
 import org.apache.pinot.common.request.Selection;
 import org.apache.pinot.pql.parsers.Pql2CompilationException;
@@ -122,6 +124,9 @@ public class SelectAstNode extends BaseAstNode {
     if (selections != null) {
       if (_recordLimit != -1) {
         selections.setSize(_recordLimit);
+      } else {
+        // Pinot quirk: default to LIMIT 10
+        selections.setSize(10);
       }
       if (_offset != -1) {
         selections.setOffset(_offset);
@@ -142,6 +147,32 @@ public class SelectAstNode extends BaseAstNode {
     // Pinot quirk: if there is both a selection and an aggregation, remove the selection
     if (brokerRequest.getAggregationsInfoSize() != 0 && brokerRequest.isSetSelections()) {
       brokerRequest.setSelections(null);
+    }
+  }
+
+  @Override
+  public void updatePinotQuery(PinotQuery pinotQuery) {
+    // Set data source
+    DataSource dataSource = new DataSource();
+    dataSource.setTableName(_resourceName);
+    pinotQuery.setDataSource(dataSource);
+    sendPinotQueryUpdateToChildren(pinotQuery);
+    if (_recordLimit != -1) {
+      pinotQuery.setLimit(_recordLimit);
+    } else {
+      // Pinot quirk: default to top 10
+      pinotQuery.setLimit(10);
+    }
+    if (_offset != -1) {
+      pinotQuery.setOffset(_offset);
+    }
+    if (pinotQuery.getGroupByListSize() > 0) {
+      if (_topN != -1) {
+        pinotQuery.setLimit(_topN);
+      } else {
+        // Pinot quirk: default to top 10
+        pinotQuery.setLimit(10);
+      }
     }
   }
 }

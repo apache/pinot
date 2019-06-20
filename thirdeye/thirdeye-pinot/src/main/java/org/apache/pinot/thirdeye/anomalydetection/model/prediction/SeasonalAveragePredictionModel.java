@@ -23,7 +23,7 @@ import org.apache.pinot.thirdeye.anomalydetection.AnomalyDetectionUtils;
 import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyDetectionContext;
 import org.apache.pinot.thirdeye.anomalydetection.context.TimeSeries;
 import java.util.List;
-import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections4.CollectionUtils;
 import org.joda.time.Interval;
 
 public class SeasonalAveragePredictionModel extends ExpectedTimeSeriesPredictionModel {

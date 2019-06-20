@@ -34,7 +34,8 @@ import org.testng.annotations.Test;
 public class ReplicaGroupBasedStreamPartitionAssignmentTest {
 
   @Test
-  public void testReplicaGroupBasedStreamPartitionAssignmentStrategy() throws InvalidConfigException {
+  public void testReplicaGroupBasedStreamPartitionAssignmentStrategy()
+      throws InvalidConfigException {
     MockReplicaGroupBasedStreamPartitionAssignmentStrategy mockStreamPartitionAssignmentStrategy =
         new MockReplicaGroupBasedStreamPartitionAssignmentStrategy();
 
@@ -43,23 +44,22 @@ public class ReplicaGroupBasedStreamPartitionAssignmentTest {
     String tableNameWithType = "tableName_REALTIME";
     List<String> partitions = Lists.newArrayList("0", "1", "2", "3", "4", "5");
     int numReplicas = 2;
-    List<String> allTaggedInstances =
-        Lists.newArrayList("server_1", "server_2", "server_3", "server_4", "server_5", "server_6", "server_7",
-            "server_8");
+    List<String> allTaggedInstances = Lists
+        .newArrayList("server_1", "server_2", "server_3", "server_4", "server_5", "server_6", "server_7", "server_8");
 
     ReplicaGroupPartitionAssignment replicaGroupPartitionAssignment =
         new ReplicaGroupPartitionAssignment(tableNameWithType);
-    replicaGroupPartitionAssignment.setInstancesToReplicaGroup(0, 0,
-        Lists.newArrayList("server_1", "server_2", "server_3", "server_4"));
-    replicaGroupPartitionAssignment.setInstancesToReplicaGroup(0, 1,
-        Lists.newArrayList("server_5", "server_6", "server_7", "server_8"));
+    replicaGroupPartitionAssignment
+        .setInstancesToReplicaGroup(0, 0, Lists.newArrayList("server_1", "server_2", "server_3", "server_4"));
+    replicaGroupPartitionAssignment
+        .setInstancesToReplicaGroup(0, 1, Lists.newArrayList("server_5", "server_6", "server_7", "server_8"));
 
     // null replica group partition assignment
     mockStreamPartitionAssignmentStrategy.setReplicaGroupPartitionAssignment(null);
     boolean exception = false;
     try {
-      mockStreamPartitionAssignmentStrategy.getStreamPartitionAssignment(null, tableNameWithType, partitions,
-          numReplicas, allTaggedInstances);
+      mockStreamPartitionAssignmentStrategy
+          .getStreamPartitionAssignment(null, tableNameWithType, partitions, numReplicas, allTaggedInstances);
     } catch (InvalidConfigException e) {
       exception = true;
     }
@@ -67,9 +67,8 @@ public class ReplicaGroupBasedStreamPartitionAssignmentTest {
 
     // mismatch between numReplicas and numReplicaGroups - follow the replica group assignment
     mockStreamPartitionAssignmentStrategy.setReplicaGroupPartitionAssignment(replicaGroupPartitionAssignment);
-    PartitionAssignment streamPartitionAssignment =
-        mockStreamPartitionAssignmentStrategy.getStreamPartitionAssignment(null, tableNameWithType, partitions, 5,
-            allTaggedInstances);
+    PartitionAssignment streamPartitionAssignment = mockStreamPartitionAssignmentStrategy
+        .getStreamPartitionAssignment(null, tableNameWithType, partitions, 5, allTaggedInstances);
     Assert.assertEquals(streamPartitionAssignment.getInstancesListForPartition("0"),
         Lists.newArrayList("server_1", "server_5"));
     Assert.assertEquals(streamPartitionAssignment.getInstancesListForPartition("1"),
@@ -85,9 +84,8 @@ public class ReplicaGroupBasedStreamPartitionAssignmentTest {
 
     // happy path - correctly generated partition assignment
     mockStreamPartitionAssignmentStrategy.setReplicaGroupPartitionAssignment(replicaGroupPartitionAssignment);
-    streamPartitionAssignment =
-        mockStreamPartitionAssignmentStrategy.getStreamPartitionAssignment(null, tableNameWithType, partitions,
-            numReplicas, allTaggedInstances);
+    streamPartitionAssignment = mockStreamPartitionAssignmentStrategy
+        .getStreamPartitionAssignment(null, tableNameWithType, partitions, numReplicas, allTaggedInstances);
     Assert.assertEquals(streamPartitionAssignment.getInstancesListForPartition("0"),
         Lists.newArrayList("server_1", "server_5"));
     Assert.assertEquals(streamPartitionAssignment.getInstancesListForPartition("1"),
@@ -102,18 +100,17 @@ public class ReplicaGroupBasedStreamPartitionAssignmentTest {
         Lists.newArrayList("server_2", "server_6"));
 
     // 0 partitions
-    streamPartitionAssignment =
-        mockStreamPartitionAssignmentStrategy.getStreamPartitionAssignment(null, tableNameWithType,
-            Collections.emptyList(), numReplicas, allTaggedInstances);
+    streamPartitionAssignment = mockStreamPartitionAssignmentStrategy
+        .getStreamPartitionAssignment(null, tableNameWithType, Collections.emptyList(), numReplicas,
+            allTaggedInstances);
     Assert.assertEquals(streamPartitionAssignment.getNumPartitions(), 0);
 
     // only 1 instance per replica group
     replicaGroupPartitionAssignment.setInstancesToReplicaGroup(0, 0, Lists.newArrayList("server_1"));
     replicaGroupPartitionAssignment.setInstancesToReplicaGroup(0, 1, Lists.newArrayList("server_2"));
     mockStreamPartitionAssignmentStrategy.setReplicaGroupPartitionAssignment(replicaGroupPartitionAssignment);
-    streamPartitionAssignment =
-        mockStreamPartitionAssignmentStrategy.getStreamPartitionAssignment(null, tableNameWithType, partitions,
-            numReplicas, allTaggedInstances);
+    streamPartitionAssignment = mockStreamPartitionAssignmentStrategy
+        .getStreamPartitionAssignment(null, tableNameWithType, partitions, numReplicas, allTaggedInstances);
     ArrayList<String> verticalSlice = Lists.newArrayList("server_1", "server_2");
     Assert.assertEquals(streamPartitionAssignment.getInstancesListForPartition("0"), verticalSlice);
     Assert.assertEquals(streamPartitionAssignment.getInstancesListForPartition("1"), verticalSlice);
@@ -123,8 +120,7 @@ public class ReplicaGroupBasedStreamPartitionAssignmentTest {
     Assert.assertEquals(streamPartitionAssignment.getInstancesListForPartition("5"), verticalSlice);
   }
 
-  private class MockReplicaGroupBasedStreamPartitionAssignmentStrategy
-      extends ReplicaGroupBasedStreamPartitionAssignmentStrategy {
+  private class MockReplicaGroupBasedStreamPartitionAssignmentStrategy extends ReplicaGroupBasedStreamPartitionAssignmentStrategy {
     private ReplicaGroupPartitionAssignment _replicaGroupPartitionAssignment;
 
     @Override

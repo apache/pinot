@@ -73,6 +73,7 @@ public class RawIndexConverter {
   // BITS_PER_ELEMENT is not applicable for raw index
   private static final int BITS_PER_ELEMENT_FOR_RAW_INDEX = -1;
 
+  private final String _rawTableName;
   private final ImmutableSegment _originalImmutableSegment;
   private final SegmentMetadataImpl _originalSegmentMetadata;
   private final File _convertedIndexDir;
@@ -83,13 +84,14 @@ public class RawIndexConverter {
    * NOTE: original segment should be in V1 format.
    * TODO: support V3 format
    */
-  public RawIndexConverter(@Nonnull File originalIndexDir, @Nonnull File convertedIndexDir,
-      @Nullable String columnsToConvert)
+  public RawIndexConverter(@Nonnull String rawTableName, @Nonnull File originalIndexDir,
+      @Nonnull File convertedIndexDir, @Nullable String columnsToConvert)
       throws Exception {
     FileUtils.copyDirectory(originalIndexDir, convertedIndexDir);
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
     indexLoadingConfig.setSegmentVersion(SegmentVersion.v1);
     indexLoadingConfig.setReadMode(ReadMode.mmap);
+    _rawTableName = rawTableName;
     _originalImmutableSegment = ImmutableSegmentLoader.load(originalIndexDir, indexLoadingConfig);
     _originalSegmentMetadata = (SegmentMetadataImpl) _originalImmutableSegment.getSegmentMetadata();
     _convertedIndexDir = convertedIndexDir;
@@ -101,8 +103,7 @@ public class RawIndexConverter {
   public boolean convert()
       throws Exception {
     String segmentName = _originalSegmentMetadata.getName();
-    String tableName = _originalSegmentMetadata.getTableName();
-    LOGGER.info("Start converting segment: {} in table: {}", segmentName, tableName);
+    LOGGER.info("Start converting segment: {} in table: {}", segmentName, _rawTableName);
 
     List<FieldSpec> columnsToConvert = new ArrayList<>();
     Schema schema = _originalSegmentMetadata.getSchema();
@@ -134,7 +135,7 @@ public class RawIndexConverter {
     }
 
     if (columnsToConvert.isEmpty()) {
-      LOGGER.info("No column converted for segment: {} in table: {}", segmentName, tableName);
+      LOGGER.info("No column converted for segment: {} in table: {}", segmentName, _rawTableName);
       return false;
     } else {
       // Convert columns
@@ -148,7 +149,8 @@ public class RawIndexConverter {
           .persistCreationMeta(_convertedIndexDir, CrcUtils.forAllFilesInFolder(_convertedIndexDir).computeCrc(),
               _originalSegmentMetadata.getIndexCreationTime());
 
-      LOGGER.info("{} columns converted for segment: {} in table: {}", columnsToConvert.size(), segmentName, tableName);
+      LOGGER.info("{} columns converted for segment: {} in table: {}", columnsToConvert.size(), segmentName,
+          _rawTableName);
       return true;
     }
   }

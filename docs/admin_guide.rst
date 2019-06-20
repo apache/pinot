@@ -28,7 +28,6 @@ Admin Guide
 
    tableconfig_schema
    in_production
-   management_api
    pinot_hadoop
    customizations
    tuning_pinot

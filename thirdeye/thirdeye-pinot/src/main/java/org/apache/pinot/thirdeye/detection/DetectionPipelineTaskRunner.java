@@ -41,6 +41,8 @@ import org.apache.pinot.thirdeye.datasource.loader.AggregationLoader;
 import org.apache.pinot.thirdeye.datasource.loader.DefaultAggregationLoader;
 import org.apache.pinot.thirdeye.datasource.loader.DefaultTimeSeriesLoader;
 import org.apache.pinot.thirdeye.datasource.loader.TimeSeriesLoader;
+import org.apache.pinot.thirdeye.detection.annotation.registry.DetectionRegistry;
+import org.joda.time.Instant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,6 +54,7 @@ public class DetectionPipelineTaskRunner implements TaskRunner {
   private final EvaluationManager evaluationDAO;
   private final DetectionPipelineLoader loader;
   private final DataProvider provider;
+  private final ModelMaintenanceFlow maintenanceFlow;
 
   /**
    * Default constructor for ThirdEye task execution framework.
@@ -80,6 +83,7 @@ public class DetectionPipelineTaskRunner implements TaskRunner {
 
     this.provider = new DefaultDataProvider(metricDAO, datasetDAO, eventDAO, this.anomalyDAO, this.evaluationDAO,
         timeseriesLoader, aggregationLoader, this.loader);
+    this.maintenanceFlow = new ModelRetuneFlow(this.provider, DetectionRegistry.getInstance());
   }
 
   /**
@@ -98,6 +102,7 @@ public class DetectionPipelineTaskRunner implements TaskRunner {
     this.evaluationDAO = evaluationDAO;
     this.loader = loader;
     this.provider = provider;
+    this.maintenanceFlow = new ModelRetuneFlow(this.provider, DetectionRegistry.getInstance());
   }
 
   @Override
@@ -133,6 +138,10 @@ public class DetectionPipelineTaskRunner implements TaskRunner {
         this.evaluationDAO.save(evaluationDTO);
       }
 
+      // run maintenance flow to update model
+      config = maintenanceFlow.maintain(config, Instant.now());
+      this.detectionDAO.update(config);
+
       return Collections.emptyList();
 
     } catch(Exception e) {
@@ -143,5 +152,4 @@ public class DetectionPipelineTaskRunner implements TaskRunner {
       ThirdeyeMetricsUtil.detectionTaskSuccessCounter.inc();
     }
   }
-
 }

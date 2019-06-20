@@ -30,7 +30,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-import org.apache.commons.collections.MapUtils;
+import org.apache.commons.collections4.MapUtils;
 
 
 /**
@@ -52,7 +52,7 @@ public class GrouperStageWrapper extends DetectionPipeline {
     Preconditions.checkArgument(properties.containsKey(PROP_STAGE_CLASSNAME), "Missing " + PROP_STAGE_CLASSNAME);
 
     this.grouperStage = loadGroupingStage(MapUtils.getString(properties, PROP_STAGE_CLASSNAME));
-    this.grouperStage.init(MapUtils.getMap(properties, PROP_SPECS), config.getId(), startTime, endTime);
+    this.grouperStage.init(ConfigUtils.getMap(properties.get(PROP_SPECS)), config.getId(), startTime, endTime);
   }
 
   /**

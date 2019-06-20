@@ -113,7 +113,7 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
     List<String> segmentsToDelete = new ArrayList<>();
     for (OfflineSegmentZKMetadata offlineSegmentZKMetadata : _pinotHelixResourceManager
         .getOfflineSegmentMetadata(offlineTableName)) {
-      if (retentionStrategy.isPurgeable(offlineSegmentZKMetadata)) {
+      if (retentionStrategy.isPurgeable(offlineTableName, offlineSegmentZKMetadata)) {
         segmentsToDelete.add(offlineSegmentZKMetadata.getSegmentName());
       }
     }
@@ -141,7 +141,7 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
         }
       } else {
         // Sealed segment
-        if (retentionStrategy.isPurgeable(realtimeSegmentZKMetadata)) {
+        if (retentionStrategy.isPurgeable(realtimeTableName, realtimeSegmentZKMetadata)) {
           segmentsToDelete.add(segmentName);
         }
       }

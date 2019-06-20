@@ -29,6 +29,7 @@ public class InAndNotInComparison extends ComparisonFunction {
 
   public InAndNotInComparison(String values, boolean isItNotIn, AggregationInfo aggregationInfo) {
     super(aggregationInfo);
+    this._isItNotIn = isItNotIn;
     String[] splitedValues = values.split("\\t\\t");
     int size = splitedValues.length;
     this._values = new double[size];

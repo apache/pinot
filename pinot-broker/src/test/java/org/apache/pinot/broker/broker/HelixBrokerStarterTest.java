@@ -96,7 +96,8 @@ public class HelixBrokerStarterTest extends ControllerTest {
 
     for (int i = 0; i < 5; i++) {
       _helixResourceManager
-          .addNewSegment(SegmentMetadataMockUtils.mockSegmentMetadata(RAW_DINING_TABLE_NAME), "downloadUrl");
+          .addNewSegment(DINING_TABLE_NAME, SegmentMetadataMockUtils.mockSegmentMetadata(RAW_DINING_TABLE_NAME),
+              "downloadUrl");
     }
 
     Thread.sleep(1000);
@@ -216,7 +217,8 @@ public class HelixBrokerStarterTest extends ControllerTest {
         5);
 
     _helixResourceManager
-        .addNewSegment(SegmentMetadataMockUtils.mockSegmentMetadata(RAW_DINING_TABLE_NAME), "downloadUrl");
+        .addNewSegment(DINING_TABLE_NAME, SegmentMetadataMockUtils.mockSegmentMetadata(RAW_DINING_TABLE_NAME),
+            "downloadUrl");
 
     // Wait up to 30s for external view to reach the expected size
     waitForPredicate(new Callable<Boolean>() {
@@ -268,7 +270,7 @@ public class HelixBrokerStarterTest extends ControllerTest {
       OfflineSegmentZKMetadata offlineSegmentZKMetadata =
           _helixResourceManager.getOfflineSegmentZKMetadata(RAW_DINING_TABLE_NAME, segment);
       Assert.assertNotNull(offlineSegmentZKMetadata);
-      _helixResourceManager.refreshSegment(
+      _helixResourceManager.refreshSegment(DINING_TABLE_NAME,
           SegmentMetadataMockUtils.mockSegmentMetadataWithEndTimeInfo(RAW_DINING_TABLE_NAME, segment, endTime++),
           offlineSegmentZKMetadata);
     }

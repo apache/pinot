@@ -19,6 +19,7 @@
 package org.apache.pinot.pql.parsers.pql2.ast;
 
 import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.request.RequestUtils;
 
 
@@ -30,5 +31,11 @@ public class WhereAstNode extends BaseAstNode {
   public void updateBrokerRequest(BrokerRequest brokerRequest) {
     PredicateAstNode predicateAstNode = (PredicateAstNode) getChildren().get(0);
     RequestUtils.generateFilterFromTree(predicateAstNode.buildFilterQueryTree(), brokerRequest);
+  }
+
+  @Override
+  public void updatePinotQuery(PinotQuery pinotQuery) {
+    PredicateAstNode predicateAstNode = (PredicateAstNode) getChildren().get(0);
+    pinotQuery.setFilterExpression(predicateAstNode.buildFilterExpression());
   }
 }

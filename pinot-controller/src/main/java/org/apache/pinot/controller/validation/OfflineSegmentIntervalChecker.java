@@ -183,6 +183,11 @@ public class OfflineSegmentIntervalChecker extends ControllerPeriodicTask<Void> 
     return numTotalDocs;
   }
 
+  @VisibleForTesting
+  public ValidationMetrics getValidationMetrics() {
+    return _validationMetrics;
+  }
+
   @Override
   public void cleanUpTask() {
     LOGGER.info("Unregister all the validation metrics.");

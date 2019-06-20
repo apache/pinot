@@ -69,22 +69,21 @@ public class PinotResourceManagerTest extends ControllerTest {
   @Test
   public void testUpdateSegmentZKMetadata() {
     OfflineSegmentZKMetadata segmentZKMetadata = new OfflineSegmentZKMetadata();
-    segmentZKMetadata.setTableName("testTable");
     segmentZKMetadata.setSegmentName("testSegment");
 
     // Segment ZK metadata does not exist
-    Assert.assertFalse(_helixResourceManager.updateZkMetadata(segmentZKMetadata, 0));
+    Assert.assertFalse(_helixResourceManager.updateZkMetadata("testTable_OFFLINE", segmentZKMetadata, 0));
 
     // Set segment ZK metadata
-    Assert.assertTrue(_helixResourceManager.updateZkMetadata(segmentZKMetadata));
+    Assert.assertTrue(_helixResourceManager.updateZkMetadata("testTable_OFFLINE", segmentZKMetadata));
 
     // Update ZK metadata
     Assert.assertEquals(
         _helixResourceManager.getSegmentMetadataZnRecord("testTable_OFFLINE", "testSegment").getVersion(), 0);
-    Assert.assertTrue(_helixResourceManager.updateZkMetadata(segmentZKMetadata, 0));
+    Assert.assertTrue(_helixResourceManager.updateZkMetadata("testTable_OFFLINE", segmentZKMetadata, 0));
     Assert.assertEquals(
         _helixResourceManager.getSegmentMetadataZnRecord("testTable_OFFLINE", "testSegment").getVersion(), 1);
-    Assert.assertFalse(_helixResourceManager.updateZkMetadata(segmentZKMetadata, 0));
+    Assert.assertFalse(_helixResourceManager.updateZkMetadata("testTable_OFFLINE", segmentZKMetadata, 0));
   }
 
   /**
@@ -102,7 +101,8 @@ public class PinotResourceManagerTest extends ControllerTest {
 
     // Basic add/delete case
     for (int i = 1; i <= 2; i++) {
-      _helixResourceManager.addNewSegment(SegmentMetadataMockUtils.mockSegmentMetadata(TABLE_NAME), "downloadUrl");
+      _helixResourceManager
+          .addNewSegment(TABLE_NAME, SegmentMetadataMockUtils.mockSegmentMetadata(TABLE_NAME), "downloadUrl");
     }
     IdealState idealState = _helixAdmin.getResourceIdealState(getHelixClusterName(), offlineTableName);
     Set<String> segments = idealState.getPartitionSet();
@@ -122,7 +122,7 @@ public class PinotResourceManagerTest extends ControllerTest {
         public void run() {
           for (int i = 0; i < 10; i++) {
             _helixResourceManager
-                .addNewSegment(SegmentMetadataMockUtils.mockSegmentMetadata(TABLE_NAME), "downloadUrl");
+                .addNewSegment(TABLE_NAME, SegmentMetadataMockUtils.mockSegmentMetadata(TABLE_NAME), "downloadUrl");
           }
         }
       });

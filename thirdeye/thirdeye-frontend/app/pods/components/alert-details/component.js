@@ -22,6 +22,7 @@ import { colorMapping, makeTime, toMetricLabel, extractTail } from 'thirdeye-fro
 import { getYamlPreviewAnomalies,
   getAnomaliesByAlertId,
   getFormattedDuration,
+  getBoundsAndAnomalies,
   anomalyResponseMapNew,
   anomalyResponseObj,
   anomalyResponseObjNew,
@@ -39,7 +40,7 @@ const TIME_PICKER_INCREMENT = 5; // tells date picker hours field how granularly
 const DEFAULT_ACTIVE_DURATION = '1m'; // setting this date range selection as default (Last 24 Hours)
 const UI_DATE_FORMAT = 'MMM D, YYYY hh:mm a'; // format for date picker to use (usually varies by route or metric)
 const DISPLAY_DATE_FORMAT = 'YYYY-MM-DD HH:mm'; // format used consistently across app to display custom date range
-const TIME_RANGE_OPTIONS = ['1d', '1w', '1m', '3m'];
+const TIME_RANGE_OPTIONS = ['48h', '1w', '1m', '3m'];
 const ANOMALY_LEGEND_THRESHOLD = 20; // If number of anomalies is larger than this threshold, don't show the legend
 
 export default Component.extend({
@@ -48,7 +49,7 @@ export default Component.extend({
   anomalyMapping: {},
   timeseries: null,
   isLoading: false,
-  analysisRange: [moment().subtract(1, 'day').startOf('day').valueOf(), moment().add(1, 'day').startOf('day').valueOf()],
+  analysisRange: [moment().subtract(2, 'day').startOf('day').valueOf(), moment().add(1, 'day').startOf('day').valueOf()],
   isPendingData: false,
   colorMapping: colorMapping,
   zoom: {
@@ -89,6 +90,9 @@ export default Component.extend({
   uniqueTimeSeries: null,
   selectedRule: null,
   isLoadingTimeSeries: false,
+  granularity: null,
+  alertYaml: null,
+  dimensionExploration: null,
 
 
 
@@ -97,10 +101,11 @@ export default Component.extend({
    * @type {Array}
    */
   baselineOptions: computed(
-    'isPreviewMode',
+    'showRules',
     function() {
+      const showRules = get(this, 'showRules');
       let options;
-      if (get(this, 'isPreviewMode')) {
+      if (showRules) {
         options = [
           { name: 'predicted', isActive: true},
           { name: 'wo1w', isActive: false},
@@ -156,14 +161,13 @@ export default Component.extend({
     function() {
       const uniqueTimeSeries = get(this, 'uniqueTimeSeries');
       if (uniqueTimeSeries) {
-        return [...new Set(uniqueTimeSeries.map(series => {
-          const detectorName = series.detectorName;
-          const nameOnly = detectorName.split(':')[0];
+        return [...new Set(uniqueTimeSeries.map(series => series.detectorName))].map(detector => {
+          const nameOnly = detector.split(':')[0];
           return {
-            detectorName,
+            detectorName: detector,
             name: nameOnly
           };
-        }))];
+        });
       }
       return [];
     }
@@ -182,6 +186,24 @@ export default Component.extend({
   ),
 
   /**
+   * flag to differentiate whether we show bounds and rules or not
+   * @type {Boolean}
+   */
+  showRules: computed(
+    'isPreviewMode',
+    'granularity',
+    'dimensionExploration',
+    function() {
+      const {
+        isPreviewMode,
+        granularity,
+        dimensionExploration
+      } = this.getProperties('isPreviewMode', 'granularity', 'dimensionExploration');
+      return (isPreviewMode || (!dimensionExploration && (granularity === 'DAYS')));
+    }
+  ),
+
+  /**
    * dimensions to display in dimensions dropdown
    * @type {Array}
    */
@@ -191,7 +213,9 @@ export default Component.extend({
       const metricUrnList = get(this, 'metricUrnList');
       let options = [];
       metricUrnList.forEach(urn => {
-        options.push(toMetricLabel(extractTail(decodeURIComponent(urn))));
+        let dimensionUrn = toMetricLabel(extractTail(decodeURIComponent(urn)));
+        dimensionUrn = dimensionUrn ? dimensionUrn : 'All Dimensions';
+        options.push(dimensionUrn);
       });
       return options;
     }
@@ -343,7 +367,7 @@ export default Component.extend({
             format: (d) => {
               const t = makeTime(d);
               if (t.valueOf() === t.clone().startOf('day').valueOf()) {
-                return t.format('MMM D (ddd)');
+                return t.format('MMM D');
               }
               return t.format('h:mm a');
             }
@@ -358,18 +382,19 @@ export default Component.extend({
     'metricUrn',
     'selectedRule',
     'selectedDimension',
+    'showRules',
     function() {
       let currentAnomalies = [];
       const {
-        metricUrn, anomalies, selectedRule
-      } = getProperties(this, 'metricUrn', 'anomalies', 'selectedRule');
+        metricUrn, anomalies, selectedRule, showRules
+      } = getProperties(this, 'metricUrn', 'anomalies', 'selectedRule', 'showRules');
       if (!_.isEmpty(anomalies)) {
 
         currentAnomalies = anomalies.filter(anomaly => {
           if (anomaly.metricUrn === metricUrn) {
-            if(get(this, 'isPreviewMode') && anomaly.properties && typeof anomaly.properties === 'object') {
-              return (anomaly.properties.detectorComponentName.includes(selectedRule));
-            } else if (!get(this, 'isPreviewMode')) {
+            if(showRules && anomaly.properties && typeof anomaly.properties === 'object' && selectedRule && typeof selectedRule === 'object') {
+              return (anomaly.properties.detectorComponentName.includes(selectedRule.detectorName));
+            } else if (!showRules) {
               // This is necessary until we surface rule selector in Alert Overview
               return true;
             }
@@ -414,8 +439,8 @@ export default Component.extend({
     'metricUrn',
     function () {
       const {
-        currentAnomalies, timeseries, baseline
-      } = getProperties(this, 'currentAnomalies', 'timeseries', 'baseline');
+        currentAnomalies, timeseries, baseline, showRules
+      } = getProperties(this, 'currentAnomalies', 'timeseries', 'baseline', 'showRules');
 
       const series = {};
       if (!_.isEmpty(currentAnomalies)) {
@@ -426,52 +451,52 @@ export default Component.extend({
             timestamps: [anomaly.startTime, anomaly.endTime],
             values: [1, 1],
             type: 'line',
-            color: 'teal',
+            color: 'red',
             axis: 'y2'
           };
           series[key + '-region'] = Object.assign({}, series[key], {
             type: 'region',
-            color: 'orange'
+            color: 'screenshot-anomaly'
           });
         });
       }
 
       // The current time series has a different naming convention in Preview
-      if (get(this, 'isPreviewMode')) {
+      if (showRules) {
         if (timeseries && !_.isEmpty(timeseries.current)) {
-          series['current'] = {
+          series['Current'] = {
             timestamps: timeseries.timestamp,
             values: stripNonFiniteValues(timeseries.current),
             type: 'line',
-            color: 'grey'
+            color: 'screenshot-current'
           };
         }
       } else {
         if (timeseries && !_.isEmpty(timeseries.value)) {
-          series['current'] = {
+          series['Current'] = {
             timestamps: timeseries.timestamp,
             values: stripNonFiniteValues(timeseries.value),
             type: 'line',
-            color: 'grey'
+            color: 'screenshot-current'
           };
         }
       }
 
       if (baseline && !_.isEmpty(baseline.value)) {
-        series['baseline'] = {
+        series['Baseline'] = {
           timestamps: baseline.timestamp,
           values: stripNonFiniteValues(baseline.value),
           type: 'line',
-          color: 'blue'
+          color: 'screenshot-predicted'
         };
       }
 
       if (baseline && !_.isEmpty(baseline.upper_bound)) {
-        series['upperBound'] = {
+        series['Upper and lower bound'] = {
           timestamps: baseline.timestamp,
           values: stripNonFiniteValues(baseline.upper_bound),
           type: 'line',
-          color: 'confidence-bounds-blue'
+          color: 'screenshot-bounds'
         };
       }
 
@@ -480,7 +505,7 @@ export default Component.extend({
           timestamps: baseline.timestamp,
           values: stripNonFiniteValues(baseline.lower_bound),
           type: 'line',
-          color: 'confidence-bounds-blue'
+          color: 'screenshot-bounds'
         };
       }
       return series;
@@ -625,9 +650,10 @@ export default Component.extend({
       analysisRange,
       anomaliesRange,
       notifications,
-      isPreviewMode,
-      alertId
-    } = this.getProperties('analysisRange', 'anomaliesRange', 'notifications', 'isPreviewMode', 'alertId');
+      showRules,
+      alertId,
+      granularity
+    } = this.getProperties('analysisRange', 'anomaliesRange', 'notifications', 'showRules', 'alertId', 'granularity');
     //detection alert fetch
     const start = analysisRange[0];
     const end = analysisRange[1];
@@ -637,13 +663,16 @@ export default Component.extend({
     let uniqueTimeSeries;
     let applicationAnomalies;
     let metricUrnList;
+    let firstDimension;
     try {
-      if(isPreviewMode){
-        applicationAnomalies = yield getYamlPreviewAnomalies(alertYaml, startAnomalies, endAnomalies, alertId);
+      if(showRules){
+        applicationAnomalies = (granularity === 'DAYS') ? yield getBoundsAndAnomalies(alertId, startAnomalies, endAnomalies) : yield getYamlPreviewAnomalies(alertYaml, startAnomalies, endAnomalies, alertId);
         if (applicationAnomalies && applicationAnomalies.diagnostics && applicationAnomalies.diagnostics['0']) {
           metricUrnList = Object.keys(applicationAnomalies.diagnostics['0']);
           set(this, 'metricUrnList', metricUrnList);
-          set(this, 'selectedDimension', toMetricLabel(extractTail(decodeURIComponent(metricUrnList[0]))));
+          firstDimension = toMetricLabel(extractTail(decodeURIComponent(metricUrnList[0])));
+          firstDimension = firstDimension ? firstDimension : 'All Dimensions';
+          set(this, 'selectedDimension', firstDimension);
           if (applicationAnomalies.predictions && Array.isArray(applicationAnomalies.predictions) && (typeof applicationAnomalies.predictions[0] === 'object')){
             const detectorName = applicationAnomalies.predictions[0].detectorName;
             const selectedRule = {
@@ -665,9 +694,13 @@ export default Component.extend({
           });
           metricUrnList = Object.keys(metricUrnObj);
           if (metricUrnList.length > 0) {
-            set(this, 'metricUrnList', metricUrnList);
-            set(this, 'selectedDimension', toMetricLabel(extractTail(decodeURIComponent(metricUrnList[0]))));
-            set(this, 'metricUrn', metricUrnList[0]);
+            firstDimension = toMetricLabel(extractTail(decodeURIComponent(metricUrnList[0])));
+            firstDimension = firstDimension ? firstDimension : 'All Dimensions';
+            this.setProperties({
+              metricUrnList,
+              selectedDimension: firstDimension,
+              metricUrn: metricUrnList[0]
+            });
           }
         }
         anomalies = applicationAnomalies;
@@ -706,18 +739,23 @@ export default Component.extend({
 
   init() {
     this._super(...arguments);
-    const isPreviewMode = get(this, 'isPreviewMode');
+    const {
+      granularity,
+      isPreviewMode,
+      dimensionExploration
+    } = this.getProperties('granularity', 'isPreviewMode', 'dimensionExploration');
     if (!isPreviewMode) {
       this.setProperties({
         analysisRange: [moment().add(1, 'day').subtract(1, 'month').startOf('day').valueOf(), moment().add(1, 'day').startOf('day').valueOf()],
         duration: '1m',
         selectedDimension: 'Choose a dimension',
-        selectedBaseline: 'wo1w'
+        // For now, we will only show predicted and bounds on daily metrics with no dimensions, for the Alert Overview page
+        selectedBaseline: (granularity === 'DAYS' && !dimensionExploration) ? 'predicted' : 'wo1w'
       });
       this._fetchAnomalies();
     } else {
       this.setProperties({
-        duration: '1d',
+        duration: '48h',
         selectedBaseline: 'predicted'
       });
     }
@@ -736,10 +774,10 @@ export default Component.extend({
       metricUrn,
       analysisRange,
       selectedBaseline,
-      isPreviewMode,
+      showRules,
       selectedRule,
       uniqueTimeSeries
-    } = this.getProperties('metricUrn', 'analysisRange', 'selectedBaseline', 'isPreviewMode', 'selectedRule', 'uniqueTimeSeries');
+    } = this.getProperties('metricUrn', 'analysisRange', 'selectedBaseline', 'showRules', 'selectedRule', 'uniqueTimeSeries');
     const timeZone = 'America/Los_Angeles';
 
     this.setProperties({
@@ -747,7 +785,7 @@ export default Component.extend({
       isLoadingTimeSeries: true
     });
 
-    if (isPreviewMode) {
+    if (showRules) {
       const seriesSet = uniqueTimeSeries.find(series => {
         if (series.detectorName === selectedRule.detectorName && series.metricUrn === metricUrn) {
           return series;
@@ -986,13 +1024,19 @@ export default Component.extend({
     onSelectDimension(selected) {
       const metricUrnList = get(this, 'metricUrnList');
       const newMetricUrn = metricUrnList.find(urn => {
-        if (toMetricLabel(extractTail(decodeURIComponent(urn))) === selected) {
+        const dimensionUrn = toMetricLabel(extractTail(decodeURIComponent(urn)));
+        if (dimensionUrn === selected) {
+          return urn;
+          // if there is no tail, this will be called 'All Dimensions' in the UI
+        } else if (dimensionUrn === '' && selected === 'All Dimensions') {
           return urn;
         }
       });
+      let dimension = toMetricLabel(extractTail(decodeURIComponent(newMetricUrn)));
+      dimension = dimension ? dimension : 'All Dimensions';
       this.setProperties({
         metricUrn: newMetricUrn,
-        selectedDimension: toMetricLabel(extractTail(decodeURIComponent(newMetricUrn)))
+        selectedDimension: dimension
       });
       this._fetchTimeseries();
     },

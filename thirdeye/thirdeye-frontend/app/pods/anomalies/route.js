@@ -9,6 +9,7 @@ import {
   getAnomalyFiltersByAnomalyId,
   anomalyResponseObjNew } from 'thirdeye-frontend/utils/anomaly';
 import _ from 'lodash';
+import AuthenticatedRouteMixin from 'ember-simple-auth/mixins/authenticated-route-mixin';
 
 const start = moment().subtract(1, 'day').valueOf();
 const end = moment().valueOf();
@@ -18,7 +19,7 @@ const queryParamsConfig = {
   replace: false
 };
 
-export default Route.extend({
+export default Route.extend(AuthenticatedRouteMixin, {
 
   // Make duration service accessible
   durationCache: service('services/duration'),

@@ -81,6 +81,8 @@ public class AggregationFunctionFactory {
             return new DistinctCountAggregationFunction();
           case DISTINCTCOUNTHLL:
             return new DistinctCountHLLAggregationFunction();
+          case DISTINCTCOUNTRAWHLL:
+            return new DistinctCountRawHLLAggregationFunction();
           case FASTHLL:
             return new FastHLLAggregationFunction();
           case COUNTMV:
@@ -99,6 +101,8 @@ public class AggregationFunctionFactory {
             return new DistinctCountMVAggregationFunction();
           case DISTINCTCOUNTHLLMV:
             return new DistinctCountHLLMVAggregationFunction();
+          case DISTINCTCOUNTRAWHLLMV:
+            return new DistinctCountRawHLLMVAggregationFunction();
           default:
             throw new IllegalArgumentException();
         }

@@ -5,6 +5,7 @@ import { get, getWithDefault } from '@ember/object';
 import { inject as service } from '@ember/service';
 import { checkStatus, formatYamlFilter } from 'thirdeye-frontend/utils/utils';
 import { powerSort } from 'thirdeye-frontend/utils/manage-alert-utils';
+import AuthenticatedRouteMixin from 'ember-simple-auth/mixins/authenticated-route-mixin';
 
 // Maps filter name to alert property for filtering
 const filterToPropertyMap = {
@@ -15,7 +16,7 @@ const filterToPropertyMap = {
   metric: 'metric'
 };
 
-export default Route.extend({
+export default Route.extend(AuthenticatedRouteMixin, {
 
   // Make duration service accessible
   durationCache: service('services/duration'),
@@ -170,7 +171,6 @@ export default Route.extend({
       filterBlocksGlobal,
       filterBlocksLocal,
       filteredAlerts: model.alerts,
-      totalFilteredAlerts: model.alerts.length,
       sortModes: ['Edited:first', 'Edited:last', 'A to Z', 'Z to A'] // Alerts Search Mode options
     });
   },

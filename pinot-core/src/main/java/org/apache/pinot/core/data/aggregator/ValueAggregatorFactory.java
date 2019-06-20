@@ -50,6 +50,7 @@ public class ValueAggregatorFactory {
       case MINMAXRANGE:
         return new MinMaxRangeValueAggregator();
       case DISTINCTCOUNTHLL:
+      case DISTINCTCOUNTRAWHLL:
         return new DistinctCountHLLValueAggregator();
       case PERCENTILEEST:
         return new PercentileEstValueAggregator();
@@ -81,6 +82,7 @@ public class ValueAggregatorFactory {
       case MINMAXRANGE:
         return MinMaxRangeValueAggregator.AGGREGATED_VALUE_TYPE;
       case DISTINCTCOUNTHLL:
+      case DISTINCTCOUNTRAWHLL:
         return DistinctCountHLLValueAggregator.AGGREGATED_VALUE_TYPE;
       case PERCENTILEEST:
         return PercentileEstValueAggregator.AGGREGATED_VALUE_TYPE;

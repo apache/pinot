@@ -18,12 +18,15 @@
  */
 package org.apache.pinot.queries;
 
+import java.io.Serializable;
+import java.util.function.Function;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
+import org.apache.pinot.common.utils.BytesUtils;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
+import org.apache.pinot.core.startree.hll.HllUtil;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.*;
 
 
 public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleValueQueriesTest {
@@ -201,6 +204,32 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     brokerResponse = getBrokerResponseForQueryWithFilter(query + GROUP_BY);
     QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 24516L, 336536L, 73548L, 120000L,
         new String[]{"1278", "3285"});
+  }
+
+  @Test
+  public void testDistinctCountRawHLL() {
+    String query = "SELECT DISTINCTCOUNTRAWHLL(column1), DISTINCTCOUNTRAWHLL(column3) FROM testTable";
+    Function<Serializable, String> cardinalityExtractor = value -> String.valueOf(HllUtil.buildHllFromBytes(BytesUtils.toBytes(value)).cardinality());
+
+    BrokerResponseNative brokerResponse = getBrokerResponseForQuery(query);
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 240000L, 120000L,
+        cardinalityExtractor,
+        new String[]{"5977", "23825"});
+
+    brokerResponse = getBrokerResponseForQueryWithFilter(query);
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 24516L, 336536L, 49032L, 120000L,
+        cardinalityExtractor,
+        new String[]{"1886", "4492"});
+
+    brokerResponse = getBrokerResponseForQuery(query + GROUP_BY);
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 120000L, 0L, 360000L, 120000L,
+        cardinalityExtractor,
+        new String[]{"3592", "11889"});
+
+    brokerResponse = getBrokerResponseForQueryWithFilter(query + GROUP_BY);
+    QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 24516L, 336536L, 73548L, 120000L,
+        cardinalityExtractor,
+        new String[]{"1324", "3197"});
   }
 
   @Test

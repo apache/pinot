@@ -157,8 +157,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
                   indexCreationInfo.getTotalNumberOfEntries()));
         }
 
-        // Initialize inverted index creator
-        if (invertedIndexColumns.contains(columnName)) {
+        // Initialize inverted index creator; skip creating inverted index if sorted
+        if (invertedIndexColumns.contains(columnName) && !indexCreationInfo.isSorted()) {
           if (segmentCreationSpec.isOnHeap()) {
             _invertedIndexCreatorMap
                 .put(columnName, new OnHeapBitmapInvertedIndexCreator(_indexDir, columnName, cardinality));

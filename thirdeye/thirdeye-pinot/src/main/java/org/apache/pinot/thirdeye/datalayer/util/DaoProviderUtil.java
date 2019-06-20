@@ -22,6 +22,7 @@ package org.apache.pinot.thirdeye.datalayer.util;
 import com.google.common.base.CaseFormat;
 import com.google.inject.AbstractModule;
 import com.google.inject.Provides;
+import io.dropwizard.configuration.YamlConfigurationFactory;
 import org.apache.pinot.thirdeye.datalayer.ScriptRunner;
 import org.apache.pinot.thirdeye.datalayer.bao.jdbc.AbstractManagerImpl;
 import org.apache.pinot.thirdeye.datalayer.dto.AbstractDTO;
@@ -52,7 +53,6 @@ import org.apache.pinot.thirdeye.datalayer.entity.RawAnomalyResultIndex;
 import org.apache.pinot.thirdeye.datalayer.entity.RootcauseSessionIndex;
 import org.apache.pinot.thirdeye.datalayer.entity.SessionIndex;
 import org.apache.pinot.thirdeye.datalayer.entity.TaskIndex;
-import io.dropwizard.configuration.ConfigurationFactory;
 import io.dropwizard.jackson.Jackson;
 import java.io.File;
 import java.io.InputStream;
@@ -124,8 +124,8 @@ public abstract class DaoProviderUtil {
   }
 
   public static PersistenceConfig createConfiguration(File configFile) {
-    ConfigurationFactory<PersistenceConfig> factory =
-        new ConfigurationFactory<>(PersistenceConfig.class,
+    YamlConfigurationFactory<PersistenceConfig> factory =
+        new YamlConfigurationFactory<>(PersistenceConfig.class,
             Validation.buildDefaultValidatorFactory().getValidator(), Jackson.newObjectMapper(),
             "");
     PersistenceConfig configuration;

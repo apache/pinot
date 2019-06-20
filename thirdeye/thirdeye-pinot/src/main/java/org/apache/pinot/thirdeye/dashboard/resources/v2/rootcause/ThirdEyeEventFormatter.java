@@ -28,7 +28,7 @@ import org.apache.pinot.thirdeye.rootcause.impl.EventEntity;
 import org.apache.pinot.thirdeye.rootcause.impl.ThirdEyeEventEntity;
 import java.util.List;
 import java.util.Map;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 
 
 public class ThirdEyeEventFormatter extends RootCauseEventEntityFormatter {

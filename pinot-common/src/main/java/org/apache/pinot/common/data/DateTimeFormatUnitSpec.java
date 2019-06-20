@@ -95,7 +95,6 @@ public class DateTimeFormatUnitSpec {
      * @return Time since epoch of desired time unit
      */
     public abstract long fromMillis(long millisSinceEpoch);
-
   }
 
   private TimeUnit _timeUnit = null;

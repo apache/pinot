@@ -25,7 +25,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
-import org.apache.commons.collections.MapUtils;
+import org.apache.commons.collections4.MapUtils;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
@@ -95,7 +95,7 @@ public class DetectionConfigTuner {
         .get(metricConfig.getDataset());
     Preconditions.checkNotNull(this.datasetConfig, "dataset not found");
 
-    this.metricUrn = MetricEntity.fromMetric(MapUtils.getMap(yamlConfig, PROP_FILTERS), metricConfig.getId()).getUrn();
+    this.metricUrn = MetricEntity.fromMetric(ConfigUtils.getMap(yamlConfig.get(PROP_FILTERS)), metricConfig.getId()).getUrn();
   }
 
   /**

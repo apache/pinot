@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.pql.parsers.pql2.ast;
 
+import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
 import org.apache.pinot.common.utils.request.HavingQueryTree;
 
@@ -29,6 +30,11 @@ public class PredicateParenthesisGroupAstNode extends PredicateAstNode {
   @Override
   public FilterQueryTree buildFilterQueryTree() {
     return ((PredicateAstNode) getChildren().get(0)).buildFilterQueryTree();
+  }
+
+  @Override
+  public Expression buildFilterExpression() {
+    return ((PredicateAstNode) getChildren().get(0)).buildFilterExpression();
   }
 
   @Override

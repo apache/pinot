@@ -20,8 +20,8 @@
 package org.apache.pinot.thirdeye.dashboard.resources;
 
 import org.apache.pinot.thirdeye.api.Constants;
-import com.wordnik.swagger.annotations.Api;
-import com.wordnik.swagger.annotations.ApiOperation;
+import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiOperation;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;

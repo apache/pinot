@@ -99,7 +99,6 @@ public class MutableSegmentImpl implements MutableSegment {
   private final int _numKeyColumns;
 
   // default message metadata
-  private static final StreamMessageMetadata _defaultMetadata = new StreamMessageMetadata(System.currentTimeMillis());
   private volatile long _lastIndexedTimeMs = Long.MIN_VALUE;
   private volatile long _latestIngestionTimeMs = Long.MIN_VALUE;
 
@@ -243,7 +242,7 @@ public class MutableSegmentImpl implements MutableSegment {
 
     _lastIndexedTimeMs = System.currentTimeMillis();
 
-    if (rowMetadata != null) {
+    if (rowMetadata != null && rowMetadata.getIngestionTimeMs() != Long.MIN_VALUE) {
       _latestIngestionTimeMs = Math.max(_latestIngestionTimeMs, rowMetadata.getIngestionTimeMs());
     }
     return canTakeMore;
@@ -431,8 +430,7 @@ public class MutableSegmentImpl implements MutableSegment {
 
   private ColumnDataSource getVirtualDataSource(String column) {
     VirtualColumnContext virtualColumnContext =
-        new VirtualColumnContext(NetUtil.getHostnameOrAddress(), _segmentMetadata.getTableName(), getSegmentName(),
-            column, _numDocsIndexed + 1);
+        new VirtualColumnContext(NetUtil.getHostnameOrAddress(), getSegmentName(), column, _numDocsIndexed + 1);
     VirtualColumnProvider provider =
         VirtualColumnProviderFactory.buildProvider(_schema.getFieldSpecFor(column).getVirtualColumnProvider());
     return new ColumnDataSource(provider.buildColumnIndexContainer(virtualColumnContext),

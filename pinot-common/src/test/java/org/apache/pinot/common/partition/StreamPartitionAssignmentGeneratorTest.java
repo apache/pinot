@@ -98,7 +98,8 @@ public class StreamPartitionAssignmentGeneratorTest {
 
     // ReplicaGroup
     when(mockValidationConfig.getSegmentAssignmentStrategy()).thenReturn(
-        CommonConstants.Helix.DataSource.SegmentAssignmentStrategyType.ReplicaGroupSegmentAssignmentStrategy.toString());
+        CommonConstants.Helix.DataSource.SegmentAssignmentStrategyType.ReplicaGroupSegmentAssignmentStrategy
+            .toString());
     when(tableConfig.getValidationConfig()).thenReturn(mockValidationConfig);
     streamPartitionAssignmentStrategy =
         StreamPartitionAssignmentStrategyFactory.getStreamPartitionAssignmentStrategy(tableConfig);

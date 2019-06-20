@@ -18,9 +18,23 @@
  */
 package org.apache.pinot.client;
 
+import java.util.Map;
+
 /**
  * Factory for client transports.
  */
 interface PinotClientTransportFactory {
+  /**
+   * This method is deprecating. Method with headers can be used in place of this by passing null headers.
+   */
+  @Deprecated
   PinotClientTransport buildTransport();
+
+  /**
+   * Fetch pinot client transport
+   * @param headers custom headers to be passed in the pinot client call.
+   */
+  default PinotClientTransport buildTransport(Map<String, String> headers) {
+    return buildTransport();
+  }
 }

@@ -37,8 +37,18 @@ public class CommonConstants {
 
     public static final String SERVER_INSTANCE_TYPE = "server";
     public static final String BROKER_INSTANCE_TYPE = "broker";
+    public static final String CONTROLLER_INSTANCE_TYPE = "controller";
 
     public static final String BROKER_RESOURCE_INSTANCE = "brokerResource";
+    public static final String LEAD_CONTROLLER_RESOURCE_NAME = "leadControllerResource";
+
+    // More information on why these numbers are set can be found in the following doc:
+    // https://cwiki.apache.org/confluence/display/PINOT/Controller+Separation+between+Helix+and+Pinot
+    public static final int NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE = 24;
+    public static final int LEAD_CONTROLLER_RESOURCE_REPLICA_COUNT = 1;
+    public static final boolean ENABLE_DELAY_REBALANCE = true;
+    public static final int MIN_ACTIVE_REPLICAS = 0;
+    public static final long REBALANCE_DELAY_MS = 300_000L; // 5 minutes.
 
     public static final String UNTAGGED_SERVER_INSTANCE = "server_untagged";
     public static final String UNTAGGED_BROKER_INSTANCE = "broker_untagged";
@@ -320,7 +330,6 @@ public class CommonConstants {
     }
 
     public static final String SEGMENT_NAME = "segment.name";
-    public static final String TABLE_NAME = "segment.table.name";
     public static final String SEGMENT_TYPE = "segment.type";
     public static final String CRYPTER_NAME = "segment.crypter";
     public static final String INDEX_VERSION = "segment.index.version";
@@ -350,6 +359,9 @@ public class CommonConstants {
     public enum SegmentType {
       OFFLINE, REALTIME
     }
+
+    @Deprecated
+    public static final String TABLE_NAME = "segment.table.name";
   }
 
   public static class SegmentOperations {

@@ -44,8 +44,8 @@ public class RandomAssignmentStrategy implements SegmentAssignmentStrategy {
 
   @Override
   public List<String> getAssignedInstances(HelixManager helixManager, HelixAdmin helixAdmin,
-      ZkHelixPropertyStore<ZNRecord> propertyStore, String helixClusterName, SegmentMetadata segmentMetadata,
-      int numReplicas, String tenantName) {
+      ZkHelixPropertyStore<ZNRecord> propertyStore, String tableNameWithType, String helixClusterName,
+      SegmentMetadata segmentMetadata, int numReplicas, String tenantName) {
     String serverTenantName = TagNameUtils.getOfflineTagForTenant(tenantName);
     final Random random = new Random(System.currentTimeMillis());
 
@@ -56,8 +56,8 @@ public class RandomAssignmentStrategy implements SegmentAssignmentStrategy {
       selectedInstanceList.add(allInstanceList.get(idx));
       allInstanceList.remove(idx);
     }
-    LOGGER.info("Segment assignment result for : " + segmentMetadata.getName() + ", in resource : " + segmentMetadata
-        .getTableName() + ", selected instances: " + Arrays.toString(selectedInstanceList.toArray()));
+    LOGGER.info("Segment assignment result for : " + segmentMetadata.getName() + ", in resource : " + tableNameWithType
+        + ", selected instances: " + Arrays.toString(selectedInstanceList.toArray()));
 
     return selectedInstanceList;
   }

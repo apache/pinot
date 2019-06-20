@@ -34,7 +34,7 @@ public class EvaluationBean extends AbstractBean {
   private long startTime; // the start time for the detection window being monitored
   private long endTime; // the end time for the detection window being monitored
   private String detectorName; // the name for the detector
-  private double mape; //  the mean absolute percentage error (MAPE)
+  private Double mape; //  the mean absolute percentage error (MAPE)
   private String metricUrn; // the metric urn
 
   public long getDetectionConfigId() {
@@ -69,11 +69,11 @@ public class EvaluationBean extends AbstractBean {
     this.detectorName = detectorName;
   }
 
-  public double getMape() {
+  public Double getMape() {
     return mape;
   }
 
-  public void setMape(double mape) {
+  public void setMape(Double mape) {
     this.mape = mape;
   }
 

@@ -20,6 +20,7 @@
 package org.apache.pinot.thirdeye.datalayer.pojo;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
@@ -41,6 +42,7 @@ public class DetectionConfigBean extends AbstractBean {
   boolean active;
   String yaml;
   Map<String, Object> componentSpecs;
+  long lastTuningTimestamp;
 
   public Map<String, Object> getComponentSpecs() {
     return componentSpecs;
@@ -96,6 +98,14 @@ public class DetectionConfigBean extends AbstractBean {
 
   public void setLastTimestamp(long lastTimestamp) {
     this.lastTimestamp = lastTimestamp;
+  }
+
+  public long getLastTuningTimestamp() {
+    return lastTuningTimestamp;
+  }
+
+  public void setLastTuningTimestamp(long lastTuningTimestamp) {
+    this.lastTuningTimestamp = lastTuningTimestamp;
   }
 
   public boolean isActive() {

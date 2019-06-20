@@ -26,8 +26,8 @@ import java.util.List;
 import java.util.Set;
 import javax.mail.internet.AddressException;
 import javax.mail.internet.InternetAddress;
-import org.apache.commons.lang.StringUtils;
-import org.apache.commons.lang.Validate;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.Validate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,7 +46,7 @@ public class EmailUtils {
       InternetAddress emailAddr = new InternetAddress(email);
       emailAddr.validate();
       return true;
-    } catch (AddressException | IllegalArgumentException e) {
+    } catch (Exception e) {
       return false;
     }
   }
