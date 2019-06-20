@@ -37,17 +37,18 @@ public class LowLevelRoutingTableBuilderUtil {
    * state) for the following reasons:
    * <ul>
    *   <li>
-   *     If within a partition, there are multiple CONSUMING segments (typically caused by the delay of CONSUMING to
-   *     ONLINE state transition), we can only query the first CONSUMING segment because it might contain records that
-   *     overlapped with the records in the next segment (over-consumed).
+   *     Within a partition, there could be multiple CONSUMING segments (typically caused by the delay of CONSUMING to
+   *     ONLINE state transition). We should only query the first CONSUMING segment because it might contain records
+   *     that overlapped with the records in the next segment (over-consumed).
    *   </li>
    *   <li>
-   *     If the instance states for a segment is partial ONLINE and partial CONSUMING (some instances finished the
-   *     CONSUMING to ONLINE state transition, others didn't), we count the segment as CONSUMING segment (most likely
-   *     the first CONSUMING segment because it is already committed and is performing the CONSUMING to ONLINE state
-   *     transition). If we don't count the segment as CONSUMING segment, then this segment is not allowed to be in the
-   *     CONSUMING state for routing purpose, and we will route all queries to the ONLINE instances which can
-   *     potentially overwhelm instance.
+   *     If the instance states for a segment are partial CONSUMING (instances can be ONLINE if they have finished
+   *     the CONSUMING to ONLINE state transition; instances can be OFFLINE if they encountered error while consuming
+   *     and controller set the IdealState to OFFLINE; instances can be ERROR if they encountered error during the state
+   *     transition), we count the segment as CONSUMING segment. If we don't count the segment as CONSUMING segment,
+   *     then this segment is not allowed to be in the CONSUMING state for routing purpose, and we will not route
+   *     queries to this segment if there is no ONLINE instances, or route all queries to the ONLINE instances which can
+   *     potentially overwhelm instances.
    *   </li>
    *   <li>
    *     It is possible that the latest CONSUMING segment is not allowed for routing purpose and we won't query it, but
@@ -57,9 +58,9 @@ public class LowLevelRoutingTableBuilderUtil {
    *   </li>
    * </ul>
    *
-   * @param externalView helix external view
-   * @param sortedSegmentsByPartition map of partition to sorted set of segment names.
-   * @return map of allowed consuming segment for each partition for routing.
+   * @param externalView External view for the real-time table
+   * @param sortedSegmentsByPartition Map from partition to segments
+   * @return Map from partition to allowed CONSUMING segment for routing purpose
    */
   public static Map<String, SegmentName> getAllowedConsumingStateSegments(ExternalView externalView,
       Map<String, SortedSet<SegmentName>> sortedSegmentsByPartition) {
