@@ -75,6 +75,21 @@
       <groupId>io.dropwizard-bundles</groupId>
       <artifactId>dropwizard-redirect-bundle</artifactId>
     </dependency>
+
+    <!-- Pin jackson version and omit from third party dependencies-->
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-core</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-annotations</artifactId>
+    </dependency>
+
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-api</artifactId>
