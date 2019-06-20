@@ -4,19 +4,18 @@ import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteOrder;
-import org.apache.pinot.core.io.writer.impl.MutableOffHeapByteArrayStore;
-import org.apache.pinot.core.io.writer.impl.MutableOffHeapByteArrayStore.Buffer;
+import org.apache.pinot.core.io.writer.impl.OffHeapByteArrayStore;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 
 
 public class VarLengthBytesValueReaderWriter implements Closeable, ValueReader {
 
-  private MutableOffHeapByteArrayStore.Buffer _buffer;
+  private OffHeapByteArrayStore _buffer;
 
   // Used for memory-mapping while loading a segment
   public VarLengthBytesValueReaderWriter(PinotDataBuffer pinotDataBuffer) {
     PinotDataBuffer valuesBuffer = readHedader(pinotDataBuffer);
-    _buffer = new Buffer(valuesBuffer);
+    _buffer = new OffHeapByteArrayStore(valuesBuffer);
   }
 
   // Used to create one while building a segment
@@ -26,7 +25,7 @@ public class VarLengthBytesValueReaderWriter implements Closeable, ValueReader {
         .mapFile(dictionaryFile, false, 0, size, ByteOrder.BIG_ENDIAN,
             getClass().getSimpleName());
     writeHeader(pinotDataBuffer, arrays);
-    _buffer = new Buffer(pinotDataBuffer);
+    _buffer = new OffHeapByteArrayStore(pinotDataBuffer);
     for (byte[] array : arrays) {
       _buffer.add(array);
     }
