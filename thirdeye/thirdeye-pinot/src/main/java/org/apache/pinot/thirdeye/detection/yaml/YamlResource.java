@@ -112,6 +112,10 @@ public class YamlResource {
   private static final String PROP_SUBS_GROUP_NAME = "subscriptionGroupName";
   private static final String PROP_DETECTION_NAME = "detectionName";
 
+  private static final String PROP_SESSION_KEY = "sessionKey";
+  private static final String PROP_PRINCIPAL_TYPE = "principalType";
+  private static final String PROP_SERVICE = "service";
+
   // default onboarding replay period
   private static final long ONBOARDING_REPLAY_LOOKBACK = TimeUnit.DAYS.toMillis(30);
 
@@ -400,8 +404,8 @@ public class YamlResource {
 
   private boolean isServiceAccount(ThirdEyePrincipal user) {
     List<Predicate> predicates = new ArrayList<>();
-    predicates.add(Predicate.EQ("sessionKey", user.getSessionKey()));
-    predicates.add(Predicate.EQ("principalType", "SERVICE"));
+    predicates.add(Predicate.EQ(PROP_SESSION_KEY, user.getSessionKey()));
+    predicates.add(Predicate.EQ(PROP_PRINCIPAL_TYPE, PROP_SERVICE));
 
     List<SessionDTO> sessionDTO = this.sessionDAO.findByPredicate(Predicate.AND(predicates.toArray(new Predicate[0])));
     return sessionDTO != null && !sessionDTO.isEmpty();
