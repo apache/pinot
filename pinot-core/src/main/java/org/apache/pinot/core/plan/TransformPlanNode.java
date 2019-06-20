@@ -21,6 +21,7 @@ package org.apache.pinot.core.plan;
 import static org.apache.pinot.core.query.selection.SelectionOperatorUtils.getSelectionColumns;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
@@ -101,6 +102,7 @@ public class TransformPlanNode implements PlanNode {
       List<String> expressions = selection.getSelectionColumns();
       if (expressions.size() == 1 && expressions.get(0).equals("*")) {
         expressions = new LinkedList<>(indexSegment.getPhysicalColumnNames());
+        Collections.sort(expressions);
       }
       if (selection.getSelectionSortSequence() != null) {
         for (SelectionSort selectionSort : selection.getSelectionSortSequence()) {

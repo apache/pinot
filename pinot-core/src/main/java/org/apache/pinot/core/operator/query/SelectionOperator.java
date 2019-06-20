@@ -21,6 +21,7 @@ package org.apache.pinot.core.operator.query;
 import java.io.Serializable;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.LinkedList;
@@ -100,11 +101,18 @@ public class SelectionOperator extends BaseOperator<IntermediateResultsBlock> {
       if (selectColumns.contains(expression.toString())) {
         _selectExpressions.add(expression);
       }
-      if (orderByColumns.contains(expression.toString())) {
-        _orderByExpressions.add(expression);
-        _orderByIndices.add(i);
+    }
+
+    for (String orderByColumn : orderByColumns) {
+      for (int i = 0; i < _expressions.size(); i++) {
+        TransformExpressionTree expression = _expressions.get(i);
+        if (orderByColumn.equalsIgnoreCase(expression.toString())) {
+          _orderByExpressions.add(expression);
+          _orderByIndices.add(i);
+        }
       }
     }
+
     _blockValSets = new BlockValSet[_expressions.size()];
     _expressionResultMetadata = new TransformResultMetadata[_expressions.size()];
     _dictionaries = new Dictionary[_expressions.size()];
@@ -121,7 +129,7 @@ public class SelectionOperator extends BaseOperator<IntermediateResultsBlock> {
       }
     }
     _dataSchema = new DataSchema(columnNames, columnDataTypes);
-    if(_orderByExpressions.isEmpty()) {
+    if (_orderByExpressions.isEmpty()) {
       _rowEvents = new ArrayList<>();
     } else {
       Comparator<Serializable[]> comparator = getStrictComparator();
@@ -139,11 +147,15 @@ public class SelectionOperator extends BaseOperator<IntermediateResultsBlock> {
           int ret = 0;
           SelectionSort selectionSort = sortSequence.get(i);
           int index = _orderByIndices.get(i);
+          // Only compare single-value columns.
+          if (!_expressionResultMetadata[index].isSingleValue()) {
+            continue;
+          }
+
           Serializable v1 = o1[index];
           Serializable v2 = o2[index];
 
           DataType dataType = _expressionResultMetadata[index].getDataType();
-          // Only compare single-value columns.
           switch (dataType) {
             case INT:
               if (!selectionSort.isIsAsc()) {
@@ -221,6 +233,7 @@ public class SelectionOperator extends BaseOperator<IntermediateResultsBlock> {
           docId = docId + 1;
         }
         if (_rowEvents.size() >= _limit) {
+          numDocsScanned += docId;
           break;
         }
       } else {
@@ -236,6 +249,7 @@ public class SelectionOperator extends BaseOperator<IntermediateResultsBlock> {
           }
           docId = docId + 1;
         }
+        numDocsScanned += docId;
       }
     }
 
