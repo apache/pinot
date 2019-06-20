@@ -85,7 +85,7 @@ import org.slf4j.LoggerFactory;
 public class MutableOffHeapByteArrayStore implements Closeable {
   private static final Logger LOGGER = LoggerFactory.getLogger(MutableOffHeapByteArrayStore.class);
 
-  private static class Buffer implements Closeable {
+  public static class Buffer implements Closeable {
 
     private final PinotDataBuffer _pinotDataBuffer;
     private final ByteBuffer _byteBuffer;
@@ -107,7 +107,15 @@ public class MutableOffHeapByteArrayStore implements Closeable {
       _size = size;
     }
 
-    private int add(byte[] value) {
+    public Buffer(PinotDataBuffer pinotDataBuffer) {
+      _pinotDataBuffer = pinotDataBuffer;
+      _byteBuffer = _pinotDataBuffer.toDirectByteBuffer(0, (int)pinotDataBuffer.size());
+      _startIndex = 0;
+      _availEndOffset = _byteBuffer.capacity();
+      _size = pinotDataBuffer.size();
+    }
+
+    public int add(byte[] value) {
       int startOffset = _availEndOffset - value.length;
       if (startOffset < (_numValues + 1) * Integer.BYTES) {
         // full
@@ -121,7 +129,7 @@ public class MutableOffHeapByteArrayStore implements Closeable {
       return _numValues++;
     }
 
-    private boolean equalsValueAt(byte[] value, int index) {
+    public boolean equalsValueAt(byte[] value, int index) {
       int startOffset = _byteBuffer.getInt(index * Integer.BYTES);
       int endOffset = _byteBuffer.capacity();
       if (index > 0) {
@@ -138,7 +146,7 @@ public class MutableOffHeapByteArrayStore implements Closeable {
       return true;
     }
 
-    private byte[] get(final int index) {
+    public byte[] get(final int index) {
       int startOffset = _byteBuffer.getInt(index * Integer.BYTES);
       int endOffset = _byteBuffer.capacity();
       if (index > 0) {
