@@ -179,9 +179,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
     Preconditions.checkNotNull(tableConfig);
 
-    Schema schema = null;
-    // For REALTIME and OFFLINE tables, try to get schema for default columns
-    schema = ZKMetadataProvider.getTableSchema(_propertyStore, tableNameWithType);
+    Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, tableNameWithType);
 
     reloadSegment(tableNameWithType, segmentMetadata, tableConfig, schema);
 
