@@ -70,6 +70,17 @@ public class Connection {
   }
 
   /**
+   * Executes a SQL statement.
+   * @param statement The statement to execute
+   * @return The result of the query
+   * @throws PinotClientException If an exception occurs while processing the query
+   */
+  public ResultSetGroup executeSql(String statement)
+      throws PinotClientException {
+    return execute(null, statement);
+  }
+
+  /**
    * Executes a PQL statement.
    *
    * @param statement The statement to execute
@@ -84,6 +95,27 @@ public class Connection {
           "Could not find broker to query for table: " + (tableName == null ? "null" : tableName));
     }
     BrokerResponse response = _transport.executeQuery(brokerHostPort, statement);
+    if (response.hasExceptions()) {
+      throw new PinotClientException("Query had processing exceptions: \n" + response.getExceptions());
+    }
+    return new ResultSetGroup(response);
+  }
+
+  /**
+   * Executes a SQL statement.
+   *
+   * @param statement The statement to execute
+   * @return The result of the query
+   * @throws PinotClientException If an exception occurs while processing the query
+   */
+  public ResultSetGroup executeSql(String tableName, String statement)
+      throws PinotClientException {
+    String brokerHostPort = _brokerSelector.selectBroker(tableName);
+    if (brokerHostPort == null) {
+      throw new PinotClientException(
+          "Could not find broker to query for table: " + (tableName == null ? "null" : tableName));
+    }
+    BrokerResponse response = _transport.executeSqlQuery(brokerHostPort, statement);
     if (response.hasExceptions()) {
       throw new PinotClientException("Query had processing exceptions: \n" + response.getExceptions());
     }

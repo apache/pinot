@@ -25,6 +25,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
 import org.apache.pinot.common.request.FilterOperator;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
@@ -42,7 +43,7 @@ public class MultipleOrEqualitiesToInClauseFilterQueryTreeOptimizer extends Filt
 
   private FilterQueryTree optimize(FilterQueryTree filterQueryTree, FilterQueryTree parent) {
     if (filterQueryTree.getOperator() == FilterOperator.OR) {
-      Map<String, Set<String>> columnToValues = new HashMap<>();
+      Map<String, Set<String>> columnToValues = new TreeMap<>();
       List<FilterQueryTree> nonEqualityOperators = new ArrayList<>();
 
       // Collect all equality/in values and non-equality operators

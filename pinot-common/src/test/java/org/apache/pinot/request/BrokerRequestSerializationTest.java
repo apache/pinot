@@ -158,19 +158,19 @@ public class BrokerRequestSerializationTest {
     pinotQuery.addToSelectList(RequestUtils.createIdentifierExpression("dummy1"));
 
     //Populate OrderBy
-    Expression ascExpr = RequestUtils.createFunctionExpression("asc");
+    Expression ascExpr = RequestUtils.getFunctionExpression("asc");
     ascExpr.getFunctionCall().addToOperands(RequestUtils.createIdentifierExpression("dummy1"));
     pinotQuery.addToOrderByList(ascExpr);
 
     //Populate FilterQuery
-    Expression filter = RequestUtils.createFunctionExpression(FilterOperator.AND.name());
+    Expression filter = RequestUtils.getFunctionExpression(FilterOperator.AND.name());
 
-    Expression filterExpr1 = RequestUtils.createFunctionExpression(FilterOperator.EQUALITY.name());
+    Expression filterExpr1 = RequestUtils.getFunctionExpression(FilterOperator.EQUALITY.name());
     filterExpr1.getFunctionCall().addToOperands(RequestUtils.createIdentifierExpression("dummy1"));
     filterExpr1.getFunctionCall().addToOperands(RequestUtils.createLiteralExpression(new StringLiteralAstNode("dummy1")));
     filter.getFunctionCall().addToOperands(filterExpr1);
 
-    Expression filterExpr2 = RequestUtils.createFunctionExpression(FilterOperator.EQUALITY.name());
+    Expression filterExpr2 = RequestUtils.getFunctionExpression(FilterOperator.EQUALITY.name());
     filterExpr2.getFunctionCall().addToOperands(RequestUtils.createIdentifierExpression("dummy2"));
     filterExpr2.getFunctionCall().addToOperands(RequestUtils.createLiteralExpression(new StringLiteralAstNode("dummy2")));
     filter.getFunctionCall().addToOperands(filterExpr2);
@@ -178,7 +178,7 @@ public class BrokerRequestSerializationTest {
     pinotQuery.setFilterExpression(filter);
 
     //Populate Aggregations
-    Expression aggExpr = RequestUtils.createFunctionExpression("dummy1");
+    Expression aggExpr = RequestUtils.getFunctionExpression("dummy1");
     aggExpr.getFunctionCall().addToOperands(RequestUtils.createIdentifierExpression("dummy"));
     pinotQuery.addToSelectList(aggExpr);
 

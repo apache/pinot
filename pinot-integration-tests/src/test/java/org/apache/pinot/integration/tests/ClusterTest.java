@@ -521,13 +521,23 @@ public abstract class ClusterTest extends ControllerTest {
 
   public static JsonNode postQuery(String query, String brokerBaseApiUrl)
       throws Exception {
-    return postQuery(query, brokerBaseApiUrl, false);
+    return postQuery(query, brokerBaseApiUrl, false, "pql");
   }
 
-  public static JsonNode postQuery(String query, String brokerBaseApiUrl, boolean enableTrace)
+  public static JsonNode postSqlQuery(String query, String brokerBaseApiUrl)
+      throws Exception {
+    return postQuery(query, brokerBaseApiUrl, false, "sql");
+  }
+
+  public static JsonNode postSqlQuery(String query, String brokerBaseApiUrl, boolean enableTrace)
+      throws Exception {
+    return postQuery(query, brokerBaseApiUrl, enableTrace, "sql");
+  }
+
+  public static JsonNode postQuery(String query, String brokerBaseApiUrl, boolean enableTrace, String queryType)
       throws Exception {
     ObjectNode payload = JsonUtils.newObjectNode();
-    payload.put("pql", query);
+    payload.put(queryType, query);
     payload.put("trace", enableTrace);
 
     return JsonUtils.stringToJsonNode(sendPostRequest(brokerBaseApiUrl + "/query", payload.toString()));

@@ -49,17 +49,21 @@ import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.FilterOperator;
 import org.apache.pinot.common.request.FilterQuery;
 import org.apache.pinot.common.request.FilterQueryMap;
+import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.core.query.reduce.BrokerReduceService;
+import org.apache.pinot.pql.parsers.PinotQuery2BrokerRequestConverter;
 import org.apache.pinot.pql.parsers.Pql2Compiler;
+import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.pinot.common.utils.CommonConstants.Broker.*;
 import static org.apache.pinot.common.utils.CommonConstants.Broker.Request.DEBUG_OPTIONS;
 import static org.apache.pinot.common.utils.CommonConstants.Broker.Request.PQL;
+import static org.apache.pinot.common.utils.CommonConstants.Broker.Request.SQL;
 import static org.apache.pinot.common.utils.CommonConstants.Broker.Request.TRACE;
 
 
@@ -132,7 +136,14 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     requestStatistics.setRequestId(requestId);
     requestStatistics.setRequestArrivalTimeMillis(System.currentTimeMillis());
 
-    String query = request.get(PQL).asText();
+    String query;
+    boolean isSqlQuery = false;
+    if (request.has(SQL)) {
+      query = request.get(SQL).asText();
+      isSqlQuery = true;
+    } else {
+      query = request.get(PQL).asText();
+    }
     LOGGER.debug("Query string for request {}: {}", requestId, query);
     requestStatistics.setPql(query);
 
@@ -140,7 +151,12 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     long compilationStartTimeNs = System.nanoTime();
     BrokerRequest brokerRequest;
     try {
-      brokerRequest = REQUEST_COMPILER.compileToBrokerRequest(query);
+      if (isSqlQuery) {
+        final PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+        brokerRequest = new PinotQuery2BrokerRequestConverter().convert(pinotQuery);
+      } else {
+        brokerRequest = REQUEST_COMPILER.compileToBrokerRequest(query);
+      }
     } catch (Exception e) {
       LOGGER.info("Caught exception while compiling request {}: {}, {}", requestId, query, e.getMessage());
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_COMPILATION_EXCEPTIONS, 1);

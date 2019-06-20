@@ -61,9 +61,14 @@ class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
 
   @Override
   public Future<BrokerResponse> executeQueryAsync(String brokerAddress, final String query) {
+    return executePinotQueryAsync(brokerAddress, query, "pql");
+  }
+
+  public Future<BrokerResponse> executePinotQueryAsync(String brokerAddress, final String query,
+      final String queryType) {
     try {
       ObjectNode json = JsonNodeFactory.instance.objectNode();
-      json.put("pql", query);
+      json.put(queryType, query);
 
       final String url = "http://" + brokerAddress + "/query";
 
@@ -81,6 +86,22 @@ class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
     } catch (Exception e) {
       throw new PinotClientException(e);
     }
+  }
+
+  @Override
+  public BrokerResponse executeSqlQuery(String brokerAddress, String query)
+      throws PinotClientException {
+    try {
+      return executeSqlQueryAsync(brokerAddress, query).get();
+    } catch (Exception e) {
+      throw new PinotClientException(e);
+    }
+  }
+
+  @Override
+  public Future<BrokerResponse> executeSqlQueryAsync(String brokerAddress, String query)
+      throws PinotClientException {
+    return executePinotQueryAsync(brokerAddress, query, "sql");
   }
 
   private static class BrokerResponseFuture implements Future<BrokerResponse> {

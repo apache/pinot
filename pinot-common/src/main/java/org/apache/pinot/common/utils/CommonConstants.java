@@ -159,6 +159,7 @@ public class CommonConstants {
 
     public static class Request {
       public static final String PQL = "pql";
+      public static final String SQL = "sql";
       public static final String TRACE = "trace";
       public static final String DEBUG_OPTIONS = "debugOptions";
 

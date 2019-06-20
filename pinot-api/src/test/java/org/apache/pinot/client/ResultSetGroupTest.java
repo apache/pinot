@@ -147,6 +147,18 @@ public class ResultSetGroupTest {
         throws PinotClientException {
       return null;
     }
+
+    @Override
+    public BrokerResponse executeSqlQuery(String brokerAddress, String query)
+        throws PinotClientException {
+      return null;
+    }
+
+    @Override
+    public Future<BrokerResponse> executeSqlQueryAsync(String brokerAddress, String query)
+        throws PinotClientException {
+      return null;
+    }
   }
 
   class DummyJsonTransportFactory implements PinotClientTransportFactory {

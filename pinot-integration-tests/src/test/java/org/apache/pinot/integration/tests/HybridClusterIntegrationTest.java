@@ -237,6 +237,13 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
 
   @Test
   @Override
+  public void testSqlQueriesFromQueryFile()
+      throws Exception {
+    super.testQueriesFromQueryFile();
+  }
+
+  @Test
+  @Override
   public void testGeneratedQueriesWithMultiValues()
       throws Exception {
     super.testGeneratedQueriesWithMultiValues();

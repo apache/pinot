@@ -61,7 +61,7 @@ public class OrderByAstNode extends BaseAstNode {
         if ("asc".equalsIgnoreCase(node.getOrdering())) {
           ordering = "asc";
         }
-        Expression orderByExpression = RequestUtils.createFunctionExpression(ordering);
+        Expression orderByExpression = RequestUtils.getFunctionExpression(ordering);
         Function orderByFunc = orderByExpression.getFunctionCall();
         Expression colExpr = RequestUtils.createIdentifierExpression(node.getColumn());
         orderByFunc.addToOperands(colExpr);

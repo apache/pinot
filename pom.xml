@@ -126,6 +126,7 @@
     <swagger.version>1.5.16</swagger.version>
     <hadoop.version>2.7.0</hadoop.version>
     <antlr.version>4.6</antlr.version>
+    <calcite.version>1.19.0</calcite.version>
     <!-- commons-configuration, hadoop-common, hadoop-client use commons-lang -->
     <commons-lang.version>2.6</commons-lang.version>
     <!-- pinot-common, commons-configuration, hadoop-common, hadoop-client use commons-logging-->
@@ -712,6 +713,17 @@
         <groupId>org.antlr</groupId>
         <artifactId>antlr4-runtime</artifactId>
         <version>${antlr.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.calcite</groupId>
+        <artifactId>calcite-core</artifactId>
+        <version>${calcite.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>com.google.protobuf</groupId>
+            <artifactId>protobuf-java</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
       <dependency>
         <groupId>com.jcabi</groupId>
