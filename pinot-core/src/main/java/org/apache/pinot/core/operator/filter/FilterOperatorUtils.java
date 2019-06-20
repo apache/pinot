@@ -53,18 +53,25 @@ public class FilterOperatorUtils {
     // TODO: make it exclusive
     int endDocId = numDocs - 1;
 
-    // Use inverted index if the predicate type is not RANGE or REGEXP_LIKE for efficiency
+    // Use scan-based operator if inverted index does not exist or the predicate type is RANGE or REGEXP_LIKE with more
+    // than 1 matching dictionary ids
+    // NOTE: allow RANGE with single matching dictionary id to use inverted index is very useful for time column with
+    //       DAYS granularity and time values across two days
+    // TODO: whether to use inverted index should be based on the number of matching dictionary ids and cardinality of
+    //       the column instead of the predicate type
+    // TODO: if column is sorted, should always use sorted index for RANGE predicate
     DataSourceMetadata dataSourceMetadata = dataSource.getDataSourceMetadata();
     Predicate.Type predicateType = predicateEvaluator.getPredicateType();
-    if (dataSourceMetadata.hasInvertedIndex() && (predicateType != Predicate.Type.RANGE) && (predicateType
-        != Predicate.Type.REGEXP_LIKE)) {
+    if (!dataSourceMetadata.hasInvertedIndex() || (
+        (predicateType == Predicate.Type.RANGE || predicateType == Predicate.Type.REGEXP_LIKE)
+            && predicateEvaluator.getNumMatchingDictIds() > 1)) {
+      return new ScanBasedFilterOperator(predicateEvaluator, dataSource, startDocId, endDocId);
+    } else {
       if (dataSourceMetadata.isSorted()) {
         return new SortedInvertedIndexBasedFilterOperator(predicateEvaluator, dataSource, startDocId, endDocId);
       } else {
         return new BitmapBasedFilterOperator(predicateEvaluator, dataSource, startDocId, endDocId);
       }
-    } else {
-      return new ScanBasedFilterOperator(predicateEvaluator, dataSource, startDocId, endDocId);
     }
   }
 

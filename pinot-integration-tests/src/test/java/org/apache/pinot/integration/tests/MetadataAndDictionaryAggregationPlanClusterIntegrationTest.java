@@ -415,7 +415,7 @@ public class MetadataAndDictionaryAggregationPlanClusterIntegrationTest extends 
     assertEquals(response.get("totalDocs").asLong(), response.get("numDocsScanned").asLong());
 
     // filter in query: not answered by DictionaryBasedAggregationOperator
-    pqlQuery = "SELECT MAX(ArrTime) FROM " + DEFAULT_TABLE_NAME + " where DaysSinceEpoch > 16100";
+    pqlQuery = "SELECT MAX(ArrTime) FROM " + DEFAULT_TABLE_NAME + " where DaysSinceEpoch > 16200";
     response = postQuery(pqlQuery);
     assertTrue(response.get("numEntriesScannedPostFilter").asLong() > 0);
     assertTrue(response.get("numEntriesScannedInFilter").asLong() > 0);
@@ -466,7 +466,7 @@ public class MetadataAndDictionaryAggregationPlanClusterIntegrationTest extends 
     assertEquals(response.get("totalDocs").asLong(), response.get("numDocsScanned").asLong());
 
     // filter present in query: not answered by MetadataBasedAggregationOperator
-    pqlQuery = "SELECT COUNT(*) FROM " + DEFAULT_TABLE_NAME + " WHERE DaysSinceEpoch > 16100";
+    pqlQuery = "SELECT COUNT(*) FROM " + DEFAULT_TABLE_NAME + " WHERE DaysSinceEpoch > 16200";
     response = postQuery(pqlQuery);
     assertEquals(response.get("numEntriesScannedPostFilter").asLong(), 0);
     assertTrue(response.get("numEntriesScannedInFilter").asLong() > 0);
