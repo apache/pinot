@@ -22,6 +22,7 @@ package org.apache.pinot.thirdeye.detection.yaml;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
+import io.dropwizard.auth.Auth;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
@@ -34,9 +35,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.security.PermitAll;
 import javax.validation.constraints.NotNull;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.GET;
+import javax.ws.rs.NotAuthorizedException;
 import javax.ws.rs.POST;
 import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
@@ -49,6 +52,7 @@ import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.thirdeye.anomaly.task.TaskConstants;
 import org.apache.pinot.thirdeye.api.Constants;
+import org.apache.pinot.thirdeye.auth.ThirdEyePrincipal;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
 import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionAlertConfigManager;
@@ -57,9 +61,11 @@ import org.apache.pinot.thirdeye.datalayer.bao.EvaluationManager;
 import org.apache.pinot.thirdeye.datalayer.bao.EventManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import org.apache.pinot.thirdeye.datalayer.bao.MetricConfigManager;
+import org.apache.pinot.thirdeye.datalayer.bao.SessionManager;
 import org.apache.pinot.thirdeye.datalayer.bao.TaskManager;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.SessionDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.TaskDTO;
 import org.apache.pinot.thirdeye.datalayer.util.Predicate;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
@@ -106,6 +112,10 @@ public class YamlResource {
   private static final String PROP_SUBS_GROUP_NAME = "subscriptionGroupName";
   private static final String PROP_DETECTION_NAME = "detectionName";
 
+  private static final String PROP_SESSION_KEY = "sessionKey";
+  private static final String PROP_PRINCIPAL_TYPE = "principalType";
+  private static final String PROP_SERVICE = "SERVICE";
+
   // default onboarding replay period
   private static final long ONBOARDING_REPLAY_LOOKBACK = TimeUnit.DAYS.toMillis(30);
 
@@ -120,6 +130,7 @@ public class YamlResource {
   private final MergedAnomalyResultManager anomalyDAO;
   private final EvaluationManager evaluationDAO;
   private final TaskManager taskDAO;
+  private final SessionManager sessionDAO;
   private final DetectionPipelineLoader loader;
   private final Yaml yaml;
 
@@ -132,6 +143,7 @@ public class YamlResource {
     this.anomalyDAO = DAORegistry.getInstance().getMergedAnomalyResultDAO();
     this.taskDAO = DAORegistry.getInstance().getTaskDAO();
     this.evaluationDAO = DAORegistry.getInstance().getEvaluationManager();
+    this.sessionDAO = DAORegistry.getInstance().getSessionDAO();
     this.yaml = new Yaml();
 
     TimeSeriesLoader timeseriesLoader =
@@ -222,12 +234,23 @@ public class YamlResource {
     return Response.serverError().entity(responseMessage).build();
   }
 
+  private Response processBadAuthorizationResponse(String type, String operation, String payload, NotAuthorizedException e) {
+    Map<String, String> responseMessage = new HashMap<>();
+    LOG.warn("Authorization error while {} {} with payload {}", operation, type, payload, e);
+    responseMessage.put(type + "Msg", "Authorization Error!");
+    responseMessage.put(type + "Msg-moreInfo", "Configure owners property in " + type + " config");
+    return Response.status(Response.Status.UNAUTHORIZED).entity(responseMessage).build();
+  }
+
   @POST
   @Path("/create-alert")
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.APPLICATION_JSON)
+  @PermitAll
   @ApiOperation("Use yaml to create both subscription and detection yaml. ")
-  public Response createYamlAlert(@ApiParam(value =  "a json contains both subscription and detection yaml as string")  String payload,
+  public Response createYamlAlert(
+      @Auth ThirdEyePrincipal user,
+      @ApiParam(value =  "a json contains both subscription and detection yaml as string")  String payload,
       @ApiParam("tuning window start time for tunable components") @QueryParam("startTime") long startTime,
       @ApiParam("tuning window end time for tunable components") @QueryParam("endTime") long endTime) throws Exception {
     Map<String, String> yamls;
@@ -266,16 +289,18 @@ public class YamlResource {
       List<DetectionAlertConfigDTO> alertConfigDTOS = detectionAlertConfigDAO.findByPredicate(Predicate.EQ("name", groupName));
       if (!alertConfigDTOS.isEmpty()) {
         detectionAlertConfigId = alertConfigDTOS.get(0).getId();
-        updateSubscriptionGroup(detectionAlertConfigId, subscriptionYaml);
+        updateSubscriptionGroup(user, detectionAlertConfigId, subscriptionYaml);
       } else {
         detectionAlertConfigId = createSubscriptionGroup(subscriptionYaml);
       }
     } catch (IllegalArgumentException e) {
       this.detectionConfigDAO.deleteById(detectionConfigId);
-      return processBadRequestResponse(PROP_SUBSCRIPTION, YamlOperations.CREATING.name(), payload, e);
+      return processBadRequestResponse(PROP_SUBSCRIPTION, YamlOperations.CREATING.name() + "/" + YamlOperations.UPDATING.name(), payload, e);
+    } catch (NotAuthorizedException e) {
+      return processBadAuthorizationResponse(PROP_SUBSCRIPTION, YamlOperations.UPDATING.name(), payload, e);
     } catch (Exception e) {
       this.detectionConfigDAO.deleteById(detectionConfigId);
-      return processServerErrorResponse(PROP_DETECTION, YamlOperations.CREATING.name(), payload, e);
+      return processServerErrorResponse(PROP_DETECTION, YamlOperations.CREATING.name() + "/" + YamlOperations.UPDATING.name(), payload, e);
     }
 
     // create an yaml onboarding task to run replay and tuning
@@ -345,16 +370,18 @@ public class YamlResource {
     return Response.ok().entity(responseMessage).build();
   }
 
-  void updateDetectionPipeline(long detectionID, String yamlDetectionConfig) {
-    updateDetectionPipeline(detectionID, yamlDetectionConfig, 0, 0);
+  private void updateDetectionPipeline(ThirdEyePrincipal user, long detectionID, String yamlDetectionConfig) {
+    updateDetectionPipeline(user, detectionID, yamlDetectionConfig, 0, 0);
   }
 
-  void updateDetectionPipeline(long detectionID, String payload, long startTime, long endTime)
+  private void updateDetectionPipeline(ThirdEyePrincipal user, long detectionID, String payload, long startTime, long endTime)
       throws IllegalArgumentException {
     DetectionConfigDTO existingDetectionConfig = this.detectionConfigDAO.findById(detectionID);
     DetectionConfigDTO detectionConfig;
     Preconditions.checkNotNull(existingDetectionConfig, "Cannot find detection pipeline " + detectionID);
     Preconditions.checkArgument(StringUtils.isNotBlank(payload), "The Yaml Payload in the request is empty.");
+
+    authorizeUser(user, detectionID, PROP_DETECTION);
     try {
       detectionConfig = buildDetectionConfigFromYaml(startTime, endTime, payload, existingDetectionConfig);
 
@@ -375,6 +402,43 @@ public class YamlResource {
     }
   }
 
+  private boolean isServiceAccount(ThirdEyePrincipal user) {
+    List<Predicate> predicates = new ArrayList<>();
+    predicates.add(Predicate.EQ(PROP_SESSION_KEY, user.getSessionKey()));
+    predicates.add(Predicate.EQ(PROP_PRINCIPAL_TYPE, PROP_SERVICE));
+
+    List<SessionDTO> sessionDTO = this.sessionDAO.findByPredicate(Predicate.AND(predicates.toArray(new Predicate[0])));
+    return sessionDTO != null && !sessionDTO.isEmpty();
+  }
+
+  private void validateConfigOwner(ThirdEyePrincipal user, List<String> owners) {
+    if (owners == null || !owners.contains(user.getName())) {
+      throw new NotAuthorizedException("Service account " + user.getName() + " is not authorized to access this resource.");
+    }
+  }
+
+  /**
+   * Enforce authorization only with service accounts to prevent risk
+   * of modifying other configs when making programmatic calls.
+   */
+  private void authorizeUser(ThirdEyePrincipal user, long id, String authEntity) {
+    if (user == null || StringUtils.isBlank(user.getName()) || StringUtils.isBlank(user.getSessionKey())) {
+      throw new NotAuthorizedException("Unable to find the credentials/token in the request");
+    }
+
+    // Authorize only service accounts
+    if (isServiceAccount(user)) {
+      if (authEntity.equals(PROP_DETECTION)) {
+        DetectionConfigDTO detectionConfig = this.detectionConfigDAO.findById(id);
+        validateConfigOwner(user, detectionConfig.getOwners());
+      } else if (authEntity.equals(PROP_SUBSCRIPTION)) {
+        DetectionAlertConfigDTO subscriptionConfig = this.detectionAlertConfigDAO.findById(id);
+        validateConfigOwner(user, subscriptionConfig.getOwners());
+      }
+    }
+    LOG.info("User " + user.getName() + " authorized successfully");
+  }
+
   /**
    Edit a detection pipeline using a YAML config
    @param payload YAML config string
@@ -387,17 +451,21 @@ public class YamlResource {
   @Path("/{id}")
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.TEXT_PLAIN)
+  @PermitAll
   @ApiOperation("Edit a detection pipeline using a YAML config")
   public Response updateDetectionPipelineApi(
+      @Auth ThirdEyePrincipal user,
       @ApiParam("yaml config") String payload,
       @ApiParam("the detection config id to edit") @PathParam("id") long id,
       @ApiParam("tuning window start time for tunable components")  @QueryParam("startTime") long startTime,
       @ApiParam("tuning window end time for tunable components") @QueryParam("endTime") long endTime) {
     Map<String, String> responseMessage = new HashMap<>();
     try {
-      updateDetectionPipeline(id, payload, startTime, endTime);
+      updateDetectionPipeline(user, id, payload, startTime, endTime);
     } catch (IllegalArgumentException e) {
       return processBadRequestResponse(PROP_DETECTION, YamlOperations.UPDATING.name(), payload, e);
+    } catch (NotAuthorizedException e) {
+      return processBadAuthorizationResponse(PROP_DETECTION, YamlOperations.UPDATING.name(), payload, e);
     } catch (Exception e) {
       return processServerErrorResponse(PROP_DETECTION, YamlOperations.UPDATING.name(), payload, e);
     }
@@ -427,13 +495,13 @@ public class YamlResource {
     return existingDetectionConfig;
   }
 
-  long createOrUpdateDetectionPipeline(String payload) {
+  long createOrUpdateDetectionPipeline(ThirdEyePrincipal user, String payload) {
     Preconditions.checkArgument(StringUtils.isNotBlank(payload), "The Yaml Payload in the request is empty.");
     long detectionId;
     DetectionConfigDTO existingDetection = fetchExistingDetection(payload);
     if (existingDetection != null) {
       detectionId = existingDetection.getId();
-      updateDetectionPipeline(detectionId, payload);
+      updateDetectionPipeline(user, detectionId, payload);
     } else {
       detectionId = createDetectionPipeline(payload);
     }
@@ -450,14 +518,19 @@ public class YamlResource {
   @Path("/create-or-update")
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.TEXT_PLAIN)
+  @PermitAll
   @ApiOperation("Create a new detection pipeline or update existing if one already exists")
-  public Response createOrUpdateDetectionPipelineApi(@ApiParam("yaml config") String payload) {
+  public Response createOrUpdateDetectionPipelineApi(
+      @Auth ThirdEyePrincipal user,
+      @ApiParam("yaml config") String payload) {
     Map<String, String> responseMessage = new HashMap<>();
     long detectionConfigId;
     try {
-      detectionConfigId = createOrUpdateDetectionPipeline(payload);
+      detectionConfigId = createOrUpdateDetectionPipeline(user, payload);
     } catch (IllegalArgumentException e) {
       return processBadRequestResponse(PROP_DETECTION, YamlOperations.CREATING.name() + "/" + YamlOperations.UPDATING.name(), payload, e);
+    } catch (NotAuthorizedException e) {
+      return processBadAuthorizationResponse(PROP_DETECTION, YamlOperations.CREATING.name() + "/" + YamlOperations.UPDATING.name(), payload, e);
     } catch (Exception e) {
       return processServerErrorResponse(PROP_DETECTION, YamlOperations.CREATING.name() + "/" + YamlOperations.UPDATING.name(), payload, e);
     }
@@ -533,17 +606,19 @@ public class YamlResource {
     oldAlertConfig.setAlertSuppressors(newAlertConfig.getAlertSuppressors());
     oldAlertConfig.setProperties(newAlertConfig.getProperties());
     oldAlertConfig.setYaml(newAlertConfig.getYaml());
+    oldAlertConfig.setOwners(newAlertConfig.getOwners());
 
     return oldAlertConfig;
   }
 
-  void updateSubscriptionGroup(long oldAlertConfigID, String yamlConfig) {
+  void updateSubscriptionGroup(ThirdEyePrincipal user, long oldAlertConfigID, String yamlConfig) {
     DetectionAlertConfigDTO oldAlertConfig = this.detectionAlertConfigDAO.findById(oldAlertConfigID);
     if (oldAlertConfig == null) {
       throw new RuntimeException("Cannot find subscription group " + oldAlertConfigID);
     }
     Preconditions.checkArgument(StringUtils.isNotBlank(yamlConfig), "The Yaml Payload in the request is empty.");
 
+    authorizeUser(user, oldAlertConfigID, PROP_SUBSCRIPTION);
     DetectionAlertConfigDTO newAlertConfig = new SubscriptionConfigTranslator(detectionConfigDAO, yamlConfig).translate();
     DetectionAlertConfigDTO updatedAlertConfig = updateDetectionAlertConfig(oldAlertConfig, newAlertConfig);
 
@@ -577,15 +652,19 @@ public class YamlResource {
   @Path("/subscription/{id}")
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.TEXT_PLAIN)
+  @PermitAll
   @ApiOperation("Edit a subscription group using a YAML config")
   public Response updateSubscriptionGroupApi(
+      @Auth ThirdEyePrincipal user,
       @ApiParam("payload") String payload,
       @ApiParam("the detection alert config id to edit") @PathParam("id") long id) {
     Map<String, String> responseMessage = new HashMap<>();
     try {
-      updateSubscriptionGroup(id, payload);
+      updateSubscriptionGroup(user, id, payload);
     } catch (IllegalArgumentException e) {
       return processBadRequestResponse(PROP_SUBSCRIPTION, YamlOperations.UPDATING.name(), payload, e);
+    } catch (NotAuthorizedException e) {
+      return processBadAuthorizationResponse(PROP_SUBSCRIPTION, YamlOperations.UPDATING.name(), payload, e);
     } catch (Exception e) {
       return processServerErrorResponse(PROP_SUBSCRIPTION, YamlOperations.UPDATING.name(), payload, e);
     }
