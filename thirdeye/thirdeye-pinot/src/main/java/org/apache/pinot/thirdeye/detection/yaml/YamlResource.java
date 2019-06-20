@@ -114,7 +114,7 @@ public class YamlResource {
 
   private static final String PROP_SESSION_KEY = "sessionKey";
   private static final String PROP_PRINCIPAL_TYPE = "principalType";
-  private static final String PROP_SERVICE = "service";
+  private static final String PROP_SERVICE = "SERVICE";
 
   // default onboarding replay period
   private static final long ONBOARDING_REPLAY_LOOKBACK = TimeUnit.DAYS.toMillis(30);
