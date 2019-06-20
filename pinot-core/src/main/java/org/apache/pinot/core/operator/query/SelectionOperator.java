@@ -228,7 +228,6 @@ public class SelectionOperator extends BaseOperator<IntermediateResultsBlock> {
         int docId = 0;
         while (docId < transformBlock.getNumDocs()) {
           Serializable[] row = dataFetcher.getRow(docId);
-          _priorityQueue.add(row);
           if (_priorityQueue.size() < _maxRows) {
             _priorityQueue.add(row);
           } else if (_priorityQueue.comparator().compare(_priorityQueue.peek(), row) < 0) {

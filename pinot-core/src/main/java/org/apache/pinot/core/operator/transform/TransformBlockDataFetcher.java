@@ -22,6 +22,7 @@ import java.io.Serializable;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.FieldSpec.DataType;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
+import org.apache.pinot.common.utils.BytesUtils;
 import org.apache.pinot.common.utils.primitive.ByteArray;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.segment.index.readers.Dictionary;
@@ -199,7 +200,7 @@ class DictionaryBasedSVValueFetcher implements Fetcher {
 
   public Serializable getValue(int docId) {
     if (_dataType.equals(FieldSpec.DataType.BYTES)) {
-      return ByteArray.toHexString(_dictionary.getBytesValue(_dictionaryIds[docId]));
+      return BytesUtils.toHexString(_dictionary.getBytesValue(_dictionaryIds[docId]));
     }
     return (Serializable) _dictionary.get(_dictionaryIds[docId]);
   }

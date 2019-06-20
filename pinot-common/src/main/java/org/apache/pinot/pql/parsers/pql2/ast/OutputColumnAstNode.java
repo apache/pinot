@@ -24,6 +24,7 @@ import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.request.Selection;
+import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.pql.parsers.Pql2CompilationException;
 
@@ -35,7 +36,6 @@ public class OutputColumnAstNode extends BaseAstNode {
   @Override
   public void updateBrokerRequest(BrokerRequest brokerRequest) {
     for (AstNode astNode : getChildren()) {
-      // If the column is a function call, it must be an aggregation function
       if (astNode instanceof FunctionCallAstNode) {
         String functionName = ((FunctionCallAstNode) astNode).getName();
         if (FunctionDefinitionRegistry.isAggFunc(functionName)) {

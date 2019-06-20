@@ -24,6 +24,7 @@ import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.request.Selection;
 import org.apache.pinot.common.request.SelectionSort;
+import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.pql.parsers.Pql2CompilationException;
 
@@ -40,7 +41,9 @@ public class OrderByAstNode extends BaseAstNode {
       if (astNode instanceof OrderByExpressionAstNode) {
         OrderByExpressionAstNode node = (OrderByExpressionAstNode) astNode;
         SelectionSort elem = new SelectionSort();
-        elem.setColumn(node.getColumn());
+        TransformExpressionTree transformExpressionTree =
+            TransformExpressionTree.compileToExpressionTree(node.getColumn());
+        elem.setColumn(transformExpressionTree.toString());
         elem.setIsAsc("asc".equalsIgnoreCase(node.getOrdering()));
         selections.addToSelectionSortSequence(elem);
       } else {
