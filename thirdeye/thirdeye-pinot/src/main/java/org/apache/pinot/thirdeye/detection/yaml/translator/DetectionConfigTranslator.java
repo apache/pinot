@@ -21,6 +21,7 @@ package org.apache.pinot.thirdeye.detection.yaml.translator;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
+import java.time.Period;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -374,31 +375,18 @@ public class DetectionConfigTranslator extends ConfigTranslator<DetectionConfigD
 
   // fill in window size and unit if detector requires this
   private void fillInDetectorWrapperProperties(Map<String, Object> properties, Map<String, Object> yamlConfig, String detectorType, TimeGranularity datasetTimegranularity) {
-    if (MOVING_WINDOW_DETECTOR_TYPES.contains(detectorType)) {
-      properties.put(PROP_MOVING_WINDOW_DETECTION, true);
-      switch (datasetTimegranularity.getUnit()) {
-        case MINUTES:
-          properties.put(PROP_WINDOW_SIZE, 6);
-          properties.put(PROP_WINDOW_UNIT, TimeUnit.HOURS);
-          properties.put(PROP_FREQUENCY, new TimeGranularity(15, TimeUnit.MINUTES));
-          break;
-        case HOURS:
-          properties.put(PROP_WINDOW_SIZE, 24);
-          properties.put(PROP_WINDOW_UNIT, TimeUnit.HOURS);
-          break;
-        case DAYS:
-          properties.put(PROP_WINDOW_SIZE, 1);
-          properties.put(PROP_WINDOW_UNIT, TimeUnit.DAYS);
-          // TODO completeness checker true
-          break;
-        default:
-          properties.put(PROP_WINDOW_SIZE, 6);
-          properties.put(PROP_WINDOW_UNIT, TimeUnit.HOURS);
-      }
-    }
     // set default bucketPeriod
     properties.put(PROP_BUCKET_PERIOD, datasetTimegranularity.toPeriod().toString());
-    // override from yaml
+
+    // override bucketPeriod now since it is needed by detection window
+    if (yamlConfig.containsKey(PROP_BUCKET_PERIOD)){
+      properties.put(PROP_BUCKET_PERIOD, MapUtils.getString(yamlConfig, PROP_BUCKET_PERIOD));
+    }
+
+    // set default detection window
+    setDefaultDetectionWindow(properties, detectorType);
+
+    // override other properties from yaml
     if (yamlConfig.containsKey(PROP_WINDOW_SIZE)) {
       properties.put(PROP_MOVING_WINDOW_DETECTION, true);
       properties.put(PROP_WINDOW_SIZE, MapUtils.getString(yamlConfig, PROP_WINDOW_SIZE));
@@ -416,11 +404,35 @@ public class DetectionConfigTranslator extends ConfigTranslator<DetectionConfigD
     if (yamlConfig.containsKey(PROP_TIMEZONE)){
       properties.put(PROP_TIMEZONE, MapUtils.getString(yamlConfig, PROP_TIMEZONE));
     }
-    if (yamlConfig.containsKey(PROP_BUCKET_PERIOD)){
-      properties.put(PROP_BUCKET_PERIOD, MapUtils.getString(yamlConfig, PROP_BUCKET_PERIOD));
-    }
     if (yamlConfig.containsKey(PROP_CACHE_PERIOD_LOOKBACK)) {
       properties.put(PROP_CACHE_PERIOD_LOOKBACK, MapUtils.getString(yamlConfig, PROP_CACHE_PERIOD_LOOKBACK));
+    }
+  }
+
+  // Set the default detection window if it is not specified.
+  // Here instead of using data granularity we use the detection period to set the default window size.
+  private void setDefaultDetectionWindow(Map<String, Object> properties, String detectorType) {
+    if (MOVING_WINDOW_DETECTOR_TYPES.contains(detectorType)) {
+      properties.put(PROP_MOVING_WINDOW_DETECTION, true);
+      org.joda.time.Period detectionPeriod =
+          org.joda.time.Period.parse(MapUtils.getString(properties, PROP_BUCKET_PERIOD));
+      int days = detectionPeriod.toStandardDays().getDays();
+      int hours = detectionPeriod.toStandardHours().getHours();
+      int minutes = detectionPeriod.toStandardMinutes().getMinutes();
+      if (days >= 1) {
+        properties.put(PROP_WINDOW_SIZE, 1);
+        properties.put(PROP_WINDOW_UNIT, TimeUnit.DAYS);
+      } else if (hours >= 1) {
+        properties.put(PROP_WINDOW_SIZE, 24);
+        properties.put(PROP_WINDOW_UNIT, TimeUnit.HOURS);
+      } else if (minutes >= 1) {
+        properties.put(PROP_WINDOW_SIZE, 6);
+        properties.put(PROP_WINDOW_UNIT, TimeUnit.HOURS);
+        properties.put(PROP_FREQUENCY, new TimeGranularity(15, TimeUnit.MINUTES));
+      } else {
+        properties.put(PROP_WINDOW_SIZE, 6);
+        properties.put(PROP_WINDOW_UNIT, TimeUnit.HOURS);
+      }
     }
   }
 
