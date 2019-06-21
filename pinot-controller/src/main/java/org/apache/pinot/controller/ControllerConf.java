@@ -25,6 +25,7 @@ import java.util.Random;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.helix.InstanceType;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.filesystem.LocalPinotFS;
@@ -136,6 +137,7 @@ public class ControllerConf extends PropertiesConfiguration {
   // If it's set to false, existing HLC realtime tables will stop consumption, and creation of new HLC tables will be disallowed.
   // Please make sure there is no HLC table running in the cluster before disallowing it.
   private static final String ALLOW_HLC_TABLES = "controller.allow.hlc.tables";
+  private static final String HELIX_INSTANCE_TYPE = "controller.helix.instance.type";
 
   // Defines the kind of storage and the underlying PinotFS implementation
   private static final String PINOT_FS_FACTORY_CLASS_PREFIX = "controller.storage.factory.class";
@@ -155,6 +157,7 @@ public class ControllerConf extends PropertiesConfiguration {
   private static final boolean DEFAULT_ENABLE_BATCH_MESSAGE_MODE = false;
   private static final boolean DEFAULT_ALLOW_HLC_TABLES = true;
   private static final String DEFAULT_CONTROLLER_MODE = ControllerMode.DUAL.name();
+  private static final String DEFAULT_HELIX_INSTANCE_TYPE = InstanceType.ADMINISTRATOR.name();
 
   private static final String DEFAULT_PINOT_FS_FACTORY_CLASS_LOCAL = LocalPinotFS.class.getName();
 
@@ -604,5 +607,13 @@ public class ControllerConf extends PropertiesConfiguration {
 
   public String getMetricsPrefix() {
     return getString(CONFIG_OF_CONTROLLER_METRICS_PREFIX, DEFAULT_METRICS_PREFIX);
+  }
+
+  public String getHelixInstanceType() {
+    return getString(HELIX_INSTANCE_TYPE, DEFAULT_HELIX_INSTANCE_TYPE);
+  }
+
+  void setHelixInstanceType(InstanceType instanceType) {
+    setProperty(HELIX_INSTANCE_TYPE, instanceType.name());
   }
 }

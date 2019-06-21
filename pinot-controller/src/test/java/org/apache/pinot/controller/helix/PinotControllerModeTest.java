@@ -22,15 +22,16 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
+import org.apache.helix.manager.zk.ZkClient;
 import org.apache.helix.model.ExternalView;
-import org.apache.helix.model.MasterSlaveSMD;
-import org.apache.pinot.common.utils.CommonConstants;
+import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.ControllerStarter;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
+import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -107,8 +108,6 @@ public class PinotControllerModeTest extends ControllerTest {
     stopController();
   }
 
-  // TODO: enable it after removing HelixControllerLeadershipManager which requires both CONTROLLER and PARTICIPANT
-  //       HelixManager
   @Test
   public void testPinotOnlyController() {
     ControllerConf firstPinotOnlyControllerConfig = getDefaultControllerConfiguration();
@@ -212,6 +211,15 @@ public class PinotControllerModeTest extends ControllerTest {
       }
       return true;
     }, TIMEOUT_IN_MS, "Failed to pick only one instance as: " + expectedInstanceState);
+  }
+
+  @AfterMethod
+  public void cleanUpCluster() {
+    ZkClient zkClient = new ZkClient(ZkStarter.DEFAULT_ZK_STR);
+    if (zkClient.exists("/" + getHelixClusterName())) {
+      zkClient.deleteRecursively("/" + getHelixClusterName());
+    }
+    zkClient.close();
   }
 
   @AfterClass

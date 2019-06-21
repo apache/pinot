@@ -45,17 +45,18 @@ public class LeadControllerResourceMasterSlaveStateModelFactory extends MasterSl
   }
 
   public class LeadControllerResourceMasterSlaveStateModel extends MasterSlaveStateModel {
+
     @Override
-    public void onBecomeSlaveFromMaster(Message message, NotificationContext context) {
-      super.onBecomeSlaveFromMaster(message, context);
+    public void onBecomeMasterFromSlave(Message message, NotificationContext context) {
+      super.onBecomeMasterFromSlave(message, context);
       String partitionName = message.getPartitionName();
       _leadControllerManager.addPartitionLeader(partitionName);
       _leadControllerManager.onLeadControllerChange();
     }
 
     @Override
-    public void onBecomeMasterFromSlave(Message message, NotificationContext context) {
-      super.onBecomeMasterFromSlave(message, context);
+    public void onBecomeSlaveFromMaster(Message message, NotificationContext context) {
+      super.onBecomeSlaveFromMaster(message, context);
       String partitionName = message.getPartitionName();
       _leadControllerManager.removePartitionLeader(partitionName);
       _leadControllerManager.onLeadControllerChange();

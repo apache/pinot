@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller;
 
+import java.util.Set;
 import org.apache.helix.model.ExternalView;
 import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.utils.helix.HelixHelper;
@@ -35,6 +36,7 @@ public class LeadControllerManager {
 
   private final LeadControllerChecker _leadControllerChecker;
   private PinotHelixResourceManager _pinotHelixResourceManager;
+  private boolean _amIHelixLeader = false;
 
   public LeadControllerManager() {
     _leadControllerChecker = new LeadControllerChecker();
@@ -52,7 +54,7 @@ public class LeadControllerManager {
   public boolean isLeaderForTable(String tableName) {
     String rawTableName = TableNameBuilder.extractRawTableName(tableName);
     int partitionIndex =
-        HelixHelper.getHashCodeForTable(rawTableName) % NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE;
+        HelixHelper.getPartitionIdForTable(rawTableName, NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE);
     if (_leadControllerChecker.isPartitionLeader(partitionIndex)) {
       return true;
     } else {
@@ -61,15 +63,26 @@ public class LeadControllerManager {
   }
 
   /**
-   * Get lead controller for table.
+   * Get lead controller id and partition index for given table. Returns -1 as partition index and null as lead controller id if not found.
    * @param tableName table name with/without table type.
-   * @return lead controller id
+   * @return lead controller id and partition index
    */
-  public String getLeadControllerForTable(String tableName) {
+  public LeadControllerResponse getLeadControllerAndPartitionIdForTable(String tableName) {
     String rawTableName = TableNameBuilder.extractRawTableName(tableName);
     ExternalView leadControllerResourceExternalView = _pinotHelixResourceManager.getHelixAdmin()
         .getResourceExternalView(_pinotHelixResourceManager.getHelixClusterName(), LEAD_CONTROLLER_RESOURCE_NAME);
-    return HelixHelper.getLeadControllerForTable(leadControllerResourceExternalView, rawTableName);
+    if (leadControllerResourceExternalView == null) {
+      return new LeadControllerResponse();
+    }
+    Set<String> partitionSet = leadControllerResourceExternalView.getPartitionSet();
+    if (partitionSet == null || partitionSet.isEmpty()) {
+      return new LeadControllerResponse();
+    }
+
+    int numPartitions = partitionSet.size();
+    int partitionIndex = HelixHelper.getPartitionIdForTable(rawTableName, numPartitions);
+    String leadControllerId = HelixHelper.getLeadControllerForTable(leadControllerResourceExternalView, rawTableName);
+    return new LeadControllerResponse(partitionIndex, leadControllerId);
   }
 
   public synchronized void addPartitionLeader(String partitionName) {
@@ -80,8 +93,63 @@ public class LeadControllerManager {
     _leadControllerChecker.removePartitionLeader(partitionName);
   }
 
+  /**
+   * Checks if the current controller host is Helix leader.
+   */
   private boolean isHelixLeader() {
-    return _pinotHelixResourceManager != null && _pinotHelixResourceManager.isHelixLeader();
+    return _amIHelixLeader;
+  }
+
+  /**
+   * Response class to return lead controller id and partition index.
+   */
+  public class LeadControllerResponse {
+    private int _partitionIndex;
+    private String _leadControllerId;
+
+    public LeadControllerResponse(int partitionIndex, String leadControllerId) {
+      _partitionIndex = partitionIndex;
+      _leadControllerId = leadControllerId;
+    }
+
+    public LeadControllerResponse() {
+      _partitionIndex = -1;
+      _leadControllerId = null;
+    }
+
+    public int getPartitionIndex() {
+      return _partitionIndex;
+    }
+
+    public String getLeadControllerId() {
+      return _leadControllerId;
+    }
+
+    @Override
+    public String toString() {
+      return "Partition index: " + getPartitionIndex() + ", lead controller id: " + getLeadControllerId();
+    }
+  }
+
+  /**
+   * Callback on changes in the controller. Should be registered to the controller callback.
+   */
+  public void onHelixControllerChange() {
+    if (_pinotHelixResourceManager.isHelixLeader()) {
+      if (!_amIHelixLeader) {
+        _amIHelixLeader = true;
+        LOGGER.info("Became Helix leader");
+      } else {
+        LOGGER.info("Already Helix leader. Duplicate notification");
+      }
+    } else {
+      if (_amIHelixLeader) {
+        _amIHelixLeader = false;
+        LOGGER.info("Lost Helix leadership");
+      } else {
+        LOGGER.info("Already not Helix leader. Duplicate notification");
+      }
+    }
   }
 
   public void onLeadControllerChange() {

@@ -19,7 +19,6 @@
 package org.apache.pinot.controller;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import com.google.common.primitives.Longs;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.yammer.metrics.core.MetricsRegistry;
@@ -40,10 +39,12 @@ import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixManager;
 import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.InstanceType;
+import org.apache.helix.InstanceType;
 import org.apache.helix.SystemPropertyKeys;
 import org.apache.helix.api.listeners.ControllerChangeListener;
 import org.apache.helix.examples.MasterSlaveStateModelFactory;
 import org.apache.helix.model.MasterSlaveSMD;
+import org.apache.helix.api.listeners.ControllerChangeListener;
 import org.apache.helix.task.TaskDriver;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.metrics.ControllerMeter;
@@ -147,6 +148,9 @@ public class ControllerStarter {
     } else {
       _adminApp =
           new ControllerAdminApiApplication(_config.getQueryConsoleWebappPath(), _config.getQueryConsoleUseHttps());
+      // Helix instance type should explicitly be set to PARTICIPANT ONLY in {@link ControllerStarter}.
+      // Other places like {@link PerfBenchmarkDriver} which directly call {@link PinotHelixResourceManager} should NOT register as PARTICIPANT, which would be put to lead controller resource and mess up the leadership assignment. Those places should use ADMINISTRATOR other than PARTICIPANT.
+      _config.setHelixInstanceType(InstanceType.PARTICIPANT);
       // Do not use this before the invocation of {@link PinotHelixResourceManager::start()}, which happens in {@link ControllerStarter::start()}
       _helixResourceManager = new PinotHelixResourceManager(_config);
       _executorService =
@@ -254,11 +258,6 @@ public class ControllerStarter {
   }
 
   private void setUpPinotController() {
-    // Note: Right now we don't allow Pinot-only controller as ControllerLeadershipManager is setup in Helix controller
-    //       and Pinot controller relies on it
-    // TODO: Remove ControllerLeadershipManager
-    Preconditions.checkState(_controllerLeadershipManager != null);
-
     // Set up Pinot cluster in Helix
     HelixSetupUtils.setupPinotCluster(_helixClusterName, _helixZkURL, _isUpdateStateModel, _enableBatchMessageMode);
 
@@ -275,6 +274,10 @@ public class ControllerStarter {
 
     // Get lead controller manager from resource manager.
     _leadControllerManager = _helixResourceManager.getLeadControllerManager();
+
+    LOGGER.info("Registering helix controller listener");
+    helixParticipantManager.addControllerListener(
+        (ControllerChangeListener) changeContext -> _leadControllerManager.onHelixControllerChange());
 
     LOGGER.info("Starting task resource manager");
     _helixTaskResourceManager = new PinotHelixTaskResourceManager(new TaskDriver(helixParticipantManager));

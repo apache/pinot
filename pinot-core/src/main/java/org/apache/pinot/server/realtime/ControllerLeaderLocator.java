@@ -116,15 +116,11 @@ public class ControllerLeaderLocator {
         _helixManager.getClusterManagmentTool().getResourceExternalView(_clusterName, LEAD_CONTROLLER_RESOURCE_NAME);
     String partitionLeader = HelixHelper.getLeadControllerForTable(leadControllerResourceExternalView, rawTableName);
     if (partitionLeader != null) {
-      leaderForTable = partitionLeader;
+      // Converts participant id (with Prefix "Controller_") to controller id and assigns it as the leader.
+      leaderForTable = partitionLeader.substring(partitionLeader.indexOf("_") + 1);
     } else {
-      // Get Helix leader to be the leader to this table.
-      String helixLeader = getHelixClusterLeader();
-      if (helixLeader != null) {
-        leaderForTable = helixLeader;
-      } else {
-        leaderForTable = null;
-      }
+      // Gets Helix leader to be the leader to this table, otherwise returns null.
+      leaderForTable = getHelixClusterLeader();
     }
     return leaderForTable;
   }

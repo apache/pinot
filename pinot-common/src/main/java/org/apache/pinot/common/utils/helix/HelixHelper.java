@@ -506,11 +506,23 @@ public class HelixHelper {
 
   /**
    * Gets hash code for table.
+   * Note: This method CANNOT be changed when lead controller resource has been enabled.
+   * Otherwise it will assign different controller for the same table, which will mess up the controller periodic tasks and realtime segment completion.
    * @param rawTableName table name
    * @return hash code
    */
-  public static int getHashCodeForTable(String rawTableName) {
+  private static int getHashCodeForTable(String rawTableName) {
     return rawTableName.hashCode();
+  }
+
+  /**
+   * Given a raw table name and number of partitions, returns the partition id in lead controller resource.
+   * @param rawTableName raw table name
+   * @param numPartitions number of partitions
+   * @return partition id in lead controller resource.
+   */
+  public static int getPartitionIdForTable(String rawTableName, int numPartitions) {
+    return getHashCodeForTable(rawTableName) % numPartitions;
   }
 
   /**
@@ -518,7 +530,7 @@ public class HelixHelper {
    * If the resource is disabled or no controller registered as participant, there is no instance in "MASTER" state.
    * @param leadControllerResourceExternalView external view of lead controller resource
    * @param rawTableName table name without type
-   * @return leader of partition, null if not found.
+   * @return leader of partition, null if not found or resource is disabled.
    */
   public static String getLeadControllerForTable(ExternalView leadControllerResourceExternalView,  String rawTableName) {
     if (leadControllerResourceExternalView == null) {
@@ -529,7 +541,7 @@ public class HelixHelper {
       return null;
     }
     int numPartitions = partitionSet.size();
-    int partitionIndex = getHashCodeForTable(rawTableName) % numPartitions;
+    int partitionIndex = getPartitionIdForTable(rawTableName, numPartitions);
     String partitionName = LEAD_CONTROLLER_RESOURCE_NAME + "_" + partitionIndex;
     Map<String, String> partitionStateMap = leadControllerResourceExternalView.getStateMap(partitionName);
 
@@ -539,6 +551,7 @@ public class HelixHelper {
         return entry.getKey();
       }
     }
+    LOGGER.info("No host in MASTER state in Partition: {} for Table: {}", partitionIndex, rawTableName);
     return null;
   }
 }

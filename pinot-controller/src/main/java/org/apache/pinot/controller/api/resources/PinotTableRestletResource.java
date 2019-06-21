@@ -506,9 +506,9 @@ public class PinotTableRestletResource {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables/{tableName}/controller")
-  @ApiOperation(value = "Gets the lead controller for the given table", notes = "Gets lead controller for the table")
-  public String getLeadControllerForTable(
+  @ApiOperation(value = "Gets the lead controller and partition index for the given table", notes = "Gets lead controller and partition index for the table")
+  public SuccessResponse getLeadControllerAndPartitionIndexForTable(
       @ApiParam(value = "Name of the table") @Nonnull @PathParam("tableName") String tableName) {
-    return _leadControllerManager.getLeadControllerForTable(tableName);
+    return new SuccessResponse(_leadControllerManager.getLeadControllerAndPartitionIdForTable(tableName).toString());
   }
 }
