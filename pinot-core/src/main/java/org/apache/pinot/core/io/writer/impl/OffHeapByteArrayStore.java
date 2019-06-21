@@ -1,3 +1,22 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
 package org.apache.pinot.core.io.writer.impl;
 
 import java.io.Closeable;
@@ -69,6 +88,15 @@ public class OffHeapByteArrayStore implements Closeable {
   private int _numValues = 0;
   private int _availEndOffset;  // Exclusive
 
+  /**
+   * This constructor is useful when the values are not known ahead of time. If the caller uses this
+   * constructor, then it is expected that the caller invokes {@link #add(byte[])} method until it returns -1
+   * at which point it is known that no more strings can be added to the buffer.
+   *
+   * @param size
+   * @param memoryManager
+   * @param allocationContext
+   */
   public OffHeapByteArrayStore(long size, PinotDataBufferMemoryManager memoryManager, String allocationContext) {
     if (size >= Integer.MAX_VALUE) {
       size = Integer.MAX_VALUE - 1;
@@ -86,6 +114,11 @@ public class OffHeapByteArrayStore implements Closeable {
   }
 
   // TODO Add unit tests for this code path
+
+  /**
+   *
+   * @param pinotDataBuffer
+   */
   public OffHeapByteArrayStore(PinotDataBuffer pinotDataBuffer) {
     _pinotDataBuffer = pinotDataBuffer;
     _byteBuffer = _pinotDataBuffer.toDirectByteBuffer(0, (int)pinotDataBuffer.size());
