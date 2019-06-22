@@ -138,11 +138,12 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
   private void registerCallbackHandlers() {
     List<String> instances = _helixAdmin.getInstancesInCluster(_clusterName);
-    instances.removeIf(instance -> (!instance.startsWith(CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE) && !instance.startsWith(
-        CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE)));
+    instances.removeIf(instance -> (!instance.startsWith(CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE) && !instance
+        .startsWith(CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE)));
     List<String> resourcesInCluster = _helixAdmin.getResourcesInCluster(_clusterName);
-    resourcesInCluster.removeIf(resource -> (!TableNameBuilder.isTableResource(resource)
-        && !CommonConstants.Helix.BROKER_RESOURCE_INSTANCE.equals(resource)));
+    resourcesInCluster.removeIf(
+        resource -> (!TableNameBuilder.isTableResource(resource) && !CommonConstants.Helix.BROKER_RESOURCE_INSTANCE
+            .equals(resource)));
     for (String instance : instances) {
       List<String> resourcesToMonitor = new ArrayList<>();
       for (String resourceName : resourcesInCluster) {
@@ -154,11 +155,11 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
           }
         }
       }
-      _serviceStatusCallbacks.add(new ServiceStatus.MultipleCallbackServiceStatusCallback(ImmutableList.of(
-          new ServiceStatus.IdealStateAndCurrentStateMatchServiceStatusCallback(_helixManager, _clusterName, instance,
-              resourcesToMonitor, 100.0),
-          new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(_helixManager, _clusterName, instance,
-              resourcesToMonitor, 100.0))));
+      _serviceStatusCallbacks.add(new ServiceStatus.MultipleCallbackServiceStatusCallback(ImmutableList
+          .of(new ServiceStatus.IdealStateAndCurrentStateMatchServiceStatusCallback(_helixManager, _clusterName,
+                  instance, resourcesToMonitor, 100.0),
+              new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(_helixManager, _clusterName,
+                  instance, resourcesToMonitor, 100.0))));
     }
   }
 
@@ -555,7 +556,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   @Test
   public void testSelectionUDF()
       throws Exception {
-    SelectionPlanNode.enableUDFInSelection = true;
     String pqlQuery = "SELECT DaysSinceEpoch, timeConvert(DaysSinceEpoch,'DAYS','SECONDS') FROM mytable";
     JsonNode response = postQuery(pqlQuery);
     ArrayNode selectionResults = (ArrayNode) response.get("selectionResults").get("results");
@@ -596,7 +596,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       Assert.assertTrue(secondsSinceEpoch <= prevValue);
       prevValue = secondsSinceEpoch;
     }
-    SelectionPlanNode.enableUDFInSelection = false;
   }
 
   @AfterClass

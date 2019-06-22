@@ -23,10 +23,7 @@ import org.apache.pinot.common.request.Selection;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.indexsegment.IndexSegment;
 import org.apache.pinot.core.operator.query.EmptySelectionOperator;
-import org.apache.pinot.core.operator.query.SelectionOnlyOperator;
 import org.apache.pinot.core.operator.query.SelectionOperator;
-import org.apache.pinot.core.operator.query.SelectionOrderByOperator;
-import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,35 +35,17 @@ import org.slf4j.LoggerFactory;
 public class SelectionPlanNode implements PlanNode {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SelectionPlanNode.class);
-  public static boolean enableUDFInSelection = true;
   private final IndexSegment _indexSegment;
   private final Selection _selection;
   private TransformPlanNode _transformPlanNode;
-  private ProjectionPlanNode _projectionPlanNode;
 
   public SelectionPlanNode(IndexSegment indexSegment, BrokerRequest brokerRequest) {
     _indexSegment = indexSegment;
     _selection = brokerRequest.getSelections();
-    if (enableUDFInSelection) {
-      if (_selection.getSize() > 0) {
-        _transformPlanNode = new TransformPlanNode(_indexSegment, brokerRequest);
-      } else {
-        _transformPlanNode = null;
-      }
+    if (_selection.getSize() > 0) {
+      _transformPlanNode = new TransformPlanNode(_indexSegment, brokerRequest);
     } else {
-      if (_selection.getSize() > 0) {
-        int maxDocPerNextCall = DocIdSetPlanNode.MAX_DOC_PER_CALL;
-
-        // No ordering required, select minimum number of documents
-        if (!_selection.isSetSelectionSortSequence()) {
-          maxDocPerNextCall = Math.min(_selection.getOffset() + _selection.getSize(), maxDocPerNextCall);
-        }
-        DocIdSetPlanNode docIdSetPlanNode = new DocIdSetPlanNode(_indexSegment, brokerRequest, maxDocPerNextCall);
-        _projectionPlanNode = new ProjectionPlanNode(_indexSegment,
-            SelectionOperatorUtils.extractSelectionRelatedColumns(_selection, indexSegment), docIdSetPlanNode);
-      } else {
-        _projectionPlanNode = null;
-      }
+      _transformPlanNode = null;
     }
   }
 
@@ -75,15 +54,7 @@ public class SelectionPlanNode implements PlanNode {
     if (_selection.getSize() <= 0) {
       return new EmptySelectionOperator(_indexSegment, _selection);
     }
-    if (enableUDFInSelection) {
-      return new SelectionOperator(_indexSegment, _selection, _transformPlanNode.run());
-    } else {
-      if (_selection.isSetSelectionSortSequence()) {
-        return new SelectionOrderByOperator(_indexSegment, _selection, _projectionPlanNode.run());
-      } else {
-        return new SelectionOnlyOperator(_indexSegment, _selection, _projectionPlanNode.run());
-      }
-    }
+    return new SelectionOperator(_indexSegment, _selection, _transformPlanNode.run());
   }
 
   @Override

@@ -131,7 +131,7 @@ public class PinotQuery2BrokerRequestConverter {
 
           Function functionCall = expression.getFunctionCall();
           String functionName = functionCall.getOperator();
-          if(FunctionDefinitionRegistry.isAggFunc(functionName)) {
+          if (FunctionDefinitionRegistry.isAggFunc(functionName)) {
             AggregationInfo aggInfo = buildAggregationInfo(functionCall);
             if (aggregationInfoList == null) {
               aggregationInfoList = new ArrayList<>();

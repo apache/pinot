@@ -28,8 +28,6 @@ import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.blocks.IntermediateResultsBlock;
 import org.apache.pinot.core.operator.query.EmptySelectionOperator;
-import org.apache.pinot.core.operator.query.SelectionOnlyOperator;
-import org.apache.pinot.core.operator.query.SelectionOrderByOperator;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
