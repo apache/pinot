@@ -34,6 +34,8 @@ public class Quickstart {
 
   private static final String TAB = "\t\t";
   private static final String NEW_LINE = "\n";
+  private static final String SELECTION_RESULTS_FIELD = "selectionResults";
+  private static final String AGGREGATION_RESULTS_FIELD = "aggregationResults";
 
   public enum Color {
     RESET("\u001B[0m"), GREEN("\u001B[32m"), YELLOW("\u001B[33m"), CYAN("\u001B[36m");
@@ -53,14 +55,14 @@ public class Quickstart {
     StringBuilder responseBuilder = new StringBuilder();
 
     // Selection query
-    if (response.has("selectionResults")) {
-      JsonNode columns = response.get("selectionResults").get("columns");
+    if (response.has(SELECTION_RESULTS_FIELD)) {
+      JsonNode columns = response.get(SELECTION_RESULTS_FIELD).get("columns");
       int numColumns = columns.size();
       for (int i = 0; i < numColumns; i++) {
         responseBuilder.append(columns.get(i).asText()).append(TAB);
       }
       responseBuilder.append(NEW_LINE);
-      JsonNode rows = response.get("selectionResults").get("results");
+      JsonNode rows = response.get(SELECTION_RESULTS_FIELD).get("results");
       int numRows = rows.size();
       for (int i = 0; i < numRows; i++) {
         JsonNode row = rows.get(i);
@@ -73,8 +75,11 @@ public class Quickstart {
     }
 
     // Aggregation only query
-    if (!response.get("aggregationResults").get(0).has("groupByResult")) {
-      JsonNode aggregationResults = response.get("aggregationResults");
+    if (!response.has(AGGREGATION_RESULTS_FIELD)) {
+      return responseBuilder.toString();
+    }
+    JsonNode aggregationResults = response.get(AGGREGATION_RESULTS_FIELD);
+    if (!aggregationResults.get(0).has("groupByResult")) {
       int numAggregations = aggregationResults.size();
       for (int i = 0; i < numAggregations; i++) {
         responseBuilder.append(aggregationResults.get(i).get("function").asText()).append(TAB);
@@ -88,7 +93,7 @@ public class Quickstart {
     }
 
     // Aggregation group-by query
-    JsonNode groupByResults = response.get("aggregationResults");
+    JsonNode groupByResults = response.get(AGGREGATION_RESULTS_FIELD);
     int numGroupBys = groupByResults.size();
     for (int i = 0; i < numGroupBys; i++) {
       JsonNode groupByResult = groupByResults.get(i);
