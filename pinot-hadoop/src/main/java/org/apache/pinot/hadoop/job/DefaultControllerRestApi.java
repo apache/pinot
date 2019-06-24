@@ -155,7 +155,7 @@ public class DefaultControllerRestApi implements ControllerRestApi {
 
   @Override
   public List<String> getAllSegments(String tableType) {
-    LOGGER.info("Getting all segments");
+    LOGGER.info("Getting all segments of table {}", _rawTableName);
     for (PushLocation pushLocation : _pushLocations) {
       try {
         SimpleHttpResponse response = _fileUploadDownloadClient.sendGetRequest(
