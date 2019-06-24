@@ -77,25 +77,11 @@ public class DetectionConfigTuner {
 
   private final DetectionConfigDTO detectionConfig;
   private final DataProvider dataProvider;
-  private final DatasetConfigDTO datasetConfig;
-  private final String metricUrn;
 
   public DetectionConfigTuner(DetectionConfigDTO config, DataProvider dataProvider) {
     Preconditions.checkNotNull(config);
     this.detectionConfig = config;
     this.dataProvider = dataProvider;
-
-    Map<String, Object> yamlConfig = ConfigUtils.getMap(new org.yaml.snakeyaml.Yaml().load(config.getYaml()));
-
-    MetricConfigDTO metricConfig = dataProvider.fetchMetric(
-        MapUtils.getString(yamlConfig, PROP_METRIC),
-        MapUtils.getString(yamlConfig, PROP_DATASET));
-    Preconditions.checkNotNull(metricConfig, "metric not found");
-    this.datasetConfig = dataProvider.fetchDatasets(Collections.singletonList(metricConfig.getDataset()))
-        .get(metricConfig.getDataset());
-    Preconditions.checkNotNull(this.datasetConfig, "dataset not found");
-
-    this.metricUrn = MetricEntity.fromMetric(ConfigUtils.getMap(yamlConfig.get(PROP_FILTERS)), metricConfig.getId()).getUrn();
   }
 
   /**
@@ -117,17 +103,19 @@ public class DetectionConfigTuner {
     Tunable tunable = instantiateTunable(componentClassName, yamlParams, dataFetcher);
 
     // round to daily boundary
-    DateTimeZone timezone = DateTimeZone.forID(this.datasetConfig.getTimezone() == null ? DEFAULT_TIMEZONE : this.datasetConfig.getTimezone());
+    String metricName = componentProps.get(PROP_METRIC).toString();
+    String datasetName = componentProps.get(PROP_DATASET).toString();
+    MetricConfigDTO metricConfig = dataProvider.fetchMetric(metricName, datasetName);
+    DatasetConfigDTO datasetConfig = dataProvider.fetchDatasets(Collections.singletonList(metricConfig.getDataset()))
+        .get(metricConfig.getDataset());
+    String metricUrn = MetricEntity.fromMetric(ConfigUtils.getMap(componentProps.get(PROP_FILTERS)), metricConfig.getId()).getUrn();
+    DateTimeZone timezone = DateTimeZone.forID(datasetConfig.getTimezone() == null ? DEFAULT_TIMEZONE : datasetConfig.getTimezone());
     DateTime start = new DateTime(startTime, timezone).withTimeAtStartOfDay();
     DateTime end =  new DateTime(endTime, timezone).withTimeAtStartOfDay();
     Interval window = new Interval(start, end);
 
     // TODO: if dimension drill down applied, pass in the metric urn of top dimension
-    tunedSpec.putAll(tunable.tune(componentProps, window, this.metricUrn));
-
-    // Hack to retain the raw yaml parameters.
-    // The tunable requires raw yaml params and previously tuned params to generate fresh params
-    tunedSpec.put(PROP_YAML_PARAMS, yamlParams);
+    tunedSpec.putAll(tunable.tune(componentProps, window, metricUrn));
 
     return tunedSpec;
   }
@@ -162,15 +150,13 @@ public class DetectionConfigTuner {
       String type = DetectionUtils.getComponentType(componentKey);
       if (!TURNOFF_TUNING_COMPONENTS.contains(type) && DETECTION_REGISTRY.isTunable(componentClassName)) {
         try {
-          tunedComponentProps.put(PROP_CLASS_NAME, componentClassName);
           tunedComponentProps.putAll(getTunedSpecs(existingComponentProps, tuningWindowStart, tuningWindowEnd));
         } catch (Exception e) {
           LOG.error("Tuning failed for component " + type, e);
         }
-      } else {
-        tunedComponentProps.putAll(existingComponentProps);
       }
 
+      tunedComponentProps.putAll(existingComponentProps);
       tunedComponentSpecs.put(componentKey, tunedComponentProps);
     }
 

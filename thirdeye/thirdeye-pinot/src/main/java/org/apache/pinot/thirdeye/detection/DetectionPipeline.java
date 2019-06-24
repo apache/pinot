@@ -100,7 +100,7 @@ public abstract class DetectionPipeline {
       for (String componentKey : componentSpecs.keySet()) {
         Map<String, Object> componentSpec = ConfigUtils.getMap(componentSpecs.get(componentKey));
         for (Map.Entry<String, Object> entry : componentSpec.entrySet()){
-          if (DetectionUtils.isReferenceName(entry.getValue().toString())) {
+          if (entry.getValue() != null && DetectionUtils.isReferenceName(entry.getValue().toString())) {
             componentSpec.put(entry.getKey(), instancesMap.get(DetectionUtils.getComponentKey(entry.getValue().toString())));
           }
         }
