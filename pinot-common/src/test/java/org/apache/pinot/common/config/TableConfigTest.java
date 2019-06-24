@@ -32,6 +32,9 @@ import static org.testng.Assert.*;
 
 public class TableConfigTest {
 
+  private static final long FRESHNESS_LAG_MS = 10000;
+  private static final long LATENCY_MS = 100;
+
   @Test
   public void testSerializeMandatoryFields()
       throws Exception {
@@ -322,6 +325,16 @@ public class TableConfigTest {
       tableConfigToCompare = TableConfig.fromZnRecord(tableConfig.toZNRecord());
       checkTableConfigWithHllConfig(tableConfig, tableConfigToCompare);
     }
+    {
+      // with slo config
+      SloConfig sloConfig = new SloConfig();
+      sloConfig.setFreshnessLagMs(FRESHNESS_LAG_MS);
+      sloConfig.setLatencyMs(LATENCY_MS);
+      TableConfig tableConfig = tableConfigBuilder.setSloConfig(sloConfig).build();
+
+      TableConfig tableConfigToCompare = TableConfig.fromJsonConfig(tableConfig.toJsonConfig());
+      checkTableConfigWithSloConfig(tableConfig, tableConfigToCompare);
+    }
   }
 
   private void checkTableConfigWithAssignmentConfig(TableConfig tableConfig, TableConfig tableConfigToCompare) {
@@ -380,5 +393,14 @@ public class TableConfigTest {
     assertEquals(hllConfig.getColumnsToDeriveHllFields(), columns);
     assertEquals(hllConfig.getHllLog2m(), 9);
     assertEquals(hllConfig.getHllDeriveColumnSuffix(), "suffix");
+  }
+
+  private void checkTableConfigWithSloConfig(TableConfig tableConfig, TableConfig tableConfigToCompare) {
+    assertEquals(tableConfigToCompare.getTableName(), tableConfig.getTableName());
+    assertNotNull(tableConfigToCompare.getSloConfig());
+
+    SloConfig config = tableConfigToCompare.getSloConfig();
+    assertEquals(config.getLatencyMs(), LATENCY_MS);
+    assertEquals(config.getFreshnessLagMs(), FRESHNESS_LAG_MS);
   }
 }

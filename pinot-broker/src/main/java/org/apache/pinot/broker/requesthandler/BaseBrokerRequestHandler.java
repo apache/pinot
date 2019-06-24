@@ -40,6 +40,8 @@ import org.apache.pinot.broker.queryquota.QueryQuotaManager;
 import org.apache.pinot.broker.routing.RoutingTable;
 import org.apache.pinot.broker.routing.RoutingTableLookupRequest;
 import org.apache.pinot.broker.routing.TimeBoundaryService;
+import org.apache.pinot.common.config.SloConfig;
+import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.BrokerMeter;
@@ -73,6 +75,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   protected final TimeBoundaryService _timeBoundaryService;
   protected final AccessControlFactory _accessControlFactory;
   protected final QueryQuotaManager _queryQuotaManager;
+  protected final LazyTableConfigCache _tableConfigCache;
   protected final BrokerMetrics _brokerMetrics;
 
   protected final AtomicLong _requestIdGenerator = new AtomicLong();
@@ -90,12 +93,13 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
   public BaseBrokerRequestHandler(Configuration config, RoutingTable routingTable,
       TimeBoundaryService timeBoundaryService, AccessControlFactory accessControlFactory,
-      QueryQuotaManager queryQuotaManager, BrokerMetrics brokerMetrics) {
+      QueryQuotaManager queryQuotaManager, LazyTableConfigCache cache, BrokerMetrics brokerMetrics) {
     _config = config;
     _routingTable = routingTable;
     _timeBoundaryService = timeBoundaryService;
     _accessControlFactory = accessControlFactory;
     _queryQuotaManager = queryQuotaManager;
+    _tableConfigCache = cache;
     _brokerMetrics = brokerMetrics;
 
     _brokerId = config.getString(CONFIG_OF_BROKER_ID, getDefaultBrokerId());
@@ -125,6 +129,15 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   @SuppressWarnings("Duplicates")
   @Override
   public BrokerResponse handleRequest(JsonNode request, @Nullable RequesterIdentity requesterIdentity,
+      RequestStatistics requestStatistics)
+      throws Exception {
+
+    BrokerResponse response = _handleRequest(request, requesterIdentity, requestStatistics);
+    scoreResponse(response, requestStatistics);
+    return response;
+  }
+
+  private BrokerResponse _handleRequest(JsonNode request, @Nullable RequesterIdentity requesterIdentity,
       RequestStatistics requestStatistics)
       throws Exception {
     long requestId = _requestIdGenerator.incrementAndGet();
@@ -305,10 +318,21 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
     LOGGER.debug("Broker Response: {}", brokerResponse);
 
+    logResponse(requestId, query, brokerRequest, brokerResponse, totalTimeMs, serverStats);
+
+    return brokerResponse;
+  }
+
+  /**
+   * Helper function to log the broker response
+   */
+  private void logResponse(long requestId, String query,
+      BrokerRequest brokerRequest, BrokerResponse brokerResponse, long totalTimeMs,
+      ServerStats serverStats) {
+
     if (_queryLogRateLimiter.tryAcquire() || forceLog(brokerResponse, totalTimeMs)) {
       // Table name might have been changed (with suffix _OFFLINE/_REALTIME appended)
-      LOGGER.info(
-          "RequestId:{}, table:{}, timeMs:{}, docs:{}/{}, entries:{}/{},"
+      LOGGER.info("RequestId:{}, table:{}, timeMs:{}, docs:{}/{}, entries:{}/{},"
               + " segments(queried/processed/matched/consuming):{}/{}/{}/{}, consumingFreshnessTimeMs:{},"
               + " servers:{}/{}, groupLimitReached:{}, exceptions:{}, serverStats:{}, query:{}", requestId,
           brokerRequest.getQuerySource().getTableName(), totalTimeMs, brokerResponse.getNumDocsScanned(),
@@ -335,7 +359,6 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       // Increment the count for dropped log
       _numDroppedLog.incrementAndGet();
     }
-    return brokerResponse;
   }
 
   /**
@@ -359,6 +382,52 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     }
 
     return false;
+  }
+
+
+  private void scoreResponse(BrokerResponse response, RequestStatistics stats) {
+
+    try {
+
+      if (response == BrokerResponseNative.EMPTY_RESULT || response == BrokerResponseNative.NO_TABLE_RESULT
+          || response.getNumServersResponded() == 0 || !response.getProcessingExceptions().isEmpty()) {
+        // error response
+        _brokerMetrics.addMeteredTableValue(stats.getTableName(), BrokerMeter.ERROR_RESPONSE, 1);
+        return;
+      }
+
+      if ((response.getNumServersQueried() > response.getNumServersResponded())
+          || stats.getFanoutType() == RequestStatistics.FanoutType.HYBRID
+          && response.getNumConsumingSegmentsQueried() <= 0 || response.isNumGroupsLimitReached()) {
+        // partial response
+        _brokerMetrics.addMeteredTableValue(stats.getTableName(), BrokerMeter.PARTIAL_RESPONSE, 1);
+        return;
+      }
+
+      TableConfig tableConfig = _tableConfigCache.get(stats.getTableName());
+      if (tableConfig != null && tableConfig.getSloConfig() != null) {
+        SloConfig sloConfig = tableConfig.getSloConfig();
+        if (sloConfig.getFreshnessLagMs() > 0 && (stats.getFanoutType() == RequestStatistics.FanoutType.HYBRID
+            || stats.getFanoutType() == RequestStatistics.FanoutType.REALTIME)
+            && response.getMinConsumingFreshnessTimeMs() > 0 && (System.currentTimeMillis() - response.getMinConsumingFreshnessTimeMs() > sloConfig.getFreshnessLagMs())) {
+          // stale response
+          _brokerMetrics.addMeteredTableValue(stats.getTableName(), BrokerMeter.STALE_RESPONSE, 1);
+          return;
+        }
+
+        if (sloConfig.getLatencyMs() > 0 && stats.getProcessingTimeMillis() > sloConfig.getLatencyMs()) {
+          // latent response
+          _brokerMetrics.addMeteredTableValue(stats.getTableName(), BrokerMeter.LATENT_RESPONSE, 1);
+          return;
+        }
+      }
+
+      _brokerMetrics.addMeteredTableValue(stats.getTableName(), BrokerMeter.HEALTHY_RESPONSE, 1);
+    } catch (Exception e) {
+      // don't fail the request due to any issues related to tracking!
+      LOGGER.error("Failed to score request with id={} table={} cache={}", stats.getRequestId(), stats.getTableName(),
+          _tableConfigCache, e);
+    }
   }
 
   /**

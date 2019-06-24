@@ -99,7 +99,18 @@ public enum BrokerMeter implements AbstractMetrics.Meter {
   NETTY_CONNECTION_BYTES_SENT("nettyConnection", true),
   NETTY_CONNECTION_BYTES_RECEIVED("nettyConnection", true),
 
-  PROACTIVE_CLUSTER_CHANGE_CHECK("proactiveClusterChangeCheck", true);
+  PROACTIVE_CLUSTER_CHANGE_CHECK("proactiveClusterChangeCheck", true),
+
+  // responses that are considered errors
+  ERROR_RESPONSE("queries", false),
+  // responses that are considered partial (for various reasons)
+  PARTIAL_RESPONSE("queries", false),
+  // responses that are considered stale
+  STALE_RESPONSE("queries", false),
+  // responses that are considered latent/slow
+  LATENT_RESPONSE("queries", false),
+  // responses that were considered healthy
+  HEALTHY_RESPONSE("queries", false);
 
   private final String brokerMeterName;
   private final String unit;

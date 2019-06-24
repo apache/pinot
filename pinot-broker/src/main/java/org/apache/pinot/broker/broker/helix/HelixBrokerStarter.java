@@ -171,7 +171,7 @@ public class HelixBrokerStarter {
     _helixExternalViewBasedRouting.init(_spectatorHelixManager);
     _helixExternalViewBasedQueryQuotaManager = new HelixExternalViewBasedQueryQuotaManager();
     _helixExternalViewBasedQueryQuotaManager.init(_spectatorHelixManager);
-    _brokerServerBuilder = new BrokerServerBuilder(_brokerConf, _helixExternalViewBasedRouting,
+    _brokerServerBuilder = new BrokerServerBuilder(_brokerConf,_propertyStore, _helixExternalViewBasedRouting,
         _helixExternalViewBasedRouting.getTimeBoundaryService(), _helixExternalViewBasedQueryQuotaManager);
     BrokerRequestHandler brokerRequestHandler = _brokerServerBuilder.getBrokerRequestHandler();
     if (brokerRequestHandler instanceof ConnectionPoolBrokerRequestHandler) {

@@ -22,9 +22,12 @@ import com.google.common.base.Preconditions;
 import com.yammer.metrics.core.MetricsRegistry;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.configuration.Configuration;
+import org.apache.helix.ZNRecord;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
 import org.apache.pinot.broker.requesthandler.ConnectionPoolBrokerRequestHandler;
+import org.apache.pinot.broker.requesthandler.LazyTableConfigCache;
 import org.apache.pinot.broker.requesthandler.SingleConnectionBrokerRequestHandler;
 import org.apache.pinot.broker.routing.RoutingTable;
 import org.apache.pinot.broker.routing.TimeBoundaryService;
@@ -56,8 +59,10 @@ public class BrokerServerBuilder {
   private final BrokerMetrics _brokerMetrics;
   private final BrokerRequestHandler _brokerRequestHandler;
   private final BrokerAdminApiApplication _brokerAdminApplication;
+  private final LazyTableConfigCache _tableConfigCache;
 
-  public BrokerServerBuilder(Configuration config, RoutingTable routingTable, TimeBoundaryService timeBoundaryService,
+  public BrokerServerBuilder(Configuration config, ZkHelixPropertyStore<ZNRecord> propertyStore,
+      RoutingTable routingTable, TimeBoundaryService timeBoundaryService,
       QueryQuotaManager queryQuotaManager) {
     _config = config;
     _delayedShutdownTimeMs =
@@ -72,6 +77,7 @@ public class BrokerServerBuilder {
     _brokerMetrics =
         new BrokerMetrics(_metricsRegistry, !_config.getBoolean(Broker.CONFIG_OF_ENABLE_TABLE_LEVEL_METRICS, true));
     _brokerMetrics.initializeGlobalMeters();
+    _tableConfigCache = new LazyTableConfigCache(propertyStore);
     _brokerRequestHandler = buildRequestHandler();
     _brokerAdminApplication = new BrokerAdminApiApplication(this);
   }
@@ -82,11 +88,11 @@ public class BrokerServerBuilder {
     if (requestHandlerType.equalsIgnoreCase(Broker.CONNECTION_POOL_REQUEST_HANDLER_TYPE)) {
       LOGGER.info("Using ConnectionPoolBrokerRequestHandler");
       return new ConnectionPoolBrokerRequestHandler(_config, _routingTable, _timeBoundaryService, _accessControlFactory,
-          _queryQuotaManager, _brokerMetrics, _metricsRegistry);
+          _queryQuotaManager, _tableConfigCache, _brokerMetrics, _metricsRegistry);
     } else {
       LOGGER.info("Using SingleConnectionBrokerRequestHandler");
       return new SingleConnectionBrokerRequestHandler(_config, _routingTable, _timeBoundaryService,
-          _accessControlFactory, _queryQuotaManager, _brokerMetrics);
+          _accessControlFactory, _queryQuotaManager, _tableConfigCache, _brokerMetrics);
     }
   }
 
@@ -116,6 +122,7 @@ public class BrokerServerBuilder {
     Preconditions.checkState(_state.get() == State.RUNNING);
     _state.set(State.SHUTTING_DOWN);
 
+    _tableConfigCache.shutDown();
     _brokerRequestHandler.shutDown();
     _brokerAdminApplication.stop();
 
