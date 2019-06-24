@@ -28,7 +28,10 @@ Run through step 1-2 in :ref:`presto`. or :ref:`mysql`.
 
 **1: Import Metric on Front End**
 
-Click `Create Alert` on top right of the page, click `Import a Metric from SQL` link under `Define detection configuration`.
+Click on this link to import: ``http://localhost:1426/app/#/self-serve/import-sql-metric``
+
+Once the UI is fixed, this link should appear in the create alert page.
+
 Fill in the form which includes the following fields, and click Import Metrics.
  
 ``Table Name``: For Presto, it is the Presto table name, including all schema prefixes. For MySQL it is just the table name.
