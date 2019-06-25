@@ -68,21 +68,7 @@ public class TriggerConditionGrouper implements Grouper<TriggerConditionGrouperS
    * before calling the grouper, we do not have to deal with overlapping
    * anomalies within an entity/metric
    *
-   * Core logic:
-   * Sort anomalies by start time and iterate through the list
-   * Push first anomaly to stack
-   * For each anomaly following, pop stack and compare with current anomaly
-   * 1. No overlap:
-   *    If the anomaly doesn't overlap, create and push new entity anomaly
-   * 2. Partial overlap:
-   *    If partial overlap, create new grouped entity anomaly and push to stack followed by current anomaly
-   * 3. Full overlap:
-   *    If full overlap, create new grouped entity anomaly and push to stack followed by current anomaly
-   * After the last anomaly, the stack will have one extra anomaly which needs to be popped out.
-   * Now the stack will hold all the grouped/entity anomalies
-   *
-   * Note the each time an entity copy is created, the children needs to be marked and set appropriately
-   *
+   * Sort anomalies and incrementally compare two anomalies for overlap criteria; break when no overlap
    */
   private List<MergedAnomalyResultDTO> andGrouping(
       List<MergedAnomalyResultDTO> anomalyListA, List<MergedAnomalyResultDTO> anomalyListB) {
@@ -91,7 +77,6 @@ public class TriggerConditionGrouper implements Grouper<TriggerConditionGrouperS
     if (anomalies.isEmpty()) {
       return anomalies;
     }
-
 
     for (int i = 0; i < anomalies.size(); i++) {
       for (int j = i + 1; j < anomalies.size(); j++) {
@@ -121,7 +106,6 @@ public class TriggerConditionGrouper implements Grouper<TriggerConditionGrouperS
    * anomalies within an entity/metric
    *
    * Sort anomalies by start time and incrementally merge anomalies
-   *
    */
   private List<MergedAnomalyResultDTO> orGrouping(
       List<MergedAnomalyResultDTO> anomalyListA, List<MergedAnomalyResultDTO> anomalyListB) {
