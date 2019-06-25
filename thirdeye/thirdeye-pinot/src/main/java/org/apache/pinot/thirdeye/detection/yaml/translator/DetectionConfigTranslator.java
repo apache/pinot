@@ -40,7 +40,6 @@ import org.apache.pinot.thirdeye.detection.DataProvider;
 import org.apache.pinot.thirdeye.detection.DetectionUtils;
 import org.apache.pinot.thirdeye.detection.algorithm.DimensionWrapper;
 import org.apache.pinot.thirdeye.detection.annotation.registry.DetectionRegistry;
-import org.apache.pinot.thirdeye.detection.components.MockGrouper;
 import org.apache.pinot.thirdeye.detection.validators.DetectionConfigValidator;
 import org.apache.pinot.thirdeye.detection.wrapper.AnomalyDetectorWrapper;
 import org.apache.pinot.thirdeye.detection.wrapper.AnomalyFilterWrapper;
@@ -133,6 +132,8 @@ public class DetectionConfigTranslator extends ConfigTranslator<DetectionConfigD
   private static final String PROP_TYPE = "type";
   private static final String PROP_CLASS_NAME = "className";
   private static final String PROP_PARAMS = "params";
+  private static final String PROP_METRIC = "metric";
+  private static final String PROP_DATASET = "dataset";
   private static final String PROP_METRIC_URN = "metricUrn";
   private static final String PROP_DIMENSION_FILTER_METRIC = "dimensionFilterMetric";
   private static final String PROP_NESTED_METRIC_URNS = "nestedMetricUrns";
@@ -470,6 +471,9 @@ public class DetectionConfigTranslator extends ConfigTranslator<DetectionConfigD
 
     String componentClassName = DETECTION_REGISTRY.lookup(type);
     componentSpecs.put(PROP_CLASS_NAME, componentClassName);
+    componentSpecs.put(PROP_METRIC, MapUtils.getString(yamlConfig, PROP_METRIC));
+    componentSpecs.put(PROP_DATASET, MapUtils.getString(yamlConfig, PROP_DATASET));
+    componentSpecs.put(PROP_FILTERS, MapUtils.getString(yamlConfig, PROP_FILTERS));
 
     Map<String, Object> params = ConfigUtils.getMap(yamlConfig.get(PROP_PARAMS));
 
