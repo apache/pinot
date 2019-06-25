@@ -52,8 +52,8 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
  * <p>Based on the number of values we need to store, we use direct memory or MMap file to allocate the buffer.
  */
 public final class OffHeapBitmapInvertedIndexCreator implements InvertedIndexCreator {
-  // Use MMapBuffer if the buffer size is larger than 100MB
-  private static final int NUM_VALUES_THRESHOLD_FOR_MMAP_BUFFER = 25_000_000;
+  // Use MMapBuffer if the value buffer size is larger than 2G
+  private static final int NUM_VALUES_THRESHOLD_FOR_MMAP_BUFFER = 500_000_000;
 
   private static final String FORWARD_INDEX_VALUE_BUFFER_SUFFIX = ".fwd.idx.val.buf";
   private static final String FORWARD_INDEX_LENGTH_BUFFER_SUFFIX = ".fwd.idx.len.buf";
