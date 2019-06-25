@@ -95,6 +95,9 @@ public class DetectionHealthTest {
     this.taskDAO.save(task2);
     DetectionHealth health = new DetectionHealth.Builder(configId, startTime, endTime).addDetectionTaskStatus(this.taskDAO, 2).build();
     Assert.assertEquals(health.getDetectionTaskStatus().getHealthStatus(), HealthStatus.MODERATE);
+    Assert.assertEquals(health.getDetectionTaskStatus().getTaskCounts(),
+        ImmutableMap.of(TaskConstants.TaskStatus.COMPLETED, 1L, TaskConstants.TaskStatus.TIMEOUT, 0L,
+            TaskConstants.TaskStatus.WAITING, 0L, TaskConstants.TaskStatus.FAILED, 1L));
     Assert.assertEquals(health.getDetectionTaskStatus().getTaskSuccessRate(), 0.5);
     Assert.assertEquals(health.getDetectionTaskStatus().getTasks(), Arrays.asList(task2, task1));
   }

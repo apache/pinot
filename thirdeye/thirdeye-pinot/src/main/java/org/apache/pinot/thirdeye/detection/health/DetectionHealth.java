@@ -143,7 +143,8 @@ public class DetectionHealth {
     }
 
     /**
-     * Add the global health status in the report built by the builder, consider regression health, coverage ratio and task health
+     * Add the global health status in the report built by the builder, consider both regression health, coverage ratio and task health.
+     * The overall health can be generated only regression health, coverage ratio and task health are available.
      * @return the builder
      */
     public Builder addOverallHealth() {
@@ -228,7 +229,8 @@ public class DetectionHealth {
               Predicate.LT(COL_NAME_START_TIME, endTime), Predicate.GT(COL_NAME_END_TIME, startTime),
               Predicate.EQ(COL_NAME_TASK_TYPE, TaskConstants.TaskType.DETECTION.toString()),
               Predicate.IN(COL_NAME_TASK_STATUS, new String[]{TaskConstants.TaskStatus.COMPLETED.toString(),
-                  TaskConstants.TaskStatus.FAILED.toString(), TaskConstants.TaskStatus.TIMEOUT.toString()})));
+                  TaskConstants.TaskStatus.FAILED.toString(), TaskConstants.TaskStatus.TIMEOUT.toString(),
+                  TaskConstants.TaskStatus.WAITING.toString()})));
       tasks.sort(Comparator.comparingLong(TaskBean::getStartTime).reversed());
       // limit the task size
       tasks = tasks.stream().limit(this.taskLimit).collect(Collectors.toList());
