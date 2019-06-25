@@ -144,7 +144,7 @@ public class DetectionHealth {
 
     /**
      * Add the global health status in the report built by the builder, consider both regression health, coverage ratio and task health.
-     * The overall health can be generated only regression health, coverage ratio and task health are available.
+     * The overall health can be generated only if regression health, coverage ratio and task health are available.
      * @return the builder
      */
     public Builder addOverallHealth() {
