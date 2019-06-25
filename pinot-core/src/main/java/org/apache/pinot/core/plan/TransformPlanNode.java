@@ -93,7 +93,6 @@ public class TransformPlanNode implements PlanNode {
         }
       }
     } else {
-//      throw new UnsupportedOperationException("Transforms not supported in selection queries.");
       Selection selection = brokerRequest.getSelections();
       // No ordering required, select minimum number of documents
       if (!selection.isSetSelectionSortSequence()) {
