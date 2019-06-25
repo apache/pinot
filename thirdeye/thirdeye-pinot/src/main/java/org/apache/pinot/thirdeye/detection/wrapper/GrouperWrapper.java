@@ -47,11 +47,15 @@ public class GrouperWrapper extends DetectionPipeline {
   private static final String PROP_NESTED = "nested";
   private static final String PROP_CLASS_NAME = "className";
   private static final String PROP_GROUPER = "grouper";
+  private static final String PROP_DETECTOR = "detector";
+  private static final String PROP_DETECTOR_COMPONENT_NAME = "detectorComponentName";
 
   private final List<Map<String, Object>> nestedProperties;
 
   private final Grouper grouper;
   private final String grouperName;
+  private final String detectorName;
+  private final String entityName;
 
   public GrouperWrapper(DataProvider provider, DetectionConfigDTO config, long startTime, long endTime)
       throws Exception {
@@ -64,6 +68,9 @@ public class GrouperWrapper extends DetectionPipeline {
     this.grouperName = DetectionUtils.getComponentKey(MapUtils.getString(config.getProperties(), PROP_GROUPER));
     Preconditions.checkArgument(this.config.getComponents().containsKey(this.grouperName));
     this.grouper = (Grouper) this.config.getComponents().get(this.grouperName);
+
+    this.entityName = MapUtils.getString(config.getProperties(), PROP_DETECTOR);
+    this.detectorName = DetectionUtils.getComponentKey(entityName);
   }
 
   /**
@@ -74,7 +81,6 @@ public class GrouperWrapper extends DetectionPipeline {
   public final DetectionPipelineResult run() throws Exception {
     List<MergedAnomalyResultDTO> candidates = new ArrayList<>();
     Map<String, Object> diagnostics = new HashMap<>();
-    List<MergedAnomalyResultDTO> generated = new ArrayList<>();
     List<PredictionResult> predictionResults = new ArrayList<>();
     List<EvaluationDTO> evaluations = new ArrayList<>();
 
@@ -94,7 +100,6 @@ public class GrouperWrapper extends DetectionPipeline {
       DetectionPipelineResult intermediate = pipeline.run();
       lastTimeStamps.add(intermediate.getLastTimestamp());
 
-      generated.addAll(intermediate.getAnomalies());
       predictionResults.addAll(intermediate.getPredictions());
       evaluations.addAll(intermediate.getEvaluations());
       diagnostics.putAll(intermediate.getDiagnostics());
@@ -102,6 +107,16 @@ public class GrouperWrapper extends DetectionPipeline {
     }
 
     List<MergedAnomalyResultDTO> anomalies = this.grouper.group(candidates);
+
+    for (MergedAnomalyResultDTO anomaly : anomalies) {
+      if (anomaly.isChild()) {
+        throw new RuntimeException("Child anomalies returned by grouper. It should always return parent anomalies"
+            + " with child mapping. Detection id: " + this.config.getId() + ", detector name: " + this.detectorName);
+      }
+
+      anomaly.setDetectionConfigId(this.config.getId());
+      anomaly.getProperties().put(PROP_DETECTOR_COMPONENT_NAME, this.detectorName);
+    }
 
     return new DetectionPipelineResult(anomalies, DetectionUtils.consolidateNestedLastTimeStamps(lastTimeStamps),
         predictionResults, evaluations).setDiagnostics(diagnostics);
