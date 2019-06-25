@@ -25,6 +25,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.detection.ConfigUtils;
@@ -141,14 +142,10 @@ public class TriggerConditionGrouper implements Grouper<TriggerConditionGrouperS
     // Base condition - If reached leaf node, then return the anomalies corresponding to the entity/metric
     String value = MapUtils.getString(operatorNode, "value");
     if (value != null) {
-      List<MergedAnomalyResultDTO> filteredAnomalies = new ArrayList<>();
-      for (MergedAnomalyResultDTO anomaly : anomalies) {
-        if (anomaly.getProperties() != null && anomaly.getProperties().get(PROP_DETECTOR_COMPONENT_NAME) != null
-            && anomaly.getProperties().get(PROP_DETECTOR_COMPONENT_NAME).startsWith(value)) {
-          filteredAnomalies.add(anomaly);
-        }
-      }
-      return filteredAnomalies;
+      return anomalies.stream().filter(anomaly ->
+          anomaly.getProperties() != null && anomaly.getProperties().get(PROP_DETECTOR_COMPONENT_NAME) != null
+              && anomaly.getProperties().get(PROP_DETECTOR_COMPONENT_NAME).startsWith(value)
+      ).collect(Collectors.toList());
     }
 
     String operator = MapUtils.getString(operatorNode, PROP_OPERATOR);
