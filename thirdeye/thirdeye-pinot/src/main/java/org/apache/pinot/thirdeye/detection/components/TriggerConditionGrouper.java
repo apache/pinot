@@ -103,7 +103,6 @@ public class TriggerConditionGrouper implements Grouper<TriggerConditionGrouperS
           setEntityChildMapping(currentAnomaly, anomalies.get(j));
 
           groupedAnomalies.add(currentAnomaly);
-          //groupedAnomalies.addAll(currentAnomaly.getChildren());
         } else {
           break;
         }
@@ -141,12 +140,10 @@ public class TriggerConditionGrouper implements Grouper<TriggerConditionGrouperS
       }  else {
         // No overlap
         groupedAnomalies.add(currentAnomaly);
-        //groupedAnomalies.addAll(currentAnomaly.getChildren());
         currentAnomaly = makeParentEntityAnomaly(anomalies.get(i));
       }
     }
     groupedAnomalies.add(currentAnomaly);
-    //groupedAnomalies.addAll(currentAnomaly.getChildren());
 
     return new ArrayList<>(groupedAnomalies);
   }
