@@ -24,6 +24,8 @@ import com.google.common.collect.Lists;
 import java.io.File;
 import java.net.URL;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.utils.retry.RetryPolicies;
+import org.apache.pinot.common.utils.retry.RetryPolicy;
 import org.apache.pinot.core.data.readers.FileFormat;
 import org.apache.pinot.tools.admin.command.QuickstartRunner;
 
@@ -158,8 +160,8 @@ public class Quickstart {
     runner.buildSegment();
     printStatus(Color.CYAN, "***** Pushing segment to the controller *****");
     runner.pushSegment();
-    printStatus(Color.CYAN, "***** Waiting for 5 seconds for the server to fetch the assigned segment *****");
-    Thread.sleep(5000);
+    printStatus(Color.CYAN, "***** Waiting for 60 seconds for the server to fetch the assigned segment *****");
+    waitForAllDocsLoaded(runner, 60_000L);
 
     Runtime.getRuntime().addShutdownHook(new Thread() {
       @Override
@@ -207,6 +209,29 @@ public class Quickstart {
     printStatus(Color.GREEN, "***************************************************");
 
     printStatus(Color.GREEN, "You can always go to http://localhost:9000/query/ to play around in the query console");
+  }
+
+  protected void waitForAllDocsLoaded(QuickstartRunner runner, long timeoutMs)
+      throws Exception {
+    final long countStarResult = 97889L;
+    final long delayMs = 5_000L;
+    int maxNumAttempts = (int) (timeoutMs / delayMs);
+
+    RetryPolicy retryPolicy = RetryPolicies.fixedDelayRetryPolicy(maxNumAttempts, delayMs);
+    retryPolicy.attempt(() -> getCurrentCountStarResult(runner) == countStarResult);
+  }
+
+  private long getCurrentCountStarResult(QuickstartRunner runner)
+      throws Exception {
+    String query = "select count(*) from baseballStats";
+    JsonNode jsonNode = runner.runQuery(query);
+    if (jsonNode.has(AGGREGATION_RESULTS_FIELD)) {
+      JsonNode aggregationResults = jsonNode.get(AGGREGATION_RESULTS_FIELD);
+      if (!aggregationResults.get(0).has("groupByResult")) {
+        return Long.parseLong(aggregationResults.get(0).get("value").asText());
+      }
+    }
+    return 0L;
   }
 
   public static void main(String[] args)
