@@ -21,6 +21,7 @@ package org.apache.pinot.pql.parsers.pql2.ast;
 import java.util.Collections;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.FilterOperator;
+import org.apache.pinot.common.request.transform.TransformExpressionTree;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
 import org.apache.pinot.common.utils.request.HavingQueryTree;
 import org.apache.pinot.common.utils.request.RequestUtils;
@@ -59,6 +60,7 @@ public class ComparisonPredicateAstNode extends PredicateAstNode {
     } else if (childNode instanceof FunctionCallAstNode) {
       if (_function == null && _identifier == null) {
         _function = (FunctionCallAstNode) childNode;
+        _identifier = TransformExpressionTree.getStandardExpression(childNode);
       } else if (_function != null) {
         throw new Pql2CompilationException("Comparison between two functions is not supported.");
       } else {
@@ -126,6 +128,7 @@ public class ComparisonPredicateAstNode extends PredicateAstNode {
   @Override
   public FilterQueryTree buildFilterQueryTree() {
     if (_identifier == null) {
+
       throw new Pql2CompilationException("Comparison predicate has no identifier");
     }
 

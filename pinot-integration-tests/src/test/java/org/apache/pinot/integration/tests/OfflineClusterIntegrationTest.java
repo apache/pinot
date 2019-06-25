@@ -598,6 +598,59 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     }
   }
 
+  @Test
+  public void testFilterUDF()
+      throws Exception {
+    int daysSinceEpoch = 16138;
+    long secondsSinceEpoch = 16138 * 24 * 60 * 60;
+
+    String pqlQuery;
+    pqlQuery = "SELECT count(*) FROM mytable WHERE DaysSinceEpoch = " + daysSinceEpoch;
+    JsonNode response1 = postQuery(pqlQuery);
+
+    pqlQuery = "SELECT count(*) FROM mytable WHERE timeConvert(DaysSinceEpoch,'DAYS','SECONDS') = " + secondsSinceEpoch;
+    JsonNode response2 = postQuery(pqlQuery);
+
+    pqlQuery = "SELECT count(*) FROM mytable WHERE DaysSinceEpoch = " + daysSinceEpoch + " OR timeConvert(DaysSinceEpoch,'DAYS','SECONDS') = " + secondsSinceEpoch;
+    JsonNode response3 = postQuery(pqlQuery);
+
+    pqlQuery = "SELECT count(*) FROM mytable WHERE DaysSinceEpoch = " + daysSinceEpoch + " AND timeConvert(DaysSinceEpoch,'DAYS','SECONDS') = " + secondsSinceEpoch;
+    JsonNode response4 = postQuery(pqlQuery);
+
+    double val1 = response1.get("aggregationResults").get(0).get("value").asDouble();
+    double val2 = response2.get("aggregationResults").get(0).get("value").asDouble();
+    double val3 = response3.get("aggregationResults").get(0).get("value").asDouble();
+    double val4 = response4.get("aggregationResults").get(0).get("value").asDouble();
+    Assert.assertEquals(val1, val2);
+    Assert.assertEquals(val1, val3);
+    Assert.assertEquals(val1, val4);
+  }
+
+  @Test
+  public void testFilterWithInvertedIndexUDF()
+      throws Exception {
+    int daysSinceEpoch = 16138;
+    long secondsSinceEpoch = 16138 * 24 * 60 * 60;
+
+    String[] origins =
+        new String[]{"ATL", "ORD", "DFW", "DEN", "LAX", "IAH", "SFO", "PHX", "LAS", "EWR", "MCO", "BOS", "SLC", "SEA", "MSP", "CLT", "LGA", "DTW", "JFK", "BWI"};
+    String pqlQuery;
+    for (String origin : origins) {
+      pqlQuery =
+          "SELECT count(*) FROM mytable WHERE Origin = \"" + origin + "\" AND DaysSinceEpoch = " + daysSinceEpoch;
+      JsonNode response1 = postQuery(pqlQuery);
+      //System.out.println(response1);
+      pqlQuery = "SELECT count(*) FROM mytable WHERE Origin = \"" + origin
+          + "\" AND timeConvert(DaysSinceEpoch,'DAYS','SECONDS') = " + secondsSinceEpoch;
+      JsonNode response2 = postQuery(pqlQuery);
+      //System.out.println(response2);
+      double val1 = response1.get("aggregationResults").get(0).get("value").asDouble();
+      double val2 = response2.get("aggregationResults").get(0).get("value").asDouble();
+      Assert.assertEquals(val1, val2);
+    }
+
+  }
+
   @AfterClass
   public void tearDown()
       throws Exception {
