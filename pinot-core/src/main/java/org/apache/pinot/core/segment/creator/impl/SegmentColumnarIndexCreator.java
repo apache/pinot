@@ -23,6 +23,7 @@ import com.google.common.collect.Iterables;
 import java.io.File;
 import java.io.IOException;
 import java.util.Collection;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -36,6 +37,7 @@ import org.apache.pinot.common.data.FieldSpec.FieldType;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.data.StarTreeIndexSpec;
 import org.apache.pinot.common.utils.FileUtils;
+import org.apache.pinot.common.utils.time.TimeUtils;
 import org.apache.pinot.core.data.GenericRow;
 import org.apache.pinot.core.data.partition.PartitionFunction;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
@@ -340,6 +342,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     if (timeColumnIndexCreationInfo != null) {
       // Use start/end time in config if defined
       if (config.getStartTime() != null) {
+        checkTime(config.getStartTime(), config.getEndTime(), segmentName);
         properties.setProperty(SEGMENT_START_TIME, config.getStartTime());
         properties.setProperty(SEGMENT_END_TIME, Preconditions.checkNotNull(config.getEndTime()));
         properties.setProperty(TIME_UNIT, Preconditions.checkNotNull(config.getSegmentTimeUnit()));
@@ -350,10 +353,14 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         if (config.getTimeColumnType() == SegmentGeneratorConfig.TimeColumnType.SIMPLE_DATE) {
           // For simple date format, convert time value into millis since epoch
           DateTimeFormatter dateTimeFormatter = DateTimeFormat.forPattern(config.getSimpleDateFormat());
-          properties.setProperty(SEGMENT_START_TIME, dateTimeFormatter.parseMillis(minTime.toString()));
-          properties.setProperty(SEGMENT_END_TIME, dateTimeFormatter.parseMillis(maxTime.toString()));
+          final Long minTimeMillis = dateTimeFormatter.parseMillis(minTime.toString());
+          final Long maxTimeMillis = dateTimeFormatter.parseMillis(maxTime.toString());
+          checkTime(minTimeMillis, maxTimeMillis, segmentName);
+          properties.setProperty(SEGMENT_START_TIME, minTimeMillis);
+          properties.setProperty(SEGMENT_END_TIME, maxTimeMillis);
           properties.setProperty(TIME_UNIT, TimeUnit.MILLISECONDS);
         } else {
+          checkTime(minTime, maxTime, segmentName);
           properties.setProperty(SEGMENT_START_TIME, minTime);
           properties.setProperty(SEGMENT_END_TIME, maxTime);
           properties.setProperty(TIME_UNIT, Preconditions.checkNotNull(config.getSegmentTimeUnit()));
@@ -391,6 +398,43 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     }
 
     properties.save();
+  }
+
+  /**
+   * Check for the validity of segment start and end time
+   * @param startTime segment start time
+   * @param endTime segment end time
+   * @param segmentName segment name
+   */
+  private void checkTime(final Object startTime, final Object endTime, final String segmentName) {
+    if (startTime == null || endTime == null) {
+      throw new RuntimeException("Expecting non-null start/end time for segment: " + segmentName);
+    }
+
+    long startMillis = 0;
+    long endMillis = 0;
+
+    if (startTime instanceof Long && endTime instanceof Long) {
+      startMillis = (long)startTime;
+      endMillis = (long)endTime;
+    } else if (startTime instanceof Integer && endTime instanceof Integer) {
+      startMillis = ((Integer) startTime).longValue();
+      endMillis = ((Integer) endTime).longValue();
+    } else if (startTime instanceof String && endTime instanceof String) {
+      startMillis = Long.parseLong((String)startTime);
+      endMillis = Long.parseLong((String)endTime);
+    } else  {
+      throw new RuntimeException("Unable to interpret type of time column");
+    }
+
+    if (!TimeUtils.timeValueInValidRange(startMillis) || !TimeUtils.timeValueInValidRange(endMillis)) {
+      final Date minDate = new Date(TimeUtils.getValidMinTimeMillis());
+      final Date maxDate = new Date(TimeUtils.getValidMaxTimeMillis());
+      LOGGER.error(
+          "Invalid start time '{}ms' or end time '{}ms' for segment {}, must be between '{}' and '{}'",
+          startMillis, endMillis, segmentName, minDate, maxDate);
+      throw new RuntimeException("Invalid start/end time for segment: " + segmentName);
+    }
   }
 
   public static void addColumnMetadataInfo(PropertiesConfiguration properties, String column,
