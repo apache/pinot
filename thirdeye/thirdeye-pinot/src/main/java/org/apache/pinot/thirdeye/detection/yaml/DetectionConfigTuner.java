@@ -105,7 +105,9 @@ public class DetectionConfigTuner {
     Map<Long, MetricConfigDTO> metricConfigMap = dataProvider.fetchMetrics(Collections.singleton(metricEntity.getId()));
     Preconditions.checkArgument(metricConfigMap.size() == 1, "Unable to find the metric to tune");
 
-    DatasetConfigDTO datasetConfig = metricConfigMap.values().iterator().next().getDatasetConfig();
+    MetricConfigDTO metricConfig = metricConfigMap.values().iterator().next();
+    DatasetConfigDTO datasetConfig = dataProvider.fetchDatasets(Collections.singletonList(metricConfig.getDataset()))
+        .get(metricConfig.getDataset());
     DateTimeZone timezone = DateTimeZone.forID(datasetConfig.getTimezone() == null ? DEFAULT_TIMEZONE : datasetConfig.getTimezone());
     DateTime start = new DateTime(startTime, timezone).withTimeAtStartOfDay();
     DateTime end =  new DateTime(endTime, timezone).withTimeAtStartOfDay();
