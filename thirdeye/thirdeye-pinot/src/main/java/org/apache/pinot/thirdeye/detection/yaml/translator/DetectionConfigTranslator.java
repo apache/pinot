@@ -202,14 +202,14 @@ public class DetectionConfigTranslator extends ConfigTranslator<DetectionConfigD
     for (Map<String, Object> ruleYaml : ruleYamls) {
       List<Map<String, Object>> filterYamls = ConfigUtils.getList(ruleYaml.get(PROP_FILTER));
       List<Map<String, Object>> detectionYamls = ConfigUtils.getList(ruleYaml.get(PROP_DETECTION));
-      List<Map<String, Object>> detectionProperties = buildListOfMergeWrapperProperties(detectionYamls, mergerProperties,
+      List<Map<String, Object>> detectionProperties = buildListOfMergeWrapperProperties(metricUrn, detectionYamls, mergerProperties,
           datasetConfigDTO.bucketTimeGranularity());
       if (filterYamls.isEmpty()) {
         nestedPipelines.addAll(detectionProperties);
       } else {
         List<Map<String, Object>> filterNestedProperties = detectionProperties;
         for (Map<String, Object> filterProperties : filterYamls) {
-          filterNestedProperties = buildFilterWrapperProperties(AnomalyFilterWrapper.class.getName(), filterProperties,
+          filterNestedProperties = buildFilterWrapperProperties(metricUrn, AnomalyFilterWrapper.class.getName(), filterProperties,
               filterNestedProperties);
         }
         nestedPipelines.addAll(filterNestedProperties);
@@ -227,7 +227,7 @@ public class DetectionConfigTranslator extends ConfigTranslator<DetectionConfigD
     // Wrap with metric level grouper, restricting to only 1 grouper
     List<Map<String, Object>> grouperYamls = getList(metricAlertConfigMap.get(PROP_GROUPER));
     if (!grouperYamls.isEmpty()) {
-      properties = buildGroupWrapperProperties(grouperYamls.get(0), Collections.singletonList(properties));
+      properties = buildGroupWrapperProperties(metricUrn, grouperYamls.get(0), Collections.singletonList(properties));
     }
 
     return properties;
@@ -320,16 +320,17 @@ public class DetectionConfigTranslator extends ConfigTranslator<DetectionConfigD
     return dimensionWrapperProperties;
   }
 
-  private List<Map<String, Object>> buildListOfMergeWrapperProperties(
-      List<Map<String, Object>> yamlConfigs, Map<String, Object> mergerProperties, TimeGranularity datasetTimegranularity) {
+  private List<Map<String, Object>> buildListOfMergeWrapperProperties(String metricUrn, List<Map<String, Object>> yamlConfigs,
+      Map<String, Object> mergerProperties, TimeGranularity datasetTimegranularity) {
     List<Map<String, Object>> properties = new ArrayList<>();
     for (Map<String, Object> yamlConfig : yamlConfigs) {
-      properties.add(buildMergeWrapperProperties(yamlConfig, mergerProperties, datasetTimegranularity));
+      properties.add(buildMergeWrapperProperties(metricUrn, yamlConfig, mergerProperties, datasetTimegranularity));
     }
     return properties;
   }
 
-  private Map<String, Object> buildMergeWrapperProperties(Map<String, Object> yamlConfig, Map<String, Object> mergerProperties, TimeGranularity datasetTimegranularity) {
+  private Map<String, Object> buildMergeWrapperProperties(String metricUrn, Map<String, Object> yamlConfig,
+      Map<String, Object> mergerProperties, TimeGranularity datasetTimegranularity) {
     String detectorType = MapUtils.getString(yamlConfig, PROP_TYPE);
     String name = MapUtils.getString(yamlConfig, PROP_NAME);
     Map<String, Object> nestedProperties = new HashMap<>();
@@ -338,7 +339,7 @@ public class DetectionConfigTranslator extends ConfigTranslator<DetectionConfigD
 
     fillInDetectorWrapperProperties(nestedProperties, yamlConfig, detectorType, datasetTimegranularity);
 
-    buildComponentSpec(yamlConfig, detectorType, detectorRefKey);
+    buildComponentSpec(metricUrn, yamlConfig, detectorType, detectorRefKey);
 
     Map<String, Object> properties = new HashMap<>();
     properties.put(PROP_CLASS_NAME, BaselineFillingMergeWrapper.class.getName());
@@ -352,7 +353,7 @@ public class DetectionConfigTranslator extends ConfigTranslator<DetectionConfigD
     } else {
       String baselineProviderType = DEFAULT_BASELINE_PROVIDER_YAML_TYPE;
       String baselineProviderKey = makeComponentRefKey(baselineProviderType, name);
-      buildComponentSpec(yamlConfig, baselineProviderType, baselineProviderKey);
+      buildComponentSpec(metricUrn, yamlConfig, baselineProviderType, baselineProviderKey);
       properties.put(PROP_BASELINE_PROVIDER, baselineProviderKey);
     }
     properties.putAll(mergerProperties);
@@ -360,6 +361,10 @@ public class DetectionConfigTranslator extends ConfigTranslator<DetectionConfigD
   }
 
   private Map<String, Object> buildGroupWrapperProperties(Map<String, Object> grouperYaml, List<Map<String, Object>> nestedProps) {
+    return buildGroupWrapperProperties(null, grouperYaml, nestedProps);
+  }
+
+  private Map<String, Object> buildGroupWrapperProperties(String metricUrn, Map<String, Object> grouperYaml, List<Map<String, Object>> nestedProps) {
     Map<String, Object> properties = new HashMap<>();
     properties.put(PROP_CLASS_NAME, GrouperWrapper.class.getName());
     properties.put(PROP_NESTED, nestedProps);
@@ -369,7 +374,7 @@ public class DetectionConfigTranslator extends ConfigTranslator<DetectionConfigD
     String grouperRefKey = makeComponentRefKey(grouperType, grouperName);
     properties.put(PROP_GROUPER, grouperRefKey);
 
-    buildComponentSpec(grouperYaml, grouperType, grouperRefKey);
+    buildComponentSpec(metricUrn, grouperYaml, grouperType, grouperRefKey);
 
     return properties;
   }
@@ -437,7 +442,7 @@ public class DetectionConfigTranslator extends ConfigTranslator<DetectionConfigD
     }
   }
 
-  private List<Map<String, Object>> buildFilterWrapperProperties(String wrapperClassName,
+  private List<Map<String, Object>> buildFilterWrapperProperties(String metricUrn, String wrapperClassName,
       Map<String, Object> yamlConfig, List<Map<String, Object>> nestedProperties) {
     if (yamlConfig == null || yamlConfig.isEmpty()) {
       return nestedProperties;
@@ -450,7 +455,7 @@ public class DetectionConfigTranslator extends ConfigTranslator<DetectionConfigD
     String filterType = MapUtils.getString(yamlConfig, PROP_TYPE);
     String filterRefKey = makeComponentRefKey(filterType, name);
     wrapperProperties.put(PROP_FILTER, filterRefKey);
-    buildComponentSpec(yamlConfig, filterType, filterRefKey);
+    buildComponentSpec(metricUrn, yamlConfig, filterType, filterRefKey);
 
     return Collections.singletonList(wrapperProperties);
   }
@@ -478,14 +483,12 @@ public class DetectionConfigTranslator extends ConfigTranslator<DetectionConfigD
     return properties;
   }
 
-  private void buildComponentSpec(Map<String, Object> yamlConfig, String type, String componentRefKey) {
+  private void buildComponentSpec(String metricUrn, Map<String, Object> yamlConfig, String type, String componentRefKey) {
     Map<String, Object> componentSpecs = new HashMap<>();
 
     String componentClassName = DETECTION_REGISTRY.lookup(type);
     componentSpecs.put(PROP_CLASS_NAME, componentClassName);
-    componentSpecs.put(PROP_METRIC, MapUtils.getString(yamlConfig, PROP_METRIC));
-    componentSpecs.put(PROP_DATASET, MapUtils.getString(yamlConfig, PROP_DATASET));
-    componentSpecs.put(PROP_FILTERS, MapUtils.getString(yamlConfig, PROP_FILTERS));
+    componentSpecs.put(PROP_METRIC_URN, metricUrn);
 
     Map<String, Object> params = ConfigUtils.getMap(yamlConfig.get(PROP_PARAMS));
 
