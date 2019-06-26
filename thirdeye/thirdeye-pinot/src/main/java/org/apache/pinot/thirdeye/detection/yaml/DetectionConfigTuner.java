@@ -25,14 +25,12 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
-import org.apache.commons.collections4.MapUtils;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
 import org.apache.pinot.thirdeye.detection.ConfigUtils;
 import org.apache.pinot.thirdeye.detection.DataProvider;
 import org.apache.pinot.thirdeye.detection.DefaultInputDataFetcher;
-import org.apache.pinot.thirdeye.detection.DetectionPipelineLoader;
 import org.apache.pinot.thirdeye.detection.DetectionUtils;
 import org.apache.pinot.thirdeye.detection.InputDataFetcher;
 import org.apache.pinot.thirdeye.detection.annotation.registry.DetectionRegistry;
@@ -56,11 +54,9 @@ import static org.apache.pinot.thirdeye.detection.DetectionUtils.*;
 public class DetectionConfigTuner {
   protected static final Logger LOG = LoggerFactory.getLogger(DetectionConfigTuner.class);
 
-  private static final String PROP_FILTERS = "filters";
   private static final String PROP_CLASS_NAME = "className";
+  private static final String PROP_METRIC_URN = "metricUrn";
   private static final String DEFAULT_TIMEZONE = "America/Los_Angeles";
-  private static final String PROP_METRIC = "metric";
-  private static final String PROP_DATASET = "dataset";
 
   private static final DetectionRegistry DETECTION_REGISTRY = DetectionRegistry.getInstance();
   static {
@@ -103,12 +99,15 @@ public class DetectionConfigTuner {
     Tunable tunable = instantiateTunable(componentClassName, yamlParams, dataFetcher);
 
     // round to daily boundary
-    String metricName = componentProps.get(PROP_METRIC).toString();
-    String datasetName = componentProps.get(PROP_DATASET).toString();
-    MetricConfigDTO metricConfig = dataProvider.fetchMetric(metricName, datasetName);
+    Preconditions.checkNotNull(componentProps.get(PROP_METRIC_URN));
+    String metricUrn = componentProps.get(PROP_METRIC_URN).toString();
+    MetricEntity metricEntity = MetricEntity.fromURN(metricUrn);
+    Map<Long, MetricConfigDTO> metricConfigMap = dataProvider.fetchMetrics(Collections.singleton(metricEntity.getId()));
+    Preconditions.checkArgument(metricConfigMap.size() == 1, "Unable to find the metric to tune");
+
+    MetricConfigDTO metricConfig = metricConfigMap.values().iterator().next();
     DatasetConfigDTO datasetConfig = dataProvider.fetchDatasets(Collections.singletonList(metricConfig.getDataset()))
         .get(metricConfig.getDataset());
-    String metricUrn = MetricEntity.fromMetric(ConfigUtils.getMap(componentProps.get(PROP_FILTERS)), metricConfig.getId()).getUrn();
     DateTimeZone timezone = DateTimeZone.forID(datasetConfig.getTimezone() == null ? DEFAULT_TIMEZONE : datasetConfig.getTimezone());
     DateTime start = new DateTime(startTime, timezone).withTimeAtStartOfDay();
     DateTime end =  new DateTime(endTime, timezone).withTimeAtStartOfDay();
