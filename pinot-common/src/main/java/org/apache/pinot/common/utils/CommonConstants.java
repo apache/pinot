@@ -320,6 +320,11 @@ public class CommonConstants {
         IN_PROGRESS, DONE
       }
 
+      public enum CompletionMode {
+        DEFAULT, // default behavior
+        DOWNLOAD // always download the segment
+      }
+
       public static final String STATUS = "segment.realtime.status";
     }
 

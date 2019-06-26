@@ -252,6 +252,21 @@ public class TableConfigTest {
       checkTableConfigWithAssignmentConfig(tableConfig, tableConfigToCompare);
     }
     {
+      CompletionConfig completionConfig = new CompletionConfig();
+      completionConfig.setCompletionMode("DEFAULT");
+
+      TableConfig tableConfig =
+          tableConfigBuilder.build();
+      tableConfig.getValidationConfig().setCompletionConfig(completionConfig);
+
+      // Serialize then de-serialize
+      TableConfig tableConfigToCompare = TableConfig.fromJsonConfig(tableConfig.toJsonConfig());
+      checkTableConfigWithCompletionConfig(tableConfig, tableConfigToCompare);
+
+      tableConfigToCompare = TableConfig.fromZnRecord(tableConfig.toZNRecord());
+      checkTableConfigWithCompletionConfig(tableConfig, tableConfigToCompare);
+    }
+    {
       // With default StreamConsumptionConfig
       TableConfig tableConfig = tableConfigBuilder.build();
       assertEquals(tableConfig.getIndexingConfig().getStreamConsumptionConfig().getStreamPartitionAssignmentStrategy(),
@@ -337,6 +352,19 @@ public class TableConfigTest {
     assertTrue(strategyConfig.getMirrorAssignmentAcrossReplicaGroups());
     assertEquals(strategyConfig.getNumInstancesPerPartition(), 5);
     assertEquals(strategyConfig.getPartitionColumn(), "memberId");
+  }
+
+  private void checkTableConfigWithCompletionConfig(TableConfig tableConfig, TableConfig tableConfigToCompare) {
+    // Check that the segment assignment configuration does exist.
+    assertEquals(tableConfigToCompare.getTableName(), tableConfig.getTableName());
+    assertNotNull(tableConfigToCompare.getValidationConfig().getCompletionConfig());
+    assertEquals(tableConfigToCompare.getValidationConfig().getCompletionConfig(),
+        tableConfig.getValidationConfig().getCompletionConfig());
+
+    // Check that the configurations are correct.
+    CompletionConfig completionConfig =
+        tableConfigToCompare.getValidationConfig().getCompletionConfig();
+    assertEquals(completionConfig.getCompletionMode(), "DEFAULT");
   }
 
   private void checkTableConfigWithStarTreeConfig(TableConfig tableConfig, TableConfig tableConfigToCompare)
