@@ -19,6 +19,7 @@
 
 package org.apache.pinot.thirdeye.datalayer.bao.jdbc;
 
+import com.google.common.base.Preconditions;
 import com.google.inject.Singleton;
 import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.AnomalyFunctionDTO;
@@ -98,10 +99,7 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
       update(mergedAnomalyResultDTO);
       return mergedAnomalyResultDTO.getId();
     }
-    MergedAnomalyResultBean mergeAnomalyBean = convertMergeAnomalyDTO2Bean(mergedAnomalyResultDTO);
-    Long id = genericPojoDao.put(mergeAnomalyBean);
-    mergedAnomalyResultDTO.setId(id);
-    return id;
+    return saveAnomaly(mergedAnomalyResultDTO, new HashSet<>());
   }
 
   public int update(MergedAnomalyResultDTO mergedAnomalyResultDTO) {
@@ -113,9 +111,70 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
         return 0;
       }
     } else {
-      MergedAnomalyResultBean mergeAnomalyBean = convertMergeAnomalyDTO2Bean(mergedAnomalyResultDTO);
-      return genericPojoDao.update(mergeAnomalyBean);
+      return updateAnomaly(mergedAnomalyResultDTO, new HashSet<>());
     }
+  }
+
+  private Long saveAnomaly(MergedAnomalyResultDTO mergedAnomalyResultDTO, Set<MergedAnomalyResultDTO> visitedAnomalies) {
+    Preconditions.checkNotNull(mergedAnomalyResultDTO);
+    Preconditions.checkNotNull(visitedAnomalies);
+
+    visitedAnomalies.add(mergedAnomalyResultDTO);
+
+    if (mergedAnomalyResultDTO.getId() != null) {
+      updateAnomaly(mergedAnomalyResultDTO, visitedAnomalies);
+      return mergedAnomalyResultDTO.getId();
+    }
+
+    MergedAnomalyResultBean mergeAnomalyBean = convertMergeAnomalyDTO2Bean(mergedAnomalyResultDTO);
+    Set<Long> childAnomalyIds = saveChildAnomalies(mergedAnomalyResultDTO, visitedAnomalies);
+    mergeAnomalyBean.setChildIds(childAnomalyIds);
+
+    Long id = genericPojoDao.put(mergeAnomalyBean);
+    mergedAnomalyResultDTO.setId(id);
+    return id;
+  }
+
+  private int updateAnomaly(MergedAnomalyResultDTO mergedAnomalyResultDTO, Set<MergedAnomalyResultDTO> visitedAnomalies) {
+    visitedAnomalies.add(mergedAnomalyResultDTO);
+
+    if (mergedAnomalyResultDTO.getId() == null) {
+      Long id = saveAnomaly(mergedAnomalyResultDTO, visitedAnomalies);
+      if (id > 0) {
+        return 1;
+      } else {
+        return 0;
+      }
+    }
+
+    MergedAnomalyResultBean mergeAnomalyBean = convertMergeAnomalyDTO2Bean(mergedAnomalyResultDTO);
+    Set<Long> childAnomalyIds = saveChildAnomalies(mergedAnomalyResultDTO, visitedAnomalies);
+    mergeAnomalyBean.setChildIds(childAnomalyIds);
+
+    return genericPojoDao.update(mergeAnomalyBean);
+  }
+
+  private Set<Long> saveChildAnomalies(MergedAnomalyResultDTO parentAnomaly,
+      Set<MergedAnomalyResultDTO> visitedAnomalies) {
+    Set<Long> childIds = new HashSet<>();
+    Set<MergedAnomalyResultDTO> childAnomalies = parentAnomaly.getChildren();
+    if (childAnomalies == null || childAnomalies.isEmpty()) {
+      // No child anomalies to save
+      return null;
+    }
+
+    for (MergedAnomalyResultDTO child : childAnomalies) {
+      if (child.getId() == null) {
+        // Prevent cycles
+        if (visitedAnomalies.contains(child)) {
+          throw new IllegalArgumentException("Loop detected! Child anomaly referencing ancestor");
+        }
+      }
+      child.setChild(true);
+      childIds.add(saveAnomaly(child, visitedAnomalies));
+    }
+
+    return childIds;
   }
 
   @Override
@@ -403,31 +462,6 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
       bean.setFunctionId(entity.getFunction().getId());
     }
 
-    if (entity.getChildren() != null && !entity.getChildren().isEmpty()) {
-      Set<Long> childIds = new HashSet<>();
-      for (MergedAnomalyResultDTO child : entity.getChildren()) {
-        if (child.getId() == null) {
-          // only allow single level to prevent cycles
-          if (child == entity){
-            throw new IllegalArgumentException("Cannot contain itself as child anomaly");
-          }
-          if (child.getChildren() != null && !child.getChildren().isEmpty()) {
-            throw new IllegalArgumentException("Multi-level anomaly nesting not supported");
-          }
-        }
-        child.setChild(true);
-        save(child);
-        childIds.add(child.getId());
-      }
-
-      // only allow single level to prevent cycles
-      if (bean.isChild()) {
-        throw new IllegalArgumentException("Multi-level anomaly nesting not supported");
-      }
-
-      bean.setChildIds(childIds);
-    }
-
     return bean;
   }
 
@@ -448,6 +482,12 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
       mergedAnomalyResultDTO.setFeedback(anomalyFeedbackDTO);
     }
 
+    mergedAnomalyResultDTO.setChildren(getChildAnomalies(mergedAnomalyResultBean));
+
+    return mergedAnomalyResultDTO;
+  }
+
+  private Set<MergedAnomalyResultDTO> getChildAnomalies(MergedAnomalyResultBean mergedAnomalyResultBean) {
     Set<MergedAnomalyResultDTO> children = new HashSet<>();
     if (mergedAnomalyResultBean.getChildIds() != null) {
       for (Long id : mergedAnomalyResultBean.getChildIds()) {
@@ -460,9 +500,7 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
         children.add(child);
       }
     }
-    mergedAnomalyResultDTO.setChildren(children);
-
-    return mergedAnomalyResultDTO;
+    return children;
   }
 
   @Override
