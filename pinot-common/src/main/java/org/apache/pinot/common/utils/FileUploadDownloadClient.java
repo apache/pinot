@@ -35,6 +35,7 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import javax.net.ssl.SSLContext;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang.StringUtils;
 import org.apache.http.Header;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpHeaders;
@@ -133,11 +134,13 @@ public class FileUploadDownloadClient implements Closeable {
   public static URI getDeleteSegmentHttpUri(String host, int port, String rawTableName, String segmentName,
       String tableType)
       throws URISyntaxException, UnsupportedEncodingException {
-    return getURI(HTTP, host, port, OLD_SEGMENT_PATH + "/" + rawTableName + "/" + URLEncoder.encode(segmentName, "UTF-8") + "?type=" + tableType);
+    return new URI(StringUtil.join("/", StringUtils.chomp(HTTP + "://" + host + ":" + port, "/"),
+        OLD_SEGMENT_PATH, rawTableName + "/" + URLEncoder.encode(segmentName, "UTF-8") + TYPE_DELIMITER + tableType));
   }
 
   public static URI getRetrieveAllSegmentWithTableTypeHttpUri(String host, int port, String rawTableName, String tableType) throws URISyntaxException {
-    return getURI(HTTP, host, port, OLD_SEGMENT_PATH + "/" + rawTableName + "?type=" + tableType);
+    return new URI(StringUtil.join("/", StringUtils.chomp(HTTP + "://" + host + ":" + port, "/"),
+        OLD_SEGMENT_PATH, rawTableName + TYPE_DELIMITER + tableType));
   }
 
   public static URI getRetrieveSchemaHttpURI(String host, int port, String schemaName)

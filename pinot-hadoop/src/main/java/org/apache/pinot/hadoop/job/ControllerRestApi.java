@@ -36,12 +36,7 @@ public interface ControllerRestApi extends Closeable {
 
   void sendSegmentUris(List<String> segmentUris);
 
-  /**
-   * Delete extra segments after push during REFRESH use cases. Also used in APPEND use cases where
-   * a day that has been re-pushed has extra segments.
-   * @param segmentUris
-   */
-  void deleteExtraSegmentUris(List<String> segmentUris);
+  void deleteSegmentUris(List<String> segmentUris);
 
   List<String> getAllSegments(String tableType);
 }

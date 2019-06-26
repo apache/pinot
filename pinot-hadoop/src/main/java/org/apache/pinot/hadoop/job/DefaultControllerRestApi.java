@@ -19,9 +19,11 @@
 package org.apache.pinot.hadoop.job;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.List;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -135,7 +137,7 @@ public class DefaultControllerRestApi implements ControllerRestApi {
   }
 
   @Override
-  public void deleteExtraSegmentUris(List<String> segmentUris) {
+  public void deleteSegmentUris(List<String> segmentUris) {
     LOGGER.info("Start deleting segment URIs: {} to locations: {}", segmentUris, _pushLocations);
     for (String segmentUri : segmentUris) {
       for (PushLocation pushLocation : _pushLocations) {
@@ -156,13 +158,14 @@ public class DefaultControllerRestApi implements ControllerRestApi {
   @Override
   public List<String> getAllSegments(String tableType) {
     LOGGER.info("Getting all segments of table {}", _rawTableName);
+    ObjectMapper objectMapper = new ObjectMapper();
     for (PushLocation pushLocation : _pushLocations) {
       try {
         SimpleHttpResponse response = _fileUploadDownloadClient.sendGetRequest(
             FileUploadDownloadClient.getRetrieveAllSegmentWithTableTypeHttpUri(pushLocation.getHost(), pushLocation.getPort(),
                 _rawTableName, tableType));
         JsonNode segmentList = getSegmentsFromJsonSegmentAPI(response.getResponse(), tableType);
-        return segmentList.findValuesAsText(tableType);
+        return objectMapper.convertValue(segmentList, ArrayList.class);
       } catch (Exception e) {
         LOGGER.warn("Caught exception while getting all {} segments for table: {} from push location: {}", tableType, _rawTableName,
             pushLocation, e);
@@ -182,8 +185,8 @@ public class DefaultControllerRestApi implements ControllerRestApi {
     _fileUploadDownloadClient.close();
   }
 
-  private JsonNode getSegmentsFromJsonSegmentAPI(String json, String type)
+  private JsonNode getSegmentsFromJsonSegmentAPI(String json, String tableType)
       throws Exception {
-    return JsonUtils.stringToJsonNode(json).get(0).get(type);
+    return JsonUtils.stringToJsonNode(json).get(0).get(tableType);
   }
 }
