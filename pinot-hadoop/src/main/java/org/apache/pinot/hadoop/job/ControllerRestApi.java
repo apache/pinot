@@ -35,4 +35,8 @@ public interface ControllerRestApi extends Closeable {
   void pushSegments(FileSystem fileSystem, List<Path> tarFilePaths);
 
   void sendSegmentUris(List<String> segmentUris);
+
+  void deleteSegmentUris(List<String> segmentUris);
+
+  List<String> getAllSegments(String tableType);
 }
