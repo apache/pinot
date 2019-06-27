@@ -30,7 +30,7 @@ import org.apache.pinot.common.utils.EqualityUtils;
 public class CompletionConfig {
 
   @ConfigKey(value = "completionMode")
-  @ConfigDoc("Mode to use when completing segment. DEFAULT for default strategy (build segment if segment is equivalent to the committed segment, else download). DOWNLOAD for always download the segment, never build. ")
+  @ConfigDoc(value = "Mode to use when completing segment. DEFAULT for default strategy (build segment if segment is equivalent to the committed segment, else download). DOWNLOAD for always download the segment, never build.", mandatory = false)
   private String _completionMode;
 
   public String getCompletionMode() {
