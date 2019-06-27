@@ -48,11 +48,13 @@ public class GrouperWrapper extends DetectionPipeline {
   private static final String PROP_CLASS_NAME = "className";
   private static final String PROP_GROUPER = "grouper";
   private static final String PROP_DETECTOR_COMPONENT_NAME = "detectorComponentName";
+  private static final String PROP_ENTITY_NAME = "subEntityName";
 
   private final List<Map<String, Object>> nestedProperties;
 
   private final Grouper grouper;
   private final String grouperName;
+  private final String entityName;
 
   public GrouperWrapper(DataProvider provider, DetectionConfigDTO config, long startTime, long endTime)
       throws Exception {
@@ -65,6 +67,9 @@ public class GrouperWrapper extends DetectionPipeline {
     this.grouperName = DetectionUtils.getComponentKey(MapUtils.getString(config.getProperties(), PROP_GROUPER));
     Preconditions.checkArgument(this.config.getComponents().containsKey(this.grouperName));
     this.grouper = (Grouper) this.config.getComponents().get(this.grouperName);
+    Preconditions.checkArgument(this.config.getProperties().containsKey(PROP_ENTITY_NAME));
+    this.entityName = this.config.getProperties().get(PROP_ENTITY_NAME).toString();
+
   }
 
   /**
@@ -110,6 +115,7 @@ public class GrouperWrapper extends DetectionPipeline {
 
       anomaly.setDetectionConfigId(this.config.getId());
       anomaly.getProperties().put(PROP_DETECTOR_COMPONENT_NAME, this.grouperName);
+      anomaly.getProperties().put(PROP_ENTITY_NAME, this.entityName);
     }
 
     return new DetectionPipelineResult(anomalies, DetectionUtils.consolidateNestedLastTimeStamps(lastTimeStamps),

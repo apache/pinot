@@ -21,12 +21,10 @@ package org.apache.pinot.thirdeye.detection.yaml.translator;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
-import java.time.Period;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -132,9 +130,8 @@ public class DetectionConfigTranslator extends ConfigTranslator<DetectionConfigD
   private static final String PROP_FILTERS = "filters";
   private static final String PROP_TYPE = "type";
   private static final String PROP_CLASS_NAME = "className";
+  private static final String PROP_ENTITY_NAME = "subEntityName";
   private static final String PROP_PARAMS = "params";
-  private static final String PROP_METRIC = "metric";
-  private static final String PROP_DATASET = "dataset";
   private static final String PROP_METRIC_URN = "metricUrn";
   private static final String PROP_DIMENSION_FILTER_METRIC = "dimensionFilterMetric";
   private static final String PROP_NESTED_METRIC_URNS = "nestedMetricUrns";
@@ -226,8 +223,9 @@ public class DetectionConfigTranslator extends ConfigTranslator<DetectionConfigD
 
     // Wrap with metric level grouper, restricting to only 1 grouper
     List<Map<String, Object>> grouperYamls = getList(metricAlertConfigMap.get(PROP_GROUPER));
+    String subEntityName = MapUtils.getString(metricAlertConfigMap, PROP_ENTITY_NAME);
     if (!grouperYamls.isEmpty()) {
-      properties = buildGroupWrapperProperties(metricUrn, grouperYamls.get(0), Collections.singletonList(properties));
+      properties = buildGroupWrapperProperties(subEntityName, metricUrn, grouperYamls.get(0), Collections.singletonList(properties));
     }
 
     return properties;
@@ -252,13 +250,14 @@ public class DetectionConfigTranslator extends ConfigTranslator<DetectionConfigD
 
     // Wrap the entity level grouper, only 1 grouper is supported now
     List<Map<String, Object>> grouperProps = ConfigUtils.getList(compositeAlertConfigMap.get(PROP_GROUPER));
+    String subEntityName = MapUtils.getString(compositeAlertConfigMap, PROP_ENTITY_NAME);
     if (!grouperProps.isEmpty()) {
-      properties = buildGroupWrapperProperties(grouperProps.get(0), nestedPropertiesList);
+      properties = buildGroupWrapperProperties(subEntityName, grouperProps.get(0), nestedPropertiesList);
     } else {
       Map<String, Object> defaultGrouper = new HashMap<>();
       defaultGrouper.put(PROP_TYPE, "MOCK_GROUPER");
       defaultGrouper.put(PROP_NAME, "Default grouper");
-      properties = buildGroupWrapperProperties(defaultGrouper, nestedPropertiesList);
+      properties = buildGroupWrapperProperties(subEntityName, defaultGrouper, nestedPropertiesList);
     }
 
     // Wrap the entity level merger
@@ -360,13 +359,15 @@ public class DetectionConfigTranslator extends ConfigTranslator<DetectionConfigD
     return properties;
   }
 
-  private Map<String, Object> buildGroupWrapperProperties(Map<String, Object> grouperYaml, List<Map<String, Object>> nestedProps) {
-    return buildGroupWrapperProperties(null, grouperYaml, nestedProps);
+  private Map<String, Object> buildGroupWrapperProperties(String entityName, Map<String, Object> grouperYaml, List<Map<String, Object>> nestedProps) {
+    return buildGroupWrapperProperties(entityName, null, grouperYaml, nestedProps);
   }
 
-  private Map<String, Object> buildGroupWrapperProperties(String metricUrn, Map<String, Object> grouperYaml, List<Map<String, Object>> nestedProps) {
+  private Map<String, Object> buildGroupWrapperProperties(String entityName, String metricUrn,
+      Map<String, Object> grouperYaml, List<Map<String, Object>> nestedProps) {
     Map<String, Object> properties = new HashMap<>();
     properties.put(PROP_CLASS_NAME, GrouperWrapper.class.getName());
+    properties.put(PROP_ENTITY_NAME, entityName);
     properties.put(PROP_NESTED, nestedProps);
 
     String grouperType = MapUtils.getString(grouperYaml, PROP_TYPE);
