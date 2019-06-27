@@ -1,0 +1,814 @@
+SELECT *  FROM testTable ORDER BY column6, column1
+SELECT *  FROM testTable ORDER BY column6, column1 WHERE column1 > 100000000 AND column3 BETWEEN 20000000 AND 1000000000 AND column5 = 'gFuH' AND (column6 < 500000000 OR column11 NOT IN ('t', 'P')) AND daysSinceEpoch = 126164076
+SELECT * FROM testTable LIMIT 0
+SELECT * FROM testTable LIMIT 0 WHERE column1 > 100000000 AND column2 BETWEEN 20000000 AND 1000000000 AND column3 <> 'w' AND (column6 < 500000 OR column7 NOT IN (225, 407)) AND daysSinceEpoch = 1756015683
+SELECT * FROM testTable LIMIT 0 WHERE column1 > 100000000 AND column3 BETWEEN 20000000 AND 1000000000 AND column5 = 'gFuH' AND (column6 < 500000000 OR column11 NOT IN ('t', 'P')) AND daysSinceEpoch = 126164076
+SELECT ActualElapsedTime FROM mytable WHERE  REGEXP_LIKE(OriginCityName, 'Pon.*e, PR') ORDER BY CancellationCode LIMIT 14
+SELECT ActualElapsedTime FROM mytable WHERE LateAircraftDelay > 98 AND DestWac BETWEEN 15 AND 66 AND TailNum BETWEEN 'N843MQ' AND 'N14916' ORDER BY WeatherDelay LIMIT 22
+SELECT ActualElapsedTime, ArrTime, TailNum FROM mytable LIMIT 16
+SELECT ActualElapsedTime, CancellationCode FROM mytable WHERE OriginCityName <= 'Hibbing, MN' ORDER BY FlightNum LIMIT 24
+SELECT ActualElapsedTime, CancellationCode FROM mytable WHERE Year BETWEEN 2014 AND 2014 ORDER BY Flights, DepTimeBlk, DaysSinceEpoch LIMIT 3
+SELECT ActualElapsedTime, DaysSinceEpoch FROM mytable LIMIT 4
+SELECT ActualElapsedTime, Dest, DestState FROM mytable WHERE OriginWac BETWEEN 85 AND 83 ORDER BY CRSDepTime, CancellationCode LIMIT 3
+SELECT ActualElapsedTime, DestStateFips FROM mytable ORDER BY FlightDate LIMIT 7
+SELECT ActualElapsedTime, DivWheelsOffs FROM mytable WHERE DivDistance BETWEEN 328 AND 334 AND DestCityMarketID IN (31641, 31337, 31205, 30107) ORDER BY DivActualElapsedTime LIMIT 8
+SELECT ActualElapsedTime, DivWheelsOffs FROM mytable WHERE OriginCityName < 'Hayden, CO' LIMIT 10
+SELECT ActualElapsedTime, DivWheelsOns FROM mytable WHERE Month BETWEEN 5 AND 6 AND DepartureDelayGroups <= 4 LIMIT 28
+SELECT ActualElapsedTime, FlightDate, ArrDel15 FROM mytable WHERE ArrivalDelayGroups NOT IN (0) OR  REGEXP_LIKE(OriginStateName, 'U.S. Pacific Trust Terr.*tories and Possessions') ORDER BY CancellationCode, CRSArrTime LIMIT 12
+SELECT ActualElapsedTime, Month, DivActualElapsedTime FROM mytable WHERE CarrierDelay IN (80) OR DestStateName <= 'Tennessee' LIMIT 21
+SELECT ActualElapsedTime, NASDelay FROM mytable WHERE Year BETWEEN 2014 AND 2014 AND LateAircraftDelay NOT IN (199, 60, 362) AND Year BETWEEN 2014 AND 2014 ORDER BY CancellationCode, DestAirportID, OriginAirportID LIMIT 1
+SELECT ActualElapsedTime, OriginAirportSeqID, AirTime FROM mytable WHERE Diverted BETWEEN 0 AND 0 OR DivLongestGTimes IN (172.0, 99.0, 154.0, 48.0) LIMIT 16
+SELECT ActualElapsedTime, OriginCityName, ArrivalDelayGroups FROM mytable WHERE TailNum BETWEEN 'N637MQ' AND 'N564AS' ORDER BY DivReachedDest LIMIT 15
+SELECT AirTime FROM mytable ORDER BY ActualElapsedTime, DepDel15 LIMIT 24
+SELECT AirTime FROM mytable WHERE  REGEXP_LIKE(DepTimeBlk, '09.*0-0959') OR DivTotalGTimes BETWEEN 26 AND 71 AND CRSDepTime = 2 ORDER BY Origin, WheelsOn LIMIT 4
+SELECT AirTime FROM mytable WHERE  REGEXP_LIKE(OriginCityName, 'Bemidji, M.*') AND Month BETWEEN 7 AND 10 LIMIT 13
+SELECT AirTime FROM mytable WHERE Diverted <= 0 ORDER BY Origin, DivAirportLandings LIMIT 10
+SELECT AirTime FROM mytable WHERE TaxiIn = 20 AND SecurityDelay <= 14 AND DivAirports IN ('SGF', 'MOB', 'APA', 'BLI') ORDER BY CancellationCode LIMIT 15
+SELECT AirTime, DepTimeBlk, TotalAddGTime FROM mytable WHERE OriginCityName BETWEEN 'Santa Ana, CA' AND 'Klamath Falls, OR' OR TaxiOut <> 21 AND WheelsOn = 1518 ORDER BY Quarter, OriginStateFips LIMIT 8
+SELECT AirTime, DestCityMarketID FROM mytable WHERE DestWac NOT IN (67, 51, 82, 73, 14) ORDER BY SecurityDelay LIMIT 13
+SELECT AirTime, UniqueCarrier, DestStateFips FROM mytable ORDER BY Month LIMIT 11
+SELECT AirlineID FROM mytable WHERE CRSElapsedTime = 152 OR DayOfWeek <> 4 AND  REGEXP_LIKE(UniqueCarrier, '.*L') ORDER BY FirstDepTime, ArrTimeBlk, DepTime LIMIT 3
+SELECT AirlineID FROM mytable WHERE DepTime <> 631 OR DaysSinceEpoch = 16148 OR  REGEXP_LIKE(Origin, 'O.*J') ORDER BY ArrDel15, DivReachedDest, WeatherDelay LIMIT 27
+SELECT AirlineID FROM mytable WHERE NASDelay <> 6 ORDER BY Month, AirTime, DepTimeBlk LIMIT 29
+SELECT AirlineID FROM mytable WHERE Quarter BETWEEN 1 AND 1 AND DestAirportSeqID BETWEEN 1029904 AND 1219702 OR DivTotalGTimes BETWEEN 63 AND 90 LIMIT 24
+SELECT AirlineID, Dest, TaxiOut FROM mytable WHERE SecurityDelay = 5 AND OriginState IN ('KS', 'CT', 'TX') OR DestCityMarketID >= 30285 ORDER BY FirstDepTime LIMIT 0
+SELECT AirlineID, DivLongestGTimes, DepDelayMinutes FROM mytable WHERE DivWheelsOns >= 1816 ORDER BY CancellationCode LIMIT 10
+SELECT AirlineID, OriginStateName FROM mytable ORDER BY Year LIMIT 25
+SELECT AirlineID, WheelsOff FROM mytable WHERE DestState = 'MI' AND FlightNum = 3060 ORDER BY OriginStateName, Distance, DestCityName LIMIT 10
+SELECT ArrDel15 FROM mytable ORDER BY AirTime LIMIT 20
+SELECT ArrDel15 FROM mytable ORDER BY OriginCityName, ArrTime, ArrDelayMinutes LIMIT 18
+SELECT ArrDel15 FROM mytable WHERE DestWac < 66 ORDER BY FirstDepTime, FlightNum, Cancelled LIMIT 19
+SELECT ArrDel15 FROM mytable WHERE OriginStateFips BETWEEN 42 AND 19 OR DivReachedDest < 0 OR WheelsOff BETWEEN 1202 AND 1218 ORDER BY DivDistance LIMIT 29
+SELECT ArrDel15, DestStateName FROM mytable WHERE Month NOT IN (12) LIMIT 23
+SELECT ArrDel15, TaxiOut FROM mytable WHERE DepTime BETWEEN 1657 AND 233 ORDER BY OriginAirportSeqID, DivReachedDest, TailNum LIMIT 0
+SELECT ArrDel15, UniqueCarrier FROM mytable WHERE OriginWac < 14 OR DivReachedDest = 1 AND Dest BETWEEN 'SAV' AND 'GSO' ORDER BY OriginCityMarketID, DayofMonth LIMIT 8
+SELECT ArrDel15, WeatherDelay FROM mytable ORDER BY DepDel15 LIMIT 24
+SELECT ArrDelay FROM mytable ORDER BY ArrDelay LIMIT 15
+SELECT ArrDelay FROM mytable WHERE  REGEXP_LIKE(DestStateName, 'Ind.*ana') ORDER BY ActualElapsedTime, TailNum LIMIT 0
+SELECT ArrDelay FROM mytable WHERE DestState >= 'VI' AND DivLongestGTimes = 66.0 AND Quarter = 1 ORDER BY AirTime, ArrTimeBlk LIMIT 27
+SELECT ArrDelay FROM mytable WHERE OriginState BETWEEN 'NV' AND 'CO' AND ArrTime NOT IN (1304, 1211, 1724) ORDER BY FlightDate, DivActualElapsedTime LIMIT 21
+SELECT ArrDelay, ArrivalDelayGroups, ArrTimeBlk FROM mytable WHERE DestState IN ('AZ', 'NE', 'WY', 'VI') OR DestCityName < 'Laredo, TX' OR DestCityMarketID <> 33795 ORDER BY DestAirportID LIMIT 28
+SELECT ArrDelay, CancellationCode FROM mytable ORDER BY OriginAirportSeqID LIMIT 7
+SELECT ArrDelay, Month, OriginStateName FROM mytable ORDER BY DepartureDelayGroups, SecurityDelay LIMIT 26
+SELECT ArrDelayMinutes, DestWac FROM mytable WHERE DaysSinceEpoch > 16238 OR DistanceGroup BETWEEN 4 AND 3 ORDER BY FlightDate, DistanceGroup, UniqueCarrier LIMIT 21
+SELECT ArrDelayMinutes, WheelsOn FROM mytable WHERE DivAirportLandings NOT IN (2, 0, 9) AND DivWheelsOffs IN (842, 1816, 2152, 1907) AND Dest <> 'PIT' ORDER BY OriginAirportSeqID, DepartureDelayGroups, DestAirportID LIMIT 13
+SELECT ArrTime FROM mytable WHERE ArrDel15 NOT IN (1, -9999) AND UniqueCarrier BETWEEN 'HA' AND 'WN' ORDER BY TotalAddGTime LIMIT 9
+SELECT ArrTime FROM mytable WHERE SecurityDelay BETWEEN 17 AND 17 AND TaxiIn = 116 OR TotalAddGTime BETWEEN 4 AND 80 LIMIT 20
+SELECT ArrTime FROM mytable WHERE WheelsOn NOT IN (1511, 627) ORDER BY OriginAirportSeqID, OriginStateFips, Cancelled LIMIT 12
+SELECT ArrTime FROM mytable WHERE Year IN (2014) OR ArrTime BETWEEN 244 AND 637 AND UniqueCarrier BETWEEN 'VX' AND 'US' ORDER BY Quarter
+SELECT ArrTime, AirTime FROM mytable WHERE DayOfWeek BETWEEN 1 AND 7 AND FirstDepTime IN (1032, 2145, 1940, -9999) LIMIT 23
+SELECT ArrTime, ArrDelayMinutes, DestCityName FROM mytable WHERE TotalAddGTime <= 26 LIMIT 10
+SELECT ArrTime, DestStateName FROM mytable ORDER BY Flights, CRSElapsedTime LIMIT 9
+SELECT ArrTime, DestStateName, DestCityName FROM mytable WHERE LongestAddGTime NOT IN (48) OR DestCityName IN ('Lake Charles, LA', 'College Station/Bryan, TX', 'Sun Valley/Hailey/Ketchum, ID', 'Tucson, AZ') AND NASDelay <> 87 ORDER BY OriginAirportID LIMIT 25
+SELECT ArrTime, DistanceGroup, DivAirportSeqIDs FROM mytable ORDER BY LongestAddGTime, DestState, Cancelled LIMIT 8
+SELECT ArrTime, DivAirportIDs, CancellationCode FROM mytable ORDER BY OriginCityMarketID, ArrDel15 LIMIT 4
+SELECT ArrTime, OriginState, DestStateName FROM mytable WHERE DivActualElapsedTime = 607 OR  REGEXP_LIKE(Origin, '.*GG') ORDER BY DivAirportLandings, OriginCityName, DestState LIMIT 19
+SELECT ArrTimeBlk FROM mytable ORDER BY CRSDepTime, FirstDepTime LIMIT 21
+SELECT ArrTimeBlk FROM mytable ORDER BY CarrierDelay LIMIT 13
+SELECT ArrTimeBlk FROM mytable WHERE SecurityDelay NOT IN (0, 4, 8, 14, -9999) AND DayofMonth < 28 AND TotalAddGTime = 51 ORDER BY DivDistance, CRSDepTime LIMIT 29
+SELECT ArrivalDelayGroups FROM mytable WHERE DepartureDelayGroups BETWEEN 1 AND -1 ORDER BY TotalAddGTime, TailNum, DivArrDelay LIMIT 18
+SELECT COUNT(*) FROM mytable GROUP BY add(DaysSinceEpoch,DaysSinceEpoch,15)
+SELECT COUNT(*) FROM mytable GROUP BY div(DaysSinceEpoch,2)
+SELECT COUNT(*) FROM mytable GROUP BY mult(DaysSinceEpoch,24,3600)
+SELECT COUNT(*) FROM mytable GROUP BY sub(DaysSinceEpoch,25)
+SELECT CRSArrTime FROM mytable ORDER BY OriginAirportSeqID, ArrTime, OriginAirportID LIMIT 15
+SELECT CRSArrTime FROM mytable WHERE CRSDepTime IN (808, 45, 1850, 1809, 2240) LIMIT 22
+SELECT CRSArrTime FROM mytable WHERE Carrier BETWEEN 'OO' AND 'AS' ORDER BY Distance, ArrTimeBlk LIMIT 4
+SELECT CRSArrTime FROM mytable WHERE DayofMonth > 19 AND DestStateName BETWEEN 'Hawaii' AND 'New York' LIMIT 29
+SELECT CRSArrTime FROM mytable WHERE DestStateFips IN (20, 10, 30, 32) LIMIT 12
+SELECT CRSArrTime FROM mytable WHERE NASDelay <= 63 AND AirTime NOT IN (208) OR DivReachedDest NOT IN (1, -9999) ORDER BY TaxiOut LIMIT 22
+SELECT CRSArrTime, AirTime FROM mytable WHERE DivAirports BETWEEN 'TWF' AND 'RFD' OR ArrDelay BETWEEN 363.0 AND 159.0 OR OriginStateName BETWEEN 'Alabama' AND 'Oregon' ORDER BY Year, Month LIMIT 16
+SELECT CRSArrTime, ArrDelay, DestAirportID FROM mytable WHERE WheelsOff <= 142 OR Distance NOT IN (1092) ORDER BY DivAirportLandings, FirstDepTime, ArrTime LIMIT 28
+SELECT CRSArrTime, ArrDelayMinutes, DivAirportSeqIDs FROM mytable WHERE Month IN (1) AND ArrDel15 BETWEEN 0 AND 0 AND DivTailNums BETWEEN 'N636MQ' AND 'N16976' LIMIT 26
+SELECT CRSArrTime, ArrivalDelayGroups FROM mytable WHERE Diverted > 0 ORDER BY DivAirportLandings LIMIT 28
+SELECT CRSArrTime, FlightDate FROM mytable WHERE OriginStateName IN ('Washington') AND OriginAirportID IN (12007, 12888, 12206, 11122, 10693) AND Diverted IN (1, 0) ORDER BY DepDelay, DestAirportSeqID LIMIT 21
+SELECT CRSArrTime, SecurityDelay, ArrTimeBlk FROM mytable WHERE ArrTime IN (2302) AND OriginCityName BETWEEN 'Kona, HI' AND 'New York, NY' ORDER BY FlightNum LIMIT 17
+SELECT CRSArrTime, WheelsOn FROM mytable WHERE DivLongestGTimes BETWEEN 112.0 AND 39.0 LIMIT 8
+SELECT CRSDepTime FROM mytable ORDER BY FlightNum LIMIT 14
+SELECT CRSDepTime FROM mytable WHERE TaxiOut NOT IN (55) OR Distance NOT IN (985) OR OriginCityMarketID >= 31041 ORDER BY DestWac, DestStateName, OriginStateName LIMIT 28
+SELECT CRSDepTime, Carrier, DayofMonth FROM mytable WHERE Distance NOT IN (1679, 1368, 334, 727, 1290) AND DistanceGroup = 5 AND DivWheelsOns >= 2301 ORDER BY Dest LIMIT 18
+SELECT CRSDepTime, DestAirportID FROM mytable WHERE OriginStateFips <= 37 ORDER BY AirTime, DivReachedDest
+SELECT CRSDepTime, DestState, DivAirportSeqIDs FROM mytable WHERE DestStateFips NOT IN (24) AND DepDelayMinutes IN (20.0) ORDER BY FirstDepTime LIMIT 23
+SELECT CRSDepTime, DivAirportLandings FROM mytable ORDER BY OriginWac, AirTime, CRSArrTime LIMIT 9
+SELECT CRSDepTime, DivLongestGTimes FROM mytable ORDER BY OriginWac, DestAirportSeqID LIMIT 1
+SELECT CRSDepTime, DivTotalGTimes, OriginStateName FROM mytable WHERE DepDel15 > 0 AND Year <> 2014 OR DaysSinceEpoch BETWEEN 16082 AND 16086 ORDER BY Cancelled, DestAirportID LIMIT 24
+SELECT CRSDepTime, DivWheelsOffs, Diverted FROM mytable WHERE DepDel15 <= 0 OR OriginCityName BETWEEN 'Scranton/Wilkes-Barre, PA' AND 'Abilene, TX' ORDER BY Month, OriginCityName LIMIT 27
+SELECT CRSDepTime, OriginWac, DestCityName FROM mytable ORDER BY SecurityDelay
+SELECT CRSDepTime, TailNum, OriginAirportID FROM mytable WHERE DepartureDelayGroups NOT IN (12) OR FlightDate > '2014-09-10' ORDER BY DivAirportLandings, CRSElapsedTime, Diverted LIMIT 3
+SELECT CRSDepTime, TaxiIn, ArrTime FROM mytable WHERE DestAirportSeqID = 1379502 ORDER BY CRSArrTime, Carrier LIMIT 13
+SELECT CRSElapsedTime, DestWac FROM mytable WHERE DivLongestGTimes < 189.0 ORDER BY Dest, TotalAddGTime LIMIT 4
+SELECT CRSElapsedTime, OriginAirportID FROM mytable LIMIT 27
+SELECT CRSElapsedTime, OriginAirportID FROM mytable WHERE DepTimeBlk NOT IN ('1800-1859', '1300-1359', '2200-2259') AND DayOfWeek = 7 OR LateAircraftDelay = 78 ORDER BY OriginCityMarketID, LongestAddGTime, DivDistance LIMIT 1
+SELECT CancellationCode FROM mytable LIMIT 29
+SELECT CancellationCode FROM mytable ORDER BY SecurityDelay, AirTime
+SELECT CancellationCode FROM mytable WHERE AirTime > 233 ORDER BY WeatherDelay, DestAirportSeqID, OriginWac LIMIT 8
+SELECT CancellationCode FROM mytable WHERE AirTime NOT IN (204, 96, 277, 252) AND OriginAirportSeqID NOT IN (1148102) ORDER BY DestWac, DestAirportID LIMIT 11
+SELECT CancellationCode FROM mytable WHERE DestCityName NOT IN ('Detroit, MI') ORDER BY FlightNum, WheelsOn, Month LIMIT 17
+SELECT CancellationCode, ArrivalDelayGroups, ArrTimeBlk FROM mytable WHERE CRSDepTime = 1050 OR DepDelayMinutes BETWEEN 207.0 AND 88.0 ORDER BY OriginAirportSeqID, DestAirportID LIMIT 24
+SELECT CancellationCode, DepDelay, WeatherDelay FROM mytable WHERE DivArrDelay > 866 ORDER BY FlightNum LIMIT 17
+SELECT CancellationCode, DestState, CRSElapsedTime FROM mytable ORDER BY CancellationCode LIMIT 22
+SELECT CancellationCode, DivActualElapsedTime FROM mytable ORDER BY OriginStateFips, DestAirportSeqID, AirlineID LIMIT 9
+SELECT CancellationCode, DivTailNums, DestCityMarketID FROM mytable WHERE DivReachedDest BETWEEN 0 AND -9999 OR Cancelled BETWEEN 1 AND 0 ORDER BY Year, OriginState LIMIT 7
+SELECT CancellationCode, Diverted FROM mytable ORDER BY ArrDelayMinutes, TaxiOut, DestAirportID LIMIT 0
+SELECT CancellationCode, OriginAirportSeqID, CRSArrTime FROM mytable WHERE Month BETWEEN 5 AND 1 LIMIT 9
+SELECT CancellationCode, WeatherDelay, Cancelled FROM mytable WHERE OriginWac > 61 OR Distance BETWEEN 636 AND 223 AND DivAirportLandings <> 1 ORDER BY DivReachedDest LIMIT 7
+SELECT Cancelled FROM mytable ORDER BY AirlineID, WheelsOn LIMIT 27
+SELECT Cancelled FROM mytable WHERE CRSElapsedTime BETWEEN 365 AND 160 LIMIT 14
+SELECT Cancelled FROM mytable WHERE CarrierDelay BETWEEN 144 AND 12 OR DestWac NOT IN (2, 93) OR DivDistance <> 89 ORDER BY OriginAirportSeqID, Diverted, DepTime LIMIT 9
+SELECT Cancelled FROM mytable WHERE DestWac <= 14 AND ArrTime IN (2329, 1417) OR DivTotalGTimes = 84 ORDER BY OriginCityMarketID, ActualElapsedTime, Origin LIMIT 21
+SELECT Cancelled FROM mytable WHERE TotalAddGTime IN (42) OR ArrDelayMinutes IN (193.0, 52.0, 382.0, 392.0, 147.0) AND DayOfWeek = 3 ORDER BY FlightNum, ArrivalDelayGroups, DepTime LIMIT 25
+SELECT Cancelled, ArrDel15, CRSElapsedTime FROM mytable WHERE DivWheelsOffs >= 851 AND Month BETWEEN 1 AND 1 ORDER BY WheelsOff, ArrivalDelayGroups LIMIT 6
+SELECT Cancelled, CancellationCode FROM mytable WHERE DestStateFips BETWEEN 24 AND 34 AND AirTime IN (202, 357, 172, 192) AND DestCityMarketID <> 31308 ORDER BY DepDelay, Carrier LIMIT 23
+SELECT Cancelled, DestAirportID FROM mytable WHERE DivAirports BETWEEN 'DRO' AND 'CDC' AND DestState NOT IN ('CO', 'NY') ORDER BY Distance
+SELECT Cancelled, DivAirportLandings FROM mytable WHERE Origin NOT IN ('OGG', 'EVV', 'SAT') AND DepartureDelayGroups IN (2) AND Origin NOT IN ('IMT', 'MGM', 'ALB', 'ROW') LIMIT 7
+SELECT Carrier FROM mytable ORDER BY DivArrDelay LIMIT 28
+SELECT Carrier FROM mytable ORDER BY DivArrDelay, Dest, OriginAirportSeqID LIMIT 2
+SELECT Carrier FROM mytable WHERE OriginStateName < 'Mississippi' AND CancellationCode BETWEEN 'A' AND 'noodles' OR SecurityDelay BETWEEN 16 AND 17 ORDER BY CancellationCode, Year, WeatherDelay LIMIT 5
+SELECT Carrier, AirlineID FROM mytable WHERE DayOfWeek BETWEEN 4 AND 6 AND ArrDelayMinutes NOT IN (143.0) OR FlightDate BETWEEN '2014-01-11' AND '2014-01-18' LIMIT 21
+SELECT Carrier, ArrDel15, DayOfWeek FROM mytable WHERE ArrDelayMinutes >= 116.0 AND DivTailNums IN ('N3HHAA') OR ArrivalDelayGroups BETWEEN 1 AND -1 LIMIT 3
+SELECT Carrier, ArrTime, DestCityMarketID FROM mytable WHERE TailNum NOT IN ('N5ELAA', 'N788AS', 'N558AA') OR CRSArrTime NOT IN (1232, 1924) AND DestStateName NOT IN ('Alaska', 'Rhode Island') LIMIT 23
+SELECT Carrier, CRSArrTime, UniqueCarrier FROM mytable WHERE DestStateName BETWEEN 'Nebraska' AND 'Illinois' OR DayOfWeek > 3 ORDER BY DivArrDelay LIMIT 20
+SELECT Carrier, CRSElapsedTime, DayOfWeek FROM mytable WHERE Diverted BETWEEN 0 AND 1 OR Month <> 1 AND DivActualElapsedTime <> 469 ORDER BY AirTime LIMIT 25
+SELECT Carrier, Cancelled FROM mytable WHERE DivTailNums <= 'N486WN' ORDER BY TaxiOut LIMIT 19
+SELECT Carrier, DestAirportSeqID FROM mytable ORDER BY FlightDate LIMIT 14
+SELECT Carrier, Distance, DaysSinceEpoch FROM mytable WHERE CancellationCode BETWEEN 'A' AND 'C' OR FirstDepTime BETWEEN 1738 AND 2104 ORDER BY OriginCityMarketID, DivActualElapsedTime LIMIT 2
+SELECT Carrier, OriginAirportID FROM mytable WHERE DivAirportSeqIDs IN (1385103, 1302402) ORDER BY OriginState LIMIT 25
+SELECT Carrier, OriginWac FROM mytable WHERE ActualElapsedTime BETWEEN 396 AND 86 AND FirstDepTime = 857 ORDER BY AirlineID, DivArrDelay LIMIT 24
+SELECT Carrier, WheelsOn FROM mytable ORDER BY TaxiIn, DestCityName, CRSDepTime LIMIT 23
+SELECT CarrierDelay FROM mytable LIMIT 22
+SELECT CarrierDelay FROM mytable ORDER BY CarrierDelay LIMIT 17
+SELECT CarrierDelay, ArrDelayMinutes, TotalAddGTime FROM mytable WHERE AirTime = 404 OR CancellationCode > 'B' OR DestState >= 'AZ' ORDER BY DivDistance, DepDelayMinutes LIMIT 12
+SELECT CarrierDelay, ArrivalDelayGroups FROM mytable WHERE Dest <> 'CVG' AND OriginCityMarketID IN (33344, 34945, 34992) LIMIT 14
+SELECT CarrierDelay, DepTimeBlk, TailNum FROM mytable WHERE CarrierDelay = 163 ORDER BY Month, OriginCityName, NASDelay LIMIT 8
+SELECT CarrierDelay, DestAirportID FROM mytable WHERE DepTime IN (253, 1831, 1154, 309) AND Origin > 'ISN' LIMIT 3
+SELECT CarrierDelay, DestCityMarketID, DestCityName FROM mytable WHERE DayofMonth BETWEEN 27 AND 19 OR  REGEXP_LIKE(Origin, '.*WM') OR DestAirportSeqID = 1201602 LIMIT 19
+SELECT CarrierDelay, DestStateFips, ActualElapsedTime FROM mytable WHERE Year NOT IN (2014) OR OriginAirportSeqID IN (1541202) OR DestWac NOT IN (51) ORDER BY TaxiIn, DaysSinceEpoch LIMIT 6
+SELECT CarrierDelay, DistanceGroup, ArrivalDelayGroups FROM mytable WHERE DepDelayMinutes <> 98.0 AND DivAirportLandings BETWEEN 2 AND 0 ORDER BY OriginStateFips, ArrDel15 LIMIT 16
+SELECT CarrierDelay, DistanceGroup, DaysSinceEpoch FROM mytable WHERE CRSArrTime > 1232 OR NASDelay = 146 OR DivWheelsOffs <= 1413 ORDER BY DivDistance, DestStateName LIMIT 12
+SELECT CarrierDelay, DivTotalGTimes FROM mytable WHERE Year BETWEEN 2014 AND 2014 AND Cancelled >= 1 ORDER BY ActualElapsedTime, DepTime LIMIT 21
+SELECT CarrierDelay, DivWheelsOffs FROM mytable WHERE ArrDel15 BETWEEN -9999 AND 1 AND DestAirportSeqID = 1251902 ORDER BY DepartureDelayGroups, TailNum LIMIT 19
+SELECT CarrierDelay, DivWheelsOffs FROM mytable WHERE DayOfWeek BETWEEN 5 AND 2 AND DepDelayMinutes NOT IN (114.0, 89.0, 91.0, 75.0) LIMIT 4
+SELECT CarrierDelay, FirstDepTime FROM mytable LIMIT 25
+SELECT CarrierDelay, Origin, DayOfWeek FROM mytable WHERE ActualElapsedTime BETWEEN 163 AND 322 OR CarrierDelay IN (17, 266) OR AirlineID IN (19690, 20366) ORDER BY TaxiIn, TailNum LIMIT 1
+SELECT CarrierDelay, OriginStateFips FROM mytable WHERE  REGEXP_LIKE(OriginCityName, 'Aberdeen,.*SD') AND CRSArrTime >= 1733 ORDER BY WeatherDelay LIMIT 9
+SELECT DayOfWeek FROM mytable WHERE DepDelayMinutes IN (227.0, 332.0, 174.0, 38.0) AND CRSDepTime BETWEEN 726 AND 1806 ORDER BY DepartureDelayGroups, TailNum, DestCityName LIMIT 29
+SELECT DayOfWeek FROM mytable WHERE FirstDepTime >= 1940 ORDER BY OriginCityMarketID, DaysSinceEpoch LIMIT 12
+SELECT DayOfWeek FROM mytable WHERE WheelsOn < 314 LIMIT 8
+SELECT DayOfWeek, Carrier, TailNum FROM mytable ORDER BY DivActualElapsedTime, WeatherDelay LIMIT 23
+SELECT DayOfWeek, DepDel15, DivTotalGTimes FROM mytable WHERE  REGEXP_LIKE(DestState, '.*D') ORDER BY AirlineID, LongestAddGTime LIMIT 18
+SELECT DayOfWeek, DestStateFips, WheelsOn FROM mytable WHERE FlightDate BETWEEN '2014-01-02' AND '2014-12-22' OR Month NOT IN (12, 1, 3, 5, 10) OR CRSArrTime NOT IN (448, 1150) LIMIT 20
+SELECT DayOfWeek, DivActualElapsedTime FROM mytable ORDER BY Distance LIMIT 0
+SELECT DayOfWeek, DivAirports FROM mytable ORDER BY DivArrDelay, WeatherDelay LIMIT 28
+SELECT DayOfWeek, DivTailNums, Distance FROM mytable WHERE OriginAirportID NOT IN (13891, 14842) AND DivWheelsOffs >= 327 OR OriginStateFips = 35 LIMIT 13
+SELECT DayOfWeek, FlightDate, OriginStateFips FROM mytable WHERE DestAirportID BETWEEN 14524 AND 11413 OR LongestAddGTime = 83 AND OriginWac = 83 ORDER BY ActualElapsedTime, CRSDepTime, ArrDelay LIMIT 15
+SELECT DayOfWeek, LongestAddGTime, TaxiOut FROM mytable WHERE DepTime = 710 AND CarrierDelay >= 197 AND DepDelayMinutes NOT IN (294.0, 916.0, 242.0, 38.0) ORDER BY DivActualElapsedTime, DepDelayMinutes, ArrDelay LIMIT 25
+SELECT DayOfWeek, OriginWac, OriginStateFips FROM mytable WHERE FirstDepTime >= 1252 AND FlightDate IN ('2014-02-14', '2014-03-25') OR TotalAddGTime IN (157, 169, 105, 41) ORDER BY WheelsOn LIMIT 8
+SELECT DayOfWeek, TailNum FROM mytable ORDER BY DepDel15, WheelsOn LIMIT 18
+SELECT DayOfWeek, TaxiIn FROM mytable LIMIT 14
+SELECT DayofMonth, OriginWac, DivArrDelay FROM mytable WHERE CRSArrTime BETWEEN 1743 AND 2103 ORDER BY Year, Quarter, ArrivalDelayGroups LIMIT 17
+SELECT DaysSinceEpoch FROM mytable WHERE DistanceGroup <= 2 AND OriginState IN ('VA', 'ME', 'MN', 'VI') AND AirlineID <> 19690 ORDER BY DestState, DestStateFips LIMIT 13
+SELECT DaysSinceEpoch FROM mytable WHERE DivWheelsOns >= 623 ORDER BY DestAirportSeqID, ArrTimeBlk LIMIT 22
+SELECT DepDel15 FROM mytable WHERE DepDelayMinutes = 205.0 LIMIT 11
+SELECT DepDel15 FROM mytable WHERE Flights IN (1) OR Carrier > 'UA' ORDER BY DestState LIMIT 3
+SELECT DepDel15, DestCityName, UniqueCarrier FROM mytable WHERE ArrDel15 BETWEEN 1 AND -9999 ORDER BY DistanceGroup, AirTime LIMIT 14
+SELECT DepDel15, DivAirportIDs FROM mytable WHERE OriginCityMarketID > 32012 AND ArrDelayMinutes BETWEEN 161.0 AND 205.0 AND FlightDate = '2014-04-05' ORDER BY ActualElapsedTime, DestState, CRSArrTime LIMIT 4
+SELECT DepDel15, DivAirportLandings FROM mytable WHERE ActualElapsedTime BETWEEN 54 AND 263 AND DivAirportIDs = 11278 ORDER BY TotalAddGTime LIMIT 19
+SELECT DepDel15, OriginStateFips, Distance FROM mytable WHERE  REGEXP_LIKE(DestState, 'D.*') OR DivTailNums BETWEEN 'N585AA' AND 'N905MQ' ORDER BY Dest, DestStateFips, DestAirportID LIMIT 25
+SELECT DepDel15, OriginWac, DivReachedDest FROM mytable LIMIT 2
+SELECT DepDelay FROM mytable WHERE  REGEXP_LIKE(Origin, '.*AE') OR TaxiOut = 147 AND TotalAddGTime BETWEEN 84 AND 63 ORDER BY TailNum, DestCityName LIMIT 16
+SELECT DepDelay FROM mytable WHERE DayofMonth NOT IN (14) ORDER BY Dest LIMIT 0
+SELECT DepDelay FROM mytable WHERE TaxiIn = 48 OR DivAirports BETWEEN 'PPG' AND 'MOB' LIMIT 19
+SELECT DepDelay, CRSArrTime FROM mytable WHERE DepTime > 2212 ORDER BY TaxiOut, LateAircraftDelay, CRSArrTime LIMIT 19
+SELECT DepDelay, Cancelled, DayofMonth FROM mytable ORDER BY TotalAddGTime LIMIT 17
+SELECT DepDelay, Cancelled, DivWheelsOffs FROM mytable WHERE DivLongestGTimes BETWEEN 43.0 AND 56.0 ORDER BY DistanceGroup, WeatherDelay LIMIT 26
+SELECT DepDelay, DayofMonth FROM mytable WHERE UniqueCarrier = 'FL' OR Year BETWEEN 2014 AND 2014 OR DestState BETWEEN 'GA' AND 'IA' ORDER BY DayOfWeek LIMIT 2
+SELECT DepDelay, DivReachedDest FROM mytable WHERE DivReachedDest BETWEEN 1 AND 1 ORDER BY OriginState LIMIT 9
+SELECT DepDelay, DivTotalGTimes FROM mytable WHERE DivTotalGTimes IN (52) OR DepTime NOT IN (2220, 2344, 1407, 55, 625) LIMIT 9
+SELECT DepDelay, OriginCityName, ArrTimeBlk FROM mytable WHERE DivWheelsOns BETWEEN 1145 AND 915 LIMIT 12
+SELECT DepDelay, Quarter, SecurityDelay FROM mytable WHERE DivTailNums < 'N793SA' OR Carrier IN ('EV', 'WN', 'B6', 'VX') ORDER BY Distance, DepTime, OriginWac LIMIT 24
+SELECT DepDelayMinutes FROM mytable ORDER BY DestStateName, OriginWac, DestCityMarketID LIMIT 17
+SELECT DepDelayMinutes FROM mytable WHERE ArrTime = 1703 ORDER BY DestAirportID LIMIT 0
+SELECT DepDelayMinutes FROM mytable WHERE DivAirportIDs <= 14771 LIMIT 4
+SELECT DepDelayMinutes FROM mytable WHERE TailNum < 'N36272' AND TotalAddGTime NOT IN (42) LIMIT 5
+SELECT DepDelayMinutes, ArrDel15 FROM mytable WHERE DepartureDelayGroups NOT IN (4) AND WheelsOn = 2215 AND OriginState BETWEEN 'IN' AND 'NM' ORDER BY DepDelay, Diverted, DestCityName LIMIT 29
+SELECT DepDelayMinutes, Cancelled, DestStateName FROM mytable WHERE DivTailNums BETWEEN 'N688MQ' AND 'N554JB' AND LateAircraftDelay <= 71 AND ArrDelayMinutes BETWEEN 246.0 AND 171.0 LIMIT 21
+SELECT DepDelayMinutes, DayofMonth, TotalAddGTime FROM mytable WHERE  REGEXP_LIKE(OriginState, '.*A') AND Distance <= 262 AND DivWheelsOffs <= 1918 ORDER BY AirlineID, DepDelayMinutes, TaxiIn LIMIT 17
+SELECT DepDelayMinutes, DepDel15, OriginAirportID FROM mytable ORDER BY DepTime, DivAirportLandings LIMIT 18
+SELECT DepDelayMinutes, DepTime, DayOfWeek FROM mytable WHERE CancellationCode IN ('B') AND Distance NOT IN (842) AND ArrTime BETWEEN 1445 AND 858 ORDER BY DepDelayMinutes, DestCityName, Dest LIMIT 23
+SELECT DepDelayMinutes, Month FROM mytable WHERE DepDel15 IN (-9999) AND TaxiIn < 21 ORDER BY DepDelay, ArrTime LIMIT 16
+SELECT DepDelayMinutes, Origin, CRSDepTime FROM mytable ORDER BY DestState, Origin, WheelsOn LIMIT 28
+SELECT DepDelayMinutes, TaxiIn, OriginAirportSeqID FROM mytable WHERE Distance = 1978 OR DivReachedDest > 0 AND OriginStateFips BETWEEN 49 AND 72 ORDER BY Origin, ArrTime LIMIT 4
+SELECT DepTime FROM mytable WHERE DepTime NOT IN (752, 1559) OR SecurityDelay <> 18 ORDER BY OriginCityMarketID LIMIT 9
+SELECT DepTime FROM mytable WHERE FlightNum = 1896 ORDER BY ArrTime LIMIT 18
+SELECT DepTime FROM mytable WHERE OriginCityMarketID NOT IN (33570) LIMIT 9
+SELECT DepTime FROM mytable WHERE TaxiIn BETWEEN 14 AND 162 ORDER BY DivReachedDest, DestStateFips LIMIT 16
+SELECT DepTime, AirlineID FROM mytable WHERE CRSElapsedTime BETWEEN 390 AND 314 AND UniqueCarrier > 'HA' AND DivTailNums IN ('N378SW', 'N957DN', 'N274WN', 'N728SW', 'N16999') ORDER BY DepDel15, AirlineID, DayOfWeek LIMIT 8
+SELECT DepTime, Cancelled FROM mytable LIMIT 19
+SELECT DepTime, DestAirportSeqID, DestAirportID FROM mytable WHERE Diverted IN (1, 0) AND DivAirportIDs IN (12892, 11259, 12478) AND ArrivalDelayGroups > 9 LIMIT 7
+SELECT DepTime, DivAirportSeqIDs FROM mytable WHERE DivAirportSeqIDs <= 1482802 OR DivDistance <> 234 OR SecurityDelay BETWEEN 14 AND 27 ORDER BY OriginCityName, DestAirportSeqID LIMIT 10
+SELECT DepTimeBlk, ArrDelay, DayofMonth FROM mytable WHERE FlightNum <> 4360 LIMIT 23
+SELECT DepTimeBlk, Cancelled FROM mytable WHERE  REGEXP_LIKE(UniqueCarrier, 'U.*') AND DivAirportIDs IN (14771, 11252, 11731) LIMIT 27
+SELECT DepTimeBlk, Cancelled FROM mytable WHERE DaysSinceEpoch BETWEEN 16181 AND 16353 LIMIT 23
+SELECT DepTimeBlk, WeatherDelay FROM mytable WHERE ArrTimeBlk > '1600-1659' OR FirstDepTime > 622 ORDER BY FlightNum, OriginStateFips LIMIT 0
+SELECT DepartureDelayGroups FROM mytable ORDER BY DivArrDelay, ArrDelayMinutes, ArrivalDelayGroups LIMIT 9
+SELECT DepartureDelayGroups FROM mytable WHERE DayofMonth = 5 OR DestWac <= 35 ORDER BY DepTime LIMIT 18
+SELECT DepartureDelayGroups FROM mytable WHERE DivWheelsOns IN (1514, 1347, 2005, 1440) OR ArrDelayMinutes BETWEEN 316.0 AND 69.0 OR Quarter BETWEEN 2 AND 1 ORDER BY Diverted LIMIT 6
+SELECT DepartureDelayGroups FROM mytable WHERE FirstDepTime < 908 OR DestAirportSeqID IN (1059904) AND FlightDate BETWEEN '2014-01-13' AND '2014-01-13' ORDER BY WheelsOff LIMIT 11
+SELECT DepartureDelayGroups FROM mytable WHERE Origin = 'RDD' OR Distance BETWEEN 406 AND 711 ORDER BY DepDelay, ArrDelayMinutes, DayofMonth LIMIT 8
+SELECT DepartureDelayGroups FROM mytable WHERE OriginAirportSeqID < 1302402 AND OriginAirportSeqID IN (1302402, 1419304, 1489302) OR DestAirportID = 14730 LIMIT 7
+SELECT DepartureDelayGroups, ArrDel15 FROM mytable WHERE DestCityName BETWEEN 'Key West, FL' AND 'Twin Falls, ID' ORDER BY OriginStateFips, Distance, CRSElapsedTime LIMIT 4
+SELECT DepartureDelayGroups, Cancelled FROM mytable WHERE DayofMonth <= 29 OR TotalAddGTime NOT IN (78, 42, 4, 55, 34) OR Diverted NOT IN (1, 0) ORDER BY Flights, DestAirportID LIMIT 13
+SELECT DepartureDelayGroups, Carrier FROM mytable WHERE LongestAddGTime BETWEEN 146 AND 46 OR OriginAirportID < 11252 LIMIT 10
+SELECT DepartureDelayGroups, DaysSinceEpoch FROM mytable ORDER BY LongestAddGTime LIMIT 10
+SELECT DepartureDelayGroups, DestState, DepTimeBlk FROM mytable WHERE ArrTimeBlk BETWEEN '1400-1459' AND '0700-0759' AND Month IN (11, 12) LIMIT 22
+SELECT DepartureDelayGroups, Flights, UniqueCarrier FROM mytable ORDER BY AirTime, DaysSinceEpoch LIMIT 3
+SELECT DepartureDelayGroups, NASDelay FROM mytable WHERE DivReachedDest <> 0 OR DivAirportLandings IN (1, 0, 9) ORDER BY LateAircraftDelay, WeatherDelay LIMIT 9
+SELECT DepartureDelayGroups, TaxiIn FROM mytable WHERE TotalAddGTime = 55 ORDER BY DestAirportSeqID LIMIT 7
+SELECT DepartureDelayGroups, WheelsOn FROM mytable WHERE TailNum BETWEEN 'N243WN' AND 'N323NB' AND DivActualElapsedTime NOT IN (291) AND ArrDelayMinutes = 278.0 ORDER BY ArrDelayMinutes, Distance LIMIT 14
+SELECT Dest FROM mytable ORDER BY NASDelay, WeatherDelay, ArrDelayMinutes LIMIT 26
+SELECT Dest FROM mytable WHERE DivAirportSeqIDs IN (1091802, 1226603, 1247802) AND Diverted BETWEEN 0 AND 0 OR FlightDate NOT IN ('2014-05-03', '2014-09-22', '2014-07-30', '2014-08-08', '2014-02-20') ORDER BY DivArrDelay, ActualElapsedTime, OriginAirportID LIMIT 2
+SELECT Dest FROM mytable WHERE Year BETWEEN 2014 AND 2014 AND DestStateName < 'Missouri' ORDER BY DestCityName, NASDelay LIMIT 25
+SELECT Dest, AirTime FROM mytable WHERE ArrDelayMinutes BETWEEN 420.0 AND 351.0 OR DivDistance IN (24) OR OriginAirportID IN (10279, 11433) ORDER BY DepartureDelayGroups LIMIT 16
+SELECT Dest, ArrDel15 FROM mytable WHERE Cancelled <= 0 AND WeatherDelay >= 166 ORDER BY ArrTime
+SELECT Dest, Carrier FROM mytable WHERE DivReachedDest BETWEEN -9999 AND 1 ORDER BY DivArrDelay, CancellationCode, OriginAirportID LIMIT 29
+SELECT Dest, DayofMonth, ArrTimeBlk FROM mytable WHERE CRSDepTime <= 1607 AND WeatherDelay BETWEEN 33 AND 107 ORDER BY TaxiIn LIMIT 7
+SELECT Dest, DepDelayMinutes FROM mytable WHERE CRSElapsedTime BETWEEN 69 AND 96 OR DestAirportID BETWEEN 11003 AND 13933 OR DivWheelsOffs IN (1854) LIMIT 26
+SELECT Dest, DepDelayMinutes FROM mytable WHERE Quarter NOT IN (1, 2, 3, 4) OR DivTailNums IN ('N3FSAA', 'N796SK', 'N013AA', 'N938AT') AND DayOfWeek = 7 LIMIT 17
+SELECT Dest, DivWheelsOffs, TaxiIn FROM mytable WHERE DivAirportLandings NOT IN (0, 2) ORDER BY Year, WheelsOff, ArrDelayMinutes LIMIT 22
+SELECT Dest, Year, OriginAirportSeqID FROM mytable WHERE TaxiOut = 128 AND DivTailNums BETWEEN 'N492AA' AND 'N795AS' LIMIT 19
+SELECT DestAirportID FROM mytable ORDER BY WheelsOff, ArrDelayMinutes, DepTimeBlk LIMIT 8
+SELECT DestAirportID FROM mytable WHERE DepTime BETWEEN 1043 AND 1250 ORDER BY DivReachedDest, OriginState, OriginStateName LIMIT 17
+SELECT DestAirportID, WheelsOn FROM mytable WHERE DivAirportIDs IN (14113, 14794, 14679, 13230) AND ArrTimeBlk IN ('2000-2059', '1700-1759', '1100-1159') OR ArrTimeBlk BETWEEN '1900-1959' AND '1100-1159' ORDER BY DistanceGroup, Diverted LIMIT 22
+SELECT DestAirportSeqID FROM mytable WHERE DivReachedDest BETWEEN 1 AND -9999 OR AirTime IN (132, 259) AND Dest > 'ALB' ORDER BY DivArrDelay, DivActualElapsedTime, DepDelay LIMIT 8
+SELECT DestAirportSeqID FROM mytable WHERE Origin BETWEEN 'LBB' AND 'SGU' AND  REGEXP_LIKE(OriginState, '.*T') AND Quarter = 3 ORDER BY FlightNum, OriginStateName LIMIT 24
+SELECT DestAirportSeqID FROM mytable WHERE OriginStateFips >= 2 ORDER BY ArrTimeBlk, DepTimeBlk, UniqueCarrier LIMIT 23
+SELECT DestAirportSeqID, ArrivalDelayGroups FROM mytable WHERE TotalAddGTime IN (47, 31, 28) ORDER BY DepDel15
+SELECT DestAirportSeqID, DestAirportID FROM mytable ORDER BY OriginStateName, DepDelay LIMIT 25
+SELECT DestAirportSeqID, Distance, DivAirportSeqIDs FROM mytable WHERE Origin BETWEEN 'RST' AND 'RDM' OR Quarter = 1 ORDER BY TaxiIn, Diverted LIMIT 26
+SELECT DestAirportSeqID, DivAirportIDs, UniqueCarrier FROM mytable WHERE DestCityName = 'Albany, GA' AND DepDel15 = 0 OR DivAirportSeqIDs <= 1112202 LIMIT 9
+SELECT DestAirportSeqID, UniqueCarrier, DestCityMarketID FROM mytable WHERE OriginAirportSeqID = 1422204 AND DistanceGroup NOT IN (11, 2, 7) AND OriginCityName IN ('Kalamazoo, MI', 'Oklahoma City, OK', 'San Diego, CA', 'Grand Island, NE') ORDER BY AirlineID LIMIT 26
+SELECT DestCityMarketID FROM mytable ORDER BY DivReachedDest, OriginCityName LIMIT 29
+SELECT DestCityMarketID FROM mytable WHERE DivLongestGTimes BETWEEN 39.0 AND 156.0 ORDER BY DayofMonth LIMIT 27
+SELECT DestCityMarketID FROM mytable WHERE Year = 2014 OR  REGEXP_LIKE(OriginCityName, 'Clev.*land, OH') AND Origin = 'LFT' ORDER BY LateAircraftDelay LIMIT 12
+SELECT DestCityMarketID, OriginAirportID FROM mytable WHERE FirstDepTime <= 1119 OR OriginAirportSeqID = 1091802 OR DivAirportLandings = 9 ORDER BY ArrDel15, DestAirportSeqID, DestStateFips LIMIT 22
+SELECT DestCityMarketID, WheelsOn, Distance FROM mytable WHERE WheelsOn BETWEEN 205 AND 1422 OR WheelsOn BETWEEN 1933 AND 1456 LIMIT 8
+SELECT DestCityMarketID, WheelsOn, OriginAirportID FROM mytable WHERE ArrDelay IN (97.0) OR FlightNum > 3329 AND OriginAirportSeqID NOT IN (1087402) ORDER BY SecurityDelay, OriginState LIMIT 7
+SELECT DestCityName FROM mytable LIMIT 7
+SELECT DestCityName FROM mytable ORDER BY CRSArrTime, WheelsOn LIMIT 12
+SELECT DestCityName FROM mytable ORDER BY Dest LIMIT 14
+SELECT DestCityName FROM mytable WHERE DepartureDelayGroups BETWEEN 5 AND 6 OR DivTailNums BETWEEN 'N4WJAA' AND 'N8314L' ORDER BY Dest, DestCityMarketID LIMIT 21
+SELECT DestCityName FROM mytable WHERE DivTailNums IN ('N636JB', 'N1EAMQ', 'N219AG', 'N223AG') OR DestState BETWEEN 'ME' AND 'SC' ORDER BY TaxiOut, CRSArrTime, DestStateName LIMIT 26
+SELECT DestCityName FROM mytable WHERE NASDelay BETWEEN 80 AND 36 AND DistanceGroup = 10 ORDER BY Distance, TailNum, Origin LIMIT 5
+SELECT DestCityName, ArrDel15, DivArrDelay FROM mytable WHERE AirlineID NOT IN (20304, 19790, 19805) AND FlightDate = '2014-01-09' ORDER BY ArrTime, NASDelay, AirlineID LIMIT 0
+SELECT DestCityName, DayOfWeek FROM mytable WHERE OriginAirportID BETWEEN 14696 AND 14633 AND UniqueCarrier = 'VX' ORDER BY DepTime, OriginAirportID LIMIT 6
+SELECT DestCityName, Dest FROM mytable WHERE FlightDate <= '2014-01-10' OR DivTailNums IN ('N630JB', 'N130DL', 'N371SW') AND DivWheelsOffs IN (1715) ORDER BY DestStateFips, ArrDelayMinutes LIMIT 29
+SELECT DestCityName, DivTotalGTimes FROM mytable WHERE Origin = 'EUG' AND UniqueCarrier NOT IN ('HA', 'AS', 'AA') OR DestWac NOT IN (51, 54, 37) ORDER BY FlightNum, DestCityName, DestAirportID LIMIT 24
+SELECT DestCityName, NASDelay FROM mytable LIMIT 12
+SELECT DestCityName, OriginAirportID FROM mytable WHERE WheelsOff = 1619 OR LongestAddGTime BETWEEN -9999 AND 86 ORDER BY FirstDepTime LIMIT 8
+SELECT DestCityName, WheelsOn FROM mytable WHERE SecurityDelay >= 1 OR DepDel15 BETWEEN -9999 AND -9999 ORDER BY CarrierDelay, ArrDel15, DestStateName LIMIT 22
+SELECT DestState FROM mytable LIMIT 23
+SELECT DestState FROM mytable ORDER BY ArrTime LIMIT 17
+SELECT DestState FROM mytable ORDER BY DestAirportSeqID LIMIT 17
+SELECT DestState FROM mytable WHERE DestWac >= 22 OR NASDelay NOT IN (1, 19) ORDER BY DepDelay, DivAirportLandings, OriginStateName LIMIT 10
+SELECT DestState FROM mytable WHERE DivLongestGTimes > 145.0 ORDER BY DepDelay, WeatherDelay LIMIT 6
+SELECT DestState, ArrDel15 FROM mytable WHERE DivDistance BETWEEN 251 AND 0 OR DepTime > 1157 ORDER BY FlightNum, TaxiIn LIMIT 15
+SELECT DestState, ArrDelay, DaysSinceEpoch FROM mytable WHERE OriginState BETWEEN 'NE' AND 'NY' OR ArrDel15 BETWEEN -9999 AND 1 LIMIT 29
+SELECT DestState, ArrTimeBlk FROM mytable WHERE Distance <= 1162 OR DepDelay NOT IN (52.0, 88.0, 77.0, 66.0, -11.0) AND Dest >= 'MCI' ORDER BY DepDelay, OriginState LIMIT 9
+SELECT DestState, CRSArrTime FROM mytable WHERE OriginStateName > 'U.S. Virgin Islands' AND OriginCityMarketID = 30198 OR Distance BETWEEN 840 AND 1609 ORDER BY DivActualElapsedTime, OriginStateFips LIMIT 25
+SELECT DestState, CRSDepTime, DivActualElapsedTime FROM mytable ORDER BY DepDelayMinutes, AirTime LIMIT 26
+SELECT DestState, Cancelled, TailNum FROM mytable WHERE ArrTimeBlk IN ('1000-1059', '2100-2159', '0600-0659', '1200-1259', '1800-1859') OR OriginAirportSeqID BETWEEN 1186502 AND 1131502 ORDER BY ArrTime LIMIT 10
+SELECT DestState, Distance, OriginCityName FROM mytable WHERE Month <= 1 ORDER BY DepTime, DestStateName LIMIT 22
+SELECT DestState, OriginAirportID FROM mytable WHERE OriginAirportID NOT IN (15356, 10136) LIMIT 2
+SELECT DestState, OriginAirportSeqID, DaysSinceEpoch FROM mytable ORDER BY LongestAddGTime LIMIT 5
+SELECT DestState, WeatherDelay FROM mytable WHERE Flights BETWEEN 1 AND 1 AND DayOfWeek >= 4 OR Carrier BETWEEN 'F9' AND 'WN' ORDER BY FlightNum, OriginCityName, ArrTime LIMIT 28
+SELECT DestState, WheelsOn FROM mytable WHERE TaxiIn = 69 AND FlightNum BETWEEN 7392 AND 2938 ORDER BY DestCityMarketID LIMIT 28
+SELECT DestStateFips FROM mytable WHERE ArrivalDelayGroups = -2 ORDER BY ArrDel15 LIMIT 18
+SELECT DestStateFips FROM mytable WHERE DepTime BETWEEN 1321 AND 1115 AND OriginStateFips BETWEEN 13 AND 44 OR FlightDate >= '2014-01-06' ORDER BY DistanceGroup LIMIT 5
+SELECT DestStateFips, AirlineID FROM mytable WHERE DivWheelsOffs IN (5, 1403) ORDER BY Month LIMIT 9
+SELECT DestStateFips, ArrDel15 FROM mytable ORDER BY DepDelay, TotalAddGTime, DestStateName LIMIT 5
+SELECT DestStateFips, ArrDelayMinutes FROM mytable WHERE AirTime BETWEEN 394 AND 367 AND Quarter BETWEEN 4 AND 1 ORDER BY OriginStateName, CancellationCode, OriginCityName LIMIT 4
+SELECT DestStateFips, ArrTimeBlk, UniqueCarrier FROM mytable ORDER BY OriginCityMarketID, ActualElapsedTime, Month LIMIT 3
+SELECT DestStateFips, ArrivalDelayGroups FROM mytable ORDER BY DayOfWeek, DivActualElapsedTime, OriginAirportID LIMIT 21
+SELECT DestStateFips, ArrivalDelayGroups FROM mytable WHERE OriginAirportSeqID BETWEEN 1357702 AND 1153703 ORDER BY Month LIMIT 5
+SELECT DestStateFips, DaysSinceEpoch FROM mytable WHERE FirstDepTime = 1902 ORDER BY WheelsOff, DestCityName LIMIT 9
+SELECT DestStateFips, DivTailNums, DayofMonth FROM mytable WHERE CRSArrTime BETWEEN 809 AND 1655 AND LateAircraftDelay <= 154 ORDER BY DestAirportID, DestCityMarketID LIMIT 12
+SELECT DestStateName FROM mytable LIMIT 8
+SELECT DestStateName FROM mytable ORDER BY DepDelayMinutes LIMIT 27
+SELECT DestStateName FROM mytable WHERE  REGEXP_LIKE(OriginState, '.*C') AND DepartureDelayGroups > 1 ORDER BY Dest, TaxiOut LIMIT 16
+SELECT DestStateName FROM mytable WHERE ActualElapsedTime > 163 AND DivAirportLandings <> 2 ORDER BY ArrDelay, DayofMonth, OriginAirportID LIMIT 1
+SELECT DestStateName FROM mytable WHERE DayOfWeek >= 1 LIMIT 15
+SELECT DestStateName FROM mytable WHERE DestCityMarketID > 33195 AND ArrDel15 <> 1 LIMIT 11
+SELECT DestStateName FROM mytable WHERE OriginAirportSeqID BETWEEN 1275803 AND 1129803 OR ArrDel15 BETWEEN -9999 AND 0 OR ArrDel15 >= -9999 ORDER BY Quarter, FlightNum, DestAirportSeqID LIMIT 23
+SELECT DestStateName, AirlineID, DivActualElapsedTime FROM mytable LIMIT 15
+SELECT DestStateName, DivAirportIDs, WheelsOn FROM mytable ORDER BY ArrTimeBlk LIMIT 22
+SELECT DestStateName, NASDelay FROM mytable WHERE OriginCityName BETWEEN 'Roanoke, VA' AND 'Lewiston, ID' AND Quarter NOT IN (1) AND Carrier > 'FL' ORDER BY DivReachedDest, ArrivalDelayGroups LIMIT 23
+SELECT DestStateName, NASDelay, ArrDelay FROM mytable ORDER BY AirTime LIMIT 17
+SELECT DestStateName, NASDelay, CancellationCode FROM mytable WHERE DestCityMarketID NOT IN (30918, 31865, 33964, 34543, 33277) AND DivWheelsOns BETWEEN 1017 AND 1018 OR TailNum IN ('N3733Z', 'N919DE', 'N658CT', 'N12567') ORDER BY DayofMonth LIMIT 7
+SELECT DestWac FROM mytable LIMIT 3
+SELECT DestWac FROM mytable WHERE DestCityMarketID IN (32884, 33024, 33792, 31041) AND DepDelayMinutes > 536.0 LIMIT 14
+SELECT DestWac FROM mytable WHERE DestState BETWEEN 'TX' AND 'PA' LIMIT 21
+SELECT DestWac FROM mytable WHERE DivReachedDest >= 1 OR ArrTime NOT IN (816) OR DepTime NOT IN (853, 1430) ORDER BY DivActualElapsedTime, Cancelled LIMIT 24
+SELECT DestWac FROM mytable WHERE Flights = 1 OR Origin NOT IN ('KTN', 'DTW') AND FirstDepTime = 1046 ORDER BY Month, OriginAirportSeqID, DaysSinceEpoch LIMIT 9
+SELECT DestWac, ArrDel15, CRSDepTime FROM mytable ORDER BY DepDelay LIMIT 22
+SELECT DestWac, CRSDepTime, DivActualElapsedTime FROM mytable WHERE TaxiIn NOT IN (64, 15) ORDER BY DestWac, OriginState LIMIT 21
+SELECT DestWac, DepDel15, OriginWac FROM mytable WHERE WheelsOn = 1351 AND OriginCityMarketID BETWEEN 34952 AND 30466 LIMIT 27
+SELECT DestWac, DepDelay FROM mytable WHERE OriginAirportID BETWEEN 10372 AND 14730 AND DivAirportSeqIDs BETWEEN 1524903 AND 1348502 OR OriginStateFips BETWEEN 10 AND 45 ORDER BY TaxiOut, Diverted, ArrivalDelayGroups LIMIT 7
+SELECT DestWac, DepDelay, Dest FROM mytable WHERE WheelsOff >= 2011 AND DepTimeBlk IN ('1200-1259', '1400-1459', '1500-1559') LIMIT 24
+SELECT DestWac, DestStateName FROM mytable WHERE AirlineID BETWEEN 19930 AND 20437 AND DepartureDelayGroups < -1 OR Month NOT IN (1) ORDER BY Quarter, LateAircraftDelay, OriginCityName LIMIT 0
+SELECT DestWac, DivWheelsOffs, OriginWac FROM mytable WHERE DivLongestGTimes IN (102.0, 21.0, 42.0, 62.0) ORDER BY Flights, DepTimeBlk, AirlineID LIMIT 13
+SELECT DestWac, FirstDepTime FROM mytable WHERE ArrTime BETWEEN 1221 AND 6 AND LongestAddGTime < 39 ORDER BY Diverted LIMIT 0
+SELECT DestWac, OriginStateFips, DivTailNums FROM mytable WHERE AirlineID NOT IN (20436, 20366, 20409) AND DivLongestGTimes IN (3.0, 85.0, 38.0, 75.0) AND Year <> 2014 ORDER BY Month LIMIT 10
+SELECT DestWac, OriginWac, WheelsOn FROM mytable WHERE DivActualElapsedTime BETWEEN 318 AND 280 ORDER BY OriginState, OriginStateFips LIMIT 5
+SELECT DestWac, TotalAddGTime FROM mytable WHERE DivWheelsOns < 2334 ORDER BY DestState, Quarter, DestAirportSeqID LIMIT 19
+SELECT Distance FROM mytable WHERE DivDistance >= 109 OR DivWheelsOns BETWEEN 1628 AND 1554 LIMIT 23
+SELECT Distance, DivAirportLandings, OriginWac FROM mytable ORDER BY DaysSinceEpoch LIMIT 20
+SELECT Distance, DivWheelsOffs FROM mytable WHERE DestState BETWEEN 'NY' AND 'IA' AND TailNum BETWEEN 'N764SK' AND 'N15985' AND Month <> 1 LIMIT 3
+SELECT Distance, Month FROM mytable WHERE CRSDepTime = 1037 AND DivAirports IN ('MCN') ORDER BY Year, Distance, SecurityDelay LIMIT 11
+SELECT Distance, WheelsOn FROM mytable WHERE OriginStateFips BETWEEN 28 AND 33 AND NASDelay NOT IN (2, 106) ORDER BY DestCityMarketID LIMIT 5
+SELECT DistanceGroup FROM mytable ORDER BY FlightNum, ArrTime, DayOfWeek LIMIT 12
+SELECT DistanceGroup FROM mytable WHERE DestAirportSeqID BETWEEN 1463502 AND 1338801 LIMIT 24
+SELECT DistanceGroup FROM mytable WHERE DistanceGroup IN (2) AND ArrDelayMinutes < 341.0 OR Diverted = 0 ORDER BY Flights, TailNum LIMIT 23
+SELECT DistanceGroup FROM mytable WHERE WeatherDelay <= 101 OR Month >= 1 AND AirTime BETWEEN 85 AND 442 ORDER BY DepDelayMinutes, ArrTime, Dest LIMIT 13
+SELECT DistanceGroup, AirlineID FROM mytable ORDER BY TaxiOut, Year, DivAirportLandings LIMIT 11
+SELECT DistanceGroup, ArrTimeBlk, UniqueCarrier FROM mytable ORDER BY CRSArrTime, OriginAirportID LIMIT 21
+SELECT DistanceGroup, CRSElapsedTime, DestCityMarketID FROM mytable ORDER BY AirTime, DepTimeBlk, ArrTimeBlk LIMIT 27
+SELECT DistanceGroup, CarrierDelay, DestCityName FROM mytable WHERE Month NOT IN (1) ORDER BY DestWac LIMIT 2
+SELECT DistanceGroup, DestAirportID FROM mytable ORDER BY DepDelayMinutes, DaysSinceEpoch LIMIT 19
+SELECT DistanceGroup, DestCityMarketID FROM mytable WHERE CancellationCode NOT IN ('noodles', 'C', 'B') AND DivArrDelay NOT IN (765) AND DivActualElapsedTime = 327 LIMIT 16
+SELECT DistanceGroup, DestStateFips, OriginAirportID FROM mytable WHERE DivWheelsOffs BETWEEN 202 AND 1314 AND DestState NOT IN ('KY', 'NE') ORDER BY NASDelay, DaysSinceEpoch LIMIT 16
+SELECT DistanceGroup, TotalAddGTime FROM mytable WHERE OriginStateName IN ('Mississippi', 'Georgia') OR DivWheelsOffs <= 1906 LIMIT 15
+SELECT DivActualElapsedTime FROM mytable ORDER BY ArrTimeBlk LIMIT 27
+SELECT DivActualElapsedTime FROM mytable WHERE CRSDepTime BETWEEN 500 AND 646 OR DivTotalGTimes > 180 LIMIT 20
+SELECT DivActualElapsedTime FROM mytable WHERE Cancelled IN (1, 0) ORDER BY Diverted LIMIT 19
+SELECT DivActualElapsedTime FROM mytable WHERE DepDel15 < 0 ORDER BY FlightNum LIMIT 15
+SELECT DivActualElapsedTime FROM mytable WHERE DestCityMarketID BETWEEN 33244 AND 32337 OR WheelsOff = 1248 OR DivReachedDest = -9999 ORDER BY FlightDate, CancellationCode, DaysSinceEpoch LIMIT 24
+SELECT DivActualElapsedTime FROM mytable WHERE DistanceGroup BETWEEN 4 AND 1 OR DepDelay <> 124.0 ORDER BY OriginStateName LIMIT 7
+SELECT DivActualElapsedTime, ArrDel15, DivAirportIDs FROM mytable LIMIT 19
+SELECT DivActualElapsedTime, DivWheelsOffs, DestStateName FROM mytable WHERE DestCityName < 'Dothan, AL' AND AirTime = 315 AND Carrier >= 'OO' LIMIT 26
+SELECT DivActualElapsedTime, LongestAddGTime, CRSArrTime FROM mytable WHERE DivAirportIDs <= 11618 OR AirTime BETWEEN 134 AND 406 AND AirlineID < 21171 ORDER BY DistanceGroup, DestCityMarketID LIMIT 21
+SELECT DivAirportIDs FROM mytable WHERE AirTime NOT IN (115, 11, 100, 351) ORDER BY Quarter, TailNum LIMIT 4
+SELECT DivAirportIDs FROM mytable WHERE DestCityMarketID <= 30113 AND WheelsOff IN (1921, 1257, 1332) ORDER BY Carrier LIMIT 25
+SELECT DivAirportIDs FROM mytable WHERE Quarter NOT IN (1) AND AirTime IN (312, 273) OR DestState BETWEEN 'PR' AND 'LA' LIMIT 10
+SELECT DivAirportIDs, DestCityName, OriginAirportID FROM mytable WHERE OriginCityName BETWEEN 'San Antonio, TX' AND 'Omaha, NE' OR CarrierDelay <> 169 ORDER BY ArrDelay LIMIT 14
+SELECT DivAirportLandings FROM mytable ORDER BY Flights LIMIT 9
+SELECT DivAirportLandings FROM mytable WHERE ActualElapsedTime NOT IN (180, 145, 415, 177, 347) AND FlightDate BETWEEN '2014-01-06' AND '2014-01-24' OR OriginWac BETWEEN 91 AND 41 LIMIT 9
+SELECT DivAirportLandings FROM mytable WHERE CarrierDelay BETWEEN 23 AND 43 AND DivReachedDest BETWEEN -9999 AND 0 LIMIT 17
+SELECT DivAirportLandings FROM mytable WHERE DestWac BETWEEN 12 AND 85 ORDER BY DepTimeBlk
+SELECT DivAirportLandings, DaysSinceEpoch FROM mytable ORDER BY Quarter LIMIT 27
+SELECT DivAirportLandings, DaysSinceEpoch FROM mytable WHERE ActualElapsedTime NOT IN (544, 335) ORDER BY CarrierDelay, ArrTime, OriginAirportID LIMIT 21
+SELECT DivAirportLandings, DepDelay FROM mytable WHERE DestCityMarketID <= 32519 OR WheelsOff IN (1655, 506, 1900) AND Cancelled >= 0 ORDER BY DepDel15 LIMIT 2
+SELECT DivAirportLandings, DestCityMarketID, Distance FROM mytable ORDER BY SecurityDelay, OriginCityName LIMIT 24
+SELECT DivAirportLandings, Year, ArrDelay FROM mytable WHERE NASDelay = 92 ORDER BY Carrier LIMIT 19
+SELECT DivAirportSeqIDs FROM mytable ORDER BY NASDelay LIMIT 23
+SELECT DivAirportSeqIDs FROM mytable WHERE DepDelay IN (63.0, 270.0, 408.0) OR OriginCityMarketID = 34794 ORDER BY DivDistance, OriginAirportSeqID, DestAirportID LIMIT 23
+SELECT DivAirportSeqIDs FROM mytable WHERE DivDistance = 128 ORDER BY CRSDepTime, DayOfWeek LIMIT 14
+SELECT DivAirportSeqIDs, DestStateName FROM mytable ORDER BY CarrierDelay, ArrDelayMinutes, DestStateName LIMIT 9
+SELECT DivAirports FROM mytable ORDER BY DestAirportSeqID LIMIT 17
+SELECT DivAirports FROM mytable ORDER BY Quarter LIMIT 26
+SELECT DivAirports FROM mytable WHERE DestStateFips > 17 ORDER BY Distance, ArrDelay, OriginAirportID LIMIT 8
+SELECT DivAirports FROM mytable WHERE UniqueCarrier BETWEEN 'DL' AND 'FL' OR DivReachedDest NOT IN (1, -9999) OR DestAirportID < 11726 ORDER BY ArrDel15 LIMIT 4
+SELECT DivAirports, CancellationCode, DestAirportID FROM mytable WHERE OriginWac > 92 OR DepTimeBlk NOT IN ('1900-1959', '2300-2359', '0800-0859', '1700-1759', '2200-2259') OR  REGEXP_LIKE(FlightDate, '2014-03.*07') ORDER BY OriginCityMarketID, WheelsOn LIMIT 11
+SELECT DivAirports, DepDelayMinutes FROM mytable WHERE NASDelay BETWEEN 23 AND 139 AND DepartureDelayGroups NOT IN (12, 6, -9999, 9, 10) LIMIT 14
+SELECT DivAirports, DistanceGroup, DestAirportID FROM mytable WHERE Diverted NOT IN (0, 1) AND DestCityMarketID NOT IN (30154, 30918, 33485, 31986) ORDER BY ArrDel15 LIMIT 13
+SELECT DivAirports, FirstDepTime, TailNum FROM mytable WHERE  REGEXP_LIKE(OriginState, '.*E') AND ArrivalDelayGroups BETWEEN -2 AND 11 AND DepDel15 > -9999 ORDER BY CarrierDelay, DepTime LIMIT 4
+SELECT DivAirports, OriginAirportSeqID FROM mytable WHERE ActualElapsedTime BETWEEN 445 AND 294 AND DivWheelsOffs <= 914 LIMIT 17
+SELECT DivAirports, OriginCityName FROM mytable WHERE DestStateFips > 25 OR FlightDate = '2014-01-22' ORDER BY OriginStateFips, DivDistance LIMIT 7
+SELECT DivAirports, TaxiIn, DivAirportLandings FROM mytable ORDER BY CRSArrTime, CRSDepTime, DaysSinceEpoch
+SELECT DivAirports, WeatherDelay, Distance FROM mytable WHERE DestWac BETWEEN 74 AND 34 ORDER BY Dest, DaysSinceEpoch LIMIT 1
+SELECT DivArrDelay FROM mytable ORDER BY DayOfWeek, OriginWac LIMIT 18
+SELECT DivArrDelay FROM mytable ORDER BY DepDel15, Dest LIMIT 9
+SELECT DivArrDelay FROM mytable ORDER BY LongestAddGTime, DepDelay, DestState LIMIT 29
+SELECT DivArrDelay FROM mytable WHERE ActualElapsedTime = 399 ORDER BY DivDistance, OriginWac, OriginStateFips LIMIT 8
+SELECT DivArrDelay FROM mytable WHERE DaysSinceEpoch BETWEEN 16244 AND 16175 AND DestStateFips = 15 ORDER BY DepDel15 LIMIT 5
+SELECT DivArrDelay FROM mytable WHERE DistanceGroup IN (4, 7, 9) OR Dest > 'MDT' ORDER BY DepDel15 LIMIT 3
+SELECT DivArrDelay FROM mytable WHERE DivWheelsOffs IN (956) OR DestAirportID NOT IN (12519, 14831, 15841) LIMIT 26
+SELECT DivArrDelay FROM mytable WHERE Flights BETWEEN 1 AND 1 ORDER BY DivReachedDest, DestStateFips, ActualElapsedTime LIMIT 11
+SELECT DivArrDelay FROM mytable WHERE TaxiOut > 138 OR ArrTimeBlk NOT IN ('2000-2059', '0600-0659', '0800-0859', '2200-2259') OR Quarter NOT IN (3) ORDER BY ArrDelay LIMIT 25
+SELECT DivArrDelay, ArrDelay FROM mytable WHERE AirTime = 200 AND DestAirportID = 10136 OR CRSArrTime = 1855 ORDER BY Quarter, OriginWac, AirTime LIMIT 29
+SELECT DivArrDelay, CRSElapsedTime, ArrTimeBlk FROM mytable WHERE DestAirportSeqID BETWEEN 1069302 AND 1190502 OR DayofMonth = 10 OR AirlineID >= 19790 LIMIT 21
+SELECT DivArrDelay, DestWac, DestAirportID FROM mytable WHERE OriginWac <= 2 OR  REGEXP_LIKE(ArrTimeBlk, '1.*00-1359') AND NASDelay > 213 ORDER BY DepartureDelayGroups, OriginAirportSeqID LIMIT 23
+SELECT DivArrDelay, DivActualElapsedTime, ArrTime FROM mytable ORDER BY WheelsOff LIMIT 14
+SELECT DivArrDelay, FlightDate, DayofMonth FROM mytable WHERE FlightNum BETWEEN 512 AND 3535 AND WeatherDelay BETWEEN 88 AND 973 ORDER BY ArrDelayMinutes LIMIT 14
+SELECT DivArrDelay, OriginStateName, DivAirports FROM mytable WHERE OriginAirportSeqID BETWEEN 1387302 AND 1509602 OR Distance = 1532 OR DivWheelsOns IN (1139, 1424, 1401, 1135, 2020) LIMIT 4
+SELECT DivDistance FROM mytable ORDER BY DistanceGroup, CarrierDelay, DepTime LIMIT 26
+SELECT DivDistance FROM mytable WHERE  REGEXP_LIKE(CancellationCode, '.*') LIMIT 15
+SELECT DivDistance FROM mytable WHERE CancellationCode <= 'C' AND Origin BETWEEN 'HOU' AND 'SBA' AND ActualElapsedTime = 130 ORDER BY DayofMonth LIMIT 3
+SELECT DivDistance, ArrTimeBlk FROM mytable WHERE ActualElapsedTime NOT IN (301, 668, 294) OR WeatherDelay = 61 ORDER BY OriginWac, OriginStateFips, ArrivalDelayGroups LIMIT 0
+SELECT DivDistance, CarrierDelay FROM mytable WHERE DestStateFips <= 31 AND DivTailNums BETWEEN 'N8315C' AND 'N4XLAA' ORDER BY SecurityDelay, DivAirportLandings LIMIT 2
+SELECT DivDistance, DepTime FROM mytable ORDER BY FlightNum, Diverted LIMIT 12
+SELECT DivDistance, Dest FROM mytable WHERE DestCityName IN ('Wichita, KS') OR LateAircraftDelay NOT IN (159) AND DestAirportSeqID NOT IN (1468902) ORDER BY WheelsOff, Distance LIMIT 14
+SELECT DivDistance, DestAirportSeqID, TailNum FROM mytable WHERE DestState NOT IN ('CA', 'IA', 'AR') LIMIT 18
+SELECT DivDistance, DestStateFips, TotalAddGTime FROM mytable WHERE LateAircraftDelay IN (127) AND DivReachedDest NOT IN (1, 0, -9999) AND CancellationCode BETWEEN 'noodles' AND 'noodles' LIMIT 17
+SELECT DivDistance, Distance, DepTime FROM mytable WHERE  REGEXP_LIKE(DepTimeBlk, '0800-085.*') AND DivLongestGTimes IN (149.0, 22.0, 124.0) OR AirlineID BETWEEN 20355 AND 20366 ORDER BY DistanceGroup, DestWac, DestCityName LIMIT 19
+SELECT DivDistance, DivAirportSeqIDs FROM mytable ORDER BY DepartureDelayGroups, OriginState LIMIT 6
+SELECT DivDistance, Diverted FROM mytable ORDER BY FlightDate, DivReachedDest, DayofMonth LIMIT 23
+SELECT DivDistance, NASDelay, OriginWac FROM mytable WHERE ArrTimeBlk >= '1400-1459' AND ArrDel15 IN (1, 0) ORDER BY OriginStateFips LIMIT 24
+SELECT DivLongestGTimes FROM mytable ORDER BY SecurityDelay, ArrDelayMinutes LIMIT 21
+SELECT DivLongestGTimes, ArrTimeBlk, DestCityName FROM mytable WHERE DivAirportIDs <= 13024 OR Quarter BETWEEN 1 AND 1 AND DestAirportSeqID NOT IN (1393303, 1164802) ORDER BY OriginState, TaxiIn, Month LIMIT 0
+SELECT DivLongestGTimes, DayofMonth FROM mytable WHERE DestCityName BETWEEN 'Hilo, HI' AND 'Boston, MA' AND CarrierDelay BETWEEN 17 AND 141 OR ArrDelayMinutes = 93.0 ORDER BY OriginStateFips, Flights LIMIT 0
+SELECT DivLongestGTimes, DepDelay FROM mytable WHERE FlightDate NOT IN ('2014-01-06', '2014-11-29') ORDER BY ActualElapsedTime, FlightDate LIMIT 17
+SELECT DivLongestGTimes, Distance, CancellationCode FROM mytable WHERE OriginAirportSeqID BETWEEN 1445702 AND 1484304 OR TaxiIn BETWEEN 8 AND 30 AND Cancelled IN (1, 0) ORDER BY DistanceGroup, LateAircraftDelay, NASDelay LIMIT 2
+SELECT DivLongestGTimes, DistanceGroup FROM mytable WHERE DestState = 'NV' LIMIT 14
+SELECT DivLongestGTimes, Flights FROM mytable WHERE DestCityMarketID BETWEEN 34524 AND 30155 ORDER BY DivActualElapsedTime LIMIT 27
+SELECT DivLongestGTimes, OriginAirportSeqID FROM mytable WHERE DivAirports IN ('MDY', 'RNO', 'DRO', 'ATW') OR DestStateFips BETWEEN 13 AND 28 ORDER BY CancellationCode, OriginWac LIMIT 0
+SELECT DivLongestGTimes, TotalAddGTime FROM mytable WHERE WeatherDelay <> 9 AND DivDistance = 417 OR DestStateFips BETWEEN 19 AND 5 LIMIT 0
+SELECT DivReachedDest FROM mytable ORDER BY DistanceGroup, OriginStateFips, WeatherDelay LIMIT 17
+SELECT DivReachedDest FROM mytable WHERE ArrivalDelayGroups BETWEEN -1 AND 5 ORDER BY TailNum LIMIT 20
+SELECT DivReachedDest FROM mytable WHERE DivReachedDest = -9999 ORDER BY OriginCityMarketID, Diverted LIMIT 3
+SELECT DivReachedDest FROM mytable WHERE SecurityDelay NOT IN (1, 0, 4, 27, -9999) OR DivArrDelay = 322 ORDER BY Origin, CRSDepTime LIMIT 7
+SELECT DivReachedDest, ArrDelayMinutes FROM mytable WHERE DivTotalGTimes BETWEEN 164 AND 138 LIMIT 20
+SELECT DivReachedDest, CarrierDelay, WheelsOn FROM mytable ORDER BY OriginCityMarketID, OriginCityName, DaysSinceEpoch LIMIT 20
+SELECT DivReachedDest, DayofMonth FROM mytable WHERE TotalAddGTime BETWEEN 19 AND 40 AND Diverted BETWEEN 1 AND 1 AND DayOfWeek BETWEEN 3 AND 7 LIMIT 10
+SELECT DivReachedDest, DepDelay, Dest FROM mytable WHERE ArrDelay <> 363.0 OR WheelsOff BETWEEN 1836 AND 905 OR DivReachedDest BETWEEN 1 AND 1 ORDER BY DayofMonth LIMIT 11
+SELECT DivReachedDest, DestWac, DivActualElapsedTime FROM mytable WHERE DepTimeBlk IN ('2200-2259', '0700-0759', '0800-0859', '1400-1459', '1800-1859') OR CRSElapsedTime >= 196 OR AirTime BETWEEN 163 AND 251 ORDER BY WheelsOn, ArrivalDelayGroups LIMIT 7
+SELECT DivReachedDest, Diverted, OriginAirportID FROM mytable WHERE DivTailNums >= 'N675MQ' OR DestState BETWEEN 'VI' AND 'VT' AND DepDelayMinutes BETWEEN 82.0 AND 487.0 LIMIT 18
+SELECT DivReachedDest, FlightDate, Origin FROM mytable WHERE ActualElapsedTime BETWEEN 310 AND 423 OR CRSDepTime NOT IN (1454, 1248, 1737, 1036) AND TailNum BETWEEN 'N37267' AND 'N104UW' ORDER BY CRSArrTime, Month LIMIT 23
+SELECT DivReachedDest, FlightNum, DepDelayMinutes FROM mytable WHERE SecurityDelay BETWEEN 8 AND 0 ORDER BY Dest, ArrDelay LIMIT 14
+SELECT DivReachedDest, NASDelay FROM mytable WHERE CRSElapsedTime = 255 LIMIT 29
+SELECT DivReachedDest, TailNum FROM mytable WHERE DivTotalGTimes BETWEEN 32 AND 90 AND WheelsOn NOT IN (2017, 812, 1521, 1541, 928) AND DivAirports BETWEEN 'LAS' AND 'SYR' ORDER BY DepTime LIMIT 29
+SELECT DivTailNums FROM mytable ORDER BY NASDelay LIMIT 13
+SELECT DivTailNums FROM mytable WHERE AirTime NOT IN (276, 11) OR CarrierDelay NOT IN (201) LIMIT 29
+SELECT DivTailNums, Month, CRSElapsedTime FROM mytable LIMIT 21
+SELECT DivTailNums, TailNum, DestCityName FROM mytable WHERE LongestAddGTime BETWEEN 24 AND 69 OR Month IN (12, 5) AND DepDel15 = -9999 ORDER BY DivArrDelay, ArrDelayMinutes LIMIT 2
+SELECT DivTotalGTimes FROM mytable LIMIT 5
+SELECT DivTotalGTimes FROM mytable WHERE ArrDelay BETWEEN 349.0 AND 323.0 OR DivWheelsOffs IN (919, 951, 1705) ORDER BY Year LIMIT 6
+SELECT DivTotalGTimes FROM mytable WHERE ArrTimeBlk NOT IN ('1200-1259') ORDER BY DayOfWeek, DestState, UniqueCarrier LIMIT 16
+SELECT DivTotalGTimes FROM mytable WHERE DestAirportID >= 13486 OR DivActualElapsedTime BETWEEN 174 AND 207 AND LateAircraftDelay BETWEEN 109 AND 85 ORDER BY DivDistance, TailNum, UniqueCarrier LIMIT 27
+SELECT DivTotalGTimes FROM mytable WHERE DivActualElapsedTime BETWEEN 214 AND 461 OR DivDistance BETWEEN 1262 AND 449 AND CRSArrTime BETWEEN 2102 AND 2221 ORDER BY DepTime, DestCityName, AirlineID LIMIT 16
+SELECT DivTotalGTimes FROM mytable WHERE DivArrDelay NOT IN (1280, 42, 331) OR DepDel15 NOT IN (1, 0, -9999) AND DepDel15 > 0 LIMIT 23
+SELECT DivTotalGTimes FROM mytable WHERE TailNum NOT IN ('N8612K', 'N918MQ', 'N954WN') OR Quarter BETWEEN 1 AND 1 ORDER BY Dest, DepTimeBlk LIMIT 15
+SELECT DivTotalGTimes, DestAirportSeqID, TotalAddGTime FROM mytable WHERE CarrierDelay > 148 ORDER BY DivDistance, WheelsOff, TotalAddGTime LIMIT 18
+SELECT DivTotalGTimes, DestCityMarketID, DivAirportIDs FROM mytable WHERE UniqueCarrier >= 'WN' LIMIT 15
+SELECT DivWheelsOffs FROM mytable ORDER BY DepDelay, ArrDel15 LIMIT 4
+SELECT DivWheelsOffs FROM mytable WHERE ArrDelayMinutes >= 240.0 AND DepTimeBlk BETWEEN '1200-1259' AND '1400-1459' AND Distance BETWEEN 543 AND 900 LIMIT 11
+SELECT DivWheelsOffs FROM mytable WHERE Carrier < 'MQ' LIMIT 4
+SELECT DivWheelsOffs FROM mytable WHERE DaysSinceEpoch <> 16253 AND Flights BETWEEN 1 AND 1 OR Quarter > 1 ORDER BY Origin, TaxiOut LIMIT 17
+SELECT DivWheelsOffs FROM mytable WHERE Flights > 1 OR CRSArrTime = 119 OR  REGEXP_LIKE(DestState, '.*S') LIMIT 10
+SELECT DivWheelsOffs FROM mytable WHERE NASDelay > 53 OR Year NOT IN (2014) OR TailNum BETWEEN 'N407WN' AND 'N576SW' ORDER BY DivReachedDest, DepDelayMinutes, OriginWac LIMIT 18
+SELECT DivWheelsOffs, DestCityMarketID FROM mytable WHERE DestStateName BETWEEN 'Virginia' AND 'Alabama' AND CRSArrTime >= 2204 AND DepartureDelayGroups BETWEEN 2 AND 11 LIMIT 6
+SELECT DivWheelsOffs, Origin FROM mytable WHERE DivTailNums IN ('N413SW', 'N248WN', 'N983DL') OR ArrDelay BETWEEN 28.0 AND 184.0 ORDER BY DestStateFips, ArrTime LIMIT 11
+SELECT DivWheelsOffs, OriginStateFips FROM mytable WHERE DivActualElapsedTime BETWEEN 1100 AND 472 ORDER BY ArrivalDelayGroups LIMIT 28
+SELECT DivWheelsOns FROM mytable WHERE ArrTimeBlk <> '1700-1759' OR OriginCityName IN ('Aspen, CO', 'Little Rock, AR', 'Charleston, SC', 'Saginaw/Bay City/Midland, MI') ORDER BY Quarter, DepDelayMinutes, OriginStateName LIMIT 6
+SELECT DivWheelsOns FROM mytable WHERE DivWheelsOns IN (1523, 932, 1706) OR DivAirportLandings BETWEEN 9 AND 1 OR UniqueCarrier > 'MQ' ORDER BY DivReachedDest LIMIT 21
+SELECT DivWheelsOns FROM mytable WHERE Quarter <= 3 AND DepDelay = 42.0 OR ArrTime = 2229 ORDER BY ActualElapsedTime, CarrierDelay, CancellationCode LIMIT 24
+SELECT DivWheelsOns, ArrTime, Origin FROM mytable WHERE ArrDel15 IN (1, 0, -9999) LIMIT 4
+SELECT DivWheelsOns, Carrier FROM mytable WHERE DepDel15 IN (0, -9999) OR WeatherDelay = 32 AND DivTotalGTimes BETWEEN 1 AND 14 ORDER BY FlightNum, UniqueCarrier
+SELECT DivWheelsOns, DestAirportSeqID FROM mytable WHERE OriginStateFips IN (1, 16, 28) OR DestCityMarketID IN (32467, 35249, 33830, 32320, 32891) OR OriginWac <> 61 ORDER BY DivActualElapsedTime, DestWac, TotalAddGTime LIMIT 11
+SELECT DivWheelsOns, DistanceGroup, WeatherDelay FROM mytable ORDER BY CarrierDelay, AirTime LIMIT 3
+SELECT DivWheelsOns, DivAirports, DestStateFips FROM mytable ORDER BY DepDel15, AirTime LIMIT 21
+SELECT DivWheelsOns, DivAirports, DivArrDelay FROM mytable ORDER BY DepDelayMinutes LIMIT 2
+SELECT DivWheelsOns, Flights, DivAirportLandings FROM mytable WHERE WheelsOn NOT IN (1140) AND Cancelled <= 0 LIMIT 13
+SELECT DivWheelsOns, LateAircraftDelay, DivAirportSeqIDs FROM mytable ORDER BY DestState, CarrierDelay, Origin LIMIT 7
+SELECT DivWheelsOns, OriginWac, Year FROM mytable WHERE DestWac NOT IN (81, 83, 62, 85, 53) AND ArrDelayMinutes >= 120.0 ORDER BY OriginStateFips, TaxiIn LIMIT 25
+SELECT DivWheelsOns, TaxiIn, Diverted FROM mytable WHERE  REGEXP_LIKE(OriginStateName, 'Conne.*ticut') OR ArrDelay >= 178.0 AND ArrDel15 = 1 LIMIT 5
+SELECT DivWheelsOns, Year FROM mytable WHERE Distance = 902 OR OriginAirportID = 12982 AND Diverted IN (1) ORDER BY DivArrDelay, CancellationCode LIMIT 3
+SELECT Diverted FROM mytable ORDER BY DepDelayMinutes LIMIT 10
+SELECT Diverted FROM mytable WHERE DayofMonth NOT IN (20, 4, 18, 15, 14) ORDER BY CancellationCode LIMIT 14
+SELECT Diverted FROM mytable WHERE Flights <= 1 OR Flights <> 1 ORDER BY TaxiOut
+SELECT Diverted, AirlineID FROM mytable WHERE DayofMonth NOT IN (31) AND SecurityDelay >= 10 OR DestWac IN (5, 41, 86, 87) ORDER BY WheelsOff LIMIT 27
+SELECT Diverted, DaysSinceEpoch FROM mytable WHERE OriginWac IN (44, 74) ORDER BY Diverted, DestStateName LIMIT 23
+SELECT Diverted, DepDel15 FROM mytable LIMIT 0
+SELECT Diverted, DestCityName FROM mytable LIMIT 16
+SELECT Diverted, FlightDate FROM mytable ORDER BY Diverted, AirTime LIMIT 12
+SELECT Diverted, OriginCityName, DepDel15 FROM mytable WHERE TaxiIn NOT IN (79, 75, 89) AND DestCityName > 'San Angelo, TX' ORDER BY Origin LIMIT 29
+SELECT Diverted, WeatherDelay FROM mytable WHERE OriginCityMarketID BETWEEN 32896 AND 33785 AND DepTimeBlk IN ('2200-2259', '2100-2159', '2300-2359', '1200-1259') LIMIT 20
+SELECT FirstDepTime FROM mytable LIMIT 6
+SELECT FirstDepTime FROM mytable WHERE DepTime <> 1602 AND ActualElapsedTime = 123 OR LateAircraftDelay = 21 LIMIT 21
+SELECT FirstDepTime FROM mytable WHERE WheelsOff BETWEEN 2205 AND 2230 ORDER BY Carrier, DivArrDelay LIMIT 10
+SELECT FirstDepTime FROM mytable WHERE Year NOT IN (2014) ORDER BY DistanceGroup, DepDelayMinutes LIMIT 23
+SELECT FirstDepTime, AirlineID, CRSElapsedTime FROM mytable ORDER BY ArrDel15, TailNum LIMIT 1
+SELECT FirstDepTime, ArrTimeBlk FROM mytable ORDER BY DivAirportLandings, CRSArrTime, DestAirportID LIMIT 18
+SELECT FirstDepTime, Carrier FROM mytable WHERE CRSDepTime <> 1826 OR FirstDepTime BETWEEN 2146 AND 1540 AND Year >= 2014 ORDER BY WeatherDelay, DivArrDelay LIMIT 9
+SELECT FirstDepTime, DaysSinceEpoch FROM mytable WHERE NASDelay = 150 LIMIT 29
+SELECT FirstDepTime, DestCityMarketID FROM mytable WHERE OriginStateName NOT IN ('Idaho', 'Massachusetts', 'Wisconsin') AND DestStateName BETWEEN 'Tennessee' AND 'Pennsylvania' OR AirTime >= 376 LIMIT 19
+SELECT FirstDepTime, DestCityMarketID, DaysSinceEpoch FROM mytable LIMIT 3
+SELECT FirstDepTime, DestStateFips FROM mytable WHERE NASDelay NOT IN (202, 305, 16, 60) AND DivTailNums IN ('N373SW') LIMIT 17
+SELECT FirstDepTime, DestStateName, Diverted FROM mytable LIMIT 13
+SELECT FirstDepTime, DestWac, ArrTimeBlk FROM mytable WHERE DivAirports IN ('ISN', 'AGS', 'DLH', 'ANC', 'ACV') OR FlightDate BETWEEN '2014-08-19' AND '2014-10-09' OR ArrTime NOT IN (1027, 130) ORDER BY WheelsOff LIMIT 7
+SELECT FirstDepTime, DistanceGroup FROM mytable ORDER BY Dest LIMIT 3
+SELECT FirstDepTime, DivAirportLandings, CRSElapsedTime FROM mytable WHERE OriginState BETWEEN 'VI' AND 'KS' OR DestStateFips BETWEEN 23 AND 42 ORDER BY DepDelay, ArrTime, DestCityName LIMIT 16
+SELECT FirstDepTime, DivAirportLandings, TaxiOut FROM mytable ORDER BY ArrTime, TotalAddGTime LIMIT 19
+SELECT FirstDepTime, DivReachedDest FROM mytable WHERE DestCityMarketID IN (34574) ORDER BY WheelsOff, WheelsOn, ArrTimeBlk LIMIT 20
+SELECT FirstDepTime, DivTailNums, ArrTime FROM mytable WHERE CarrierDelay = 375 ORDER BY DestCityName LIMIT 8
+SELECT FlightDate FROM mytable LIMIT 24
+SELECT FlightDate FROM mytable ORDER BY CRSDepTime, CarrierDelay, DivAirportLandings LIMIT 7
+SELECT FlightDate, ArrDelayMinutes, DaysSinceEpoch FROM mytable ORDER BY Quarter, OriginStateFips, Distance LIMIT 22
+SELECT FlightDate, ArrTimeBlk, ArrivalDelayGroups FROM mytable LIMIT 18
+SELECT FlightDate, DaysSinceEpoch FROM mytable WHERE CarrierDelay IN (70, 414) OR LateAircraftDelay NOT IN (63) OR Month <= 1 LIMIT 23
+SELECT FlightDate, DepDel15, CRSElapsedTime FROM mytable WHERE OriginCityMarketID >= 33244 AND OriginCityName IN ('Seattle, WA', 'Eagle, CO') AND DestCityName <= 'San Luis Obispo, CA' ORDER BY DivDistance, CRSArrTime LIMIT 20
+SELECT FlightDate, Dest, DivActualElapsedTime FROM mytable WHERE DivLongestGTimes < 135.0 ORDER BY WeatherDelay, DaysSinceEpoch LIMIT 22
+SELECT FlightDate, DivAirports, DestWac FROM mytable ORDER BY AirlineID, ArrTime LIMIT 11
+SELECT FlightDate, DivTotalGTimes, DestAirportSeqID FROM mytable ORDER BY SecurityDelay, DepTimeBlk, Distance LIMIT 12
+SELECT FlightDate, OriginCityName FROM mytable WHERE OriginCityName BETWEEN 'Crescent City, CA' AND 'Casper, WY' AND DayOfWeek IN (1, 2, 3, 7) OR Distance = 77 ORDER BY Origin, Year, TaxiOut LIMIT 18
+SELECT FlightDate, TotalAddGTime FROM mytable WHERE DivAirports < 'SIT' OR DepDelay NOT IN (329.0, 39.0) ORDER BY FlightNum LIMIT 0
+SELECT FlightDate, WheelsOn FROM mytable ORDER BY SecurityDelay, DepDel15, Flights LIMIT 20
+SELECT FlightNum FROM mytable ORDER BY NASDelay, Origin LIMIT 23
+SELECT FlightNum FROM mytable WHERE ArrDel15 NOT IN (0, 1, -9999) OR WheelsOn = 109 OR DayofMonth NOT IN (25, 14) ORDER BY DivActualElapsedTime, Diverted, ArrTimeBlk LIMIT 2
+SELECT FlightNum FROM mytable WHERE CarrierDelay BETWEEN 4 AND 78 ORDER BY ArrivalDelayGroups LIMIT 27
+SELECT FlightNum FROM mytable WHERE DayofMonth BETWEEN 18 AND 11 AND NASDelay BETWEEN 73 AND 39 OR Cancelled NOT IN (0) ORDER BY LateAircraftDelay, OriginState, Cancelled LIMIT 17
+SELECT FlightNum FROM mytable WHERE LateAircraftDelay > 132 LIMIT 25
+SELECT FlightNum, ActualElapsedTime FROM mytable WHERE ArrTime = 1004 OR ArrDelay >= 323.0 ORDER BY FlightNum, OriginCityMarketID, DestWac LIMIT 13
+SELECT FlightNum, ArrDelayMinutes FROM mytable ORDER BY DepDelay, DivAirportLandings, DivArrDelay LIMIT 13
+SELECT FlightNum, ArrDelayMinutes FROM mytable WHERE DivWheelsOffs = 1135 AND  REGEXP_LIKE(UniqueCarrier, '.*9') ORDER BY DayOfWeek, DestAirportID, DestCityName LIMIT 24
+SELECT FlightNum, ArrTime, OriginAirportID FROM mytable WHERE CRSElapsedTime <> 191 OR DepDelay = 33.0 AND OriginState BETWEEN 'WA' AND 'KY' ORDER BY DistanceGroup, DestStateFips, Origin LIMIT 1
+SELECT FlightNum, ArrTimeBlk FROM mytable WHERE Year NOT IN (2014) AND OriginAirportSeqID = 1307602 LIMIT 3
+SELECT FlightNum, DayofMonth FROM mytable WHERE DestAirportSeqID IN (1148102, 1532302, 1104103, 1383002) AND Dest NOT IN ('PAH') ORDER BY Month, DayOfWeek LIMIT 7
+SELECT FlightNum, Dest, TaxiIn FROM mytable WHERE DestCityMarketID IN (32896, 32556, 35841, 34057) AND DestWac = 81 LIMIT 21
+SELECT FlightNum, DestAirportID FROM mytable WHERE OriginStateFips <= 16 AND Carrier NOT IN ('F9', 'WN', 'FL') AND LateAircraftDelay BETWEEN 61 AND 98 ORDER BY DestState, Flights LIMIT 27
+SELECT FlightNum, DestAirportID, OriginAirportID FROM mytable ORDER BY Quarter, FirstDepTime, DivAirportLandings LIMIT 14
+SELECT FlightNum, DestState FROM mytable WHERE LateAircraftDelay = 108 LIMIT 18
+SELECT FlightNum, DestStateFips, TaxiOut FROM mytable LIMIT 21
+SELECT FlightNum, DivTailNums, DestCityMarketID FROM mytable WHERE DivTailNums = 'N8617E' OR OriginCityMarketID BETWEEN 32600 AND 31775 LIMIT 20
+SELECT FlightNum, DivWheelsOns, DestState FROM mytable WHERE DayOfWeek = 4 AND AirlineID BETWEEN 19393 AND 21171 OR OriginCityName NOT IN ('St. George, UT') LIMIT 22
+SELECT FlightNum, Diverted, DestWac FROM mytable WHERE DivTotalGTimes <= 85 OR Distance NOT IN (1204, 1192) ORDER BY DepDelayMinutes, ArrTime, DestWac LIMIT 25
+SELECT FlightNum, FlightDate, TotalAddGTime FROM mytable WHERE TotalAddGTime BETWEEN 34 AND 167 AND CRSElapsedTime = 556 ORDER BY TailNum LIMIT 11
+SELECT FlightNum, LateAircraftDelay FROM mytable LIMIT 1
+SELECT FlightNum, OriginStateName FROM mytable WHERE Distance BETWEEN 901 AND 1144 ORDER BY DestState, FlightDate LIMIT 10
+SELECT FlightNum, WeatherDelay, OriginAirportID FROM mytable WHERE DivAirportSeqIDs BETWEEN 1091802 AND 1029904 AND Origin > 'LGB' LIMIT 19
+SELECT Flights FROM mytable WHERE ArrTimeBlk BETWEEN '2200-2259' AND '2300-2359' ORDER BY DestCityMarketID LIMIT 8
+SELECT Flights FROM mytable WHERE DivTotalGTimes >= 36 OR CarrierDelay <= 32 ORDER BY DepTime, DestCityMarketID, DivArrDelay LIMIT 29
+SELECT Flights, CRSElapsedTime FROM mytable WHERE TaxiIn BETWEEN 75 AND 107 AND DestAirportID NOT IN (11624, 11049) AND DestState = 'AZ' ORDER BY DestStateFips LIMIT 14
+SELECT Flights, DaysSinceEpoch FROM mytable WHERE CRSArrTime BETWEEN 813 AND 1616 ORDER BY OriginStateName LIMIT 6
+SELECT Flights, DepDelayMinutes, WheelsOn FROM mytable WHERE Month NOT IN (1) OR CRSDepTime BETWEEN 1427 AND 1906 AND DestState IN ('MS', 'IN') ORDER BY OriginCityMarketID, SecurityDelay, DestStateName LIMIT 17
+SELECT Flights, DepTime FROM mytable WHERE WeatherDelay NOT IN (10, 100) AND FlightDate BETWEEN '2014-01-20' AND '2014-01-17' LIMIT 24
+SELECT Flights, DistanceGroup FROM mytable WHERE FlightNum <= 58 AND DestCityMarketID > 30141 ORDER BY DivAirportLandings, TailNum LIMIT 24
+SELECT Flights, Diverted FROM mytable WHERE SecurityDelay IN (0, 3, 41, 10) LIMIT 19
+SELECT Flights, FlightDate FROM mytable ORDER BY DepartureDelayGroups, SecurityDelay LIMIT 4
+SELECT Flights, OriginWac FROM mytable WHERE WeatherDelay IN (68, 37, 38) ORDER BY NASDelay LIMIT 15
+SELECT Flights, TaxiIn, DivAirportLandings FROM mytable WHERE DestCityMarketID = 31637 ORDER BY OriginCityName
+SELECT Flights, UniqueCarrier FROM mytable WHERE DivTotalGTimes BETWEEN 107 AND 105 ORDER BY DepartureDelayGroups, DepTimeBlk LIMIT 7
+SELECT Flights, WeatherDelay, SecurityDelay FROM mytable WHERE DestAirportID <> 11308 ORDER BY TaxiIn, DestCityName LIMIT 24
+SELECT LateAircraftDelay FROM mytable LIMIT 15
+SELECT LateAircraftDelay FROM mytable ORDER BY DivActualElapsedTime LIMIT 21
+SELECT LateAircraftDelay FROM mytable WHERE TailNum IN ('N684DA', 'N299WN', 'N765US', 'N5CCAA', 'N12924') ORDER BY LongestAddGTime, DepTime, DestStateName LIMIT 22
+SELECT LateAircraftDelay, ArrTime FROM mytable ORDER BY CarrierDelay, Year, DestCityMarketID LIMIT 20
+SELECT LateAircraftDelay, CarrierDelay FROM mytable WHERE TaxiOut BETWEEN 89 AND 126 AND OriginState IN ('SC', 'KS', 'RI', 'MO', 'DE') AND DestCityMarketID BETWEEN 32177 AND 31122 ORDER BY DivActualElapsedTime, DestStateFips, DepTime LIMIT 19
+SELECT LateAircraftDelay, DestAirportID, CRSDepTime FROM mytable WHERE DepDel15 <= 1 OR OriginStateFips IN (49, 47, 35, 13) ORDER BY LateAircraftDelay, Month, DaysSinceEpoch LIMIT 4
+SELECT LateAircraftDelay, Flights, OriginStateName FROM mytable WHERE ArrTime BETWEEN 1234 AND 1540 ORDER BY DivReachedDest, DestStateName, CRSDepTime LIMIT 22
+SELECT LateAircraftDelay, Origin FROM mytable WHERE Quarter NOT IN (1) LIMIT 11
+SELECT LateAircraftDelay, OriginCityName, AirTime FROM mytable ORDER BY TotalAddGTime, AirTime, WheelsOn
+SELECT LateAircraftDelay, OriginStateName, DivActualElapsedTime FROM mytable WHERE DivAirportLandings >= 0 OR DivWheelsOffs IN (1612, 2356, 1012, 326) LIMIT 3
+SELECT LateAircraftDelay, TotalAddGTime FROM mytable WHERE LateAircraftDelay <= 87 OR UniqueCarrier = 'AA' OR UniqueCarrier >= 'WN' ORDER BY DepDelayMinutes, Cancelled, DepDel15 LIMIT 14
+SELECT LateAircraftDelay, Year, DepTimeBlk FROM mytable WHERE ArrDel15 = 1 OR DivAirportSeqIDs BETWEEN 1495203 AND 1131502 OR DivAirportLandings NOT IN (0, 1, 2, 9) ORDER BY SecurityDelay, CancellationCode LIMIT 26
+SELECT LongestAddGTime FROM mytable ORDER BY AirlineID, CRSElapsedTime
+SELECT LongestAddGTime FROM mytable WHERE DistanceGroup BETWEEN 11 AND 5 AND Month BETWEEN 1 AND 7 OR LongestAddGTime BETWEEN 142 AND 13 ORDER BY LateAircraftDelay, FirstDepTime, ArrTime LIMIT 5
+SELECT LongestAddGTime FROM mytable WHERE OriginStateFips BETWEEN 31 AND 31 ORDER BY NASDelay, DestAirportSeqID, DestCityMarketID LIMIT 29
+SELECT LongestAddGTime, CRSElapsedTime, ArrDelay FROM mytable ORDER BY DivArrDelay, LongestAddGTime, OriginAirportID LIMIT 1
+SELECT LongestAddGTime, CancellationCode, OriginStateName FROM mytable WHERE CRSDepTime <= 1106 ORDER BY TaxiIn, DestAirportID, AirlineID LIMIT 20
+SELECT LongestAddGTime, Cancelled, DivTailNums FROM mytable ORDER BY DestWac, DivActualElapsedTime, DayOfWeek LIMIT 23
+SELECT LongestAddGTime, DivTailNums FROM mytable WHERE Flights <= 1 OR CRSDepTime BETWEEN 1911 AND 1129 LIMIT 15
+SELECT LongestAddGTime, OriginCityName, DayOfWeek FROM mytable WHERE ArrTime BETWEEN 1537 AND 2258 AND DivAirportLandings >= 0 AND DivTotalGTimes < 99 ORDER BY OriginState, Month LIMIT 24
+SELECT LongestAddGTime, OriginStateFips, DestStateFips FROM mytable WHERE DivActualElapsedTime = 141 ORDER BY Quarter, OriginStateName, Flights LIMIT 20
+SELECT LongestAddGTime, TotalAddGTime FROM mytable LIMIT 16
+SELECT LongestAddGTime, TotalAddGTime, DestCityMarketID FROM mytable WHERE DestStateName BETWEEN 'Puerto Rico' AND 'Connecticut' ORDER BY ArrDelay LIMIT 26
+SELECT LongestAddGTime, WeatherDelay FROM mytable ORDER BY CarrierDelay, UniqueCarrier, TailNum LIMIT 18
+SELECT LongestAddGTime, WeatherDelay FROM mytable WHERE TaxiIn IN (79, 109, 52, 38) OR SecurityDelay BETWEEN 0 AND -9999 AND FirstDepTime IN (2145, 1856, 1902) ORDER BY WheelsOn LIMIT 7
+SELECT MIN(div(DaysSinceEpoch,2)) FROM mytable
+SELECT Month FROM mytable LIMIT 27
+SELECT Month FROM mytable WHERE  REGEXP_LIKE(DestState, 'D.*') AND DivArrDelay BETWEEN 96 AND 935 LIMIT 14
+SELECT Month FROM mytable WHERE DivDistance NOT IN (114, 116, 229) AND TaxiIn = 63 ORDER BY CarrierDelay, DestStateName LIMIT 0
+SELECT Month FROM mytable WHERE DivReachedDest IN (1) AND CRSArrTime >= 843 ORDER BY OriginStateFips, TotalAddGTime LIMIT 14
+SELECT Month, CRSArrTime, DestCityName FROM mytable WHERE DestAirportSeqID BETWEEN 1452002 AND 1129202 AND OriginAirportSeqID > 1473003 AND DestCityName NOT IN ('St. Augustine, FL') ORDER BY ArrTimeBlk LIMIT 1
+SELECT Month, CancellationCode FROM mytable WHERE DepTime IN (2243, 615, 1957) ORDER BY DivAirportLandings, OriginStateFips LIMIT 7
+SELECT Month, DivTailNums, ArrivalDelayGroups FROM mytable WHERE DestStateName <> 'Hawaii' ORDER BY DayOfWeek, UniqueCarrier, DestStateName LIMIT 29
+SELECT Month, DivTailNums, DepDelay FROM mytable WHERE DestState <> 'MO' AND DivLongestGTimes >= 27.0 ORDER BY DepDelayMinutes LIMIT 11
+SELECT Month, OriginStateName, DestStateName FROM mytable ORDER BY Origin, DestCityMarketID LIMIT 16
+SELECT NASDelay FROM mytable WHERE ArrDelayMinutes = 188.0 LIMIT 12
+SELECT NASDelay FROM mytable WHERE ArrDelayMinutes BETWEEN 54.0 AND 208.0 AND CancellationCode BETWEEN 'B' AND 'noodles' OR OriginAirportID BETWEEN 11193 AND 10781 ORDER BY OriginState, CRSArrTime LIMIT 4
+SELECT NASDelay FROM mytable WHERE DepDelay IN (192.0, 23.0, 261.0, 178.0, 326.0) OR DayofMonth = 24 AND FirstDepTime BETWEEN 1440 AND 1733 ORDER BY WeatherDelay, ArrivalDelayGroups LIMIT 25
+SELECT NASDelay FROM mytable WHERE Dest BETWEEN 'SPI' AND 'SAV' OR DepDel15 BETWEEN 1 AND -9999 ORDER BY Origin LIMIT 9
+SELECT NASDelay, AirTime FROM mytable WHERE DivAirportIDs IN (14869, 11193, 13342, 11003, 10521) ORDER BY Origin LIMIT 15
+SELECT NASDelay, ArrDelay FROM mytable LIMIT 8
+SELECT NASDelay, ArrTimeBlk FROM mytable WHERE TaxiIn <> 10 OR ArrDelay NOT IN (96.0, 410.0, 231.0, 112.0) ORDER BY DestAirportID LIMIT 23
+SELECT NASDelay, DestCityMarketID FROM mytable ORDER BY DestAirportSeqID, Month LIMIT 21
+SELECT NASDelay, DestCityName, DestStateName FROM mytable WHERE DestWac NOT IN (5, 4, 52, 72, 74) ORDER BY Dest, Month LIMIT 4
+SELECT NASDelay, Distance FROM mytable WHERE ArrivalDelayGroups IN (3, 4, 5, 7) OR  REGEXP_LIKE(Origin, 'Y.*K') AND DayofMonth BETWEEN 10 AND 20 ORDER BY CarrierDelay LIMIT 27
+SELECT NASDelay, DivTotalGTimes, DayOfWeek FROM mytable WHERE DivAirportLandings NOT IN (2, 9) ORDER BY ArrDel15, AirlineID, DestAirportID LIMIT 2
+SELECT NASDelay, Diverted, DestWac FROM mytable WHERE ArrDelayMinutes = 180.0 ORDER BY WheelsOn, Distance LIMIT 8
+SELECT NASDelay, Origin FROM mytable WHERE DivWheelsOns BETWEEN 2237 AND 1408 LIMIT 20
+SELECT NASDelay, Origin, OriginAirportID FROM mytable WHERE DayOfWeek BETWEEN 5 AND 5 AND Dest BETWEEN 'WRG' AND 'GUC' AND DestCityName BETWEEN 'Topeka, KS' AND 'Pocatello, ID' ORDER BY ActualElapsedTime, DayofMonth, OriginStateName LIMIT 28
+SELECT Origin FROM mytable WHERE ArrTimeBlk BETWEEN '0600-0659' AND '2100-2159' OR DistanceGroup NOT IN (7, 11) ORDER BY FlightDate LIMIT 26
+SELECT Origin FROM mytable WHERE CarrierDelay IN (111, 141) LIMIT 29
+SELECT Origin FROM mytable WHERE DayOfWeek BETWEEN 1 AND 6 ORDER BY DivArrDelay, DivDistance, UniqueCarrier LIMIT 5
+SELECT Origin, ActualElapsedTime, DivTotalGTimes FROM mytable LIMIT 25
+SELECT Origin, DepDelay FROM mytable WHERE DestWac = 35 AND DivLongestGTimes IN (153.0, 19.0) ORDER BY ArrivalDelayGroups LIMIT 12
+SELECT Origin, DivTailNums FROM mytable WHERE DivDistance BETWEEN 128 AND 77 ORDER BY FirstDepTime, ArrDel15 LIMIT 2
+SELECT Origin, DivTotalGTimes, OriginStateName FROM mytable LIMIT 26
+SELECT Origin, LongestAddGTime, DivTailNums FROM mytable WHERE DestCityMarketID NOT IN (30918, 33792, 35165, 34109) OR CRSArrTime < 1202 AND Flights BETWEEN 1 AND 1 ORDER BY SecurityDelay, Month, Carrier LIMIT 26
+SELECT Origin, Month, OriginAirportSeqID FROM mytable WHERE DivTotalGTimes <= 182 OR DivAirportSeqIDs = 1228002 ORDER BY CarrierDelay, OriginCityName LIMIT 12
+SELECT Origin, OriginCityName, DestCityMarketID FROM mytable WHERE WheelsOff BETWEEN 1540 AND 2211 ORDER BY Origin, CancellationCode, DivDistance LIMIT 8
+SELECT Origin, OriginStateName, ArrDel15 FROM mytable WHERE DepDelayMinutes BETWEEN 110.0 AND 124.0 AND DepDelayMinutes NOT IN (151.0, 391.0, 51.0, 505.0, 187.0) AND CancellationCode IN ('C', 'A') ORDER BY ArrDelay LIMIT 24
+SELECT OriginAirportID FROM mytable WHERE CRSDepTime BETWEEN 959 AND 2056 AND  REGEXP_LIKE(ArrTimeBlk, '2000-.*059') ORDER BY DestStateFips LIMIT 9
+SELECT OriginAirportID FROM mytable WHERE Month BETWEEN 12 AND 7 OR TotalAddGTime = 12 OR Cancelled BETWEEN 1 AND 0 ORDER BY CRSElapsedTime LIMIT 12
+SELECT OriginAirportSeqID FROM mytable WHERE Origin = 'FCA' OR CRSArrTime BETWEEN 1521 AND 2305 ORDER BY DivDistance LIMIT 29
+SELECT OriginAirportSeqID, ArrDel15, UniqueCarrier FROM mytable WHERE DayOfWeek >= 3 OR DayofMonth <= 30 LIMIT 12
+SELECT OriginAirportSeqID, CRSArrTime FROM mytable WHERE FlightNum NOT IN (2438, 2642, 2012, 6051) OR DepDelayMinutes <> 973.0 OR WheelsOn BETWEEN 1544 AND 2344 ORDER BY DestStateName, AirlineID, CancellationCode LIMIT 12
+SELECT OriginAirportSeqID, DepDelay, OriginStateName FROM mytable WHERE Quarter BETWEEN 1 AND 1 LIMIT 29
+SELECT OriginAirportSeqID, DestAirportSeqID FROM mytable WHERE DestCityMarketID BETWEEN 35165 AND 35323 AND DestStateFips = 51 AND OriginCityName <= 'Manhattan/Ft. Riley, KS' ORDER BY Flights LIMIT 6
+SELECT OriginAirportSeqID, DestStateName, DayOfWeek FROM mytable ORDER BY DaysSinceEpoch, DayOfWeek LIMIT 11
+SELECT OriginAirportSeqID, DivLongestGTimes, ArrivalDelayGroups FROM mytable WHERE DepTime <> 922 ORDER BY Carrier, OriginStateName LIMIT 1
+SELECT OriginAirportSeqID, DivLongestGTimes, ArrivalDelayGroups FROM mytable WHERE TaxiOut BETWEEN 9 AND 37 OR DaysSinceEpoch BETWEEN 16090 AND 16080 ORDER BY TaxiOut LIMIT 0
+SELECT OriginAirportSeqID, DivReachedDest, LateAircraftDelay FROM mytable ORDER BY CarrierDelay, OriginWac LIMIT 0
+SELECT OriginAirportSeqID, OriginStateName FROM mytable WHERE ArrivalDelayGroups IN (-9999) AND Flights < 1 LIMIT 16
+SELECT OriginAirportSeqID, Quarter, DaysSinceEpoch FROM mytable WHERE OriginWac NOT IN (93, 39, 14) OR DepDel15 IN (1, 0, -9999) AND DaysSinceEpoch IN (16074, 16086) ORDER BY DayofMonth, OriginWac LIMIT 4
+SELECT OriginCityMarketID FROM mytable ORDER BY TaxiOut, OriginCityName LIMIT 26
+SELECT OriginCityMarketID FROM mytable WHERE OriginStateName <> 'Virginia' OR FlightNum IN (2943, 2359, 5054, 2909, 4865) OR ActualElapsedTime <> 232 LIMIT 1
+SELECT OriginCityMarketID, ArrTime FROM mytable WHERE Year < 2014 AND OriginState NOT IN ('PA', 'VI', 'IA', 'VA', 'RI') LIMIT 14
+SELECT OriginCityMarketID, CancellationCode, DivWheelsOffs FROM mytable WHERE WeatherDelay = 105 AND DivReachedDest = 0 OR DivAirports BETWEEN 'SMF' AND 'BOI' ORDER BY TaxiIn, DepTimeBlk
+SELECT OriginCityMarketID, Cancelled FROM mytable WHERE DepTime = 1220 AND ActualElapsedTime = 578 ORDER BY DivAirportLandings, DestStateFips LIMIT 0
+SELECT OriginCityMarketID, DayofMonth FROM mytable WHERE Dest BETWEEN 'MOD' AND 'RNO' AND DepartureDelayGroups BETWEEN 10 AND 12 LIMIT 14
+SELECT OriginCityMarketID, DayofMonth FROM mytable WHERE NASDelay = 168 AND TotalAddGTime = 106 OR WeatherDelay NOT IN (156, 218, 151, 41) ORDER BY ArrTimeBlk LIMIT 2
+SELECT OriginCityMarketID, DepDelay, CRSElapsedTime FROM mytable WHERE OriginAirportSeqID = 1133703 ORDER BY FlightNum, DestAirportSeqID LIMIT 27
+SELECT OriginCityMarketID, DepDelay, DayofMonth FROM mytable WHERE DayofMonth = 25 ORDER BY Year, DestStateFips LIMIT 12
+SELECT OriginCityMarketID, DepTimeBlk, CRSArrTime FROM mytable WHERE Distance >= 600 ORDER BY DestState, TailNum, DestAirportID LIMIT 23
+SELECT OriginCityMarketID, Distance, DestAirportID FROM mytable ORDER BY ArrTime, DepTimeBlk LIMIT 2
+SELECT OriginCityMarketID, DistanceGroup, DepTime FROM mytable WHERE Flights = 1 AND ArrDelayMinutes BETWEEN 246.0 AND 181.0 AND DivAirportSeqIDs BETWEEN 1160302 AND 1186703 ORDER BY DepartureDelayGroups LIMIT 20
+SELECT OriginCityMarketID, DivAirportLandings, DestStateName FROM mytable WHERE OriginState NOT IN ('WY') AND ArrDel15 BETWEEN 1 AND -9999 ORDER BY ArrDelay, DestAirportID LIMIT 5
+SELECT OriginCityMarketID, DivAirportSeqIDs FROM mytable WHERE DestState BETWEEN 'CO' AND 'OK' ORDER BY ArrDelayMinutes, ArrDelay LIMIT 27
+SELECT OriginCityMarketID, DivAirportSeqIDs FROM mytable WHERE Origin < 'BUR' LIMIT 24
+SELECT OriginCityMarketID, Origin, ArrivalDelayGroups FROM mytable LIMIT 3
+SELECT OriginCityName FROM mytable WHERE ArrDelayMinutes <= 148.0 OR TotalAddGTime BETWEEN 30 AND 21 ORDER BY DepDelay, Quarter, DestCityMarketID LIMIT 10
+SELECT OriginCityName FROM mytable WHERE DivLongestGTimes BETWEEN 85.0 AND 21.0 OR TailNum BETWEEN 'N28478' AND 'N26210' OR DistanceGroup IN (7, 8) ORDER BY DestWac, NASDelay LIMIT 12
+SELECT OriginCityName FROM mytable WHERE DivWheelsOffs IN (1832, 1350, 1810, 2205) OR ArrivalDelayGroups BETWEEN 1 AND 8 LIMIT 8
+SELECT OriginCityName, DepDel15, AirTime FROM mytable WHERE DivDistance IN (158) OR DestAirportSeqID < 1470903 ORDER BY DepTimeBlk LIMIT 9
+SELECT OriginCityName, DivActualElapsedTime FROM mytable WHERE ArrivalDelayGroups NOT IN (1, 0, -9999) OR DestStateFips BETWEEN 4 AND 49 ORDER BY DaysSinceEpoch LIMIT 1
+SELECT OriginCityName, OriginAirportSeqID, CRSArrTime FROM mytable WHERE DaysSinceEpoch = 16424 ORDER BY DepDel15, ArrivalDelayGroups LIMIT 27
+SELECT OriginState FROM mytable LIMIT 20
+SELECT OriginState FROM mytable WHERE Cancelled = 0 OR DivActualElapsedTime < 223 AND CarrierDelay = 2 ORDER BY SecurityDelay, OriginState, AirTime LIMIT 25
+SELECT OriginState FROM mytable WHERE DivTailNums BETWEEN 'N852AA' AND 'N832AS' AND  REGEXP_LIKE(CancellationCode, '.*') AND  REGEXP_LIKE(ArrTimeBlk, '2200-225.*') ORDER BY OriginAirportID LIMIT 21
+SELECT OriginState FROM mytable WHERE DivWheelsOns IN (1833, 1127, 8, 1759, 1208) OR Flights < 1 ORDER BY TailNum LIMIT 2
+SELECT OriginState, ArrTimeBlk FROM mytable WHERE CRSElapsedTime = 238 AND WheelsOn > 1317 LIMIT 10
+SELECT OriginState, CRSElapsedTime FROM mytable WHERE CRSElapsedTime IN (540, 89, 441, 643, 481) AND DestAirportSeqID BETWEEN 1074702 AND 1212903 ORDER BY LongestAddGTime LIMIT 10
+SELECT OriginState, DayofMonth, UniqueCarrier FROM mytable WHERE DivAirportLandings >= 9 OR OriginAirportID NOT IN (10980, 12888, 10685, 11111) ORDER BY DestStateFips LIMIT 3
+SELECT OriginState, DepDelay, OriginWac FROM mytable WHERE WheelsOff IN (1235, 2134) ORDER BY NASDelay, AirlineID, ArrDelay LIMIT 14
+SELECT OriginState, DepTime FROM mytable WHERE DepDelay IN (179.0, 320.0, -15.0, 94.0, 174.0) OR DepDelay BETWEEN 7.0 AND 139.0 ORDER BY OriginCityName, ArrDel15, Month LIMIT 8
+SELECT OriginState, Distance, DivActualElapsedTime FROM mytable WHERE DivTotalGTimes = 76 OR Cancelled = 1 OR DestAirportID <> 13851 ORDER BY TaxiOut, DivActualElapsedTime, DaysSinceEpoch LIMIT 5
+SELECT OriginState, DivReachedDest, DestAirportID FROM mytable WHERE DistanceGroup <> 6 AND DivAirportIDs IN (10918, 13476, 10245, 10599) OR WheelsOff <= 2039 LIMIT 9
+SELECT OriginState, DivTailNums, AirlineID FROM mytable ORDER BY Quarter LIMIT 8
+SELECT OriginState, FlightDate, CancellationCode FROM mytable WHERE DestCityName IN ('Durango, CO', 'Bellingham, WA', 'College Station/Bryan, TX') ORDER BY CRSArrTime LIMIT 21
+SELECT OriginState, FlightDate, DivArrDelay FROM mytable WHERE DestStateFips > 75 OR DivActualElapsedTime IN (389, 198, 307) AND Distance > 3801 ORDER BY DepDelayMinutes LIMIT 10
+SELECT OriginState, LongestAddGTime, DivArrDelay FROM mytable WHERE DepDelayMinutes >= 106.0 OR FirstDepTime IN (814, 1939) OR NASDelay NOT IN (211, 56, 16, 63) ORDER BY NASDelay, DestAirportID LIMIT 10
+SELECT OriginState, OriginStateFips, DestCityMarketID FROM mytable WHERE TailNum NOT IN ('N615MQ', 'N995DL', 'N537AA') ORDER BY DayOfWeek LIMIT 28
+SELECT OriginStateFips FROM mytable WHERE DestWac IN (43, 5, 35, 51, 85) OR Dest <= 'PIA' AND Diverted BETWEEN 0 AND 1 ORDER BY DestWac, DepDel15 LIMIT 22
+SELECT OriginStateFips FROM mytable WHERE OriginCityMarketID >= 30073 ORDER BY CRSElapsedTime LIMIT 9
+SELECT OriginStateFips, ActualElapsedTime, DivTotalGTimes FROM mytable WHERE OriginStateFips >= 2 LIMIT 16
+SELECT OriginStateFips, ArrTimeBlk, OriginAirportID FROM mytable WHERE DivArrDelay NOT IN (161, 864, 410, 9, 710) LIMIT 13
+SELECT OriginStateFips, DestAirportSeqID FROM mytable WHERE CRSArrTime IN (740, 1257, 712, 629) AND DivAirportIDs = 15370 ORDER BY OriginCityMarketID LIMIT 29
+SELECT OriginStateFips, Flights, ArrDel15 FROM mytable WHERE DivDistance NOT IN (306) AND DestCityName >= 'Harlingen/San Benito, TX' LIMIT 10
+SELECT OriginStateName FROM mytable ORDER BY DepDelayMinutes, CRSArrTime LIMIT 9
+SELECT OriginStateName FROM mytable WHERE  REGEXP_LIKE(UniqueCarrier, 'E.*') LIMIT 0
+SELECT OriginStateName FROM mytable WHERE DepDel15 <> 1 LIMIT 14
+SELECT OriginStateName, DivReachedDest, DestCityName FROM mytable ORDER BY TaxiIn, ArrTime, ArrTimeBlk LIMIT 19
+SELECT OriginWac FROM mytable ORDER BY DivAirportLandings, ArrDelay, TotalAddGTime LIMIT 20
+SELECT OriginWac FROM mytable WHERE DepDelayMinutes IN (212.0, 252.0, 69.0) OR DivLongestGTimes IN (24.0, 189.0, 43.0, 98.0, 152.0) AND  REGEXP_LIKE(Carrier, '.*O') LIMIT 3
+SELECT OriginWac FROM mytable WHERE DepTimeBlk IN ('2000-2059') OR OriginAirportSeqID >= 1084903 ORDER BY LongestAddGTime LIMIT 3
+SELECT OriginWac FROM mytable WHERE DestCityName NOT IN ('Gillette, WY', 'Watertown, NY') ORDER BY DivDistance, ArrDelay LIMIT 6
+SELECT OriginWac FROM mytable WHERE DivDistance > 181 LIMIT 19
+SELECT OriginWac FROM mytable WHERE FirstDepTime BETWEEN 1309 AND 1856 AND DestAirportID BETWEEN 12191 AND 10208 AND DivLongestGTimes BETWEEN 6.0 AND 64.0 LIMIT 29
+SELECT OriginWac FROM mytable WHERE Year = 2014 OR DayofMonth > 13 AND ArrTimeBlk BETWEEN '2200-2259' AND '1500-1559' LIMIT 1
+SELECT OriginWac, AirlineID, OriginStateName FROM mytable ORDER BY ArrDelayMinutes, DayofMonth LIMIT 7
+SELECT OriginWac, ArrDelay FROM mytable WHERE DivDistance NOT IN (2994, 546, 602, 729) AND ActualElapsedTime <= 370 ORDER BY ArrivalDelayGroups LIMIT 6
+SELECT OriginWac, ArrivalDelayGroups FROM mytable WHERE ArrTime BETWEEN 1540 AND 553 AND Diverted IN (1, 0) ORDER BY Month LIMIT 28
+SELECT OriginWac, CRSArrTime FROM mytable WHERE FlightNum BETWEEN 2987 AND 109 OR OriginAirportID = 14307 LIMIT 13
+SELECT OriginWac, CRSElapsedTime FROM mytable WHERE DestCityName < 'Idaho Falls, ID' OR DivAirportIDs IN (11823) OR Month NOT IN (3) ORDER BY Quarter, UniqueCarrier, DestStateFips LIMIT 12
+SELECT OriginWac, DayofMonth FROM mytable WHERE DayofMonth NOT IN (22, 28, 8, 10) AND NASDelay = 178 AND NASDelay = 155 ORDER BY OriginStateName, DepDelayMinutes, OriginState LIMIT 15
+SELECT OriginWac, Distance FROM mytable ORDER BY CRSElapsedTime LIMIT 27
+SELECT OriginWac, DistanceGroup FROM mytable WHERE TailNum NOT IN ('N748EV', 'N941MQ', 'N850UA', 'N623DL', 'N216WR') ORDER BY Month, DepDel15, OriginAirportID LIMIT 13
+SELECT OriginWac, Flights, DepDelay FROM mytable ORDER BY SecurityDelay, OriginCityMarketID, AirlineID LIMIT 21
+SELECT Quarter FROM mytable LIMIT 18
+SELECT Quarter FROM mytable WHERE Origin >= 'XNA' AND DivAirportSeqIDs IN (1019402, 1046902, 1584102) LIMIT 11
+SELECT Quarter, ActualElapsedTime, OriginAirportSeqID FROM mytable WHERE ArrDel15 BETWEEN 1 AND 1 AND DestAirportID IN (10268) OR AirlineID >= 19690 ORDER BY FlightNum, ArrDelayMinutes LIMIT 6
+SELECT Quarter, ArrTime, WeatherDelay FROM mytable WHERE DivWheelsOns > 233 ORDER BY Cancelled LIMIT 29
+SELECT Quarter, CancellationCode FROM mytable WHERE DivDistance > 448 AND DestStateName <= 'Mississippi' AND ArrTime <> 1804 ORDER BY Quarter, Distance, Month LIMIT 15
+SELECT Quarter, CarrierDelay, DivAirportSeqIDs FROM mytable WHERE FirstDepTime = 710 AND Cancelled BETWEEN 1 AND 0 ORDER BY DestState, DivArrDelay LIMIT 23
+SELECT Quarter, CarrierDelay, DivTotalGTimes FROM mytable WHERE Distance < 335 OR Dest BETWEEN 'JAX' AND 'DBQ' ORDER BY UniqueCarrier LIMIT 28
+SELECT Quarter, DestStateFips, DestWac FROM mytable WHERE DivWheelsOffs IN (2333, 337) ORDER BY LongestAddGTime, TaxiIn, DestAirportID LIMIT 24
+SELECT Quarter, Distance FROM mytable WHERE WheelsOn IN (2019, 1821, 2105) OR ArrDel15 NOT IN (1) LIMIT 17
+SELECT Quarter, Distance, OriginStateName FROM mytable WHERE DestAirportSeqID BETWEEN 1200702 AND 1562401 OR DivReachedDest >= -9999 ORDER BY DivActualElapsedTime, ArrivalDelayGroups, DaysSinceEpoch LIMIT 17
+SELECT Quarter, DivAirports FROM mytable ORDER BY FlightNum LIMIT 8
+SELECT Quarter, FlightDate, ArrivalDelayGroups FROM mytable WHERE DivArrDelay = 127 OR Flights < 1 AND FlightNum IN (2223, 1763, 2868, 2137) ORDER BY DepartureDelayGroups, DepDelay, OriginAirportID LIMIT 15
+SELECT Quarter, FlightDate, TailNum FROM mytable WHERE DivArrDelay <> 204 ORDER BY OriginAirportSeqID, OriginCityMarketID, ArrTime LIMIT 17
+SELECT Quarter, OriginCityName FROM mytable WHERE Carrier BETWEEN 'EV' AND 'OO' AND WheelsOff BETWEEN 1411 AND 354 ORDER BY Flights LIMIT 10
+SELECT Quarter, OriginStateFips FROM mytable ORDER BY DayofMonth LIMIT 25
+SELECT Quarter, OriginStateFips, DestWac FROM mytable LIMIT 19
+SELECT SecurityDelay FROM mytable ORDER BY Quarter, NASDelay LIMIT 17
+SELECT SecurityDelay FROM mytable WHERE DivWheelsOns <= 18 AND DivDistance BETWEEN 66 AND 160 ORDER BY CRSArrTime LIMIT 12
+SELECT SecurityDelay FROM mytable WHERE OriginCityMarketID BETWEEN 31638 AND 33486 LIMIT 13
+SELECT SecurityDelay, ArrDelay FROM mytable WHERE DistanceGroup BETWEEN 3 AND 8 AND Dest NOT IN ('HOU', 'GSP') ORDER BY ActualElapsedTime, ArrDelay LIMIT 7
+SELECT SecurityDelay, ArrTime, ArrDel15 FROM mytable WHERE DestStateName NOT IN ('New Hampshire') AND ArrTimeBlk > '1500-1559' OR DestCityName BETWEEN 'International Falls, MN' AND 'Ketchikan, AK' ORDER BY OriginStateName, Dest LIMIT 0
+SELECT SecurityDelay, ArrTime, DestStateFips FROM mytable WHERE Diverted NOT IN (0, 1) LIMIT 18
+SELECT SecurityDelay, DepTime, OriginWac FROM mytable ORDER BY OriginWac LIMIT 9
+SELECT SecurityDelay, DestStateFips, TaxiOut FROM mytable WHERE  REGEXP_LIKE(ArrTimeBlk, '18.*0-1859') AND WheelsOn < 2359 OR WheelsOff NOT IN (1305, 1029, 1324, 1300, 1052) ORDER BY TotalAddGTime LIMIT 8
+SELECT SecurityDelay, DestStateName FROM mytable LIMIT 8
+SELECT SecurityDelay, DestWac, DepTime FROM mytable WHERE DivArrDelay = 149 OR CarrierDelay = 239 AND AirlineID = 20366 ORDER BY DivAirportLandings, Year LIMIT 9
+SELECT SecurityDelay, DivAirportIDs, AirTime FROM mytable WHERE ArrDel15 NOT IN (1, 0, -9999) LIMIT 2
+SELECT SecurityDelay, DivAirports FROM mytable LIMIT 16
+SELECT SecurityDelay, DivDistance, DepDelay FROM mytable LIMIT 20
+SELECT SecurityDelay, OriginStateFips FROM mytable WHERE DivArrDelay BETWEEN 445 AND 343 OR OriginCityMarketID IN (32951, 33344, 30436) AND CRSArrTime = 1903 LIMIT 23
+SELECT SecurityDelay, OriginStateName, DaysSinceEpoch FROM mytable WHERE DayOfWeek = 4 ORDER BY CRSArrTime, TaxiOut, WheelsOn LIMIT 13
+SELECT SecurityDelay, Quarter, DivLongestGTimes FROM mytable WHERE Year >= 2014 ORDER BY UniqueCarrier, DestAirportID, Distance LIMIT 0
+SELECT SecurityDelay, TotalAddGTime FROM mytable WHERE WheelsOn BETWEEN 953 AND 819 OR FirstDepTime NOT IN (908, 1153, 710, 1018, 1449) LIMIT 18
+SELECT SecurityDelay, WeatherDelay FROM mytable WHERE DepTimeBlk >= '2000-2059' OR DayOfWeek BETWEEN 6 AND 5 OR FirstDepTime = 801 ORDER BY DestAirportSeqID
+SELECT TailNum FROM mytable WHERE DivTotalGTimes = 58 AND DepDelayMinutes BETWEEN 130.0 AND 253.0 ORDER BY OriginAirportID LIMIT 10
+SELECT TailNum FROM mytable WHERE Month <= 11 ORDER BY DivActualElapsedTime, ArrTime, DestAirportID LIMIT 2
+SELECT TailNum FROM mytable WHERE WheelsOn IN (404, -9999) OR FlightDate >= '2014-04-13' AND CancellationCode BETWEEN 'noodles' AND 'A' ORDER BY OriginWac, DestAirportID, WheelsOn LIMIT 22
+SELECT TailNum, DestCityName, Month FROM mytable ORDER BY DistanceGroup, DestWac LIMIT 6
+SELECT TailNum, DivAirportIDs FROM mytable WHERE OriginAirportSeqID BETWEEN 1288403 AND 1537602 AND OriginCityName BETWEEN 'Columbus, GA' AND 'San Antonio, TX' LIMIT 22
+SELECT TailNum, OriginWac FROM mytable WHERE OriginAirportSeqID BETWEEN 1393303 AND 1295402 LIMIT 2
+SELECT TaxiIn FROM mytable WHERE CRSElapsedTime NOT IN (186) AND OriginCityMarketID BETWEEN 30620 AND 32511 AND DayOfWeek BETWEEN 1 AND 4 ORDER BY DestWac, LateAircraftDelay LIMIT 26
+SELECT TaxiIn FROM mytable WHERE DestAirportSeqID BETWEEN 1468502 AND 1448702 OR DestState BETWEEN 'NC' AND 'PA' OR CarrierDelay IN (113, 64, 51, 290, 73) ORDER BY CarrierDelay, OriginAirportID LIMIT 7
+SELECT TaxiIn FROM mytable WHERE WheelsOn = 256 ORDER BY DivDistance, CRSElapsedTime, Cancelled LIMIT 23
+SELECT TaxiIn, AirTime FROM mytable WHERE ArrDelayMinutes IN (146.0, 109.0) ORDER BY DistanceGroup, SecurityDelay LIMIT 29
+SELECT TaxiIn, ArrDel15, AirTime FROM mytable WHERE DivAirportIDs BETWEEN 12992 AND 14107 AND CRSElapsedTime IN (224, 179, 208, 29) LIMIT 16
+SELECT TaxiIn, ArrTime, TotalAddGTime FROM mytable ORDER BY ArrTime LIMIT 13
+SELECT TaxiIn, Cancelled FROM mytable LIMIT 29
+SELECT TaxiIn, DivAirportIDs, Distance FROM mytable WHERE  REGEXP_LIKE(OriginCityName, 'College S.*ation/Bryan, TX') OR DivAirportLandings = 9 AND DivAirportIDs > 13303 ORDER BY DepTimeBlk LIMIT 19
+SELECT TaxiIn, DivAirportSeqIDs, DepTime FROM mytable WHERE DivAirportLandings = 9 AND ArrDelay >= 321.0 ORDER BY DayOfWeek, ArrDelayMinutes LIMIT 16
+SELECT TaxiIn, DivArrDelay FROM mytable WHERE DivArrDelay BETWEEN 640 AND 232 AND LateAircraftDelay <= 17 LIMIT 25
+SELECT TaxiIn, DivArrDelay, DaysSinceEpoch FROM mytable WHERE DivActualElapsedTime > 372 AND ArrDelayMinutes <> 60.0 OR TaxiIn BETWEEN 22 AND 84 ORDER BY Year, LongestAddGTime, ActualElapsedTime LIMIT 6
+SELECT TaxiIn, UniqueCarrier, OriginAirportID FROM mytable WHERE DestAirportID BETWEEN 11865 AND 14256 ORDER BY ArrTimeBlk, Month LIMIT 25
+SELECT TaxiOut FROM mytable ORDER BY ArrDelayMinutes, CRSElapsedTime LIMIT 5
+SELECT TaxiOut FROM mytable WHERE CRSDepTime NOT IN (2210, 716, 1510, 1153, 1517) AND ArrTimeBlk BETWEEN '1900-1959' AND '0700-0759' ORDER BY Flights, OriginCityMarketID LIMIT 25
+SELECT TaxiOut, Carrier, ArrivalDelayGroups FROM mytable WHERE Month IN (1) AND DivArrDelay BETWEEN 362 AND 399 OR TailNum NOT IN ('N266WN', 'N3GVAA', 'N593JB') LIMIT 20
+SELECT TaxiOut, DepDel15, DivWheelsOffs FROM mytable WHERE DivAirports < 'MCO' ORDER BY OriginState LIMIT 23
+SELECT TaxiOut, Dest FROM mytable WHERE ArrTime BETWEEN 807 AND 2154 AND ActualElapsedTime BETWEEN 172 AND 307 ORDER BY DestCityName LIMIT 5
+SELECT TaxiOut, DivArrDelay FROM mytable ORDER BY CarrierDelay, SecurityDelay, DepTime LIMIT 23
+SELECT TaxiOut, DivLongestGTimes FROM mytable ORDER BY DestState, Flights LIMIT 1
+SELECT TaxiOut, OriginState, OriginAirportID FROM mytable ORDER BY OriginCityMarketID, CRSArrTime, DestStateName LIMIT 7
+SELECT TaxiOut, TaxiIn, DayOfWeek FROM mytable WHERE TotalAddGTime NOT IN (8) AND CRSArrTime BETWEEN 923 AND 2150 ORDER BY Flights, WeatherDelay, DivActualElapsedTime LIMIT 15
+SELECT TaxiOut, TotalAddGTime FROM mytable WHERE DepartureDelayGroups IN (-1, 8) ORDER BY OriginStateFips, ArrivalDelayGroups LIMIT 2
+SELECT TotalAddGTime FROM mytable LIMIT 24
+SELECT TotalAddGTime FROM mytable WHERE DivAirports = 'ALO' OR WheelsOff IN (1655, 1225, 2314, 515) ORDER BY LateAircraftDelay, Flights, ArrTimeBlk LIMIT 24
+SELECT TotalAddGTime, AirlineID, DaysSinceEpoch FROM mytable WHERE DivWheelsOffs < 1231 OR ArrDelayMinutes BETWEEN 22.0 AND 164.0 AND DivAirportIDs IN (13476, 15376, 13029, 14831) ORDER BY TailNum LIMIT 13
+SELECT TotalAddGTime, ArrTime, Month FROM mytable LIMIT 28
+SELECT TotalAddGTime, DepDel15 FROM mytable WHERE CRSElapsedTime NOT IN (349, 183, 356, 41, 315) OR TaxiOut BETWEEN 78 AND 25 ORDER BY CancellationCode, DivArrDelay LIMIT 13
+SELECT TotalAddGTime, DivActualElapsedTime FROM mytable ORDER BY Carrier, CarrierDelay, DestCityName LIMIT 28
+SELECT TotalAddGTime, DivTotalGTimes FROM mytable WHERE CancellationCode IN ('A', 'B', 'C', 'noodles') ORDER BY DivReachedDest, CRSDepTime, DaysSinceEpoch LIMIT 13
+SELECT TotalAddGTime, NASDelay FROM mytable ORDER BY DepartureDelayGroups, TaxiIn, ArrTimeBlk LIMIT 18
+SELECT UniqueCarrier FROM mytable LIMIT 5
+SELECT UniqueCarrier FROM mytable ORDER BY DestState LIMIT 13
+SELECT UniqueCarrier FROM mytable WHERE DivArrDelay IN (68, 520) ORDER BY SecurityDelay, OriginWac LIMIT 21
+SELECT UniqueCarrier FROM mytable WHERE DivLongestGTimes IN (36.0, 118.0, 10.0) OR OriginAirportSeqID = 1127802 LIMIT 10
+SELECT UniqueCarrier FROM mytable WHERE FlightNum BETWEEN 26 AND 2973 AND CRSArrTime <= 639 OR NASDelay IN (6, 41) ORDER BY DistanceGroup, UniqueCarrier LIMIT 12
+SELECT UniqueCarrier FROM mytable WHERE Origin <> 'TOL' AND DepDelay = 256.0 AND NASDelay BETWEEN 368 AND 75 LIMIT 8
+SELECT UniqueCarrier, ArrDelay FROM mytable WHERE ActualElapsedTime NOT IN (203, 92, 97, 98) OR DestAirportID <> 11267 AND  REGEXP_LIKE(OriginStateName, '.*laska') ORDER BY DivArrDelay, Month LIMIT 21
+SELECT UniqueCarrier, DayofMonth, DestAirportID FROM mytable WHERE DestStateName IN ('Massachusetts', 'Virginia', 'Kentucky', 'Kansas', 'Washington') ORDER BY DestWac LIMIT 25
+SELECT UniqueCarrier, DaysSinceEpoch FROM mytable WHERE Carrier IN ('DL', 'B6', 'VX') OR Flights < 1 ORDER BY DivActualElapsedTime LIMIT 0
+SELECT UniqueCarrier, DepTime FROM mytable ORDER BY DestAirportSeqID, DestCityMarketID, WeatherDelay LIMIT 28
+SELECT UniqueCarrier, WeatherDelay, DivAirportIDs FROM mytable ORDER BY DivAirportLandings, ArrDelayMinutes LIMIT 1
+SELECT WeatherDelay FROM mytable ORDER BY TaxiIn LIMIT 2
+SELECT WeatherDelay FROM mytable WHERE ActualElapsedTime = 426 ORDER BY FlightDate, DivDistance, ArrivalDelayGroups
+SELECT WeatherDelay FROM mytable WHERE Carrier NOT IN ('EV', 'HA', 'MQ') OR DivWheelsOns IN (1144, 1259, 1558, 1303) AND DivAirportSeqIDs IN (1120302, 1160302, 1106603) ORDER BY TotalAddGTime, CancellationCode LIMIT 16
+SELECT WeatherDelay FROM mytable WHERE DivActualElapsedTime IN (652, 435, 920, 416) OR DestAirportSeqID IN (1239102, 1228002, 1177801) OR TailNum <> 'N797AS' ORDER BY OriginAirportID LIMIT 12
+SELECT WeatherDelay, AirlineID, DivTotalGTimes FROM mytable WHERE DivAirportLandings IN (2, 0, 9) OR SecurityDelay BETWEEN 4 AND 10 ORDER BY CRSDepTime, Month LIMIT 28
+SELECT WeatherDelay, CRSDepTime FROM mytable WHERE CRSDepTime BETWEEN 2127 AND 659 ORDER BY FlightNum LIMIT 5
+SELECT WeatherDelay, Cancelled, Dest FROM mytable WHERE AirTime <= 329 OR AirlineID < 20366 OR AirlineID BETWEEN 20304 AND 19805 ORDER BY OriginAirportID LIMIT 22
+SELECT WeatherDelay, DestCityName, DepTimeBlk FROM mytable WHERE ArrTimeBlk <= '1400-1459' AND DestAirportID = 10754 LIMIT 21
+SELECT WeatherDelay, Distance FROM mytable ORDER BY LateAircraftDelay, CancellationCode, DivAirportLandings LIMIT 11
+SELECT WheelsOff FROM mytable ORDER BY CancellationCode, DestWac, DepTime LIMIT 1
+SELECT WheelsOff FROM mytable WHERE ArrTime IN (154, 2214, 257, 702, 207) OR WheelsOff IN (1742, 2010) AND DepTime <= 2306 ORDER BY CRSDepTime, DayofMonth, TailNum LIMIT 16
+SELECT WheelsOff FROM mytable WHERE ArrivalDelayGroups NOT IN (10, 0, 7, -1) LIMIT 20
+SELECT WheelsOff FROM mytable WHERE DivTotalGTimes IN (98, 57, 9, 118) OR DepTime <> 1910 AND DayofMonth <> 25 LIMIT 29
+SELECT WheelsOff FROM mytable WHERE TaxiIn BETWEEN 36 AND 65 AND DestWac >= 88 LIMIT 27
+SELECT WheelsOff, ArrTimeBlk, OriginStateName FROM mytable WHERE DepDel15 NOT IN (0) AND DayofMonth BETWEEN 20 AND 14 ORDER BY Diverted, SecurityDelay, ArrDelayMinutes LIMIT 14
+SELECT WheelsOff, Carrier, DivArrDelay FROM mytable WHERE LateAircraftDelay IN (250, 24) ORDER BY DestWac, Distance, SecurityDelay LIMIT 14
+SELECT WheelsOff, Dest, OriginWac FROM mytable ORDER BY Diverted, TailNum, UniqueCarrier LIMIT 2
+SELECT WheelsOff, DestStateFips FROM mytable WHERE OriginWac >= 11 OR DepTimeBlk BETWEEN '1000-1059' AND '1600-1659' LIMIT 9
+SELECT WheelsOff, DivAirportSeqIDs, Month FROM mytable ORDER BY AirlineID, DestAirportID LIMIT 6
+SELECT WheelsOff, DivReachedDest FROM mytable ORDER BY TaxiOut, DepTime, Dest LIMIT 27
+SELECT WheelsOff, DivReachedDest, Cancelled FROM mytable ORDER BY DivReachedDest LIMIT 7
+SELECT WheelsOff, Diverted, OriginAirportID FROM mytable WHERE WheelsOn < 27 ORDER BY CRSElapsedTime LIMIT 13
+SELECT WheelsOff, LongestAddGTime FROM mytable WHERE DivTotalGTimes BETWEEN 92 AND 49 AND ActualElapsedTime <> 274 OR WheelsOff BETWEEN 1033 AND 1318 ORDER BY FlightNum, FlightDate, SecurityDelay LIMIT 21
+SELECT WheelsOff, Origin FROM mytable WHERE DayofMonth NOT IN (2, 6, 31, 22, 25) AND DepartureDelayGroups <> 2 ORDER BY OriginCityMarketID LIMIT 25
+SELECT WheelsOff, TaxiIn, Carrier FROM mytable WHERE OriginCityMarketID = 33933 ORDER BY ArrDelayMinutes LIMIT 29
+SELECT WheelsOff, TotalAddGTime, Month FROM mytable ORDER BY OriginState LIMIT 24
+SELECT WheelsOn FROM mytable ORDER BY AirlineID, TailNum LIMIT 12
+SELECT WheelsOn FROM mytable ORDER BY OriginAirportSeqID, WheelsOff, AirlineID LIMIT 29
+SELECT WheelsOn FROM mytable WHERE DivAirportIDs <= 12448 AND DepartureDelayGroups BETWEEN 1 AND 4 AND FlightDate > '2014-01-24' ORDER BY DayofMonth, DayOfWeek, OriginStateName LIMIT 29
+SELECT WheelsOn FROM mytable WHERE DivArrDelay > 284 OR Month = 6 AND WeatherDelay BETWEEN 59 AND 147 ORDER BY OriginWac, CRSArrTime LIMIT 8
+SELECT WheelsOn, ArrivalDelayGroups FROM mytable WHERE ArrDel15 NOT IN (0, -9999) AND ArrTimeBlk BETWEEN '0600-0659' AND '1700-1759' LIMIT 4
+SELECT WheelsOn, CRSDepTime, OriginAirportID FROM mytable WHERE Origin BETWEEN 'ATW' AND 'MYR' ORDER BY Diverted, DayOfWeek LIMIT 24
+SELECT WheelsOn, DaysSinceEpoch FROM mytable WHERE DestWac < 52 OR ArrDel15 > -9999 ORDER BY Carrier, Origin LIMIT 29
+SELECT WheelsOn, OriginAirportID FROM mytable WHERE DivReachedDest NOT IN (1) AND DivArrDelay BETWEEN 99 AND 870 LIMIT 3
+SELECT Year FROM mytable WHERE DestState BETWEEN 'HI' AND 'OK' LIMIT 0
+SELECT Year FROM mytable WHERE DestWac BETWEEN 54 AND 67 ORDER BY OriginAirportSeqID, OriginState LIMIT 15
+SELECT Year, AirTime, DestStateName FROM mytable ORDER BY LongestAddGTime LIMIT 3
+SELECT Year, ArrDel15 FROM mytable WHERE OriginState NOT IN ('LA') OR DepDelay IN (357.0, 41.0, 375.0, 126.0) AND DivAirportIDs BETWEEN 13487 AND 15027 ORDER BY DepDelay, ArrDelayMinutes LIMIT 3
+SELECT Year, ArrTimeBlk FROM mytable WHERE DestState IN ('PR', 'WY') AND OriginCityName IN ('Sacramento, CA', 'El Paso, TX', 'Butte, MT', 'Denver, CO', 'San Antonio, TX') ORDER BY Quarter, DestCityMarketID, ArrivalDelayGroups LIMIT 16
+SELECT Year, DestWac FROM mytable WHERE DepDelay IN (414.0, 174.0, 142.0, 38.0) AND Flights BETWEEN 1 AND 1 ORDER BY TailNum LIMIT 4
+SELECT Year, DivArrDelay, DivActualElapsedTime FROM mytable WHERE DivDistance IN (436, 814, 636, 88, 50) AND Flights NOT IN (1) LIMIT 15
+SELECT Year, DivTailNums, Dest FROM mytable WHERE DaysSinceEpoch BETWEEN 16074 AND 16094 OR DivReachedDest NOT IN (0, -9999) OR DivWheelsOns IN (1810, 928, 1646, 1312) ORDER BY FlightDate, DestAirportSeqID, DepTimeBlk LIMIT 16
+SELECT Year, FlightNum, LongestAddGTime FROM mytable WHERE DivAirportIDs IN (14307, 14689, 10397) OR CarrierDelay >= 21 OR OriginCityMarketID BETWEEN 32467 AND 30631 ORDER BY WheelsOff, Quarter, DepTime LIMIT 29
+SELECT Year, LongestAddGTime, CRSDepTime FROM mytable WHERE CancellationCode > 'A' OR LateAircraftDelay NOT IN (122, 176, 246) ORDER BY OriginCityMarketID, ArrDelayMinutes, CancellationCode LIMIT 20
+SELECT Year, OriginAirportID FROM mytable WHERE DivLongestGTimes BETWEEN 144.0 AND 107.0 AND DivWheelsOns BETWEEN 1202 AND 1752 ORDER BY CRSDepTime, Origin, DivAirportLandings LIMIT 24
+SELECT Year, OriginState, ArrDel15 FROM mytable WHERE OriginAirportID IN (12343, 10980, 11695, 10423) OR  REGEXP_LIKE(DestState, 'I.*') OR FirstDepTime = 534 ORDER BY DivReachedDest, ArrDelayMinutes, Distance LIMIT 24
+SELECT Year, OriginWac, CRSDepTime FROM mytable WHERE DivDistance BETWEEN 1011 AND 68 OR UniqueCarrier < 'VX' LIMIT 4
+SELECT Year, Quarter FROM mytable WHERE DestCityMarketID NOT IN (34960, 33316, 33127, 31973, 32982) LIMIT 19
+SELECT Year, TaxiOut FROM mytable ORDER BY CarrierDelay LIMIT 9
+SELECT column1, column5, column11 FROM testTable ORDER BY column6, column1
+SELECT column1, column5, column11 FROM testTable ORDER BY column6, column1 WHERE column1 > 100000000 AND column3 BETWEEN 20000000 AND 1000000000 AND column5 = 'gFuH' AND (column6 < 500000000 OR column11 NOT IN ('t', 'P')) AND daysSinceEpoch = 126164076
+SELECT column1, column5, column6 FROM testTable ORDER BY column5, column9
+SELECT column1, column5, column6 FROM testTable ORDER BY column5, column9 WHERE column1 > 100000000 AND column2 BETWEEN 20000000 AND 1000000000 AND column3 <> 'w' AND (column6 < 500000 OR column7 NOT IN (225, 407)) AND daysSinceEpoch = 1756015683
+select $docId, $segmentName, $hostName from mytable where $docId < 5 limit 50
+select $docId, $segmentName, $hostName from mytable where $docId = 5 limit 50
+select $docId, $segmentName, $hostName from mytable where $docId > 19998 limit 50

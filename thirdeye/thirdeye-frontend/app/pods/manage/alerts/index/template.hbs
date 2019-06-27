@@ -37,7 +37,7 @@
       {{/power-select}}
     </div>
 
-    {{#if (gt paginatedSelectedAlerts.length 1)}}
+    {{#if (gt currentPageAlerts 1)}}
       <div class="manage-alert-search__sort">
         <div class="manage-alert-search__label">Sort By:</div>
         {{#power-select
@@ -67,7 +67,7 @@
       {{/if}}
       {{#if paginatedSelectedAlerts}}
         <span class="te-search-header__displaynum pull-right">
-          Showing {{paginatedSelectedAlerts.length}} of
+          Showing {{currentPageAlerts}} of
           {{totalFilteredAlerts}} {{if (gt totalFilteredAlerts 1) 'alerts' 'alert'}}
         </span>
       {{/if}}

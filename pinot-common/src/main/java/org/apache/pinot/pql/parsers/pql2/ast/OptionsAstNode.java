@@ -20,6 +20,7 @@ package org.apache.pinot.pql.parsers.pql2.ast;
 
 import java.util.HashMap;
 import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.request.PinotQuery;
 
 
 /**
@@ -31,7 +32,14 @@ public class OptionsAstNode extends BaseAstNode {
     if (brokerRequest.getQueryOptions() == null) {
       brokerRequest.setQueryOptions(new HashMap<>());
     }
-
     sendBrokerRequestUpdateToChildren(brokerRequest);
+  }
+
+  @Override
+  public void updatePinotQuery(PinotQuery pinotQuery) {
+    if (pinotQuery.getQueryOptions() == null) {
+      pinotQuery.setQueryOptions(new HashMap<>());
+    }
+    sendPinotQueryUpdateToChildren(pinotQuery);
   }
 }

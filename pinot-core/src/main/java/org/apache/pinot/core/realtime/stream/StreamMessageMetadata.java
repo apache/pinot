@@ -29,6 +29,12 @@ public class StreamMessageMetadata implements RowMetadata {
 
   private final long _ingestionTimeMs;
 
+  /**
+   * Construct the stream based message/row message metadata
+   *
+   * @param ingestionTimeMs  the time that the message was ingested by the stream provider
+   *                         use Long.MIN_VALUE if not applicable
+   */
   public StreamMessageMetadata(long ingestionTimeMs) {
     _ingestionTimeMs = ingestionTimeMs;
   }

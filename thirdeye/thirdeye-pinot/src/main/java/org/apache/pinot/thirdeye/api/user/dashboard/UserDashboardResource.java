@@ -21,9 +21,9 @@ package org.apache.pinot.thirdeye.api.user.dashboard;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Collections2;
-import com.wordnik.swagger.annotations.Api;
-import com.wordnik.swagger.annotations.ApiOperation;
-import com.wordnik.swagger.annotations.ApiParam;
+import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiOperation;
+import io.swagger.annotations.ApiParam;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -42,7 +42,7 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.thirdeye.api.Constants;
 import org.apache.pinot.thirdeye.constant.AnomalyFeedbackType;
 import org.apache.pinot.thirdeye.dashboard.resources.v2.ResourceUtils;
@@ -246,7 +246,7 @@ public class UserDashboardResource {
       summary.setMetricId(metricId);
 
       if (metricId > 0) {
-        summary.setMetricUrn(this.getMetricUrn(anomaly));
+        summary.setMetricUrn(anomaly.getMetricUrn());
       }
 
       // TODO use alert filter if necessary
@@ -393,15 +393,5 @@ public class UserDashboardResource {
     } catch (Exception e) {
       return -1;
     }
-  }
-
-  /**
-   * Returns an URN matching the anomalies associated metric (and dimensions)
-   *
-   * @param anomaly anomaly dto
-   * @return metric urn
-   */
-  private String getMetricUrn(MergedAnomalyResultDTO anomaly) {
-    return MetricEntity.fromMetric(1.0, this.getMetricId(anomaly), ResourceUtils.getAnomalyFilters(anomaly, this.datasetDAO)).getUrn();
   }
 }

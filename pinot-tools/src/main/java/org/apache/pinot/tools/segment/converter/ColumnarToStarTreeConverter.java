@@ -45,6 +45,9 @@ public class ColumnarToStarTreeConverter {
   @Option(name = "-outputDir", required = true, usage = "Path to output directory")
   private String _outputDirName = null;
 
+  @Option(name = "-tableName", required = true, usage = "Table name without type")
+  private String _rawTableName = null;
+
   @Option(name = "-starTreeConfigFile", required = false, usage = "Path to Star Tree configuration file")
   private String _starTreeConfigFileName = null;
 
@@ -115,7 +118,7 @@ public class ColumnarToStarTreeConverter {
     config.setFormat(FileFormat.PINOT);
     config.setOutDir(_outputDirName);
     config.setOverwrite(_overwrite);
-    config.setTableName(segmentMetadata.getTableName());
+    config.setTableName(_rawTableName);
     config.setSegmentName(segmentMetadata.getName());
 
     StarTreeIndexSpec starTreeIndexSpec = null;

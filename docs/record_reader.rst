@@ -67,6 +67,17 @@ Thrift Record Reader Config
 The Thrift record reader config is mandatory. It contains the Thrift class name for the record reader to de-serialize
 the Thrift objects.
 
+ORC Record Reader Config
+~~~~~~~~~~~~~~~~~~~~~~~~
+The following property is to be set during segment generation in your Hadoop properties.
+
+record.reader.path: ${FULL_PATH_OF_YOUR_RECORD_READER_CLASS}
+
+For ORC, it would be:
+
+record.reader.path: org.apache.pinot.orc.data.readers.ORCRecordReader
+
+
 Implement Your Own Record Reader
 --------------------------------
 

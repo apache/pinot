@@ -21,12 +21,14 @@ package org.apache.pinot.thirdeye.detection.wrapper;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.apache.commons.collections.MapUtils;
+import org.apache.commons.collections4.MapUtils;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
+import org.apache.pinot.thirdeye.datalayer.dto.EvaluationDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.detection.ConfigUtils;
 import org.apache.pinot.thirdeye.detection.DataProvider;
@@ -45,6 +47,7 @@ public class GrouperWrapper extends DetectionPipeline {
   private static final String PROP_NESTED = "nested";
   private static final String PROP_CLASS_NAME = "className";
   private static final String PROP_GROUPER = "grouper";
+  private static final String PROP_DETECTOR_COMPONENT_NAME = "detectorComponentName";
 
   private final List<Map<String, Object>> nestedProperties;
 
@@ -71,29 +74,45 @@ public class GrouperWrapper extends DetectionPipeline {
   @Override
   public final DetectionPipelineResult run() throws Exception {
     List<MergedAnomalyResultDTO> candidates = new ArrayList<>();
+    Map<String, Object> diagnostics = new HashMap<>();
+    List<PredictionResult> predictionResults = new ArrayList<>();
+    List<EvaluationDTO> evaluations = new ArrayList<>();
 
     Set<Long> lastTimeStamps = new HashSet<>();
-    List<PredictionResult> predictionResults = new ArrayList<>();
     for (Map<String, Object> properties : this.nestedProperties) {
       DetectionConfigDTO nestedConfig = new DetectionConfigDTO();
 
       Preconditions.checkArgument(properties.containsKey(PROP_CLASS_NAME), "Nested missing " + PROP_CLASS_NAME);
+
       nestedConfig.setId(this.config.getId());
       nestedConfig.setName(this.config.getName());
       nestedConfig.setDescription(this.config.getDescription());
       nestedConfig.setProperties(properties);
-
+      nestedConfig.setComponents(this.config.getComponents());
       DetectionPipeline pipeline = this.provider.loadPipeline(nestedConfig, this.startTime, this.endTime);
 
       DetectionPipelineResult intermediate = pipeline.run();
       lastTimeStamps.add(intermediate.getLastTimestamp());
-      predictionResults.addAll(intermediate.getPredictions());
 
+      predictionResults.addAll(intermediate.getPredictions());
+      evaluations.addAll(intermediate.getEvaluations());
+      diagnostics.putAll(intermediate.getDiagnostics());
       candidates.addAll(intermediate.getAnomalies());
     }
 
     List<MergedAnomalyResultDTO> anomalies = this.grouper.group(candidates);
 
-    return new DetectionPipelineResult(anomalies, DetectionUtils.consolidateNestedLastTimeStamps(lastTimeStamps), predictionResults);
+    for (MergedAnomalyResultDTO anomaly : anomalies) {
+      if (anomaly.isChild()) {
+        throw new RuntimeException("Child anomalies returned by grouper. It should always return parent anomalies"
+            + " with child mapping. Detection id: " + this.config.getId() + ", grouper name: " + this.grouperName);
+      }
+
+      anomaly.setDetectionConfigId(this.config.getId());
+      anomaly.getProperties().put(PROP_DETECTOR_COMPONENT_NAME, this.grouperName);
+    }
+
+    return new DetectionPipelineResult(anomalies, DetectionUtils.consolidateNestedLastTimeStamps(lastTimeStamps),
+        predictionResults, evaluations).setDiagnostics(diagnostics);
   }
 }

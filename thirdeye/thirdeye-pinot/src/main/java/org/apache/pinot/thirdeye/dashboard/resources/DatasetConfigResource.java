@@ -20,6 +20,7 @@
 package org.apache.pinot.thirdeye.dashboard.resources;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.base.Preconditions;
 import org.apache.pinot.thirdeye.dashboard.Utils;
 import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
@@ -41,8 +42,7 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.apache.commons.lang.NullArgumentException;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.codehaus.jackson.node.ObjectNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -72,9 +72,7 @@ public class DatasetConfigResource {
 
   private void toggleRequiresCompletenessCheck(String dataset, boolean state) {
     DatasetConfigDTO datasetConfig = datasetConfigDAO.findByDataset(dataset);
-    if(datasetConfig == null) {
-      throw new NullArgumentException("dataset config spec not found");
-    }
+    Preconditions.checkNotNull(datasetConfig, "dataset config spec not found");
     datasetConfig.setRequiresCompletenessCheck(state);
     datasetConfigDAO.update(datasetConfig);
   }

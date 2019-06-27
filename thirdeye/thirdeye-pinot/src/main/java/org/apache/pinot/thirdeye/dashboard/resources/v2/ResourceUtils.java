@@ -42,8 +42,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.regex.Pattern;
-import org.apache.commons.collections.MapUtils;
-import org.apache.commons.lang.text.StrSubstitutor;
+import org.apache.commons.collections4.MapUtils;
+import org.apache.commons.lang3.text.StrSubstitutor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

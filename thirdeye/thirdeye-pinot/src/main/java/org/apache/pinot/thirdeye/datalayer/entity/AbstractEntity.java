@@ -20,8 +20,8 @@
 package org.apache.pinot.thirdeye.datalayer.entity;
 
 import java.sql.Timestamp;
-import org.apache.commons.lang.builder.ToStringBuilder;
-import org.apache.commons.lang.builder.ToStringStyle;
+import org.apache.commons.lang3.builder.ToStringBuilder;
+import org.apache.commons.lang3.builder.ToStringStyle;
 
 /**
  * Abstract superclass for entities with an id of type long.

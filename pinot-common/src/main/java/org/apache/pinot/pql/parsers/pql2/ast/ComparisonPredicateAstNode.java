@@ -19,9 +19,11 @@
 package org.apache.pinot.pql.parsers.pql2.ast;
 
 import java.util.Collections;
+import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.FilterOperator;
 import org.apache.pinot.common.utils.request.FilterQueryTree;
 import org.apache.pinot.common.utils.request.HavingQueryTree;
+import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.pql.parsers.Pql2CompilationException;
 
 
@@ -149,6 +151,74 @@ public class ComparisonPredicateAstNode extends PredicateAstNode {
 
       if (_identifier != null) {
         return new FilterQueryTree(_identifier, Collections.singletonList(comparison), FilterOperator.RANGE, null);
+      } else {
+        throw new Pql2CompilationException("One column is needed for comparison.");
+      }
+    }
+  }
+
+  @Override
+  public Expression buildFilterExpression() {
+    if (_identifier == null) {
+      throw new Pql2CompilationException("Comparison predicate has no identifier");
+    }
+
+    if ("=".equals(_operand)) {
+      if (_identifier != null && _literal != null) {
+        Expression expr = RequestUtils.createFunctionExpression(FilterKind.EQUALS.name());
+        expr.getFunctionCall().addToOperands(RequestUtils.createIdentifierExpression(_identifier));
+        expr.getFunctionCall().addToOperands(RequestUtils.createLiteralExpression(_literal));
+        return expr;
+      } else {
+        throw new Pql2CompilationException("Comparison is not between a column and a constant");
+      }
+    } else if ("<>".equals(_operand) || "!=".equals(_operand)) {
+      if (_identifier != null && _literal != null) {
+        Expression expr = RequestUtils.createFunctionExpression(FilterKind.NOT_EQUALS.name());
+        expr.getFunctionCall().addToOperands(RequestUtils.createIdentifierExpression(_identifier));
+        expr.getFunctionCall().addToOperands(RequestUtils.createLiteralExpression(_literal));
+        return expr;
+      } else {
+        throw new Pql2CompilationException("Comparison is not between a column and a constant");
+      }
+    } else {
+      if (_identifier != null) {
+        boolean identifierIsOnLeft = true;
+        if (getChildren().get(0) instanceof LiteralAstNode) {
+          identifierIsOnLeft = false;
+        }
+        Expression expr = null;
+        if ("<".equals(_operand)) {
+          if (identifierIsOnLeft) {
+            expr = RequestUtils.createFunctionExpression(FilterKind.LESS_THAN.name());
+          } else {
+            expr = RequestUtils.createFunctionExpression(FilterKind.GREATER_THAN.name());
+          }
+        } else if ("<=".equals(_operand)) {
+          if (identifierIsOnLeft) {
+            expr = RequestUtils.createFunctionExpression(FilterKind.LESS_THAN_OR_EQUAL.name());
+          } else {
+            expr = RequestUtils.createFunctionExpression(FilterKind.GREATER_THAN_OR_EQUAL.name());
+          }
+        } else if (">".equals(_operand)) {
+          if (identifierIsOnLeft) {
+            expr = RequestUtils.createFunctionExpression(FilterKind.GREATER_THAN.name());
+          } else {
+            expr = RequestUtils.createFunctionExpression(FilterKind.LESS_THAN.name());
+          }
+        } else if (">=".equals(_operand)) {
+          if (identifierIsOnLeft) {
+            expr = RequestUtils.createFunctionExpression(FilterKind.GREATER_THAN_OR_EQUAL.name());
+          } else {
+            expr = RequestUtils.createFunctionExpression(FilterKind.LESS_THAN_OR_EQUAL.name());
+          }
+        }
+        if (expr == null) {
+          throw new Pql2CompilationException("The comparison operator is not valid/is not supported for HAVING query");
+        }
+        expr.getFunctionCall().addToOperands(RequestUtils.createIdentifierExpression(_identifier));
+        expr.getFunctionCall().addToOperands(RequestUtils.createLiteralExpression(_literal));
+        return expr;
       } else {
         throw new Pql2CompilationException("One column is needed for comparison.");
       }

@@ -16,10 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.query.aggregation.function;
+package org.apache.pinot.common.function;
 
 import javax.annotation.Nonnull;
-import org.apache.pinot.core.query.exception.BadQueryRequestException;
 
 
 public enum AggregationFunctionType {
@@ -32,6 +31,7 @@ public enum AggregationFunctionType {
   MINMAXRANGE("minMaxRange"),
   DISTINCTCOUNT("distinctCount"),
   DISTINCTCOUNTHLL("distinctCountHLL"),
+  DISTINCTCOUNTRAWHLL("distinctCountRawHLL"),
   FASTHLL("fastHLL"),
   PERCENTILE("percentile"),
   PERCENTILEEST("percentileEst"),
@@ -45,6 +45,7 @@ public enum AggregationFunctionType {
   MINMAXRANGEMV("minMaxRangeMV"),
   DISTINCTCOUNTMV("distinctCountMV"),
   DISTINCTCOUNTHLLMV("distinctCountHLLMV"),
+  DISTINCTCOUNTRAWHLLMV("distinctCountRawHLLMV"),
   PERCENTILEMV("percentileMV"),
   PERCENTILEESTMV("percentileEstMV"),
   PERCENTILETDIGESTMV("percentileTDigestMV");
@@ -97,7 +98,7 @@ public enum AggregationFunctionType {
         return AggregationFunctionType.valueOf(upperCaseFunctionName);
       }
     } catch (Exception e) {
-      throw new BadQueryRequestException("Invalid aggregation function name: " + functionName);
+      throw new UnsupportedOperationException("Invalid aggregation function name: " + functionName);
     }
   }
 }

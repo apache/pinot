@@ -33,8 +33,8 @@ import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import javax.mail.internet.InternetAddress;
-import org.apache.commons.collections.CollectionUtils;
-import org.apache.commons.collections.MapUtils;
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.collections4.MapUtils;
 
 public class AlertUtils {
   private AlertUtils() {
@@ -84,7 +84,7 @@ public class AlertUtils {
 
   public static long getHighWaterMark(Collection<MergedAnomalyResultDTO> anomalies) {
     if (anomalies.isEmpty()) {
-      return -1;
+      return 0;
     }
     return Collections.max(Collections2.transform(anomalies, mergedAnomalyResultDTO -> mergedAnomalyResultDTO.getId()));
   }

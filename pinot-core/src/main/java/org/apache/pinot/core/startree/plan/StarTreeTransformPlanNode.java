@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.startree.plan;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Map;
@@ -65,7 +66,7 @@ public class StarTreeTransformPlanNode implements PlanNode {
 
   @Override
   public TransformOperator run() {
-    return new TransformOperator(_starTreeProjectionPlanNode.run(), _groupByExpressions);
+    return new TransformOperator(_starTreeProjectionPlanNode.run(), new ArrayList<>(_groupByExpressions));
   }
 
   @Override

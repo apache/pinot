@@ -138,7 +138,7 @@ public class DefaultAggregationExecutorTest {
     MatchAllFilterOperator matchAllFilterOperator = new MatchAllFilterOperator(totalRawDocs);
     DocIdSetOperator docIdSetOperator = new DocIdSetOperator(matchAllFilterOperator, DocIdSetPlanNode.MAX_DOC_PER_CALL);
     ProjectionOperator projectionOperator = new ProjectionOperator(dataSourceMap, docIdSetOperator);
-    TransformOperator transformOperator = new TransformOperator(projectionOperator, expressionTrees);
+    TransformOperator transformOperator = new TransformOperator(projectionOperator, new ArrayList<>(expressionTrees));
     TransformBlock transformBlock = transformOperator.nextBlock();
     int numAggFuncs = _aggregationInfoList.size();
     AggregationFunctionContext[] aggrFuncContextArray = new AggregationFunctionContext[numAggFuncs];

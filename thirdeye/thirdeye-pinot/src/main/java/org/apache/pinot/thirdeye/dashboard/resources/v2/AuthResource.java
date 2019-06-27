@@ -19,9 +19,9 @@
 
 package org.apache.pinot.thirdeye.dashboard.resources.v2;
 
-import com.google.common.base.Optional;
-import org.apache.pinot.thirdeye.auth.Credentials;
+import java.util.Optional;
 import org.apache.pinot.thirdeye.auth.ThirdEyeAuthFilter;
+import org.apache.pinot.thirdeye.auth.ThirdEyeCredentials;
 import org.apache.pinot.thirdeye.auth.ThirdEyePrincipal;
 import org.apache.pinot.thirdeye.datalayer.bao.SessionManager;
 import org.apache.pinot.thirdeye.datalayer.dto.SessionDTO;
@@ -53,12 +53,12 @@ public class AuthResource {
   private final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
   private static final int DEFAULT_VALID_DAYS_VALUE = 90;
-  private final Authenticator<Credentials, ThirdEyePrincipal> authenticator;
+  private final Authenticator<ThirdEyeCredentials, ThirdEyePrincipal> authenticator;
   private final long cookieTTL;
   private final SessionManager sessionDAO;
   private final Random random;
 
-  public AuthResource(Authenticator<Credentials, ThirdEyePrincipal> authenticator,
+  public AuthResource(Authenticator<ThirdEyeCredentials, ThirdEyePrincipal> authenticator,
       long cookieTTL) {
     this.authenticator = authenticator;
     this.cookieTTL = cookieTTL;
@@ -93,7 +93,7 @@ public class AuthResource {
 
   @Path("/authenticate")
   @POST
-  public Response authenticate(Credentials credentials) {
+  public Response authenticate(ThirdEyeCredentials credentials) {
     try {
       final Optional<ThirdEyePrincipal> optPrincipal = this.authenticator.authenticate(credentials);
       if (!optPrincipal.isPresent()) {

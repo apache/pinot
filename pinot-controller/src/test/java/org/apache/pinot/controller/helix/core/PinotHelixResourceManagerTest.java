@@ -244,29 +244,25 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
     // Test retrieving OFFLINE segment ZK metadata
     {
       OfflineSegmentZKMetadata offlineSegmentZKMetadata = new OfflineSegmentZKMetadata();
-      offlineSegmentZKMetadata.setTableName(OFFLINE_TABLE_NAME);
       offlineSegmentZKMetadata.setSegmentName(segmentName);
-      ZKMetadataProvider.setOfflineSegmentZKMetadata(_propertyStore, offlineSegmentZKMetadata);
+      ZKMetadataProvider.setOfflineSegmentZKMetadata(_propertyStore, OFFLINE_TABLE_NAME, offlineSegmentZKMetadata);
       List<OfflineSegmentZKMetadata> retrievedMetadataList =
           _helixResourceManager.getOfflineSegmentMetadata(OFFLINE_TABLE_NAME);
       Assert.assertEquals(retrievedMetadataList.size(), 1);
       OfflineSegmentZKMetadata retrievedMetadata = retrievedMetadataList.get(0);
-      Assert.assertEquals(retrievedMetadata.getTableName(), OFFLINE_TABLE_NAME);
       Assert.assertEquals(retrievedMetadata.getSegmentName(), segmentName);
     }
 
     // Test retrieving REALTIME segment ZK metadata
     {
       RealtimeSegmentZKMetadata realtimeMetadata = new RealtimeSegmentZKMetadata();
-      realtimeMetadata.setTableName(REALTIME_TABLE_NAME);
       realtimeMetadata.setSegmentName(segmentName);
       realtimeMetadata.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
-      ZKMetadataProvider.setRealtimeSegmentZKMetadata(_propertyStore, realtimeMetadata);
+      ZKMetadataProvider.setRealtimeSegmentZKMetadata(_propertyStore, REALTIME_TABLE_NAME, realtimeMetadata);
       List<RealtimeSegmentZKMetadata> retrievedMetadataList =
           _helixResourceManager.getRealtimeSegmentMetadata(REALTIME_TABLE_NAME);
       Assert.assertEquals(retrievedMetadataList.size(), 1);
       RealtimeSegmentZKMetadata retrievedMetadata = retrievedMetadataList.get(0);
-      Assert.assertEquals(retrievedMetadata.getTableName(), REALTIME_TABLE_NAME);
       Assert.assertEquals(retrievedMetadata.getSegmentName(), segmentName);
       Assert.assertEquals(realtimeMetadata.getStatus(), CommonConstants.Segment.Realtime.Status.DONE);
     }

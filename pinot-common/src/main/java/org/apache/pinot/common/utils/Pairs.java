@@ -32,46 +32,45 @@ public class Pairs {
   }
 
   public static class IntPair {
-    int a;
+    private int _left;
+    private int _right;
 
-    int b;
-
-    public IntPair(int a, int b) {
-      this.a = a;
-      this.b = b;
+    public IntPair(int left, int right) {
+      _left = left;
+      _right = right;
     }
 
     public int getLeft() {
-      return a;
+      return _left;
     }
 
     public int getRight() {
-      return b;
+      return _right;
     }
 
-    public void setLeft(int a) {
-      this.a = a;
+    public void setLeft(int left) {
+      _left = left;
     }
 
-    public void setRight(int b) {
-      this.b = b;
+    public void setRight(int right) {
+      _right = right;
     }
 
     @Override
     public String toString() {
-      return "[" + a + "," + b + "]";
+      return "[" + _left + "," + _right + "]";
     }
 
     @Override
     public int hashCode() {
-      return toString().hashCode();
+      return 37 * _left + _right;
     }
 
     @Override
     public boolean equals(Object obj) {
       if (obj instanceof IntPair) {
         IntPair that = (IntPair) obj;
-        return obj != null && a == (that.a) && b == that.b;
+        return _left == that._left && _right == that._right;
       }
       return false;
     }
@@ -80,8 +79,12 @@ public class Pairs {
   public static class AscendingIntPairComparator implements Comparator<IntPair> {
 
     @Override
-    public int compare(IntPair o1, IntPair o2) {
-      return Integer.compare(o1.a, o2.a);
+    public int compare(IntPair pair1, IntPair pair2) {
+      if (pair1._left != pair2._left) {
+        return Integer.compare(pair1._left, pair2._left);
+      } else {
+        return Integer.compare(pair1._right, pair2._right);
+      }
     }
   }
 

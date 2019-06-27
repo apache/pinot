@@ -32,7 +32,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import org.apache.commons.collections.MapUtils;
+import org.apache.commons.collections4.MapUtils;
 import org.joda.time.Period;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -105,20 +105,24 @@ public class AutoOnboardMockDataSource extends AutoOnboard {
 
     // NOTE: save in order as mock datasource expects metric ids first
     for (MetricConfigDTO metricConfig : metricConfigs) {
-      Long id = this.metricDAO.save(metricConfig);
-      if (id != null) {
-        LOG.info("Created metric '{}' with id {}", metricConfig.getAlias(), id);
-      } else {
-        LOG.warn("Could not create metric '{}'", metricConfig.getAlias());
+      if (this.metricDAO.findByMetricAndDataset(metricConfig.getName(), metricConfig.getDataset()) == null) {
+        Long id = this.metricDAO.save(metricConfig);
+        if (id != null) {
+          LOG.info("Created metric '{}' with id {}", metricConfig.getAlias(), id);
+        } else {
+          LOG.warn("Could not create metric '{}'", metricConfig.getAlias());
+        }
       }
     }
 
     for (DatasetConfigDTO datasetConfig : datasetConfigs) {
-      Long id = this.datasetDAO.save(datasetConfig);
-      if (id != null) {
-        LOG.info("Created dataset '{}' with id {}", datasetConfig.getDataset(), id);
-      } else {
-        LOG.warn("Could not create dataset '{}'", datasetConfig.getDataset());
+      if (this.datasetDAO.findByDataset(datasetConfig.getDataset()) == null) {
+        Long id = this.datasetDAO.save(datasetConfig);
+        if (id != null) {
+          LOG.info("Created dataset '{}' with id {}", datasetConfig.getDataset(), id);
+        } else {
+          LOG.warn("Could not create dataset '{}'", datasetConfig.getDataset());
+        }
       }
     }
   }

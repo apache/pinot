@@ -22,9 +22,18 @@ package org.apache.pinot.thirdeye.auth;
 import java.util.Objects;
 
 
-public class Credentials {
+public class ThirdEyeCredentials {
   String principal;
   String password;
+  String token;
+
+  ThirdEyeCredentials(String principal, String password) {
+    this.principal = principal;
+    this.password = password;
+  }
+
+  public ThirdEyeCredentials() {
+  }
 
   public String getPrincipal() {
     return principal;
@@ -42,16 +51,25 @@ public class Credentials {
     this.password = password;
   }
 
+  public String getToken() {
+    return token;
+  }
+
+  public void setToken(String token) {
+    this.token = token;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {
       return true;
     }
-    if (!(o instanceof Credentials)) {
+    if (!(o instanceof ThirdEyeCredentials)) {
       return false;
     }
-    Credentials that = (Credentials) o;
-    return Objects.equals(principal, that.principal) && Objects.equals(password, that.password);
+    ThirdEyeCredentials that = (ThirdEyeCredentials) o;
+    return (Objects.equals(principal, that.principal) && Objects.equals(password, that.password))
+        || Objects.equals(token, that.token);
   }
 
   @Override

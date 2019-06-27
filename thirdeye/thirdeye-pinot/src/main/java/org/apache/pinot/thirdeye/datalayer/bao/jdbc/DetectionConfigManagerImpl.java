@@ -20,6 +20,13 @@
 package org.apache.pinot.thirdeye.datalayer.bao.jdbc;
 
 import com.google.inject.Singleton;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
+import javax.naming.AuthenticationException;
+import javax.ws.rs.NotAuthorizedException;
+import org.apache.pinot.thirdeye.auth.ThirdEyeAuthFilter;
+import org.apache.pinot.thirdeye.auth.ThirdEyePrincipal;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
@@ -56,6 +63,7 @@ public class DetectionConfigManagerImpl extends AbstractManagerImpl<DetectionCon
       update(detectionConfigDTO);
       return detectionConfigDTO.getId();
     }
+
     DetectionConfigBean detectionConfigBean = convertDetectionConfigDTO2Bean(detectionConfigDTO);
     Long id = genericPojoDao.put(detectionConfigBean);
     detectionConfigDTO.setId(id);

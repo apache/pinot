@@ -27,8 +27,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.apache.commons.collections.MapUtils;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.collections4.MapUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.thirdeye.datalayer.dto.DatasetConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
@@ -146,9 +146,11 @@ public class DetectionConfigValidator implements ConfigValidator<DetectionConfig
     String alertName = MapUtils.getString(detectionYaml, PROP_NAME);
 
     // Validate all compulsory fields
-    Preconditions.checkArgument(detectionYaml.containsKey(PROP_METRIC),
+    String metric = MapUtils.getString(detectionYaml, PROP_METRIC);
+    Preconditions.checkArgument(StringUtils.isNotEmpty(metric),
         "Missing property (" + PROP_METRIC + ") in sub-alert " + alertName);
-    Preconditions.checkArgument(detectionYaml.containsKey(PROP_DATASET),
+    String dataset = MapUtils.getString(detectionYaml, PROP_DATASET);
+    Preconditions.checkArgument(StringUtils.isNotEmpty(dataset),
         "Missing property (" + PROP_DATASET + ") in sub-alert " + alertName);
     Preconditions.checkArgument(detectionYaml.containsKey(PROP_RULES),
         "Missing property (" + PROP_RULES + ") in sub-alert " + alertName);
@@ -160,10 +162,15 @@ public class DetectionConfigValidator implements ConfigValidator<DetectionConfig
             + " indentation level of detection yaml it applies to.");
 
     // Check if the metric defined in the config exists
-    MetricConfigDTO metricConfig = provider
-        .fetchMetric(MapUtils.getString(detectionYaml, PROP_METRIC), MapUtils.getString(detectionYaml, PROP_DATASET));
+    MetricConfigDTO metricConfig = provider.fetchMetric(metric, dataset);
     Preconditions.checkArgument(metricConfig != null,
-        "Invalid metric (not found) in sub-alert " + alertName);
+        "Metric doesn't exist in our records. Metric " + metric + " in sub-alert " + alertName);
+
+    // Check if the dataset defined in the config exists
+    DatasetConfigDTO datasetConfig = provider
+        .fetchDatasets(Collections.singletonList(metricConfig.getDataset())).get(metricConfig.getDataset());
+    Preconditions.checkArgument(datasetConfig != null,
+        "Dataset doesn't exist in our records. Dataset " + dataset + " in sub-alert " + alertName);
 
     // We support only one grouper per metric
     Preconditions.checkArgument(ConfigUtils.getList(detectionYaml.get(PROP_GROUPER)).size() <= 1,
@@ -195,11 +202,8 @@ public class DetectionConfigValidator implements ConfigValidator<DetectionConfig
     }
 
     // Safety condition: Validate if maxDuration is greater than 15 minutes
-    Map<String, Object> mergerProperties = MapUtils.getMap(detectionYaml, PROP_MERGER, new HashMap());
+    Map<String, Object> mergerProperties = ConfigUtils.getMap(detectionYaml.get(PROP_MERGER));
     if (mergerProperties.get(PROP_MAX_DURATION) != null) {
-      DatasetConfigDTO datasetConfig = provider
-          .fetchDatasets(Collections.singletonList(metricConfig.getDataset()))
-          .get(metricConfig.getDataset());
       Preconditions.checkArgument(
           MapUtils.getLong(mergerProperties, PROP_MAX_DURATION) >= datasetConfig.bucketTimeGranularity().toMillis(),
           "The maxDuration field set is not acceptable. Please check the the document and set it correctly.");

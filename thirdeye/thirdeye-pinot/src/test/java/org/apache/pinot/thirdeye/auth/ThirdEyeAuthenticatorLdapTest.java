@@ -16,15 +16,16 @@
 
 package org.apache.pinot.thirdeye.auth;
 
-import com.google.common.base.Optional;
 import io.dropwizard.auth.AuthenticationException;
 import java.util.Arrays;
 import java.util.Hashtable;
 import java.util.List;
+import java.util.Optional;
 import javax.naming.Context;
 import javax.naming.NamingException;
 import javax.naming.directory.DirContext;
 import javax.naming.spi.InitialContextFactory;
+import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,8 +36,8 @@ import org.testng.annotations.Test;
 
 public class ThirdEyeAuthenticatorLdapTest {
   private static final Logger LOG = LoggerFactory.getLogger(ThirdEyeAuthenticatorLdapTest.class);
-  private ThirdEyeAuthenticatorLdap thirdEyeAuthenticatorLdap;
-  private Credentials credentials;
+  private ThirdEyeLdapAuthenticator thirdEyeAuthenticatorLdap;
+  private ThirdEyeCredentials credentials;
 
   private static String USERNAME1 = "username1"; // @DOMAIN1
   private static String USERNAME2 = "username2"; // @DOMAIN2
@@ -49,18 +50,15 @@ public class ThirdEyeAuthenticatorLdapTest {
   @BeforeClass
   public void setup() {
     List<String> domains = Arrays.asList(DOMAIN1, DOMAIN2);
-    thirdEyeAuthenticatorLdap = new ThirdEyeAuthenticatorLdap(domains, "ldaps://someLdap");
+    thirdEyeAuthenticatorLdap = new ThirdEyeLdapAuthenticator(domains, "ldaps://someLdap", DAORegistry.getInstance().getSessionDAO());
     thirdEyeAuthenticatorLdap.setInitialContextFactory(MockInitialDirContextFactory.class.getName());
-
-    credentials = new Credentials();
-    credentials.setPassword(PASSWORD);
   }
 
   @Test
   public void testBasicAuthentication() {
     // Test multiple domains
     try {
-      credentials.setPrincipal(USERNAME1);
+      credentials = new ThirdEyeCredentials(USERNAME1, PASSWORD);
       Optional<ThirdEyePrincipal> authenticate = thirdEyeAuthenticatorLdap.authenticate(credentials);
       Assert.assertTrue(authenticate.isPresent(), "Authentication should not fail!");
     } catch (AuthenticationException e) {
@@ -68,7 +66,7 @@ public class ThirdEyeAuthenticatorLdapTest {
       Assert.fail();
     }
     try {
-      credentials.setPrincipal(USERNAME2);
+      credentials = new ThirdEyeCredentials(USERNAME2, PASSWORD);
       Optional<ThirdEyePrincipal> authenticate = thirdEyeAuthenticatorLdap.authenticate(credentials);
       Assert.assertTrue(authenticate.isPresent(), "Authentication should not fail!");
     } catch (AuthenticationException e) {
@@ -78,7 +76,7 @@ public class ThirdEyeAuthenticatorLdapTest {
 
     // Test given domain name
     try {
-      credentials.setPrincipal(USERNAME3 + '@' + DOMAIN3);
+      credentials = new ThirdEyeCredentials(USERNAME3 + '@' + DOMAIN3, PASSWORD);
       Optional<ThirdEyePrincipal> authenticate = thirdEyeAuthenticatorLdap.authenticate(credentials);
       Assert.assertTrue(authenticate.isPresent(), "Authentication should not fail!");
     } catch (AuthenticationException e) {
@@ -91,7 +89,7 @@ public class ThirdEyeAuthenticatorLdapTest {
   public void testFailedAuthentication() {
     // Failed reason: username 3 doesn't exist in domain1 and domain2
     try {
-      credentials.setPrincipal(USERNAME3);
+      credentials = new ThirdEyeCredentials(USERNAME3, PASSWORD);
       Optional<ThirdEyePrincipal> authenticate = thirdEyeAuthenticatorLdap.authenticate(credentials);
       Assert.assertFalse(authenticate.isPresent(), "Authentication should fail!");
     } catch (AuthenticationException e) {
@@ -104,7 +102,7 @@ public class ThirdEyeAuthenticatorLdapTest {
   public void testBlankAuthentication() {
     // Failed reason: blank username
     try {
-      credentials.setPrincipal(null);
+      credentials = new ThirdEyeCredentials(null, PASSWORD);
       Optional<ThirdEyePrincipal> authenticate = thirdEyeAuthenticatorLdap.authenticate(credentials);
       Assert.assertFalse(authenticate.isPresent(), "Authentication should fail!");
     } catch (AuthenticationException e) {

@@ -23,7 +23,11 @@ export const colorMapping = {
   'light-teal': '#98DADE',
   'light-pink': '#FFB9E2',
   'light-grey': '#CFCFCF',
-  'confidence-bounds-blue' : '#dcf8f3'
+  'confidence-bounds-blue' : '#dcf8f3',
+  'screenshot-current' : '#622570',
+  'screenshot-predicted' : '#EA168E',
+  'screenshot-anomaly' : '#EEF2F5',
+  'screenshot-bounds' : '#1CAFED'
 };
 
 // TODO load from config

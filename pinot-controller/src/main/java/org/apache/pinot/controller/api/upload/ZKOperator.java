@@ -120,7 +120,8 @@ public class ZKOperator {
 
       // Lock the segment by setting the upload start time in ZK
       existingSegmentZKMetadata.setSegmentUploadStartTime(System.currentTimeMillis());
-      if (!_pinotHelixResourceManager.updateZkMetadata(existingSegmentZKMetadata, znRecord.getVersion())) {
+      if (!_pinotHelixResourceManager
+          .updateZkMetadata(offlineTableName, existingSegmentZKMetadata, znRecord.getVersion())) {
         throw new ControllerApplicationException(LOGGER,
             "Failed to lock the segment: " + segmentName + " of table: " + offlineTableName + ", retry later",
             Response.Status.CONFLICT);
@@ -158,7 +159,7 @@ public class ZKOperator {
         // (creation time is not included in the crc)
         existingSegmentZKMetadata.setCreationTime(segmentMetadata.getIndexCreationTime());
         existingSegmentZKMetadata.setRefreshTime(System.currentTimeMillis());
-        if (!_pinotHelixResourceManager.updateZkMetadata(existingSegmentZKMetadata)) {
+        if (!_pinotHelixResourceManager.updateZkMetadata(offlineTableName, existingSegmentZKMetadata)) {
           throw new RuntimeException(
               "Failed to update ZK metadata for segment: " + segmentName + " of table: " + offlineTableName);
         }
@@ -179,7 +180,7 @@ public class ZKOperator {
         _pinotHelixResourceManager.refreshSegment(offlineTableName, segmentMetadata, existingSegmentZKMetadata);
       }
     } catch (Exception e) {
-      if (!_pinotHelixResourceManager.updateZkMetadata(existingSegmentZKMetadata)) {
+      if (!_pinotHelixResourceManager.updateZkMetadata(offlineTableName, existingSegmentZKMetadata)) {
         LOGGER.error("Failed to update ZK metadata for segment: {} of table: {}", segmentName, offlineTableName);
       }
       throw e;

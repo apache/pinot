@@ -50,7 +50,7 @@ public class MapePercentageChangeModelEvaluatorTest {
     dataFetcher = new DefaultInputDataFetcher(dataProvider, mockDetectionConfigId);
   }
 
-  private EvaluationDTO makeMockEvaluationDTO(long mockDetectionConfigId, String mockMetricUrn, long start, long end, double mape) {
+  private EvaluationDTO makeMockEvaluationDTO(long mockDetectionConfigId, String mockMetricUrn, long start, long end, Double mape) {
     EvaluationDTO eval = new EvaluationDTO();
     eval.setStartTime(start);
     eval.setEndTime(end);

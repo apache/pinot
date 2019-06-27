@@ -33,7 +33,7 @@ import org.apache.pinot.thirdeye.util.ThirdEyeUtils;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.commons.collections.MapUtils;
+import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 
 
@@ -68,7 +68,7 @@ public class LegacyDimensionWrapper extends DimensionWrapper {
     super(provider, augmentConfig(config), startTime, endTime);
 
     this.anomalyFunctionClassName = MapUtils.getString(config.getProperties(), PROP_ANOMALY_FUNCTION_CLASS);
-    this.anomalyFunctionSpecs = MapUtils.getMap(config.getProperties(), PROP_SPEC);
+    this.anomalyFunctionSpecs = ConfigUtils.getMap(config.getProperties().get(PROP_SPEC));
     this.anomalyFunction = (BaseAnomalyFunction) Class.forName(this.anomalyFunctionClassName).newInstance();
 
     String specs = OBJECT_MAPPER.writeValueAsString(this.anomalyFunctionSpecs);

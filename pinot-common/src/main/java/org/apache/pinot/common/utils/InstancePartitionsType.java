@@ -1,4 +1,4 @@
-/*
+/**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -16,24 +16,22 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
-package org.apache.pinot.thirdeye.detection.annotation;
-
-import com.fasterxml.jackson.annotation.JsonProperty;
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Inherited;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
-
+package org.apache.pinot.common.utils;
 
 /**
- * Yaml annotation
- * Registers the yaml translator to the translator factory.
+ * The type of the instance partitions.
+ * <p>
+ *   The instance partitions name will be of the format {@code <rawTableName>_<type>}, e.g. {@code table_OFFLINE},
+ *   {@code table_CONSUMING}, {@code table_COMPLETED}.
  */
-@Target({ElementType.TYPE})
-@Retention(RetentionPolicy.RUNTIME)
-@Inherited
-public @interface Yaml {
-  @JsonProperty String pipelineType() default "";
+public enum InstancePartitionsType {
+  OFFLINE,    // For segments from offline table// For consuming segments from real-time table
+  CONSUMING,  // For consuming segments from real-time table
+  COMPLETED;  // For completed segments from real-time table
+
+  public static final char TYPE_SUFFIX_SEPARATOR = '_';
+
+  public String getInstancePartitionsName(String rawTableName) {
+    return rawTableName + TYPE_SUFFIX_SEPARATOR + name();
+  }
 }

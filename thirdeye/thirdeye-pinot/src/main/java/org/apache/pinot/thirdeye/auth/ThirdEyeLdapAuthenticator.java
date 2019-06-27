@@ -19,7 +19,6 @@
 
 package org.apache.pinot.thirdeye.auth;
 
-import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import io.dropwizard.auth.AuthenticationException;
 import io.dropwizard.auth.Authenticator;
@@ -27,27 +26,32 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Hashtable;
 import java.util.List;
+import java.util.Optional;
 import javax.naming.Context;
 import javax.naming.NamingException;
 import javax.naming.directory.InitialDirContext;
-import org.apache.commons.collections.CollectionUtils;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.thirdeye.datalayer.bao.SessionManager;
+import org.apache.pinot.thirdeye.datalayer.dto.SessionDTO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class ThirdEyeAuthenticatorLdap implements Authenticator<Credentials, ThirdEyePrincipal> {
-  private static final Logger LOG = LoggerFactory.getLogger(ThirdEyeAuthenticatorLdap.class);
+public class ThirdEyeLdapAuthenticator implements Authenticator<ThirdEyeCredentials, ThirdEyePrincipal> {
+  private static final Logger LOG = LoggerFactory.getLogger(ThirdEyeLdapAuthenticator.class);
 
   private static final String LDAP_CONTEXT_FACTORY = "com.sun.jndi.ldap.LdapCtxFactory";
 
   private final List<String> domainSuffix;
   private final String ldapUrl;
+  private final SessionManager sessionDAO;
   private String ldapContextFactory;
 
-  public ThirdEyeAuthenticatorLdap(List<String> domainSuffix, String ldapUrl) {
+  public ThirdEyeLdapAuthenticator(List<String> domainSuffix, String ldapUrl, SessionManager sessionDAO) {
     this.domainSuffix = domainSuffix;
     this.ldapUrl = ldapUrl;
+    this.sessionDAO = sessionDAO;
     this.ldapContextFactory = LDAP_CONTEXT_FACTORY;
   }
 
@@ -56,60 +60,74 @@ public class ThirdEyeAuthenticatorLdap implements Authenticator<Credentials, Thi
   }
 
   /**
+   * Attempt ldap authentication with the following steps:
+   * 1. If user's name contains domain name or the system doesn't have any given domain names,
+   *    then use the username as is.
+   * 2. Else, try out all combinations of username and the given domain names of the system.
+   */
+  private Optional<ThirdEyePrincipal> ldapAuthenticate(String username, String password) {
+    LOG.info("Authenticating '{}' via username and password", username);
+    Hashtable<String, String> env = new Hashtable<>();
+    env.put(Context.INITIAL_CONTEXT_FACTORY, ldapContextFactory);
+    env.put(Context.PROVIDER_URL, this.ldapUrl);
+    if (this.ldapUrl.startsWith("ldaps")) {
+      env.put(Context.SECURITY_PROTOCOL, "ssl");
+    }
+    env.put(Context.SECURITY_AUTHENTICATION, "simple");
+    env.put(Context.SECURITY_CREDENTIALS, password);
+
+    AuthenticationResults authenticationResults = new AuthenticationResults();
+    if (username.contains("@") || CollectionUtils.isEmpty(domainSuffix)) {
+      env.put(Context.SECURITY_PRINCIPAL, username);
+      AuthenticationResult authenticationResult = authenticate(env);
+      authenticationResults.appendAuthenticationResult(authenticationResult);
+    } else {
+      for (String suffix : domainSuffix) {
+        env.put(Context.SECURITY_PRINCIPAL, username + '@' + suffix);
+        AuthenticationResult authenticationResult = authenticate(env);
+        authenticationResults.appendAuthenticationResult(authenticationResult);
+        if (authenticationResults.isAuthenticated()) {
+          break;
+        }
+      }
+    }
+
+    if (authenticationResults.isAuthenticated()) {
+      ThirdEyePrincipal principal = new ThirdEyePrincipal();
+      principal.setName(env.get(Context.SECURITY_PRINCIPAL));
+      LOG.info("Successfully authenticated {} with LDAP", env.get(Context.SECURITY_PRINCIPAL));
+      return Optional.of(principal);
+    } else {
+      // Failed to authenticate the user; log all error messages.
+      List<String> errorMessages = authenticationResults.getMessages();
+      for (String errorMessage : errorMessages) {
+        LOG.error(errorMessage);
+      }
+      return Optional.empty();
+    }
+  }
+
+  /**
    *  {@inheritDoc}
    */
   @Override
-  public Optional<ThirdEyePrincipal> authenticate(Credentials credentials) throws AuthenticationException {
+  public Optional<ThirdEyePrincipal> authenticate(ThirdEyeCredentials credentials) throws AuthenticationException {
     try {
-      String principalName = credentials.getPrincipal();
-      if (StringUtils.isBlank(principalName)) {
-        LOG.info("Unable to authenticate empty user name.");
-        return Optional.absent();
+      if (StringUtils.isNotBlank(credentials.getToken())) {
+        SessionDTO sessionDTO = this.sessionDAO.findBySessionKey(credentials.getToken());
+        if (sessionDTO != null && System.currentTimeMillis() < sessionDTO.getExpirationTime()) {
+          return Optional.of(new ThirdEyePrincipal(credentials.getPrincipal(), credentials.getToken()));
+        }
+      }
+
+      String username = credentials.getPrincipal();
+      String password = credentials.getPassword();
+
+      if (StringUtils.isBlank(username) || StringUtils.isBlank(password)) {
+        LOG.info("Unable to authenticate empty user name/password");
+        return Optional.empty();
       } else {
-        LOG.info("Authenticating '{}' via username and password", principalName);
-
-        Hashtable<String, String> env = new Hashtable<>();
-        env.put(Context.INITIAL_CONTEXT_FACTORY, ldapContextFactory);
-        env.put(Context.PROVIDER_URL, this.ldapUrl);
-        if (this.ldapUrl.startsWith("ldaps")) {
-          env.put(Context.SECURITY_PROTOCOL, "ssl");
-        }
-        env.put(Context.SECURITY_AUTHENTICATION, "simple");
-        env.put(Context.SECURITY_CREDENTIALS, credentials.getPassword());
-
-        // Attempt ldap authentication with the following steps:
-        // 1. If user's name contains domain name or the system doesn't have any given domain names, then
-        //    use the username as is.
-        // 2. Else, try out all combinations of username and the given domain names of the system.
-        AuthenticationResults authenticationResults = new AuthenticationResults();
-        if (principalName.contains("@") || CollectionUtils.isEmpty(domainSuffix)) {
-          env.put(Context.SECURITY_PRINCIPAL, principalName);
-          AuthenticationResult authenticationResult = authenticate(env);
-          authenticationResults.appendAuthenticationResult(authenticationResult);
-        } else {
-          for (String suffix : domainSuffix) {
-            env.put(Context.SECURITY_PRINCIPAL, principalName + '@' + suffix);
-            AuthenticationResult authenticationResult = authenticate(env);
-            authenticationResults.appendAuthenticationResult(authenticationResult);
-            if (authenticationResults.isAuthenticated()) {
-              break;
-            }
-          }
-        }
-
-        if (authenticationResults.isAuthenticated()) {
-          ThirdEyePrincipal principal = new ThirdEyePrincipal();
-          principal.setName(env.get(Context.SECURITY_PRINCIPAL));
-          LOG.info("Successfully authenticated {} with LDAP", env.get(Context.SECURITY_PRINCIPAL));
-          return Optional.of(principal);
-        } else {
-          // Failed to authenticate the user; log all error messages.
-          List<String> errorMessages = authenticationResults.getMessages();
-          for (String errorMessage : errorMessages) {
-            LOG.error(errorMessage);
-          }
-          return Optional.absent();
-        }
+        return ldapAuthenticate(username, password);
       }
     } catch (Exception e) {
       throw new AuthenticationException(e);

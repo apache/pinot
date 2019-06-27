@@ -20,8 +20,8 @@
 package org.apache.pinot.thirdeye.anomaly.alert.grouping;
 
 import java.util.Objects;
-import org.apache.commons.lang.builder.ToStringBuilder;
-import org.apache.commons.lang.builder.ToStringStyle;
+import org.apache.commons.lang3.builder.ToStringBuilder;
+import org.apache.commons.lang3.builder.ToStringStyle;
 
 /**
  * Group key is wrapper class that is used to retrieve the specified group of anomalies from AlertGrouper.

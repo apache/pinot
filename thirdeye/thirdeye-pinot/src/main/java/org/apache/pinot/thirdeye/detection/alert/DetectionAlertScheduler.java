@@ -20,13 +20,11 @@
 package org.apache.pinot.thirdeye.detection.alert;
 
 import java.util.stream.Collectors;
-import org.apache.pinot.thirdeye.anomaly.alert.v2.AlertJobSchedulerV2;
 import org.apache.pinot.thirdeye.anomaly.task.TaskConstants;
 import org.apache.pinot.thirdeye.anomaly.utils.AnomalyUtils;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionAlertConfigManager;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.Executors;
@@ -53,7 +51,7 @@ import org.slf4j.LoggerFactory;
  * in the cron scheduler.
  */
 public class DetectionAlertScheduler implements Runnable {
-  private static final Logger LOG = LoggerFactory.getLogger(AlertJobSchedulerV2.class);
+  private static final Logger LOG = LoggerFactory.getLogger(DetectionAlertScheduler.class);
   private static final int DEFAULT_ALERT_DELAY = 1;
   private static final TimeUnit DEFAULT_ALERT_DELAY_UNIT = TimeUnit.MINUTES;
 

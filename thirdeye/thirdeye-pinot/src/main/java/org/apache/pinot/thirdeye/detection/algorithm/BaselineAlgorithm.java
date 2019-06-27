@@ -37,7 +37,7 @@ import org.apache.pinot.thirdeye.rootcause.timeseries.BaselineAggregateType;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import org.apache.commons.collections.MapUtils;
+import org.apache.commons.collections4.MapUtils;
 import org.joda.time.DateTimeZone;
 
 import static org.apache.pinot.thirdeye.dataframe.util.DataFrameUtils.*;

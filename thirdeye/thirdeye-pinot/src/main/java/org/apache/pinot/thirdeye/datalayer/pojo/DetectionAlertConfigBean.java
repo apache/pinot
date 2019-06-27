@@ -51,6 +51,15 @@ public class DetectionAlertConfigBean extends AbstractBean {
   Map<String, Object> properties;
 
   Map<String, String> refLinks;
+  List<String> owners;
+
+  public List<String> getOwners() {
+    return owners;
+  }
+
+  public void setOwners(List<String> owners) {
+    this.owners = owners;
+  }
 
   public boolean isActive() {
     return active;

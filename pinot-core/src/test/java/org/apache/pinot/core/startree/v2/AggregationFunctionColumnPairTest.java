@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.core.startree.v2;
 
-import org.apache.pinot.core.query.aggregation.function.AggregationFunctionType;
+import org.apache.pinot.common.function.AggregationFunctionType;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -69,6 +69,15 @@ public class AggregationFunctionColumnPairTest {
     Assert.assertEquals(pair.getColumn(), COLUMN);
     columnName = pair.toColumnName();
     Assert.assertEquals(columnName, "distinctCountHLL__column");
+    fromColumnName = AggregationFunctionColumnPair.fromColumnName(columnName);
+    Assert.assertEquals(fromColumnName, pair);
+    Assert.assertEquals(fromColumnName.hashCode(), pair.hashCode());
+
+    pair = new AggregationFunctionColumnPair(AggregationFunctionType.DISTINCTCOUNTRAWHLL, COLUMN);
+    Assert.assertEquals(pair.getFunctionType(), AggregationFunctionType.DISTINCTCOUNTRAWHLL);
+    Assert.assertEquals(pair.getColumn(), COLUMN);
+    columnName = pair.toColumnName();
+    Assert.assertEquals(columnName, "distinctCountRawHLL__column");
     fromColumnName = AggregationFunctionColumnPair.fromColumnName(columnName);
     Assert.assertEquals(fromColumnName, pair);
     Assert.assertEquals(fromColumnName.hashCode(), pair.hashCode());

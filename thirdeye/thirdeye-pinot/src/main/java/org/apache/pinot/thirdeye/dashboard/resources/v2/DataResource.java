@@ -20,9 +20,9 @@
 package org.apache.pinot.thirdeye.dashboard.resources.v2;
 
 import org.apache.pinot.thirdeye.api.Constants;
-import com.wordnik.swagger.annotations.Api;
-import com.wordnik.swagger.annotations.ApiOperation;
-import com.wordnik.swagger.annotations.ApiParam;
+import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiOperation;
+import io.swagger.annotations.ApiParam;
 import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.Arrays;

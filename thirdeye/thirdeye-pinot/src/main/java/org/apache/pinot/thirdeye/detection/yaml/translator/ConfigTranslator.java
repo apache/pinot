@@ -19,10 +19,15 @@
 
 package org.apache.pinot.thirdeye.detection.yaml.translator;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import org.apache.pinot.thirdeye.datalayer.dto.AbstractDTO;
-import org.apache.pinot.thirdeye.detection.DataProvider;
+import org.apache.pinot.thirdeye.detection.ConfigUtils;
 import org.apache.pinot.thirdeye.detection.validators.ConfigValidator;
+import org.yaml.snakeyaml.Yaml;
 
 
 /**
@@ -30,23 +35,34 @@ import org.apache.pinot.thirdeye.detection.validators.ConfigValidator;
  */
 public abstract class ConfigTranslator<T extends AbstractDTO, V extends ConfigValidator> {
 
-  Map<String, Object> yamlConfig;
+  protected final String yamlConfig;
+  protected final ConfigValidator validator;
+  protected final Yaml yaml;
 
-  protected ConfigValidator validator;
-  protected DataProvider dataProvider;
-
-  ConfigTranslator(Map<String, Object> yamlConfig, V validator) {
+  ConfigTranslator(String yamlConfig, V validator) {
     this.yamlConfig = yamlConfig;
     this.validator = validator;
+    this.yaml = new Yaml();
   }
 
-  abstract T translateConfig() throws IllegalArgumentException;
+  List<String> filterOwners(List<String> configuredOwners) {
+    List<String> owners = new ArrayList<>();
+    for (String configuredOwner : configuredOwners) {
+      // TODO: check if configured owner is a valid account
+      owners.add(configuredOwner.trim());
+    }
+    // Return after removing duplicates
+    return new ArrayList<>(new HashSet<>(owners));
+  }
+
+  abstract T translateConfig(Map<String, Object> yamlConfigMap) throws IllegalArgumentException;
 
   /**
    * Convert raw yaml configuration into config object with pre and post validation
    */
   public T translate() throws IllegalArgumentException {
-    validator.validateYaml(this.yamlConfig);
-    return this.translateConfig();
+    Map<String, Object> yamlConfigMap = new HashMap<>(ConfigUtils.getMap(this.yaml.load(yamlConfig)));
+    validator.validateYaml(yamlConfigMap);
+    return this.translateConfig(yamlConfigMap);
   }
 }

@@ -23,17 +23,15 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import org.apache.pinot.thirdeye.detection.annotation.Components;
 import org.apache.pinot.thirdeye.detection.annotation.Tune;
-import org.apache.pinot.thirdeye.detection.annotation.Yaml;
 import org.apache.pinot.thirdeye.detection.spi.components.BaseComponent;
 import org.apache.pinot.thirdeye.detection.spi.components.BaselineProvider;
-import org.apache.pinot.thirdeye.detection.yaml.translator.YamlDetectionConfigTranslator;
 import java.lang.annotation.Annotation;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.apache.commons.collections.MapUtils;
+import org.apache.commons.collections4.MapUtils;
 import org.reflections.Reflections;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -91,16 +89,6 @@ public class DetectionRegistry {
           }
         }
       }
-      // register yaml translators
-      Set<Class<? extends YamlDetectionConfigTranslator>> yamlConverterClasses =
-          reflections.getSubTypesOf(YamlDetectionConfigTranslator.class);
-      for (Class<? extends YamlDetectionConfigTranslator> clazz : yamlConverterClasses) {
-        for (Annotation annotation : clazz.getAnnotations()) {
-          if (annotation instanceof Yaml) {
-            YAML_MAP.put(((Yaml) annotation).pipelineType(), clazz.getName());
-          }
-        }
-      }
     } catch (Exception e) {
       LOG.warn("initialize detection registry error", e);
     }
@@ -110,6 +98,27 @@ public class DetectionRegistry {
     try {
       Class<? extends BaseComponent> clazz = (Class<? extends BaseComponent>) Class.forName(className);
       REGISTRY_MAP.put(type, ImmutableMap.of(KEY_CLASS_NAME, className, KEY_IS_BASELINE_PROVIDER, isBaselineProvider(clazz)));
+    } catch (Exception e) {
+      LOG.warn("Encountered exception when registering component {}", className, e);
+    }
+  }
+
+  public static void registerTunableComponent(String className, String tunable, String type) {
+    try {
+      Class<? extends BaseComponent> clazz = (Class<? extends BaseComponent>) Class.forName(className);
+      REGISTRY_MAP.put(type, ImmutableMap.of(KEY_CLASS_NAME, className, KEY_IS_BASELINE_PROVIDER, isBaselineProvider(clazz)));
+      Tune tune = new Tune(){
+        @Override
+        public String tunable() {
+          return tunable;
+        }
+
+        @Override
+        public Class<? extends Annotation> annotationType() {
+          return Tune.class;
+        }
+      };
+      TUNE_MAP.put(className, tune);
     } catch (Exception e) {
       LOG.warn("Encountered exception when registering component {}", className, e);
     }

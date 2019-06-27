@@ -20,7 +20,7 @@ import { getFormattedDuration,
 } from 'thirdeye-frontend/utils/anomaly';
 import RSVP from "rsvp";
 import fetch from 'fetch';
-import { checkStatus, humanizeFloat } from 'thirdeye-frontend/utils/utils';
+import { checkStatus, humanizeFloat, stripNonFiniteValues } from 'thirdeye-frontend/utils/utils';
 import columns from 'thirdeye-frontend/shared/anomaliesTableColumns';
 import moment from 'moment';
 import _ from 'lodash';
@@ -90,9 +90,9 @@ export default Component.extend({
 
       let start = anomalyData.startTime;
       let end = anomalyData.endTime;
-      if (series.current && series.current.timestamps && Array.isArray(series.current.timestamps)) {
-        start = series.current.timestamps[0];
-        end = series.current.timestamps[series.current.timestamps.length - 1];
+      if (series.Current && series.Current.timestamps && Array.isArray(series.Current.timestamps)) {
+        start = series.Current.timestamps[0];
+        end = series.Current.timestamps[series.Current.timestamps.length - 1];
       }
 
       return {
@@ -117,7 +117,7 @@ export default Component.extend({
             format: (d) => {
               const t = makeTime(d);
               if (t.valueOf() === t.clone().startOf('day').valueOf()) {
-                return t.format('MMM D (ddd)');
+                return t.format('MMM D');
               }
               return t.format('h:mm a');
             }
@@ -139,32 +139,51 @@ export default Component.extend({
       const series = {};
 
       if (!_.isEmpty(anomalyData)) {
-        const key = this._formatAnomaly(anomalyData);
+        const key = 'Anomaly';
         series[key] = {
           timestamps: [anomalyData.startTime, anomalyData.endTime],
           values: [1, 1],
           type: 'region',
-          color: 'orange'
+          color: 'screenshot-anomaly'
         };
       }
 
       if (current && !_.isEmpty(current.current)) {
-        series['current'] = {
+        series['Current'] = {
           timestamps: current.timestamp,
           values: current.current,
           type: 'line',
-          color: 'blue'
+          color: 'screenshot-current'
         };
       }
 
       if (predicted && !_.isEmpty(predicted.value)) {
-        series['predicted'] = {
+        series['Predicted'] = {
           timestamps: predicted.timestamp,
           values: predicted.value,
           type: 'line',
-          color: 'orange'
+          color: 'screenshot-predicted'
         };
       }
+
+      if (predicted && !_.isEmpty(predicted.upper_bound)) {
+        series['Upper and lower bound'] = {
+          timestamps: predicted.timestamp,
+          values: stripNonFiniteValues(predicted.upper_bound),
+          type: 'line',
+          color: 'screenshot-bounds'
+        };
+      }
+
+      if (predicted && !_.isEmpty(predicted.lower_bound)) {
+        series['lowerBound'] = {
+          timestamps: predicted.timestamp,
+          values: stripNonFiniteValues(predicted.lower_bound),
+          type: 'line',
+          color: 'screenshot-bounds'
+        };
+      }
+
       return series;
     }
   ),
@@ -204,6 +223,17 @@ export default Component.extend({
         };
       }
       return tableAnomaly;
+    }
+  ),
+
+  /**
+   * generates component id using anomalyId
+   */
+  id: computed(
+    'anomalyId',
+    function() {
+      const anomalyId = get(this, 'anomalyId');
+      return `timeseries-chart-anomaly-summary-${anomalyId}`;
     }
   ),
 

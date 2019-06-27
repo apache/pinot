@@ -19,7 +19,7 @@
 package org.apache.pinot.core.data.aggregator;
 
 import org.apache.pinot.common.data.FieldSpec.DataType;
-import org.apache.pinot.core.query.aggregation.function.AggregationFunctionType;
+import org.apache.pinot.common.function.AggregationFunctionType;
 
 
 /**
@@ -50,6 +50,7 @@ public class ValueAggregatorFactory {
       case MINMAXRANGE:
         return new MinMaxRangeValueAggregator();
       case DISTINCTCOUNTHLL:
+      case DISTINCTCOUNTRAWHLL:
         return new DistinctCountHLLValueAggregator();
       case PERCENTILEEST:
         return new PercentileEstValueAggregator();
@@ -81,6 +82,7 @@ public class ValueAggregatorFactory {
       case MINMAXRANGE:
         return MinMaxRangeValueAggregator.AGGREGATED_VALUE_TYPE;
       case DISTINCTCOUNTHLL:
+      case DISTINCTCOUNTRAWHLL:
         return DistinctCountHLLValueAggregator.AGGREGATED_VALUE_TYPE;
       case PERCENTILEEST:
         return PercentileEstValueAggregator.AGGREGATED_VALUE_TYPE;
