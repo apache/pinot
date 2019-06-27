@@ -59,6 +59,7 @@ public class OnboardingNotificationEmailContentFormatter extends BaseEmailConten
   @Override
   protected void updateTemplateDataByAnomalyResults(Map<String, Object> templateData,
       Collection<AnomalyResult> anomalies, EmailContentFormatterContext context) {
+    enrichMetricInfo(templateData, anomalies);
     AnomalyFunctionDTO anomalyFunctionSpec = context.getAnomalyFunctionSpec();
     for (AnomalyResult anomalyResult : anomalies) {
       if (!(anomalyResult instanceof MergedAnomalyResultDTO)) {

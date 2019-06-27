@@ -190,25 +190,37 @@ public abstract class BaseEmailContentFormatter implements EmailContentFormatter
   protected abstract void updateTemplateDataByAnomalyResults(Map<String, Object> templateData,
       Collection<AnomalyResult> anomalies, EmailContentFormatterContext context);
 
-  /**
-   * Add the auxiliary email information into parameter map
-   * @param alertConfigDTO
-   * @param groupId
-   * @param groupName
-   * @param anomalies
-   * @return
-   */
+  protected void enrichMetricInfo(Map<String, Object> templateData, Collection<AnomalyResult> anomalies) {
+    Set<String> metrics = new TreeSet<>();
+    Set<String> datasets = new TreeSet<>();
+
+    Map<String, MetricConfigDTO> metricsMap = new TreeMap<>();
+    for (AnomalyResult anomalyResult : anomalies) {
+      if (anomalyResult instanceof MergedAnomalyResultDTO) {
+        MergedAnomalyResultDTO mergedAnomaly = (MergedAnomalyResultDTO) anomalyResult;
+        datasets.add(mergedAnomaly.getCollection());
+        metrics.add(mergedAnomaly.getMetric());
+
+        MetricConfigDTO metric = this.metricDAO.findByMetricAndDataset(mergedAnomaly.getMetric(), mergedAnomaly.getCollection());
+        if (metric != null) {
+          metricsMap.put(metric.getId().toString(), metric);
+        }
+      }
+    }
+
+    templateData.put("datasetsCount", datasets.size());
+    templateData.put("datasets", StringUtils.join(datasets, ", "));
+    templateData.put("metricsCount", metrics.size());
+    templateData.put("metrics", StringUtils.join(metrics, ", "));
+    templateData.put("metricsMap", metricsMap);
+  }
+
   protected Map<String, Object> getTemplateData(AlertConfigDTO alertConfigDTO, Long groupId, String groupName,
       Collection<AnomalyResult> anomalies) {
     Map<String, Object> templateData = new HashMap<>();
 
-    DateTimeZone timeZone = DateTimeZone.forTimeZone(AlertTaskRunnerV2.DEFAULT_TIME_ZONE);
-
-    Set<String> metrics = new TreeSet<>();
-    Set<String> datasets = new TreeSet<>();
+    DateTimeZone timeZone = DateTimeZone.forTimeZone(TimeZone.getTimeZone(DEFAULT_TIME_ZONE));
     List<MergedAnomalyResultDTO> mergedAnomalyResults = new ArrayList<>();
-
-    Map<String, MetricConfigDTO> metricsMap = new TreeMap<>();
 
     // Calculate start and end time of the anomalies
     DateTime startTime = DateTime.now();
@@ -217,14 +229,6 @@ public abstract class BaseEmailContentFormatter implements EmailContentFormatter
       if (anomalyResult instanceof MergedAnomalyResultDTO) {
         MergedAnomalyResultDTO mergedAnomaly = (MergedAnomalyResultDTO) anomalyResult;
         mergedAnomalyResults.add(mergedAnomaly);
-        datasets.add(mergedAnomaly.getCollection());
-        metrics.add(mergedAnomaly.getMetric());
-
-        MetricConfigDTO metric = this.metricDAO.findByMetricAndDataset(mergedAnomaly.getMetric(), mergedAnomaly.getCollection());
-        if (metric != null) {
-          // NOTE: our stale freemarker version doesn't play nice with non-string keys
-          metricsMap.put(metric.getId().toString(), metric);
-        }
       }
       if (anomalyResult.getStartTime() < startTime.getMillis()) {
         startTime = new DateTime(anomalyResult.getStartTime(), dateTimeZone);
@@ -236,11 +240,6 @@ public abstract class BaseEmailContentFormatter implements EmailContentFormatter
 
     PrecisionRecallEvaluator precisionRecallEvaluator = new PrecisionRecallEvaluator(new DummyAlertFilter(), mergedAnomalyResults);
 
-    templateData.put("datasetsCount", datasets.size());
-    templateData.put("datasets", StringUtils.join(datasets, ", "));
-    templateData.put("metricsCount", metrics.size());
-    templateData.put("metrics", StringUtils.join(metrics, ", "));
-    templateData.put("metricsMap", metricsMap);
     templateData.put("anomalyCount", anomalies.size());
     templateData.put("startTime", getDateString(startTime));
     templateData.put("endTime", getDateString(endTime));
@@ -592,6 +591,10 @@ public abstract class BaseEmailContentFormatter implements EmailContentFormatter
     String endTime;
     String timezone;
     String issueType;
+    String score;
+    Double weight;
+    String groupKey;
+    String entityName;
 
     private static String RAW_VALUE_FORMAT = "%.0f";
     private static String PERCENTAGE_FORMAT = "%.2f %%";
@@ -791,6 +794,38 @@ public abstract class BaseEmailContentFormatter implements EmailContentFormatter
 
     public void setIssueType(String issueType) {
       this.issueType = issueType;
+    }
+
+    public void setWeight(Double weight) {
+      this.weight = weight;
+    }
+
+    public double getWeight() {
+      return weight;
+    }
+
+    public String getScore() {
+      return score;
+    }
+
+    public void setScore(String score) {
+      this.score = score;
+    }
+
+    public String getEntityName() {
+      return entityName;
+    }
+
+    public void setEntityName(String entityName) {
+      this.entityName = entityName;
+    }
+
+    public String getGroupKey() {
+      return groupKey;
+    }
+
+    public void setGroupKey(String groupKey) {
+      this.groupKey = groupKey;
     }
 
     public boolean isPositiveWoWLift() {

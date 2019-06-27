@@ -71,6 +71,8 @@ public class MetricAnomaliesEmailContentFormatter extends BaseEmailContentFormat
   @Override
   protected void updateTemplateDataByAnomalyResults(Map<String, Object> templateData,
       Collection<AnomalyResult> anomalies, EmailContentFormatterContext context) {
+    enrichMetricInfo(templateData, anomalies);
+
     DateTime windowStart = DateTime.now();
     DateTime windowEnd = new DateTime(0);
 

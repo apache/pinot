@@ -131,7 +131,7 @@ public class DetectionEmailAlerter extends DetectionAlertScheme {
 
   public enum EmailTemplate {
     DEFAULT_EMAIL,
-    ENTITY_REPORT
+    ENTITY_GROUPBY_REPORT
   }
 
   /**
@@ -148,7 +148,7 @@ public class DetectionEmailAlerter extends DetectionAlertScheme {
         LOG.info("Using the " + DEFAULT_EMAIL_FORMATTER_TYPE + " email template.");
         return EmailContentFormatterFactory.fromClassName(DEFAULT_EMAIL_FORMATTER_TYPE);
 
-      case ENTITY_REPORT:
+      case ENTITY_GROUPBY_REPORT:
         LOG.info("Using the " + template + " email template.");
         return EmailContentFormatterFactory.fromClassName(ENTITY_REPORT_FORMATTER_TYPE);
 

@@ -17,6 +17,7 @@
 package org.apache.pinot.thirdeye.tools;
 
 import org.apache.pinot.thirdeye.anomaly.task.TaskConstants;
+import org.apache.pinot.thirdeye.constant.AnomalyResultSource;
 import org.apache.pinot.thirdeye.datalayer.bao.AlertConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import org.apache.pinot.thirdeye.datalayer.bao.ApplicationManager;
@@ -454,6 +455,17 @@ public class RunAdhocDatabaseQueriesTool {
     }
   }
 
+  private void disableAllActiveSubsGroups(Collection<Long> exception){
+    List<DetectionAlertConfigDTO> subsConfigs = detectionAlertConfigDAO.findAll();
+    for (DetectionAlertConfigDTO subsConfig : subsConfigs) {
+      if (subsConfig.isActive() && (CollectionUtils.isEmpty(exception) || !exception
+          .contains(subsConfig.getId()))) {
+        subsConfig.setActive(false);
+        detectionAlertConfigDAO.update(subsConfig);
+      }
+    }
+  }
+
   /**
    * Generates a report of the status and owner of all the un-subscribed anomaly functions
    */
@@ -573,6 +585,20 @@ public class RunAdhocDatabaseQueriesTool {
       }
 
       detectionAlertConfigDAO.delete(alert);
+    }
+  }
+
+  /**
+   * Replayed anomalies are flagged accordingly and such anomalies are excluded from the email report.
+   * This method removes the replay flag to test an email report from replayed results.
+   */
+  private void removeReplayFlagFromAnomalies() {
+    List<MergedAnomalyResultDTO> anomalies = mergedResultDAO.findByDetectionConfigAndIdGreaterThan(116257854l,0l);
+    for (MergedAnomalyResultDTO anomaly : anomalies) {
+      if (!anomaly.isChild()) {
+        anomaly.setAnomalyResultSource(AnomalyResultSource.DEFAULT_ANOMALY_DETECTION);
+        mergedResultDAO.save(anomaly);
+      }
     }
   }
 

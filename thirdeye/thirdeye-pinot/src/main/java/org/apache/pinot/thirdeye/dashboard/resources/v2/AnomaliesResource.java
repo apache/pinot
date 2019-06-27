@@ -95,6 +95,7 @@ import org.apache.pinot.thirdeye.datalayer.dto.GroupedAnomalyResultsDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MetricConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.pojo.AlertConfigBean;
+import org.apache.pinot.thirdeye.datalayer.pojo.MergedAnomalyResultBean;
 import org.apache.pinot.thirdeye.datasource.DAORegistry;
 import org.apache.pinot.thirdeye.datasource.ThirdEyeCacheRegistry;
 import org.apache.pinot.thirdeye.datasource.cache.QueryCache;
@@ -303,7 +304,7 @@ public class AnomaliesResource {
 
     List<MergedAnomalyResultDTO> mergedAnomalies = mergedAnomalyResultDAO.findByTime(startTime, endTime);
     AnomaliesWrapper anomaliesWrapper =
-        constructAnomaliesWrapperFromMergedAnomalies(mergedAnomalies, searchFiltersJSON, pageNumber, filterOnly);
+        constructAnomaliesWrapperFromMergedAnomalies(removeChildren(mergedAnomalies), searchFiltersJSON, pageNumber, filterOnly);
     return anomaliesWrapper;
   }
 
@@ -337,7 +338,7 @@ public class AnomaliesResource {
       }
     }
     AnomaliesWrapper
-        anomaliesWrapper = constructAnomaliesWrapperFromMergedAnomalies(mergedAnomalies, searchFiltersJSON, pageNumber, filterOnly);
+        anomaliesWrapper = constructAnomaliesWrapperFromMergedAnomalies(removeChildren(mergedAnomalies), searchFiltersJSON, pageNumber, filterOnly);
     return anomaliesWrapper;
   }
 
@@ -369,7 +370,7 @@ public class AnomaliesResource {
     }
     List<MergedAnomalyResultDTO> mergedAnomalies = getAnomaliesForMetricIdsInRange(metricIds, startTime, endTime);
     AnomaliesWrapper
-        anomaliesWrapper = constructAnomaliesWrapperFromMergedAnomalies(mergedAnomalies, searchFiltersJSON, pageNumber, filterOnly);
+        anomaliesWrapper = constructAnomaliesWrapperFromMergedAnomalies(removeChildren(mergedAnomalies), searchFiltersJSON, pageNumber, filterOnly);
     return anomaliesWrapper;
   }
 
@@ -419,7 +420,7 @@ public class AnomaliesResource {
     }
 
     AnomaliesWrapper
-        anomaliesWrapper = constructAnomaliesWrapperFromMergedAnomalies(mergedAnomalies, searchFiltersJSON, pageNumber, filterOnly);
+        anomaliesWrapper = constructAnomaliesWrapperFromMergedAnomalies(removeChildren(mergedAnomalies), searchFiltersJSON, pageNumber, filterOnly);
     return anomaliesWrapper;
   }
 
@@ -680,6 +681,13 @@ public class AnomaliesResource {
     return endDateTime.minus(periodToSubtract).getMillis();
   }
 
+  /**
+   * Removes child anomalies
+   */
+  private List<MergedAnomalyResultDTO> removeChildren(List<MergedAnomalyResultDTO> mergedAnomalies) {
+    mergedAnomalies.removeIf(MergedAnomalyResultBean::isChild);
+    return mergedAnomalies;
+  }
 
   /**
    * Constructs AnomaliesWrapper object from a list of merged anomalies
@@ -688,14 +696,6 @@ public class AnomaliesResource {
       String searchFiltersJSON, int pageNumber, boolean filterOnly) throws ExecutionException {
 
     AnomaliesWrapper anomaliesWrapper = new AnomaliesWrapper();
-
-    // remove child anomalies
-    Iterator<MergedAnomalyResultDTO> itAnomaly = mergedAnomalies.iterator();
-    while (itAnomaly.hasNext()) {
-      if (itAnomaly.next().isChild()) {
-        itAnomaly.remove();
-      }
-    }
 
     //filter the anomalies
     SearchFilters searchFilters = new SearchFilters();
