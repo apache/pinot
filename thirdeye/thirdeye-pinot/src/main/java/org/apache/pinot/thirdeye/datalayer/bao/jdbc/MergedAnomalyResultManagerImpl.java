@@ -160,7 +160,7 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
     Set<MergedAnomalyResultDTO> childAnomalies = parentAnomaly.getChildren();
     if (childAnomalies == null || childAnomalies.isEmpty()) {
       // No child anomalies to save
-      return null;
+      return childIds;
     }
 
     for (MergedAnomalyResultDTO child : childAnomalies) {
