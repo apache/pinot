@@ -38,6 +38,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.pinot.thirdeye.detection.DetectionUtils.*;
+import static org.apache.pinot.thirdeye.detection.ExpressionParser.*;
 
 
 /**
@@ -165,30 +166,17 @@ public class TriggerConditionGrouper implements Grouper<TriggerConditionGrouperS
     }
   }
 
-  /**
-   * Groups the anomalies based on the operator string expression
-   */
-  private List<MergedAnomalyResultDTO> groupAnomaliesByExpression(String expression, List<MergedAnomalyResultDTO> anomalies) {
-    groupAnomaliesByOperator(buildOperatorTree(expression), anomalies);
-    return anomalies;
-  }
-
-  // TODO: Build parse tree from string expression and execute
-  private Map<String, Object> buildOperatorTree(String expression) {
-    return new HashMap<>();
-  }
-
   @Override
   public List<MergedAnomalyResultDTO> group(List<MergedAnomalyResultDTO> anomalies) {
+    Map<String, Object> operatorTreeRoot = new HashMap<>();
     if (operator != null) {
-      Map<String, Object> operatorTreeRoot = new HashMap<>();
       operatorTreeRoot.put(PROP_OPERATOR, operator);
       operatorTreeRoot.put(PROP_LEFT_OP, leftOp);
       operatorTreeRoot.put(PROP_RIGHT_OP, rightOp);
-      return groupAnomaliesByOperator(operatorTreeRoot, anomalies);
     } else {
-      return groupAnomaliesByExpression(expression, anomalies);
+      operatorTreeRoot = generateOperators(expression);
     }
+    return groupAnomaliesByOperator(operatorTreeRoot, anomalies);
   }
 
   @Override
