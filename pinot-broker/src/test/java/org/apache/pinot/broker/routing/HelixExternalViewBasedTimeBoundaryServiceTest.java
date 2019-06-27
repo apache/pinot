@@ -62,8 +62,9 @@ public class HelixExternalViewBasedTimeBoundaryServiceTest {
     String helixClusterName = "TestTimeBoundaryService";
     _zkClient.deleteRecursively("/" + helixClusterName + "/PROPERTYSTORE");
     _zkClient.createPersistent("/" + helixClusterName + "/PROPERTYSTORE", true);
-    _propertyStore = new ZkHelixPropertyStore<>(new ZkBaseDataAccessor<ZNRecord>(_zkClient),
-        "/" + helixClusterName + "/PROPERTYSTORE", null);
+    _propertyStore =
+        new ZkHelixPropertyStore<>(new ZkBaseDataAccessor<>(_zkClient), "/" + helixClusterName + "/PROPERTYSTORE",
+            null);
   }
 
   @AfterClass
@@ -87,7 +88,7 @@ public class HelixExternalViewBasedTimeBoundaryServiceTest {
       addSchema(rawTableName, timeUnit);
 
       int endTimeInDays = tableIndex;
-      addSegmentZKMetadata(rawTableName, endTimeInDays, timeUnit);
+      addSegmentZKMetadata(rawTableName, endTimeInDays, timeUnit, false);
 
       // Should skip real-time external view
       ExternalView externalView = constructRealtimeExternalView(realtimeTableName);
@@ -103,7 +104,8 @@ public class HelixExternalViewBasedTimeBoundaryServiceTest {
       TimeBoundaryInfo timeBoundaryInfo = timeBoundaryService.getTimeBoundaryInfoFor(offlineTableName);
       assertNotNull(timeBoundaryInfo);
       assertEquals(timeBoundaryInfo.getTimeColumn(), TIME_COLUMN);
-      assertEquals(Long.parseLong(timeBoundaryInfo.getTimeValue()), timeUnit.convert(endTimeInDays - 1, TimeUnit.DAYS));
+      assertEquals(Long.parseLong(timeBoundaryInfo.getTimeValue()),
+          timeUnit.convert(endTimeInDays - 1, TimeUnit.DAYS) + 1);
 
       // Test HOURLY push frequency
       addTableConfig(rawTableName, timeUnit, "hourly");
@@ -115,11 +117,21 @@ public class HelixExternalViewBasedTimeBoundaryServiceTest {
       assertEquals(timeBoundaryInfo.getTimeColumn(), TIME_COLUMN);
       long timeValue = Long.parseLong(timeBoundaryInfo.getTimeValue());
       if (timeUnit == TimeUnit.DAYS) {
-        assertEquals(timeValue, timeUnit.convert(endTimeInDays - 1, TimeUnit.DAYS));
+        assertEquals(timeValue, timeUnit.convert(endTimeInDays - 1, TimeUnit.DAYS) + 1);
       } else {
         assertEquals(timeValue,
-            timeUnit.convert(TimeUnit.HOURS.convert(endTimeInDays, TimeUnit.DAYS) - 1, TimeUnit.HOURS));
+            timeUnit.convert(TimeUnit.HOURS.convert(endTimeInDays, TimeUnit.DAYS) - 1, TimeUnit.HOURS) + 1);
       }
+
+      // Test the same start/end time
+      addSegmentZKMetadata(rawTableName, endTimeInDays, timeUnit, true);
+      timeBoundaryService.updateTimeBoundaryService(externalView);
+      assertNull(timeBoundaryService.getTimeBoundaryInfoFor(rawTableName));
+      assertNull(timeBoundaryService.getTimeBoundaryInfoFor(realtimeTableName));
+      timeBoundaryInfo = timeBoundaryService.getTimeBoundaryInfoFor(offlineTableName);
+      assertNotNull(timeBoundaryInfo);
+      assertEquals(timeBoundaryInfo.getTimeColumn(), TIME_COLUMN);
+      assertEquals(Long.parseLong(timeBoundaryInfo.getTimeValue()), timeUnit.convert(endTimeInDays, TimeUnit.DAYS));
 
       tableIndex++;
     }
@@ -139,11 +151,18 @@ public class HelixExternalViewBasedTimeBoundaryServiceTest {
             .build());
   }
 
-  private void addSegmentZKMetadata(String rawTableName, int endTimeInDays, TimeUnit timeUnit) {
+  private void addSegmentZKMetadata(String rawTableName, int endTimeInDays, TimeUnit timeUnit,
+      boolean sameStartEndTime) {
     for (int i = 1; i <= endTimeInDays; i++) {
       OfflineSegmentZKMetadata offlineSegmentZKMetadata = new OfflineSegmentZKMetadata();
       offlineSegmentZKMetadata.setSegmentName(rawTableName + i);
-      offlineSegmentZKMetadata.setEndTime(i * timeUnit.convert(1L, TimeUnit.DAYS));
+      long segmentEndTime = i * timeUnit.convert(1L, TimeUnit.DAYS);
+      if (sameStartEndTime) {
+        offlineSegmentZKMetadata.setStartTime(segmentEndTime);
+      } else {
+        offlineSegmentZKMetadata.setStartTime(0L);
+      }
+      offlineSegmentZKMetadata.setEndTime(segmentEndTime);
       offlineSegmentZKMetadata.setTimeUnit(timeUnit);
       ZKMetadataProvider
           .setOfflineSegmentZKMetadata(_propertyStore, TableNameBuilder.OFFLINE.tableNameWithType(rawTableName),

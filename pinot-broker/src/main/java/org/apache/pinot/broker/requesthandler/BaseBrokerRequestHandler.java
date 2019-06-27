@@ -307,8 +307,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
     if (_queryLogRateLimiter.tryAcquire() || forceLog(brokerResponse, totalTimeMs)) {
       // Table name might have been changed (with suffix _OFFLINE/_REALTIME appended)
-      LOGGER.info(
-          "RequestId:{}, table:{}, timeMs:{}, docs:{}/{}, entries:{}/{},"
+      LOGGER.info("RequestId:{}, table:{}, timeMs:{}, docs:{}/{}, entries:{}/{},"
               + " segments(queried/processed/matched/consuming):{}/{}/{}/{}, consumingFreshnessTimeMs:{},"
               + " servers:{}/{}, groupLimitReached:{}, exceptions:{}, serverStats:{}, query:{}", requestId,
           brokerRequest.getQuerySource().getTableName(), totalTimeMs, brokerResponse.getNumDocsScanned(),
@@ -441,7 +440,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     timeFilterQuery.setId(-1);
     timeFilterQuery.setColumn(timeBoundaryInfo.getTimeColumn());
     String timeValue = timeBoundaryInfo.getTimeValue();
-    String filterValue = isOfflineRequest ? "(*\t\t" + timeValue + "]" : "(" + timeValue + "\t\t*)";
+    String filterValue = isOfflineRequest ? "(*\t\t" + timeValue + ")" : "[" + timeValue + "\t\t*)";
     timeFilterQuery.setValue(Collections.singletonList(filterValue));
     timeFilterQuery.setOperator(FilterOperator.RANGE);
     timeFilterQuery.setNestedFilterQueryIds(Collections.emptyList());

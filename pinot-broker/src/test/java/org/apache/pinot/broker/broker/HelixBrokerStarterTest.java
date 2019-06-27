@@ -261,7 +261,7 @@ public class HelixBrokerStarterTest extends ControllerTest {
     TimeBoundaryService.TimeBoundaryInfo tbi = _helixBrokerStarter.getHelixExternalViewBasedRouting().
         getTimeBoundaryService().getTimeBoundaryInfoFor(DINING_TABLE_NAME);
 
-    Assert.assertEquals(tbi.getTimeValue(), Long.toString(currentTimeBoundary - 1));
+    Assert.assertEquals(tbi.getTimeValue(), Long.toString(currentTimeBoundary));
 
     List<String> segmentNames = _helixResourceManager.getSegmentsFor(DINING_TABLE_NAME);
     long endTime = currentTimeBoundary + 10;

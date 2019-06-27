@@ -92,7 +92,8 @@ public class HelixExternalViewBasedTimeBoundaryService implements TimeBoundarySe
     List<OfflineSegmentZKMetadata> segmentZKMetadataList =
         ZKMetadataProvider.getOfflineSegmentZKMetadataListForTable(_propertyStore, tableNameWithType);
 
-    long maxTimeValue = -1L;
+    OfflineSegmentZKMetadata latestSegmentZKMetadata = null;
+    long latestSegmentEndTimeMs = 0L;
     for (OfflineSegmentZKMetadata segmentZKMetadata : segmentZKMetadataList) {
       String segmentName = segmentZKMetadata.getSegmentName();
 
@@ -111,25 +112,48 @@ public class HelixExternalViewBasedTimeBoundaryService implements TimeBoundarySe
         continue;
       }
 
-      // Convert segment end time into table time unit
-      // NOTE: for now, time unit in segment ZK metadata should always match table time unit, but in the future we might
-      //       want to always use MILLISECONDS as the time unit in segment ZK metadata
-      maxTimeValue = Math.max(maxTimeValue, tableTimeUnit.convert(segmentEndTime, segmentZKMetadata.getTimeUnit()));
+      long segmentEndTimeMs = segmentZKMetadata.getTimeUnit().toMillis(segmentEndTime);
+      if (segmentEndTimeMs > latestSegmentEndTimeMs) {
+        latestSegmentZKMetadata = segmentZKMetadata;
+        latestSegmentEndTimeMs = segmentEndTimeMs;
+      }
     }
 
-    if (maxTimeValue == -1L) {
+    if (latestSegmentZKMetadata == null) {
       LOGGER.error("Skipping updating time boundary for table: '{}' because no segment contains valid end time",
           tableNameWithType);
       return;
     }
 
-    // For HOURLY push table with time unit other than DAYS, use (maxTimeValue - 1 HOUR) as the time boundary
-    // Otherwise, use (maxTimeValue - 1 DAY)
-    long timeBoundary;
-    if ("HOURLY".equalsIgnoreCase(retentionConfig.getSegmentPushFrequency()) && tableTimeUnit != TimeUnit.DAYS) {
-      timeBoundary = maxTimeValue - tableTimeUnit.convert(1L, TimeUnit.HOURS);
-    } else {
-      timeBoundary = maxTimeValue - tableTimeUnit.convert(1L, TimeUnit.DAYS);
+    // Convert segment end time into table time unit
+    // NOTE: for now, time unit in segment ZK metadata should always match table time unit, but in the future we might
+    //       want to always use MILLISECONDS as the time unit in segment ZK metadata
+    long latestSegmentEndTime = latestSegmentZKMetadata.getEndTime();
+    long timeBoundary = tableTimeUnit.convert(latestSegmentEndTime, latestSegmentZKMetadata.getTimeUnit());
+
+    // When pushing multiple offline segments, the first pushed offline segment will push forward the time boundary
+    // before the other offline segments arrived. If we directly push the time boundary to the segment end time, we
+    // might get inconsistent result before all the segments arrived. In order to address this issue:
+    // - Case 1: segment has the same start and end time, directly use the end time as the time boundary. It is OK to
+    //   directly use the end time as the time boundary because all the records in the new segments have the same time
+    //   value and the time filter will filter all of them out, so the result is consistent. The reason why we handle
+    //   this case separately is because there are use cases with time unit other than DAYS, but have time value rounded
+    //   to the start of the day for offline table (offline segments have the same start and end time), and un-rounded
+    //   time value for real-time table (real-time segments have different start and end time). In order to get the
+    //   correct result, must attach filter 'time < endTime' to the offline side and filter 'time >= endTime' to the
+    //   real-time side.
+    // - Case 2. segment has different start and end time, rewind the end time with the push interval and use it as the
+    //   time boundary. The assumption we made here is that the push will finish in the push interval, and next push
+    //   will push the time boundary forward again and make the records within the last push interval queryable.
+    if (latestSegmentEndTime != latestSegmentZKMetadata.getStartTime()) {
+
+      // For HOURLY push table with time unit other than DAYS, use {latestSegmentEndTime - (1 HOUR) + 1} as the time
+      // boundary; otherwise, use {latestSegmentEndTime - (1 DAY) + 1} as the time boundary
+      if ("HOURLY".equalsIgnoreCase(retentionConfig.getSegmentPushFrequency()) && tableTimeUnit != TimeUnit.DAYS) {
+        timeBoundary = timeBoundary - tableTimeUnit.convert(1L, TimeUnit.HOURS) + 1;
+      } else {
+        timeBoundary = timeBoundary - tableTimeUnit.convert(1L, TimeUnit.DAYS) + 1;
+      }
     }
 
     LOGGER.info("Updated time boundary for table: '{}' to: {} {}", tableNameWithType, timeBoundary, tableTimeUnit);
