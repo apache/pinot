@@ -49,6 +49,8 @@ public class TableConfig {
   public static final String QUOTA_CONFIG_KEY = "quota";
   public static final String TASK_CONFIG_KEY = "task";
   public static final String ROUTING_CONFIG_KEY = "routing";
+  // config for service-level-objectives
+  public static final String SLO_CONFIG_KEY = "slo";
 
   private static final String FIELD_MISSING_MESSAGE_TEMPLATE = "Mandatory field '%s' is missing";
 
@@ -82,6 +84,9 @@ public class TableConfig {
   @NestedConfig
   private RoutingConfig _routingConfig;
 
+  @NestedConfig
+  private SLOConfig _sloConfig;
+
   /**
    * NOTE: DO NOT use this constructor, use builder instead. This constructor is for deserializer only.
    */
@@ -93,7 +98,8 @@ public class TableConfig {
 
   private TableConfig(String tableName, TableType tableType, SegmentsValidationAndRetentionConfig validationConfig,
       TenantConfig tenantConfig, IndexingConfig indexingConfig, TableCustomConfig customConfig,
-      @Nullable QuotaConfig quotaConfig, @Nullable TableTaskConfig taskConfig, @Nullable RoutingConfig routingConfig) {
+      @Nullable QuotaConfig quotaConfig, @Nullable TableTaskConfig taskConfig, @Nullable RoutingConfig routingConfig,
+      @Nullable SLOConfig sloConfig) {
     _tableName = TableNameBuilder.forType(tableType).tableNameWithType(tableName);
     _tableType = tableType;
     _validationConfig = validationConfig;
@@ -103,6 +109,7 @@ public class TableConfig {
     _quotaConfig = quotaConfig;
     _taskConfig = taskConfig;
     _routingConfig = routingConfig;
+    _sloConfig = sloConfig;
   }
 
   public static TableConfig fromJsonString(String jsonString)
@@ -146,8 +153,10 @@ public class TableConfig {
 
     RoutingConfig routingConfig = extractChildConfig(jsonConfig, ROUTING_CONFIG_KEY, RoutingConfig.class);
 
+    SLOConfig sloConfig = extractChildConfig(jsonConfig, SLO_CONFIG_KEY, SLOConfig.class);
+
     return new TableConfig(tableName, tableType, validationConfig, tenantConfig, indexingConfig, customConfig,
-        quotaConfig, taskConfig, routingConfig);
+        quotaConfig, taskConfig, routingConfig, sloConfig);
   }
 
   /**
@@ -191,6 +200,9 @@ public class TableConfig {
     }
     if (_routingConfig != null) {
       jsonConfig.set(ROUTING_CONFIG_KEY, JsonUtils.objectToJsonNode(_routingConfig));
+    }
+    if (_sloConfig != null) {
+      jsonConfig.set(SLO_CONFIG_KEY, JsonUtils.objectToJsonNode(_sloConfig));
     }
 
     return jsonConfig;
@@ -250,8 +262,14 @@ public class TableConfig {
       routingConfig = JsonUtils.stringToObject(routingConfigString, RoutingConfig.class);
     }
 
+    SLOConfig sloConfig = null;
+    String sloConfigString = simpleFields.get(SLO_CONFIG_KEY);
+    if (sloConfigString != null) {
+      sloConfig = JsonUtils.stringToObject(sloConfigString, SLOConfig.class);
+    }
+
     return new TableConfig(tableName, tableType, validationConfig, tenantConfig, indexingConfig, customConfig,
-        quotaConfig, taskConfig, routingConfig);
+        quotaConfig, taskConfig, routingConfig, sloConfig);
   }
 
   public ZNRecord toZNRecord()
@@ -277,6 +295,9 @@ public class TableConfig {
     }
     if (_routingConfig != null) {
       simpleFields.put(ROUTING_CONFIG_KEY, JsonUtils.objectToString(_routingConfig));
+    }
+    if (_sloConfig != null) {
+      simpleFields.put(SLO_CONFIG_KEY, JsonUtils.objectToString(_sloConfig));
     }
 
     ZNRecord znRecord = new ZNRecord(_tableName);
@@ -372,6 +393,15 @@ public class TableConfig {
     _routingConfig = routingConfig;
   }
 
+  @Nullable
+  public SLOConfig getSloConfig() {
+    return _sloConfig;
+  }
+
+  public void setSloConfig(SLOConfig sloConfig) {
+    _sloConfig = sloConfig;
+  }
+
   @Override
   public String toString() {
     try {
@@ -393,7 +423,8 @@ public class TableConfig {
           .isEqual(_tenantConfig, that._tenantConfig) && EqualityUtils.isEqual(_indexingConfig, that._indexingConfig)
           && EqualityUtils.isEqual(_customConfig, that._customConfig) && EqualityUtils
           .isEqual(_quotaConfig, that._quotaConfig) && EqualityUtils.isEqual(_taskConfig, that._taskConfig)
-          && EqualityUtils.isEqual(_routingConfig, that._routingConfig);
+          && EqualityUtils.isEqual(_routingConfig, that._routingConfig)
+          && EqualityUtils.isEqual(_sloConfig, that._sloConfig);
     }
     return false;
   }
@@ -409,6 +440,8 @@ public class TableConfig {
     result = EqualityUtils.hashCodeOf(result, _quotaConfig);
     result = EqualityUtils.hashCodeOf(result, _taskConfig);
     result = EqualityUtils.hashCodeOf(result, _routingConfig);
+    result = EqualityUtils.hashCodeOf(result, _sloConfig);
+
     return result;
   }
 
@@ -458,6 +491,7 @@ public class TableConfig {
     private RoutingConfig _routingConfig;
     private HllConfig _hllConfig;
     private StarTreeIndexSpec _starTreeIndexSpec;
+    private SLOConfig _sloConfig;
 
     public Builder(TableType tableType) {
       _tableType = tableType;
@@ -609,6 +643,11 @@ public class TableConfig {
       return this;
     }
 
+    public Builder setSloConfig(SLOConfig sloConfig) {
+      _sloConfig = sloConfig;
+      return this;
+    }
+
     public TableConfig build() {
       // Validation config
       SegmentsValidationAndRetentionConfig validationConfig = new SegmentsValidationAndRetentionConfig();
@@ -654,7 +693,7 @@ public class TableConfig {
       }
 
       return new TableConfig(_tableName, _tableType, validationConfig, tenantConfig, indexingConfig, _customConfig,
-          _quotaConfig, _taskConfig, _routingConfig);
+          _quotaConfig, _taskConfig, _routingConfig, _sloConfig);
     }
   }
 }

@@ -24,6 +24,7 @@ import java.util.HashSet;
 import java.util.Set;
 import org.apache.pinot.common.data.StarTreeIndexSpec;
 import org.apache.pinot.common.utils.CommonConstants.Helix.TableType;
+import org.apache.pinot.common.utils.time.TimeUtils;
 import org.apache.pinot.startree.hll.HllConfig;
 import org.testng.annotations.Test;
 
@@ -31,6 +32,9 @@ import static org.testng.Assert.*;
 
 
 public class TableConfigTest {
+
+  private static final String FRESHNESS_LAG = "10s";
+  private static final long LATENCY_MS = 100;
 
   @Test
   public void testSerializeMandatoryFields()
@@ -322,6 +326,16 @@ public class TableConfigTest {
       tableConfigToCompare = TableConfig.fromZnRecord(tableConfig.toZNRecord());
       checkTableConfigWithHllConfig(tableConfig, tableConfigToCompare);
     }
+    {
+      // with slo config
+      SLOConfig sloConfig = new SLOConfig();
+      sloConfig.setRealtimeFreshnessLagTime(FRESHNESS_LAG);
+      sloConfig.setLatencyMs(LATENCY_MS);
+      TableConfig tableConfig = tableConfigBuilder.setSloConfig(sloConfig).build();
+
+      TableConfig tableConfigToCompare = TableConfig.fromJsonConfig(tableConfig.toJsonConfig());
+      checkTableConfigWithSloConfig(tableConfig, tableConfigToCompare);
+    }
   }
 
   private void checkTableConfigWithAssignmentConfig(TableConfig tableConfig, TableConfig tableConfigToCompare) {
@@ -380,5 +394,15 @@ public class TableConfigTest {
     assertEquals(hllConfig.getColumnsToDeriveHllFields(), columns);
     assertEquals(hllConfig.getHllLog2m(), 9);
     assertEquals(hllConfig.getHllDeriveColumnSuffix(), "suffix");
+  }
+
+  private void checkTableConfigWithSloConfig(TableConfig tableConfig, TableConfig tableConfigToCompare) {
+    assertEquals(tableConfigToCompare.getTableName(), tableConfig.getTableName());
+    assertNotNull(tableConfigToCompare.getSloConfig());
+
+    SLOConfig config = tableConfigToCompare.getSloConfig();
+    assertEquals(config.getLatencyMs(), LATENCY_MS);
+    assertEquals(config.getRealtimeFreshnessLagTime(), FRESHNESS_LAG);
+    assertEquals(config.getRealtimeFreshnessLagMs(), (long)TimeUtils.convertPeriodToMillis(FRESHNESS_LAG));
   }
 }

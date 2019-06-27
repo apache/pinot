@@ -66,6 +66,7 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.config.IndexingConfig;
 import org.apache.pinot.common.config.OfflineTagConfig;
 import org.apache.pinot.common.config.RealtimeTagConfig;
+import org.apache.pinot.common.config.SLOConfig;
 import org.apache.pinot.common.config.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.config.TableCustomConfig;
@@ -1066,6 +1067,7 @@ public class PinotHelixResourceManager {
       tableConfig.setTenantConfig(tenantConfig);
     }
     validateTableTenantConfig(tableConfig, tableNameWithType, tableType);
+    checkSLOConfig(tableConfig, tableNameWithType, tableType);
 
     SegmentsValidationAndRetentionConfig segmentsConfig = tableConfig.getValidationConfig();
     switch (tableType) {
@@ -1195,6 +1197,38 @@ public class PinotHelixResourceManager {
                   + tableNameWithType);
         }
       }
+    }
+  }
+
+  /**
+   * Check if the SLO config matches existing config for the other (offline|realtime) table.
+   */
+  private void checkSLOConfig(TableConfig tableConfig, String tableNameWithType, TableType tableType) {
+
+    SLOConfig sloConfig = tableConfig.getSloConfig();
+
+    TableConfig otherConfig = null;
+    TableType otherType = null;
+    if (tableType.equals(TableType.OFFLINE)) {
+      otherConfig = ZKMetadataProvider.getRealtimeTableConfig(_propertyStore,
+          TableNameBuilder.extractRawTableName(tableNameWithType));
+      otherType = TableType.REALTIME;
+    } else {
+      otherConfig = ZKMetadataProvider.getOfflineTableConfig(_propertyStore,
+          TableNameBuilder.extractRawTableName(tableNameWithType));
+      otherType = TableType.OFFLINE;
+    }
+
+    if (otherConfig == null
+        || (sloConfig == null && otherConfig.getSloConfig() == null)) {
+      return;
+    }
+
+    SLOConfig otherSloConfig = otherConfig.getSloConfig();
+    if ((otherSloConfig != null && ! otherSloConfig.equals(sloConfig))
+      || (sloConfig != null && ! sloConfig.equals(otherSloConfig))) {
+      LOGGER.warn("SLO config different between {} table and new config: {} = {}, new = {}", otherType, otherType,
+          otherSloConfig, sloConfig);
     }
   }
 
@@ -1342,6 +1376,7 @@ public class PinotHelixResourceManager {
       throws IOException {
 
     validateTableTenantConfig(tableConfig, tableNameWithType, tableType);
+    checkSLOConfig(tableConfig, tableNameWithType, tableType);
     setExistingTableConfig(tableConfig, tableNameWithType, tableType);
   }
 
