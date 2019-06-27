@@ -89,6 +89,11 @@ public class StreamConfigProperties {
    */
   public static final String SEGMENT_FLUSH_DESIRED_SIZE = "realtime.segment.flush.desired.size";
 
+  /**
+   * The initial num rows to use for segment size auto tuning. By default 100_000 is used.
+   */
+  public static final String SEGMENT_INITIAL_ROWS_THRESHOLD = "realtime.segment.initial.rows.threshold";
+
   // Time threshold that controller will wait for the segment to be built by the server
   public static final String SEGMENT_COMMIT_TIMEOUT_SECONDS = "realtime.segment.commit.timeoutSeconds";
 

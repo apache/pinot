@@ -47,6 +47,7 @@ public class StreamConfig {
   private static final int DEFAULT_FLUSH_THRESHOLD_ROWS = 5_000_000;
   private static final long DEFAULT_FLUSH_THRESHOLD_TIME = TimeUnit.MILLISECONDS.convert(6, TimeUnit.HOURS);
   private static final long DEFAULT_DESIRED_SEGMENT_SIZE_BYTES = 200 * 1024 * 1024; // 200M
+  private static final int DEFAULT_INITIAL_ROWS_THRESHOLD = 100_000;
   private static final String DEFAULT_CONSUMER_FACTORY_CLASS_NAME_STRING =
       "org.apache.pinot.core.realtime.impl.kafka.KafkaConsumerFactory";
 
@@ -68,6 +69,7 @@ public class StreamConfig {
   final private int _flushThresholdRows;
   final private long _flushThresholdTimeMillis;
   final private long _flushSegmentDesiredSizeBytes;
+  final private int _initialRowsThreshold; // initial num rows to use for SegmentSizeBasedFlushThresholdUpdater
 
   final private String _groupId;
 
@@ -135,8 +137,8 @@ public class StreamConfig {
       try {
         connectionTimeoutMillis = Long.parseLong(connectionTimeoutValue);
       } catch (Exception e) {
-        LOGGER.warn("Caught exception while parsing the connection timeout, defaulting to {} ms", e,
-            DEFAULT_STREAM_CONNECTION_TIMEOUT_MILLIS);
+        LOGGER.warn("Caught exception while parsing the connection timeout, defaulting to {} ms",
+            DEFAULT_STREAM_CONNECTION_TIMEOUT_MILLIS, e);
       }
     }
     _connectionTimeoutMillis = connectionTimeoutMillis;
@@ -197,6 +199,19 @@ public class StreamConfig {
       _flushSegmentDesiredSizeBytes = DEFAULT_DESIRED_SEGMENT_SIZE_BYTES;
     }
 
+    int initialRowsThreshold = 0;
+    String initialRowsThresholdValue = streamConfigMap.get(StreamConfigProperties.SEGMENT_INITIAL_ROWS_THRESHOLD);
+    if (initialRowsThresholdValue != null) {
+      try {
+        initialRowsThreshold = Integer.parseInt(initialRowsThresholdValue);
+      } catch (Exception e) {
+        LOGGER.warn("Caught exception while parsing {}:{}, defaulting to {} ms",
+            StreamConfigProperties.SEGMENT_INITIAL_ROWS_THRESHOLD, initialRowsThresholdValue,
+            DEFAULT_INITIAL_ROWS_THRESHOLD, e);
+      }
+    }
+    _initialRowsThreshold = initialRowsThreshold > 0 ? initialRowsThreshold : DEFAULT_INITIAL_ROWS_THRESHOLD;
+
     String groupIdKey = StreamConfigProperties.constructStreamProperty(_type, StreamConfigProperties.GROUP_ID);
     _groupId = streamConfigMap.get(groupIdKey);
 
@@ -227,8 +242,20 @@ public class StreamConfig {
     return _consumerFactoryClassName;
   }
 
+  public static String getDefaultConsumerFactoryClassName() {
+    return DEFAULT_CONSUMER_FACTORY_CLASS_NAME_STRING;
+  }
+
   public OffsetCriteria getOffsetCriteria() {
     return _offsetCriteria;
+  }
+
+  public String getDecoderClass() {
+    return _decoderClass;
+  }
+
+  public Map<String, String> getDecoderProperties() {
+    return _decoderProperties;
   }
 
   public long getConnectionTimeoutMillis() {
@@ -255,10 +282,6 @@ public class StreamConfig {
     return DEFAULT_FLUSH_THRESHOLD_TIME;
   }
 
-  public static String getDefaultConsumerFactoryClassName() {
-    return DEFAULT_CONSUMER_FACTORY_CLASS_NAME_STRING;
-  }
-
   public long getFlushSegmentDesiredSizeBytes() {
     return _flushSegmentDesiredSizeBytes;
   }
@@ -267,12 +290,12 @@ public class StreamConfig {
     return DEFAULT_DESIRED_SEGMENT_SIZE_BYTES;
   }
 
-  public String getDecoderClass() {
-    return _decoderClass;
+  public int getInitialRowsThreshold() {
+    return _initialRowsThreshold;
   }
 
-  public Map<String, String> getDecoderProperties() {
-    return _decoderProperties;
+  public static int getDefaultInitialRowsThreshold() {
+    return DEFAULT_INITIAL_ROWS_THRESHOLD;
   }
 
   public String getGroupId() {
@@ -290,8 +313,8 @@ public class StreamConfig {
         + _offsetCriteria + '\'' + ", _connectionTimeoutMillis=" + _connectionTimeoutMillis + ", _fetchTimeoutMillis="
         + _fetchTimeoutMillis + ", _flushThresholdRows=" + _flushThresholdRows + ", _flushThresholdTimeMillis="
         + _flushThresholdTimeMillis + ", _flushSegmentDesiredSizeBytes=" + _flushSegmentDesiredSizeBytes
-        + ", _decoderClass='" + _decoderClass + '\'' + ", _decoderProperties=" + _decoderProperties + ", _groupId='"
-        + _groupId + '}';
+        + ", _initialRowsThreshold=" + _initialRowsThreshold + ", _decoderClass='" + _decoderClass
+        + '\'' + ", _decoderProperties=" + _decoderProperties + ", _groupId='" + _groupId + '}';
   }
 
   @Override
@@ -311,6 +334,7 @@ public class StreamConfig {
         .isEqual(_flushThresholdRows, that._flushThresholdRows) && EqualityUtils
         .isEqual(_flushThresholdTimeMillis, that._flushThresholdTimeMillis) && EqualityUtils
         .isEqual(_flushSegmentDesiredSizeBytes, that._flushSegmentDesiredSizeBytes) && EqualityUtils
+        .isEqual(_initialRowsThreshold, that._initialRowsThreshold) && EqualityUtils
         .isEqual(_type, that._type) && EqualityUtils.isEqual(_topicName, that._topicName) && EqualityUtils
         .isEqual(_consumerTypes, that._consumerTypes) && EqualityUtils
         .isEqual(_consumerFactoryClassName, that._consumerFactoryClassName) && EqualityUtils
@@ -331,6 +355,7 @@ public class StreamConfig {
     result = EqualityUtils.hashCodeOf(result, _flushThresholdRows);
     result = EqualityUtils.hashCodeOf(result, _flushThresholdTimeMillis);
     result = EqualityUtils.hashCodeOf(result, _flushSegmentDesiredSizeBytes);
+    result = EqualityUtils.hashCodeOf(result, _initialRowsThreshold);
     result = EqualityUtils.hashCodeOf(result, _decoderClass);
     result = EqualityUtils.hashCodeOf(result, _decoderProperties);
     result = EqualityUtils.hashCodeOf(result, _groupId);
