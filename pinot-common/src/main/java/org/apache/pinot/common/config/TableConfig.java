@@ -112,6 +112,8 @@ public class TableConfig {
 
   public static TableConfig fromJsonConfig(JsonNode jsonConfig)
       throws IOException {
+    Preconditions
+        .checkState(jsonConfig != null, "Table does not exist");
     // Mandatory fields
     JsonNode jsonTableType = jsonConfig.get(TABLE_TYPE_KEY);
     Preconditions
