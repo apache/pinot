@@ -32,6 +32,7 @@ public enum AggregationFunctionType {
   MINMAXRANGE("minMaxRange"),
   DISTINCTCOUNT("distinctCount"),
   DISTINCTCOUNTHLL("distinctCountHLL"),
+  DISTINCTCOUNTRAWHLL("distinctCountRawHLL"),
   FASTHLL("fastHLL"),
   PERCENTILE("percentile"),
   PERCENTILEEST("percentileEst"),
@@ -45,6 +46,7 @@ public enum AggregationFunctionType {
   MINMAXRANGEMV("minMaxRangeMV"),
   DISTINCTCOUNTMV("distinctCountMV"),
   DISTINCTCOUNTHLLMV("distinctCountHLLMV"),
+  DISTINCTCOUNTRAWHLLMV("distinctCountRawHLLMV"),
   PERCENTILEMV("percentileMV"),
   PERCENTILEESTMV("percentileEstMV"),
   PERCENTILETDIGESTMV("percentileTDigestMV");

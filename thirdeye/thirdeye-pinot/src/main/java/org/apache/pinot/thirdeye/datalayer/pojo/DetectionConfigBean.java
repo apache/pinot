@@ -43,6 +43,15 @@ public class DetectionConfigBean extends AbstractBean {
   String yaml;
   Map<String, Object> componentSpecs;
   long lastTuningTimestamp;
+  List<String> owners;
+
+  public List<String> getOwners() {
+    return owners;
+  }
+
+  public void setOwners(List<String> owners) {
+    this.owners = owners;
+  }
 
   public Map<String, Object> getComponentSpecs() {
     return componentSpecs;

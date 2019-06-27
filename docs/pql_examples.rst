@@ -157,6 +157,7 @@ Supported aggregations on single-value columns
 * ``MINMAXRANGE``
 * ``DISTINCTCOUNT``
 * ``DISTINCTCOUNTHLL``
+* ``DISTINCTCOUNTRAWHLL``: Returns HLL response serialized as string. The serialized HLL can be converted back into an HLL (see `pinot-core/\*\*/HllUtil.java` as an example) and then aggregated with other HLLs. A common use case may be to merge HLL responses from different Pinot tables, or to allow aggregation after client-side batching.
 * ``FASTHLL`` (**WARN**: will be deprecated soon. ``FASTHLL`` stores serialized HyperLogLog in String format, which performs
   worse than ``DISTINCTCOUNTHLL``, which supports serialized HyperLogLog in BYTES (byte array) format)
 * ``PERCENTILE[0-100]``: e.g. ``PERCENTILE5``, ``PERCENTILE50``, ``PERCENTILE99``, etc.
@@ -173,6 +174,7 @@ Supported aggregations on multi-value columns
 * ``MINMAXRANGEMV``
 * ``DISTINCTCOUNTMV``
 * ``DISTINCTCOUNTHLLMV``
+* ``DISTINCTCOUNTRAWHLLMV``: Returns HLL response serialized as string. The serialized HLL can be converted back into an HLL (see `pinot-core/**/HllUtil.java` as an example) and then aggregated with other HLLs. A common use case may be to merge HLL responses from different Pinot tables, or to allow aggregation after client-side batching.
 * ``FASTHLLMV`` (**WARN**: will be deprecated soon. It does not make lots of sense to configure serialized HyperLogLog
   column as a dimension)
 * ``PERCENTILE[0-100]MV``: e.g. ``PERCENTILE5MV``, ``PERCENTILE50MV``, ``PERCENTILE99MV``, etc.

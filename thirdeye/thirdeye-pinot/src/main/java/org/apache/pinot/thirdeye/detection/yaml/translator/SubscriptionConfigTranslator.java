@@ -53,6 +53,7 @@ public class SubscriptionConfigTranslator extends ConfigTranslator<DetectionAler
   public static final String PROP_ACTIVE = "active";
   public static final String PROP_APPLICATION = "application";
   public static final String PROP_FROM = "fromAddress";
+  public static final String PROP_OWNERS = "owners";
   public static final String PROP_EMAIL_SUBJECT_TYPE = "emailSubjectStyle";
   public static final String PROP_ALERT_SCHEMES = "alertSchemes";
   public static final String PROP_DETECTION_NAMES = "subscribedDetections";
@@ -168,6 +169,7 @@ public class SubscriptionConfigTranslator extends ConfigTranslator<DetectionAler
     alertConfigDTO.setName(MapUtils.getString(yamlConfigMap, PROP_SUBS_GROUP_NAME));
     alertConfigDTO.setApplication(MapUtils.getString(yamlConfigMap, PROP_APPLICATION));
     alertConfigDTO.setFrom(MapUtils.getString(yamlConfigMap, PROP_FROM));
+    alertConfigDTO.setOwners(filterOwners(ConfigUtils.getList(yamlConfigMap.get(PROP_OWNERS))));
 
     alertConfigDTO.setCronExpression(MapUtils.getString(yamlConfigMap, PROP_CRON, CRON_SCHEDULE_DEFAULT));
     alertConfigDTO.setActive(MapUtils.getBooleanValue(yamlConfigMap, PROP_ACTIVE, true));

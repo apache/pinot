@@ -122,9 +122,9 @@ public class LowLevelConsumerRoutingTableBuilder extends GeneratorBasedRoutingTa
             continue;
           }
 
-          // Replicas in CONSUMING state are only allowed on the last segment
-          if (state.equalsIgnoreCase(CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel.CONSUMING)
-              && segmentName.equals(validConsumingSegment)) {
+          // If the server is in CONSUMING status, the segment has to be match with the valid consuming segment
+          if (state.equals(CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel.CONSUMING)
+              && validConsumingSegment != null && segmentNameStr.equals(validConsumingSegment.getSegmentName())) {
             validServers.add(instance);
           }
         }

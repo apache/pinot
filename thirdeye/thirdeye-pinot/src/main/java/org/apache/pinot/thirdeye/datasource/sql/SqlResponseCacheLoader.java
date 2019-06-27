@@ -85,7 +85,7 @@ public class SqlResponseCacheLoader extends CacheLoader<SqlQuery, ThirdEyeResult
       for (Map<String, Object> objMap: prestoMapList) {
         Map<String, String> dbNameToURLMap = (Map)objMap.get(DB);
         String prestoUser = (String)objMap.get(USER);
-        String prestoPassword = (String)objMap.get(PASSWORD);
+        String prestoPassword = getPassword(objMap);
 
         for (Map.Entry<String, String> entry: dbNameToURLMap.entrySet()) {
           DataSource dataSource = new DataSource();
@@ -113,7 +113,7 @@ public class SqlResponseCacheLoader extends CacheLoader<SqlQuery, ThirdEyeResult
       for (Map<String, Object> objMap: mysqlMapList) {
         Map<String, String> dbNameToURLMap = (Map)objMap.get(DB);
         String mysqlUser = (String)objMap.get(USER);
-        String mysqlPassword = (String)objMap.get(PASSWORD);
+        String mysqlPassword = getPassword(objMap);
 
         for (Map.Entry<String, String> entry: dbNameToURLMap.entrySet()) {
           DataSource dataSource = new DataSource();
@@ -141,7 +141,7 @@ public class SqlResponseCacheLoader extends CacheLoader<SqlQuery, ThirdEyeResult
       h2DataSource.setInitialSize(INIT_CONNECTIONS);
       h2DataSource.setMaxActive(MAX_CONNECTIONS);
       String h2User = (String) objMap.get(USER);
-      String h2Password = (String) objMap.get(PASSWORD);
+      String h2Password = getPassword(objMap);
       h2Url = (String) objMap.get(DB);
       h2DataSource.setUsername(h2User);
       h2DataSource.setPassword(h2Password);
@@ -202,6 +202,12 @@ public class SqlResponseCacheLoader extends CacheLoader<SqlQuery, ThirdEyeResult
         }
       }
     }
+  }
+
+  private String getPassword(Map<String, Object> objMap) {
+    String password = (String) objMap.get(PASSWORD);
+    password = (password == null) ? "" : password;
+    return password;
   }
 
   /**

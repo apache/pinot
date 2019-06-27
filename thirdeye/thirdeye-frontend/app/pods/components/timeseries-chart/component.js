@@ -243,7 +243,17 @@ export default Component.extend({
       if (upperBoundVals && lowerBoundVals) {
         upperBoundVals = upperBoundVals.values.map(e => e.value);
         lowerBoundVals = lowerBoundVals.values.map(e => e.value);
-
+        // If all upper bound vals are null, we assume that there is only a lower bound
+        if (upperBoundVals.every(val => val === null)) {
+          let currentVals = chart.internal.data.targets.find(target => {
+            return target.id === 'Current';
+          });
+          if (currentVals) {
+            currentVals = currentVals.values.map(e => e.value);
+            const currentMax = Math.max(...currentVals);
+            upperBoundVals = upperBoundVals.map(() => 2 * currentMax);
+          }
+        }
         const area_main = d3.svg.area()
           .interpolate('linear')
           .x(d => xscale(xVals[d]))

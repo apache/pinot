@@ -179,11 +179,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
     Preconditions.checkNotNull(tableConfig);
 
-    Schema schema = null;
-    // For OFFLINE table, try to get schema for default columns
-    if (TableNameBuilder.OFFLINE.tableHasTypeSuffix(tableNameWithType)) {
-      schema = ZKMetadataProvider.getTableSchema(_propertyStore, tableNameWithType);
-    }
+    Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, tableNameWithType);
 
     reloadSegment(tableNameWithType, segmentMetadata, tableConfig, schema);
 
@@ -197,11 +193,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
     Preconditions.checkNotNull(tableConfig);
 
-    Schema schema = null;
-    // For OFFLINE table, try to get schema for default columns
-    if (TableNameBuilder.OFFLINE.tableHasTypeSuffix(tableNameWithType)) {
-      schema = ZKMetadataProvider.getTableSchema(_propertyStore, tableNameWithType);
-    }
+    Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, tableNameWithType);
 
     for (SegmentMetadata segmentMetadata : getAllSegmentsMetadata(tableNameWithType)) {
       reloadSegment(tableNameWithType, segmentMetadata, tableConfig, schema);

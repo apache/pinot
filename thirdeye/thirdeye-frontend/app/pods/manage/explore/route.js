@@ -49,7 +49,12 @@ export default Route.extend({
           });
 
           try {
-            granularity = detection_json.properties.nested[0].nested[0].nested[0].windowUnit;
+            if (detectionInfo.dataset) {
+              const datasetUrl = `/detection/dataset?name=${detectionInfo.dataset}`;
+              const dataset_result = await fetch(datasetUrl, getProps);
+              const dataset_json = await dataset_result.json();
+              granularity = dataset_json.timeUnit;
+            }
           } catch (error) {
             granularity = null;
           }
