@@ -184,7 +184,7 @@ public class ControllerPeriodicTasksIntegrationTests extends BaseClusterIntegrat
     Assert.assertNotNull(outgoingTimeUnit);
     String timeType = outgoingTimeUnit.toString();
 
-    addOfflineTable(table, timeColumnName, timeType, TENANT_NAME, TENANT_NAME, null, SegmentVersion.v1, null, null, null, null, null);
+    addOfflineTable(tableName, timeColumnName, timeType, TENANT_NAME, TENANT_NAME, null, SegmentVersion.v1, null, null, null, null, null);
     completeTableConfiguration();
 
     ExecutorService executor = Executors.newCachedThreadPool();
