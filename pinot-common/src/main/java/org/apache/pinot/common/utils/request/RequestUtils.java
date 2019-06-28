@@ -216,7 +216,7 @@ public class RequestUtils {
   public static Set<String> extractFilterColumns(FilterQueryTree root) {
     Set<String> filterColumns = new HashSet<>();
     if (root.getChildren() == null) {
-      filterColumns.add(root.getColumn());
+      root.getExpression().getColumns(filterColumns);
     } else {
       Stack<FilterQueryTree> stack = new Stack<>();
       stack.add(root);
@@ -224,7 +224,7 @@ public class RequestUtils {
         FilterQueryTree node = stack.pop();
         for (FilterQueryTree child : node.getChildren()) {
           if (child.getChildren() == null) {
-            filterColumns.add(child.getColumn());
+            child.getExpression().getColumns(filterColumns);
           } else {
             stack.push(child);
           }

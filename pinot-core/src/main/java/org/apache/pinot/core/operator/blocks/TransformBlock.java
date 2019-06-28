@@ -79,4 +79,8 @@ public class TransformBlock implements Block {
   public BlockMetadata getMetadata() {
     throw new UnsupportedOperationException();
   }
+
+  public DocIdSetBlock getDocIdSetBlock(){
+    return _projectionBlock.getDocIdSetBlock();
+  }
 }
