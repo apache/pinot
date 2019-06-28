@@ -54,7 +54,7 @@ public class TriggerConditionGrouper implements Grouper<TriggerConditionGrouperS
   private Map<String, Object> rightOp;
   private InputDataFetcher dataFetcher;
 
-  static final String PROP_DETECTOR_COMPONENT_NAME = "detectorComponentName";
+  static final String PROP_ENTITY_NAME = "subEntityName";
   static final String PROP_AND = "and";
   static final String PROP_OR = "or";
   static final String PROP_OPERATOR = "operator";
@@ -143,8 +143,8 @@ public class TriggerConditionGrouper implements Grouper<TriggerConditionGrouperS
     String value = MapUtils.getString(operatorNode, "value");
     if (value != null) {
       return anomalies.stream().filter(anomaly ->
-          anomaly.getProperties() != null && anomaly.getProperties().get(PROP_DETECTOR_COMPONENT_NAME) != null
-              && anomaly.getProperties().get(PROP_DETECTOR_COMPONENT_NAME).startsWith(value)
+          anomaly.getProperties() != null && anomaly.getProperties().get(PROP_ENTITY_NAME) != null
+              && anomaly.getProperties().get(PROP_ENTITY_NAME).startsWith(value)
       ).collect(Collectors.toList());
     }
 
