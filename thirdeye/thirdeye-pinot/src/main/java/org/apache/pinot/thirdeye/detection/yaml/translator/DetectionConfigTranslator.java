@@ -232,7 +232,7 @@ public class DetectionConfigTranslator extends ConfigTranslator<DetectionConfigD
   }
 
   private Map<String, Object> translateCompositeAlert(Map<String, Object> compositeAlertConfigMap) {
-    Map<String, Object> properties;
+    Map<String, Object> properties = new HashMap<>();
 
     // Recursively translate all the sub-alerts
     List<Map<String, Object>> subDetectionYamls = ConfigUtils.getList(compositeAlertConfigMap.get(PROP_ALERTS));
@@ -253,18 +253,14 @@ public class DetectionConfigTranslator extends ConfigTranslator<DetectionConfigD
     String subEntityName = MapUtils.getString(compositeAlertConfigMap, PROP_ENTITY_NAME);
     if (!grouperProps.isEmpty()) {
       properties = buildGroupWrapperProperties(subEntityName, grouperProps.get(0), nestedPropertiesList);
-    } else {
-      Map<String, Object> defaultGrouper = new HashMap<>();
-      defaultGrouper.put(PROP_TYPE, "MOCK_GROUPER");
-      defaultGrouper.put(PROP_NAME, "Default grouper");
-      properties = buildGroupWrapperProperties(subEntityName, defaultGrouper, nestedPropertiesList);
+      nestedPropertiesList = Collections.singletonList(properties);
     }
 
     // Wrap the entity level merger
     Map<String, Object> mergerProperties = ConfigUtils.getMap(compositeAlertConfigMap.get(PROP_MERGER));
     properties = buildWrapperProperties(
         ChildKeepingMergeWrapper.class.getName(),
-        Collections.singletonList(properties),
+        nestedPropertiesList,
         mergerProperties);
 
     return properties;
@@ -367,8 +363,10 @@ public class DetectionConfigTranslator extends ConfigTranslator<DetectionConfigD
       Map<String, Object> grouperYaml, List<Map<String, Object>> nestedProps) {
     Map<String, Object> properties = new HashMap<>();
     properties.put(PROP_CLASS_NAME, GrouperWrapper.class.getName());
-    properties.put(PROP_ENTITY_NAME, entityName);
     properties.put(PROP_NESTED, nestedProps);
+    if (entityName != null) {
+      properties.put(PROP_ENTITY_NAME, entityName);
+    }
 
     String grouperType = MapUtils.getString(grouperYaml, PROP_TYPE);
     String grouperName = MapUtils.getString(grouperYaml, PROP_NAME);
