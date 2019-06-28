@@ -617,13 +617,18 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     pqlQuery = "SELECT count(*) FROM mytable WHERE DaysSinceEpoch = " + daysSinceEpoch + " AND timeConvert(DaysSinceEpoch,'DAYS','SECONDS') = " + secondsSinceEpoch;
     JsonNode response4 = postQuery(pqlQuery);
 
+    pqlQuery = "SELECT count(*) FROM mytable WHERE DIV(timeConvert(DaysSinceEpoch,'DAYS','SECONDS'),1) = " + secondsSinceEpoch;
+    JsonNode response5 = postQuery(pqlQuery);
+
     double val1 = response1.get("aggregationResults").get(0).get("value").asDouble();
     double val2 = response2.get("aggregationResults").get(0).get("value").asDouble();
     double val3 = response3.get("aggregationResults").get(0).get("value").asDouble();
     double val4 = response4.get("aggregationResults").get(0).get("value").asDouble();
+    double val5 = response5.get("aggregationResults").get(0).get("value").asDouble();
     Assert.assertEquals(val1, val2);
     Assert.assertEquals(val1, val3);
     Assert.assertEquals(val1, val4);
+    Assert.assertEquals(val1, val5);
   }
 
   @Test

@@ -128,7 +128,6 @@ public class ComparisonPredicateAstNode extends PredicateAstNode {
   @Override
   public FilterQueryTree buildFilterQueryTree() {
     if (_identifier == null) {
-
       throw new Pql2CompilationException("Comparison predicate has no identifier");
     }
 

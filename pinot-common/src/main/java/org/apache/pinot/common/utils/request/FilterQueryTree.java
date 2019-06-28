@@ -39,7 +39,7 @@ public class FilterQueryTree {
     this.value = value;
     this.operator = operator;
     this.children = children;
-    if(column != null) {
+    if (column != null) {
       _expression = TransformExpressionTree.compileToExpressionTree(column);
     } else {
       _expression = null;
