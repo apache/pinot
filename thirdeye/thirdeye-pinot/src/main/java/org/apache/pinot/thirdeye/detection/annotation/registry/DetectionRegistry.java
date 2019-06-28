@@ -82,10 +82,12 @@ public class DetectionRegistry {
             REGISTRY_MAP.put(componentsAnnotation.type(),
                 ImmutableMap.of(KEY_CLASS_NAME, className, KEY_ANNOTATION, componentsAnnotation,
                     KEY_IS_BASELINE_PROVIDER, isBaselineProvider(clazz)));
+            LOG.info("Registered component {} - {}", componentsAnnotation.type(), className);
           }
           if (annotation instanceof Tune) {
             Tune tunableAnnotation = (Tune) annotation;
             TUNE_MAP.put(className, tunableAnnotation);
+            LOG.info("Registered tuner {}", className);
           }
         }
       }
@@ -98,6 +100,7 @@ public class DetectionRegistry {
     try {
       Class<? extends BaseComponent> clazz = (Class<? extends BaseComponent>) Class.forName(className);
       REGISTRY_MAP.put(type, ImmutableMap.of(KEY_CLASS_NAME, className, KEY_IS_BASELINE_PROVIDER, isBaselineProvider(clazz)));
+      LOG.info("Registered component {} {}", type, className);
     } catch (Exception e) {
       LOG.warn("Encountered exception when registering component {}", className, e);
     }
@@ -119,6 +122,7 @@ public class DetectionRegistry {
         }
       };
       TUNE_MAP.put(className, tune);
+      LOG.info("Registered tunable component {} {}", type, className);
     } catch (Exception e) {
       LOG.warn("Encountered exception when registering component {}", className, e);
     }
@@ -126,6 +130,7 @@ public class DetectionRegistry {
 
   public static void registerYamlConvertor(String className, String type) {
     YAML_MAP.put(type, className);
+    LOG.info("Registered yaml convertor {} {}", type, className);
   }
 
   /**
