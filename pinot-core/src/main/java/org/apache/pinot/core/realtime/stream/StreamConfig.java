@@ -200,13 +200,13 @@ public class StreamConfig {
     }
 
     int initialRowsThreshold = 0;
-    String initialRowsThresholdValue = streamConfigMap.get(StreamConfigProperties.SEGMENT_INITIAL_ROWS_THRESHOLD);
+    String initialRowsThresholdValue = streamConfigMap.get(StreamConfigProperties.SEGMENT_FLUSH_INITIAL_ROWS_THRESHOLD);
     if (initialRowsThresholdValue != null) {
       try {
         initialRowsThreshold = Integer.parseInt(initialRowsThresholdValue);
       } catch (Exception e) {
-        LOGGER.warn("Caught exception while parsing {}:{}, defaulting to {} ms",
-            StreamConfigProperties.SEGMENT_INITIAL_ROWS_THRESHOLD, initialRowsThresholdValue,
+        LOGGER.warn("Caught exception while parsing {}:{}, defaulting to {}",
+            StreamConfigProperties.SEGMENT_FLUSH_INITIAL_ROWS_THRESHOLD, initialRowsThresholdValue,
             DEFAULT_INITIAL_ROWS_THRESHOLD, e);
       }
     }

@@ -337,7 +337,7 @@ public class FlushThresholdUpdaterTest {
         DEFAULT_INITIAL_ROWS_THRESHOLD);
 
     // initial rows threshold
-    streamConfigs.put(StreamConfigProperties.SEGMENT_INITIAL_ROWS_THRESHOLD, "500000");
+    streamConfigs.put(StreamConfigProperties.SEGMENT_FLUSH_INITIAL_ROWS_THRESHOLD, "500000");
     realtimeTableConfig = tableConfigBuilder.build();
     FlushThresholdUpdateManager newManager = new FlushThresholdUpdateManager();
     flushThresholdUpdater = newManager.getFlushThresholdUpdater(realtimeTableConfig);
