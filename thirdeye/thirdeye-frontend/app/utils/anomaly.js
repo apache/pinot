@@ -14,7 +14,7 @@ import {
   getAnomaliesByAlertIdUrl,
   getAnomalyFiltersByTimeRangeUrl,
   getAnomalyFiltersByAnomalyIdUrl,
-  getBoundsAndAnomaliesUrl
+  getBoundsUrl
 } from 'thirdeye-frontend/utils/api/anomaly';
 
 /**
@@ -112,15 +112,15 @@ export function getYamlPreviewAnomalies(yamlString, startTime, endTime, alertId)
 }
 
 /**
- * Get bounds and anomalies for a given detection
+ * Get bounds for a given detection (note the anomalies in this response are not end-user anomalies)
  * @method getBoundsAndAnomalies
  * @param {String} detectionId - the id of the detection
  * @param {Number} startTime - start time of analysis range
  * @param {Number} endTime - end time of analysis range
  * @return {Ember.RSVP.Promise}
  */
-export function getBoundsAndAnomalies(detectionId, startTime, endTime) {
-  const url = getBoundsAndAnomaliesUrl(detectionId, startTime, endTime);
+export function getBounds(detectionId, startTime, endTime) {
+  const url = getBoundsUrl(detectionId, startTime, endTime);
   return fetch(url, getProps()).then((res) => checkStatus(res));
 }
 
@@ -217,5 +217,6 @@ export default {
   verifyAnomalyFeedback,
   pluralizeTime,
   getYamlPreviewAnomalies,
-  getAnomaliesByAlertId
+  getAnomaliesByAlertId,
+  getBounds
 };

@@ -32,7 +32,6 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapred.JobContext;
@@ -46,7 +45,8 @@ import org.apache.pinot.common.config.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.utils.StringUtil;
-import org.apache.pinot.hadoop.job.mapper.SegmentCreationMapper;
+import org.apache.pinot.hadoop.job.mappers.SegmentCreationMapper;
+import org.apache.pinot.hadoop.utils.JobPreparationHelper;
 import org.apache.pinot.hadoop.utils.PushLocation;
 
 
@@ -202,16 +202,7 @@ public class SegmentCreationJob extends BaseSegmentJob {
     }
     _logger.info("Making directory: {}", dirPath);
     _fileSystem.mkdirs(dirPath);
-    setDirPermission(dirPath);
-  }
-
-  protected void setDirPermission(Path dirPath)
-      throws IOException {
-    if (_defaultPermissionsMask != null) {
-      FsPermission permission = FsPermission.getDirDefault().applyUMask(new FsPermission(_defaultPermissionsMask));
-      _logger.info("Setting permission: {} to directory: {}", permission, dirPath);
-      _fileSystem.setPermission(dirPath, permission);
-    }
+    JobPreparationHelper.setDirPermission(_fileSystem, dirPath, _defaultPermissionsMask);
   }
 
   @Nullable
@@ -263,23 +254,7 @@ public class SegmentCreationJob extends BaseSegmentJob {
   protected void addDepsJarToDistributedCache(Job job)
       throws IOException {
     if (_depsJarDir != null) {
-      addDepsJarToDistributedCacheHelper(job, _depsJarDir);
-    }
-  }
-
-  protected void addDepsJarToDistributedCacheHelper(Job job, Path depsJarDir)
-      throws IOException {
-    FileStatus[] fileStatuses = _fileSystem.listStatus(depsJarDir);
-    for (FileStatus fileStatus : fileStatuses) {
-      if (fileStatus.isDirectory()) {
-        addDepsJarToDistributedCacheHelper(job, fileStatus.getPath());
-      } else {
-        Path depJarPath = fileStatus.getPath();
-        if (depJarPath.getName().endsWith(".jar")) {
-          _logger.info("Adding deps jar: {} to distributed cache", depJarPath);
-          job.addCacheArchive(depJarPath.toUri());
-        }
-      }
+      JobPreparationHelper.addDepsJarToDistributedCacheHelper(_fileSystem, job, _depsJarDir);
     }
   }
 

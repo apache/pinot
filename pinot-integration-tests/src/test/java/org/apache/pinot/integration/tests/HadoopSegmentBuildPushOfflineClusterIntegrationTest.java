@@ -93,7 +93,7 @@ public class HadoopSegmentBuildPushOfflineClusterIntegrationTest extends BaseClu
 
     // Create the table
     addOfflineTable(getTableName(), _schema.getTimeColumnName(), _schema.getOutgoingTimeUnit().toString(), null, null,
-        getLoadMode(), SegmentVersion.v3, getInvertedIndexColumns(), getBloomFilterIndexColumns(), getTaskConfig());
+        getLoadMode(), SegmentVersion.v3, getInvertedIndexColumns(), getBloomFilterIndexColumns(), getTaskConfig(), null, null);
 
     // Generate and push Pinot segments from Hadoop
     generateAndPushSegmentsFromHadoop();

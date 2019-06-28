@@ -47,6 +47,7 @@ public class GrouperWrapper extends DetectionPipeline {
   private static final String PROP_NESTED = "nested";
   private static final String PROP_CLASS_NAME = "className";
   private static final String PROP_GROUPER = "grouper";
+  private static final String PROP_DETECTOR_COMPONENT_NAME = "detectorComponentName";
 
   private final List<Map<String, Object>> nestedProperties;
 
@@ -74,7 +75,6 @@ public class GrouperWrapper extends DetectionPipeline {
   public final DetectionPipelineResult run() throws Exception {
     List<MergedAnomalyResultDTO> candidates = new ArrayList<>();
     Map<String, Object> diagnostics = new HashMap<>();
-    List<MergedAnomalyResultDTO> generated = new ArrayList<>();
     List<PredictionResult> predictionResults = new ArrayList<>();
     List<EvaluationDTO> evaluations = new ArrayList<>();
 
@@ -94,7 +94,6 @@ public class GrouperWrapper extends DetectionPipeline {
       DetectionPipelineResult intermediate = pipeline.run();
       lastTimeStamps.add(intermediate.getLastTimestamp());
 
-      generated.addAll(intermediate.getAnomalies());
       predictionResults.addAll(intermediate.getPredictions());
       evaluations.addAll(intermediate.getEvaluations());
       diagnostics.putAll(intermediate.getDiagnostics());
@@ -102,6 +101,16 @@ public class GrouperWrapper extends DetectionPipeline {
     }
 
     List<MergedAnomalyResultDTO> anomalies = this.grouper.group(candidates);
+
+    for (MergedAnomalyResultDTO anomaly : anomalies) {
+      if (anomaly.isChild()) {
+        throw new RuntimeException("Child anomalies returned by grouper. It should always return parent anomalies"
+            + " with child mapping. Detection id: " + this.config.getId() + ", grouper name: " + this.grouperName);
+      }
+
+      anomaly.setDetectionConfigId(this.config.getId());
+      anomaly.getProperties().put(PROP_DETECTOR_COMPONENT_NAME, this.grouperName);
+    }
 
     return new DetectionPipelineResult(anomalies, DetectionUtils.consolidateNestedLastTimeStamps(lastTimeStamps),
         predictionResults, evaluations).setDiagnostics(diagnostics);

@@ -22,7 +22,7 @@ import { colorMapping, makeTime, toMetricLabel, extractTail } from 'thirdeye-fro
 import { getYamlPreviewAnomalies,
   getAnomaliesByAlertId,
   getFormattedDuration,
-  getBoundsAndAnomalies,
+  getBounds,
   anomalyResponseMapNew,
   anomalyResponseObj,
   anomalyResponseObjNew,
@@ -666,7 +666,7 @@ export default Component.extend({
     let firstDimension;
     try {
       if(showRules){
-        applicationAnomalies = (granularity === 'DAYS') ? yield getBoundsAndAnomalies(alertId, startAnomalies, endAnomalies) : yield getYamlPreviewAnomalies(alertYaml, startAnomalies, endAnomalies, alertId);
+        applicationAnomalies = (granularity === 'DAYS') ? yield getBounds(alertId, startAnomalies, endAnomalies) : yield getYamlPreviewAnomalies(alertYaml, startAnomalies, endAnomalies, alertId);
         if (applicationAnomalies && applicationAnomalies.diagnostics && applicationAnomalies.diagnostics['0']) {
           metricUrnList = Object.keys(applicationAnomalies.diagnostics['0']);
           set(this, 'metricUrnList', metricUrnList);
@@ -683,7 +683,8 @@ export default Component.extend({
           }
           set(this, 'metricUrn', metricUrnList[0]);
         }
-        anomalies = applicationAnomalies.anomalies;
+        // In the case of Alert Overview, the anomalies returned by getBounds may not be valid, so get anomalies from different endpoint
+        anomalies = (granularity === 'DAYS') ? yield getAnomaliesByAlertId(alertId, start, end) : applicationAnomalies.anomalies;
         uniqueTimeSeries = applicationAnomalies.predictions;
       } else {
         applicationAnomalies = yield getAnomaliesByAlertId(alertId, start, end);

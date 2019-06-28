@@ -22,6 +22,7 @@ import com.tdunning.math.stats.TDigest;
 import java.nio.ByteBuffer;
 import javax.annotation.Nonnull;
 import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.common.function.AggregationFunctionType;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
