@@ -19,6 +19,7 @@
 package org.apache.pinot.client;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -154,6 +155,15 @@ public class Connection {
         throws InterruptedException, ExecutionException, TimeoutException {
       BrokerResponse response = _responseFuture.get(timeout, unit);
       return new ResultSetGroup(response);
+    }
+  }
+
+  /**
+   * connection close.
+   */
+  public void close() {
+    if(Objects.nonNull(_transport)) {
+      System.exit(0);
     }
   }
 }
