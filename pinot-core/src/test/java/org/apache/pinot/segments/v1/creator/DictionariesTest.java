@@ -94,6 +94,7 @@ public class DictionariesTest {
         .getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, "time_day", TimeUnit.DAYS,
             "test");
 
+    config.setCheckTimeColumnValidityDuringGeneration(false);
     final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
     driver.init(config);
     driver.build();

@@ -83,6 +83,7 @@ public class CrcUtilsTest {
             "testTable");
     config.setSegmentNamePostfix("1");
     config.setTimeColumnName("daysSinceEpoch");
+    config.setCheckTimeColumnValidityDuringGeneration(false);
     final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
     driver.init(config);
     driver.build();

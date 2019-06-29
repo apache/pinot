@@ -68,6 +68,7 @@ public class ColumnMetadataTest {
             "testTable");
     config.setSegmentNamePostfix("1");
     config.setTimeColumnName("daysSinceEpoch");
+    config.setCheckTimeColumnValidityDuringGeneration(false);
     return config;
   }
 

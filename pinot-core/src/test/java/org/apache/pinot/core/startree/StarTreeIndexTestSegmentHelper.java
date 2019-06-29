@@ -85,6 +85,7 @@ public class StarTreeIndexTestSegmentHelper {
     config.setFormat(FileFormat.AVRO);
     config.setSegmentName(segmentName);
     config.setHllConfig(hllConfig);
+    config.setCheckTimeColumnValidityDuringGeneration(false);
 
     List<GenericRow> rows = new ArrayList<>(numRows);
     for (int rowId = 0; rowId < numRows; rowId++) {

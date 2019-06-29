@@ -134,6 +134,7 @@ public class SegmentWithHllIndexCreateHelper {
     segmentGenConfig.createInvertedIndexForAllColumns();
     segmentGenConfig.setSegmentName(segmentName);
     segmentGenConfig.setSegmentNamePostfix("1");
+    segmentGenConfig.setCheckTimeColumnValidityDuringGeneration(false);
 
     if (enableStarTree) {
       setupStarTreeConfig(segmentGenConfig);

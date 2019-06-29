@@ -342,7 +342,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     if (timeColumnIndexCreationInfo != null) {
       // Use start/end time in config if defined
       if (config.getStartTime() != null) {
-        checkTime(config.getStartTime(), config.getEndTime(), segmentName);
+        checkTime(config, config.getStartTime(), config.getEndTime(), segmentName);
         properties.setProperty(SEGMENT_START_TIME, config.getStartTime());
         properties.setProperty(SEGMENT_END_TIME, Preconditions.checkNotNull(config.getEndTime()));
         properties.setProperty(TIME_UNIT, Preconditions.checkNotNull(config.getSegmentTimeUnit()));
@@ -355,12 +355,12 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
           DateTimeFormatter dateTimeFormatter = DateTimeFormat.forPattern(config.getSimpleDateFormat());
           final Long minTimeMillis = dateTimeFormatter.parseMillis(minTime.toString());
           final Long maxTimeMillis = dateTimeFormatter.parseMillis(maxTime.toString());
-          checkTime(minTimeMillis, maxTimeMillis, segmentName);
+          checkTime(config, minTimeMillis, maxTimeMillis, segmentName);
           properties.setProperty(SEGMENT_START_TIME, minTimeMillis);
           properties.setProperty(SEGMENT_END_TIME, maxTimeMillis);
           properties.setProperty(TIME_UNIT, TimeUnit.MILLISECONDS);
         } else {
-          checkTime(minTime, maxTime, segmentName);
+          checkTime(config, minTime, maxTime, segmentName);
           properties.setProperty(SEGMENT_START_TIME, minTime);
           properties.setProperty(SEGMENT_END_TIME, maxTime);
           properties.setProperty(TIME_UNIT, Preconditions.checkNotNull(config.getSegmentTimeUnit()));
@@ -406,7 +406,12 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
    * @param endTime segment end time
    * @param segmentName segment name
    */
-  private void checkTime(final Object startTime, final Object endTime, final String segmentName) {
+  private void checkTime(final SegmentGeneratorConfig config, final Object startTime,
+      final Object endTime, final String segmentName) {
+    if (!config.isCheckTimeColumnValidityDuringGeneration()) {
+      return;
+    }
+
     if (startTime == null || endTime == null) {
       throw new RuntimeException("Expecting non-null start/end time for segment: " + segmentName);
     }

@@ -70,6 +70,7 @@ public class IntArraysTest {
         .getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, "weeksSinceEpochSunday",
             TimeUnit.DAYS, "test");
     config.setTimeColumnName("weeksSinceEpochSunday");
+    config.setCheckTimeColumnValidityDuringGeneration(false);
     driver.init(config);
     driver.build();
 

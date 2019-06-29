@@ -94,6 +94,7 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
     segmentGeneratorConfig.setTableName("testTable");
     segmentGeneratorConfig.setSegmentName(SEGMENT_NAME);
     segmentGeneratorConfig.setOutDir(INDEX_DIR.getAbsolutePath());
+    segmentGeneratorConfig.setCheckTimeColumnValidityDuringGeneration(false);
     segmentGeneratorConfig
         .setInvertedIndexCreationColumns(Arrays.asList("column6", "column7", "column11", "column17", "column18"));
 
@@ -121,6 +122,7 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
     segmentGeneratorConfig.setSegmentName(SEGMENT_NAME_STARTREE);
     segmentGeneratorConfig.setOutDir(INDEX_DIR_STARTREE.getAbsolutePath());
     segmentGeneratorConfig.enableStarTreeIndex(new StarTreeIndexSpec());
+    segmentGeneratorConfig.setCheckTimeColumnValidityDuringGeneration(false);
 
     // Build the index segment.
     driver = new SegmentIndexCreationDriverImpl();
