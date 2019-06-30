@@ -65,7 +65,7 @@ $(document).ready(function() {
 
   $("#execute-query").click(function() {
     // execute query and draw the results
-    var query = EDITOR.getValue().trim();
+    var query = EDITOR.getSelection().trim() || EDITOR.getValue().trim();
     var traceEnabled = document.getElementById('trace-enabled').checked;
     HELPERS.executeQuery(query, traceEnabled, function(data) {
       RESULTS.setValue(js_beautify(data, JS_BEAUTIFY_SETTINGS));
