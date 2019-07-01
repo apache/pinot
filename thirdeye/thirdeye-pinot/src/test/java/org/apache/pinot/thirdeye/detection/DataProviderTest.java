@@ -25,6 +25,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executors;
@@ -275,6 +276,7 @@ public class DataProviderTest {
     anomaly.setStartTime(start);
     anomaly.setEndTime(end);
     anomaly.setId(id);
+    anomaly.setChildIds(new HashSet<>());
 
     DimensionMap filters = new DimensionMap();
     for (String fs : filterStrings) {

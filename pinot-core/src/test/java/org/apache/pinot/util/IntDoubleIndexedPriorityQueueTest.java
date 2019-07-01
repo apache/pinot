@@ -85,7 +85,7 @@ public class IntDoubleIndexedPriorityQueueTest {
     // Transfer the map into list so it can be sorted.
     List<Pairs.IntDoublePair> list = new ArrayList<>(NUM_RECORDS);
     for (Int2DoubleMap.Entry entry : map.int2DoubleEntrySet()) {
-      list.add(new Pairs.IntDoublePair(entry.getKey(), entry.getValue()));
+      list.add(new Pairs.IntDoublePair(entry.getIntKey(), entry.getDoubleValue()));
     }
 
     // Comparison for min heap is the same as that for ascending order.

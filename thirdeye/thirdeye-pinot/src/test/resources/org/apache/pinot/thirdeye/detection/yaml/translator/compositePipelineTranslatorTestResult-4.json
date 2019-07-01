@@ -2,26 +2,22 @@
   "properties": {
     "className": "org.apache.pinot.thirdeye.detection.wrapper.ChildKeepingMergeWrapper",
     "nested": [{
-      "grouper": "$Default grouper:MOCK_GROUPER",
-      "className": "org.apache.pinot.thirdeye.detection.wrapper.GrouperWrapper",
+      "className": "org.apache.pinot.thirdeye.detection.wrapper.ChildKeepingMergeWrapper",
       "nested": [{
-        "className": "org.apache.pinot.thirdeye.detection.wrapper.ChildKeepingMergeWrapper",
+        "nestedMetricUrns": ["thirdeye:metric:1:D1%3Dv1:D1%3Dv2:D2%3Dv3"],
+        "className": "org.apache.pinot.thirdeye.detection.algorithm.DimensionWrapper",
+        "metricUrn": "thirdeye:metric:1:D1%3Dv1:D1%3Dv2:D2%3Dv3",
         "nested": [{
-          "nestedMetricUrns": ["thirdeye:metric:1:D1%3Dv1:D1%3Dv2:D2%3Dv3"],
-          "className": "org.apache.pinot.thirdeye.detection.algorithm.DimensionWrapper",
-          "metricUrn": "thirdeye:metric:1:D1%3Dv1:D1%3Dv2:D2%3Dv3",
+          "baselineValueProvider": "$maxThreshold_1:THRESHOLD",
+          "className": "org.apache.pinot.thirdeye.detection.wrapper.BaselineFillingMergeWrapper",
           "nested": [{
-            "baselineValueProvider": "$maxThreshold_1:THRESHOLD",
-            "className": "org.apache.pinot.thirdeye.detection.wrapper.BaselineFillingMergeWrapper",
-            "nested": [{
-              "bucketPeriod": "P1D",
-              "className": "org.apache.pinot.thirdeye.detection.wrapper.AnomalyDetectorWrapper"
-            }],
-            "detector": "$maxThreshold_1:THRESHOLD"
+            "bucketPeriod": "P1D",
+            "className": "org.apache.pinot.thirdeye.detection.wrapper.AnomalyDetectorWrapper"
           }],
-          "minContribution": 0.05,
-          "dimensions": ["D1", "D2"]
-        }]
+          "detector": "$maxThreshold_1:THRESHOLD"
+        }],
+        "minContribution": 0.05,
+        "dimensions": ["D1", "D2"]
       }]
     }]
   },

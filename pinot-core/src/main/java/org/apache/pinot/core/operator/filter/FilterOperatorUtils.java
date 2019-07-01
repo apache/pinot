@@ -151,6 +151,9 @@ public class FilterOperatorUtils {
         if (filterOperator instanceof ScanBasedFilterOperator) {
           return getScanBasedFilterPriority((ScanBasedFilterOperator) filterOperator, 4, debugOptions);
         }
+        if (filterOperator instanceof ExpressionFilterOperator) {
+          return 10;
+        }
         throw new IllegalStateException(filterOperator.getClass().getSimpleName()
             + " should not be reordered, remove it from the list before calling this method");
       }
