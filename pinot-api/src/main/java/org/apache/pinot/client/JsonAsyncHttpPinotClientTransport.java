@@ -137,4 +137,10 @@ class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
       }
     }
   }
+
+  public void close() {
+    if(!_httpClient.isClosed()) {
+      _httpClient.close();
+    }
+  }
 }

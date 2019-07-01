@@ -91,5 +91,6 @@ public class ConnectionFactoryTest {
     String tableName = args[1];
     ResultSetGroup resultSetGroup = connection.execute(tableName, args[2]);
     System.out.println(resultSetGroup);
+    connection.close();
   }
 }

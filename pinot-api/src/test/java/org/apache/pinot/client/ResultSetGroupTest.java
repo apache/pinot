@@ -147,6 +147,11 @@ public class ResultSetGroupTest {
         throws PinotClientException {
       return null;
     }
+
+    @Override
+    public void close() {
+
+    }
   }
 
   class DummyJsonTransportFactory implements PinotClientTransportFactory {

@@ -163,7 +163,7 @@ public class Connection {
    */
   public void close() {
     if(Objects.nonNull(_transport)) {
-      System.exit(0);
+      _transport.close();
     }
   }
 }

@@ -65,6 +65,11 @@ public class PreparedStatementTest {
     public String getLastQuery() {
       return _lastQuery;
     }
+
+    @Override
+    public void close() {
+
+    }
   }
 
   class DummyPinotClientTransportFactory implements PinotClientTransportFactory {
