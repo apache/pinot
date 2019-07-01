@@ -161,7 +161,7 @@ public class TestMergedAnomalyResultManager{
   }
 
   @Test
-  public void testLoadChildren() {
+  public void testSaveAndLoadHierarchicalAnomalies() {
     MergedAnomalyResultDTO parent = new MergedAnomalyResultDTO();
     parent.setStartTime(1000);
     parent.setEndTime(2000);
@@ -174,6 +174,11 @@ public class TestMergedAnomalyResultManager{
     child2.setStartTime(1500);
     child2.setEndTime(2000);
 
+    MergedAnomalyResultDTO child3 = new MergedAnomalyResultDTO();
+    child3.setStartTime(1600);
+    child3.setEndTime(1800);
+
+    child2.setChildren(new HashSet<>(Arrays.asList(child3)));
     parent.setChildren(new HashSet<>(Arrays.asList(child1, child2)));
 
     long parentId = this.mergedAnomalyResultDAO.save(parent);
@@ -203,5 +208,44 @@ public class TestMergedAnomalyResultManager{
     Assert.assertTrue(readChildren.get(1).isChild());
     Assert.assertEquals(readChildren.get(1).getStartTime(), 1500);
     Assert.assertEquals(readChildren.get(1).getEndTime(), 2000);
+    Assert.assertEquals(readChildren.get(1).getChildren().size(), 1);
+    Assert.assertEquals(readChildren.get(1).getChildren().iterator().next().getStartTime(), 1600);
+    Assert.assertEquals(readChildren.get(1).getChildren().iterator().next().getEndTime(), 1800);
+  }
+
+  @Test
+  public void testUpdateToAnomalyHierarchy() {
+    MergedAnomalyResultDTO parent = new MergedAnomalyResultDTO();
+    parent.setStartTime(1000);
+    parent.setEndTime(2000);
+
+    MergedAnomalyResultDTO child1 = new MergedAnomalyResultDTO();
+    child1.setStartTime(1000);
+    child1.setEndTime(1500);
+
+    MergedAnomalyResultDTO child2 = new MergedAnomalyResultDTO();
+    child2.setStartTime(1500);
+    child2.setEndTime(2000);
+
+    MergedAnomalyResultDTO child3 = new MergedAnomalyResultDTO();
+    child3.setStartTime(1600);
+    child3.setEndTime(1800);
+
+    child1.setChildren(new HashSet<>(Arrays.asList(child2)));
+    parent.setChildren(new HashSet<>(Arrays.asList(child1)));
+
+    this.mergedAnomalyResultDAO.save(parent);
+
+    child2.setChildren(new HashSet<>(Arrays.asList(child3)));
+
+    this.mergedAnomalyResultDAO.save(parent);
+
+    MergedAnomalyResultDTO read = this.mergedAnomalyResultDAO.findById(parent.getId());
+    Assert.assertFalse(read.getChildren().isEmpty());
+    Assert.assertEquals(read.getChildren().iterator().next().getStartTime(), 1000);
+    Assert.assertFalse(read.getChildren().iterator().next().getChildren().isEmpty());
+    Assert.assertEquals(read.getChildren().iterator().next().getChildren().iterator().next().getStartTime(), 1500);
+    Assert.assertFalse(read.getChildren().iterator().next().getChildren().iterator().next().getChildren().isEmpty());
+    Assert.assertEquals(read.getChildren().iterator().next().getChildren().iterator().next().getChildren().iterator().next().getStartTime(), 1600);
   }
 }

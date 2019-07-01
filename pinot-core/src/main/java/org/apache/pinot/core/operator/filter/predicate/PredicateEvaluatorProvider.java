@@ -19,7 +19,6 @@
 package org.apache.pinot.core.operator.filter.predicate;
 
 import org.apache.pinot.common.data.FieldSpec.DataType;
-import org.apache.pinot.core.common.DataSource;
 import org.apache.pinot.core.common.Predicate;
 import org.apache.pinot.core.common.predicate.EqPredicate;
 import org.apache.pinot.core.common.predicate.InPredicate;
@@ -35,10 +34,9 @@ public class PredicateEvaluatorProvider {
   private PredicateEvaluatorProvider() {
   }
 
-  public static PredicateEvaluator getPredicateEvaluator(Predicate predicate, DataSource dataSource) {
+  public static PredicateEvaluator getPredicateEvaluator(Predicate predicate, Dictionary dictionary, DataType dataType) {
     try {
-      if (dataSource.getDataSourceMetadata().hasDictionary()) {
-        Dictionary dictionary = dataSource.getDictionary();
+      if (dictionary != null) {
         switch (predicate.getType()) {
           case EQ:
             return EqualsPredicateEvaluatorFactory.newDictionaryBasedEvaluator((EqPredicate) predicate, dictionary);
@@ -57,7 +55,6 @@ public class PredicateEvaluatorProvider {
             throw new UnsupportedOperationException("Unsupported predicate type: " + predicate.getType());
         }
       } else {
-        DataType dataType = dataSource.getDataSourceMetadata().getDataType();
         switch (predicate.getType()) {
           case EQ:
             return EqualsPredicateEvaluatorFactory.newRawValueBasedEvaluator((EqPredicate) predicate, dataType);

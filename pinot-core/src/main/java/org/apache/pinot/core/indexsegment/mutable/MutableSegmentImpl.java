@@ -20,7 +20,6 @@ package org.apache.pinot.core.indexsegment.mutable;
 
 import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.ints.IntArrays;
-import it.unimi.dsi.fastutil.ints.IntComparator;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -532,18 +531,8 @@ public class MutableSegmentImpl implements MutableSegment {
     for (int i = 0; i < numValues; i++) {
       dictIds[i] = i;
     }
-    IntArrays.quickSort(dictIds, new IntComparator() {
-      @Override
-      public int compare(int dictId1, int dictId2) {
-        return dictionary.compare(dictId1, dictId2);
-      }
 
-      @Override
-      public int compare(Integer o1, Integer o2) {
-        return compare((int) o1, (int) o2);
-      }
-    });
-
+    IntArrays.quickSort(dictIds, (dictId1, dictId2) -> dictionary.compare(dictId1, dictId2));
     RealtimeInvertedIndexReader invertedIndex = _invertedIndexMap.get(column);
     int[] docIds = new int[_numDocsIndexed];
     int docIdIndex = 0;
