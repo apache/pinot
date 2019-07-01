@@ -26,24 +26,26 @@ import org.apache.pinot.core.realtime.stream.StreamConsumerFactory;
 import org.apache.pinot.core.realtime.stream.StreamLevelConsumer;
 import org.apache.pinot.core.realtime.stream.StreamMetadataProvider;
 
-public class KafkaConsumerFactory extends StreamConsumerFactory {
-    @Override
-    public PartitionLevelConsumer createPartitionLevelConsumer(String clientId, int partition) {
-        return new KafkaPartitionConsumer(_streamConfig, partition);
-    }
 
-    @Override
-    public StreamLevelConsumer createStreamLevelConsumer(String clientId, String tableName, Schema schema, InstanceZKMetadata instanceZKMetadata, ServerMetrics serverMetrics) {
-        throw new UnsupportedOperationException("High level consumer not supported in kafka 2. Use Kafka partition level consumers");
-    }
+public class Kafka2ConsumerFactory extends StreamConsumerFactory {
+  @Override
+  public PartitionLevelConsumer createPartitionLevelConsumer(String clientId, int partition) {
+    return new Kafka2PartitionLevelPartitionLevelConsumer(clientId, _streamConfig, partition);
+  }
 
-    @Override
-    public StreamMetadataProvider createPartitionMetadataProvider(String clientId, int partition) {
-        return null;
-    }
+  @Override
+  public StreamLevelConsumer createStreamLevelConsumer(String clientId, String tableName, Schema schema,
+      InstanceZKMetadata instanceZKMetadata, ServerMetrics serverMetrics) {
+    return new Kafka2StreamLevelConsumer(clientId, tableName, _streamConfig, schema, instanceZKMetadata, serverMetrics);
+  }
 
-    @Override
-    public StreamMetadataProvider createStreamMetadataProvider(String clientId) {
-        throw new UnsupportedOperationException("High level consumer not supported in kafka 2. Use Kafka partition level consumers");
-    }
+  @Override
+  public StreamMetadataProvider createPartitionMetadataProvider(String clientId, int partition) {
+    return new Kafka2PartitionLevelStreamMetadataProvider(clientId, _streamConfig, partition);
+  }
+
+  @Override
+  public StreamMetadataProvider createStreamMetadataProvider(String clientId) {
+    return new Kafka2PartitionLevelStreamMetadataProvider(clientId, _streamConfig);
+  }
 }

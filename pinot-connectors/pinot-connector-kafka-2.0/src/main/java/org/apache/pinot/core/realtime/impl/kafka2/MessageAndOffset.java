@@ -20,30 +20,34 @@ package org.apache.pinot.core.realtime.impl.kafka2;
 
 import java.nio.ByteBuffer;
 
+
 public class MessageAndOffset {
 
-    private ByteBuffer _message;
-    private long _offset;
+  private ByteBuffer _message;
+  private long _offset;
 
-    public MessageAndOffset(byte[] message, long offset) {
-        _message = ByteBuffer.wrap(message);
-        _offset = offset;
-    }
+  public MessageAndOffset(byte[] message, long offset) {
+    this(ByteBuffer.wrap(message), offset);
+  }
 
-    public MessageAndOffset(ByteBuffer message, long offset) {
-        _message = message;
-        _offset = offset;
-    }
+  public MessageAndOffset(ByteBuffer message, long offset) {
+    _message = message;
+    _offset = offset;
+  }
 
-    public ByteBuffer getMessage() {
-        return _message;
-    }
+  public ByteBuffer getMessage() {
+    return _message;
+  }
 
-    public long getOffset() {
-        return _offset;
-    }
+  public long getOffset() {
+    return _offset;
+  }
 
-    public long getNextOffset() {
-        return _offset + 1;
-    }
+  public long getNextOffset() {
+    return getOffset() + 1;
+  }
+
+  public int payloadSize() {
+    return getMessage().array().length;
+  }
 }
