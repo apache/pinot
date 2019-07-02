@@ -26,7 +26,7 @@ import com.yammer.metrics.core.MetricsRegistry;
  */
 public class ControllerMetrics extends AbstractMetrics<AbstractMetrics.QueryPhase, ControllerMeter, ControllerGauge, ControllerTimer> {
 
-  // FYI this is not correct as it generate metrics named without a dot after pinot.controller part,
+  // FYI this is incorrect as it generate metrics named without a dot after pinot.controller part,
   // but we keep this default for backward compatibility in case someone relies on this format
   // see Servermetrics or BrokerMetrics class for correct prefix should be use
   public static final String METRICS_PREFIX_DEFAULT = "pinot.controller";

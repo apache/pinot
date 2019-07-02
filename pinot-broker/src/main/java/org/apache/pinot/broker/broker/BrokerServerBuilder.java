@@ -39,7 +39,6 @@ import org.slf4j.LoggerFactory;
 public class BrokerServerBuilder {
   private static final Logger LOGGER = LoggerFactory.getLogger(BrokerServerBuilder.class);
 
-
   public enum State {
     INIT, STARTING, RUNNING, SHUTTING_DOWN, SHUTDOWN
   }
