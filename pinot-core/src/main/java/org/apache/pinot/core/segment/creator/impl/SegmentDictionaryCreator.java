@@ -171,7 +171,7 @@ public class SegmentDictionaryCreator implements Closeable {
           _numBytesPerEntry = Math.max(_numBytesPerEntry, valueBytes.length);
         }
 
-        writeBytesValueDictionary(numValues, sortedStringBytes);
+        writeBytesValueDictionary(sortedStringBytes);
         LOGGER.info(
             "Created dictionary for STRING column: {} with cardinality: {}, max length in bytes: {}, range: {} to {}",
             _fieldSpec.getName(), numValues, _numBytesPerEntry, sortedStrings[0], sortedStrings[numValues - 1]);
@@ -192,7 +192,7 @@ public class SegmentDictionaryCreator implements Closeable {
           _numBytesPerEntry = Math.max(_numBytesPerEntry, value.getBytes().length);
         }
 
-        writeBytesValueDictionary(numValues, sortedByteArrays);
+        writeBytesValueDictionary(sortedByteArrays);
         LOGGER.info(
             "Created dictionary for BYTES column: {} with cardinality: {}, max length in bytes: {}, range: {} to {}",
             _fieldSpec.getName(), numValues, _numBytesPerEntry, sortedBytes[0], sortedBytes[numValues - 1]);
@@ -203,35 +203,38 @@ public class SegmentDictionaryCreator implements Closeable {
     }
   }
 
-  private void writeBytesValueDictionary(int numValues, byte[][] sortedByteArrays) throws IOException {
+  /**
+   * Helper method to write the given sorted byte[][] to an immutable bytes value dictionary.
+   * The dictionary implementation is chosen based on configuration at column level.
+   *
+   * @param sortedByteArrays The actual sorted byte arrays to be written to the store.
+   */
+  private void writeBytesValueDictionary(byte[][] sortedByteArrays)
+      throws IOException {
 
     if (_useVarLengthDictionary) {
       // Backward-compatible: index file is always big-endian
       long size = VarLengthBytesValueReaderWriter.getRequiredSize(sortedByteArrays);
       try (PinotDataBuffer dataBuffer = PinotDataBuffer
-          .mapFile(_dictionaryFile, false, 0, size, ByteOrder.BIG_ENDIAN,
-              getClass().getSimpleName());
-          VarLengthBytesValueReaderWriter writer = new VarLengthBytesValueReaderWriter(
-              dataBuffer)) {
-        writer.init(sortedByteArrays);
+          .mapFile(_dictionaryFile, false, 0, size, ByteOrder.BIG_ENDIAN, getClass().getSimpleName());
+          VarLengthBytesValueReaderWriter writer = new VarLengthBytesValueReaderWriter(dataBuffer)) {
+        writer.write(sortedByteArrays);
 
-        LOGGER.info("Using variable length bytes dictionary for column: {}, size: {}",
-            _fieldSpec.getName(), size);
+        LOGGER.info("Using variable length bytes dictionary for column: {}, size: {}", _fieldSpec.getName(), size);
       }
-    }
-    else {
+    } else {
       // Backward-compatible: index file is always big-endian
       try (PinotDataBuffer dataBuffer = PinotDataBuffer
-          .mapFile(_dictionaryFile, false, 0, (long) numValues * _numBytesPerEntry, ByteOrder.BIG_ENDIAN,
+          .mapFile(_dictionaryFile, false, 0, (long) sortedByteArrays.length * _numBytesPerEntry, ByteOrder.BIG_ENDIAN,
               getClass().getSimpleName());
           FixedByteValueReaderWriter writer = new FixedByteValueReaderWriter(dataBuffer)) {
-        for (int i = 0; i < numValues; i++) {
+        for (int i = 0; i < sortedByteArrays.length; i++) {
           byte[] value = sortedByteArrays[i];
           writer.writeUnpaddedString(i, _numBytesPerEntry, value);
         }
 
-        LOGGER.info("Using fixed bytes value dictionary for column: {}, size: {}",
-            _fieldSpec.getName(), (long) numValues * _numBytesPerEntry);
+        LOGGER.info("Using fixed bytes value dictionary for column: {}, size: {}", _fieldSpec.getName(),
+            (long) sortedByteArrays.length * _numBytesPerEntry);
       }
     }
   }
@@ -259,7 +262,7 @@ public class SegmentDictionaryCreator implements Closeable {
     }
   }
 
-  int[] indexOfMV(Object value) {
+  public int[] indexOfMV(Object value) {
     Object[] multiValues = (Object[]) value;
     int[] indexes = new int[multiValues.length];
 

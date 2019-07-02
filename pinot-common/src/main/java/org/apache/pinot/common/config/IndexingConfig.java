@@ -235,8 +235,8 @@ public class IndexingConfig {
     return _varLengthDictionaryColumns;
   }
 
-  public void setVarLengthDictionaryColumns(List<String> _varLengthDictionaryColumns) {
-    this._varLengthDictionaryColumns = _varLengthDictionaryColumns;
+  public void setVarLengthDictionaryColumns(List<String> varLengthDictionaryColumns) {
+    _varLengthDictionaryColumns = varLengthDictionaryColumns;
   }
 
   @Override

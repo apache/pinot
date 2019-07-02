@@ -18,12 +18,12 @@
  */
 package org.apache.pinot.core.io.util;
 
-import com.google.common.base.Preconditions;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.Arrays;
 import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
+
 
 /**
  * Implementation of {@link ValueReader} that will allow each value to be of variable
@@ -32,13 +32,25 @@ import org.apache.pinot.core.segment.memory.PinotDataBuffer;
  * The layout of the file is as follows:
  * <p> Header Section: </p>
  * <ul>
- *   <li> Magic header byte sequence. </li>
+ *   <li> Magic bytes: Chose this to be ".vl;" to avoid conflicts with the fixed size
+ *        {@link ValueReader} implementations. By having special characters, this avoids conflicts
+ *        with regular bytes/strings dictionaries.
+ *   </li>
+ *   <li> Version number: This is an integer and can be used for the evolution of the store
+ *        implementation by incrementing version for every incompatible change to the store/format.
+ *   </li>
+ *   <li> Number of elements in the store. </li>
  * </ul>
  *
- * <p> Values: </p>
+ * <p> Data section: </p>
  * <ul>
- *   <li> Integer offsets to start position of byte arrays. </li>
- *   <li> All byte arrays. </li>
+ *   <li> Offsets Array: Integer offsets to start position of byte arrays.
+ *        Example: [O(1), O(2),...O(n)] where O is the Offset function. Length of nth element
+ *        is computed as: O(n+1) - O(n). Since the last element's length can't be computed
+ *        using this formula, we store an extra offset at the end to be able to compute last
+ *        element's length with the same formula, without depending on underlying buffer's size.
+ *   </li>
+ *   <li> All byte arrays or values. </li>
  * </ul>
  *
  * Only sequential writes are supported.
@@ -48,74 +60,89 @@ import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 public class VarLengthBytesValueReaderWriter implements Closeable, ValueReader {
 
   /**
-   * Header used to identify the dictionary files written in variable length bytes
-   * format. Keeping this a mix of alphanumeric with special character to avoid
-   * collisions with the regular int/string dictionary values written in fixed size
-   * format.
+   * Magic bytes used to identify the dictionary files written in variable length bytes format.
    */
-  private static final byte[] MAGIC_HEADER = StringUtil.encodeUtf8("....vl1;");
-  private static final int MAGIC_HEADER_LENGTH = MAGIC_HEADER.length;
-  private static final int INDEX_ARRAY_START_OFFSET = MAGIC_HEADER.length + Integer.BYTES;
+  private static final byte[] MAGIC_BYTES = StringUtil.encodeUtf8(".vl;");
+
+  /**
+   * Increment this version if there are any structural changes in the store format and
+   * deal with backward compatibility correctly based on old versions.
+   */
+  private static final int VERSION = 1;
+
+  private static final int NUM_ELEMENTS_OFFSET = MAGIC_BYTES.length + Integer.BYTES;
+
+  // version, numElements
+  private static final int HEADER_LENGTH = MAGIC_BYTES.length + 2 * Integer.BYTES;
 
   private final PinotDataBuffer _dataBuffer;
-  private transient int _numElements;
+
+  /**
+   * Total number of values present. Initialize this to -1 to handle '0' values as well.
+   */
+  private transient int _numElements = -1;
 
   public VarLengthBytesValueReaderWriter(PinotDataBuffer dataBuffer) {
-    this._dataBuffer = dataBuffer;
+    _dataBuffer = dataBuffer;
   }
 
   public static long getRequiredSize(byte[][] byteArrays) {
-    // First include the magic header, length field and offsets array.
-    long length = INDEX_ARRAY_START_OFFSET + Integer.BYTES * (byteArrays.length);
+    // First include the header and then the data section.
+    // Remember there are n+1 offsets
+    long length = HEADER_LENGTH + Integer.BYTES * (byteArrays.length + 1);
 
-    for (byte[] array: byteArrays) {
+    for (byte[] array : byteArrays) {
       length += array.length;
     }
     return length;
   }
 
   public static boolean isVarLengthBytesDictBuffer(PinotDataBuffer buffer) {
-    // If the buffer is smaller than header + numElements size, it's not var length dictionary.
-    if (buffer.size() > INDEX_ARRAY_START_OFFSET) {
-      byte[] header = new byte[MAGIC_HEADER_LENGTH];
-      buffer.copyTo(0, header, 0, MAGIC_HEADER_LENGTH);
+    // If the buffer is smaller than header size, it's not var length dictionary.
+    if (buffer.size() > HEADER_LENGTH) {
+      byte[] magicBytes = new byte[MAGIC_BYTES.length];
+      buffer.copyTo(0, magicBytes, 0, MAGIC_BYTES.length);
 
-      if (Arrays.equals(MAGIC_HEADER, header)) {
-        // Also verify that there is a valid numElements value.
-        int numElements = buffer.getInt(MAGIC_HEADER_LENGTH);
-        return numElements > 0;
+      if (Arrays.equals(MAGIC_BYTES, magicBytes)) {
+        // Verify the version.
+        if (VERSION == buffer.getInt(MAGIC_BYTES.length)) {
+          // Also verify that there is a valid numElements value.
+          return buffer.getInt(NUM_ELEMENTS_OFFSET) >= 0;
+        }
       }
     }
 
     return false;
   }
 
-  private void writeHeader() {
-    for (int offset = 0; offset < MAGIC_HEADER_LENGTH; offset++) {
-      _dataBuffer.putByte(offset, MAGIC_HEADER[offset]);
+  private void writeHeader(int numElements) {
+    for (int offset = 0; offset < MAGIC_BYTES.length; offset++) {
+      _dataBuffer.putByte(offset, MAGIC_BYTES[offset]);
     }
+    _dataBuffer.putInt(MAGIC_BYTES.length, VERSION);
+    _dataBuffer.putInt(NUM_ELEMENTS_OFFSET, numElements);
   }
 
-  public void init(byte[][] byteArrays) {
-    this._numElements = byteArrays.length;
+  public void write(byte[][] byteArrays) {
+    _numElements = byteArrays.length;
 
-    writeHeader();
-
-    // Add the number of elements as the first field in the buffer.
-    _dataBuffer.putInt(MAGIC_HEADER_LENGTH, byteArrays.length);
+    writeHeader(_numElements);
 
     // Then write the offset of each of the byte array in the data buffer.
-    int nextOffset = INDEX_ARRAY_START_OFFSET;
-    int nextArrayStartOffset = INDEX_ARRAY_START_OFFSET + Integer.BYTES * byteArrays.length;
-    for (byte[] array: byteArrays) {
+    int nextOffset = HEADER_LENGTH;
+    int nextArrayStartOffset = HEADER_LENGTH + Integer.BYTES * (byteArrays.length + 1);
+    for (byte[] array : byteArrays) {
       _dataBuffer.putInt(nextOffset, nextArrayStartOffset);
       nextOffset += Integer.BYTES;
       nextArrayStartOffset += array.length;
     }
 
+    // Write the additional offset to easily get the length of last array.
+    _dataBuffer.putInt(nextOffset, nextArrayStartOffset);
+
     // Finally write the byte arrays.
-    nextArrayStartOffset = INDEX_ARRAY_START_OFFSET + Integer.BYTES * byteArrays.length;
-    for (byte[] array: byteArrays) {
+    nextArrayStartOffset = HEADER_LENGTH + Integer.BYTES * (byteArrays.length + 1);
+    for (byte[] array : byteArrays) {
       _dataBuffer.readFrom(nextArrayStartOffset, array);
       nextArrayStartOffset += array.length;
     }
@@ -123,11 +150,10 @@ public class VarLengthBytesValueReaderWriter implements Closeable, ValueReader {
 
   int getNumElements() {
     // Lazily initialize the numElements.
-    if (_numElements == 0) {
-      _numElements = _dataBuffer.getInt(MAGIC_HEADER_LENGTH);
-      Preconditions.checkArgument(_numElements > 0);
+    if (_numElements == -1) {
+      _numElements = _dataBuffer.getInt(NUM_ELEMENTS_OFFSET);
     }
-    return this._numElements;
+    return _numElements;
   }
 
   @Override
@@ -163,25 +189,16 @@ public class VarLengthBytesValueReaderWriter implements Closeable, ValueReader {
   @Override
   public byte[] getBytes(int index, int numBytesPerValue, byte[] buffer) {
     // Read the offset of the byte array first and then read the actual byte array.
-    int offset = _dataBuffer.getInt(INDEX_ARRAY_START_OFFSET + Integer.BYTES * index);
+    int offset = _dataBuffer.getInt(HEADER_LENGTH + Integer.BYTES * index);
 
-    // To get the length of the byte array, we use the next byte array offset. However,
-    // for last element there is no next byte array so we use buffer size.
-    int length;
-    if (index == getNumElements() - 1) {
-      // This is the last byte array in the buffer so use buffer size to get the length.
-      length = (int) (_dataBuffer.size() - offset);
-    }
-    else {
-      length = _dataBuffer.getInt(INDEX_ARRAY_START_OFFSET + Integer.BYTES * (index + 1)) - offset;
-    }
+    // To get the length of the byte array, we use the next byte array offset.
+    int length = _dataBuffer.getInt(HEADER_LENGTH + Integer.BYTES * (index + 1)) - offset;
 
     byte[] b;
     // If the caller didn't pass a buffer, create one with exact length.
     if (buffer == null) {
       b = new byte[length];
-    }
-    else {
+    } else {
       // If the buffer passed by the caller isn't big enough, create a new one.
       b = buffer.length == length ? buffer : new byte[length];
     }
@@ -190,7 +207,8 @@ public class VarLengthBytesValueReaderWriter implements Closeable, ValueReader {
   }
 
   @Override
-  public void close() throws IOException {
+  public void close()
+      throws IOException {
     _dataBuffer.close();
   }
 }
