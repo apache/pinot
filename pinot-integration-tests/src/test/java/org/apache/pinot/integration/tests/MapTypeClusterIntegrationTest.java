@@ -79,6 +79,7 @@ public class MapTypeClusterIntegrationTest extends BaseClusterIntegrationTest {
   static final long TOTAL_DOCS = 1_000L;
 
   protected Schema _schema;
+
   private String _currentTable;
 
   @Nonnull
@@ -128,6 +129,7 @@ public class MapTypeClusterIntegrationTest extends BaseClusterIntegrationTest {
     // Wait for all documents loaded
     _currentTable = DEFAULT_TABLE_NAME;
     waitForAllDocsLoaded(60_000);
+
   }
 
   @Override
@@ -223,11 +225,25 @@ public class MapTypeClusterIntegrationTest extends BaseClusterIntegrationTest {
     //Group By Query
     pqlQuery = "Select count(*) from " + DEFAULT_TABLE_NAME + " group by map_value(myMap__KEYS, 'k1', myMap__VALUES)";
     pinotResponse = postQuery(pqlQuery);
+    //Group By Query
+     pqlQuery =
+        "Select count(*) from " + DEFAULT_TABLE_NAME + " group by map_value(myMap__KEYS, 'k1', myMap__VALUES)";
+     pinotResponse = postQuery(pqlQuery);
     Assert.assertNotNull(pinotResponse.get("aggregationResults"));
     JsonNode groupByResult = pinotResponse.get("aggregationResults").get(0).get("groupByResult");
     Assert.assertNotNull(groupByResult);
     Assert.assertTrue(groupByResult.isArray());
     Assert.assertTrue(groupByResult.size() > 0);
+
+
+    //Selection Query
+    pqlQuery = "Select map_value(myMap__KEYS, 'k1', myMap__VALUES) from " + DEFAULT_TABLE_NAME ;
+    pinotResponse = postQuery(pqlQuery);
+    System.out.println("pinotResponse = " + pinotResponse);
+
+    pqlQuery = "Select map_value(myMap__KEYS, 'k1', myMap__VALUES) from " + DEFAULT_TABLE_NAME  + " order by map_value(myMap__KEYS, 'k1', myMap__VALUES)" ;
+    pinotResponse = postQuery(pqlQuery);
+
 
   }
 

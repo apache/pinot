@@ -19,6 +19,9 @@
 package org.apache.pinot.core.realtime.stream;
 
 import com.google.common.base.Preconditions;
+
+import java.util.Map;
+import java.util.TreeSet;
 import org.apache.avro.generic.GenericData;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.Schema;
@@ -46,6 +49,7 @@ public class AvroRecordToPinotRowGenerator {
       FieldSpec incomingFieldSpec =
           fieldSpec.getFieldType() == FieldSpec.FieldType.TIME ? _incomingTimeFieldSpec : fieldSpec;
       AvroUtils.extractField(incomingFieldSpec, from, to);
+
     }
     return to;
   }
