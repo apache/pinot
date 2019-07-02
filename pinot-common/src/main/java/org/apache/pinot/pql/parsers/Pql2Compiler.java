@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.pql.parsers;
 
-import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Stack;
@@ -43,6 +42,7 @@ import org.apache.pinot.common.request.AggregationInfo;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.request.transform.TransformExpressionTree;
+import org.apache.pinot.parsers.AbstractCompiler;
 import org.apache.pinot.pql.parsers.pql2.ast.AstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.BaseAstNode;
 import org.apache.pinot.pql.parsers.pql2.ast.BetweenPredicateAstNode;
@@ -207,7 +207,6 @@ public class Pql2Compiler implements AbstractCompiler {
     return result;
   }
 
-  @Override
   public TransformExpressionTree compileToExpressionTree(String expression) {
     CharStream charStream = new ANTLRInputStream(expression);
     PQL2Lexer lexer = new PQL2Lexer(charStream);

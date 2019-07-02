@@ -49,14 +49,10 @@ import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.FilterOperator;
 import org.apache.pinot.common.request.FilterQuery;
 import org.apache.pinot.common.request.FilterQueryMap;
-import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.core.query.reduce.BrokerReduceService;
-import org.apache.pinot.pql.parsers.PinotQuery2BrokerRequestConverter;
-import org.apache.pinot.pql.parsers.Pql2Compiler;
-import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -70,7 +66,6 @@ import static org.apache.pinot.common.utils.CommonConstants.Broker.Request.TRACE
 @ThreadSafe
 public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseBrokerRequestHandler.class);
-  private static final Pql2Compiler REQUEST_COMPILER = new Pql2Compiler();
 
   protected final Configuration _config;
   protected final RoutingTable _routingTable;
@@ -136,27 +131,16 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     requestStatistics.setRequestId(requestId);
     requestStatistics.setRequestArrivalTimeMillis(System.currentTimeMillis());
 
-    String query;
-    boolean isSqlQuery = false;
-    if (request.has(SQL)) {
-      query = request.get(SQL).asText();
-      isSqlQuery = true;
-    } else {
-      query = request.get(PQL).asText();
-    }
-    LOGGER.debug("Query string for request {}: {}", requestId, query);
+    PinotQueryRequest pinotQueryRequest = getPinotQueryRequest(request);
+    String query = pinotQueryRequest.getQuery();
+    LOGGER.debug("Query string for request {}: {}", requestId, pinotQueryRequest.getQuery());
     requestStatistics.setPql(query);
 
     // Compile the request
     long compilationStartTimeNs = System.nanoTime();
     BrokerRequest brokerRequest;
     try {
-      if (isSqlQuery) {
-        final PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
-        brokerRequest = new PinotQuery2BrokerRequestConverter().convert(pinotQuery);
-      } else {
-        brokerRequest = REQUEST_COMPILER.compileToBrokerRequest(query);
-      }
+      brokerRequest = PinotQueryParserFactory.get(pinotQueryRequest.getQueryFormat()).compileToBrokerRequest(query);
     } catch (Exception e) {
       LOGGER.info("Caught exception while compiling request {}: {}, {}", requestId, query, e.getMessage());
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_COMPILATION_EXCEPTIONS, 1);
@@ -323,8 +307,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
     if (_queryLogRateLimiter.tryAcquire() || forceLog(brokerResponse, totalTimeMs)) {
       // Table name might have been changed (with suffix _OFFLINE/_REALTIME appended)
-      LOGGER.info(
-          "RequestId:{}, table:{}, timeMs:{}, docs:{}/{}, entries:{}/{},"
+      LOGGER.info("RequestId:{}, table:{}, timeMs:{}, docs:{}/{}, entries:{}/{},"
               + " segments(queried/processed/matched/consuming):{}/{}/{}/{}, consumingFreshnessTimeMs:{},"
               + " servers:{}/{}, groupLimitReached:{}, exceptions:{}, serverStats:{}, query:{}", requestId,
           brokerRequest.getQuerySource().getTableName(), totalTimeMs, brokerResponse.getNumDocsScanned(),
@@ -352,6 +335,13 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       _numDroppedLog.incrementAndGet();
     }
     return brokerResponse;
+  }
+
+  private PinotQueryRequest getPinotQueryRequest(JsonNode request) {
+    if (request.has(SQL)) {
+      return new PinotQueryRequest(SQL, request.get(SQL).asText());
+    }
+    return new PinotQueryRequest(PQL, request.get(PQL).asText());
   }
 
   /**
@@ -502,12 +492,12 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   protected static class ServerStats {
     private String _serverStats;
 
-    public void setServerStats(String serverStats) {
-      _serverStats = serverStats;
-    }
-
     public String getServerStats() {
       return _serverStats;
+    }
+
+    public void setServerStats(String serverStats) {
+      _serverStats = serverStats;
     }
   }
 }

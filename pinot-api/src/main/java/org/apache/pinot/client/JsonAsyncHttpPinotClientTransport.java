@@ -61,14 +61,13 @@ class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
 
   @Override
   public Future<BrokerResponse> executeQueryAsync(String brokerAddress, final String query) {
-    return executePinotQueryAsync(brokerAddress, query, "pql");
+    return executeQueryAsync(brokerAddress, new Request("pql", query));
   }
 
-  public Future<BrokerResponse> executePinotQueryAsync(String brokerAddress, final String query,
-      final String queryType) {
+  public Future<BrokerResponse> executePinotQueryAsync(String brokerAddress, final Request r) {
     try {
       ObjectNode json = JsonNodeFactory.instance.objectNode();
-      json.put(queryType, query);
+      json.put(r.getQueryFormat(), r.getQuery());
 
       final String url = "http://" + brokerAddress + "/query";
 
@@ -82,26 +81,26 @@ class JsonAsyncHttpPinotClientTransport implements PinotClientTransport {
           .addHeader("Content-Type", "application/json; charset=utf-8")
           .setBody(json.toString()).execute();
 
-      return new BrokerResponseFuture(response, query, url);
+      return new BrokerResponseFuture(response, r.getQuery(), url);
     } catch (Exception e) {
       throw new PinotClientException(e);
     }
   }
 
   @Override
-  public BrokerResponse executeSqlQuery(String brokerAddress, String query)
+  public BrokerResponse executeQuery(String brokerAddress, Request request)
       throws PinotClientException {
     try {
-      return executeSqlQueryAsync(brokerAddress, query).get();
+      return executeQueryAsync(brokerAddress, request).get();
     } catch (Exception e) {
       throw new PinotClientException(e);
     }
   }
 
   @Override
-  public Future<BrokerResponse> executeSqlQueryAsync(String brokerAddress, String query)
+  public Future<BrokerResponse> executeQueryAsync(String brokerAddress, Request request)
       throws PinotClientException {
-    return executePinotQueryAsync(brokerAddress, query, "sql");
+    return executePinotQueryAsync(brokerAddress, request);
   }
 
   private static class BrokerResponseFuture implements Future<BrokerResponse> {

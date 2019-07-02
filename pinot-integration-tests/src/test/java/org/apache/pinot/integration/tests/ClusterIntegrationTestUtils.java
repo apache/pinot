@@ -52,6 +52,8 @@ import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.io.BinaryEncoder;
 import org.apache.avro.io.EncoderFactory;
 import org.apache.avro.util.Utf8;
+import org.apache.pinot.broker.requesthandler.PinotQueryRequest;
+import org.apache.pinot.client.Request;
 import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.common.utils.JsonUtils;
 import org.apache.pinot.common.utils.StringUtil;
@@ -497,21 +499,22 @@ public class ClusterIntegrationTestUtils {
    * </ul>
    *
    * @param pinotQuery Pinot query
-   * @param isPqlSyntax Is Pinot query in PQL syntax
+   * @param queryFormat Pinot query format
    * @param brokerUrl Pinot broker URL
    * @param pinotConnection Pinot connection
    * @param sqlQueries H2 SQL queries
    * @param h2Connection H2 connection
    * @throws Exception
    */
-  public static void testQuery(@Nonnull String pinotQuery, @Nonnull boolean isPqlSyntax, @Nonnull String brokerUrl,
+  public static void testQuery(@Nonnull String pinotQuery, @Nonnull String queryFormat, @Nonnull String brokerUrl,
       @Nonnull org.apache.pinot.client.Connection pinotConnection, @Nullable List<String> sqlQueries,
       @Nullable Connection h2Connection)
       throws Exception {
     // Use broker response for metadata check, connection response for value check
-    JsonNode pinotResponse = (isPqlSyntax)? ClusterTest.postQuery(pinotQuery, brokerUrl) : ClusterTest.postSqlQuery(pinotQuery, brokerUrl);
-
-    ResultSetGroup pinotResultSetGroup =  (isPqlSyntax)? pinotConnection.execute(pinotQuery): pinotConnection.executeSql(pinotQuery);
+    PinotQueryRequest pinotBrokerQueryRequest = new PinotQueryRequest(queryFormat, pinotQuery);
+    JsonNode pinotResponse = ClusterTest.postQuery(pinotBrokerQueryRequest, brokerUrl);
+    Request pinotClientRequest = new Request(queryFormat, pinotQuery);
+    ResultSetGroup pinotResultSetGroup = pinotConnection.execute(pinotClientRequest);
 
     // Skip comparison if SQL queries are not specified
     if (sqlQueries == null) {

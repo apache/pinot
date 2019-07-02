@@ -16,24 +16,30 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.client;
+package org.apache.pinot.broker.requesthandler;
 
-import java.util.concurrent.Future;
+public class PinotQueryRequest {
+  private String queryFormat;
+  private String query;
 
+  public PinotQueryRequest(String queryFormat, String query) {
+    this.queryFormat = queryFormat;
+    this.query = query;
+  }
 
-/**
- * Interface for plugging different client transports.
- */
-interface PinotClientTransport {
-  BrokerResponse executeQuery(String brokerAddress, String query)
-      throws PinotClientException;
+  public String getQueryFormat() {
+    return queryFormat;
+  }
 
-  Future<BrokerResponse> executeQueryAsync(String brokerAddress, String query)
-      throws PinotClientException;
+  public void setQueryFormat(String queryFormat) {
+    this.queryFormat = queryFormat;
+  }
 
-  BrokerResponse executeQuery(String brokerAddress, Request request)
-      throws PinotClientException;
+  public String getQuery() {
+    return query;
+  }
 
-  Future<BrokerResponse> executeQueryAsync(String brokerAddress, Request request)
-      throws PinotClientException;
+  public void setQuery(String query) {
+    this.query = query;
+  }
 }

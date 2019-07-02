@@ -184,7 +184,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   }
 
   @Nullable
-  protected  String getServerTenant() {
+  protected String getServerTenant() {
     return TagNameUtils.DEFAULT_TENANT_NAME;
   }
 
@@ -384,7 +384,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   protected void testQuery(@Nonnull String pqlQuery, @Nullable List<String> sqlQueries)
       throws Exception {
     ClusterIntegrationTestUtils
-        .testQuery(pqlQuery, true, _brokerBaseApiUrl, getPinotConnection(), sqlQueries, getH2Connection());
+        .testQuery(pqlQuery, "pql", _brokerBaseApiUrl, getPinotConnection(), sqlQueries, getH2Connection());
   }
 
   /**
@@ -397,6 +397,6 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   protected void testSqlQuery(@Nonnull String sqlQuery, @Nullable List<String> sqlQueries)
       throws Exception {
     ClusterIntegrationTestUtils
-        .testQuery(sqlQuery, false, _brokerBaseApiUrl, getPinotConnection(), sqlQueries, getH2Connection());
+        .testQuery(sqlQuery, "sql", _brokerBaseApiUrl, getPinotConnection(), sqlQueries, getH2Connection());
   }
 }

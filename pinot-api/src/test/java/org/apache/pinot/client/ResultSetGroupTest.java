@@ -149,13 +149,13 @@ public class ResultSetGroupTest {
     }
 
     @Override
-    public BrokerResponse executeSqlQuery(String brokerAddress, String query)
+    public BrokerResponse executeQuery(String brokerAddress, Request request)
         throws PinotClientException {
       return null;
     }
 
     @Override
-    public Future<BrokerResponse> executeSqlQueryAsync(String brokerAddress, String query)
+    public Future<BrokerResponse> executeQueryAsync(String brokerAddress, Request request)
         throws PinotClientException {
       return null;
     }

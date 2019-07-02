@@ -16,24 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.client;
+package org.apache.pinot.parsers;
 
-import java.util.concurrent.Future;
+import org.apache.pinot.common.request.BrokerRequest;
 
 
 /**
- * Interface for plugging different client transports.
+ * Interface for Pinot Query compilers.
  */
-interface PinotClientTransport {
-  BrokerResponse executeQuery(String brokerAddress, String query)
-      throws PinotClientException;
-
-  Future<BrokerResponse> executeQueryAsync(String brokerAddress, String query)
-      throws PinotClientException;
-
-  BrokerResponse executeQuery(String brokerAddress, Request request)
-      throws PinotClientException;
-
-  Future<BrokerResponse> executeQueryAsync(String brokerAddress, Request request)
-      throws PinotClientException;
+public interface AbstractCompiler {
+  BrokerRequest compileToBrokerRequest(String expression);
 }

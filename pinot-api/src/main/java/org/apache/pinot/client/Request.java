@@ -16,17 +16,34 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.pql.parsers;
-
-import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.request.transform.TransformExpressionTree;
-
+package org.apache.pinot.client;
 
 /**
- * Interface for PQL compilers.
+ * Request is used in server request to host multiple pinot query types, like PQL, SQL.
  */
-public interface AbstractCompiler {
-  BrokerRequest compileToBrokerRequest(String expression);
+public class Request {
 
-  TransformExpressionTree compileToExpressionTree(String expression);
+  private String queryFormat;
+  private String query;
+
+  public Request(String queryFormat, String query) {
+    this.queryFormat = queryFormat;
+    this.query = query;
+  }
+
+  public String getQueryFormat() {
+    return queryFormat;
+  }
+
+  public void setQueryFormat(String queryType) {
+    this.queryFormat = queryType;
+  }
+
+  public String getQuery() {
+    return query;
+  }
+
+  public void setQuery(String query) {
+    this.query = query;
+  }
 }

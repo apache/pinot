@@ -74,16 +74,16 @@ public class PreparedStatementTest {
     }
 
     @Override
-    public BrokerResponse executeSqlQuery(String brokerAddress, String query)
+    public BrokerResponse executeQuery(String brokerAddress, Request request)
         throws PinotClientException {
-      _lastQuery = query;
+      _lastQuery = request.getQuery();
       return null;
     }
 
     @Override
-    public Future<BrokerResponse> executeSqlQueryAsync(String brokerAddress, String query)
+    public Future<BrokerResponse> executeQueryAsync(String brokerAddress, Request request)
         throws PinotClientException {
-      _lastQuery = query;
+      _lastQuery = request.getQuery();
       return null;
     }
 

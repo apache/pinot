@@ -45,6 +45,7 @@ import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.http.HttpStatus;
 import org.apache.pinot.broker.broker.helix.HelixBrokerStarter;
+import org.apache.pinot.broker.requesthandler.PinotQueryRequest;
 import org.apache.pinot.common.config.IndexingConfig;
 import org.apache.pinot.common.config.SegmentPartitionConfig;
 import org.apache.pinot.common.config.TableConfig;
@@ -516,22 +517,12 @@ public abstract class ClusterTest extends ControllerTest {
 
   protected JsonNode postQuery(String query)
       throws Exception {
-    return postQuery(query, _brokerBaseApiUrl);
+    return postQuery(new PinotQueryRequest("pql", query), _brokerBaseApiUrl);
   }
 
-  public static JsonNode postQuery(String query, String brokerBaseApiUrl)
+  public static JsonNode postQuery(PinotQueryRequest r, String brokerBaseApiUrl)
       throws Exception {
-    return postQuery(query, brokerBaseApiUrl, false, "pql");
-  }
-
-  public static JsonNode postSqlQuery(String query, String brokerBaseApiUrl)
-      throws Exception {
-    return postQuery(query, brokerBaseApiUrl, false, "sql");
-  }
-
-  public static JsonNode postSqlQuery(String query, String brokerBaseApiUrl, boolean enableTrace)
-      throws Exception {
-    return postQuery(query, brokerBaseApiUrl, enableTrace, "sql");
+    return postQuery(r.getQuery(), brokerBaseApiUrl, false, r.getQueryFormat());
   }
 
   public static JsonNode postQuery(String query, String brokerBaseApiUrl, boolean enableTrace, String queryType)

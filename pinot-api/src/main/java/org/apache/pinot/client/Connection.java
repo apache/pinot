@@ -66,18 +66,18 @@ public class Connection {
    */
   public ResultSetGroup execute(String statement)
       throws PinotClientException {
-    return execute(null, statement);
+    return execute(null, new Request("pql", statement));
   }
 
   /**
-   * Executes a SQL statement.
-   * @param statement The statement to execute
+   * Executes a Pinot Request.
+   * @param request The statement to execute
    * @return The result of the query
    * @throws PinotClientException If an exception occurs while processing the query
    */
-  public ResultSetGroup executeSql(String statement)
+  public ResultSetGroup execute(Request request)
       throws PinotClientException {
-    return execute(null, statement);
+    return execute(null, request);
   }
 
   /**
@@ -89,33 +89,24 @@ public class Connection {
    */
   public ResultSetGroup execute(String tableName, String statement)
       throws PinotClientException {
-    String brokerHostPort = _brokerSelector.selectBroker(tableName);
-    if (brokerHostPort == null) {
-      throw new PinotClientException(
-          "Could not find broker to query for table: " + (tableName == null ? "null" : tableName));
-    }
-    BrokerResponse response = _transport.executeQuery(brokerHostPort, statement);
-    if (response.hasExceptions()) {
-      throw new PinotClientException("Query had processing exceptions: \n" + response.getExceptions());
-    }
-    return new ResultSetGroup(response);
+    return execute(tableName, new Request("pql", statement));
   }
 
   /**
-   * Executes a SQL statement.
+   * Executes a Pinot Request.
    *
-   * @param statement The statement to execute
+   * @param request The statement to execute
    * @return The result of the query
    * @throws PinotClientException If an exception occurs while processing the query
    */
-  public ResultSetGroup executeSql(String tableName, String statement)
+  public ResultSetGroup execute(String tableName, Request request)
       throws PinotClientException {
     String brokerHostPort = _brokerSelector.selectBroker(tableName);
     if (brokerHostPort == null) {
       throw new PinotClientException(
           "Could not find broker to query for table: " + (tableName == null ? "null" : tableName));
     }
-    BrokerResponse response = _transport.executeSqlQuery(brokerHostPort, statement);
+    BrokerResponse response = _transport.executeQuery(brokerHostPort, request);
     if (response.hasExceptions()) {
       throw new PinotClientException("Query had processing exceptions: \n" + response.getExceptions());
     }
@@ -131,12 +122,25 @@ public class Connection {
    */
   public Future<ResultSetGroup> executeAsync(String statement)
       throws PinotClientException {
+    return executeAsync(new Request("pql", statement));
+  }
+
+  /**
+   * Executes a Pinot Request asynchronously.
+   *
+   * @param request The statement to execute
+   * @return A future containing the result of the query
+   * @throws PinotClientException If an exception occurs while processing the query
+   */
+  public Future<ResultSetGroup> executeAsync(Request request)
+      throws PinotClientException {
     String brokerHostPort = _brokerSelector.selectBroker(null);
     if (brokerHostPort == null) {
       throw new PinotClientException(
-          "Could not find broker to query for statement: " + (statement == null ? "null" : statement));
+          "Could not find broker to query for statement: " + (request.getQuery() == null ? "null"
+              : request.getQuery()));
     }
-    final Future<BrokerResponse> responseFuture = _transport.executeQueryAsync(brokerHostPort, statement);
+    final Future<BrokerResponse> responseFuture = _transport.executeQueryAsync(brokerHostPort, request.getQuery());
     return new ResultSetGroupFuture(responseFuture);
   }
 

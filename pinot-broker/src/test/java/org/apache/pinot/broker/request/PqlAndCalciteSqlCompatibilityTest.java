@@ -42,7 +42,7 @@ import org.testng.annotations.Test;
  * Some tests for the SQL compiler.
  * Please note that this test will load test resources: `pql_queries.list` and `pql_queries.list` under `pinot-common` module.
  */
-public class PqlAndCalciteSqlCompatibleTest {
+public class PqlAndCalciteSqlCompatibilityTest {
 
   private static final Pql2Compiler COMPILER = new Pql2Compiler();
 
@@ -51,7 +51,7 @@ public class PqlAndCalciteSqlCompatibleTest {
   // PQL parser will flat the case of multiple children under AND/OR.
   // After optimization, both BrokerRequests from PQL and SQL should look the same and be easier to compare.
   private static final BrokerRequestOptimizer OPTIMIZER = new BrokerRequestOptimizer();
-  private static final Logger LOGGER = LoggerFactory.getLogger(PqlAndCalciteSqlCompatibleTest.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(PqlAndCalciteSqlCompatibilityTest.class);
 
   @Test
   public void testSinglePqlAndSqlCompatible() {
@@ -85,9 +85,9 @@ public class PqlAndCalciteSqlCompatibleTest {
   public void testPqlAndSqlCompatible()
       throws Exception {
     final BufferedReader brPql = new BufferedReader(new InputStreamReader(
-        PqlAndCalciteSqlCompatibleTest.class.getClassLoader().getResourceAsStream("pql_queries.list")));
+        PqlAndCalciteSqlCompatibilityTest.class.getClassLoader().getResourceAsStream("pql_queries.list")));
     final BufferedReader brSql = new BufferedReader(new InputStreamReader(
-        PqlAndCalciteSqlCompatibleTest.class.getClassLoader().getResourceAsStream("sql_queries.list")));
+        PqlAndCalciteSqlCompatibilityTest.class.getClassLoader().getResourceAsStream("sql_queries.list")));
     String sql;
     int seqId = 0;
     while ((sql = brSql.readLine()) != null) {

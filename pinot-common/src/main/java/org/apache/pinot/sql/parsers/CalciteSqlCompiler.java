@@ -16,24 +16,21 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.client;
+package org.apache.pinot.sql.parsers;
 
-import java.util.concurrent.Future;
+import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.request.PinotQuery;
+import org.apache.pinot.parsers.AbstractCompiler;
+import org.apache.pinot.pql.parsers.PinotQuery2BrokerRequestConverter;
 
 
 /**
- * Interface for plugging different client transports.
+ * CalciteSqlCompiler is a Calcite SQL compiler.
  */
-interface PinotClientTransport {
-  BrokerResponse executeQuery(String brokerAddress, String query)
-      throws PinotClientException;
-
-  Future<BrokerResponse> executeQueryAsync(String brokerAddress, String query)
-      throws PinotClientException;
-
-  BrokerResponse executeQuery(String brokerAddress, Request request)
-      throws PinotClientException;
-
-  Future<BrokerResponse> executeQueryAsync(String brokerAddress, Request request)
-      throws PinotClientException;
+public class CalciteSqlCompiler implements AbstractCompiler {
+  @Override
+  public BrokerRequest compileToBrokerRequest(String query) {
+    final PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    return new PinotQuery2BrokerRequestConverter().convert(pinotQuery);
+  }
 }
