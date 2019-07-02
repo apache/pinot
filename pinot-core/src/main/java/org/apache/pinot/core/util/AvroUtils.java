@@ -23,6 +23,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeSet;
@@ -42,6 +43,7 @@ import org.apache.pinot.common.data.MetricFieldSpec;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.data.TimeFieldSpec;
 import org.apache.pinot.core.data.GenericRow;
+import org.apache.pinot.core.data.readers.RecordReaderUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -298,6 +300,35 @@ public class AvroUtils {
       return extractSupportedSchema(recordFields.get(0).schema());
     } else {
       return fieldSchema;
+    }
+  }
+
+  public static void extractField(FieldSpec incomingFieldSpec, GenericRecord from, GenericRow to) {
+    String fieldName = incomingFieldSpec.getName();
+    //Handle MAP types
+    if (fieldName.toUpperCase().endsWith("__KEYS")) {
+      String avroFieldName = fieldName.replaceAll("__KEYS", "");
+      Object o = from.get(avroFieldName);
+      if (o instanceof Map) {
+        Map map = (Map) o;
+        TreeSet sortedKeySet = new TreeSet(map.keySet());
+        to.putField(fieldName, RecordReaderUtils.convert(incomingFieldSpec, sortedKeySet));
+      }
+    } else if (fieldName.toUpperCase().endsWith("__VALUES")) {
+      String avroFieldName = fieldName.replaceAll("__VALUES", "");
+      Object o = from.get(avroFieldName);
+      if (o instanceof Map) {
+        Map map = (Map) o;
+        TreeSet sortedKeySet = new TreeSet(map.keySet());
+        List values = new ArrayList(map.size());
+        int i = 0;
+        for (Object key : sortedKeySet) {
+          values.add(map.get(key));
+        }
+        to.putField(fieldName, RecordReaderUtils.convert(incomingFieldSpec, values));
+      }
+    } else {
+      to.putField(fieldName, RecordReaderUtils.convert(incomingFieldSpec, from.get(fieldName)));
     }
   }
 }

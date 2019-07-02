@@ -79,7 +79,6 @@ public class MapTypeClusterIntegrationTest extends BaseClusterIntegrationTest {
   static final long TOTAL_DOCS = 1_000L;
 
   protected Schema _schema;
-  private StarTreeQueryGenerator _queryGenerator;
   private String _currentTable;
 
   @Nonnull
@@ -122,13 +121,13 @@ public class MapTypeClusterIntegrationTest extends BaseClusterIntegrationTest {
     // Create the tables
     ArrayList<String> invertedIndexColumns = Lists.newArrayList();
     addOfflineTable(DEFAULT_TABLE_NAME, null, null, null, null, null, SegmentVersion.v1, invertedIndexColumns, null,
-        null);
+        null, null, null);
 
     setUpSegmentsAndQueryGenerator();
 
     // Wait for all documents loaded
     _currentTable = DEFAULT_TABLE_NAME;
-    waitForAllDocsLoaded(10_000);
+    waitForAllDocsLoaded(60_000);
   }
 
   @Override
@@ -184,26 +183,51 @@ public class MapTypeClusterIntegrationTest extends BaseClusterIntegrationTest {
   @Test
   public void testQueries()
       throws Exception {
-    //Group By Query
-    String pqlQuery =
-        "Select count(*) from " + DEFAULT_TABLE_NAME + " group by map_value(myMap__KEYS, 'k1', myMap__VALUES)";
+
+    //Selection Query
+    String pqlQuery = "Select map_value(myMap__KEYS, 'k1', myMap__VALUES) from " + DEFAULT_TABLE_NAME;
     JsonNode pinotResponse = postQuery(pqlQuery);
-    System.out.println("pinotResponse = " + pinotResponse);
+    ArrayNode selectionResults = (ArrayNode) pinotResponse.get("selectionResults").get("results");
+    Assert.assertNotNull(selectionResults);
+    Assert.assertTrue(selectionResults.size() > 0);
+    for (int i = 0; i < selectionResults.size(); i++) {
+      String value = selectionResults.get(i).get(0).textValue();
+      Assert.assertTrue(value.indexOf("-k1-") > 0);
+    }
+
+    //Filter Query
+    pqlQuery = "Select map_value(myMap__KEYS, 'k1', myMap__VALUES) from " + DEFAULT_TABLE_NAME
+        + "  where map_value(myMap__KEYS, 'k1', myMap__VALUES) = 'value-k1-0'";
+    pinotResponse = postQuery(pqlQuery);
+    selectionResults = (ArrayNode) pinotResponse.get("selectionResults").get("results");
+    Assert.assertNotNull(selectionResults);
+    Assert.assertTrue(selectionResults.size() > 0);
+    for (int i = 0; i < selectionResults.size(); i++) {
+      String value = selectionResults.get(i).get(0).textValue();
+      Assert.assertEquals(value, "value-k1-0");
+    }
+
+
+   //selection order by
+    pqlQuery = "Select map_value(myMap__KEYS, 'k1', myMap__VALUES) from " + DEFAULT_TABLE_NAME
+        + " order by map_value(myMap__KEYS, 'k1', myMap__VALUES)";
+    pinotResponse = postQuery(pqlQuery);
+    selectionResults = (ArrayNode) pinotResponse.get("selectionResults").get("results");
+    Assert.assertNotNull(selectionResults);
+    Assert.assertTrue(selectionResults.size() > 0);
+    for (int i = 0; i < selectionResults.size(); i++) {
+      String value = selectionResults.get(i).get(0).textValue();
+      Assert.assertTrue(value.indexOf("-k1-") > 0);
+    }
+
+    //Group By Query
+    pqlQuery = "Select count(*) from " + DEFAULT_TABLE_NAME + " group by map_value(myMap__KEYS, 'k1', myMap__VALUES)";
+    pinotResponse = postQuery(pqlQuery);
     Assert.assertNotNull(pinotResponse.get("aggregationResults"));
     JsonNode groupByResult = pinotResponse.get("aggregationResults").get(0).get("groupByResult");
     Assert.assertNotNull(groupByResult);
     Assert.assertTrue(groupByResult.isArray());
     Assert.assertTrue(groupByResult.size() > 0);
-
-    //Selection Query
-    pqlQuery = "Select map_value(myMap__KEYS, 'k1', myMap__VALUES) from " + DEFAULT_TABLE_NAME ;
-    pinotResponse = postQuery(pqlQuery);
-    System.out.println("pinotResponse = " + pinotResponse);
-
-    pqlQuery = "Select map_value(myMap__KEYS, 'k1', myMap__VALUES) from " + DEFAULT_TABLE_NAME  + " order by map_value(myMap__KEYS, 'k1', myMap__VALUES)" ;
-    pinotResponse = postQuery(pqlQuery);
-    System.out.println("pinotResponse = " + pinotResponse);
-
 
   }
 
