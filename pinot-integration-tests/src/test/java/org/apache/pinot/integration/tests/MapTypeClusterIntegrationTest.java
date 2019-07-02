@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
- *   http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -24,9 +24,9 @@ package org.apache.pinot.integration.tests;
  * copyright ownership.  The ASF licenses this file to you under the Apache License, Version 2.0
  * (the "License"); you may not use this file except in compliance with the License.  You may obtain
  * a copy of the License at
- *
+ * <p>
  * http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
  * Unless required by applicable law or agreed to in writing, software distributed under the License
  * is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
  * or implied.  See the License for the specific language governing permissions and limitations
@@ -34,6 +34,7 @@ package org.apache.pinot.integration.tests;
  */
 
 import com.fasterxml.jackson.databind.node.ArrayNode;
+
 import java.io.File;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -129,7 +130,6 @@ public class MapTypeClusterIntegrationTest extends BaseClusterIntegrationTest {
     // Wait for all documents loaded
     _currentTable = DEFAULT_TABLE_NAME;
     waitForAllDocsLoaded(60_000);
-
   }
 
   @Override
@@ -209,8 +209,7 @@ public class MapTypeClusterIntegrationTest extends BaseClusterIntegrationTest {
       Assert.assertEquals(value, "value-k1-0");
     }
 
-
-   //selection order by
+    //selection order by
     pqlQuery = "Select map_value(myMap__KEYS, 'k1', myMap__VALUES) from " + DEFAULT_TABLE_NAME
         + " order by map_value(myMap__KEYS, 'k1', myMap__VALUES)";
     pinotResponse = postQuery(pqlQuery);
@@ -226,25 +225,13 @@ public class MapTypeClusterIntegrationTest extends BaseClusterIntegrationTest {
     pqlQuery = "Select count(*) from " + DEFAULT_TABLE_NAME + " group by map_value(myMap__KEYS, 'k1', myMap__VALUES)";
     pinotResponse = postQuery(pqlQuery);
     //Group By Query
-     pqlQuery =
-        "Select count(*) from " + DEFAULT_TABLE_NAME + " group by map_value(myMap__KEYS, 'k1', myMap__VALUES)";
-     pinotResponse = postQuery(pqlQuery);
+    pqlQuery = "Select count(*) from " + DEFAULT_TABLE_NAME + " group by map_value(myMap__KEYS, 'k1', myMap__VALUES)";
+    pinotResponse = postQuery(pqlQuery);
     Assert.assertNotNull(pinotResponse.get("aggregationResults"));
     JsonNode groupByResult = pinotResponse.get("aggregationResults").get(0).get("groupByResult");
     Assert.assertNotNull(groupByResult);
     Assert.assertTrue(groupByResult.isArray());
     Assert.assertTrue(groupByResult.size() > 0);
-
-
-    //Selection Query
-    pqlQuery = "Select map_value(myMap__KEYS, 'k1', myMap__VALUES) from " + DEFAULT_TABLE_NAME ;
-    pinotResponse = postQuery(pqlQuery);
-    System.out.println("pinotResponse = " + pinotResponse);
-
-    pqlQuery = "Select map_value(myMap__KEYS, 'k1', myMap__VALUES) from " + DEFAULT_TABLE_NAME  + " order by map_value(myMap__KEYS, 'k1', myMap__VALUES)" ;
-    pinotResponse = postQuery(pqlQuery);
-
-
   }
 
   @AfterClass
