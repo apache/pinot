@@ -77,7 +77,7 @@ public class PreparedStatementTest {
     public BrokerResponse executeQuery(String brokerAddress, Request request)
         throws PinotClientException {
       _lastQuery = request.getQuery();
-      return null;
+      return BrokerResponse.empty();
     }
 
     @Override
