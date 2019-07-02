@@ -19,6 +19,9 @@
 package org.apache.pinot.core.realtime.stream;
 
 import com.google.common.base.Preconditions;
+
+import java.util.Map;
+import java.util.TreeSet;
 import org.apache.avro.generic.GenericData;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.Schema;
@@ -28,6 +31,7 @@ import org.apache.pinot.core.data.readers.RecordReaderUtils;
 
 
 public class AvroRecordToPinotRowGenerator {
+
   private final Schema _schema;
   private final FieldSpec _incomingTimeFieldSpec;
 
@@ -45,7 +49,36 @@ public class AvroRecordToPinotRowGenerator {
       FieldSpec incomingFieldSpec =
           fieldSpec.getFieldType() == FieldSpec.FieldType.TIME ? _incomingTimeFieldSpec : fieldSpec;
       String fieldName = incomingFieldSpec.getName();
-      to.putField(fieldName, RecordReaderUtils.convert(incomingFieldSpec, from.get(fieldName)));
+      //Handle MAP types
+      if (fieldName.toUpperCase().endsWith("__KEYS")) {
+        String avroFieldName = fieldName.replaceAll("__KEYS", "");
+        Object o = from.get(avroFieldName);
+        if (o instanceof Map) {
+          Map map = (Map) o;
+          TreeSet sortedKeySet = new TreeSet(map.keySet());
+          Object[] keys = new Object[map.size()];
+          int i = 0;
+          for (Object key : sortedKeySet) {
+            keys[i++] = RecordReaderUtils.convert(incomingFieldSpec, key);
+          }
+          to.putField(fieldName, keys);
+        }
+      } else if (fieldName.toUpperCase().endsWith("__VALUES")) {
+        String avroFieldName = fieldName.replaceAll("__VALUES", "");
+        Object o = from.get(avroFieldName);
+        if (o instanceof Map) {
+          Map map = (Map) o;
+          TreeSet sortedKeySet = new TreeSet(map.keySet());
+          Object[] values = new Object[map.size()];
+          int i = 0;
+          for (Object key : sortedKeySet) {
+            values[i++] = RecordReaderUtils.convert(incomingFieldSpec, map.get(key));
+          }
+          to.putField(fieldName, values);
+        }
+      } else {
+        to.putField(fieldName, RecordReaderUtils.convert(incomingFieldSpec, from.get(fieldName)));
+      }
     }
     return to;
   }
