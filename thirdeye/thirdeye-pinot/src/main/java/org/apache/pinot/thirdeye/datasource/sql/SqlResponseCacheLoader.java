@@ -23,13 +23,16 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.cache.CacheLoader;
 import java.io.File;
 import java.sql.Connection;
+import java.sql.DriverManager;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Scanner;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.StringUtils;
@@ -60,19 +63,23 @@ public class SqlResponseCacheLoader extends CacheLoader<SqlQuery, ThirdEyeResult
   private static int MAX_CONNECTIONS = 50;
   private static final String PRESTO = "Presto";
   private static final String MYSQL = "MySQL";
+  private static final String VERTICA = "Vertica";
   private static final String DATASETS = "datasets";
   private static final String H2 = "H2";
   private static final String USER = "user";
   private static final String DB = "db";
   private static final String PASSWORD = "password";
+  private static final String DRIVER = "driver";
   private static final DateTime MIN_DATETIME = DateTime.parse("1970-01-01");
   private static final int ABANDONED_TIMEOUT = 60000;
 
   private Map<String, DataSource> prestoDBNameToDataSourceMap = new HashMap<>();
   private Map<String, DataSource> mysqlDBNameToDataSourceMap = new HashMap<>();
+  private Map<String, DataSource> verticaDBNameToDataSourceMap = new HashMap<>();
 
   private static Map<String, String> prestoDBNameToURLMap = new HashMap<>();
   private static Map<String, String> mysqlDBNameToURLMap = new HashMap<>();
+  private static Map<String, String> verticaDBNameToURLMap = new HashMap<>();
 
   private static String h2Url;
   DataSource h2DataSource;
@@ -129,6 +136,35 @@ public class SqlResponseCacheLoader extends CacheLoader<SqlQuery, ThirdEyeResult
 
           mysqlDBNameToDataSourceMap.put(entry.getKey(), dataSource);
           mysqlDBNameToURLMap.putAll(dbNameToURLMap);
+        }
+      }
+    }
+
+    // Init Vertica datasources
+    if (properties.containsKey(VERTICA)) {
+      List<Map<String, Object>> verticaMapList = ConfigUtils.getList(properties.get(VERTICA));
+      for (Map<String, Object> objMap: verticaMapList) {
+        Map<String, String> dbNameToURLMap = (Map)objMap.get(DB);
+        String verticaUser = (String)objMap.get(USER);
+        String verticaPassword = getPassword(objMap);
+        String verticaDriver = (String)objMap.get(DRIVER);
+
+        for (Map.Entry<String, String> entry: dbNameToURLMap.entrySet()) {
+          DataSource dataSource = new DataSource();
+          dataSource.setInitialSize(INIT_CONNECTIONS);
+          dataSource.setMaxActive(MAX_CONNECTIONS);
+          System.out.println(verticaUser);
+          dataSource.setUsername(verticaUser);
+          dataSource.setPassword(verticaPassword);
+          dataSource.setDriverClassName(verticaDriver);
+          dataSource.setUrl(entry.getValue());
+
+          // Timeout before an abandoned(in use) connection can be removed.
+          dataSource.setRemoveAbandonedTimeout(ABANDONED_TIMEOUT);
+          dataSource.setRemoveAbandoned(true);
+
+          verticaDBNameToDataSourceMap.put(entry.getKey(), dataSource);
+          verticaDBNameToURLMap.putAll(dbNameToURLMap);
         }
       }
     }
@@ -293,6 +329,8 @@ public class SqlResponseCacheLoader extends CacheLoader<SqlQuery, ThirdEyeResult
       dataSource = prestoDBNameToDataSourceMap.get(SQLQuery.getDbName());
     } else if (sourceName.equals(MYSQL)) {
       dataSource = mysqlDBNameToDataSourceMap.get(SQLQuery.getDbName());
+    } else if (sourceName.equals(VERTICA)) {
+      dataSource = verticaDBNameToDataSourceMap.get(SQLQuery.getDbName());
     } else {
       dataSource = h2DataSource;
     }
@@ -323,6 +361,7 @@ public class SqlResponseCacheLoader extends CacheLoader<SqlQuery, ThirdEyeResult
     Map<String, Map<String,String>> dbNameToURLMap = new LinkedHashMap<>();
     dbNameToURLMap.put(PRESTO, prestoDBNameToURLMap);
     dbNameToURLMap.put(MYSQL, mysqlDBNameToURLMap);
+    dbNameToURLMap.put(VERTICA, verticaDBNameToURLMap);
 
     Map<String, String> h2ToURLMap = new HashMap<>();
     h2ToURLMap.put(H2, h2Url);
@@ -348,6 +387,8 @@ public class SqlResponseCacheLoader extends CacheLoader<SqlQuery, ThirdEyeResult
       return prestoDBNameToDataSourceMap.get(dbName);
     } else if (sourceName.equals(MYSQL)) {
       return mysqlDBNameToDataSourceMap.get(dbName);
+    } else if (sourceName.equals(VERTICA)) {
+      return verticaDBNameToDataSourceMap.get(dbName);
     } else {
       return h2DataSource;
     }
