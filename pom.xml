@@ -135,6 +135,10 @@
 
     <!-- Sets the VM argument line used when unit tests are run. -->
     <argLine>-Xms4g -Xmx4g -XX:MaxPermSize=512m -XX:MaxDirectMemorySize=10g</argLine>
+
+    <!-- handle kafka imports -->
+    <kafka.version>0.9</kafka.version>
+    <kafka.scala.version>2.10</kafka.scala.version>
   </properties>
 
   <profiles>
