@@ -35,21 +35,18 @@ public abstract class ImmutableDictionaryReader extends BaseDictionary {
   private final int _length;
   private final int _numBytesPerValue;
   private final byte _paddingByte;
-  private final ThreadLocal<byte[]> _reusableBytes;
 
   protected ImmutableDictionaryReader(PinotDataBuffer dataBuffer, int length, int numBytesPerValue, byte paddingByte) {
     if (VarLengthBytesValueReaderWriter.isVarLengthBytesDictBuffer(dataBuffer)) {
       _valueReader = new VarLengthBytesValueReaderWriter(dataBuffer);
       _numBytesPerValue = -1;
       _paddingByte = 0;
-      _reusableBytes = null;
     }
     else {
       Preconditions.checkState(dataBuffer.size() == length * numBytesPerValue);
       _valueReader = new FixedByteValueReaderWriter(dataBuffer);
       _numBytesPerValue = numBytesPerValue;
       _paddingByte = paddingByte;
-      _reusableBytes = ThreadLocal.withInitial(() -> new byte[numBytesPerValue]);
     }
     _length = length;
   }
@@ -59,7 +56,6 @@ public abstract class ImmutableDictionaryReader extends BaseDictionary {
     _length = length;
     _numBytesPerValue = -1;
     _paddingByte = 0;
-    _reusableBytes = null;
   }
 
   /**
@@ -256,6 +252,6 @@ public abstract class ImmutableDictionaryReader extends BaseDictionary {
   }
 
   protected byte[] getBuffer() {
-    return _reusableBytes == null ? null : _reusableBytes.get();
+    return _numBytesPerValue == -1 ? null : new byte[_numBytesPerValue];
   }
 }
