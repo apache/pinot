@@ -183,7 +183,7 @@ public class VarLengthBytesValueReaderWriter implements Closeable, ValueReader {
 
   @Override
   public String getPaddedString(int index, int numBytesPerValue, byte[] buffer) {
-    return StringUtil.decodeUtf8(getBytes(index, numBytesPerValue, buffer));
+    throw new UnsupportedOperationException();
   }
 
   @Override
