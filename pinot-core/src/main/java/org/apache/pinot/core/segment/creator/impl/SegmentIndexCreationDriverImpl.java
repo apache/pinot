@@ -37,7 +37,7 @@ import org.apache.pinot.common.data.StarTreeIndexSpec;
 import org.apache.pinot.core.data.GenericRow;
 import org.apache.pinot.core.data.readers.RecordReader;
 import org.apache.pinot.core.data.readers.RecordReaderFactory;
-import org.apache.pinot.core.data.recordtransformer.CompoundTransformer;
+import org.apache.pinot.core.data.recordtransformer.CompositeTransformer;
 import org.apache.pinot.core.data.recordtransformer.RecordTransformer;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
@@ -111,7 +111,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   }
 
   public void init(SegmentGeneratorConfig config, SegmentCreationDataSource dataSource) {
-    init(config, dataSource, CompoundTransformer.getDefaultTransformer(dataSource.getRecordReader().getSchema()));
+    init(config, dataSource, CompositeTransformer.getDefaultTransformer(dataSource.getRecordReader().getSchema()));
   }
 
   public void init(SegmentGeneratorConfig config, SegmentCreationDataSource dataSource,

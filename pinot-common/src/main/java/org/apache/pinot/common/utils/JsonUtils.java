@@ -124,7 +124,8 @@ public class JsonUtils {
       if (jsonValue != null && !jsonValue.isNull()) {
         return extractSingleValue(jsonValue, fieldSpec.getDataType());
       } else {
-        return fieldSpec.getDefaultNullValue();
+//        return fieldSpec.getDefaultNullValue();
+        return null;
       }
     } else {
       if (jsonValue != null && !jsonValue.isNull()) {
@@ -137,13 +138,15 @@ public class JsonUtils {
             }
             return values;
           } else {
-            return new Object[]{fieldSpec.getDefaultNullValue()};
+            return null;
+//            return new Object[]{fieldSpec.getDefaultNullValue()};
           }
         } else {
           return new Object[]{extractSingleValue(jsonValue, fieldSpec.getDataType())};
         }
       } else {
-        return new Object[]{fieldSpec.getDefaultNullValue()};
+        return null;
+        //return new Object[]{fieldSpec.getDefaultNullValue()};
       }
     }
   }

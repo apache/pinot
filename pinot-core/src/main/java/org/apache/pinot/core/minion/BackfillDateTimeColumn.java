@@ -33,7 +33,7 @@ import org.apache.pinot.core.data.GenericRow;
 import org.apache.pinot.core.data.readers.FileFormat;
 import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
 import org.apache.pinot.core.data.readers.RecordReader;
-import org.apache.pinot.core.data.recordtransformer.CompoundTransformer;
+import org.apache.pinot.core.data.recordtransformer.CompositeTransformer;
 import org.apache.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import org.apache.pinot.core.segment.creator.RecordReaderSegmentCreationDataSource;
 import org.apache.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
@@ -103,7 +103,7 @@ public class BackfillDateTimeColumn {
     LOGGER.info("Creating segment for {} with config {}", segmentName, config.toString());
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
     driver.init(config, new RecordReaderSegmentCreationDataSource(wrapperReader),
-        CompoundTransformer.getPassThroughTransformer());
+        CompositeTransformer.getPassThroughTransformer());
     driver.build();
 
     return true;

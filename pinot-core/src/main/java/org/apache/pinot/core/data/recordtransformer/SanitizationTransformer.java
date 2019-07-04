@@ -27,7 +27,7 @@ import org.apache.pinot.core.data.GenericRow;
 
 
 /**
- * The {@code SanitationTransformer} class will sanitize the values to follow certain rules including:
+ * The {@code SanitizationTransformer} class will sanitize the values to follow certain rules including:
  * <ul>
  *   <li>No {@code null} characters in string values</li>
  *   <li>Values are within the length limit</li>
@@ -36,10 +36,10 @@ import org.apache.pinot.core.data.GenericRow;
  * <p>NOTE: should put this after the {@link DataTypeTransformer} so that all values follow the data types in
  * {@link FieldSpec}.
  */
-public class SanitationTransformer implements RecordTransformer {
+public class SanitizationTransformer implements RecordTransformer {
   private final Map<String, Integer> _stringColumnMaxLengthMap = new HashMap<>();
 
-  public SanitationTransformer(Schema schema) {
+  public SanitizationTransformer(Schema schema) {
     for (Map.Entry<String, FieldSpec> entry : schema.getFieldSpecMap().entrySet()) {
       FieldSpec fieldSpec = entry.getValue();
       if (fieldSpec.getDataType() == FieldSpec.DataType.STRING) {

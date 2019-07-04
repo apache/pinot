@@ -21,7 +21,7 @@ package org.apache.pinot.core.segment.creator;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.core.data.GenericRow;
 import org.apache.pinot.core.data.readers.RecordReader;
-import org.apache.pinot.core.data.recordtransformer.CompoundTransformer;
+import org.apache.pinot.core.data.recordtransformer.CompositeTransformer;
 import org.apache.pinot.core.data.recordtransformer.RecordTransformer;
 import org.apache.pinot.core.segment.creator.impl.stats.SegmentPreIndexStatsCollectorImpl;
 import org.slf4j.Logger;
@@ -45,7 +45,7 @@ public class RecordReaderSegmentCreationDataSource implements SegmentCreationDat
   @Override
   public SegmentPreIndexStatsCollector gatherStats(StatsCollectorConfig statsCollectorConfig) {
     try {
-      RecordTransformer recordTransformer = CompoundTransformer.getDefaultTransformer(statsCollectorConfig.getSchema());
+      RecordTransformer recordTransformer = CompositeTransformer.getDefaultTransformer(statsCollectorConfig.getSchema());
 
       SegmentPreIndexStatsCollector collector = new SegmentPreIndexStatsCollectorImpl(statsCollectorConfig);
       collector.init();

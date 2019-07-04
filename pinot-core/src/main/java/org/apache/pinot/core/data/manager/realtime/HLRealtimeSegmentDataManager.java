@@ -38,7 +38,7 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
 import org.apache.pinot.common.utils.CommonConstants.Segment.SegmentType;
 import org.apache.pinot.core.data.GenericRow;
-import org.apache.pinot.core.data.recordtransformer.CompoundTransformer;
+import org.apache.pinot.core.data.recordtransformer.CompositeTransformer;
 import org.apache.pinot.core.data.recordtransformer.RecordTransformer;
 import org.apache.pinot.core.indexsegment.generator.SegmentVersion;
 import org.apache.pinot.core.indexsegment.immutable.ImmutableSegment;
@@ -105,7 +105,7 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     super();
     _segmentVersion = indexLoadingConfig.getSegmentVersion();
     this.schema = schema;
-    _recordTransformer = CompoundTransformer.getDefaultTransformer(schema);
+    _recordTransformer = CompositeTransformer.getDefaultTransformer(schema);
     this.serverMetrics = serverMetrics;
     this.segmentName = realtimeSegmentZKMetadata.getSegmentName();
     this.tableNameWithType = tableConfig.getTableName();
