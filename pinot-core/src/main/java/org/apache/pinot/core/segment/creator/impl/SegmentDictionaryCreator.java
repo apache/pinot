@@ -217,10 +217,10 @@ public class SegmentDictionaryCreator implements Closeable {
       long size = VarLengthBytesValueReaderWriter.getRequiredSize(sortedByteArrays);
       try (PinotDataBuffer dataBuffer = PinotDataBuffer
           .mapFile(_dictionaryFile, false, 0, size, ByteOrder.BIG_ENDIAN, getClass().getSimpleName());
-          VarLengthBytesValueReaderWriter writer = new VarLengthBytesValueReaderWriter(dataBuffer)) {
-        writer.write(sortedByteArrays);
+          VarLengthBytesValueReaderWriter writer = new VarLengthBytesValueReaderWriter(dataBuffer, sortedByteArrays)) {
 
-        LOGGER.info("Using variable length bytes dictionary for column: {}, size: {}", _fieldSpec.getName(), size);
+        LOGGER.info("Using variable length bytes dictionary for column: {}, size: {}, numElements: {}",
+            _fieldSpec.getName(), size, writer.getNumElements());
       }
     } else {
       // Backward-compatible: index file is always big-endian

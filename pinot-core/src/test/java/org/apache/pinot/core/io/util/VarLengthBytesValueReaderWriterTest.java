@@ -39,14 +39,13 @@ public class VarLengthBytesValueReaderWriterTest {
       throws IOException {
     byte[][] byteArrays = new byte[][]{};
     long size = VarLengthBytesValueReaderWriter.getRequiredSize(byteArrays);
-    Assert.assertEquals(size, 16);
+    Assert.assertEquals(size, 20);
 
     final File tempFile =
         new File(FileUtils.getTempDirectory(), VarLengthBytesValueReaderWriterTest.class.getName() + random.nextInt());
 
     try (PinotDataBuffer buffer = PinotDataBuffer.mapFile(tempFile, false, 0, size, ByteOrder.BIG_ENDIAN, null)) {
-      VarLengthBytesValueReaderWriter readerWriter = new VarLengthBytesValueReaderWriter(buffer);
-      readerWriter.write(byteArrays);
+      VarLengthBytesValueReaderWriter readerWriter = new VarLengthBytesValueReaderWriter(buffer, byteArrays);
       Assert.assertEquals(readerWriter.getNumElements(), 0);
     }
 
@@ -64,14 +63,13 @@ public class VarLengthBytesValueReaderWriterTest {
     byte[] array = new byte[]{1, 2, 3, 4};
     byte[][] byteArrays = new byte[][]{array};
     long size = VarLengthBytesValueReaderWriter.getRequiredSize(byteArrays);
-    Assert.assertEquals(size, 24);
+    Assert.assertEquals(size, 28);
 
     final File tempFile =
         new File(FileUtils.getTempDirectory(), VarLengthBytesValueReaderWriterTest.class.getName() + random.nextInt());
 
     try (PinotDataBuffer buffer = PinotDataBuffer.mapFile(tempFile, false, 0, size, ByteOrder.BIG_ENDIAN, null)) {
-      VarLengthBytesValueReaderWriter readerWriter = new VarLengthBytesValueReaderWriter(buffer);
-      readerWriter.write(byteArrays);
+      VarLengthBytesValueReaderWriter readerWriter = new VarLengthBytesValueReaderWriter(buffer, byteArrays);
       Assert.assertEquals(readerWriter.getNumElements(), 1);
     }
 
@@ -101,8 +99,7 @@ public class VarLengthBytesValueReaderWriterTest {
         new File(FileUtils.getTempDirectory(), VarLengthBytesValueReaderWriterTest.class.getName() + random.nextInt());
 
     try (PinotDataBuffer buffer = PinotDataBuffer.mapFile(tempFile, false, 0, size, ByteOrder.BIG_ENDIAN, null)) {
-      VarLengthBytesValueReaderWriter readerWriter = new VarLengthBytesValueReaderWriter(buffer);
-      readerWriter.write(byteArrays);
+      VarLengthBytesValueReaderWriter readerWriter = new VarLengthBytesValueReaderWriter(buffer, byteArrays);
       Assert.assertEquals(byteArrays.length, readerWriter.getNumElements());
     }
 

@@ -26,8 +26,9 @@ import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 
 
 /**
- * Implementation of {@link ValueReader} that will allow each value to be of variable
- * length and there by avoiding the unnecessary padding.
+ * An immutable implementation of {@link ValueReader} that will allow each byte[] to be of variable
+ * length and there by avoiding the unnecessary padding. Since this is an immutable data structure,
+ * full data has to be given at initialization time an doesn't have any write() methods.
  *
  * The layout of the file is as follows:
  * <p> Header Section: </p>
@@ -40,6 +41,10 @@ import org.apache.pinot.core.segment.memory.PinotDataBuffer;
  *        implementation by incrementing version for every incompatible change to the store/format.
  *   </li>
  *   <li> Number of elements in the store. </li>
+ *   <li> The offset where the data section starts. Though the data section usually starts right after
+ *        the header, having this explicitly will let the store to be evolved freely without any
+ *        assumptions about where the data section starts.
+ *   </li>
  * </ul>
  *
  * <p> Data section: </p>
@@ -52,8 +57,6 @@ import org.apache.pinot.core.segment.memory.PinotDataBuffer;
  *   </li>
  *   <li> All byte arrays or values. </li>
  * </ul>
- *
- * Only sequential writes are supported.
  *
  * @see FixedByteValueReaderWriter
  */
@@ -70,20 +73,48 @@ public class VarLengthBytesValueReaderWriter implements Closeable, ValueReader {
    */
   private static final int VERSION = 1;
 
-  private static final int NUM_ELEMENTS_OFFSET = MAGIC_BYTES.length + Integer.BYTES;
-
-  // version, numElements
-  private static final int HEADER_LENGTH = MAGIC_BYTES.length + 2 * Integer.BYTES;
+  // Offsets of different fields in the header. Having as constants for readability.
+  private static final int VERSION_OFFSET = MAGIC_BYTES.length;
+  private static final int NUM_ELEMENTS_OFFSET = VERSION_OFFSET + Integer.BYTES;
+  private static final int DATA_SECTION_OFFSET_POSITION = NUM_ELEMENTS_OFFSET + Integer.BYTES;
+  private static final int HEADER_LENGTH = DATA_SECTION_OFFSET_POSITION + Integer.BYTES;
 
   private final PinotDataBuffer _dataBuffer;
 
   /**
-   * Total number of values present. Initialize this to -1 to handle '0' values as well.
+   * The offset of the data section in the buffer/store. This info will be persisted in the header
+   * so it has to be read from the buffer while initializing the store in read cases.
    */
-  private transient int _numElements = -1;
+  private final int _dataSectionStartOffSet;
 
+  /**
+   * Total number of values present in the store.
+   */
+  private final int _numElements;
+
+  /**
+   * Constructor to create a VarLengthBytesValueReaderWriter from a previously written buffer.
+   */
   public VarLengthBytesValueReaderWriter(PinotDataBuffer dataBuffer) {
     _dataBuffer = dataBuffer;
+
+    // To prepare ourselves to start reading the data, initialize the data offset.
+    _numElements = dataBuffer.getInt(NUM_ELEMENTS_OFFSET);
+    _dataSectionStartOffSet = dataBuffer.getInt(DATA_SECTION_OFFSET_POSITION);
+  }
+
+  /**
+   * Constructor to create a new immutable store with the given data.
+   */
+  public VarLengthBytesValueReaderWriter(PinotDataBuffer dataBuffer, byte[][] byteArrays) {
+    _dataBuffer = dataBuffer;
+    _numElements = byteArrays.length;
+
+    // For now, start writing the data section right after the header but if this store evolves,
+    // we could decide to start the data section somewhere else.
+    _dataSectionStartOffSet = HEADER_LENGTH;
+
+    write(byteArrays);
   }
 
   public static long getRequiredSize(byte[][] byteArrays) {
@@ -106,8 +137,8 @@ public class VarLengthBytesValueReaderWriter implements Closeable, ValueReader {
       if (Arrays.equals(MAGIC_BYTES, magicBytes)) {
         // Verify the version.
         if (VERSION == buffer.getInt(MAGIC_BYTES.length)) {
-          // Also verify that there is a valid numElements value.
-          return buffer.getInt(NUM_ELEMENTS_OFFSET) >= 0;
+          // Also verify that there is a valid numElements value and valid offset for data section.
+          return buffer.getInt(NUM_ELEMENTS_OFFSET) >= 0 && buffer.getInt(DATA_SECTION_OFFSET_POSITION) > 0;
         }
       }
     }
@@ -115,22 +146,21 @@ public class VarLengthBytesValueReaderWriter implements Closeable, ValueReader {
     return false;
   }
 
-  private void writeHeader(int numElements) {
+  private void writeHeader() {
     for (int offset = 0; offset < MAGIC_BYTES.length; offset++) {
       _dataBuffer.putByte(offset, MAGIC_BYTES[offset]);
     }
-    _dataBuffer.putInt(MAGIC_BYTES.length, VERSION);
-    _dataBuffer.putInt(NUM_ELEMENTS_OFFSET, numElements);
+    _dataBuffer.putInt(VERSION_OFFSET, VERSION);
+    _dataBuffer.putInt(NUM_ELEMENTS_OFFSET, _numElements);
+    _dataBuffer.putInt(DATA_SECTION_OFFSET_POSITION, _dataSectionStartOffSet);
   }
 
-  public void write(byte[][] byteArrays) {
-    _numElements = byteArrays.length;
-
-    writeHeader(_numElements);
+  private void write(byte[][] byteArrays) {
+    writeHeader();
 
     // Then write the offset of each of the byte array in the data buffer.
-    int nextOffset = HEADER_LENGTH;
-    int nextArrayStartOffset = HEADER_LENGTH + Integer.BYTES * (byteArrays.length + 1);
+    int nextOffset = _dataSectionStartOffSet;
+    int nextArrayStartOffset = _dataSectionStartOffSet + Integer.BYTES * (byteArrays.length + 1);
     for (byte[] array : byteArrays) {
       _dataBuffer.putInt(nextOffset, nextArrayStartOffset);
       nextOffset += Integer.BYTES;
@@ -141,18 +171,14 @@ public class VarLengthBytesValueReaderWriter implements Closeable, ValueReader {
     _dataBuffer.putInt(nextOffset, nextArrayStartOffset);
 
     // Finally write the byte arrays.
-    nextArrayStartOffset = HEADER_LENGTH + Integer.BYTES * (byteArrays.length + 1);
+    nextArrayStartOffset = _dataSectionStartOffSet + Integer.BYTES * (byteArrays.length + 1);
     for (byte[] array : byteArrays) {
       _dataBuffer.readFrom(nextArrayStartOffset, array);
       nextArrayStartOffset += array.length;
     }
   }
 
-  int getNumElements() {
-    // Lazily initialize the numElements.
-    if (_numElements == -1) {
-      _numElements = _dataBuffer.getInt(NUM_ELEMENTS_OFFSET);
-    }
+  public int getNumElements() {
     return _numElements;
   }
 
@@ -189,10 +215,10 @@ public class VarLengthBytesValueReaderWriter implements Closeable, ValueReader {
   @Override
   public byte[] getBytes(int index, int numBytesPerValue, byte[] buffer) {
     // Read the offset of the byte array first and then read the actual byte array.
-    int offset = _dataBuffer.getInt(HEADER_LENGTH + Integer.BYTES * index);
+    int offset = _dataBuffer.getInt(_dataSectionStartOffSet + Integer.BYTES * index);
 
     // To get the length of the byte array, we use the next byte array offset.
-    int length = _dataBuffer.getInt(HEADER_LENGTH + Integer.BYTES * (index + 1)) - offset;
+    int length = _dataBuffer.getInt(_dataSectionStartOffSet + Integer.BYTES * (index + 1)) - offset;
 
     byte[] b;
     // If the caller didn't pass a buffer, create one with exact length.
