@@ -129,6 +129,18 @@ public class BenchmarkDictionaryCreation {
     }
   }
 
+  @Benchmark
+  @BenchmarkMode(Mode.SampleTime)
+  @OutputTimeUnit(TimeUnit.MILLISECONDS)
+  public int benchmarkVarLengthStringDictionaryCreation()
+      throws IOException {
+    try (SegmentDictionaryCreator dictionaryCreator =
+        new SegmentDictionaryCreator(_sortedStrings, STRING_FIELD, INDEX_DIR, true)) {
+      dictionaryCreator.build();
+      return dictionaryCreator.indexOfSV("0");
+    }
+  }
+
   @TearDown
   public void tearDown()
       throws Exception {

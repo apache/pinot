@@ -87,6 +87,14 @@ public class IndexingConfig {
   @ConfigKey("aggregateMetrics")
   private boolean _aggregateMetrics;
 
+  /**
+   * The list of columns for which the variable length dictionary needs to be enabled in offline
+   * segments. This is only valid for string and bytes columns and has no impact for columns of
+   * other data types.
+   */
+  @ConfigKey("varLengthDictionaryColumns")
+  private List<String> _varLengthDictionaryColumns;
+
   public List<String> getInvertedIndexColumns() {
     return _invertedIndexColumns;
   }
@@ -223,6 +231,14 @@ public class IndexingConfig {
     return _aggregateMetrics;
   }
 
+  public List<String> getVarLengthDictionaryColumns() {
+    return _varLengthDictionaryColumns;
+  }
+
+  public void setVarLengthDictionaryColumns(List<String> varLengthDictionaryColumns) {
+    _varLengthDictionaryColumns = varLengthDictionaryColumns;
+  }
+
   @Override
   public String toString() {
     final StringBuilder result = new StringBuilder();
@@ -279,7 +295,8 @@ public class IndexingConfig {
         .isEqual(_onHeapDictionaryColumns, that._onHeapDictionaryColumns) && EqualityUtils
         .isEqual(_starTreeIndexSpec, that._starTreeIndexSpec) && EqualityUtils
         .isEqual(_segmentPartitionConfig, that._segmentPartitionConfig) && EqualityUtils
-        .isEqual(_bloomFilterColumns, that._bloomFilterColumns);
+        .isEqual(_bloomFilterColumns, that._bloomFilterColumns) && EqualityUtils
+        .isEqual(_varLengthDictionaryColumns, that._varLengthDictionaryColumns);
   }
 
   @Override
@@ -298,6 +315,7 @@ public class IndexingConfig {
     result = EqualityUtils.hashCodeOf(result, _starTreeIndexSpec);
     result = EqualityUtils.hashCodeOf(result, _segmentPartitionConfig);
     result = EqualityUtils.hashCodeOf(result, _bloomFilterColumns);
+    result = EqualityUtils.hashCodeOf(result, _varLengthDictionaryColumns);
     return result;
   }
 }

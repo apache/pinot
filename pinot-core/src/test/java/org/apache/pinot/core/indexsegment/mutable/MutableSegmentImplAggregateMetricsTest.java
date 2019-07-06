@@ -52,6 +52,7 @@ public class MutableSegmentImplAggregateMetricsTest {
         .build();
     _mutableSegmentImpl = MutableSegmentImplTestUtils
         .createMutableSegmentImpl(schema, new HashSet<>(Arrays.asList(DIMENSION_1, METRIC)),
+            new HashSet<>(Arrays.asList(DIMENSION_1)),
             Collections.singleton(DIMENSION_1), true);
   }
 
