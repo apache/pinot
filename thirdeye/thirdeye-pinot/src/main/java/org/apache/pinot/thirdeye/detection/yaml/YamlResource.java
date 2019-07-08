@@ -34,7 +34,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import javax.annotation.security.PermitAll;
 import javax.validation.constraints.NotNull;
 import javax.ws.rs.Consumes;
@@ -53,6 +57,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.thirdeye.anomaly.task.TaskConstants;
 import org.apache.pinot.thirdeye.api.Constants;
 import org.apache.pinot.thirdeye.auth.ThirdEyePrincipal;
+import org.apache.pinot.thirdeye.dashboard.DetectionPreviewConfiguration;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
 import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionAlertConfigManager;
@@ -133,8 +138,10 @@ public class YamlResource {
   private final SessionManager sessionDAO;
   private final DetectionPipelineLoader loader;
   private final Yaml yaml;
+  private final ExecutorService executor;
+  private final long previewTimeout;
 
-  public YamlResource() {
+  public YamlResource(DetectionPreviewConfiguration previewConfig) {
     this.detectionConfigDAO = DAORegistry.getInstance().getDetectionConfigManager();
     this.detectionAlertConfigDAO = DAORegistry.getInstance().getDetectionAlertConfigManager();
     this.metricDAO = DAORegistry.getInstance().getMetricConfigDAO();
@@ -145,6 +152,8 @@ public class YamlResource {
     this.evaluationDAO = DAORegistry.getInstance().getEvaluationManager();
     this.sessionDAO = DAORegistry.getInstance().getSessionDAO();
     this.yaml = new Yaml();
+    this.executor = Executors.newFixedThreadPool(previewConfig.getParallelism());
+    this.previewTimeout = previewConfig.getTimeout();
 
     TimeSeriesLoader timeseriesLoader =
         new DefaultTimeSeriesLoader(metricDAO, datasetDAO, ThirdEyeCacheRegistry.getInstance().getQueryCache());
@@ -713,6 +722,7 @@ public class YamlResource {
     long ts = System.currentTimeMillis();
     Map<String, String> responseMessage = new HashMap<>();
     DetectionPipelineResult result;
+    Future<DetectionPipelineResult> future = null;
     try {
       DetectionConfigDTO detectionConfig;
       if (existingConfig == null) {
@@ -724,12 +734,17 @@ public class YamlResource {
 
       Preconditions.checkNotNull(detectionConfig);
       DetectionPipeline pipeline = this.loader.from(this.provider, detectionConfig, start, end);
-      result = pipeline.run();
-
+      future = this.executor.submit(pipeline::run);
+      result = future.get(this.previewTimeout, TimeUnit.MILLISECONDS);
+      LOG.info("Preview successful, used {} milliseconds", System.currentTimeMillis() - ts);
+      return Response.ok(result).build();
     } catch (IllegalArgumentException e) {
       return processBadRequestResponse(YamlOperations.PREVIEW.name(), YamlOperations.RUNNING.name(), payload, e);
     } catch (InvocationTargetException e) {
       responseMessage.put("message", "Failed to run the preview due to " + e.getTargetException().getMessage());
+      return Response.serverError().entity(responseMessage).build();
+    } catch (TimeoutException e) {
+      responseMessage.put("message", "Preview has timed out");
       return Response.serverError().entity(responseMessage).build();
     } catch (Exception e) {
       LOG.error("Error running preview with payload " + payload, e);
@@ -738,9 +753,12 @@ public class YamlResource {
       getErrorMessage(0, 5, e, sb);
       responseMessage.put("message", "Failed to run the preview. Error stack: " + sb.toString());
       return Response.serverError().entity(responseMessage).build();
+    } finally {
+      // stop the preview
+      if (future != null) {
+        future.cancel(true);
+      }
     }
-    LOG.info("Preview successful, used {} milliseconds", System.currentTimeMillis() - ts);
-    return Response.ok(result).build();
   }
 
   private void getErrorMessage(int curLevel, int totalLevel, Throwable e, StringBuilder sb) {

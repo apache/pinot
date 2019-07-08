@@ -2,6 +2,7 @@ package org.apache.pinot.thirdeye.detection.yaml;
 
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.thirdeye.auth.ThirdEyePrincipal;
+import org.apache.pinot.thirdeye.dashboard.DetectionPreviewConfiguration;
 import org.apache.pinot.thirdeye.datalayer.bao.DAOTestBase;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
 import org.apache.pinot.thirdeye.datalayer.dto.ApplicationDTO;
@@ -34,7 +35,7 @@ public class YamlResourceTest {
   public void beforeClass() {
     testDAOProvider = DAOTestBase.getInstance();
     this.user = new ThirdEyePrincipal("test", "test");
-    this.yamlResource = new YamlResource();
+    this.yamlResource = new YamlResource(new DetectionPreviewConfiguration());
     this.daoRegistry = DAORegistry.getInstance();
     DetectionConfigManager detectionDAO = this.daoRegistry.getDetectionConfigManager();
     DetectionConfigDTO config1 = new DetectionConfigDTO();
