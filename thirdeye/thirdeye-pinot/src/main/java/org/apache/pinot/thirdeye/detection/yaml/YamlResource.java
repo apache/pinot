@@ -736,14 +736,14 @@ public class YamlResource {
       DetectionPipeline pipeline = this.loader.from(this.provider, detectionConfig, start, end);
       future = this.executor.submit(pipeline::run);
       result = future.get(this.previewTimeout, TimeUnit.MILLISECONDS);
+      LOG.info("Preview successful, used {} milliseconds", System.currentTimeMillis() - ts);
+      return Response.ok(result).build();
     } catch (IllegalArgumentException e) {
       return processBadRequestResponse(YamlOperations.PREVIEW.name(), YamlOperations.RUNNING.name(), payload, e);
     } catch (InvocationTargetException e) {
       responseMessage.put("message", "Failed to run the preview due to " + e.getTargetException().getMessage());
       return Response.serverError().entity(responseMessage).build();
     } catch (TimeoutException e) {
-      // stop the preview
-      future.cancel(true);
       responseMessage.put("message", "Preview has timed out");
       return Response.serverError().entity(responseMessage).build();
     } catch (Exception e) {
@@ -753,9 +753,12 @@ public class YamlResource {
       getErrorMessage(0, 5, e, sb);
       responseMessage.put("message", "Failed to run the preview. Error stack: " + sb.toString());
       return Response.serverError().entity(responseMessage).build();
+    } finally {
+      // stop the preview
+      if (future != null) {
+        future.cancel(true);
+      }
     }
-    LOG.info("Preview successful, used {} milliseconds", System.currentTimeMillis() - ts);
-    return Response.ok(result).build();
   }
 
   private void getErrorMessage(int curLevel, int totalLevel, Throwable e, StringBuilder sb) {
