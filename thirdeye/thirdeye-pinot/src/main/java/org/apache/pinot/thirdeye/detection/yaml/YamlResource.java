@@ -57,6 +57,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.thirdeye.anomaly.task.TaskConstants;
 import org.apache.pinot.thirdeye.api.Constants;
 import org.apache.pinot.thirdeye.auth.ThirdEyePrincipal;
+import org.apache.pinot.thirdeye.dashboard.DetectionPreviewConfiguration;
 import org.apache.pinot.thirdeye.dataframe.util.MetricSlice;
 import org.apache.pinot.thirdeye.datalayer.bao.DatasetConfigManager;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionAlertConfigManager;
@@ -119,10 +120,6 @@ public class YamlResource {
   private static final String PROP_SESSION_KEY = "sessionKey";
   private static final String PROP_PRINCIPAL_TYPE = "principalType";
   private static final String PROP_SERVICE = "SERVICE";
-  // 5 detection previews are running at the same time at most
-  private static final int PREVIEW_PARALLELISM = 5;
-  // max time allowed for a preview task
-  private static final long PREVIEW_TIMEOUT = TimeUnit.MINUTES.toMillis(5);
 
   // default onboarding replay period
   private static final long ONBOARDING_REPLAY_LOOKBACK = TimeUnit.DAYS.toMillis(30);
@@ -142,8 +139,9 @@ public class YamlResource {
   private final DetectionPipelineLoader loader;
   private final Yaml yaml;
   private final ExecutorService executor;
+  private final long previewTimeout;
 
-  public YamlResource() {
+  public YamlResource(DetectionPreviewConfiguration previewConfig) {
     this.detectionConfigDAO = DAORegistry.getInstance().getDetectionConfigManager();
     this.detectionAlertConfigDAO = DAORegistry.getInstance().getDetectionAlertConfigManager();
     this.metricDAO = DAORegistry.getInstance().getMetricConfigDAO();
@@ -154,7 +152,8 @@ public class YamlResource {
     this.evaluationDAO = DAORegistry.getInstance().getEvaluationManager();
     this.sessionDAO = DAORegistry.getInstance().getSessionDAO();
     this.yaml = new Yaml();
-    this.executor = Executors.newFixedThreadPool(PREVIEW_PARALLELISM);
+    this.executor = Executors.newFixedThreadPool(previewConfig.getParallelism());
+    this.previewTimeout = previewConfig.getTimeout();
 
     TimeSeriesLoader timeseriesLoader =
         new DefaultTimeSeriesLoader(metricDAO, datasetDAO, ThirdEyeCacheRegistry.getInstance().getQueryCache());
@@ -736,7 +735,7 @@ public class YamlResource {
       Preconditions.checkNotNull(detectionConfig);
       DetectionPipeline pipeline = this.loader.from(this.provider, detectionConfig, start, end);
       future = this.executor.submit(pipeline::run);
-      result = future.get(PREVIEW_TIMEOUT, TimeUnit.MILLISECONDS);
+      result = future.get(this.previewTimeout, TimeUnit.MILLISECONDS);
     } catch (IllegalArgumentException e) {
       return processBadRequestResponse(YamlOperations.PREVIEW.name(), YamlOperations.RUNNING.name(), payload, e);
     } catch (InvocationTargetException e) {

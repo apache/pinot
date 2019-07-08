@@ -30,6 +30,15 @@ public class ThirdEyeDashboardConfiguration extends ThirdEyeConfiguration {
   AuthConfiguration authConfig;
   RootCauseConfiguration rootCause;
   List<ResourceConfiguration> resourceConfig;
+  DetectionPreviewConfiguration detectionPreviewConfig = new DetectionPreviewConfiguration();
+
+  public DetectionPreviewConfiguration getDetectionPreviewConfig() {
+    return detectionPreviewConfig;
+  }
+
+  public void setDetectionPreviewConfig(DetectionPreviewConfiguration detectionPreviewConfig) {
+    this.detectionPreviewConfig = detectionPreviewConfig;
+  }
 
   public List<ResourceConfiguration> getResourceConfig() {
     return resourceConfig;
