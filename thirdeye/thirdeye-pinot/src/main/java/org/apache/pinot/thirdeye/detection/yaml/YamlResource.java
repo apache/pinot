@@ -34,7 +34,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import javax.annotation.security.PermitAll;
 import javax.validation.constraints.NotNull;
 import javax.ws.rs.Consumes;
@@ -115,6 +119,10 @@ public class YamlResource {
   private static final String PROP_SESSION_KEY = "sessionKey";
   private static final String PROP_PRINCIPAL_TYPE = "principalType";
   private static final String PROP_SERVICE = "SERVICE";
+  // 5 detection previews are running at the same time at most
+  private static final int PREVIEW_PARALLELISM = 5;
+  // max time allowed for a preview task
+  private static final long PREVIEW_TIMEOUT = TimeUnit.MINUTES.toMillis(5);
 
   // default onboarding replay period
   private static final long ONBOARDING_REPLAY_LOOKBACK = TimeUnit.DAYS.toMillis(30);
@@ -133,6 +141,7 @@ public class YamlResource {
   private final SessionManager sessionDAO;
   private final DetectionPipelineLoader loader;
   private final Yaml yaml;
+  private final ExecutorService executor;
 
   public YamlResource() {
     this.detectionConfigDAO = DAORegistry.getInstance().getDetectionConfigManager();
@@ -145,6 +154,7 @@ public class YamlResource {
     this.evaluationDAO = DAORegistry.getInstance().getEvaluationManager();
     this.sessionDAO = DAORegistry.getInstance().getSessionDAO();
     this.yaml = new Yaml();
+    this.executor = Executors.newFixedThreadPool(PREVIEW_PARALLELISM);
 
     TimeSeriesLoader timeseriesLoader =
         new DefaultTimeSeriesLoader(metricDAO, datasetDAO, ThirdEyeCacheRegistry.getInstance().getQueryCache());
@@ -724,12 +734,15 @@ public class YamlResource {
 
       Preconditions.checkNotNull(detectionConfig);
       DetectionPipeline pipeline = this.loader.from(this.provider, detectionConfig, start, end);
-      result = pipeline.run();
-
+      Future<DetectionPipelineResult> future = this.executor.submit(pipeline::run);
+      result = future.get(PREVIEW_TIMEOUT, TimeUnit.MILLISECONDS);
     } catch (IllegalArgumentException e) {
       return processBadRequestResponse(YamlOperations.PREVIEW.name(), YamlOperations.RUNNING.name(), payload, e);
     } catch (InvocationTargetException e) {
       responseMessage.put("message", "Failed to run the preview due to " + e.getTargetException().getMessage());
+      return Response.serverError().entity(responseMessage).build();
+    } catch (TimeoutException e) {
+      responseMessage.put("message", "Preview has timed out");
       return Response.serverError().entity(responseMessage).build();
     } catch (Exception e) {
       LOG.error("Error running preview with payload " + payload, e);
