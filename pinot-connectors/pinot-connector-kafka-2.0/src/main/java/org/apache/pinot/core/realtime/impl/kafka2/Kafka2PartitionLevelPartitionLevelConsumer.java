@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.concurrent.TimeoutException;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
+import org.apache.kafka.common.utils.Bytes;
 import org.apache.pinot.core.realtime.stream.MessageBatch;
 import org.apache.pinot.core.realtime.stream.PartitionLevelConsumer;
 import org.apache.pinot.core.realtime.stream.StreamConfig;
@@ -43,14 +44,14 @@ public class Kafka2PartitionLevelPartitionLevelConsumer extends Kafka2PartitionL
   public MessageBatch fetchMessages(long startOffset, long endOffset, int timeoutMillis)
       throws TimeoutException {
     _consumer.seek(_topicPartition, startOffset);
-    ConsumerRecords<String, byte[]> consumerRecords = _consumer.poll(Duration.ofMillis(timeoutMillis));
-    final Iterable<ConsumerRecord<String, byte[]>> messageAndOffsetIterable =
+    ConsumerRecords<String, Bytes> consumerRecords = _consumer.poll(Duration.ofMillis(timeoutMillis));
+    final Iterable<ConsumerRecord<String, Bytes>> messageAndOffsetIterable =
         buildOffsetFilteringIterable(consumerRecords.records(_topicPartition), startOffset, endOffset);
     return new Kafka2MessageBatch(messageAndOffsetIterable);
   }
 
-  private Iterable<ConsumerRecord<String, byte[]>> buildOffsetFilteringIterable(
-      final List<ConsumerRecord<String, byte[]>> messageAndOffsets, final long startOffset, final long endOffset) {
+  private Iterable<ConsumerRecord<String, Bytes>> buildOffsetFilteringIterable(
+      final List<ConsumerRecord<String, Bytes>> messageAndOffsets, final long startOffset, final long endOffset) {
     return Iterables.filter(messageAndOffsets, input -> {
       // Filter messages that are either null or have an offset ∉ [startOffset, endOffset]
       return input != null && input.offset() >= startOffset && (endOffset > input.offset() || endOffset == -1);

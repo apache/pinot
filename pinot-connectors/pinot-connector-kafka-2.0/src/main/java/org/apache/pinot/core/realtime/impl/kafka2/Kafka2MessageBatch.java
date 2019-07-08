@@ -21,6 +21,7 @@ package org.apache.pinot.core.realtime.impl.kafka2;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.common.utils.Bytes;
 import org.apache.pinot.core.realtime.stream.MessageBatch;
 
 
@@ -28,9 +29,9 @@ public class Kafka2MessageBatch implements MessageBatch<byte[]> {
 
   private List<MessageAndOffset> messageList = new ArrayList<>();
 
-  public Kafka2MessageBatch(Iterable<ConsumerRecord<String, byte[]>> iterable) {
-    for (ConsumerRecord<String, byte[]> record : iterable) {
-      messageList.add(new MessageAndOffset(record.value(), record.offset()));
+  public Kafka2MessageBatch(Iterable<ConsumerRecord<String, Bytes>> iterable) {
+    for (ConsumerRecord<String, Bytes> record : iterable) {
+      messageList.add(new MessageAndOffset(record.value().get(), record.offset()));
     }
   }
 

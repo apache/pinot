@@ -28,6 +28,7 @@ import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.serialization.BytesDeserializer;
 import org.apache.kafka.common.serialization.StringDeserializer;
+import org.apache.kafka.common.utils.Bytes;
 import org.apache.pinot.core.realtime.stream.StreamConfig;
 
 
@@ -37,7 +38,7 @@ public abstract class Kafka2PartitionLevelConnectionHandler {
   protected final String _clientId;
   protected final int _partition;
   protected final String _topic;
-  protected final Consumer<String, byte[]> _consumer;
+  protected final Consumer<String, Bytes> _consumer;
   protected final TopicPartition _topicPartition;
 
   public Kafka2PartitionLevelConnectionHandler(String clientId, StreamConfig streamConfig, int partition) {

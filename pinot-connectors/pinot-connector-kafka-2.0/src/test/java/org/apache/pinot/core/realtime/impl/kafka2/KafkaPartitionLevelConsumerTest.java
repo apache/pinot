@@ -21,13 +21,18 @@ package org.apache.pinot.core.realtime.impl.kafka2;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.TimeoutException;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.apache.pinot.core.realtime.impl.kafka2.utils.MiniKafkaCluster;
+import org.apache.pinot.core.realtime.stream.MessageBatch;
 import org.apache.pinot.core.realtime.stream.OffsetCriteria;
+import org.apache.pinot.core.realtime.stream.PartitionLevelConsumer;
 import org.apache.pinot.core.realtime.stream.StreamConfig;
+import org.apache.pinot.core.realtime.stream.StreamConsumerFactory;
+import org.apache.pinot.core.realtime.stream.StreamConsumerFactoryProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
@@ -45,7 +50,7 @@ public class KafkaPartitionLevelConsumerTest {
   private static final long STABILIZE_SLEEP_DELAYS = 3000;
   private static final String TEST_TOPIC_1 = "foo";
   private static final String TEST_TOPIC_2 = "bar";
-  private static final int NUM_MSG_PRODUCED = 1000;
+  private static final int NUM_MSG_PRODUCED_PER_PARTITION = 1000;
 
   private static MiniKafkaCluster kafkaCluster;
   private static String brokerAddress;
@@ -71,8 +76,10 @@ public class KafkaPartitionLevelConsumerTest {
     props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
     props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
     KafkaProducer p = new KafkaProducer<>(props);
-    for (int i = 0; i < NUM_MSG_PRODUCED; i++) {
+    for (int i = 0; i < NUM_MSG_PRODUCED_PER_PARTITION; i++) {
       p.send(new ProducerRecord(TEST_TOPIC_1, "sample_msg_" + i));
+      // TEST_TOPIC_2 has 2 partitions
+      p.send(new ProducerRecord(TEST_TOPIC_2, "sample_msg_" + i));
       p.send(new ProducerRecord(TEST_TOPIC_2, "sample_msg_" + i));
     }
   }
@@ -225,8 +232,61 @@ public class KafkaPartitionLevelConsumerTest {
           new Kafka2PartitionLevelStreamMetadataProvider(clientId, streamConfig, partition);
       Assert.assertEquals(0, kafkaStreamMetadataProvider
           .fetchPartitionOffset(new OffsetCriteria.OffsetCriteriaBuilder().withOffsetSmallest(), 10000));
-      Assert.assertEquals(NUM_MSG_PRODUCED / numPartitions, kafkaStreamMetadataProvider
+      Assert.assertEquals(NUM_MSG_PRODUCED_PER_PARTITION, kafkaStreamMetadataProvider
           .fetchPartitionOffset(new OffsetCriteria.OffsetCriteriaBuilder().withOffsetLargest(), 10000));
+    }
+  }
+
+  @Test
+  public void testConsumer()
+      throws Exception {
+    testConsumer(TEST_TOPIC_1);
+    testConsumer(TEST_TOPIC_2);
+  }
+
+  private void testConsumer(String topic)
+      throws TimeoutException {
+    String streamType = "kafka";
+    String streamKafkaBrokerList = "127.0.0.1:" + kafkaCluster.getKafkaServerPort(0);
+    String streamKafkaConsumerType = "simple";
+    String clientId = "clientId";
+
+    Map<String, String> streamConfigMap = new HashMap<>();
+    streamConfigMap.put("streamType", streamType);
+    streamConfigMap.put("stream.kafka.topic.name", topic);
+    streamConfigMap.put("stream.kafka.broker.list", streamKafkaBrokerList);
+    streamConfigMap.put("stream.kafka.consumer.type", streamKafkaConsumerType);
+    streamConfigMap.put("stream.kafka.consumer.factory.class.name", Kafka2ConsumerFactory.class.getName());
+    streamConfigMap.put("stream.kafka.decoder.class.name", "decoderClass");
+    StreamConfig streamConfig = new StreamConfig(streamConfigMap);
+
+    final StreamConsumerFactory streamConsumerFactory = StreamConsumerFactoryProvider.create(streamConfig);
+    int numPartitions =
+        new Kafka2PartitionLevelStreamMetadataProvider(clientId, streamConfig).fetchPartitionCount(10000);
+    for (int partition = 0; partition < numPartitions; partition++) {
+      final PartitionLevelConsumer consumer = streamConsumerFactory.createPartitionLevelConsumer(clientId, partition);
+
+      // Test consume a large batch, only 500 records will be returned.
+      final MessageBatch batch1 = consumer.fetchMessages(0, NUM_MSG_PRODUCED_PER_PARTITION, 10000);
+      Assert.assertEquals(batch1.getMessageCount(), 500);
+      for (int i = 0; i < batch1.getMessageCount(); i++) {
+        final byte[] msg = (byte[]) batch1.getMessageAtIndex(i);
+        Assert.assertEquals(new String(msg), "sample_msg_" + i);
+      }
+      // Test second half batch
+      final MessageBatch batch2 = consumer.fetchMessages(500, NUM_MSG_PRODUCED_PER_PARTITION, 10000);
+      Assert.assertEquals(batch2.getMessageCount(), 500);
+      for (int i = 0; i < batch2.getMessageCount(); i++) {
+        final byte[] msg = (byte[]) batch2.getMessageAtIndex(i);
+        Assert.assertEquals(new String(msg), "sample_msg_" + (500 + i));
+      }
+      // Some random range
+      final MessageBatch batch3 = consumer.fetchMessages(10, 35, 10000);
+      Assert.assertEquals(batch3.getMessageCount(), 25);
+      for (int i = 0; i < batch3.getMessageCount(); i++) {
+        final byte[] msg = (byte[]) batch3.getMessageAtIndex(i);
+        Assert.assertEquals(new String(msg), "sample_msg_" + (10 + i));
+      }
     }
   }
 }
