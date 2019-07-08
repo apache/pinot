@@ -34,6 +34,7 @@ import org.apache.hadoop.mapreduce.TaskID;
 import org.apache.hadoop.mapreduce.TaskType;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.common.utils.time.TimeUtils;
 import org.apache.pinot.core.data.GenericRow;
 import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
 import org.apache.pinot.core.data.readers.RecordReader;
@@ -129,7 +130,7 @@ public class PinotOutputFormatTest {
 
   private Map<Integer, Emp> addTestData()
       throws IOException, InterruptedException {
-    int days = 2000;
+    long days = TimeUtils.getValidMinTimeMillis();
     int sal = 20;
     RecordWriter<Object, Emp> writer = outputFormat.getRecordWriter(fakeTaskAttemptContext);
     Map<Integer, Emp> inputMap = new HashMap<>();
@@ -147,10 +148,10 @@ public class PinotOutputFormatTest {
 
     public int id;
     public String name;
-    public int epochDays;
+    public long epochDays;
     public int salary;
 
-    public Emp(int id, String name, int epochDays, int salary) {
+    public Emp(int id, String name, long epochDays, int salary) {
       this.id = id;
       this.name = name;
       this.epochDays = epochDays;
@@ -171,7 +172,7 @@ public class PinotOutputFormatTest {
         + "    },\n" + "    {\n" + "      \"name\": \"name\",\n" + "      \"dataType\" : \"STRING\",\n"
         + "      \"delimiter\" : null,\n" + "      \"singleValueField\" : true\n" + "    }\n" + "  ],\n"
         + "  \"timeFieldSpec\" : {\n" + "    \"incomingGranularitySpec\" : {\n" + "      \"timeType\" : \"DAYS\",\n"
-        + "      \"dataType\" : \"INT\",\n" + "      \"name\" : \"epochDays\"\n" + "    }\n" + "  },\n"
+        + "      \"dataType\" : \"LONG\",\n" + "      \"name\" : \"epochDays\"\n" + "    }\n" + "  },\n"
         + "  \"metricFieldSpecs\" : [\n" + "    {\n" + "      \"name\" : \"salary\",\n"
         + "      \"dataType\" : \"INT\",\n" + "      \"delimiter\" : null,\n" + "      \"singleValueField\" : true\n"
         + "    }\n" + "   ],\n" + "  \"schemaName\" : \"emp\"\n" + "}";
