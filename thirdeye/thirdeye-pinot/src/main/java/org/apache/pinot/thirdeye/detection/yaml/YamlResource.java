@@ -723,6 +723,7 @@ public class YamlResource {
     long ts = System.currentTimeMillis();
     Map<String, String> responseMessage = new HashMap<>();
     DetectionPipelineResult result;
+    Future<DetectionPipelineResult> future = null;
     try {
       DetectionConfigDTO detectionConfig;
       if (existingConfig == null) {
@@ -734,7 +735,7 @@ public class YamlResource {
 
       Preconditions.checkNotNull(detectionConfig);
       DetectionPipeline pipeline = this.loader.from(this.provider, detectionConfig, start, end);
-      Future<DetectionPipelineResult> future = this.executor.submit(pipeline::run);
+      future = this.executor.submit(pipeline::run);
       result = future.get(PREVIEW_TIMEOUT, TimeUnit.MILLISECONDS);
     } catch (IllegalArgumentException e) {
       return processBadRequestResponse(YamlOperations.PREVIEW.name(), YamlOperations.RUNNING.name(), payload, e);
@@ -742,6 +743,8 @@ public class YamlResource {
       responseMessage.put("message", "Failed to run the preview due to " + e.getTargetException().getMessage());
       return Response.serverError().entity(responseMessage).build();
     } catch (TimeoutException e) {
+      // stop the preview
+      future.cancel(true);
       responseMessage.put("message", "Preview has timed out");
       return Response.serverError().entity(responseMessage).build();
     } catch (Exception e) {
