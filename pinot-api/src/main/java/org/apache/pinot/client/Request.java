@@ -23,27 +23,27 @@ package org.apache.pinot.client;
  */
 public class Request {
 
-  private String queryFormat;
-  private String query;
+  private String _queryFormat;
+  private String _query;
 
   public Request(String queryFormat, String query) {
-    this.queryFormat = queryFormat;
-    this.query = query;
+    _queryFormat = queryFormat;
+    _query = query;
   }
 
   public String getQueryFormat() {
-    return queryFormat;
+    return _queryFormat;
   }
 
   public void setQueryFormat(String queryType) {
-    this.queryFormat = queryType;
+    _queryFormat = queryType;
   }
 
   public String getQuery() {
-    return query;
+    return _query;
   }
 
   public void setQuery(String query) {
-    this.query = query;
+    _query = query;
   }
 }
