@@ -350,7 +350,14 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         Object minTime = Preconditions.checkNotNull(timeColumnIndexCreationInfo.getMin());
         Object maxTime = Preconditions.checkNotNull(timeColumnIndexCreationInfo.getMax());
 
-        if (config.getTimeColumnType() == SegmentGeneratorConfig.TimeColumnType.SIMPLE_DATE) {
+        if (config.getSegmentTimeUnit() == TimeUnit.DAYS) {
+          final long minTimeMillis = TimeUnit.DAYS.toMillis(((Integer) minTime).longValue());
+          final long maxTimeMillis =  TimeUnit.DAYS.toMillis(((Integer) maxTime).longValue());
+          checkTime(config, minTimeMillis, maxTimeMillis, segmentName);
+          properties.setProperty(SEGMENT_START_TIME, minTimeMillis);
+          properties.setProperty(SEGMENT_END_TIME, maxTimeMillis);
+          properties.setProperty(TIME_UNIT, TimeUnit.MILLISECONDS);
+        } else if (config.getTimeColumnType() == SegmentGeneratorConfig.TimeColumnType.SIMPLE_DATE) {
           // For simple date format, convert time value into millis since epoch
           DateTimeFormatter dateTimeFormatter = DateTimeFormat.forPattern(config.getSimpleDateFormat());
           final Long minTimeMillis = dateTimeFormatter.parseMillis(minTime.toString());
@@ -416,8 +423,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       throw new RuntimeException("Expecting non-null start/end time for segment: " + segmentName);
     }
 
-    long startMillis = 0;
-    long endMillis = 0;
+    long startMillis;
+    long endMillis;
 
     if (startTime instanceof Long && endTime instanceof Long) {
       startMillis = (long)startTime;

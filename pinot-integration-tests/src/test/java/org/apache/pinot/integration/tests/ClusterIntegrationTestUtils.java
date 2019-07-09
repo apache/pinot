@@ -270,7 +270,6 @@ public class ClusterIntegrationTestUtils {
 
           // Build the segment
           SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
-          segmentGeneratorConfig.setCheckTimeColumnValidityDuringGeneration(false);
           driver.init(segmentGeneratorConfig);
           driver.build();
 
