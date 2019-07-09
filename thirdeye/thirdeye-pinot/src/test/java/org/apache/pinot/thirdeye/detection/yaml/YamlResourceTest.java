@@ -239,6 +239,9 @@ public class YamlResourceTest {
       Assert.assertNotNull(alertDTO);
       Assert.assertEquals(alertDTO.getName(), "Subscription Group Name");
       Assert.assertEquals(alertDTO.getApplication(), "test_application");
+      Assert.assertNotNull(alertDTO.getAlertSchemes().get("emailScheme"));
+      Assert.assertEquals(alertDTO.getAlertSchemes().get("emailScheme").get("template"), "ENTITY_REPORT");
+      Assert.assertEquals(alertDTO.getAlertSchemes().get("emailScheme").get("subject"), "METRICS");
 
       // Verify if the vector clock is updated with the updated detection
       Assert.assertEquals(alertDTO.getVectorClocks().keySet().size(), 1);
