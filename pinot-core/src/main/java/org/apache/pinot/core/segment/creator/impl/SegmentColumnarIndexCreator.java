@@ -350,23 +350,17 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         Object minTime = Preconditions.checkNotNull(timeColumnIndexCreationInfo.getMin());
         Object maxTime = Preconditions.checkNotNull(timeColumnIndexCreationInfo.getMax());
 
-        if (config.getSegmentTimeUnit() == TimeUnit.DAYS) {
-          final long minTimeMillis = TimeUnit.DAYS.toMillis(((Integer) minTime).longValue());
-          final long maxTimeMillis =  TimeUnit.DAYS.toMillis(((Integer) maxTime).longValue());
-          checkTime(config, minTimeMillis, maxTimeMillis, segmentName);
-          properties.setProperty(SEGMENT_START_TIME, minTimeMillis);
-          properties.setProperty(SEGMENT_END_TIME, maxTimeMillis);
-          properties.setProperty(TIME_UNIT, TimeUnit.MILLISECONDS);
-        } else if (config.getTimeColumnType() == SegmentGeneratorConfig.TimeColumnType.SIMPLE_DATE) {
+        if (config.getTimeColumnType() == SegmentGeneratorConfig.TimeColumnType.SIMPLE_DATE) {
           // For simple date format, convert time value into millis since epoch
           DateTimeFormatter dateTimeFormatter = DateTimeFormat.forPattern(config.getSimpleDateFormat());
-          final Long minTimeMillis = dateTimeFormatter.parseMillis(minTime.toString());
-          final Long maxTimeMillis = dateTimeFormatter.parseMillis(maxTime.toString());
+          final long minTimeMillis = dateTimeFormatter.parseMillis(minTime.toString());
+          final long maxTimeMillis = dateTimeFormatter.parseMillis(maxTime.toString());
           checkTime(config, minTimeMillis, maxTimeMillis, segmentName);
           properties.setProperty(SEGMENT_START_TIME, minTimeMillis);
           properties.setProperty(SEGMENT_END_TIME, maxTimeMillis);
           properties.setProperty(TIME_UNIT, TimeUnit.MILLISECONDS);
         } else {
+          // by default, time column type is EPOCH
           checkTime(config, minTime, maxTime, segmentName);
           properties.setProperty(SEGMENT_START_TIME, minTime);
           properties.setProperty(SEGMENT_END_TIME, maxTime);
@@ -429,12 +423,35 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     if (startTime instanceof Long && endTime instanceof Long) {
       startMillis = (long)startTime;
       endMillis = (long)endTime;
-    } else if (startTime instanceof Integer && endTime instanceof Integer) {
-      startMillis = ((Integer) startTime).longValue();
-      endMillis = ((Integer) endTime).longValue();
     } else if (startTime instanceof String && endTime instanceof String) {
       startMillis = Long.parseLong((String)startTime);
       endMillis = Long.parseLong((String)endTime);
+    } else if (startTime instanceof Integer && endTime instanceof Integer) {
+      // convert to millis for comparison
+      switch (config.getSegmentTimeUnit()) {
+        case DAYS:
+          startMillis = TimeUnit.DAYS.toMillis(((Integer) startTime).longValue());
+          endMillis = TimeUnit.DAYS.toMillis(((Integer) endTime).longValue());
+          break;
+        case HOURS:
+          startMillis = TimeUnit.HOURS.toMillis(((Integer) startTime).longValue());
+          endMillis = TimeUnit.HOURS.toMillis(((Integer) endTime).longValue());
+          break;
+        case MINUTES:
+          startMillis = TimeUnit.MINUTES.toMillis(((Integer) startTime).longValue());
+          endMillis = TimeUnit.MINUTES.toMillis(((Integer) endTime).longValue());
+          break;
+        case SECONDS:
+          startMillis = TimeUnit.SECONDS.toMillis(((Integer) startTime).longValue());
+          endMillis = TimeUnit.SECONDS.toMillis(((Integer) endTime).longValue());
+          break;
+        default:
+          final StringBuilder sb = new StringBuilder();
+          sb.append("Unexpected time unit: ").append(config.getSegmentTimeUnit())
+              .append(" for time column: ").append(config.getTimeColumnName())
+              .append(" of data type INT");
+          throw new RuntimeException(sb.toString());
+      }
     } else  {
       throw new RuntimeException("Unable to interpret type of time column");
     }
@@ -445,7 +462,18 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       LOGGER.error(
           "Invalid start time '{}ms' or end time '{}ms' for segment {}, must be between '{}' and '{}'",
           startMillis, endMillis, segmentName, minDate, maxDate);
-      throw new RuntimeException("Invalid start/end time for segment: " + segmentName);
+      final StringBuilder sb = new StringBuilder();
+      sb.append("Invalid start/end time for segment: ")
+          .append(segmentName)
+          .append(" for time column: ")
+          .append(config.getTimeColumnName())
+          .append(" given start time: ")
+          .append(startMillis).append(" ms")
+          .append(" given end time: ")
+          .append(endMillis).append(" ms")
+          .append(" start and end time must be between ")
+          .append(minDate).append(" ").append(maxDate);
+      throw new RuntimeException(sb.toString());
     }
   }
 

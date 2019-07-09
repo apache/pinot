@@ -97,7 +97,7 @@ public class SegmentGenerationWithTimeColumnTest {
       Schema schema = createSchema(false);
       buildSegment(schema, false, true);
     } catch (Exception e) {
-      Assert.assertTrue(e.getMessage().contains("Invalid start/end time for segment: testSegment"));
+      Assert.assertTrue(e.getMessage().contains("Invalid start/end time for segment: testSegment for time column: date"));
       error = true;
     }
     Assert.assertTrue(error);
