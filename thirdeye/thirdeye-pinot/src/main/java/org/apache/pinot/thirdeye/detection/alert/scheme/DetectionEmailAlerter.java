@@ -31,6 +31,7 @@ import org.apache.pinot.thirdeye.anomalydetection.context.AnomalyResult;
 import org.apache.pinot.thirdeye.datalayer.dto.AlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import org.apache.pinot.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import org.apache.pinot.thirdeye.datalayer.pojo.AlertConfigBean;
 import org.apache.pinot.thirdeye.detection.ConfigUtils;
 import org.apache.pinot.thirdeye.detection.alert.AlertUtils;
 import org.apache.pinot.thirdeye.detection.alert.DetectionAlertFilterRecipients;
@@ -61,7 +62,11 @@ public class DetectionEmailAlerter extends DetectionAlertScheme {
   private static final Comparator<AnomalyResult> COMPARATOR_DESC =
       (o1, o2) -> -1 * Long.compare(o1.getStartTime(), o2.getStartTime());
   private static final String DEFAULT_EMAIL_FORMATTER_TYPE = "MultipleAnomaliesEmailContentFormatter";
+  private static final String ENTITY_REPORT_FORMATTER_TYPE = "EntityContentFormatter";
   private static final String EMAIL_WHITELIST_KEY = "emailWhitelist";
+  private static final String PROP_EMAIL_SCHEME = "emailScheme";
+  private static final String PROP_EMAIL_TEMPLATE = "template";
+  private static final String PROP_EMAIL_SUBJECT_STYLE = "subject";
 
   private ThirdEyeAnomalyConfiguration teConfig;
 
@@ -124,24 +129,65 @@ public class DetectionEmailAlerter extends DetectionAlertScheme {
     LOG.info("Email sent with subject '{}' to {} recipients", email.getSubject(), recipientCount);
   }
 
+  public enum EmailTemplate {
+    DEFAULT_EMAIL,
+    ENTITY_REPORT
+  }
+
+  /**
+   * Plug the appropriate template based on configuration.
+   */
+  private static EmailContentFormatter makeTemplate(Map<String, Object> emailParams) throws Exception {
+    EmailTemplate template = EmailTemplate.DEFAULT_EMAIL;
+    if (emailParams != null && emailParams.containsKey(PROP_EMAIL_TEMPLATE)) {
+      template = EmailTemplate.valueOf(emailParams.get(PROP_EMAIL_TEMPLATE).toString());
+    }
+
+    switch (template) {
+      case DEFAULT_EMAIL:
+        LOG.info("Using the " + DEFAULT_EMAIL_FORMATTER_TYPE + " email template.");
+        return EmailContentFormatterFactory.fromClassName(DEFAULT_EMAIL_FORMATTER_TYPE);
+
+      case ENTITY_REPORT:
+        LOG.info("Using the " + template + " email template.");
+        return EmailContentFormatterFactory.fromClassName(ENTITY_REPORT_FORMATTER_TYPE);
+
+      default:
+        throw new IllegalArgumentException(String.format("Unknown type '%s'", template));
+    }
+  }
+
+  /**
+   * Plug the appropriate email subject style based on configuration
+   */
+  private AlertConfigBean.SubjectType makeSubject(Map<String, Object> emailParams) {
+    AlertConfigBean.SubjectType subjectType;
+    if (emailParams != null && emailParams.containsKey(PROP_EMAIL_SUBJECT_STYLE)) {
+      subjectType = AlertConfigBean.SubjectType.valueOf(emailParams.get(PROP_EMAIL_SUBJECT_STYLE).toString());
+    } else {
+      // To support the legacy email subject configuration
+      subjectType = this.config.getSubjectType();
+    }
+
+    return subjectType;
+  }
+
   private void sendEmail(DetectionAlertFilterRecipients recipients, Set<MergedAnomalyResultDTO> anomalies) throws Exception {
     whitelistRecipients(recipients);
     validateAlert(recipients, anomalies);
 
-    EmailContentFormatter emailContentFormatter =
-        EmailContentFormatterFactory.fromClassName(DEFAULT_EMAIL_FORMATTER_TYPE);
-
+    Map<String, Object> emailParams = ConfigUtils.getMap(this.config.getAlertSchemes().get(PROP_EMAIL_SCHEME));
+    EmailContentFormatter emailContentFormatter = makeTemplate(emailParams);
     emailContentFormatter.init(new Properties(),
         EmailContentFormatterConfiguration.fromThirdEyeAnomalyConfiguration(this.teConfig));
 
-    List<AnomalyResult> anomalyResultListOfGroup = new ArrayList<>();
-    anomalyResultListOfGroup.addAll(anomalies);
-    Collections.sort(anomalyResultListOfGroup, COMPARATOR_DESC);
+    List<AnomalyResult> anomalyResultListOfGroup = new ArrayList<>(anomalies);
+    anomalyResultListOfGroup.sort(COMPARATOR_DESC);
 
     AlertConfigDTO alertConfig = new AlertConfigDTO();
     alertConfig.setName(this.config.getName());
     alertConfig.setFromAddress(this.config.getFrom());
-    alertConfig.setSubjectType(this.config.getSubjectType());
+    alertConfig.setSubjectType(makeSubject(emailParams));
     alertConfig.setReferenceLinks(this.config.getReferenceLinks());
 
     EmailEntity emailEntity = emailContentFormatter.getEmailEntity(alertConfig, null,
