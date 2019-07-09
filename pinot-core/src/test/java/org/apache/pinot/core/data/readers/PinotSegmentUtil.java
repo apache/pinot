@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.data.readers;
 
+import com.google.common.base.Preconditions;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -28,6 +29,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.Schema;
@@ -99,7 +101,34 @@ public class PinotSegmentUtil {
 
   private static Object generateSingleValue(ThreadLocalRandom random, FieldSpec fieldSpec) {
     if (fieldSpec instanceof TimeFieldSpec) {
-      return random.nextLong(TimeUtils.getValidMinTimeMillis(), TimeUtils.getValidMaxTimeMillis());
+      // explicitly generate the time column values within allowed range so that
+      // segment generation code doesn't throw exception
+      TimeFieldSpec timeFieldSpec = (TimeFieldSpec)fieldSpec;
+      TimeUnit unit = timeFieldSpec.getIncomingGranularitySpec().getTimeType();
+      final long milliMin = TimeUtils.getValidMinTimeMillis();
+      final long milliMax = TimeUtils.getValidMaxTimeMillis();
+      final long daysMin = TimeUnit.DAYS.convert(milliMin, TimeUnit.MILLISECONDS);
+      final long daysMax = TimeUnit.DAYS.convert(milliMax, TimeUnit.MILLISECONDS);
+      final long hoursMin = TimeUnit.HOURS.convert(milliMin, TimeUnit.MILLISECONDS);
+      final long hoursMax = TimeUnit.HOURS.convert(milliMax, TimeUnit.MILLISECONDS);
+      final long minutesMin = TimeUnit.MINUTES.convert(milliMin, TimeUnit.MILLISECONDS);
+      final long minutesMax = TimeUnit.MINUTES.convert(milliMax, TimeUnit.MILLISECONDS);
+      switch (unit) {
+        case MILLISECONDS:
+          return random.nextLong(milliMin, milliMax);
+        case SECONDS:
+          return random.nextLong(milliMin/1000, milliMax/1000);
+        case MICROSECONDS:
+          return random.nextLong(milliMin*1000, milliMax*1000);
+        case NANOSECONDS:
+          return random.nextLong(milliMin*1000*1000, milliMax*1000*1000);
+        case DAYS:
+          return random.nextLong(daysMin, daysMax);
+        case HOURS:
+          return random.nextLong(hoursMin, hoursMax);
+        case MINUTES:
+          return random.nextLong(minutesMin, minutesMax);
+      }
     } else {
       switch (fieldSpec.getDataType()) {
         case INT:
@@ -112,10 +141,10 @@ public class PinotSegmentUtil {
           return Math.abs(random.nextDouble());
         case STRING:
           return RandomStringUtils.randomAlphabetic(DEFAULT_STRING_VALUE_LENGTH);
-        default:
-          throw new IllegalStateException("Illegal data type");
       }
     }
+
+    throw new IllegalStateException("Illegal data type");
   }
 
   private static Object[] generateMultiValue(ThreadLocalRandom random, FieldSpec fieldSpec) {

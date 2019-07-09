@@ -417,60 +417,80 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       throw new RuntimeException("Expecting non-null start/end time for segment: " + segmentName);
     }
 
-    long startMillis;
-    long endMillis;
+    long start;
+    long end;
 
     if (startTime instanceof Long && endTime instanceof Long) {
-      startMillis = (long)startTime;
-      endMillis = (long)endTime;
+      start = (long)startTime;
+      end = (long)endTime;
     } else if (startTime instanceof String && endTime instanceof String) {
-      startMillis = Long.parseLong((String)startTime);
-      endMillis = Long.parseLong((String)endTime);
+      start = Long.parseLong((String)startTime);
+      end = Long.parseLong((String)endTime);
     } else if (startTime instanceof Integer && endTime instanceof Integer) {
-      // convert to millis for comparison
-      switch (config.getSegmentTimeUnit()) {
-        case DAYS:
-          startMillis = TimeUnit.DAYS.toMillis(((Integer) startTime).longValue());
-          endMillis = TimeUnit.DAYS.toMillis(((Integer) endTime).longValue());
-          break;
-        case HOURS:
-          startMillis = TimeUnit.HOURS.toMillis(((Integer) startTime).longValue());
-          endMillis = TimeUnit.HOURS.toMillis(((Integer) endTime).longValue());
-          break;
-        case MINUTES:
-          startMillis = TimeUnit.MINUTES.toMillis(((Integer) startTime).longValue());
-          endMillis = TimeUnit.MINUTES.toMillis(((Integer) endTime).longValue());
-          break;
-        case SECONDS:
-          startMillis = TimeUnit.SECONDS.toMillis(((Integer) startTime).longValue());
-          endMillis = TimeUnit.SECONDS.toMillis(((Integer) endTime).longValue());
-          break;
-        default:
-          final StringBuilder sb = new StringBuilder();
-          sb.append("Unexpected time unit: ").append(config.getSegmentTimeUnit())
-              .append(" for time column: ").append(config.getTimeColumnName())
-              .append(" of data type INT");
-          throw new RuntimeException(sb.toString());
-      }
+      start = ((Integer) startTime).longValue();
+      end = ((Integer)endTime).longValue();
     } else  {
       throw new RuntimeException("Unable to interpret type of time column");
     }
 
-    if (!TimeUtils.timeValueInValidRange(startMillis) || !TimeUtils.timeValueInValidRange(endMillis)) {
+    // note that handling of SimpleDateFormat (TimeColumnType.SIMPLE)
+    // is done by the caller of this function that converts the simple format
+    // into millis since epoch before calling this function for validation.
+    // For TimeColumnType.EPOCH, the time field spec could still have unit
+    // as any of the following and we need to convert to millis for doing the
+    // min-max comparison against TimeUtils.getValidMinTimeMillis() and
+    // TimeUtils.getValidMaxTimeMillis()
+    if (config.getTimeColumnType() == SegmentGeneratorConfig.TimeColumnType.EPOCH) {
+      switch (config.getSegmentTimeUnit()) {
+        case DAYS:
+          start = TimeUnit.DAYS.toMillis(start);
+          end = TimeUnit.DAYS.toMillis(end);
+          break;
+        case HOURS:
+          start = TimeUnit.HOURS.toMillis(start);
+          end = TimeUnit.HOURS.toMillis(end);
+          break;
+        case MINUTES:
+          start = TimeUnit.MINUTES.toMillis(start);
+          end = TimeUnit.MINUTES.toMillis(end);
+          break;
+        case SECONDS:
+          start = TimeUnit.SECONDS.toMillis(start);
+          end = TimeUnit.SECONDS.toMillis(end);
+          break;
+        case MICROSECONDS:
+          start = TimeUnit.MICROSECONDS.toMillis(start);
+          end = TimeUnit.MICROSECONDS.toMillis(end);
+          break;
+        case NANOSECONDS:
+          start = TimeUnit.NANOSECONDS.toMillis(start);
+          end = TimeUnit.NANOSECONDS.toMillis(end);
+          break;
+        default:
+          if (config.getSegmentTimeUnit() != TimeUnit.MILLISECONDS) {
+            final StringBuilder sb = new StringBuilder();
+            sb.append("Unexpected time unit: ").append(config.getSegmentTimeUnit())
+                .append(" for time column: ").append(config.getTimeColumnName());
+            throw new RuntimeException(sb.toString());
+          }
+      }
+    }
+
+    if (!TimeUtils.timeValueInValidRange(start) || !TimeUtils.timeValueInValidRange(end)) {
       final Date minDate = new Date(TimeUtils.getValidMinTimeMillis());
       final Date maxDate = new Date(TimeUtils.getValidMaxTimeMillis());
       LOGGER.error(
           "Invalid start time '{}ms' or end time '{}ms' for segment {}, must be between '{}' and '{}'",
-          startMillis, endMillis, segmentName, minDate, maxDate);
+          start, end, segmentName, minDate, maxDate);
       final StringBuilder sb = new StringBuilder();
       sb.append("Invalid start/end time for segment: ")
           .append(segmentName)
           .append(" for time column: ")
           .append(config.getTimeColumnName())
           .append(" given start time: ")
-          .append(startMillis).append(" ms")
+          .append(start).append(" ms")
           .append(" given end time: ")
-          .append(endMillis).append(" ms")
+          .append(end).append(" ms")
           .append(" start and end time must be between ")
           .append(minDate).append(" ").append(maxDate);
       throw new RuntimeException(sb.toString());
