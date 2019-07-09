@@ -130,7 +130,7 @@ public class DetectionConfigTranslator extends ConfigTranslator<DetectionConfigD
   private static final String PROP_FILTERS = "filters";
   private static final String PROP_TYPE = "type";
   private static final String PROP_CLASS_NAME = "className";
-  private static final String PROP_ENTITY_NAME = "subEntityName";
+  private static final String PROP_ENTITY_NAME = "entityName";
   private static final String PROP_PARAMS = "params";
   private static final String PROP_METRIC_URN = "metricUrn";
   private static final String PROP_DIMENSION_FILTER_METRIC = "dimensionFilterMetric";
@@ -223,16 +223,22 @@ public class DetectionConfigTranslator extends ConfigTranslator<DetectionConfigD
 
     // Wrap with metric level grouper, restricting to only 1 grouper
     List<Map<String, Object>> grouperYamls = getList(metricAlertConfigMap.get(PROP_GROUPER));
-    String subEntityName = MapUtils.getString(metricAlertConfigMap, PROP_ENTITY_NAME);
+    String subEntityName = MapUtils.getString(metricAlertConfigMap, PROP_NAME);
     if (!grouperYamls.isEmpty()) {
       properties = buildGroupWrapperProperties(subEntityName, metricUrn, grouperYamls.get(0), Collections.singletonList(properties));
     }
+
+    // Wrap the metric level merger
+    properties = buildWrapperProperties(
+        ChildKeepingMergeWrapper.class.getName(),
+        Collections.singletonList(properties),
+        mergerProperties);
 
     return properties;
   }
 
   private Map<String, Object> translateCompositeAlert(Map<String, Object> compositeAlertConfigMap) {
-    Map<String, Object> properties = new HashMap<>();
+    Map<String, Object> properties;
 
     // Recursively translate all the sub-alerts
     List<Map<String, Object>> subDetectionYamls = ConfigUtils.getList(compositeAlertConfigMap.get(PROP_ALERTS));
@@ -250,7 +256,7 @@ public class DetectionConfigTranslator extends ConfigTranslator<DetectionConfigD
 
     // Wrap the entity level grouper, only 1 grouper is supported now
     List<Map<String, Object>> grouperProps = ConfigUtils.getList(compositeAlertConfigMap.get(PROP_GROUPER));
-    String subEntityName = MapUtils.getString(compositeAlertConfigMap, PROP_ENTITY_NAME);
+    String subEntityName = MapUtils.getString(compositeAlertConfigMap, PROP_NAME);
     if (!grouperProps.isEmpty()) {
       properties = buildGroupWrapperProperties(subEntityName, grouperProps.get(0), nestedPropertiesList);
       nestedPropertiesList = Collections.singletonList(properties);

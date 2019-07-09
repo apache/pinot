@@ -91,7 +91,7 @@ public class DetectionAlertTaskFactory {
     if (alertSchemes == null || alertSchemes.isEmpty()) {
       Map<String, Object> emailScheme = new HashMap<>();
       emailScheme.put("className", DEFAULT_ALERT_SCHEME);
-      alertSchemes = Collections.singletonMap("EmailScheme", emailScheme);
+      alertSchemes = Collections.singletonMap("emailScheme", emailScheme);
     }
     Set<DetectionAlertScheme> detectionAlertSchemeSet = new HashSet<>();
     for (String alertSchemeType : alertSchemes.keySet()) {

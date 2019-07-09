@@ -38,9 +38,6 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.pinot.thirdeye.detection.validators.SubscriptionConfigValidator;
-import org.yaml.snakeyaml.DumperOptions;
-import org.yaml.snakeyaml.Yaml;
-
 
 /**
  * The translator converts the alert yaml config into a detection alert config
