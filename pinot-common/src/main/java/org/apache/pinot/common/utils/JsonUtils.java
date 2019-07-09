@@ -139,14 +139,12 @@ public class JsonUtils {
             return values;
           } else {
             return null;
-//            return new Object[]{fieldSpec.getDefaultNullValue()};
           }
         } else {
           return new Object[]{extractSingleValue(jsonValue, fieldSpec.getDataType())};
         }
       } else {
         return null;
-        //return new Object[]{fieldSpec.getDefaultNullValue()};
       }
     }
   }

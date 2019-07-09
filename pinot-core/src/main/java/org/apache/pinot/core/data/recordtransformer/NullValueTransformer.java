@@ -35,11 +35,11 @@ public class NullValueTransformer implements RecordTransformer {
     _fieldSpecs = _schema.getAllFieldSpecs();
   }
 
-  @Nullable
   @Override
   public GenericRow transform(GenericRow row) {
     for (FieldSpec fieldSpec : _fieldSpecs) {
       String fieldName = fieldSpec.getName();
+      // Do not allow default value for time column
       if (row.getValue(fieldName) == null && fieldSpec.getFieldType() != FieldSpec.FieldType.TIME) {
         if (fieldSpec.isSingleValueField()) {
           row.putField(fieldName, fieldSpec.getDefaultNullValue());
