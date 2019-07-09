@@ -11,13 +11,15 @@ import { toastOptions } from 'thirdeye-frontend/utils/constants';
 import { formatYamlFilter } from 'thirdeye-frontend/utils/utils';
 import yamljs from 'yamljs';
 import moment from 'moment';
+import AuthenticatedRouteMixin from 'ember-simple-auth/mixins/authenticated-route-mixin';
 
-export default Route.extend({
+export default Route.extend(AuthenticatedRouteMixin, {
   notifications: service('toast'),
+  analysisRange: [moment().add(1, 'day').subtract(30, 'day').startOf('day').valueOf(), moment().add(1, 'day').startOf('day').valueOf()],
 
   async model(params) {
     const alertId = params.alert_id;
-    // makes sense to rename this getProps since we are using the get method
+    const analysisRange = get(this, 'analysisRange');
     const getProps = {
       method: 'get',
       headers: { 'content-type': 'application/json' }
@@ -73,6 +75,23 @@ export default Route.extend({
       notifications.error('Retrieving alert yaml failed.', error, toastOptions);
     }
 
+    //detection health fetch
+    const executionTime = moment().valueOf(); // grab execution time
+    const healthUrl = `/detection/health/${alertId}?start=${analysisRange[0]}&end=${analysisRange[1]}`;
+    try {
+      const health_result = await fetch(healthUrl, getProps);
+      const health_status  = get(health_result, 'status');
+      const health_json = await health_result.json();
+      if (health_status !== 200) {
+        notifications.error('Retrieval of detection health failed.', 'Error', toastOptions);
+      } else {
+        health_json.executionTime = executionTime; // attach execution time for display
+        set(this, 'detectionHealth', health_json);
+      }
+    } catch (error) {
+      notifications.error('Retrieval of detection health failed.', 'Error', toastOptions);
+    }
+
     //subscription group fetch
     const subUrl = `/detection/subscription-groups/${alertId}`;//dropdown of subscription groups
     try {
@@ -107,10 +126,24 @@ export default Route.extend({
       alertId,
       alertData: get(this, 'detectionInfo'),
       detectionYaml: get(this, 'rawDetectionYaml'),
+      detectionHealth: get(this, 'detectionHealth'),
       subscribedGroups,
       metricUrn: get(this, 'metricUrn'),
       metricUrnList: get(this, 'metricUrnList') ? get(this, 'metricUrnList') : [],
       granularity
     });
+  },
+
+  actions: {
+    /**
+     * save session url for transition on login
+     * @method willTransition
+     */
+    willTransition(transition) {
+      //saving session url - TODO: add a util or service - lohuynh
+      if (transition.intent.name && transition.intent.name !== 'logout') {
+        this.set('session.store.fromUrl', {lastIntentTransition: transition});
+      }
+    }
   }
 });

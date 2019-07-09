@@ -54,25 +54,71 @@
             predefinedRanges=pill.predefinedRanges
             selectAction=(action "onRangeSelection")
           }}
-          <div class="te-horizontal-cards te-content-block">
-            <h4 class="te-self-serve__block-title">
-              <label for="select-dimension" class="control-label te-label">
-                Alert Performance
-                <span>
-                  <i class="glyphicon glyphicon-question-sign"></i>
-                  {{#tooltip-on-element class="te-tooltip"}}
-                    All estimated performance numbers are based on reviewed anomalies.
-                  {{/tooltip-on-element}}
-                </span>
-              </label>
-            </h4>
-            {{!-- Alert anomaly stats cards --}}
-            {{stats-cards stats=stats}}
 
-            {{#if repRunStatus}}
-              <p class="te-self-serve__block-subtext te-self-serve__block-subtext--normal">Replay in progress. Please check back later...</p>
-            {{/if}}
+
+          {{#if alertId}}
+
+          <div class="te-content-block__performance-health-wrapper">
+            <!-- Anomalies, Response Rate, Precision, Recall -->
+            <div class="te-horizontal-cards te-content-block__alert-performance">
+              <h4 class="te-self-serve__block-title">
+                <label for="select-dimension" class="control-label te-label">
+                  Alert Performance
+                  <span>
+                    <i class="glyphicon glyphicon-question-sign"></i>
+                    {{#tooltip-on-element class="te-tooltip"}}
+                      All estimated performance numbers are based on reviewed anomalies.
+                    {{/tooltip-on-element}}
+                  </span>
+                </label>
+              </h4>
+              {{!-- Alert anomaly stats cards --}}
+              {{stats-cards stats=stats}}
+            </div>
+
+            <!-- Detection Health -->
+            <div class="te-horizontal-cards te-content-block__detection-health">
+              <h4 class="te-self-serve__block-title">
+                <label for="select-dimension" class="control-label te-label">
+                  Detection health
+                  <span>
+                    <i class="glyphicon glyphicon-question-sign"></i>
+                    {{#tooltip-on-element class="te-tooltip"}}
+                      See how your detection configuration is performing in detail
+                      by clicking 'view details' below{{#if showRules}},
+                      and select different rules above the graph
+                      to see their respective regression errors{{/if}}.
+                    {{/tooltip-on-element}}
+                  </span>
+                </label>
+              </h4>
+              {{detection-health
+                health=detectionHealth
+                selectedRule=selectedRule
+              }}
+            </div>
           </div>
+
+          {{else}}
+
+            <!-- Anomalies, Response Rate, Precision, Recall -->
+            <div class="te-horizontal-cards te-content-block">
+              <h4 class="te-self-serve__block-title">
+                <label for="select-dimension" class="control-label te-label">
+                  Alert Performance
+                  <span>
+                    <i class="glyphicon glyphicon-question-sign"></i>
+                    {{#tooltip-on-element class="te-tooltip"}}
+                      All estimated performance numbers are based on reviewed anomalies.
+                    {{/tooltip-on-element}}
+                  </span>
+                </label>
+              </h4>
+              {{!-- Alert anomaly stats cards --}}
+              {{stats-cards stats=stats}}
+            </div>
+
+          {{/if}}
 
           {{#if isReportSuccess}}
             {{#bs-alert type="success" class="te-form__banner te-form__banner--success"}}
