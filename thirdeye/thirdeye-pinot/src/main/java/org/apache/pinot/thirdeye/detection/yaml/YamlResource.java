@@ -412,6 +412,10 @@ public class YamlResource {
   }
 
   private boolean isServiceAccount(ThirdEyePrincipal user) {
+    if (user == null || user.getSessionKey() == null) {
+      return false;
+    }
+
     List<Predicate> predicates = new ArrayList<>();
     predicates.add(Predicate.EQ(PROP_SESSION_KEY, user.getSessionKey()));
     predicates.add(Predicate.EQ(PROP_PRINCIPAL_TYPE, PROP_SERVICE));
@@ -421,6 +425,7 @@ public class YamlResource {
   }
 
   private void validateConfigOwner(ThirdEyePrincipal user, List<String> owners) {
+    Preconditions.checkNotNull(user.getName(), "Unable to retrieve the user name from the request");
     if (owners == null || !owners.contains(user.getName())) {
       throw new NotAuthorizedException("Service account " + user.getName() + " is not authorized to access this resource.");
     }
@@ -431,11 +436,6 @@ public class YamlResource {
    * of modifying other configs when making programmatic calls.
    */
   private void authorizeUser(ThirdEyePrincipal user, long id, String authEntity) {
-    if (user == null || StringUtils.isBlank(user.getName()) || StringUtils.isBlank(user.getSessionKey())) {
-      throw new NotAuthorizedException("Unable to find the credentials/token in the request");
-    }
-
-    // Authorize only service accounts
     if (isServiceAccount(user)) {
       if (authEntity.equals(PROP_DETECTION)) {
         DetectionConfigDTO detectionConfig = this.detectionConfigDAO.findById(id);
@@ -444,8 +444,9 @@ public class YamlResource {
         DetectionAlertConfigDTO subscriptionConfig = this.detectionAlertConfigDAO.findById(id);
         validateConfigOwner(user, subscriptionConfig.getOwners());
       }
+
+      LOG.info("Service account " + user.getName() + " authorized successfully");
     }
-    LOG.info("User " + user.getName() + " authorized successfully");
   }
 
   /**
