@@ -34,7 +34,6 @@ import org.apache.hadoop.mapreduce.TaskID;
 import org.apache.hadoop.mapreduce.TaskType;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
-import org.apache.pinot.common.utils.time.TimeUtils;
 import org.apache.pinot.core.data.GenericRow;
 import org.apache.pinot.core.data.readers.PinotSegmentRecordReader;
 import org.apache.pinot.core.data.readers.RecordReader;
@@ -130,7 +129,7 @@ public class PinotOutputFormatTest {
 
   private Map<Integer, Emp> addTestData()
       throws IOException, InterruptedException {
-    long days = TimeUtils.getValidMinTimeMillis();
+    int days = 2000;
     int sal = 20;
     RecordWriter<Object, Emp> writer = outputFormat.getRecordWriter(fakeTaskAttemptContext);
     Map<Integer, Emp> inputMap = new HashMap<>();
