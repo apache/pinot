@@ -225,14 +225,11 @@ public class DetectionConfigTranslator extends ConfigTranslator<DetectionConfigD
     List<Map<String, Object>> grouperYamls = getList(metricAlertConfigMap.get(PROP_GROUPER));
     String subEntityName = MapUtils.getString(metricAlertConfigMap, PROP_NAME);
     if (!grouperYamls.isEmpty()) {
-      properties = buildGroupWrapperProperties(subEntityName, metricUrn, grouperYamls.get(0), Collections.singletonList(properties));
+      properties = buildWrapperProperties(
+          ChildKeepingMergeWrapper.class.getName(),
+          Collections.singletonList(buildGroupWrapperProperties(subEntityName, metricUrn, grouperYamls.get(0), Collections.singletonList(properties))),
+          mergerProperties);
     }
-
-    // Wrap the metric level merger
-    properties = buildWrapperProperties(
-        ChildKeepingMergeWrapper.class.getName(),
-        Collections.singletonList(properties),
-        mergerProperties);
 
     return properties;
   }
