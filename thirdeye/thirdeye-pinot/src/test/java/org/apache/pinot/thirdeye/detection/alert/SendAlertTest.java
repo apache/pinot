@@ -119,7 +119,7 @@ public class SendAlertTest {
 
     Map<String, Object> emailScheme = new HashMap<>();
     emailScheme.put("className", "org.apache.pinot.thirdeye.detection.alert.scheme.RandomAlerter");
-    this.alertConfigDTO.setAlertSchemes(Collections.singletonMap("EmailScheme", emailScheme));
+    this.alertConfigDTO.setAlertSchemes(Collections.singletonMap("emailScheme", emailScheme));
     this.alertConfigDTO.setProperties(properties);
     this.alertConfigDTO.setFrom(FROM_ADDRESS_VALUE);
     this.alertConfigDTO.setName(ALERT_NAME_VALUE);

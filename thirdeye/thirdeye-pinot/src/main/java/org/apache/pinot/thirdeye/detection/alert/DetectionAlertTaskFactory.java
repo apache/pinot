@@ -53,6 +53,7 @@ public class DetectionAlertTaskFactory {
   private static final Logger LOG = LoggerFactory.getLogger(DetectionAlertTaskFactory.class);
 
   private static final String PROP_CLASS_NAME = "className";
+  private static final String PROP_EMAIL_SCHEME = "emailScheme";
   private static final String DEFAULT_ALERT_SCHEME = "org.apache.pinot.thirdeye.detection.alert.scheme.DetectionEmailAlerter";
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
@@ -90,15 +91,15 @@ public class DetectionAlertTaskFactory {
     Map<String, Map<String, Object>> alertSchemes = alertConfig.getAlertSchemes();
     if (alertSchemes == null || alertSchemes.isEmpty()) {
       Map<String, Object> emailScheme = new HashMap<>();
-      emailScheme.put("className", DEFAULT_ALERT_SCHEME);
-      alertSchemes = Collections.singletonMap("EmailScheme", emailScheme);
+      emailScheme.put(PROP_CLASS_NAME, DEFAULT_ALERT_SCHEME);
+      alertSchemes = Collections.singletonMap(PROP_EMAIL_SCHEME, emailScheme);
     }
     Set<DetectionAlertScheme> detectionAlertSchemeSet = new HashSet<>();
     for (String alertSchemeType : alertSchemes.keySet()) {
       LOG.debug("Loading Alert Scheme : {}", alertSchemeType);
       Preconditions.checkNotNull(alertSchemes.get(alertSchemeType));
-      Preconditions.checkNotNull(alertSchemes.get(alertSchemeType).get("className"));
-      Constructor<?> constructor = Class.forName(alertSchemes.get(alertSchemeType).get("className").toString().trim())
+      Preconditions.checkNotNull(alertSchemes.get(alertSchemeType).get(PROP_CLASS_NAME));
+      Constructor<?> constructor = Class.forName(alertSchemes.get(alertSchemeType).get(PROP_CLASS_NAME).toString().trim())
           .getConstructor(DetectionAlertConfigDTO.class, ThirdEyeAnomalyConfiguration.class, DetectionAlertFilterResult.class);
       detectionAlertSchemeSet.add((DetectionAlertScheme) constructor.newInstance(alertConfig,
           thirdeyeConfig, result));
@@ -117,8 +118,8 @@ public class DetectionAlertTaskFactory {
     for (String alertSuppressor : alertSuppressors.keySet()) {
       LOG.debug("Loading Alert Suppressor : {}", alertSuppressor);
       Preconditions.checkNotNull(alertSuppressors.get(alertSuppressor));
-      Preconditions.checkNotNull(alertSuppressors.get(alertSuppressor).get("className"));
-      Constructor<?> constructor = Class.forName(alertSuppressors.get(alertSuppressor).get("className").toString().trim())
+      Preconditions.checkNotNull(alertSuppressors.get(alertSuppressor).get(PROP_CLASS_NAME));
+      Constructor<?> constructor = Class.forName(alertSuppressors.get(alertSuppressor).get(PROP_CLASS_NAME).toString().trim())
           .getConstructor(DetectionAlertConfigDTO.class);
       detectionAlertSuppressors.add((DetectionAlertSuppressor) constructor.newInstance(alertConfig));
     }

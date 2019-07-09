@@ -54,7 +54,7 @@ public class TriggerConditionGrouper implements Grouper<TriggerConditionGrouperS
   private Map<String, Object> rightOp;
   private InputDataFetcher dataFetcher;
 
-  static final String PROP_ENTITY_NAME = "subEntityName";
+  static final String PROP_ENTITY_NAME = "entityName";
   static final String PROP_AND = "and";
   static final String PROP_OR = "or";
   static final String PROP_OPERATOR = "operator";
