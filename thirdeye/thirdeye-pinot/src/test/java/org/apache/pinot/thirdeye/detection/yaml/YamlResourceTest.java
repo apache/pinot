@@ -2,6 +2,7 @@ package org.apache.pinot.thirdeye.detection.yaml;
 
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.thirdeye.auth.ThirdEyePrincipal;
+import org.apache.pinot.thirdeye.dashboard.DetectionPreviewConfiguration;
 import org.apache.pinot.thirdeye.datalayer.bao.DAOTestBase;
 import org.apache.pinot.thirdeye.datalayer.bao.DetectionConfigManager;
 import org.apache.pinot.thirdeye.datalayer.dto.ApplicationDTO;
@@ -34,7 +35,7 @@ public class YamlResourceTest {
   public void beforeClass() {
     testDAOProvider = DAOTestBase.getInstance();
     this.user = new ThirdEyePrincipal("test", "test");
-    this.yamlResource = new YamlResource();
+    this.yamlResource = new YamlResource(new DetectionPreviewConfiguration());
     this.daoRegistry = DAORegistry.getInstance();
     DetectionConfigManager detectionDAO = this.daoRegistry.getDetectionConfigManager();
     DetectionConfigDTO config1 = new DetectionConfigDTO();
@@ -238,6 +239,9 @@ public class YamlResourceTest {
       Assert.assertNotNull(alertDTO);
       Assert.assertEquals(alertDTO.getName(), "Subscription Group Name");
       Assert.assertEquals(alertDTO.getApplication(), "test_application");
+      Assert.assertNotNull(alertDTO.getAlertSchemes().get("emailScheme"));
+      Assert.assertEquals(alertDTO.getAlertSchemes().get("emailScheme").get("template"), "ENTITY_REPORT");
+      Assert.assertEquals(alertDTO.getAlertSchemes().get("emailScheme").get("subject"), "METRICS");
 
       // Verify if the vector clock is updated with the updated detection
       Assert.assertEquals(alertDTO.getVectorClocks().keySet().size(), 1);
