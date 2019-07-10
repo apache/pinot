@@ -105,14 +105,16 @@ public class StorageQuotaChecker {
 
     if (quotaConfig == null || Strings.isNullOrEmpty(quotaConfig.getStorage())) {
       // no quota configuration...so ignore for backwards compatibility
-      LOGGER.warn("Quota configuration not set for table: {}", tableNameWithType);
-      return success("Quota configuration not set for table: " + tableNameWithType);
+      LOGGER.info("Storage quota is not configured for table: {}, skipping the check", tableNameWithType);
+      return success("Storage quota is not configured for table: " + tableNameWithType);
     }
 
     long allowedStorageBytes = numReplicas * quotaConfig.storageSizeBytes();
-    if (allowedStorageBytes < 0) {
-      LOGGER.warn("Storage quota is not configured for table: {}", tableNameWithType);
-      return success("Storage quota is not configured for table: " + tableNameWithType);
+    if (allowedStorageBytes <= 0) {
+      LOGGER.warn("Invalid storage quota: {} for table: {}, skipping the check", quotaConfig.getStorage(),
+          tableNameWithType);
+      return success(
+          String.format("Invalid storage quota: %s for table: %s", quotaConfig.getStorage(), tableNameWithType));
     }
     _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.TABLE_QUOTA, allowedStorageBytes);
 

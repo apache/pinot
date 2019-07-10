@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.helix;
 
+import com.google.common.base.Preconditions;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
@@ -38,7 +39,6 @@ import org.apache.commons.io.IOUtils;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
-import org.apache.helix.manager.zk.ZkClient;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.data.DimensionFieldSpec;
 import org.apache.pinot.common.data.FieldSpec;
@@ -55,10 +55,9 @@ import org.testng.Assert;
  * Base class for controller tests.
  */
 public abstract class ControllerTest {
-  public static final String LOCAL_HOST = "localhost";
-
-  private static final int DEFAULT_CONTROLLER_PORT = 18998;
-  private static final String DEFAULT_DATA_DIR =
+  protected static final String LOCAL_HOST = "localhost";
+  protected static final int DEFAULT_CONTROLLER_PORT = 18998;
+  protected static final String DEFAULT_DATA_DIR =
       new File(FileUtils.getTempDirectoryPath(), "test-controller-" + System.currentTimeMillis()).getAbsolutePath();
 
   protected int _controllerPort;
@@ -66,7 +65,6 @@ public abstract class ControllerTest {
   protected ControllerRequestURLBuilder _controllerRequestURLBuilder;
   protected String _controllerDataDir;
 
-  protected ZkClient _zkClient;
   protected ControllerStarter _controllerStarter;
   protected PinotHelixResourceManager _helixResourceManager;
   protected HelixManager _helixManager;
@@ -95,26 +93,15 @@ public abstract class ControllerTest {
     }
   }
 
-  public static ControllerConf getDefaultControllerConfiguration() {
+  public ControllerConf getDefaultControllerConfiguration() {
     ControllerConf config = new ControllerConf();
     config.setControllerHost(LOCAL_HOST);
     config.setControllerPort(Integer.toString(DEFAULT_CONTROLLER_PORT));
     config.setDataDir(DEFAULT_DATA_DIR);
     config.setZkStr(ZkStarter.DEFAULT_ZK_STR);
+    config.setHelixClusterName(getHelixClusterName());
 
     return config;
-  }
-
-  public class TestOnlyControllerStarter extends ControllerStarter {
-
-    TestOnlyControllerStarter(ControllerConf conf) {
-      super(conf);
-    }
-
-    @Override
-    public boolean isPinotOnlyModeSupported() {
-      return true;
-    }
   }
 
   protected void startController() {
@@ -122,31 +109,17 @@ public abstract class ControllerTest {
   }
 
   protected void startController(ControllerConf config) {
-    startController(config, true);
-  }
-
-  protected void startController(ControllerConf config, boolean deleteCluster) {
-    Assert.assertNotNull(config);
-    Assert.assertNull(_controllerStarter);
+    Preconditions.checkState(_controllerStarter == null);
 
     _controllerPort = Integer.valueOf(config.getControllerPort());
     _controllerBaseApiUrl = "http://localhost:" + _controllerPort;
     _controllerRequestURLBuilder = ControllerRequestURLBuilder.baseUrl(_controllerBaseApiUrl);
     _controllerDataDir = config.getDataDir();
 
-    String helixClusterName = getHelixClusterName();
-    config.setHelixClusterName(helixClusterName);
-
-    String zkStr = config.getZkStr();
-    _zkClient = new ZkClient(zkStr);
-    if (_zkClient.exists("/" + helixClusterName) && deleteCluster) {
-      _zkClient.deleteRecursive("/" + helixClusterName);
-    }
-
     startControllerStarter(config);
 
     // HelixResourceManager is null in Helix only mode, while HelixManager is null in Pinot only mode.
-    switch (getControllerStarter().getControllerMode()) {
+    switch (_controllerStarter.getControllerMode()) {
       case DUAL:
       case PINOT_ONLY:
         _helixAdmin = _helixResourceManager.getHelixAdmin();
@@ -160,16 +133,19 @@ public abstract class ControllerTest {
   }
 
   protected void startControllerStarter(ControllerConf config) {
-    _controllerStarter = new TestOnlyControllerStarter(config);
+    _controllerStarter = getControllerStarter(config);
     _controllerStarter.start();
     _helixResourceManager = _controllerStarter.getHelixResourceManager();
     _helixManager = _controllerStarter.getHelixControllerManager();
   }
 
+  protected ControllerStarter getControllerStarter(ControllerConf config) {
+    return new ControllerStarter(config);
+  }
+
   protected void stopController() {
     stopControllerStarter();
     FileUtils.deleteQuietly(new File(_controllerDataDir));
-    _zkClient.close();
   }
 
   protected void stopControllerStarter() {
@@ -177,10 +153,6 @@ public abstract class ControllerTest {
 
     _controllerStarter.stop();
     _controllerStarter = null;
-  }
-
-  protected ControllerStarter getControllerStarter() {
-    return _controllerStarter;
   }
 
   protected Schema createDummySchema(String tableName) {

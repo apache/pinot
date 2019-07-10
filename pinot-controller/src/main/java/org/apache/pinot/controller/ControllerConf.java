@@ -21,7 +21,6 @@ package org.apache.pinot.controller;
 import java.io.File;
 import java.io.UnsupportedEncodingException;
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.List;
@@ -59,9 +58,7 @@ public class ControllerConf extends PropertiesConfiguration {
   private static final String CONTROLLER_MODE = "controller.mode";
 
   public enum ControllerMode {
-    DUAL,
-    PINOT_ONLY,
-    HELIX_ONLY
+    DUAL, PINOT_ONLY, HELIX_ONLY
   }
 
   public static class ControllerPeriodicTasksConf {
@@ -175,22 +172,17 @@ public class ControllerConf extends PropertiesConfiguration {
    * Returns the URI for the given path, appends the local (file) scheme to the URI if no scheme exists.
    */
   public static URI getUriFromPath(String path) {
-    try {
-      URI uri = new URI(path);
-      if (uri.getScheme() != null) {
-        return uri;
-      } else {
-        return new URI(CommonConstants.Segment.LOCAL_SEGMENT_SCHEME, path, null);
-      }
-    } catch (URISyntaxException e) {
-      LOGGER.error("Could not construct uri from path {}", path);
-      throw new RuntimeException(e);
+    URI uri = URI.create(path);
+    if (uri.getScheme() == null) {
+      uri = URI.create(CommonConstants.Segment.LOCAL_SEGMENT_SCHEME + ":" + path);
     }
+    return uri;
   }
 
   public static URI constructSegmentLocation(String baseDataDir, String tableName, String segmentName) {
     try {
-      return getUriFromPath(StringUtil.join(File.separator, baseDataDir, tableName, URLEncoder.encode(segmentName, "UTF-8")));
+      return getUriFromPath(
+          StringUtil.join(File.separator, baseDataDir, tableName, URLEncoder.encode(segmentName, "UTF-8")));
     } catch (UnsupportedEncodingException e) {
       LOGGER
           .error("Could not construct segment location with baseDataDir {}, tableName {}, segmentName {}", baseDataDir,

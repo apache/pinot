@@ -172,16 +172,17 @@ public class SegmentDeletionManager {
   }
 
   protected void removeSegmentFromStore(String tableNameWithType, String segmentId) {
-    final String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+    // Ignore HLC segments as they are not stored in Pinot FS
+    if (SegmentName.isHighLevelConsumerSegmentName(segmentId)) {
+      return;
+    }
     if (_dataDir != null) {
-      URI fileToMoveURI;
-      PinotFS pinotFS;
-      URI dataDirURI = ControllerConf.getUriFromPath(_dataDir);
-      fileToMoveURI = ControllerConf.constructSegmentLocation(_dataDir, rawTableName, segmentId);
+      String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+      URI fileToMoveURI = ControllerConf.constructSegmentLocation(_dataDir, rawTableName, segmentId);
       URI deletedSegmentDestURI = ControllerConf
           .constructSegmentLocation(StringUtil.join(File.separator, _dataDir, DELETED_SEGMENTS), rawTableName,
               segmentId);
-      pinotFS = PinotFSFactory.create(dataDirURI.getScheme());
+      PinotFS pinotFS = PinotFSFactory.create(fileToMoveURI.getScheme());
 
       try {
         if (pinotFS.exists(fileToMoveURI)) {
@@ -197,9 +198,7 @@ public class SegmentDeletionManager {
                 deletedSegmentDestURI.toString());
           }
         } else {
-          if (!SegmentName.isHighLevelConsumerSegmentName(segmentId)) {
-            LOGGER.warn("Not found local segment file for segment {}" + fileToMoveURI.toString());
-          }
+          LOGGER.warn("Not found local segment file for segment {}", fileToMoveURI.toString());
         }
       } catch (IOException e) {
         LOGGER.warn("Could not move segment {} from {} to {}", segmentId, fileToMoveURI.toString(),

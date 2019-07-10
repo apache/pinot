@@ -160,10 +160,10 @@ public class PinotHelixResourceManager {
 
   public PinotHelixResourceManager(@Nonnull ControllerConf controllerConf) {
     this(controllerConf.getZkStr(), controllerConf.getHelixClusterName(),
-        CommonConstants.Helix.PREFIX_OF_CONTROLLER_INSTANCE + controllerConf.getControllerHost() + "_"
-            + controllerConf.getControllerPort(), controllerConf.getDataDir(),
-        controllerConf.getExternalViewOnlineToOfflineTimeout(), controllerConf.tenantIsolationEnabled(),
-        controllerConf.getEnableBatchMessageMode(), controllerConf.getHLCTablesAllowed());
+        CommonConstants.Helix.PREFIX_OF_CONTROLLER_INSTANCE + controllerConf.getControllerHost() + "_" + controllerConf
+            .getControllerPort(), controllerConf.getDataDir(), controllerConf.getExternalViewOnlineToOfflineTimeout(),
+        controllerConf.tenantIsolationEnabled(), controllerConf.getEnableBatchMessageMode(),
+        controllerConf.getHLCTablesAllowed());
   }
 
   /**
@@ -1087,9 +1087,6 @@ public class PinotHelixResourceManager {
         // lets add table configs
         ZKMetadataProvider.setOfflineTableConfig(_propertyStore, tableNameWithType, tableConfig.toZNRecord());
 
-        _propertyStore.create(ZKMetadataProvider.constructPropertyStorePathForResource(tableNameWithType),
-            new ZNRecord(tableNameWithType), AccessOption.PERSISTENT);
-
         // Update replica group partition assignment to the property store if applicable
         updateReplicaGroupPartitionAssignment(tableConfig);
         break;
@@ -1228,9 +1225,8 @@ public class PinotHelixResourceManager {
           servers = getInstancesWithTag(realtimeTagConfig.getConsumingServerTag());
         }
         int numReplicas = ReplicationUtils.getReplication(tableConfig);
-        ReplicaGroupPartitionAssignment partitionAssignment =
-            partitionAssignmentGenerator.buildReplicaGroupPartitionAssignment(tableNameWithType, tableConfig,
-                numReplicas, servers);
+        ReplicaGroupPartitionAssignment partitionAssignment = partitionAssignmentGenerator
+            .buildReplicaGroupPartitionAssignment(tableNameWithType, tableConfig, numReplicas, servers);
         partitionAssignmentGenerator.writeReplicaGroupPartitionAssignment(partitionAssignment);
       }
     }
@@ -1272,7 +1268,8 @@ public class PinotHelixResourceManager {
     // Check if HLC table is allowed.
     StreamConfig streamConfig = new StreamConfig(indexingConfig.getStreamConfigs());
     if (streamConfig.hasHighLevelConsumerType() && !_allowHLCTables) {
-      throw new InvalidTableConfigException("Creating HLC realtime table is not allowed for Table: " + tableNameWithType);
+      throw new InvalidTableConfigException(
+          "Creating HLC realtime table is not allowed for Table: " + tableNameWithType);
     }
   }
 
@@ -1468,8 +1465,8 @@ public class PinotHelixResourceManager {
     LOGGER.info("Deleting table {}: Finish", offlineTableName);
   }
 
-  public void deleteRealtimeTable(String rawTableName) {
-    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(rawTableName);
+  public void deleteRealtimeTable(String tableName) {
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
     LOGGER.info("Deleting table {}: Start", realtimeTableName);
 
     // Remove the table from brokerResource
@@ -2071,14 +2068,12 @@ public class PinotHelixResourceManager {
         : PinotResourceManagerResponse.failure("Timed out. External view not completely updated");
   }
 
-  public boolean hasRealtimeTable(String tableName) {
-    String actualTableName = tableName + "_REALTIME";
-    return getAllTables().contains(actualTableName);
+  public boolean hasOfflineTable(String tableName) {
+    return getAllResources().contains(TableNameBuilder.OFFLINE.tableNameWithType(tableName));
   }
 
-  public boolean hasOfflineTable(String tableName) {
-    String actualTableName = tableName + "_OFFLINE";
-    return getAllTables().contains(actualTableName);
+  public boolean hasRealtimeTable(String tableName) {
+    return getAllResources().contains(TableNameBuilder.REALTIME.tableNameWithType(tableName));
   }
 
   /**

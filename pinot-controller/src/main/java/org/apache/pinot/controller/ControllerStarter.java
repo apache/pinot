@@ -19,6 +19,7 @@
 package org.apache.pinot.controller;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.google.common.primitives.Longs;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.yammer.metrics.core.MetricsRegistry;
@@ -31,6 +32,7 @@ import java.util.List;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
@@ -236,12 +238,10 @@ public class ControllerStarter {
   }
 
   private void setUpPinotController() {
-    // Note: Right now we don't allow pinot-only mode to be used in production yet.
-    // Now we only have this mode used in tests.
-    // TODO: Remove this logic once all the helix separation PRs are committed.
-    if (_controllerMode == ControllerConf.ControllerMode.PINOT_ONLY && !isPinotOnlyModeSupported()) {
-      throw new RuntimeException("Pinot only controller currently isn't supported in production yet.");
-    }
+    // Note: Right now we don't allow Pinot-only controller as ControllerLeadershipManager is setup in Helix controller
+    //       and Pinot controller relies on it
+    // TODO: Remove ControllerLeadershipManager
+    Preconditions.checkState(_controllerLeadershipManager != null);
 
     // Set up Pinot cluster in Helix
     HelixSetupUtils.setupPinotCluster(_helixClusterName, _helixZkURL, _isUpdateStateModel, _enableBatchMessageMode);
@@ -500,14 +500,12 @@ public class ControllerStarter {
       LOGGER.info("Stopping resource manager");
       _helixResourceManager.stop();
 
+      LOGGER.info("Shutting down executor service");
       _executorService.shutdownNow();
+      _executorService.awaitTermination(10L, TimeUnit.SECONDS);
     } catch (final Exception e) {
       LOGGER.error("Caught exception while shutting down", e);
     }
-  }
-
-  public boolean isPinotOnlyModeSupported() {
-    return false;
   }
 
   public MetricsRegistry getMetricsRegistry() {

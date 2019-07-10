@@ -62,7 +62,7 @@ public class ClusterChangeMediator implements ExternalViewChangeListener, Instan
 
   private final Thread _clusterChangeHandlingThread;
 
-  private volatile boolean _stopped = false;
+  private boolean _stopped = false;
 
   public ClusterChangeMediator(Map<ChangeType, List<ClusterChangeHandler>> changeHandlersMap,
       BrokerMetrics brokerMetrics) {
@@ -145,7 +145,7 @@ public class ClusterChangeMediator implements ExternalViewChangeListener, Instan
   /**
    * Starts the cluster change mediator.
    */
-  public void start() {
+  public synchronized void start() {
     LOGGER.info("Starting the cluster change handling thread");
     _clusterChangeHandlingThread.start();
   }
@@ -153,7 +153,7 @@ public class ClusterChangeMediator implements ExternalViewChangeListener, Instan
   /**
    * Stops the cluster change mediator.
    */
-  public void stop() {
+  public synchronized void stop() {
     LOGGER.info("Stopping the cluster change handling thread");
     _stopped = true;
     synchronized (_lastChangeTimeMap) {
@@ -197,7 +197,11 @@ public class ClusterChangeMediator implements ExternalViewChangeListener, Instan
    *
    * @param changeType Type of the change
    */
-  private void enqueueChange(ChangeType changeType) {
+  private synchronized void enqueueChange(ChangeType changeType) {
+    // Do not enqueue changes if already stopped
+    if (_stopped) {
+      return;
+    }
     if (_clusterChangeHandlingThread.isAlive()) {
       LOGGER.info("Enqueue {} change", changeType);
       synchronized (_lastChangeTimeMap) {
