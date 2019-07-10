@@ -16,13 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.controller.api.resources;
+package org.apache.pinot.controller.api;
 
-import java.io.IOException;
-import javax.ws.rs.core.HttpHeaders;
+import java.io.File;
 import org.apache.pinot.controller.ControllerConf;
-import org.apache.pinot.controller.api.access.AccessControl;
-import org.apache.pinot.controller.api.access.AccessControlFactory;
+import org.apache.pinot.controller.api.resources.FileUploadPathProvider;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -30,44 +28,32 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-public class AccessControlTest extends ControllerTest {
+public class FileUploadPathProviderTest extends ControllerTest {
+  private static ControllerConf _controllerConf;
 
   @BeforeClass
   public void setUp() {
     startZk();
-    ControllerConf config = getDefaultControllerConfiguration();
-    config.setAccessControlFactoryClass(DenyAllAccessFactory.class.getName());
-    startController(config);
+    _controllerConf = getDefaultControllerConfiguration();
+    startController(_controllerConf);
   }
 
   @Test
-  public void testAccessDenied() {
-    try {
-      sendGetRequest(_controllerRequestURLBuilder.forSegmentDownload("testTable", "testSegment"));
-    } catch (IOException e) {
-      Assert.assertTrue(e.getMessage().startsWith("Server returned HTTP response code: 403"));
-      return;
-    }
-    Assert.fail("Access not denied");
+  public void testFileUploadPathProvider()
+      throws Exception {
+    FileUploadPathProvider provider = new FileUploadPathProvider(_controllerConf);
+    Assert.assertEquals(provider.getBaseDataDir().getAbsolutePath(), _controllerDataDir);
+    String fileUploadTmpDirPath = provider.getFileUploadTmpDir().getAbsolutePath();
+    Assert.assertEquals(fileUploadTmpDirPath, new File(_controllerDataDir, "fileUploadTemp").getAbsolutePath());
+    Assert.assertEquals(provider.getSchemasTmpDir().getAbsolutePath(),
+        new File(_controllerDataDir, "schemasTemp").getAbsolutePath());
+    Assert.assertEquals(provider.getTmpUntarredPath().getAbsolutePath(),
+        new File(fileUploadTmpDirPath, "untarred").getAbsolutePath());
   }
 
   @AfterClass
   public void tearDown() {
     stopController();
     stopZk();
-  }
-
-  public static class DenyAllAccessFactory implements AccessControlFactory {
-    private static final AccessControl DENY_ALL_ACCESS = new AccessControl() {
-      @Override
-      public boolean hasDataAccess(HttpHeaders httpHeaders, String tableName) {
-        return false;
-      }
-    };
-
-    @Override
-    public AccessControl create() {
-      return DENY_ALL_ACCESS;
-    }
   }
 }
