@@ -150,7 +150,6 @@ public class SqlResponseCacheLoader extends CacheLoader<SqlQuery, ThirdEyeResult
           DataSource dataSource = new DataSource();
           dataSource.setInitialSize(INIT_CONNECTIONS);
           dataSource.setMaxActive(MAX_CONNECTIONS);
-          System.out.println(verticaUser);
           dataSource.setUsername(verticaUser);
           dataSource.setPassword(verticaPassword);
           dataSource.setDriverClassName(verticaDriver);
