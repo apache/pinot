@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.controller.api.resources;
+package org.apache.pinot.controller.api;
 
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;

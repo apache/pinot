@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.server.api.resources;
+package org.apache.pinot.server.api;
 
 import javax.ws.rs.core.Response;
 import org.apache.pinot.common.restlet.resources.TableSizeInfo;
