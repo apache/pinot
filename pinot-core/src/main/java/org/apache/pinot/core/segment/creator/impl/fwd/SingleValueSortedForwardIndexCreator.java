@@ -56,10 +56,13 @@ public class SingleValueSortedForwardIndexCreator implements SingleValueForwardI
   public void close()
       throws IOException {
     int cardinality = _maxDocIds.length;
-    for (int i = 0; i < cardinality; i++) {
-      _writer.setInt(i, 0, _minDocIds[i]);
-      _writer.setInt(i, 1, _maxDocIds[i]);
+    try {
+      for (int i = 0; i < cardinality; i++) {
+        _writer.setInt(i, 0, _minDocIds[i]);
+        _writer.setInt(i, 1, _maxDocIds[i]);
+      }
+    } finally {
+      _writer.close();
     }
-    _writer.close();
   }
 }

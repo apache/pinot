@@ -19,6 +19,7 @@
 package org.apache.pinot.core.segment.creator.impl;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Iterables;
 import java.io.File;
 import java.io.IOException;
 import java.util.Collection;
@@ -29,6 +30,7 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.pinot.common.Closeables;
 import org.apache.pinot.common.data.DateTimeFieldSpec;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.common.data.FieldSpec.FieldType;
@@ -532,14 +534,6 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   @Override
   public void close()
       throws IOException {
-    for (SegmentDictionaryCreator dictionaryCreator : _dictionaryCreatorMap.values()) {
-      dictionaryCreator.close();
-    }
-    for (ForwardIndexCreator forwardIndexCreator : _forwardIndexCreatorMap.values()) {
-      forwardIndexCreator.close();
-    }
-    for (InvertedIndexCreator invertedIndexCreator : _invertedIndexCreatorMap.values()) {
-      invertedIndexCreator.close();
-    }
+    Closeables.close(Iterables.concat(_dictionaryCreatorMap.values(), _forwardIndexCreatorMap.values(), _invertedIndexCreatorMap.values()));
   }
 }

@@ -101,7 +101,9 @@ public class FixedByteSingleValueMultiColWriter {
 
   public void close()
       throws IOException {
-    this.indexDataBuffer.close();
-    this.indexDataBuffer = null;
+    if (indexDataBuffer != null) {
+      this.indexDataBuffer.close();
+      this.indexDataBuffer = null;
+    }
   }
 }
