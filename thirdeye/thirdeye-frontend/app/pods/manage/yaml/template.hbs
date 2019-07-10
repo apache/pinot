@@ -38,7 +38,7 @@
           {{#bs-accordion onChange=(action "changeAccordion") as |acc|}}
             {{#acc.item value=preview as |aitem|}}
               {{#aitem.title}}
-                <section class="dashboard-container__title thirdeye-link-secondary">Preview alert [Beta] {{if toggleCollapsed "/ Enter YAML configuration to preview alert." ""}}
+                <section class="dashboard-container__title thirdeye-link-secondary">Preview alert {{if toggleCollapsed "/ Enter YAML configuration to preview alert." ""}}
                   <span class="pull-right"><i class="glyphicon glyphicon-menu-{{if toggleCollapsed "down" "up"}}"></i></span>
                 </section>
               {{/aitem.title}}
@@ -48,6 +48,7 @@
                   alertId=model.alertId
                   alertYaml=detectionYaml
                   dataIsCurrent=alertDataIsCurrent
+                  detectionHealth=model.detectionHealth
                 }}
                   {{yield}}
                 {{/alert-details}}

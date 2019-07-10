@@ -1,0 +1,84 @@
+<ul class="te-horizontal-cards__single-card">
+  <li class="te-horizontal-cards__card-title">
+    <label for="select-dimension" class="control-label te-label--no-bottom">
+      30-day status
+      <span>
+        <i class="glyphicon glyphicon-question-sign"></i>
+        {{#tooltip-on-element class="te-tooltip"}}
+          The overall health status of your detection configuration is based on
+          the most recent 30 days.
+        {{/tooltip-on-element}}
+      </span>
+    </label>
+  </li>
+  <li class="te-horizontal-cards__card-number{{overall.label}}">
+    {{overall.status}}
+  </li>
+  <a role="button" tabindex="0" class=".te-button--link">
+    view details
+    {{#bs-popover placement="bottom" title="Detection health"}}
+      <p>Overall health of the metrics that monitor detection performance.</p>
+
+      <div class="te-horizontal-metrics__container">
+        <ul class="te-horizontal-metrics__metric">
+          <li class="te-horizontal-metrics__number">{{executionTime}}</li>
+          <li class="te-horizontal-metrics__title">Execution Time</li>
+        </ul>
+      </div>
+
+      <label class="control-label te-label">
+        Detection task status
+      </label>
+
+      <div class="te-horizontal-metrics__container">
+        <ul class="te-horizontal-metrics__metric">
+          <li class="te-horizontal-metrics__number{{detection.label}}">{{detection.status}}</li>
+          <li class="te-horizontal-metrics__title">Status</li>
+        </ul>
+
+        {{#each tasks as |task|}}
+          <ul class="te-horizontal-metrics__metric">
+            <li class="te-horizontal-metrics__number{{task.label}}">{{task.number}}</li>
+            <li class="te-horizontal-metrics__title">{{task.title}}</li>
+          </ul>
+        {{/each}}
+      </div>
+
+      <label class="control-label te-label">
+        Anomaly coverage ratio
+      </label>
+
+      <div class="te-horizontal-metrics__container">
+        <ul class="te-horizontal-metrics__metric">
+          <li class="te-horizontal-metrics__number{{anomalyCoverage.label}}">{{anomalyCoverage.status}}</li>
+          <li class="te-horizontal-metrics__title">Status</li>
+        </ul>
+
+        <ul class="te-horizontal-metrics__metric">
+          <li class="te-horizontal-metrics__number">{{anomalyCoverage.ratio}}%</li>
+          <li class="te-horizontal-metrics__title">Last 30 days</li>
+        </ul>
+      </div>
+
+      <p>Adjust alert sensitivity using alert preview.</p>
+
+      <label class="control-label te-label">
+        Regression error{{#if regressionInfo.rule}} for {{regressionInfo.rule}}{{/if}}
+      </label>
+
+      <div class="te-horizontal-metrics__container">
+        <ul class="te-horizontal-metrics__metric">
+          <li class="te-horizontal-metrics__number{{regressionInfo.label}}">{{regressionInfo.status}}</li>
+          <li class="te-horizontal-metrics__title">Status</li>
+        </ul>
+
+        <ul class="te-horizontal-metrics__metric">
+          <li class="te-horizontal-metrics__number">{{regressionInfo.mape}}%</li>
+          <li class="te-horizontal-metrics__title">Percentage of anomalies covered</li>
+        </ul>
+      </div>
+
+      <p>Tune the alert using preview.</p>
+    {{/bs-popover}}
+  </a>
+</ul>

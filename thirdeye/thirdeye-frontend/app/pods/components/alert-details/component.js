@@ -93,6 +93,7 @@ export default Component.extend({
   granularity: null,
   alertYaml: null,
   dimensionExploration: null,
+  detectionHealth: null, // result of call to detection/health/{id}, passed in by parent
 
 
 
@@ -614,6 +615,7 @@ export default Component.extend({
       return statsArray;
     }
   ),
+
 
   /**
    * Date types to display in the pills
