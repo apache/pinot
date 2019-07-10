@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.controller.api.resources;
+package org.apache.pinot.controller.api;
 
 import java.io.IOException;
 import org.apache.commons.httpclient.methods.PostMethod;

@@ -55,9 +55,9 @@ public class TableViews {
 
   public static class TableView {
     @JsonProperty("OFFLINE")
-    Map<String, Map<String, String>> offline;
+    public Map<String, Map<String, String>> offline;
     @JsonProperty("REALTIME")
-    Map<String, Map<String, String>> realtime;
+    public Map<String, Map<String, String>> realtime;
   }
 
   @GET

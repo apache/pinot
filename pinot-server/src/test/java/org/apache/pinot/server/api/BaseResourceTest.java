@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.server.api.resources;
+package org.apache.pinot.server.api;
 
 import java.io.File;
 import java.net.URL;
