@@ -108,6 +108,13 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTestSe
 
   @Test
   @Override
+  public void testSqlQueriesFromQueryFile()
+      throws Exception {
+    super.testQueriesFromQueryFile();
+  }
+
+  @Test
+  @Override
   public void testGeneratedQueriesWithMultiValues()
       throws Exception {
     super.testGeneratedQueriesWithMultiValues();
@@ -193,5 +200,11 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTestSe
   @Override
   protected boolean isUsingNewConfigFormat() {
     return true;
+  }
+
+  @Test
+  public void testHardcodedSqlQueries()
+      throws Exception {
+    super.testHardcodedSqlQueries();
   }
 }

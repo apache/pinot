@@ -16,24 +16,18 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.client;
-
-import java.util.concurrent.Future;
-
+package org.apache.pinot.sql.parsers;
 
 /**
- * Interface for plugging different client transports.
+ * Exceptions that occur while compiling SQL.
  */
-interface PinotClientTransport {
-  BrokerResponse executeQuery(String brokerAddress, String query)
-      throws PinotClientException;
+public class SqlCompilationException extends RuntimeException {
 
-  Future<BrokerResponse> executeQueryAsync(String brokerAddress, String query)
-      throws PinotClientException;
+  public SqlCompilationException(String msg) {
+    super(msg);
+  }
 
-  BrokerResponse executeQuery(String brokerAddress, Request request)
-      throws PinotClientException;
-
-  Future<BrokerResponse> executeQueryAsync(String brokerAddress, Request request)
-      throws PinotClientException;
+  public SqlCompilationException(Throwable throwable) {
+    super(throwable);
+  }
 }

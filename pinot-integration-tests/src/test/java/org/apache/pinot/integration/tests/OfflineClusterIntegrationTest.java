@@ -752,4 +752,11 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   protected boolean isUsingNewConfigFormat() {
     return true;
   }
+
+  @Test
+  @Override
+  public void testSqlQueriesFromQueryFile()
+      throws Exception {
+    super.testQueriesFromQueryFile();
+  }
 }

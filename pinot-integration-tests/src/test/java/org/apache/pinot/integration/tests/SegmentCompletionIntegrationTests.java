@@ -194,6 +194,13 @@ public class SegmentCompletionIntegrationTests extends LLCRealtimeClusterIntegra
 
   @Test(enabled = false)
   @Override
+  public void testSqlQueriesFromQueryFile()
+      throws Exception {
+    // Skipped
+  }
+
+  @Test(enabled = false)
+  @Override
   public void testGeneratedQueriesWithMultiValues()
       throws Exception {
     // Skipped

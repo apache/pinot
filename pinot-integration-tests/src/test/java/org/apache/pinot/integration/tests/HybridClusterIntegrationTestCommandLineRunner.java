@@ -36,6 +36,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import javax.annotation.Nonnull;
 import kafka.server.KafkaServerStartable;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.broker.requesthandler.PinotQueryRequest;
 import org.apache.pinot.common.data.Schema;
 import org.apache.pinot.common.utils.JsonUtils;
 import org.apache.pinot.controller.ControllerConf;
@@ -338,7 +339,8 @@ public class HybridClusterIntegrationTestCommandLineRunner {
                 @Override
                 public void run() {
                   try {
-                    JsonNode actualResponse = postQuery(currentQuery, "http://localhost:" + BROKER_BASE_PORT);
+                    JsonNode actualResponse =
+                        postQuery(new PinotQueryRequest("pql", currentQuery), "http://localhost:" + BROKER_BASE_PORT);
                     if (QueryComparison.compareWithEmpty(actualResponse, expectedResponse)
                         == QueryComparison.ComparisonStatus.FAILED) {
                       numFailedQueries.getAndIncrement();
