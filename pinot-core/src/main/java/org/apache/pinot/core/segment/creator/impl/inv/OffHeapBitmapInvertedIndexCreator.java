@@ -26,7 +26,6 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.Closeables;
 import org.apache.pinot.common.data.FieldSpec;
 import org.apache.pinot.core.segment.creator.InvertedIndexCreator;
 import org.apache.pinot.core.segment.creator.impl.V1Constants;
@@ -215,10 +214,11 @@ public final class OffHeapBitmapInvertedIndexCreator implements InvertedIndexCre
   @Override
   public void close()
       throws IOException {
-    Closeables.close(new DataBufferAndFile(_forwardIndexValueBuffer, _forwardIndexValueBufferFile),
-        new DataBufferAndFile(_forwardIndexLengthBuffer, _forwardIndexLengthBufferFile),
-        new DataBufferAndFile(_invertedIndexValueBuffer, _invertedIndexValueBufferFile),
-        new DataBufferAndFile(_invertedIndexLengthBuffer, _invertedIndexLengthBufferFile));
+    org.apache.pinot.common.utils.FileUtils
+        .close(new DataBufferAndFile(_forwardIndexValueBuffer, _forwardIndexValueBufferFile),
+            new DataBufferAndFile(_forwardIndexLengthBuffer, _forwardIndexLengthBufferFile),
+            new DataBufferAndFile(_invertedIndexValueBuffer, _invertedIndexValueBufferFile),
+            new DataBufferAndFile(_invertedIndexLengthBuffer, _invertedIndexLengthBufferFile));
   }
 
   private class DataBufferAndFile implements Closeable {
@@ -231,7 +231,8 @@ public final class OffHeapBitmapInvertedIndexCreator implements InvertedIndexCre
     }
 
     @Override
-    public void close() throws IOException {
+    public void close()
+        throws IOException {
       destroyBuffer(_dataBuffer, _file);
     }
   }

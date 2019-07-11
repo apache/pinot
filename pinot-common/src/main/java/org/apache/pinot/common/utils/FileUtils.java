@@ -18,16 +18,22 @@
  */
 package org.apache.pinot.common.utils;
 
+import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
+import java.util.Arrays;
 import java.util.Random;
+import javax.annotation.Nonnull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class FileUtils {
   private FileUtils() {
   }
 
+  private static final Logger LOGGER = LoggerFactory.getLogger(FileUtils.class);
   private static final Random RANDOM = new Random();
 
   public static String getRandomFileName() {
@@ -63,5 +69,64 @@ public class FileUtils {
       position += numBytesTransferred;
       count -= numBytesTransferred;
     }
+  }
+
+  /**
+   * Close a collection of {@link Closeable} resources
+   * This is a utility method to help release multiple {@link Closeable}
+   * resources in a safe manner without leaking.
+   * As an example if we have a list of Closeable resources,
+   * then the following code is prone to leaking 1 or more
+   * subsequent resources if an exception is thrown while
+   * closing one of them.
+   *
+   * for (closeable_resource : resources) {
+   *   closeable_resource.close()
+   * }
+   *
+   * The helper methods provided here do this safely
+   * while keeping track of exception(s) raised during
+   * close() of each resource and still continuing to close
+   * subsequent resources.
+   * @param closeables collection of resources to close
+   * @throws IOException
+   */
+  public static void close(@Nonnull Iterable<? extends Closeable> closeables)
+      throws IOException {
+
+    IOException topLevelException = null;
+
+    for (Closeable closeable : closeables) {
+      try {
+        if (closeable != null) {
+          closeable.close();
+        }
+      } catch (IOException e) {
+        if (topLevelException == null) {
+          topLevelException = e;
+        } else if (e != topLevelException) {
+          topLevelException.addSuppressed(e);
+        }
+      }
+    }
+
+    if (topLevelException != null) {
+      // this will log the call stack of top level exception and
+      // all of the suppressed exceptions
+      LOGGER.error("Failed to close one or more resources", topLevelException);
+      throw topLevelException;
+    }
+  }
+
+  /**
+   * Another version of {@link FileUtils#close(Iterable)} which allows
+   * to pass variable number of closeable resources when the caller
+   * doesn't already have them in a collection.
+   * @param closeables one or more resources to close
+   * @throws IOException
+   */
+  public static void close(Closeable... closeables)
+      throws IOException {
+    close(Arrays.asList(closeables));
   }
 }

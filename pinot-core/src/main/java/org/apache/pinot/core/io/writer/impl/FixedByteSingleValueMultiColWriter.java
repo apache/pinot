@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.io.writer.impl;
 
+import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteOrder;
@@ -25,7 +26,7 @@ import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 
 
-public class FixedByteSingleValueMultiColWriter {
+public class FixedByteSingleValueMultiColWriter implements Closeable {
   private final int[] columnOffsets;
   private final PinotDataBuffer indexDataBuffer;
   private int rowSizeInBytes;
@@ -99,6 +100,7 @@ public class FixedByteSingleValueMultiColWriter {
     indexDataBuffer.readFrom(offset, bytes);
   }
 
+  @Override
   public void close()
       throws IOException {
     this.indexDataBuffer.close();
