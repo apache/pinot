@@ -91,7 +91,7 @@ public abstract class BaseMultiValueQueriesTest extends BaseQueriesTest {
         .addMultiValueDimension("column6", FieldSpec.DataType.INT)
         .addMultiValueDimension("column7", FieldSpec.DataType.INT)
         .addSingleValueDimension("column8", FieldSpec.DataType.INT).addMetric("column9", FieldSpec.DataType.INT)
-        .addMetric("column10", FieldSpec.DataType.INT).addTime("daysSinceEpoch", TimeUnit.MILLISECONDS, FieldSpec.DataType.LONG)
+        .addMetric("column10", FieldSpec.DataType.INT).addTime("daysSinceEpoch", TimeUnit.DAYS, FieldSpec.DataType.INT)
         .build();
 
     // Create the segment generator config.

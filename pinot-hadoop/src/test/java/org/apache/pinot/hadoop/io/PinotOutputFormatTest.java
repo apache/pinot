@@ -147,10 +147,10 @@ public class PinotOutputFormatTest {
 
     public int id;
     public String name;
-    public long epochDays;
+    public int epochDays;
     public int salary;
 
-    public Emp(int id, String name, long epochDays, int salary) {
+    public Emp(int id, String name, int epochDays, int salary) {
       this.id = id;
       this.name = name;
       this.epochDays = epochDays;
@@ -171,7 +171,7 @@ public class PinotOutputFormatTest {
         + "    },\n" + "    {\n" + "      \"name\": \"name\",\n" + "      \"dataType\" : \"STRING\",\n"
         + "      \"delimiter\" : null,\n" + "      \"singleValueField\" : true\n" + "    }\n" + "  ],\n"
         + "  \"timeFieldSpec\" : {\n" + "    \"incomingGranularitySpec\" : {\n" + "      \"timeType\" : \"DAYS\",\n"
-        + "      \"dataType\" : \"LONG\",\n" + "      \"name\" : \"epochDays\"\n" + "    }\n" + "  },\n"
+        + "      \"dataType\" : \"INT\",\n" + "      \"name\" : \"epochDays\"\n" + "    }\n" + "  },\n"
         + "  \"metricFieldSpecs\" : [\n" + "    {\n" + "      \"name\" : \"salary\",\n"
         + "      \"dataType\" : \"INT\",\n" + "      \"delimiter\" : null,\n" + "      \"singleValueField\" : true\n"
         + "    }\n" + "   ],\n" + "  \"schemaName\" : \"emp\"\n" + "}";
