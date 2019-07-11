@@ -121,6 +121,7 @@ public class DetectionEmailAlerter extends DetectionAlertScheme {
     if (config.getSmtpUser() != null && config.getSmtpPassword() != null) {
       email.setAuthenticator(new DefaultAuthenticator(config.getSmtpUser(), config.getSmtpPassword()));
       email.setSSLOnConnect(true);
+      email.setSslSmtpPort(Integer.toString(config.getSmtpPort()));
     }
     email.send();
 
