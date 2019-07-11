@@ -431,13 +431,22 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       end = ((Integer) endTime).longValue();
     } else {
       final StringBuilder err = new StringBuilder();
-      err.append(
-          "Unable to interpret type of time column value. Failed to validate start and end time of segment time column")
-          .append(" uninterpreted type: ").append(startTime.getClass()).append(" start time: ").append(startTime)
-          .append(" end time: ").append(endTime).append(" time column name: ").append(config.getTimeColumnName())
-          .append(" segment name: ").append(segmentName).append(" segment time column unit: ")
-          .append(config.getSegmentTimeUnit().toString()).append(" segment time column type: ")
-          .append(config.getTimeColumnType().toString()).append(" time field spec data type: ")
+      err.append("Unable to interpret type of time column value. Failed to validate start and end time of segment")
+          .append(" uninterpreted type: ")
+          .append(startTime.getClass())
+          .append(" start time: ")
+          .append(startTime)
+          .append(" end time: ")
+          .append(endTime)
+          .append(" time column name: ")
+          .append(config.getTimeColumnName())
+          .append(" segment name: ")
+          .append(segmentName)
+          .append(" segment time column unit: ")
+          .append(config.getSegmentTimeUnit().toString())
+          .append(" segment time column type: ")
+          .append(config.getTimeColumnType().toString())
+          .append(" time field spec data type: ")
           .append(config.getSchema().getTimeFieldSpec().getDataType().toString());
       LOGGER.error(err.toString());
       throw new RuntimeException(err.toString());
@@ -480,8 +489,11 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
           if (config.getSegmentTimeUnit() != TimeUnit.MILLISECONDS) {
             // we should never be here
             final StringBuilder err = new StringBuilder();
-            err.append("Unexpected time unit: ").append(config.getSegmentTimeUnit().toString())
-                .append(" for time column: ").append(config.getTimeColumnName()).append(" for segment: ")
+            err.append("Unexpected time unit: ")
+                .append(config.getSegmentTimeUnit().toString())
+                .append(" for time column: ")
+                .append(config.getTimeColumnName())
+                .append(" for segment: ")
                 .append(segmentName);
             LOGGER.error(err.toString());
             throw new RuntimeException(err.toString());
@@ -493,12 +505,24 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       final Date minDate = new Date(TimeUtils.getValidMinTimeMillis());
       final Date maxDate = new Date(TimeUtils.getValidMaxTimeMillis());
       final StringBuilder err = new StringBuilder();
-      err.append("Invalid start/end time.").append(" segment name: ").append(segmentName).append(" time column name: ")
-          .append(config.getTimeColumnName()).append(" given start time: ").append(start).append("ms")
-          .append(" given end time: ").append(end).append("ms").append(" start and end time must be between ")
-          .append(minDate).append(" and ").append(maxDate).append(" segment time column unit: ")
-          .append(config.getSegmentTimeUnit().toString()).append(" segment time column type: ")
-          .append(config.getTimeColumnType().toString()).append(" time field spec data type: ")
+      err.append("Invalid start/end time.")
+          .append(" segment name: ")
+          .append(segmentName)
+          .append(" time column name: ")
+          .append(config.getTimeColumnName())
+          .append(" given start time: ")
+          .append(start).append("ms")
+          .append(" given end time: ")
+          .append(end).append("ms")
+          .append(" start and end time must be between ")
+          .append(minDate)
+          .append(" and ")
+          .append(maxDate)
+          .append(" segment time column unit: ")
+          .append(config.getSegmentTimeUnit().toString())
+          .append(" segment time column type: ")
+          .append(config.getTimeColumnType().toString())
+          .append(" time field spec data type: ")
           .append(config.getSchema().getTimeFieldSpec().getDataType().toString());
       LOGGER.error(err.toString());
       throw new RuntimeException(err.toString());
