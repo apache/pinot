@@ -68,6 +68,6 @@ module('Integration | Component | yaml-editor', function(hooks) {
       }}
     `);
 
-    assert.ok(this.$('.ace_line')[29].children[0].textContent === defaultText);
+    assert.ok(this.$('.ace_line')[30].children[0].textContent === defaultText);
   });
 });
