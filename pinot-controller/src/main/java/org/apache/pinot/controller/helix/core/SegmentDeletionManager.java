@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.controller.helix.core;
 
-import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
@@ -41,8 +40,7 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.config.TableNameBuilder;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.utils.SegmentName;
-import org.apache.pinot.common.utils.StringUtil;
-import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.filesystem.PinotFS;
 import org.apache.pinot.filesystem.PinotFSFactory;
 import org.joda.time.DateTime;
@@ -174,14 +172,9 @@ public class SegmentDeletionManager {
   protected void removeSegmentFromStore(String tableNameWithType, String segmentId) {
     final String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
     if (_dataDir != null) {
-      URI fileToMoveURI;
-      PinotFS pinotFS;
-      URI dataDirURI = ControllerConf.getUriFromPath(_dataDir);
-      fileToMoveURI = ControllerConf.constructSegmentLocation(_dataDir, rawTableName, segmentId);
-      URI deletedSegmentDestURI = ControllerConf
-          .constructSegmentLocation(StringUtil.join(File.separator, _dataDir, DELETED_SEGMENTS), rawTableName,
-              segmentId);
-      pinotFS = PinotFSFactory.create(dataDirURI.getScheme());
+      URI fileToMoveURI = URIUtils.getUri(_dataDir, rawTableName, URIUtils.encode(segmentId));
+      URI deletedSegmentDestURI = URIUtils.getUri(_dataDir, DELETED_SEGMENTS, rawTableName, URIUtils.encode(segmentId));
+      PinotFS pinotFS = PinotFSFactory.create(fileToMoveURI.getScheme());
 
       try {
         if (pinotFS.exists(fileToMoveURI)) {
@@ -216,9 +209,8 @@ public class SegmentDeletionManager {
    */
   public void removeAgedDeletedSegments(int retentionInDays) {
     if (_dataDir != null) {
-      URI dataDirURI = ControllerConf.getUriFromPath(_dataDir);
-      URI deletedDirURI = ControllerConf.getUriFromPath(StringUtil.join(File.separator, _dataDir, DELETED_SEGMENTS));
-      PinotFS pinotFS = PinotFSFactory.create(dataDirURI.getScheme());
+      URI deletedDirURI = URIUtils.getUri(_dataDir, DELETED_SEGMENTS);
+      PinotFS pinotFS = PinotFSFactory.create(deletedDirURI.getScheme());
 
       try {
         // Check that the directory for deleted segments exists.
@@ -234,12 +226,12 @@ public class SegmentDeletionManager {
         }
 
         for (String tableNameDir : tableNameDirs) {
-          URI tableNameURI = ControllerConf.getUriFromPath(tableNameDir);
+          URI tableNameURI = URIUtils.getUri(tableNameDir);
           // Get files that are aged
           final String[] targetFiles = pinotFS.listFiles(tableNameURI, false);
           int numFilesDeleted = 0;
           for (String targetFile : targetFiles) {
-            URI targetURI = ControllerConf.getUriFromPath(targetFile);
+            URI targetURI = URIUtils.getUri(targetFile);
             Date dateToDelete = DateTime.now().minusDays(retentionInDays).toDate();
             if (pinotFS.lastModified(targetURI) < dateToDelete.getTime()) {
               if (!pinotFS.delete(targetURI, true)) {

@@ -23,7 +23,6 @@ import com.google.common.util.concurrent.MoreExecutors;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -111,7 +110,8 @@ public class PinotURIUploadIntegrationTest extends BaseClusterIntegrationTestSet
     }
   }
 
-  private File generateRandomSegment(String segmentName, int rowCount) throws Exception {
+  private File generateRandomSegment(String segmentName, int rowCount)
+      throws Exception {
     ThreadLocalRandom random = ThreadLocalRandom.current();
     Schema schema = new Schema.Parser()
         .parse(new File(TestUtils.getFileFromResourceUrl(getClass().getClassLoader().getResource("dummy.avsc"))));
@@ -267,12 +267,12 @@ public class PinotURIUploadIntegrationTest extends BaseClusterIntegrationTestSet
     }
   }
 
-  private List<String> getAllSegments(String tablename)
+  private List<String> getAllSegments(String tableName)
       throws IOException {
     List<String> allSegments = new ArrayList<>();
     HttpHost controllerHttpHost = new HttpHost("localhost", _controllerPort);
     HttpClient controllerClient = new DefaultHttpClient();
-    HttpGet req = new HttpGet("/segments/" + URLEncoder.encode(tablename, "UTF-8"));
+    HttpGet req = new HttpGet("/segments/" + tableName);
     HttpResponse res = controllerClient.execute(controllerHttpHost, req);
     try {
       if (res.getStatusLine().getStatusCode() != 200) {

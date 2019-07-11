@@ -25,11 +25,11 @@ import java.io.InputStreamReader;
 import java.net.SocketException;
 import java.net.URL;
 import java.net.URLConnection;
-import java.net.URLEncoder;
 import java.net.UnknownHostException;
 import org.apache.pinot.common.config.TableConfig;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.NetUtil;
+import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.controller.helix.ControllerRequestURLBuilder;
 import org.apache.pinot.tools.admin.command.AddTableCommand;
 import org.apache.pinot.tools.admin.command.CreateSegmentCommand;
@@ -254,7 +254,7 @@ public class ClusterStarter {
   public int perfQuery(String query)
       throws Exception {
     LOGGER.debug("Running perf query on Pinot Cluster");
-    String encodedQuery = URLEncoder.encode(query, "UTF-8");
+    String encodedQuery = URIUtils.encode(query);
     String brokerUrl = _perfUrl + encodedQuery;
     LOGGER.info("Executing command: " + brokerUrl);
     URLConnection conn = new URL(brokerUrl).openConnection();
