@@ -27,6 +27,7 @@ rules:                            # Can configure multiple rules with "OR" relat
         configuration:
           bucketPeriod: P1D       # Use PT1H for hourly and PT5M for minute level (ingraph metrics) data.
           pValueThreshold: 0.05   # Higher value means more sensitive to small changes.
+          mlConfig: true          # The machine learning auto config to select and maintain the configuration with the best performance.
   filter:                         # Filter out anomalies detected by rules to reduce noise.
     - name: filter_rule_1
       type: PERCENTAGE_CHANGE_FILTER
