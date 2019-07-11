@@ -34,11 +34,6 @@ ThirdEye is not a generic dashboard builder toolkit. ThirdEye attempts to bring 
 
 ## Getting Involved
  - Ask questions on [Apache ThirdEye Slack](https://communityinviter.com/apps/apache-thirdeye/apache-thirdeye)
- - Please join Apache Pinot mailing lists  
-   dev-subscribe@pinot.apache.org (subscribe to pinot-dev mailing list)  
-   dev@pinot.apache.org (posting to pinot-dev mailing list)  
-   users-subscribe@pinot.apache.org (subscribe to pinot-user mailing list)  
-   users@pinot.apache.org (positng to pinot-user mailing list)
 
 ## Documentation
 
@@ -48,4 +43,3 @@ Detailed documentation can be found at [ThirdEye documentation](https://thirdeye
 - [Data Sources Setup](https://thirdeye.readthedocs.io/en/latest/datasources.html)
 - [Production Settings](https://thirdeye.readthedocs.io/en/latest/production.html)
 - [Alert Setup](https://thirdeye.readthedocs.io/en/latest/alert_setup.html)
-- [Chat](https://communityinviter.com/apps/apache-thirdeye/apache-thirdeye)
