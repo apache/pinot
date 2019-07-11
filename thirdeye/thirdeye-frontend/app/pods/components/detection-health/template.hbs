@@ -19,16 +19,16 @@
     {{#bs-popover placement="bottom" title="Detection health"}}
       <p>Overall health of the metrics that monitor detection performance.</p>
 
-      <div class="te-horizontal-metrics__container">
-        <ul class="te-horizontal-metrics__metric">
-          <li class="te-horizontal-metrics__number">{{executionTime}}</li>
-          <li class="te-horizontal-metrics__title">Execution Time</li>
-        </ul>
-      </div>
-
       <label class="control-label te-label">
         Detection task status
       </label>
+
+      <div class="te-horizontal-metrics__container">
+        <ul class="te-horizontal-metrics__metric">
+          <li class="te-horizontal-metrics__number">{{executionTime}}</li>
+          <li class="te-horizontal-metrics__title">Last Detection Task Finish Time</li>
+        </ul>
+      </div>
 
       <div class="te-horizontal-metrics__container">
         <ul class="te-horizontal-metrics__metric">
@@ -56,11 +56,11 @@
 
         <ul class="te-horizontal-metrics__metric">
           <li class="te-horizontal-metrics__number">{{anomalyCoverage.ratio}}%</li>
-          <li class="te-horizontal-metrics__title">Last 30 days</li>
+          <li class="te-horizontal-metrics__title">The percentage of anomalous duration over the past 30 days</li>
         </ul>
       </div>
 
-      <p>Adjust alert sensitivity using alert preview.</p>
+      <p>To improve this, adjust alert sensitivity using preview.</p>
 
       <label class="control-label te-label">
         Regression error{{#if regressionInfo.rule}} for {{regressionInfo.rule}}{{/if}}
@@ -74,11 +74,11 @@
 
         <ul class="te-horizontal-metrics__metric">
           <li class="te-horizontal-metrics__number">{{regressionInfo.mape}}%</li>
-          <li class="te-horizontal-metrics__title">Percentage of anomalies covered</li>
+          <li class="te-horizontal-metrics__title">The average prediction error (MAPE) of the baseline</li>
         </ul>
       </div>
 
-      <p>Tune the alert using preview.</p>
+      <p>To improve this, tune the detection rules using preview.</p>
     {{/bs-popover}}
   </a>
 </ul>

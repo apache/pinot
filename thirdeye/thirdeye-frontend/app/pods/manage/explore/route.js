@@ -76,7 +76,6 @@ export default Route.extend(AuthenticatedRouteMixin, {
     }
 
     //detection health fetch
-    const executionTime = moment().valueOf(); // grab execution time
     const healthUrl = `/detection/health/${alertId}?start=${analysisRange[0]}&end=${analysisRange[1]}`;
     try {
       const health_result = await fetch(healthUrl, getProps);
@@ -85,7 +84,6 @@ export default Route.extend(AuthenticatedRouteMixin, {
       if (health_status !== 200) {
         notifications.error('Retrieval of detection health failed.', 'Error', toastOptions);
       } else {
-        health_json.executionTime = executionTime; // attach execution time for display
         set(this, 'detectionHealth', health_json);
       }
     } catch (error) {
