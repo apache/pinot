@@ -34,7 +34,7 @@
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/../..</pinot.root>
-    <kafka.version>0.9.0.1</kafka.version>
+    <kafka.lib.version>0.9.0.1</kafka.lib.version>
   </properties>
 
   <dependencies>
@@ -42,8 +42,8 @@
     <!-- Kafka  -->
     <dependency>
       <groupId>org.apache.kafka</groupId>
-      <artifactId>kafka_2.10</artifactId>
-      <version>${kafka.version}</version>
+      <artifactId>kafka_${kafka.scala.version}</artifactId>
+      <version>${kafka.lib.version}</version>
       <exclusions>
         <exclusion>
           <groupId>org.slf4j</groupId>
