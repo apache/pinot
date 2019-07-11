@@ -92,16 +92,13 @@ public class StreamConfigProperties {
   /**
    * The initial num rows to use for segment size auto tuning. By default 100_000 is used.
    */
-  public static final String SEGMENT_FLUSH_INITIAL_ROWS_THRESHOLD = "realtime.segment.flush.initial.rows.threshold";
+  public static final String SEGMENT_FLUSH_AUTOTUNE_INITIAL_ROWS = "realtime.segment.flush.autotune.initialRows";
 
   // Time threshold that controller will wait for the segment to be built by the server
   public static final String SEGMENT_COMMIT_TIMEOUT_SECONDS = "realtime.segment.commit.timeoutSeconds";
 
   /**
    * Helper method to create a stream specific property
-   * @param streamType
-   * @param property
-   * @return
    */
   public static String constructStreamProperty(String streamType, String property) {
     return Joiner.on(DOT_SEPARATOR).join(STREAM_PREFIX, streamType, property);

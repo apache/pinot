@@ -45,7 +45,7 @@ public class SegmentSizeBasedFlushThresholdUpdater implements FlushThresholdUpda
   private static final int MINIMUM_NUM_ROWS_THRESHOLD = 10_000;
 
   private final long _desiredSegmentSizeBytes;
-  private final int _initialRowsThreshold;
+  private final int _autotuneInitialRows;
 
   /** Below this size, we double the rows threshold */
   private final double _optimalSegmentSizeBytesMin;
@@ -53,8 +53,8 @@ public class SegmentSizeBasedFlushThresholdUpdater implements FlushThresholdUpda
   private final double _optimalSegmentSizeBytesMax;
 
   @VisibleForTesting
-  int getInitialRowsThreshold() {
-    return _initialRowsThreshold;
+  int getAutotuneInitialRows() {
+    return _autotuneInitialRows;
   }
 
   @VisibleForTesting
@@ -80,11 +80,11 @@ public class SegmentSizeBasedFlushThresholdUpdater implements FlushThresholdUpda
   // num rows to segment size ratio of last committed segment for this table
   private double _latestSegmentRowsToSizeRatio = 0;
 
-  public SegmentSizeBasedFlushThresholdUpdater(long desiredSegmentSizeBytes, int initialRowsThreshold) {
+  public SegmentSizeBasedFlushThresholdUpdater(long desiredSegmentSizeBytes, int autotuneInitialRows) {
     _desiredSegmentSizeBytes = desiredSegmentSizeBytes;
     _optimalSegmentSizeBytesMin = _desiredSegmentSizeBytes / 2;
     _optimalSegmentSizeBytesMax = _desiredSegmentSizeBytes * 1.5;
-    _initialRowsThreshold = initialRowsThreshold;
+    _autotuneInitialRows = autotuneInitialRows;
   }
 
   // synchronized since this method could be called for multiple partitions of the same table in different threads
@@ -104,8 +104,8 @@ public class SegmentSizeBasedFlushThresholdUpdater implements FlushThresholdUpda
         newSegmentZKMetadata.setSizeThresholdToFlushSegment((int) targetSegmentNumRows);
       } else {
         LOGGER.info("Committing segment zk metadata is not available, setting threshold for {} as {}", newSegmentName,
-            _initialRowsThreshold);
-        newSegmentZKMetadata.setSizeThresholdToFlushSegment(_initialRowsThreshold);
+            _autotuneInitialRows);
+        newSegmentZKMetadata.setSizeThresholdToFlushSegment(_autotuneInitialRows);
       }
       return;
     }
