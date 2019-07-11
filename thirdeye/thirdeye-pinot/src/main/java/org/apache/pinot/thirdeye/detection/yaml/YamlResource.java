@@ -26,6 +26,8 @@ import io.dropwizard.auth.Auth;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -231,23 +233,27 @@ public class YamlResource {
   private Response processBadRequestResponse(String type, String operation, String payload, IllegalArgumentException e) {
     Map<String, String> responseMessage = new HashMap<>();
     LOG.warn("Validation error while {} {} with payload {}", operation, type, payload, e);
-    responseMessage.put(type + "Msg", "Validation Error! " + e.getMessage());
+    responseMessage.put("message", "Validation Error in " + type + "! " + e.getMessage());
+    StringWriter sw = new StringWriter();
+    PrintWriter pw = new PrintWriter(sw);
+    e.getCause().printStackTrace(pw);
+    responseMessage.put("more-info", "Error = " + sw.toString());
     return Response.status(Response.Status.BAD_REQUEST).entity(responseMessage).build();
   }
 
   private Response processServerErrorResponse(String type, String operation, String payload, Exception e) {
     Map<String, String> responseMessage = new HashMap<>();
     LOG.error("Error {} {} with payload {}", operation, type, payload, e);
-    responseMessage.put(type + "Msg", "Failed to create the " + type + ". Reach out to the ThirdEye team.");
-    responseMessage.put(type + "Msg-moreInfo", "Error = " + e.getMessage());
+    responseMessage.put("message", "Failed to create the " + type + ". Reach out to the ThirdEye team.");
+    responseMessage.put("more-info", "Error = " + e.getMessage());
     return Response.serverError().entity(responseMessage).build();
   }
 
   private Response processBadAuthorizationResponse(String type, String operation, String payload, NotAuthorizedException e) {
     Map<String, String> responseMessage = new HashMap<>();
     LOG.warn("Authorization error while {} {} with payload {}", operation, type, payload, e);
-    responseMessage.put(type + "Msg", "Authorization Error!");
-    responseMessage.put(type + "Msg-moreInfo", "Configure owners property in " + type + " config");
+    responseMessage.put("message", "Authorization error! You do not have permissions to " + operation + " this " + type + " config");
+    responseMessage.put("more-info", "Configure owners property in " + type + " config");
     return Response.status(Response.Status.UNAUTHORIZED).entity(responseMessage).build();
   }
 
@@ -265,7 +271,6 @@ public class YamlResource {
     Map<String, String> yamls;
 
     // Detection
-    Map<String, String> responseMessage = new HashMap<>();
     long detectionConfigId;
     try {
       yamls = OBJECT_MAPPER.readValue(payload, Map.class);
@@ -374,8 +379,8 @@ public class YamlResource {
     }
 
     LOG.info("Detection created with id " + detectionConfigId + " using payload " + payload);
-    responseMessage.put("detectionMsg", "Alert was created successfully.");
-    responseMessage.put("detectionMsg-moreInfo", "Record saved with id " + detectionConfigId);
+    responseMessage.put("message", "Alert was created successfully.");
+    responseMessage.put("more-info", "Record saved with id " + detectionConfigId);
     return Response.ok().entity(responseMessage).build();
   }
 
@@ -741,9 +746,6 @@ public class YamlResource {
       return Response.ok(result).build();
     } catch (IllegalArgumentException e) {
       return processBadRequestResponse(YamlOperations.PREVIEW.name(), YamlOperations.RUNNING.name(), payload, e);
-    } catch (InvocationTargetException e) {
-      responseMessage.put("message", "Failed to run the preview due to " + e.getTargetException().getMessage());
-      return Response.serverError().entity(responseMessage).build();
     } catch (TimeoutException e) {
       responseMessage.put("message", "Preview has timed out");
       return Response.serverError().entity(responseMessage).build();
