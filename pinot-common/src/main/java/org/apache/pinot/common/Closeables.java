@@ -21,23 +21,46 @@ package org.apache.pinot.common;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.Arrays;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
+/**
+ * A utility class to help release multiple {@link Closeable}
+ * resources in a safe manner without leaking.
+ * As an example if we have a list of Closeable resources,
+ * then the following code is prone to leaking 1 or more
+ * subsequent resources if an exception is thrown while
+ * closing one of them.
+ *
+ * for (closeable_resource : resources) {
+ *   closeable_resource.close()
+ * }
+ *
+ * The helper methods provided here do this safely
+ * while keeping track of exception(s) raised during
+ * close() of each resource and still continuing to close
+ * subsequent resources.
+ */
 public class Closeables {
 
-  public static void close(Iterable<? extends Closeable> ac)
+  private static final Logger LOGGER = LoggerFactory.getLogger(Closeables.class);
+
+  /**
+   * Close a collection of {@link Closeable} resources
+   * @param closeables collection of resources to close
+   * @throws IOException
+   */
+  public static void close(Iterable<? extends Closeable> closeables)
       throws IOException {
 
-    if (ac == null) {
-      return;
-    } else if (ac instanceof Closeable) {
-      ((Closeable) ac).close();
+    if (closeables == null) {
       return;
     }
 
     IOException topLevelException = null;
 
-    for (Closeable closeable : ac) {
+    for (Closeable closeable : closeables) {
       try {
         if (closeable != null) {
           closeable.close();
@@ -52,9 +75,18 @@ public class Closeables {
     }
 
     if (topLevelException != null) {
+      LOGGER.error("Failed to close resource", topLevelException);
       throw topLevelException;
     }
   }
+
+  /**
+   * Another version of {@link Closeables#close(Iterable)} which allows
+   * to pass variable number of closeable resources when the caller
+   * doesn't already have them in a collection.
+   * @param closeables one or more resources to close
+   * @throws IOException
+   */
   public static void close(Closeable... closeables) throws IOException {
     close(Arrays.asList(closeables));
   }
