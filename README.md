@@ -67,7 +67,7 @@ $ bin/quick-start-offline.sh
 ```
 
 ## Getting Involved
- - Ask questions on [Slack](https://join.slack.com/t/apache-pinot/shared_invite/enQtNDY4NDczOTYyNjk1LTExODVjY2QxYzBkMzJjNTk0ZGQ3NThiYTU2YzdlNjE0MWI5ZjUwYjI2ZTgxNjNiYWJiNmEzYjkxMTIzMzUxNTQ)
+ - Ask questions on [Apache Pinot Slack](https://communityinviter.com/apps/apache-pinot/apache-pinot)
  - Please join Apache Pinot mailing lists  
    dev-subscribe@pinot.apache.org (subscribe to pinot-dev mailing list)  
    dev@pinot.apache.org (posting to pinot-dev mailing list)  
