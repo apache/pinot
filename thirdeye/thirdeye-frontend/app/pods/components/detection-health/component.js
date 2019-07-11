@@ -14,8 +14,6 @@ import { get, computed } from '@ember/object';
 import floatToPercent from 'thirdeye-frontend/utils/float-to-percent';
 import moment from 'moment';
 
-const EXECUTION_TIME_FORMAT = 'MMM DD, YYYY - HH:mm:ss';
-
 export default Component.extend({
   selectedRule: null, // passed in by parent when relevant
   classNames: ['te-horizontal-cards__container'],
@@ -115,7 +113,11 @@ export default Component.extend({
     'health',
     function() {
       const health = get(this, 'health');
-      return `${moment(health.executionTime).format(EXECUTION_TIME_FORMAT)}`;
+      if (health.detectionTaskStatus.tasks.length != 0) {
+        const lastExecutionTime = new Date(health.detectionTaskStatus.tasks[0].endTime);
+        return lastExecutionTime.toDateString() + ", " +  lastExecutionTime.toLocaleTimeString() + " (" + moment().tz(moment.tz.guess()).format('z') + ")"
+      }
+      return "-"
     }
   ),
 
@@ -157,12 +159,13 @@ export default Component.extend({
       const info = {};
       info.mape = floatToPercent(NaN); // set default to Nan
       let rule = selectedRule ? selectedRule.detectorName : null;
+      info.status = 'Unknown'
       // 3 possibilities: selectedRule, no selectedRule and rules available, no rules available
       if (health && health.regressionStatus && typeof health.regressionStatus === 'object') {
         const regressionStatus = health.regressionStatus;
         info.status = statusMap[regressionStatus.healthStatus]; // default status will be overall regression status
         info.label = labelMap[regressionStatus.healthStatus];
-        if (typeof regressionStatus.detectorMapes === 'object' && typeof regressionStatus.detectorHealthStatus === 'object') {
+        if (typeof regressionStatus.detectorMapes === 'object' && typeof regressionStatus.detectorHealthStatus === 'object' && Object.keys(regressionStatus.detectorMapes).length != 0) {
           // There is a selectedRule
           if (rule) {
             info.mape = floatToPercent(regressionStatus.detectorMapes[rule]);
