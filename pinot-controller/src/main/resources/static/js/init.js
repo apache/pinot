@@ -178,6 +178,8 @@ var HELPERS = {
         "paging": false,
         "info": false
       });
+    }).fail(function() {
+      $(".schema-detail-view").html("Table " + tableName + " schema not found")
     });
   },
 
