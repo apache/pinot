@@ -112,10 +112,10 @@ export default Component.extend({
   executionTime: computed(
     'health',
     function() {
-      const health = get(this, 'health');
-      if (health.detectionTaskStatus.tasks.length != 0) {
-        const lastExecutionTime = new Date(health.detectionTaskStatus.tasks[0].endTime);
-        return lastExecutionTime.toDateString() + ", " +  lastExecutionTime.toLocaleTimeString() + " (" + moment().tz(moment.tz.guess()).format('z') + ")"
+      const lastTaskExecutionTimestamp = get(this, 'health').detectionTaskStatus.lastTaskExecutionTime;
+      if (lastTaskExecutionTimestamp > 0) {
+        const executionDateTime = new Date(lastTaskExecutionTimestamp);
+        return executionDateTime.toDateString() + ", " +  executionDateTime.toLocaleTimeString() + " (" + moment().tz(moment.tz.guess()).format('z') + ")"
       }
       return "-"
     }
