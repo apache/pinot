@@ -27,7 +27,7 @@ ThirdEye supports an interactive demo mode for the analysis dashboard. These ste
 **1: Prerequisites**
 
 
-You'll need Java 8+, Maven 3+, and NPM 3.10+
+You'll need Java 8+, Maven 3.6+, and NPM 3.10+
 
 
 **2: Build ThirdEye**
@@ -43,7 +43,7 @@ You'll need Java 8+, Maven 3+, and NPM 3.10+
 Note: The build of thirdeye-frontend may take several minutes
 
 
-**3: Run ThirdEye frontend**
+**3: Run frontend**
 
 .. code-block:: bash
 
@@ -60,6 +60,7 @@ Note: ThirdEye in demo mode will accept any credentials
 You will find the root cause analysis page like below:
 
 .. image:: https://user-images.githubusercontent.com/44730481/59537777-674b0680-8eac-11e9-8c8b-314bf64d5914.png
+  :width: 500
 
 **5: Have fun**
 
@@ -106,10 +107,11 @@ Click ``Run Preview`` button, the anomalies will be detected. Then you can play 
 You will find the alert preview page like below:
 
 .. image:: https://user-images.githubusercontent.com/44730481/59538138-9f9f1480-8ead-11e9-9b2f-bbb3475f27ed.png
+  :width: 500
 
 If you want to preview the hourly data, just change ``dataset: H2.H2.daily`` to ``dataset: H2.H2.hourly``, and rerun the preview.
 
-If you want to setup and run real anomaly detection rules, you need to see :ref:`production` and :ref:`alert-setup`.
+If you want to setup in production, you need to see :ref:`configurations` and :ref:`alert-setup`.
 
 
 **7: Shutdown**
