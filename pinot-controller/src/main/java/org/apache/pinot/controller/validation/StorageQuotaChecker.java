@@ -21,8 +21,6 @@ package org.apache.pinot.controller.validation;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import java.io.File;
-import javax.annotation.Nonnegative;
-import javax.annotation.Nonnull;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.config.QuotaConfig;
 import org.apache.pinot.common.config.TableConfig;
@@ -83,15 +81,12 @@ public class StorageQuotaChecker {
    * @param segmentFile untarred segment. This should not be null.
    *                    segmentFile must exist on disk and must be a directory
    * @param segmentName name of the segment being added
-   * @param timeoutMsec timeout in milliseconds for reading table sizes from server
+   * @param timeoutMs timeout in milliseconds for reading table sizes from server
    *
    */
-  public QuotaCheckerResponse isSegmentStorageWithinQuota(@Nonnull File segmentFile, @Nonnull String segmentName,
-      @Nonnegative int timeoutMsec)
+  public QuotaCheckerResponse isSegmentStorageWithinQuota(File segmentFile, String segmentName, int timeoutMs)
       throws InvalidConfigException {
-    Preconditions.checkNotNull(segmentFile);
-    Preconditions.checkNotNull(segmentName);
-    Preconditions.checkArgument(timeoutMsec > 0, "Timeout value must be > 0, input: %s", timeoutMsec);
+    Preconditions.checkArgument(timeoutMs > 0, "Timeout value must be > 0, input: %s", timeoutMs);
     Preconditions.checkArgument(segmentFile.exists(), "Segment file: %s does not exist", segmentFile);
     Preconditions.checkArgument(segmentFile.isDirectory(), "Segment file: %s is not a directory", segmentFile);
 
@@ -105,23 +100,28 @@ public class StorageQuotaChecker {
 
     if (quotaConfig == null || Strings.isNullOrEmpty(quotaConfig.getStorage())) {
       // no quota configuration...so ignore for backwards compatibility
-      LOGGER.warn("Quota configuration not set for table: {}", tableNameWithType);
-      return success("Quota configuration not set for table: " + tableNameWithType);
+      String message =
+          String.format("Storage quota is not configured for table: %s, skipping the check", tableNameWithType);
+      LOGGER.info(message);
+      return success(message);
     }
 
     long allowedStorageBytes = numReplicas * quotaConfig.storageSizeBytes();
-    if (allowedStorageBytes < 0) {
-      LOGGER.warn("Storage quota is not configured for table: {}", tableNameWithType);
-      return success("Storage quota is not configured for table: " + tableNameWithType);
+    if (allowedStorageBytes <= 0) {
+      String message = String
+          .format("Invalid storage quota: %s for table: %s, skipping the check", quotaConfig.getStorage(),
+              tableNameWithType);
+      LOGGER.warn(message);
+      return success(message);
     }
     _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.TABLE_QUOTA, allowedStorageBytes);
 
     long incomingSegmentSizeBytes = FileUtils.sizeOfDirectory(segmentFile);
 
     // read table size
-    TableSizeReader.TableSubTypeSizeDetails tableSubtypeSize = null;
+    TableSizeReader.TableSubTypeSizeDetails tableSubtypeSize;
     try {
-      tableSubtypeSize = _tableSizeReader.getTableSubtypeSize(tableNameWithType, timeoutMsec);
+      tableSubtypeSize = _tableSizeReader.getTableSubtypeSize(tableNameWithType, timeoutMs);
     } catch (InvalidConfigException e) {
       LOGGER.error("Failed to get table size for table {}", tableNameWithType, e);
       throw e;
@@ -157,7 +157,7 @@ public class StorageQuotaChecker {
         tableNameWithType, tableSubtypeSize.estimatedSizeInBytes, tableSubtypeSize.reportedSizeInBytes);
 
     // Only emit the real percentage of storage quota usage by lead controller, otherwise emit 0L.
-    if (isLeader() && allowedStorageBytes != 0L) {
+    if (isLeader()) {
       long existingStorageQuotaUtilization = tableSubtypeSize.estimatedSizeInBytes * 100 / allowedStorageBytes;
       _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.TABLE_STORAGE_QUOTA_UTILIZATION,
           existingStorageQuotaUtilization);
