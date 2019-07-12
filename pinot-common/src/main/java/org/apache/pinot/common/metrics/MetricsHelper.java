@@ -48,7 +48,7 @@ public class MetricsHelper {
       new WeakHashMap<MetricsRegistryRegistrationListener, Object>();
 
   /**
-   * Initializes the metrics system by initializing the registry rePinotJmxMetricsReporter is startedgistration listeners present in the configuration.
+   * Initializes the metrics system by initializing the registry registration listeners present in the configuration.
    *
    * @param configuration The subset of the configuration containing the metrics-related keys
    */
