@@ -152,6 +152,22 @@ public class VarLengthBytesValueReaderWriter implements Closeable, ValueReader {
     return false;
   }
 
+  /**
+   * Returns the power of 2 >= n.
+   */
+  private static int nextPowerOf2(int n) {
+    int power = 1;
+    if (n > 0 && (n & (n - 1)) == 0) {
+      return n;
+    }
+
+    while (power < n) {
+      power <<= 1;
+    }
+
+    return power;
+  }
+
   private void writeHeader() {
     for (int offset = 0; offset < MAGIC_BYTES.length; offset++) {
       _dataBuffer.putByte(offset, MAGIC_BYTES[offset]);
@@ -216,7 +232,19 @@ public class VarLengthBytesValueReaderWriter implements Closeable, ValueReader {
     // To get the length of the byte array, we use the next byte array offset.
     int length = _dataBuffer.getInt(_dataSectionStartOffSet + Integer.BYTES * (index + 1)) - offset;
 
-    return StringUtil.decodeUtf8(getBytes(buffer, offset, length, true), 0, length);
+    byte[] b;
+    if (buffer != null && buffer.length >= length) {
+      b = buffer;
+    } else {
+      // Check if the current instance of ThreadLocal buffer is big enough. If not, resize it to double the size.
+      if (_reusableBytes.get().length < length) {
+        _reusableBytes.set(new byte[nextPowerOf2(length)]);
+      }
+      b = _reusableBytes.get();
+    }
+
+    _dataBuffer.copyTo(offset, b, 0, length);
+    return StringUtil.decodeUtf8(b, 0, length);
   }
 
   @Override
@@ -232,25 +260,13 @@ public class VarLengthBytesValueReaderWriter implements Closeable, ValueReader {
     // To get the length of the byte array, we use the next byte array offset.
     int length = _dataBuffer.getInt(_dataSectionStartOffSet + Integer.BYTES * (index + 1)) - offset;
 
-    // Since the byte[] is returned to the caller and caller could hold a reference to it,
-    // the buffer can't really be reused here. Hence, don't use ThreadLocal buffer in this case.
-    return getBytes(buffer, offset, length, false);
-  }
-
-  private byte[] getBytes(byte[] buffer, int offset, int length, boolean useThreadLocalBuffer) {
     byte[] b;
-    // If the caller has passed a buffer that can be used, use it.
-    if (buffer != null && buffer.length == length) {
-      b = buffer;
-    } else if (useThreadLocalBuffer) {
-      // Check if the current instance of ThreadLocal buffer is big enough. If not, resize it to double the size.
-      while (_reusableBytes.get().length < length) {
-        _reusableBytes.set(new byte[_reusableBytes.get().length * 2]);
-      }
-      b = _reusableBytes.get();
-    } else {
-      // Can't use caller's buffer or ThreadLocal buffer so create a new one.
+    // If the caller didn't pass a buffer, create one with exact length.
+    if (buffer == null) {
       b = new byte[length];
+    } else {
+      // If the buffer passed by the caller isn't big enough, create a new one.
+      b = buffer.length == length ? buffer : new byte[length];
     }
     _dataBuffer.copyTo(offset, b, 0, length);
     return b;
