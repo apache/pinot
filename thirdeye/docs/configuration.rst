@@ -17,28 +17,32 @@
 .. under the License.
 ..
 
-Configuration Settings
+Configuration
 =======================
 
 Overview
--------------
+---------
 ThirdEye could be deployed on single machine or deployed in clusters.
 
 - Dashboard servers are used to host web applications.
+
 The ``org.apache.pinot.thirdeye.dashboard.ThirdEyeDashboardApplication`` class is the entry point.
 
-``dashboard.yml`` and ``rca.yml`` are used to configure dashboard servers.
+:ref:`dashboard.yml` and :ref:`rca.yml` are used to configure dashboard servers.
 
 - Backend servers are used to schedule tasks or run the tasks. 
+
 The ``org.apache.pinot.thirdeye.anomaly.ThirdEyeAnomalyApplication`` class is the entry point.
 
-``detector.yml``, ``persistence.yml`` and ``data-sources-config.yml`` are used to configure backend servers.
+:ref:`detector.yml`, :ref:`persistence.yml` and :ref:`data-sources-config.yml` are used to configure backend servers.
 
 .. image:: https://user-images.githubusercontent.com/44730481/61093367-fd684300-a3fe-11e9-943e-d20ba9651528.png
+  :width: 400
 
+.. _detector.yml:
 
 detector.yml
-^^^^^^^^^^^^^^^
+--------------
 
 ThirdEye uses this file to configure the backend server.
 
@@ -54,6 +58,7 @@ Here are a list of modules you can configure in this file:
 - detectionAlert: Scheduler to generate alert tasks.
 
 .. image:: https://user-images.githubusercontent.com/44730481/61093449-6d76c900-a3ff-11e9-85e6-01201ea71eeb.png
+  :width: 500
 
 To enable one module, you can change the module's value to "true". 
 
@@ -78,9 +83,10 @@ Besides the module configuration you can configure the other followings in this 
 - Swagger configuration.
 - PhantomJSPath: PhantomJS is used to generate anomaly metrics screenshots which are attached in alert mail.
 
+.. _persistence.yml:
 
 persistence.yml
-^^^^^^^^^^^^^^^^^^^
+------------------
 
 ThirdEye uses MySQL to store all the metadata.  This file is used to configure MySQL database instance.
 
@@ -90,8 +96,10 @@ Here is an example:
 databaseConfiguration: url: jdbc:mysql:///thirdeye?autoReconnect=true user: te_dev password: xxxxx driver: com.mysql.jdbc.Driver
 
 
+.. _data-sources-config.yml:
+
 data-sources-config.yml
-^^^^^^^^^^^^^^^^^^^^^^^^
+------------------------
 
 ThirdEye doesn't store the actual metrics but will pull the metrics using data source loaders. This file controls the metrics data sources.
 
@@ -120,8 +128,12 @@ Please note ThirdEye support MySQL data source, and this configuration is differ
 	            user: 'thirdeye'
 	            password: '<password>'
 
+For more examples on datasource configurations please check :ref:`alert-setup`.
+
+.. _dashboard.yml:
+
 dashboard.yml
-^^^^^^^^^^^^^^
+------------------
 
 Controls settings relate to web application servers. The followings are configured here:
 
@@ -145,9 +157,10 @@ Controls settings relate to web application servers. The followings are configur
 - Dashboard host and endpoints configuration.
 - Swagger configuration.
 
+.. _rca.yml:
 
 rca.yml
-^^^^^^^^
+------------------
 This configures the RCA pipelines, which is used to either do metrics analysis or loads events from different systems.
 
 These pipelines are called online and not pre-loaded.
@@ -158,17 +171,15 @@ The "className" is used to create instances using reflection.
 
 
 FAQ
-^^^^
+-----------
 
-How to add a new application?
--------------------------------
+**How to add a new application?**
 
 Application is a group of users. ThirdEye can show anomalies grouped by applications. 
 
-There are two ways to add a new application
+There are two ways to add a new application:
 
-Send a post message
----------------------
+1.Send a post message
 
 curl -vX POST '.../thirdeye/entity?entityType=APPLICATION' -H "Content-Type: application/json" -H 'Cookie: te_auth=[REPLACE_TOKEN_HERE]' --data-binary @application.json
 
@@ -181,15 +192,17 @@ Example payload could be:
 	    "recipients": "owner-of-this-application@company.com"
 	}
 
-From admin page
-----------------
+2.From admin page
 
-1. Navigate to admin page: http://localhost:1426/thirdeye-admin
-2. Select an existing application from "Entity Editor".
+a. Navigate to admin page: http://localhost:1426/thirdeye-admin
+b. Select an existing application from "Entity Editor".
 
 .. image:: https://user-images.githubusercontent.com/44730481/61093646-61d7d200-a400-11e9-8517-0b46bd33fe2a.png
+  :width: 500
 
-3. Put the application and recipients in the editor, and leave id, version etc unspecified.
+c. Put the application and recipients in the editor, and leave id, version etc unspecified.
+
 .. image:: https://user-images.githubusercontent.com/44730481/61093659-6c926700-a400-11e9-8690-6a1742671e5e.png
+  :width: 500
 
-4. Click "load to editor" then click "submit". 
+d. Click "load to editor" then click "submit". 
