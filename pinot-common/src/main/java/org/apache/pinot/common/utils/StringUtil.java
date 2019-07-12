@@ -72,9 +72,9 @@ public class StringUtil {
     return decodeUtf8(bytes, 0, bytes.length);
   }
 
-  public static String decodeUtf8(byte[] bytes, int startIndex, int endIndex) {
+  public static String decodeUtf8(byte[] bytes, int startIndex, int length) {
     try {
-      return new String(bytes, startIndex, endIndex, charSet);
+      return new String(bytes, startIndex, length, charSet);
     } catch (UnsupportedEncodingException e) {
       throw new RuntimeException(e);
     }
