@@ -25,6 +25,6 @@ ThirdEye
    :maxdepth: 2
 
    introduction
+   configuration
    datasources
-   production
    alert_setup
