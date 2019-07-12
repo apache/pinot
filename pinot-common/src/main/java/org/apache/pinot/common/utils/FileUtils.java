@@ -91,7 +91,7 @@ public class FileUtils {
    * @param closeables collection of resources to close
    * @throws IOException
    */
-  public static void close(@Nonnull Iterable<? extends Closeable> closeables)
+  public static void close(Iterable<? extends Closeable> closeables)
       throws IOException {
 
     IOException topLevelException = null;
