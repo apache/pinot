@@ -17,6 +17,8 @@
 .. under the License.
 ..
 
+.. _configurations:
+
 Configuration
 =======================
 

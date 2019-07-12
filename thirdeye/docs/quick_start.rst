@@ -111,7 +111,7 @@ You will find the alert preview page like below:
 
 If you want to preview the hourly data, just change ``dataset: H2.H2.daily`` to ``dataset: H2.H2.hourly``, and rerun the preview.
 
-If you want to setup in production, you need to see :ref:`configuration` and :ref:`alert-setup`.
+If you want to setup in production, you need to see :ref:`configurations` and :ref:`alert-setup`.
 
 
 **7: Shutdown**
