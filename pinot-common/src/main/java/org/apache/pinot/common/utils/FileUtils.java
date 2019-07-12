@@ -111,9 +111,6 @@ public class FileUtils {
     }
 
     if (topLevelException != null) {
-      // this will log the call stack of top level exception and
-      // all of the suppressed exceptions
-      LOGGER.error("Failed to close one or more resources", topLevelException);
       throw topLevelException;
     }
   }
