@@ -156,16 +156,13 @@ public class VarLengthBytesValueReaderWriter implements Closeable, ValueReader {
    * Returns the power of 2 >= n.
    */
   private static int nextPowerOf2(int n) {
-    int power = 1;
-    if (n > 0 && (n & (n - 1)) == 0) {
-      return n;
-    }
-
-    while (power < n) {
-      power <<= 1;
-    }
-
-    return power;
+    n -= 1;
+    n |= n >>> 1;
+    n |= n >>> 2;
+    n |= n >>> 4;
+    n |= n >>> 8;
+    n |= n >>> 16;
+    return n + 1;
   }
 
   private void writeHeader() {
@@ -237,10 +234,11 @@ public class VarLengthBytesValueReaderWriter implements Closeable, ValueReader {
       b = buffer;
     } else {
       // Check if the current instance of ThreadLocal buffer is big enough. If not, resize it to double the size.
-      if (_reusableBytes.get().length < length) {
-        _reusableBytes.set(new byte[nextPowerOf2(length)]);
-      }
       b = _reusableBytes.get();
+      if (b.length < length) {
+        b = new byte[nextPowerOf2(length)];
+        _reusableBytes.set(b);
+      }
     }
 
     _dataBuffer.copyTo(offset, b, 0, length);
