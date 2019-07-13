@@ -62,7 +62,6 @@ import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceUserConfigConstants;
-import org.apache.pinot.core.realtime.stream.StreamConfig;
 import org.apache.pinot.core.util.ReplicationUtils;
 import org.slf4j.LoggerFactory;
 
@@ -252,14 +251,16 @@ public class PinotTableRestletResource {
   @ApiOperation(value = "Deletes a table", notes = "Deletes a table")
   public SuccessResponse deleteTable(
       @ApiParam(value = "Name of the table to delete", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "realtime|offline", required = false) @QueryParam("type") String tableTypeStr) {
+      @ApiParam(value = "realtime|offline") @QueryParam("type") String tableTypeStr) {
     List<String> tablesDeleted = new LinkedList<>();
     try {
-      if (tableTypeStr == null || tableTypeStr.equalsIgnoreCase(CommonConstants.Helix.TableType.OFFLINE.name())) {
+      if ((tableTypeStr == null || tableTypeStr.equalsIgnoreCase(CommonConstants.Helix.TableType.OFFLINE.name()))
+          && !TableNameBuilder.REALTIME.tableHasTypeSuffix(tableName)) {
         _pinotHelixResourceManager.deleteOfflineTable(tableName);
         tablesDeleted.add(TableNameBuilder.OFFLINE.tableNameWithType(tableName));
       }
-      if (tableTypeStr == null || tableTypeStr.equalsIgnoreCase(CommonConstants.Helix.TableType.REALTIME.name())) {
+      if ((tableTypeStr == null || tableTypeStr.equalsIgnoreCase(CommonConstants.Helix.TableType.REALTIME.name()))
+          && !TableNameBuilder.OFFLINE.tableHasTypeSuffix(tableName)) {
         _pinotHelixResourceManager.deleteRealtimeTable(tableName);
         tablesDeleted.add(TableNameBuilder.REALTIME.tableNameWithType(tableName));
       }
@@ -372,7 +373,6 @@ public class PinotTableRestletResource {
       String errorMsg = String.format("Invalid tableIndexConfig or streamConfig: %s", e.getMessage());
       throw new PinotHelixResourceManager.InvalidTableConfigException(errorMsg, e);
     }
-
 
     if (verifyReplication) {
       int requestReplication;

@@ -32,14 +32,14 @@ import org.apache.pinot.controller.ControllerConf;
 
 
 @Api(tags = Constants.HEALTH_TAG)
-@Path("/pinot-controller/admin")
+@Path("/")
 public class PinotControllerHealthCheck {
 
   @Inject
   ControllerConf controllerConf;
 
   @GET
-  @Path("/")
+  @Path("pinot-controller/admin")
   @ApiOperation(value = "Check controller health")
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Good")})
   @Produces(MediaType.TEXT_PLAIN)

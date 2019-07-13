@@ -110,6 +110,8 @@ public class PinotTableConfigRestletResource {
             .type(MediaType.TEXT_PLAIN_TYPE).build();
       }
 
+      // TODO: Fix the bug - when schema is not configured, after deserialization, CombinedConfig will have a non-null
+      //       schema with null schema name
       if (config.getSchema() != null) {
         _resourceManager.addOrUpdateSchema(config.getSchema());
       }
