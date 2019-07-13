@@ -26,10 +26,8 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.io.UnsupportedEncodingException;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.net.URLEncoder;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -133,14 +131,16 @@ public class FileUploadDownloadClient implements Closeable {
 
   public static URI getDeleteSegmentHttpUri(String host, int port, String rawTableName, String segmentName,
       String tableType)
-      throws URISyntaxException, UnsupportedEncodingException {
-    return new URI(StringUtil.join("/", StringUtils.chomp(HTTP + "://" + host + ":" + port, "/"),
-        OLD_SEGMENT_PATH, rawTableName + "/" + URLEncoder.encode(segmentName, "UTF-8") + TYPE_DELIMITER + tableType));
+      throws URISyntaxException {
+    return new URI(StringUtil.join("/", StringUtils.chomp(HTTP + "://" + host + ":" + port, "/"), OLD_SEGMENT_PATH,
+        rawTableName + "/" + URIUtils.encode(segmentName) + TYPE_DELIMITER + tableType));
   }
 
-  public static URI getRetrieveAllSegmentWithTableTypeHttpUri(String host, int port, String rawTableName, String tableType) throws URISyntaxException {
-    return new URI(StringUtil.join("/", StringUtils.chomp(HTTP + "://" + host + ":" + port, "/"),
-        OLD_SEGMENT_PATH, rawTableName + TYPE_DELIMITER + tableType));
+  public static URI getRetrieveAllSegmentWithTableTypeHttpUri(String host, int port, String rawTableName,
+      String tableType)
+      throws URISyntaxException {
+    return new URI(StringUtil.join("/", StringUtils.chomp(HTTP + "://" + host + ":" + port, "/"), OLD_SEGMENT_PATH,
+        rawTableName + TYPE_DELIMITER + tableType));
   }
 
   public static URI getRetrieveSchemaHttpURI(String host, int port, String schemaName)

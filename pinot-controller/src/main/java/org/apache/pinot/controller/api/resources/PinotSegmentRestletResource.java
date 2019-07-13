@@ -24,8 +24,6 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
-import java.io.UnsupportedEncodingException;
-import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -54,6 +52,7 @@ import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.JsonUtils;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
+import org.apache.pinot.common.utils.URIUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -138,7 +137,7 @@ public class PinotSegmentRestletResource {
       @ApiParam(value = "Name of segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
       @ApiParam(value = "enable|disable|drop", required = false) @QueryParam("state") String stateStr,
       @ApiParam(value = "realtime|offline", required = false) @QueryParam("type") String tableTypeStr) {
-    segmentName = checkGetEncodedParam(segmentName);
+    segmentName = URIUtils.decode(segmentName);
     // segmentName will never be null,otherwise we would reach the method toggleStateOrListMetadataForAllSegments()
     CommonConstants.Helix.TableType tableType = Constants.validateTableType(tableTypeStr);
     StateType stateType = Constants.validateState(stateStr);
@@ -159,15 +158,6 @@ public class PinotSegmentRestletResource {
         }
       }
       return toggleStateInternal(tableName, stateType, tableType, segmentName, _pinotHelixResourceManager);
-    }
-  }
-
-  private String checkGetEncodedParam(String encoded) {
-    try {
-      return URLDecoder.decode(encoded, "UTF-8");
-    } catch (UnsupportedEncodingException e) {
-      String errStr = "Could not decode parameter '" + encoded + "'";
-      throw new ControllerApplicationException(LOGGER, errStr, Response.Status.BAD_REQUEST);
     }
   }
 
@@ -193,7 +183,7 @@ public class PinotSegmentRestletResource {
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "Name of segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
       @ApiParam(value = "realtime|offline", required = false) @QueryParam("type") String tableTypeStr) {
-    segmentName = checkGetEncodedParam(segmentName);
+    segmentName = URIUtils.decode(segmentName);
     CommonConstants.Helix.TableType tableType = Constants.validateTableType(tableTypeStr);
     return listSegmentMetadataInternal(tableName, segmentName, tableType);
   }
@@ -229,7 +219,7 @@ public class PinotSegmentRestletResource {
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "Name of segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
       @ApiParam(value = "realtime|offline") @QueryParam("type") String tableTypeStr) {
-    segmentName = checkGetEncodedParam(segmentName);
+    segmentName = URIUtils.decode(segmentName);
     CommonConstants.Helix.TableType tableType = Constants.validateTableType(tableTypeStr);
     return reloadSegmentForTable(tableName, segmentName, tableType);
   }
@@ -254,7 +244,7 @@ public class PinotSegmentRestletResource {
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "Name of segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
       @ApiParam(value = "realtime|offline") @QueryParam("type") String tableTypeStr) {
-    segmentName = checkGetEncodedParam(segmentName);
+    segmentName = URIUtils.decode(segmentName);
     CommonConstants.Helix.TableType tableType = Constants.validateTableType(tableTypeStr);
     return reloadSegmentForTable(tableName, segmentName, tableType);
   }

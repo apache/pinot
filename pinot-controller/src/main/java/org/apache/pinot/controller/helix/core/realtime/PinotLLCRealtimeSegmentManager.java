@@ -62,7 +62,7 @@ import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.SegmentName;
-import org.apache.pinot.common.utils.StringUtil;
+import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.common.utils.retry.RetryPolicies;
 import org.apache.pinot.controller.ControllerConf;
@@ -147,7 +147,6 @@ public class PinotLLCRealtimeSegmentManager {
     _flushThresholdUpdateManager = new FlushThresholdUpdateManager();
     _controllerLeadershipManager = controllerLeadershipManager;
   }
-
 
   public boolean getIsSplitCommitEnabled() {
     return _controllerConf.getAcceptSplitCommit();
@@ -335,11 +334,10 @@ public class PinotLLCRealtimeSegmentManager {
     }
     String segmentName = committingSegmentDescriptor.getSegmentName();
     String segmentLocation = committingSegmentDescriptor.getSegmentLocation();
-    URI segmentFileURI = ControllerConf.getUriFromPath(segmentLocation);
-    URI baseDirURI = ControllerConf.getUriFromPath(_controllerConf.getDataDir());
-    URI tableDirURI = ControllerConf.getUriFromPath(StringUtil.join("/", _controllerConf.getDataDir(), tableName));
-    URI uriToMoveTo = ControllerConf.getUriFromPath(StringUtil.join("/", tableDirURI.toString(), segmentName));
-    PinotFS pinotFS = PinotFSFactory.create(baseDirURI.getScheme());
+    URI segmentFileURI = URIUtils.getUri(segmentLocation);
+    URI tableDirURI = URIUtils.getUri(_controllerConf.getDataDir(), tableName);
+    URI uriToMoveTo = URIUtils.getUri(_controllerConf.getDataDir(), tableName, URIUtils.encode(segmentName));
+    PinotFS pinotFS = PinotFSFactory.create(tableDirURI.getScheme());
 
     if (!isConnected() || !isLeader()) {
       // We can potentially log a different value than what we saw ....
@@ -452,7 +450,7 @@ public class PinotLLCRealtimeSegmentManager {
 
     // Step-1
     boolean success = updateOldSegmentMetadataZNRecord(realtimeTableName, committingLLCSegmentName, nextOffset,
-            committingSegmentDescriptor);
+        committingSegmentDescriptor);
     if (!success) {
       return false;
     }
@@ -483,7 +481,7 @@ public class PinotLLCRealtimeSegmentManager {
     } catch (Exception e) {
       LOGGER.error("Caught exception when updating ideal state for {}", committingSegmentNameStr, e);
       return false;
-    }  finally {
+    } finally {
       lock.unlock();
     }
 
@@ -502,8 +500,7 @@ public class PinotLLCRealtimeSegmentManager {
    * @return
    */
   protected boolean updateOldSegmentMetadataZNRecord(String realtimeTableName, LLCSegmentName committingLLCSegmentName,
-                                                     long nextOffset,
-                                                     CommittingSegmentDescriptor committingSegmentDescriptor) {
+      long nextOffset, CommittingSegmentDescriptor committingSegmentDescriptor) {
 
     String committingSegmentNameStr = committingLLCSegmentName.getSegmentName();
     Stat stat = new Stat();
@@ -516,8 +513,8 @@ public class PinotLLCRealtimeSegmentManager {
       return false;
     }
     if (committingSegmentDescriptor.getSegmentMetadata() == null) {
-      LOGGER.error("No segment metadata found in descriptor for committing segment {} for table {}", committingLLCSegmentName,
-              realtimeTableName);
+      LOGGER.error("No segment metadata found in descriptor for committing segment {} for table {}",
+          committingLLCSegmentName, realtimeTableName);
       return false;
     }
     SegmentMetadataImpl segmentMetadata = committingSegmentDescriptor.getSegmentMetadata();
@@ -527,7 +524,7 @@ public class PinotLLCRealtimeSegmentManager {
     committingSegmentMetadata.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
     String rawTableName = TableNameBuilder.extractRawTableName(realtimeTableName);
     committingSegmentMetadata.setDownloadUrl(
-        ControllerConf.constructDownloadUrl(rawTableName, committingSegmentNameStr, _controllerConf.generateVipUrl()));
+        URIUtils.constructDownloadUrl(_controllerConf.generateVipUrl(), rawTableName, committingSegmentNameStr));
     committingSegmentMetadata.setCrc(Long.valueOf(segmentMetadata.getCrc()));
     committingSegmentMetadata.setStartTime(segmentMetadata.getTimeInterval().getStartMillis());
     committingSegmentMetadata.setEndTime(segmentMetadata.getTimeInterval().getEndMillis());
@@ -1010,8 +1007,9 @@ public class PinotLLCRealtimeSegmentManager {
     LLCRealtimeSegmentZKMetadata metadata = getRealtimeSegmentZKMetadata(tableNameWithType, segmentId, stat);
     long metadataUpdateTime = stat.getMtime();
     if (now > metadataUpdateTime + MAX_SEGMENT_COMPLETION_TIME_MILLIS) {
-      LOGGER.info("Segment:{}, Now:{}, metadataUpdateTime:{}, Exceeded MAX_SEGMENT_COMPLETION_TIME_MILLIS:{}",
-          segmentId, now, metadataUpdateTime, MAX_SEGMENT_COMPLETION_TIME_MILLIS);
+      LOGGER
+          .info("Segment:{}, Now:{}, metadataUpdateTime:{}, Exceeded MAX_SEGMENT_COMPLETION_TIME_MILLIS:{}", segmentId,
+              now, metadataUpdateTime, MAX_SEGMENT_COMPLETION_TIME_MILLIS);
       return true;
     }
     return false;
@@ -1340,8 +1338,8 @@ public class PinotLLCRealtimeSegmentManager {
     Map<String, String> stateMap = idealState.getInstanceStateMap(newSegmentId);
     if (stateMap == null) {
       for (String instance : newSegmentInstances) {
-        idealState
-            .setPartitionState(newSegmentId, instance, PinotHelixSegmentOnlineOfflineStateModelGenerator.CONSUMING_STATE);
+        idealState.setPartitionState(newSegmentId, instance,
+            PinotHelixSegmentOnlineOfflineStateModelGenerator.CONSUMING_STATE);
       }
     }
 

@@ -29,6 +29,7 @@ import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.CommonConstants;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.ControllerLeadershipManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -40,7 +41,6 @@ import org.testng.annotations.Test;
 
 import static org.apache.pinot.common.protocols.SegmentCompletionProtocol.ControllerResponseStatus;
 import static org.apache.pinot.common.protocols.SegmentCompletionProtocol.Request;
-import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -1165,9 +1165,8 @@ public class SegmentCompletionTest {
     public boolean commitSegmentMetadata(String rawTableName, CommittingSegmentDescriptor committingSegmentDescriptor) {
       _segmentMetadata.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
       _segmentMetadata.setEndOffset(committingSegmentDescriptor.getNextOffset());
-      _segmentMetadata.setDownloadUrl(ControllerConf
-          .constructDownloadUrl(rawTableName, committingSegmentDescriptor.getSegmentName(),
-              CONTROLLER_CONF.generateVipUrl()));
+      _segmentMetadata.setDownloadUrl(URIUtils.constructDownloadUrl(CONTROLLER_CONF.generateVipUrl(), rawTableName,
+          committingSegmentDescriptor.getSegmentName()));
       _segmentMetadata.setEndTime(_segmentCompletionMgr.getCurrentTimeMs());
       return true;
     }
