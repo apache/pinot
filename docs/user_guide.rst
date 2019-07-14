@@ -28,4 +28,5 @@ User Guide
 
    pql_examples
    client_api
+   onboarding_best_practices
 

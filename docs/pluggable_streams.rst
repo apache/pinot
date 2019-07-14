@@ -134,6 +134,7 @@ In addition to these properties, you can define thresholds for the consuming seg
 
 * rows threshold
 * time threshold
+* segment size threshold
 
 The properties for the thresholds are as follows:
 
@@ -141,6 +142,7 @@ The properties for the thresholds are as follows:
 
   "realtime.segment.flush.threshold.size" : "100000"
   "realtime.segment.flush.threshold.time" : "6h"
+  "realtime.segment.flush.desired.size" : "200M"
 
 
 An example of this implementation can be found in the `KafkaConsumerFactory <https://github.com/apache/incubator-pinot/blob/master/pinot-core/src/main/java/org/apache/pinot/core/realtime/impl/kafka/KafkaConsumerFactory.java>`_, which is an implementation for the kafka stream.
