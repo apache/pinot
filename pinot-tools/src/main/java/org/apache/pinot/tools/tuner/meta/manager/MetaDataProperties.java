@@ -2,7 +2,9 @@ package org.apache.pinot.tools.tuner.meta.manager;
 
 import org.apache.commons.math.fraction.BigFraction;
 
-
+/*
+ * Access fields of metadata.properties
+ */
 public interface MetaDataProperties {
   String WEIGHTED_SUM_CARDINALITY = "w_cardinality";
   String SUM_DOCS = "n_totalDocs";
