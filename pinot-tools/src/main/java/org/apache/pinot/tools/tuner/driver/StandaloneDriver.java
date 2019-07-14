@@ -23,8 +23,10 @@ public abstract class StandaloneDriver extends TunerDriver {
 
   @Override
   public void excute() {
+    /*
+     * Accumulate all the queries to threadAccumulator:/threadID/table/column
+     */
     Map<Long, Map<String, Map<String, ColumnStatsObj>>> threadAccumulator=new HashMap<>();
-
     ThreadPoolExecutor executor = new ThreadPoolExecutor(
         this._coreSize,
         this._coreSize,
@@ -37,13 +39,12 @@ public abstract class StandaloneDriver extends TunerDriver {
 
     while(this._querySrc.hasNext()){
       BasicQueryStats basicQueryStats=this._querySrc.next();
-      executor.execute(() -> {
-        long threadID=Thread.currentThread().getId();
-        if(!threadAccumulator.containsKey(threadID)){
-          threadAccumulator.put(threadID,new HashMap<>());
-        }
-        this._strategy.accumulator(basicQueryStats, this._metaManager, threadAccumulator.get(threadID));
-      });
+      if(this._strategy.filter(basicQueryStats)) {
+        executor.execute(() -> {
+          long threadID = Thread.currentThread().getId();
+          this._strategy.accumulator(basicQueryStats, this._metaManager, threadAccumulator.getOrDefault(threadID, new HashMap<>()));
+        });
+      }
     }
     executor.shutdown();
     try{
@@ -52,6 +53,10 @@ public abstract class StandaloneDriver extends TunerDriver {
     catch (InterruptedException e){
       LOGGER.error(e.getMessage());
     }
+
+    /*
+     * Merge corresponding entries
+     */
 
   }
 }
