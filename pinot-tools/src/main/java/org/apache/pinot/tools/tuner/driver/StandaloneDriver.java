@@ -9,6 +9,5 @@ import org.apache.pinot.tools.tuner.strategy.BasicStrategy;
 public abstract class StandaloneDriver extends TunerDriver {
   @Override
   public void excute() {
-
   }
 }
