@@ -55,7 +55,7 @@ public class JsonFileMetaManagerImpl implements MetaManager {
     try {
       metaBytes = FileUtils.readFileToString(file);
     } catch (IOException e) {
-      LOGGER.error(e.getMessage());
+      LOGGER.error(e.toString());
       System.exit(1);
     }
     try {

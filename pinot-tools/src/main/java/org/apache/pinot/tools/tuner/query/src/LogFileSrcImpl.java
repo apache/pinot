@@ -58,7 +58,7 @@ public class LogFileSrcImpl implements QuerySrc {
       _bufferedReader = new BufferedReader(new InputStreamReader(_fileInputStream));
       _stringBuffer = _bufferedReader.readLine();
     } catch(IOException e){
-      LOGGER.error(e.getMessage());
+      LOGGER.error(e.toString());
       _stringBuffer = null;
       System.exit(1);
     }
@@ -75,7 +75,7 @@ public class LogFileSrcImpl implements QuerySrc {
         this._fileInputStream.close();
       }
       catch (IOException e) {
-        LOGGER.error(e.getMessage());
+        LOGGER.error(e.toString());
       }
       finally {
         return false;

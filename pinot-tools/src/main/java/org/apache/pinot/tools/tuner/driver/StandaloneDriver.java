@@ -15,6 +15,8 @@ import org.apache.pinot.tools.tuner.strategy.ColumnStatsObj;
 public abstract class StandaloneDriver extends TunerDriver {
 
   int _coreSize = 0;
+  private Map<Long, Map<String, Map<String, ColumnStatsObj>>> _threadAccumulator=null;
+  private Map<String, Map<String, ColumnStatsObj>> _mergedResults;
 
   public StandaloneDriver setCoreSize(int coreSize) {
     _coreSize = coreSize;
@@ -29,32 +31,63 @@ public abstract class StandaloneDriver extends TunerDriver {
     /*
      * Accumulate all the queries to threadAccumulator:/threadID/table/column
      */
-    Map<Long, Map<String, Map<String, ColumnStatsObj>>> threadAccumulator = new HashMap<>();
-    ThreadPoolExecutor executor = new ThreadPoolExecutor(this._coreSize, this._coreSize, 60, TimeUnit.SECONDS,
+    _threadAccumulator = new HashMap<>();
+    ThreadPoolExecutor accumulateExecutor = new ThreadPoolExecutor(this._coreSize, this._coreSize, 60, TimeUnit.SECONDS,
         new LinkedBlockingQueue<>(Integer.MAX_VALUE), new ThreadPoolExecutor.CallerRunsPolicy());
 
-    executor.setKeepAliveTime(60, TimeUnit.SECONDS);
-
-    while (this._querySrc.hasNext()) {
-      BasicQueryStats basicQueryStats = this._querySrc.next();
-      if (this._strategy.filter(basicQueryStats)) {
-        executor.execute(() -> {
+    while (_querySrc.hasNext()) {
+      BasicQueryStats basicQueryStats = _querySrc.next();
+      if (_strategy.filter(basicQueryStats)) {
+        accumulateExecutor.execute(() -> {
           long threadID = Thread.currentThread().getId();
-          threadAccumulator.putIfAbsent(threadID, new HashMap<>());
-          this._strategy.accumulator(basicQueryStats, this._metaManager, threadAccumulator.get(threadID));
+          _threadAccumulator.putIfAbsent(threadID, new HashMap<>());
+          _strategy.accumulator(basicQueryStats, _metaManager, _threadAccumulator.get(threadID));
         });
       }
     }
-    executor.shutdown();
+    accumulateExecutor.shutdown();
     try {
-      executor.awaitTermination(24, TimeUnit.HOURS);
+      accumulateExecutor.awaitTermination(24, TimeUnit.HOURS);
     } catch (InterruptedException e) {
-      LOGGER.error(e.getMessage());
+      LOGGER.error(e.toString());
     }
 
     /*
      * Merge corresponding entries
      */
+    _mergedResults=new HashMap<>();
+    for(Map.Entry<Long,Map<String, Map<String, ColumnStatsObj>>> threadEntry: _threadAccumulator.entrySet()){
+      for (String tableNameWithType: threadEntry.getValue().keySet()){
+        _mergedResults.putIfAbsent(tableNameWithType,new HashMap<>());
+      }
+    }
+    ThreadPoolExecutor mergeExecutor = new ThreadPoolExecutor(this._coreSize, this._coreSize, 60, TimeUnit.SECONDS,
+        new LinkedBlockingQueue<>(Integer.MAX_VALUE), new ThreadPoolExecutor.CallerRunsPolicy());
+    for(String tableNameWithType: _mergedResults.keySet()){
+      mergeExecutor.execute(() -> {
+        for (Map.Entry<Long,Map<String, Map<String, ColumnStatsObj>>> tableEntries: _threadAccumulator.entrySet()){
+          for(Map.Entry<String, ColumnStatsObj> columnEntry: tableEntries.getValue().getOrDefault(tableNameWithType, new HashMap<>()).entrySet()){
+            try {
+              _mergedResults.get(tableNameWithType).putIfAbsent(columnEntry.getKey(), columnEntry.getValue().getClass().newInstance());
+            }
+            catch (Exception e){
+              LOGGER.error("Instantiation Exception in Merger!");
+              LOGGER.error(e.toString());
+            }
+            _strategy.merger(_mergedResults.get(tableNameWithType).get(columnEntry.getKey()), columnEntry.getValue());
+          }
+        }
+      });
+    }
+    mergeExecutor.shutdown();
+    try {
+      mergeExecutor.awaitTermination(24, TimeUnit.HOURS);
+    } catch (InterruptedException e) {
+      LOGGER.error(e.toString());
+    }
 
+    /*
+     * Report
+     */
   }
 }
