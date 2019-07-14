@@ -30,6 +30,25 @@ public class JsonFileMetaManagerImpl implements MetaManager {
     _path = builder._path;
   }
 
+
+  public static final class Builder {
+    private String _path;
+
+    public Builder() {
+    }
+
+    @Nonnull
+    public Builder _path(@Nonnull String val) {
+      _path = val;
+      return this;
+    }
+
+    @Nonnull
+    public JsonFileMetaManagerImpl build() {
+      return new JsonFileMetaManagerImpl(this);
+    }
+  }
+
   public JsonFileMetaManagerImpl cache() {
     File file = new File(this._path);
     String metaBytes = "";
@@ -78,23 +97,5 @@ public class JsonFileMetaManagerImpl implements MetaManager {
       return null;
     }
     return ret.asText();
-  }
-
-  public static final class Builder {
-    private String _path;
-
-    public Builder() {
-    }
-
-    @Nonnull
-    public Builder _path(@Nonnull String val) {
-      _path = val;
-      return this;
-    }
-
-    @Nonnull
-    public JsonFileMetaManagerImpl build() {
-      return new JsonFileMetaManagerImpl(this);
-    }
   }
 }

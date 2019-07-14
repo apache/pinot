@@ -27,6 +27,31 @@ public class LogFileSrcImpl implements QuerySrc {
     _path = builder._path;
   }
 
+  public static final class Builder {
+    private BasicQueryParser _parser;
+    private String _path;
+
+    public Builder() {
+    }
+
+    @Nonnull
+    public Builder _parser(@Nonnull BasicQueryParser val) {
+      _parser = val;
+      return this;
+    }
+
+    @Nonnull
+    public Builder _path(@Nonnull String val) {
+      _path = val;
+      return this;
+    }
+
+    @Nonnull
+    public LogFileSrcImpl build() {
+      return new LogFileSrcImpl(this).openFile();
+    }
+  }
+
   private LogFileSrcImpl openFile(){
     try {
       _fileInputStream = new FileInputStream(this._path);
@@ -73,31 +98,6 @@ public class LogFileSrcImpl implements QuerySrc {
     }
     finally {
       return _parser.parse(_ret);
-    }
-  }
-
-  public static final class Builder {
-    private BasicQueryParser _parser;
-    private String _path;
-
-    public Builder() {
-    }
-
-    @Nonnull
-    public Builder _parser(@Nonnull BasicQueryParser val) {
-      _parser = val;
-      return this;
-    }
-
-    @Nonnull
-    public Builder _path(@Nonnull String val) {
-      _path = val;
-      return this;
-    }
-
-    @Nonnull
-    public LogFileSrcImpl build() {
-      return new LogFileSrcImpl(this).openFile();
     }
   }
 }

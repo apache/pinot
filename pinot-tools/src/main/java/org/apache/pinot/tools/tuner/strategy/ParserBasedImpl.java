@@ -36,6 +36,31 @@ public class ParserBasedImpl implements BasicStrategy {
     _tableNamesWithType = builder._tableNamesWithType;
   }
 
+  public static final class Builder {
+    private int _algorithmOrder = FIRST_ORDER;
+    private HashSet<String> _tableNamesWithType = new HashSet<>();
+
+    public Builder() {
+    }
+
+    @Nonnull
+    public ParserBasedImpl build() {
+      return new ParserBasedImpl(this);
+    }
+
+    @Nonnull
+    public Builder _algorithmOrder(int val) {
+      _algorithmOrder = val;
+      return this;
+    }
+
+    @Nonnull
+    public Builder _tableNamesWithType(@Nonnull List<String> val) {
+      _tableNamesWithType.addAll(val);
+      return this;
+    }
+  }
+
   @Override
   public boolean filter(BasicQueryStats queryStats) {
     IndexSuggestQueryStatsImpl indexSuggestQueryStatsImpl = (IndexSuggestQueryStatsImpl) queryStats;
@@ -60,31 +85,6 @@ public class ParserBasedImpl implements BasicStrategy {
   @Override
   public void reporter(String tableNameWithType, Map<String, ColumnStatsObj> MergedOut) {
 
-  }
-
-  public static final class Builder {
-    private int _algorithmOrder = FIRST_ORDER;
-    private HashSet<String> _tableNamesWithType = new HashSet<>();
-
-    public Builder() {
-    }
-
-    @Nonnull
-    public ParserBasedImpl build() {
-      return new ParserBasedImpl(this);
-    }
-
-    @Nonnull
-    public Builder _algorithmOrder(int val) {
-      _algorithmOrder = val;
-      return this;
-    }
-
-    @Nonnull
-    public Builder _tableNamesWithType(@Nonnull List<String> val) {
-      _tableNamesWithType.addAll(val);
-      return this;
-    }
   }
 
   class DimensionScoring {

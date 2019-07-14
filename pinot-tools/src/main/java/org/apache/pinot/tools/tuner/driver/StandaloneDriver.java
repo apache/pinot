@@ -29,31 +29,26 @@ public abstract class StandaloneDriver extends TunerDriver {
     /*
      * Accumulate all the queries to threadAccumulator:/threadID/table/column
      */
-    Map<Long, Map<String, Map<String, ColumnStatsObj>>> threadAccumulator=new HashMap<>();
-    ThreadPoolExecutor executor = new ThreadPoolExecutor(
-        this._coreSize,
-        this._coreSize,
-        60,
-        TimeUnit.SECONDS,
-        new LinkedBlockingQueue<>(Integer.MAX_VALUE),
-        new ThreadPoolExecutor.CallerRunsPolicy());
+    Map<Long, Map<String, Map<String, ColumnStatsObj>>> threadAccumulator = new HashMap<>();
+    ThreadPoolExecutor executor = new ThreadPoolExecutor(this._coreSize, this._coreSize, 60, TimeUnit.SECONDS,
+        new LinkedBlockingQueue<>(Integer.MAX_VALUE), new ThreadPoolExecutor.CallerRunsPolicy());
 
     executor.setKeepAliveTime(60, TimeUnit.SECONDS);
 
-    while(this._querySrc.hasNext()){
-      BasicQueryStats basicQueryStats=this._querySrc.next();
-      if(this._strategy.filter(basicQueryStats)) {
+    while (this._querySrc.hasNext()) {
+      BasicQueryStats basicQueryStats = this._querySrc.next();
+      if (this._strategy.filter(basicQueryStats)) {
         executor.execute(() -> {
           long threadID = Thread.currentThread().getId();
-          this._strategy.accumulator(basicQueryStats, this._metaManager, threadAccumulator.getOrDefault(threadID, new HashMap<>()));
+          this._strategy.accumulator(basicQueryStats, this._metaManager,
+              threadAccumulator.getOrDefault(threadID, new HashMap<>()));
         });
       }
     }
     executor.shutdown();
-    try{
+    try {
       executor.awaitTermination(24, TimeUnit.HOURS);
-    }
-    catch (InterruptedException e){
+    } catch (InterruptedException e) {
       LOGGER.error(e.getMessage());
     }
 

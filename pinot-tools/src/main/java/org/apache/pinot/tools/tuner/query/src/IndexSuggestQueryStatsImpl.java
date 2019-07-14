@@ -3,44 +3,12 @@ package org.apache.pinot.tools.tuner.query.src;
 import javax.annotation.Nonnull;
 
 
-public class IndexSuggestQueryStatsImpl extends BasicQueryStats{
+public class IndexSuggestQueryStatsImpl extends BasicQueryStats {
 
   private String _tableNameWithType;
   private long _numEntriesScannedInFilter;
   private long _numEntriesScannedPostFilter;
   private String _query;
-
-  @Override
-  public String toString() {
-    return "IndexSuggestQueryStatsImpl{" + "_tableNameWithType='" + _tableNameWithType + '\''
-        + ", _numEntriesScannedInFilter=" + _numEntriesScannedInFilter + ", _numEntriesScannedPostFilter="
-        + _numEntriesScannedPostFilter + ", _query='" + _query + '\'' + '}';
-  }
-
-  private IndexSuggestQueryStatsImpl(Builder builder) {
-    _tableNameWithType = builder._tableNameWithType;
-    _numEntriesScannedInFilter = builder._numEntriesScannedInFilter;
-    _numEntriesScannedPostFilter = builder._numEntriesScannedPostFilter;
-    _query = builder._query;
-  }
-
-  public String getQuery() {
-    return _query;
-  }
-
-  public String getTableNameWithType() {
-    return _tableNameWithType;
-  }
-
-  public long getNumEntriesScannedInFilter() {
-    return _numEntriesScannedInFilter;
-  }
-
-  public long getNumEntriesScannedPostFilter() {
-    return _numEntriesScannedPostFilter;
-  }
-
-
 
   public static final class Builder {
     private String _tableNameWithType;
@@ -79,5 +47,35 @@ public class IndexSuggestQueryStatsImpl extends BasicQueryStats{
     public IndexSuggestQueryStatsImpl build() {
       return new IndexSuggestQueryStatsImpl(this);
     }
+  }
+
+  @Override
+  public String toString() {
+    return "IndexSuggestQueryStatsImpl{" + "_tableNameWithType='" + _tableNameWithType + '\''
+        + ", _numEntriesScannedInFilter=" + _numEntriesScannedInFilter + ", _numEntriesScannedPostFilter="
+        + _numEntriesScannedPostFilter + ", _query='" + _query + '\'' + '}';
+  }
+
+  private IndexSuggestQueryStatsImpl(Builder builder) {
+    _tableNameWithType = builder._tableNameWithType;
+    _numEntriesScannedInFilter = builder._numEntriesScannedInFilter;
+    _numEntriesScannedPostFilter = builder._numEntriesScannedPostFilter;
+    _query = builder._query;
+  }
+
+  public String getQuery() {
+    return _query;
+  }
+
+  public String getTableNameWithType() {
+    return _tableNameWithType;
+  }
+
+  public long getNumEntriesScannedInFilter() {
+    return _numEntriesScannedInFilter;
+  }
+
+  public long getNumEntriesScannedPostFilter() {
+    return _numEntriesScannedPostFilter;
   }
 }
