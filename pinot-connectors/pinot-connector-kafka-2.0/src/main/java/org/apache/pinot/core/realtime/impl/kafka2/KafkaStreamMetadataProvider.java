@@ -29,13 +29,13 @@ import org.apache.pinot.core.realtime.stream.StreamConfig;
 import org.apache.pinot.core.realtime.stream.StreamMetadataProvider;
 
 
-public class Kafka2PartitionLevelStreamMetadataProvider extends Kafka2PartitionLevelConnectionHandler implements StreamMetadataProvider {
+public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHandler implements StreamMetadataProvider {
 
-  public Kafka2PartitionLevelStreamMetadataProvider(String clientId, StreamConfig streamConfig) {
+  public KafkaStreamMetadataProvider(String clientId, StreamConfig streamConfig) {
     this(clientId, streamConfig, Integer.MIN_VALUE);
   }
 
-  public Kafka2PartitionLevelStreamMetadataProvider(String clientId, StreamConfig streamConfig, int partition) {
+  public KafkaStreamMetadataProvider(String clientId, StreamConfig streamConfig, int partition) {
     super(clientId, streamConfig, partition);
   }
 

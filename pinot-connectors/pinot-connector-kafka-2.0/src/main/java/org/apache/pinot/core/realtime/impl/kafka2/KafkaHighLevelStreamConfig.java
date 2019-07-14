@@ -30,9 +30,9 @@ import org.apache.pinot.core.realtime.stream.StreamConfigProperties;
 
 
 /**
- * Wrapper around {@link StreamConfig} for use in the {@link Kafka2StreamLevelConsumer}
+ * Wrapper around {@link StreamConfig} for use in the {@link KafkaStreamLevelConsumer}
  */
-public class Kafka2HighLevelStreamConfig {
+public class KafkaHighLevelStreamConfig {
   private static final String DEFAULT_AUTO_COMMIT_ENABLE = "false";
 
   private static final Map<String, String> defaultProps;
@@ -47,13 +47,13 @@ public class Kafka2HighLevelStreamConfig {
    * @param tableName
    * @param instanceZKMetadata
    */
-  public Kafka2HighLevelStreamConfig(StreamConfig streamConfig, String tableName,
+  public KafkaHighLevelStreamConfig(StreamConfig streamConfig, String tableName,
       InstanceZKMetadata instanceZKMetadata) {
     Map<String, String> streamConfigMap = streamConfig.getStreamConfigsMap();
 
     _kafkaTopicName = streamConfig.getTopicName();
-    String hlcBootstrapBrokerUrlKey = Kafka2StreamConfigProperties
-        .constructStreamProperty(Kafka2StreamConfigProperties.HighLevelConsumer.KAFKA_HLC_BOOTSTRAP_SERVER);
+    String hlcBootstrapBrokerUrlKey = KafkaStreamConfigProperties
+        .constructStreamProperty(KafkaStreamConfigProperties.HighLevelConsumer.KAFKA_HLC_BOOTSTRAP_SERVER);
     _bootstrapServers = streamConfigMap.get(hlcBootstrapBrokerUrlKey);
     Preconditions.checkNotNull(_bootstrapServers,
         "Must specify bootstrap broker connect string " + hlcBootstrapBrokerUrlKey + " in high level kafka consumer");
@@ -61,7 +61,7 @@ public class Kafka2HighLevelStreamConfig {
 
     _kafkaConsumerProperties = new HashMap<>();
     String kafkaConsumerPropertyPrefix =
-        Kafka2StreamConfigProperties.constructStreamProperty(Kafka2StreamConfigProperties.KAFKA_CONSUMER_PROP_PREFIX);
+        KafkaStreamConfigProperties.constructStreamProperty(KafkaStreamConfigProperties.KAFKA_CONSUMER_PROP_PREFIX);
     for (String key : streamConfigMap.keySet()) {
       if (key.startsWith(kafkaConsumerPropertyPrefix)) {
         _kafkaConsumerProperties
@@ -93,7 +93,7 @@ public class Kafka2HighLevelStreamConfig {
 
   @Override
   public String toString() {
-    return "Kafka2HighLevelStreamConfig{" + "_kafkaTopicName='" + _kafkaTopicName + '\'' + ", _groupId='" + _groupId
+    return "KafkaHighLevelStreamConfig{" + "_kafkaTopicName='" + _kafkaTopicName + '\'' + ", _groupId='" + _groupId
         + '\'' + ", _bootstrapServers='" + _bootstrapServers + '\'' + ", _kafkaConsumerProperties="
         + _kafkaConsumerProperties + '}';
   }
@@ -108,7 +108,7 @@ public class Kafka2HighLevelStreamConfig {
       return false;
     }
 
-    Kafka2HighLevelStreamConfig that = (Kafka2HighLevelStreamConfig) o;
+    KafkaHighLevelStreamConfig that = (KafkaHighLevelStreamConfig) o;
 
     return EqualityUtils.isEqual(_kafkaTopicName, that._kafkaTopicName) && EqualityUtils
         .isEqual(_groupId, that._groupId) && EqualityUtils.isEqual(_bootstrapServers, that._bootstrapServers)
@@ -130,6 +130,6 @@ public class Kafka2HighLevelStreamConfig {
 
   static {
     defaultProps = new HashMap<>();
-    defaultProps.put(Kafka2StreamConfigProperties.HighLevelConsumer.AUTO_COMMIT_ENABLE, DEFAULT_AUTO_COMMIT_ENABLE);
+    defaultProps.put(KafkaStreamConfigProperties.HighLevelConsumer.AUTO_COMMIT_ENABLE, DEFAULT_AUTO_COMMIT_ENABLE);
   }
 }

@@ -44,7 +44,7 @@ import org.slf4j.LoggerFactory;
 /**
  * An implementation of a {@link StreamLevelConsumer} which consumes from the kafka stream
  */
-public class Kafka2StreamLevelConsumer implements StreamLevelConsumer {
+public class KafkaStreamLevelConsumer implements StreamLevelConsumer {
 
   private StreamMessageDecoder _messageDecoder;
   private Logger INSTANCE_LOGGER;
@@ -53,7 +53,7 @@ public class Kafka2StreamLevelConsumer implements StreamLevelConsumer {
   private String _tableAndStreamName;
 
   private StreamConfig _streamConfig;
-  private Kafka2HighLevelStreamConfig _kafka2HighLevelStreamConfig;
+  private KafkaHighLevelStreamConfig _kafkaHighLevelStreamConfig;
 
   private KafkaConsumer<byte[], byte[]> consumer;
   private ConsumerRecords<byte[], byte[]> consumerRecords;
@@ -68,24 +68,24 @@ public class Kafka2StreamLevelConsumer implements StreamLevelConsumer {
   private Meter tableAndStreamRowsConsumed = null;
   private Meter tableRowsConsumed = null;
 
-  public Kafka2StreamLevelConsumer(String clientId, String tableName, StreamConfig streamConfig, Schema schema,
+  public KafkaStreamLevelConsumer(String clientId, String tableName, StreamConfig streamConfig, Schema schema,
       InstanceZKMetadata instanceZKMetadata, ServerMetrics serverMetrics) {
     _clientId = clientId;
     _streamConfig = streamConfig;
-    _kafka2HighLevelStreamConfig = new Kafka2HighLevelStreamConfig(streamConfig, tableName, instanceZKMetadata);
+    _kafkaHighLevelStreamConfig = new KafkaHighLevelStreamConfig(streamConfig, tableName, instanceZKMetadata);
     _serverMetrics = serverMetrics;
 
     _messageDecoder = StreamDecoderProvider.create(streamConfig, schema);
 
     _tableAndStreamName = tableName + "-" + streamConfig.getTopicName();
     INSTANCE_LOGGER = LoggerFactory
-        .getLogger(Kafka2StreamLevelConsumer.class.getName() + "_" + tableName + "_" + streamConfig.getTopicName());
+        .getLogger(KafkaStreamLevelConsumer.class.getName() + "_" + tableName + "_" + streamConfig.getTopicName());
   }
 
   @Override
   public void start()
       throws Exception {
-    consumer = Kafka2ConsumerManager.acquireKafkaConsumerForConfig(_kafka2HighLevelStreamConfig);
+    consumer = KafkaStreamLevelConsumerManager.acquireKafkaConsumerForConfig(_kafkaHighLevelStreamConfig);
   }
 
   private void updateKafkaIterator() {
@@ -160,7 +160,7 @@ public class Kafka2StreamLevelConsumer implements StreamLevelConsumer {
       throws Exception {
     if (consumer != null) {
       consumer = null;
-      Kafka2ConsumerManager.releaseKafkaConsumer(consumer);
+      KafkaStreamLevelConsumerManager.releaseKafkaConsumer(consumer);
     }
   }
 }

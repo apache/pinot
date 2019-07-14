@@ -33,10 +33,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class Kafka2PartitionLevelPartitionLevelConsumer extends Kafka2PartitionLevelConnectionHandler implements PartitionLevelConsumer {
-  private static final Logger LOGGER = LoggerFactory.getLogger(Kafka2PartitionLevelPartitionLevelConsumer.class);
+public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHandler implements PartitionLevelConsumer {
+  private static final Logger LOGGER = LoggerFactory.getLogger(KafkaPartitionLevelConsumer.class);
 
-  public Kafka2PartitionLevelPartitionLevelConsumer(String clientId, StreamConfig streamConfig, int partition) {
+  public KafkaPartitionLevelConsumer(String clientId, StreamConfig streamConfig, int partition) {
     super(clientId, streamConfig, partition);
   }
 
@@ -47,7 +47,7 @@ public class Kafka2PartitionLevelPartitionLevelConsumer extends Kafka2PartitionL
     ConsumerRecords<String, Bytes> consumerRecords = _consumer.poll(Duration.ofMillis(timeoutMillis));
     final Iterable<ConsumerRecord<String, Bytes>> messageAndOffsetIterable =
         buildOffsetFilteringIterable(consumerRecords.records(_topicPartition), startOffset, endOffset);
-    return new Kafka2MessageBatch(messageAndOffsetIterable);
+    return new KafkaMessageBatch(messageAndOffsetIterable);
   }
 
   private Iterable<ConsumerRecord<String, Bytes>> buildOffsetFilteringIterable(

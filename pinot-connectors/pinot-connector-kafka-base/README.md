@@ -18,8 +18,6 @@
     under the License.
 
 -->
-# Pinot connector for kafka 2.0.x
+# Base class and common utils for Pinot Kafka connector
 
-This is an implementation of the kafka stream for kafka versions 2.0.x The version used in this implementation is kafka 2.0.0.
-
-A stream plugin for another version of kafka, or another stream, can be added in a similar fashion. Refer to documentation on (Pluggable Streams)[https://pinot.readthedocs.io/en/latest/pluggable_streams.html] for the specfic interfaces to implement.
+This is a shared module by all the Pinot Kafka Connector

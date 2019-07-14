@@ -32,17 +32,17 @@ import org.apache.kafka.common.utils.Bytes;
 import org.apache.pinot.core.realtime.stream.StreamConfig;
 
 
-public abstract class Kafka2PartitionLevelConnectionHandler {
+public abstract class KafkaPartitionLevelConnectionHandler {
 
-  protected final Kafka2PartitionLevelStreamConfig _config;
+  protected final KafkaPartitionLevelStreamConfig _config;
   protected final String _clientId;
   protected final int _partition;
   protected final String _topic;
   protected final Consumer<String, Bytes> _consumer;
   protected final TopicPartition _topicPartition;
 
-  public Kafka2PartitionLevelConnectionHandler(String clientId, StreamConfig streamConfig, int partition) {
-    _config = new Kafka2PartitionLevelStreamConfig(streamConfig);
+  public KafkaPartitionLevelConnectionHandler(String clientId, StreamConfig streamConfig, int partition) {
+    _config = new KafkaPartitionLevelStreamConfig(streamConfig);
     _clientId = clientId;
     _partition = partition;
     _topic = _config.getKafkaTopicName();
@@ -62,7 +62,7 @@ public abstract class Kafka2PartitionLevelConnectionHandler {
   }
 
   @VisibleForTesting
-  protected Kafka2PartitionLevelStreamConfig getKafka2PartitionLevelStreamConfig() {
+  protected KafkaPartitionLevelStreamConfig getKafkaPartitionLevelStreamConfig() {
     return _config;
   }
 }

@@ -110,39 +110,39 @@ public class KafkaPartitionLevelConsumerTest {
     streamConfigMap.put("stream.kafka.topic.name", streamKafkaTopicName);
     streamConfigMap.put("stream.kafka.broker.list", streamKafkaBrokerList);
     streamConfigMap.put("stream.kafka.consumer.type", streamKafkaConsumerType);
-    streamConfigMap.put("stream.kafka.consumer.factory.class.name", Kafka2ConsumerFactory.class.getName());
+    streamConfigMap.put("stream.kafka.consumer.factory.class.name", KafkaConsumerFactory.class.getName());
     streamConfigMap.put("stream.kafka.decoder.class.name", "decoderClass");
     streamConfigMap.put("stream.kafka.fetcher.size", "10000");
     streamConfigMap.put("stream.kafka.fetcher.minBytes", "20000");
     StreamConfig streamConfig = new StreamConfig(streamConfigMap);
 
-    Kafka2PartitionLevelStreamMetadataProvider streamMetadataProvider =
-        new Kafka2PartitionLevelStreamMetadataProvider(clientId, streamConfig);
+    KafkaStreamMetadataProvider streamMetadataProvider =
+        new KafkaStreamMetadataProvider(clientId, streamConfig);
 
     // test default value
-    Kafka2PartitionLevelPartitionLevelConsumer kafkaSimpleStreamConsumer =
-        new Kafka2PartitionLevelPartitionLevelConsumer(clientId, streamConfig, 0);
+    KafkaPartitionLevelConsumer kafkaSimpleStreamConsumer =
+        new KafkaPartitionLevelConsumer(clientId, streamConfig, 0);
     kafkaSimpleStreamConsumer.fetchMessages(12345L, 23456L, 10000);
 
-    Assert.assertEquals(Kafka2StreamConfigProperties.LowLevelConsumer.KAFKA_BUFFER_SIZE_DEFAULT,
-        kafkaSimpleStreamConsumer.getKafka2PartitionLevelStreamConfig().getKafkaBufferSize());
-    Assert.assertEquals(Kafka2StreamConfigProperties.LowLevelConsumer.KAFKA_SOCKET_TIMEOUT_DEFAULT,
-        kafkaSimpleStreamConsumer.getKafka2PartitionLevelStreamConfig().getKafkaSocketTimeout());
+    Assert.assertEquals(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_BUFFER_SIZE_DEFAULT,
+        kafkaSimpleStreamConsumer.getKafkaPartitionLevelStreamConfig().getKafkaBufferSize());
+    Assert.assertEquals(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_SOCKET_TIMEOUT_DEFAULT,
+        kafkaSimpleStreamConsumer.getKafkaPartitionLevelStreamConfig().getKafkaSocketTimeout());
 
     // test parsing values
     Assert.assertEquals(10000,
-        kafkaSimpleStreamConsumer.getKafka2PartitionLevelStreamConfig().getKafkaFetcherSizeBytes());
+        kafkaSimpleStreamConsumer.getKafkaPartitionLevelStreamConfig().getKafkaFetcherSizeBytes());
     Assert
-        .assertEquals(20000, kafkaSimpleStreamConsumer.getKafka2PartitionLevelStreamConfig().getKafkaFetcherMinBytes());
+        .assertEquals(20000, kafkaSimpleStreamConsumer.getKafkaPartitionLevelStreamConfig().getKafkaFetcherMinBytes());
 
     // test user defined values
     streamConfigMap.put("stream.kafka.buffer.size", "100");
     streamConfigMap.put("stream.kafka.socket.timeout", "1000");
     streamConfig = new StreamConfig(streamConfigMap);
-    kafkaSimpleStreamConsumer = new Kafka2PartitionLevelPartitionLevelConsumer(clientId, streamConfig, 0);
+    kafkaSimpleStreamConsumer = new KafkaPartitionLevelConsumer(clientId, streamConfig, 0);
     kafkaSimpleStreamConsumer.fetchMessages(12345L, 23456L, 10000);
-    Assert.assertEquals(100, kafkaSimpleStreamConsumer.getKafka2PartitionLevelStreamConfig().getKafkaBufferSize());
-    Assert.assertEquals(1000, kafkaSimpleStreamConsumer.getKafka2PartitionLevelStreamConfig().getKafkaSocketTimeout());
+    Assert.assertEquals(100, kafkaSimpleStreamConsumer.getKafkaPartitionLevelStreamConfig().getKafkaBufferSize());
+    Assert.assertEquals(1000, kafkaSimpleStreamConsumer.getKafkaPartitionLevelStreamConfig().getKafkaSocketTimeout());
   }
 
   @Test
@@ -157,12 +157,12 @@ public class KafkaPartitionLevelConsumerTest {
     streamConfigMap.put("stream.kafka.topic.name", TEST_TOPIC_1);
     streamConfigMap.put("stream.kafka.broker.list", streamKafkaBrokerList);
     streamConfigMap.put("stream.kafka.consumer.type", streamKafkaConsumerType);
-    streamConfigMap.put("stream.kafka.consumer.factory.class.name", Kafka2ConsumerFactory.class.getName());
+    streamConfigMap.put("stream.kafka.consumer.factory.class.name", KafkaConsumerFactory.class.getName());
     streamConfigMap.put("stream.kafka.decoder.class.name", "decoderClass");
     StreamConfig streamConfig = new StreamConfig(streamConfigMap);
 
-    Kafka2PartitionLevelStreamMetadataProvider streamMetadataProvider =
-        new Kafka2PartitionLevelStreamMetadataProvider(clientId, streamConfig);
+    KafkaStreamMetadataProvider streamMetadataProvider =
+        new KafkaStreamMetadataProvider(clientId, streamConfig);
     Assert.assertEquals(streamMetadataProvider.fetchPartitionCount(10000L), 1);
 
     streamConfigMap = new HashMap<>();
@@ -170,11 +170,11 @@ public class KafkaPartitionLevelConsumerTest {
     streamConfigMap.put("stream.kafka.topic.name", TEST_TOPIC_2);
     streamConfigMap.put("stream.kafka.broker.list", streamKafkaBrokerList);
     streamConfigMap.put("stream.kafka.consumer.type", streamKafkaConsumerType);
-    streamConfigMap.put("stream.kafka.consumer.factory.class.name", Kafka2ConsumerFactory.class.getName());
+    streamConfigMap.put("stream.kafka.consumer.factory.class.name", KafkaConsumerFactory.class.getName());
     streamConfigMap.put("stream.kafka.decoder.class.name", "decoderClass");
     streamConfig = new StreamConfig(streamConfigMap);
 
-    streamMetadataProvider = new Kafka2PartitionLevelStreamMetadataProvider(clientId, streamConfig);
+    streamMetadataProvider = new KafkaStreamMetadataProvider(clientId, streamConfig);
     Assert.assertEquals(streamMetadataProvider.fetchPartitionCount(10000L), 2);
   }
 
@@ -192,13 +192,13 @@ public class KafkaPartitionLevelConsumerTest {
     streamConfigMap.put("stream.kafka.topic.name", streamKafkaTopicName);
     streamConfigMap.put("stream.kafka.broker.list", streamKafkaBrokerList);
     streamConfigMap.put("stream.kafka.consumer.type", streamKafkaConsumerType);
-    streamConfigMap.put("stream.kafka.consumer.factory.class.name", Kafka2ConsumerFactory.class.getName());
+    streamConfigMap.put("stream.kafka.consumer.factory.class.name", KafkaConsumerFactory.class.getName());
     streamConfigMap.put("stream.kafka.decoder.class.name", "decoderClass");
     StreamConfig streamConfig = new StreamConfig(streamConfigMap);
 
     int partition = 0;
-    Kafka2PartitionLevelPartitionLevelConsumer kafkaSimpleStreamConsumer =
-        new Kafka2PartitionLevelPartitionLevelConsumer(clientId, streamConfig, partition);
+    KafkaPartitionLevelConsumer kafkaSimpleStreamConsumer =
+        new KafkaPartitionLevelConsumer(clientId, streamConfig, partition);
     kafkaSimpleStreamConsumer.fetchMessages(12345L, 23456L, 10000);
   }
 
@@ -221,15 +221,15 @@ public class KafkaPartitionLevelConsumerTest {
     streamConfigMap.put("stream.kafka.topic.name", topic);
     streamConfigMap.put("stream.kafka.broker.list", streamKafkaBrokerList);
     streamConfigMap.put("stream.kafka.consumer.type", streamKafkaConsumerType);
-    streamConfigMap.put("stream.kafka.consumer.factory.class.name", Kafka2ConsumerFactory.class.getName());
+    streamConfigMap.put("stream.kafka.consumer.factory.class.name", KafkaConsumerFactory.class.getName());
     streamConfigMap.put("stream.kafka.decoder.class.name", "decoderClass");
     StreamConfig streamConfig = new StreamConfig(streamConfigMap);
 
     int numPartitions =
-        new Kafka2PartitionLevelStreamMetadataProvider(clientId, streamConfig).fetchPartitionCount(10000);
+        new KafkaStreamMetadataProvider(clientId, streamConfig).fetchPartitionCount(10000);
     for (int partition = 0; partition < numPartitions; partition++) {
-      Kafka2PartitionLevelStreamMetadataProvider kafkaStreamMetadataProvider =
-          new Kafka2PartitionLevelStreamMetadataProvider(clientId, streamConfig, partition);
+      KafkaStreamMetadataProvider kafkaStreamMetadataProvider =
+          new KafkaStreamMetadataProvider(clientId, streamConfig, partition);
       Assert.assertEquals(0, kafkaStreamMetadataProvider
           .fetchPartitionOffset(new OffsetCriteria.OffsetCriteriaBuilder().withOffsetSmallest(), 10000));
       Assert.assertEquals(NUM_MSG_PRODUCED_PER_PARTITION, kafkaStreamMetadataProvider
@@ -256,13 +256,13 @@ public class KafkaPartitionLevelConsumerTest {
     streamConfigMap.put("stream.kafka.topic.name", topic);
     streamConfigMap.put("stream.kafka.broker.list", streamKafkaBrokerList);
     streamConfigMap.put("stream.kafka.consumer.type", streamKafkaConsumerType);
-    streamConfigMap.put("stream.kafka.consumer.factory.class.name", Kafka2ConsumerFactory.class.getName());
+    streamConfigMap.put("stream.kafka.consumer.factory.class.name", KafkaConsumerFactory.class.getName());
     streamConfigMap.put("stream.kafka.decoder.class.name", "decoderClass");
     StreamConfig streamConfig = new StreamConfig(streamConfigMap);
 
     final StreamConsumerFactory streamConsumerFactory = StreamConsumerFactoryProvider.create(streamConfig);
     int numPartitions =
-        new Kafka2PartitionLevelStreamMetadataProvider(clientId, streamConfig).fetchPartitionCount(10000);
+        new KafkaStreamMetadataProvider(clientId, streamConfig).fetchPartitionCount(10000);
     for (int partition = 0; partition < numPartitions; partition++) {
       final PartitionLevelConsumer consumer = streamConsumerFactory.createPartitionLevelConsumer(clientId, partition);
 

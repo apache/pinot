@@ -29,49 +29,10 @@
     <relativePath>..</relativePath>
   </parent>
   <modelVersion>4.0.0</modelVersion>
-  <artifactId>pinot-connector-kafka-0.9</artifactId>
-  <name>Pinot Connector Kafka 0.9</name>
+  <artifactId>pinot-connector-kafka-base</artifactId>
+  <name>Pinot Connector Kafka Base</name>
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/../..</pinot.root>
-    <kafka.lib.version>0.9.0.1</kafka.lib.version>
-    <kafka.scala.version>2.10</kafka.scala.version>
   </properties>
-
-  <dependencies>
-    <dependency>
-      <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-connector-kafka-base</artifactId>
-      <version>${project.version}</version>
-    </dependency>
-    <!-- Kafka  -->
-    <dependency>
-      <groupId>org.apache.kafka</groupId>
-      <artifactId>kafka_2.10</artifactId>
-      <version>${kafka.lib.version}</version>
-      <exclusions>
-        <exclusion>
-          <groupId>org.slf4j</groupId>
-          <artifactId>slf4j-log4j12</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>net.sf.jopt-simple</groupId>
-          <artifactId>jopt-simple</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.scala-lang</groupId>
-          <artifactId>scala-library</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.zookeeper</groupId>
-          <artifactId>zookeeper</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-    <dependency>
-      <groupId>org.scala-lang</groupId>
-      <artifactId>scala-library</artifactId>
-      <version>2.10.5</version>
-    </dependency>
-  </dependencies>
 </project>

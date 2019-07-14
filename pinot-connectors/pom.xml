@@ -38,6 +38,7 @@
   </properties>
 
   <modules>
+    <module>pinot-connector-kafka-base</module>
     <module>pinot-connector-kafka-0.9</module>
     <module>pinot-connector-kafka-2.0</module>
   </modules>

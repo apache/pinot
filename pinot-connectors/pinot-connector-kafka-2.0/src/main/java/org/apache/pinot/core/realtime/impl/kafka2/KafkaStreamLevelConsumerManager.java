@@ -60,64 +60,64 @@ import org.slf4j.LoggerFactory;
  * This temporary code should be completely removed by the time we redesign the consumption to use the lower level
  * Kafka APIs.
  */
-public class Kafka2ConsumerManager {
+public class KafkaStreamLevelConsumerManager {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(Kafka2ConsumerManager.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(KafkaStreamLevelConsumerManager.class);
   private static final Long IN_USE = -1L;
   private static final long CONSUMER_SHUTDOWN_DELAY_MILLIS = TimeUnit.SECONDS.toMillis(60); // One minute
   private static final Map<ImmutableTriple<String, String, String>, KafkaConsumer> CONSUMER_FOR_CONFIG_KEY =
       new HashMap<>();
   private static final IdentityHashMap<KafkaConsumer, Long> CONSUMER_RELEASE_TIME = new IdentityHashMap<>();
 
-  public static KafkaConsumer acquireKafkaConsumerForConfig(Kafka2HighLevelStreamConfig kafka2HighLevelStreamConfig) {
+  public static KafkaConsumer acquireKafkaConsumerForConfig(KafkaHighLevelStreamConfig kafkaHighLevelStreamConfig) {
     final ImmutableTriple<String, String, String> configKey =
-        new ImmutableTriple<>(kafka2HighLevelStreamConfig.getKafkaTopicName(), kafka2HighLevelStreamConfig.getGroupId(),
-            kafka2HighLevelStreamConfig.getBootstrapServers());
+        new ImmutableTriple<>(kafkaHighLevelStreamConfig.getKafkaTopicName(), kafkaHighLevelStreamConfig.getGroupId(),
+            kafkaHighLevelStreamConfig.getBootstrapServers());
 
-    synchronized (Kafka2ConsumerManager.class) {
+    synchronized (KafkaStreamLevelConsumerManager.class) {
       // If we have the consumer and it's not already acquired, return it, otherwise error out if it's already acquired
       if (CONSUMER_FOR_CONFIG_KEY.containsKey(configKey)) {
         KafkaConsumer kafkaConsumer = CONSUMER_FOR_CONFIG_KEY.get(configKey);
         if (CONSUMER_RELEASE_TIME.get(kafkaConsumer).equals(IN_USE)) {
-          throw new RuntimeException("Consumer/iterator " + kafkaConsumer + " already in use!");
+          throw new RuntimeException("Consumer " + kafkaConsumer + " already in use!");
         } else {
-          LOGGER.info("Reusing kafka consumer/iterator with id {}", kafkaConsumer);
+          LOGGER.info("Reusing kafka consumer with id {}", kafkaConsumer);
           CONSUMER_RELEASE_TIME.put(kafkaConsumer, IN_USE);
           return kafkaConsumer;
         }
       }
 
       LOGGER.info("Creating new kafka consumer and iterator for topic {}",
-          kafka2HighLevelStreamConfig.getKafkaTopicName());
+          kafkaHighLevelStreamConfig.getKafkaTopicName());
 
       // Create the consumer
 
       Properties consumerProp = new Properties();
-      consumerProp.putAll(kafka2HighLevelStreamConfig.getKafkaConsumerProperties());
-      consumerProp.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, kafka2HighLevelStreamConfig.getBootstrapServers());
+      consumerProp.putAll(kafkaHighLevelStreamConfig.getKafkaConsumerProperties());
+      consumerProp.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaHighLevelStreamConfig.getBootstrapServers());
       consumerProp.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
       consumerProp.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, BytesDeserializer.class.getName());
       KafkaConsumer consumer = new KafkaConsumer<>(consumerProp);
-      consumer.subscribe(Collections.singletonList(kafka2HighLevelStreamConfig.getKafkaTopicName()));
+      consumer.subscribe(Collections.singletonList(kafkaHighLevelStreamConfig.getKafkaTopicName()));
 
       // Mark both the consumer and iterator as acquired
       CONSUMER_FOR_CONFIG_KEY.put(configKey, consumer);
       CONSUMER_RELEASE_TIME.put(consumer, IN_USE);
 
-      LOGGER.info("Created consumer/iterator with id {} for topic {}", consumer,
-          kafka2HighLevelStreamConfig.getKafkaTopicName());
+      LOGGER.info("Created consumer with id {} for topic {}", consumer,
+          kafkaHighLevelStreamConfig.getKafkaTopicName());
 
       return consumer;
     }
   }
 
   public static void releaseKafkaConsumer(final KafkaConsumer kafkaConsumer) {
-    synchronized (Kafka2ConsumerManager.class) {
+    synchronized (KafkaStreamLevelConsumerManager.class) {
       // Release the consumer, mark it for shutdown in the future
       final long releaseTime = System.currentTimeMillis() + CONSUMER_SHUTDOWN_DELAY_MILLIS;
       CONSUMER_RELEASE_TIME.put(kafkaConsumer, releaseTime);
 
-      LOGGER.info("Marking consumer/iterator with id {} for release at {}", kafkaConsumer, releaseTime);
+      LOGGER.info("Marking consumer with id {} for release at {}", kafkaConsumer, releaseTime);
 
       // Schedule the shutdown of the consumer
       new Thread() {
@@ -128,8 +128,8 @@ public class Kafka2ConsumerManager {
             Uninterruptibles.sleepUninterruptibly(CONSUMER_SHUTDOWN_DELAY_MILLIS, TimeUnit.MILLISECONDS);
 
             // Shutdown all consumers that have not been re-acquired
-            synchronized (Kafka2ConsumerManager.class) {
-              LOGGER.info("Executing release check for consumer/iterator {} at {}, scheduled at ", kafkaConsumer,
+            synchronized (KafkaStreamLevelConsumerManager.class) {
+              LOGGER.info("Executing release check for consumer {} at {}, scheduled at {}", kafkaConsumer,
                   System.currentTimeMillis(), releaseTime);
 
               Iterator<Map.Entry<ImmutableTriple<String, String, String>, KafkaConsumer>> configIterator =
@@ -141,7 +141,7 @@ public class Kafka2ConsumerManager {
 
                 final Long releaseTime = CONSUMER_RELEASE_TIME.get(kafkaConsumer);
                 if (!releaseTime.equals(IN_USE) && releaseTime < System.currentTimeMillis()) {
-                  LOGGER.info("Releasing consumer/iterator {}", kafkaConsumer);
+                  LOGGER.info("Releasing consumer {}", kafkaConsumer);
 
                   try {
                     kafkaConsumer.close();
@@ -152,12 +152,12 @@ public class Kafka2ConsumerManager {
                   configIterator.remove();
                   CONSUMER_RELEASE_TIME.remove(kafkaConsumer);
                 } else {
-                  LOGGER.info("Not releasing consumer/iterator {}, it has been reacquired", kafkaConsumer);
+                  LOGGER.info("Not releasing consumer {}, it has been reacquired", kafkaConsumer);
                 }
               }
             }
           } catch (Exception e) {
-            LOGGER.warn("Caught exception in release of consumer/iterator {}", e, kafkaConsumer);
+            LOGGER.warn("Caught exception in release of consumer {}", kafkaConsumer, e);
           }
         }
       }.start();
@@ -167,13 +167,13 @@ public class Kafka2ConsumerManager {
   public static void closeAllConsumers() {
     try {
       // Shutdown all consumers
-      synchronized (Kafka2ConsumerManager.class) {
+      synchronized (KafkaStreamLevelConsumerManager.class) {
         LOGGER.info("Trying to shutdown all the kafka consumers");
         Iterator<KafkaConsumer> consumerIterator = CONSUMER_FOR_CONFIG_KEY.values().iterator();
 
         while (consumerIterator.hasNext()) {
           KafkaConsumer kafkaConsumer = consumerIterator.next();
-          LOGGER.info("Trying to shutdown consumer/iterator {}", kafkaConsumer);
+          LOGGER.info("Trying to shutdown consumer {}", kafkaConsumer);
           try {
             kafkaConsumer.close();
           } catch (Exception e) {

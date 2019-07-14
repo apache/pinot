@@ -22,14 +22,15 @@ import java.util.ArrayList;
 import java.util.List;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.utils.Bytes;
+import org.apache.pinot.core.realtime.impl.kafka.MessageAndOffset;
 import org.apache.pinot.core.realtime.stream.MessageBatch;
 
 
-public class Kafka2MessageBatch implements MessageBatch<byte[]> {
+public class KafkaMessageBatch implements MessageBatch<byte[]> {
 
   private List<MessageAndOffset> messageList = new ArrayList<>();
 
-  public Kafka2MessageBatch(Iterable<ConsumerRecord<String, Bytes>> iterable) {
+  public KafkaMessageBatch(Iterable<ConsumerRecord<String, Bytes>> iterable) {
     for (ConsumerRecord<String, Bytes> record : iterable) {
       messageList.add(new MessageAndOffset(record.value().get(), record.offset()));
     }

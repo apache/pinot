@@ -34,16 +34,21 @@
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/../..</pinot.root>
-    <kafka.version>2.0.0</kafka.version>
+    <kafka.lib.version>2.0.0</kafka.lib.version>
+    <kafka.scala.version>2.12</kafka.scala.version>
   </properties>
 
   <dependencies>
-
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-connector-kafka-base</artifactId>
+      <version>${project.version}</version>
+    </dependency>
     <!-- Kafka  -->
     <dependency>
       <groupId>org.apache.kafka</groupId>
       <artifactId>kafka-clients</artifactId>
-      <version>${kafka.version}</version>
+      <version>${kafka.lib.version}</version>
       <exclusions>
         <exclusion>
           <groupId>org.slf4j</groupId>
@@ -63,11 +68,15 @@
         </exclusion>
       </exclusions>
     </dependency>
-
+    <dependency>
+      <groupId>org.scala-lang</groupId>
+      <artifactId>scala-library</artifactId>
+      <version>2.12.8</version>
+    </dependency>
     <dependency>
       <groupId>org.apache.kafka</groupId>
-      <artifactId>kafka_2.12</artifactId>
-      <version>${kafka.version}</version>
+      <artifactId>kafka_${kafka.scala.version}</artifactId>
+      <version>${kafka.lib.version}</version>
       <exclusions>
         <exclusion>
           <groupId>org.slf4j</groupId>
@@ -90,13 +99,6 @@
           <artifactId>zookeeper</artifactId>
         </exclusion>
       </exclusions>
-      <scope>test</scope>
-    </dependency>
-
-    <dependency>
-      <groupId>org.scala-lang</groupId>
-      <artifactId>scala-library</artifactId>
-      <version>2.12.8</version>
       <scope>test</scope>
     </dependency>
   </dependencies>

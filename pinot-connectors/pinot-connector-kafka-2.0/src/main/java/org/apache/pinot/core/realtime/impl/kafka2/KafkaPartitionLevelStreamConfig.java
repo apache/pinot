@@ -26,9 +26,9 @@ import org.apache.pinot.core.realtime.stream.StreamConfig;
 
 
 /**
- * Wrapper around {@link StreamConfig} for use in {@link Kafka2PartitionLevelPartitionLevelConsumer}
+ * Wrapper around {@link StreamConfig} for use in {@link KafkaPartitionLevelConsumer}
  */
-public class Kafka2PartitionLevelStreamConfig {
+public class KafkaPartitionLevelStreamConfig {
 
   private final String _kafkaTopicName;
   private final String _bootstrapHosts;
@@ -42,29 +42,29 @@ public class Kafka2PartitionLevelStreamConfig {
    * Builds a wrapper around {@link StreamConfig} to fetch kafka partition level consumer related configs
    * @param streamConfig
    */
-  public Kafka2PartitionLevelStreamConfig(StreamConfig streamConfig) {
+  public KafkaPartitionLevelStreamConfig(StreamConfig streamConfig) {
     _streamConfigMap = streamConfig.getStreamConfigsMap();
 
     _kafkaTopicName = streamConfig.getTopicName();
 
-    String llcBrokerListKey = Kafka2StreamConfigProperties
-        .constructStreamProperty(Kafka2StreamConfigProperties.LowLevelConsumer.KAFKA_BROKER_LIST);
-    String llcBufferKey = Kafka2StreamConfigProperties
-        .constructStreamProperty(Kafka2StreamConfigProperties.LowLevelConsumer.KAFKA_BUFFER_SIZE);
-    String llcTimeoutKey = Kafka2StreamConfigProperties
-        .constructStreamProperty(Kafka2StreamConfigProperties.LowLevelConsumer.KAFKA_SOCKET_TIMEOUT);
-    String fetcherSizeKey = Kafka2StreamConfigProperties
-        .constructStreamProperty(Kafka2StreamConfigProperties.LowLevelConsumer.KAFKA_FETCHER_SIZE_BYTES);
-    String fetcherMinBytesKey = Kafka2StreamConfigProperties
-        .constructStreamProperty(Kafka2StreamConfigProperties.LowLevelConsumer.KAFKA_FETCHER_MIN_BYTES);
+    String llcBrokerListKey = KafkaStreamConfigProperties
+        .constructStreamProperty(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_BROKER_LIST);
+    String llcBufferKey = KafkaStreamConfigProperties
+        .constructStreamProperty(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_BUFFER_SIZE);
+    String llcTimeoutKey = KafkaStreamConfigProperties
+        .constructStreamProperty(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_SOCKET_TIMEOUT);
+    String fetcherSizeKey = KafkaStreamConfigProperties
+        .constructStreamProperty(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_FETCHER_SIZE_BYTES);
+    String fetcherMinBytesKey = KafkaStreamConfigProperties
+        .constructStreamProperty(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_FETCHER_MIN_BYTES);
     _bootstrapHosts = _streamConfigMap.get(llcBrokerListKey);
     _kafkaBufferSize = getIntConfigWithDefault(_streamConfigMap, llcBufferKey,
-        Kafka2StreamConfigProperties.LowLevelConsumer.KAFKA_BUFFER_SIZE_DEFAULT);
+        KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_BUFFER_SIZE_DEFAULT);
     _kafkaSocketTimeout = getIntConfigWithDefault(_streamConfigMap, llcTimeoutKey,
-        Kafka2StreamConfigProperties.LowLevelConsumer.KAFKA_SOCKET_TIMEOUT_DEFAULT);
+        KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_SOCKET_TIMEOUT_DEFAULT);
     _kafkaFetcherSizeBytes = getIntConfigWithDefault(_streamConfigMap, fetcherSizeKey, _kafkaBufferSize);
     _kafkaFetcherMinBytes = getIntConfigWithDefault(_streamConfigMap, fetcherMinBytesKey,
-        Kafka2StreamConfigProperties.LowLevelConsumer.KAFKA_FETCHER_MIN_BYTES_DEFAULT);
+        KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_FETCHER_MIN_BYTES_DEFAULT);
     Preconditions.checkNotNull(_bootstrapHosts,
         "Must specify kafka brokers list " + llcBrokerListKey + " in case of low level kafka consumer");
   }
@@ -123,7 +123,7 @@ public class Kafka2PartitionLevelStreamConfig {
       return false;
     }
 
-    Kafka2PartitionLevelStreamConfig that = (Kafka2PartitionLevelStreamConfig) o;
+    KafkaPartitionLevelStreamConfig that = (KafkaPartitionLevelStreamConfig) o;
 
     return EqualityUtils.isEqual(_kafkaTopicName, that._kafkaTopicName) && EqualityUtils
         .isEqual(_bootstrapHosts, that._bootstrapHosts) && EqualityUtils
