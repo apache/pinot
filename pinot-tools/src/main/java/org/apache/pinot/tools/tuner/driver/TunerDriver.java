@@ -14,8 +14,8 @@ TunerDriver is an executable interface, has three pluggable modules:
                                                                                 |		       |				    |				      |
                                                                             ThreadID	TableName	    ColumnName		Abstract object of stats for a column
         Filter: A function to filter BasicQueryStats, by table name, number of entries scanned in filters, number of entries scanned post filter, etc. The relevant BasicQueryStats will be feed to Accumulator.
-        Accumulator: A function to process BasicQueryStats and accumulate it to corresponding ColumnStatsObj entry.
-        Merger: A function to merge two ColumnStatsObj entries having the same TableName/ColumnName.
+        Accumulator: A function to process BasicQueryStats and MetaDataProperties; then accumulate stats to corresponding ColumnStatsObj entry.
+        Merger: A function to merge two ColumnStatsObj entries having the same TableName/ColumnName from different threads.
         Reporter: A function to print(email) out the final results of a table.
 */
 
