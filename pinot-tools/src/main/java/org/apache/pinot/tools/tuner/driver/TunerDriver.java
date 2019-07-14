@@ -8,11 +8,11 @@ import org.slf4j.LoggerFactory;
 
 
 public abstract class TunerDriver {
-  private static final Logger LOGGER = LoggerFactory.getLogger(TunerDriver.class);
+  protected static final Logger LOGGER = LoggerFactory.getLogger(TunerDriver.class);
 
-  private QuerySrc _querySrc = null;
-  private MetaManager _metaManager = null;
-  private BasicStrategy _strategy = null;
+  protected QuerySrc _querySrc = null;
+  protected MetaManager _metaManager = null;
+  protected BasicStrategy _strategy = null;
 
   protected TunerDriver setQuerySrc(QuerySrc querySrc) {
     _querySrc = querySrc;
