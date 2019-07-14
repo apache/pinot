@@ -40,8 +40,8 @@ public abstract class StandaloneDriver extends TunerDriver {
       if (this._strategy.filter(basicQueryStats)) {
         executor.execute(() -> {
           long threadID = Thread.currentThread().getId();
-          this._strategy.accumulator(basicQueryStats, this._metaManager,
-              threadAccumulator.getOrDefault(threadID, new HashMap<>()));
+          threadAccumulator.putIfAbsent(threadID, new HashMap<>());
+          this._strategy.accumulator(basicQueryStats, this._metaManager, threadAccumulator.get(threadID));
         });
       }
     }
