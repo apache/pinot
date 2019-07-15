@@ -6,6 +6,7 @@ import org.apache.pinot.tools.tuner.strategy.BasicStrategy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
 /*
 TunerDriver is an executable interface, has three pluggable modules:
     MetaData Manager: a manger for MetaDataProperties, which is an interface to access segment metadata.
@@ -18,7 +19,6 @@ TunerDriver is an executable interface, has three pluggable modules:
         Merger: A function to merge two ColumnStatsObj entries having the same TableName/ColumnName from different threads.
         Reporter: A function to postprocess and print(email) out the final results of a table.
 */
-
 public abstract class TunerDriver {
   protected static final Logger LOGGER = LoggerFactory.getLogger(TunerDriver.class);
 

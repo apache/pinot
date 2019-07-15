@@ -6,14 +6,14 @@ import javax.annotation.Nonnull;
 public class IndexSuggestQueryStatsImpl extends BasicQueryStats {
 
   private String _tableNameWithType;
-  private long _numEntriesScannedInFilter;
-  private long _numEntriesScannedPostFilter;
+  private String _numEntriesScannedInFilter;
+  private String _numEntriesScannedPostFilter;
   private String _query;
 
   public static final class Builder {
     private String _tableNameWithType;
-    private long _numEntriesScannedInFilter;
-    private long _numEntriesScannedPostFilter;
+    private String _numEntriesScannedInFilter;
+    private String _numEntriesScannedPostFilter;
     private String _query;
 
     public Builder() {
@@ -33,13 +33,13 @@ public class IndexSuggestQueryStatsImpl extends BasicQueryStats {
 
     @Nonnull
     Builder _numEntriesScannedInFilter(String val) {
-      _numEntriesScannedInFilter = Long.parseLong(val);
+      _numEntriesScannedInFilter = val;
       return this;
     }
 
     @Nonnull
     Builder _numEntriesScannedPostFilter(String val) {
-      _numEntriesScannedPostFilter = Long.parseLong(val);
+      _numEntriesScannedPostFilter = val;
       return this;
     }
 
@@ -71,11 +71,11 @@ public class IndexSuggestQueryStatsImpl extends BasicQueryStats {
     return _tableNameWithType;
   }
 
-  public long getNumEntriesScannedInFilter() {
+  public String getNumEntriesScannedInFilter() {
     return _numEntriesScannedInFilter;
   }
 
-  public long getNumEntriesScannedPostFilter() {
+  public String getNumEntriesScannedPostFilter() {
     return _numEntriesScannedPostFilter;
   }
 }
