@@ -93,6 +93,12 @@ public class VarLengthBytesValueReaderWriter implements Closeable, ValueReader {
   private final int _numElements;
 
   /**
+   * ThreadLocal buffer to reuse the byte[] wherever we can. The byte[] is created with a decent
+   * size and later resized dynamically based on the size of elements.
+   */
+  private final ThreadLocal<byte[]> _reusableBytes = ThreadLocal.withInitial(() -> new byte[16]);
+
+  /**
    * Constructor to create a VarLengthBytesValueReaderWriter from a previously written buffer.
    */
   public VarLengthBytesValueReaderWriter(PinotDataBuffer dataBuffer) {
@@ -144,6 +150,19 @@ public class VarLengthBytesValueReaderWriter implements Closeable, ValueReader {
     }
 
     return false;
+  }
+
+  /**
+   * Returns the power of 2 >= n.
+   */
+  private static int nextPowerOf2(int n) {
+    n -= 1;
+    n |= n >>> 1;
+    n |= n >>> 2;
+    n |= n >>> 4;
+    n |= n >>> 8;
+    n |= n >>> 16;
+    return n + 1;
   }
 
   private void writeHeader() {
@@ -204,7 +223,26 @@ public class VarLengthBytesValueReaderWriter implements Closeable, ValueReader {
 
   @Override
   public String getUnpaddedString(int index, int numBytesPerValue, byte paddingByte, byte[] buffer) {
-    return StringUtil.decodeUtf8(getBytes(index, numBytesPerValue, buffer));
+    // Read the offset of the byte array first and then read the actual byte array.
+    int offset = _dataBuffer.getInt(_dataSectionStartOffSet + Integer.BYTES * index);
+
+    // To get the length of the byte array, we use the next byte array offset.
+    int length = _dataBuffer.getInt(_dataSectionStartOffSet + Integer.BYTES * (index + 1)) - offset;
+
+    byte[] b;
+    if (buffer != null && buffer.length >= length) {
+      b = buffer;
+    } else {
+      // Check if the current instance of ThreadLocal buffer is big enough. If not, resize it to double the size.
+      b = _reusableBytes.get();
+      if (b.length < length) {
+        b = new byte[nextPowerOf2(length)];
+        _reusableBytes.set(b);
+      }
+    }
+
+    _dataBuffer.copyTo(offset, b, 0, length);
+    return StringUtil.decodeUtf8(b, 0, length);
   }
 
   @Override

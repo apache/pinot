@@ -24,6 +24,8 @@ import java.nio.ByteOrder;
 import java.util.Arrays;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang.RandomStringUtils;
+import org.apache.pinot.common.utils.StringUtil;
 import org.apache.pinot.core.segment.memory.PinotDataBuffer;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -32,6 +34,8 @@ import org.testng.annotations.Test;
  * Unit test for {@link VarLengthBytesValueReaderWriter}
  */
 public class VarLengthBytesValueReaderWriterTest {
+  private static final int MAX_STRING_LENGTH = 200;
+
   private final Random random = new Random();
 
   @Test
@@ -50,6 +54,7 @@ public class VarLengthBytesValueReaderWriterTest {
     }
 
     try (PinotDataBuffer buffer = PinotDataBuffer.mapFile(tempFile, true, 0, size, ByteOrder.BIG_ENDIAN, null)) {
+      Assert.assertTrue(VarLengthBytesValueReaderWriter.isVarLengthBytesDictBuffer(buffer));
       VarLengthBytesValueReaderWriter readerWriter = new VarLengthBytesValueReaderWriter(buffer);
       Assert.assertEquals(readerWriter.getNumElements(), 0);
     } finally {
@@ -74,6 +79,7 @@ public class VarLengthBytesValueReaderWriterTest {
     }
 
     try (PinotDataBuffer buffer = PinotDataBuffer.mapFile(tempFile, true, 0, size, ByteOrder.BIG_ENDIAN, null)) {
+      Assert.assertTrue(VarLengthBytesValueReaderWriter.isVarLengthBytesDictBuffer(buffer));
       VarLengthBytesValueReaderWriter readerWriter = new VarLengthBytesValueReaderWriter(buffer);
       Assert.assertEquals(readerWriter.getNumElements(), 1);
       byte[] newArray = readerWriter.getBytes(0, -1, null);
@@ -104,12 +110,58 @@ public class VarLengthBytesValueReaderWriterTest {
     }
 
     try (PinotDataBuffer buffer = PinotDataBuffer.mapFile(tempFile, false, 0, size, ByteOrder.BIG_ENDIAN, null)) {
+      Assert.assertTrue(VarLengthBytesValueReaderWriter.isVarLengthBytesDictBuffer(buffer));
       VarLengthBytesValueReaderWriter readerWriter = new VarLengthBytesValueReaderWriter(buffer);
       Assert.assertEquals(byteArrays.length, readerWriter.getNumElements());
       for (int i = 0; i < byteArrays.length; i++) {
         byte[] array = byteArrays[i];
         byte[] newArray = readerWriter.getBytes(i, -1, null);
         Assert.assertTrue(Arrays.equals(array, newArray));
+      }
+    } finally {
+      FileUtils.forceDelete(tempFile);
+    }
+  }
+
+  @Test
+  public void testArbitraryLengthStringDictionary()
+      throws IOException {
+    Random random = new Random();
+    int numStrings = random.nextInt(100);
+    String[] strings = new String[numStrings];
+    for (int i = 0; i < numStrings; i++) {
+      strings[i] = RandomStringUtils.randomAlphanumeric(1 + random.nextInt(MAX_STRING_LENGTH));
+    }
+
+    byte[][] byteArrays = new byte[numStrings][];
+    for (int i = 0; i < numStrings; i++) {
+      byteArrays[i] = StringUtil.encodeUtf8(strings[i]);
+    }
+    long size = VarLengthBytesValueReaderWriter.getRequiredSize(byteArrays);
+
+    final File tempFile =
+        new File(FileUtils.getTempDirectory(), VarLengthBytesValueReaderWriterTest.class.getName() + random.nextInt());
+
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapFile(tempFile, false, 0, size, ByteOrder.BIG_ENDIAN, null)) {
+      VarLengthBytesValueReaderWriter readerWriter = new VarLengthBytesValueReaderWriter(buffer, byteArrays);
+      Assert.assertEquals(byteArrays.length, readerWriter.getNumElements());
+    }
+
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapFile(tempFile, false, 0, size, ByteOrder.BIG_ENDIAN, null)) {
+      Assert.assertTrue(VarLengthBytesValueReaderWriter.isVarLengthBytesDictBuffer(buffer));
+      VarLengthBytesValueReaderWriter readerWriter = new VarLengthBytesValueReaderWriter(buffer);
+      Assert.assertEquals(byteArrays.length, readerWriter.getNumElements());
+      for (int i = 0; i < strings.length; i++) {
+        String value = readerWriter.getUnpaddedString(i, -1, (byte) 0, null);
+        Assert.assertEquals(value, strings[i]);
+      }
+
+      // Reading a padded string should fail.
+      try {
+        readerWriter.getPaddedString(0, -1, null);
+        Assert.fail("getPaddedString() should fail on VarLengthBytesValueReader.");
+      } catch (UnsupportedOperationException ignore) {
+        // Expected.
       }
     } finally {
       FileUtils.forceDelete(tempFile);
