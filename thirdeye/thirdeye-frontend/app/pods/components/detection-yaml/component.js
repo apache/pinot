@@ -238,9 +238,6 @@ export default Component.extend({
     onEditingDetectionYamlAction(value) {
       const setDetectionYaml = get(this, 'setDetectionYaml');
       setDetectionYaml(value);
-      setProperties(this, {
-        detectionMsg: ''
-      });
     },
 
     /**

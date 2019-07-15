@@ -8,11 +8,7 @@ import { inject as service } from '@ember/service';
 import fetch from 'fetch';
 import Controller from '@ember/controller';
 import { set, get } from '@ember/object';
-import { checkStatus } from 'thirdeye-frontend/utils/utils';
-import {toastOptions} from 'thirdeye-frontend/utils/constants';
-import {
-  selfServeApiCommon
-} from 'thirdeye-frontend/utils/api/self-serve';
+import { toastOptions } from 'thirdeye-frontend/utils/constants';
 import config from 'thirdeye-frontend/config/environment';
 
 export default Controller.extend({
@@ -43,43 +39,11 @@ export default Controller.extend({
   debug: reads('model.debug'),
 
   /**
-   * Fetches an alert function record by name.
-   * Use case: when user names an alert, make sure no duplicate already exists.
-   * @method _fetchAnomalyByName
-   * @param {String} functionName - name of alert or function
-   * @return {Promise}
-   */
-  _fetchAlertsByName(functionName) {
-    const url = selfServeApiCommon.alertFunctionByName(functionName);
-    return fetch(url).then(checkStatus);
-  },
-
-  /**
    * Actions for create alert form view
    */
   actions: {
     changeAccordion() {
       set(this, 'toggleCollapsed', !get(this, 'toggleCollapsed'));
-    },
-
-    /**
-     * Make sure alert name does not already exist in the system
-     * @method validateAlertName
-     * @param {String} userProvidedName - The new alert name
-     * @param {Boolean} userModified - Up to this moment, is the new name auto-generated, or user modified?
-     * If user-modified, we will stop modifying it dynamically (via 'isAlertNameUserModified')
-     * @return {undefined}
-     */
-    validateAlertName(userProvidedName, userModified = false) {
-      this._fetchAlertsByName(userProvidedName).then(matchingAlerts => {
-        const isDuplicateName = matchingAlerts.find(alert => alert.functionName === userProvidedName);
-        // If the user edits the alert name, we want to stop auto-generating it.
-        if (userModified) {
-          this.set('isAlertNameUserModified', true);
-        }
-        // Either add or clear the "is duplicate name" banner
-        this.set('isAlertNameDuplicate', isDuplicateName);
-      });
     },
 
     /**

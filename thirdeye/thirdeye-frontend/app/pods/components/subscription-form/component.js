@@ -2,12 +2,10 @@
  * Component to render the subscription configuration form editor.
  * @module components/subscription-form
  * @property {Array of Objects} allApplicationNames - applications from Ember data converted to vanilla objects
- * @property {function} validateAlertName - action passed in from parent, shared with detection-form component
  * @property {Array of Objects} allAlertsConfigGroups - subscription-groups from Ember Data converted to vanilla objects
  * @example
    {{subscription-form
      allApplicationNames=applicationNames
-     validateAlertName=(action "parentAction")
      allAlertsConfigGroups=allAlertsConfigGroups
    }}
  * @author hjackson
@@ -38,7 +36,6 @@ export default Component.extend({
   generalFieldsEnabled: true,
   allApplicationNames: null,
   allAlertsConfigGroups: [],
-  validateAlertName: null, // action passed in by parent
 
 
   /**
@@ -123,24 +120,6 @@ export default Component.extend({
   },
 
   /**
-   * Auto-generate the alert name until the user directly edits it
-   * @method _modifyAlertFunctionName
-   * @return {undefined}
-   */
-  _modifyAlertFunctionName() {
-    const {
-      functionNamePrimer,
-      isAlertNameUserModified
-    } = this.getProperties('functionNamePrimer', 'isAlertNameUserModified');
-    // If user has not yet edited the alert name, continue to auto-generate it.
-    if (!isAlertNameUserModified) {
-      this.set('alertFunctionName', functionNamePrimer);
-    }
-    // Each time we modify the name, we validate it as well to ensure no duplicates exist.
-    this.get('validateAlertName')(this.get('alertFunctionName'));
-  },
-
-  /**
    * Enriches the list of functions by Id, adding the properties we may want to display.
    * We are preparing to display the alerts that belong to the currently selected config group.
    * TODO: Good candidate to move to self-serve shared services
@@ -179,7 +158,6 @@ export default Component.extend({
         selectedAppName: selectedObj,
         selectedApplication: selectedObj.application
       });
-      this._modifyAlertFunctionName();
     },
 
     /**

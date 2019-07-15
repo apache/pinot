@@ -11,7 +11,6 @@
      isEditMode=true
      subscriptionYaml=model.subscriptionYaml
      setSubscriptionYaml=(action "updateSubscriptionYaml")
-     subscriptionMsg={string} //Optional error message to surface
      selectSubscriptionGroup=(action "changeSubscriptionGroup")
      subscriptionGroupNamesDisplay=subscriptionGroupNamesDisplay
      groupName=groupName
@@ -38,7 +37,6 @@ export default Component.extend({
   isEditMode: false,
   showSettings: true,
   disableSubGroupSave: true,
-  subscriptionMsg: '',                //General subscription failures
   subscriptionYaml:  null,            // The YAML for the subscription group
   currentYamlSettingsOriginal: defaultSubscriptionYaml,
   showAnomalyModal: false,
