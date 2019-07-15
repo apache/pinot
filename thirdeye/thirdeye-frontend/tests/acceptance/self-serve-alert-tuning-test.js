@@ -22,7 +22,7 @@ module('Acceptance | tune alert settings', function(hooks) {
     'Subscription Group'
   ];
 
-  test(`visiting alert page to test self-serve tuning flow`, async (assert) => {
+  test(`check whether alerts page shows correct number of alerts`, async (assert) => {
     server.createList('alert', 5);
     await visit(`/manage/alerts`);
     const $targetAlertLink = $(`${selfServeConst.RESULTS_LINK}:contains(${alertLinkTitle})`);

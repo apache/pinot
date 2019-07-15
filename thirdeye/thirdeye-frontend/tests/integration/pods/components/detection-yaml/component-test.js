@@ -1,17 +1,14 @@
 /**
- * Integration tests for the yaml-editor component.
+ * Integration tests for the detection-yaml component.
  * @property {number} alertId - the alert id
  * @property {Array} subscriptionGroupNames - an array of objects containing subscription group information
  * @property {boolean} isEditMode - to activate the edit mode
  * @property {boolean} showSettings - to show the subscriber groups yaml editor
  * @property {string} detectionYaml - the detection yaml to display
  * @example
-   {{yaml-editor
+   {{detection-yaml
      alertId=1
-     subscriptionGroupId=1
      isEditMode=true
-     showSettings=true
-     subscriptionGroupNames=subscriptionGroupNames
      detectionYaml=detectionYaml
    }}
  * @author hjackson
@@ -22,7 +19,7 @@ import { setupRenderingTest } from 'ember-qunit';
 import { render } from '@ember/test-helpers';
 import hbs from 'htmlbars-inline-precompile';
 
-module('Integration | Component | yaml-editor', function(hooks) {
+module('Integration | Component | detection-yaml', function(hooks) {
   setupRenderingTest(hooks);
   const testText = 'default yaml';
 
@@ -34,11 +31,9 @@ module('Integration | Component | yaml-editor', function(hooks) {
     });
 
     await render(hbs`
-      {{yaml-editor
-        alertId=alertId
+      {{detection-yaml
         isEditMode=true
-        showSettings=true
-        subscriptionGroupNames=subscriptionGroups
+        alertId=alertId
         detectionYaml=detectionYaml
       }}
     `);
@@ -49,25 +44,11 @@ module('Integration | Component | yaml-editor', function(hooks) {
 
     const defaultText = '# Below is a sample template. You may refer the documentation for more examples and update the fields accordingly.';
     await render(hbs`
-      {{yaml-editor
+      {{detection-yaml
         isEditMode=false
-        showSettings=true
       }}
     `);
 
     assert.ok(this.$('.ace_line')[0].children[0].textContent === defaultText);
-  });
-
-  test(`displays default yaml file of subscription group in create mode`, async function(assert) {
-
-    const defaultText = '# Below is a sample subscription group template. You may refer the documentation and update accordingly.';
-    await render(hbs`
-      {{yaml-editor
-        isEditMode=false
-        showSettings=true
-      }}
-    `);
-
-    assert.ok(this.$('.ace_line')[29].children[0].textContent === defaultText);
   });
 });

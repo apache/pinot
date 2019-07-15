@@ -16,9 +16,10 @@
  */
 
 import Component from '@ember/component';
-import {computed, set, get, getProperties, setProperties} from '@ember/object';
-import {checkStatus} from 'thirdeye-frontend/utils/utils';
-import {yamlAlertProps, toastOptions} from 'thirdeye-frontend/utils/constants';
+import { computed, set, get, getProperties, setProperties } from '@ember/object';
+import { checkStatus } from 'thirdeye-frontend/utils/utils';
+import { defaultDetectionYaml } from 'thirdeye-frontend/utils/yaml-tools';
+import { toastOptions } from 'thirdeye-frontend/utils/constants';
 import yamljs from 'yamljs';
 import RSVP from "rsvp";
 import fetch from 'fetch';
@@ -29,7 +30,7 @@ import {inject as service} from '@ember/service';
 import config from 'thirdeye-frontend/config/environment';
 
 export default Component.extend({
-  classNames: ['yaml-editor'],
+  classNames: ['detection-yaml'],
   notifications: service('toast'),
   /**
    * Properties we expect to receive for the detection-yaml
@@ -39,21 +40,12 @@ export default Component.extend({
   alertTitle: 'Define detection configuration',
   isEditMode: false,
   disableYamlSave: true,
-  detectionMsg: '',                   //General alert failures
   detectionYaml: null,                // The YAML for the anomaly detection
-  currentYamlAlertOriginal: yamlAlertProps,
+  currentYamlAlertOriginal: defaultDetectionYaml,
   alertId: null, // only needed in edit mode
   setDetectionYaml: null, // bubble up detectionYaml changes to parent
 
 
-
-  isDetectionMsg: computed(
-    'detectionMsg',
-    function() {
-      const detectionMsg = get(this, 'detectionMsg');
-      return detectionMsg !== '';
-    }
-  ),
 
   init() {
     this._super(...arguments);
@@ -248,9 +240,6 @@ export default Component.extend({
     onEditingDetectionYamlAction(value) {
       const setDetectionYaml = get(this, 'setDetectionYaml');
       setDetectionYaml(value);
-      setProperties(this, {
-        detectionMsg: ''
-      });
     },
 
     /**

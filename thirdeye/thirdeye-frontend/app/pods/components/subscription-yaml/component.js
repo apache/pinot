@@ -11,7 +11,6 @@
      isEditMode=true
      subscriptionYaml=model.subscriptionYaml
      setSubscriptionYaml=(action "updateSubscriptionYaml")
-     subscriptionMsg={string} //Optional error message to surface
      selectSubscriptionGroup=(action "changeSubscriptionGroup")
      subscriptionGroupNamesDisplay=subscriptionGroupNamesDisplay
      groupName=groupName
@@ -21,16 +20,16 @@
  */
 
 import Component from '@ember/component';
-import {computed, get, set} from '@ember/object';
-import {yamlAlertSettings} from 'thirdeye-frontend/utils/constants';
-import {inject as service} from '@ember/service';
+import { computed, get, set } from '@ember/object';
+import { defaultSubscriptionYaml } from 'thirdeye-frontend/utils/yaml-tools';
+import { inject as service } from '@ember/service';
 import config from 'thirdeye-frontend/config/environment';
 
 export default Component.extend({
-  classNames: ['yaml-editor'],
+  classNames: ['subscription-yaml'],
   notifications: service('toast'),
   /**
-   * Properties we expect to receive for the yaml-editor
+   * Properties we expect to receive for the subscription-yaml
    */
   currentMetric: null,
   isYamlParseable: true,
@@ -38,23 +37,14 @@ export default Component.extend({
   isEditMode: false,
   showSettings: true,
   disableSubGroupSave: true,
-  subscriptionMsg: '',                //General subscription failures
   subscriptionYaml:  null,            // The YAML for the subscription group
-  currentYamlSettingsOriginal: yamlAlertSettings,
+  currentYamlSettingsOriginal: defaultSubscriptionYaml,
   showAnomalyModal: false,
   showNotificationModal: false,
   setSubscriptionYaml: null, // function passed in from parent
   createGroup: null,
 
 
-
-  isSubscriptionMsg: computed(
-    'subscriptionMsg',
-    function() {
-      const subscriptionMsg = get(this, 'subscriptionMsg');
-      return subscriptionMsg !== '';
-    }
-  ),
 
   init() {
     this._super(...arguments);

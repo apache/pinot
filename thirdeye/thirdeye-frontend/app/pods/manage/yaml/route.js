@@ -9,8 +9,8 @@ import { set, get } from '@ember/object';
 import { inject as service } from '@ember/service';
 import yamljs from 'yamljs';
 import moment from 'moment';
-import { yamlAlertSettings, toastOptions } from 'thirdeye-frontend/utils/constants';
-import { formatYamlFilter } from 'thirdeye-frontend/utils/utils';
+import { defaultSubscriptionYaml, formatYamlFilter } from 'thirdeye-frontend/utils/yaml-tools';
+import { toastOptions } from 'thirdeye-frontend/utils/constants';
 import AuthenticatedRouteMixin from 'ember-simple-auth/mixins/authenticated-route-mixin';
 
 const CREATE_GROUP_TEXT = 'Create a new subscription group';
@@ -124,7 +124,7 @@ export default Route.extend(AuthenticatedRouteMixin, {
     const createGroup = {
       name: CREATE_GROUP_TEXT,
       id: 'n/a',
-      yaml: yamlAlertSettings
+      yaml: defaultSubscriptionYaml
     };
     const moddedArray = [createGroup];
     const subscriptionGroups = this.get('store')
@@ -144,7 +144,7 @@ export default Route.extend(AuthenticatedRouteMixin, {
       { groupName: 'Other Groups', options: subscriptionGroups}
     ];
 
-    let subscriptionYaml = yamlAlertSettings;
+    let subscriptionYaml = defaultSubscriptionYaml;
     let groupName = createGroup;
     let subscriptionGroupId = createGroup.id;
 

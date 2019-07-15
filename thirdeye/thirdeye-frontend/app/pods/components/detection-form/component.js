@@ -1,21 +1,21 @@
 /**
  * Component to render the detection configuration form editor.
  * @module components/detection-form
- * @property {boolean} isAlertNameDuplicate - triggered by alert name validation action on parent
- * @property {boolean} isAlertNameUserModified - triggered by alert name validation action on parent
- * @property {function} validateAlertName - action passed in from parent, shared with subscrtiption-form component
+ * @property {boolean} isDetectionNameDuplicate - triggered by alert name validation action on parent
+ * @property {boolean} isDetectionNameUserModified - triggered by alert name validation action on parent
  * @example
    {{detection-form
-     validateAlertName=(action "someAction")
-     isAlertNameUserModified=isAlertNameUserModified
-     isAlertNameDuplicate=isAlertNameDuplicate
+     isEditMode=false
+     detectionYaml=detectionYaml
+     setDetectionYaml=(action "updateDetectionYaml")
    }}
  * @author hjackson
  */
 
 import Component from '@ember/component';
-import {computed, getWithDefault} from '@ember/object';
-import {checkStatus} from 'thirdeye-frontend/utils/utils';
+import { computed, set, get } from '@ember/object';
+import { checkStatus } from 'thirdeye-frontend/utils/utils';
+import { defaultDetectionYaml, fieldsToYaml } from 'thirdeye-frontend/utils/yaml-tools';
 import RSVP from "rsvp";
 import fetch from 'fetch';
 import {
@@ -23,22 +23,23 @@ import {
 } from 'thirdeye-frontend/utils/api/self-serve';
 import config from 'thirdeye-frontend/config/environment';
 import { task, timeout } from 'ember-concurrency';
+import yamljs from 'yamljs';
 
 export default Component.extend({
-  alertFunctionName: null,
-  /**
-   * Properties we expect to receive for the detection-form
-   */
   metricHelpMailto: `mailto:${config.email}?subject=Metric Onboarding Request (non-additive UMP or derived)`,
-  selectedMetricOption: null,
-  isEditMode: false,
+  isEditMode: false, // passed in by parent
   metricLookupCache: [],
   isMetricSelected: false,
   isMetricDataInvalid: false,
-  validateAlertName: null, // action passed in by parent
   selectedDimension: null,
-  selectedGranularity: null,
+  selectedMetric: null, // set using yaml or metric dropdown
   selectedApplication: null,
+  selectedDataset: null, //set using Yaml or by selecting metric with form
+  detectionYaml: null, // shared with detection-yaml component - passed in by parent
+  setDetectionYaml: null, // action passed in by parent
+  detectionName: null, // set using yaml or input box
+  isDetectionNameUserModified: false, // set true if name passed in through yaml or typed
+  isDetectionNameDuplicate: false, // set true if name not valid
 
   /**
    * Determines whether input fields in general are enabled. When metric data is 'invalid',
@@ -52,28 +53,24 @@ export default Component.extend({
    * Generate alert name primer based on user selections
    * @type {String}
    */
-  functionNamePrimer: computed(
+  detectionNamePrimer: computed(
     'selectedDimension',
-    'selectedGranularity',
-    'selectedApplication',
-    'selectedMetricOption',
+    'selectedMetric',
+    'selectedDataset',
     function() {
       const {
+        selectedDataset,
         selectedDimension,
-        selectedGranularity,
-        selectedApplication,
-        selectedMetricOption
+        selectedMetric
       } = this.getProperties(
+        'selectedDataset',
         'selectedDimension',
-        'selectedGranularity',
-        'selectedApplication',
-        'selectedMetricOption'
+        'selectedMetric'
       );
+      const dataset = selectedDataset ? `${selectedDataset.camelize()}_` : 'datasetName_';
       const dimension = selectedDimension ? `${selectedDimension.camelize()}_` : '';
-      const granularity = selectedGranularity ? selectedGranularity.toLowerCase().camelize() : '';
-      const app = selectedApplication ? `${selectedApplication.camelize()}_` : 'applicationName_';
-      const metric = selectedMetricOption ? `${selectedMetricOption.name.camelize()}_` : 'metricName_';
-      return `${app}${metric}${dimension}${granularity}`;
+      const metric = selectedMetric ? `${selectedMetric.name.camelize()}_` : 'metricName_';
+      return `${dataset}${metric}${dimension}`;
     }
   ),
 
@@ -90,6 +87,100 @@ export default Component.extend({
     return autoCompleteResults;
   }),
 
+  init() {
+    this._super(...arguments);
+    const detectionYaml = get(this, 'detectionYaml');
+    if (detectionYaml && detectionYaml !== defaultDetectionYaml) {
+      this._getFieldsFromYaml(detectionYaml);
+    }
+  },
+
+  /**
+   * This hook will integrate form changes with yaml and send the new yaml to parent
+   * so that the changes are reflected in detection-yaml
+   * @method willDestroyElement
+   * @return (undefined)
+   */
+  willDestroyElement() {
+    const fields = {
+      detectionName: this.get('detectionName'),
+      metric: this.get('selectedMetric') ? this.get('selectedMetric').name : null,
+      dataset: this.get('selectedDataset')
+      // to-do: put rules in here after rule component is operational
+    };
+    // send fields and yaml to yaml util to merge old to update values
+    let detectionYaml = get(this, 'detectionYaml') ? get(this, 'detectionYaml') : defaultDetectionYaml;
+    detectionYaml = fieldsToYaml(fields, detectionYaml);
+    // send new Yaml to parent
+    this.get('setDetectionYaml')(detectionYaml);
+  },
+
+  /**
+   * Fetches an alert function record by name.
+   * Use case: when user names an alert, make sure no duplicate already exists.
+   * @method _fetchAnomalyByName
+   * @param {String} functionName - name of alert or function
+   * @return {Promise}
+   */
+  _fetchAlertsByName(functionName) {
+    const url = selfServeApiCommon.alertFunctionByName(functionName);
+    return fetch(url).then(checkStatus);
+  },
+
+  /**
+   * If the yaml is passed in, then parse the relevant fields to props for the form
+   * Assumes yaml string is not the default detection yaml
+   * @method _getFieldsFromYaml
+   * @param {String} yaml - current yaml string
+   * @return {undefined}
+   */
+  _getFieldsFromYaml(yaml) {
+    let yamlAsObject = {};
+    let dy = {}; // dy = default yaml
+    let metricAsObject;
+    let metricAlias;
+    let dataset;
+    try {
+      yamlAsObject = yamljs.parse(yaml);
+      dy = yamljs.parse(defaultDetectionYaml);
+      set(this, 'isYamlParseable', true);
+    }
+    catch(err){
+      set(this, 'isYamlParseable', false);
+      return null;
+    }
+    // if dataset and metric are in the yaml and are not default template values, convert them to alias
+    if (yamlAsObject.dataset && yamlAsObject.metric && yamlAsObject.dataset !== dy.dataset && yamlAsObject.metric !== dy.metric) {
+      metricAlias = `${yamlAsObject.dataset}::${yamlAsObject.metric}`;
+    }
+    // if the alias is there, we can build selectedMetric and populate the dropdown
+    if (metricAlias) {
+      metricAsObject = {
+        alias: metricAlias,
+        name: yamlAsObject.metric
+      };
+      dataset = yamlAsObject.dataset;
+      set(this, 'isMetricSelected', true);
+    }
+    // we only use fields that have been updated
+    this.setProperties({
+      selectedDataset: dataset,
+      selectedMetric: metricAsObject,
+      detectionDescription: (yamlAsObject.detectionDescription !== dy.detectionDescription) ? yamlAsObject.detectionDescription: null,
+      rulesOfDetection: (yamlAsObject.rules !== dy.rules) ? yamlAsObject.rules: null
+    });
+    // if the user has already specified a name, keep it
+    if (yamlAsObject.detectionName !== dy.detectionName) {
+      this.setProperties({
+        detectionName: yamlAsObject.detectionName,
+        isDetectionNameUserModified: true
+      });
+    // otherwise, generate one if there is a metric alias available
+    } else if (metricAlias){
+      this._modifyDetectionName();
+    }
+  },
+
   /**
    * Fetches all essential metric properties by metric Id.
    * This is the data we will feed to the graph generating component.
@@ -101,7 +192,6 @@ export default Component.extend({
   _fetchMetricData(metricId) {
     const promiseHash = {
       maxTime: fetch(selfServeApiGraph.maxDataTime(metricId)).then(res => checkStatus(res, 'get', true)),
-      granularities: fetch(selfServeApiGraph.metricGranularity(metricId)).then(res => checkStatus(res, 'get', true)),
       filters: fetch(selfServeApiGraph.metricFilters(metricId)).then(res => checkStatus(res, 'get', true)),
       dimensions: fetch(selfServeApiGraph.metricDimensions(metricId)).then(res => checkStatus(res, 'get', true))
     };
@@ -110,21 +200,43 @@ export default Component.extend({
 
   /**
    * Auto-generate the alert name until the user directly edits it
-   * @method _modifyAlertFunctionName
+   * @method _modifyDetectionName
    * @return {undefined}
    */
-  _modifyAlertFunctionName() {
+  _modifyDetectionName() {
     const {
-      functionNamePrimer,
-      isAlertNameUserModified
-    } = this.getProperties('functionNamePrimer', 'isAlertNameUserModified');
+      detectionNamePrimer,
+      isDetectionNameUserModified
+    } = this.getProperties('detectionNamePrimer', 'isDetectionNameUserModified');
     // If user has not yet edited the alert name, continue to auto-generate it.
-    if (!isAlertNameUserModified) {
-      this.set('alertFunctionName', functionNamePrimer);
+    if (!isDetectionNameUserModified) {
+      this.set('detectionName', detectionNamePrimer);
     }
     // Each time we modify the name, we validate it as well to ensure no duplicates exist.
-    this.get('validateAlertName')(this.get('alertFunctionName'));
+    this._validateDetectionName(this.get('detectionName'));
   },
+
+  /**
+   * Make sure alert name does not already exist in the system
+   * @method _validateDetectionName
+   * @param {String} userProvidedName - The new alert name
+   * @param {Boolean} userModified - Up to this moment, is the new name auto-generated, or user modified?
+   * If user-modified, we will stop modifying it dynamically (via 'isDetectionNameUserModified')
+   * @return {undefined}
+   */
+  _validateDetectionName(userProvidedName, userModified = false) {
+    this._fetchAlertsByName(userProvidedName).then(matchingAlerts => {
+      const isDuplicateName = matchingAlerts.find(alert => alert.functionName === userProvidedName);
+      // If the user edits the alert name, we want to stop auto-generating it.
+      if (userModified) {
+        this.set('isDetectionNameUserModified', true);
+      }
+      // Either add or clear the "is duplicate name" banner
+      this.set('isDetectionNameDuplicate', isDuplicateName);
+    });
+  },
+
+
 
   actions: {
     /**
@@ -136,29 +248,22 @@ export default Component.extend({
      */
     onSelectMetric(selectedObj) {
       this.setProperties({
-        topDimensions: [],
         isMetricDataLoading: true,
-        selectedMetricOption: selectedObj,
+        selectedMetric: selectedObj,
+        selectedDataset: selectedObj.alias.split('::')[0], // grab dataset name
         isMetricSelected: true
       });
       this._fetchMetricData(selectedObj.id)
         .then((metricHash) => {
-          const { maxTime, filters, dimensions, granularities } = metricHash;
-          const targetMetric = this.get('metricLookupCache').find(metric => metric.id === selectedObj.id);
-          const inGraphLink = getWithDefault(targetMetric, 'extSourceLinkInfo.INGRAPH', null);
-          // In the event that we have an "ingraph" metric, enable only "minute" level granularity
-          const adjustedGranularity = (targetMetric && inGraphLink) ? granularities.filter(g => g.toLowerCase().includes('minute')) : granularities;
+          const { maxTime, filters, dimensions } = metricHash;
 
           this.setProperties({
             maxTime,
             filters,
             dimensions,
             metricLookupCache: [],
-            granularities: adjustedGranularity,
             originalDimensions: dimensions,
-            metricGranularityOptions: adjustedGranularity,
-            selectedGranularity: adjustedGranularity[0],
-            alertFunctionName: this.get('functionNamePrimer')
+            detectionName: this.get('detectionNamePrimer')
           });
         })
         .catch((err) => {
@@ -170,34 +275,20 @@ export default Component.extend({
     },
 
     /**
-     * Bubble up to validateAlertName action
+     * Bubble up to validateDetectionName action
      * @method validateName
      * @param {String} userProvidedName - The new alert name
      * @param {Boolean} userModified - Up to this moment, is the new name auto-generated, or user modified?
      * @return {undefined}
      */
     validateName(userProvidedName, userModified = false) {
-      this.get('validateAlertName')(userProvidedName, userModified);
-    },
-
-    /**
-     * Set our selected granularity. Trigger graph reload.
-     * @method onSelectGranularity
-     * @param {Object} selectedObj - The selected granularity option
-     * @return {undefined}
-     */
-    onSelectGranularity(selectedObj) {
-      this.setProperties({
-        selectedGranularity: selectedObj,
-        isSecondaryDataLoading: true
-      });
-      this._modifyAlertFunctionName();
+      this._validateDetectionName(userProvidedName, userModified);
     },
 
     /**
      * When a dimension is selected, fetch new anomaly graph data based on that dimension
      * and trigger a new graph load, showing the top contributing subdimensions.
-     * @method onSelectFilter
+     * @method onSelectDimension
      * @param {Object} selectedDimension - The selected dimension to apply
      * @return {undefined}
      */
@@ -213,40 +304,7 @@ export default Component.extend({
         });
       } else {
         this.set('isSecondaryDataLoading', true);
-        this._modifyAlertFunctionName();
-      }
-    },
-
-    /**
-     * When a filter is selected, fetch new anomaly graph data based on that filter
-     * and trigger a new graph load. Also filter dimension names already selected as filters.
-     * @method onSelectFilter
-     * @param {Object} selectedFilters - The selected filters to apply
-     * @return {undefined}
-     */
-    onSelectFilter(selectedFilters) {
-      const selectedFilterObj = JSON.parse(selectedFilters);
-      const dimensionNameSet = new Set(this.get('originalDimensions'));
-      const filterNames = Object.keys(JSON.parse(selectedFilters));
-      let isSelectedDimensionEqualToSelectedFilter = false;
-
-      // Remove selected filters from dimension options only if filter has single entity
-      for (var key of filterNames) {
-        if (selectedFilterObj[key].length === 1) {
-          dimensionNameSet.delete(key);
-          if (key === this.get('selectedDimension')) {
-            isSelectedDimensionEqualToSelectedFilter = true;
-          }
-        }
-      }
-      // Update dimension options and loader
-      this.setProperties({
-        dimensions: [...dimensionNameSet],
-        isSecondaryDataLoading: true
-      });
-      // Do not allow selected dimension to match selected filter
-      if (isSelectedDimensionEqualToSelectedFilter) {
-        this.set('selectedDimension', 'All');
+        this._modifyDetectionName();
       }
     }
   }

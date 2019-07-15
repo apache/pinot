@@ -4,7 +4,7 @@
 <div class="col-xs-12 col-sm-8">
   <label for="select-metric" class="control-label te-label te-label--taller required">Alert name</label>
   <div class="te-form__sub-label te-form__sub-label--raised">
-    Plese follow this naming convention: applicationName_metricName_dimensionName_other
+    Plese follow this naming convention: datasetName_metricName_dimensionName_other
   </div>
   {{#if isAlertNameDuplicate}}
     <div class="te-form__alert--warning alert-warning">Warning: <strong>{{alertFunctionName}}</strong> already exists. Please try another name.</div>
@@ -14,7 +14,7 @@
     id="anomaly-form-function-name"
     class="form-control te-input"
     placeholder="Add a descriptive alert name"
-    value=alertFunctionName
+    value=detectionName
     key-up=(action "validateName" alertFunctionName true)
     disabled=(not generalFieldsEnabled)
   }}
@@ -43,7 +43,8 @@
   </div>
   {{#power-select
     search=(perform searchMetricsList)
-    selected=selectedMetricOption
+    selected=selectedMetric
+    value=selectedMetric
     onchange=(action "onSelectMetric")
     loadingMessage="Waiting for the server...."
     placeholder="Search by Metric Name"
@@ -55,70 +56,6 @@
   }}
     {{metric.alias}}
   {{/power-select}}
-</div>
-
-<div class="te-form__custom-field te-form__custom-field--lower col-xs-6 col-sm-4">
-  <label for="select-granularity" class="control-label te-label te-label--taller">Data granularity</label>
-  {{#power-select
-    options=metricGranularityOptions
-    selected=selectedGranularity
-    onchange=(action "onSelectGranularity")
-    placeholder="Select a Granularity"
-    searchPlaceholder="Type to filter..."
-    triggerId="select-granularity"
-    triggerClass="te-form__select te-form__select--granularity"
-    searchEnabled=false
-    disabled=isGranularitySelectDisabled
-    as |granularity|
-  }}
-    {{granularity}}
-  {{/power-select}}
-</div>
-
-<div class="col-xs-6">
-  <label for="select-dimension" class="control-label te-label te-label--taller">
-    Create an alert for each dimension value in: (optional)
-    <span>
-      <i class="glyphicon glyphicon-question-sign"></i>
-      {{#tooltip-on-element class="te-tooltip"}}
-        For example, selecting Continent means anomalies on each continent will be monitored.
-      {{/tooltip-on-element}}
-    </span>
-  </label>
-  {{#power-select
-    classNames="te-input"
-    options=dimensions
-    selected=selectedDimension
-    onchange=(action "onSelectDimension")
-    loadingMessage="Waiting for the server...."
-    placeholder="Break Dimensions By..."
-    searchPlaceholder="Type to filter..."
-    triggerId="select-dimension"
-    triggerClass="te-form__select"
-    disabled=(not generalFieldsEnabled)
-    as |dimension|
-  }}
-    {{dimension}}
-  {{/power-select}}
-</div>
-
-<div class="col-xs-6">
-  <label for="select-filters" class="control-label te-label te-label--taller required">
-    Filter metric by: (Optional)
-    <span>
-      <i class="glyphicon glyphicon-question-sign"></i>
-      {{#tooltip-on-element class="te-tooltip"}}
-        For example, filter on countryCode::US implies only anomalies in US will be detected.
-      {{/tooltip-on-element}}
-    </span>
-  </label>
-  {{filter-select
-    options=filters
-    selected=selectedFilters
-    triggerId="select-filters"
-    onChange=(action "onSelectFilter")
-    disabled=isFilterSelectDisabled
-  }}
 </div>
 
 <div class="col-xs-12">

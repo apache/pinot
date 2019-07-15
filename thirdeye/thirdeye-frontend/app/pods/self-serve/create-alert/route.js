@@ -9,7 +9,7 @@ import Route from '@ember/routing/route';
 import { selfServeApiOnboard } from 'thirdeye-frontend/utils/api/self-serve';
 import { postProps, checkStatus } from 'thirdeye-frontend/utils/utils';
 import { inject as service } from '@ember/service';
-import { yamlAlertSettings } from 'thirdeye-frontend/utils/constants';
+import { defaultSubscriptionYaml } from 'thirdeye-frontend/utils/yaml-tools';
 
 const CREATE_GROUP_TEXT = 'Create a new subscription group';
 
@@ -39,7 +39,7 @@ export default Route.extend({
     const createGroup = {
       name: CREATE_GROUP_TEXT,
       id: 'n/a',
-      yaml: yamlAlertSettings
+      yaml: defaultSubscriptionYaml
     };
     const moddedArray = [createGroup];
     // get applications and map to array of vanilla objects
@@ -65,7 +65,7 @@ export default Route.extend({
         };
       });
     const subscriptionGroupNamesDisplay = [...moddedArray, ...subscriptionGroups];
-    let subscriptionYaml = yamlAlertSettings;
+    let subscriptionYaml = defaultSubscriptionYaml;
     let groupName = createGroup;
     if (subscriptionGroupNamesDisplay && Array.isArray(subscriptionGroupNamesDisplay) && subscriptionGroupNamesDisplay.length > 0) {
       const firstGroup = subscriptionGroupNamesDisplay[0];

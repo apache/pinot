@@ -167,19 +167,6 @@ export function getProps() {
 }
 
 /**
- * Preps post object for Yaml payload
- * @param {string} text to post
- * @returns {Object}
- */
-export function postYamlProps(postData) {
-  return {
-    method: 'post',
-    body: postData,
-    headers: { 'content-type': 'text/plain' }
-  };
-}
-
-/**
  * Format conversion helper
  * @param {String} dateStr - date to convert
  */
@@ -197,40 +184,6 @@ export function stripNonFiniteValues(timeSeries) {
   });
 }
 
-/**
- * The yaml filters formatter. Convert filters in the yaml file in to a legacy filters string
- * For example, filters = {
- *   "country": ["us", "cn"],
- *   "browser": ["chrome"]
- * }
- * will be convert into "country=us;country=cn;browser=chrome"
- *
- * @method _formatYamlFilter
- * @param {Map} filters multimap of filters
- * @return {String} - formatted filters string
- */
-export function formatYamlFilter(filters) {
-  if (filters){
-    const filterStrings = [];
-    Object.keys(filters).forEach(
-      function(filterKey) {
-        const filter = filters[filterKey];
-        if (filter && Array.isArray(filter)) {
-          filter.forEach(
-            function (filterValue) {
-              filterStrings.push(filterKey + '=' + filterValue);
-            }
-          );
-        } else {
-          filterStrings.push(filterKey + '=' + filter);
-        }
-      }
-    );
-    return filterStrings.join(';');
-  }
-  return '';
-}
-
 export default {
   checkStatus,
   humanizeFloat,
@@ -241,7 +194,5 @@ export default {
   postProps,
   toIso,
   stripNonFiniteValues,
-  postYamlProps,
-  formatYamlFilter,
   getProps
 };

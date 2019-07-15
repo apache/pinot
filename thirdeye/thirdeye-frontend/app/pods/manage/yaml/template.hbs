@@ -25,14 +25,13 @@
     {{else}}
       <fieldset class="te-form__section te-form__section--first row">
 
-        {{#detection-yaml
+        {{detection-yaml
           isEditMode=true
           alertId=model.alertId
           detectionYaml=detectionYaml
           setDetectionYaml=(action "updateDetectionYaml")
           disableYamlSave=disableYamlSave
         }}
-        {{/detection-yaml}}
 
         <div class="col-xs-12">
           {{#bs-accordion onChange=(action "changeAccordion") as |acc|}}
@@ -61,17 +60,15 @@
           <hr/>
         </div>
 
-        {{#subscription-yaml
+        {{subscription-yaml
           isEditMode=true
           subscriptionYaml=subscriptionYaml
           setSubscriptionYaml=(action "updateSubscriptionYaml")
-          subscriptionMsg=""
           selectSubscriptionGroup=(action "changeSubscriptionGroup")
           subscriptionGroupNamesDisplay=subscriptionGroupNamesDisplay
           groupName=groupName
           createGroup=createGroup
         }}
-        {{/subscription-yaml}}
 
       </fieldset>
       <fieldset class="te-form__section-submit">

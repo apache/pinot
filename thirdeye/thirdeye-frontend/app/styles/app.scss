@@ -66,7 +66,8 @@ body {
 @import 'components/timeseries-chart';
 @import 'components/range-pill-selectors';
 @import 'components/shared/common-tabs';
-@import 'components/yaml-editor';
+@import 'components/detection-yaml';
+@import 'components/subscription-yaml';
 
 // Pod Pages
 @import 'ember-power-select/themes/bootstrap';

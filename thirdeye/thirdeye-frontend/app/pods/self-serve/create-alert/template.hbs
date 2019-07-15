@@ -24,16 +24,16 @@
     <fieldset class="te-form__section te-form__section--first row">
 
       {{detection-form
-        validateAlertName=(action "validateAlertName")
-        isAlertNameUserModified=isAlertNameUserModified
-        isAlertNameDuplicate=isAlertNameDuplicate
+        isEditMode=false
+        detectionYaml=detectionYaml
+        setDetectionYaml=(action "updateDetectionYaml")
       }}
 
       <div class="col-xs-12">
         {{#bs-accordion onChange=(action "changeAccordion") as |acc|}}
           {{#acc.item value=preview as |aitem|}}
             {{#aitem.title}}
-              <section class="dashboard-container__title thirdeye-link-secondary">Preview alert [Beta]
+              <section class="dashboard-container__title thirdeye-link-secondary">Preview alert
                 <span class="pull-right"><i class="glyphicon glyphicon-menu-{{if toggleCollapsed "down" "up"}}"></i></span>
               </section>
             {{/aitem.title}}
@@ -56,7 +56,6 @@
 
       {{subscription-form
         allApplicationNames=applicationNames
-        validateAlertName=(action "validateAlertName")
         allAlertsConfigGroups=allAlertsConfigGroups
       }}
 
@@ -64,12 +63,11 @@
   {{else}}
     <fieldset class="te-form__section te-form__section--first row">
 
-      {{#detection-yaml
+      {{detection-yaml
         isEditMode=false
         detectionYaml=detectionYaml
         setDetectionYaml=(action "updateDetectionYaml")
       }}
-      {{/detection-yaml}}
 
       <div class="col-xs-12">
         {{#bs-accordion onChange=(action "changeAccordion") as |acc|}}
@@ -80,13 +78,11 @@
               </section>
             {{/aitem.title}}
             {{#aitem.body}}
-              {{#alert-details
+              {{alert-details
                 isPreviewMode=true
                 alertYaml=detectionYaml
                 dataIsCurrent=alertDataIsCurrent
               }}
-                {{yield}}
-              {{/alert-details}}
             {{/aitem.body}}
           {{/acc.item}}
         {{/bs-accordion}}
@@ -96,16 +92,14 @@
         <hr/>
       </div>
 
-      {{#subscription-yaml
+      {{subscription-yaml
         isEditMode=false
         subscriptionYaml=subscriptionYaml
         setSubscriptionYaml=(action "updateSubscriptionYaml")
-        subscriptionMsg=""
         selectSubscriptionGroup=(action "changeSubscriptionGroup")
         subscriptionGroupNamesDisplay=subscriptionGroupNamesDisplay
         groupName=groupName
       }}
-      {{/subscription-yaml}}
 
     </fieldset>
   {{/if}}
